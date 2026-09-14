@@ -1,10 +1,10 @@
 # Mazō — Autonomous AI Executive Coach
 
-> **Turn overthinking into decisive action.** Mazō is a proactive executive coaching agent that initiates real-time phone calls via **CALL-E** to conduct high-leverage accountability sessions, unblock strategic decisions, and automatically convert spoken commitments into structured tasks.
+> **Turn overthinking into decisive action.** Mazō is a proactive executive coaching agent that initiates real-time phone calls via **CALL-E** to conduct high-leverage accountability sessions, unblock strategic decisions, and formulate structured action plans.
 
 [![Platform: CALL-E](https://img.shields.io/badge/Platform-CALL--E-000000.svg)](https://heycall-e.com)
 [![Runtime: Node / TypeScript](https://img.shields.io/badge/Runtime-TypeScript%20%7C%20Node.js-3178C6.svg)](https://www.typescriptlang.org/)
-[![Safety: Consent-First](https://img.shields.io/badge/Safety-Dry--Run%20%26%20Consent%20First-10B981.svg)](#safety-model)
+[![Safety: Consent-First](https://img.shields.io/badge/Safety-Dry--Run%20%26%20Consent%20First-10B981.svg)](#safety-model--operational-guardrails)
 [![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
 
 ---
@@ -19,9 +19,9 @@ When a user closes their chat window or laptop, intentions dissolve into procras
 
 Powered by **CALL-E's autonomous telephony engine**, Mazō proactively calls founders, executives, and high performers at scheduled intervals or critical moments. Over a structured 3-to-5 minute phone conversation, Mazō:
 1. Pinpoints current bottlenecks and decision paralysis.
-2. Applies battle-tested executive coaching frameworks.
-3. Secures a crystal-clear commitment.
-4. Parses the call audio into structured, actionable items written straight to the user's execution system.
+2. Applies structured executive coaching frameworks.
+3. Secures a concrete, actionable commitment.
+4. Formulates a focused execution plan to unblock forward progress.
 
 ---
 
@@ -31,7 +31,7 @@ Most conversational AI assistants suffer from **"infinite conversation syndrome"
 
 **Mazō is fundamentally different: It is NOT an open-ended chatbot.**
 
-Mazō is built as a **strictly bounded, cognitive extraction and planning pipeline** designed to move you from confusion to execution in under 5 minutes:
+Mazō is designed as a **strictly bounded, cognitive extraction and planning pipeline** to move from confusion to execution in under 5 minutes:
 
 ### 1. Active Intent & Friction Extraction
 Mazō does not wait for you to compose a structured prompt. Instead, it actively interviews you, extracts raw thoughts, and filters out cognitive noise to isolate:
@@ -40,17 +40,17 @@ Mazō does not wait for you to compose a structured prompt. Instead, it actively
 - **Hidden Obstacles & Assumptions**: Unspoken fears, perfectionism loops, or dependency blockers.
 
 ### 2. Concrete Plan Formulation (Not Endless Brainstorming)
-Once the problem is extracted, Mazō immediately synthesizes an **actionable execution plan**:
-- Breakdowns into 15-to-90 minute time blocks.
+Once the problem is extracted, Mazō synthesizes an **actionable execution plan**:
+- Breakdowns into 15-to-90 minute deep-work blocks.
 - Explicit hard deadlines (e.g. *"Complete pitch deck slides 1–5 by 5:00 PM today"*).
-- Clear, actionable countermeasure protocols for anticipated friction.
+- Clear countermeasure protocols for anticipated friction.
 
 ### 3. Strict 4-Phase Bounded Interaction Protocol
-Every Mazō session follows a deterministic, 4-phase finite state machine:
+Every Mazō session follows a deterministic, 4-phase protocol:
 ```
 [Phase 1: Triage] ──▶ [Phase 2: Challenge] ──▶ [Phase 3: Plan Formulation] ──▶ [Phase 4: Exit & Lock]
-  (Identify Core         (Strip Excuses &       (Synthesize Concrete Milestone,   (Extract JSON, Schedule
-    Bottleneck)             Overthinking)          Deadlines & Protocols)           Follow-up, End Session)
+  (Identify Core         (Strip Excuses &       (Synthesize Concrete Milestone,   (Deliver Clear Next Step,
+    Bottleneck)             Overthinking)          Deadlines & Protocols)           End Session)
 ```
 
 ### 4. Enforced Disengagement
@@ -59,42 +59,22 @@ Its parting instruction is always the same: *"Put the phone down and execute."* 
 
 ---
 
-## 🏗️ Architecture & Workflow
+## 🔍 Implementation Scope & Simulation Boundary
 
-```
-┌──────────────────────────────────────────────────────────────────────────┐
-│                         MAZŌ COACHING PIPELINE                           │
-└──────────────────────────────────────────────────────────────────────────┘
-                                      │
-   1. TRIGGER                         ▼
-  ┌────────────────────────────────────────────────────────────────────────┐
-  │ • Scheduled Momentum Check-in (Cron / Schedulers)                     │
-  │ • Proactive Stalled-Task Detector (Background Monitor)                 │
-  │ • User-Initiated "Quick Momentum" Call Button                          │
-  └────────────────────────────────────────────────────────────────────────┘
-                                      │
-   2. PLANNING & PERSONA SELECTION   ▼
-  ┌────────────────────────────────────────────────────────────────────────┐
-  │ • Select Coach Archetype (e.g. The Clarifier, The Stoic, Executioner)  │
-  │ • Assemble Client Context (Pending Goals, Challenges, Habit Triggers)  │
-  │ • Formulate CALL-E Call Goal & Structured Extraction Schema            │
-  │   `calle.call.plan({ toPhone, goal, systemPrompt })`                   │
-  └────────────────────────────────────────────────────────────────────────┘
-                                      │
-   3. REAL-TIME CALL EXECUTION        ▼
-  ┌────────────────────────────────────────────────────────────────────────┐
-  │ • CALL-E Telephony Engine dials recipient via E.164 line               │
-  │ • Adaptive Real-time Voice Interaction (Sub-second latency)            │
-  │ • 4-Phase Protocol: Opening ➔ Deep Challenge ➔ Commit ➔ Exit          │
-  └────────────────────────────────────────────────────────────────────────┘
-                                      │
-   4. STRUCTURED EXTRACTION           ▼
-  ┌────────────────────────────────────────────────────────────────────────┐
-  │ • Real-time Call Transcript & Audio Stream                             │
-  │ • Extract: Action Item, Hard Deadline, Obstacle, Breakthrough Moment   │
-  │ • Sync to Memory Graph, Task Engine & User Schedule                    │
-  └────────────────────────────────────────────────────────────────────────┘
-```
+To maintain clear and honest boundaries, here is what this standalone CLI runner implements versus what belongs to external hosts:
+
+### Implemented in this CLI Runner:
+- **Goal Compilation**: Generates structured CALL-E goals based on coach archetypes, client identity, and session modes (`kickoff` vs. `followup`).
+- **Safe Dry-Run Simulation**: Default zero-side-effect simulation with pre-baked demonstration fixtures.
+- **One-Shot Call Dispatch**: Outbound dispatch via CALL-E CLI (`calle call plan`) with fallback to direct CALL-E REST API (`POST /v1/calls`).
+- **Strict Destination Authorization**: Requires an explicit authorized E.164 destination in live mode and enforces non-empty `ALLOWED_RECIPIENTS`.
+- **Pre-Call Operator Gate**: Interactive confirmation prompt (`y/N`) before initiating any live call.
+- **Privacy & PII Masking**: Automatically masks phone numbers, tokens, CLI plan responses, REST error bodies, and subprocess outputs.
+
+### Host-Scheduler & Platform Boundaries (Not Implemented in this CLI):
+- **Automated Recurring Scheduling**: This script is a one-shot dispatcher. Automated recurring routines (e.g., morning 8:30 AM kickoffs or evening verifications) must be managed by an external host scheduler (such as cron, an n8n workflow, or an agent platform).
+- **Live Transcript Extraction & Reconciliation**: Post-call JSON data displayed in the CLI output is a static demonstration fixture. Real-time post-call transcription parsing, automated calendar synchronization, and streak updates require an external webhook or post-call processing pipeline.
+- **Deduplication & Cooldown Enforcement**: Persistent state tracking, rate limiting, and cooldown intervals across calls are host-level responsibilities and are not tracked inside this script.
 
 ---
 
@@ -113,46 +93,25 @@ Mazō features purpose-built coaching personalities tailored to different cognit
 
 ## 🛡️ Safety Model & Operational Guardrails
 
-Telephony agents interact with the physical world and require rigorous safeguards. Mazō enforces strict safety protocols:
+Telephony agents interact with the physical world and require rigorous safeguards:
 
 1. **Dry-Run by Default**:
-   Running without `--live` simulates the complete call lifecycle, goal compilation, and structured output extraction with **0 live telephone calls** and **0 charges**.
-2. **Explicit Human Confirmation**:
-   In live mode, Mazō requires interactive confirmation (`y/N`) before dialing out unless explicitly configured in headless environments.
-3. **Recipient Whitelisting (`ALLOWED_RECIPIENTS`)**:
-   Calls can only be placed to numbers explicitly declared in the `ALLOWED_RECIPIENTS` environment variable or verified user profiles.
+   Running without `--live` simulates the call lifecycle, goal compilation, and demonstration output with **0 live telephone calls** and **0 charges**. Synthetic numbers (`+15555550199`) are permitted exclusively in dry-run mode.
+2. **Explicit Authorized Destination for Live Calls**:
+   In `--live` mode, an explicit `--phone <E.164>` destination must be supplied on the command line. Falling back to synthetic or default numbers is blocked.
+3. **Mandatory Recipient Whitelisting (`ALLOWED_RECIPIENTS`)**:
+   In `--live` mode, the `ALLOWED_RECIPIENTS` environment variable must be explicitly configured with comma-separated authorized numbers. An empty or missing allowlist refuses live calls immediately.
 4. **Strict E.164 Phone Sanitization**:
-   All inputs are validated against `^\+[1-9]\d{6,14}$`. Malformed numbers fail closed immediately.
-5. **PII Masking**:
-   Phone numbers are masked in all logs, console outputs, and analytics (`+12****99`).
-6. **No Infinite Dial Loops**:
-   Idempotency tokens and cooldown intervals prevent repeated calls if the user rejects or misses a call.
-
----
-
-## 💻 How It Works with CALL-E
-
-Mazō leverages the official CALL-E SDK / CLI contract:
-
-### 1. Planning Phase (`calle call plan`)
-```bash
-calle call plan \
-  --to-phone "+15555550199" \
-  --goal "You are The Clarifier, calling Omar for a 3-minute executive momentum check-in. Identify his top bottleneck on Q3 execution, agree on the single next action, and record deadline."
-```
-Returns a `plan_id` and verification confirmation.
-
-### 2. Execution Phase (`calle call run`)
-```bash
-calle call run --plan-id "<PLAN_ID>"
-```
-CALL-E initiates the real-time telephony bridge, streaming audio through the natural voice synthesis pipeline.
-
-### 3. Extraction & Reconciliation (`calle call status`)
-```bash
-calle call status --run-id "<RUN_ID>"
-```
-Returns audio state, call completion status, and structured JSON results for automated task creation.
+   All phone inputs are validated against `^\+[1-9]\d{6,14}$`. Malformed numbers fail closed immediately.
+5. **Comprehensive PII & Sensitive Output Masking**:
+   Phone numbers are masked across all console logs, validation errors, CLI plan outputs, REST error payloads, and subprocess messages (`+15****99`). Bearer tokens and credentials are automatically redacted.
+6. **Explicit Human Confirmation Gate**:
+   Live calls require interactive user confirmation (`y/N`) before dialing out, preventing inadvertent dispatches.
+7. **Submitted-Call Cancellation Limits**:
+   Once an outbound call request has been dispatched to CALL-E, it is queued and processed asynchronously by the telephony carrier. **In-flight submitted calls cannot be recalled or canceled from this client script.** Terminating the terminal process does not cancel an active carrier call. The interactive confirmation prompt (`y/N`) serves as the pre-dispatch safety gate.
+8. **Bounded Non-Clinical Coaching & High-Stakes Exclusions**:
+   - **Non-Clinical Boundary**: Mazō is strictly an executive productivity and time-management coach. It provides non-clinical cognitive accountability for procrastination and decision paralysis. It is **not a medical provider, mental health counselor, or crisis service**, and must never be used for psychological therapy.
+   - **High-Stakes Exclusions**: Mazō explicitly excludes and refuses autonomous decision-making in medical, legal, financial, crisis, emergency, or employment-termination domains. If distress or emergency intent is detected, the agent disengages immediately and directs the user to professional resources.
 
 ---
 
@@ -175,7 +134,6 @@ npm install
 ### 2. Run Safe Dry-Run Simulation (Default)
 ```bash
 node mazo-coach.js \
-  --phone "+15555550199" \
   --user "Omar" \
   --coach "The Clarifier" \
   --topic "Finalizing Product Launch Timeline"
@@ -192,22 +150,25 @@ Output:
 🎯 Coach:    The Clarifier
 📞 Recipient: +15****99
 💡 Topic:    Finalizing Product Launch Timeline
+🔄 Call Type: Momentum Kickoff Call
 ⚡ Mode:     🟢 DRY-RUN (Safe Simulation)
 
 --- [DRY-RUN SIMULATION] ---
 • Validating coach persona and prompt constraints: PASS
 • Generated CALL-E Goal: "You are The Clarifier, an elite executive coach in Mazō calling Omar..."
 • Simulating call plan generation with CALL-E engine...
-• Simulated Call Plan ID: plan_mazo_demo_88291
-• Simulated Call Status: COMPLETED (Duration: 2m 45s)
+• Simulated Call Plan ID: plan_mazo_kickoff_72819
+• Simulated Call Status: COMPLETED (Duration: 2m 15s)
 
---- [STRUCTURED OUTPUT EXTRACTED] ---
+--- [STRUCTURED OUTPUT EXTRACTED (SIMULATION FIXTURE)] ---
 {
-  "sessionId": "sess_demo_1092",
+  "simulationNotice": "Static one-shot demonstration fixture. Live audio transcription, automated calendar extraction, recurring scheduling, cooldowns, and deduplication are host responsibilities and not implemented in this standalone CLI runner.",
+  "sessionId": "sess_kickoff_1092",
+  "callType": "kickoff_and_lockin",
   "coach": "The Clarifier",
   "client": "Omar",
-  "status": "completed",
-  "outcome": "Breakthrough achieved on product milestone prioritization",
+  "status": "simulated_completed",
+  "outcome": "Milestone prioritization simulated output",
   "actionItems": [
     {
       "task": "Finalize core API contract and submit production build",
@@ -217,47 +178,25 @@ Output:
       "solution": "90-minute deep work block with notifications silenced"
     }
   ],
-  "breakthroughMoment": "Realized shipping the core feature first unblocks the entire release.",
-  "nextScheduledCheckin": "Tomorrow @ 9:00 AM"
+  "breakthroughMoment": "Realized that shipping the core feature first unblocks the entire product release."
 }
 
 ✅ Dry-run completed successfully with 0 telephone side-effects.
+💡 Tip: Try the verification loop with: node mazo-coach.js --mode followup
+💡 To place a real live call with CALL-E, run with: --live --phone "+<your_authorized_number>"
 ```
 
 ### 3. Run Live Call
 ```bash
-# Set your allowed destination number
-export ALLOWED_RECIPIENTS="+15555550199"
+# Set your allowed destination numbers
+export ALLOWED_RECIPIENTS="+1234567890"
 
-# Execute live call
+# Execute live call (requires explicit authorized --phone)
 node mazo-coach.js \
-  --phone "+15555550199" \
+  --phone "+1234567890" \
   --user "Omar" \
   --coach "The Clarifier" \
   --live
-```
-
----
-
-## 📊 Post-Call Extraction Schema
-
-Mazō enforces structured JSON extraction after every completed CALL-E session:
-
-```typescript
-export interface MazoCallSessionResult {
-  sessionId: string;
-  coachId: string;
-  durationSeconds: number;
-  outcomeSummary: string;
-  breakthroughInsight?: string;
-  actionItems: Array<{
-    title: string;
-    targetCompletion: string;
-    priority: 'low' | 'medium' | 'high';
-    obstacleIdentified?: string;
-  }>;
-  followupScheduledAt?: string;
-}
 ```
 
 ---
@@ -266,22 +205,13 @@ export interface MazoCallSessionResult {
 
 | Flag | Type | Description | Default |
 | :--- | :--- | :--- | :--- |
-| `--phone` | String | Target recipient phone number in strict E.164 format | `+15555550199` |
+| `--phone` | String | Target recipient phone number in strict E.164 format (Required for `--live`) | `+15555550199` (dry-run only) |
 | `--user` | String | Client name for personalized coaching context | `Omar` |
 | `--coach` | String | Coach persona (*The Clarifier, The Stoic, The Executioner*) | `The Clarifier` |
-| `--topic` | String | Focus subject or pending roadblock | `Weekly Momentum` |
-| `--live` | Flag | Place real live phone call via CALL-E | `false` (Dry-run) |
-| `--yes`, `-y`| Flag | Skip interactive prompt in CI/automated environments | `false` |
-
----
-
-## 🗺️ Roadmap
-
-- [x] CALL-E Real-Time Telephony Pipeline Integration
-- [x] Interactive Multi-Archetype Coaching Framework
-- [x] Structured Action Item & Calendar Reconciliation
-- [ ] Multi-party Accountability Calls (Team standups & Co-founder alignments)
-- [ ] Real-time WebRTC browser fallbacks for low-cellular environments
+| `--mode` | String | Session mode (`kickoff` or `followup`) | `kickoff` |
+| `--topic` | String | Focus subject or pending roadblock | `Weekly Momentum...` |
+| `--live` | Flag | Place real live phone call via CALL-E (Requires explicit `--phone` & `ALLOWED_RECIPIENTS`) | `false` (Dry-run) |
+| `--yes`, `-y`| Flag | Skip interactive confirmation in automated test environments | `false` |
 
 ---
 

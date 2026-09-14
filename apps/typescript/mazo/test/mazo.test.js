@@ -3,6 +3,7 @@ const assert = require('node:assert/strict');
 const {
   isValidE164,
   maskPhone,
+  maskSensitiveOutput,
   buildCallGoal,
   simulateExtraction,
 } = require('../mazo-coach.js');
@@ -22,10 +23,11 @@ test('E.164 phone validation rules', async (t) => {
     assert.equal(isValidE164('+1 555 555 0199'), false); // unstripped spaces
     assert.equal(isValidE164('invalid-phone'), false);
     assert.equal(isValidE164(''), false);
+    assert.equal(isValidE164(null), false);
   });
 });
 
-test('Privacy and PII phone masking', async (t) => {
+test('Privacy, PII and sensitive output masking', async (t) => {
   await t.test('masks middle digits for console and telemetry outputs', () => {
     const masked = maskPhone('+15555550199');
     assert.equal(masked, '+15****99');
@@ -36,6 +38,15 @@ test('Privacy and PII phone masking', async (t) => {
     assert.equal(maskPhone(''), '***');
     assert.equal(maskPhone(null), '***');
     assert.equal(maskPhone('123'), '***');
+  });
+
+  await t.test('maskSensitiveOutput redacts phone numbers, bearer tokens, and error payloads', () => {
+    const rawError = 'Error dialing +15555550199 with Bearer eyJhbGciOiJIUzI1Ni... token=secret12345678';
+    const sanitized = maskSensitiveOutput(rawError, '+15555550199');
+    assert.ok(!sanitized.includes('+15555550199'));
+    assert.ok(!sanitized.includes('secret12345678'));
+    assert.ok(sanitized.includes('+15****99'));
+    assert.ok(sanitized.includes('Bearer [REDACTED]'));
   });
 });
 
@@ -69,14 +80,14 @@ test('Call goal prompt compilation', async (t) => {
 });
 
 test('Structured extraction schema verification', async (t) => {
-  await t.test('kickoff extraction yields structured action items and callback trigger', () => {
+  await t.test('kickoff extraction yields structured action items and simulation notice', () => {
     const result = simulateExtraction({
       sessionMode: 'kickoff',
       coachRole: 'The Clarifier',
       userName: 'Omar',
     });
 
-    assert.equal(result.status, 'completed');
+    assert.equal(result.status, 'simulated_completed');
     assert.equal(result.coach, 'The Clarifier');
     assert.equal(result.client, 'Omar');
     assert.ok(Array.isArray(result.actionItems));
@@ -84,8 +95,8 @@ test('Structured extraction schema verification', async (t) => {
     assert.ok(result.actionItems[0].task);
     assert.ok(result.actionItems[0].deadline);
     assert.ok(result.actionItems[0].priority);
-    assert.ok(result.relentlessAccountabilityLoop);
-    assert.equal(result.relentlessAccountabilityLoop.status, 'armed');
+    assert.ok(result.simulationNotice);
+    assert.ok(result.simulationNotice.includes('host'));
   });
 
   await t.test('followup extraction records milestone reconciliation and awards XP', () => {
@@ -95,10 +106,11 @@ test('Structured extraction schema verification', async (t) => {
       userName: 'Omar',
     });
 
-    assert.equal(result.status, 'verified_completed');
+    assert.equal(result.status, 'simulated_verified_completed');
     assert.equal(result.callType, 'accountability_verification');
     assert.ok(result.reconciledMilestone);
     assert.ok(result.momentumScoreAwarded.includes('XP'));
     assert.ok(result.streakLevel.includes('Active'));
+    assert.ok(result.simulationNotice);
   });
 });
