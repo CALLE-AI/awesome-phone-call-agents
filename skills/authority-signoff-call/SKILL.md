@@ -1,22 +1,31 @@
 ---
 name: authority-signoff-call
-description: Place one CALL-E phone call to get a real, attributable confirm-or-override from the named authority a decision was already auto-authorized in the name of — for autonomous agent systems that resolve things on their own and need a post-hoc accountability channel, not a pre-action approval gate. Use when the accountable person is away from a dashboard and a phone call is the only thing that reaches them.
+description: Built for real emergency-response automation — when an autonomous government/incident-response agent auto-authorizes an action under a real delegated-authority tier (a duty magistrate, an on-call commissioner, a disaster-management chair) without waiting for a human, this places one real CALL-E phone call to reach the accountable official directly, wherever they are, and get a real attributable confirm-or-override on what was done in their name. Proven in production inside GovOS, a live autonomous emergency-response system that runs Delhi's real government response chain during real incidents.
 license: MIT
 ---
 
 # Authority Sign-Off Call
 
-Use this skill when your agent system already decided something on its own,
-under a real delegated-authority tier, and the specific named person that
-decision was made *in the name of* deserves a real chance to confirm it or
-veto it — not a notification they might never open.
+Autonomous agents that run real emergency or government-operations
+response — dispatch, budget release, disaster-management sanctions — often
+can't wait for a human before acting, and shouldn't: the whole point of
+automating incident response is that it doesn't stall on a dashboard nobody's
+watching. But someone real is still accountable for what got authorized in
+their name, and a push notification they might never open doesn't close that
+loop. A phone call does.
 
-It does not invent a decision-application mechanism. It places one CALL-E
-call to the accountable person's own pre-registered number, reads the
-decision out loud, and returns a structured `confirm` or `override` you feed
-into whatever function your system already uses to apply a human decision to
-that record. Two integration surfaces are documented below — use whichever
-matches where the decision to place the call is actually happening.
+This skill is exactly that call: it reaches the specific named official a
+decision was auto-authorized under — on their own pre-registered line,
+wherever they actually are — reads the decision out loud, and returns a
+real, attributable `confirm` or `override`. It's the accountability step
+that makes "the agent already acted, no human blocked it" safe to ship in a
+government or emergency-response system, not just a demo convenience.
+
+It does not invent a decision-application mechanism. It feeds the structured
+outcome into whatever function your system already uses to apply a human
+decision to that record. Two integration surfaces are documented below — use
+whichever matches where the decision to place the call is actually
+happening.
 
 ## When to use
 

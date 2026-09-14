@@ -1,7 +1,13 @@
 # Authority Sign-Off Call
 
-A real CALL-E phone call that closes the accountability loop on a decision an
-autonomous agent system *already made* under a real delegated-authority tier.
+The accountability call for autonomous emergency-response and government
+agents: a real CALL-E phone call that reaches the accountable official
+directly when a decision was already auto-authorized in their name, because
+the whole point of automating incident response is that it doesn't wait for
+a human — and a push notification they might never open doesn't close that
+loop after the fact. Proven live inside GovOS, an autonomous system that
+runs Delhi's real government emergency-response chain (see "Reference
+implementation in production" below).
 
 This is not a pre-action approval gate — see
 [`deployment-approval-call`](../../../skills/deployment-approval-call/) and
@@ -104,11 +110,13 @@ result = await request_signoff_call(
 ## Reference implementation in production
 
 [GovOS](https://github.com/shubhangi-mish/agents-for-humans/tree/main/govos)
-is a Strands Agents-based autonomous incident-response system (built for a
-separate hackathon) that uses this exact pattern: when its policy engine
-auto-authorizes an action under a city-wide "DDMA" authority tier, it places
-one sign-off call using this same library, and a confirm/override result
-feeds into the identical function its own dashboard's override button calls.
-See
+is a Strands Agents-based autonomous incident-response system for Delhi
+(built for a separate hackathon) that runs a real government response chain —
+District Magistrate, Police Commissioner, and DDMA (Delhi Disaster
+Management Authority, chaired by the Chief Minister) — and auto-authorizes
+real actions under those tiers without waiting for a person. Whenever it
+does, it places one sign-off call using this exact pattern, and a
+confirm/override result feeds into the identical function its own
+dashboard's override button calls. See
 [`../../../skills/authority-signoff-call/references/govos-reference-implementation.md`](../../../skills/authority-signoff-call/references/govos-reference-implementation.md)
 for the real wiring, including a captured dry-run log line from a live run.
