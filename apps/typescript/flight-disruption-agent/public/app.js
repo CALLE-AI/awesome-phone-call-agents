@@ -4,6 +4,7 @@ let snap = null;
 let selected = null; // { disruptionId, pnr }
 let selectedRequest = null; // request id
 const airlinePreviews = new Map();
+const passengerPreviews = new Map();
 const callbackPreviews = new Map();
 const previews = new Map();
 const draft = {}; // form values by element id, kept across re-renders
@@ -82,7 +83,7 @@ async function load({ quiet = false } = {}) {
   clearTimeout(pollTimer);
   const running =
     snap.disruptions.some((d) => d.bookings.some((b) => b.entry && (b.entry.status === "in_progress" || b.entry.status === "submitted"))) ||
-    snap.requests.some((r) => r.status === "airline_call_in_progress" || r.callback?.status === "in_progress");
+    snap.requests.some((r) => r.status === "passenger_call_in_progress" || r.status === "airline_call_in_progress" || r.callback?.status === "in_progress");
   pollTimer = setTimeout(() => load({ quiet: !running }), running ? (snap.live ? 5000 : 1500) : 5000);
 }
 
@@ -444,10 +445,11 @@ async function ensurePreview(disruptionId, pnr, key) {
 
 const REQUEST_CHIPS = {
   ineligible: ["bad", "Not eligible"],
-  quoted: ["run", "Waiting for passenger"],
-  declined: ["", "Declined by passenger"],
+  awaiting_call: ["run", "CALL-E to call passenger"],
+  passenger_call_in_progress: ["run", "Calling passenger"],
+  declined: ["", "Kept booking"],
+  confirmed_on_call: ["run", "Agreed · call airline desk"],
   completed: ["ok", "Done"],
-  portal_rejected: ["warn", "Portal refused · call airline"],
   airline_call_in_progress: ["run", "Calling airline desk"],
   needs_review: ["warn", "Needs a person"],
   resolved_by_human: ["ok", "Resolved by agent"],
@@ -464,20 +466,20 @@ function renderRequestForm() {
   const bookings = snap.bookings.filter((b) => b.state.status === "ticketed");
   const pnr = bookings.some((b) => b.pnr === draft["req-pnr"]) ? draft["req-pnr"] : bookings[0]?.pnr;
   const booking = snap.bookings.find((b) => b.pnr === pnr);
-  const kind = draft["req-kind"] ?? "reschedule";
+  const kind = draft["req-kind"] ?? "change";
   const channel = draft["req-channel"] ?? "chat";
   const opt = (v, label, cur) => `<option value="${esc(v)}"${cur === v ? " selected" : ""}>${esc(label)}</option>`;
   const moves = booking?.voluntary.moves ?? [];
-  const target = moves.some((m) => m.flightId === draft["req-target"]) ? draft["req-target"] : moves[0]?.flightId;
+  const target = moves.some((m) => m.flightId === draft["req-target"]) ? draft["req-target"] : "";
   form.innerHTML = `<h3>New request</h3>
     <div class="fields">
       <label>Booking<select id="req-pnr">${bookings.map((b) => opt(b.pnr, `${b.pnr} · ${b.passenger} · ${b.flight.code}${b.disrupted ? " (disrupted)" : ""}`, pnr)).join("")}</select></label>
-      <label>Passenger wants<select id="req-kind">${opt("reschedule", "Reschedule", kind)}${opt("refund", "Refund", kind)}</select></label>
-      ${kind === "reschedule" ? `<label>New flight<select id="req-target">${moves.length ? moves.map((m) => opt(m.flightId, `${m.label} · ${idr(m.total)}`, target)).join("") : `<option value="">No later flights with seats</option>`}</select></label>` : `<label>Refund<select disabled><option>${booking ? idr(booking.voluntary.refund) : "–"}</option></select></label>`}
+      <label>Passenger asked about<select id="req-kind">${opt("change", "A change (picks on the call)", kind)}${opt("reschedule", "Another flight", kind)}${opt("refund", "A refund", kind)}</select></label>
+      ${kind === "reschedule" ? `<label>Flight they mentioned<select id="req-target">${opt("", "None, pick on the call", target ?? "")}${moves.map((m) => opt(m.flightId, `${m.label} · ${idr(m.total)}`, target)).join("")}</select></label>` : ""}
       <label>Came in through<select id="req-channel">${opt("chat", "Chat", channel)}${opt("web_form", "Web form", channel)}${opt("phone", "Phone line", channel)}</select></label>
     </div>
-    <div class="row-inline"><button type="submit" class="btn" ${booking ? "" : "disabled"}>Check and quote</button>
-      <span class="note">Prices use voluntary rules. Nothing changes until the passenger confirms.</span></div>`;
+    <div class="row-inline"><button type="submit" class="btn" ${booking ? "" : "disabled"}>Check and price</button>
+      <span class="note">Prices every option at voluntary rates. CALL-E then calls the passenger to agree the change; nothing changes until they agree.</span></div>`;
 }
 
 function renderRequests() {
@@ -485,18 +487,21 @@ function renderRequests() {
   const list = $("request-list");
   if (!snap.requests.length) {
     list.innerHTML = "";
-    $("request-detail").innerHTML = `<p class="empty">Log a request to see the eligibility check, the quote, and what happens at the airline portal.</p>`;
+    $("request-detail").innerHTML = `<p class="empty">Log a request to see the priced options, CALL-E's call to the passenger, and CALL-E's call to the airline desk.</p>`;
     return;
   }
   if (!snap.requests.some((r) => r.request.id === selectedRequest)) selectedRequest = snap.requests[0].request.id;
   list.innerHTML = `<article class="event">${snap.requests
     .map((r) => {
       const current = r.request.id === selectedRequest;
-      const what = r.request.kind === "refund" ? "Refund" : `Reschedule to ${r.quote.moves.find((m) => m.flightId === r.request.targetFlightId)?.label ?? r.request.targetFlightId ?? "?"}`;
+      const agreedMove = r.action?.kind === "move" ? r.quote.moves.find((m) => m.id === r.action.optionId) : null;
+      const what = r.action
+        ? r.action.kind === "refund" ? "Agreed: refund" : `Agreed: ${agreedMove?.label ?? "move"}`
+        : r.request.kind === "refund" ? "Asked about a refund" : r.request.kind === "reschedule" ? "Asked about another flight" : "Asked about a change";
       return `<button type="button" class="row" data-req-select="${esc(r.request.id)}" aria-current="${current}">
         <span class="who"><b>${esc(r.request.pnr)}</b> ${esc(r.passenger)} <span class="muted">${esc(r.flight.code)} · via ${esc(r.request.channel.replace("_", " "))}</span></span>
         ${requestChip(r.status)}
-        <span class="prices"><span>${esc(what)}</span>${r.amount === null ? "" : `<span>${r.request.kind === "refund" ? "Refund" : "Passenger pays"} <b>${idr(r.amount)}</b></span>`}</span>
+        <span class="prices"><span>${esc(what)}</span>${r.amount === null ? "" : `<span>${r.action?.kind === "refund" ? "Refund" : "Passenger pays"} <b>${idr(r.amount)}</b></span>`}</span>
       </button>`;
     })
     .join("")}</article>`;
@@ -505,18 +510,20 @@ function renderRequests() {
 
 function requestSteps(r) {
   const step = (cls, text) => `<li class="${cls}">${text}</li>`;
-  const steps = [step(r.eligibility.eligible ? "done" : "stop", r.eligibility.eligible ? "Eligible and priced" : "Not eligible")];
+  const steps = [step(r.eligibility.eligible ? "done" : "stop", r.eligibility.eligible ? "Eligible; every option priced" : "Not eligible")];
   if (!r.eligibility.eligible) return steps;
-  if (r.status === "quoted") steps.push(step("todo", "Passenger confirms the amount"));
-  else if (r.status === "declined") steps.push(step("stop", "Passenger declined"));
-  else steps.push(step("done", "Passenger confirmed the amount"));
-  if (r.portal) steps.push(step(r.portal.kind === "accepted" ? "done" : "stop", r.portal.kind === "accepted" ? "Portal accepted the change" : `Portal refused (${esc(r.portal.code)})`));
-  if (r.airlineCall) {
-    const done = r.status === "completed";
-    steps.push(step(done ? "done" : r.status === "airline_call_in_progress" ? "todo" : "stop", done
-      ? r.request.kind === "refund" ? "Airline desk approved the refund" : "Airline desk reissued the ticket"
-      : r.status === "airline_call_in_progress" ? "Calling the airline desk" : r.request.kind === "refund" ? "Airline desk did not approve the refund" : "Airline desk did not reissue"));
-  } else if (r.status === "portal_rejected") steps.push(step("todo", "Call the airline service desk"));
+  const agreed = r.confirmedBy?.kind === "call";
+  if (r.status === "awaiting_call") steps.push(step("todo", "CALL-E calls the passenger"));
+  else if (r.status === "passenger_call_in_progress") steps.push(step("todo", "CALL-E is calling the passenger"));
+  else if (r.status === "declined") steps.push(step("stop", "Passenger kept the booking on the call"));
+  else if (agreed) steps.push(step("done", `Passenger agreed on the call: ${r.action?.kind === "refund" ? "refund" : "move"} for ${idr(r.amount ?? 0)}`));
+  else if (r.passengerCall) steps.push(step("stop", "No clear agreement on the passenger call"));
+  if (agreed) {
+    if (r.status === "confirmed_on_call") steps.push(step("todo", "CALL-E calls the airline desk"));
+    else if (r.status === "airline_call_in_progress") steps.push(step("todo", "CALL-E is calling the airline desk"));
+    else if (r.status === "completed") steps.push(step("done", r.action?.kind === "refund" ? "Airline desk approved the refund" : "Airline desk reissued the ticket"));
+    else if (r.airlineCall) steps.push(step("stop", "Airline desk did not make the change"));
+  }
   if (r.status === "needs_review") steps.push(step("todo", "A person resolves the request"));
   if (r.status === "resolved_by_human") steps.push(step("done", "Resolved by an agent"));
   if (r.callbackVerdict) steps.push(step(r.callbackVerdict.kind === "delivered" ? "done" : "stop", r.callbackVerdict.kind === "delivered" ? "Passenger heard the result" : "Passenger needs written follow-up"));
@@ -528,38 +535,35 @@ function renderRequestDetail() {
   const r = snap.requests.find((x) => x.request.id === selectedRequest);
   if (!r) return;
   const id = r.request.id;
-  const move = r.quote.moves.find((m) => m.flightId === r.request.targetFlightId);
   const parts = [];
   parts.push(`<div><h2>${esc(r.passenger)} <span class="mono muted">${esc(r.request.pnr)}</span></h2>
     <dl class="kv" style="margin-top:8px">
       <dt>Flight</dt><dd>${esc(r.flight.code)} · ${dayMonth(r.flight.departure)} ${hhmm(r.flight.departure)}</dd>
       <dt>Sold via</dt><dd>${r.channel.map((p) => esc(p.name)).join(" → ")}</dd>
       <dt>Request</dt><dd>${esc(r.request.kind)} via ${esc(r.request.channel.replace("_", " "))}${r.request.conversation ? ` <span class="muted">(from the channel integration, conversation <span class="mono">${esc(r.request.conversation.id)}</span>)</span>` : " <span class=\"muted\">(typed by the operator)</span>"}</dd>
-      ${r.confirmedBy ? `<dt>Confirmed by</dt><dd>${r.confirmedBy.kind === "passenger" ? `the passenger in the ${esc(r.confirmedBy.channel.replace("_", " "))} <span class="mono muted">${esc(r.confirmedBy.messageId)}</span>` : "the operator"}</dd>` : ""}
+      ${r.confirmedBy ? `<dt>Agreed</dt><dd>by the passenger on the CALL-E call <span class="mono muted">${esc(r.confirmedBy.callId ?? "")}</span></dd>` : ""}
       <dt>Booking</dt><dd>${esc(r.bookingState.status.replaceAll("_", " "))}${r.bookingState.currentPnr !== r.request.pnr ? ` · new code <b class="mono">${esc(r.bookingState.currentPnr)}</b>` : ""}</dd>
     </dl></div>`);
   parts.push(`<ol class="steps">${requestSteps(r).join("")}</ol>`);
   if (r.eligibility.reasons.length) parts.push(`<ul class="reasons">${r.eligibility.reasons.map((x) => `<li>${esc(x)}</li>`).join("")}</ul>`);
   if (r.eligibility.eligible) {
-    parts.push(r.request.kind === "refund"
-      ? quoteTable("Cancel and refund", r.quote.refund.lines, "Refund", r.quote.refund.amount, ["Fare paid", r.quote.refund.gross])
-      : move ? quoteTable(`Move to ${move.label}`, move.lines, "Passenger pays", move.total) : "");
+    const agreedId = r.action?.kind === "move" ? r.action.optionId : null;
+    const tables = [
+      ...r.quote.moves
+        .filter((m) => !r.action || m.id === agreedId)
+        .map((m) => quoteTable(`Move to ${m.label}`, m.lines, "Passenger pays", m.total)),
+      !r.action || r.action.kind === "refund" ? quoteTable("Cancel and refund", r.quote.refund.lines, "Refund", r.quote.refund.amount, ["Fare paid", r.quote.refund.gross]) : "",
+    ];
+    parts.push(`<div><h3 style="margin-bottom:6px">${r.action ? "The change the passenger agreed" : "Options CALL-E will offer"}</h3>${tables.join("")}</div>`);
   }
   if (r.eligibility.warnings.length) parts.push(`<ul class="reasons">${r.eligibility.warnings.map((x) => `<li>${esc(x)}</li>`).join("")}</ul>`);
 
-  if (r.status === "quoted") {
-    const amountId = `req-amount-${id}`;
-    parts.push(`<div class="callbox"><h3>Passenger's answer</h3>
-      <p class="note">${r.request.conversation
-        ? `The quote was sent to the passenger's ${esc(r.request.channel.replace("_", " "))}. Their YES there confirms it automatically; only type the amount if they confirmed some other way.`
-        : `Send the quote through the ${esc(r.request.channel.replace("_", " "))}. When the passenger says yes, type the amount they agreed to.`}</p>
-      <div class="row-inline"><label for="${esc(amountId)}" class="note">Confirmed amount (IDR)</label>
-        <input id="${esc(amountId)}" class="wide" inputmode="numeric" autocomplete="off" value="${esc(draft[amountId] ?? "")}">
-        <button type="button" class="btn" data-req-confirm="${esc(id)}">Confirm and submit</button>
-        <button type="button" class="btn ghost" data-req-decline="${esc(id)}">Passenger declined</button></div></div>`);
+  if (r.status === "awaiting_call") {
+    parts.push(renderPassengerCallBox(r));
+    ensurePassengerPreview(id);
   }
-  if (r.portal?.kind === "rejected") parts.push(`<p class="note bad">${esc(r.portal.message)}</p>`);
-  if (r.status === "portal_rejected") {
+  if (r.passengerCall && !(r.status === "awaiting_call" && r.passengerCall.status === "failed_to_submit")) parts.push(renderPassengerCall(r));
+  if (r.status === "confirmed_on_call") {
     parts.push(renderAirlineCallBox(r));
     ensureAirlinePreview(id);
   }
@@ -576,8 +580,8 @@ function renderRequestDetail() {
     const ids = { apply: `req-apply-${id}`, pnr: `req-newpnr-${id}`, ticket: `req-ticket-${id}`, note: `req-note-${id}` };
     const apply = draft[ids.apply] ?? "none";
     parts.push(`<div class="callbox"><h3>Resolve as a person</h3>
-      <select id="${esc(ids.apply)}"><option value="none"${apply === "none" ? " selected" : ""}>Close without changing the booking</option><option value="apply"${apply === "apply" ? " selected" : ""}>Apply the confirmed ${esc(r.request.kind)}</option></select>
-      ${r.request.kind === "reschedule" ? `<div class="row-inline"><label for="${esc(ids.pnr)}" class="note">Booking code from the airline</label><input id="${esc(ids.pnr)}" class="wide" maxlength="6" autocomplete="off" value="${esc(draft[ids.pnr] ?? "")}">
+      <select id="${esc(ids.apply)}"><option value="none"${apply === "none" ? " selected" : ""}>Close without changing the booking</option>${r.action ? `<option value="apply"${apply === "apply" ? " selected" : ""}>Apply the agreed ${r.action.kind === "refund" ? "refund" : "move"}</option>` : ""}</select>
+      ${r.action?.kind === "move" ? `<div class="row-inline"><label for="${esc(ids.pnr)}" class="note">Booking code from the airline</label><input id="${esc(ids.pnr)}" class="wide" maxlength="6" autocomplete="off" value="${esc(draft[ids.pnr] ?? "")}">
         <label for="${esc(ids.ticket)}" class="note">Ticket</label><input id="${esc(ids.ticket)}" class="wide" placeholder="000-0000000000" autocomplete="off" value="${esc(draft[ids.ticket] ?? "")}"></div>` : ""}
       <label for="${esc(ids.note)}" class="note">Note for the booking</label>
       <textarea id="${esc(ids.note)}">${esc(draft[ids.note] ?? "")}</textarea>
@@ -593,6 +597,63 @@ function renderRequestDetail() {
     }
   }
   el.innerHTML = parts.join("");
+}
+
+function renderPassengerCallBox(r) {
+  const id = r.request.id;
+  const p = passengerPreviews.get(id);
+  const live = snap.live;
+  const last4Id = `req-p-last4-${id}`;
+  const blocked = p?.blockedReason;
+  return `<div class="callbox ${live ? "live" : ""}">
+    <h3>${live ? "CALL-E calls the passenger for real" : "Simulate CALL-E calling the passenger"}</h3>
+    <p class="note">CALL-E offers every option above, gets a clear yes to any cost, and records the choice. The airline is contacted only after this call.</p>
+    ${r.passengerCall?.status === "failed_to_submit" ? `<p class="note bad">Last attempt was not started: ${esc(r.passengerCall.error)}</p>` : ""}
+    <dl class="kv"><dt>Destination</dt><dd class="mono">${p ? `${esc(p.destinationMasked)}${p.redirected ? ' <span class="note">(live calls always go to LIVE_DEMO_PHONE)</span>' : ""}` : "…"}</dd></dl>
+    ${blocked ? `<p class="note bad">${esc(blocked)}</p>` : ""}
+    ${p ? `<details><summary>What CALL-E will be told</summary><pre>${esc(p.task)}</pre></details>
+    <details><summary>Result schema</summary><pre>${esc(JSON.stringify(p.resultSchema, null, 2))}</pre></details>` : ""}
+    ${live
+      ? `<div class="row-inline"><label for="${esc(last4Id)}">Type the last 4 digits of the destination to confirm</label>
+          <input id="${esc(last4Id)}" inputmode="numeric" maxlength="4" autocomplete="off" value="${esc(draft[last4Id] ?? "")}">
+          <button type="button" class="btn live" data-req-passenger="${esc(id)}" ${blocked ? "disabled" : ""}>Place real call</button></div>`
+      : `<div class="row-inline"><button type="button" class="btn" data-req-passenger="${esc(id)}" ${blocked ? "disabled" : ""}>Simulate passenger call</button></div>`}
+  </div>`;
+}
+
+function renderPassengerCall(r) {
+  const c = r.passengerCall;
+  const o = c.outcome;
+  const s = o?.structured;
+  const flight = s && s.selected_flight !== "none" ? r.quote.moves.find((m) => m.flightId === s.selected_flight)?.label ?? s.selected_flight : null;
+  return `<div class="outcome"><h3>CALL-E call to the passenger</h3>
+    <dl class="kv">
+      <dt>Status</dt><dd>${esc(c.status.replaceAll("_", " "))} <span class="muted">${esc(o?.providerStatus ?? "")}</span></dd>
+      <dt>Call id</dt><dd class="mono">${esc(c.callId ?? "none")}</dd>
+      <dt>Dialed</dt><dd class="mono">${esc(c.destinationMasked)}${c.redirected ? " (demo phone)" : ""}</dd>
+      ${o?.confidence ? `<dt>Confidence</dt><dd>${o.confidence.score.toFixed(2)} (${esc(o.confidence.label)})</dd>` : ""}
+      ${s ? `<dt>Choice</dt><dd><b>${esc(String(s.choice).replaceAll("_", " "))}</b>${flight ? ` · ${esc(flight)}` : ""}</dd>
+      <dt>Cost accepted</dt><dd>${esc(String(s.fee_accepted).replaceAll("_", " "))}</dd>
+      <dt>Asked for a person</dt><dd>${esc(s.human_requested)}</dd>` : ""}
+    </dl>
+    ${c.error ? `<p class="note bad">${esc(c.error)}</p>` : ""}
+    ${s?.reason ? `<blockquote>${esc(s.reason)}</blockquote>` : ""}
+    ${o?.summary ? `<p><span class="muted">Summary:</span> ${esc(o.summary)}</p>` : ""}
+    ${o?.transcript?.length ? `<details><summary>Transcript (${o.transcript.length} turns)</summary><div class="transcript" style="padding:10px 12px">${o.transcript.map((t) => `<div class="turn"><span class="spk">${esc(t.speaker)}</span><span>${esc(t.text)}</span></div>`).join("")}</div></details>` : ""}
+    <details><summary>What CALL-E was told</summary><pre>${esc(c.task)}</pre></details>
+  </div>`;
+}
+
+async function ensurePassengerPreview(id) {
+  if (passengerPreviews.has(id)) return;
+  passengerPreviews.set(id, null);
+  try {
+    passengerPreviews.set(id, await api("/api/requests/passenger/preview", { id }));
+    if (selectedRequest === id) renderRequestDetail();
+  } catch (e) {
+    passengerPreviews.delete(id);
+    showError(e.message);
+  }
 }
 
 function renderCallbackBox(r) {
@@ -648,7 +709,8 @@ function renderAirlineCallBox(r) {
   const last4Id = `req-last4-${id}`;
   const blocked = p?.blockedReason;
   return `<div class="callbox ${live ? "live" : ""}">
-    <h3>${live ? "Call the airline desk for real" : "Simulate the airline desk call"}</h3>
+    <h3>${live ? "CALL-E calls the airline desk for real" : "Simulate CALL-E calling the airline desk"}</h3>
+    <p class="note">CALL-E asks the desk to make exactly the change the passenger agreed, and never accepts a higher charge or a lower refund.</p>
     ${r.airlineCall?.status === "failed_to_submit" ? `<p class="note bad">Last attempt was not started: ${esc(r.airlineCall.error)}</p>` : ""}
     <dl class="kv"><dt>Desk</dt><dd>${esc(p?.airline ?? "…")}</dd><dt>Destination</dt><dd class="mono">${p ? `${esc(p.destinationMasked)}${p.redirected ? ' <span class="note">(live calls always go to LIVE_DEMO_PHONE)</span>' : ""}` : "…"}</dd></dl>
     ${blocked ? `<p class="note bad">${esc(blocked)}</p>` : ""}
@@ -664,7 +726,7 @@ function renderAirlineCallBox(r) {
 
 function renderAirlineCall(r) {
   const c = r.airlineCall;
-  if (c.status === "failed_to_submit" && r.status === "portal_rejected") return "";
+  if (c.status === "failed_to_submit" && r.status === "confirmed_on_call") return "";
   const o = c.outcome;
   const s = o?.structured;
   return `<div class="outcome"><h3>Airline desk call</h3>
@@ -715,7 +777,7 @@ document.addEventListener("change", (e) => {
 document.addEventListener("submit", (e) => {
   if (e.target.id === "request-form") {
     e.preventDefault();
-    const kind = draft["req-kind"] ?? "reschedule";
+    const kind = draft["req-kind"] ?? "change";
     const body = {
       pnr: $("req-pnr")?.value,
       kind,
@@ -777,16 +839,10 @@ document.addEventListener("click", (e) => {
     renderRequests();
     return;
   }
-  const reqConfirm = e.target.closest("[data-req-confirm]");
-  if (reqConfirm) {
-    const id = reqConfirm.dataset.reqConfirm;
-    const raw = String(draft[`req-amount-${id}`] ?? "").replace(/[^\d]/g, "");
-    act(() => api("/api/requests/confirm", { id, confirmedAmount: raw === "" ? NaN : Number(raw) }));
-    return;
-  }
-  const reqDecline = e.target.closest("[data-req-decline]");
-  if (reqDecline) {
-    act(() => api("/api/requests/decline", { id: reqDecline.dataset.reqDecline }));
+  const reqPassenger = e.target.closest("[data-req-passenger]");
+  if (reqPassenger) {
+    const id = reqPassenger.dataset.reqPassenger;
+    act(() => api("/api/requests/passenger/start", { id, confirmLast4: draft[`req-p-last4-${id}`] }));
     return;
   }
   const reqAirline = e.target.closest("[data-req-airline]");
