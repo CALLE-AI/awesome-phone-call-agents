@@ -21,10 +21,10 @@
     
     <!-- Top Action Area: Self-Calling Number Badge + Summary & Plus Buttons -->
     <div class="flex items-center space-x-2">
-      <!-- Compact Self Calling Phone Number Input -->
+      <!-- Compact Self Calling Phone Number Input (Password masked by default) -->
       <div class="flex items-center bg-indigo-800/90 border border-indigo-700 rounded-2xl px-2.5 py-1 text-xs space-x-1">
         <span class="text-indigo-200 font-bold hidden sm:inline">📞 Phone:</span>
-        <input type="tel" id="self-phone-input" value="+15550100000" placeholder="+15550100000" class="bg-transparent text-white font-extrabold text-xs w-28 sm:w-32 focus:outline-none" oninput="saveSelfPhone()">
+        <input type="password" id="self-phone-input" value="+15550100000" placeholder="+15550100000" class="bg-transparent text-white font-extrabold text-xs w-28 sm:w-32 focus:outline-none" oninput="saveSelfPhone()" onfocus="this.type='text'" onblur="this.type='password'" title="Click to edit calling number">
       </div>
 
       <!-- Summary Icon -->
@@ -134,6 +134,12 @@
       return `${prefix} ***** *${suffix}`;
     }
 
+    // Replace all E.164 phone occurrences in text with masked format
+    function maskAllPhonesInText(text) {
+      if (!text) return '';
+      return String(text).replace(/\+[1-9]\d{9,14}/g, (match) => maskPhone(match));
+    }
+
     function isValidE164(phone) {
       return /^\+[1-9]\d{1,14}$/.test(String(phone).trim());
     }
@@ -175,10 +181,10 @@
     ];
 
     function loadData() {
-      // Clear old unmasked keys to ensure no unmasked numbers linger
-      ['bc_persons', 'bc_persons_v2', 'bc_persons_v3', 'bc_persons_v4', 'bc_persons_v5'].forEach(k => localStorage.removeItem(k));
+      // Clear all old unmasked local storage keys
+      ['bc_persons', 'bc_persons_v2', 'bc_persons_v3', 'bc_persons_v4', 'bc_persons_v5', 'bc_persons_v6', 'bc_persons_v7', 'bc_self_phone', 'bc_self_phone_v5', 'bc_self_phone_v6', 'bc_self_phone_v7'].forEach(k => localStorage.removeItem(k));
 
-      const savedSelfPhone = localStorage.getItem('bc_self_phone_v7');
+      const savedSelfPhone = localStorage.getItem('bc_self_phone_v8');
       if (savedSelfPhone && isValidE164(savedSelfPhone)) {
         selfPhone = savedSelfPhone;
         document.getElementById('self-phone-input').value = selfPhone;
@@ -186,7 +192,7 @@
         document.getElementById('self-phone-input').value = '+15550100000';
       }
 
-      const savedPersons = localStorage.getItem('bc_persons_v7');
+      const savedPersons = localStorage.getItem('bc_persons_v8');
       if (savedPersons) {
         try { 
           const parsed = JSON.parse(savedPersons);
@@ -205,12 +211,12 @@
       const val = document.getElementById('self-phone-input').value.trim();
       if (isValidE164(val)) {
         selfPhone = val;
-        localStorage.setItem('bc_self_phone_v7', selfPhone);
+        localStorage.setItem('bc_self_phone_v8', selfPhone);
       }
     }
 
     function saveData() {
-      localStorage.setItem('bc_persons_v7', JSON.stringify(persons));
+      localStorage.setItem('bc_persons_v8', JSON.stringify(persons));
       renderCards();
     }
 
@@ -492,7 +498,7 @@
       saveData();
 
       const summaryContent = `Call #${log.callNumber}\nStart Time: ${log.startTime}\nDuration: ${log.duration}\nStatus: ${log.status}\n\nKey Points:\n` + 
-        (log.points || []).map(p => `• ${p}`).join('\n');
+        (log.points || []).map(p => `• ${maskAllPhonesInText(p)}`).join('\n');
 
       const waMessage = encodeURIComponent(`💌 BridgeCalle Call Summary for ${person.name || 'Human'}:\n\n${summaryContent}\n\nSent via BridgeCalle Voice AI.`);
       const cleanWaNum = waNum.replace(/[^+\d]/g, '').replace('+', '');
@@ -611,7 +617,7 @@
               bullet.textContent = '•';
 
               const ptText = document.createElement('span');
-              ptText.textContent = pt;
+              ptText.textContent = maskAllPhonesInText(pt);
 
               li.appendChild(bullet);
               li.appendChild(ptText);
@@ -649,11 +655,13 @@
           waInputRow.className = 'flex items-center space-x-2';
 
           const waInput = document.createElement('input');
-          waInput.type = 'tel';
+          waInput.type = 'password';
           waInput.id = `wa-input-${person.id}`;
           waInput.value = currentWaNum;
           waInput.placeholder = '+15550100000';
           waInput.className = 'flex-1 bg-white border border-emerald-300 text-slate-900 text-xs font-bold rounded-lg p-2 focus:ring-2 focus:ring-emerald-500 focus:outline-none';
+          waInput.onfocus = function() { this.type = 'text'; };
+          waInput.onblur = function() { this.type = 'password'; };
           waInput.onchange = (e) => updatePersonWhatsAppNumber(person.id, e.target.value);
 
           const waBtn = document.createElement('button');
