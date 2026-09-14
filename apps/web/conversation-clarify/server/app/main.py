@@ -199,15 +199,20 @@ class ConfirmIn(BaseModel):
 
 # --- app ---------------------------------------------------------------------
 
-def _for_display(finding: dict) -> dict:
-    """A copy of a finding safe to put in a response or a log.
+def _for_display(value):
+    """A copy safe to put in a response, a log, or a panel.
 
-    The thread text it quotes can itself contain a phone number.
+    Findings quote the thread verbatim, and the thread can contain a phone
+    number -- in a signature, in the sentence itself, anywhere. Masking is
+    applied to every string reached, lists included, because `options` is one.
     """
-    return {
-        k: (mask_text(v) if isinstance(v, str) else v)
-        for k, v in finding.items()
-    }
+    if isinstance(value, str):
+        return mask_text(value)
+    if isinstance(value, list):
+        return [_for_display(v) for v in value]
+    if isinstance(value, dict):
+        return {k: _for_display(v) for k, v in value.items()}
+    return value
 
 
 def create_app(env=None) -> FastAPI:
@@ -278,8 +283,11 @@ def create_app(env=None) -> FastAPI:
         candidates, _ = find_candidates(thread)
         return {
             "thread_fingerprint": thread.fingerprint(),
-            "counterparty": thread.counterparty,
-            "findings": [f.to_dict() for f in findings],
+            "counterparty": mask_text(thread.counterparty),
+            # Masked on the way out, like every other quoted-thread field. The
+            # client hands these back on the next call and verify_finding masks
+            # both sides before comparing, so the round trip still holds.
+            "findings": [_for_display(f.to_dict()) for f in findings],
             "phone_candidates": [c.to_dict() for c in candidates],
             "model_pass": ("skipped" if (provider and payload.rules_only)
                            else (provider.name if provider else "off")),
@@ -429,9 +437,13 @@ def create_app(env=None) -> FastAPI:
             # echo the request back, destination included.
             proposal.state = "failed_to_place"
             store.release(proposal.idempotency_key)
+            # Reached only when CALL-E answered and rejected the request, so
+            # "nothing was dialled" is a fact rather than an assumption. Anything
+            # that might have been accepted arrives as AmbiguousOutcome above and
+            # keeps its claim.
             raise HTTPException(
                 status_code=502,
-                detail=f"Could not place the call ({type(exc).__name__}). Nothing was dialled.",
+                detail=f"CALL-E rejected the request ({type(exc).__name__}). Nothing was dialled.",
             )
 
         return {"proposal_id": proposal.id, "call_id": proposal.call_id, "state": proposal.state}

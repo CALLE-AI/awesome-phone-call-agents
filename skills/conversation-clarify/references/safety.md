@@ -142,6 +142,13 @@ someone actually spoke, and is deliberately kept **out of the draft reply**. The
 knows what they said, and mailing them a garbled transcription of their own words is at
 best odd. What belongs in the written record is the agreement, not the phonemes.
 
+**Anything leaving the server is masked, including the user's own thread text.** A finding
+quotes the thread verbatim and the thread can carry a number anywhere — a signature, the
+sentence itself. Findings, previews, gate reasons and error bodies are all masked on the way
+out. Because a client hands a finding back, verification masks the thread before comparing,
+so both sides are in the same form; masking is deterministic, so this neither weakens the
+check nor lets a paraphrase through.
+
 **The gate checks the quote by matching text, not by understanding it.** The quote must
 appear in what the recipient actually said, after case, punctuation and emphasis markup are
 normalised away. That catches an invented or paraphrased quote. It does not judge whether

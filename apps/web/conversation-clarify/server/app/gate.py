@@ -39,16 +39,22 @@ def evaluate(call: dict, *, answer_field: str, expected_options: list[str] | Non
     result = call.get("structured_result") or {}
 
     if call.get("status") != "completed":
-        reasons.append(f"the call did not complete (status: {call.get('status')})")
+        reasons.append(
+            f"the call did not complete (status: {mask_text(str(call.get('status')))})"
+        )
     if not call.get("task_completed"):
         reasons.append("CALL-E did not judge the task complete")
     if not call.get("structured_result"):
         reasons.append("no schema-valid result could be extracted from the call")
 
+    # answered_by and resolved are declared enums, but they are provider-supplied
+    # strings on the wire and nothing stops one arriving with a number in it.
     if result.get("answered_by") != "human":
-        reasons.append(f"a person did not answer (endpoint: {result.get('answered_by') or 'unknown'})")
+        endpoint = mask_text(str(result.get("answered_by") or "unknown"))
+        reasons.append(f"a person did not answer (endpoint: {endpoint})")
     if result.get("resolved") != "yes":
-        reasons.append(f"the question was not settled (resolved: {result.get('resolved') or 'unknown'})")
+        settled = mask_text(str(result.get("resolved") or "unknown"))
+        reasons.append(f"the question was not settled (resolved: {settled})")
 
     answer = (result.get(answer_field) or "").strip()
     if not answer:

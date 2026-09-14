@@ -539,26 +539,48 @@ def test_a_rejected_answer_is_masked_in_the_reason():
     assert "0142" not in str(verdict.reasons)
 
 
-def test_a_create_timeout_is_unknown_not_a_failure():
-    """A timeout may still have placed the call, so the claim must not be
-    released and a fresh key must not become available."""
-    from app.caller import AmbiguousOutcome, _is_timeout
-
-    assert _is_timeout(TimeoutError("x"))
-    assert _is_timeout(type("ReadTimeout", (Exception,), {})("x"))
-    assert not _is_timeout(ValueError("x"))
-
+def _live_caller_raising(exc):
+    """A LiveCaller whose create() fails, with no network and no key."""
     import app.caller as caller_mod
 
-    def times_out(**kwargs):
-        raise TimeoutError("read timed out")
+    def boom(**kwargs):
+        raise exc
 
-    live = caller_mod.LiveCaller.__new__(caller_mod.LiveCaller)   # no network, no key
-    live._client = type("c", (), {"calls": type("k", (), {"create": staticmethod(times_out)})()})()
+    live = caller_mod.LiveCaller.__new__(caller_mod.LiveCaller)
+    live._client = type("c", (), {"calls": type("k", (), {"create": staticmethod(boom)})()})()
+    return live
 
-    with pytest.raises(AmbiguousOutcome, match="may or may not have been placed"):
-        live.place(task="t", phone=RESERVED, schema={}, recipient={},
-                   idempotency_key="k", metadata={})
+
+def test_a_submission_that_might_have_been_accepted_stays_unknown():
+    """Only a reply from CALL-E proves nothing was placed. A timeout, a reset or
+    a 5xx may all have created the call before failing, so the claim is kept."""
+    from app.caller import AmbiguousOutcome
+
+    class ConnectionResetish(Exception):
+        pass
+
+    class ServerError(Exception):
+        status_code = 503
+
+    for exc in (TimeoutError("read timed out"),
+                ConnectionResetError("connection reset by peer"),
+                ConnectionResetish("reset"),
+                ServerError("bad gateway")):
+        with pytest.raises(AmbiguousOutcome, match="may or may not have been accepted"):
+            _live_caller_raising(exc).place(
+                task="t", phone=RESERVED, schema={}, recipient={},
+                idempotency_key="k", metadata={})
+
+
+def test_a_rejected_submission_is_a_definite_failure():
+    """A 4xx means CALL-E received the request and refused it."""
+    class Rejected(Exception):
+        status_code = 422
+
+    with pytest.raises(Rejected):
+        _live_caller_raising(Rejected("unprocessable")).place(
+            task="t", phone=RESERVED, schema={}, recipient={},
+            idempotency_key="k", metadata={})
 
 
 def test_the_proposal_response_masks_the_text_it_echoes():
@@ -578,3 +600,56 @@ def test_the_proposal_response_masks_the_text_it_echoes():
     }, headers=AUTH).text
     assert "0143" not in body        # the number quoted inside the thread text
     assert RESERVED not in body      # and the destination
+
+
+# --- review f8175155: masking on every outbound path ------------------------
+
+NUMBERS_IN_THREAD = {
+    "thread_id": "t", "subject": "Kickoff",
+    "messages": [
+        {"sender": "Charles Miller", "from_me": True,
+         "body": "Monday or Tuesday? My direct line is +1 555 010 0143."},
+        {"sender": "Alex Doe", "from_me": False,
+         "body": f"Yeah, count me in.\n\n--\nAlex Doe\n{RESERVED}"},
+    ],
+}
+
+
+def test_analyze_masks_the_thread_text_it_quotes_back():
+    """A finding quotes the thread verbatim, and the thread can carry a number."""
+    body = client().post("/v1/analyze", json=NUMBERS_IN_THREAD, headers=AUTH).text
+    assert "0143" not in body      # the number inside the quoted question
+    assert RESERVED not in body    # and the one in the signature
+
+
+def test_a_masked_finding_still_verifies_on_the_way_back():
+    """The client returns what it was given. Masking one side of the comparison
+    would have broken the round trip, so both sides are masked."""
+    c = client()
+    finding = c.post("/v1/analyze", json=NUMBERS_IN_THREAD,
+                     headers=AUTH).json()["findings"][0]
+    assert "0143" not in str(finding)          # it really is the masked copy
+    response = c.post("/v1/proposals", json={
+        "thread": NUMBERS_IN_THREAD, "finding": finding,
+        "recipient_name": "Alex Doe", "phone_typed": RESERVED,
+    }, headers=AUTH)
+    assert response.status_code == 200, response.text
+
+
+def test_gate_reasons_mask_provider_supplied_strings():
+    """answered_by, resolved and status are declared enums but arrive as strings."""
+    from app.gate import evaluate
+
+    call = {
+        "status": f"weird {RESERVED}",
+        "task_completed": False,
+        "structured_result": {
+            "resolved": f"unknown {RESERVED}",
+            "answered_by": f"unknown {RESERVED}",
+            "chosen_option": "", "evidence_quote": "",
+        },
+    }
+    verdict = evaluate(call, answer_field="chosen_option", expected_options=["Monday"])
+    joined = " ".join(verdict.reasons)
+    assert RESERVED not in joined
+    assert "0142" not in joined

@@ -55,7 +55,7 @@ The server starts in fixture mode. A fresh checkout **cannot dial anyone.**
 ```bash
 cd server
 python3 -m venv .venv && .venv/bin/pip install -r requirements-dev.txt
-.venv/bin/python -m pytest tests/ -q          # 105 tests, no network
+.venv/bin/python -m pytest tests/ -q          # 109 tests, no network
 CONVERSATION_CLARIFY_USER="Your Name" .venv/bin/python -m uvicorn app.main:app --port 8000
 ```
 
@@ -196,8 +196,11 @@ This is the platform's own position too. From CALL-E's engineering blog, 11 Sept
 - **Numbers come only from the thread or from you.** No lookup, no inference from a name.
   Strict ASCII E.164 validated with `[0-9]`, not `\d`, which also matches Unicode digits.
   A number without a country code is refused, not completed with a guess.
-- **Masked everywhere**, recursively, including provider text that may echo a number back
-  in a shape we never sent.
+- **Masked everywhere**, recursively: the destination, provider text that may echo a number
+  back in a shape we never sent, the thread text a finding quotes, the task preview, and the
+  reasons the gate gives for refusing. Findings are masked before they leave, and
+  verification masks the thread too, so comparing a returned finding against the thread still
+  compares like with like.
 - **Explicit intent per call.** The button names the destination and says whether it dials
   for real. A stored setting is not intent. The dial endpoint also requires a one-time token
   issued with the proposal, so it cannot be driven without first fetching what the call
@@ -206,9 +209,11 @@ This is the platform's own position too. From CALL-E's engineering blog, 11 Sept
   finding, destination and a nonce for the running process; the attempt counter advances
   only after the previous attempt reaches a terminal state, so a retry is possible and a
   double-click is not.
-- **Ambiguous outcomes halt.** A create that returns no call id, or that times out before
-  answering, is treated as unknown rather than failed: the call may be in flight, so the
-  key is held and nothing is freed for a fresh attempt. A call CALL-E hands back from its
+- **Ambiguous outcomes halt.** Only one thing proves no call was placed: CALL-E answering
+  and rejecting the request. A timeout, a connection reset, a broken pipe or a 5xx all leave
+  it unknown — the submission may have been accepted and the call dialled before the failure
+  — so the idempotency claim is held, reconciliation is required, and no fresh key is
+  issued. Guessing "failed" there is how the same person gets dialled twice. A call CALL-E hands back from its
   idempotency store, rather than placing a new one, is refused rather than polled — a stale
   outcome reported as a fresh one is worse than an error.
 - **The token and the thread go nowhere unencrypted.** The extension sends them over HTTPS,
@@ -223,7 +228,7 @@ This is the platform's own position too. From CALL-E's engineering blog, 11 Sept
 ## Commands
 
 ```bash
-.venv/bin/python -m pytest tests/ -q                     # 105 offline tests
+.venv/bin/python -m pytest tests/ -q                     # 109 offline tests
 .venv/bin/python -m uvicorn app.main:app --port 8000     # fixture mode
 ```
 

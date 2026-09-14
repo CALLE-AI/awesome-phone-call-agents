@@ -21,6 +21,7 @@ Display-only fields are rebuilt here rather than accepted.
 from __future__ import annotations
 
 from .detect import Finding
+from .numbers import mask_text
 from .thread import Thread
 
 KINDS = {"unclear_choice", "vague_commitment"}
@@ -38,9 +39,14 @@ def quoted_in(candidate: str, haystack: str) -> bool:
 
     A model that paraphrases, merges two sentences, or invents one fails this,
     and the finding is dropped rather than shown to the user.
+
+    Both sides are masked before comparing. Findings leave this server with any
+    phone-shaped run masked, so a client returning one is returning the masked
+    form; masking the thread too compares like with like. Masking is
+    deterministic, so this neither weakens the check nor accepts a paraphrase.
     """
-    needle = normalise(candidate)
-    return bool(needle) and needle in normalise(haystack)
+    needle = normalise(mask_text(candidate))
+    return bool(needle) and needle in normalise(mask_text(haystack))
 
 
 def verify_finding(thread: Thread, data: dict, *, source: str) -> Finding | None:

@@ -103,12 +103,13 @@ class LiveCaller(Caller):
                 idempotency_key=idempotency_key,
             )
         except Exception as exc:
-            if _is_timeout(exc):
-                raise AmbiguousOutcome(
-                    "The request to place the call timed out. It may or may not have been "
-                    "placed. Reconcile with the same idempotency key before trying again."
-                ) from exc
-            raise
+            if _definitely_not_placed(exc):
+                raise
+            raise AmbiguousOutcome(
+                f"The request to place the call failed as {type(exc).__name__} without a "
+                f"reply from CALL-E. It may or may not have been accepted. Reconcile with "
+                f"the same idempotency key before trying again; do not issue a new one."
+            ) from exc
         call_id = call.get("id")
         if not call_id:
             # Accepted with no call id is ambiguous: a call may or may not be in
@@ -136,17 +137,33 @@ class AmbiguousOutcome(RuntimeError):
     """Raised when we cannot tell whether a call was placed. Never auto-retried."""
 
 
-def _is_timeout(exc: BaseException) -> bool:
-    """Did this request fail without telling us whether the call was placed?
+def _rejected_status(exc: BaseException) -> int | None:
+    """The HTTP status CALL-E answered with, if it answered at all."""
+    for candidate in (exc, exc.__cause__, exc.__context__):
+        if candidate is None:
+            continue
+        status = getattr(candidate, "status_code", None) or getattr(candidate, "status", None)
+        if status is None:
+            response = getattr(candidate, "response", None)
+            status = getattr(response, "status_code", None) if response is not None else None
+        if isinstance(status, int):
+            return status
+    return None
 
-    A timeout on create is the ambiguous case: the request may have reached
-    CALL-E and dialled. Matched by name as well as by type, because the SDK
-    wraps its transport and the concrete classes differ between versions.
+
+def _definitely_not_placed(exc: BaseException) -> bool:
+    """Can we prove no call was created?
+
+    Only one thing proves it: CALL-E answered and rejected the request. A 4xx
+    means the submission was received and refused, so nothing was dialled.
+
+    Everything else -- a timeout, a connection reset, a broken pipe, a 5xx --
+    leaves it unknown. The request may have been accepted and the call placed
+    before the failure. Guessing "failed" there releases the idempotency claim
+    and frees a fresh key, which is how the same person gets dialled twice.
     """
-    if isinstance(exc, TimeoutError):
-        return True
-    names = {type(e).__name__.lower() for e in (exc, exc.__cause__, exc.__context__) if e}
-    return any("timeout" in n or "timedout" in n for n in names)
+    status = _rejected_status(exc)
+    return status is not None and 400 <= status < 500
 
 
 class IdempotentReplay(RuntimeError):

@@ -157,10 +157,11 @@ never rang.
    double-click is not. If the provider answers with a call it already holds rather than
    placing a new one, refuse it instead of polling it — see
    [references/safety.md](references/safety.md).
-7. Poll to terminal. Do not trust an unsigned webhook for a side effect. If the
-   request that places the call times out, treat the outcome as **unknown**, not
-   as a failure: the call may have been placed. Hold the key and reconcile rather
-   than freeing it for a fresh attempt.
+7. Poll to terminal. Do not trust an unsigned webhook for a side effect. Treat the
+   submission as **failed** only when the provider answered and rejected it. A
+   timeout, a connection reset or a server error leaves the outcome **unknown**:
+   the call may already have been placed. Hold the key, require reconciliation,
+   and do not issue a new one.
 8. Apply the gate. Draft, or explain the abstention.
 
 ## Result schema
