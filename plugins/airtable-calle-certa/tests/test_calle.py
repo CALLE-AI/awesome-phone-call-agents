@@ -16,7 +16,7 @@ from certa.calle import (
     interpret,
 )
 from certa.consent import authorize, derive_token
-from certa.schema import derive_recipient_schema
+from certa.schema import UNKNOWN, derive_recipient_schema
 from certa.tasks import TASK_SPEC_VERSION
 from certa.transport import (
     ALLOWED_CREDENTIAL_ORIGINS,
@@ -281,7 +281,7 @@ class CredentialBoundary(unittest.TestCase):
     def test_arbitrary_base_url_is_refused(self):
         with self.assertRaises(TransportError) as ctx:
             LiveTransport("iams_live_example", base_url="https://evil.example.com")
-        self.assertIn("refusing to send an API key", str(ctx.exception))
+        self.assertIn("refusing to send a CALL-E API key", str(ctx.exception))
 
     def test_plain_http_is_refused(self):
         with self.assertRaises(TransportError):
@@ -310,6 +310,55 @@ class FixtureReplay(unittest.TestCase):
     def test_fixture_transport_places_no_calls(self):
         transport = FixtureTransport({"create": {"id": "call_1"}})
         self.assertFalse(hasattr(transport, "api_key"))
+
+
+class GatesThatWereSkippable(unittest.TestCase):
+    """Two ways a result reached VERIFIED without being checked.
+
+    Both were raised in review on PR #552 and both were real: a call with no
+    `completion_confidence` skipped the floor entirely, and a value the
+    schema does not define was neither a contradiction nor an unknown, so it
+    passed both of those checks and counted as an established fact.
+    """
+
+    def call(self, answers, confidence=0.93):
+        body = {
+            "status": "completed",
+            "evidence": ["a person confirmed employment"],
+            "recipients": [{"structured_result": answers}],
+        }
+        if confidence is not None:
+            body["completion_confidence"] = {"score": confidence}
+        return interpret(body, DERIVED, confidence_floor=DEFAULT_CONFIDENCE_FLOOR)
+
+    BASE = {"reached_employer": "yes", "employment_confirmed": "yes"}
+
+    def test_a_missing_confidence_is_not_a_passed_confidence(self):
+        result = self.call({**self.BASE, "title_matches": "yes"}, confidence=None)
+        self.assertEqual(result.disposition, Disposition.NEEDS_REVIEW)
+        self.assertIn("no completion confidence", result.reason)
+
+    def test_a_present_confidence_still_verifies(self):
+        result = self.call({**self.BASE, "title_matches": "yes"}, confidence=0.93)
+        self.assertEqual(result.disposition, Disposition.VERIFIED)
+
+    def test_a_value_outside_the_schema_is_not_a_fact(self):
+        for bad in ("probably", "YES", "y", "true", ""):
+            result = self.call({**self.BASE, "title_matches": bad})
+            self.assertEqual(
+                result.disposition, Disposition.NEEDS_REVIEW,
+                msg=f"{bad!r} was treated as established",
+            )
+
+    def test_the_off_schema_value_is_named_in_the_reason(self):
+        result = self.call({**self.BASE, "title_matches": "probably"})
+        self.assertIn("title_matches", result.reason)
+        self.assertIn("probably", result.reason)
+
+    def test_unknown_is_still_partial_not_review(self):
+        """`unknown` is a defined answer: unestablished, not suspicious."""
+        result = self.call({**self.BASE, "title_matches": UNKNOWN})
+        self.assertEqual(result.disposition, Disposition.PARTIAL)
 
 
 if __name__ == "__main__":

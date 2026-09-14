@@ -44,6 +44,7 @@ from ..airtable import (
 from ..grant import GrantError, grant_consent, revoke_consent
 from ..audit import AuditLog
 from ..checkup import check_table
+from ..types import redact
 from ..runner import RunError, execute, plan
 from ..mcp import McpTransport
 from ..transport import FixtureTransport, LiveTransport, TransportError
@@ -319,7 +320,8 @@ class Panel:
                     state.elapsed = report.elapsed_seconds
             except (RunError, Exception) as exc:  # noqa: BLE001 - surfaced to the operator
                 with state.lock:
-                    state.error = str(exc)
+                    # May carry a provider failure body.
+                    state.error = redact(str(exc))
             finally:
                 with state.lock:
                     state.running = False

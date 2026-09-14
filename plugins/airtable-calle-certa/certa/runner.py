@@ -333,6 +333,52 @@ def execute(
     report = RunReport(plan=current, started_at=now())
 
     def dispatch(item: Planned) -> Outcome:
+        # The plan is a snapshot, and a batch can take minutes. Re-read this
+        # row's consent immediately before dialing so a revocation made while
+        # the run is in flight still stops calls that have not gone out yet.
+        # It cannot recall a call already placed -- CALL-E has no
+        # cancel-in-flight operation -- so this narrows the window rather
+        # than closing it, and README states that plainly.
+        try:
+            fresh = client.get_record(table, item.row.record_id)
+        except Exception:  # noqa: BLE001 - a failed re-read must not place a call
+            return Outcome(
+                record_id=item.row.record_id,
+                request_id=item.contact.request_id,
+                call_id="",
+                interpretation=Interpretation(
+                    Disposition.NEEDS_REVIEW,
+                    "consent could not be re-read immediately before dialing, "
+                    "so the call was not placed",
+                ),
+            )
+        current_row = to_row(fresh, fields)
+        try:
+            authorize(
+                current_row.request,
+                relationship=Relationship.EMPLOYER,
+                task_spec_version=TASK_SPEC_VERSION,
+                presented_token=current_row.presented_token,
+            )
+        except BoundaryError as exc:
+            audit.append(
+                "call.withheld",
+                request_id=item.contact.request_id,
+                masked_number=item.contact.masked_number(),
+                consent_token=item.contact.consent_token,
+                detail={"reason": str(exc)},
+            )
+            return Outcome(
+                record_id=item.row.record_id,
+                request_id=item.contact.request_id,
+                call_id="",
+                interpretation=Interpretation(
+                    Disposition.NEEDS_REVIEW,
+                    "consent changed after the run started, so no call was "
+                    f"placed: {exc}",
+                ),
+            )
+
         # Recorded and durable before the phone can ring. A record with no call
         # is recoverable; a call with no record is not.
         audit.append(

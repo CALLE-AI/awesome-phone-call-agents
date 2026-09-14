@@ -20,6 +20,9 @@ import urllib.request
 from pathlib import Path
 from typing import Any, Protocol
 
+from .types import redact
+from .net import CredentialRoutingError, check_base_url, urlopen as net_urlopen
+
 DEFAULT_BASE_URL = "https://api.heycall-e.com"
 
 # A credential-bearing request may only go here. Overriding the base URL is
@@ -59,18 +62,12 @@ class LiveTransport:
     ) -> None:
         if not api_key:
             raise TransportError("CALLE_API_KEY is required for live transport")
-        parts = urllib.parse.urlsplit(base_url)
-        if parts.scheme != "https" and parts.hostname not in ("localhost", "127.0.0.1"):
+        try:
+            check_base_url(base_url, ALLOWED_CREDENTIAL_ORIGINS, what="a CALL-E API key")
+        except CredentialRoutingError as exc:
             raise TransportError(
-                f"refusing a non-HTTPS CALL-E base URL: {base_url!r}"
-            )
-        if _origin(base_url) not in ALLOWED_CREDENTIAL_ORIGINS:
-            raise TransportError(
-                f"refusing to send an API key to {_origin(base_url)!r}. "
-                f"Credentialed requests are restricted to "
-                f"{sorted(ALLOWED_CREDENTIAL_ORIGINS)}; point a fake server at "
-                "FixtureTransport instead."
-            )
+                f"{exc} Point a fake server at FixtureTransport instead."
+            ) from exc
         self.api_key = api_key
         self.base_url = base_url.rstrip("/")
         self.timeout = timeout
@@ -93,10 +90,12 @@ class LiveTransport:
             request.add_header(key, value)
 
         try:
-            with urllib.request.urlopen(request, timeout=self.timeout) as response:
+            with net_urlopen(request, timeout=self.timeout) as response:
                 raw = response.read().decode("utf-8")
+        except CredentialRoutingError as exc:
+            raise TransportError(str(exc)) from exc
         except urllib.error.HTTPError as exc:
-            detail = exc.read().decode("utf-8", "replace")[:500]
+            detail = redact(exc.read().decode("utf-8", "replace")[:500])
             raise TransportError(f"CALL-E {method} {path} -> {exc.code}: {detail}") from exc
         except urllib.error.URLError as exc:
             raise TransportError(f"CALL-E {method} {path} unreachable: {exc.reason}") from exc

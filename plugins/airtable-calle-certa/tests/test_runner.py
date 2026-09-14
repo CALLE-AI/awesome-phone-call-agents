@@ -9,7 +9,9 @@ import threading
 import unittest
 from pathlib import Path
 
-from certa.airtable import FieldMap, FixtureAirtable
+import json
+
+from certa.airtable import AirtableError, FieldMap, FixtureAirtable
 from certa.audit import AuditLog
 from certa.calle import Disposition
 from certa.consent import derive_token
@@ -412,6 +414,61 @@ class RevisedAfterTerminal(Base):
         report = self.run_it(self.client([consented()]), settle_delay=1)
         self.assertEqual(report.outcomes[0].interpretation.disposition,
                          Disposition.VERIFIED)
+
+
+class ConsentRevokedMidRun(Base):
+    """The plan is a snapshot; a batch can take minutes.
+
+    Raised in review on PR #552: revoking consent after a run started did not
+    stop rows that had not been dialed yet, because `execute` dispatched from
+    the snapshot `plan` took at the start. Consent is now re-read immediately
+    before each call. It still cannot recall a call already placed -- CALL-E
+    has no cancel-in-flight operation -- so this narrows the window rather
+    than closing it, and the README says so.
+    """
+
+    class RevokingClient(FixtureAirtable):
+        """Clears the consent token the first time a row is re-read."""
+
+        def get_record(self, table, record_id):
+            record = dict(super().get_record(table, record_id))
+            fields = dict(record.get("fields", {}))
+            fields[FIELDS.consent_token] = ""
+            record["fields"] = fields
+            return record
+
+    def test_a_call_is_not_placed_when_consent_went_away(self):
+        client = self.RevokingClient(SCHEMA, [consented()])
+        report = self.run_it(client)
+        outcome = report.outcomes[0]
+        self.assertEqual(outcome.call_id, "", "a call was placed anyway")
+        self.assertEqual(self.transport.created, [], "the transport was reached")
+        self.assertIn("consent changed", outcome.interpretation.reason)
+
+    def test_the_withholding_is_in_the_audit_chain(self):
+        client = self.RevokingClient(SCHEMA, [consented()])
+        self.run_it(client)
+        events = [json.loads(line)["event"] for line in
+                  (Path(self._tmp.name) / "audit.jsonl").read_text().splitlines()]
+        self.assertIn("call.withheld", events)
+        self.assertNotIn("call.dispatched", events)
+
+    def test_an_unchanged_consent_still_dials(self):
+        client = self.client([consented()])
+        report = self.run_it(client)
+        self.assertNotEqual(report.outcomes[0].call_id, "")
+        self.assertEqual(len(self.transport.created), 1)
+
+    def test_a_failed_re_read_does_not_place_the_call(self):
+        """If consent cannot be confirmed, nothing is dialed."""
+        class Broken(FixtureAirtable):
+            def get_record(self, table, record_id):
+                raise AirtableError("Airtable unreachable")
+
+        client = Broken(SCHEMA, [consented()])
+        report = self.run_it(client)
+        self.assertEqual(self.transport.created, [])
+        self.assertIn("could not be re-read", report.outcomes[0].interpretation.reason)
 
 
 if __name__ == "__main__":

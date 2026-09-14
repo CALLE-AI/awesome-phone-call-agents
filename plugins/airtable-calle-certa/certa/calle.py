@@ -29,7 +29,7 @@ from typing import Any, Sequence
 
 from .schema import CONTACT_GATE_KEY, UNKNOWN, DerivedSchema, derive_task_schema
 from .tasks import build_task
-from .types import ConsentedEmployerContact
+from .types import ConsentedEmployerContact, redact
 
 # Operator-defined columns vary, but these carry meaning to the state machine
 # when present.
@@ -179,8 +179,13 @@ def interpret(
             Disposition.PENDING, f"call status is {status or 'unknown'}"
         )
 
+    # Provider-written text. It lands in an Airtable cell, the console and
+    # the audit record, and it can quote a number back at us, so it is
+    # redacted once here rather than at each of those surfaces.
     evidence = tuple(
-        e for e in (call.get("evidence") or []) if isinstance(e, str) and e.strip()
+        redact(e)
+        for e in (call.get("evidence") or [])
+        if isinstance(e, str) and e.strip()
     )
 
     if status in ("failed", "canceled"):
@@ -228,7 +233,20 @@ def interpret(
             answers=answers,
         )
 
-    if confidence is not None and confidence < confidence_floor:
+    if confidence is None:
+        # A skipped check is not a passed one. Without a score there is
+        # nothing to compare against the floor, so this cannot be called
+        # confident and a person decides.
+        return Interpretation(
+            Disposition.NEEDS_REVIEW,
+            "the call carried no completion confidence, so the floor could "
+            "not be applied",
+            evidence=evidence,
+            confidence=None,
+            answers=answers,
+        )
+
+    if confidence < confidence_floor:
         return Interpretation(
             Disposition.NEEDS_REVIEW,
             f"completion confidence {confidence:.2f} is below {confidence_floor:.2f}",
@@ -272,6 +290,25 @@ def interpret(
         if key not in (CONTACT_GATE_KEY, EMPLOYMENT_KEY, DECLINED_KEY)
         and isinstance(derived.schema["properties"].get(key, {}).get("enum"), list)
     ]
+    # A value the schema does not define is not a fact. "probably" is
+    # neither a contradiction nor an unknown, so it passed both checks below
+    # and counted as established until this gate existed.
+    off_schema = [
+        key
+        for key in checks
+        if answers.get(key) is not None
+        and answers.get(key) not in derived.schema["properties"][key]["enum"]
+    ]
+    if off_schema:
+        return Interpretation(
+            Disposition.NEEDS_REVIEW,
+            "the provider returned a value outside the schema for "
+            + ", ".join(f"{k} ({answers.get(k)!r})" for k in sorted(off_schema)),
+            evidence=evidence,
+            confidence=confidence,
+            answers=answers,
+        )
+
     contradicted = [key for key in checks if answers.get(key) == "no"]
     if contradicted:
         return Interpretation(

@@ -227,7 +227,9 @@ before dialing — for a verification product that is *employment confirmed with
 no conversation*. That gate sits above every positive outcome, and a table
 whose columns cannot express it is refused at setup.
 
-**Fails closed, always.** Low confidence, a positive claim with no supporting evidence string, or any internal contradiction all route to human review. `tests/test_calle.py` asserts **no rule can promote a result** — every gate can only move a disposition toward review.
+**Fails closed.** Low confidence, a positive claim with no supporting evidence string, or any internal contradiction all route to human review. `tests/test_calle.py` asserts **no rule can promote a result** — every gate can only move a disposition toward review.
+
+Two gates existed only after review on this PR pointed out they did not. A call carrying no `completion_confidence` skipped the floor comparison entirely and could reach `verified` with no score at all; and a value the derived schema does not define — `"probably"`, `"YES"` — was neither a contradiction nor an `unknown`, so it passed both of those checks and counted as an established fact. Both now route to review, and `GatesThatWereSkippable` in `tests/test_calle.py` fails if either regresses.
 
 ![Every gate moves a disposition only toward review; none can promote one](assets/disposition-gates.jpg)
 
@@ -319,6 +321,9 @@ cannot fix and does not pretend to.
 - **Spend is estimated, not authoritative.** CALL-E exposes no balance endpoint (issue **#183**), so caps are enforced locally against a published $0.05 per call.
 - **Airtable free plan: 1,000 API calls per workspace per month**, 5 requests/second. This plugin uses the Web API rather than an extension or scripted automation precisely so it runs on free, where neither is available.
 - **Number provenance is asserted by the operator**, recorded in a `Number source` column and carried into the call metadata. Certa does not itself source numbers.
+- **Revoking consent mid-run stops calls not yet placed, but cannot recall one already dialed.** Consent is re-read immediately before each call, so a revocation made while a batch is running does stop the rows still queued. A call already handed to CALL-E is gone: there is no cancel-in-flight operation to reach it with. Treat "revoked" as "nothing further will be dialed", not as "the call in progress will stop".
+- **A confirming re-read can fail, and then the first read stands.** A terminal result is read a second time after a settle delay, and a changed answer routes to review. If that second request raises, the first interpretation is kept rather than invented — so a network failure during confirmation leaves the original disposition in place, unconfirmed.
+- **`verified` is a disposition, not a legal attestation.** It means a person at an independently sourced number was reached, answered, and their answers passed every gate at the moment they were read. It does not certify identity, authority, or that the person who answered was entitled to speak for the employer.
 
 ---
 

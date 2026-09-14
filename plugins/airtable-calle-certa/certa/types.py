@@ -26,11 +26,22 @@ from dataclasses import dataclass, field
 from enum import Enum
 from typing import Any
 
-# CALL-E's OpenAPI contract for recipient phone numbers, copied exactly:
+# CALL-E's OpenAPI contract for recipient phone numbers:
 #   pattern: "^\\+[1-9]\\d{6,14}$"
 # Numbers are never repaired, normalised or given an inferred country code.
 # A number that does not already match is rejected, not fixed.
-E164 = re.compile(r"^\+[1-9]\d{6,14}$")
+#
+# Two deliberate departures from a naive translation of that pattern:
+#
+#   `\d` matches Unicode decimal digits in Python, so "+1" followed by nine
+#   Arabic-Indic digits satisfied the pattern and resolved to a US
+#   destination. `[0-9]` keeps it to the digits E.164 actually defines.
+#
+#   `$` also matches just before a trailing newline, so "+15551234567\n"
+#   passed. `fullmatch` against the whole string is used everywhere instead
+#   of `match`, and `\Z` anchors the pattern for any caller that reaches for
+#   `.match` out of habit.
+E164 = re.compile(r"\A\+[1-9][0-9]{6,14}\Z", re.ASCII)
 
 # Only the factories below hold this. Passing anything else to a guarded
 # __init__ raises, which is what makes "cannot be constructed" true rather
@@ -52,6 +63,49 @@ def mask(phone: str) -> str:
         return "(no number)"
     tail = phone[-4:]
     return f"{phone[:2]}{'•' * max(len(phone) - 6, 1)}{tail}"
+
+
+# A phone number inside free text: seven or more digits, optionally grouped
+# by the usual separators, optionally with a country code. Deliberately not
+# anchored to E.164, because the text being scanned was written by a provider
+# and can spell a number any way it likes.
+# A date is a run of digits with separators too, and masking one helps
+# nobody. Timestamps ending in a letter are already excluded by the
+# lookahead above; a bare ISO date is not.
+_DATE_LIKE = re.compile(r"\d{4}[-/]\d{1,2}[-/]\d{1,2}|\d{1,2}[-/]\d{1,2}[-/]\d{2,4}")
+
+_PHONE_IN_TEXT = re.compile(
+    r"(?<![\w.])(\+?\d(?:[\d\s().\-]{5,}\d))(?![\w.])"
+)
+
+
+def redact(text: str) -> str:
+    """Mask anything phone-shaped inside provider-written text.
+
+    `mask` renders a number we already hold. This handles the other
+    direction: evidence strings, summaries, failure bodies and disposition
+    reasons come back from CALL-E and go on to an Airtable cell, the
+    console and the audit log, and any of them may quote a number back at
+    us. The operator's own inputs are untouched -- this runs on output, so
+    the number actually dialed still travels intact to the provider.
+
+    A date, a decimal or an identifier with word characters around it is
+    left alone; only a run of digits long enough to be a phone number and
+    standing on its own is masked.
+    """
+    if not text:
+        return text
+
+    def _mask(match: re.Match[str]) -> str:
+        raw = match.group(1)
+        if _DATE_LIKE.fullmatch(raw.strip()):
+            return raw
+        digits = re.sub(r"\D", "", raw)
+        if len(digits) < 7:
+            return raw
+        return mask(digits)
+
+    return _PHONE_IN_TEXT.sub(_mask, text)
 
 
 class NumberSource(str, Enum):
@@ -128,7 +182,7 @@ def source_number(e164: str, source: NumberSource, note: str = "") -> SourcedNum
     """
     if not isinstance(source, NumberSource):
         raise BoundaryError(f"unknown number source: {source!r}")
-    if not E164.match(e164 or ""):
+    if not E164.fullmatch(e164 or ""):
         raise BoundaryError(
             "number is not E.164 and will not be repaired or inferred: "
             f"{mask(e164 or '')}"

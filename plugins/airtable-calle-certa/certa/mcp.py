@@ -37,6 +37,7 @@ import subprocess
 from typing import Any
 
 from .transport import TransportError
+from .types import redact
 
 # Preserves install attribution for the skills.sh integration, exactly as
 # CALL-E's installation guide specifies.
@@ -96,7 +97,8 @@ class McpTransport:
             ) from exc
 
         if proc.returncode != 0:
-            detail = (proc.stderr or proc.stdout or "").strip()[:400]
+            # CLI output is provider-written and can echo the number dialed.
+            detail = redact((proc.stderr or proc.stdout or "").strip()[:400])
             raise TransportError(f"calle {' '.join(args[:2])} failed: {detail}")
         try:
             payload = json.loads(proc.stdout or "{}")
@@ -105,7 +107,7 @@ class McpTransport:
                 f"calle {' '.join(args[:2])} returned output that is not JSON"
             ) from exc
         if payload.get("ok") is False:
-            raise TransportError(f"calle reported failure: {str(payload)[:300]}")
+            raise TransportError(f"calle reported failure: {redact(str(payload)[:300])}")
         return payload
 
     @staticmethod
@@ -205,12 +207,12 @@ class McpTransport:
         evidence: list[str] = []
         summary = payload.get("summary") or payload.get("call_summary")
         if isinstance(summary, str) and summary.strip():
-            evidence.append(summary.strip())
+            evidence.append(redact(summary.strip()))
         for turn in payload.get("transcript") or payload.get("transcript_turns") or []:
             if isinstance(turn, dict) and turn.get("text"):
-                evidence.append(f"{turn.get('speaker', 'unknown')}: {turn['text']}")
+                evidence.append(redact(f"{turn.get('speaker', 'unknown')}: {turn['text']}"))
             elif isinstance(turn, str):
-                evidence.append(turn)
+                evidence.append(redact(turn))
 
         return {
             "id": call_id,

@@ -134,7 +134,7 @@ def resolve(e164: str) -> Destination:
     front of the number, so +1 216 (Cleveland) and +216 (Tunisia) do not
     collide: the first is read as code "1", the second as code "216".
     """
-    if not E164.match(e164):
+    if not E164.fullmatch(e164):
         raise UnsupportedRegion(
             f"{e164!r} is not an E.164 number, so no destination can be read "
             "from it"

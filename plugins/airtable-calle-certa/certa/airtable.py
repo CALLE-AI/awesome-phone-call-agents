@@ -36,6 +36,9 @@ from .types import (
     source_number,
 )
 
+from .types import redact
+from .net import CredentialRoutingError, check_base_url, urlopen as net_urlopen
+
 AIRTABLE_ORIGIN = "api.airtable.com"
 DEFAULT_BASE_URL = f"https://{AIRTABLE_ORIGIN}"
 USER_AGENT = "certa/0.1 (+awesome-phone-call-agents)"
@@ -123,6 +126,8 @@ class AirtableClient(Protocol):
 
     def list_view(self, table: str, view: str) -> list[dict[str, Any]]: ...
 
+    def get_record(self, table: str, record_id: str) -> dict[str, Any]: ...
+
     def count_table(self, table: str) -> int: ...
 
     def update_records(self, table: str, updates: Sequence[dict[str, Any]]) -> None: ...
@@ -141,12 +146,12 @@ class LiveAirtable:
     ) -> None:
         if not token or not base_id:
             raise AirtableError("AIRTABLE_TOKEN and AIRTABLE_BASE_ID are required")
-        origin = urllib.parse.urlsplit(base_url).netloc.lower()
-        if origin != AIRTABLE_ORIGIN:
-            raise AirtableError(
-                f"refusing to send an Airtable token to {origin!r}; "
-                f"credentialed requests are restricted to {AIRTABLE_ORIGIN}"
-            )
+        # Host alone is not enough: http://api.airtable.com passes a hostname
+        # check and puts the token on the wire in clear.
+        try:
+            check_base_url(base_url, frozenset({AIRTABLE_ORIGIN}), what="an Airtable token")
+        except CredentialRoutingError as exc:
+            raise AirtableError(str(exc)) from exc
         self.token = token
         self.base_id = base_id
         self.base_url = base_url.rstrip("/")
@@ -163,10 +168,12 @@ class LiveAirtable:
         request.add_header("Content-Type", "application/json")
         request.add_header("User-Agent", USER_AGENT)
         try:
-            with urllib.request.urlopen(request, timeout=self.timeout) as response:
+            with net_urlopen(request, timeout=self.timeout) as response:
                 raw = response.read().decode("utf-8")
+        except CredentialRoutingError as exc:
+            raise AirtableError(str(exc)) from exc
         except urllib.error.HTTPError as exc:
-            detail = exc.read().decode("utf-8", "replace")[:400]
+            detail = redact(exc.read().decode("utf-8", "replace")[:400])
             if exc.code == 429:
                 raise AirtableError(
                     "Airtable rate limit reached. The free plan allows 1,000 API "
@@ -210,6 +217,12 @@ class LiveAirtable:
         if view:
             params["view"] = view
         return self._paged(table, params)
+
+    def get_record(self, table: str, record_id: str) -> dict[str, Any]:
+        """One row, read fresh. Used to re-check consent just before dialing."""
+        return self._request(
+            "GET", f"/v0/{self.base_id}/{urllib.parse.quote(table)}/{record_id}"
+        )
 
     def views(self, table: str) -> list[dict[str, str]]:
         """Views on the table, so the operator can pick one instead of typing it."""
@@ -261,6 +274,12 @@ class FixtureAirtable:
 
     def list_view(self, table: str, view: str) -> list[dict[str, Any]]:
         return list(self._view)
+
+    def get_record(self, table: str, record_id: str) -> dict[str, Any]:
+        for record in self._records:
+            if record.get("id") == record_id:
+                return record
+        raise AirtableError(f"no record {record_id!r} in the fixture")
 
     def count_table(self, table: str) -> int:
         return len(self._records)
