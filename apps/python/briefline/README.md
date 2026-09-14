@@ -28,6 +28,8 @@ without a person babysitting a queue.
 
 ## Setup
 
+This is an external experimental reference. Keep `DRY_RUN=true`, use synthetic contacts and briefs, and leave provider credentials unset for the public walkthrough. The fake-model tests below are the offline verification path; the application preview is not an offline privacy boundary. The app is single-tenant with stubbed authentication, so do not expose live calling or private records to the public internet.
+
 ```bash
 git clone https://github.com/uthejitha04/dialtone && cd dialtone/backend
 python -m venv .venv
@@ -37,7 +39,7 @@ python -m venv .venv
 cp ../.env.example ../.env
 ```
 
-Two keys are enough to place a call:
+For a separately authorized live experiment, the source project uses these keys:
 
 ```bash
 CALLE_API_KEY=      # heycall-e.com
@@ -78,10 +80,9 @@ curl -X POST http://127.0.0.1:8010/api/phone/call \
   }'
 ```
 
-`dry_run: true` returns the exact task and result schema that *would* be sent
-and places no call. It needs no API key, because nothing leaves the machine.
+`dry_run: true` returns the task and result schema that *would* be sent to CALL-E and places no telephone call. It needs no CALL-E key, but compilation can send the brief to a configured Groq/Gemini model before returning the preview. Use only synthetic text here; use the fake-model tests, not this endpoint, when no network traffic is required.
 
-Set `"dry_run": false` to dial. The response carries a `call_id`; poll
+Only after reviewing the source limitations and confirming an authorized E.164 destination, `"dry_run": false` can dial. The response carries a `call_id`; poll
 `GET /api/phone/call/{call_id}` or receive the terminal result on the webhook.
 
 ## Side effects
@@ -101,6 +102,8 @@ Worth reading before setting `dry_run: false` — these reach real people.
 
 `DRY_RUN=true` is the default and exercises all of the above except dialling.
 
+The live scheduler currently rearms failed submissions with a new intent key, including timeouts where CALL-E may already have accepted the call. Campaign dispatch can also advance after an uncertain failure. This is not safe automatic recovery: keep the walkthrough dry-run-only, and stop/reconcile unknown attempts with the provider before enabling another real call or callback. This entry does not qualify unattended live campaigns.
+
 ## Cancelling
 
 - **One follow-up:** `POST /api/follow-ups/{id}/cancel`, or the Cancel button
@@ -117,18 +120,18 @@ A call already in progress is CALL-E's to end; this app cannot hang it up.
 
 ## Guardrails
 
-Enforced in code and covered by tests, not left to the prompt:
+The source combines tested scheduling rules with agent instructions. These are experimental controls, not guarantees about arbitrary conversations or ambiguous provider outcomes:
 
 | | |
 |---|---|
 | Permanent opt-out | Outranks a callback the same person requested earlier |
 | Calling hours | Due callbacks defer to the next window rather than dial |
 | No guessed times | An unusable phrase refuses to schedule instead of inventing one |
-| No invented facts | The agent states only supplied facts, or says it does not know |
+| No invented facts | The task instructs the agent to use supplied facts; a person must verify consequential claims |
 | AI disclosure | Says it is an AI in the opening line; CALL-E rejects tasks that hide it |
 | Stale callbacks | A callback missed by six hours reschedules rather than calling cold |
 | Bad numbers | Rejected with a row number and reason, never dialled |
-| Failed dials | Re-armed and retried, never silently dropped |
+| Failed dials | Currently re-armed; ambiguous submissions require manual reconciliation before live retry |
 | Webhook trust | CALL-E webhooks are unsigned, so the callback URL carries a secret |
 
 Full detail in [SAFETY.md](https://github.com/uthejitha04/dialtone/blob/master/SAFETY.md).
@@ -139,7 +142,7 @@ Full detail in [SAFETY.md](https://github.com/uthejitha04/dialtone/blob/master/S
 cd backend && ./.venv/Scripts/python -m pytest -q
 ```
 
-98 tests, run against a fake model so the suite is free and offline. They
+The author reports 98 tests against a fake model so the suite is free and offline; that count was not independently verified here. They
 concentrate on the cases where a mistake reaches a person: that an opt-out beats
 a scheduled callback, that a callback time is never guessed, that a failed dial
 is re-armed, and that dry run never spends credit.
