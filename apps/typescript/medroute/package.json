@@ -1,0 +1,24 @@
+{
+  "name": "medroute-calle",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "start": "node --env-file-if-exists=.env --env-file-if-exists=.env.local server.js",
+    "demo": "node demo-server.js",
+    "dev": "node --env-file-if-exists=.env --env-file-if-exists=.env.local --watch server.js",
+    "check": "node --check server.js",
+    "lint": "eslint .",
+    "test": "node --test test/*.test.js"
+  },
+  "dependencies": {
+    "@call-e/calle": "^0.2.2",
+    "jose": "^6.2.4",
+    "pg": "^8.22.0"
+  },
+  "devDependencies": {
+    "@eslint/js": "^10.0.1",
+    "eslint": "^10.9.1",
+    "eslint-plugin-jsdoc": "^63.3.3"
+  }
+}
