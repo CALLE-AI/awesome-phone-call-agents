@@ -14,16 +14,16 @@ Build a phone-native AI assistant for seniors: ask, search, understand, remember
 - Architecture: one realtime conversation agent with a small tool layer; CALL-E handles outbound phone actions.
 - Branch: `feat/senior-phone-ai-app`.
 - Planned app directory: `apps/typescript/senior-phone-ai/`.
-- Scope: 15 MVP tickets and 4 optional extensions.
+- Scope: 15 MVP tickets and 5 optional extensions.
 - Live information must be retrieved after the caller asks and answered during that same call. Fake providers are for explicitly labeled development/tests only.
 - Host scheduling owns recurrence; the provider handles one call per scheduled run.
 - Provider capabilities and deployment requirements must be verified during implementation.
 
 ## Current progress
 
-Last updated: 2026-09-11
+Last updated: 2026-09-14
 
-Implementation is in progress. MVP: **13/15 done**. Optional extensions: **0/4 done**.
+Implementation is in progress. MVP: **13/15 done**. Optional extensions: **0/5 done**.
 
 Current ticket: [SPA-015](#spa-015). Deployment, demo and PR materials are prepared; hosted migration verification and approved live browser evidence remain. The Twilio voice/SMS gate remains [SPA-004](#spa-004). The [CALL-E post-call workflow](calle-followups.md) now collects request/permission evidence, waits for completion, searches and sends one Twilio SMS. The `/followups` UI uses the CALL-E monitor. Live extraction and carrier verification remain unfinished.
 
@@ -49,7 +49,7 @@ The final MVP gate is [SPA-004](#spa-004): connect Twilio/inbound SIP only after
 | M1: Prove realtime browser tool calling | SPA-001–SPA-003 | Realtime browser search gate passes with redacted evidence |
 | M2: Build the core MVP | SPA-005–SPA-013 | SMS, persistence, reminders, CALL-E and authorized dashboard work end to end |
 | M3: Verify, demonstrate and connect the MVP | SPA-014–SPA-015, then SPA-004 | Required checks, the browser demo and the authorized live telephone gate pass; operations are documented |
-| M4: Optional extensions | SPA-016–SPA-019 | Selected extensions meet their own acceptance criteria after the MVP |
+| M4: Optional extensions | SPA-016–SPA-020 | Selected extensions meet their own acceptance criteria after the MVP |
 
 ## Ticket board
 
@@ -74,6 +74,7 @@ The final MVP gate is [SPA-004](#spa-004): connect Twilio/inbound SIP only after
 | [SPA-017](#spa-017) | Optional: contact trusted family on explicit senior request | M4 | Low | Backlog | [SPA-004](#spa-004) |
 | [SPA-018](#spa-018) | Optional: add weather and government-information tools | M4 | Low | Backlog | [SPA-004](#spa-004) |
 | [SPA-019](#spa-019) | Optional: add explicitly scheduled recurring check-ins | M4 | Low | Backlog | [SPA-004](#spa-004) |
+| [SPA-020](#spa-020) | Optional: add consented two-way SMS questions | M4 | Low | Backlog | [SPA-004](#spa-004) |
 
 ## Ticket details
 
@@ -375,10 +376,33 @@ Acceptance criteria:
 
 Implementation notes and verification: Not started.
 
+### SPA-020
+
+**Optional: add consented two-way SMS questions**
+
+Let a senior reply to an opted-in follow-up SMS, search current public
+information with OpenAI on the server and return a concise answer in the same
+SMS conversation.
+
+Acceptance criteria:
+- [ ] Validate Twilio Messaging webhook signatures and deduplicate provider retries by message ID.
+- [ ] Bind each sender to an active, explicitly consented phone-number conversation with a documented expiry.
+- [ ] Process `STOP`, `UNSUBSCRIBE`, `HELP` and equivalent controls before any model request.
+- [ ] Use server-side OpenAI web search, include a useful source and retrieval date, and state when information cannot be verified.
+- [ ] Enforce quiet hours, message, cost and conversation-turn limits without creating a hidden recurring job.
+- [ ] Decline or hand off medical, legal, personal financial, emergency and account-changing requests.
+- [ ] Show inbound questions, outbound answers and Twilio delivery status beside the related call in the combined history.
+- [ ] Test signature failure, duplicate delivery, expired consent, opt-out, search failure and provider failure with synthetic data and no live side effects.
+
+Implementation notes and verification: Not started. Use the Responses API with
+web search for asynchronous SMS; reserve Realtime for a later live voice
+handoff.
+
 ## Progress log
 
 | Date | Tickets | Update | Verification |
 |---|---|---|---|
+| 2026-09-14 | SPA-020 | Scoped a future consented two-way SMS question flow with current public-information search, source-aware replies, opt-out handling and bounded conversation history. | Documentation-only change; the capability remains Backlog and no SMS was sent. |
 | 2026-09-11 | SPA-015 foundation | Prepared no-Docker deployment, rollback, scheduler and Margaret demo runbooks; added catalog entries and a scoped PR draft. SPA-015 is In progress pending hosted migration verification and approved live evidence. | Documentation and public artifacts are being validated without reading `.env.local` or invoking a provider. |
 | 2026-09-11 | SPA-014 | Added safe workflow outcome metrics and focused malformed-provider, disconnected-session and untrusted-rendering tests; documented residual risks and made SPA-015 Ready. | Ninety-one offline tests, lint and typecheck passed. Clean install, production build/startup, unauthorized probes and repository validation passed without provider side effects. |
 | 2026-09-11 | SPA-013 | Added the authenticated family workspace, RLS-backed views, owner settings, permission-checked reminder cancellation and broader phone-text redaction; marked SPA-013 Done and SPA-014 Ready. | Eighty-seven offline tests, lint, typecheck and production build passed. Embedded PostgreSQL denied cross-account management; live signed-out page and endpoint checks exposed no private data. |

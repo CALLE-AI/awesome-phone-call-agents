@@ -152,7 +152,7 @@ This project is an awesome list for AI-agent phone-call workflows. Add resources
 
 ### Apps
 
-- [Senior Phone AI](apps/typescript/senior-phone-ai/) - Consent-first Next.js assistant for older people with browser Realtime search, confirmed reminders and CALL-E actions, grounded summaries, and a private family dashboard; preview/fake adapters make the default path no-call.
+- [Senior Phone AI](apps/typescript/senior-phone-ai/) - Next.js CALL-E demo for older Australians with a shared source-backed daily briefing, explicitly confirmed calls, and combined call/SMS history. Because the current CALL-E integration cannot invoke the app's web-search tool during a provider-hosted call, new requests use consent-gated post-call search followed by an SMS preview or Twilio delivery; preview adapters keep the default path side-effect free.
 - [Clarity](apps/typescript/clarity/) - Clarifies one ambiguous job-application claim through an adaptive CALL-E phone call, returning transcript-backed facts and unresolved questions, with a no-call replay default. [Demo video](https://www.youtube.com/watch?v=_eHWqBgilrI)
 - [OneReach service follow-up](apps/typescript/onereach-service-followup/) - Turns an authorized CALL-E service appointment conversation into a validated Operations handoff, with a no-call default and standalone public integration example.
 
@@ -168,7 +168,7 @@ Runnable demo apps live under [`apps/`](apps/). They are not a CALL-E SDK and do
 
 | App | Language | Purpose |
 | --- | --- | --- |
-| [`apps/typescript/senior-phone-ai`](apps/typescript/senior-phone-ai/) | TypeScript / Next.js | Consent-first browser Realtime search, authorized reminders and CALL-E actions, grounded post-call summaries, and a private family dashboard with a no-call default. |
+| [`apps/typescript/senior-phone-ai`](apps/typescript/senior-phone-ai/) | TypeScript / Next.js | Shared Australian daily knowledge injected into confirmed CALL-E calls, consent-gated post-call search, SMS previews or Twilio delivery, and per-call conversation/SMS history with a no-call default. |
 | [`apps/typescript/clarity`](apps/typescript/clarity/) | TypeScript / Next.js | Clarifies one job-application claim with an adaptive CALL-E follow-up, structured results, timestamped transcript evidence, and a synthetic no-call replay. |
 | [`apps/typescript/payoutproof`](apps/typescript/payoutproof/) | JavaScript / Node | Compiles a publicly sourced reward inquiry into one disclosed, approval-gated CALL-E payout-policy call; masks the number in previews and treats verbal answers as non-contractual until backed by written terms. |
 | [`apps/typescript/creditcall`](apps/typescript/creditcall/) | JavaScript / Node | Human-approved invoice-exception call handoff with a no-call dry run, disclosed test calls, masked phone output, and duplicate-start protection. |

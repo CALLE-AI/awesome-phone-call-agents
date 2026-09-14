@@ -1,34 +1,72 @@
 # Senior Phone AI
 
-The [Australian Twilio SMS pilot](../../../docs/senior-phone-ai/twilio-sms.md)
-adds an explicitly enabled live SMS adapter, signed delivery callbacks and a
-server-only post-call factory. The [CALL-E follow-up workflow](../../../docs/senior-phone-ai/calle-followups.md)
-offers an SMS recap during every eligible call, collects permission, and includes
-requested search results after completion in one Twilio follow-up. Track it at `/followups`.
-Live carrier verification remains. Preview is the default.
+Senior Phone AI is a local Next.js reference app for calling older Australians
+with CALL-E. Before a call, the operator can equip CALL-E with one shared,
+source-backed Australian daily briefing. During the conversation, the recipient
+can ask about useful news, scams, digital safety, services, benefits or retirement
+updates contained in that dated briefing.
 
-Senior Phone AI is a phone-native assistant designed to give older people access to realtime information, reminders and simple phone actions through an ordinary phone call. The intended live architecture uses one OpenAI Realtime agent with typed tools; CALL-E is reserved for explicitly approved outbound phone actions.
+After a completed call, the app can turn one clearly confirmed public-information
+request into a concise sourced SMS. The [CALL-E follow-up workflow](../../../docs/senior-phone-ai/calle-followups.md)
+requires an affirmative answer to an SMS permission question and rejects later
+withdrawal. Preview mode performs the search and displays the exact proposed text
+without contacting Twilio. The optional [Australian Twilio SMS pilot](../../../docs/senior-phone-ai/twilio-sms.md)
+adds delivery and receipt tracking when explicitly enabled.
 
-This directory contains the application scaffold and a protected developer-only OpenAI Realtime microphone harness with server-side live web search. It also contains an authorized, idempotent SMS workflow using preview/fake adapters, Supabase persistence with family-scoped row-level access controls, and a local-only explicitly confirmed CALL-E outbound-call harness. It does not yet connect an inbound telephone. An opt-in Twilio adapter is available for the Australian SMS pilot; live delivery is not yet verified.
+The `/calls` page contains call creation, same-day scheduling, transcripts,
+summaries and the SMS record for each call in one table. The separate family,
+people, reminder, settings and follow-up workspaces are outside this focused demo.
+The protected `/realtime` microphone harness remains available for direct browser
+experiments with OpenAI Realtime and server-side web search.
 
 ## Quick start
 
-### Personalized morning briefings
+### Shared Australian daily knowledge
 
-Open `/briefings` to save separate senior profiles with confirmed country, locality, timezone, interests and personalization consent. Prepare current news, nearby activities and official benefits/retirement information before a call, review the dated evidence, then explicitly confirm one CALL-E briefing call. Optional health prompts use only provided dates and agreed clinician follow-up plans. The telephone conversation uses the saved briefing; it does not browse live.
+Open `/briefings` to prepare and review one dated briefing used for every senior.
+No personal profile is required. The briefing uses live OpenAI web search and
+stores source-backed sections for Australian news, consumer and scam alerts,
+digital safety, community services, benefits and retirement information. A
+section without acceptable citations remains visibly unavailable.
 
-Daily preparation is opt-in per profile and runs while the local Next.js server remains running. It makes read-only searches, never automatic calls. See the [morning briefing guide](../../../docs/senior-phone-ai/morning-briefings.md) for setup, encryption, source policies, cancellation, recovery and production limitations.
+On `/calls`, enable **Use today's knowledge briefing** before reviewing a call.
+The app prepares or reuses the current Australia/Sydney briefing and injects its
+evidence into CALL-E's task. CALL-E cannot browse during the phone call; it answers
+from the prepared sources and says when a requested detail was not verified.
+Knowledge-enabled schedules are limited to later on the same Australian day so a
+future call cannot silently reuse stale news.
 
 Use Node.js 22.9 or newer.
 
 ```bash
 cd apps/typescript/senior-phone-ai
 npm ci
-copy .env.example .env
+copy .env.example .env.local
 npm run dev
 ```
 
-Open <http://localhost:3000>. `SENIOR_PHONE_AI_MODE` defaults to `preview` when it is absent. The health route at `/api/health` reports that side effects are disabled.
+Open <http://127.0.0.1:3000>. `SENIOR_PHONE_AI_MODE` defaults to `preview` when it is absent. The health route at `/api/health` reports that side effects are disabled.
+
+For the local CALL-E demo with live calls, live searches and operator-only SMS
+previews, set these values in `.env.local`:
+
+```dotenv
+SENIOR_PHONE_AI_MODE=live
+CALLE_API_KEY=
+OPENAI_API_KEY=
+CALLE_FOLLOWUP_ENABLED=true
+CALLE_FOLLOWUP_PREVIEW=true
+CALLE_FOLLOWUP_STORAGE_KEY=
+SMS_TEST_RECIPIENTS=+614xxxxxxxx
+SMS_ENABLED=false
+```
+
+Use a stable random `CALLE_FOLLOWUP_STORAGE_KEY` containing at least 32
+characters. `SMS_TEST_RECIPIENTS` is a comma-separated allowlist of explicitly
+consented Australian test mobiles. This mode places real CALL-E calls and runs
+real OpenAI searches, but it does not contact Twilio. To test Twilio delivery,
+follow the [Australian SMS setup](../../../docs/senior-phone-ai/twilio-sms.md),
+turn preview off, enable SMS, and configure the Twilio account, token and sender.
 
 ### Live local Realtime harness
 
@@ -49,9 +87,18 @@ News and local-event requests use dedicated `search_news` and `search_local_even
 
 ### Local CALL-E conversation monitor
 
-Open <http://127.0.0.1:3000/calls> in live mode. The page automatically loads the calls registered in the server-only `CALLE_MONITORED_CALL_IDS` setting and presents them in a table. Active calls refresh every two seconds, showing lifecycle status and each caller/assistant transcript turn that the provider has published. The [CALL-E Calls API](https://docs.heycall-e.com/api-reference/calls) has no list-all-calls operation, so each successful application dispatch must add its returned call ID to the durable call registry as part of SPA-010. The API documents transcript turns on an individual call response but does not promise that they are available before the terminal result.
+Open <http://127.0.0.1:3000/calls> in live mode. The page automatically loads calls registered by this application, plus optional IDs from `CALLE_MONITORED_CALL_IDS`, and presents them in one table. Active calls refresh every two seconds, showing lifecycle status and each caller/assistant transcript turn that the provider has published. Each row also shows its matching SMS follow-up status and expandable message. The [CALL-E Calls API](https://docs.heycall-e.com/api-reference/calls) has no list-all-calls operation, so successful dispatches are recorded in the local durable registry. The API documents transcript turns on an individual call response but does not promise that they are available before the terminal result.
 
-To place a call, select the country calling code and enter the local phone number on `/calls`. The app normalizes that input to strict E.164 before review. The purpose is optional and bounded to 300 characters; an empty purpose produces a general conversation without inventing a reason in the operator review. **Review call now** performs no provider request and displays a masked confirmation. Only **Confirm and place call** dispatches to CALL-E. To schedule it, choose a browser-local date and time, use **Review scheduled call**, then **Confirm and schedule call**. Pending schedules appear in a table and can be canceled until dispatch starts. The local scheduler checks while the page is open and catches up at its next check after a restart. Production deployment still requires the authenticated durable scheduler work in SPA-011. Pending destination and purpose data are AES-GCM encrypted in an ignored, permission-restricted local registry using a key derived from the server-only CALL-E key.
+To place a call, select the country calling code and enter the local phone number on `/calls`. The app normalizes that input to strict E.164 before review. The additional instruction is optional and bounded to 300 characters; an empty value produces a general conversation. Enable daily knowledge when the call should answer from today's shared briefing. **Review call now** prepares any selected briefing and displays a masked confirmation. Only **Confirm and place call** dispatches to CALL-E. To schedule it, choose a browser-local date and time, use **Review scheduled call**, then **Confirm and schedule call**. Pending schedules appear in a table and can be canceled until dispatch starts. The local scheduler checks while the page is open and catches up at its next check after a restart. Production deployment still requires the authenticated durable scheduler work in SPA-011. Pending destination, instruction and briefing reference data are AES-GCM encrypted in an ignored, permission-restricted local registry using a key derived from the server-only CALL-E key.
+
+For allowlisted Australian mobiles, an eligible call is automatically registered
+for one post-call SMS record. CALL-E speaks a short recap, collects one complete
+public-information request when needed, and asks whether the recipient wants an
+SMS prepared for the same number. The local worker verifies the completed call,
+request and affirmative consent before searching. It stores one sourced result or
+an explicit failure state and never retries an uncertain send. In
+`CALLE_FOLLOWUP_PREVIEW=true`, CALL-E uses natural customer-facing SMS language,
+while the table clearly labels the result **Preview — not sent**.
 
 Call diagnostics use newline-delimited JSON at `logs/call-activity.ndjson`. The log covers immediate and scheduled provider requests and records schedule creation, cancellation, expiration, dispatch claims, request timing, acceptance, definitive provider rejection and bounded failure codes. HTTP 4xx responses are recorded as rejected and allow a corrected, newly reviewed request to use a fresh idempotency key; uncertain transport and 5xx failures remain unknown and require same-intent reconciliation. The log masks destinations and excludes the call purpose, API key, raw provider response, provider call ID and idempotency key. The entire `logs/` directory is ignored by Git. To follow it during local testing in PowerShell, run `Get-Content logs/call-activity.ndjson -Wait` from this app directory.
 
@@ -116,10 +163,42 @@ Future provider actions must document their own cancellation limits. In particul
 
 Implementation progress and acceptance criteria are tracked in [`docs/senior-phone-ai/README.md`](../../../docs/senior-phone-ai/README.md).
 
+## Future: two-way SMS questions
+
+A planned extension will let a senior reply to an opted-in follow-up SMS with a
+question and receive a concise answer in the same message conversation. SMS is
+asynchronous, so the server-side OpenAI Responses API with web search is a better
+fit for this flow than keeping an audio Realtime session open. A later telephone
+handoff can use Realtime when an ongoing voice conversation is required.
+
+The inbound flow must:
+
+- accept only Twilio Messaging webhooks with a valid Twilio signature, and
+  deduplicate retries by provider message ID;
+- bind the sender to an active, explicitly consented conversation for that phone
+  number, with a short expiry and no automatic enrollment from an unrelated call;
+- process `STOP`, `UNSUBSCRIBE`, `HELP` and equivalent controls before sending
+  text to a model;
+- enforce quiet hours, message, cost and conversation-turn limits;
+- search current public information on the server, include a useful source and
+  date in the answer, and say when the answer cannot be verified;
+- keep medical, legal, personal financial, emergency and account-changing
+  requests outside the automated flow and provide an appropriate handoff; and
+- record inbound questions, outbound answers and Twilio delivery status beside
+  the related call in the combined history.
+
+This capability is tracked as SPA-020 and is not implemented in the current
+demo.
+
 ## Current limitations
 
 - There is no inbound phone integration.
-- Live Twilio SMS delivery is unverified. CALL-E automatic follow-ups require structured request/permission fields with matching transcript evidence; old calls without those fields cannot trigger SMS. Scheduled CALL-E calls currently use the local operator registry; durable multi-worker Supabase scheduling remains in SPA-011.
+- The current CALL-E integration cannot invoke this app's OpenAI web-search tool
+  during a provider-hosted phone call. The app therefore captures the senior's
+  request and SMS permission during the call, runs the search after CALL-E marks
+  the call complete, and prepares or sends the sourced answer by SMS. The shared
+  daily briefing is the only searched information available inside the call.
+- Live Twilio SMS delivery is unverified. CALL-E automatic follow-ups require structured request and permission evidence; preview mode can conservatively recover a confirmed public request when CALL-E splits the consent question across adjacent transcript turns. Old calls without evidence cannot trigger SMS. Scheduled CALL-E calls currently use the local operator registry; durable multi-worker Supabase scheduling remains in SPA-011.
 - Conversation notes are stored only in one browser and have no authentication or multi-user access controls.
 - CALL-E transcript turns may not appear until a call reaches a terminal state.
 - Preview adapters exercise safe interfaces only; they do not prove provider compatibility.
