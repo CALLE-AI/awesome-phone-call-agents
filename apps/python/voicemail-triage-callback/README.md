@@ -41,8 +41,8 @@ export CALLE_API_KEY="<your key from https://dashboard.heycall-e.com/account/api
 python callback.py --live --confirm --task "Call back and confirm the 2:30pm cleaning appointment." --to-phone "+15551234567"
 ```
 
-- `--live` and `--confirm` are both required together; `--confirm` is explicit intent, never
-  implied by `--live` alone.
+- `--live` and `--confirm` are both required together; `--confirm` attests explicit intent
+  for this call and the recipient's authorization, never implied by `--live` alone.
 - `--to-phone` must be a real E.164 number you own or are authorized to call. This app never
   guesses, infers, or reformats a phone number -- the value you pass is exactly what gets
   dialed.
@@ -56,9 +56,9 @@ python callback.py --live --confirm --task "Call back and confirm the 2:30pm cle
 - No API key is bundled, hardcoded, or read from anywhere but the `CALLE_API_KEY` environment
   variable -- the app fails with a clear `RuntimeError` rather than falling back to a shared
   default.
-- The full CALL-E result (status, per-recipient outcome, `transcript_turns`, any
-  `structured_result`) is printed to stdout as JSON. This app does not persist a log file or
-  write anywhere else on disk.
+- The live CLI prints only a bounded status and a masked destination. Integrations calling
+  `place_callback` receive the private provider result and must protect it before sharing.
+  This app does not persist a log file or write anywhere else on disk.
 - All example phone numbers in this README, in `--demo` mode, and in tests are fictional
   reserved numbers (`+1555...`) -- never a real, dialable number.
 
@@ -68,6 +68,12 @@ python callback.py --live --confirm --task "Call back and confirm the 2:30pm cle
 `--live --confirm`, this app cannot cancel it mid-call; use the CALL-E dashboard if it exposes
 a cancel action for in-progress calls. There is no recurring schedule anywhere in this app to
 disable, and no local state file is written that would need cleaning up.
+
+After a timeout or unclear provider outcome, reconcile the original call before trying
+again; this primitive never automatically retries. Upstream classification is advisory.
+Medical, legal, financial, employment, emergency, or otherwise consequential decisions
+require human review and are outside this automatic callback's scope. Do not disclose
+sensitive information merely because an upstream classifier marked the task safe.
 
 ## Validation
 

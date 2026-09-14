@@ -21,6 +21,7 @@ from __future__ import annotations
 import argparse
 import json
 import os
+import re
 from typing import Any
 
 JsonObject = dict[str, Any]
@@ -46,6 +47,8 @@ def place_callback(task: str, phone_number: str, *, api_key: str | None = None) 
     Raises RuntimeError if no API key is available. Imports the calle-ai SDK lazily so that
     --demo mode above needs no dependency installed at all.
     """
+    if not isinstance(phone_number, str) or not re.fullmatch(r"\+[1-9][0-9]{1,14}", phone_number):
+        raise ValueError("Destination must be exact ASCII E.164; no number was submitted.")
     api_key = api_key or os.environ.get("CALLE_API_KEY")
     if not api_key:
         raise RuntimeError("CALLE_API_KEY is not set -- see README.md for setup.")
@@ -92,7 +95,7 @@ def main() -> None:
     parser.add_argument(
         "--confirm",
         action="store_true",
-        help="Explicit confirmation a real call may be placed. Never implied by --live alone.",
+        help="Confirm this call and attest the recipient authorized it. Never implied by --live alone.",
     )
     args = parser.parse_args()
 
@@ -111,8 +114,17 @@ def main() -> None:
     if not args.task or not args.to_phone:
         parser.error("--live requires both --task and --to-phone.")
 
-    result = place_callback(args.task, args.to_phone)
-    print(json.dumps(result, indent=2))
+    try:
+        result = place_callback(args.task, args.to_phone)
+    except ValueError:
+        parser.exit(1, "Destination must be exact ASCII E.164; no number was submitted.\n")
+    except Exception:
+        parser.exit(1, "Call submission or waiting failed; its outcome may be unknown. Reconcile with the provider before another call.\n")
+    # Raw provider objects remain private to the integration, not CLI output.
+    status = result.get("status")
+    if status not in {"queued", "pending", "in_progress", "completed", "failed", "canceled"}:
+        status = "unknown"
+    print(json.dumps({"status": status, "destination": "[phone redacted]"}, indent=2))
 
 
 if __name__ == "__main__":
