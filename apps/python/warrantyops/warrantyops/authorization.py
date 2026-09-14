@@ -17,7 +17,7 @@ from enum import Enum
 #: ``phone`` pattern ``^\+[1-9]\d{7,14}$``. The Calls API accepts one digit
 #: fewer; refusing the shorter form here can only reject a number CALL-E would
 #: have accepted, never accept one it would reject.
-E164_RE = re.compile(r"^\+[1-9]\d{7,14}$")
+E164_RE = re.compile(r"^\+[1-9][0-9]{7,14}$")
 
 
 class AuthorizationBasis(str, Enum):
