@@ -121,8 +121,9 @@ export function decideAirline(outcome: CallOutcome): AirlineDecision {
   }
 
   const reasons: string[] = [];
-  if (result.outcome === "refused") reasons.push(`The airline desk refused: ${result.reason || "no reason given"}.`);
-  if (result.outcome === "callback_later") reasons.push(`The airline desk asked for a call back: ${result.reason || "no detail"}.`);
+  const said = result.reason.replace(/[.\s]+$/, "");
+  if (result.outcome === "refused") reasons.push(`The airline desk refused: ${said || "no reason given"}.`);
+  if (result.outcome === "callback_later") reasons.push(`The airline desk asked for a call back: ${said || "no detail"}.`);
   if (result.outcome === "unknown") reasons.push("The airline desk outcome is unclear.");
   if (result.extra_charge_requested === "yes") reasons.push("The desk asked for more than the quoted airline fees.");
   if (outcome.taskCompleted === false) reasons.push("CALL-E reports the task was not completed.");

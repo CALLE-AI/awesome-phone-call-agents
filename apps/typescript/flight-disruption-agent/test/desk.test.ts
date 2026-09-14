@@ -122,3 +122,19 @@ test("the task discloses the AI, states exact amounts, and forbids payment detai
   const schema = buildResultSchema(quote) as { properties: { selected_flight: { enum: string[] } } };
   assert.deepEqual(schema.properties.selected_flight.enum, [...quote.moves.map((m) => m.flightId), "none"]);
 });
+
+test("live mode sends the airline desk call to the demo phone only, after typed confirmation", async () => {
+  const gateway = new RecordingGateway({ kind: "started", callId: "call_airline" });
+  const now = () => new Date("2026-09-19T08:00:00+07:00").getTime();
+  const desk = new Desk(loadCatalog(), gateway, { statePath: null, liveDemoPhone: "+6591234567", liveCallBudget: 1, now });
+  const entry = desk.submitRequest("P3X9GA", "reschedule", "NA729-2026-09-20", "chat");
+  desk.confirmRequest(entry.request.id, 415_000);
+  const preview = desk.previewAirlineCall(entry.request.id);
+  assert.equal(preview.redirected, true);
+  assert.equal(preview.destinationMasked, "+65 ••• 4567");
+  await assert.rejects(desk.callAirlineDesk(entry.request.id), /last 4 digits/);
+  assert.equal((await desk.callAirlineDesk(entry.request.id, "4567")).status, "airline_call_in_progress");
+  assert.equal(gateway.requests[0]?.phone, "+6591234567");
+  assert.equal(gateway.requests[0]?.idempotencyKey, "fda-req_P3X9GA_1-airline");
+  assert.equal(gateway.requests[0]?.metadata.purpose, "airline_forced_reissue");
+});
