@@ -8,7 +8,6 @@ the AI **picks up the phone** through CALL-E and writes the structured result
 back to the same order, booking and conversation.
 
 - Repository: [https://github.com/TayseerLaz/frontdesk-core](https://github.com/TayseerLaz/frontdesk-core)
-- Demo video: [https://youtu.be/REPLACE_WITH_VIDEO_ID](https://youtu.be/REPLACE_WITH_VIDEO_ID)
 
 ## The phone-work problem
 
