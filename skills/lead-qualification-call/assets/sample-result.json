@@ -1,0 +1,38 @@
+{
+  "object": "call_task",
+  "id": "call_fictional0000001",
+  "status": "completed",
+  "metadata": {
+    "lead_id": "LEAD-2026-0042",
+    "campaign_id": "Q3-2026-website-callbacks",
+    "workflow": "lead_qualification",
+    "idempotency_key": "lead_qualification:LEAD-2026-0042:Q3-2026-website-callbacks"
+  },
+  "summary": "Fictional Avery confirmed an active analytics need and a budget in the 5k to 20k range, wants to act within 1 to 3 months, and is the decision maker. They asked for a human follow-up call.",
+  "structured_result": {
+    "needs": "Consolidate reporting across three teams into one analytics platform.",
+    "budget_range": "5k_20k",
+    "timeline": "1_3_months",
+    "is_decision_maker": true,
+    "interest_level": "high",
+    "callback_requested": true,
+    "disposition": "qualified"
+  },
+  "recipients": [
+    {
+      "phones": ["+15550101234"],
+      "structured_result": {
+        "needs": "Consolidate reporting across three teams into one analytics platform.",
+        "budget_range": "5k_20k",
+        "timeline": "1_3_months",
+        "is_decision_maker": true,
+        "interest_level": "high",
+        "callback_requested": true,
+        "disposition": "qualified"
+      }
+    }
+  ],
+  "completion_confidence": 0.93,
+  "task_completed": true,
+  "completed_at": "2026-09-11T18:42:07Z"
+}

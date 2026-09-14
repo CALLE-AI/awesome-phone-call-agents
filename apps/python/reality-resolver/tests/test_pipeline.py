@@ -11,6 +11,7 @@ here reaches a real provider or places a real call.
 from __future__ import annotations
 
 import json
+from dataclasses import asdict
 from pathlib import Path
 
 import pytest
@@ -276,3 +277,48 @@ def test_resolve_works_without_an_observer_at_all() -> None:
 
         assert result.verdict is not None
         assert result.verdict.status == "RESOLVED"
+
+
+# --- per-request credential: it must not reach the Resolution --------
+#
+# ResolutionRequest can now carry a CALL-E key. Resolution must not: it
+# is what gets serialized and stored, so a key that reached it would
+# reach a client. Checked here rather than trusted, because the two
+# classes live in the same file and nothing but a test stops someone
+# copying the field across.
+
+SENTINEL_KEY = "iams_live_pipeline_sentinel_not_a_real_credential"
+
+
+def test_a_per_request_key_never_appears_in_the_resolution() -> None:
+    with FakeCalleServer() as server:
+        result = resolve(_request(ESCALATION, server.base_url, execute=True, api_key=SENTINEL_KEY))
+
+        rendered = json.dumps(asdict(result), default=str)
+        assert SENTINEL_KEY not in rendered
+        assert "api_key" not in rendered
+        assert result.verdict is not None
+        assert result.verdict.status == "RESOLVED"
+
+
+def test_a_per_request_key_changes_nothing_against_the_fake_backend() -> None:
+    """The fake path is unaffected: resolve_api_key only honours a
+    per-request key on the live path, so supplying one here must produce
+    exactly the same run as not supplying one.
+    """
+    with FakeCalleServer() as server:
+        without = resolve(_request(ESCALATION, server.base_url, execute=True))
+        with_key = resolve(_request(ESCALATION, server.base_url, execute=True, api_key=SENTINEL_KEY))
+
+        assert without.verdict == with_key.verdict
+        assert without.call_placed == with_key.call_placed is True
+        assert without.call is not None and with_key.call is not None
+        assert (
+            without.call["structured_result"] == with_key.call["structured_result"]
+        ), "the fake backend must behave identically with or without a key"
+
+
+def test_the_default_is_none_so_the_cli_path_is_untouched() -> None:
+    request = ResolutionRequest(case_path="x", base_url="http://127.0.0.1:1")
+
+    assert request.api_key is None
