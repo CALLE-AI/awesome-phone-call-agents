@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
-import { buildAirlineResultSchema, buildAirlineTask, decideAirline } from "../src/airline.ts";
+import { airlineRefundAmount, buildAirlineRefundResultSchema, buildAirlineRefundTask, buildAirlineResultSchema, buildAirlineTask, decideAirline, decideAirlineRefund } from "../src/airline.ts";
 import { DryRunGateway } from "../src/calle.ts";
 import { findBooking, loadCatalog } from "../src/data.ts";
 import { voluntaryQuoteFor } from "../src/rules.ts";
@@ -91,4 +91,34 @@ test("dry run scripts the airline desk from the booking fixture", async () => {
     const decision = decideAirline(await gateway.get(started.kind === "started" ? started.callId : ""));
     assert.equal(decision.kind, kind, pnr);
   }
+});
+
+test("a refused refund is escalated with the airline's own refund amount, never a voucher", () => {
+  const booking = findBooking(catalog, "W4N7QS"); // flex 2,180,000 sold directly by TripKita
+  const quote = voluntaryQuoteFor(catalog, booking);
+  assert.equal(airlineRefundAmount(catalog, booking, quote), 1_962_000, "90% of the flex fare");
+  assert.equal(quote.refund.amount, 1_962_000 - 50_000, "the passenger's refund also loses the TripKita fee");
+  const task = buildAirlineRefundTask(catalog, { booking, quote, rejectionCode: "REFUND_NOT_PERMITTED" });
+  assert.match(task, /approve the refund of 1,962,000 rupiah/);
+  assert.match(task, /Do not accept a lower refund, a travel voucher, or credit/);
+  assert.match(task, /Never give card numbers, bank account numbers/);
+  assert.ok((buildAirlineRefundResultSchema() as { required: string[] }).required.includes("refund_reference"));
+});
+
+test("only an approval of exactly the expected refund with a reference is applied", () => {
+  const approved = {
+    outcome: "refund_approved",
+    approved_refund_amount: "1,962,000",
+    refund_reference: "NA-RF-0107",
+    reduced_refund_offered: "no",
+    reason: "Desk agent said: Approved.",
+  };
+  assert.deepEqual(decideAirlineRefund(outcome(approved), 1_962_000), { kind: "refund_approved", reference: "NA-RF-0107" });
+  assert.equal(decideAirlineRefund(outcome({ ...approved, approved_refund_amount: "1500000" }), 1_962_000).kind, "review");
+  assert.equal(decideAirlineRefund(outcome({ ...approved, refund_reference: "none" }), 1_962_000).kind, "review");
+  assert.equal(decideAirlineRefund(outcome({ ...approved, reduced_refund_offered: "yes" }), 1_962_000).kind, "review");
+  assert.equal(decideAirlineRefund(outcome({ ...approved, reduced_refund_offered: "unknown" }), 1_962_000).kind, "review");
+  assert.equal(decideAirlineRefund(outcome({ ...approved, outcome: "refused" }), 1_962_000).kind, "review");
+  assert.equal(decideAirlineRefund(outcome(approved, { taskCompleted: null }), 1_962_000).kind, "review");
+  assert.equal(decideAirlineRefund(outcome(null), 1_962_000).kind, "review");
 });
