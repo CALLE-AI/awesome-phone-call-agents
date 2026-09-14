@@ -253,6 +253,7 @@ This project is an awesome list for AI-agent phone-call workflows. Add resources
 - [OOO-Pilot](https://github.com/balajianbalagan/ooopilot) - Slack-based AI work proxy that places real CALL-E phone calls on an absent employee's behalf, verifies coworker claims against Jira before treating them as fact, and reports discrepancies in a return-to-work summary.
 
 -  [VendorPulse](https://github.com/Eman2123/VendorPlus) - Autonomous CALL-E-powered vendor check-in tool that calls suppliers about order status, scores delivery risk, and escalates high-risk vendors for human review.
+- [hivemind-closer](apps/python/hivemind-closer/) - Mock-first lead qualifier that folds one structured CALL-E result into a deterministic bargaining board with immediate graceful exit on opt-out and a code-enforced 20-call budget; dry-run preview by default.
 Runnable demo apps live under [`apps/`](apps/). They are not a CALL-E SDK and do not define a supported application API.
 
 | App | Language | Purpose |
