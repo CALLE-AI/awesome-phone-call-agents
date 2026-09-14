@@ -5,7 +5,7 @@
 
 import { parseArgs } from "node:util";
 import { createInterface } from "node:readline/promises";
-import { existsSync, mkdirSync, writeFileSync } from "node:fs";
+import { existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import { basename, dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 import type { Call, CalleClient } from "@call-e/calle";
@@ -556,8 +556,17 @@ const campaign: Campaign = { id: `probe-${asOf}-${runStamp}`, title: "Conformanc
       // filename, or a stray `--simulate violating` would quietly overwrite the report from the
       // real calls.
       const stem = config.mode === "live" ? "conformance" : simulateMode === "violating" ? "conformance-simulated-violating" : "conformance-simulated";
-      writeFileSync(join(dir, `${stem}.jsonl`), `${results.map((r) => JSON.stringify(r)).join("\n")}\n`, "utf8");
-      const markdown = buildConformanceReport(results);
+      // Probes are run a few at a time, so the record accumulates: running one probe must not erase
+      // the evidence from the other seven. The latest result for a probe replaces its previous one;
+      // every other probe's result is kept.
+      const ledgerPath = join(dir, `${stem}.jsonl`);
+      const previous: ProbeResult[] = existsSync(ledgerPath)
+        ? readFileSync(ledgerPath, "utf8").split("\n").filter((line) => line.trim().length > 0).map((line) => JSON.parse(line) as ProbeResult)
+        : [];
+      const merged = [...previous.filter((p) => !results.some((r) => r.probeId === p.probeId)), ...results]
+        .sort((a, b) => a.probeId.localeCompare(b.probeId));
+      writeFileSync(ledgerPath, `${merged.map((r) => JSON.stringify(r)).join("\n")}\n`, "utf8");
+      const markdown = buildConformanceReport(merged);
       writeFileSync(join(dir, `${stem}.md`), markdown, "utf8");
       const failed = results.filter((r) => !r.passed).length;
       log("");
