@@ -102,11 +102,11 @@ $$
 Leads outside their window are deferred, not dialled, and the result records the next
 local window.
 
-51 tests run against a fake CALL-E client, so the suite never places a phone call.
+54 tests run against a fake CALL-E client, so the suite never places a phone call.
 
 ## Challenges
 
-**Two defects were invisible in every dry run.** They only appeared when a real person
+**Three defects were invisible in every dry run.** They only appeared when a real person
 answered in their own words.
 
 The first was a compound question. `task.py` asked "Is that still what you want, and what
@@ -126,6 +126,15 @@ $$
 
 with the spoken options rewritten to "ten up to twenty thousand, or twenty thousand or
 more."
+
+The third was in routing, and it was the worst of the three. A person answered five of
+the seven questions at $0.90$ confidence, but the provider reported
+`task_completed: false`, and that single gate sent the lead to `retry_later` before any
+commercial branch was read. The lead was at attempt 2 of 3, so the next run would have
+called someone a third time to ask what they had just answered. The first two defects lost
+data; this one would have bothered a person. An incomplete task now routes to
+`manual_review` when the person was reached and consented, and only a call that never got
+that far is retried.
 
 **Confidence is not a liveness signal.** Two attempts on a test line were declined by the
 provider before any media existed — zero duration, no ringing, connected, audio, or ASR
@@ -150,8 +159,9 @@ The label had to be decided against rather than trusted.
 each would need a real port list it can quote and a real call placed to verify it. The
 `destination_port` enum now matches the only market served.
 
-**Live calls are the only test for a spoken script.** Both defects above passed 51 tests.
-Seven live executions across four leads exercised five of the seven routes — including the
+**Live calls are the only test for a spoken script.** All three defects above passed the
+51 tests that existed at the time. Ten live executions across six leads reached every
+route except `payment_support` — including the
 revenue route and the opt-out route — and one of them corrected the delivery port from the
 one on file to Nacala. That correction mattered more to me than the conversion: it means
 the script was understood well enough to be *argued with*, and the structured result
@@ -169,4 +179,4 @@ the opt-out path was proved against an automated hotline agent, not against a pe
 saying no. The routing is identical either way, but that recording does not exist yet, and
 it is the most valuable gap left.
 
-Every run, both defects, and every remaining gap are written up in `docs/field-notes.md`.
+Every run, all three defects, and every remaining gap are written up in `docs/field-notes.md`.

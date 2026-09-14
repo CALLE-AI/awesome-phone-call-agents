@@ -44,18 +44,20 @@ file will not parse.
 Open [`docs/field-notes.md`](docs/field-notes.md). This is the section that separates this
 project from a prototype.
 
-1. Show the runs table: seven executions, four leads, three campaigns, five of the seven
-   routes exercised live.
+1. Show the runs table: ten executions, six leads, four campaigns, and every route except
+   `payment_support` reached live.
 2. **The conversion.** "On this call the person confirmed the inquiry, said they were
    ready to buy, gave a twenty-thousand-dollar budget, and corrected the delivery port
    from the one on file to Nacala. The structured result carries the correction instead of
    the stale CRM value. They heard a wrong detail and argued with it — that is the script
    being understood, not just tolerated."
-3. **The two defects.** "Both of these were invisible in a dry run. One question asked two
-   things at once, so people confirmed the vehicle and the type was never collected. And
-   the budget bands had open borders — twenty thousand dollars sat exactly on the line
-   between two of them. Both are fixed, and the fix for the first one is verified: the
-   most recent live call returned `pickup`, not `unknown`."
+3. **The three defects.** "All three were invisible in a dry run. One question asked two
+   things at once, so people confirmed the vehicle and the type was never collected. The
+   budget bands had open borders — twenty thousand dollars sat exactly on the line between
+   two of them. And the worst: a person answered five questions, the provider said the
+   task was incomplete, and routing would have called them a third time. The first two
+   lost data; the third would have bothered a person. All three are fixed, and the vehicle
+   type fix is verified live: a later call returned `pickup`, not `unknown`."
 4. **The provider findings.** "Two reports to CALL-E became three tracked issues: hotline
    availability, a fifteen-second CLI default timeout, and the troubleshooting docs. They
    also confirmed that CALL-E maps a failed result to `DECLINED` even when media was never

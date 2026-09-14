@@ -107,7 +107,7 @@ def validate_timezone(value: str, field: str) -> str:
 
 def validate_phone(value: str, field: str) -> str:
     if not E164.fullmatch(value):
-        raise ValueError(f"{field} must use E.164 format, for example +258821234567")
+        raise ValueError(f"{field} must use E.164 format, for example +258800000001")
     return value
 
 

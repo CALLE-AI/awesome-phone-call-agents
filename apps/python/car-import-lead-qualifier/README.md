@@ -4,7 +4,7 @@ A vehicle importer collects inquiries all week — a quote form on the site, a c
 
 This Python app makes those calls. It rings people who already submitted a vehicle import inquiry, discloses that the caller is an AI assistant, asks seven qualification questions, and returns a schema-validated result plus one routing decision per lead: close it, book a human specialist, nurture, retry later, or stop calling this number.
 
-**It has been run against real phone lines.** On one live call the person confirmed the inquiry, said they were ready to buy, gave a USD 20,000 budget, *corrected the delivery port* from the one on file to Nacala, and accepted a callback from a human specialist — and the structured result carries the correction instead of the stale CRM value. Live runs have exercised five of the seven routes, including the revenue route and the opt-out route. Every run, and the two defects that surfaced only in real speech, are recorded in [`docs/field-notes.md`](docs/field-notes.md).
+**It has been run against real phone lines.** On one live call the person confirmed the inquiry, said they were ready to buy, gave a USD 20,000 budget, *corrected the delivery port* from the one on file to Nacala, and accepted a callback from a human specialist — and the structured result carries the correction instead of the stale CRM value. Live runs have reached every route except `payment_support`, including the revenue route and the opt-out route. Every run, and the three defects that surfaced only in real speech, are recorded in [`docs/field-notes.md`](docs/field-notes.md).
 
 The language and the clock come from the lead, not from the seller: the E.164 prefix of the number that is actually dialled resolves the market, and the market decides the locale, the timezone, and the local calling window. A mislabelled CRM row cannot cause a call in the wrong language or at three in the morning.
 
@@ -40,10 +40,10 @@ car-import-lead-qualifier/
 │   └── test_qualifier.py
 └── docs/
     ├── safety.md
-    └── field-notes.md      # what six live calls returned, and what they changed
+    └── field-notes.md      # what ten live executions returned, and what they changed
 ```
 
-This app has been run against real phone lines. [`docs/field-notes.md`](docs/field-notes.md) records the six live executions, the routes they produced, the two defects they exposed, and what is still untested.
+This app has been run against real phone lines. [`docs/field-notes.md`](docs/field-notes.md) records the ten live executions, the routes they produced, the three defects they exposed, and what is still untested.
 
 ## Setup
 
@@ -183,8 +183,8 @@ One known edge remains: `budget_band_usd` is fixed in US dollars, which is the c
 | --- | --- | --- |
 | `suppress_number` | Wrong person, or declined to continue after AI disclosure | No, stop calling the number |
 | `close_lead` | Does not want a callback, or not interested | No |
-| `retry_later` | Deferred by business hours, unanswered or declined call, or task not completed | Yes |
-| `manual_review` | Low completion confidence, missing result, unclear intent, or unclear callback consent | Yes |
+| `retry_later` | Deferred by business hours, unanswered or declined call, or task not completed before a consenting person was reached | Yes |
+| `manual_review` | Low completion confidence, missing result, unclear intent, unclear callback consent, or task not completed after the person was reached and consented | Yes |
 | `book_specialist_callback` | Ready to buy, consent given, nothing blocking payment | Yes, `high` priority |
 | `payment_support` | Ready to buy or comparing, but blocked by forex, a transfer limit, deposit size, financing, or funds in transit | Yes |
 | `nurture_sequence` | Comparing or browsing with no payment blocker | Yes |
