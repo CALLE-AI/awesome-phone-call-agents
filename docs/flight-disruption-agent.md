@@ -3,7 +3,7 @@
 A concept for an AI phone agent that handles flight reschedule and refund requests for online travel agencies (OTAs) and airlines, replacing the repetitive parts of work that is commonly outsourced to business process outsourcing (BPO) contact centers.
 
 > [!NOTE]
-> A runnable implementation lives in [`apps/typescript/flight-disruption-agent`](../apps/typescript/flight-disruption-agent/). It combines both workflows below into one outbound call per passenger, with a dry-run default and fictional data.
+> A runnable implementation lives in [`apps/typescript/flight-disruption-agent`](../apps/typescript/flight-disruption-agent/), with a dry-run default and fictional data. It implements Workflow A as one outbound call per delayed passenger, and Workflow B as an operator-logged request that is quoted, confirmed, submitted to a fake portal, and escalated to the airline service desk by CALL-E when the portal refuses a reissue.
 
 ## Problem
 
@@ -69,6 +69,8 @@ Automate steps 2 through 6 of the current process.
 3. The agent confirms the quote with the passenger before taking any action.
 4. The agent submits the change through the B2B platform or GDS integration.
 5. If the platform rejects the change, the agent places an outbound call to the airline customer service to request a forced reschedule, then reports the outcome.
+
+In the implementation, the operator logs the request and types back the amount the passenger confirmed. The airline desk call returns the new booking code and ticket number as a structured result, and only a confirmed, well-formed reissue within the quoted airline fees updates the booking. A refund the portal refuses goes to a person instead of a call.
 
 ## Fit with CALL-E
 

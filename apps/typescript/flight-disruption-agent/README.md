@@ -1,6 +1,11 @@
 # Flight Disruption Agent
 
-A disruption desk for online travel agencies (OTAs) and airlines. When a flight is delayed, it prices every option for each passenger across the whole ticket sales chain (airline, distributors, OTA), has CALL-E call the passenger to offer those options, and applies the passenger's confirmed choice to the booking after the call. Anything unclear goes to a human agent.
+A disruption desk for online travel agencies (OTAs) and airlines. It covers two workflows:
+
+- **Workflow A: delays.** When a flight is delayed, it prices every option for each passenger across the whole ticket sales chain (airline, distributors, OTA), has CALL-E call the passenger to offer those options, and applies the passenger's confirmed choice to the booking after the call.
+- **Workflow B: passenger requests.** When a passenger asks to reschedule or refund, it checks eligibility, quotes the change, and submits it to the airline portal once the passenger confirms. If the portal refuses a reissue, CALL-E calls the airline service desk to force it, and can then call the passenger with the result.
+
+Anything unclear goes to a human agent.
 
 Dry run is the default. It places no calls, needs no credentials, and uses fictional data.
 
@@ -18,7 +23,7 @@ Each party has its own reschedule and refund rules, so the same delay costs two 
 
 See [`docs/flight-disruption-agent.md`](../../../docs/flight-disruption-agent.md) for the full process write-up.
 
-## How it works
+## How it works: Workflow A (delays)
 
 ```mermaid
 flowchart LR
@@ -47,6 +52,31 @@ flowchart LR
    Everything else lands in the review queue with the reasons.
 6. **Apply** in the fake booking system: keep the ticket, rebook with a new booking code and reissued ticket (and one fewer seat), or record the refund and void the ticket. A human can resolve any review item with one of the offered options.
 
+## How it works: Workflow B (passenger requests)
+
+```mermaid
+flowchart LR
+    A["Request via chat,<br/>web form, or phone line"] --> B["Check eligibility<br/>+ voluntary quote"]
+    B -- "not eligible" --> X["Recorded, nothing quoted"]
+    B --> C["Passenger confirms<br/>the exact amount"]
+    C --> D["Submit to fake<br/>airline portal"]
+    D -- "accepted" --> E["Booking updated"]
+    D -- "reissue refused" --> F["CALL-E calls the<br/>airline service desk"]
+    D -- "refund refused" --> I["Human review queue"]
+    F -- "reissued with codes" --> E
+    F -- "refused / call back / unclear" --> I
+    E -.-> G["Optional: CALL-E calls the<br/>passenger with the result"]
+```
+
+1. **Log the request** in the Passenger requests panel. Requests arrive through an existing channel (chat, web form, or the phone line); the desk does not answer inbound calls.
+2. **Check and quote.** The desk refuses bookings that were already changed, are on a flight with a reported delay (Workflow A owns those), have departed, or depart within 60 minutes. It also refuses a reschedule to any flight that is not a later flight on the same route with seats. Eligible requests are priced at voluntary rates across the sales chain, with warnings for a cost or a reduced or zero refund.
+3. **Confirm.** Send the quote through the passenger's channel. To submit, the operator types back the exact amount the passenger agreed to; any other amount is refused.
+4. **Submit to the portal.** The fake portal accepts most changes. It is scripted to refuse the reissue for two NA 725 bookings.
+5. **Call the airline desk** when a reissue is refused. The task gives the booking code, ticket, requested flight, and error, caps any airline charge at the quoted airline fees, and never shares payment details. The result schema returns `outcome`, `new_booking_code`, `new_ticket_number`, `airline_reference`, `extra_charge_requested`, and `reason`. The booking is updated with the desk's codes only when the desk confirmed the reissue, the codes are well formed, no extra charge was asked, and confidence is at least 0.7. Everything else goes to review, where a person can close the request or apply the reissue with codes they got from the airline.
+6. **Call the passenger back (optional)** once the request is finished. The call only reports the new booking code and amount, the refund, or that the change could not be made. It changes nothing; if the passenger was not reached or wants a person, the desk flags written follow-up.
+
+Each request allows one airline desk call and one callback. Both use idempotency keys (`fda-<request>-airline`, `fda-<request>-callback`).
+
 ### Where CALL-E is used
 
 | Mode | Path | Credential | Result |
@@ -67,14 +97,20 @@ npm install
 npm start
 ```
 
-Open http://127.0.0.1:4310, report a delay on NA 721, select passengers, and simulate calls. The five NA 721 passengers are scripted to cover each path: keep, refund, rebook, asks for a person, and no answer.
+Open http://127.0.0.1:4310.
 
-Terminal walkthrough of the same flow:
+- **Workflow A:** report a delay on NA 721, select passengers, and simulate calls. The five NA 721 passengers are scripted to cover each path: keep, refund, rebook, asks for a person, and no answer.
+- **Workflow B:** in Passenger requests, log a reschedule for the NA 725 passengers to NA 729. Nadia Kusuma (L6F2KM) goes straight through the portal. The portal refuses Bima Saputra (P3X9GA), and the airline desk reissues the ticket. It also refuses Dewi Halim (C5V8EJ), and the desk refuses too, so that request needs a person.
+
+Terminal walkthroughs:
 
 ```bash
-npm run demo        # 4-hour delay: involuntary pricing
-npm run demo 90     # 90-minute delay: voluntary pricing
+npm run demo            # Workflow A, 4-hour delay: involuntary pricing
+npm run demo 90         # Workflow A, 90-minute delay: voluntary pricing
+npm run demo:requests   # Workflow B: five scripted passenger requests
 ```
+
+The fixture flights depart on 20 September 2026. After that date, Workflow B requests in the dashboard are refused as departed; the terminal demo and tests pin the clock to the day before.
 
 Tests and type check:
 
@@ -94,7 +130,7 @@ cp .env.example .env
 Then set:
 
 - `CALLE_MODE=sdk` and `CALLE_API_KEY` from the [CALL-E dashboard](https://dashboard.heycall-e.com/account/api-keys), or `CALLE_MODE=cli` after `calle auth login`.
-- `LIVE_DEMO_PHONE`: the one E.164 number that live calls may reach, owned by someone who has agreed to take a test call. It must be in a region CALL-E supports. Indonesian (+62) numbers are currently refused by CALL-E, and the desk refuses them before any request is sent.
+- `LIVE_DEMO_PHONE`: the one E.164 number that live calls (passenger, airline desk, and callback) may reach, owned by someone who has agreed to take a test call. It must be in a region CALL-E supports. Indonesian (+62) numbers are currently refused by CALL-E, and the desk refuses them before any request is sent.
 - `LIVE_CALL_BUDGET`: maximum live calls per server run (default 3).
 
 Restart with `npm start`. The header turns red and shows the destination masked.
@@ -102,16 +138,18 @@ Restart with `npm start`. The header turns red and shows the destination masked.
 ## Safety and side effects
 
 - **No live calls by default.** Dry run never touches the network.
-- **One destination in live mode.** Every live call goes to `LIVE_DEMO_PHONE`. The fictional fixture numbers (the reserved +1 555-01xx range) are never dialed, and the UI says when a call is redirected.
+- **One destination in live mode.** Every live call, including airline desk calls and result callbacks, goes to `LIVE_DEMO_PHONE`. The fictional fixture numbers (the reserved +1 555-01xx range, including the airline desk) are never dialed, and the UI says when a call is redirected.
 - **Per-call confirmation.** Each live call requires typing the last four digits of the destination.
 - **Call budget.** A live call budget caps credit use.
 - **No duplicate calls.**
   - Each booking is called at most once per disruption (dedupe key `<event>:<booking>`), and the call is recorded before dialing.
+  - Each booking has at most one open request, and each request allows one airline desk call and one result callback.
   - A submission with an uncertain outcome is marked `uncertain` and never retried automatically.
   - SDK calls also carry an idempotency key.
 - **Masked numbers** everywhere in the UI and API responses.
 - **AI disclosure and consent** are in the task text. The agent must say it is an AI assistant and must get an explicit yes to any cost. It never asks for card numbers, passport numbers, passwords, or one-time codes.
 - **Human in the loop.** Unclear, low-confidence, or unconsented results are never applied automatically.
+- **Confirmed amounts only.** A Workflow B change is submitted only after the operator types the exact quoted amount the passenger agreed to. The airline desk call may not accept charges above the quoted airline fees.
 - **Local only.** The server binds to `127.0.0.1` and rejects cross-origin POSTs. It has no authentication, so do not expose it to a network.
 - **Credentials** stay in `.env` (gitignored), are only read on the server, and are never sent to the browser.
 
@@ -124,7 +162,9 @@ Restart with `npm start`. The header turns red and shows the destination masked.
 
 ## Limitations
 
-- **Fictional data.** The airline, distributors, OTA, bookings, and fares are fictional. There is no real GDS or airline integration; the "apply" step changes a local in-memory booking.
+- **Fictional data.** The airline, distributors, OTA, bookings, and fares are fictional. There is no real GDS or airline integration; the portal is scripted, and the "apply" step changes a local in-memory booking.
+- **Requests are logged by an operator.** Workflow B has no chat, web form, or inbound call integration, and the passenger's confirmation is recorded by typing the amount back.
+- **Refused refunds are not phoned in.** The airline desk call only covers reissues; a refund the portal refuses goes to review.
 - **No mid-call lookups.** CALL-E cannot call out to other systems during a call, so prices are fixed before dialing. If seats sell out between the call and the apply step, the result goes to review.
 - **English only.** Calls are in English.
 - **No Indonesian numbers.** Indonesian numbers cannot be called today, so a live demo uses a number in a supported region.
@@ -136,10 +176,15 @@ Restart with `npm start`. The header turns red and shows the destination masked.
 ```text
 fixtures/            fictional flights, bookings, and fare rules per party
 src/rules.ts         prices keep / move / refund across the sales chain
-src/task.ts          CALL-E task text and per-recipient result schema
-src/decide.ts        apply automatically or send to review
+src/task.ts          passenger call task text and result schema (Workflow A)
+src/decide.ts        apply automatically or send to review (Workflow A)
+src/eligibility.ts   can this booking be changed as requested (Workflow B)
+src/gds.ts           fake airline portal that can refuse a change (Workflow B)
+src/airline.ts       airline service desk call: task, schema, decision (Workflow B)
+src/callback.ts      report-only result call to the passenger (Workflow B)
 src/calle.ts         dry-run, SDK, and CLI gateways
-src/desk.ts          disruptions, call ledger, dedupe, fake GDS
+src/desk.ts          disruptions, requests, call ledger, dedupe, fake GDS
+src/demo*.ts         terminal walkthroughs
 src/server.ts        local HTTP server and JSON API
 public/              operator dashboard
 test/                node:test suites (no network)
