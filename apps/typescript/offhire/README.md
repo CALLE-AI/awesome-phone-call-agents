@@ -2,7 +2,7 @@
 
 A TypeScript reference for one easily missed equipment-rental handoff: the site requests collection, but still needs the rental desk's effective off-rent date, time and confirmation reference. CALL-E asks those questions; OffHire checks the transcript before displaying a supplier-reported cutoff. A pickup booking remains a separate result.
 
-Built by **Shivam Gupta**. This standalone CLI shares its pure evidence engine with the [OffHire application source](https://github.com/shi1720/call-e). **Hosted URL access is pending confirmation; this contribution needs no hosted service.** No live-call proof, real supplier verification, recovered money or production deployment is claimed here.
+Built by **Shivam Gupta**. This standalone CLI shares its pure evidence engine with the [OffHire application source](https://github.com/shi1720/OffHire). The [public rehearsal](https://offhire.web.app) is available without an account; this contribution also runs independently of the hosted app. No live-call proof, real supplier verification or recovered money is claimed here.
 
 ## Quick start: no account or phone call
 
@@ -114,4 +114,4 @@ Unlocking creates/cancels nothing and does not change the request. Never unlock 
 
 This is a local reference, not a public calling endpoint, SDK replacement or production guarantee. It has no hosted authentication, multi-tenant database, background worker or webhook receiver. English evidence checks are heuristic and advisory. Invoice approval, contract interpretation, disputes/refunds and physical equipment handling remain human responsibilities. Tests establish local behavior and the SDK boundary with fake responses, not live telephony quality or commercial outcomes.
 
-License: MIT. Core source and standalone CLI by Shivam Gupta; [full application repository](https://github.com/shi1720/call-e).
+License: MIT. Core source and standalone CLI by Shivam Gupta; [full application repository](https://github.com/shi1720/OffHire).
