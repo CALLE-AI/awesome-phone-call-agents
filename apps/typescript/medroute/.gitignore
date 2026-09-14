@@ -1,0 +1,9 @@
+node_modules/
+__pycache__/
+*.pyc
+.env
+.env.local
+data/
+.deslop/
+tmp/
+.DS_Store

@@ -1,0 +1,6 @@
+{
+  "event": "call.result_validation_failed",
+  "call_id": "call_synthetic_webhook_validation_0003",
+  "timestamp": "2026-09-01T12:07:02Z",
+  "note": "Replayed delivery fixture; Synthetic scenario."
+}

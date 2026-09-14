@@ -1,0 +1,33 @@
+{
+  "id": "ivr_maze",
+  "status": "completed",
+  "task_completed": false,
+  "completion_confidence": { "score": 0.86, "label": "high" },
+  "disposition": "ivr_dead_end",
+  "evidence": [
+    "The call navigated a DTMF tree and reached a dead end with no path to a human or the verification goal."
+  ],
+  "structured_result": {
+    "dialed_count": 1,
+    "reached_count": 0,
+    "unreached_count": 1,
+    "critical_count": 0
+  },
+  "recipient_structured_result": {
+    "employment_confirmed": "unknown",
+    "title_stated": null,
+    "start_date_stated": null,
+    "end_date_stated": null,
+    "eligible_for_rehire": "unknown",
+    "verifier_name": null,
+    "verifier_role": null,
+    "verifier_authority": "unknown",
+    "refusal_reason": "unknown"
+  },
+  "transcript_turns": [
+    { "offset_seconds": 0, "speaker": "bot", "text": "This is an automated verification assistant calling to verify employment." },
+    { "offset_seconds": 6, "speaker": "user", "text": "For English, press 1. For the directory, press 2. For employment verification, press 3." },
+    { "offset_seconds": 12, "speaker": "bot", "text": "Pressing 3." },
+    { "offset_seconds": 16, "speaker": "user", "text": "That option is no longer available. Please visit our website. Goodbye." }
+  ]
+}
