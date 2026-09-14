@@ -105,3 +105,7 @@ Console output is a masked status summary. Full results are in the private journ
 The protocol is an unapproved demonstration, not hospital-approved triage. No diagnosis, dosage changes, treatment advice or new investigations. Patient reports do not overwrite prescribed treatment. RED marks priority review; it does not summon help. Models can misinterpret speech or omit findings; source quotes, missing information and human review remain necessary. Offline tests verify implementation behavior, not clinical effectiveness or real-service availability.
 
 Only fictional records and authored transcripts are included. The private website, deployment configuration, databases, real call recordings/transcripts and credentials are excluded. No runtime dependency on the private application exists.
+
+## License
+
+This standalone contribution is licensed under the [MIT License](LICENSE). This grant covers the files in this directory; it does not grant rights to the separate private Avelis application.
