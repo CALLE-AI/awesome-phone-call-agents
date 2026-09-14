@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import json
+import re
 import urllib.error
 import urllib.parse
 import urllib.request
@@ -112,7 +113,9 @@ def note_text(result: LadderResult, code: int, records: int, head: str) -> str:
         f"and exited {code}. Ledger at the verdict: {records} records, head {head}."
     )
     lines.append("This note is a record of a phone call. It changes no incident state.")
-    return "\n".join(lines)[:NOTE_LIMIT]
+    # Evidence spans and reasons can contain phone numbers too. Redact the
+    # outgoing note without modifying the private source evidence.
+    return re.sub(r"(?<![\w])\+?[0-9](?:[0-9 ().-]{6,}[0-9])", "[phone redacted]", "\n".join(lines))[:NOTE_LIMIT]
 
 
 def post_note(

@@ -736,8 +736,9 @@ human is asked to call back.
 
 ## Side effects, cancellation, credentials
 
-- At most one CALL-E call per rung, per run. Nothing recurring is created, so there is no
-  schedule to clean up.
+- One initial CALL-E call per rung, plus at most one callback explicitly requested by the
+  recipient after a completed call and within the remaining budget. An ambiguous outcome
+  does not trigger a callback. Nothing recurring is created, so there is no schedule to clean up.
 - `preview`, `verify` and `adapt` place no calls and read no credentials. `run` refuses to do
   anything without the exact confirmation phrase. `suggest-mapping` places no calls either, but it
   is the one other subcommand that reads a credential and opens a socket — to Gemini, never to the
