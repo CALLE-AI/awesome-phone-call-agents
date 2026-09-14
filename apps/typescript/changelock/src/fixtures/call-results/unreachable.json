@@ -1,0 +1,9 @@
+{
+  "status": "failed",
+  "taskCompleted": false,
+  "recipientStatus": "failed",
+  "confidenceScore": null,
+  "failureCode": "no_answer",
+  "structuredResult": null,
+  "evidence": []
+}
