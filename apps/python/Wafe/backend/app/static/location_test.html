@@ -1,0 +1,138 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>CALL-E GPS Test</title>
+
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            max-width: 500px;
+            margin: 50px auto;
+            padding: 20px;
+        }
+
+        button {
+            padding: 12px 20px;
+            font-size: 16px;
+            cursor: pointer;
+        }
+
+        #status {
+            margin-top: 20px;
+            white-space: pre-wrap;
+        }
+    </style>
+</head>
+
+<body>
+
+    <h1>CALL-E GPS Test</h1>
+
+    <p>
+        Session:
+        <strong id="session">walk_test_001</strong>
+    </p>
+
+    <button onclick="startTracking()">
+        Start Location Tracking
+    </button>
+
+    <div id="status">
+        Waiting...
+    </div>
+
+<script>
+
+const sessionId = "walk_test_001";
+
+function updateStatus(message) {
+    document.getElementById("status").textContent = message;
+}
+
+
+function sendLocation(position) {
+
+    const latitude = position.coords.latitude;
+    const longitude = position.coords.longitude;
+    const accuracy = position.coords.accuracy;
+
+    updateStatus(
+        `Latitude: ${latitude}
+Longitude: ${longitude}
+Accuracy: ${accuracy} meters
+
+Sending to backend...`
+    );
+
+    fetch("/api/location", {
+        method: "POST",
+        headers: {
+            "Content-Type": "application/json"
+        },
+        body: JSON.stringify({
+            session_id: sessionId,
+            latitude: latitude,
+            longitude: longitude,
+            accuracy: accuracy
+        })
+    })
+    .then(response => response.json())
+    .then(data => {
+
+        updateStatus(
+            `Latitude: ${latitude}
+Longitude: ${longitude}
+Accuracy: ${accuracy} meters
+
+Backend:
+${JSON.stringify(data, null, 2)}`
+        );
+
+    })
+    .catch(error => {
+        updateStatus("Error: " + error);
+    });
+}
+
+
+function locationError(error) {
+
+    updateStatus(
+        "GPS ERROR:\n" +
+        error.message
+    );
+}
+
+
+function startTracking() {
+
+    if (!navigator.geolocation) {
+
+        updateStatus(
+            "Geolocation is not supported by this browser."
+        );
+
+        return;
+    }
+
+    updateStatus(
+        "Requesting location permission..."
+    );
+
+    navigator.geolocation.watchPosition(
+        sendLocation,
+        locationError,
+        {
+            enableHighAccuracy: true,
+            maximumAge: 5000,
+            timeout: 10000
+        }
+    );
+}
+
+</script>
+
+</body>
+</html>

@@ -1,0 +1,1782 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+
+    <meta
+        name="viewport"
+        content="width=device-width, initial-scale=1.0"
+    >
+
+    <meta
+        name="theme-color"
+        content="#0f172a"
+    >
+
+    <title>WAFE — Walk Me Home</title>
+
+    <style>
+
+        * {
+            box-sizing: border-box;
+        }
+
+        :root {
+            --bg: #f8fafc;
+            --card: rgba(255, 255, 255, 0.94);
+            --text: #0f172a;
+            --muted: #64748b;
+            --border: #e2e8f0;
+
+            --green: #16a34a;
+            --green-soft: #dcfce7;
+
+            --yellow: #d97706;
+            --yellow-soft: #fef3c7;
+
+            --red: #dc2626;
+            --red-dark: #b91c1c;
+            --red-soft: #fee2e2;
+        }
+
+        html,
+        body {
+            margin: 0;
+            min-height: 100%;
+        }
+
+        body {
+            font-family:
+                Inter,
+                ui-sans-serif,
+                system-ui,
+                -apple-system,
+                BlinkMacSystemFont,
+                "Segoe UI",
+                sans-serif;
+
+            color: var(--text);
+
+            background:
+                radial-gradient(
+                    circle at top,
+                    #e0e7ff 0,
+                    transparent 34%
+                ),
+                var(--bg);
+        }
+
+        button,
+        input {
+            font: inherit;
+        }
+
+        button {
+            -webkit-tap-highlight-color: transparent;
+        }
+
+        .app {
+            width: 100%;
+            max-width: 480px;
+            min-height: 100vh;
+
+            margin: auto;
+            padding: 18px 16px 32px;
+
+            display: flex;
+            flex-direction: column;
+        }
+
+        /* ========================================
+           HEADER
+        ======================================== */
+
+        .header {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+        }
+
+        .brand {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+
+        .brand-logo {
+            width: 44px;
+            height: 44px;
+
+            object-fit: contain;
+            object-position: center;
+
+            border-radius: 12px;
+
+            background: white;
+
+            box-shadow:
+                0 4px 12px
+                rgba(15, 23, 42, 0.08);
+        }
+
+        .brand-name {
+            font-size: 21px;
+            font-weight: 900;
+            letter-spacing: -0.6px;
+        }
+
+        .brand-subtitle {
+            margin-top: 1px;
+
+            font-size: 11px;
+            color: var(--muted);
+        }
+
+        .session-badge {
+            padding: 7px 10px;
+
+            border-radius: 999px;
+
+            background: #eef2ff;
+            color: #4338ca;
+
+            font-size: 10px;
+            font-weight: 850;
+            letter-spacing: 0.05em;
+        }
+
+        /* ========================================
+           START SCREEN
+        ======================================== */
+
+        .start-screen {
+            padding-top: 58px;
+        }
+
+        .hero {
+            text-align: center;
+        }
+
+        .hero-orb {
+            width: 112px;
+            height: 112px;
+
+            margin: 0 auto;
+
+            display: flex;
+            align-items: center;
+            justify-content: center;
+
+            border-radius: 50%;
+
+            background:
+                linear-gradient(
+                    145deg,
+                    #e0e7ff,
+                    #eef2ff
+                );
+
+            box-shadow:
+                0 16px 40px
+                rgba(79, 70, 229, 0.15);
+
+            font-size: 47px;
+        }
+
+        .hero h1 {
+            margin: 26px 0 10px;
+
+            font-size: 36px;
+            line-height: 1.05;
+
+            letter-spacing: -1.5px;
+        }
+
+        .hero p {
+            max-width: 390px;
+
+            margin: 0 auto;
+
+            color: var(--muted);
+
+            font-size: 15px;
+            line-height: 1.65;
+        }
+
+        /* ========================================
+           FEATURES
+        ======================================== */
+
+        .feature-row {
+            display: grid;
+
+            grid-template-columns:
+                repeat(3, 1fr);
+
+            gap: 9px;
+
+            margin-top: 30px;
+        }
+
+        .feature {
+            padding: 14px 8px;
+
+            text-align: center;
+
+            border:
+                1px solid
+                var(--border);
+
+            border-radius: 16px;
+
+            background:
+                rgba(255, 255, 255, 0.75);
+        }
+
+        .feature-icon {
+            font-size: 21px;
+        }
+
+        .feature-title {
+            margin-top: 6px;
+
+            font-size: 11px;
+            font-weight: 850;
+        }
+
+        .feature-text {
+            margin-top: 3px;
+
+            font-size: 9px;
+            line-height: 1.3;
+
+            color: var(--muted);
+        }
+
+        /* ========================================
+           CARDS
+        ======================================== */
+
+        .card {
+            margin-top: 18px;
+
+            padding: 18px;
+
+            border:
+                1px solid
+                rgba(226, 232, 240, 0.9);
+
+            border-radius: 20px;
+
+            background: var(--card);
+
+            box-shadow:
+                0 12px 35px
+                rgba(15, 23, 42, 0.055);
+
+            backdrop-filter: blur(12px);
+        }
+
+        .label {
+            display: block;
+
+            margin-bottom: 8px;
+
+            font-size: 12px;
+            font-weight: 850;
+        }
+
+        .phone-input {
+            width: 100%;
+
+            padding: 14px 15px;
+
+            border:
+                1px solid
+                #cbd5e1;
+
+            border-radius: 13px;
+
+            outline: none;
+
+            background: white;
+            color: var(--text);
+
+            font-size: 16px;
+        }
+
+        .phone-input:focus {
+            border-color: #6366f1;
+
+            box-shadow:
+                0 0 0 4px
+                rgba(99, 102, 241, 0.11);
+        }
+
+        /* ========================================
+           BUTTONS
+        ======================================== */
+
+        .primary-button,
+        .danger-button {
+            width: 100%;
+
+            border: none;
+
+            border-radius: 14px;
+
+            padding: 16px;
+
+            font-size: 16px;
+            font-weight: 850;
+
+            cursor: pointer;
+
+            transition:
+                transform 0.15s ease,
+                opacity 0.15s ease;
+        }
+
+        .primary-button {
+            background: #0f172a;
+            color: white;
+        }
+
+        .danger-button {
+            background: var(--red-soft);
+            color: var(--red-dark);
+        }
+
+        button:active {
+            transform: scale(0.985);
+        }
+
+        button:disabled {
+            cursor: not-allowed;
+            opacity: 0.5;
+        }
+
+        .button-note {
+            margin: 10px 0 0;
+
+            text-align: center;
+
+            color: var(--muted);
+
+            font-size: 11px;
+            line-height: 1.4;
+        }
+
+        /* ========================================
+           ACTIVE SCREEN
+        ======================================== */
+
+        .active-screen {
+            padding-top: 34px;
+        }
+
+        .state-area {
+            text-align: center;
+        }
+
+        .state-orb {
+            width: 110px;
+            height: 110px;
+
+            margin: 0 auto;
+
+            display: flex;
+            align-items: center;
+            justify-content: center;
+
+            border-radius: 50%;
+
+            background: var(--green-soft);
+
+            font-size: 42px;
+
+            transition:
+                background 0.25s ease,
+                transform 0.25s ease;
+        }
+
+        .state-orb.starting {
+            background: var(--yellow-soft);
+
+            animation:
+                pulse 1.8s infinite;
+        }
+
+        .state-orb.safe {
+            background: var(--green-soft);
+        }
+
+        .state-orb.danger {
+            background: var(--red-soft);
+
+            animation:
+                dangerPulse 1.3s infinite;
+        }
+
+        @keyframes pulse {
+
+            0%,
+            100% {
+                transform: scale(1);
+            }
+
+            50% {
+                transform: scale(1.035);
+            }
+        }
+
+        @keyframes dangerPulse {
+
+            0%,
+            100% {
+                transform: scale(1);
+            }
+
+            50% {
+                transform: scale(1.055);
+            }
+        }
+
+        .state-title {
+            margin: 22px 0 7px;
+
+            font-size: 30px;
+
+            letter-spacing: -1px;
+        }
+
+        .state-description {
+            max-width: 360px;
+
+            margin: 0 auto;
+
+            color: var(--muted);
+
+            line-height: 1.55;
+            font-size: 14px;
+        }
+
+        /* ========================================
+           LIVE STATUS
+        ======================================== */
+
+        .live-card {
+            padding: 0;
+            overflow: hidden;
+        }
+
+        .status-row {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+
+            padding: 16px 17px;
+
+            background:
+                rgba(255, 255, 255, 0.85);
+
+            border-bottom:
+                1px solid
+                var(--border);
+        }
+
+        .status-row:last-child {
+            border-bottom: none;
+        }
+
+        .status-left {
+            display: flex;
+            align-items: center;
+
+            gap: 11px;
+        }
+
+        .status-icon {
+            width: 34px;
+            height: 34px;
+
+            display: flex;
+            align-items: center;
+            justify-content: center;
+
+            border-radius: 10px;
+
+            background: #f1f5f9;
+
+            font-size: 16px;
+        }
+
+        .status-label {
+            font-size: 11px;
+            color: var(--muted);
+        }
+
+        .status-value {
+            margin-top: 2px;
+
+            font-size: 14px;
+            font-weight: 850;
+        }
+
+        /* ========================================
+           DANGER
+        ======================================== */
+
+        .danger-card {
+            margin-top: 18px;
+
+            padding: 20px;
+
+            border:
+                2px solid
+                #ef4444;
+
+            border-radius: 20px;
+
+            background:
+                linear-gradient(
+                    145deg,
+                    #fff1f2,
+                    #fee2e2
+                );
+        }
+
+        .danger-label {
+            color: var(--red-dark);
+
+            font-size: 11px;
+            font-weight: 900;
+
+            letter-spacing: 0.07em;
+        }
+
+        .danger-title {
+            margin-top: 7px;
+
+            font-size: 23px;
+            font-weight: 900;
+
+            letter-spacing: -0.5px;
+        }
+
+        .danger-description {
+            margin-top: 9px;
+
+            color: #7f1d1d;
+
+            font-size: 14px;
+            line-height: 1.55;
+        }
+
+        .danger-reason {
+            margin-top: 15px;
+
+            padding: 13px 14px;
+
+            border-radius: 12px;
+
+            background:
+                rgba(255, 255, 255, 0.65);
+
+            color: #7f1d1d;
+
+            font-size: 13px;
+            line-height: 1.5;
+        }
+
+        /* ========================================
+           FOOTER
+        ======================================== */
+
+        .footer {
+            margin-top: auto;
+
+            padding-top: 25px;
+
+            text-align: center;
+
+            color: #94a3b8;
+
+            font-size: 10px;
+            line-height: 1.5;
+        }
+
+        .hidden {
+            display: none !important;
+        }
+
+    </style>
+</head>
+
+
+<body>
+
+<div class="app">
+
+
+    <!-- ====================================== -->
+    <!-- HEADER                                -->
+    <!-- ====================================== -->
+
+    <header class="header">
+
+        <div class="brand">
+            ☎︎
+            <div>
+
+                <div class="brand-name">
+                    WAFE
+                </div>
+
+                <div class="brand-subtitle">
+                    Your walking safety companion
+                </div>
+
+            </div>
+
+        </div>
+
+
+        <div class="session-badge">
+            WALK ME HOME
+        </div>
+
+    </header>
+
+
+    <!-- ====================================== -->
+    <!-- START SCREEN                          -->
+    <!-- ====================================== -->
+
+    <section
+        id="startScreen"
+        class="start-screen"
+    >
+
+        <div class="hero">
+
+            <div class="hero-orb">☎︎</div>
+
+
+            <h1>
+                Walk Me Home
+            </h1>
+
+
+            <p>
+                Stay connected while you walk.
+                WAFE keeps you company on a live
+                call and helps alert your trusted
+                contact when something goes wrong.
+            </p>
+
+        </div>
+
+
+        <div class="feature-row">
+
+
+            <div class="feature">
+
+                <div class="feature-icon">
+                    📞
+                </div>
+
+                <div class="feature-title">
+                    Live Call
+                </div>
+
+                <div class="feature-text">
+                    Natural conversation
+                </div>
+
+            </div>
+
+
+            <div class="feature">
+
+                <div class="feature-icon">
+                    📍
+                </div>
+
+                <div class="feature-title">
+                    Location
+                </div>
+
+                <div class="feature-text">
+                    Last known position
+                </div>
+
+            </div>
+
+
+            <div class="feature">
+
+                <div class="feature-icon">
+                    🚨
+                </div>
+
+                <div class="feature-title">
+                    Alert
+                </div>
+
+                <div class="feature-text">
+                    Trusted contact
+                </div>
+
+            </div>
+
+
+        </div>
+
+
+        <div class="card">
+
+            <label
+                class="label"
+                for="phoneNumber"
+            >
+                Your phone number
+            </label>
+
+
+            <input
+                id="phoneNumber"
+                class="phone-input"
+                type="tel"
+                placeholder="+91 XXXXX XXXXX"
+                autocomplete="tel"
+            >
+
+        </div>
+
+
+        <div class="card">
+
+            <button
+                class="primary-button"
+                onclick="startWalk()"
+            >
+                Start Walk Home
+            </button>
+
+
+            <p class="button-note">
+                Keep your phone nearby and answer
+                the incoming safety call.
+            </p>
+
+        </div>
+
+
+        <div class="footer">
+
+            WAFE · Walk Me Home
+
+        </div>
+
+    </section>
+
+
+    <!-- ====================================== -->
+    <!-- ACTIVE SESSION                        -->
+    <!-- ====================================== -->
+
+    <section
+        id="activeScreen"
+        class="active-screen hidden"
+    >
+
+        <div class="state-area">
+
+            <div
+                id="stateOrb"
+                class="state-orb starting"
+            >
+                📞
+            </div>
+
+
+            <h1
+                id="statusTitle"
+                class="state-title"
+            >
+                Starting your call
+            </h1>
+
+
+            <p
+                id="statusDescription"
+                class="state-description"
+            >
+                Preparing your safety call.
+                Keep your phone nearby.
+            </p>
+
+        </div>
+
+
+        <!-- ================================== -->
+        <!-- STATUS CARD                        -->
+        <!-- ================================== -->
+
+        <div class="card live-card">
+
+
+            <div class="status-row">
+
+                <div class="status-left">
+
+                    <div class="status-icon">
+                        📞
+                    </div>
+
+
+                    <div>
+
+                        <div class="status-label">
+                            SAFETY CALL
+                        </div>
+
+
+                        <div
+                            id="callStatus"
+                            class="status-value"
+                        >
+                            Starting
+                        </div>
+
+                    </div>
+
+                </div>
+
+            </div>
+
+
+            <div class="status-row">
+
+                <div class="status-left">
+
+                    <div class="status-icon">
+                        📍
+                    </div>
+
+
+                    <div>
+
+                        <div class="status-label">
+                            LOCATION
+                        </div>
+
+
+                        <div
+                            id="locationStatus"
+                            class="status-value"
+                        >
+                            Starting
+                        </div>
+
+                    </div>
+
+                </div>
+
+            </div>
+
+
+            <div class="status-row">
+
+                <div class="status-left">
+
+                    <div class="status-icon">
+                        ⏱
+                    </div>
+
+
+                    <div>
+
+                        <div class="status-label">
+                            SESSION TIME
+                        </div>
+
+
+                        <div
+                            id="sessionTime"
+                            class="status-value"
+                        >
+                            00:00
+                        </div>
+
+                    </div>
+
+                </div>
+
+            </div>
+
+
+        </div>
+
+
+        <!-- ================================== -->
+        <!-- DANGER CARD                        -->
+        <!-- ================================== -->
+
+        <div
+            id="dangerCard"
+            class="danger-card hidden"
+        >
+
+            <div class="danger-label">
+                SAFETY ALERT
+            </div>
+
+
+            <div class="danger-title">
+                Danger detected
+            </div>
+
+
+            <div class="danger-description">
+                WAFE detected a possible safety
+                incident. Your trusted contact
+                has been alerted.
+            </div>
+
+
+            <div
+                id="dangerReason"
+                class="danger-reason"
+            >
+            </div>
+
+        </div>
+
+
+        <!-- ================================== -->
+        <!-- END SESSION                        -->
+        <!-- ================================== -->
+
+        <div class="card">
+
+            <button
+                id="stopButton"
+                class="danger-button"
+                onclick="endWalk()"
+            >
+                End Walk
+            </button>
+
+        </div>
+
+
+        <div class="footer">
+            Stay aware of your surroundings.
+        </div>
+
+
+    </section>
+
+
+</div>
+
+
+<script>
+
+let sessionId = null;
+
+let statusInterval = null;
+
+let locationWatchId = null;
+
+let sessionStartedAt = null;
+
+let timerInterval = null;
+
+
+/* ==========================================
+   START WALK
+========================================== */
+
+async function startWalk() {
+
+    const phoneNumber =
+        document
+            .getElementById(
+                "phoneNumber"
+            )
+            .value
+            .trim();
+
+
+    if (!phoneNumber) {
+
+        alert(
+            "Please enter your phone number."
+        );
+
+        return;
+    }
+
+
+    const button =
+        document.querySelector(
+            ".primary-button"
+        );
+
+
+    button.disabled = true;
+
+    button.textContent =
+        "Starting...";
+
+
+    try {
+
+        const response =
+            await fetch(
+                "/api/session/start",
+                {
+                    method: "POST",
+
+                    headers: {
+                        "Content-Type":
+                            "application/json"
+                    },
+
+                    body: JSON.stringify({
+                        phone_number:
+                            phoneNumber
+                    })
+                }
+            );
+
+
+        if (!response.ok) {
+
+            throw new Error(
+                "Failed to start session"
+            );
+        }
+
+
+        const data =
+            await response.json();
+
+
+        sessionId =
+            data.session_id;
+
+
+        sessionStartedAt =
+            new Date();
+
+
+        document
+            .getElementById(
+                "startScreen"
+            )
+            .classList
+            .add("hidden");
+
+
+        document
+            .getElementById(
+                "activeScreen"
+            )
+            .classList
+            .remove("hidden");
+
+
+        startLocationTracking();
+
+        startStatusPolling();
+
+        startTimer();
+
+
+    } catch (error) {
+
+        console.error(error);
+
+        alert(
+            "Could not start the safety session."
+        );
+
+
+        button.disabled = false;
+
+        button.textContent =
+            "Start Walk Home";
+    }
+}
+
+
+/* ==========================================
+   GPS
+========================================== */
+
+function startLocationTracking() {
+
+    if (!navigator.geolocation) {
+
+        setText(
+            "locationStatus",
+            "Unavailable"
+        );
+
+        return;
+    }
+
+
+    locationWatchId =
+        navigator.geolocation.watchPosition(
+
+            async function(position) {
+
+                const location = {
+
+                    session_id:
+                        sessionId,
+
+                    latitude:
+                        position.coords.latitude,
+
+                    longitude:
+                        position.coords.longitude,
+
+                    accuracy:
+                        position.coords.accuracy
+
+                };
+
+
+                try {
+
+                    const response =
+                        await fetch(
+                            "/api/location",
+                            {
+                                method: "POST",
+
+                                headers: {
+                                    "Content-Type":
+                                        "application/json"
+                                },
+
+                                body:
+                                    JSON.stringify(
+                                        location
+                                    )
+                            }
+                        );
+
+
+                    if (response.ok) {
+
+                        setText(
+                            "locationStatus",
+                            "Active"
+                        );
+
+                    }
+
+
+                } catch (error) {
+
+                    console.error(
+                        "Location update failed:",
+                        error
+                    );
+
+                }
+
+            },
+
+
+            function(error) {
+
+                console.error(
+                    "GPS error:",
+                    error
+                );
+
+
+                setText(
+                    "locationStatus",
+                    "Unavailable"
+                );
+
+            },
+
+
+            {
+                enableHighAccuracy: true,
+                maximumAge: 5000,
+                timeout: 10000
+            }
+
+        );
+}
+
+
+/* ==========================================
+   STATUS POLLING
+========================================== */
+
+function startStatusPolling() {
+
+    updateSessionStatus();
+
+
+    statusInterval =
+        setInterval(
+            updateSessionStatus,
+            3000
+        );
+}
+
+
+async function updateSessionStatus() {
+
+    if (!sessionId) {
+        return;
+    }
+
+
+    try {
+
+        const response =
+            await fetch(
+                `/api/session/status/${sessionId}`
+            );
+
+
+        if (!response.ok) {
+            return;
+        }
+
+
+        const data =
+            await response.json();
+
+
+        updateUI(data);
+
+
+        await checkAlerts();
+
+
+    } catch (error) {
+
+        console.error(
+            "Status update failed:",
+            error
+        );
+
+    }
+}
+
+
+/* ==========================================
+   UPDATE STATUS UI
+========================================== */
+
+function updateUI(data) {
+
+    const calleStatus =
+        data.calle_status;
+
+
+    setText(
+        "callStatus",
+        formatStatus(
+            calleStatus
+        )
+    );
+
+
+    if (
+        calleStatus === "queued"
+    ) {
+
+        setNormalState(
+
+            "starting",
+
+            "📞",
+
+            "Starting your call",
+
+            "Preparing your safety call."
+        );
+
+
+    } else if (
+        calleStatus === "in_progress"
+    ) {
+
+        setNormalState(
+
+            "safe",
+
+            "🟢",
+
+            "WAFE is with you",
+
+            "Stay on the line while you walk."
+        );
+
+
+    } else if (
+        calleStatus === "completed"
+    ) {
+
+        setNormalState(
+
+            "safe",
+
+            "✓",
+
+            "Session complete",
+
+            "Your Walk Me Home session has ended."
+        );
+
+
+    } else if (
+        calleStatus === "failed"
+    ) {
+
+        setNormalState(
+
+            "starting",
+
+            "⚠️",
+
+            "Call unavailable",
+
+            "The safety call could not be completed."
+        );
+
+    }
+
+}
+
+
+/* ==========================================
+   NORMAL STATE
+========================================== */
+
+function setNormalState(
+    type,
+    icon,
+    title,
+    description
+) {
+
+    const orb =
+        document.getElementById(
+            "stateOrb"
+        );
+
+
+    orb.className =
+        `state-orb ${type}`;
+
+
+    orb.textContent =
+        icon;
+
+
+    setText(
+        "statusTitle",
+        title
+    );
+
+
+    setText(
+        "statusDescription",
+        description
+    );
+}
+
+
+/* ==========================================
+   ALERTS
+========================================== */
+
+async function checkAlerts() {
+
+    try {
+
+        const response =
+            await fetch(
+                "/api/alerts"
+            );
+
+
+        if (!response.ok) {
+            return;
+        }
+
+
+        const data =
+            await response.json();
+
+
+        const alerts =
+            data.alerts || [];
+
+
+        const activeAlert =
+            alerts.find(
+                alert =>
+                    alert.status === "new"
+            );
+
+
+        if (activeAlert) {
+
+            showDanger(
+                activeAlert
+            );
+
+        }
+
+    } catch (error) {
+
+        console.error(
+            "Alert check failed:",
+            error
+        );
+
+    }
+}
+
+
+function showDanger(alert) {
+
+    const orb =
+        document.getElementById(
+            "stateOrb"
+        );
+
+
+    orb.className =
+        "state-orb danger";
+
+
+    orb.textContent =
+        "🚨";
+
+
+    setText(
+        "statusTitle",
+        "Danger detected"
+    );
+
+
+    setText(
+        "statusDescription",
+        "Your trusted contact has been alerted."
+    );
+
+
+    const card =
+        document.getElementById(
+            "dangerCard"
+        );
+
+
+    card.classList.remove(
+        "hidden"
+    );
+
+
+    const reason =
+        document.getElementById(
+            "dangerReason"
+        );
+
+
+    reason.textContent =
+        extractReason(
+            alert.message
+        );
+}
+
+
+/* ==========================================
+   END WALK
+========================================== */
+
+async function endWalk() {
+
+    if (
+        !confirm(
+            "End your Walk Me Home session?"
+        )
+    ) {
+
+        return;
+    }
+
+
+    const button =
+        document.getElementById(
+            "stopButton"
+        );
+
+
+    button.disabled = true;
+
+    button.textContent =
+        "Ending...";
+
+
+    try {
+
+        await fetch(
+            `/api/session/end/${sessionId}`,
+            {
+                method: "POST"
+            }
+        );
+
+    } catch (error) {
+
+        console.error(
+            "Could not end session:",
+            error
+        );
+    }
+
+
+    stopTracking();
+
+
+    setNormalState(
+
+        "safe",
+
+        "✓",
+
+        "Session ended",
+
+        "Your Walk Me Home session has ended."
+    );
+
+
+    setText(
+        "callStatus",
+        "Ended"
+    );
+
+
+    setText(
+        "locationStatus",
+        "Stopped"
+    );
+
+
+    button.textContent =
+        "Session Ended";
+}
+
+
+/* ==========================================
+   STOP TRACKING
+========================================== */
+
+function stopTracking() {
+
+    if (
+        locationWatchId !== null
+    ) {
+
+        navigator
+            .geolocation
+            .clearWatch(
+                locationWatchId
+            );
+
+        locationWatchId =
+            null;
+    }
+
+
+    if (
+        statusInterval !== null
+    ) {
+
+        clearInterval(
+            statusInterval
+        );
+
+        statusInterval =
+            null;
+    }
+
+
+    if (
+        timerInterval !== null
+    ) {
+
+        clearInterval(
+            timerInterval
+        );
+
+        timerInterval =
+            null;
+    }
+}
+
+
+/* ==========================================
+   TIMER
+========================================== */
+
+function startTimer() {
+
+    updateTimer();
+
+
+    timerInterval =
+        setInterval(
+            updateTimer,
+            1000
+        );
+}
+
+
+function updateTimer() {
+
+    if (!sessionStartedAt) {
+        return;
+    }
+
+
+    const elapsed =
+        Math.floor(
+            (
+                new Date() -
+                sessionStartedAt
+            ) / 1000
+        );
+
+
+    const minutes =
+        Math.floor(
+            elapsed / 60
+        );
+
+
+    const seconds =
+        elapsed % 60;
+
+
+    setText(
+
+        "sessionTime",
+
+        `${String(minutes).padStart(2, "0")}:` +
+        `${String(seconds).padStart(2, "0")}`
+
+    );
+}
+
+
+/* ==========================================
+   HELPERS
+========================================== */
+
+function setText(
+    id,
+    value
+) {
+
+    const element =
+        document.getElementById(
+            id
+        );
+
+
+    if (element) {
+
+        element.textContent =
+            value;
+    }
+}
+
+
+function formatStatus(
+    status
+) {
+
+    const map = {
+
+        queued:
+            "Waiting",
+
+        in_progress:
+            "Active",
+
+        completed:
+            "Completed",
+
+        failed:
+            "Failed",
+
+        canceled:
+            "Canceled"
+
+    };
+
+
+    return (
+        map[status] ||
+        status
+    );
+}
+
+
+function extractReason(
+    message
+) {
+
+    if (!message) {
+
+        return (
+            "A safety incident was detected."
+        );
+    }
+
+
+    const match =
+        message.match(
+            /Reason:\s*([\s\S]*?)(?:\n\n|Last known location:|Time:)/
+        );
+
+
+    if (match) {
+
+        return match[1].trim();
+
+    }
+
+
+    return (
+        "A safety incident was detected."
+    );
+}
+
+</script>
+
+</body>
+
+</html>
