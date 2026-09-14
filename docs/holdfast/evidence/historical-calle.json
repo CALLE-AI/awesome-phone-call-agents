@@ -1,0 +1,29 @@
+{
+  "evidence_scope": "Historical transport integration only. This is not the controlled Sam fixture and not a current-runner end-to-end result. Field verification, DTMF events, hold queues and human pickup are not established by these excerpts.",
+  "records": [
+    {
+      "source_artifact_name": "001-denver-forecast-final.json",
+      "source_artifact_sha256": "e90a9e96af83fd5b9ae2ebfdd89d8261a5f2d8b19b62ef1e6fa2a6ab4d3d5f70",
+      "source_kind": "saved CALL-E response from a historical call to a public automated weather recording",
+      "provider_ok": true,
+      "provider_status": "COMPLETED",
+      "run_id": "Ka4XD974IZOSYCfcp33PMA",
+      "duration_seconds": 132,
+      "transcript_excerpt": "[00:00:39] USER: Thank you for calling the forecast information line for the National Weather Service office in Boulder, Colorado.",
+      "structured_result_present": false,
+      "redactions": "Selected public-recording excerpt only; credentials, URLs, phone destinations, full transcript and unrelated provider metadata omitted."
+    },
+    {
+      "source_artifact_name": "002-ohio-menu-final.json",
+      "source_artifact_sha256": "11061716b2a4066ea5c4523b4136b47571b6409c91377d4669b49f0e4df35fef",
+      "source_kind": "saved CALL-E response from a historical call to a public automated weather recording",
+      "provider_ok": true,
+      "provider_status": "COMPLETED",
+      "run_id": "yDCDaJs4icJyJ597D-hqMg",
+      "duration_seconds": 146,
+      "transcript_excerpt": "[00:00:00] USER: Hello.",
+      "structured_result_present": false,
+      "redactions": "Selected public-recording excerpt only; credentials, URLs, phone destinations, full transcript and unrelated provider metadata omitted."
+    }
+  ]
+}
