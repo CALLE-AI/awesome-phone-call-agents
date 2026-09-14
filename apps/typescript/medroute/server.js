@@ -1588,7 +1588,7 @@ server.once("error", (error) => {
   throw error;
 });
 
-server.listen(port, () => {
+server.listen({ port, host: productionMode ? undefined : "127.0.0.1" }, () => {
   console.log(`MedRoute running at http://localhost:${port}`);
   // Start periodic eviction of stale in-memory state
   if (evictionIntervalMs > 0) {
