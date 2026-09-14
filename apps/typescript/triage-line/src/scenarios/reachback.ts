@@ -69,8 +69,14 @@ interface Resident {
   locale?: string;
 }
 
-/** Eight residents to call. Resident 6 is Spanish-speaking (drives lang retry). */
-const RESIDENTS: Resident[] = [
+/**
+ * Sample roster for the MOCK/no-call demo only. These are fictional
+ * standards-reserved (555) numbers and are never dialed for real: they exist so
+ * the simulated fan-out has recipients. Live and hybrid modes ignore these as
+ * real recipients — real legs come only from explicitly authorized config
+ * (REACHBACK_PHONES). Resident 6 is Spanish-speaking (drives language retry).
+ */
+const SAMPLE_RESIDENTS: Resident[] = [
   { id: "reachback-1", name: "Ada Ellison", phone: "+14155550101" },
   { id: "reachback-2", name: "Bo Nguyen", phone: "+14155550102" },
   { id: "reachback-3", name: "Carmen Diaz", phone: "+14155550103" },
@@ -121,29 +127,38 @@ function residentsToCall(): Resident[] {
   const phones = configuredPhones();
   const region = configuredRegion();
   const locale = configuredLocale();
-  const hybrid = (process.env.CALL_MODE ?? "").toLowerCase() === "hybrid";
+  const mode = (process.env.CALL_MODE ?? "").toLowerCase();
 
-  if (hybrid) {
+  // MOCK: the sample roster is used purely to simulate a fan-out; these 555
+  // numbers are never dialed for real.
+  if (mode !== "live" && mode !== "hybrid") {
+    return SAMPLE_RESIDENTS;
+  }
+
+  // HYBRID: real legs (REAL_NODE_IDS) must have an explicitly authorized number
+  // from config; the rest of the roster are simulated stand-ins routed to the
+  // mock. A real node id with no configured number is dropped (fail closed) so
+  // no fixture is ever dialed for real.
+  if (mode === "hybrid") {
     const realIds = [...realNodeIds()];
-    // Assign configured phones to the real node ids in order.
-    return RESIDENTS.map((r) => {
+    return SAMPLE_RESIDENTS.flatMap((r) => {
       const idx = realIds.indexOf(r.id);
-      if (idx >= 0 && phones[idx]) {
-        return { ...r, phone: phones[idx], region, locale };
+      if (idx >= 0) {
+        if (!phones[idx]) return []; // authorized number required for a real leg
+        return [{ ...r, phone: phones[idx], region, locale }];
       }
-      return r;
+      return [r]; // simulated stand-in (routed to mock)
     });
   }
 
-  if (phones.length === 0) return RESIDENTS;
-  return phones.map((phone, i) => {
-    const base = RESIDENTS[i] ?? {
-      id: `reachback-${i + 1}`,
-      name: `Resident ${i + 1}`,
-      phone,
-    };
-    return { ...base, phone, region, locale };
-  });
+  // LIVE: call ONLY explicitly authorized recipients. No fixture fallback.
+  return phones.map((phone, i) => ({
+    id: `reachback-${i + 1}`,
+    name: `Resident ${i + 1}`,
+    phone,
+    region,
+    locale,
+  }));
 }
 
 /** Does a verified welfare result indicate the resident needs help? */
@@ -267,5 +282,5 @@ export function buildReachbackGraph(): CallGraph {
 
 /** Name lookup for pretty output. */
 export const RESIDENT_NAMES: Record<string, string> = Object.fromEntries(
-  RESIDENTS.map((r) => [r.id, r.name])
+  SAMPLE_RESIDENTS.map((r) => [r.id, r.name])
 );

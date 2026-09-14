@@ -72,18 +72,28 @@ export interface RunEvent {
 type Listener = (event: RunEvent) => void;
 
 /**
- * Redact phone-like values from a structured result before it's serialized.
- * Provider-discovered numbers (e.g. referral_phone) must never leak in full.
+ * Deeply redact phone-like values anywhere in a JSON value (strings, nested
+ * objects, arrays). Provider-discovered numbers (e.g. a nested referral_phone)
+ * must never leak in full at any depth.
  */
+function redactDeep(value: unknown): unknown {
+  if (typeof value === "string") return redactPhones(value);
+  if (Array.isArray(value)) return value.map(redactDeep);
+  if (value && typeof value === "object") {
+    const out: Record<string, unknown> = {};
+    for (const [k, v] of Object.entries(value as Record<string, unknown>)) {
+      out[k] = redactDeep(v);
+    }
+    return out;
+  }
+  return value;
+}
+
 function redactResult(
   result: Record<string, unknown> | undefined
 ): Record<string, unknown> | undefined {
   if (!result) return undefined;
-  const out: Record<string, unknown> = {};
-  for (const [k, v] of Object.entries(result)) {
-    out[k] = typeof v === "string" ? redactPhones(v) : v;
-  }
-  return out;
+  return redactDeep(result) as Record<string, unknown>;
 }
 
 function snapshotNode(n: CallNode): NodeSnapshot {
@@ -109,8 +119,9 @@ function snapshotNode(n: CallNode): NodeSnapshot {
       ? {
           trusted: n.verification.trusted,
           status: n.verification.status,
-          notes: n.verification.notes,
-          policyFlags: n.verification.policyFlags,
+          // Notes/flags are human-facing text and can contain numbers.
+          notes: n.verification.notes.map((s) => redactPhones(s)),
+          policyFlags: n.verification.policyFlags.map((s) => redactPhones(s)),
         }
       : undefined,
     attemptedLocales: n.attemptedLocales,
@@ -153,7 +164,8 @@ class Run {
       startedAt: this.startedAt,
       finishedAt: this.finishedAt,
       nodes: this.graph.nodes.map(snapshotNode),
-      error: this.error,
+      // Error text can include a number (e.g. a failed E.164) — mask it.
+      error: this.error ? redactPhones(this.error) : undefined,
     };
   }
 

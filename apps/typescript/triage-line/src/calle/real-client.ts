@@ -115,9 +115,11 @@ export class RealCalleClient implements CalleClient {
     if (!options.apiKey) {
       throw new Error("RealCalleClient requires a CALL-E apiKey.");
     }
-    // Never send real credentials over a non-HTTPS origin. If a baseUrl is
-    // provided it must be https; otherwise we fall back to the SDK default
-    // (the official HTTPS API).
+    // Credentials may only be sent to an approved HTTPS origin. Accepting any
+    // https:// URL is insufficient — a mistyped or hostile host would still
+    // receive the API key. We enforce an allowlist of exact origins. The
+    // default allows only the official CALL-E API; additional origins can be
+    // added via CALLE_ALLOWED_ORIGINS (comma-separated) for self-hosted setups.
     if (options.baseUrl !== undefined) {
       let url: URL;
       try {
@@ -129,6 +131,22 @@ export class RealCalleClient implements CalleClient {
         throw new Error(
           `Refusing to send CALL-E credentials over a non-HTTPS origin ` +
             `(${url.protocol}//). Use an https:// base URL.`
+        );
+      }
+      const allowed = new Set(
+        [
+          "https://api.heycall-e.com",
+          ...(process.env.CALLE_ALLOWED_ORIGINS ?? "")
+            .split(",")
+            .map((s) => s.trim())
+            .filter(Boolean),
+        ].map((o) => o.replace(/\/$/, ""))
+      );
+      if (!allowed.has(url.origin)) {
+        throw new Error(
+          `Refusing to send CALL-E credentials to unapproved origin ` +
+            `"${url.origin}". Approved: ${[...allowed].join(", ")}. ` +
+            `Add it to CALLE_ALLOWED_ORIGINS if intended.`
         );
       }
     }

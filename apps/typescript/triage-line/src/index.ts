@@ -17,6 +17,7 @@ import { executeGraph, type ExecutorEvent } from "./graph/executor.js";
 import type { CallGraph, CallNode } from "./graph/types.js";
 import { buildReachbackGraph, RESIDENT_NAMES } from "./scenarios/reachback.js";
 import { buildRunaroundGraph } from "./scenarios/runaround.js";
+import { redactPhones } from "./util/phone.js";
 
 const URGENCY_RANK: Record<string, number> = {
   high: 0,
@@ -111,14 +112,14 @@ function printReachbackTriage(graph: CallGraph): void {
     const needs = Array.isArray(n.result?.["needs"])
       ? (n.result!["needs"] as string[]).join(",") || "-"
       : "-";
-    const note = n.verification?.notes.slice(-1)[0] ?? "";
+    const note = redactPhones(n.verification?.notes.slice(-1)[0] ?? "");
     console.log(
       [
         STATUS_ICON[n.status] ?? "?",
         n.status,
         urgency,
         name,
-        needs,
+        redactPhones(needs),
         note,
       ].join("\t")
     );
@@ -148,15 +149,17 @@ function printRunaroundChain(graph: CallGraph): void {
       `  ${STATUS_ICON[n.status] ?? "?"} ${n.id}${parent} → ${n.status}`
     );
     const note = n.result?.["note"];
-    if (note) console.log(`      ${note}`);
+    if (note) console.log(`      ${redactPhones(String(note))}`);
     for (const flag of n.verification?.policyFlags ?? []) {
-      console.log(`      ⛔ ${flag}`);
+      console.log(`      ⛔ ${redactPhones(flag)}`);
     }
   }
   const booked = graph.nodes.find((n) => n.result?.["confirmation_number"]);
   if (booked) {
     console.log(
-      `\nOutcome: booked with confirmation ${booked.result!["confirmation_number"]}.`
+      `\nOutcome: booked with confirmation ${redactPhones(
+        String(booked.result!["confirmation_number"])
+      )}.`
     );
   }
 }
@@ -195,6 +198,8 @@ async function main(): Promise<void> {
 }
 
 main().catch((err) => {
-  console.error(err);
+  // Error text may include a number (e.g. a rejected E.164); mask before print.
+  const msg = err instanceof Error ? err.message : String(err);
+  console.error(redactPhones(msg));
   process.exit(1);
 });

@@ -45,9 +45,14 @@ function chainNode(
 }
 
 export function buildRunaroundGraph(): CallGraph {
+  // The clinic number is an explicit, authorized recipient supplied via config.
+  // There is no built-in fixture fallback: if unset the value is empty and the
+  // E.164 guard refuses to dial it (fail closed).
+  const clinicPhone = (process.env.CLINIC_PHONE ?? "").trim();
+
   const start = chainNode(
     "runaround-clinic",
-    "+14155550120",
+    clinicPhone,
     "Book an appointment with the specialist clinic for the patient. If a " +
       "referral or pre-authorization is required, find out exactly what is " +
       "needed and the phone number to arrange it."
@@ -111,10 +116,12 @@ export function buildRunaroundGraph(): CallGraph {
       }
 
       if (node.id === "runaround-insurer" && next === "book_clinic") {
+        const hasPreauth = typeof r["preauth_code"] === "string" && r["preauth_code"] !== "";
         return [
           chainNode(
             "runaround-book",
-            "+14155550120",
+            // Same authorized clinic recipient from config; no fixture fallback.
+            clinicPhone,
             "Call the specialist clinic back with the pre-authorization code " +
               `${String(r["preauth_code"] ?? "")} and referral to book the ` +
               "appointment. Get a confirmation number.",
@@ -124,6 +131,15 @@ export function buildRunaroundGraph(): CallGraph {
                 ...STEP_SCHEMA,
                 required: ["next_step", "confirmation_number"],
               },
+              // Booking is a consequential commitment. The mere presence of a
+              // preauth code / result field does NOT authorize it — a human
+              // must approve before this booking call is placed.
+              requiresApproval: true,
+              proposedReason: hasPreauth
+                ? `Insurer returned a pre-authorization code; propose the final ` +
+                  `booking call to the clinic (${maskPhone(clinicPhone)}).`
+                : `Propose the final booking call to the clinic ` +
+                  `(${maskPhone(clinicPhone)}).`,
             }
           ),
         ];
