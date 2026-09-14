@@ -5,7 +5,6 @@ from pipeline.precheck import run_prechecks
 ALERT = Alert(
     claimed_reason="unusual activity",
     phone_number="(800) 555-0187",
-    sender_domain="example.com",
     source_email_excerpt="...",
 )
 
