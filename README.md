@@ -191,7 +191,7 @@ This project is an awesome list for AI-agent phone-call workflows. Add resources
 
 ### Apps
 
-
+- [Rove](https://github.com/siaohue1188/rove) - Logistics workforce operations control tower that detects the gap between digitally assigned and physically secured workers, uses CALL-E to verify standby-worker availability and arrival feasibility, and applies deterministic recovery or human-escalation rules. [Live Demo](https://rove-iota-seven.vercel.app/)
 - [SiteWitness](apps/typescript/sitewitness/) - Local site-history interview workspace that carries reviewed evidence gaps into individually approved CALL-E calls, with exact transcript quotations, human year review, and a no-call rehearsal mode.
 - [Rebuttal Dispute Call](apps/python/rebuttal-dispute-call/) - One disclosed CALL-E call to a disputing customer, cross-examined against its transcript before it becomes chargeback evidence, with six scripted no-call scenarios and a live path gated by per-run consent, an allowlist and local calling hours.
 - [Clinic Slot Assistant](apps/typescript/clinic-slot-assistant/) - Preview a consented appointment-availability call, review CALL-E results, and confirm a fictional booking; local simulation is the default.
