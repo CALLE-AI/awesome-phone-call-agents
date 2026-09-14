@@ -102,6 +102,7 @@ function buildBookingTask(contract: ApprovedBookingContract): string {
     "Do not accept a different date, time, or party size.",
     "If the requested slot is unavailable, ask once whether an alternative is available, record it, but do not book it.",
     "Do not leave a voicemail and do not make promises outside this reservation request.",
+    "Before ending, repeat the restaurant's outcome back to the person on the line, including the guest name, party size, requested date and time, and any confirmation number or alternative offered, then ask them to confirm that you heard it correctly.",
     "Return only evidence-supported structured fields. If the outcome is ambiguous, use uncertain.",
   ].join("\n");
 }

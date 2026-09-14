@@ -1,10 +1,11 @@
-# DineLine CALL-E Edition: Final 2 Minute 50 Second Video
+# DineLine CALL-E Edition: Final Submission Video
 
-Updated September 13, 2026 after the final media QA pass.
+Updated September 14, 2026 after the final controlled-call evidence and media
+QA pass.
 
 ## Verified render
 
-- Runtime: 2 minutes 50.4 seconds
+- Runtime: 2 minutes 49.6 seconds
 - Frame size: 1920 x 1080
 - Video: H.264 at 25 frames per second
 - Audio: mono AAC at 48 kHz, normalized to approximately -16 LUFS
@@ -15,11 +16,12 @@ Updated September 13, 2026 after the final media QA pass.
 
 ## Claim boundary
 
-The video shows the functioning fixture-only judge interface. It explicitly says
-that the displayed calls and restaurant results are simulated. It also states
-that a separately controlled Agent 1 call reached CALL-E's terminal structured-
-result path but failed human audio QA, so that call is not presented as a
-successful voice demonstration.
+The video shows the functioning fixture-only judge interface and explicitly
+says the displayed result is simulated. It also states that separate controlled
+calls to an owned phone verified both native CALL-E roles: Agent 1 captured a
+complete request in clear English, and Agent Jake returned a confirmed outcome
+while Greg role-played the restaurant. It does not describe those role-level
+canaries as one complete live round trip.
 
 ## Shot list and final narration
 
@@ -72,7 +74,7 @@ Narration:
 > time, party size, and rules. Changing any protected detail cancels the
 > approval.
 
-### 1:25-1:57 | Agent Jake and evidence
+### 1:25-1:56 | Agent Jake and evidence
 
 Visual: Approved Agent Jake control followed by the verified fixture outcome.
 
@@ -81,12 +83,12 @@ Narration:
 > Agent Jake has a separate CALL-E task, result schema, permission switch,
 > destination allowlist, and journal. DineLine reports a booking only when
 > provider status, task completion, confidence, evidence, and the approved
-> contract all agree. This public result is explicitly simulated. I separately
-> validated Agent One's terminal structured-result path on an owned phone, but
-> the audio did not pass my human quality check, so I will not present that call
-> as a successful voice demo.
+> contract all agree. This public result is simulated. In separate controlled
+> calls to an owned phone, the Concierge captured a complete dinner request in
+> clear English, and Agent Jake returned a confirmed outcome while I role-played
+> the restaurant.
 
-### 1:57-2:18 | Duplicate and uncertain-call safety
+### 1:56-2:17 | Duplicate and uncertain-call safety
 
 Visual: Exact retry followed by the visible duplicate-blocked result.
 
@@ -97,15 +99,16 @@ Narration:
 > evidence. If CALL-E accepted a call but the result is late, DineLine checks
 > that exact call ID. It never guesses and never automatically retries.
 
-### 2:18-2:50 | Provenance, new work, and close
+### 2:17-2:49 | Provenance, new work, and close
 
 Visual: The six-stage architecture strip and final product statement.
 
 Narration:
 
-> I first built DineLine for my April 2026 capstone and rebuilt version two in
-> May, before this hackathon. During the submission period, I replaced the
-> previous voice runtime with two CALL-E providers, added bounded approvals and
-> reconciliation, built this new interface, and added sixty-five automated
-> tests. The pattern can extend to legal intake, service scheduling, and other
-> phone-heavy work. DineLine finds the place. Agent Jake closes the phone loop.
+> I first built DineLine for my April 2026 capstone and rebuilt version two over
+> Memorial Day weekend, before this hackathon. For this edition, I adapted that
+> original architecture to two CALL-E providers, added bounded approvals and
+> reconciliation, built this interface, and added sixty-five automated tests.
+> The same pattern is already becoming CaseCapture, a separate three-agent
+> legal-intake prototype. DineLine finds the place. Agent Jake closes the phone
+> loop.

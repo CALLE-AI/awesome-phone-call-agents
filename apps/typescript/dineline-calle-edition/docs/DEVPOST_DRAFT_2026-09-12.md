@@ -47,11 +47,13 @@ DineLine uses two CALL-E agents with different jobs.
 The DineLine Concierge calls the diner and asks naturally about location,
 cuisine, date, time, party size, budget, atmosphere, and dietary needs. Its
 structured result is checked against call evidence before it can move forward.
-The generated n8n integration then validates the request, searches Google
-Places, ranks five choices, and caches the exact result set when configured with
-live credentials. The current evidence package verifies that orchestration with
-fixtures; the submission does not present the fictional cards as live Google
-Places results.
+Because CALL-E executes each phone task asynchronously, that call ends before
+discovery begins. The app is the handoff between the two agents: the generated
+n8n integration validates the request, searches Google Places, ranks five
+choices, and caches the exact result set when configured with live credentials.
+The public walkthrough uses fictional fixtures; one separately authorized live
+Google Places request returned and ranked five options through the same request
+and ranking contract.
 
 The diner chooses one restaurant and reviews a readable booking contract. That
 contract binds the restaurant, destination, date, time, party size, guest, and
@@ -126,10 +128,14 @@ dispatch journal, non-retryable unknown state, and evidence verifier.
   timeout, and duplicate outcomes
 - Completed n8n fixture execution `879` through both agent boundaries with the
   final assertion marked `passed`
-- Completed one controlled CALL-E Agent 1 call whose structured preferences,
-  confidence, evidence, and request metadata passed DineLine's verifier; its
-  voice output did not pass human conversational QA, has been reported to
-  CALL-E support, and remains unresolved
+- Completed a controlled CALL-E Agent 1 call on an owned line that captured a
+  complete dinner request in clear English with `0.93` provider confidence and
+  no missing search fields
+- Completed a separate controlled Agent Jake call on the same owned line while
+  role-playing the restaurant; CALL-E returned a confirmed outcome and
+  DineLine's verifier accepted it without human review
+- Exercised the Google Places request and ranking contract once against the live
+  API, returning HTTP 200 and five ranked options
 - Verified the fixture journal boundary in the browser: an exact retry in the
   same session is blocked, while a fresh sample session can run normally
 - Preserved accepted call IDs and added read-only exact-call reconciliation so
@@ -137,7 +143,7 @@ dispatch journal, non-retryable unknown state, and evidence verifier.
 - Passed 65 automated tests, TypeScript compilation, the upstream repository
   validator, JavaScript syntax validation, and an npm audit with zero known
   vulnerabilities
-- Produced and frame-reviewed a 2 minute 50.4 second English demo at 1080p with
+- Produced and frame-reviewed a 2 minute 49.6 second English demo at 1080p with
   small burned-in captions, a separate SRT file, and no private account data
 - Kept the original DineLine repositories untouched
 
@@ -165,7 +171,7 @@ restaurant side and help receive, validate, and route reservation requests.
 
 ## Judge testing instructions
 
-1. Open `[PUBLIC_DEMO_URL]` on desktop or mobile.
+1. Open `https://dineline-calle-edition.vercel.app` on desktop or mobile.
 2. Select **Skip the call and use the sample request**.
 3. Inspect the evidence-backed dinner request and five fictional choices.
 4. Choose one restaurant.
@@ -179,12 +185,13 @@ restaurant side and help receive, validate, and route reservation requests.
 
 The public app cannot make real calls. The source contribution contains both
 native CALL-E providers and the fixture-only hosted adapter. The final public
-video shows the fixture path and describes the separately controlled Agent 1
-technical evidence with its failed human-audio QA limitation intact.
+video shows the complete staged fixture path and accurately describes the two
+separate owned-line CALL-E canaries. It does not claim that the entire live
+round trip was executed as one continuous conversation.
 
 ## Links to fill after approval
 
-- Public demo: `[PUBLIC_DEMO_URL]`
+- Public demo: `https://dineline-calle-edition.vercel.app`
 - Public video under three minutes: `[YOUTUBE_OR_VIMEO_URL]`
 - Required upstream pull request: `[CALL_E_PR_URL]`
 - CALL-E account email: `[ACCOUNT_EMAIL]`

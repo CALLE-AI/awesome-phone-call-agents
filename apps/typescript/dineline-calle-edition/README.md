@@ -54,13 +54,14 @@ to eat. DineLine starts earlier and completes the whole decision-to-action loop:
 
 `Understand -> Discover -> Compare -> Approve -> Call -> Verify -> Return`
 
-The first agent gathers the diner's real constraints. When the generated n8n
-integration is configured and run, it searches live Google Places data and
-returns five grounded choices rather than inventing recommendations. The user
-chooses and approves the exact request. Only then does the second agent call the
-restaurant, and the verified outcome returns to the original experience. That
-recommendation-plus-execution architecture is the core distinction from a
-single restaurant-booking agent.
+The first agent gathers the diner's real constraints and ends with a structured
+request. CALL-E runs phone work as asynchronous tasks, so the app becomes the
+handoff between calls: the generated n8n integration searches live Google
+Places data, returns five grounded choices, and waits for the diner to choose.
+Only after that choice and an exact approval does the second agent call the
+restaurant. The verified outcome then returns to the app. That discovery-plus-
+execution architecture is the core distinction from a single restaurant-
+booking agent.
 
 ## Reusable architecture
 
@@ -88,8 +89,9 @@ is complete today.
   budget, atmosphere, dietary needs, and notes without inventing missing data.
 - The generated n8n workflow validates the Agent 1 result, searches Google
   Places, normalizes and ranks results, and returns five choices when configured
-  with live credentials. The current evidence package verifies this path with
-  fixtures; one sanitized live Google Places proof remains pending.
+  with live credentials. The public walkthrough uses fixtures; a separate,
+  bounded live Google Places request returned HTTP 200 and ranked five options
+  through the same request and ranking contract.
 - The selected Google result is recovered from n8n's cache rather than trusted
   from arbitrary browser input.
 - A readable booking contract binds the user's approval to the exact restaurant,
@@ -106,6 +108,16 @@ is complete today.
   demo in the same interface used by the real providers.
 
 No test or fixture command places a phone call.
+
+## Controlled live verification
+
+On September 14, two separately authorized calls to an owned test line verified
+the native CALL-E roles without contacting a restaurant. The DineLine Concierge
+captured a complete, search-ready dinner request in clear English. In a separate
+call, Agent Jake returned a confirmed reservation outcome while Greg role-played
+the restaurant, and DineLine's evidence verifier accepted it without human
+review. These were role-level canaries, not a claimed live execution of the
+entire staged workflow. The public judge experience remains fixture-only.
 
 ## Run locally
 

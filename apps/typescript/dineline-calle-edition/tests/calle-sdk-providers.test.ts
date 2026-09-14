@@ -95,6 +95,7 @@ describe("native CALL-E SDK providers", () => {
     expect(request.task).toContain("clear United States English");
     expect(request.task).toContain("controlled demonstration with an authorized participant");
     expect(request.task).toContain("Do not accept a different date, time, or party size");
+    expect(request.task).toContain("repeat the restaurant's outcome back");
     expect(options).toEqual({ idempotencyKey: contract.idempotencyKey });
     expect(sdk.waitForResult).toHaveBeenCalledWith("call-test-1", {
       timeoutMs: 12_345,
