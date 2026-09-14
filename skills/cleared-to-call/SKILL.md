@@ -1,6 +1,6 @@
 ---
 name: cleared-to-call
-description: Gate outbound CALL-E phone calls behind a declarative US federal compliance policy, so a collection or account-servicing call is placed only when the call window, consent, suppression, and disclosure checks all pass, is ended and suppressed the moment the recipient opts out, and leaves a tamper-evident audit record either way.
+description: Evaluate supplied account records against an experimental pre-call policy and flag literal opt-out phrases before integrating a CALL-E collection or account-servicing workflow. Offline advisory helpers only; the host owns calling, suppression persistence, and audit records.
 license: MIT
 ---
 
@@ -10,11 +10,12 @@ Use this skill when an agent is about to place an outbound call to a consumer
 about money: a past-due balance, a payment reminder, a collection follow-up, or
 any account-servicing call where the recipient did not initiate the contact.
 
-`cleared-to-call` is a gate, not a dialer. It does not replace the CALL-E call
-workflow and it does not add a provider. It sits in front of one, decides
-whether this call to this person at this moment is allowed, and refuses with a
-named reason when it is not. Every decision, allow or refuse, is written to an
-append-only audit log.
+`cleared-to-call` supplies offline advisory helpers, not a dialer or a legal
+compliance certification. They read supplied records, evaluate a declared
+policy, and print results. They do not place or end calls, write suppression
+entries, or create or verify an audit chain. The integration requirements below
+describe work a host must implement; they are not shipped runtime features.
+An `ALLOW` result is not proof that a call is lawful or authorized.
 
 The rules are data, not prose. They live in `assets/policy.json` and are
 explained in `references/policy.md`.
@@ -26,8 +27,8 @@ Use this skill for:
 - outbound collection, payment-reminder, or past-due account calls
 - any batch of consumer accounts where each row must be checked before dialing
 - workflows that must honor "stop calling me" during the call, not after it
-- workflows that must be able to prove afterwards that a call was lawful
-- workflows that must be able to prove a call was correctly refused
+- workflows collecting evidence for a human compliance assessment
+- workflows explaining why the declared policy blocked a record
 
 ## When Not To Use
 
@@ -88,7 +89,8 @@ At that instant `A-1001` is clear, `A-1002` is outside its local call window,
 
 ## The Pre-Dial Gate
 
-Four rules run before anything dials. All four must pass.
+The host must run these four checks before dialing. Passing them is necessary
+for this sample policy, not sufficient authorization for a real call.
 
 | Rule | Requirement | Block reason |
 | --- | --- | --- |
@@ -111,24 +113,24 @@ holds every rule result, not only the failing one, so an audit reader can see
 the whole evaluation.
 
 When several rules fail, the reported `block_reason` is the first failure in
-policy order. All four are still evaluated and recorded.
+policy order. All four are still evaluated and printed for the host to retain.
 
 Read `references/policy.md` for what each rule means, which authority it comes
 from, and the property it is meant to enforce.
 
 ## The In-Call Revocation Handler
 
-Rule 5 cannot be decided before dialing. It is enforced twice, and both halves
-matter:
+Rule 5 cannot be decided before dialing. A host integration has two duties;
+only the literal transcript checker is included here:
 
 1. The call task tells the agent to stop the moment the recipient revokes:
    acknowledge once, end the call, do not ask why, do not offer alternatives.
-2. After the call, the returned transcript is re-read for a revocation. That
-   check is the one that writes the suppression entry.
+2. After the call, run the transcript checker, then have the host persist any
+   required suppression entry and record the outcome.
 
-The second step exists because the first cannot be trusted on its own. If the
-agent talks past the opt-out, the number is still suppressed and the outcome is
-still recorded as `opt_out`.
+The checker prints a required action; it does not carry it out. If the agent
+talks past an opt-out, the host must still persist suppression and record
+`opt_out`. A post-call check cannot retrospectively stop a running call.
 
 ```bash
 node scripts/check-revocation.mjs --utterance "stop calling me"
@@ -139,8 +141,9 @@ Exit code `3` means the number must be suppressed. Only recipient turns count:
 the agent saying "if you would like us to stop calling" is a required
 disclosure, not an opt-out.
 
-Once suppressed, R3 blocks that number on every later run. The opt-out is
-permanent unless the consumer asks for it to be reversed.
+Once the host persists suppression and supplies the updated list, R3 blocks the
+number on later evaluations. The host must retain the opt-out unless the
+consumer asks for it to be reversed.
 
 ## How CALL-E Is Invoked
 
@@ -171,7 +174,7 @@ that. Match symbol masks only; the call script itself says "account ending
 
 ## Structured Result
 
-Every account yields exactly one result, whether or not it was called:
+Suggested host outcome shape, not an output implemented by the bundled helpers:
 
 ```json
 {
@@ -190,29 +193,29 @@ Every account yields exactly one result, whether or not it was called:
 `opt_out`, `not_called`. A blocked account is always `not_called` with
 `call_placed: false` and a non-null `block_reason`.
 
-`disclosure_given` is read back from what the agent actually said, not from the
-fact that the script contained it.
+The host must derive `disclosure_given` from what was actually said, not merely
+from the script. This package does not implement that post-call verification.
 
 ## Audit Record
 
-Every decision appends one line to a JSONL log. Each line carries the hash of
-the line before it, so an edited, deleted, or reordered entry breaks the chain
-from that point on.
+Optional host design: retain decisions in a hash-linked JSONL log. This package
+does not append entries or verify a chain. A hash chain alone is not proof of
+legal compliance or protection against rewriting the entire log.
 
-Each entry holds the timestamp, the account id, the masked phone number, the
+Such an entry can hold the timestamp, the account id, the masked phone number, the
 decision, the block reason, every rule result, the outcome, the policy id and
 version, and `prev_hash` plus `hash`.
 
-Phone numbers in the audit log are always masked, for example `+1******1234`.
+The host must mask phone numbers in audit output, for example `+1******1234`.
 
 ## Dry Run
 
-Dry run is the default. In dry run the gate, the disclosure check, the
-revocation detection, the suppression writes, and the audit chain all run
-exactly as they do live - only the dialing is simulated.
+All bundled helpers are offline: they read input and print advisory results.
+There is no live adapter, simulated dialer, suppression writer, or audit-chain
+writer. Host integrations must provide and validate those features separately.
 
-Never place a real call to test the gate. A blocked account is proven blocked
-without dialing, and a cleared account is proven cleared without dialing.
+Never place a real call to test the helpers. Offline checks exercise the
+declared sample policy, not the legality of a real calling program.
 
 Place a real call only when the operator has explicitly asked for one, on a
 number they are authorized to call.
@@ -232,13 +235,13 @@ Read `references/safety.md` for the full contract. Always:
 
 ## Output Format
 
-After a batch, report:
+After a host-managed batch, report only actions the host actually performed:
 
 - how many accounts were cleared, blocked, and opted out
 - each blocked account with its block reason
 - each cleared account with its outcome and masked number
-- any opt-out, with the number now suppressed
-- the audit chain verification result and the number of entries
+- any opt-out, distinguishing suppression required from confirmed persistence
+- any implemented audit verification result, or state that it is not implemented
 
 If the gate blocked everything, say so plainly and give the reasons. A run that
 places no calls because no account was clearable is a successful run, not a

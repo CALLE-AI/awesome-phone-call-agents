@@ -14,8 +14,8 @@ Place a call only when the operator has explicitly asked for this batch or this
 account to be called.
 
 Never place a call to test the gate, warm up a connection, verify credentials,
-or demonstrate that the workflow runs. Dry run proves all of that without
-dialing anyone.
+or demonstrate that the helpers run. Offline checks validate only the supplied
+policy examples, not live integration or credential validity.
 
 Never place a call to a number the operator has not confirmed they are
 authorized to call.
@@ -42,12 +42,12 @@ Mask numbers in every summary, log line, audit entry, error message, and status
 report. The mask keeps the first two and last four characters:
 `+15550101234` becomes `+1******1234`.
 
-The full number appears in exactly two places: the suppression list, which must
-match real dial targets, and the dial payload handed to the provider. It does
-not belong in an audit log, a commit message, an issue comment, a screenshot,
-or a demo recording.
+Keep full numbers in private input records, suppression data, and authorized
+provider payloads only. They do not belong in an audit log, commit message,
+issue comment, screenshot, or demo recording.
 
-Documentation, fixtures, and tests use reserved fictional numbers only.
+The bundled example records are synthetic placeholders for offline evaluation;
+do not dial them or infer that their formatting proves a reserved number range.
 
 ## Opt-Out Handling
 
@@ -65,8 +65,9 @@ When a recipient revokes consent:
 
 Re-read the transcript after every call, even one that ended normally. The
 agent's in-call behavior is not evidence that the opt-out was honored: the
-post-call check is what actually suppresses the number, and it must run whether
-or not the agent claims to have handled it.
+post-call check reports a required action, and the host must persist suppression
+whether or not the agent claims to have handled it. The bundled checker does
+not write a list or send a hang-up request.
 
 A suppressed number stays suppressed. Removing an entry is a deliberate,
 human-authorized act on the record, never a step in a calling workflow.
@@ -117,16 +118,16 @@ reason to keep them separate.
 
 ## Audit Integrity
 
-The audit log is append-only, and each entry hashes the one before it.
+If the host implements the suggested hash-linked audit log, it should be
+append-only. No audit writer or chain verifier is included in this package.
 
 - never rewrite, delete, or reorder an entry
 - never backdate a timestamp
 - never write an allow entry for a call that was blocked, or the reverse
 - verify the chain after every batch and report the result
 
-If verification fails, say so immediately and prominently. A broken chain means
-the log can no longer prove anything, which is a more serious problem than a
-failed call.
+If implemented verification fails, report it. A valid chain is an integrity
+signal, not proof of legality or protection against complete log replacement.
 
 ## Batch Boundaries
 
@@ -142,5 +143,6 @@ failed call.
 This skill checks the five rules in `references/policy.md` under US federal law.
 It does not check state-level rules, call frequency caps, reassigned number
 databases, litigation-risk suppression, or any non-US regime. Do not describe it
-as making a calling program compliant. It enforces five specific preconditions,
-proves it did, and refuses when it cannot.
+as making a calling program compliant. It evaluates four supplied pre-call
+conditions and literal revocation phrases, then prints advisory results. Live
+enforcement, suppression persistence, and outcome/audit recording belong to the host.

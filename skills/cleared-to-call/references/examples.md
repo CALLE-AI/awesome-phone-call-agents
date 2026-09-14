@@ -1,7 +1,8 @@
 # Examples
 
-Every number below is a reserved fictional `555-01xx` number and belongs to
-nobody. All runs shown are dry runs.
+All account records below are synthetic placeholders for offline evaluation;
+do not dial them. Call outcomes and audit references illustrate a possible host
+integration, not actions performed by these read-only helper scripts.
 
 ## A batch, gated
 
@@ -203,13 +204,14 @@ node scripts/check-revocation.mjs --transcript transcript.json
   "revoked": true,
   "turn_index": 3,
   "speaker": "recipient",
-  "text": "Stop calling me. I do not want these calls.",
+  "text_omitted": true,
   "matched_phrase": "stop calling",
   "action": "end_call_and_suppress"
 }
 ```
 
-Exit code `3`. Result:
+Exit code `3` reports required suppression. Suggested host result after the
+host actually records the opt-out:
 
 ```json
 {
@@ -227,15 +229,15 @@ Exit code `3`. Result:
 The agent's first turn contains the phrase "stop calling" as part of the
 required disclosure, and turn 0 is not flagged - only recipient turns are read.
 
-Run the same batch again and that account is now blocked:
+After the host persists suppression and supplies the updated list, reevaluating
+the same batch blocks that account:
 
 ```text
 A-1005    BLOCK    ON_SUPPRESSION_LIST    -    aud_9c4471be
 ```
 
-The opt-out becoming a permanent block, on the next run, with no further human
-action, is the whole point of writing it to the suppression list rather than
-just to the result.
+The host must implement that persistence; the helper itself does not modify
+the suppression file or the result record.
 
 ## An agent that ignores the opt-out
 
@@ -250,7 +252,8 @@ The recipient revokes and the agent keeps going:
 ]
 ```
 
-The agent would report `promise_to_pay`. The post-call check overrides it:
+If the agent reports `promise_to_pay`, a host should review the detected opt-out
+and record the appropriate outcome instead. Suggested result:
 
 ```json
 {
@@ -260,8 +263,8 @@ The agent would report `promise_to_pay`. The post-call check overrides it:
 }
 ```
 
-The promise is discarded, the number is suppressed, and the audit entry records
-`opt_out`. A promise extracted after an opt-out is not a promise worth keeping.
+The host must discard that promise, persist suppression, and record `opt_out`;
+the checker only prints its match and required action.
 
 ## An unusable row
 

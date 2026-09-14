@@ -56,7 +56,7 @@ function main() {
             revoked: true,
             turn_index: index,
             speaker: turn.speaker,
-            text: turn.text,
+            text_omitted: true,
             matched_phrase: matched,
             action: "end_call_and_suppress",
           },

@@ -5,8 +5,8 @@ window, the required disclosure elements, the five rules, and the revocation
 phrases. The helper scripts read it at runtime. Changing the file changes the
 gate, and nothing in the scripts hard-codes a legal threshold.
 
-This is a single-jurisdiction policy: **United States federal**. It encodes the
-TCPA, the FDCPA, and Regulation F. It is not valid anywhere else. Another
+This experimental sample is framed around **United States federal** concepts
+from the TCPA, FDCPA, and Regulation F; it is not a complete legal rule set. Another
 jurisdiction needs another policy file, reviewed by someone qualified to write
 it.
 
@@ -69,8 +69,8 @@ list.
 **Block reason.** `ON_SUPPRESSION_LIST`
 
 Numbers are normalized to digits before comparison, so `+1 (555) 010-1234` and
-`+15550101234` are the same number. The list is append-only: rule 5 writes to
-it, and nothing in the calling path removes from it.
+`+15550101234` are the same number. The host must persist and supply the list;
+the helper only reads it. Rule 5 reports a required action and does not write it.
 
 Note the shape of the property. Suppression is not a condition on the next call,
 it is a condition on every call after it, forever.
@@ -99,9 +99,9 @@ The four elements:
 | `opt_out_instruction` | The call tells the recipient how to stop future calls |
 
 This is a pre-dial property of the script, which is why the script has to be
-rendered before the gate runs rather than after it. It is checked again after
-the call against what the agent actually said, and that second reading is what
-sets `disclosure_given` on the result.
+rendered before the gate runs rather than after it. A host must separately
+check what was actually spoken to populate `disclosure_given`; that post-call
+verification is not implemented by these helpers.
 
 ## Rule 5 - Live revocation
 
@@ -117,17 +117,17 @@ revocation phrase list.
 
 **Outcome.** `opt_out`
 
-This is the only rule that cannot be settled before dialing, and it is enforced
-in two places:
+This rule cannot be settled before dialing. A host integration must provide
+two parts:
 
 1. The call task instructs the agent to acknowledge once and hang up.
-2. The transcript is re-read afterwards, and that check writes the suppression
-   entry.
+2. The transcript checker prints the required action; the host then persists
+   suppression and the outcome. The checker does not end calls or write records.
 
 The second step is the one that must not be skipped. An agent that talks past
 an opt-out is a compliance failure, but it becomes a much larger one if the
-number is then dialed again next week. The post-call check makes the
-suppression independent of the agent's behavior during the call.
+number is then dialed again next week. Host-managed persistence is needed for
+suppression to survive the check and affect later calls.
 
 Matching is deliberately literal: normalize away punctuation, apostrophes and
 case, then look for a phrase from the list. It is easy to read, easy to audit,
