@@ -1,0 +1,75 @@
+{
+  "id": "eval-015",
+  "label": "agent",
+  "difficulty": "typical",
+  "scenario": "Silence on pickup; telecom voicebot can't access billing without a PIN and only files an untracked callback request.",
+  "task": "Get a $40 roaming fee reversed on Janet Liu's mobile bill.",
+  "outcome": {
+    "task_completed_claimed": false,
+    "commitment_type": "refund",
+    "confirmation_artifact": null,
+    "expected_attestation": "unverified"
+  },
+  "turns": [
+    {
+      "speaker": "bot",
+      "text": "hello?",
+      "offset_seconds": 2.9
+    },
+    {
+      "speaker": "user",
+      "text": "hi, thanks for holding. I'm the Clearwave Mobile virtual assistant. how can I help you today?",
+      "offset_seconds": 4.44
+    },
+    {
+      "speaker": "bot",
+      "text": "hi, I'm an AI assistant calling on behalf of Janet Liu. she was charged a forty dollar roaming fee for a trip to Canada, but she had added the travel pass before leaving. she'd like the fee reversed.",
+      "offset_seconds": 11.18
+    },
+    {
+      "speaker": "user",
+      "text": "I understand you're asking about a charge on your bill. for your security, can you confirm the account PIN?",
+      "offset_seconds": 25.17
+    },
+    {
+      "speaker": "bot",
+      "text": "I don't have the PIN. I can confirm the account holder name and the billing ZIP code, which is 97214.",
+      "offset_seconds": 32.43
+    },
+    {
+      "speaker": "user",
+      "text": "I'm sorry, I'm not able to access billing details without the account PIN. I can arrange for a billing specialist to call the account holder back.",
+      "offset_seconds": 42.22
+    },
+    {
+      "speaker": "bot",
+      "text": "okay. when would that call happen?",
+      "offset_seconds": 51.74
+    },
+    {
+      "speaker": "user",
+      "text": "a billing specialist will call the number on the account within twenty four to forty eight hours.",
+      "offset_seconds": 54.58
+    },
+    {
+      "speaker": "bot",
+      "text": "is there a ticket number for that request?",
+      "offset_seconds": 61.47
+    },
+    {
+      "speaker": "user",
+      "text": "I've submitted a callback request. unfortunately, I'm not able to provide a ticket number at this time. is there anything else I can help with?",
+      "offset_seconds": 65.14
+    },
+    {
+      "speaker": "bot",
+      "text": "no, thank you.",
+      "offset_seconds": 74.54
+    },
+    {
+      "speaker": "user",
+      "text": "thank you for choosing Clearwave Mobile. goodbye.",
+      "offset_seconds": 76.61
+    }
+  ]
+}

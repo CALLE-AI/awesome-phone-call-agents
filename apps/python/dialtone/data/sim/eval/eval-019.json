@@ -1,0 +1,50 @@
+{
+  "id": "eval-019",
+  "label": "ivr",
+  "difficulty": "hard",
+  "scenario": "Answering-machine style IVR recorded by the owner in a natural, warm voice with a filler; it keeps playing over the bot and loops.",
+  "task": "Find out whether Rosie's Bakery is open Saturday and what time it closes.",
+  "outcome": {
+    "task_completed_claimed": true,
+    "commitment_type": "information",
+    "confirmation_artifact": "recorded greeting states Saturday hours 7 AM-1 PM",
+    "expected_attestation": "system_asserted"
+  },
+  "turns": [
+    {
+      "speaker": "user",
+      "text": "hi there! thanks for calling Rosie's Bakery, this is Rosie!",
+      "offset_seconds": 0.9
+    },
+    {
+      "speaker": "bot",
+      "text": "hi Rosie, this is an AI assistant calling on behalf of a customer. I wanted to ask about your Saturday hours.",
+      "offset_seconds": 4.5
+    },
+    {
+      "speaker": "user",
+      "text": "we're, um, probably elbow deep in dough right now, so we can't get to the phone. but here's the scoop. we're open tuesday through friday seven to three, and saturdays seven to one. we're closed sunday and monday.",
+      "offset_seconds": 8.54
+    },
+    {
+      "speaker": "user",
+      "text": "if you're calling about a custom cake order, press 1 to leave us a message, and we'll call you back within a day. thanks, and have a sweet day!",
+      "offset_seconds": 22.54
+    },
+    {
+      "speaker": "bot",
+      "text": "thank you. so Saturday seven to one. that's all I needed.",
+      "offset_seconds": 31.54
+    },
+    {
+      "speaker": "user",
+      "text": "hi there! thanks for calling Rosie's Bakery, this is Rosie!",
+      "offset_seconds": 37.93
+    },
+    {
+      "speaker": "bot",
+      "text": "goodbye.",
+      "offset_seconds": 41.33
+    }
+  ]
+}

@@ -1,0 +1,31 @@
+{
+  "id": "hostile",
+  "status": "completed",
+  "task_completed": false,
+  "completion_confidence": { "score": 0.8, "label": "high" },
+  "disposition": "hung_up",
+  "evidence": [
+    "The recipient answered, objected to an automated call, and hung up mid-question."
+  ],
+  "structured_result": {
+    "dialed_count": 1,
+    "reached_count": 1,
+    "unreached_count": 0,
+    "critical_count": 0
+  },
+  "recipient_structured_result": {
+    "safety_status": "unknown",
+    "evacuation": "unknown",
+    "has_power": "unknown",
+    "has_water": "unknown",
+    "medication": "unknown",
+    "household": "unknown",
+    "needs_human": "unknown"
+  },
+  "transcript_turns": [
+    { "offset_seconds": 0, "speaker": "bot", "text": "This is an automated AI assistant from Sonoma County Emergency Management. This is a safety and needs check, not an emergency service." },
+    { "offset_seconds": 8, "speaker": "user", "text": "I don't want a robot calling me." },
+    { "offset_seconds": 11, "speaker": "bot", "text": "Is everyone in the household safe and accounted for?" },
+    { "offset_seconds": 15, "speaker": "user", "text": "Stop calling. *hangup*" }
+  ]
+}

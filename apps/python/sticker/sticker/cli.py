@@ -1,11 +1,12 @@
 """Sticker's command line.
 
-Four commands, and the split between them is the safety model:
+Five commands, and the split between them is the safety model:
 
     sticker find     reads the federal pharmacy registry. Never dials.
     sticker cost     reads the federal acquisition cost. Never dials.
     sticker survey   asks the price. Simulated unless argued into being live.
     sticker doctor   checks the API key without spending a call.
+    sticker trace    draws who had the floor on a call, from its event stream. Reads only.
 
 `find` deliberately does not feed `survey`. It writes a candidate list for a person to
 read, and live calling only ever dials numbers a person has moved into an authorized
@@ -30,6 +31,7 @@ from .report import render_text
 from .safety import SafetyError, authorize_destinations, is_fictional, mask
 from .simulation import SIMULATED_BASE_URL, SIMULATED_POLL_SECONDS, SimulatedCalle
 from .survey import run_survey
+from .trace import render, turns
 
 CONFIRM_TOKEN = "PLACE-REAL-CALLS"
 LIVE_ENV = "STICKER_LIVE_CALLS_ENABLED"
@@ -228,6 +230,45 @@ def cmd_doctor(args: argparse.Namespace) -> int:
     return asyncio.run(probe())
 
 
+def cmd_trace(args: argparse.Namespace) -> int:
+    """Draw a call's two-channel trace and count the collisions.
+
+    Reads the call's events with the key, or replays a saved stream (the JSON the API
+    returns, or just its `data` list) with no key at all. Never dials.
+    """
+    import json
+
+    if bool(args.call_id) == bool(args.events):
+        print("Give exactly one of --call-id or --events.", file=sys.stderr)
+        return 2
+
+    if args.events:
+        payload = json.loads(Path(args.events).read_text(encoding="utf-8"))
+        events = payload.get("data", payload) if isinstance(payload, dict) else payload
+        label = Path(args.events).name
+    else:
+        api_key = os.environ.get(KEY_ENV, "")
+        if not api_key:
+            print(f"{KEY_ENV} is not set.", file=sys.stderr)
+            return 2
+        base = os.environ.get(BASE_ENV, DEFAULT_BASE_URL)
+
+        async def fetch() -> list[dict]:
+            async with CalleTransport(api_key=api_key, base_url=base) as transport:
+                return (await transport.get(f"{args.call_id}/events")).get("data", [])
+
+        events = asyncio.run(fetch())
+        label = args.call_id
+
+    if not isinstance(events, list):
+        print("The events payload is not a list.", file=sys.stderr)
+        return 1
+    trace = turns(events)
+    print(f"{label}: {len(events)} events")
+    print(render(trace, seconds=args.seconds))
+    return 0
+
+
 # -- fixtures -------------------------------------------------------------------
 
 
@@ -325,6 +366,17 @@ def build_parser() -> argparse.ArgumentParser:
 
     p_doctor = sub.add_parser("doctor", help="Check the API key without spending a call.")
     p_doctor.set_defaults(func=cmd_doctor)
+
+    p_trace = sub.add_parser(
+        "trace", help="Who had the floor on a call, from its event stream. Reads only."
+    )
+    p_trace.add_argument("--call-id", help="A call on your account; needs CALLE_API_KEY.")
+    p_trace.add_argument("--events", help="A saved events JSON to replay instead; no key needed.")
+    p_trace.add_argument(
+        "--seconds", type=float, default=None,
+        help="Draw a fixed window (60 makes calls comparable). Default: fit the whole call.",
+    )
+    p_trace.set_defaults(func=cmd_trace)
 
     return parser
 

@@ -1,0 +1,51 @@
+{
+ "id": "train-human-009",
+ "label": "human",
+ "source": "sim-train",
+ "meta": {
+  "task": "request a refund for a double charge",
+  "hard": true
+ },
+ "turns": [
+  {
+   "speaker": "user",
+   "text": "Thank you for calling Northside Dental, this is Sam, how can I help you?",
+   "offset_seconds": 2.09
+  },
+  {
+   "speaker": "bot",
+   "text": "Hi, I'm an AI assistant calling on behalf of Casey Brown. Casey Brown was charged twice for the same order last week, and I'm calling to request a refund for the duplicate.",
+   "offset_seconds": 7.77
+  },
+  {
+   "speaker": "user",
+   "text": "Oh I see it, yeah, charged twice. I'll put the refund through now.",
+   "offset_seconds": 20.5
+  },
+  {
+   "speaker": "user",
+   "text": "yeah",
+   "offset_seconds": 25.66
+  },
+  {
+   "speaker": "bot",
+   "text": "Can you confirm the refund has been issued?",
+   "offset_seconds": 27.12
+  },
+  {
+   "speaker": "user",
+   "text": "Yeah.",
+   "offset_seconds": 30.6
+  },
+  {
+   "speaker": "bot",
+   "text": "How long will the refund take?",
+   "offset_seconds": 32.28
+  },
+  {
+   "speaker": "user",
+   "text": "Alright, take care.",
+   "offset_seconds": 35.57
+  }
+ ]
+}
