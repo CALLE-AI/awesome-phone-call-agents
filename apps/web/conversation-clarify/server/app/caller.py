@@ -94,13 +94,21 @@ class LiveCaller(Caller):
         self._client = CalleClient(api_key=api_key, base_url=base_url)
 
     def place(self, *, task, phone, schema, recipient, idempotency_key, metadata) -> str:
-        call = self._client.calls.create(
-            task=task,
-            recipients=[{"phones": [phone], **recipient}],
-            result_schema=schema,
-            metadata=metadata,
-            idempotency_key=idempotency_key,
-        )
+        try:
+            call = self._client.calls.create(
+                task=task,
+                recipients=[{"phones": [phone], **recipient}],
+                result_schema=schema,
+                metadata=metadata,
+                idempotency_key=idempotency_key,
+            )
+        except Exception as exc:
+            if _is_timeout(exc):
+                raise AmbiguousOutcome(
+                    "The request to place the call timed out. It may or may not have been "
+                    "placed. Reconcile with the same idempotency key before trying again."
+                ) from exc
+            raise
         call_id = call.get("id")
         if not call_id:
             # Accepted with no call id is ambiguous: a call may or may not be in
@@ -126,6 +134,19 @@ class LiveCaller(Caller):
 
 class AmbiguousOutcome(RuntimeError):
     """Raised when we cannot tell whether a call was placed. Never auto-retried."""
+
+
+def _is_timeout(exc: BaseException) -> bool:
+    """Did this request fail without telling us whether the call was placed?
+
+    A timeout on create is the ambiguous case: the request may have reached
+    CALL-E and dialled. Matched by name as well as by type, because the SDK
+    wraps its transport and the concrete classes differ between versions.
+    """
+    if isinstance(exc, TimeoutError):
+        return True
+    names = {type(e).__name__.lower() for e in (exc, exc.__cause__, exc.__context__) if e}
+    return any("timeout" in n or "timedout" in n for n in names)
 
 
 class IdempotentReplay(RuntimeError):

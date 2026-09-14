@@ -121,8 +121,8 @@ thread, all of these must hold:
 | `answered_by == "human"` | Voicemail and IVR are not answers. |
 | `resolved == "yes"` | The question was actually settled. |
 | a non-empty answer | Something was said. |
-| a non-empty verbatim quote | Their words, not a paraphrase of them. |
-| the answer is one of the options offered | Catches an extraction that invented a value. |
+| a quote that appears in the transcript | Checked against what the recipient actually said, so "verbatim" means something. |
+| the answer is one of the options offered | Whole-word, and rejected if negated. Catches an extraction that invented a value. |
 
 Any failure means **nothing is drafted** and the user is told, in plain language, which
 checks failed. An unresolved thread left untouched is a correct outcome, not an error.
@@ -157,7 +157,10 @@ never rang.
    double-click is not. If the provider answers with a call it already holds rather than
    placing a new one, refuse it instead of polling it — see
    [references/safety.md](references/safety.md).
-7. Poll to terminal. Do not trust an unsigned webhook for a side effect.
+7. Poll to terminal. Do not trust an unsigned webhook for a side effect. If the
+   request that places the call times out, treat the outcome as **unknown**, not
+   as a failure: the call may have been placed. Hold the key and reconcile rather
+   than freeing it for a fresh attempt.
 8. Apply the gate. Draft, or explain the abstention.
 
 ## Result schema

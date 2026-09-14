@@ -12,6 +12,7 @@ is not evidence and is not used as any.
 
 from __future__ import annotations
 
+import re
 from dataclasses import dataclass, field
 
 from .numbers import mask_text
@@ -56,13 +57,22 @@ def evaluate(call: dict, *, answer_field: str, expected_options: list[str] | Non
     quote = (result.get("evidence_quote") or "").strip()
     if not quote:
         reasons.append("the call returned no verbatim quote to stand behind the answer")
+    else:
+        # "Verbatim" has to mean something. Check the quote against what the
+        # recipient actually said, rather than trusting the extraction to have
+        # copied rather than paraphrased.
+        spoken = _spoken_by_recipient(call)
+        if not spoken:
+            reasons.append("the call returned no transcript to check the quote against")
+        elif not _appears_in(quote, spoken):
+            reasons.append("the quoted words do not appear in what the recipient said")
 
     # An answer that is not one of the options we offered is not an answer to
     # the question we asked. This catches an extraction that invented a value.
     if answer and expected_options:
         if not _matches_an_option(answer, expected_options):
             reasons.append(
-                f"the answer '{answer}' is not one of the options that were offered"
+                f"the answer {mask_text(answer)!r} is not one of the options that were offered"
             )
 
     if reasons:
@@ -76,6 +86,52 @@ def evaluate(call: dict, *, answer_field: str, expected_options: list[str] | Non
     return Verdict(passed=True, answer=mask_text(answer), quote=mask_text(quote))
 
 
+# Words that flip the meaning of a sentence that otherwise contains an option.
+# "not Monday" mentions Monday; it does not choose it.
+_NEGATION = re.compile(
+    r"\b(not|no|neither|nor|none|never|isn't|wasn't|won't|can't|cannot|"
+    r"instead|other than|rather than|except)\b"
+)
+
+
+def _normalise(text: str) -> str:
+    """Lower-case, strip punctuation and markdown, collapse whitespace."""
+    text = (text or "").replace("*", " ").replace("_", " ")
+    text = re.sub(r"[^\w\s]+", " ", text.lower())
+    return " ".join(text.split())
+
+
+def _spoken_by_recipient(call: dict) -> str:
+    """Everything the person on the other end said, normalised.
+
+    Read from the raw call rather than a masked copy, so a quote containing a
+    number can still be matched against the turn it came from.
+    """
+    said = []
+    for recipient in call.get("recipients") or []:
+        for attempt in recipient.get("attempts") or []:
+            for turn in attempt.get("transcript_turns") or []:
+                if (turn.get("speaker") or "") == "user":
+                    said.append(turn.get("text") or "")
+    return _normalise(" ".join(said))
+
+
+def _appears_in(quote: str, spoken: str) -> bool:
+    needle = _normalise(quote)
+    return bool(needle) and needle in spoken
+
+
 def _matches_an_option(answer: str, options: list[str]) -> bool:
-    low = answer.lower()
-    return any(option.lower() in low or low in option.lower() for option in options)
+    """Whole-word match, and nothing that negates the option it names.
+
+    Substring matching in either direction was too loose: it accepted "Mon" for
+    "Monday" and, worse, accepted "not Monday" and "neither Monday nor Tuesday"
+    as though they had chosen one.
+    """
+    low = _normalise(answer)
+    if not low or _NEGATION.search(low):
+        return False
+    return any(
+        re.search(rf"\b{re.escape(_normalise(option))}\b", low)
+        for option in options if _normalise(option)
+    )

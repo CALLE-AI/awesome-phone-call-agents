@@ -142,6 +142,18 @@ someone actually spoke, and is deliberately kept **out of the draft reply**. The
 knows what they said, and mailing them a garbled transcription of their own words is at
 best odd. What belongs in the written record is the agreement, not the phonemes.
 
+**The gate checks the quote by matching text, not by understanding it.** The quote must
+appear in what the recipient actually said, after case, punctuation and emphasis markup are
+normalised away. That catches an invented or paraphrased quote. It does not judge whether
+the quote *supports* the answer, and a transcript that is unavailable means the call is
+refused rather than trusted.
+
+**Option matching is deliberately narrow.** The answer must contain an offered option as a
+whole word, and is rejected outright if it also contains a negation — "not Monday" and
+"neither Monday nor Tuesday" used to be accepted as choices. The cost is that shorthand is
+refused too: "Mon" does not match "Monday". Refusing is the safe direction, and the user is
+told which check failed.
+
 **Detection is rules, and rules miss things.** The detector finds what it is written to
 find. It will not catch an ambiguity phrased unusually, and it can raise a finding on a
 thread where a human would see no problem. It errs towards silence; the user decides

@@ -7,6 +7,33 @@
  * instruction not to call the Developer API from a browser or untrusted client.
  */
 
+/**
+ * Where this extension is allowed to send the shared token and the thread.
+ *
+ * The thread is somebody's private mail and the token authorises real calls, so
+ * neither may leave over plaintext to an arbitrary host. HTTPS anywhere the user
+ * configures, or plain HTTP only to this machine.
+ */
+const LOOPBACK = ['127.0.0.1', 'localhost', '[::1]', '::1'];
+
+function checkedOrigin(serverUrl) {
+  let url;
+  try {
+    url = new URL(String(serverUrl));
+  } catch (error) {
+    return { error: `"${serverUrl}" is not a valid address.` };
+  }
+  if (url.protocol === 'https:') return { base: url.origin + url.pathname.replace(/\/+$/, '') };
+  if (url.protocol === 'http:' && LOOPBACK.includes(url.hostname)) {
+    return { base: url.origin + url.pathname.replace(/\/+$/, '') };
+  }
+  return {
+    error:
+      `Refusing to send your token and this thread to ${url.origin}. ` +
+      'Use https for a remote server, or http only on this machine.',
+  };
+}
+
 const DEFAULTS = {
   serverUrl: 'http://127.0.0.1:8000',
   token: 'local-dev-token',
@@ -20,12 +47,17 @@ async function settings() {
 
 async function call(path, options = {}) {
   const { serverUrl, token } = await settings();
-  const base = String(serverUrl).replace(/\/+$/, '');
+  const checked = checkedOrigin(serverUrl);
+  if (checked.error) return { ok: false, error: checked.error };
+  const base = checked.base;
 
   let response;
   try {
     response = await fetch(`${base}${path}`, {
       ...options,
+      // A redirect would re-send the Authorization header and the thread body to
+      // wherever it points. Treat one as a failure rather than following it.
+      redirect: 'error',
       headers: {
         'Content-Type': 'application/json',
         Authorization: `Bearer ${token}`,

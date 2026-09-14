@@ -39,7 +39,7 @@ from .detect import Finding, detect
 from .draft import build_draft, unresolved_note
 from .gate import evaluate
 from .llm import ModelUnavailable, build_provider, findings_from_model, merge
-from .numbers import accept_typed, find_candidates, mask
+from .numbers import accept_typed, find_candidates, mask, mask_text
 from .thread import thread_from_payload
 from .verify import verify_finding
 
@@ -187,7 +187,7 @@ class ProposeIn(BaseModel):
     # thread so nothing is taken on the client's word.
     finding: dict | None = None
     finding_index: int = 0     # legacy: rules-only selection, kept for the CLI path
-    phone_token: str = ""      # a masked token from /analyze
+    phone_token: str = ""      # an opaque candidate id from /analyze
     phone_typed: str = ""      # or a full +E.164 the user typed
     recipient_name: str = ""
     caller_name: str = ""
@@ -198,6 +198,17 @@ class ConfirmIn(BaseModel):
 
 
 # --- app ---------------------------------------------------------------------
+
+def _for_display(finding: dict) -> dict:
+    """A copy of a finding safe to put in a response or a log.
+
+    The thread text it quotes can itself contain a phone number.
+    """
+    return {
+        k: (mask_text(v) if isinstance(v, str) else v)
+        for k, v in finding.items()
+    }
+
 
 def create_app(env=None) -> FastAPI:
     settings = Settings.load(env)
@@ -306,8 +317,8 @@ def create_app(env=None) -> FastAPI:
         elif payload.phone_token:
             phone = lookup.get(payload.phone_token, "")
             if not phone:
-                # The token did not come from this thread. Refuse rather than
-                # fall back to any other number we happen to hold.
+                # The id did not come from this thread. Refuse rather than fall
+                # back to any other number we happen to hold.
                 raise HTTPException(
                     status_code=400,
                     detail="That number is not one of the dialable numbers in this thread.",
@@ -362,10 +373,10 @@ def create_app(env=None) -> FastAPI:
 
         return {
             "proposal_id": proposal.id,
-            "finding": finding.to_dict(),
+            "finding": _for_display(finding.to_dict()),
             "destination_masked": masked,
             "recipient_name": recipient_name,
-            "task_preview": proposal.task,
+            "task_preview": mask_text(proposal.task),
             "result_schema": proposal.schema,
             "idempotency_key": proposal.idempotency_key,
             "confirm_token": proposal.confirm_token,
@@ -414,9 +425,14 @@ def create_app(env=None) -> FastAPI:
             proposal.state = "needs_reconciliation"
             raise HTTPException(status_code=409, detail=str(exc))
         except Exception as exc:
+            # Report the kind of failure, never the provider's own message: it can
+            # echo the request back, destination included.
             proposal.state = "failed_to_place"
             store.release(proposal.idempotency_key)
-            raise HTTPException(status_code=502, detail=f"Could not place the call: {exc}")
+            raise HTTPException(
+                status_code=502,
+                detail=f"Could not place the call ({type(exc).__name__}). Nothing was dialled.",
+            )
 
         return {"proposal_id": proposal.id, "call_id": proposal.call_id, "state": proposal.state}
 

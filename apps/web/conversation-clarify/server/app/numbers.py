@@ -13,7 +13,9 @@ Three rules, all structural rather than advisory:
 
 from __future__ import annotations
 
+import hashlib
 import re
+import secrets
 from dataclasses import dataclass, asdict
 
 from .thread import Thread
@@ -67,11 +69,29 @@ def is_dialable(phone: str) -> bool:
     return bool(E164.match(phone or ""))
 
 
+# Per-process salt for candidate identifiers. A phone number has far too little
+# entropy to hash bare, so the id is salted; the salt never leaves this process
+# and both /analyze and the proposal that follows it run inside the same one.
+_ID_SALT = secrets.token_bytes(16)
+
+
+def candidate_id(number: str) -> str:
+    """An opaque, collision-free handle for one exact number.
+
+    The masked label cannot serve as the identifier. Two different numbers that
+    share a country code, a length and their last two digits mask to the same
+    string, so keying on it made the second number silently overwrite the first
+    and the caller dialled a destination the user had not chosen.
+    """
+    return hashlib.sha256(_ID_SALT + number.encode("utf-8")).hexdigest()[:16]
+
+
 @dataclass
 class Candidate:
     """A phone number found in the thread, with where it came from."""
 
-    masked: str
+    id: str               # opaque handle; what a client refers to
+    masked: str           # for display only, and deliberately ambiguous
     dialable: bool
     reason: str           # "" when dialable, else why it cannot be used
     message_index: int
@@ -83,11 +103,13 @@ class Candidate:
 
 
 def find_candidates(thread: Thread) -> tuple[list[Candidate], dict[str, str]]:
-    """Return (candidates, token->number).
+    """Return (candidates, id->number).
 
     The plain number never leaves in the candidate list. Callers refer to a
-    number by its masked token and look it up in the private mapping, so an
-    API response or a log line cannot carry a full destination by accident.
+    number by its opaque id and look it up in the private mapping, so an API
+    response or a log line cannot carry a full destination by accident -- and
+    because the id is derived from the exact number rather than from its masked
+    label, two numbers that display alike still resolve to different rows.
     """
     candidates: list[Candidate] = []
     lookup: dict[str, str] = {}
@@ -116,11 +138,12 @@ def find_candidates(thread: Thread) -> tuple[list[Candidate], dict[str, str]]:
                     reason = ""
                     dialable = True
 
-                token = mask(number)
+                handle = candidate_id(number)
                 if dialable:
-                    lookup[token] = number
+                    lookup[handle] = number
                 candidates.append(Candidate(
-                    masked=token,
+                    id=handle,
+                    masked=mask(number),
                     dialable=dialable,
                     reason=reason,
                     message_index=message.index,

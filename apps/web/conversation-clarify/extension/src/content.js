@@ -297,7 +297,9 @@
 
     dialable.forEach((candidate) => {
       const option = el('option', null, `${candidate.masked} — from ${candidate.sender}'s message`);
-      option.value = candidate.masked;
+      // The value is the opaque id, never the masked label: two different
+      // numbers can display identically, and picking by label dialled the wrong one.
+      option.value = candidate.id;
       select.appendChild(option);
     });
     const manual = el('option', null, 'Type a number instead…');

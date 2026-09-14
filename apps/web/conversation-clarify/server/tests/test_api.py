@@ -100,7 +100,7 @@ def test_analyze_never_returns_a_full_number():
 
 def test_proposal_masks_the_destination_and_issues_a_token():
     c = client()
-    token = analyze(c)["phone_candidates"][0]["masked"]   # the token as the client sees it
+    token = analyze(c)["phone_candidates"][0]["id"]       # the opaque handle the client sees
     data = propose(c, phone_token=token)
     assert RESERVED not in str(data)
     assert data["confirm_token"]
@@ -448,8 +448,133 @@ def test_the_answer_is_masked_like_the_quote():
             "committed_date": "Thursday, or call +1 555 010 0142",
             "evidence_quote": "I will send it Thursday.",
         },
+        "recipients": [{"attempts": [{"transcript_turns": [
+            {"speaker": "user", "text": "I will send it Thursday."},
+        ]}]}],
     }
     verdict = evaluate(call, answer_field="committed_date", expected_options=None)
     assert verdict.passed
     assert "0142" not in verdict.answer
     assert "Thursday" in verdict.answer          # a real date survives masking
+
+
+# --- review 3d25c272: the five gaps, each with the case that found it --------
+
+def with_turns(*user_lines, **result):
+    """A completed call whose recipient said these lines."""
+    base = {"resolved": "yes", "answered_by": "human",
+            "chosen_option": "Tuesday", "evidence_quote": "I meant Tuesday."}
+    base.update(result)
+    return {
+        "status": "completed", "task_completed": True, "structured_result": base,
+        "recipients": [{"attempts": [{"transcript_turns": [
+            {"speaker": "bot", "text": "Which one did you mean?"},
+            *({"speaker": "user", "text": line} for line in user_lines),
+        ]}]}],
+    }
+
+
+def test_two_numbers_that_mask_alike_stay_distinct():
+    """The masked label is not an identifier. +1555010**42 and +1555999**42
+    display identically; keying on that dialled whichever was seen last."""
+    from app.numbers import find_candidates, mask
+    from app.thread import thread_from_payload
+
+    first, second = "+15550100142", "+15550104242"
+    assert mask(first) == mask(second)                    # they really do collide
+    thread = thread_from_payload({"thread_id": "t", "subject": "s", "messages": [
+        {"sender": "Me", "from_me": True, "body": "?"},
+        {"sender": "Them", "from_me": False, "body": f"Desk {first} or mobile {second}"},
+    ]})
+    candidates, lookup = find_candidates(thread)
+    assert len(candidates) == 2 and len(lookup) == 2
+    assert lookup[candidates[0].id] == first
+    assert lookup[candidates[1].id] == second
+    assert candidates[0].id != candidates[1].id
+
+
+def test_a_candidate_id_does_not_disclose_its_number():
+    from app.numbers import candidate_id
+    assert "0142" not in candidate_id("+15550100142")
+
+
+def test_an_invented_quote_is_refused():
+    """"Verbatim" has to be checked, or it means nothing."""
+    from app.gate import evaluate
+    call = with_turns("I meant Tuesday.", evidence_quote="Tuesday is confirmed and final.")
+    verdict = evaluate(call, answer_field="chosen_option", expected_options=["Monday", "Tuesday"])
+    assert not verdict.passed
+    assert any("do not appear in what the recipient said" in r for r in verdict.reasons)
+
+
+def test_a_genuine_quote_survives_markdown_in_the_transcript():
+    """CALL-E has been observed emitting emphasis markup inside transcript text."""
+    from app.gate import evaluate
+    call = with_turns("I meant **Tuesday**.", evidence_quote="I meant Tuesday.")
+    assert evaluate(call, answer_field="chosen_option",
+                    expected_options=["Monday", "Tuesday"]).passed
+
+
+def test_a_negated_option_is_not_a_choice():
+    """Substring matching accepted "not Monday" as having chosen Monday."""
+    from app.gate import evaluate
+    for answer in ("not Monday", "neither Monday nor Tuesday", "Mon"):
+        call = with_turns(f"Well, {answer}.", chosen_option=answer,
+                          evidence_quote=f"Well, {answer}.")
+        verdict = evaluate(call, answer_field="chosen_option",
+                           expected_options=["Monday", "Tuesday"])
+        assert not verdict.passed, answer
+        assert any("not one of the options" in r for r in verdict.reasons), answer
+
+
+def test_a_rejected_answer_is_masked_in_the_reason():
+    from app.gate import evaluate
+    call = with_turns("Call me on +1 555 010 0142.",
+                      chosen_option="call me on +1 555 010 0142",
+                      evidence_quote="Call me on +1 555 010 0142.")
+    verdict = evaluate(call, answer_field="chosen_option",
+                       expected_options=["Monday", "Tuesday"])
+    assert not verdict.passed
+    assert RESERVED not in str(verdict.reasons)
+    assert "0142" not in str(verdict.reasons)
+
+
+def test_a_create_timeout_is_unknown_not_a_failure():
+    """A timeout may still have placed the call, so the claim must not be
+    released and a fresh key must not become available."""
+    from app.caller import AmbiguousOutcome, _is_timeout
+
+    assert _is_timeout(TimeoutError("x"))
+    assert _is_timeout(type("ReadTimeout", (Exception,), {})("x"))
+    assert not _is_timeout(ValueError("x"))
+
+    import app.caller as caller_mod
+
+    def times_out(**kwargs):
+        raise TimeoutError("read timed out")
+
+    live = caller_mod.LiveCaller.__new__(caller_mod.LiveCaller)   # no network, no key
+    live._client = type("c", (), {"calls": type("k", (), {"create": staticmethod(times_out)})()})()
+
+    with pytest.raises(AmbiguousOutcome, match="may or may not have been placed"):
+        live.place(task="t", phone=RESERVED, schema={}, recipient={},
+                   idempotency_key="k", metadata={})
+
+
+def test_the_proposal_response_masks_the_text_it_echoes():
+    c = client()
+    thread = {
+        "thread_id": "t", "subject": "Kickoff",
+        "messages": [
+            {"sender": "Charles Miller", "from_me": True,
+             "body": "Monday or Tuesday? My direct line is +1 555 010 0143."},
+            {"sender": "Alex Doe", "from_me": False,
+             "body": f"Yeah, count me in.\n\n--\nAlex Doe\n{RESERVED}"},
+        ],
+    }
+    body = c.post("/v1/proposals", json={
+        "thread": thread, "finding_index": 0,
+        "recipient_name": "Alex Doe", "phone_typed": RESERVED,
+    }, headers=AUTH).text
+    assert "0143" not in body        # the number quoted inside the thread text
+    assert RESERVED not in body      # and the destination

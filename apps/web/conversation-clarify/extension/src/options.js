@@ -98,6 +98,17 @@ document.getElementById('save').addEventListener('click', async () => {
     return;
   }
 
+  // Same rule the background worker enforces, stated here so it is refused at
+  // the point it is typed rather than silently failing on the first request.
+  const isLocal = ['127.0.0.1', 'localhost', '[::1]', '::1'].includes(url.hostname);
+  if (url.protocol !== 'https:' && !(url.protocol === 'http:' && isLocal)) {
+    savedNode.className = 'warn';
+    savedNode.textContent =
+      'Use https for a remote server, or http only on this machine. '
+      + 'Your token and the thread are not sent over plaintext to another host.';
+    return;
+  }
+
   // Persist BEFORE anything that can close this popup. Chrome's permission
   // dialog dismisses the popup, so a save that waited on it never ran and the
   // address silently stayed at the default.

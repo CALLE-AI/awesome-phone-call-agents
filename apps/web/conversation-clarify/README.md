@@ -55,7 +55,7 @@ The server starts in fixture mode. A fresh checkout **cannot dial anyone.**
 ```bash
 cd server
 python3 -m venv .venv && .venv/bin/pip install -r requirements-dev.txt
-.venv/bin/python -m pytest tests/ -q          # 97 tests, no network
+.venv/bin/python -m pytest tests/ -q          # 105 tests, no network
 CONVERSATION_CLARIFY_USER="Your Name" .venv/bin/python -m uvicorn app.main:app --port 8000
 ```
 
@@ -179,9 +179,9 @@ stand alone and the panel says the pass did not run — rather than silently deg
 
 Before anything is written, all of these must hold: `status == completed`,
 `task_completed`, a non-null `structured_result`, `answered_by == human`,
-`resolved == yes`, a non-empty answer, a non-empty verbatim quote, and an answer that is
-one of the options actually offered. Otherwise nothing is drafted and you are told which
-checks failed.
+`resolved == yes`, a non-empty answer, a quote that actually appears in what the recipient
+said, and an answer that is one of the options offered — matched whole-word and rejected if
+it is negated. Otherwise nothing is drafted and you are told which checks failed.
 
 **`completion_confidence` is deliberately ignored.** On four observed calls that never
 rang, CALL-E returned confidence of 0.85, 0.9, 0.9 and 0.82 — all labelled `"high"` —
@@ -206,17 +206,24 @@ This is the platform's own position too. From CALL-E's engineering blog, 11 Sept
   finding, destination and a nonce for the running process; the attempt counter advances
   only after the previous attempt reaches a terminal state, so a retry is possible and a
   double-click is not.
-- **Ambiguous outcomes halt.** A create that returns no call id is never retried with a
-  fresh key. A call CALL-E hands back from its idempotency store, rather than placing a new
-  one, is refused rather than polled — a stale outcome reported as a fresh one is worse
-  than an error.
+- **Ambiguous outcomes halt.** A create that returns no call id, or that times out before
+  answering, is treated as unknown rather than failed: the call may be in flight, so the
+  key is held and nothing is freed for a fresh attempt. A call CALL-E hands back from its
+  idempotency store, rather than placing a new one, is refused rather than polled — a stale
+  outcome reported as a fresh one is worse than an error.
+- **The token and the thread go nowhere unencrypted.** The extension sends them over HTTPS,
+  or over plain HTTP only to this machine, and refuses to follow a redirect — which would
+  re-send both to wherever it pointed.
+- **Provider text is masked on the way out**, including the text quoted back inside a
+  finding, the task preview, and the reasons the gate gives for refusing. Error responses
+  name the kind of failure, never the provider's own message.
 - **A call cannot be recalled.** CALL-E offers no cancellation and a call in flight runs
   to completion. Closing the page does not stop it.
 
 ## Commands
 
 ```bash
-.venv/bin/python -m pytest tests/ -q                     # 97 offline tests
+.venv/bin/python -m pytest tests/ -q                     # 105 offline tests
 .venv/bin/python -m uvicorn app.main:app --port 8000     # fixture mode
 ```
 
