@@ -447,3 +447,10 @@ button.ghost {
 button.ghost:hover:not(:disabled) {
   color: var(--text);
 }
+
+/* Reason shown at the approval gate for a proposed consequential call. */
+.approve-reason {
+  margin: 0 0 0.15rem;
+  font-size: 0.82rem;
+  color: var(--warn);
+}

@@ -38,6 +38,8 @@ export interface NodeSnapshot {
     policyFlags: string[];
   };
   attemptedLocales?: string[];
+  /** Why a consequential call was proposed (shown at the approval gate). */
+  proposedReason?: string;
 }
 
 export interface RunSnapshot {
@@ -108,6 +110,9 @@ function snapshotNode(n: CallNode): NodeSnapshot {
         }
       : undefined,
     attemptedLocales: n.attemptedLocales,
+    proposedReason: n.proposedReason
+      ? redactPhones(n.proposedReason)
+      : undefined,
   };
 }
 

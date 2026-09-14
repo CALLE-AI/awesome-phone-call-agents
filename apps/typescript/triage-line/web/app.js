@@ -19,6 +19,7 @@ const { useState, useEffect, useRef, useCallback } = React;
 const STATUS_LABEL = {
   pending: "Pending",
   blocked: "Blocked",
+  awaiting_approval: "Awaiting approval",
   running: "Calling…",
   done: "Done",
   needs_review: "Needs review",
@@ -157,7 +158,11 @@ function StatusBadge({ status }) {
 }
 
 function isReviewable(node) {
-  return node.status === "needs_review" || node.status === "needs_user";
+  return (
+    node.status === "needs_review" ||
+    node.status === "needs_user" ||
+    node.status === "awaiting_approval"
+  );
 }
 
 /**
@@ -169,6 +174,12 @@ function ApproveControl({ node, onApprove, pending }) {
   const [note, setNote] = useState("");
   if (!isReviewable(node)) return null;
 
+  // A consequential call proposed by escalation is authorized (it will then be
+  // placed); a completed-but-flagged result is accepted.
+  const isAuthorize = node.status === "awaiting_approval";
+  const openLabel = isAuthorize ? "Authorize call…" : "Approve…";
+  const confirmLabel = isAuthorize ? "Authorize · place call" : "Confirm · mark done";
+
   if (!open) {
     return h(
       "button",
@@ -176,9 +187,9 @@ function ApproveControl({ node, onApprove, pending }) {
         className: "approve",
         onClick: () => setOpen(true),
         disabled: pending,
-        "aria-label": `Review and approve ${node.id}`,
+        "aria-label": `${openLabel} for ${node.id}`,
       },
-      "Approve…"
+      openLabel
     );
   }
 
@@ -192,6 +203,9 @@ function ApproveControl({ node, onApprove, pending }) {
   return h(
     "div",
     { className: "approve-form" },
+    node.proposedReason
+      ? h("p", { className: "approve-reason" }, node.proposedReason)
+      : null,
     h(
       "label",
       { htmlFor: inputId, className: "approve-label" },
@@ -220,7 +234,7 @@ function ApproveControl({ node, onApprove, pending }) {
       h(
         "button",
         { className: "approve", onClick: submit, disabled: pending },
-        pending ? "Approving…" : "Confirm · mark done"
+        pending ? "Working…" : confirmLabel
       ),
       h(
         "button",
