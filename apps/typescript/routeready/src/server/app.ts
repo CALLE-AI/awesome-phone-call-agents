@@ -39,6 +39,9 @@ const PAGES: Record<string, [file: string, type: string]> = {
   "/route": ["route.html", HTML],
   "/route.js": ["route.js", JS],
   "/route.css": ["route.css", "text/css; charset=utf-8"],
+  "/splash.js": ["splash.js", JS],
+  "/splash.css": ["splash.css", "text/css; charset=utf-8"],
+  "/favicon.svg": ["favicon.svg", "image/svg+xml"],
 };
 const CONSENT = "Every live number belongs to me or to someone who agreed to take these calls.";
 

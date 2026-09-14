@@ -306,3 +306,41 @@
 .tip.halted b {
   color: inherit;
 }
+
+/* ---------- motion ---------- */
+.setup > * {
+  animation: rise-in 0.6s cubic-bezier(0.2, 0.7, 0.2, 1) both;
+}
+
+.setup > :nth-child(3) {
+  animation-delay: 0.06s;
+}
+
+.setup > :nth-child(4) {
+  animation-delay: 0.12s;
+}
+
+.setup > :nth-child(n + 5) {
+  animation-delay: 0.18s;
+}
+
+.stop-form {
+  animation: rise-in 0.4s cubic-bezier(0.2, 0.7, 0.2, 1) both;
+}
+
+.setup .cta {
+  box-shadow: 0 12px 26px rgb(14 16 20 / 0.16);
+}
+
+.setup .cta:disabled {
+  opacity: 0.6;
+}
+
+.setup-hero .mark {
+  animation: pin-in 0.5s 0.1s cubic-bezier(0.2, 1.6, 0.4, 1) both;
+}
+
+.splash-on .setup > *,
+.splash-on .setup-hero .mark {
+  animation-play-state: paused;
+}

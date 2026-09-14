@@ -959,3 +959,137 @@ a.ghost {
     border-right: 1px solid var(--line);
   }
 }
+
+/* ---------- motion ---------- */
+button,
+a.ghost,
+.cta {
+  transition: transform 0.16s ease, background 0.2s ease, opacity 0.2s ease;
+}
+
+button:active,
+a.ghost:active {
+  transform: scale(0.97);
+}
+
+.screen.active {
+  animation: screen-in 0.32s cubic-bezier(0.2, 0.7, 0.2, 1);
+}
+
+#screen-route.active {
+  animation: none;
+}
+
+.sheet {
+  animation: sheet-up 0.55s 0.1s cubic-bezier(0.2, 0.8, 0.2, 1) both;
+}
+
+.topbar .story,
+.topbar .icon-btn {
+  animation: drop-in 0.5s cubic-bezier(0.2, 0.8, 0.2, 1) both;
+}
+
+.tabbar {
+  animation: tabbar-up 0.55s 0.2s cubic-bezier(0.2, 0.8, 0.2, 1) both;
+}
+
+.pin {
+  animation: pin-in 0.4s cubic-bezier(0.2, 1.6, 0.4, 1) both;
+}
+
+.toast.show {
+  transition: opacity 0.25s, transform 0.4s cubic-bezier(0.2, 1.6, 0.4, 1);
+}
+
+.start .hero,
+.start .pitch,
+.start .seg,
+.start .note {
+  animation: rise-in 0.6s cubic-bezier(0.2, 0.7, 0.2, 1) both;
+}
+
+.start .pitch {
+  animation-delay: 0.08s;
+}
+
+.start .seg {
+  animation-delay: 0.16s;
+}
+
+.start .note {
+  animation-delay: 0.22s;
+}
+
+.start .hero .scoot {
+  animation: scoot 2.8s ease-in-out infinite;
+}
+
+.cta:hover {
+  transform: translateY(-1px);
+}
+
+.splash-on .sheet,
+.splash-on .topbar .story,
+.splash-on .topbar .icon-btn,
+.splash-on .tabbar,
+.splash-on .start > * {
+  animation-play-state: paused;
+}
+
+@keyframes screen-in {
+  from {
+    opacity: 0;
+    transform: translateY(10px);
+  }
+}
+
+@keyframes sheet-up {
+  from {
+    transform: translateY(40%);
+    opacity: 0;
+  }
+}
+
+@keyframes drop-in {
+  from {
+    transform: translateY(-16px);
+    opacity: 0;
+  }
+}
+
+@keyframes tabbar-up {
+  from {
+    transform: translate(-50%, 30px);
+    opacity: 0;
+  }
+}
+
+@keyframes pin-in {
+  from {
+    transform: scale(0.3);
+    opacity: 0;
+  }
+}
+
+@keyframes rise-in {
+  from {
+    opacity: 0;
+    transform: translateY(14px);
+  }
+}
+
+@keyframes scoot {
+  50% {
+    transform: translateX(-10px) rotate(-3deg);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01s !important;
+    animation-delay: 0s !important;
+    animation-iteration-count: 1 !important;
+  }
+}
