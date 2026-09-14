@@ -286,13 +286,58 @@ function renderDesk() {
   renderDetail();
 }
 
-function quoteTable(title, lines, totalLabel, total, extraFirst) {
+/** Chat-style transcript: CALL-E on one side, the person it called on the other. */
+function transcriptHtml(turns, other) {
+  return `<div class="transcript">${turns
+    .map((t) => {
+      const bot = t.speaker === "bot";
+      return `<div class="bubble ${bot ? "bot" : "them"}"><span class="spk">${bot ? "CALL-E" : esc(other)}</span><span>${esc(t.text)}</span></div>`;
+    })
+    .join("")}</div>`;
+}
+
+/** The workflow as a strip of steps, so it is clear where this booking or request is. */
+function flowRibbon(steps) {
+  return `<ol class="ribbon" aria-label="Progress">${steps
+    .map(([state, label]) => `<li class="${state}"><span class="dot" aria-hidden="true"></span><span class="lbl">${esc(label)}</span></li>`)
+    .join("")}</ol>`;
+}
+
+function disruptionRibbon(entry) {
+  const s = entry?.status;
+  const call = !entry ? "todo" : s === "submitted" || s === "in_progress" ? "ring" : s === "uncertain" || s === "failed_to_submit" ? "stop" : "done";
+  const decided = s === "applied" || s === "resolved_by_human" ? "done" : s === "needs_review" ? "stop" : "todo";
+  return flowRibbon([
+    ["done", "Options priced"],
+    [call, call === "ring" ? "CALL-E is calling the passenger" : "CALL-E calls the passenger"],
+    [decided, s === "needs_review" ? "A person takes over" : "Passenger decides"],
+    [s === "applied" || s === "resolved_by_human" ? "done" : "todo", "Booking updated"],
+  ]);
+}
+
+function requestRibbon(r) {
+  const s = r.status;
+  if (s === "ineligible") return flowRibbon([["stop", "Not eligible"]]);
+  const agreed = r.confirmedBy?.kind === "call";
+  const passenger =
+    s === "awaiting_call" ? "todo" : s === "passenger_call_in_progress" ? "ring" : agreed ? "done" : s === "declined" ? "done" : "stop";
+  const airline = s === "confirmed_on_call" ? "todo" : s === "airline_call_in_progress" ? "ring" : s === "completed" ? "done" : agreed && r.airlineCall ? "stop" : "todo";
+  const last = s === "completed" || s === "resolved_by_human" ? "done" : s === "declined" ? "stop" : "todo";
+  return flowRibbon([
+    ["done", "Request priced"],
+    [passenger, passenger === "ring" ? "CALL-E is calling the passenger" : agreed ? "Passenger agreed on the call" : s === "declined" ? "Passenger kept the booking" : "CALL-E calls the passenger"],
+    [airline, airline === "ring" ? "CALL-E is calling the airline desk" : "CALL-E calls the airline desk"],
+    [last, s === "resolved_by_human" ? "Resolved by an agent" : s === "declined" ? "Nothing changes" : "Booking updated"],
+  ]);
+}
+
+function quoteTable(title, lines, totalLabel, total, extraFirst, chosen = false) {
   const body = [
     extraFirst ? `<tr><td>${esc(extraFirst[0])}</td><td></td><td class="amt">${idr(extraFirst[1])}</td></tr>` : "",
     ...lines.map((l) => `<tr><td>${esc(l.party)}</td><td>${esc(l.label)}</td><td class="amt">${l.amount === 0 ? "0" : idr(l.amount)}</td></tr>`),
   ].join("");
-  return `<table class="quote">
-    <thead><tr><th colspan="2">${esc(title)}</th><th class="amt">${esc(totalLabel)}</th></tr></thead>
+  return `<table class="quote${chosen ? " chosen" : ""}">
+    <thead><tr><th colspan="2">${esc(title)}${chosen ? ' <span class="chip ok">Chosen on the call</span>' : ""}</th><th class="amt">${esc(totalLabel)}</th></tr></thead>
     <tbody>${body}<tr class="total"><td colspan="2">${esc(totalLabel)}</td><td class="amt">${idr(total)}</td></tr></tbody>
   </table>`;
 }
@@ -310,15 +355,19 @@ function renderDetail() {
   const q = b.quote;
 
   const n = q.keep ? 1 : 0;
+  const pick = entry?.outcome?.result;
+  const chose = (kind, flightId) => Boolean(pick && pick.choice === kind && (!flightId || pick.selected_flight === flightId));
+  const keepChosen = chose("keep_delayed_flight");
   const options = [
     q.keep
-      ? `<table class="quote"><thead><tr><th colspan="2">1 · Keep delayed flight (${hhmm(q.keep.newDeparture)})</th><th class="amt">Cost</th></tr></thead><tbody><tr class="total"><td colspan="2">No change to the ticket</td><td class="amt">${idr(0)}</td></tr></tbody></table>`
+      ? `<table class="quote${keepChosen ? " chosen" : ""}"><thead><tr><th colspan="2">1 · Keep delayed flight (${hhmm(q.keep.newDeparture)})${keepChosen ? ' <span class="chip ok">Chosen on the call</span>' : ""}</th><th class="amt">Cost</th></tr></thead><tbody><tr class="total"><td colspan="2">No change to the ticket</td><td class="amt">${idr(0)}</td></tr></tbody></table>`
       : "",
-    ...q.moves.map((m) => quoteTable(`${n + 1} · Move to ${m.label} (${m.seatsAvailable} seats)`, m.lines, "Passenger pays", m.total)),
-    quoteTable(`${n + 2} · Cancel and refund`, q.refund.lines, "Refund", q.refund.amount, ["Fare paid", q.refund.gross]),
+    ...q.moves.map((m) => quoteTable(`${n + 1} · Move to ${m.label} (${m.seatsAvailable} seats)`, m.lines, "Passenger pays", m.total, undefined, chose("move_to_other_flight", m.flightId))),
+    quoteTable(`${n + 2} · Cancel and refund`, q.refund.lines, "Refund", q.refund.amount, ["Fare paid", q.refund.gross], chose("refund")),
   ].join("");
 
   el.innerHTML = `
+    ${disruptionRibbon(entry)}
     <div>
       <h2>${esc(b.passenger)} <span class="mono muted">${esc(b.pnr)}</span></h2>
       <dl class="kv" style="margin-top:8px">
@@ -420,9 +469,7 @@ function renderEntry(entry, b, key) {
       <div class="row-inline"><button type="button" class="btn" data-resolve="${esc(key)}">Resolve</button></div></div>`);
   }
   if (o?.transcript?.length) {
-    parts.push(`<details><summary>Transcript (${o.transcript.length} turns)</summary><div class="transcript" style="padding:10px 12px">${o.transcript
-      .map((t) => `<div class="turn"><span class="spk">${esc(t.speaker)}</span><span>${esc(t.text)}</span></div>`)
-      .join("")}</div></details>`);
+    parts.push(`<details open><summary>Transcript (${o.transcript.length} turns)</summary>${transcriptHtml(o.transcript, "Passenger")}</details>`);
   }
   parts.push(`<details><summary>What CALL-E was told</summary><pre>${esc(entry.task)}</pre></details>`);
   return `<div class="outcome"><h3>Call</h3>${parts.join("")}</div>`;
@@ -544,6 +591,7 @@ function renderRequestDetail() {
       ${r.confirmedBy ? `<dt>Agreed</dt><dd>by the passenger on the CALL-E call <span class="mono muted">${esc(r.confirmedBy.callId ?? "")}</span></dd>` : ""}
       <dt>Booking</dt><dd>${esc(r.bookingState.status.replaceAll("_", " "))}${r.bookingState.currentPnr !== r.request.pnr ? ` · new code <b class="mono">${esc(r.bookingState.currentPnr)}</b>` : ""}</dd>
     </dl></div>`);
+  parts.unshift(requestRibbon(r));
   parts.push(`<ol class="steps">${requestSteps(r).join("")}</ol>`);
   if (r.eligibility.reasons.length) parts.push(`<ul class="reasons">${r.eligibility.reasons.map((x) => `<li>${esc(x)}</li>`).join("")}</ul>`);
   if (r.eligibility.eligible) {
@@ -639,7 +687,7 @@ function renderPassengerCall(r) {
     ${c.error ? `<p class="note bad">${esc(c.error)}</p>` : ""}
     ${s?.reason ? `<blockquote>${esc(s.reason)}</blockquote>` : ""}
     ${o?.summary ? `<p><span class="muted">Summary:</span> ${esc(o.summary)}</p>` : ""}
-    ${o?.transcript?.length ? `<details><summary>Transcript (${o.transcript.length} turns)</summary><div class="transcript" style="padding:10px 12px">${o.transcript.map((t) => `<div class="turn"><span class="spk">${esc(t.speaker)}</span><span>${esc(t.text)}</span></div>`).join("")}</div></details>` : ""}
+    ${o?.transcript?.length ? `<details open><summary>Transcript (${o.transcript.length} turns)</summary>${transcriptHtml(o.transcript, "Passenger")}</details>` : ""}
     <details><summary>What CALL-E was told</summary><pre>${esc(c.task)}</pre></details>
   </div>`;
 }
@@ -685,7 +733,7 @@ function renderCallRecord(title, c) {
     </dl>
     ${c.error ? `<p class="note bad">${esc(c.error)}</p>` : ""}
     ${o?.summary ? `<p><span class="muted">Summary:</span> ${esc(o.summary)}</p>` : ""}
-    ${o?.transcript?.length ? `<details><summary>Transcript (${o.transcript.length} turns)</summary><div class="transcript" style="padding:10px 12px">${o.transcript.map((t) => `<div class="turn"><span class="spk">${esc(t.speaker)}</span><span>${esc(t.text)}</span></div>`).join("")}</div></details>` : ""}
+    ${o?.transcript?.length ? `<details open><summary>Transcript (${o.transcript.length} turns)</summary>${transcriptHtml(o.transcript, "Passenger")}</details>` : ""}
     <details><summary>What CALL-E was told</summary><pre>${esc(c.task)}</pre></details>
   </div>`;
 }
@@ -744,7 +792,7 @@ function renderAirlineCall(r) {
     </dl>
     ${s?.reason ? `<blockquote>${esc(s.reason)}</blockquote>` : ""}
     ${o?.summary ? `<p><span class="muted">Summary:</span> ${esc(o.summary)}</p>` : ""}
-    ${o?.transcript?.length ? `<details><summary>Transcript (${o.transcript.length} turns)</summary><div class="transcript" style="padding:10px 12px">${o.transcript.map((t) => `<div class="turn"><span class="spk">${esc(t.speaker)}</span><span>${esc(t.text)}</span></div>`).join("")}</div></details>` : ""}
+    ${o?.transcript?.length ? `<details open><summary>Transcript (${o.transcript.length} turns)</summary>${transcriptHtml(o.transcript, "Airline desk")}</details>` : ""}
     <details><summary>What CALL-E was told</summary><pre>${esc(c.task)}</pre></details>
   </div>`;
 }

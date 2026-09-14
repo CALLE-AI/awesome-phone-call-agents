@@ -22,11 +22,11 @@
 }
 @media (prefers-color-scheme: dark) {
   :root {
-    --ground: #0F1418;
-    --surface: #161D22;
-    --ink: #E4E9ED;
-    --muted: #93A0AB;
-    --rule: #29333B;
+    --ground: #0C131C;
+    --surface: #121B26;
+    --ink: #E4EAF0;
+    --muted: #8EA0B3;
+    --rule: #223042;
     --accent: #4FC2BD;
     --accent-soft: #143331;
     --board: #07090B;
@@ -37,7 +37,7 @@
     --warn-soft: #36270F;
     --bad: #F2857A;
     --bad-soft: #3B1A17;
-    --code: #1C242A;
+    --code: #182330;
   }
 }
 
@@ -93,9 +93,10 @@ main { padding: 20px; display: grid; grid-template-columns: minmax(0, 1fr); gap:
 .board button:hover { filter: brightness(1.08); }
 
 .btn {
-  border: 1px solid var(--ink); background: var(--ink); color: var(--surface); border-radius: 5px;
-  padding: 7px 14px; font-weight: 600; cursor: pointer;
+  border: 1px solid var(--accent); background: var(--accent); color: var(--surface); border-radius: 6px;
+  padding: 8px 16px; font-weight: 600; cursor: pointer; letter-spacing: 0.01em;
 }
+.btn:hover { filter: brightness(1.08); }
 .btn.ghost { background: transparent; color: var(--ink); border-color: var(--rule); }
 .btn.live { background: var(--bad); border-color: var(--bad); color: #fff; }
 .btn:disabled { opacity: 0.45; cursor: not-allowed; }
@@ -181,9 +182,34 @@ pre {
 .outcome { display: grid; gap: 10px; }
 .reasons { margin: 0; padding-left: 1.1em; color: var(--warn); font-size: 0.9rem; }
 .applied { background: var(--ok-soft); color: var(--ok); padding: 8px 12px; border-radius: 5px; font-weight: 500; font-size: 0.9rem; }
-.transcript { display: grid; gap: 6px; font-size: 0.85rem; }
+.transcript { display: grid; gap: 8px; font-size: 0.88rem; padding: 12px; }
 .transcript .turn { display: grid; grid-template-columns: 5.5em 1fr; gap: 8px; }
 .transcript .turn .spk { color: var(--muted); font-family: var(--mono); font-size: 0.75rem; padding-top: 2px; }
+.bubble { display: grid; gap: 2px; max-width: 88%; padding: 8px 12px; border-radius: 12px; line-height: 1.45; }
+.bubble .spk { font-size: 0.72rem; font-weight: 600; color: var(--muted); }
+.bubble.bot { background: var(--accent-soft); border-bottom-left-radius: 3px; justify-self: start; }
+.bubble.bot .spk { color: var(--accent); }
+.bubble.them { background: var(--code); border-bottom-right-radius: 3px; justify-self: end; }
+
+/* Where this booking or request is in its workflow. */
+.ribbon { list-style: none; margin: 0; padding: 12px 14px; display: flex; flex-wrap: wrap; gap: 6px 0;
+  background: var(--ground); border: 1px solid var(--rule); border-radius: 8px; }
+.ribbon li { display: flex; align-items: center; gap: 8px; font-size: 0.82rem; color: var(--muted); flex: 1 1 0; min-width: 9em; position: relative; padding-right: 10px; }
+.ribbon li:not(:last-child)::after { content: ""; flex: 1; height: 2px; min-width: 12px; background: var(--rule); border-radius: 2px; }
+.ribbon .dot { width: 12px; height: 12px; border-radius: 50%; border: 2px solid var(--rule); flex: none; background: var(--surface); }
+.ribbon .lbl { flex: 0 1 auto; }
+.ribbon li.done { color: var(--ink); }
+.ribbon li.done .dot { background: var(--ok); border-color: var(--ok); }
+.ribbon li.done:not(:last-child)::after { background: var(--ok); }
+.ribbon li.stop { color: var(--warn); }
+.ribbon li.stop .dot { background: var(--warn); border-color: var(--warn); }
+.ribbon li.ring { color: var(--accent); font-weight: 600; }
+.ribbon li.ring .dot { background: var(--accent); border-color: var(--accent); }
+.ribbon li.todo:first-of-type, .ribbon li.done + li.todo { color: var(--ink); }
+
+.quote.chosen th { color: var(--ok); }
+.quote.chosen { outline: 2px solid var(--ok); outline-offset: 4px; border-radius: 2px; }
+.chip.run::before { content: ""; display: inline-block; width: 7px; height: 7px; margin-right: 6px; border-radius: 50%; background: currentColor; vertical-align: 1px; }
 blockquote { margin: 0; padding-left: 12px; border-left: 3px solid var(--accent); font-size: 0.9rem; }
 
 .feed { background: var(--surface); border: 1px solid var(--rule); border-radius: 6px; padding: 14px 16px; display: grid; gap: 8px; }
@@ -205,7 +231,12 @@ blockquote { margin: 0; padding-left: 12px; border-left: 3px solid var(--accent)
 .steps li.todo { color: var(--muted); }
 .callbox input.wide { width: 12ch; }
 
+@keyframes ring {
+  0% { box-shadow: 0 0 0 0 color-mix(in srgb, var(--accent) 60%, transparent); }
+  100% { box-shadow: 0 0 0 9px transparent; }
+}
 @media (prefers-reduced-motion: no-preference) {
+  .ribbon li.ring .dot, .chip.run::before { animation: ring 1.2s ease-out infinite; }
   .row { transition: background-color 0.12s; }
 }
 @media (max-width: 520px) {
