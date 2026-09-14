@@ -2,25 +2,23 @@
 
 **Your words. We make the call.**
 
-KindlyCall makes the English phone calls you would rather not — for people with
+KindlyCall makes the English phone calls you would rather not, for people with
 limited English, phone anxiety, a disability, or no time during business hours.
 You speak or type a task in your own language; KindlyCall translates it to English,
 reads it back for you to confirm, and only then has CALL-E place the English call,
 navigate the menu, and talk to the receptionist. You watch the conversation happen
-live, then hear and read the outcome — and any confirmation number — back in your
+live, then hear and read the outcome, and any confirmation number, back in your
 own language, saved to your history.
 
 **Contribution area: User-facing Apps.** This directory is a catalog and setup
-guide for the runnable [KindlyCall application](https://github.com/yasaausman/Speakeasy).
+guide for the runnable [KindlyCall application](https://github.com/yasaausman/KindlyCall).
 The application source, tests, and CI are maintained there under the MIT license.
 The instructions below target revision
-[`babfc61`](https://github.com/yasaausman/Speakeasy/tree/babfc61480c5034b847b078d6b62011de080886e).
-(The GitHub repository is still hosted at `yasaausman/Speakeasy`; the product was
-renamed to KindlyCall.)
+[`babfc61`](https://github.com/yasaausman/KindlyCall/tree/babfc61480c5034b847b078d6b62011de080886e).
 
-- [Full setup and architecture](https://github.com/yasaausman/Speakeasy/blob/babfc61480c5034b847b078d6b62011de080886e/README.md)
-- [Synthetic sample result (reserved fictional data)](https://github.com/yasaausman/Speakeasy/blob/babfc61480c5034b847b078d6b62011de080886e/docs/sample-run.json)
-- [Upstream integration feedback we reported](https://github.com/yasaausman/Speakeasy/blob/babfc61480c5034b847b078d6b62011de080886e/docs/CALLE-INTEGRATION-FEEDBACK.md)
+- [Full setup and architecture](https://github.com/yasaausman/KindlyCall/blob/babfc61480c5034b847b078d6b62011de080886e/README.md)
+- [Synthetic sample result (reserved fictional data)](https://github.com/yasaausman/KindlyCall/blob/babfc61480c5034b847b078d6b62011de080886e/docs/sample-run.json)
+- [Upstream integration feedback we reported](https://github.com/yasaausman/KindlyCall/blob/babfc61480c5034b847b078d6b62011de080886e/docs/CALLE-INTEGRATION-FEEDBACK.md)
 
 ## What it does
 
@@ -30,8 +28,7 @@ renamed to KindlyCall.)
   in English; the user's side is translated.
 - **Voice and text, both ways.** Speak or type in; spoken narration and saved
   text out, using native on-device iOS speech (no third-party voice keys).
-- **Finishes the task.** Books, confirms, and captures the reference number —
-  not just a price lookup.
+- **Finishes the task.** Books, confirms, and captures the reference number,   not just a price lookup.
 - **Multi-call comparison.** Call several places, rank the outcomes for the
   user's goal, and book the best one.
 - **Speculative two-call booking.** Because CALL-E is one-shot async (there is no
@@ -63,12 +60,11 @@ behavior otherwise.
 
 ## Setup and usage
 
-Full instructions are in the upstream README. The core loop needs only Node —
-no Mac, no keys, and no real calls:
+Full instructions are in the upstream README. The core loop needs only Node, no Mac, no keys, and no real calls:
 
 ```bash
-git clone https://github.com/yasaausman/Speakeasy.git
-cd Speakeasy
+git clone https://github.com/yasaausman/KindlyCall.git
+cd KindlyCall
 npm install
 npm test            # deterministic end-to-end flow tests (fake transport, offline)
 npm run smoke:fake  # full plan -> run -> poll -> normalized result
@@ -85,11 +81,11 @@ started with `npm run dev`.
   against a fake-mode backend place **no** real calls.
 - **Real calls** are placed only in real mode, only after the in-app **confirm
   gate** (an explicit user "yes"), and only to the number the user provided.
-- **AI disclosure is non-optional** — every brief instructs the agent to identify
+- **AI disclosure is non-optional**, every brief instructs the agent to identify
   itself as an AI assistant calling on the user's behalf.
 - **Side-effect limitation (important).** The confirm gate is the only control
   point. Once `run_call` places a call it **cannot be cancelled or stopped from the
-  app** — CALL-E's MCP flow has no cancel operation, `get_call_run` is read-only,
+  app**, CALL-E's MCP flow has no cancel operation, `get_call_run` is read-only,
   and starting a new request only resets the app's view; it does **not** stop an
   in-progress call or change whether that call counts against your call quota.
   KindlyCall does not create recurring jobs or schedules, so there is nothing to
