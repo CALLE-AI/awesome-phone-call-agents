@@ -1,0 +1,9 @@
+requests>=2.31.0
+flask>=3.0.0
+pytest>=8.0.0
+apache-airflow>=2.8.0
+fastapi>=0.137.1
+langgraph>=0.2.0
+langchain-core>=0.3.0
+langchain-google-genai>=2.0.0
+google-genai>=0.1.0
