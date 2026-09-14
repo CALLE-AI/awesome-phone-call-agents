@@ -1,0 +1,34 @@
+{
+  "name": "voice-sre",
+  "version": "1.0.0",
+  "description": "Autonomous Hands-Free Production Incident Hotfix Agent powered by CALL-E",
+  "main": "dist/server.js",
+  "type": "module",
+  "scripts": {
+    "build": "tsc",
+    "start": "node dist/server.js",
+    "dev": "tsx src/server.ts",
+    "test": "tsx --test test/verify.test.ts"
+  },
+  "keywords": [
+    "call-e",
+    "voice-ai",
+    "sre",
+    "devops",
+    "oncall",
+    "incident-management"
+  ],
+  "author": "VoiceSRE Team",
+  "license": "Apache-2.0",
+  "dependencies": {
+    "@call-e/calle": "^0.7.0",
+    "dotenv": "^16.4.7",
+    "express": "^4.21.2"
+  },
+  "devDependencies": {
+    "@types/express": "^5.0.0",
+    "@types/node": "^22.13.9",
+    "tsx": "^4.19.3",
+    "typescript": "^5.8.2"
+  }
+}
