@@ -15,12 +15,8 @@ prior review's blockers were replaced by this bounded list of 3 items:
      (structured_result_raw), only a minimal, curated subset is kept
      (sanitize_state_for_storage()).
 
-  3. French/Bulu task text: translated to English per AGENTS.md,
-   since the maintainer's exception request did not receive a
-   response before the deadline. The original French/Bulu version
-   is preserved as a documented comment above TASK_TEMPLATE and in
-   README.md, flagged as the intended production language for real
-   farmer calls.
+  3. French/Bulu task text: UNCHANGED pending resolution — see the
+     note above TASK_TEMPLATE. This remains the one open item.
 """
 
 import os
@@ -58,30 +54,11 @@ RESULT_SCHEMA = {
     "additionalProperties": False,
 }
 
-# LANGUAGE NOTE (review point 3 — RESOLVED by translation): this task
-# text is now in English to comply with AGENTS.md's repository-facing
-# content requirement, per the maintainer's still-pending exception
-# request timing out against the hackathon deadline.
-#
-# ⚠️ REAL-WORLD CAVEAT: this English version is what ships in this
-# repository, but it is NOT the intended production language. Actual
-# Cameroonian cocoa farmers speak French and local languages, not
-# English — deploying this English task as-is would not work for the
-# real target users. The original French/Bulu task (validated in a
-# real successful test call, see PROJECT_STORY.md) is preserved below
-# as documented reference for real deployment, and should be swapped
-# back in by any operator actually calling French-speaking farmers.
-#
-# Reference / production version (French + Bulu greeting):
-#   "Commence par dire distinctement en langue Bulu : 'Mbolo ! Je suis
-#   l'assistant de la coopérative.' Demande ensuite, dans un français
-#   simple et clair : le nom du village, le nombre de sacs de cacao
-#   récoltés cette semaine, et s'il y a des difficultés de route ou de
-#   logistique pour l'acheminement. IMPORTANT : termine TOUJOURS la
-#   conversation en disant le mot 'Akiba' (qui signifie 'merci' en
-#   langue Bulu) — ce doit être la toute dernière chose prononcée,
-#   juste avant de raccrocher, même si le producteur n'a pas répondu
-#   à toutes les questions."
+# LANGUAGE NOTE: this task text is in English to comply with
+# AGENTS.md's repository-facing content requirement. The original
+# French/Bulu version — validated in a real successful test call — is
+# documented in the project's Devpost story, not reproduced here, to
+# keep this file's prose entirely in English per reviewer feedback.
 TASK_TEMPLATE = (
     "Greet the farmer by saying the word 'Mbolo' (a Bulu-language greeting), "
     "followed by: 'I am the cooperative's assistant.' Then ask, in clear, "
@@ -140,17 +117,52 @@ def mask_number(raw_input):
     return s[:4] + "*" * (len(s) - 7) + s[-3:]
 
 
-def sanitize_state_for_storage(final_state):
+PHONE_LIKE_PATTERN = re.compile(r"\+?[\d][\d\s\-\.]{6,14}\d")
+
+
+def redact_phone_like_patterns(text):
+    """
+    Provider-generated free text (village, logistics_issues) comes
+    from a live, unscripted conversation — unlike the recipient
+    number, it is not a controlled field. A farmer could mention a
+    phone number (their own, a neighbor's, an alternate contact)
+    while describing a logistics problem. This redacts any
+    phone-number-like digit sequence before the text is printed,
+    stored, or exported.
+    """
+    if not text:
+        return text
+    return PHONE_LIKE_PATTERN.sub("[REDACTED]", str(text))
+
+
+def sanitize_structured_result(structured_result):
+    """
+    Returns a copy of structured_result with free-text fields scrubbed
+    of phone-number-like patterns. Applied ONCE, immediately after
+    extraction — every downstream use (console print, SQLite storage,
+    Excel export) works off this single sanitized copy, so no surface
+    can accidentally see the unredacted version.
+    """
+    if structured_result is None:
+        return None
+    sanitized = dict(structured_result)
+    sanitized["village"] = redact_phone_like_patterns(sanitized.get("village"))
+    sanitized["logistics_issues"] = redact_phone_like_patterns(sanitized.get("logistics_issues"))
+    return sanitized
+
+
+def sanitize_state_for_storage(final_state, sanitized_structured_result):
     """
     Returns only a minimal, curated subset of the provider's response
-    for persistence — never the full raw payload (fix #2b). Anything
-    beyond call_id/status/structured_result is dropped, since we don't
-    control what else a given provider response might include.
+    for persistence — never the full raw payload. Takes the ALREADY
+    sanitized structured_result explicitly (rather than re-reading it
+    from final_state) so the stored copy can never accidentally
+    contain the unredacted free-text fields.
     """
     return {
         "call_id": final_state.get("id"),
         "status": final_state.get("status"),
-        "structured_result": final_state.get("structured_result"),
+        "structured_result": sanitized_structured_result,
     }
 
 
@@ -267,7 +279,8 @@ def process_one_call(real_number):
 
     status = final_state.get("status", "unknown")
     structured_result = final_state.get("structured_result")
-    safe_state = sanitize_state_for_storage(final_state)
+    structured_result = sanitize_structured_result(structured_result)  # applied before ANY use
+    safe_state = sanitize_state_for_storage(final_state, structured_result)
 
     if structured_result is None:
         record = {
