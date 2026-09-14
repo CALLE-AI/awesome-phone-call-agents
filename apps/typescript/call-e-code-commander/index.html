@@ -1,0 +1,585 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>CALL-E: Your Code Is Calling | 4-Agent Autonomous Incident Commander</title>
+  <meta name="description" content="When production crashes, your code calls you. 4 autonomous AI agents collaborate in real-time with voice dispatch, root-cause detection, automated patch synthesis, and sandboxed QA verification.">
+  
+  <!-- Modern Google Fonts -->
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:ital,wght@0,300;0,400;0,600;0,700;1,400&family=Outfit:wght@300;400;500;600;700;800;900&display=swap" rel="stylesheet">
+  
+  <link rel="stylesheet" href="/src/style.css">
+  <link rel="icon" type="image/svg+xml" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='%2300f3ff'><circle cx='12' cy='12' r='10' fill='%2307090e' stroke='%2300f3ff' stroke-width='2'/><path d='M15 9.5a3 3 0 0 0-6 0v5a3 3 0 0 0 6 0v-5z' fill='%2300f3ff'/><circle cx='12' cy='8' r='1.5' fill='%23ffffff'/></svg>">
+</head>
+<body>
+  <div id="app" class="app-root">
+    <!-- Top Navigation Header -->
+    <header class="app-header">
+      <div class="brand-container">
+        <div class="brand-logo-badge">
+          <div class="logo-orb-mini"></div>
+          <span class="logo-name">CALL<span class="logo-accent">-E</span></span>
+        </div>
+        <div class="brand-tagline-wrap">
+          <span class="brand-status-pill"><span class="pulse-dot"></span> CODE ON CALL</span>
+          <span class="brand-tagline">Your Code Is Calling &bull; 4-Agent Incident Council</span>
+        </div>
+      </div>
+
+      <div class="header-center-nav">
+        <div class="scenario-selector-wrap">
+          <label for="scenarioSelect" class="scenario-label">INCIDENT FEED:</label>
+          <select id="scenarioSelect" class="scenario-dropdown">
+            <option value="fintech-race">🚨 [FINTECH] Stripe Webhook Race Condition & Double Billing</option>
+            <option value="ai-pool-exhaust">🔥 [AI INFRA] Vector DB Connection Pool Exhaustion & Memory Leak</option>
+            <option value="security-sqli">🛡️ [CYBERSEC] JWT Algorithm Confusion & SQL Injection</option>
+            <option value="custom-incident">⚡ [CUSTOM] Paste Any Broken Code or Stacktrace</option>
+          </select>
+        </div>
+      </div>
+
+      <div class="header-actions">
+        <button id="realCallModalBtn" class="btn btn-primary" title="Page the on-call rota by real phone call via CALL-E">
+          <span class="btn-icon">📱</span>
+          <span class="btn-text">PAGE ON-CALL ROTA</span>
+        </button>
+        <button id="triggerCallBtn" class="btn btn-emergency pulse-emergency" title="Trigger simulated production crash phone call in browser">
+          <span class="btn-icon">📞</span>
+          <span class="btn-text">BROWSER SIMULATOR</span>
+        </button>
+        <button id="audioToggleBtn" class="btn btn-glass" title="Toggle audio synthesizer effects">
+          <span id="audioIcon" class="btn-icon">🔊</span>
+          <span id="audioStatusText" class="btn-text">Audio ON</span>
+        </button>
+      </div>
+    </header>
+
+    <!-- Main Workspace Grid -->
+    <main class="workspace-grid">
+      
+      <!-- Left Column: Voice Call HUD & Interactive Agent Orb -->
+      <aside class="left-panel glass-panel">
+        <div class="panel-header">
+          <div class="panel-title-wrap">
+            <span class="panel-icon">🎙️</span>
+            <h2 class="panel-title">CALL-E VOICE HUD</h2>
+          </div>
+          <span id="callStatusBadge" class="status-badge status-standby">STANDBY</span>
+        </div>
+
+        <!-- 3D/Audio-reactive Canvas Orb -->
+        <div class="orb-container">
+          <canvas id="orbCanvas" width="360" height="300"></canvas>
+          <div class="orb-overlay-info">
+            <div id="orbSpeakerLabel" class="orb-speaker">CALL-E (Ready)</div>
+            <div id="orbCallDuration" class="orb-timer">00:00</div>
+          </div>
+        </div>
+
+        <!-- Live Audio Waveform & Speech Transcript -->
+        <div class="transcript-box">
+          <div class="transcript-header">
+            <div class="transcript-tabs">
+              <button class="transcript-tab active" data-stream="transcript">TRANSCRIPT</button>
+              <button class="transcript-tab" data-stream="events">CALL-E EVENTS</button>
+            </div>
+            <span id="voiceRecogBadge" class="recog-indicator hidden"><span class="recog-dot"></span> LISTENING</span>
+          </div>
+          <div id="transcriptContent" class="transcript-content">
+            <p class="transcript-placeholder">Production systems operational. When an anomaly is detected, CALL-E will dial the on-call rota directly...</p>
+          </div>
+          <div id="eventsContent" class="transcript-content hidden">
+            <p class="transcript-placeholder">Developer events from <code>calls.listEvents()</code> stream here once a real call task is running.</p>
+          </div>
+        </div>
+
+        <!-- Voice Interaction Bar -->
+        <div class="voice-controls-bar">
+          <button id="micToggleBtn" class="btn btn-icon-round" title="Speak to CALL-E (Microphone)">
+            <svg id="micIcon" viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2">
+              <path d="M12 2a3 3 0 0 0-3 3v7a3 3 0 0 0 6 0V5a3 3 0 0 0-3-3Z"></path>
+              <path d="M19 10v2a7 7 0 0 1-14 0v-2"></path>
+              <line x1="12" y1="19" x2="12" y2="22"></line>
+            </svg>
+          </button>
+          <input type="text" id="voiceTextInput" class="voice-input" placeholder="Say or type 'CALL-E, explain the root cause'..." />
+          <button id="voiceSendBtn" class="btn btn-primary btn-sm">
+            <span>Send</span>
+          </button>
+        </div>
+
+        <!-- System Telemetry Snapshot -->
+        <div class="telemetry-compact">
+          <div class="telemetry-item">
+            <span class="telemetry-label">INCIDENT LEVEL</span>
+            <span id="incidentLevel" class="telemetry-val val-crit">SEV-1 CRITICAL</span>
+          </div>
+          <div class="telemetry-item">
+            <span class="telemetry-label">AFFECTED SERVICE</span>
+            <span id="affectedService" class="telemetry-val">payment-worker.ts</span>
+          </div>
+          <div class="telemetry-item">
+            <span class="telemetry-label">ERROR CODE</span>
+            <span id="errorCode" class="telemetry-val val-amber">HTTP 500 / DoubleCharge</span>
+          </div>
+        </div>
+      </aside>
+
+      <!-- Center Column: 4-Agent Mesh & Code Diff Studio -->
+      <section class="center-panel glass-panel">
+        
+        <!-- 4-Agent War Room Orchestrator -->
+        <div class="war-room-container">
+          <div class="section-title-bar">
+            <div class="title-with-count">
+              <span class="pulse-indicator"></span>
+              <h3>4-AGENT AUTONOMOUS COUNCIL</h3>
+            </div>
+            <div class="pipeline-progress-steps">
+              <span class="step-pill" data-step="1">1. Call & Triage</span>
+              <span class="step-arrow">&rarr;</span>
+              <span class="step-pill" data-step="2">2. Root Cause</span>
+              <span class="step-arrow">&rarr;</span>
+              <span class="step-pill" data-step="3">3. Patch Synthesis</span>
+              <span class="step-arrow">&rarr;</span>
+              <span class="step-pill" data-step="4">4. SRE Verification</span>
+              <span class="step-arrow">&rarr;</span>
+              <span class="step-pill step-pill-gate" data-step="5">5. Human Authorisation</span>
+            </div>
+          </div>
+
+          <!-- 4 Agent Status Cards -->
+          <div class="agents-grid">
+            
+            <!-- Agent 1: CALL-E Operator -->
+            <div id="agentCard1" class="agent-card active" data-agent="operator">
+              <div class="agent-card-header">
+                <div class="agent-avatar avatar-operator">🤖</div>
+                <div class="agent-meta">
+                  <div class="agent-name">CALL-E Operator</div>
+                  <div class="agent-role">Voice Dispatch & Orchestration</div>
+                </div>
+                <span class="agent-badge status-active">LISTENING</span>
+              </div>
+              <div class="agent-thought-stream" id="agentThought1">
+                Connected to lead engineer. Monitoring incident telemetry stream...
+              </div>
+              <div class="agent-confidence-wrap">
+                <span class="conf-label">Confidence:</span>
+                <div class="progress-track"><div class="progress-bar" style="width: 98%;"></div></div>
+                <span class="conf-num">98%</span>
+              </div>
+            </div>
+
+            <!-- Agent 2: Inspector Tracer -->
+            <div id="agentCard2" class="agent-card" data-agent="tracer">
+              <div class="agent-card-header">
+                <div class="agent-avatar avatar-tracer">🔍</div>
+                <div class="agent-meta">
+                  <div class="agent-name">Inspector Tracer</div>
+                  <div class="agent-role">Root-Cause Detective & AST</div>
+                </div>
+                <span class="agent-badge status-idle">STANDBY</span>
+              </div>
+              <div class="agent-thought-stream" id="agentThought2">
+                Awaiting telemetry dispatch from CALL-E Operator...
+              </div>
+              <div class="agent-confidence-wrap">
+                <span class="conf-label">Confidence:</span>
+                <div class="progress-track"><div class="progress-bar" style="width: 0%;"></div></div>
+                <span class="conf-num">0%</span>
+              </div>
+            </div>
+
+            <!-- Agent 3: Patch Architect -->
+            <div id="agentCard3" class="agent-card" data-agent="architect">
+              <div class="agent-card-header">
+                <div class="agent-avatar avatar-architect">⚡</div>
+                <div class="agent-meta">
+                  <div class="agent-name">Patch Architect</div>
+                  <div class="agent-role">Vulcan AST Code Synthesizer</div>
+                </div>
+                <span class="agent-badge status-idle">STANDBY</span>
+              </div>
+              <div class="agent-thought-stream" id="agentThought3">
+                Ready to synthesize zero-downtime hotfix patch once RCA is locked...
+              </div>
+              <div class="agent-confidence-wrap">
+                <span class="conf-label">Confidence:</span>
+                <div class="progress-track"><div class="progress-bar" style="width: 0%;"></div></div>
+                <span class="conf-num">0%</span>
+              </div>
+            </div>
+
+            <!-- Agent 4: Quality Guardian -->
+            <div id="agentCard4" class="agent-card" data-agent="guardian">
+              <div class="agent-card-header">
+                <div class="agent-avatar avatar-guardian">🛡️</div>
+                <div class="agent-meta">
+                  <div class="agent-name">Quality Guardian</div>
+                  <div class="agent-role">Sentinel SRE & Sandbox QA</div>
+                </div>
+                <span class="agent-badge status-idle">STANDBY</span>
+              </div>
+              <div class="agent-thought-stream" id="agentThought4">
+                Sandbox environment initialized. Test harness waiting for hotfix...
+              </div>
+              <div class="agent-confidence-wrap">
+                <span class="conf-label">Confidence:</span>
+                <div class="progress-track"><div class="progress-bar" style="width: 0%;"></div></div>
+                <span class="conf-num">0%</span>
+              </div>
+            </div>
+
+          </div>
+        </div>
+
+        <!-- Code & Diff Studio Area -->
+        <div class="code-studio-container">
+          <div class="code-studio-tabs-bar">
+            <div class="code-tabs-left">
+              <button class="code-tab active" data-view="diff">
+                <span class="tab-icon">⚡</span> Side-by-Side Diff
+              </button>
+              <button class="code-tab" data-view="original">
+                <span class="tab-icon">❌</span> Original Buggy Code
+              </button>
+              <button class="code-tab" data-view="patched">
+                <span class="tab-icon">✅</span> Patched Code
+              </button>
+              <button class="code-tab" data-view="tests">
+                <span class="tab-icon">🧪</span> Generated Tests
+              </button>
+            </div>
+            
+            <div class="code-actions-right">
+              <span id="currentFileName" class="file-name-pill">src/services/payment.ts</span>
+              <button id="copyCodeBtn" class="btn btn-xs btn-glass" title="Copy active code">
+                📋 Copy
+              </button>
+              <button id="applyHotfixBtn" class="btn btn-xs btn-accent" title="Apply hotfix immediately">
+                🚀 Apply Hotfix
+              </button>
+            </div>
+          </div>
+
+          <!-- Code Viewport -->
+          <div class="code-editor-viewport" id="codeViewport">
+            <!-- Rendered dynamically by codeDiffViewer.js -->
+          </div>
+        </div>
+
+      </section>
+
+      <!-- Right Column: Live Inter-Agent Chat & Sandbox Terminal -->
+      <aside class="right-panel glass-panel">
+        
+        <!-- Live Inter-Agent Comms Feed -->
+        <div class="agent-chat-container">
+          <div class="panel-header">
+            <div class="panel-title-wrap">
+              <span class="panel-icon">💬</span>
+              <h2 class="panel-title">AGENT DEBATE & COMMS</h2>
+            </div>
+            <span class="pulse-count-badge" id="messageCount">0 msgs</span>
+          </div>
+          <div class="agent-chat-messages" id="agentChatList">
+            <div class="agent-msg system-msg">
+              <span class="msg-time">00:00:01</span>
+              <span class="msg-body">CALL-E mesh network established. 4 agents synchronized.</span>
+            </div>
+          </div>
+        </div>
+
+        <!-- Sandbox Test Runner & Terminal -->
+        <div class="terminal-container">
+          <div class="terminal-header">
+            <div class="terminal-dots">
+              <span class="tdot red"></span>
+              <span class="tdot yellow"></span>
+              <span class="tdot green"></span>
+            </div>
+            <span class="terminal-title">SANDBOX EXECUTION RUNNER</span>
+            <button id="runTestsBtn" class="btn btn-xs btn-glass-cyan">
+              ▶ Run Tests
+            </button>
+          </div>
+          <div class="terminal-body" id="terminalOutput">
+            <div class="term-line term-dim">$ sandbox-ci --env=isolated-v8</div>
+            <div class="term-line term-dim">Container ready. Awaiting agent execution commands...</div>
+          </div>
+        </div>
+
+        <!-- Quick Incident Actions -->
+        <div class="incident-actions-dock">
+          <button id="openPrBtn" class="btn btn-primary w-full">
+            <span class="btn-icon">🔀</span> Create Hotfix Pull Request
+          </button>
+          <div class="dock-row">
+            <button id="exportRcaBtn" class="btn btn-glass flex-1">
+              📑 Export RCA Report
+            </button>
+            <button id="resetDemoBtn" class="btn btn-glass flex-1">
+              🔄 Reset Incident
+            </button>
+          </div>
+        </div>
+
+      </aside>
+
+    </main>
+
+    <!-- INCOMING CALL MODAL OVERLAY (THE SIGNATURE "YOUR CODE IS CALLING" WOW FACTOR) -->
+    <div id="incomingCallModal" class="modal-overlay hidden">
+      <div class="call-modal-card">
+        <div class="call-modal-ring-animation">
+          <div class="ring-pulse r1"></div>
+          <div class="ring-pulse r2"></div>
+          <div class="ring-pulse r3"></div>
+          <div class="call-avatar-glow">
+            <span class="call-avatar-emoji">📞</span>
+          </div>
+        </div>
+
+        <div class="caller-meta">
+          <div class="caller-alert-badge">🚨 INCOMING EMERGENCY CALL</div>
+          <h2 class="caller-name" id="callerServiceName">production.payment-worker.ts</h2>
+          <p class="caller-subtitle" id="callerErrorSnippet">CRITICAL 500: Webhook concurrency violation detected</p>
+          <div class="caller-telemetry-tag" id="callerImpact">Impact: 4,120 customers &bull; Double-Charge Risk</div>
+        </div>
+
+        <div class="call-actions-row">
+          <button id="declineCallBtn" class="call-btn btn-decline">
+            <span class="call-icon">📵</span>
+            <span class="call-btn-text">Ignore</span>
+          </button>
+          <button id="acceptCallBtn" class="call-btn btn-accept pulse-accept">
+            <span class="call-icon">📞</span>
+            <span class="call-btn-text">Answer Code Call</span>
+          </button>
+        </div>
+
+        <div class="call-modal-footer">
+          <span>CALL-E Autonomous Incident Council is on the line.</span>
+        </div>
+      </div>
+    </div>
+
+    <!-- CUSTOM INCIDENT / CODE PASTE MODAL -->
+    <div id="customIncidentModal" class="modal-overlay hidden">
+      <div class="custom-incident-card">
+        <div class="modal-header">
+          <h3>⚡ Submit Custom Incident to CALL-E</h3>
+          <button id="closeCustomModalBtn" class="close-btn">&times;</button>
+        </div>
+        <div class="modal-body">
+          <div class="form-group">
+            <label>Service & File Name:</label>
+            <input type="text" id="customFileName" class="custom-input" value="src/controllers/authController.ts" />
+          </div>
+          <div class="form-group">
+            <label>Error Log / Exception Trace:</label>
+            <textarea id="customErrorTrace" class="custom-textarea" rows="3">Uncaught TypeError: Cannot read properties of undefined (reading 'verify') at authMiddleware (src/controllers/authController.ts:42:18)</textarea>
+          </div>
+          <div class="form-group">
+            <label>Broken Code Snippet:</label>
+            <textarea id="customCodeSnippet" class="custom-textarea code-font" rows="8">// Vulnerable authentication handler
+export async function authenticate(req, res) {
+  const token = req.headers['authorization'];
+  // Missing signature verification & null check
+  const decoded = jwt.decode(token);
+  const user = await db.query(`SELECT * FROM users WHERE id = '${decoded.id}'`);
+  return res.json(user);
+}</textarea>
+          </div>
+        </div>
+        <div class="modal-footer">
+          <button id="cancelCustomBtn" class="btn btn-glass">Cancel</button>
+          <button id="submitCustomBtn" class="btn btn-emergency">
+            <span>🚨 Dispatch Incident to CALL-E</span>
+          </button>
+        </div>
+      </div>
+    </div>
+
+    <!-- PULL REQUEST & RCA REPORT MODAL -->
+    <div id="prReportModal" class="modal-overlay hidden">
+      <div class="pr-modal-card">
+        <div class="modal-header">
+          <div class="pr-header-title">
+            <span class="pr-icon">🔀</span>
+            <h3 id="reportModalTitle">GitHub Pull Request #1402</h3>
+          </div>
+          <button id="closeReportModalBtn" class="close-btn">&times;</button>
+        </div>
+        <div class="pr-modal-body" id="reportModalContent">
+          <!-- Dynamic PR or RCA content injected here -->
+        </div>
+        <div class="modal-footer">
+          <button id="copyReportBtn" class="btn btn-glass">📋 Copy Markdown</button>
+          <!-- The audit trail as a file, because a post-incident review attaches
+               evidence to a ticket rather than pasting it out of a clipboard. -->
+          <button id="downloadAuditBtn" class="btn btn-glass hidden">⬇️ Download audit file</button>
+          <button id="mergePrBtn" class="btn btn-accent">
+            <span>🚀 Approve & Auto-Merge Hotfix</span>
+          </button>
+        </div>
+      </div>
+    </div>
+
+    <!-- ON-CALL ESCALATION LADDER MODAL (REAL CALL-E OUTBOUND CALLS) -->
+    <div id="realPhoneCallModal" class="modal-overlay hidden">
+      <div class="custom-incident-card rota-card">
+        <div class="modal-header">
+          <div class="pr-header-title">
+            <span class="pr-icon">📞</span>
+            <h3>Page the On-Call Rota</h3>
+          </div>
+          <button id="closeRealCallModalBtn" class="close-btn">&times;</button>
+        </div>
+        <div class="modal-body">
+          <div class="real-call-notice">
+            <span class="notice-icon">🪜</span>
+            <div>
+              <strong class="notice-title">CALL-E dials each rung in order until a human authorises an action.</strong>
+              <p class="notice-body">Every call is a two-way conversation. CALL-E explains the incident, answers the engineer's questions, then extracts their spoken decision as typed JSON via <code>recipient_result_schema</code>. That decision is the only thing that can change production.</p>
+            </div>
+          </div>
+
+          <div class="mode-banner" id="modeBanner" data-mode="simulation">
+            <span class="mode-dot"></span>
+            <span id="modeBannerText">Checking for a server key…</span>
+          </div>
+
+          <div class="key-warning" id="keyModeWarning">
+            <strong>Simulation mode.</strong> No CALL-E key is loaded on the server, so no phone will ring. Put your key in a <code>.env</code> file at the project root as <code>CALLE_API_KEY=iams_live_...</code> and restart the dev server. There is deliberately no key field on this page: CALL-E documents its SDK as server-only, so the key is read from the server environment and never reaches the browser.
+          </div>
+
+          <div class="rota-section-label">
+            <span>ESCALATION LADDER</span>
+            <small>Use the person’s real name. CALL-E confirms who it is speaking to, and only that person can authorise a change. Leave a rung blank to skip it.</small>
+          </div>
+
+          <div class="rota-list" id="rotaList">
+            <div class="rota-row" data-contact="primary">
+              <div class="rota-rung">1</div>
+              <div class="rota-fields">
+                <input type="text" class="custom-input rota-name" data-field="name" placeholder="Name, e.g. Priya Raman" aria-label="Rung 1 name" />
+                <input type="tel" class="custom-input rota-phone" data-field="phone" placeholder="+14155552671" aria-label="Rung 1 phone number" />
+              </div>
+              <div class="rota-state" data-state="idle">idle</div>
+            </div>
+            <div class="rota-row" data-contact="backup">
+              <div class="rota-rung">2</div>
+              <div class="rota-fields">
+                <input type="text" class="custom-input rota-name" data-field="name" placeholder="Name (optional)" aria-label="Rung 2 name" />
+                <input type="tel" class="custom-input rota-phone" data-field="phone" placeholder="Optional" aria-label="Rung 2 phone number" />
+              </div>
+              <div class="rota-state" data-state="idle">idle</div>
+            </div>
+            <div class="rota-row" data-contact="manager">
+              <div class="rota-rung">3</div>
+              <div class="rota-fields">
+                <input type="text" class="custom-input rota-name" data-field="name" placeholder="Name (optional)" aria-label="Rung 3 name" />
+                <input type="tel" class="custom-input rota-phone" data-field="phone" placeholder="Optional" aria-label="Rung 3 phone number" />
+              </div>
+              <div class="rota-state" data-state="idle">idle</div>
+            </div>
+          </div>
+
+          <div class="country-helper-pills">
+            <span class="pill-label">Prefix rung 1:</span>
+            <button type="button" class="btn btn-xs btn-glass country-pill-btn" data-code="+91">🇮🇳 +91</button>
+            <button type="button" class="btn btn-xs btn-glass country-pill-btn" data-code="+1">🇺🇸 +1</button>
+            <button type="button" class="btn btn-xs btn-glass country-pill-btn" data-code="+44">🇬🇧 +44</button>
+            <button type="button" class="btn btn-xs btn-glass country-pill-btn" data-code="+65">🇸🇬 +65</button>
+          </div>
+          <div id="realPhoneValidationNotice" class="validation-notice"></div>
+
+          <details class="call-preview" id="callPreview">
+            <summary>Preview exactly what CALL-E will say and extract</summary>
+            <div class="call-preview-body">
+              <span class="call-preview-label">Call task sent to CALL-E</span>
+              <pre id="callPreviewTask">Enter a number to preview.</pre>
+              <span class="call-preview-label">Structured result requested back</span>
+              <pre id="callPreviewSchema">{}</pre>
+            </div>
+          </details>
+
+          <div class="real-call-status-box" id="realCallStatusBox">
+            <div class="status-box-head">
+              <span class="status-box-label">LADDER STATUS</span>
+              <span id="realCallBadge" class="status-box-badge">IDLE</span>
+            </div>
+            <div id="realCallId" class="status-box-id">No call task yet</div>
+            <div id="realCallActivity" class="status-box-activity">Enter a number and page the rota.</div>
+
+            <!-- Shown only while an agreed callback is being waited out. The
+                 ladder is deliberately not climbing during this window, so the
+                 panel says why, and offers to ring early if the engineer is
+                 ready before the clock is. -->
+            <div id="callbackPanel" class="callback-panel hidden">
+              <div class="callback-head">
+                <span class="callback-icon">⏱️</span>
+                <span class="callback-title" id="callbackTitle">Callback agreed</span>
+              </div>
+              <div class="callback-detail" id="callbackDetail"></div>
+              <div class="callback-countdown" id="callbackCountdown">—</div>
+              <button id="callBackNowBtn" class="btn btn-xs btn-accent">📞 Call back now</button>
+            </div>
+
+            <div id="decisionCard" class="decision-card hidden">
+              <div class="decision-head">
+                <span class="decision-icon" id="decisionIcon">⏳</span>
+                <span class="decision-title" id="decisionTitle">Awaiting spoken decision</span>
+              </div>
+              <dl class="decision-grid">
+                <div><dt>Decision</dt><dd id="decisionAction">—</dd></div>
+                <div><dt>Decided by</dt><dd id="decisionBy">—</dd></div>
+                <div><dt>Confidence</dt><dd id="decisionConfidence">—</dd></div>
+                <div><dt>Who answered</dt><dd id="decisionReached">—</dd></div>
+                <div><dt>Task completed</dt><dd id="decisionCompleted">—</dd></div>
+                <div><dt>Call task</dt><dd id="decisionCallId">—</dd></div>
+                <!-- Page raised to human decision. The number a post-incident
+                     review asks for, and the one a notification cannot produce. -->
+                <div><dt>Time to decision</dt><dd id="decisionElapsed">—</dd></div>
+              </dl>
+              <div class="decision-reason" id="decisionReason"></div>
+              <div class="decision-evidence hidden" id="decisionEvidenceWrap">
+                <span class="decision-evidence-label">Evidence CALL-E cited</span>
+                <ul id="decisionEvidence"></ul>
+              </div>
+              <details class="decision-raw">
+                <summary>Structured result from <code>recipient_result_schema</code></summary>
+                <pre id="decisionRawJson">{}</pre>
+              </details>
+              <details class="decision-raw">
+                <summary>Full call transcript</summary>
+                <pre id="decisionTranscript">No transcript.</pre>
+              </details>
+            </div>
+
+            <div class="status-box-actions">
+              <button id="switchBrowserSimBtn" class="btn btn-xs btn-glass">
+                🎙️ Continue in the in-browser voice simulator
+              </button>
+            </div>
+          </div>
+        </div>
+        <div class="modal-footer">
+          <button id="cancelRealCallBtn" class="btn btn-glass">Close</button>
+          <button id="dispatchRealCallBtn" class="btn btn-primary pulse-accept">
+            <span>📞 Page the rota</span>
+          </button>
+        </div>
+      </div>
+    </div>
+
+  </div>
+
+  <script type="module" src="/src/main.js"></script>
+</body>
+</html>

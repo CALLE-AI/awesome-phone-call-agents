@@ -1,0 +1,19 @@
+{
+  "name": "call-e-code-commander",
+  "private": true,
+  "version": "1.0.0",
+  "type": "module",
+  "scripts": {
+    "dev": "vite",
+    "build": "vite build",
+    "preview": "vite preview",
+    "test": "node --test test/calle.test.js test/newCapabilities.test.js",
+    "verify": "node scripts/verifyLiveCall.js"
+  },
+  "dependencies": {
+    "@call-e/calle": "^0.7.0"
+  },
+  "devDependencies": {
+    "vite": "^6.2.0"
+  }
+}
