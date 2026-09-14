@@ -122,6 +122,7 @@ This project is an awesome list for AI-agent phone-call workflows. Add resources
 
 - [`lesson-language-phone-practice`](skills/lesson-language-phone-practice/) - Consent-gated, lesson-derived phone rehearsal with a one-minute maximum, transcript-bound formative evidence, and no automatic redial.
 - [`accesscall`](skills/accesscall/) - Phone-based accessibility intake for VPAT 2.4/Section 508 audits. Run `npm install` in `skills/accesscall/` before using `scripts/format-to-vpat.js`, or it fails with `Cannot find module 'jszip'`.
+- [`accessible-outing-verifier`](skills/accessible-outing-verifier/) - Offline accessibility-planning fixture and proposed bounded CALL-E workflow; demonstrates advisory handling of qualified answers without making calls or certifying venue safety.
 - [`appointment-confirm`](skills/appointment-confirm/) - Confirms one existing appointment by phone, captures yes/no plus time as structured JSON, and leaves calendar writes to a human.
 - [`cod-order-confirmation-call`](skills/cod-order-confirmation-call/) - Prepares an authorized cash-on-delivery confirmation call from order rows with an advisory result schema; validation and status changes belong to the host or a human. Dry-run preview needs no credentials.
 - [`candidate-availability-call`](skills/candidate-availability-call/) - Recruiting coordination skill that confirms candidate interview availability by phone, returns evidence-backed time windows, and leaves scheduling commitments to a human.
@@ -190,6 +191,8 @@ This project is an awesome list for AI-agent phone-call workflows. Add resources
 
 ### Apps
 
+
+- [SiteWitness](apps/typescript/sitewitness/) - Local site-history interview workspace that carries reviewed evidence gaps into individually approved CALL-E calls, with exact transcript quotations, human year review, and a no-call rehearsal mode.
 - [Rebuttal Dispute Call](apps/python/rebuttal-dispute-call/) - One disclosed CALL-E call to a disputing customer, cross-examined against its transcript before it becomes chargeback evidence, with six scripted no-call scenarios and a live path gated by per-run consent, an allowlist and local calling hours.
 - [Clinic Slot Assistant](apps/typescript/clinic-slot-assistant/) - Preview a consented appointment-availability call, review CALL-E results, and confirm a fictional booking; local simulation is the default.
 - [MacroDial](apps/typescript/macrodial/) - No-call playbook review app using MacroDial's deployed CALL-E task compiler and outcome-to-state resolver, with synthetic persistence and a hosted-product workflow guide.
@@ -206,6 +209,7 @@ This project is an awesome list for AI-agent phone-call workflows. Add resources
 - [Kordy](https://github.com/vimzh/kordy) - External Next.js event-monitoring app that compiles plain-language triggers, filters connected-source events, and places contextual CALL-E calls after a trigger match or explicit demo invocation; Gmail replies require spoken approval, and dry-run tests intercept call transport.
 - [Tokito](https://github.com/vimzh/tokito) - Built for small teams tired of chasing ignored Google Forms, Tokito uses CALL-E to conduct adaptive phone conversations, ask intelligent follow-ups, and turn honest responses into evidence-backed insights they can act on.
 - [Kol](apps/typescript/kol/) - Evidence-gated healthcare claim-status calls with strict CALL-E structured results, independent route receipts, a fail-closed verifier, and a 640-case no-call adversarial evaluation.
+- [Triage-Line](apps/typescript/triage-line/) - Orchestrates fan-out and dependency-chained CALL-E calls with result verification, consent policy, and language auto-retry; post-outage welfare checks triage residents and auto-escalate to a GP follow-up, with a mock no-call default.
 - [late-hold-triage](apps/python/late-hold-triage/) - Dry-run board that decides whether to keep or release a late guest's held slot from one structured CALL-E result; live mode is one authorized call and never starts a waitlist cascade.
 - [ReturnReady](apps/python/returnready/) - Local return-enquiry review workbench that compares recipient quotations and later corrections with written instructions, with no-call examples and explicit approval before CALL-E requests.
 - [ActionBridge](https://actionbridge.vercel.app) - Human-controlled phone-work orchestration web app that turns a bounded goal into a reviewed CALL-E call plan, with explicit confirmation, status/events, structured results and evidence; the public demo is no-call by default.
@@ -260,6 +264,7 @@ Runnable demo apps live under [`apps/`](apps/). They are not a CALL-E SDK and do
 | [`apps/typescript/medroute`](apps/typescript/medroute/) | TypeScript | Consent-first pharmacy availability workbench with a safe demo mode, structured CALL-E results, and downloadable call transcripts. |
 | [`apps/typescript/before-we-go`](apps/typescript/before-we-go/) | TypeScript / Node.js | Consent-gated restaurant enquiry callbacks grounded in a versioned fictional fact sheet, with transcript-linked customer needs, unresolved questions, and a reviewed staff handoff; synthetic no-call default. |
 | [`apps/typescript/kol`](apps/typescript/kol/) | TypeScript / Node | Evidence-gated healthcare claim-status calls that require transcript-grounded fields, the intended payer department, the actual question, and an independent IVR route receipt; includes a 640-case no-call evaluation and explicit live CALL-E path. |
+| [`apps/typescript/triage-line`](apps/typescript/triage-line/) | TypeScript / Node | Orchestrates fan-out and dependency-chained CALL-E calls with confidence/evidence verification, consent policy, and language auto-retry; welfare-check triage auto-escalates urgent cases to a GP follow-up call, with a mock no-call default and live/hybrid modes. |
 | [`apps/python/rolloff-scope`](apps/python/rolloff-scope/) | Python | Compares a fixed dumpster scope using evidence-bound mandatory fees; excludes incomplete or contradictory quotes, with no-call fixtures by default. |
 | [`apps/typescript/teamline`](apps/typescript/teamline/) | TypeScript / Node | Coach-authorized two-call workflow that gathers facility facts, requires a human decision, then communicates the approved change and captures structured family responses; sandbox/no-call mode is the default. |
 | [`apps/web/veyra`](apps/web/veyra/) | TypeScript / Next.js / Python | Natural-language campaign builder with exact recipient review, operator-gated live dispatch, fail-closed reconciliation, and fake mode enabled by default. |
@@ -271,6 +276,7 @@ Runnable demo apps live under [`apps/`](apps/). They are not a CALL-E SDK and do
 | [`apps/typescript/payoutproof`](apps/typescript/payoutproof/) | JavaScript / Node | Compiles a publicly sourced reward inquiry into one disclosed, approval-gated CALL-E payout-policy call; masks the number in previews and treats verbal answers as non-contractual until backed by written terms. |
 | [`apps/typescript/creditcall`](apps/typescript/creditcall/) | JavaScript / Node | Human-approved invoice-exception call handoff with a no-call dry run, disclosed test calls, masked phone output, and duplicate-start protection. |
 | [`apps/typescript/fraud-ops-caller`](apps/typescript/fraud-ops-caller/) | TypeScript / Next.js | Pack-fired fraud-ops desk: KYC, evidence, collections, and merchant intents with a stub dial by default, masked plan destinations, and live CALL-E gated by operator secret, pinned origin, and confirm phrase. |
+| [`apps/typescript/changelock`](apps/typescript/changelock/) | TypeScript / Next.js | Accounts-payable fraud command center: verifies vendor payment-detail change requests by calling only the pre-existing trusted vendor-master contact, with masked destinations, content-bound idempotency, fail-closed result gates, a permanent held status, and a deterministic no-call replay default. |
 | [`apps/typescript/callpermit`](apps/typescript/callpermit/) | TypeScript / Node | Bounded appointment calls where a Tethers-backed authority envelope decides permission before CALL-E dispatch, with deterministic reconciliation and a no-call default. |
 | [`apps/typescript/sparescout`](apps/typescript/sparescout/) | TypeScript | Approval-gated multi-supplier vehicle-part sourcing with strict fitment schemas, durable evidence history, interruption-safe CALL-E monitoring, global market localization, and a no-call fixture default. |
 | [`apps/typescript/asyncfounders`](apps/typescript/asyncfounders/) | TypeScript | Callback-first persistent team memory: consented CALL-E interviews capture updates, brief unseen company deltas, and resolve open questions into evidence-linked typed memory. |
@@ -363,6 +369,8 @@ The default e2e tests use a local fake broker/OAuth/MCP server or dry-run paths,
 
 ### Community apps
 
+- [Exception Broker](https://exception-broker-production.up.railway.app) - Execution-control app for CALL-E-acquired operational decisions, with exact review, controlled ALLOW/BLOCK/WAIT dispositions, and a deterministic no-call demo. See the [integration notes](docs/community-apps/exception-broker.md) and [demo video](https://youtu.be/Smw7aXyI0fI).
+
 - [Openline](https://openlinecall.vercel.app/) - Human-approved service-availability verification app that turns a request into an inspectable CALL-E phone plan and returns evidence-backed next steps, with a no-call simulation path. ([repository](https://github.com/Datwebguy/openline))
 
 Externally hosted user-facing apps built on CALL-E. They live in their own repositories, so review their setup, credential handling, and call side effects before running them.
@@ -394,6 +402,7 @@ Plugins should be explicit about inputs, outbound call side effects, credential 
 | [`plugins/zapier-calle`](plugins/zapier-calle/) | Zapier | Zapier Platform CLI integration for outbound CALL-E calls with callback-based waiting, fail-closed dispositions, dry-run preview, and payload-derived idempotency keys. |
 | [`plugins/slack-calle-bridge`](plugins/slack-calle-bridge/) | Slack | Signed slash-command bridge for previewing and explicitly confirming one CALL-E phone task, with masked structured results and deterministic retry protection. |
 | [`plugins/firstbell-absence-calls`](plugins/firstbell-absence-calls/) | n8n | Importable school-absence call wave that dials each family in that family's own language, keeps a call that connected without producing a usable answer separate from one that did, and ships with a dry run that places no calls and needs no API key. |
+| [`plugins/google-sheets-callguardian`](plugins/google-sheets-callguardian/) | Google Sheets | Apps Script menu that gates CALL-E behind consent, call-window, do-not-call, and attempt-cap checks plus live in-call opt-out detection, with every decision written to a tamper-evident, hash-chained audit log — run directly from a spreadsheet. |
 
 ### Safety patterns
 
