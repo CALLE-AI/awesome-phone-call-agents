@@ -8,22 +8,30 @@ cross-site form post cannot set.
 
 The page itself is a shell. Everything a reader sees is fetched from the JSON
 endpoints below and written into the document as text rather than as markup, so
-a value that came off a phone call cannot become part of the page. It cannot
-place a call. Approving a claim is the only state it changes.
+a value that came off a phone call cannot become part of the page. Approving a
+claim, adding a claim, and placing a *fixture* call are the only things it can
+do. It cannot place a live call — that still requires the CLI and a written,
+expiring, budgeted authorization record, on purpose: an unauthenticated local
+server is not where a real outbound phone call and a real charge should
+originate.
 """
 from __future__ import annotations
 
 import json
 import os
+from datetime import date, timedelta
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from typing import Any, Callable, Dict, List, Optional
 from urllib.parse import parse_qs, urlparse
 
-from . import audit, engine, hold, policy, ui
-from .models import ANSWERED, NEEDS_HUMAN, UNKNOWN, load_ledger
+from . import audit, client as calle_client, demo, engine, hold, policy, ui, vault, workqueue
+from .models import ANSWERED, NEEDS_HUMAN, QUEUED, UNKNOWN, Claim, load_ledger, new_id, save_ledger
 
 LOOPBACK_HOSTS = ("127.0.0.1", "localhost", "::1")
 WRITE_HEADER = "X-Trunkline"
+
+PACKAGE_DIR = os.path.dirname(os.path.abspath(__file__))
+FIXTURES_DIR = os.path.join(os.path.dirname(PACKAGE_DIR), "fixtures")
 
 # 'self' is needed for the fetch calls that carry the data; nothing else is
 # allowed, so the page can neither load nor reach anything off this origin.
@@ -44,6 +52,7 @@ def _claim_row(ledger, claim) -> Dict[str, Any]:
         "id": claim.id,
         "claim_number": claim.claim_number,
         "payer": ledger.payer(claim.payer_id).name,
+        "payer_id": claim.payer_id,
         "workflow": claim.workflow,
         "billed_amount": claim.billed_amount,
         "filing_deadline": claim.filing_deadline,
@@ -206,18 +215,35 @@ def serve(data_dir: str, host: str = "127.0.0.1", port: int = 8770) -> int:
                     return self._text(404, "not found")
                 return self._json(_claim_detail(ledger, claim))
 
+            if path == "/api/new-claim-form":
+                return self._json({
+                    "payers": [{"id": p.id, "name": p.name} for p in ledger.payers],
+                    "envelopes": {k: list(v) for k, v in policy.DISCLOSURE_ENVELOPES.items()},
+                })
+
             self._text(404, "not found")
 
-        # -- the one write ----------------------------------------------
+        # -- writes -------------------------------------------------------
+        # Three, all local-state only: approve a claim, add a claim, and place
+        # a *fixture* call. None of them can cause a real phone call.
         def do_POST(self) -> None:
             if not self._host_ok():
                 return self._text(403, "forbidden")
             if self.headers.get(WRITE_HEADER) is None:
                 return self._text(403, "missing write header")
-            if urlparse(self.path).path != "/approve":
-                return self._text(404, "not found")
+            path = urlparse(self.path).path
             length = int(self.headers.get("Content-Length", "0"))
             form = parse_qs(self.rfile.read(length).decode("utf-8"))
+
+            if path == "/approve":
+                return self._do_approve(form)
+            if path == "/add-claim":
+                return self._do_add_claim(form)
+            if path == "/call":
+                return self._do_call(form)
+            self._text(404, "not found")
+
+        def _do_approve(self, form: Dict[str, List[str]]) -> None:
             claim_id = (form.get("claim_id") or [""])[0]
             ledger = load_ledger(data_dir)
             ctx = engine.Context(data_dir=data_dir, ledger=ledger, actor="console")
@@ -226,6 +252,124 @@ def serve(data_dir: str, host: str = "127.0.0.1", port: int = 8770) -> int:
             except (KeyError, engine.EngineError) as error:
                 return self._text(400, str(error))
             self._text(200, "approved")
+
+        def _do_add_claim(self, form: Dict[str, List[str]]) -> None:
+            def field(name: str) -> str:
+                return (form.get(name) or [""])[0].strip()
+
+            payer_id = field("payer_id")
+            workflow = field("workflow")
+            claim_number = field("claim_number")
+            date_of_service = field("date_of_service")
+            filing_deadline = field("filing_deadline")
+
+            ledger = load_ledger(data_dir)
+            try:
+                payer = ledger.payer(payer_id)
+            except KeyError:
+                return self._text(400, "unknown payer")
+            if workflow not in policy.DISCLOSURE_ENVELOPES:
+                return self._text(400, "unknown workflow")
+            if not claim_number or not date_of_service:
+                return self._text(400, "claim_number and date_of_service are required")
+            if not ledger.practices:
+                return self._text(400, "no practice on file")
+            try:
+                billed_amount = float(field("billed_amount") or "0")
+            except ValueError:
+                return self._text(400, "billed_amount must be a number")
+            if not filing_deadline:
+                filing_deadline = (date.today() + timedelta(days=180)).isoformat()
+
+            # Only the fields this workflow's envelope allows are accepted, so
+            # the form cannot be used to smuggle an unnecessary identifier into
+            # the vault. Never-disclose fields are not offered here at all.
+            envelope = policy.DISCLOSURE_ENVELOPES[workflow]
+            vault_values = {}
+            field_map = {
+                "member_id": "member_id",
+                "date_of_birth": "date_of_birth",
+                "patient_last_name": "patient_last_name",
+            }
+            for envelope_field in envelope:
+                form_field = field_map.get(envelope_field)
+                if form_field:
+                    value = field(form_field)
+                    if value:
+                        vault_values[envelope_field] = value
+            if not vault_values:
+                return self._text(400, "at least one patient identifier is required")
+
+            claim_id = new_id("clm")
+            patient_ref = new_id("pt")
+            vault.put(data_dir, patient_ref, vault_values)
+
+            claim = Claim(
+                id=claim_id,
+                practice_id=ledger.practices[0].id,
+                payer_id=payer.id,
+                patient_ref=patient_ref,
+                workflow=workflow,
+                claim_number=claim_number,
+                date_of_service=date_of_service,
+                billed_amount=billed_amount,
+                filing_deadline=filing_deadline,
+                state=QUEUED,
+            )
+            ledger.claims.append(claim)
+            workqueue.rescore(ledger)
+            save_ledger(data_dir, ledger)
+            audit.record(
+                data_dir, actor="console", action="claim.added", subject=claim_id,
+                detail={"payer_id": payer.id, "workflow": workflow, "claim_number": claim_number},
+            )
+            self._json({"ok": True, "claim_id": claim_id})
+
+        def _do_call(self, form: Dict[str, List[str]]) -> None:
+            payer_id = (form.get("payer_id") or [""])[0]
+            workflow = (form.get("workflow") or [""])[0]
+            ledger = load_ledger(data_dir)
+            try:
+                ledger.payer(payer_id)
+            except KeyError:
+                return self._text(400, "unknown payer")
+            if workflow not in policy.DISCLOSURE_ENVELOPES:
+                return self._text(400, "unknown workflow")
+
+            # ignore_window: safe here because mode is hard-coded to fixture a few
+            # lines down. The calling window matters for a real phone call; it is
+            # meaningless for a local recording replayed against a fake transport.
+            config = engine.Config(ignore_window=True)
+            ctx = engine.Context(data_dir=data_dir, ledger=ledger, config=config,
+                                  fixtures_dir=FIXTURES_DIR, actor="console")
+            workqueue.rescore(ctx.ledger)
+            bundles = workqueue.build_bundles(ctx.ledger, workflow=workflow, payer_id=payer_id, max_bundles=1)
+            if not bundles:
+                return self._text(400, "nothing queued for that payer and workflow")
+            bundle = bundles[0]
+            scenario = demo.scenario_for(
+                FIXTURES_DIR, bundle.workflow, [c.claim_number for c in bundle.claims],
+            )
+            server = calle_client.FakeCalleServer(FIXTURES_DIR).start()
+            try:
+                outcome = engine.run_bundle(
+                    ctx, bundle, mode=engine.MODE_FIXTURE, api_key="fixture-local-key",
+                    base_url=server.base_url, fixture_scenario=scenario, first_poll_delay=0.0,
+                )
+            except Exception as error:  # noqa: BLE001 - surfaced to the operator, not swallowed
+                return self._text(500, "call failed: %s" % error)
+            finally:
+                server.stop()
+
+            if outcome.suppressed:
+                return self._json({"ok": False, "suppressed": outcome.suppressed,
+                                    "reasons": [policy.describe_suppression(r) for r in outcome.suppressed]})
+            record = outcome.call
+            self._json({
+                "ok": True,
+                "call_id": record.id if record else "",
+                "outcome": record.outcome if record else "",
+            })
 
     httpd = ThreadingHTTPServer((host, port), Handler)
     audit.record(data_dir, actor="console", action="console.started",
