@@ -203,8 +203,9 @@ npm run send-channel -- submit L6F2KM Kusuma                        # open chang
 | `dry-run` (default) | Scripted in-process stand-in | None | Same shape as a real result |
 | `sdk` | `@call-e/calle` `calls.create` + `calls.get` | `CALLE_API_KEY` | Structured `recipientResultSchema` result, confidence, transcript |
 | `cli` | Local `calle call start` / `call status` | `calle auth login` (browser) | Summary and transcript only, so every call goes to human review with a hint |
+| Check with CALL-E (any mode) | Local `calle call plan` (`plan_call`) | `calle auth login` + `CALLE_PLAN_PHONE` | CALL-E's verdict and plan for the exact task; never dials |
 
-SDK calls send a stable `Idempotency-Key` (`fda-<run>-<event>-<booking>`) and `metadata` with the event and booking code. `<run>` changes on every Reset demo, so a call placed after a reset is a new call rather than a replay of the earlier one.
+The CLI is located as `CALLE_CLI`, else the global `@call-e/cli` install, because the SDK dependency also installs a `calle` command that `npm run` would otherwise pick first. SDK calls send a stable `Idempotency-Key` (`fda-<run>-<event>-<booking>`) and `metadata` with the event and booking code. `<run>` changes on every Reset demo, so a call placed after a reset is a new call rather than a replay of the earlier one.
 
 ## Run it (dry run, no calls)
 
