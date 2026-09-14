@@ -1,0 +1,135 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>VoiceSRE — Mission Control</title>
+  <link rel="stylesheet" href="style.css">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;700&family=Inter:wght@400;600;700;800&display=swap" rel="stylesheet">
+</head>
+<body>
+  <div class="app-container">
+    <!-- Header -->
+    <header class="navbar">
+      <div class="brand">
+        <div class="logo-badge">☎️ AI</div>
+        <div>
+          <h1>VoiceSRE</h1>
+          <span class="subtext">Autonomous Hands-Free Production Incident Hotfix Agent</span>
+        </div>
+      </div>
+      <div class="header-status">
+        <div id="cluster-status-badge" class="status-badge healthy">
+          <span class="pulse-dot"></span>
+          <span id="cluster-status-text">SYSTEM HEALTHY</span>
+        </div>
+        <div class="version-tag" id="current-version">v2.4.0</div>
+      </div>
+    </header>
+
+    <!-- Metrics Grid -->
+    <section class="metrics-grid">
+      <div class="metric-card" id="card-error-rate">
+        <div class="metric-title">HTTP 500 ERROR RATE</div>
+        <div class="metric-value" id="metric-error-rate">0.02%</div>
+        <div class="metric-sub" id="metric-error-sub">SLO Target: &lt; 0.05%</div>
+      </div>
+      <div class="metric-card">
+        <div class="metric-title">P99 API LATENCY</div>
+        <div class="metric-value" id="metric-latency">42 ms</div>
+        <div class="metric-sub">SLO Target: &lt; 150 ms</div>
+      </div>
+      <div class="metric-card">
+        <div class="metric-title">CPU UTILIZATION</div>
+        <div class="metric-value" id="metric-cpu">24.5%</div>
+        <div class="metric-sub">5 Pods active</div>
+      </div>
+      <div class="metric-card">
+        <div class="metric-title">K8S DEPLOYMENT</div>
+        <div class="metric-value" id="metric-service">checkout-svc</div>
+        <div class="metric-sub">Namespace: production</div>
+      </div>
+    </section>
+
+    <!-- Main Workspace: Split into Incident Control and Live Terminal -->
+    <main class="workspace-grid">
+      <!-- Left: Incident & Call Control -->
+      <section class="panel control-panel">
+        <div class="panel-header">
+          <h2>🚨 Incident Dispatcher</h2>
+          <span class="badge" id="mode-badge">PREVIEW MODE</span>
+        </div>
+
+        <div id="incident-banner" class="incident-banner hidden">
+          <div class="incident-header">
+            <span class="p0-tag">P0 OUTAGE</span>
+            <span id="inc-id" class="inc-id">INC-4091</span>
+          </div>
+          <h3 id="inc-title">HTTP 500 Spike on /api/v1/checkout</h3>
+          <p id="inc-cause" class="inc-cause">Root Cause: StripeSignatureVerificationError in payment_handler.py:104</p>
+          <div class="inc-author" id="inc-author">Commit 7c8b91a by Sarah Chen</div>
+        </div>
+
+        <div class="action-buttons">
+          <button id="btn-trigger-outage" class="btn btn-danger">
+            💥 1. Simulate P0 Outage
+          </button>
+        </div>
+
+        <div class="call-config-box">
+          <h3>☎️ CALL-E Dispatch Settings</h3>
+          <div class="form-group">
+            <label>Target On-Call Phone (E.164):</label>
+            <input type="text" id="input-phone" placeholder="+12025550123" value="+12025550123">
+          </div>
+          <div class="form-group">
+            <label>Mode:</label>
+            <select id="select-mode">
+              <option value="preview" selected>Preview (Dry-run safe simulation)</option>
+              <option value="live">Live Call (Requires real CALL-E key)</option>
+            </select>
+          </div>
+          <div class="form-group">
+            <label>CALL-E API Key (Optional for Preview):</label>
+            <input type="password" id="input-api-key" placeholder="calle_sk_...">
+          </div>
+          <button id="btn-dispatch-call" class="btn btn-primary" disabled>
+            📞 2. Dispatch VoiceSRE Call
+          </button>
+        </div>
+      </section>
+
+      <!-- Right: Live Terminal & Remediation Audit -->
+      <section class="panel terminal-panel">
+        <div class="panel-header">
+          <h2>⚡ Live Execution & Terminal Log</h2>
+          <div class="terminal-actions">
+            <span id="call-indicator" class="call-indicator hidden">
+              <span class="live-dot"></span> CALL ACTIVE
+            </span>
+          </div>
+        </div>
+
+        <div class="terminal-window" id="terminal-logs">
+          <div class="log-entry system">[SYSTEM READY] VoiceSRE Daemon initialized. Awaiting incident signals...</div>
+        </div>
+
+        <div class="audit-history">
+          <h3>📋 Remediation Audit Trail</h3>
+          <div id="audit-list" class="audit-list">
+            <div class="audit-item success">
+              <span class="audit-time">00:00:00</span>
+              <span class="audit-step">SYSTEM_INIT</span>
+              <span class="audit-desc">Cluster checkout-service v2.4.0 healthy</span>
+            </div>
+          </div>
+        </div>
+      </section>
+    </main>
+  </div>
+
+  <script src="app.js"></script>
+</body>
+</html>
