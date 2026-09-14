@@ -378,6 +378,8 @@ Externally hosted user-facing apps built on CALL-E. They live in their own repos
 
 - [Off the Hook: The Memory Line](https://github.com/tivastreasures-ops/off-the-hook) - Operator-character message-taking line: CALL-E conducts an in-character disclosed-automation call (free tier) that can terminate on a physical rotary phone via SIP/ATA, with structured results rendered as a keepsake Message Slip; paid tier adds a custom ElevenLabs voice, Stripe billing, and email-keyed call balances. Live:[The Memory Line](https://off-the-hook.replit.app)
 
+- [Vera](https://github.com/shalynmonet/vera) - Strands-orchestrated wellness companion that places recurring CALL-E calls to seniors, evaluates outcomes with Amazon Bedrock against each resident's own escalation criteria, and alerts caregivers automatically when something needs attention.
+
 ### Plugins
 
 No-code and low-code workflow plugins live under [`plugins/`](plugins/). They are for workflow-platform nodes, actions, connectors, and recipes that help operators connect business events to phone-call agent workflows without writing a full app.
