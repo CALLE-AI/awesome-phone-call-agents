@@ -18,20 +18,20 @@ export const vendorResultSchema = {
       description: "Whether the vendor says they can take this work order.",
     },
     earliest_eta: {
-      type: ["string", "null"],
-      description: "Earliest stated arrival time as ISO 8601 when known, otherwise null.",
+      type: "string",
+      description: "Earliest stated arrival time as ISO 8601 when known, otherwise the exact string unknown.",
     },
     price_type: {
       type: "string",
       enum: ["fixed", "estimate", "quote_required", "not_provided"],
     },
     price_amount: {
-      type: ["number", "null"],
-      description: "Stated call-out price or estimate only; null when not provided.",
+      type: "string",
+      description: "Non-negative decimal amount stated by the vendor, without a currency symbol; otherwise the exact string unknown.",
     },
     currency: {
-      type: ["string", "null"],
-      description: "ISO 4217 currency code when a price is provided.",
+      type: "string",
+      description: "ISO 4217 currency code when a price is provided, otherwise the exact string unknown.",
     },
     constraints: {
       type: "array",

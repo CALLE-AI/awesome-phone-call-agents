@@ -47,6 +47,22 @@ describe("buildVendorCallTask", () => {
     ]);
   });
 
+  it("uses only CALL-E-supported single JSON Schema types", () => {
+    const types: unknown[] = [];
+    const visit = (value: unknown) => {
+      if (!value || typeof value !== "object" || Array.isArray(value)) return;
+      for (const [key, child] of Object.entries(value)) {
+        if (key === "type") types.push(child);
+        visit(child);
+      }
+    };
+
+    visit(vendorResultSchema);
+
+    expect(types.length).toBeGreaterThan(0);
+    expect(types.every((type) => typeof type === "string")).toBe(true);
+  });
+
   it("serializes operator text as bounded untrusted context, not instructions", () => {
     const task = buildVendorCallTask(
       {
@@ -83,4 +99,3 @@ describe("buildVendorCallTask", () => {
     expect(task.length).toBeLessThan(5_000);
   });
 });
-

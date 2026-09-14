@@ -41,7 +41,7 @@ const structuredResult = {
   availability: "available",
   earliest_eta: "2026-08-05T09:00:00.000Z",
   price_type: "estimate",
-  price_amount: 150,
+  price_amount: "150",
   currency: "USD",
   constraints: ["Needs access to the unit"],
 };

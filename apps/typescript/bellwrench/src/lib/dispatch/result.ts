@@ -59,14 +59,14 @@ function boundedString(value: unknown, maximum: number): string | null {
   return normalized && normalized.length <= maximum ? normalized : null;
 }
 
-function validNullableEta(value: unknown): value is string | null {
+function normalizeEta(value: unknown): string | null | undefined {
+  if (value === "unknown") return null;
   return (
-    value === null ||
-    (typeof value === "string" &&
-      value.length <= 64 &&
-      value.trim() === value &&
-      Number.isFinite(Date.parse(value)))
-  );
+    typeof value === "string" &&
+    value.length <= 64 &&
+    value.trim() === value &&
+    Number.isFinite(Date.parse(value))
+  ) ? value : undefined;
 }
 
 function validConstraints(value: unknown): value is string[] {
@@ -93,12 +93,13 @@ export function parseVendorStructuredResult(
 
   const availability = value.availability;
   const priceType = value.price_type;
+  const earliestEta = normalizeEta(value.earliest_eta);
   if (
     typeof availability !== "string" ||
     !AVAILABILITIES.has(availability as VendorAvailability) ||
     typeof priceType !== "string" ||
     !PRICE_TYPES.has(priceType as PriceType) ||
-    !validNullableEta(value.earliest_eta) ||
+    earliestEta === undefined ||
     !validConstraints(value.constraints)
   ) {
     return null;
@@ -107,26 +108,30 @@ export function parseVendorStructuredResult(
   const priceAmount = value.price_amount;
   const currency = value.currency;
   const hasQuotedPrice = priceType === "fixed" || priceType === "estimate";
+  let normalizedPriceAmount: number | null = null;
+  let normalizedCurrency: string | null = null;
   if (hasQuotedPrice) {
     if (
-      typeof priceAmount !== "number" ||
-      !Number.isFinite(priceAmount) ||
-      priceAmount < 0 ||
+      typeof priceAmount !== "string" ||
+      !/^(?:0|[1-9]\d*)(?:\.\d+)?$/.test(priceAmount) ||
       typeof currency !== "string" ||
       !/^[A-Z]{3}$/.test(currency)
     ) {
       return null;
     }
-  } else if (priceAmount !== null || currency !== null) {
+    normalizedPriceAmount = Number(priceAmount);
+    if (!Number.isFinite(normalizedPriceAmount)) return null;
+    normalizedCurrency = currency;
+  } else if (priceAmount !== "unknown" || currency !== "unknown") {
     return null;
   }
 
   return {
     availability: availability as VendorAvailability,
-    earliestEta: value.earliest_eta,
+    earliestEta,
     priceType: priceType as PriceType,
-    priceAmount: priceAmount as number | null,
-    currency: currency as string | null,
+    priceAmount: normalizedPriceAmount,
+    currency: normalizedCurrency,
     constraints: [...value.constraints],
   };
 }

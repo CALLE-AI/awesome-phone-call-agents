@@ -9,7 +9,7 @@ const validStructuredResult = {
   availability: "available",
   earliest_eta: "2026-08-05T09:00:00.000Z",
   price_type: "estimate",
-  price_amount: 150,
+  price_amount: "150",
   currency: "USD",
   constraints: ["Needs access to the unit"],
 };
@@ -34,8 +34,8 @@ describe("parseVendorStructuredResult", () => {
       parseVendorStructuredResult({
         ...validStructuredResult,
         price_type: "quote_required",
-        price_amount: null,
-        currency: null,
+        price_amount: "unknown",
+        currency: "unknown",
       }),
     ).toEqual({
       availability: "available",
@@ -47,12 +47,33 @@ describe("parseVendorStructuredResult", () => {
     });
   });
 
+  it("normalizes CALL-E unknown sentinels without inventing evidence", () => {
+    expect(
+      parseVendorStructuredResult({
+        ...validStructuredResult,
+        availability: "unknown",
+        earliest_eta: "unknown",
+        price_type: "not_provided",
+        price_amount: "unknown",
+        currency: "unknown",
+        constraints: [],
+      }),
+    ).toEqual({
+      availability: "unknown",
+      earliestEta: null,
+      priceType: "not_provided",
+      priceAmount: null,
+      currency: null,
+      constraints: [],
+    });
+  });
+
   it.each([
     ["invalid availability", { availability: "maybe" }],
     ["invalid ETA", { earliest_eta: "tomorrow-ish" }],
-    ["negative price", { price_amount: -1 }],
-    ["missing currency", { currency: null }],
-    ["unexpected currency", { price_type: "quote_required", price_amount: null }],
+    ["negative price", { price_amount: "-1" }],
+    ["missing currency", { currency: "unknown" }],
+    ["unexpected currency", { price_type: "quote_required", price_amount: "unknown" }],
     ["invalid constraint", { constraints: ["valid", 7] }],
     ["extra field", { internal_note: "do not expose" }],
   ])("rejects %s", (_label, patch) => {

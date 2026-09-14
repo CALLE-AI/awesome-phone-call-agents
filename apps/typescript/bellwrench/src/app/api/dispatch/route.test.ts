@@ -49,10 +49,10 @@ function terminalCall(
         structuredResult: completed
           ? {
               availability: "available",
-              earliest_eta: null,
+              earliest_eta: "unknown",
               price_type: "quote_required",
-              price_amount: null,
-              currency: null,
+              price_amount: "unknown",
+              currency: "unknown",
               constraints: [],
             }
           : null,
