@@ -1,8 +1,9 @@
 # IVR Map Library
 
 An IVR map is a JSON file describing one organization's phone tree as observed
-by completed HoldFast calls. Maps let the next call skip exploratory
-navigation and go straight down a known path.
+by completed HoldFast calls. A map is reference material first. A route may
+enter live instructions only after a human reviews it, when it matches the
+exact task goal and was observed within the last 30 days.
 
 One file per organization: `<organization-slug>.json`. Committed sample maps
 must use fictional reserved numbers (`+1-202-555-01xx`).
@@ -26,6 +27,7 @@ must use fictional reserved numbers (`+1-202-555-01xx`).
         {"level": 3, "prompt_summary": "agent option", "keypress": "0", "meaning": "human agent"}
       ],
       "confidence": "observed",
+      "human_reviewed": false,
       "observations": 1,
       "last_observed": "2026-09-11"
     }
@@ -51,6 +53,10 @@ must use fictional reserved numbers (`+1-202-555-01xx`).
   fictional reserved samples; never personal or private numbers.
 - `confidence` is one of `observed` (a call walked this path), `reported`
   (a human told us), or `stale` (contradicted by a later call).
+- `human_reviewed` defaults to `false`. `map_update.py` always writes or resets
+  it to `false`; after comparing the proposal with transcript evidence, a
+  human reviewer may set only this flag to `true`. That approval does not
+  override exact-goal matching or the 30-day freshness limit.
 - `operator_fallback.authorized` reflects what the user authorized for calls
   to this organization, not what the IVR happens to offer.
 - Update via `scripts/map_update.py`; do not hand-edit observed counts.

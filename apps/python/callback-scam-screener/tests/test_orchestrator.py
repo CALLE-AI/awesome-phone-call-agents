@@ -36,7 +36,7 @@ def _completed_result(number_dialed: str) -> CallResult:
 
 def test_dials_the_confirmed_to_phone_not_the_loosely_formatted_extracted_text():
     client = FakeCallClient(result=_completed_result("+18005550187"))
-    run_pipeline(EMAIL_BODY, "example.com", client, to_phone="+18005550187")
+    run_pipeline(EMAIL_BODY, client, to_phone="+18005550187")
     assert client.dialed_numbers == ["+18005550187"]
 
 
@@ -44,7 +44,7 @@ def test_falls_back_to_extracted_number_when_to_phone_omitted():
     # This is the --demo/preview path, which never dials for real — the raw
     # extracted text is fine there since nothing is actually called.
     client = FakeCallClient(result=_completed_result("(800) 555-0187"))
-    run_pipeline(EMAIL_BODY, "example.com", client)
+    run_pipeline(EMAIL_BODY, client)
     assert client.dialed_numbers == ["(800) 555-0187"]
 
 
@@ -68,7 +68,7 @@ def test_skips_tagging_entirely_when_answered_by_machine():
         raise AssertionError("tagger should not be called when answered_by_machine is True")
 
     screening = run_pipeline(
-        EMAIL_BODY, "example.com", client, to_phone="+18005550187", tagger=_tagger_that_must_not_be_called
+        EMAIL_BODY, client, to_phone="+18005550187", tagger=_tagger_that_must_not_be_called
     )
     assert screening.verdict == "inconclusive"
 
@@ -78,7 +78,7 @@ def test_recipient_binding_mismatch_raises_instead_of_scoring():
     # must never silently score a verdict against the wrong recipient.
     client = FakeCallClient(result=_completed_result("+19995550199"))
     with pytest.raises(RecipientMismatch, match="mismatched recipient"):
-        run_pipeline(EMAIL_BODY, "example.com", client, to_phone="+18005550187")
+        run_pipeline(EMAIL_BODY, client, to_phone="+18005550187")
 
 
 def test_recipient_binding_does_not_alias_across_country_codes():
@@ -88,7 +88,7 @@ def test_recipient_binding_does_not_alias_across_country_codes():
     # as equal. The binding check must still catch this as a mismatch.
     client = FakeCallClient(result=_completed_result("+447700900187"))
     with pytest.raises(RecipientMismatch, match="mismatched recipient"):
-        run_pipeline(EMAIL_BODY, "example.com", client, to_phone="+17700900187")
+        run_pipeline(EMAIL_BODY, client, to_phone="+17700900187")
 
 
 @pytest.mark.parametrize(
@@ -104,7 +104,7 @@ def test_recipient_binding_tolerates_calle_formatting_a_real_match_differently(r
     # alone and permanently mark the number as an unresolved attempt -
     # full_digits_match must tolerate this.
     client = FakeCallClient(result=_completed_result(reported_rendering))
-    result = run_pipeline(EMAIL_BODY, "example.com", client, to_phone="+18005550187")
+    result = run_pipeline(EMAIL_BODY, client, to_phone="+18005550187")
     assert result is not None
 
 
@@ -116,7 +116,7 @@ def test_recipient_binding_still_rejects_a_report_missing_the_country_code():
     # guess it's a match.
     client = FakeCallClient(result=_completed_result("(800) 555-0187"))
     with pytest.raises(RecipientMismatch, match="mismatched recipient"):
-        run_pipeline(EMAIL_BODY, "example.com", client, to_phone="+18005550187")
+        run_pipeline(EMAIL_BODY, client, to_phone="+18005550187")
 
 
 def test_record_attempt_fires_before_dialing_so_a_crash_still_blocks_redial(tmp_path):
@@ -126,7 +126,7 @@ def test_record_attempt_fires_before_dialing_so_a_crash_still_blocks_redial(tmp_
     client = FakeCallClient(raises=RuntimeError("simulated ambiguous timeout"))
 
     with pytest.raises(RuntimeError, match="simulated ambiguous timeout"):
-        run_pipeline(EMAIL_BODY, "example.com", client, to_phone="+18005550187", guardrails=guardrails)
+        run_pipeline(EMAIL_BODY, client, to_phone="+18005550187", guardrails=guardrails)
 
     # A fresh instance reading the same state file must still see the
     # in-progress attempt, even though place_screening_call never returned.
@@ -144,14 +144,14 @@ def test_real_client_without_guardrails_fails_closed_at_the_library_boundary():
     # call cap. This must refuse before ever touching the client — no
     # subprocess/network mocking needed since it should never get that far.
     with pytest.raises(GuardrailViolation, match="without guardrails"):
-        run_pipeline(EMAIL_BODY, "example.com", RealCallEClient(), to_phone="+18005550187")
+        run_pipeline(EMAIL_BODY, RealCallEClient(), to_phone="+18005550187")
 
 
 def test_mock_client_without_guardrails_is_fine():
     # The --demo/preview path legitimately has no guardrails and must not
     # be affected by the RealCallEClient-specific check above.
     client = FakeCallClient(result=_completed_result("+18005550187"))
-    result = run_pipeline(EMAIL_BODY, "example.com", client, to_phone="+18005550187")
+    result = run_pipeline(EMAIL_BODY, client, to_phone="+18005550187")
     assert result is not None
 
 
@@ -160,7 +160,7 @@ def test_record_call_only_fires_after_a_successful_result(tmp_path):
         allowed_numbers=None, unrestricted=True, state_path=tmp_path / "state.json"
     )
     client = FakeCallClient(result=_completed_result("+18005550187"))
-    run_pipeline(EMAIL_BODY, "example.com", client, to_phone="+18005550187", guardrails=guardrails)
+    run_pipeline(EMAIL_BODY, client, to_phone="+18005550187", guardrails=guardrails)
 
     # Blocked by "already screened" (success path), not "unknown outcome".
     with pytest.raises(GuardrailViolation, match="already screened"):
