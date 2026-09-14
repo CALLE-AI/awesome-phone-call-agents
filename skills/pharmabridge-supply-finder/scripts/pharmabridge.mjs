@@ -1,12 +1,13 @@
 #!/usr/bin/env node
 // PharmaBridge supply finder: a dependency-free CLI over a running PharmaBridge server, for agent
-// environments such as Claude Code, Codex, and Cursor. `drug`, `discover`, and `plan` never dial.
-// `call` dials only through the server's own safety gate: simulation by default, and live routing
-// needs the operator code (plus --consent for direct calls to real businesses).
+// environments such as Claude Code, Codex, and Cursor. `drug`, `discover`, `pulse`, and `plan` never
+// dial. `call` dials only through the server's own safety gate: simulation by default, and live routing
+// needs the operator code (plus --consent for direct calls to real businesses). Operator codes and call
+// tokens go only to a loopback server or an approved https origin, redirects are refused, and phone
+// numbers are masked in everything this CLI prints or saves.
 import { randomBytes } from "node:crypto";
 import { existsSync, readFileSync, writeFileSync } from "node:fs";
 
-const BASE = (process.env.PHARMABRIDGE_URL || "http://localhost:3000").replace(/\/$/, "");
 const FACILITIES_FILE = "pharmabridge-facilities.json";
 const CALLS_FILE = "pharmabridge-calls.json";
 const RESULTS_FILE = "pharmabridge-results.json";
@@ -14,6 +15,8 @@ const TERMINAL = ["completed", "failed", "canceled"];
 
 const [command, ...rest] = process.argv.slice(2);
 const args = parseArgs(rest);
+let origin = null;
+const base = () => (origin ??= serverOrigin(process.env.PHARMABRIDGE_URL || "http://localhost:3000"));
 
 function parseArgs(list) {
   const out = {};
@@ -30,17 +33,51 @@ function parseArgs(list) {
   return out;
 }
 
+/** Masks phone numbers inside free text, keeping the last two digits. */
+function redact(text) {
+  return String(text ?? "").replace(/\+\s?\d[\d\s().-]{6,}\d|\(?\b\d{3}\)?[\s.-]\d{3}[\s.-]\d{4}\b|(?<![\w/:.-])\d{9,}(?!\w)/g, (match) => {
+    const digits = match.replace(/\D/g, "");
+    return digits.length >= 7 ? `••• ••• ••${digits.slice(-2)}` : match;
+  });
+}
+
+function redactDeep(value) {
+  if (typeof value === "string") return redact(value);
+  if (Array.isArray(value)) return value.map(redactDeep);
+  if (value && typeof value === "object") return Object.fromEntries(Object.entries(value).map(([key, item]) => [key, redactDeep(item)]));
+  return value;
+}
+
 function fail(message) {
-  console.error(`✖ ${message}`);
+  console.error(`✖ ${redact(message)}`);
   process.exit(1);
+}
+
+/** Credentials go only to a loopback server or an https origin the user listed in PHARMABRIDGE_APPROVED_ORIGINS. */
+function serverOrigin(raw) {
+  let url;
+  try {
+    url = new URL(raw);
+  } catch {
+    fail("PHARMABRIDGE_URL is not a valid URL.");
+  }
+  if (url.username || url.password) fail("PHARMABRIDGE_URL must not contain credentials.");
+  const loopback = ["localhost", "127.0.0.1", "[::1]"].includes(url.hostname);
+  const approved = (process.env.PHARMABRIDGE_APPROVED_ORIGINS ?? "")
+    .split(",")
+    .map((value) => value.trim())
+    .filter(Boolean);
+  if (loopback && (url.protocol === "http:" || url.protocol === "https:")) return url.origin;
+  if (url.protocol === "https:" && approved.includes(url.origin)) return url.origin;
+  fail(`Refusing to send operator codes or call tokens to ${url.origin}. Use a loopback URL, or list this https origin in PHARMABRIDGE_APPROVED_ORIGINS.`);
 }
 
 async function api(path, init = {}) {
   let res;
   try {
-    res = await fetch(`${BASE}${path}`, init);
+    res = await fetch(`${base()}${path}`, { ...init, redirect: "error" });
   } catch {
-    fail(`Cannot reach PharmaBridge at ${BASE}. Start it with "npm run dev" or set PHARMABRIDGE_URL.`);
+    fail(`Cannot reach PharmaBridge at ${base()} (redirects are refused). Start it with "npm run dev" or set PHARMABRIDGE_URL.`);
   }
   const json = await res.json().catch(() => ({}));
   if (!res.ok) fail(json?.error?.message ?? json?.error ?? `HTTP ${res.status}`);
@@ -128,6 +165,7 @@ const commands = {
     const kind = kindArg();
     const params = new URLSearchParams({ kind, q: String(args.near), radiusKm: String(args.radius ?? 5), synthetic: args.synthetic ? "1" : "0" });
     const data = await api(`/api/facilities?${params}`);
+    // Dispatch needs each facility's signed number, so this local cache keeps it; it is never printed.
     writeFileSync(FACILITIES_FILE, JSON.stringify(data, null, 2));
     console.log(
       `${data.facilities.length} ${kind === "pharmacy" ? "pharmacies" : "blood banks"} with a listed phone near ${data.center.label} (sources: ${data.sources.join(", ")}). Saved to ${FACILITIES_FILE}.`,
@@ -136,12 +174,38 @@ const commands = {
     data.facilities.forEach((f, i) => console.log(`${pad(i + 1, 3)} ${pad(f.name, 46)} ${pad(`${f.distanceKm.toFixed(1)} km`, 9)} ${f.phoneMasked}`));
   },
 
+  async pulse() {
+    const need = args.rxcui || args.group ? await buildNeed() : null;
+    const saved = readJson(FACILITIES_FILE);
+    const params = new URLSearchParams();
+    if (need) {
+      params.set("kind", need.kind);
+      params.set("item", need.kind === "pharmacy" ? `rx:${need.medication.rxcui}` : `blood:${need.blood.group}:${need.blood.component}`);
+    }
+    if (saved?.center) {
+      params.set("lat", String(saved.center.lat));
+      params.set("lon", String(saved.center.lon));
+      params.set("radiusKm", String(args.radius ?? 5));
+    }
+    const data = await api(`/api/pulse?${params}`);
+    const s = data.summary;
+    console.log(
+      `${s.answers} fresh answer(s) from earlier PharmaBridge calls: ${s.available + s.partial} had it, ${s.out} out, ${s.refused} won't say by phone${s.withheld ? `, ${s.withheld} shown by area only (controlled medication)` : ""}.`,
+    );
+    for (const x of data.sightings.slice(0, 20)) {
+      console.log(`${pad(x.facilityName ?? "(name withheld)", 40)} ${pad(x.status, 12)} ${pad(x.item.label, 44)} ${x.observedAt}`);
+    }
+    const skip = new Set(data.sightings.filter((x) => x.facilityId && ["out", "refused"].includes(x.status)).map((x) => x.facilityId));
+    const numbers = (saved?.facilities ?? []).flatMap((f, i) => (skip.has(f.id) ? [i + 1] : []));
+    if (numbers.length) console.log(`\nSkip facilities ${numbers.join(",")}: they answered recently (out of stock or won't say by phone).`);
+  },
+
   async plan() {
     const need = await buildNeed();
     const [facility] = pickFacilities();
     const data = await post("/api/calls", callBody(need, facility, { missionId: "plan-preview", routing: "simulation", dryRun: true }));
     console.log(`Dry run, nothing dialed. Brief for ${facility.name}:\n`);
-    console.log(data.plan.task);
+    console.log(redact(data.plan.task));
     console.log(`\nCALL-E must return: ${Object.keys(data.plan.resultSchema.properties).join(", ")}`);
   },
 
@@ -187,8 +251,8 @@ const commands = {
         const { call } = await api(`/api/calls/${c.callId}`, { headers: { "x-pharmabridge-call-token": c.token } });
         if (!TERMINAL.includes(call.status)) continue;
         pending.delete(c.callId);
-        results.push({ facility: c.facility, mode: c.mode, status: call.status, summary: call.summary, confidence: call.completionConfidence, result: call.structuredResult });
-        console.log(`• ${c.facility}: ${call.summary ?? call.failureMessage ?? call.status}`);
+        results.push(redactDeep({ facility: c.facility, mode: c.mode, status: call.status, summary: call.summary, confidence: call.completionConfidence, result: call.structuredResult }));
+        console.log(`• ${c.facility}: ${redact(call.summary ?? call.failureMessage ?? call.status)}`);
       }
       if (pending.size) await new Promise((resolve) => setTimeout(resolve, live ? 5000 : 1500));
     }
@@ -202,7 +266,7 @@ const commands = {
 };
 
 if (!commands[command]) {
-  console.log("Usage: node scripts/pharmabridge.mjs <drug|discover|plan|call|wait> [options]  (see SKILL.md)");
+  console.log("Usage: node scripts/pharmabridge.mjs <drug|discover|pulse|plan|call|wait> [options]  (see SKILL.md)");
   process.exit(command ? 1 : 0);
 }
 await commands[command]();

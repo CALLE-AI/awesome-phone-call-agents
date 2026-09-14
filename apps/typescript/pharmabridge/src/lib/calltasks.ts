@@ -13,6 +13,7 @@ import {
   type InquiryResult,
   type Medication,
   type PrescriberContact,
+  type TransferContact,
   type Urgency,
 } from "./types";
 
@@ -133,10 +134,33 @@ export const BLOOD_RESERVE_RESULT_SCHEMA = strictObject({
   evidence_quote: text("One short verbatim quote from staff that supports reserve_confirmed. Empty string if none."),
 });
 
+export const TRANSFER_RESULT_SCHEMA = strictObject({
+  reached: {
+    type: "string",
+    enum: ["pharmacy_staff", "automated_system_only", "voicemail", "no_answer", "wrong_number", "unknown"],
+    description:
+      "Who the agent actually spoke with. pharmacy_staff only if a human at the pharmacy handled the request. automated_system_only if the call never got past a phone menu. voicemail if an answering machine took the call.",
+  },
+  prescription_found: yesNoUnknown("yes only if staff said they found the patient's unfilled prescription for this medication."),
+  transfer_status: {
+    type: "string",
+    enum: ["will_transfer", "transferred", "receiving_pharmacy_must_request", "needs_prescriber", "declined", "unknown"],
+    description:
+      "transferred if staff said it was sent during the call. will_transfer if they agreed to send it. receiving_pharmacy_must_request if they said the new pharmacy has to request it. needs_prescriber if they said only the prescriber can send a new prescription. declined if they refused. unknown otherwise.",
+  },
+  expected_time: text("When staff said the transfer would happen, in their words. Empty string if not stated."),
+  reference: text("Any transfer reference or confirmation staff gave. Empty string if none."),
+  controlled_rule: text("Any rule staff cited about transferring a controlled medication, in their words. Empty string if none."),
+  follow_up_needed: text("Anything the family or the receiving pharmacy still has to do. Empty string if nothing."),
+  staff_name: text("First name of the staff member if they gave it. Empty string otherwise."),
+  evidence_quote: text("One short verbatim quote from staff that supports transfer_status. Empty string if none."),
+});
+
 export const RESULT_SCHEMAS: Record<CallKind, Record<string, unknown>> = {
   inquiry: INQUIRY_RESULT_SCHEMA,
   hold: HOLD_RESULT_SCHEMA,
   prescriber: PRESCRIBER_RESULT_SCHEMA,
+  transfer: TRANSFER_RESULT_SCHEMA,
   blood_inquiry: BLOOD_INQUIRY_RESULT_SCHEMA,
   blood_reserve: BLOOD_RESERVE_RESULT_SCHEMA,
 };
@@ -315,6 +339,56 @@ export function prescriberBrief(med: Medication, facility: Facility, hold: HoldR
   };
 }
 
+export function transferBrief(med: Medication, to: Facility, hold: HoldResult | null, contact: TransferContact): BriefSpec {
+  const store = hold?.store_identifier ? `, ${hold.store_identifier}` : "";
+  const address = to.address && to.address !== "Address not listed" ? `, ${to.address}` : "";
+  const destination = `${to.name}${store}${address}, pharmacy phone ${speakable(to.phone)}`;
+  const holdLine =
+    hold?.hold_confirmed === "yes" ? ` It is being held there under "${hold.hold_name}"${hold.hold_until ? ` until ${hold.hold_until}` : ""}.` : "";
+  return {
+    kind: "transfer",
+    title: "Prescription transfer request",
+    goal: `Ask ${contact.fromPharmacy}, where ${contact.patientFullName}'s prescription for ${med.name} is waiting unfilled because of a supply shortage, to transfer it to ${to.name}, which has it in stock right now.${holdLine}`,
+    target: [
+      { label: "Transfer from", value: contact.fromPharmacy },
+      { label: "Medication", value: med.name },
+      { label: "Transfer to", value: destination },
+    ],
+    notes: med.controlled
+      ? [
+          `This is a controlled medication (DEA schedule ${med.deaSchedule ?? "II-V"}). Federal rules allow an unfilled electronic prescription for a schedule II-V medication to be transferred once between pharmacies at the patient's request, pharmacist to pharmacist. If staff say they cannot transfer it, accept that politely, do not push, and ask whether the prescriber needs to send a new prescription instead.`,
+        ]
+      : [],
+    opening: `Hi, this is an automated AI assistant calling on behalf of ${contact.patientFullName}. Their prescription for ${med.name} is with your pharmacy but couldn't be filled because of the shortage. We found a pharmacy that has it in stock. Could you transfer the prescription there?`,
+    steps: [
+      {
+        title: "Reach pharmacy staff",
+        detail:
+          "If you reach a phone menu, choose the option for pharmacy staff. Avoid automated refill lines. If a menu asks for a prescription number, say you do not have one and ask for pharmacy staff.",
+      },
+      { title: "Locate the prescription", detail: "Give the patient's full name and date of birth only when staff ask, so they can find the prescription." },
+      { title: "Ask for the transfer", detail: `Ask them to transfer the unfilled prescription to: ${destination}.` },
+      {
+        title: "Follow their process",
+        detail:
+          "If they say the receiving pharmacy must request the transfer, or that the prescriber must send a new prescription, accept that and ask exactly what is needed.",
+      },
+      { title: "Confirm and read back", detail: "Ask when it will be sent and for a reference or the staff member's first name. Repeat back what they agreed to, thank them, and end the call." },
+    ],
+    ifYes: [],
+    ifNo: [],
+    guardrails: [
+      {
+        id: "privacy",
+        text: `The patient consented to sharing their full name and date of birth (${contact.patientDob}) with this pharmacy only. Share them only when staff ask to locate the prescription.`,
+      },
+      { id: "medical", text: "Do not request any change to the medication, strength, or quantity. Only ask to move the existing prescription." },
+      { id: "accept", text: "If they decline or need something else first, accept it and record what is needed." },
+      ...COMMON_GUARDRAILS,
+    ],
+  };
+}
+
 export function bloodInquiryBrief(blood: BloodRequest, facility: Facility): BriefSpec {
   const need = bloodNeed(blood);
   return {
@@ -401,3 +475,5 @@ export const buildHoldTask = (med: Medication, facility: Facility, inquiry: Inqu
   renderTask(holdBrief(med, facility, inquiry, contact));
 export const buildPrescriberTask = (med: Medication, facility: Facility, hold: HoldResult | null, contact: PrescriberContact) =>
   renderTask(prescriberBrief(med, facility, hold, contact));
+export const buildTransferTask = (med: Medication, to: Facility, hold: HoldResult | null, contact: TransferContact) =>
+  renderTask(transferBrief(med, to, hold, contact));

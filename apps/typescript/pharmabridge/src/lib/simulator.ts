@@ -24,7 +24,9 @@ export type ScenarioId =
   | "blood_partial"
   | "blood_unavailable_referral"
   | "blood_voicemail"
-  | "blood_reserve_confirmed";
+  | "blood_reserve_confirmed"
+  | "transfer_sent"
+  | "transfer_controlled_once";
 
 interface SimSpec {
   v: 1;
@@ -467,6 +469,68 @@ const SCRIPTS: Record<ScenarioId, (s: SimSpec) => Script> = {
     confidence: 0.95,
     evidence: ["Staff agreed to the reservation and gave reference R-2207."],
   }),
+
+  // For transfer calls, `p` is the patient's current pharmacy and `a` the pharmacy that has stock.
+  transfer_sent: (s) => ({
+    ivrAt: 5,
+    lines: [
+      [0, "user", `Thank you for calling ${s.p}. For the pharmacy, press 1.`],
+      [5, "bot", "⌨ Pressed 1 · pharmacy"],
+      [8, "user", "Pharmacy, this is Kim."],
+      [11, "bot", `Hi Kim, I'm an automated AI assistant calling on behalf of a patient. Their prescription for ${s.m} is with your pharmacy but couldn't be filled because of the shortage. ${s.a} has it in stock. Could you transfer the prescription there?`],
+      [27, "user", "Sure, I can do that. What's the patient's name and date of birth?"],
+      [32, "bot", "Shared the patient's name and date of birth (consented, this pharmacy only)."],
+      [38, "user", "Okay, I see it. It hasn't been filled. What's their number?"],
+      [42, "bot", `Here is ${s.a}'s pharmacy phone number and store number.`],
+      [49, "user", "Got it. I'll call them now and transfer it over. It should be in their system within the hour."],
+      [57, "bot", "Thank you. Is there a reference I can give the family?"],
+      [61, "user", "Tell them transfer T-5530, and it was Kim."],
+      [65, "bot", `Perfect. To confirm: the prescription goes to ${s.a} within the hour, reference T-5530. Thank you, Kim!`],
+    ],
+    result: {
+      reached: "pharmacy_staff",
+      prescription_found: "yes",
+      transfer_status: "will_transfer",
+      expected_time: "Within the hour",
+      reference: "T-5530",
+      controlled_rule: "",
+      follow_up_needed: "",
+      staff_name: "Kim",
+      evidence_quote: "I'll call them now and transfer it over. It should be in their system within the hour.",
+    },
+    summary: `${s.p} will transfer the prescription to ${s.a} within the hour (ref T-5530).`,
+    taskCompleted: true,
+    confidence: 0.94,
+    evidence: ["Staff found the unfilled prescription.", "Staff agreed to transfer it within the hour."],
+  }),
+
+  transfer_controlled_once: (s) => ({
+    lines: [
+      [0, "user", `${s.p} pharmacy, Omar speaking.`],
+      [3, "bot", `Hi Omar, I'm an automated AI assistant calling on behalf of a patient. Their prescription for ${s.m} is with your pharmacy but couldn't be filled because of the shortage. ${s.a} has it in stock. Could you transfer the prescription there?`],
+      [19, "user", "Can I get the patient's name and date of birth?"],
+      [23, "bot", "Shared the patient's name and date of birth (consented, this pharmacy only)."],
+      [29, "user", "I see it. It's a schedule two e-prescription and it hasn't been filled, so we can transfer it once. It has to go pharmacist to pharmacist, so I'll call their pharmacist."],
+      [44, "bot", "That's very helpful. When will you call them?"],
+      [47, "user", "This afternoon, before three."],
+      [51, "bot", `Thank you, Omar. To confirm: a one-time transfer of the e-prescription to ${s.a}, pharmacist to pharmacist, this afternoon before three.`],
+    ],
+    result: {
+      reached: "pharmacy_staff",
+      prescription_found: "yes",
+      transfer_status: "will_transfer",
+      expected_time: "This afternoon, before 3 PM",
+      reference: "",
+      controlled_rule: "Unfilled schedule II e-prescription: one-time transfer, pharmacist to pharmacist",
+      follow_up_needed: `${s.a}'s pharmacist takes the transfer call from Omar.`,
+      staff_name: "Omar",
+      evidence_quote: "It hasn't been filled, so we can transfer it once. It has to go pharmacist to pharmacist.",
+    },
+    summary: `${s.p} will make a one-time, pharmacist-to-pharmacist transfer of the controlled e-prescription to ${s.a} this afternoon.`,
+    taskCompleted: true,
+    confidence: 0.92,
+    evidence: ["Staff confirmed the e-prescription is unfilled.", "Staff cited the one-time transfer rule for schedule II."],
+  }),
 };
 
 const INQUIRY_ORDER: ScenarioId[] = ["out_with_alternative", "in_stock_hold", "voicemail", "partial", "in_stock_no_hold", "no_answer"];
@@ -484,6 +548,7 @@ const BLOOD_ORDER: ScenarioId[] = [
 function pickScenario(kind: CallKind, seed: number, controlled: boolean): ScenarioId {
   if (kind === "hold") return "hold_confirmed";
   if (kind === "prescriber") return "prescriber_accepted";
+  if (kind === "transfer") return controlled ? "transfer_controlled_once" : "transfer_sent";
   if (kind === "blood_reserve") return "blood_reserve_confirmed";
   if (kind === "blood_inquiry") return BLOOD_ORDER[seed % BLOOD_ORDER.length];
   const order = controlled ? CONTROLLED_ORDER : INQUIRY_ORDER;

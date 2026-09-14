@@ -14,6 +14,8 @@ import {
   PRESCRIBER_RESULT_SCHEMA,
   prescriberBrief,
   renderTask,
+  TRANSFER_RESULT_SCHEMA,
+  transferBrief,
 } from "@/lib/calltasks";
 import type { BloodRequest, Facility, Medication } from "@/lib/types";
 
@@ -84,6 +86,7 @@ describe("result schemas", () => {
     ["inquiry", INQUIRY_RESULT_SCHEMA],
     ["hold", HOLD_RESULT_SCHEMA],
     ["prescriber", PRESCRIBER_RESULT_SCHEMA],
+    ["transfer", TRANSFER_RESULT_SCHEMA],
     ["blood inquiry", BLOOD_INQUIRY_RESULT_SCHEMA],
     ["blood reservation", BLOOD_RESERVE_RESULT_SCHEMA],
   ])("%s schema uses only CALL-E-supported features", (_name, schema) => {
@@ -128,6 +131,26 @@ describe("pharmacy briefs", () => {
   });
 });
 
+describe("transfer briefs", () => {
+  const transfer = { fromPharmacy: "Corner Drug on 5th", phone: "", patientFullName: "Maya Rivera", patientDob: "2021-04-12", consent: true };
+
+  it("asks the current pharmacy to move the prescription, sharing the consented date of birth only to find it", () => {
+    const task = renderTask(transferBrief(medication, pharmacy, null, transfer));
+    expect(task).toContain("Corner Drug on 5th");
+    expect(task).toContain("Riverside Community Pharmacy");
+    expect(task).toContain("(212) 555-0110");
+    expect(task.match(/2021-04-12/g)).toHaveLength(1);
+    expect(task).toMatch(/Share them only when staff ask to locate the prescription/);
+    expect(task).toMatch(/Do not request any change to the medication, strength, or quantity/);
+  });
+
+  it("cites the one-time electronic transfer rule for controlled medications and accepts a no", () => {
+    const task = renderTask(transferBrief({ ...medication, controlled: true, deaSchedule: "CII" }, pharmacy, null, transfer));
+    expect(task).toContain("transferred once between pharmacies");
+    expect(task).toContain("do not push");
+  });
+});
+
 describe("blood bank briefs", () => {
   it("availability brief asks only about the requested group and never names the patient", () => {
     const task = renderTask(bloodInquiryBrief(blood, bank));
@@ -151,6 +174,7 @@ describe("every brief", () => {
     inquiryBrief(medication, pharmacy),
     holdBrief(medication, pharmacy, null, contact),
     prescriberBrief(medication, pharmacy, null, prescriber),
+    transferBrief(medication, pharmacy, null, { fromPharmacy: "Corner Drug on 5th", phone: "", patientFullName: "Maya Rivera", patientDob: "2021-04-12", consent: true }),
     bloodInquiryBrief(blood, bank),
     bloodReserveBrief(blood, bank, null, contact),
   ];

@@ -1,9 +1,10 @@
 "use client";
 // Browser-side mission orchestrator: parallel dispatch with a concurrency cap, polling, early stop
-// once enough facilities confirm, and manual retries. The server stays stateless.
+// once enough facilities confirm, and manual retries. The server stays stateless. A call whose outcome
+// CALL-E never confirmed is kept as "unknown" and halts queued live dispatch.
 import { useCallback, useEffect, useRef, useState } from "react";
-import { ACTIVE_PHASES, FINAL_PHASES, applyCall, newSlot, type Slot } from "@/lib/mission";
-import type { BloodRequest, Facility, Medication, Routing } from "@/lib/types";
+import { ACTIVE_PHASES, FINAL_PHASES, applyCall, markUnknown, newSlot, submissionOutcome, type CallPlan, type Slot } from "@/lib/mission";
+import type { BloodRequest, CallView, Facility, Medication, Routing } from "@/lib/types";
 import { newMissionId } from "@/lib/ui";
 
 export interface MissionSettings {
@@ -31,6 +32,16 @@ export interface Mission {
   stopReason: string | null;
 }
 
+interface CreateResponse {
+  call?: CallView;
+  accessToken?: unknown;
+  recordKey?: unknown;
+  plan?: CallPlan;
+  mode?: "simulation" | "live";
+  dialTarget?: string;
+  error?: { code?: string; message?: string };
+}
+
 export const DEFAULT_SETTINGS: MissionSettings = {
   concurrency: 3,
   stopAfter: 1,
@@ -40,10 +51,18 @@ export const DEFAULT_SETTINGS: MissionSettings = {
   directConsent: false,
 };
 
+const LOST = "Lost contact with this call. It may still be running; check Call records or the CALL-E dashboard before calling again.";
+
 const plural = (n: number, one: string, many: string) => `${n} ${n === 1 ? one : many}`;
 
 function emptyMission(): Mission {
   return { id: newMissionId(), status: "idle", startedAt: null, finishedAt: null, settings: DEFAULT_SETTINGS, need: null, slots: [], stopReason: null };
+}
+
+function halt(mission: Mission, reason: string | null) {
+  if (!reason) return;
+  mission.status = "draining";
+  mission.stopReason = reason;
 }
 
 export function useMission() {
@@ -60,8 +79,10 @@ export function useMission() {
       slot.phase = "launching";
       slot.launchedAt = Date.now();
       slot.error = null;
+      let res: Response | null = null;
+      let json: CreateResponse | null = null;
       try {
-        const res = await fetch("/api/calls", {
+        res = await fetch("/api/calls", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({
@@ -78,23 +99,33 @@ export function useMission() {
             ...(need.kind === "pharmacy" ? { medication: need.medication } : { blood: need.blood }),
           }),
         });
-        const json = await res.json();
-        if (ref.current.id !== missionId) return;
-        if (!res.ok) throw new Error(json?.error?.message ?? `Request failed (${res.status})`);
+        json = (await res.json().catch(() => null)) as CreateResponse | null;
+      } catch {
+        res = null;
+      }
+      if (ref.current.id !== missionId) return;
+
+      const accessToken = typeof json?.accessToken === "string" ? json.accessToken : null;
+      if (res?.ok && json?.call?.id && accessToken) {
         slot.callId = json.call.id;
-        slot.accessToken = typeof json.accessToken === "string" ? json.accessToken : null;
-        if (!slot.accessToken) throw new Error("The server did not issue a scoped token for this call.");
+        slot.accessToken = accessToken;
         slot.recordKey = typeof json.recordKey === "string" ? json.recordKey : null;
-        slot.plan = json.plan;
-        slot.mode = json.mode;
-        slot.dialTarget = json.dialTarget;
+        slot.plan = json.plan ?? null;
+        slot.mode = json.mode ?? null;
+        slot.dialTarget = json.dialTarget ?? null;
         slot.lastPolledAt = Date.now();
         applyCall(slot, json.call, []);
-      } catch (error) {
-        if (ref.current.id !== missionId) return;
-        slot.phase = "error";
-        slot.error = error instanceof Error ? error.message : String(error);
-        slot.finishedAt = Date.now();
+      } else {
+        const message = json?.error?.message ?? (res ? `Request failed (${res.status})` : "No response from the PharmaBridge server.");
+        if (typeof json?.recordKey === "string") slot.recordKey = json.recordKey;
+        // A success without a usable call, or anything but a definite refusal, may still have dialed.
+        if (res?.ok || submissionOutcome(res ? res.status : null, json?.error?.code) === "unknown") {
+          halt(mission, markUnknown(mission.slots, slot, message, mission.settings.routing !== "simulation"));
+        } else {
+          slot.phase = "error";
+          slot.error = message;
+          slot.finishedAt = Date.now();
+        }
       }
       bump();
     },
@@ -120,12 +151,10 @@ export function useMission() {
         slot.pollErrors = 0;
         applyCall(slot, call, events);
       } catch {
+        const mission = ref.current;
+        if (mission.id !== missionId || slot.callId !== callId) return;
         slot.pollErrors++;
-        if (slot.pollErrors >= 8) {
-          slot.phase = "error";
-          slot.error = "Lost contact with this call. Check the CALL-E dashboard for its final state.";
-          slot.finishedAt = Date.now();
-        }
+        if (slot.pollErrors >= 8) halt(mission, markUnknown(mission.slots, slot, LOST, mission.settings.routing !== "simulation"));
       }
       bump();
     },
@@ -181,9 +210,10 @@ export function useMission() {
   }, [launch, poll, bump]);
 
   const start = useCallback(
-    (need: Need, facilities: Facility[], settings: MissionSettings) => {
+    (need: Need, facilities: Facility[], settings: MissionSettings): string => {
+      const id = newMissionId();
       ref.current = {
-        id: newMissionId(),
+        id,
         status: "running",
         startedAt: Date.now(),
         finishedAt: null,
@@ -193,6 +223,7 @@ export function useMission() {
         stopReason: null,
       };
       bump();
+      return id;
     },
     [bump],
   );
@@ -217,8 +248,11 @@ export function useMission() {
     (key: string) => {
       const m = ref.current;
       const slot = m.slots.find((s) => s.key === key);
-      if (!slot || slot.attempt >= 5) return;
-      Object.assign(slot, { ...newSlot(slot.facility, slot.order), attempt: slot.attempt + 1, manual: true });
+      const unknown = slot?.phase === "unknown";
+      if (!slot || (!unknown && slot.attempt >= 5)) return;
+      // Resubmitting an unknown outcome keeps its attempt number, and so its idempotency key: CALL-E
+      // returns the original call instead of dialing a second time.
+      Object.assign(slot, { ...newSlot(slot.facility, slot.order), attempt: unknown ? slot.attempt : slot.attempt + 1, manual: true });
       if (m.status === "complete") {
         m.status = "draining";
         m.finishedAt = null;

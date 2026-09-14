@@ -128,7 +128,28 @@ export interface PrescriberResult {
   evidence_quote: string;
 }
 
-export type CallKind = "inquiry" | "hold" | "prescriber" | "blood_inquiry" | "blood_reserve";
+export type TransferStatus =
+  | "will_transfer"
+  | "transferred"
+  | "receiving_pharmacy_must_request"
+  | "needs_prescriber"
+  | "declined"
+  | "unknown";
+
+/** Structured result for the call that asks the patient's current pharmacy to transfer the prescription. */
+export interface TransferResult {
+  reached: ReachedParty;
+  prescription_found: YesNoUnknown;
+  transfer_status: TransferStatus;
+  expected_time: string;
+  reference: string;
+  controlled_rule: string;
+  follow_up_needed: string;
+  staff_name: string;
+  evidence_quote: string;
+}
+
+export type CallKind = "inquiry" | "hold" | "prescriber" | "transfer" | "blood_inquiry" | "blood_reserve";
 
 /** simulation: no call leaves the server. test_line: dial an allowlisted stand-in. direct: dial the facility's verified listed number. */
 export type Routing = "simulation" | "test_line" | "direct";
@@ -190,6 +211,15 @@ export interface HoldContact {
 export interface PrescriberContact {
   practice: string;
   prescriberName: string;
+  phone: string;
+  patientFullName: string;
+  patientDob: string;
+  consent: boolean;
+}
+
+/** The patient's current pharmacy, asked to transfer an unfilled prescription to one that has stock. */
+export interface TransferContact {
+  fromPharmacy: string;
   phone: string;
   patientFullName: string;
   patientDob: string;

@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { validCallAccessToken } from "@/lib/call-access";
 import { describeError, getLiveCall } from "@/lib/calle";
 import { recordSnapshot } from "@/lib/ledger";
+import { redactDeep } from "@/lib/phone";
 import { getSimulatedCall, isSimulatedId } from "@/lib/simulator";
 import { webhookSnapshot } from "@/lib/webhook-store";
 
@@ -21,16 +22,16 @@ export async function GET(request: Request, { params }: { params: Promise<{ id: 
     const call = getSimulatedCall(id);
     if (!call) return NextResponse.json({ error: { code: "not_found", message: "Unknown simulated call." } }, { status: 404 });
     void recordSnapshot(id, { call });
-    return NextResponse.json({ call, via: "simulation" });
+    return NextResponse.json({ call: redactDeep(call), via: "simulation" });
   }
 
   const pushed = webhookSnapshot(id);
-  if (pushed) return NextResponse.json({ call: pushed, via: "webhook" });
+  if (pushed) return NextResponse.json({ call: redactDeep(pushed), via: "webhook" });
 
   try {
     const call = await getLiveCall(id);
     void recordSnapshot(id, { call });
-    return NextResponse.json({ call, via: "poll" });
+    return NextResponse.json({ call: redactDeep(call), via: "poll" });
   } catch (error) {
     const detail = describeError(error);
     return NextResponse.json({ error: detail }, { status: detail.status });

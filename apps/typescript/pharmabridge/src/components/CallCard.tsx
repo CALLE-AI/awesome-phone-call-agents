@@ -14,7 +14,9 @@ export function CallCard({ slot, onOpen, onRetry }: { slot: Slot; onOpen: () => 
   const turns = slot.call?.attempts.flatMap((a) => a.transcriptTurns) ?? [];
   const lastTurn = turns.at(-1);
   const elapsed = slot.launchedAt ? (slot.finishedAt ?? Date.now()) - slot.launchedAt : 0;
-  const retryable = (slot.phase === "error" || slot.phase === "failed" || slot.assessment?.tier === "unreached") && slot.attempt < 5;
+  const unknown = slot.phase === "unknown";
+  // An unknown outcome is resubmitted with the same idempotency key, never retried under a new one.
+  const retryable = unknown || ((slot.phase === "error" || slot.phase === "failed" || slot.assessment?.tier === "unreached") && slot.attempt < 5);
   const finding = slot.finding;
   const staffLabel = slot.facility.kind === "blood_bank" ? "Blood bank" : "Pharmacy";
 
@@ -24,7 +26,7 @@ export function CallCard({ slot, onOpen, onRetry }: { slot: Slot; onOpen: () => 
       initial={{ opacity: 0, y: 10 }}
       animate={{ opacity: slot.phase === "skipped" ? 0.55 : 1, y: 0 }}
       transition={{ duration: 0.35 }}
-      className={cx("card relative overflow-hidden rounded-2xl", meta.pulse && "ring-2 ring-violet-200")}
+      className={cx("card relative overflow-hidden rounded-2xl", meta.pulse && "ring-2 ring-violet-200", unknown && "ring-2 ring-amber-200")}
     >
       <div className="h-1 w-full" style={{ background: meta.pulse ? `linear-gradient(90deg, ${accent}, #ec4899)` : accent, opacity: slot.phase === "queued" ? 0.3 : 1 }} />
       {meta.pulse && <div className="shimmer pointer-events-none absolute inset-0" />}
@@ -95,13 +97,16 @@ export function CallCard({ slot, onOpen, onRetry }: { slot: Slot; onOpen: () => 
               <p className="line-clamp-2 text-[12.5px] leading-snug text-slate-600">{slot.call?.summary ?? slot.call?.failureMessage ?? "No summary returned."}</p>
               <ConfidenceMeter score={slot.call?.completionConfidence?.score} label={slot.call?.completionConfidence?.label} />
             </div>
-          ) : slot.phase === "error" ? (
-            <p className="flex items-start gap-2 text-[12.5px] text-rose-600">
+          ) : slot.phase === "error" || unknown ? (
+            <p className={cx("flex items-start gap-2 text-[12.5px]", unknown ? "text-amber-700" : "text-rose-600")}>
               <AlertTriangle className="mt-0.5 h-3.5 w-3.5 shrink-0" />
-              {slot.error}
+              <span>
+                {unknown && <strong className="font-semibold">Outcome unknown. </strong>}
+                {slot.error}
+              </span>
             </p>
           ) : slot.phase === "skipped" ? (
-            <p className="text-[12.5px] text-slate-400">Cancelled before dialing: the target was already reached.</p>
+            <p className="text-[12.5px] text-slate-400">{slot.error ?? "Cancelled before dialing: the target was already reached."}</p>
           ) : (
             <div className="flex items-start gap-3">
               <Waveform active={meta.pulse} color={meta.color} />
@@ -125,7 +130,7 @@ export function CallCard({ slot, onOpen, onRetry }: { slot: Slot; onOpen: () => 
         <div className="relative flex items-center justify-between border-t border-slate-100 px-4 py-2">
           {retryable ? (
             <button onClick={onRetry} className="inline-flex items-center gap-1.5 text-[11.5px] font-semibold text-violet-600 hover:text-violet-800">
-              <RotateCcw className="h-3.5 w-3.5" /> Retry
+              <RotateCcw className="h-3.5 w-3.5" /> {unknown ? "Resubmit (same idempotency key)" : "Retry"}
             </button>
           ) : (
             <span />

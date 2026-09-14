@@ -1,6 +1,8 @@
-// Server-side wrapper around the official @call-e/calle SDK. The API key never leaves the server.
+// Server-side wrapper around the official @call-e/calle SDK. The API key never leaves the server, goes
+// only to an approved CALL-E origin, and is never re-sent on a redirect.
 import { CalleAPIError, CalleClient } from "@call-e/calle";
-import { regionFromE164 } from "./phone";
+import { redactPhones, regionFromE164 } from "./phone";
+import { calleBaseUrl, noRedirectFetch } from "./transport";
 import type { CallEventView, CallView, TranscriptTurn } from "./types";
 
 type SdkCall = Awaited<ReturnType<CalleClient["calls"]["get"]>>;
@@ -12,7 +14,7 @@ const holder = globalThis as unknown as { __pharmabridgeCalle?: CalleClient };
 export function calle(): CalleClient {
   const apiKey = process.env.CALLE_API_KEY;
   if (!apiKey) throw new Error("CALLE_API_KEY is not configured.");
-  holder.__pharmabridgeCalle ??= new CalleClient({ apiKey, baseUrl: process.env.CALLE_BASE_URL || undefined });
+  holder.__pharmabridgeCalle ??= new CalleClient({ apiKey, baseUrl: calleBaseUrl(), fetch: noRedirectFetch });
   return holder.__pharmabridgeCalle;
 }
 
@@ -135,10 +137,18 @@ export async function listLiveEvents(callId: string): Promise<CallEventView[]> {
   }));
 }
 
+/**
+ * True only when CALL-E definitively refused a create request, so no call exists. Timeouts, network
+ * errors, redirects, 5xx, and 409 (an identical request still in flight) may have created one.
+ */
+export function submissionRejected(error: unknown): boolean {
+  return error instanceof CalleAPIError && error.status >= 400 && error.status < 500 && error.status !== 408 && error.status !== 409;
+}
+
 export function describeError(error: unknown): { status: number; code: string; message: string } {
   if (error instanceof CalleAPIError) {
-    return { status: error.status >= 400 ? error.status : 502, code: error.code, message: error.message };
+    return { status: error.status >= 400 ? error.status : 502, code: error.code, message: redactPhones(error.message) };
   }
-  if (error instanceof Error) return { status: 502, code: "upstream_error", message: error.message };
+  if (error instanceof Error) return { status: 502, code: "upstream_error", message: redactPhones(error.message) };
   return { status: 500, code: "internal_error", message: "Unexpected error." };
 }

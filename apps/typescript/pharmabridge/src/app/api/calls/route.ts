@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 import { z } from "zod";
 import { issueCallAccessToken } from "@/lib/call-access";
-import { createLiveCall, describeError } from "@/lib/calle";
+import { createLiveCall, describeError, submissionRejected } from "@/lib/calle";
 import {
   bloodInquiryBrief,
   bloodNeed,
@@ -11,11 +11,13 @@ import {
   prescriberBrief,
   renderTask,
   RESULT_SCHEMAS,
+  transferBrief,
 } from "@/lib/calltasks";
 import { dailyCap, liveEnabled, operatorCodeValid, releaseLiveCall, reserveLiveCall, resolveDialTarget, webhookUrl } from "@/lib/config";
 import { verifyFacility } from "@/lib/discovery-signing";
-import { recordCreated } from "@/lib/ledger";
-import { toE164 } from "@/lib/phone";
+import { recordCreated, recordUnknownSubmission } from "@/lib/ledger";
+import { redactDeep, toE164 } from "@/lib/phone";
+import { bloodItem, medicationItem } from "@/lib/pulse-item";
 import { parseBloodInquiryResult, parseHoldResult, parseInquiryResult } from "@/lib/result-validation";
 import { createSimulatedCall } from "@/lib/simulator";
 import type { BriefSpec } from "@/lib/types";
@@ -62,8 +64,15 @@ const bloodSchema = z.object({
   urgency,
 });
 
+// Name and date of birth are shared only with the office or pharmacy that holds the prescription.
+const consentedPatient = {
+  patientFullName: z.string().trim().min(2).max(80),
+  patientDob: z.string().trim().min(4).max(20),
+  consent: z.literal(true),
+};
+
 const bodySchema = z.object({
-  kind: z.enum(["inquiry", "hold", "prescriber", "blood_inquiry", "blood_reserve"]),
+  kind: z.enum(["inquiry", "hold", "prescriber", "transfer", "blood_inquiry", "blood_reserve"]),
   missionId: z.string().regex(/^[a-z0-9-]{6,40}$/i),
   attempt: z.number().int().min(1).max(5).default(1),
   routing: z.enum(["simulation", "test_line", "direct"]),
@@ -90,9 +99,14 @@ const bodySchema = z.object({
       practice: z.string().trim().min(2).max(120),
       prescriberName: z.string().trim().min(2).max(80),
       phone: z.string().max(30),
-      patientFullName: z.string().trim().min(2).max(80),
-      patientDob: z.string().trim().min(4).max(20),
-      consent: z.literal(true),
+      ...consentedPatient,
+    })
+    .optional(),
+  transfer: z
+    .object({
+      fromPharmacy: z.string().trim().min(2).max(120),
+      phone: z.string().max(30),
+      ...consentedPatient,
     })
     .optional(),
 });
@@ -127,9 +141,13 @@ function plan(body: Body): Planned {
     }
     return { brief: holdBrief(med, facility, inquiry, body.holdContact), needSummary, staffName: inquiry.staff_name };
   }
-  if (!body.prescriber) return { error: "The prescriber step needs office details and patient consent." };
   const hold = parseHoldResult(body.hold);
   if (body.hold != null && !hold) return { error: "The hold result is not valid." };
+  if (kind === "transfer") {
+    if (!body.transfer) return { error: "The transfer step needs the current pharmacy and the patient's consent." };
+    return { brief: transferBrief(med, facility, hold, body.transfer), needSummary, staffName: "" };
+  }
+  if (!body.prescriber) return { error: "The prescriber step needs office details and patient consent." };
   return { brief: prescriberBrief(med, facility, hold, body.prescriber), needSummary, staffName: "" };
 }
 
@@ -146,15 +164,21 @@ export async function POST(request: Request) {
   const { brief, needSummary } = planned;
   const task = renderTask(brief);
   const resultSchema = RESULT_SCHEMAS[kind];
-  const callPlan = { task, resultSchema, brief };
-  if (body.dryRun) return NextResponse.json({ plan: callPlan, mode: "dry_run" });
+  // The agent gets the full task; everything shown or stored has phone numbers masked.
+  const shownPlan = redactDeep({ task, resultSchema, brief });
+  if (body.dryRun) return NextResponse.json({ plan: shownPlan, mode: "dry_run" });
 
+  // Prescriber and transfer calls dial an office or pharmacy the operator names, not the discovered facility.
+  const calledName = kind === "prescriber" ? body.prescriber?.practice : kind === "transfer" ? body.transfer?.fromPharmacy : undefined;
   const ledgerBase = {
     missionId: body.missionId,
     kind,
     needKind: facility.kind,
     needSummary,
-    facility: { id: facility.id, name: facility.name, address: facility.address, phoneMasked: facility.phoneMasked },
+    facility: calledName
+      ? { id: `${facility.id}:${kind}`, name: calledName, address: "", phoneMasked: null }
+      : { id: facility.id, name: facility.name, address: facility.address, phoneMasked: facility.phoneMasked, lat: facility.lat, lon: facility.lon, source: facility.source },
+    item: body.blood ? bloodItem(body.blood) : body.medication ? medicationItem(body.medication) : undefined,
     routing: body.routing,
     brief,
     task,
@@ -166,16 +190,16 @@ export async function POST(request: Request) {
       kind,
       seed: body.seed,
       controlled: body.medication?.controlled ?? false,
-      name: kind === "prescriber" ? (body.prescriber?.practice ?? "the prescriber's office") : facility.name,
+      name: calledName ?? facility.name,
       medication: body.blood ? bloodNeed(body.blood) : (body.medication?.name ?? ""),
       quantity: body.blood ? `${body.blood.units} unit${body.blood.units === 1 ? "" : "s"}` : (body.medication?.quantity ?? ""),
-      alternative: body.blood ? body.blood.hospital : (body.medication?.alternatives[0] ?? "a different strength or a generic"),
+      alternative: body.blood ? body.blood.hospital : kind === "transfer" ? facility.name : (body.medication?.alternatives[0] ?? "a different strength or a generic"),
       holdName,
       staffName: planned.staffName || (body.blood ? "Ravi" : "Dana"),
     });
     const recordKey = await recordCreated({ ...ledgerBase, call, mode: "simulation", dialTarget: "no call placed" });
     return NextResponse.json(
-      { call, plan: callPlan, mode: "simulation", dialTarget: "no call placed", accessToken: issueCallAccessToken(call.id), recordKey },
+      { call: redactDeep(call), plan: shownPlan, mode: "simulation", dialTarget: "no call placed", accessToken: issueCallAccessToken(call.id), recordKey },
       { status: 201 },
     );
   }
@@ -190,19 +214,19 @@ export async function POST(request: Request) {
   if (!operatorCodeValid(body.operatorCode)) {
     return NextResponse.json({ error: { code: "operator_code", message: "A valid operator code is required for live calls." } }, { status: 401 });
   }
-  if (facility.source === "synthetic" && body.routing === "direct" && kind !== "prescriber") {
+  if (facility.source === "synthetic" && body.routing === "direct" && !calledName) {
     return NextResponse.json(
       { error: { code: "dial_refused", message: "Synthetic facilities have fictional numbers and are never dialed. Use test lines instead." } },
       { status: 403 },
     );
   }
 
-  const prescriberPhone = kind === "prescriber" ? toE164(body.prescriber?.phone) : null;
+  const typedPhone = kind === "prescriber" ? toE164(body.prescriber?.phone) : kind === "transfer" ? toE164(body.transfer?.phone) : null;
   const target = resolveDialTarget({
     routing: body.routing,
-    listedPhone: kind === "prescriber" ? prescriberPhone : facility.phone,
-    // The operator types their own prescriber's number; facility numbers must carry a discovery signature.
-    listedVerified: kind === "prescriber" ? Boolean(prescriberPhone) : verifyFacility(facility, facility.signature),
+    listedPhone: calledName ? typedPhone : facility.phone,
+    // The operator types their own prescriber's or pharmacy's number; facility numbers must carry a discovery signature.
+    listedVerified: calledName ? Boolean(typedPhone) : verifyFacility(facility, facility.signature),
     directConsent: body.directConsent,
     testLineIndex: body.testLineIndex,
   });
@@ -214,6 +238,7 @@ export async function POST(request: Request) {
     );
   }
 
+  const idempotencyKey = `pharmabridge:${body.missionId}:${kind}:${facility.id}:a${body.attempt}`;
   try {
     const call = await createLiveCall({
       task,
@@ -226,20 +251,35 @@ export async function POST(request: Request) {
         kind,
         facility_kind: facility.kind,
         facility_id: facility.id,
-        facility_name: facility.name,
+        facility_name: calledName ?? facility.name,
         routing: body.routing,
       },
-      idempotencyKey: `pharmabridge:${body.missionId}:${kind}:${facility.id}:a${body.attempt}`,
+      idempotencyKey,
       webhookUrl: webhookUrl(),
     });
     const recordKey = await recordCreated({ ...ledgerBase, call, mode: "live", dialTarget: target.masked });
     return NextResponse.json(
-      { call, plan: callPlan, mode: "live", dialTarget: target.masked, accessToken: issueCallAccessToken(call.id), recordKey },
+      { call: redactDeep(call), plan: shownPlan, mode: "live", dialTarget: target.masked, accessToken: issueCallAccessToken(call.id), recordKey },
       { status: 201 },
     );
   } catch (error) {
-    releaseLiveCall();
     const detail = describeError(error);
-    return NextResponse.json({ error: detail }, { status: detail.status });
+    if (submissionRejected(error)) {
+      releaseLiveCall();
+      return NextResponse.json({ error: detail }, { status: detail.status });
+    }
+    // CALL-E didn't confirm either way, so the call may exist and may dial. Keep the daily-cap
+    // reservation, record the unknown outcome, and never report it as "not placed".
+    const recordKey = await recordUnknownSubmission({ ...ledgerBase, mode: "live", dialTarget: target.masked, idempotencyKey, error: detail.message });
+    return NextResponse.json(
+      {
+        error: {
+          code: "submission_unknown",
+          message: `CALL-E did not confirm this call (${detail.message}). It may still dial. Check Call records or the CALL-E dashboard; resubmitting reuses the same idempotency key.`,
+        },
+        recordKey,
+      },
+      { status: 502 },
+    );
   }
 }

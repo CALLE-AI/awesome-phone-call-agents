@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { validCallAccessToken } from "@/lib/call-access";
 import { describeError, listLiveEvents } from "@/lib/calle";
 import { recordSnapshot } from "@/lib/ledger";
+import { redactDeep } from "@/lib/phone";
 import { getSimulatedEvents, isSimulatedId } from "@/lib/simulator";
 
 export const dynamic = "force-dynamic";
@@ -20,13 +21,13 @@ export async function GET(request: Request, { params }: { params: Promise<{ id: 
     const events = getSimulatedEvents(id);
     if (!events) return NextResponse.json({ error: { code: "not_found", message: "Unknown simulated call." } }, { status: 404 });
     void recordSnapshot(id, { events });
-    return NextResponse.json({ events });
+    return NextResponse.json({ events: redactDeep(events) });
   }
 
   try {
     const events = await listLiveEvents(id);
     void recordSnapshot(id, { events });
-    return NextResponse.json({ events });
+    return NextResponse.json({ events: redactDeep(events) });
   } catch (error) {
     const detail = describeError(error);
     return NextResponse.json({ error: detail }, { status: detail.status });

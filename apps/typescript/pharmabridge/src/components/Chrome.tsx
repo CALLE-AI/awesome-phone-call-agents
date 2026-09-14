@@ -1,5 +1,5 @@
 "use client";
-import { Archive, Check, FlaskConical, Radio } from "lucide-react";
+import { Activity, Archive, Check, FlaskConical, Radio } from "lucide-react";
 import Link from "next/link";
 import type { AppConfig } from "@/lib/types";
 import { cx } from "@/lib/ui";
@@ -83,6 +83,12 @@ export function TopBar({ config, step, maxStep, onStep }: { config: AppConfig | 
         ) : null}
 
         <div className="flex items-center gap-2">
+          <Link
+            href="/pulse"
+            className="hidden items-center gap-1.5 rounded-xl px-3 py-2 text-xs font-semibold text-slate-600 transition hover:bg-slate-100 hover:text-slate-900 sm:inline-flex"
+          >
+            <Activity className="h-4 w-4 text-emerald-500" /> Shortage Pulse
+          </Link>
           {config?.recordsEnabled && (
             <Link
               href="/records"

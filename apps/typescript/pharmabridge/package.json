@@ -10,7 +10,7 @@
     "start": "next start",
     "typecheck": "tsc --noEmit",
     "test": "vitest run",
-    "smoke:live": "node --env-file=.env.local --import tsx scripts/smoke-live-call.ts"
+    "smoke:live": "node --env-file=.env.local --import tsx scripts/smoke-live-call.mts"
   },
   "dependencies": {
     "@call-e/calle": "0.7.0",

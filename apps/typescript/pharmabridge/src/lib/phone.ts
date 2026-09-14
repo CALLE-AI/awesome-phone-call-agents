@@ -86,3 +86,24 @@ export function maskPhone(e164: string | null | undefined): string {
   const code = callingCode(e164) ?? e164.slice(1, 3);
   return `+${code} ••• ••• ••${e164.slice(-2)}`;
 }
+
+// Phone-like text: +digits with separators, (NNN) NNN-NNNN style, or a bare run of nine or more digits.
+const PHONE_LIKE = /\+\s?\d[\d\s().-]{6,}\d|\(?\b\d{3}\)?[\s.-]\d{3}[\s.-]\d{4}\b|(?<![\w/:.-])\d{9,}(?!\w)/g;
+
+/** Masks phone numbers inside free text (transcripts, summaries, errors), keeping the last two digits. */
+export function redactPhones(text: string): string {
+  return text.replace(PHONE_LIKE, (match) => {
+    const digits = match.replace(/\D/g, "");
+    return digits.length >= 7 ? `••• ••• ••${digits.slice(-2)}` : match;
+  });
+}
+
+/** Applies redactPhones to every string inside a JSON-like value. */
+export function redactDeep<T>(value: T): T {
+  if (typeof value === "string") return redactPhones(value) as T;
+  if (Array.isArray(value)) return value.map((item) => redactDeep(item)) as T;
+  if (value && typeof value === "object") {
+    return Object.fromEntries(Object.entries(value as Record<string, unknown>).map(([key, item]) => [key, redactDeep(item)])) as T;
+  }
+  return value;
+}

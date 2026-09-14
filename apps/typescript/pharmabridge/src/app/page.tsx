@@ -11,6 +11,7 @@ import { NeedStep, type LocationQuery } from "@/components/NeedStep";
 import { ResultsStep } from "@/components/ResultsStep";
 import { DEFAULT_SETTINGS, useMission, type MissionSettings, type Need } from "@/hooks/useMission";
 import type { CallPlan } from "@/lib/mission";
+import { bloodItem, medicationItem, SKIP_STATUSES, type PulseResponse } from "@/lib/pulse-item";
 import { BLOOD_COMPONENTS, type AppConfig } from "@/lib/types";
 import { formatKm } from "@/lib/ui";
 
@@ -27,6 +28,13 @@ function StepHeader({ eyebrow, title, body }: { eyebrow: string; title: string; 
 const needTitle = (need: Need | null) =>
   !need ? "" : need.kind === "pharmacy" ? need.medication.name : `${need.blood.units} × ${need.blood.group} ${BLOOD_COMPONENTS[need.blood.component]}`;
 
+const itemFor = (need: Need) => (need.kind === "pharmacy" ? medicationItem(need.medication) : bloodItem(need.blood));
+
+/** Facilities whose fresh Pulse answer makes a repeat call pointless for now. */
+function skipIds(pulse: PulseResponse | null): Set<string> {
+  return new Set((pulse?.sightings ?? []).filter((s) => s.facilityId && SKIP_STATUSES.includes(s.status)).map((s) => s.facilityId as string));
+}
+
 export default function Home() {
   const [config, setConfig] = useState<AppConfig | null>(null);
   const [step, setStep] = useState(1);
@@ -34,6 +42,8 @@ export default function Home() {
   const [need, setNeed] = useState<Need | null>(null);
   const [location, setLocation] = useState<LocationQuery | null>(null);
   const [area, setArea] = useState<AreaResult | null>(null);
+  const [pulse, setPulse] = useState<PulseResponse | null>(null);
+  const [pulseAvoided, setPulseAvoided] = useState(0);
   const [scanning, setScanning] = useState(false);
   const [scanError, setScanError] = useState<string | null>(null);
   const [selected, setSelected] = useState<string[]>([]);
@@ -73,10 +83,23 @@ export default function Home() {
       const json = await res.json();
       if (!res.ok) throw new Error(json.error ?? "Could not load facilities.");
       if (!json.facilities?.length) throw new Error(`No ${nextNeed.kind === "pharmacy" ? "pharmacies" : "blood banks"} with a listed phone in that radius. Try a larger radius.`);
+      const nextArea = json as AreaResult;
+      const pulseParams = new URLSearchParams({
+        kind: nextNeed.kind,
+        item: itemFor(nextNeed).key,
+        lat: String(nextArea.center.lat),
+        lon: String(nextArea.center.lon),
+        radiusKm: String(loc.radiusKm),
+      });
+      const nextPulse: PulseResponse | null = await fetch(`/api/pulse?${pulseParams}`, { cache: "no-store" })
+        .then((r) => (r.ok ? r.json() : null))
+        .catch(() => null);
+      const skip = skipIds(nextPulse);
       setNeed(nextNeed);
       setLocation(loc);
-      setArea(json);
-      setSelected((json as AreaResult).facilities.slice(0, 6).map((f) => f.id));
+      setArea(nextArea);
+      setPulse(nextPulse);
+      setSelected(nextArea.facilities.filter((f) => !skip.has(f.id)).slice(0, 6).map((f) => f.id));
       loadConfig();
       go(2);
     } catch (error) {
@@ -113,13 +136,25 @@ export default function Home() {
 
   function dispatch() {
     if (!area || !need) return;
-    start(need, area.facilities.filter((f) => selected.includes(f.id)), settings);
+    // Places the Pulse recently heard had it go first; the rest keep distance order.
+    const heard = new Map((pulse?.sightings ?? []).filter((s) => s.facilityId).map((s) => [s.facilityId as string, s.status]));
+    const rank = (id: string) => (heard.get(id) === "available" ? 0 : heard.get(id) === "partial" ? 1 : 2);
+    const chosen = area.facilities.filter((f) => selected.includes(f.id)).sort((a, b) => rank(a.id) - rank(b.id) || a.distanceKm - b.distanceKm);
+    const missionId = start(need, chosen, settings);
+    const skip = skipIds(pulse);
+    const avoided = area.facilities.filter((f) => skip.has(f.id) && !selected.includes(f.id)).length;
+    setPulseAvoided(avoided);
+    if (avoided) {
+      void fetch("/api/pulse", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ missionId, avoided }) }).catch(() => undefined);
+    }
     go(3);
   }
 
   function newSearch() {
     reset();
     setArea(null);
+    setPulse(null);
+    setPulseAvoided(0);
     setMaxStep(1);
     go(1);
   }
@@ -157,7 +192,7 @@ export default function Home() {
         <StepHeader
           eyebrow="Step 2 · Discover"
           title={`Choose which ${blood ? "blood banks" : "pharmacies"} to call`}
-          body="Real listings with phone numbers, on a live map. Tap a pin or a row to include it. Nothing has been dialed yet."
+          body="Real listings with phone numbers on a live map, marked with anything the Shortage Pulse heard recently. Places that just said no are left out to save calls. Nothing has been dialed yet."
         />
       )}
       {step === 3 && (
@@ -183,6 +218,7 @@ export default function Home() {
             need={need}
             radiusKm={location?.radiusKm ?? 3}
             config={config}
+            pulse={pulse}
             selected={selected}
             onSelected={setSelected}
             settings={settings}
@@ -196,7 +232,16 @@ export default function Home() {
           <DispatchBoard mission={mission} center={area.center} radiusKm={location?.radiusKm ?? 3} onStop={stop} onRetry={retry} onOpen={setDrawerKey} onResults={() => go(4)} />
         )}
         {step === 4 && mission.need && area && (
-          <ResultsStep mission={mission} center={area.center} config={config} onOpenSlot={setDrawerKey} onBoard={() => go(3)} onExpand={expandRadius} onNewSearch={newSearch} />
+          <ResultsStep
+            mission={mission}
+            center={area.center}
+            config={config}
+            pulseAvoided={pulseAvoided}
+            onOpenSlot={setDrawerKey}
+            onBoard={() => go(3)}
+            onExpand={expandRadius}
+            onNewSearch={newSearch}
+          />
         )}
       </motion.div>
 

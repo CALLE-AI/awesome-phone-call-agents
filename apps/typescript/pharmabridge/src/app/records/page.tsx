@@ -1,6 +1,6 @@
 "use client";
-import { Archive, Bot, Droplet, FileJson, FlaskConical, Pill, Radio, Search } from "lucide-react";
-import { useEffect, useMemo, useState } from "react";
+import { Archive, Bot, Droplet, FileJson, FlaskConical, KeyRound, Pill, Radio, Search } from "lucide-react";
+import { useEffect, useMemo, useState, type FormEvent } from "react";
 import { BriefView } from "@/components/BriefView";
 import { Background, Footer, TopBar } from "@/components/Chrome";
 import { Card, Chip, ConfidenceMeter, inputClass } from "@/components/ui";
@@ -12,12 +12,26 @@ const KIND_LABEL: Record<string, string> = {
   inquiry: "Stock check",
   hold: "Hold request",
   prescriber: "Prescriber routing",
+  transfer: "Prescription transfer",
   blood_inquiry: "Blood availability",
   blood_reserve: "Blood reservation",
 };
 
+const CODE_KEY = "pharmabridge-operator-code";
+
+function storedCode(): string {
+  try {
+    return sessionStorage.getItem(CODE_KEY) ?? "";
+  } catch {
+    return "";
+  }
+}
+
 export default function RecordsPage() {
   const [config, setConfig] = useState<AppConfig | null>(null);
+  const [code, setCode] = useState<string | null>(null);
+  const [draft, setDraft] = useState("");
+  const [locked, setLocked] = useState(false);
   const [records, setRecords] = useState<LedgerSummary[] | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [selected, setSelected] = useState<string | null>(null);
@@ -25,30 +39,53 @@ export default function RecordsPage() {
   const [filter, setFilter] = useState("");
 
   useEffect(() => {
+    setCode(storedCode());
     fetch("/api/config")
       .then((r) => r.json())
       .then(setConfig)
       .catch(() => setConfig(null));
+  }, []);
+
+  useEffect(() => {
+    if (code === null) return;
+    const headers = { "x-pharmabridge-operator-code": code };
     const load = () =>
-      fetch("/api/records", { cache: "no-store" })
+      fetch("/api/records", { cache: "no-store", headers })
         .then(async (r) => {
-          const json = await r.json();
+          const json = await r.json().catch(() => ({}));
+          if (r.status === 401) {
+            setLocked(true);
+            setRecords(null);
+            return;
+          }
           if (!r.ok) throw new Error(json?.error?.message ?? "Could not load call records.");
+          setLocked(false);
+          setError(null);
           setRecords(json.records);
         })
         .catch((e: Error) => setError(e.message));
     void load();
     const timer = setInterval(load, 5000);
     return () => clearInterval(timer);
-  }, []);
+  }, [code]);
 
   useEffect(() => {
-    if (!selected) return;
-    fetch(`/api/records/${selected}`, { cache: "no-store" })
+    if (!selected || code === null) return;
+    fetch(`/api/records/${selected}`, { cache: "no-store", headers: { "x-pharmabridge-operator-code": code } })
       .then((r) => r.json())
       .then((j) => setEntry(j.record ?? null))
       .catch(() => setEntry(null));
-  }, [selected, records]);
+  }, [selected, records, code]);
+
+  function unlock(event: FormEvent) {
+    event.preventDefault();
+    try {
+      sessionStorage.setItem(CODE_KEY, draft);
+    } catch {
+      // Storage can be blocked; the code then lasts only for this page view.
+    }
+    setCode(draft);
+  }
 
   const missions = useMemo(() => {
     const q = filter.trim().toLowerCase();
@@ -79,57 +116,86 @@ export default function RecordsPage() {
         <h1 className="mt-2 font-display text-3xl font-bold tracking-tight text-slate-900">Every call, recorded</h1>
         <p className="mt-2 max-w-3xl text-sm leading-relaxed text-slate-500">
           PharmaBridge writes each call to a server-side ledger as it happens: the agent brief, routing, full transcript including phone-menu prompts and
-          keypad presses, CALL-E events, and the structured result. Stored in <span className="font-mono text-slate-700">data/ledger/</span>.
+          keypad presses, CALL-E events, and the structured result, with phone numbers masked. Stored in{" "}
+          <span className="font-mono text-slate-700">data/ledger/</span>. Records can hold live transcripts, so they open only with the operator code, in every
+          environment.
         </p>
       </div>
 
       <div className="mx-auto grid max-w-7xl gap-6 px-5 lg:grid-cols-[380px_1fr]">
         <Card className="flex max-h-[76vh] flex-col overflow-hidden">
-          <div className="border-b border-slate-100 p-3">
-            <div className="relative">
-              <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
-              <input className={cx(inputClass, "pl-9")} placeholder="Filter by facility or need" value={filter} onChange={(e) => setFilter(e.target.value)} />
-            </div>
-          </div>
-          <div className="scroll-thin flex-1 overflow-auto p-2">
-            {error && <p className="p-3 text-sm text-rose-600">{error}</p>}
-            {!error && records?.length === 0 && (
-              <div className="flex flex-col items-center gap-2 p-8 text-center text-sm text-slate-400">
-                <Archive className="h-6 w-6" /> No calls recorded yet. Dispatch a mission and they appear here live.
+          {locked ? (
+            <form onSubmit={unlock} className="space-y-3 p-5">
+              <div className="flex items-center gap-2 text-sm font-semibold text-slate-800">
+                <KeyRound className="h-4 w-4 text-violet-500" /> Operator code required
               </div>
-            )}
-            {missions.map(([missionId, calls]) => (
-              <div key={missionId} className="mb-3">
-                <div className="px-2 pb-1 pt-2 text-[10.5px] font-bold uppercase tracking-[0.12em] text-slate-400">
-                  Mission {missionId.slice(-6)} · {new Date(calls[0].createdAt).toLocaleString([], { dateStyle: "medium", timeStyle: "short" })}
+              <p className="text-[12.5px] leading-relaxed text-slate-500">
+                Enter the <span className="font-mono">PHARMABRIDGE_OPERATOR_CODE</span> from <span className="font-mono">.env.local</span>. It is kept only for this
+                browser tab.
+              </p>
+              <input
+                id="records-code"
+                type="password"
+                autoComplete="off"
+                className={inputClass}
+                value={draft}
+                onChange={(e) => setDraft(e.target.value)}
+                placeholder="Operator code"
+              />
+              <button type="submit" className="brand-bg w-full rounded-xl px-3 py-2 text-sm font-semibold text-white">
+                Unlock records
+              </button>
+              {code ? <p className="text-[12px] text-rose-600">That code didn&apos;t match, or no operator code is configured on this server.</p> : null}
+            </form>
+          ) : (
+            <>
+              <div className="border-b border-slate-100 p-3">
+                <div className="relative">
+                  <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
+                  <input className={cx(inputClass, "pl-9")} placeholder="Filter by facility or need" value={filter} onChange={(e) => setFilter(e.target.value)} />
                 </div>
-                {calls.map((r) => (
-                  <button
-                    key={r.key}
-                    onClick={() => setSelected(r.key)}
-                    className={cx("flex w-full items-center gap-3 rounded-xl px-3 py-2.5 text-left transition", selected === r.key ? "bg-violet-50 ring-1 ring-violet-200" : "hover:bg-slate-50")}
-                  >
-                    <span className={cx("flex h-8 w-8 shrink-0 items-center justify-center rounded-lg", r.needKind === "blood_bank" ? "bg-rose-50 text-rose-500" : "bg-indigo-50 text-indigo-500")}>
-                      {r.needKind === "blood_bank" ? <Droplet className="h-4 w-4" /> : <Pill className="h-4 w-4" />}
-                    </span>
-                    <span className="min-w-0 flex-1">
-                      <span className="block truncate text-[13px] font-semibold text-slate-800">{r.facility.name}</span>
-                      <span className="block truncate text-[11px] text-slate-500">
-                        {KIND_LABEL[r.kind]} · {r.status} · {r.turns} turns
-                      </span>
-                    </span>
-                    {r.mode === "live" ? <Radio className="h-4 w-4 text-emerald-500" /> : <FlaskConical className="h-4 w-4 text-indigo-300" />}
-                  </button>
+              </div>
+              <div className="scroll-thin flex-1 overflow-auto p-2">
+                {error && <p className="p-3 text-sm text-rose-600">{error}</p>}
+                {!error && records?.length === 0 && (
+                  <div className="flex flex-col items-center gap-2 p-8 text-center text-sm text-slate-400">
+                    <Archive className="h-6 w-6" /> No calls recorded yet. Dispatch a mission and they appear here live.
+                  </div>
+                )}
+                {missions.map(([missionId, calls]) => (
+                  <div key={missionId} className="mb-3">
+                    <div className="px-2 pb-1 pt-2 text-[10.5px] font-bold uppercase tracking-[0.12em] text-slate-400">
+                      Mission {missionId.slice(-6)} · {new Date(calls[0].createdAt).toLocaleString([], { dateStyle: "medium", timeStyle: "short" })}
+                    </div>
+                    {calls.map((r) => (
+                      <button
+                        key={r.key}
+                        onClick={() => setSelected(r.key)}
+                        className={cx("flex w-full items-center gap-3 rounded-xl px-3 py-2.5 text-left transition", selected === r.key ? "bg-violet-50 ring-1 ring-violet-200" : "hover:bg-slate-50")}
+                      >
+                        <span className={cx("flex h-8 w-8 shrink-0 items-center justify-center rounded-lg", r.needKind === "blood_bank" ? "bg-rose-50 text-rose-500" : "bg-indigo-50 text-indigo-500")}>
+                          {r.needKind === "blood_bank" ? <Droplet className="h-4 w-4" /> : <Pill className="h-4 w-4" />}
+                        </span>
+                        <span className="min-w-0 flex-1">
+                          <span className="block truncate text-[13px] font-semibold text-slate-800">{r.facility.name}</span>
+                          <span className={cx("block truncate text-[11px]", r.status === "unknown" ? "font-semibold text-amber-700" : "text-slate-500")}>
+                            {KIND_LABEL[r.kind]} · {r.status === "unknown" ? "outcome unknown" : r.status} · {r.turns} turns
+                          </span>
+                        </span>
+                        {r.mode === "live" ? <Radio className="h-4 w-4 text-emerald-500" /> : <FlaskConical className="h-4 w-4 text-indigo-300" />}
+                      </button>
+                    ))}
+                  </div>
                 ))}
               </div>
-            ))}
-          </div>
+            </>
+          )}
         </Card>
 
         <Card className="min-h-[60vh] p-6">
           {!entry ? (
             <div className="flex h-full min-h-[50vh] flex-col items-center justify-center gap-2 text-center text-sm text-slate-400">
-              <Bot className="h-7 w-7" /> Pick a call to see its transcript, result, and brief.
+              <Bot className="h-7 w-7" /> {locked ? "Unlock the ledger to see transcripts, results, and briefs." : "Pick a call to see its transcript, result, and brief."}
             </div>
           ) : (
             <div className="space-y-6">
@@ -140,7 +206,7 @@ export default function RecordsPage() {
                   <p className="text-sm text-slate-500">{entry.needSummary}</p>
                   <div className="mt-2 flex flex-wrap gap-1.5">
                     <Chip tone={entry.mode === "live" ? "emerald" : "indigo"}>{entry.mode === "live" ? `Live → ${entry.dialTarget}` : "Simulated"}</Chip>
-                    <Chip>{entry.status}</Chip>
+                    <Chip tone={entry.status === "unknown" ? "amber" : "slate"}>{entry.status === "unknown" ? "Outcome unknown" : entry.status}</Chip>
                     <Chip>{new Date(entry.createdAt).toLocaleString()}</Chip>
                     {entry.providerCallIds.map((id) => (
                       <Chip key={id} tone="violet">
@@ -154,7 +220,9 @@ export default function RecordsPage() {
                 </button>
               </div>
 
-              {entry.call?.summary && <p className="rounded-2xl bg-slate-50 p-4 text-[13.5px] leading-relaxed text-slate-700 ring-1 ring-slate-200">{entry.call.summary}</p>}
+              {(entry.call?.summary ?? entry.summary) && (
+                <p className="rounded-2xl bg-slate-50 p-4 text-[13.5px] leading-relaxed text-slate-700 ring-1 ring-slate-200">{entry.call?.summary ?? entry.summary}</p>
+              )}
 
               <div className="grid gap-6 xl:grid-cols-2">
                 <div>

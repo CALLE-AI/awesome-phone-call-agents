@@ -1,6 +1,6 @@
 // Local validation is a second safety net around CALL-E's result_schema enforcement.
 import { z } from "zod";
-import type { BloodInquiryResult, BloodReserveResult, CallKind, HoldResult, InquiryResult, PrescriberResult } from "./types";
+import type { BloodInquiryResult, BloodReserveResult, CallKind, HoldResult, InquiryResult, PrescriberResult, TransferResult } from "./types";
 
 const yesNoUnknown = z.enum(["yes", "no", "unknown"]);
 const stock = z.enum(["in_stock", "partial", "out_of_stock", "refused_to_disclose", "unknown"]);
@@ -45,6 +45,18 @@ const prescriberSchema = z.object({
   evidence_quote: z.string(),
 });
 
+const transferSchema = z.object({
+  reached: reached("pharmacy_staff"),
+  prescription_found: yesNoUnknown,
+  transfer_status: z.enum(["will_transfer", "transferred", "receiving_pharmacy_must_request", "needs_prescriber", "declined", "unknown"]),
+  expected_time: z.string(),
+  reference: z.string(),
+  controlled_rule: z.string(),
+  follow_up_needed: z.string(),
+  staff_name: z.string(),
+  evidence_quote: z.string(),
+});
+
 const bloodInquirySchema = z.object({
   reached: reached("facility_staff"),
   stock_status: stock,
@@ -86,6 +98,7 @@ function parser<T>(schema: z.ZodType<T>) {
 export const parseInquiryResult = parser<InquiryResult>(inquirySchema);
 export const parseHoldResult = parser<HoldResult>(holdSchema);
 export const parsePrescriberResult = parser<PrescriberResult>(prescriberSchema);
+export const parseTransferResult = parser<TransferResult>(transferSchema);
 export const parseBloodInquiryResult = parser<BloodInquiryResult>(bloodInquirySchema);
 export const parseBloodReserveResult = parser<BloodReserveResult>(bloodReserveSchema);
 
@@ -93,6 +106,7 @@ const PARSERS: Record<CallKind, (value: unknown) => unknown> = {
   inquiry: parseInquiryResult,
   hold: parseHoldResult,
   prescriber: parsePrescriberResult,
+  transfer: parseTransferResult,
   blood_inquiry: parseBloodInquiryResult,
   blood_reserve: parseBloodReserveResult,
 };

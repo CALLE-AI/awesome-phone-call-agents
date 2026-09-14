@@ -161,7 +161,8 @@ async function fromOpenStreetMap(kind: NeedKind, center: GeoPoint, radiusKm: num
 }
 
 async function fromGooglePlaces(kind: NeedKind, center: GeoPoint, radiusKm: number, callingCode: string) {
-  const key = process.env.GOOGLE_MAPS_API_KEY?.trim();
+  // Places is called server-side, so it needs a key without an HTTP-referrer restriction.
+  const key = (process.env.GOOGLE_PLACES_API_KEY || process.env.GOOGLE_MAPS_API_KEY)?.trim();
   if (!key) return { candidates: [] as Candidate[], withoutPhone: 0 };
 
   const res = await fetch("https://places.googleapis.com/v1/places:searchText", {

@@ -63,16 +63,19 @@ export function webhookUrl(): string | undefined {
 }
 
 export function googlePlacesEnabled(): boolean {
-  return Boolean(process.env.GOOGLE_MAPS_API_KEY?.trim());
+  return Boolean((process.env.GOOGLE_PLACES_API_KEY || process.env.GOOGLE_MAPS_API_KEY)?.trim());
 }
 
 export function recordsEnabled(): boolean {
   return process.env.PHARMABRIDGE_RECORDS !== "off";
 }
 
-/** Call records are open on a local dev server; a production deployment requires the operator code. */
+/**
+ * Records can hold live transcripts, so they need the operator code in every environment; NODE_ENV
+ * plays no part. Without PHARMABRIDGE_OPERATOR_CODE configured, records can't be opened at all.
+ */
 export function recordsAccessAllowed(operatorCode: string | null): boolean {
-  return recordsEnabled() && (process.env.NODE_ENV !== "production" || operatorCodeValid(operatorCode));
+  return recordsEnabled() && operatorCodeValid(operatorCode);
 }
 
 export function appConfig(): AppConfig {

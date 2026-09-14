@@ -1,7 +1,7 @@
 // Pure mission logic shared by the browser orchestrator and the tests.
 import { parseBloodInquiryResult, parseInquiryResult } from "./result-validation";
 import { assess, assessBlood, type Assessment } from "./scoring";
-import type { BloodInquiryResult, BriefSpec, CallEventView, CallView, Facility, InquiryResult, YesNoUnknown } from "./types";
+import type { BloodInquiryResult, BriefSpec, CallEventView, CallView, Facility, InquiryResult, TranscriptTurn, YesNoUnknown } from "./types";
 
 export type SlotPhase =
   | "queued"
@@ -14,10 +14,11 @@ export type SlotPhase =
   | "done"
   | "failed"
   | "skipped"
-  | "error";
+  | "error"
+  | "unknown";
 
 export const ACTIVE_PHASES: ReadonlyArray<SlotPhase> = ["launching", "dialing", "ivr", "on_hold", "talking", "extracting"];
-export const FINAL_PHASES: ReadonlyArray<SlotPhase> = ["done", "failed", "skipped", "error"];
+export const FINAL_PHASES: ReadonlyArray<SlotPhase> = ["done", "failed", "skipped", "error", "unknown"];
 
 export const PHASE_META: Record<SlotPhase, { label: string; color: string; pulse: boolean; step: number }> = {
   queued: { label: "Queued", color: "#94a3b8", pulse: false, step: 0 },
@@ -31,6 +32,7 @@ export const PHASE_META: Record<SlotPhase, { label: string; color: string; pulse
   failed: { label: "Call failed", color: "#f43f5e", pulse: false, step: 5 },
   skipped: { label: "Skipped · target reached", color: "#cbd5e1", pulse: false, step: 0 },
   error: { label: "Not placed", color: "#f43f5e", pulse: false, step: 0 },
+  unknown: { label: "Outcome unknown", color: "#f59e0b", pulse: false, step: 0 },
 };
 
 export interface CallPlan {
@@ -110,7 +112,36 @@ export function newSlot(facility: Facility, order: number): Slot {
 }
 
 // Live CALL-E events are generic `call.updated` rows whose messages carry the telephony state.
-const LIVE_CUE = /ringing|answered|connected|call ended|syncing final/i;
+const LIVE_CUE = /ringing|answered|connected|callee said|callee interrupted|bot is speaking|call ended|syncing final/i;
+const SPEECH = /^(Callee said|Callee interrupted|Bot is speaking):\s*(.+)$/i;
+
+/**
+ * A live transcript only arrives once the call ends, but CALL-E streams each utterance as an event
+ * ("Callee said: …", "Bot is speaking: …"). While a call is in progress, rebuild the conversation
+ * from those events so it shows in real time. "Callee interrupted: …" carries the agent's cut-off line.
+ */
+export function withLiveTurns(call: CallView, events: CallEventView[]): CallView {
+  const attempt = call.attempts.at(-1);
+  if (!attempt || attempt.status !== "in_progress" || attempt.transcriptTurns.length) return call;
+  const start = Date.parse(attempt.startedAt ?? events[0]?.createdAt ?? call.createdAt);
+  const turns: TranscriptTurn[] = [];
+  for (const event of events) {
+    const match = SPEECH.exec(event.message.trim());
+    if (!match) continue;
+    const speaker: TranscriptTurn["speaker"] = /^callee said/i.test(match[1]) ? "user" : "bot";
+    const text = match[2].replace(/\s*\.\.\.\s*\[interrupted\]\s*$/i, "…").trim();
+    if (!text) continue;
+    const previous = turns.at(-1);
+    const stem = (value: string) => value.replace(/…$/, "");
+    // One utterance is often reported several times as it grows; keep its longest version.
+    if (previous?.speaker === speaker && (stem(text).startsWith(stem(previous.text)) || stem(previous.text).startsWith(stem(text)))) {
+      if (text.length > previous.text.length) previous.text = text;
+      continue;
+    }
+    turns.push({ offsetSeconds: Math.max(0, Math.round((Date.parse(event.createdAt) - start) / 1000)), speaker, text });
+  }
+  return turns.length ? { ...call, attempts: [...call.attempts.slice(0, -1), { ...attempt, transcriptTurns: turns }] } : call;
+}
 
 export function derivePhase(call: CallView, events: CallEventView[]): SlotPhase {
   if (call.status === "completed") return "done";
@@ -124,9 +155,9 @@ export function derivePhase(call: CallView, events: CallEventView[]): SlotPhase 
   const types = events.map((e) => e.type);
   if (types.lastIndexOf("call.on_hold") > types.lastIndexOf("call.hold_ended")) return "on_hold";
   if (types.includes("ivr.menu_detected") && !types.includes("ivr.dtmf_sent")) return "ivr";
-  if (attempt.transcriptTurns.length > 0) return "talking";
   const cue = [...events].reverse().find((e) => LIVE_CUE.test(e.message))?.message ?? "";
   if (/call ended|syncing final/i.test(cue)) return "extracting";
+  if (attempt.transcriptTurns.length > 0) return "talking";
   if (/ringing/i.test(cue)) return "dialing";
   return "talking";
 }
@@ -180,9 +211,10 @@ export function findingFromBlood(r: BloodInquiryResult): Finding {
 }
 
 export function applyCall(slot: Slot, call: CallView, events: CallEventView[]): void {
-  slot.call = call;
+  const view = withLiveTurns(call, events);
+  slot.call = view;
   slot.events = events;
-  slot.phase = derivePhase(call, events);
+  slot.phase = derivePhase(view, events);
   if (slot.phase !== "done" && slot.phase !== "failed") return;
 
   slot.finishedAt ??= Date.now();
@@ -229,4 +261,33 @@ export function missionMetrics(slots: Slot[], startedAt: number | null, finished
     talkSeconds,
     parallelSpeedup: wallMs > 0 && talkSeconds > 0 ? (talkSeconds * 1000) / wallMs : null,
   };
+}
+
+/**
+ * Only a definite refusal (a 4xx other than 408 or 409) means nothing was dialed. No response, a 5xx,
+ * or "submission_unknown" means CALL-E may have created the call.
+ */
+export function submissionOutcome(status: number | null, code?: string | null): "rejected" | "unknown" {
+  if (status === null || code === "submission_unknown") return "unknown";
+  return status >= 400 && status < 500 && status !== 408 && status !== 409 ? "rejected" : "unknown";
+}
+
+/**
+ * Marks a call whose outcome CALL-E never confirmed. In a live mission this also halts dispatch: the
+ * next queued call could reach the same test line under a different idempotency key. Returns the
+ * stop reason when dispatch was halted.
+ */
+export function markUnknown(slots: Slot[], slot: Slot, message: string, live: boolean, now = Date.now()): string | null {
+  slot.phase = "unknown";
+  slot.error = message;
+  slot.finishedAt = now;
+  if (!live) return null;
+  const halted = slots.filter((s) => s.phase === "queued");
+  for (const s of halted) {
+    s.phase = "skipped";
+    s.error = "Not dialed: dispatch halted while another call's outcome is unknown.";
+    s.finishedAt = now;
+  }
+  const count = halted.length ? `${halted.length} queued ${halted.length === 1 ? "call was" : "calls were"} not dialed. ` : "";
+  return `Dispatch halted: CALL-E did not confirm the call to ${slot.facility.name}. ${count}Check Call records or the CALL-E dashboard before calling again.`;
 }

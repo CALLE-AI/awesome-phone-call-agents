@@ -71,6 +71,38 @@ why it matters for real phone-agent workflows, and a suggested fix.
     of 0.88. That let PharmaBridge treat failures uniformly without special cases, and the
     `provider_call_id` made the ledger record traceable to the CALL-E dashboard.
 
+17. **A call that never rang was reported as "no answer".** The handset never rang, and the attempt's
+    `started_at` equals its `completed_at` with attempt-level `failure_code: "408"`. The task still
+    reported `NO ANSWER` and a summary suggesting the recipient "may be busy". A caregiver app then
+    tells the family the facility didn't pick up, when the call never reached the network. This
+    matches the India zero-ring reports in awesome-phone-call-agents#591. *Suggestion:* a distinct
+    `not_delivered` / `route_unavailable` outcome, and a documented meaning for attempt-level codes
+    such as `404` and `408`.
+
+18. **Region restrictions change outside the API.** The regions page lists India as supported, but
+    the September 7 tightening of some regions was announced only on Discord and in an issue comment
+    (call-e-integrations#102). The API accepted the call and it failed later at the carrier.
+    *Suggestion:* reject the create request with `region_unavailable` when a route is restricted,
+    and keep the regions page's current availability in step with that.
+
+## Observed on a completed live call (2026-09-14, CALL-E US test line, provider id `9a9adaad…`)
+
+19. **Transcripts arrive only after hang-up.** `transcript_turns` stayed empty for the whole call and
+    all seven turns appeared at completion. During the call the conversation existed only as
+    free-text event messages ("Callee said: …", "Bot is speaking: …"). PharmaBridge rebuilds a live
+    transcript by parsing those strings. *Suggestion:* fill `transcript_turns` while the attempt is
+    `in_progress`, or emit typed `transcript.turn` events with `speaker`, `text`, and an offset.
+
+20. **"Callee interrupted" carries the agent's words.** The message
+    "Callee interrupted: Hi, this is an a ... [interrupted]" holds the agent's cut-off sentence, not
+    the callee's, which is easy to misattribute. *Suggestion:* typed speech events with an explicit
+    speaker and an `interrupted` flag.
+
+21. **What worked well.** The official US test line answered about five seconds after ringing, and a
+    generic receptionist reply ("I don't have inventory or dispensing information") produced
+    `stock_status: "unknown"` with a verbatim evidence quote instead of a guess. That is exactly the
+    abstention a caregiver-facing app needs.
+
 ## SDK (`@call-e/calle` 0.7.0)
 
 8. **Inconsistent casing.** Every SDK field is camelCase except transcript turns, which are passed

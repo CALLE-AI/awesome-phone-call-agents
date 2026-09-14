@@ -1,13 +1,15 @@
 // Places ONE real CALL-E call using the production inquiry brief, to verify the live path end to end.
 // Dry run by default (prints the plan). A real call also requires the complete live safety gate,
 // an explicit --operator-code matching PHARMABRIDGE_OPERATOR_CODE, and an allowlisted destination.
+// The SDK only talks to an approved CALL-E origin and refuses redirects; all output is phone-masked.
 //
 //   npm run smoke:live -- --to +15555550123                                  # dry run
 //   npm run smoke:live -- --to +15555550123 --yes --operator-code your-code  # places the call
 import { CalleClient } from "@call-e/calle";
 import { buildInquiryTask, INQUIRY_RESULT_SCHEMA } from "../src/lib/calltasks";
 import { liveEnabled, operatorCodeValid } from "../src/lib/config";
-import { isE164, maskPhone, regionFromE164 } from "../src/lib/phone";
+import { isE164, maskPhone, redactDeep, redactPhones, regionFromE164 } from "../src/lib/phone";
+import { calleBaseUrl, noRedirectFetch } from "../src/lib/transport";
 import type { Medication, Pharmacy } from "../src/lib/types";
 
 const args = process.argv.slice(2);
@@ -17,7 +19,7 @@ const locale = args.includes("--locale") ? args[args.indexOf("--locale") + 1] : 
 const operatorCode = args.includes("--operator-code") ? args[args.indexOf("--operator-code") + 1] : undefined;
 
 function fail(message: string): never {
-  console.error(`✖ ${message}`);
+  console.error(`✖ ${redactPhones(message)}`);
   process.exit(1);
 }
 
@@ -60,7 +62,7 @@ const pharmacy: Pharmacy = {
 
 const task = buildInquiryTask(medication, pharmacy);
 console.log(`Destination: ${maskPhone(to)} (region ${regionFromE164(to) ?? "unknown"})\n`);
-console.log("── Agent brief ──────────────────────────────\n" + task + "\n");
+console.log("── Agent brief ──────────────────────────────\n" + redactPhones(task) + "\n");
 
 if (!confirmed) {
   console.log("Dry run only. Re-run with --yes --operator-code <code> to place one real call.");
@@ -74,25 +76,30 @@ if (!operatorCodeValid(operatorCode)) {
   fail("Pass --operator-code with the value configured in PHARMABRIDGE_OPERATOR_CODE.");
 }
 
-const client = new CalleClient({ apiKey, baseUrl: process.env.CALLE_BASE_URL || undefined });
-const created = await client.calls.create(
-  {
-    task,
-    recipients: [{ phones: [to], region: regionFromE164(to) ?? undefined, locale }],
-    resultSchema: INQUIRY_RESULT_SCHEMA,
-    metadata: { app: "pharmabridge", kind: "smoke" },
-  },
-  { idempotencyKey: `pharmabridge:smoke:${Date.now()}` },
-);
-console.log(`✔ Created ${created.id} (${created.status}). Waiting for the terminal result…`);
+// tsx compiles this file as an ES module; main() keeps error handling in one place.
+async function main() {
+  const client = new CalleClient({ apiKey: apiKey!, baseUrl: calleBaseUrl(), fetch: noRedirectFetch });
+  const created = await client.calls.create(
+    {
+      task,
+      recipients: [{ phones: [to], region: regionFromE164(to) ?? undefined, locale }],
+      resultSchema: INQUIRY_RESULT_SCHEMA,
+      metadata: { app: "pharmabridge", kind: "smoke" },
+    },
+    { idempotencyKey: `pharmabridge:smoke:${Date.now()}` },
+  );
+  console.log(`✔ Created ${created.id} (${created.status}). Waiting for the terminal result…`);
 
-const done = await client.calls.waitForResult(created.id, { intervalMs: 4000, timeoutMs: 10 * 60_000 });
-console.log(`\nStatus: ${done.status}  taskCompleted: ${done.taskCompleted}  confidence: ${JSON.stringify(done.completionConfidence)}`);
-if (done.failureCode) console.log(`Failure: ${done.failureCode} ${done.failureMessage ?? ""}`);
-console.log("\nSummary:", done.summary);
-console.log("\nStructured result:", JSON.stringify(done.structuredResult ?? done.recipients[0]?.structuredResult, null, 2));
-console.log("\nEvidence:", done.evidence);
-for (const attempt of done.recipients.flatMap((r) => r.attempts)) {
-  console.log(`\nAttempt ${attempt.id}: ${attempt.status}`);
-  for (const turn of attempt.transcriptTurns) console.log(`  [${turn.offset_seconds ?? "?"}s] ${turn.speaker}: ${turn.text}`);
+  const done = await client.calls.waitForResult(created.id, { intervalMs: 4000, timeoutMs: 10 * 60_000 });
+  console.log(`\nStatus: ${done.status}  taskCompleted: ${done.taskCompleted}  confidence: ${JSON.stringify(done.completionConfidence)}`);
+  if (done.failureCode) console.log(`Failure: ${done.failureCode} ${redactPhones(done.failureMessage ?? "")}`);
+  console.log("\nSummary:", redactPhones(done.summary ?? ""));
+  console.log("\nStructured result:", JSON.stringify(redactDeep(done.structuredResult ?? done.recipients[0]?.structuredResult ?? null), null, 2));
+  console.log("\nEvidence:", redactDeep(done.evidence));
+  for (const attempt of done.recipients.flatMap((r) => r.attempts)) {
+    console.log(`\nAttempt ${attempt.id}: ${attempt.status}${attempt.providerCallId ? ` (provider ${attempt.providerCallId})` : ""}`);
+    for (const turn of attempt.transcriptTurns) console.log(`  [${turn.offset_seconds ?? "?"}s] ${turn.speaker}: ${redactPhones(String(turn.text ?? ""))}`);
+  }
 }
+
+main().catch((error) => fail(error instanceof Error ? error.message : String(error)));

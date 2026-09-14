@@ -13,13 +13,17 @@
 - Every destination is E.164. The server refuses anything else.
 - Direct calls only reach numbers that PharmaBridge's own discovery signed, or numbers on the
   server allowlist. The helper never accepts a free-typed destination.
-- Summaries show masked numbers (for example `+1 ••• ••• ••42`). Full numbers stay in the
-  facility file for dialing and directions only.
+- Summaries show masked numbers (for example `+1 ••• ••• ••42`). The helper masks phone numbers in
+  everything it prints and in `pharmabridge-results.json`, including transcript text and errors.
+  Full numbers stay in the facility file only because dispatch needs each signed number.
 
 ## Credentials
 
 - Never write the operator code, the CALL-E key, or any secret to disk, logs, or chat.
   Ask the user for the operator code each time it is needed.
+- The helper sends operator codes and call tokens only to a loopback PharmaBridge server or to an
+  https origin the user listed in `PHARMABRIDGE_APPROVED_ORIGINS`. It refuses other origins, URLs
+  with embedded credentials, and redirects.
 - `pharmabridge-calls.json` stores short-lived, per-call access tokens that only allow reading that
   call's status. Delete the file when the task is done.
 
@@ -27,6 +31,8 @@
 
 - Each call uses an idempotency key built from the mission, facility, and attempt, so a network retry
   never double-dials. Do not re-run `call` for the same facilities unless the user asks for a retry.
+- If a dispatch fails without a clear refusal (no response, a timeout, a server error), treat the
+  call as possibly placed. Stop, tell the user, and check the call records before calling anyone else.
 - There are no recurring jobs. To stop, simply don't place further calls. CALL-E has no cancel
   endpoint, so calls already placed run to completion.
 

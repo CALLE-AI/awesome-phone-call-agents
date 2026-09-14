@@ -1,6 +1,8 @@
 "use client";
 import { motion } from "framer-motion";
 import {
+  Activity,
+  ArrowRightLeft,
   Check,
   ClipboardCopy,
   Clock,
@@ -25,7 +27,7 @@ import { useState, type ReactNode } from "react";
 import type { Mission } from "@/hooks/useMission";
 import { useFollowUpCall, type FollowUpState } from "@/hooks/useFollowUpCall";
 import { PHASE_META, missionMetrics, rankSlots, type Slot } from "@/lib/mission";
-import { parseBloodReserveResult, parseHoldResult, parsePrescriberResult } from "@/lib/result-validation";
+import { parseBloodReserveResult, parseHoldResult, parsePrescriberResult, parseTransferResult } from "@/lib/result-validation";
 import { BLOOD_COMPONENTS, type AppConfig, type BloodInquiryResult, type InquiryResult } from "@/lib/types";
 import { TIER_META, cx, directionsUrl, driveMinutes, formatClock, formatKm, onMap } from "@/lib/ui";
 import { CallDrawer, type DrawerData } from "./CallDrawer";
@@ -33,13 +35,7 @@ import { LiveMap } from "./Map";
 import { Button, Card, Chip, ConfidenceMeter, inputClass, Label, Segmented, Stat, Toggle, Waveform } from "./ui";
 
 type ShareLanguage = "en" | "ta" | "hi";
-
-function formatPhone(e164: string | null): string {
-  if (!e164) return "Not listed";
-  if (e164.startsWith("+1") && e164.length === 12) return `+1 (${e164.slice(2, 5)}) ${e164.slice(5, 8)}-${e164.slice(8)}`;
-  if (e164.startsWith("+91") && e164.length === 13) return `+91 ${e164.slice(3, 8)} ${e164.slice(8)}`;
-  return e164;
-}
+type RouteMode = "transfer" | "prescriber";
 
 const hasAddress = (address: string) => address && address !== "Address not listed";
 
@@ -110,6 +106,7 @@ export function ResultsStep({
   mission,
   center,
   config,
+  pulseAvoided,
   onOpenSlot,
   onBoard,
   onExpand,
@@ -118,6 +115,7 @@ export function ResultsStep({
   mission: Mission;
   center: { lat: number; lon: number };
   config: AppConfig | null;
+  pulseAvoided: number;
   onOpenSlot: (key: string) => void;
   onBoard: () => void;
   onExpand: () => void;
@@ -126,6 +124,7 @@ export function ResultsStep({
   const need = mission.need!;
   const blood = need.kind === "blood_bank";
   const live = mission.settings.routing !== "simulation";
+  const direct = mission.settings.routing === "direct";
   const ranked = rankSlots(mission.slots);
   const confirmed = ranked.find((s) => s.assessment?.tier === "confirmed") ?? null;
   const partial = ranked.find((s) => s.assessment?.tier === "partial") ?? null;
@@ -134,17 +133,28 @@ export function ResultsStep({
   const backups = ranked.filter((s) => s !== best && s.assessment && ["confirmed", "partial", "alternative", "refused"].includes(s.assessment.tier)).slice(0, 3);
   const unranked = mission.slots.filter((s) => !s.assessment);
   const metrics = missionMetrics(mission.slots, mission.startedAt, mission.finishedAt);
+  const shared = ranked.filter((s) => s.assessment && ["confirmed", "partial", "alternative", "out", "refused"].includes(s.assessment.tier)).length;
 
   const secure = useFollowUpCall(live ? 4000 : 1000);
   const rx = useFollowUpCall(live ? 4000 : 1000);
+  const transfer = useFollowUpCall(live ? 4000 : 1000);
   const [secureAttempt, setSecureAttempt] = useState(0);
   const [rxAttempt, setRxAttempt] = useState(0);
-  const [drawer, setDrawer] = useState<"secure" | "rx" | null>(null);
+  const [transferAttempt, setTransferAttempt] = useState(0);
+  const [drawer, setDrawer] = useState<"secure" | "rx" | "transfer" | null>(null);
   const [copied, setCopied] = useState<string | null>(null);
+  const [routeMode, setRouteMode] = useState<RouteMode>("transfer");
   const [contact, setContact] = useState({ firstName: "Maya", lastInitial: "R", holdUntil: blood ? "10 PM tonight" : "8 PM today" });
   const [rxForm, setRxForm] = useState({
     practice: "Park Slope Pediatrics",
     prescriberName: "Dr. Alvarez",
+    phone: "",
+    patientFullName: "Maya Rivera",
+    patientDob: "2021-04-12",
+    consent: false,
+  });
+  const [transferForm, setTransferForm] = useState({
+    fromPharmacy: "Corner Drug on 5th (fictional)",
     phone: "",
     patientFullName: "Maya Rivera",
     patientDob: "2021-04-12",
@@ -159,8 +169,10 @@ export function ResultsStep({
   const hold = blood ? null : parseHoldResult(secure.call?.structuredResult);
   const reserve = blood ? parseBloodReserveResult(secure.call?.structuredResult) : null;
   const rxResult = parsePrescriberResult(rx.call?.structuredResult);
+  const transferResult = parseTransferResult(transfer.call?.structuredResult);
+  const transferAgreed = transferResult?.transfer_status === "will_transfer" || transferResult?.transfer_status === "transferred";
   const secured = hold?.hold_confirmed === "yes" || reserve?.reserve_confirmed === "yes";
-  const busy = (s: FollowUpState) => s.phase !== "idle" && s.phase !== "done" && s.phase !== "failed" && s.phase !== "error";
+  const busy = (s: FollowUpState) => s.phase !== "idle" && s.phase !== "done" && s.phase !== "failed" && s.phase !== "error" && s.phase !== "unknown";
 
   const common = {
     missionId: mission.id,
@@ -171,9 +183,14 @@ export function ResultsStep({
     directConsent: mission.settings.directConsent,
   };
 
+  // Resubmitting after an unknown outcome reuses the attempt number, so CALL-E sees the same
+  // idempotency key and returns the original call instead of dialing again.
+  const nextAttempt = (state: FollowUpState, made: number) => (state.phase === "unknown" ? Math.max(1, made) : made + 1);
+  const canCall = (state: FollowUpState, made: number) => state.phase === "unknown" || made < 5;
+
   function secureIt() {
-    if (!confirmed || secureAttempt >= 5) return;
-    const attempt = secureAttempt + 1;
+    if (!confirmed || !canCall(secure, secureAttempt)) return;
+    const attempt = nextAttempt(secure, secureAttempt);
     setSecureAttempt(attempt);
     const holdContact = { firstName: contact.firstName.trim(), lastInitial: contact.lastInitial.trim().slice(0, 1), holdUntil: contact.holdUntil.trim() };
     void secure.run({
@@ -189,8 +206,8 @@ export function ResultsStep({
   }
 
   function callPrescriber() {
-    if (!confirmed || need.kind !== "pharmacy" || rxAttempt >= 5) return;
-    const attempt = rxAttempt + 1;
+    if (!confirmed || need.kind !== "pharmacy" || !canCall(rx, rxAttempt)) return;
+    const attempt = nextAttempt(rx, rxAttempt);
     setRxAttempt(attempt);
     void rx.run({
       ...common,
@@ -201,6 +218,22 @@ export function ResultsStep({
       medication: need.medication,
       hold,
       prescriber: { ...rxForm, consent: true },
+    });
+  }
+
+  function callTransfer() {
+    if (!confirmed || need.kind !== "pharmacy" || !canCall(transfer, transferAttempt)) return;
+    const attempt = nextAttempt(transfer, transferAttempt);
+    setTransferAttempt(attempt);
+    void transfer.run({
+      ...common,
+      kind: "transfer",
+      attempt,
+      testLineIndex: confirmed.order + 1,
+      facility: confirmed.facility,
+      medication: need.medication,
+      hold,
+      transfer: { ...transferForm, consent: true },
     });
   }
 
@@ -218,7 +251,8 @@ export function ResultsStep({
         best.finding?.evidence ? `Staff said: "${best.finding.evidence}"` : "",
         hold?.hold_confirmed === "yes" ? `Held under ${hold.hold_name}${hold.hold_until ? ` until ${hold.hold_until}` : ""}${hold.reference ? ` (ref ${hold.reference})` : ""}.` : "",
         reserve?.reserve_confirmed === "yes" ? `Reserved under ${reserve.reserve_name}${reserve.reserve_until ? ` until ${reserve.reserve_until}` : ""}${reserve.reference ? ` (ref ${reserve.reference})` : ""}.` : "",
-        `Phone: ${formatPhone(best.facility.phone)} · Directions: ${directionsUrl(best.facility.lat, best.facility.lon)}`,
+        transferAgreed ? `Prescription transfer from ${transferForm.fromPharmacy}: ${transferResult!.expected_time || "agreed"}${transferResult!.reference ? ` (ref ${transferResult!.reference})` : ""}.` : "",
+        `Directions: ${directionsUrl(best.facility.lat, best.facility.lon)}`,
       ]
         .filter(Boolean)
         .join("\n")
@@ -253,7 +287,7 @@ export function ResultsStep({
     confirmed && need.kind === "pharmacy"
       ? [
           `Prescription routing request: ${need.medication.name}, ${need.medication.quantity}.`,
-          `Please e-prescribe to ${confirmed.facility.name}${hold?.store_identifier ? ` (${hold.store_identifier})` : ""}${hasAddress(confirmed.facility.address) ? `, ${confirmed.facility.address}` : ""}. Pharmacy phone: ${formatPhone(confirmed.facility.phone)}.`,
+          `Please e-prescribe to ${confirmed.facility.name}${hold?.store_identifier ? ` (${hold.store_identifier})` : ""}${hasAddress(confirmed.facility.address) ? `, ${confirmed.facility.address}` : ""}.`,
           confirmed.finding?.evidence ? `Stock confirmed by phone${confirmed.finding.staff ? ` with ${confirmed.finding.staff}` : ""}: "${confirmed.finding.evidence}"` : "",
           hold?.hold_confirmed === "yes" ? `Held under ${hold.hold_name}${hold.hold_until ? ` until ${hold.hold_until}` : ""}${hold.reference ? ` (ref ${hold.reference})` : ""}.` : "",
           "Availability check only. No change to the medication, strength, or quantity is requested.",
@@ -274,7 +308,12 @@ export function ResultsStep({
       ? `Blood donors needed: ${need.blood.group} (${BLOOD_COMPONENTS[need.blood.component]}) for a patient at ${need.blood.hospital}. The blood bank at ${confirmed.facility.name} is asking for ${reserve?.replacement_donors_required || "a replacement donor"}. If you can donate, please reply to this message.`
       : "";
 
-  const pickupItems = [hold?.pickup_requirements ?? "", hold?.reference ? `Mention hold reference ${hold.reference}` : "", hold?.hold_name ? `Held under "${hold.hold_name}"` : ""].filter(Boolean);
+  const pickupItems = [
+    hold?.pickup_requirements ?? "",
+    hold?.reference ? `Mention hold reference ${hold.reference}` : "",
+    hold?.hold_name ? `Held under "${hold.hold_name}"` : "",
+    transferAgreed ? `Prescription transferred from ${transferForm.fromPharmacy}${transferResult!.reference ? ` (ref ${transferResult!.reference})` : ""}` : "",
+  ].filter(Boolean);
 
   function exportReport() {
     const report = {
@@ -294,7 +333,11 @@ export function ResultsStep({
         confidence: s.call?.completionConfidence,
         result: s.result,
       })),
-      followUps: { secure: secure.call?.structuredResult ?? null, prescriber: rx.call?.structuredResult ?? null },
+      followUps: {
+        secure: secure.call?.structuredResult ?? null,
+        prescriber: rx.call?.structuredResult ?? null,
+        transfer: transfer.call?.structuredResult ?? null,
+      },
     };
     const url = URL.createObjectURL(new Blob([JSON.stringify(report, null, 2)], { type: "application/json" }));
     const link = document.createElement("a");
@@ -304,12 +347,27 @@ export function ResultsStep({
     URL.revokeObjectURL(url);
   }
 
+  const followUp = drawer === "secure" ? secure : drawer === "rx" ? rx : drawer === "transfer" ? transfer : null;
+  const drawerTitle =
+    drawer === "secure"
+      ? `${blood ? "Reservation" : "Hold"} · ${confirmed?.facility.name ?? ""}`
+      : drawer === "rx"
+        ? `Prescriber office · ${rxForm.practice}`
+        : `Prescription transfer · ${transferForm.fromPharmacy}`;
   const drawerData: DrawerData | null =
-    drawer === "secure" && secure.call
-      ? { title: `${blood ? "Reservation" : "Hold"} · ${confirmed?.facility.name ?? ""}`, subtitle: secure.call.id.slice(0, 40), staffLabel: blood ? "Blood bank" : "Pharmacy", call: secure.call, events: secure.events, plan: secure.plan, mode: secure.mode, dialTarget: secure.dialTarget, recordKey: null }
-      : drawer === "rx" && rx.call
-        ? { title: `Prescriber office · ${rxForm.practice}`, subtitle: rx.call.id.slice(0, 40), staffLabel: "Office", call: rx.call, events: rx.events, plan: rx.plan, mode: rx.mode, dialTarget: rx.dialTarget, recordKey: null }
-        : null;
+    followUp?.call
+      ? {
+          title: drawerTitle,
+          subtitle: followUp.call.id.slice(0, 40),
+          staffLabel: drawer === "rx" ? "Office" : blood ? "Blood bank" : "Pharmacy",
+          call: followUp.call,
+          events: followUp.events,
+          plan: followUp.plan,
+          mode: followUp.mode,
+          dialTarget: followUp.dialTarget,
+          recordKey: null,
+        }
+      : null;
 
   return (
     <section className="mx-auto max-w-7xl space-y-6 px-5">
@@ -359,7 +417,7 @@ export function ResultsStep({
                 </a>
                 {best.facility.phone && (
                   <a href={`tel:${best.facility.phone}`}>
-                    <Button variant="secondary" icon={<Phone className="h-4 w-4" />}>{formatPhone(best.facility.phone)}</Button>
+                    <Button variant="secondary" icon={<Phone className="h-4 w-4" />}>{best.facility.phoneMasked ?? "Call"}</Button>
                   </a>
                 )}
                 <Button variant="ghost" onClick={() => onOpenSlot(best.key)} icon={<PhoneCall className="h-4 w-4" />}>
@@ -457,26 +515,26 @@ export function ResultsStep({
               <div className="mt-3 grid grid-cols-[1fr_64px] gap-2">
                 <div>
                   <Label>First name</Label>
-                  <input className={inputClass} value={contact.firstName} onChange={(e) => setContact({ ...contact, firstName: e.target.value })} />
+                  <input id="hold-first-name" className={inputClass} value={contact.firstName} onChange={(e) => setContact({ ...contact, firstName: e.target.value })} />
                 </div>
                 <div>
                   <Label>Initial</Label>
-                  <input className={inputClass} maxLength={1} value={contact.lastInitial} onChange={(e) => setContact({ ...contact, lastInitial: e.target.value })} />
+                  <input id="hold-initial" className={inputClass} maxLength={1} value={contact.lastInitial} onChange={(e) => setContact({ ...contact, lastInitial: e.target.value })} />
                 </div>
               </div>
               <div className="mt-2">
                 <Label>{blood ? "Keep until" : "Hold until"}</Label>
-                <input className={inputClass} value={contact.holdUntil} onChange={(e) => setContact({ ...contact, holdUntil: e.target.value })} />
+                <input id="hold-until" className={inputClass} value={contact.holdUntil} onChange={(e) => setContact({ ...contact, holdUntil: e.target.value })} />
               </div>
               <Button
                 variant={blood ? "blood" : "primary"}
                 className="mt-3 w-full"
                 onClick={secureIt}
                 loading={busy(secure)}
-                disabled={!contact.firstName.trim() || !contact.lastInitial.trim() || secureAttempt >= 5}
+                disabled={!contact.firstName.trim() || !contact.lastInitial.trim() || !canCall(secure, secureAttempt)}
                 icon={<ShieldCheck className="h-4 w-4" />}
               >
-                {secure.phase === "done" ? "Call again" : blood ? "Call to reserve" : "Call to hold it"}
+                {secure.phase === "unknown" ? "Resubmit the same request" : secure.phase === "done" ? "Call again" : blood ? "Call to reserve" : "Call to hold it"}
               </Button>
               <FollowUpStatus state={secure} onOpen={() => setDrawer("secure")} />
               {hold && (
@@ -498,60 +556,128 @@ export function ResultsStep({
             </StepBlock>
 
             {need.kind === "pharmacy" ? (
-              <StepBlock n={2} title="Route the prescription" done={rxResult?.request_status === "accepted"}>
-                <div className="relative">
-                  <pre className="whitespace-pre-wrap rounded-2xl bg-slate-50 p-3.5 pr-10 font-mono text-[11px] leading-relaxed text-slate-700 ring-1 ring-slate-200">{handoffNote}</pre>
-                  <button onClick={() => copy("note", handoffNote)} className="absolute right-2.5 top-2.5 rounded-lg p-1.5 text-slate-400 hover:bg-white hover:text-slate-700" title="Copy">
-                    {copied === "note" ? <Check className="h-4 w-4 text-emerald-500" /> : <ClipboardCopy className="h-4 w-4" />}
-                  </button>
-                </div>
-                <details className="mt-3 rounded-2xl bg-slate-50 p-3 ring-1 ring-slate-200">
-                  <summary className="cursor-pointer text-[12.5px] font-semibold text-slate-700">Let PharmaBridge call the prescriber&apos;s office</summary>
-                  <div className="mt-3 grid grid-cols-2 gap-2">
-                    <div>
-                      <Label>Practice</Label>
-                      <input className={inputClass} value={rxForm.practice} onChange={(e) => setRxForm({ ...rxForm, practice: e.target.value })} />
-                    </div>
-                    <div>
-                      <Label>Prescriber</Label>
-                      <input className={inputClass} value={rxForm.prescriberName} onChange={(e) => setRxForm({ ...rxForm, prescriberName: e.target.value })} />
-                    </div>
-                    <div>
-                      <Label>Patient name</Label>
-                      <input className={inputClass} value={rxForm.patientFullName} onChange={(e) => setRxForm({ ...rxForm, patientFullName: e.target.value })} />
-                    </div>
-                    <div>
-                      <Label>Date of birth</Label>
-                      <input className={inputClass} value={rxForm.patientDob} onChange={(e) => setRxForm({ ...rxForm, patientDob: e.target.value })} />
-                    </div>
-                    {mission.settings.routing === "direct" && (
+              <StepBlock n={2} title="Move the prescription" done={transferAgreed || rxResult?.request_status === "accepted"}>
+                <Segmented<RouteMode>
+                  value={routeMode}
+                  onChange={setRouteMode}
+                  options={[
+                    { value: "transfer", label: <><ArrowRightLeft className="h-3.5 w-3.5" /> From my pharmacy</> },
+                    { value: "prescriber", label: <><Stethoscope className="h-3.5 w-3.5" /> Via the prescriber</> },
+                  ]}
+                />
+                {routeMode === "transfer" ? (
+                  <div className="mt-3">
+                    <p className="text-[12.5px] leading-relaxed text-slate-500">
+                      Fastest when the prescription is already sitting at your usual pharmacy: a CALL-E call asks them to transfer it to {confirmed.facility.name}.
+                      {need.medication.controlled
+                        ? " For a controlled medication, the agent cites the one-time e-prescription transfer rule and accepts a no."
+                        : ""}
+                    </p>
+                    <div className="mt-3 grid grid-cols-2 gap-2">
                       <div className="col-span-2">
-                        <Label>Office phone (E.164)</Label>
-                        <input className={inputClass} value={rxForm.phone} onChange={(e) => setRxForm({ ...rxForm, phone: e.target.value })} placeholder="+1…" />
+                        <Label>Your current pharmacy</Label>
+                        <input id="transfer-from" className={inputClass} value={transferForm.fromPharmacy} onChange={(e) => setTransferForm({ ...transferForm, fromPharmacy: e.target.value })} />
                       </div>
+                      <div>
+                        <Label>Patient name</Label>
+                        <input id="transfer-patient" className={inputClass} value={transferForm.patientFullName} onChange={(e) => setTransferForm({ ...transferForm, patientFullName: e.target.value })} />
+                      </div>
+                      <div>
+                        <Label>Date of birth</Label>
+                        <input id="transfer-dob" className={inputClass} value={transferForm.patientDob} onChange={(e) => setTransferForm({ ...transferForm, patientDob: e.target.value })} />
+                      </div>
+                      {direct && (
+                        <div className="col-span-2">
+                          <Label>Pharmacy phone (E.164)</Label>
+                          <input id="transfer-phone" className={inputClass} value={transferForm.phone} onChange={(e) => setTransferForm({ ...transferForm, phone: e.target.value })} placeholder="+1…" />
+                        </div>
+                      )}
+                    </div>
+                    <div className="mt-2">
+                      <Toggle checked={transferForm.consent} onChange={(consent) => setTransferForm({ ...transferForm, consent })}>
+                        I&apos;m the patient or their caregiver and consent to sharing this name and date of birth with this pharmacy only. Sample values are fictional.
+                      </Toggle>
+                    </div>
+                    <Button
+                      className="mt-2 w-full"
+                      onClick={callTransfer}
+                      loading={busy(transfer)}
+                      disabled={!transferForm.consent || !transferForm.fromPharmacy.trim() || !transferForm.patientFullName.trim() || !transferForm.patientDob.trim() || !canCall(transfer, transferAttempt)}
+                      icon={<ArrowRightLeft className="h-4 w-4" />}
+                    >
+                      {transfer.phase === "unknown" ? "Resubmit the same request" : transfer.phase === "done" ? "Call again" : "Call my pharmacy to transfer it"}
+                    </Button>
+                    <FollowUpStatus state={transfer} onOpen={() => setDrawer("transfer")} />
+                    {transferResult && (
+                      <>
+                        <div className="mt-3 grid grid-cols-2 gap-2">
+                          <Fact label="Transfer" value={transferResult.transfer_status.replace(/_/g, " ")} />
+                          <Fact label="Expected" value={transferResult.expected_time} />
+                          <Fact label="Reference" value={transferResult.reference} />
+                          <Fact label="Staff" value={transferResult.staff_name} />
+                        </div>
+                        {transferResult.controlled_rule && <p className="mt-2 text-[11.5px] leading-relaxed text-violet-700">Rule cited: {transferResult.controlled_rule}</p>}
+                        {transferResult.follow_up_needed && <p className="mt-1 text-[11.5px] leading-relaxed text-slate-500">Next: {transferResult.follow_up_needed}</p>}
+                      </>
                     )}
                   </div>
-                  <div className="mt-2">
-                    <Toggle checked={rxForm.consent} onChange={(consent) => setRxForm({ ...rxForm, consent })}>
-                      I&apos;m the patient or their caregiver and consent to sharing this name and date of birth with this office only. Sample values are fictional.
-                    </Toggle>
-                  </div>
-                  <Button
-                    variant="secondary"
-                    className="mt-2 w-full"
-                    onClick={callPrescriber}
-                    loading={busy(rx)}
-                    disabled={!rxForm.consent || !rxForm.practice.trim() || !rxForm.patientFullName.trim() || !rxForm.patientDob.trim() || rxAttempt >= 5}
-                    icon={<Stethoscope className="h-4 w-4" />}
-                  >
-                    Call the prescriber&apos;s office
-                  </Button>
-                </details>
-                <FollowUpStatus state={rx} onOpen={() => setDrawer("rx")} />
-                {rxResult && (
-                  <div className="mt-3 grid grid-cols-2 gap-2">
-                    <Fact label="Request" value={rxResult.request_status.replace(/_/g, " ")} />
-                    <Fact label="Sending" value={rxResult.expected_send_time} />
+                ) : (
+                  <div className="mt-3">
+                    <div className="relative">
+                      <pre className="whitespace-pre-wrap rounded-2xl bg-slate-50 p-3.5 pr-10 font-mono text-[11px] leading-relaxed text-slate-700 ring-1 ring-slate-200">{handoffNote}</pre>
+                      <button onClick={() => copy("note", handoffNote)} className="absolute right-2.5 top-2.5 rounded-lg p-1.5 text-slate-400 hover:bg-white hover:text-slate-700" title="Copy">
+                        {copied === "note" ? <Check className="h-4 w-4 text-emerald-500" /> : <ClipboardCopy className="h-4 w-4" />}
+                      </button>
+                    </div>
+                    <details className="mt-3 rounded-2xl bg-slate-50 p-3 ring-1 ring-slate-200">
+                      <summary className="cursor-pointer text-[12.5px] font-semibold text-slate-700">Let PharmaBridge call the prescriber&apos;s office</summary>
+                      <div className="mt-3 grid grid-cols-2 gap-2">
+                        <div>
+                          <Label>Practice</Label>
+                          <input id="rx-practice" className={inputClass} value={rxForm.practice} onChange={(e) => setRxForm({ ...rxForm, practice: e.target.value })} />
+                        </div>
+                        <div>
+                          <Label>Prescriber</Label>
+                          <input id="rx-prescriber" className={inputClass} value={rxForm.prescriberName} onChange={(e) => setRxForm({ ...rxForm, prescriberName: e.target.value })} />
+                        </div>
+                        <div>
+                          <Label>Patient name</Label>
+                          <input id="rx-patient" className={inputClass} value={rxForm.patientFullName} onChange={(e) => setRxForm({ ...rxForm, patientFullName: e.target.value })} />
+                        </div>
+                        <div>
+                          <Label>Date of birth</Label>
+                          <input id="rx-dob" className={inputClass} value={rxForm.patientDob} onChange={(e) => setRxForm({ ...rxForm, patientDob: e.target.value })} />
+                        </div>
+                        {direct && (
+                          <div className="col-span-2">
+                            <Label>Office phone (E.164)</Label>
+                            <input id="rx-phone" className={inputClass} value={rxForm.phone} onChange={(e) => setRxForm({ ...rxForm, phone: e.target.value })} placeholder="+1…" />
+                          </div>
+                        )}
+                      </div>
+                      <div className="mt-2">
+                        <Toggle checked={rxForm.consent} onChange={(consent) => setRxForm({ ...rxForm, consent })}>
+                          I&apos;m the patient or their caregiver and consent to sharing this name and date of birth with this office only. Sample values are fictional.
+                        </Toggle>
+                      </div>
+                      <Button
+                        variant="secondary"
+                        className="mt-2 w-full"
+                        onClick={callPrescriber}
+                        loading={busy(rx)}
+                        disabled={!rxForm.consent || !rxForm.practice.trim() || !rxForm.patientFullName.trim() || !rxForm.patientDob.trim() || !canCall(rx, rxAttempt)}
+                        icon={<Stethoscope className="h-4 w-4" />}
+                      >
+                        {rx.phase === "unknown" ? "Resubmit the same request" : "Call the prescriber's office"}
+                      </Button>
+                    </details>
+                    <FollowUpStatus state={rx} onOpen={() => setDrawer("rx")} />
+                    {rxResult && (
+                      <div className="mt-3 grid grid-cols-2 gap-2">
+                        <Fact label="Request" value={rxResult.request_status.replace(/_/g, " ")} />
+                        <Fact label="Sending" value={rxResult.expected_send_time} />
+                      </div>
+                    )}
                   </div>
                 )}
               </StepBlock>
@@ -594,7 +720,7 @@ export function ResultsStep({
                 {confirmed.facility.phone && (
                   <a href={`tel:${confirmed.facility.phone}`} className="block">
                     <Button variant="secondary" className="w-full justify-start" icon={<Phone className="h-4 w-4" />}>
-                      Call {formatPhone(confirmed.facility.phone)}
+                      Call {confirmed.facility.phoneMasked ?? "the pharmacy"}
                     </Button>
                   </a>
                 )}
@@ -700,7 +826,7 @@ export function ResultsStep({
                   <td className="px-5 py-3">–</td>
                   <td className="px-3 py-3">{s.facility.name}</td>
                   <td className="px-3 py-3" colSpan={5}>
-                    {s.phase === "skipped" ? "Not called: target already reached" : (s.error ?? PHASE_META[s.phase].label)}
+                    {s.phase === "skipped" ? (s.error ?? "Not called: target already reached") : (s.error ?? PHASE_META[s.phase].label)}
                   </td>
                 </tr>
               ))}
@@ -709,12 +835,29 @@ export function ResultsStep({
         </div>
       </Card>
 
+      <Card className="flex flex-wrap items-center gap-4 p-5">
+        <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-2xl bg-emerald-50 text-emerald-600 ring-1 ring-emerald-100">
+          <Activity className="h-5 w-5" />
+        </span>
+        <div className="min-w-0 flex-1">
+          <div className="text-[11px] font-bold uppercase tracking-[0.14em] text-emerald-700">Shared to the Shortage Pulse</div>
+          <p className="mt-1 text-[13px] leading-relaxed text-slate-600">
+            {shared} {shared === 1 ? "answer" : "answers"} from this mission now help the next family for the next 6 to 24 hours, with no names or patient details.
+            {pulseAvoided ? ` Earlier answers let this mission skip ${pulseAvoided} ${pulseAvoided === 1 ? "call" : "calls"}.` : ""}
+            {need.kind === "pharmacy" && need.medication.controlled ? " Because this is a controlled medication, in-stock answers are shared by area only." : ""}
+          </p>
+        </div>
+        <a href="/pulse">
+          <Button variant="secondary" icon={<Activity className="h-4 w-4 text-emerald-600" />}>Open the Pulse</Button>
+        </a>
+      </Card>
+
       <Card className="flex flex-wrap items-center justify-between gap-6 p-5">
         <div className="grid flex-1 grid-cols-2 gap-6 sm:grid-cols-3 lg:grid-cols-6">
           <Stat value={metrics.placed} label="calls placed" accent />
           <Stat value={metrics.reached} label="reached a person" />
           <Stat value={metrics.confirmed} label="confirmed availability" />
-          <Stat value={metrics.skipped} label="calls saved by early stop" />
+          <Stat value={metrics.skipped + pulseAvoided} label="calls saved (early stop + Pulse)" />
           <Stat value={formatClock(metrics.wallMs)} label="wall-clock time" />
           <Stat value={metrics.parallelSpeedup ? `${metrics.parallelSpeedup.toFixed(1)}×` : "—"} label="parallel speedup" />
         </div>
