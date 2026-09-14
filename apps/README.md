@@ -10,6 +10,7 @@ Current apps:
 
 | App | Language | Purpose |
 | --- | --- | --- |
+| [`typescript/macrodial`](typescript/macrodial/) | TypeScript / Node | No-call review of MacroDial's governed CALL-E playbook/task schema and persisted synthetic outcome transitions; includes hosted Auto Config and Smart Data Loader workflow documentation. |
 | [`go/callhook`](go/callhook/) | Go / TypeScript | Event-driven CALL-E calling platform: webhook in, structured outcome back, goal-driven campaigns with early-stop and budgets, 19 doc-verified platform webhooks, MCP server, and an embedded war-room UI. Dry-run by default. |
 | [`typescript/wever-callback`](typescript/wever-callback/) | TypeScript / Node.js | Consignment-boutique callback inbox with customer requests, approved CALL-E interviews, saved conversations and staff-confirmed next steps; local no-call mode by default. |
 | [`python/aftercall`](python/aftercall) | Python / React | AI post-discharge care coordinator that uses CALL-E to conduct consent-aware follow-up calls, collect structured patient-reported recovery information, identify risk signals, and to escalate concerning responses to a human care team . |
