@@ -1,0 +1,68 @@
+{
+ "id": "fixture-dialtone-bot",
+ "status": "completed",
+ "task": "GOAL: Book a table for two this Friday at 7 PM under the name Jordan Lee.\n\nYou are an AI assistant calling on behalf of Jordan Lee. Follow the DIALTONE v1 calling protocol.\n\nOPENING: As soon as someone answers, say exactly: \"Hi, I'm an AI assistant calling on behalf of Jordan Lee. Dialtone one, code four seven two.\" Then pause briefly.\n\nCLASSIFY the other side within your first two exchanges:\n- It is an AUTOMATED AGENT if it replies \"Dialtone one acknowledged\", or says it is a virtual/AI/automated assistant, or answers instantly in long polished sentences.\n- It is a PHONE MENU if it lists options such as \"press 1\".\n- Otherwise treat it as a HUMAN. When unsure, treat it as a HUMAN.\n\nMACHINE MODE (the other side is an automated agent):\n- Do not repeat the disclosure, do not make small talk, do not thank repeatedly.\n- Speak in short \"field: value\" sentences, one request per sentence. Example:\n  \"Request: table booking. Party: 2. Time: Friday 7 PM. Name: Oren. Flexibility: plus or minus one hour.\"\n- Ask for exactly: the outcome, a confirmation code, and \"Human review: yes or no?\"\n- If the other agent confirms without giving a confirmation code, ask once for a code or a written confirmation.\n- Hang up as soon as those fields are answered.\n\nHUMAN MODE (the other side is a person):\n- Keep the full disclosure: you are an AI assistant calling on behalf of the customer.\n- Speak slowly and naturally, one question at a time, and let them finish.\n- If they ask what \"dialtone\" means, say it is a signal for other automated systems and they can ignore it.\n\nPHONE MENU MODE (the other side is a recorded menu / IVR):\n- Navigate the menu with keypad tones or short spoken options toward the goal; do not converse with the recording.\n- If the menu reaches a human, switch to HUMAN MODE.\n\nHONESTY: Never say something is confirmed unless the other side explicitly confirmed it. Record whether the confirmation came from a person or from an automated agent, and any confirmation code exactly as spoken.",
+ "task_completed": true,
+ "completion_confidence": {
+  "score": 0.93,
+  "label": "high"
+ },
+ "structured_result": {
+  "counterpart_type": "agent",
+  "handshake_acknowledged": "yes",
+  "outcome": "confirmed",
+  "confirmation_code": "LT4471",
+  "human_review": "no",
+  "details": "Agent confirmed with code LT4471."
+ },
+ "evidence": [],
+ "_fixture": true,
+ "recipients": [
+  {
+   "phones": [
+    "+14155550100"
+   ],
+   "attempts": [
+    {
+     "transcript_turns": [
+      {
+       "speaker": "user",
+       "text": "Thank you for calling Luigi's Trattoria. I'm Nova, the virtual reservations assistant. How can I help?",
+       "offset_seconds": 0.9
+      },
+      {
+       "speaker": "bot",
+       "text": "Hi, I'm an AI assistant calling on behalf of Jordan Lee. Dialtone one, code four seven two.",
+       "offset_seconds": 7.83
+      },
+      {
+       "speaker": "user",
+       "text": "Dialtone one acknowledged, code four seven two. Automated agent. Human review: no.",
+       "offset_seconds": 15.43
+      },
+      {
+       "speaker": "bot",
+       "text": "Request: table booking. Party: 2. Time: Friday 7 PM. Name: Jordan Lee. Need: status, confirmation code, human review.",
+       "offset_seconds": 20.97
+      },
+      {
+       "speaker": "user",
+       "text": "Status: confirmed. Code: L T four four seven one. Party: 2. Time: Friday 7 PM. Human review: no.",
+       "offset_seconds": 29.04
+      },
+      {
+       "speaker": "bot",
+       "text": "Received. Code L T four four seven one. Goodbye.",
+       "offset_seconds": 36.71
+      },
+      {
+       "speaker": "user",
+       "text": "Goodbye.",
+       "offset_seconds": 41.24
+      }
+     ]
+    }
+   ]
+  }
+ ]
+}

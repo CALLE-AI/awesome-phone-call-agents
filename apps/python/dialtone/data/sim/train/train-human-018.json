@@ -1,0 +1,66 @@
+{
+ "id": "train-human-018",
+ "label": "human",
+ "source": "sim-train",
+ "meta": {
+  "task": "check whether the store is open on Sunday",
+  "hard": true
+ },
+ "turns": [
+  {
+   "speaker": "user",
+   "text": "Summit Fitness, Leah speaking.",
+   "offset_seconds": 0.52
+  },
+  {
+   "speaker": "bot",
+   "text": "Hi, I'm an AI assistant calling on behalf of Jordan Lee. Could you tell me your opening hours this Sunday?",
+   "offset_seconds": 2.4
+  },
+  {
+   "speaker": "user",
+   "text": "uh, Oh, uh, Sundays",
+   "offset_seconds": 11.32
+  },
+  {
+   "speaker": "bot",
+   "text": "Thanks, and is parking available?",
+   "offset_seconds": 13.63
+  },
+  {
+   "speaker": "user",
+   "text": "Yep, you're all",
+   "offset_seconds": 16.43
+  },
+  {
+   "speaker": "bot",
+   "text": "Thanks, and is parking available?",
+   "offset_seconds": 18.71
+  },
+  {
+   "speaker": "user",
+   "text": "Sure, yeah, confirmed.",
+   "offset_seconds": 21.17
+  },
+  {
+   "speaker": "bot",
+   "text": "Thank you so much, that's all I needed.",
+   "offset_seconds": 23.11
+  },
+  {
+   "speaker": "user",
+   "text": "yeah, um, Sure.",
+   "offset_seconds": 26.56
+  },
+  {
+   "speaker": "bot",
+   "text": "Thank you so much, that's all I needed.",
+   "offset_seconds": 28.69
+  },
+  {
+   "speaker": "user",
+   "text": "You too, bye.",
+   "offset_seconds": 31.74
+  }
+ ]
+}

@@ -1,0 +1,9 @@
+{
+  "appointment_id": "appt-1042",
+  "patient_name": "Daniel Kim",
+  "phone": "(212) 555-0116",
+  "language": "en-US",
+  "service_type": "Dental Cleaning",
+  "appointment_at": "2026-09-11T20:30:00Z",
+  "consent_to_call": true
+}

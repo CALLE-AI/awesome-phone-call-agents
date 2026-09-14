@@ -1,0 +1,90 @@
+{
+  "id": "eval-031",
+  "label": "agent",
+  "difficulty": "hard",
+  "scenario": "ISP voice agent is interrupted twice by the caller (barge-in), stops mid-sentence and recovers gracefully; issues confirmation number and SMS.",
+  "task": "Reschedule Robert Haines's Tuesday repair technician visit to Friday morning.",
+  "outcome": {
+    "task_completed_claimed": true,
+    "commitment_type": "reschedule",
+    "confirmation_artifact": "confirmation number TK5508; SMS sent to account mobile",
+    "expected_attestation": "agent_asserted"
+  },
+  "turns": [
+    {
+      "speaker": "user",
+      "text": "hello, you've reached Fibernet customer care. I'm an AI assistant. I can help with appointments, outages, and billing. what can I do for you today?",
+      "offset_seconds": 1.1
+    },
+    {
+      "speaker": "bot",
+      "text": "hi, I'm an AI assistant calling on behalf of Robert Haines to reschedule his technician appointment.",
+      "offset_seconds": 10.31
+    },
+    {
+      "speaker": "user",
+      "text": "sure. I see an installation appointment for Robert Haines at seven Crestview Court on Tuesday, September fifteenth, between eight AM and noon. would you like to move it to another day this week, or",
+      "offset_seconds": 16.83
+    },
+    {
+      "speaker": "bot",
+      "text": "sorry, it's actually a repair visit, not an installation.",
+      "offset_seconds": 27.75
+    },
+    {
+      "speaker": "user",
+      "text": "thanks for catching that. you're right, I see the repair visit for the intermittent connection issue, also on Tuesday from eight to noon. what day works better?",
+      "offset_seconds": 31.75
+    },
+    {
+      "speaker": "bot",
+      "text": "Friday morning, if possible.",
+      "offset_seconds": 41.75
+    },
+    {
+      "speaker": "user",
+      "text": "I have Friday, September eighteenth, from eight to ten AM, or ten AM to noon.",
+      "offset_seconds": 44.43
+    },
+    {
+      "speaker": "bot",
+      "text": "eight to ten.",
+      "offset_seconds": 50.2
+    },
+    {
+      "speaker": "user",
+      "text": "you're booked for Friday, September eighteenth, from eight to ten AM. your confirmation number is T K 5 5 0 8, and I've",
+      "offset_seconds": 52.23
+    },
+    {
+      "speaker": "bot",
+      "text": "sorry, could you repeat the confirmation number?",
+      "offset_seconds": 59.66
+    },
+    {
+      "speaker": "user",
+      "text": "of course. T as in Tango, K as in Kilo, five, five, zero, eight. I've also texted the details to the mobile number on the account.",
+      "offset_seconds": 62.87
+    },
+    {
+      "speaker": "bot",
+      "text": "thank you. and the Tuesday visit is cancelled?",
+      "offset_seconds": 72.7
+    },
+    {
+      "speaker": "user",
+      "text": "yes, the Tuesday appointment has been removed, and the technician will call before arriving on Friday.",
+      "offset_seconds": 76.46
+    },
+    {
+      "speaker": "bot",
+      "text": "great, thanks.",
+      "offset_seconds": 82.82
+    },
+    {
+      "speaker": "user",
+      "text": "you're welcome. have a good day.",
+      "offset_seconds": 84.41
+    }
+  ]
+}

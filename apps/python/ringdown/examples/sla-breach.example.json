@@ -1,0 +1,22 @@
+{
+  "id": "sla-2026-09-12-0042",
+  "title": "uptime below the 99.9% floor for the third month running",
+  "severity": "p2",
+  "service": "payments-gateway",
+  "summary": "Measured uptime is 99.41% against a 99.9% contractual floor, and the contract requires a named owner within fifteen minutes of notice.",
+  "script": "sla-breach.script.txt",
+  "ladder": [
+    "primary",
+    "secondary",
+    "incident_commander"
+  ],
+  "timezone": "America/Argentina/Buenos_Aires",
+  "policy": {
+    "min_confidence": 0.7,
+    "accepted_confidence_labels": [
+      "medium",
+      "high"
+    ],
+    "max_eta_minutes": 120
+  }
+}
