@@ -3,7 +3,7 @@
 Exception Broker is an execution-control layer for operational decisions acquired through CALL-E.
 
 - Public demo: https://exception-broker-production.up.railway.app
-- Demo video: https://youtu.be/Smw7aXyl0fI
+- Demo video: https://youtu.be/Smw7aXyI0fI
 - Runtime: TypeScript, React, Node.js, Vite, Zod, Motion, and CALL-E.
 
 Exception Broker is an externally hosted user-facing application. It is not a CALL-E SDK or a supported CALL-E API.
