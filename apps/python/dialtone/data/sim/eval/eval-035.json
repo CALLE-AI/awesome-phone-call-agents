@@ -1,0 +1,85 @@
+{
+  "id": "eval-035",
+  "label": "ivr",
+  "difficulty": "hard",
+  "scenario": "Speech IVR for car-rental reservations with natural 'okay, got it' phrasing, character-by-character confirmation retry, reads a cancellation number.",
+  "task": "Cancel Paul Nakamura's car rental reservation at Sacramento airport.",
+  "outcome": {
+    "task_completed_claimed": true,
+    "commitment_type": "cancellation",
+    "confirmation_artifact": "cancellation number CX7719; cancellation email sent",
+    "expected_attestation": "system_asserted"
+  },
+  "turns": [
+    {
+      "speaker": "user",
+      "text": "hi, you've reached Meridian Car Rental reservations. I can help you book, change, or cancel a reservation. what would you like to do?",
+      "offset_seconds": 0.6
+    },
+    {
+      "speaker": "bot",
+      "text": "hi, I'm an AI assistant calling on behalf of Paul Nakamura. I need to cancel his car rental reservation.",
+      "offset_seconds": 10.92
+    },
+    {
+      "speaker": "user",
+      "text": "okay. cancel a reservation. got it. what's your confirmation number? you can say it, or key it in.",
+      "offset_seconds": 18.37
+    },
+    {
+      "speaker": "bot",
+      "text": "M R, eight eight four, two one six.",
+      "offset_seconds": 27.15
+    },
+    {
+      "speaker": "user",
+      "text": "sorry, I didn't catch that. please say your confirmation number one character at a time. for example, M, R, one, two, three.",
+      "offset_seconds": 30.79
+    },
+    {
+      "speaker": "bot",
+      "text": "M. R. eight. eight. four. two. one. six.",
+      "offset_seconds": 41.04
+    },
+    {
+      "speaker": "user",
+      "text": "thanks. I found a reservation for. paul nakamura. picking up at. Sacramento International Airport. on. september nineteenth. at. ten A M. is that the one you want to cancel?",
+      "offset_seconds": 45.6
+    },
+    {
+      "speaker": "bot",
+      "text": "yes.",
+      "offset_seconds": 60.3
+    },
+    {
+      "speaker": "user",
+      "text": "and just to be sure. once it's cancelled, it can't be restored. should I go ahead and cancel it? please say yes, or no.",
+      "offset_seconds": 61.57
+    },
+    {
+      "speaker": "bot",
+      "text": "yes, go ahead.",
+      "offset_seconds": 72.46
+    },
+    {
+      "speaker": "user",
+      "text": "okay. your reservation has been cancelled. your cancellation number is. C. X. seven. seven. one. nine. I'll also send a cancellation email to the address on file. to hear your cancellation number again, say repeat. otherwise, you can hang up.",
+      "offset_seconds": 74.4
+    },
+    {
+      "speaker": "bot",
+      "text": "repeat.",
+      "offset_seconds": 94.07
+    },
+    {
+      "speaker": "user",
+      "text": "your cancellation number is. C. X. seven. seven. one. nine.",
+      "offset_seconds": 95.27
+    },
+    {
+      "speaker": "bot",
+      "text": "thank you, goodbye.",
+      "offset_seconds": 101.75
+    }
+  ]
+}

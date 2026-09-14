@@ -1,0 +1,6 @@
+{
+  "event": "call.completed",
+  "call_id": "call_synthetic_webhook_completed_0001",
+  "timestamp": "2026-09-01T12:03:21Z",
+  "note": "Replayed delivery fixture. Unsigned on the real platform: only the event name and call id are ever read; Synthetic scenario."
+}

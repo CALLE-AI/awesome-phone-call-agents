@@ -1,0 +1,30 @@
+{
+  "id": "wrong_person",
+  "status": "completed",
+  "task_completed": false,
+  "completion_confidence": { "score": 0.9, "label": "high" },
+  "disposition": "wrong_person",
+  "evidence": [
+    "The person who answered said this is not the intended household and asked not to be called again."
+  ],
+  "structured_result": {
+    "dialed_count": 1,
+    "reached_count": 1,
+    "unreached_count": 0,
+    "critical_count": 0
+  },
+  "recipient_structured_result": {
+    "safety_status": "unknown",
+    "evacuation": "unknown",
+    "has_power": "unknown",
+    "has_water": "unknown",
+    "medication": "unknown",
+    "household": "unknown",
+    "needs_human": "unknown"
+  },
+  "transcript_turns": [
+    { "offset_seconds": 0, "speaker": "bot", "text": "This is an automated AI assistant from Sonoma County Emergency Management calling for a safety and needs check." },
+    { "offset_seconds": 8, "speaker": "user", "text": "You've got the wrong number. Nobody by that name lives here." },
+    { "offset_seconds": 13, "speaker": "bot", "text": "Thank you. I will record that this is the wrong person and end the call." }
+  ]
+}

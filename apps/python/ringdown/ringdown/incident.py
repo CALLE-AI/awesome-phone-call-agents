@@ -9,11 +9,13 @@ from typing import Any, Literal, Mapping, Sequence, get_args
 from urllib.parse import urlparse
 from zoneinfo import ZoneInfo, ZoneInfoNotFoundError
 
-Severity = Literal["sev1", "sev2", "sev3"]
+from ringdown.task import CALL_TASK, TaskError, spoken_fields_in, validate_task_template
+
+Severity = Literal["sev1", "sev2", "sev3", "p1", "p2", "p3", "p4", "p5"]
 
 E164 = re.compile(r"^\+[1-9]\d{7,14}$")
 
-REQUIRED_INCIDENT_FIELDS = ("id", "title", "severity", "service", "summary", "ladder")
+REQUIRED_INCIDENT_FIELDS = ("id", "title", "summary", "ladder")
 REQUIRED_CONTACT_FIELDS = ("id", "name", "phone", "timezone")
 SEVERITIES = get_args(Severity)
 SPOKEN_LIMITS = {"title": 200, "summary": 600, "service": 80, "id": 80, "runbook_url": 200}
@@ -65,6 +67,7 @@ class Incident:
     ladder: tuple[str, ...]
     timezone: str
     policy: Policy
+    script: str = CALL_TASK
 
 
 @dataclass(frozen=True)
@@ -188,10 +191,11 @@ def parse_policy(raw: Any) -> Policy:
     return policy
 
 
-def parse_incident(raw: Mapping[str, Any]) -> Incident:
-    require(raw, REQUIRED_INCIDENT_FIELDS, "the incident")
-    severity = str(raw["severity"]).lower()
-    if severity not in SEVERITIES:
+def parse_incident(raw: Mapping[str, Any], script: str = CALL_TASK) -> Incident:
+    spoken = spoken_fields_in(script)
+    require(raw, dict.fromkeys(REQUIRED_INCIDENT_FIELDS + spoken), "the incident")
+    severity = str(raw.get("severity", "")).lower()
+    if severity and severity not in SEVERITIES:
         raise IncidentError(f"severity must be one of {', '.join(SEVERITIES)}, got {severity!r}")
     ladder = raw["ladder"]
     if not isinstance(ladder, (list, tuple)) or not all(isinstance(x, str) and x for x in ladder):
@@ -202,17 +206,36 @@ def parse_incident(raw: Mapping[str, Any]) -> Incident:
         id=clean_text(raw["id"], "the incident id", SPOKEN_LIMITS["id"]),
         title=clean_text(raw["title"], "the incident title", SPOKEN_LIMITS["title"]),
         severity=severity,
-        service=clean_text(raw["service"], "the incident service", SPOKEN_LIMITS["service"]),
+        service=(
+            clean_text(raw["service"], "the incident service", SPOKEN_LIMITS["service"])
+            if "service" in spoken
+            else ""
+        ),
         summary=clean_text(raw["summary"], "the incident summary", SPOKEN_LIMITS["summary"]),
         runbook_url=validate_runbook_url(raw.get("runbook_url")),
         ladder=tuple(ladder),
         timezone=validate_timezone(raw.get("timezone"), "the incident timezone"),
         policy=parse_policy(raw.get("policy")),
+        script=script,
     )
 
 
 def load_incident(path: Path) -> Incident:
-    return parse_incident(read_json(path, "incident"))
+    raw = read_json(path, "incident")
+    named = raw.get("script")
+    if not named:
+        return parse_incident(raw)
+    beside = path.parent.resolve()
+    script = (beside / str(named)).resolve()
+    if not script.is_relative_to(beside):
+        raise IncidentError(f"the incident names a call script outside {beside}")
+    if not script.is_file():
+        raise IncidentError(f"the incident names a call script at {script}, which does not exist")
+    try:
+        template = validate_task_template(script.read_text(), f"the call script {named}")
+    except (TaskError, UnicodeDecodeError) as error:
+        raise IncidentError(str(error)) from error
+    return parse_incident(raw, template)
 
 
 def parse_contact(raw: Any, where: str) -> Contact:

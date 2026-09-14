@@ -1,0 +1,65 @@
+{
+  "config_id": "sample-xyz-apartments",
+  "version": "1.0",
+  "address": {
+    "label": "XYZ Apartments, Kondapur",
+    "formal_address": "12-3-45, XYZ Apartments, Kondapur Main Road, Hyderabad - 500084",
+    "city": "Hyderabad",
+    "region_code": "IN"
+  },
+  "landmark": {
+    "name": "Apollo Pharmacy",
+    "type": "pharmacy",
+    "disambiguation_note": "Not the Apollo Pharmacy near the metro station — this one is on the main road."
+  },
+  "building_description": {
+    "distinguishing_features": [
+      "Blue and white building",
+      "XYZ Apartments signboard above the entrance"
+    ],
+    "height_or_type": "G+4 apartment block"
+  },
+  "approach_from": [
+    {
+      "direction_label": "Coming from the main road / Botanical Garden side",
+      "instructions": "Pass Apollo Pharmacy, take the second left. The building is on your right after 100 meters.",
+      "landmark_sequence": ["Apollo Pharmacy"]
+    },
+    {
+      "direction_label": "Coming from the flyover side",
+      "instructions": "Take the service road exit, go straight for two blocks. The building is on the left, opposite a small park.",
+      "landmark_sequence": ["the flyover", "the small park"]
+    }
+  ],
+  "entrance_details": {
+    "location": "Main gate on the left",
+    "identifying_marks": "XYZ Apartments sign above the entrance",
+    "access_notes": "Security allows delivery drivers in without calling up"
+  },
+  "units": [
+    {
+      "unit_identifier": "Flat 302",
+      "floor": "3rd floor",
+      "in_building_directions": "Take the lift to the 3rd floor, it's the 2nd door on the left. No nameplate — look for the door with a black gate.",
+      "consignee_name": "Priya"
+    }
+  ],
+  "escalation": {
+    "trigger_conditions": [
+      "Driver still can't locate the building after being guided through both approach directions",
+      "Driver reports Apollo Pharmacy is no longer recognizable/visible"
+    ],
+    "contact": {
+      "contact_name": "Priya",
+      "recipient_phone": "+14155550199"
+    }
+  },
+  "language": {
+    "locale": "en-IN",
+    "allow_code_switch": true
+  },
+  "metadata": {
+    "created_at": "2026-09-13",
+    "last_verified_at": "2026-09-13"
+  }
+}
