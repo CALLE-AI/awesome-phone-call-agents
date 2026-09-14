@@ -1,0 +1,38 @@
+{
+  "id": "outage-medical",
+  "title": "Power outage check for people who depend on electric medical devices",
+  "hazard_noun": "power outage",
+  "life_safety": true,
+  "triggers": {
+    "nws_events": [],
+    "open_meteo": null
+  },
+  "purpose": "check that a person who depends on an electric medical device (oxygen, ventilator, dialysis, refrigerated insulin, powered wheelchair) is safe during a power outage",
+  "questions": [
+    "Is your power out right now, and is your medical device still working?",
+    "If you use oxygen or a battery, roughly how many hours of backup do you have left?",
+    "Do you feel short of breath, dizzy, or unwell?",
+    "Is there anything you need: a ride to a place with power, a charged battery, your medication kept cold, or someone to come by?"
+  ],
+  "confusion_probe": "If the person seems confused or disoriented, gently ask once: Can you tell me what day it is today?",
+  "red_flags": [
+    "device not working and no backup power",
+    "less than four hours of backup power",
+    "difficulty breathing or chest pain",
+    "confusion or disorientation"
+  ],
+  "advice": [
+    "Keep the device's backup battery connected and avoid opening the fridge if insulin is stored there.",
+    "Keep your phone charged and near you.",
+    "If breathing becomes difficult, call {{emergency_number}} immediately."
+  ],
+  "red_flag_instruction": "If the device is not working, backup is nearly gone, or breathing is difficult, tell the person calmly to call {{emergency_number}} now and that you are alerting their emergency contact. Do not attempt to troubleshoot the medical device.",
+  "resource_label": "community resource centre with power",
+  "follow_up_hours": 2,
+  "voicemail_message": "This is an automated welfare call from {{org}} because of the power outage. If your medical device has no power, call {{emergency_number}}. We will try again shortly.",
+  "escalation_reason_templates": {
+    "red": "reported a problem with their medical device or health during our outage welfare call: {{reasons}}",
+    "unreachable": "could not be reached by phone after {{attempts}} attempts during the power outage",
+    "unverified": "answered but we could not confirm their medical device has power"
+  }
+}

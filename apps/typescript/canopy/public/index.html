@@ -1,0 +1,215 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Canopy roll call</title>
+<link rel="icon" href="data:," />
+<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" crossorigin="" />
+<style>
+  :root {
+    --bg: #0f1418; --panel: #171e24; --panel-2: #1d262e; --line: #2a353f; --text: #e8eef2; --muted: #8fa0ad;
+    --green: #2ecc71; --yellow: #f1c40f; --red: #e74c3c; --grey: #7f8c8d; --blue: #3498db; --violet: #9b59b6; --orange: #e67e22;
+    font-family: -apple-system, "Segoe UI", Inter, Roboto, sans-serif;
+  }
+  * { box-sizing: border-box; }
+  body { margin: 0; background: var(--bg); color: var(--text); }
+  header { display: flex; align-items: center; gap: 14px; padding: 12px 20px; border-bottom: 1px solid var(--line); background: var(--panel); position: sticky; top: 0; z-index: 10; flex-wrap: wrap; }
+  header h1 { font-size: 18px; margin: 0; letter-spacing: 0.3px; }
+  header .sub { color: var(--muted); font-size: 13px; }
+  .badge { font-size: 11px; padding: 3px 8px; border-radius: 999px; border: 1px solid var(--line); color: var(--muted); text-transform: uppercase; letter-spacing: 0.6px; }
+  .badge.live { border-color: var(--red); color: var(--red); }
+  .badge.dry { border-color: var(--blue); color: var(--blue); }
+  .spacer { flex: 1; }
+  button { background: var(--panel-2); color: var(--text); border: 1px solid var(--line); border-radius: 8px; padding: 8px 12px; font-size: 13px; cursor: pointer; }
+  button:hover { border-color: var(--muted); }
+  button:disabled { opacity: 0.5; cursor: default; }
+  button.primary { background: #1f4d7a; border-color: #2b6ca8; }
+  button.approve { background: #5a1f1f; border-color: #8e2a2a; }
+  main { display: grid; grid-template-columns: 1.15fr 1fr; gap: 16px; padding: 16px 20px; }
+  @media (max-width: 1000px) { main { grid-template-columns: 1fr; } }
+  section { background: var(--panel); border: 1px solid var(--line); border-radius: 12px; padding: 14px; min-width: 0; }
+  section h2 { margin: 0 0 10px; font-size: 13px; color: var(--muted); text-transform: uppercase; letter-spacing: 0.8px; }
+  .kpis { display: grid; grid-template-columns: repeat(6, 1fr); gap: 8px; grid-column: 1 / -1; }
+  @media (max-width: 1000px) { .kpis { grid-template-columns: repeat(3, 1fr); } }
+  .kpi { background: var(--panel-2); border-radius: 10px; padding: 10px 12px; border-left: 4px solid var(--line); }
+  .kpi .v { font-size: 26px; font-weight: 600; line-height: 1.1; }
+  .kpi .l { font-size: 12px; color: var(--muted); margin-top: 2px; }
+  .kpi.green { border-left-color: var(--green); } .kpi.yellow { border-left-color: var(--yellow); } .kpi.red { border-left-color: var(--red); } .kpi.grey { border-left-color: var(--grey); } .kpi.blue { border-left-color: var(--blue); } .kpi.orange { border-left-color: var(--orange); }
+  #map { height: 320px; border-radius: 10px; background: #0b1014; }
+  /* OpenStreetMap tiles need no key; the filter gives them the dashboard's dark palette. */
+  #map .leaflet-tile-pane { filter: invert(1) hue-rotate(180deg) brightness(0.82) contrast(0.9) saturate(0.6); }
+  .people { display: grid; grid-template-columns: repeat(auto-fill, minmax(240px, 1fr)); gap: 10px; }
+  .card { background: var(--panel-2); border-radius: 10px; padding: 10px 12px; border-left: 4px solid var(--grey); }
+  .card.green { border-left-color: var(--green); } .card.yellow { border-left-color: var(--yellow); } .card.red { border-left-color: var(--red); } .card.unreachable { border-left-color: var(--grey); } .card.unverified { border-left-color: var(--violet); } .card.declined { border-left-color: #5dade2; } .card.pending { border-left-color: var(--line); } .card.calling { border-left-color: var(--blue); animation: pulse 1.2s infinite; } .card.awaiting { border-left-color: var(--blue); } .card.not_attempted { border-left-color: var(--orange); }
+  @keyframes pulse { 0% { box-shadow: 0 0 0 0 rgba(52,152,219,.45); } 100% { box-shadow: 0 0 0 10px rgba(52,152,219,0); } }
+  .card .name { font-weight: 600; }
+  .card .meta { font-size: 12px; color: var(--muted); }
+  .card .why { font-size: 12px; margin-top: 6px; }
+  .card .quote { font-size: 12px; color: #c9d6e0; font-style: italic; margin-top: 4px; }
+  .pill { display: inline-block; font-size: 11px; padding: 2px 7px; border-radius: 999px; text-transform: uppercase; letter-spacing: 0.5px; margin-left: 6px; }
+  .pill.green { background: rgba(46,204,113,.18); color: var(--green); } .pill.yellow { background: rgba(241,196,15,.18); color: var(--yellow); } .pill.red { background: rgba(231,76,60,.2); color: var(--red); } .pill.unreachable { background: rgba(127,140,141,.2); color: #b8c2c6; } .pill.unverified { background: rgba(155,89,182,.2); color: #c9a3dc; } .pill.declined { background: rgba(93,173,226,.2); color: #a9d6f5; } .pill.pending { background: rgba(42,53,63,.6); color: #9fb0bd; } .pill.calling, .pill.awaiting { background: rgba(52,152,219,.2); color: #8ec5ef; } .pill.not_attempted { background: rgba(230,126,34,.2); color: #f0b27a; }
+  .timeline { max-height: 340px; overflow: auto; font-size: 12px; font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; }
+  .timeline div { padding: 3px 0; border-bottom: 1px dashed var(--line); }
+  .timeline .t { color: var(--muted); margin-right: 8px; }
+  .timeline .error { color: var(--red); } .timeline .warning { color: var(--yellow); }
+  .dispatch { display: flex; align-items: center; gap: 10px; padding: 8px 0; border-bottom: 1px solid var(--line); font-size: 13px; }
+  .dispatch .k { font-size: 11px; text-transform: uppercase; letter-spacing: 0.5px; color: var(--muted); min-width: 130px; }
+  .dispatch .k.emergency_services { color: var(--red); } .dispatch .k.not_attempted { color: var(--orange); }
+  .empty { color: var(--muted); font-size: 13px; }
+  .drill { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; }
+  select, input { background: var(--panel-2); color: var(--text); border: 1px solid var(--line); border-radius: 8px; padding: 7px 9px; font-size: 13px; }
+  footer { padding: 10px 20px 24px; color: var(--muted); font-size: 12px; }
+  .banner { grid-column: 1 / -1; background: #3a2a10; border: 1px solid #7a5a1a; color: #f3d9a4; border-radius: 10px; padding: 10px 12px; font-size: 13px; }
+</style>
+</head>
+<body>
+<header>
+  <div>
+    <h1>Canopy <span class="sub">hazard roll call on CALL-E</span></h1>
+    <div class="sub" id="headline">No event yet</div>
+  </div>
+  <span class="badge" id="mode">mode</span>
+  <span class="badge" id="conn">connecting</span>
+  <div class="spacer"></div>
+  <div class="drill" id="drill">
+    <select id="event"><option value="">Load past event...</option></select>
+    <select id="registry"></select>
+    <select id="hazard">
+      <option value="heat">heat</option><option value="flood">flood</option><option value="outage-medical">outage-medical</option><option value="smoke">smoke</option><option value="boil-water">boil-water</option>
+    </select>
+    <input id="area" value="Maricopa County, AZ" size="20" />
+    <button class="primary" id="start">Start drill (dry-run)</button>
+  </div>
+  <button id="reportBtn">After-action report</button>
+</header>
+<main>
+  <div class="kpis" id="kpis"></div>
+  <div class="banner" id="banner" hidden></div>
+  <section>
+    <h2>Registry map</h2>
+    <div id="map"></div>
+  </section>
+  <section>
+    <h2>Dispatch queue <span class="sub">(a human owns every escalation)</span></h2>
+    <div id="dispatch"><div class="empty">Nothing to dispatch.</div></div>
+  </section>
+  <section style="grid-column: 1 / -1;">
+    <h2>People</h2>
+    <div class="people" id="people"><div class="empty">Load or start an event.</div></div>
+  </section>
+  <section style="grid-column: 1 / -1;">
+    <h2>Live timeline <span class="sub">(ledger stream; phone numbers masked)</span></h2>
+    <div class="timeline" id="timeline"></div>
+  </section>
+</main>
+<footer>Dry-run drills simulate conversations with the local fake CALL-E server. Live runs are started only from the command line with <code>--confirm</code>. Quiet hours and idempotency keys are enforced in code.</footer>
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js" crossorigin=""></script>
+<script>
+(function () {
+  const $ = (id) => document.getElementById(id);
+  const params = new URLSearchParams(location.search);
+  let token = params.get("token") || null;
+  try { if (token) localStorage.setItem("canopy_token", token); else token = localStorage.getItem("canopy_token"); } catch (e) { /* storage unavailable */ }
+  const withToken = (url) => token ? url + (url.includes("?") ? "&" : "?") + "token=" + encodeURIComponent(token) : url;
+  const api = (url, opts) => fetch(withToken(url), Object.assign({ headers: Object.assign({ "content-type": "application/json" }, token ? { authorization: "Bearer " + token } : {}) }, opts || {}));
+  let map = null, markers = [];
+  const COLOURS = { green: "#2ecc71", yellow: "#f1c40f", red: "#e74c3c", declined: "#5dade2", unreachable: "#7f8c8d", unverified: "#9b59b6", not_attempted: "#e67e22", calling: "#3498db", awaiting: "#3498db", pending: "#4a5a68" };
+  function ensureMap(people) {
+    if (typeof L === "undefined") { $("map").innerHTML = '<div class="empty" style="padding:12px">Map tiles unavailable offline; see the people list below.</div>'; return; }
+    if (!map) {
+      map = L.map("map", { zoomControl: false }).setView([20, 0], 2);
+      L.tileLayer("https://tile.openstreetmap.org/{z}/{x}/{y}.png", { attribution: "&copy; OpenStreetMap contributors", maxZoom: 18 }).addTo(map);
+    }
+    for (const m of markers) m.remove();
+    markers = [];
+    const pts = [];
+    for (const p of people) {
+      if (p.lat === null || p.lng === null) continue;
+      const colour = COLOURS[p.status] || COLOURS.pending;
+      const m = L.circleMarker([p.lat, p.lng], { radius: p.outcome === "red" ? 11 : 8, color: colour, fillColor: colour, fillOpacity: 0.85, weight: 2 })
+        .bindTooltip(`${p.name} (${p.language}) - ${p.status}`).addTo(map);
+      markers.push(m); pts.push([p.lat, p.lng]);
+    }
+    if (pts.length > 1) map.fitBounds(pts, { padding: [20, 20] });
+    else if (pts.length === 1) map.setView(pts[0], 12);
+  }
+  function fmtSec(s) { if (s === null || s === undefined) return "-"; return s < 90 ? s + "s" : Math.floor(s / 60) + "m " + (s % 60) + "s"; }
+  function esc(s) { return String(s).replace(/[&<>"]/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c])); }
+  function render(state) {
+    const k = state.kpis || {};
+    $("headline").textContent = state.event ? `${state.event.headline}${state.event.headline.includes(state.event.area) ? "" : " - " + state.event.area} - ${state.event.org}${state.running ? " - roll call in progress" : ""}` : "No event yet";
+    const mode = state.mode || "dry-run";
+    $("mode").textContent = mode; $("mode").className = "badge " + (mode === "live" ? "live" : "dry");
+    $("kpis").innerHTML = [
+      ["blue", k.people ?? 0, "on registry"],
+      ["blue", k.reached ?? 0, `reached (${k.reachRate == null ? "-" : Math.round(k.reachRate * 100) + "%"})`],
+      ["green", k.green ?? 0, "green"],
+      ["yellow", k.yellow ?? 0, "yellow"],
+      ["red", k.red ?? 0, "red"],
+      ["grey", (k.unreachable ?? 0) + (k.unverified ?? 0) + (k.declined ?? 0), "unreachable / unverified / declined"],
+      ["orange", (k.notAttempted ?? 0) + (k.pending ?? 0), "not attempted / awaiting"],
+      ["blue", k.calls ?? 0, "CALL-E call tasks"],
+      ["blue", k.escalations ?? 0, "escalation calls"],
+      ["blue", k.dispatches ?? 0, "dispatch tickets"],
+      ["blue", fmtSec(k.firstVerdictSeconds), "first verdict"],
+      ["blue", fmtSec(k.lastVerdictSeconds), "last verdict"],
+    ].map(([c, v, l]) => `<div class="kpi ${c}"><div class="v">${v}</div><div class="l">${l}</div></div>`).join("");
+    const failed = (state.failedWaves || []).length, pendingCalls = k.pendingCalls || 0;
+    const showBanner = !state.running && (failed > 0 || pendingCalls > 0);
+    $("banner").hidden = !showBanner;
+    if (showBanner) $("banner").textContent = `Incomplete: ${pendingCalls} call(s) still pending, ${failed} wave(s) not accepted by CALL-E. Nobody is escalated for a call that never happened. Run: canopy resume --event-id ${state.event ? state.event.id : ""}`;
+    const people = state.people || [];
+    $("people").innerHTML = people.length === 0 ? '<div class="empty">Load or start an event.</div>' : people.map((p) => {
+      const s = p.status || "pending";
+      return `<div class="card ${s}"><div class="name">${esc(p.name)}<span class="pill ${s}">${s.replace("_", " ")}</span></div>
+        <div class="meta">${esc(p.maskedPhone)} - ${esc(p.language)}${p.age ? " - " + p.age : ""}${p.livesAlone ? " - lives alone" : ""} - P${p.priority} risk ${p.riskScore} - attempts ${p.attempts}${p.agentTier && p.outcome && p.agentTier !== p.outcome ? ` - agent said ${p.agentTier}` : ""}</div>
+        ${p.reasons && p.reasons.length ? `<div class="why">${esc(p.reasons.join("; "))}</div>` : ""}
+        ${(p.evidence || []).slice(0, 2).map((q) => `<div class="quote">"${esc(q)}"</div>`).join("")}
+        ${p.nextAction ? `<div class="meta">next: ${esc(p.nextAction.type)}${p.contactResult ? ` - ${esc(p.contactName || "contact")}: will_check=${p.contactResult.will_check}, ETA ${p.contactResult.eta_minutes}m` : ""}</div>` : ""}
+      </div>`;
+    }).join("");
+    const d = state.dispatches || [];
+    $("dispatch").innerHTML = d.length === 0 ? '<div class="empty">Nothing to dispatch.</div>' : d.map((t) => `<div class="dispatch"><span class="k ${t.kind}">${t.kind.replace(/_/g, " ")}</span><span style="flex:1">${esc(t.summary)}</span>
+      ${t.needsHumanApproval ? (t.approvedAt ? '<span class="pill green">approved</span>' : `<button class="approve" data-id="${t.id}">Approve</button>`) : (t.etaMinutes ? `<span class="pill yellow">ETA ${t.etaMinutes}m</span>` : "")}</div>`).join("");
+    for (const b of document.querySelectorAll("button.approve")) b.onclick = () => api(`/api/dispatch/${b.dataset.id}/approve`, { method: "POST" });
+    const tl = state.timeline || [];
+    $("timeline").innerHTML = tl.slice(-120).reverse().map((e) => `<div class="${e.level}"><span class="t">${e.at.slice(11, 19)}</span>${esc(e.message)}</div>`).join("");
+    ensureMap(people);
+  }
+  function connect() {
+    const es = new EventSource(withToken("/api/stream"));
+    es.addEventListener("state", (e) => render(JSON.parse(e.data)));
+    es.onopen = () => { $("conn").textContent = "live"; };
+    es.onerror = () => { $("conn").textContent = "reconnecting"; };
+  }
+  async function loadLists() {
+    try {
+      const r = await api("/api/registries"); const body = await r.json();
+      $("registry").innerHTML = (body.registries || []).map((n) => `<option value="${esc(n)}">${esc(n.replace("registry.sample.", "").replace(".csv", "") === "registry.sample" ? "phoenix sample" : n.replace("registry.sample.", "").replace(".csv", "") + " sample")}</option>`).join("");
+      if (!body.canDrill) { $("start").disabled = true; $("start").textContent = "Drills disabled (live mode)"; }
+      $("registry").onchange = () => { if ($("registry").value.includes("ahmedabad")) $("area").value = "Ahmedabad, Gujarat"; else $("area").value = "Maricopa County, AZ"; };
+    } catch (e) { /* ignore */ }
+    try {
+      const r = await api("/api/events"); const body = await r.json();
+      $("event").innerHTML = '<option value="">Load past event...</option>' + (body.events || []).map((e) => `<option value="${esc(e.eventId)}">${esc(e.headline || e.eventId)} (${e.updatedAt.slice(0, 16).replace("T", " ")})</option>`).join("");
+    } catch (e) { /* ignore */ }
+  }
+  $("event").onchange = async () => { if ($("event").value) await api("/api/load", { method: "POST", body: JSON.stringify({ eventId: $("event").value }) }); };
+  $("reportBtn").onclick = () => window.open(withToken("/api/report"), "_blank");
+  $("start").onclick = async () => {
+    $("start").disabled = true;
+    try {
+      const r = await api("/api/run", { method: "POST", body: JSON.stringify({ hazard: $("hazard").value, area: $("area").value, registry: $("registry").value || undefined }) });
+      const body = await r.json();
+      if (!r.ok) alert(body.error || "could not start");
+      setTimeout(loadLists, 4000);
+    } finally { setTimeout(() => { $("start").disabled = false; }, 3000); }
+  };
+  api("/api/state").then((r) => r.json()).then(render).catch(() => undefined);
+  loadLists();
+  connect();
+})();
+</script>
+</body>
+</html>

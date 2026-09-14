@@ -1,0 +1,11 @@
+person_id,name,phone,locale,region,age,lives_alone,has_cooling,medical_risks,address,lat,lng,contact_name,contact_phone,contact_locale,consent,consent_date,notes,scenario
+p001,Rosa Delgado,+14155550101,es-US,US,84,yes,no,cardiac,"1200 W Camelback Rd, Apt 3B",33.5095,-112.0870,Miguel Delgado,+14155550111,es-US,yes,2026-05-02,Landline only; hard of hearing,red
+p002,Harold Finch,+14155550102,en-US,US,79,yes,unknown,copd;dementia,"4410 N 7th Ave",33.5010,-112.0830,Sarah Finch,+14155550112,en-US,yes,2026-05-14,Daughter lives across town,red-confusion
+p003,Kamla Devi,+14155550103,hi-IN,US,81,yes,no,diabetes,"2231 E Indian School Rd",33.4950,-112.0330,Anil Sharma,+14155550113,hi-IN,yes,2026-06-01,Prefers Hindi,yellow
+p004,Chen Wei,+14155550104,zh-CN,US,88,no,yes,cardiac;mobility,"815 N 3rd St",33.4570,-112.0680,Li Chen,+14155550114,zh-CN,yes,2026-04-20,Daughter usually at home,caregiver
+p005,Marguerite Bell,+14155550105,en-US,US,91,yes,yes,oxygen,"3300 S Central Ave",33.4200,-112.0740,James Bell,+14155550115,en-US,yes,2026-03-11,Home oxygen concentrator,unreachable
+p006,Tomas Reyes,+14155550106,es-US,US,68,no,yes,dialysis,"6001 W Thomas Rd",33.4800,-112.1880,Ana Reyes,+14155550116,es-US,yes,2026-06-18,,green
+p007,Priya Raman,+14155550107,ta-IN,US,72,yes,yes,,"1520 E Roosevelt St",33.4590,-112.0470,Karthik Raman,+14155550117,ta-IN,yes,2026-05-27,Prefers Tamil,slow-green
+p008,Samuel Okafor,+14155550108,en-US,US,76,yes,no,respiratory,"902 W Buckeye Rd",33.4370,-112.0860,,,,yes,2026-02-09,No emergency contact on file,unverified
+p009,Declined Person,+14155550109,en-US,US,70,yes,no,,"1 Nowhere St",33.4500,-112.0700,,,,no,,Never consented; must be skipped,green
+p010,Duplicate Phone,+14155550101,en-US,US,60,no,yes,,"Same phone as p001",33.4500,-112.0700,,,,yes,2026-01-01,Duplicate phone; must be skipped,green
