@@ -10,7 +10,7 @@ if not logger.handlers:
     )
 
 CONFIG_FILE = os.path.join(
-    os.path.dirname(__file__), "..", "config", "ta_in_oncall_config.json"
+    os.path.dirname(__file__), "..", "config", "hi_in_oncall_config.json"
 )
 # CONFIG_FILE_US = os.path.join(os.path.dirname(__file__), '..', 'config', 'us_oncall_config.json')
 PLAYBOOK_FILE = os.path.join(
@@ -127,9 +127,9 @@ def get_ontripfix_on_call_engineer():
                 return {
                     "shift_name": "Confluence Team Calendar On-Call",
                     "engineer": {
-                        "name": data.get("oncall_name", "Santhosh"),
-                        "phone": data.get("oncall_phone", "+919003939495"),
-                        "email": data.get("oncall_email", "sandyinspires@icloud.com"),
+                        "name": data.get("oncall_name", "Alex Morgan"),
+                        "phone": data.get("oncall_phone", "+15550199"),
+                        "email": data.get("oncall_email", "alex.morgan@example.com"),
                         "locale": "en_US",
                         "region": "US",
                         "source": "confluence_team_calendar_api",
@@ -140,28 +140,47 @@ def get_ontripfix_on_call_engineer():
                 f"[Confluence Service] Confluence Calendar API call failed: {e}"
             )
 
-    # Fallback to local config file
-    logger.info(
-        f"[Confluence Service] On-call details not found via Confluence Calendar. Reading local config file '{CONFIG_FILE}'..."
-    )
-    if os.path.exists(CONFIG_FILE):
-        try:
-            with open(CONFIG_FILE, "r") as f:
-                data = json.load(f)
-            logger.info(
-                f"[Confluence Service] Loaded on-call engineer '{data['engineer']['name']}' from local config."
-            )
-            return data
-        except Exception as err:
-            logger.error(
-                f"[Confluence Service] Error reading local oncall config file: {err}"
-            )
+    # Fallback to local config file or example config file
+    candidate_files = [
+        CONFIG_FILE,
+        f"{CONFIG_FILE}.example",
+        os.path.join(os.path.dirname(__file__), "..", "config", "oncall_config.json.example"),
+    ]
+    for cfg_path in candidate_files:
+        if os.path.exists(cfg_path):
+            try:
+                with open(cfg_path, "r") as f:
+                    data = json.load(f)
+                logger.info(
+                    f"[Confluence Service] Loaded on-call engineer '{data['engineer']['name']}' from '{os.path.basename(cfg_path)}'."
+                )
+                return data
+            except Exception as err:
+                logger.error(
+                    f"[Confluence Service] Error reading oncall config '{cfg_path}': {err}"
+                )
 
     # Default fallback
-    return config.oncall_config
+    return {
+        "shift_name": "OnTripFix On-Call Shift",
+        "date": "2026-09-06",
+        "timezone": "UTC",
+        "engineer": {
+            "name": "Alex Morgan",
+            "role": "Primary OnTripFix Lead Engineer",
+            "phone": "+15550199",
+            "email": "alex.morgan@example.com",
+            "calle_id": "user_alex_01",
+            "source": "default_fallback",
+            "region": "US",
+            "locale": "en-US",
+            "userid": "a7m9x1",
+        },
+    }
 
 
 # Backward-compatible alias
+get_on_call_engineer = get_ontripfix_on_call_engineer
 get_weekend_on_call_engineer = get_ontripfix_on_call_engineer
 
 
@@ -172,3 +191,4 @@ if __name__ == "__main__":
     oncall = get_ontripfix_on_call_engineer()
     logger.info(f"Playbook: {pb}")
     logger.info(f"OnCall: {oncall}")
+

@@ -224,11 +224,11 @@ export default function App() {
   const oncallRosterList = [
     {
       id: 1,
-      name: stats.oncall_engineer?.name || 'Santhoshkumar Dhanasekaran',
+      name: stats.oncall_engineer?.name || 'Alex Morgan',
       role: 'Primary OnTripFix Lead Engineer',
-      phone: stats.oncall_engineer?.phone || '+919003939495',
-      region: stats.oncall_engineer?.region || 'IN',
-      locale: stats.oncall_engineer?.locale || 'en-IN',
+      phone: stats.oncall_engineer?.phone || '+15550199',
+      region: stats.oncall_engineer?.region || 'US',
+      locale: stats.oncall_engineer?.locale || 'en-US',
       status: 'ACTIVE_NOW',
       calls_handled: (stats.total_incidents || 1) * 2,
       resolutions: stats.resolved_incidents || 1

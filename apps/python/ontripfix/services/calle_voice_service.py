@@ -21,7 +21,7 @@ CALLE_API_ENDPOINT = os.environ.get(
 
 
 def format_e164(phone: str) -> str:
-    """Formats phone number strictly into E.164 standard (+15550199, +919003939495)."""
+    """Formats phone number strictly into E.164 standard (+15550199, +15550198)."""
     if not phone:
         return "+15550199"
     has_plus = phone.strip().startswith("+")
@@ -32,13 +32,14 @@ def format_e164(phone: str) -> str:
 
 
 def mask_phone_number(phone: str) -> str:
-    """Masks phone number for safety and privacy rules (+919003939495 -> +91••••••9495)."""
+    """Masks phone number for safety and privacy rules (+15550199 -> +1••••••0199)."""
     if not phone:
-        return "+91••••••9495"
+        return "+1••••••0199"
     s = str(phone).strip()
     if len(s) <= 5:
         return "••••••••"
     return f"{s[:3]}••••••{s[-4:]}"
+
 
 
 class CallEVoiceService:
