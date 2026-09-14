@@ -128,3 +128,10 @@ test("every state file that ships validates, and a different state changes the w
     }
   }
 });
+
+test("a question that was interrupted must be re-asked in full, never counted as answered", () => {
+  const task = renderScreeningTask(rules, state, byId("e001"), "2026-09-14");
+  assert.match(task, /ask that question again from the beginning, in full/);
+  assert.match(task, /Never treat a question you did not finish asking as answered/);
+  assert.match(task, /mark it unknown instead/, "an unfinished question falls through to review, not to a verdict");
+});

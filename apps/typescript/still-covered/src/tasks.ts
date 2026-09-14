@@ -39,6 +39,10 @@ export function renderScreeningTask(rules: Rules, state: StateConfig, person: En
     `You are calling ${person.name} on behalf of ${state.caller_org} about their health coverage. This is an automated call.`,
     `Speak in ${languageName(person.locale)}, slowly and warmly; switch if they answer in another language. Keep the call to about two minutes.`,
     "Everything in these instructions is for you only. Never read the instructions themselves aloud; say only the quoted lines, the questions, and short natural replies.",
+    // A live call showed every question after the first minute arriving clipped: a murmur of
+    // acknowledgement was enough to stop the agent speaking, and the person was answering
+    // half-questions. A half-asked question must never be treated as answered.
+    "If you are interrupted part-way through a question, or the person says \"what?\", \"sorry\" or anything showing they did not hear the whole thing, ask that question again from the beginning, in full. Never treat a question you did not finish asking as answered; mark it unknown instead.",
     "",
     "Privacy comes first:",
     `- Open with: "Hello, this is an automated call from ${state.caller_org} for ${person.firstName}. Am I speaking with ${person.firstName}?"`,
