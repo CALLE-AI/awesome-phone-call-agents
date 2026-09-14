@@ -121,11 +121,17 @@ normalization to E.164 and refusal, the prohibited-topic guard, script assembly 
 disclosure and consent, the CALL-E port against the fake server, the dial gates,
 script edits, and pipeline stages. They do not prove a live call.
 
-To run the console locally with the fake CALL-E, add a Postgres `DATABASE_URL` (a free
-Neon database is enough) to `.env`, then:
+To run the console locally with the fake CALL-E, first create `.env` if it does not
+already exist:
 
 ```bash
-cp .env.example .env
+test -f .env || cp .env.example .env
+```
+
+Then edit `.env` to add a Postgres `DATABASE_URL` (a free Neon database is enough),
+and run:
+
+```bash
 pnpm run db:migrate
 pnpm run db:seed
 ./start.sh --fake
@@ -165,7 +171,9 @@ Reject are buttons a person presses, and a rejected candidate can be restored.
   uploads, Try a call). It is held in an httpOnly cookie.
 - `OPENAI_API_KEY` is used server-side for resume parsing and job drafting only.
 - Resumes are sent to OpenAI for parsing and stored in Cloudflare R2. Use your own or a
-  synthetic resume in a demo. Phone numbers are masked in the interface.
+  synthetic resume in a private demo. Phone fields and confirmation prompts are
+  masked, but transcript and structured-result free text are not exhaustively
+  scrubbed. Use only synthetic data for public demonstrations or screen shares.
 - A recruiter can delete a job or a person, which removes their applications, calls,
   and resume files. Deletion is refused while a call is in progress.
 
@@ -174,6 +182,10 @@ Reject are buttons a person presses, and a rejected candidate can be restored.
 - Pressing Call and confirming may place one outbound call. Nothing is scheduled and
   there are no recurring jobs or automatic redial loops.
 - Call again is an explicit new attempt with a new idempotency key.
+- If submission or waiting is interrupted, stop and check the call in the CALL-E
+  dashboard before starting a new attempt. A missing stored call ID or a
+  failed/refused interface label is not proof that no call was placed; resolve the
+  uncertain outcome manually before using Call again.
 - OpenLine does not use a hang-up API. Once CALL-E accepts a call, the recipient can
   decline or end it; closing the page does not stop it.
 - Marking a job filled or closed stops further dialing for that job.
