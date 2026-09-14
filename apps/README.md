@@ -75,6 +75,7 @@ Current apps:
 
 - [OneReach service follow-up](typescript/onereach-service-followup/) - Standalone Node.js CALL-E appointment workflow with a no-call default, validated outcomes, and signed webhook handling.
 | [`python/otherend`](python/otherend/) | Python | Task pre-flight for a CALL-E task: CALL-E dials a programmable line you own that answers as a receptionist with a chosen adversity profile, or as a scripted person for tasks that call people, then a deterministic grader scores what CALL-E reported against what the line actually said. Replays nine synthetic rows (in-process simulation, no calls) with no keys by default, including another entry's task text run verbatim; one real call per row only behind `--yes` and an allow-list. |
+| [`web/supplier-quote-agent`](web/supplier-quote-agent/) | JavaScript / Node | Outbound supplier-quote calls where the agent plans, dials, cancels and re-plans, but approval is structurally unreachable from the tool surface: approve/reject are never registered as tools, refuse any non-owner actor, and cannot be reached through the generic update path. Fake-provider, no-call path by default. |
 
 Suggested grouping:
 
