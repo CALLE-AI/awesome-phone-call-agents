@@ -52,16 +52,17 @@ export function runEval(): { rows: EvalRow[]; matrix: Record<Grade, Record<Grade
 
 function printReport(): void {
   const { rows, matrix } = runEval();
+  const label = 15;
   const col = 12;
 
   console.log('provenance-grade — eval over labelled fixtures');
   console.log(`${rows.length} graded fields across ${new Set(rows.map((r) => r.fixture)).size} fixtures\n`);
 
   console.log('Confusion matrix (rows = ground truth, columns = predicted):\n');
-  console.log(['truth \\ pred'.padEnd(col), ...GRADES.map((g) => g.padEnd(col))].join(''));
+  console.log(['truth \\ pred'.padEnd(label), ...GRADES.map((g) => g.padEnd(col))].join(''));
   for (const t of GRADES) {
     console.log(
-      [t.padEnd(col), ...GRADES.map((p) => String(matrix[t][p]).padEnd(col))].join('')
+      [t.padEnd(label), ...GRADES.map((p) => String(matrix[t][p]).padEnd(col))].join('')
     );
   }
 
