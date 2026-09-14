@@ -74,7 +74,9 @@
     "farePaid": 2180000,
     "channel": ["tripkita", "nusantara-air"],
     "ticket": "000-2400000107",
-    "simulatedAnswer": { "kind": "refund" }
+    "simulatedAnswer": { "kind": "refund" },
+    "simulatedGds": "reject_refund",
+    "simulatedAirlineDesk": "approves"
   },
   {
     "pnr": "L6F2KM",
@@ -98,7 +100,7 @@
     "ticket": "000-2400000109",
     "simulatedAnswer": { "kind": "refund" },
     "simulatedGds": "reject_reschedule",
-    "simulatedAirlineDesk": "reissued"
+    "simulatedAirlineDesk": "approves"
   },
   {
     "pnr": "C5V8EJ",

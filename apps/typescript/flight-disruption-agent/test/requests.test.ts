@@ -87,11 +87,11 @@ test("an airline desk refusal goes to a person, who can close it or apply a manu
   assert.match(resolved.applied ?? "", /ZX12CV/);
 });
 
-test("the airline desk is only called for a rejected reissue", async () => {
+test("the airline desk is only called for a change the portal refused", async () => {
   const desk = dryDesk();
   const entry = desk.submitRequest("L6F2KM", "reschedule", "NA729-2026-09-20", "chat");
   desk.confirmRequest(entry.request.id, 30_000);
-  await assert.rejects(desk.callAirlineDesk(entry.request.id), /Only a reissue the portal refused/);
+  await assert.rejects(desk.callAirlineDesk(entry.request.id), /Only a change the portal refused/);
 });
 
 test("the passenger can be called back once with the final result, which changes nothing", async () => {
@@ -117,4 +117,22 @@ test("a callback that did not reach the passenger asks for written follow-up", a
   assert.equal(decideCallback({ ...base, structured: { reached_passenger: "no", acknowledged: "unknown", follow_up_requested: "unknown", reason: "" } }).kind, "follow_up");
   assert.equal(decideCallback({ ...base, structured: { reached_passenger: "yes", acknowledged: "yes", follow_up_requested: "yes", reason: "wants a person" } }).kind, "follow_up");
   assert.equal(decideCallback({ ...base, state: "failed", structured: null, failureCode: "no_answer" }).kind, "follow_up");
+});
+
+test("a refund the portal refuses is approved by the airline desk and then recorded", async () => {
+  const desk = dryDesk();
+  const entry = desk.submitRequest("W4N7QS", "refund", null, "web_form");
+  assert.equal(entry.amount, 1_912_000);
+  const rejected = desk.confirmRequest(entry.request.id, 1_912_000);
+  assert.equal(rejected.status, "portal_rejected");
+  assert.equal(rejected.portal?.kind === "rejected" && rejected.portal.code, "REFUND_NOT_PERMITTED");
+
+  const preview = desk.previewAirlineCall(entry.request.id);
+  assert.equal(preview.purpose, "airline_forced_refund");
+  assert.match(preview.task, /approve the refund of 1,962,000 rupiah/);
+  await desk.callAirlineDesk(entry.request.id);
+  const done = await desk.refreshRequest(entry.request.id);
+  assert.equal(done.status, "completed");
+  assert.match(done.applied ?? "", /Refund of IDR 1,912,000 recorded.*Refund approved by the airline desk, reference NA-RF-0107/);
+  assert.equal(desk.snapshot().bookings.find((b) => b.pnr === "W4N7QS")?.state?.status, "refunded");
 });

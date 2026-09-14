@@ -36,7 +36,7 @@ export interface Booking {
   /** Dry run only: how the fake B2B portal answers a submission for this booking. */
   simulatedGds?: "reject_reschedule" | "reject_refund";
   /** Dry run only: what the airline service desk says when asked to force the change. */
-  simulatedAirlineDesk?: "reissued" | "refused" | "callback_later";
+  simulatedAirlineDesk?: "approves" | "refused" | "callback_later";
 }
 
 export interface AirlineRules {

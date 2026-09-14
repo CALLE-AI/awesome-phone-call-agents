@@ -513,7 +513,9 @@ function requestSteps(r) {
   if (r.portal) steps.push(step(r.portal.kind === "accepted" ? "done" : "stop", r.portal.kind === "accepted" ? "Portal accepted the change" : `Portal refused (${esc(r.portal.code)})`));
   if (r.airlineCall) {
     const done = r.status === "completed";
-    steps.push(step(done ? "done" : r.status === "airline_call_in_progress" ? "todo" : "stop", done ? "Airline desk reissued the ticket" : r.status === "airline_call_in_progress" ? "Calling the airline desk" : "Airline desk did not reissue"));
+    steps.push(step(done ? "done" : r.status === "airline_call_in_progress" ? "todo" : "stop", done
+      ? r.request.kind === "refund" ? "Airline desk approved the refund" : "Airline desk reissued the ticket"
+      : r.status === "airline_call_in_progress" ? "Calling the airline desk" : r.request.kind === "refund" ? "Airline desk did not approve the refund" : "Airline desk did not reissue"));
   } else if (r.status === "portal_rejected") steps.push(step("todo", "Call the airline service desk"));
   if (r.status === "needs_review") steps.push(step("todo", "A person resolves the request"));
   if (r.status === "resolved_by_human") steps.push(step("done", "Resolved by an agent"));
@@ -663,7 +665,11 @@ function renderAirlineCall(r) {
       <dt>Dialed</dt><dd class="mono">${esc(c.destinationMasked)}${c.redirected ? " (demo phone)" : ""}</dd>
       <dt>Idempotency</dt><dd class="mono">${esc(c.idempotencyKey)}</dd>
       ${o?.confidence ? `<dt>Confidence</dt><dd>${o.confidence.score.toFixed(2)} (${esc(o.confidence.label)})</dd>` : ""}
-      ${s ? `<dt>Outcome</dt><dd><b>${esc(String(s.outcome).replaceAll("_", " "))}</b></dd><dt>New code</dt><dd class="mono">${esc(s.new_booking_code)}</dd><dt>Ticket</dt><dd class="mono">${esc(s.new_ticket_number)}</dd><dt>Reference</dt><dd class="mono">${esc(s.airline_reference)}</dd>` : ""}
+      ${s ? `<dt>Outcome</dt><dd><b>${esc(String(s.outcome).replaceAll("_", " "))}</b></dd>${
+        "approved_refund_amount" in s
+          ? `<dt>Approved</dt><dd class="mono">${esc(s.approved_refund_amount)}</dd><dt>Reference</dt><dd class="mono">${esc(s.refund_reference)}</dd>`
+          : `<dt>New code</dt><dd class="mono">${esc(s.new_booking_code)}</dd><dt>Ticket</dt><dd class="mono">${esc(s.new_ticket_number)}</dd><dt>Reference</dt><dd class="mono">${esc(s.airline_reference)}</dd>`
+      }` : ""}
     </dl>
     ${s?.reason ? `<blockquote>${esc(s.reason)}</blockquote>` : ""}
     ${o?.summary ? `<p><span class="muted">Summary:</span> ${esc(o.summary)}</p>` : ""}

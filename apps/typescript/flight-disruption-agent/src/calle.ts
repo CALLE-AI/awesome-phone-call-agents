@@ -21,6 +21,7 @@ export interface StartRequest {
 export type Simulation =
   | { kind: "passenger"; booking: Booking; quote: Quote }
   | { kind: "airline_desk"; booking: Booking; option: MoveOption }
+  | { kind: "airline_refund_desk"; booking: Booking; airlineRefund: number }
   | { kind: "result_callback"; booking: Booking };
 
 export type StartResult =
@@ -107,6 +108,7 @@ export class DryRunGateway implements CallGateway {
     const sim = call.request.simulation;
     if (sim.kind === "passenger") return scriptedOutcome(sim.booking, sim.quote);
     if (sim.kind === "airline_desk") return scriptedAirlineDesk(sim.booking, sim.option);
+    if (sim.kind === "airline_refund_desk") return scriptedAirlineRefundDesk(sim.booking, sim.airlineRefund);
     return scriptedCallback(sim.booking);
   }
 }
@@ -234,6 +236,55 @@ function scriptedOutcome(booking: Booking, quote: Quote): CallOutcome {
   };
 }
 
+function scriptedAirlineRefundDesk(booking: Booking, airlineRefund: number): CallOutcome {
+  const amount = airlineRefund.toLocaleString("en-US");
+  const opening: TranscriptTurn[] = [
+    { speaker: "user", text: "Nusantara Air agency desk, how can I help?", offsetSeconds: 0 },
+    { speaker: "bot", text: `Hi, I'm an AI assistant calling for TripKita. The portal refused the refund for booking ${booking.pnr}. Can you approve a refund of ${amount} rupiah?`, offsetSeconds: 3 },
+  ];
+  const base = { state: "completed" as const, providerStatus: "completed", result: null, failureCode: null, failureMessage: null };
+  const answer = booking.simulatedAirlineDesk ?? "callback_later";
+  if (answer === "approves") {
+    const reference = `NA-RF-${booking.ticket.slice(-4)}`;
+    return {
+      ...base,
+      taskCompleted: true,
+      confidence: { score: 0.91, label: "high" },
+      structured: {
+        outcome: "refund_approved",
+        approved_refund_amount: String(airlineRefund),
+        refund_reference: reference,
+        reduced_refund_offered: "no",
+        reason: `Desk agent said: Approved, ${amount} rupiah back to your agency account.`,
+      },
+      summary: `The Nusantara Air desk approved a refund of ${amount} rupiah for ${booking.pnr}, reference ${reference}.`,
+      transcript: [
+        ...opening,
+        { speaker: "user", text: `Approved. ${amount} rupiah back to your agency account, reference ${reference}.`, offsetSeconds: 35 },
+        { speaker: "bot", text: `Reading back: ${amount} rupiah, reference ${reference.split("").join(" ")}. Thank you.`, offsetSeconds: 42 },
+      ],
+    };
+  }
+  if (answer === "refused") {
+    return {
+      ...base,
+      taskCompleted: true,
+      confidence: { score: 0.88, label: "high" },
+      structured: { outcome: "refused", approved_refund_amount: "none", refund_reference: "none", reduced_refund_offered: "no", reason: "Desk agent said: This fare can only be refunded as a voucher." },
+      summary: `The Nusantara Air desk refused a cash refund for ${booking.pnr}.`,
+      transcript: [...opening, { speaker: "user", text: "Sorry, this fare can only be refunded as a voucher.", offsetSeconds: 20 }],
+    };
+  }
+  return {
+    ...base,
+    taskCompleted: false,
+    confidence: { score: 0.8, label: "high" },
+    structured: { outcome: "callback_later", approved_refund_amount: "none", refund_reference: "none", reduced_refund_offered: "unknown", reason: "Desk agent said: Refunds are handled after 2 pm, please call back." },
+    summary: "The Nusantara Air desk asked for a call back later.",
+    transcript: [...opening, { speaker: "user", text: "Refunds are handled after 2 pm, please call back.", offsetSeconds: 12 }],
+  };
+}
+
 function scriptedAirlineDesk(booking: Booking, option: MoveOption): CallOutcome {
   const opening: TranscriptTurn[] = [
     { speaker: "user", text: "Nusantara Air agency desk, how can I help?", offsetSeconds: 0 },
@@ -247,7 +298,7 @@ function scriptedAirlineDesk(booking: Booking, option: MoveOption): CallOutcome 
     failureMessage: null,
   };
   const answer = booking.simulatedAirlineDesk ?? "callback_later";
-  if (answer === "reissued") {
+  if (answer === "approves") {
     const code = `Q${booking.pnr.slice(1, 5)}Z`;
     const ticket = `0002419${booking.ticket.slice(-6)}`;
     return {

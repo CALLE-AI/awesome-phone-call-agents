@@ -3,7 +3,15 @@ import { existsSync, mkdirSync, readFileSync, renameSync, writeFileSync } from "
 import { dirname } from "node:path";
 import type { CallGateway } from "./calle.ts";
 import { findBooking, findFlight, type Catalog } from "./data.ts";
-import { buildAirlineResultSchema, buildAirlineTask, decideAirline } from "./airline.ts";
+import {
+  airlineRefundAmount,
+  buildAirlineRefundResultSchema,
+  buildAirlineRefundTask,
+  buildAirlineResultSchema,
+  buildAirlineTask,
+  decideAirline,
+  decideAirlineRefund,
+} from "./airline.ts";
 import { buildCallbackResultSchema, buildCallbackTask, decideCallback } from "./callback.ts";
 import { decide } from "./decide.ts";
 import { checkEligibility } from "./eligibility.ts";
@@ -14,7 +22,7 @@ import { maskPhone, routeFor } from "./phone.ts";
 import { redactOutcome, redactText } from "./redact.ts";
 import { airlineOf, quoteFor, voluntaryQuoteFor } from "./rules.ts";
 import { buildResultSchema, buildTask } from "./task.ts";
-import type { Action, AirlineCall, BookingState, Decision, Disruption, DisruptionCause, DisruptionKind, DisruptionSource, LedgerEntry, OpsEventRecord, OpsEventVia, Quote, RequestChannel, RequestEntry, RequestKind } from "./types.ts";
+import type { Action, AirlineCall, BookingState, CallOutcome, Decision, Disruption, DisruptionCause, DisruptionKind, DisruptionSource, LedgerEntry, OpsEventRecord, OpsEventVia, Quote, RequestChannel, RequestEntry, RequestKind } from "./types.ts";
 
 interface DeskState {
   disruptions: Disruption[];
@@ -650,12 +658,8 @@ export class Desk {
     const portal = this.gds.submit(booking, entry.action);
     entry.portal = portal;
     if (portal.kind === "rejected") {
-      if (entry.action.kind === "move") {
-        entry.status = "portal_rejected";
-      } else {
-        entry.status = "needs_review";
-        entry.reviewReasons = [`${portal.message} Ask the airline to approve the refund, then resolve this request.`];
-      }
+      // Both a refused reissue and a refused refund go to the airline service desk by phone.
+      entry.status = "portal_rejected";
       this.save();
       return entry;
     }
@@ -682,40 +686,73 @@ export class Desk {
   private airlineDesk(id: string) {
     const entry = this.requestEntry(id);
     const booking = findBooking(this.catalog, entry.request.pnr);
-    const option = entry.action?.kind === "move" ? entry.quote.moves.find((m) => m.id === (entry.action as { optionId: string }).optionId) : undefined;
-    if (!option || entry.portal?.kind !== "rejected") throw new DeskError("Only a reissue the portal refused needs the airline desk.", 409);
+    if (entry.portal?.kind !== "rejected" || !entry.action) {
+      throw new DeskError("Only a change the portal refused needs the airline desk.", 409);
+    }
     const airline = airlineOf(this.catalog, booking).rules;
     const destination = this.route(airline.supportPhone);
-    const task = buildAirlineTask(this.catalog, {
+    const rejectionCode = entry.portal.code;
+
+    if (entry.action.kind === "refund") {
+      const airlineRefund = airlineRefundAmount(this.catalog, booking, entry.quote);
+      return {
+        entry,
+        booking,
+        airline,
+        destination,
+        purpose: "airline_forced_refund" as const,
+        task: buildAirlineRefundTask(this.catalog, { booking, quote: entry.quote, rejectionCode }),
+        resultSchema: buildAirlineRefundResultSchema(),
+        simulation: { kind: "airline_refund_desk" as const, booking, airlineRefund },
+        decide: (outcome: CallOutcome) => {
+          const d = decideAirlineRefund(outcome, airlineRefund);
+          return d.kind === "review" ? d : { kind: "apply" as const, reissue: undefined, note: `Refund approved by the airline desk, reference ${d.reference}.` };
+        },
+      };
+    }
+    const optionId = entry.action.kind === "move" ? entry.action.optionId : null;
+    const option = entry.quote.moves.find((m) => m.id === optionId);
+    if (!option) throw new DeskError("Only a reissue or refund the portal refused needs the airline desk.", 409);
+    return {
+      entry,
       booking,
-      option,
-      rejectionCode: entry.portal.code,
-      rejectionMessage: entry.portal.message,
-    });
-    return { entry, booking, option, airline, destination, task };
+      airline,
+      destination,
+      purpose: "airline_forced_reissue" as const,
+      task: buildAirlineTask(this.catalog, { booking, option, rejectionCode, rejectionMessage: entry.portal.message }),
+      resultSchema: buildAirlineResultSchema(),
+      simulation: { kind: "airline_desk" as const, booking, option },
+      decide: (outcome: CallOutcome) => {
+        const d = decideAirline(outcome);
+        return d.kind === "review"
+          ? d
+          : { kind: "apply" as const, reissue: { pnr: d.newPnr, ticket: d.ticket }, note: `Reissued by the airline desk${d.reference ? `, reference ${d.reference}` : ""}.` };
+      },
+    };
   }
 
   previewAirlineCall(id: string) {
-    const { entry, airline, destination, task } = this.airlineDesk(id);
+    const { entry, airline, destination, task, resultSchema, purpose } = this.airlineDesk(id);
     const route = routeFor(destination.phone);
     return {
       id,
       mode: this.gateway.mode,
       live: this.gateway.live,
       airline: airline.name,
+      purpose,
       destinationMasked: maskPhone(destination.phone),
       redirected: destination.redirected,
       blockedReason: route.ok ? null : route.reason,
       task,
-      resultSchema: buildAirlineResultSchema(),
+      resultSchema,
       existing: entry.airlineCall,
       liveBudgetLeft: this.options.liveCallBudget - this.state.liveCallsUsed,
     };
   }
 
-  /** Step 5: the portal refused the reissue, so ask the airline desk to force it. One call per request. */
+  /** Step 5: the portal refused the reissue or refund, so ask the airline desk to push it through. One call per request. */
   async callAirlineDesk(id: string, confirmLast4?: string): Promise<RequestEntry> {
-    const { entry, booking, option, destination, task } = this.airlineDesk(id);
+    const { entry, booking, destination, task, resultSchema, simulation, purpose } = this.airlineDesk(id);
     if (entry.status !== "portal_rejected") {
       throw new DeskError(`This request is ${entry.status}; the airline desk is called at most once per request.`, 409);
     }
@@ -749,10 +786,10 @@ export class Desk {
       phone: destination.phone,
       region: route.region,
       locale: route.locale,
-      resultSchema: buildAirlineResultSchema(),
-      metadata: { request_id: id, pnr: booking.pnr, purpose: "airline_forced_reissue" },
+      resultSchema,
+      metadata: { request_id: id, pnr: booking.pnr, purpose },
       idempotencyKey,
-      simulation: { kind: "airline_desk", booking, option },
+      simulation,
     });
     if (result.kind === "started") {
       call.callId = result.callId;
@@ -792,10 +829,10 @@ export class Desk {
       return entry;
     }
     call.status = "finished";
-    const decision = decideAirline(outcome);
-    if (decision.kind === "reissued" && entry.action) {
+    const decision = this.airlineDesk(entry.request.id).decide(outcome);
+    if (decision.kind === "apply" && entry.action) {
       try {
-        entry.applied = `${this.applyChange(entry.request.pnr, entry.quote, entry.action, { pnr: decision.newPnr, ticket: decision.ticket })} Reissued by the airline desk${decision.reference ? `, reference ${decision.reference}` : ""}.`;
+        entry.applied = `${this.applyChange(entry.request.pnr, entry.quote, entry.action, decision.reissue)} ${decision.note}`;
         entry.status = "completed";
       } catch (error) {
         entry.status = "needs_review";

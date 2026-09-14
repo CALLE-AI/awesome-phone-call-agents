@@ -13,6 +13,7 @@ const scripted = [
   { pnr: "P3X9GA", kind: "reschedule", target: "NA729-2026-09-20", note: "portal refuses, airline desk reissues" },
   { pnr: "C5V8EJ", kind: "reschedule", target: "NA729-2026-09-20", note: "portal refuses, airline desk refuses" },
   { pnr: "T5W1LC", kind: "refund", target: null, note: "non-refundable basic fare" },
+  { pnr: "W4N7QS", kind: "refund", target: null, note: "portal refuses the refund, airline desk approves" },
   { pnr: "H8J3PV", kind: "reschedule", target: "NA729-2026-09-20", note: "different route, not eligible" },
 ] as const;
 
