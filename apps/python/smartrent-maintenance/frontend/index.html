@@ -1,0 +1,345 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>SmartRent · Autonomous Maintenance & Voice Telephony</title>
+    <meta name="description" content="Enterprise AI voice coordination and autonomous contractor dispatch for residential property maintenance, powered by CALL-E.">
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="/style.css">
+</head>
+<body class="mission-control">
+    <!-- Ambient Backdrop Elements -->
+    <div class="grid-backdrop"></div>
+    <div class="radial-glow"></div>
+
+    <!-- ─── 1. Top Header Bar ─────────────────────────────────── -->
+    <header class="app-header">
+        <div class="header-left">
+            <div class="brand-block">
+                <div class="brand-icon">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                        <path d="M12 2a3 3 0 0 0-3 3v7a3 3 0 0 0 6 0V5a3 3 0 0 0-3-3Z"/>
+                        <path d="M19 10v2a7 7 0 0 1-14 0v-2"/>
+                        <line x1="12" x2="12" y1="19" y2="22"/>
+                    </svg>
+                    <span class="live-signal-ping"></span>
+                </div>
+                <div class="brand-text-wrap">
+                    <div class="brand-title">SmartRent <span class="brand-env-badge">Voice Dispatch</span></div>
+                    <div class="brand-subtitle">Autonomous Property Operations &middot; Powered by CALL-E</div>
+                </div>
+            </div>
+
+            <div class="header-divider"></div>
+
+            <!-- Property Portfolio Dropdown -->
+            <div class="portfolio-selector-wrap">
+                <span class="selector-label">PORTFOLIO</span>
+                <div class="select-styled-wrap">
+                    <svg class="select-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/><polyline points="9 22 9 12 15 12 15 22"/></svg>
+                    <select id="propertyFilter" onchange="handlePropertyChange(this.value)">
+                        <option value="all">All Properties (200 Units)</option>
+                        <option value="sunset" selected>Sunset Heights (48 Units &middot; Austin, TX)</option>
+                        <option value="parkview">Parkview Towers (120 Units &middot; Seattle, WA)</option>
+                        <option value="marina">Marina Lofts (32 Units &middot; San Francisco, CA)</option>
+                    </select>
+                </div>
+            </div>
+        </div>
+
+        <div class="header-center">
+            <div class="telemetry-pill">
+                <span class="pill-dot green"></span>
+                <span class="pill-label">ENGINE:</span>
+                <span class="pill-val" id="engineStatusText">CALL-E v1.4 READY</span>
+                <span class="pill-sep">&middot;</span>
+                <span class="pill-metric">38ms SLA</span>
+                <span class="pill-sep">&middot;</span>
+                <span class="pill-metric" id="rosterCountPill">6 CONTRACTORS ON-CALL</span>
+            </div>
+        </div>
+
+        <div class="header-right">
+            <div class="mode-pill" id="modeBadge">
+                <span class="mode-dot"></span>
+                <span class="mode-text">DRY RUN SANDBOX</span>
+            </div>
+            
+            <button class="btn-action btn-standard-demo" id="btnDemo" onclick="runAutoDemo(false)" title="Standard 3-call closed-loop maintenance demo">
+                <svg width="13" height="13" viewBox="0 0 24 24" fill="currentColor"><polygon points="5,3 19,12 5,21"/></svg>
+                <span>Standard Demo</span>
+            </button>
+
+            <button class="btn-action btn-cascade-demo" id="btnCascadeDemo" onclick="runAutoDemo(true)" title="Demonstrates intelligent multi-vendor waterfall cascade when contractor #1 is busy">
+                <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"/></svg>
+                <span>Cascade Fallback</span>
+            </button>
+
+            <button class="btn-action btn-create" id="btnNewRequest" onclick="showNewRequestModal()">
+                <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
+                <span>Dispatch Ticket</span>
+            </button>
+        </div>
+    </header>
+
+    <!-- ─── 2. Executive KPI Metrics Row ────────────────────── -->
+    <section class="kpi-banner">
+        <div class="kpi-card">
+            <div class="kpi-head">
+                <span class="kpi-title">AUTONOMOUS RESOLUTION</span>
+                <span class="kpi-badge positive">+14.2%</span>
+            </div>
+            <div class="kpi-main">
+                <div class="kpi-value" id="kpiResolution">94.2%</div>
+                <div class="kpi-sub">Closed-loop without manual PM touch</div>
+            </div>
+        </div>
+
+        <div class="kpi-card">
+            <div class="kpi-head">
+                <span class="kpi-title">AVG DISPATCH VELOCITY</span>
+                <span class="kpi-badge positive">&darr; 98.6%</span>
+            </div>
+            <div class="kpi-main">
+                <div class="kpi-value" id="kpiVelocity">2.4<span class="kpi-unit">min</span></div>
+                <div class="kpi-sub">vs 4.2h industry phone tag baseline</div>
+            </div>
+        </div>
+
+        <div class="kpi-card">
+            <div class="kpi-head">
+                <span class="kpi-title">CASCADE RECOVERY SLA</span>
+                <span class="kpi-badge neutral">100% SUCCESS</span>
+            </div>
+            <div class="kpi-main">
+                <div class="kpi-value" id="kpiCascade">100%</div>
+                <div class="kpi-sub">Automated fallback when vendor busy</div>
+            </div>
+        </div>
+
+        <div class="kpi-card">
+            <div class="kpi-head">
+                <span class="kpi-title">MONTHLY LABOR SAVINGS</span>
+                <span class="kpi-badge positive">+$2,450 / 100u</span>
+            </div>
+            <div class="kpi-main">
+                <div class="kpi-value" id="kpiSavings">$6,420</div>
+                <div class="kpi-sub">142 property manager hours preserved</div>
+            </div>
+        </div>
+
+        <div class="kpi-card kpi-live-count">
+            <div class="kpi-head">
+                <span class="kpi-title">CALL-E TELEPHONY CALLS</span>
+                <span class="kpi-badge live" id="liveCallBadge">LIVE</span>
+            </div>
+            <div class="kpi-main">
+                <div class="kpi-value" id="statCalls">0</div>
+                <div class="kpi-sub"><span id="statActive">0</span> active &middot; <span id="statCompleted">0</span> completed</div>
+            </div>
+        </div>
+    </section>
+
+    <!-- ─── 3. Workflow Pipeline Rail ───────────────────────── -->
+    <section class="sequence-rail">
+        <div class="sequence-bar">
+            <div class="seq-step" id="pipeStep1" data-step="1">
+                <div class="seq-num">01</div>
+                <div class="seq-body">
+                    <div class="seq-title">TENANT DIAGNOSTIC INTAKE</div>
+                    <div class="seq-desc">CALL-E Outbound &middot; Structured damage &amp; access protocol</div>
+                </div>
+                <div class="seq-indicator">
+                    <span class="seq-dot"></span>
+                </div>
+            </div>
+
+            <div class="seq-connector" id="pipeConn1">
+                <div class="connector-track"></div>
+            </div>
+
+            <div class="seq-step" id="pipeStep2" data-step="2">
+                <div class="seq-num">02</div>
+                <div class="seq-body">
+                    <div class="seq-title">CONTRACTOR CASCADE DISPATCH</div>
+                    <div class="seq-desc">Trade matching &middot; Multi-vendor fallback &amp; quotes</div>
+                </div>
+                <div class="seq-indicator">
+                    <span class="seq-dot"></span>
+                </div>
+            </div>
+
+            <div class="seq-connector" id="pipeConn2">
+                <div class="connector-track"></div>
+            </div>
+
+            <div class="seq-step" id="pipeStep3" data-step="3">
+                <div class="seq-num">03</div>
+                <div class="seq-body">
+                    <div class="seq-title">RESIDENT SLA CONFIRMATION</div>
+                    <div class="seq-desc">Verbal authorization &middot; Access code &amp; arrival booking</div>
+                </div>
+                <div class="seq-indicator">
+                    <span class="seq-dot"></span>
+                </div>
+            </div>
+        </div>
+        <div class="sequence-status-strip" id="pipelineStatus">
+            <span class="status-indicator-dot"></span>
+            <span class="status-indicator-text">Dispatcher Idle &middot; Click <strong>"Standard Demo"</strong> or <strong>"Cascade Fallback"</strong> to initiate telephone calls</span>
+        </div>
+    </section>
+
+    <!-- ─── 4. Main Two-Column Layout ─────────────────────────── -->
+    <main class="console-body">
+        <!-- Mobile Segmented View Switcher (visible only on mobile <= 900px) -->
+        <div class="mobile-console-tabs" id="mobileConsoleTabs">
+            <button class="mobile-tab-btn active" id="btnTabQueue" onclick="setMobileView('queue')">
+                <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="8" y1="6" x2="21" y2="6"/><line x1="8" y1="12" x2="21" y2="12"/><line x1="8" y1="18" x2="21" y2="18"/><line x1="3" y1="6" x2="3.01" y2="6"/><line x1="3" y1="12" x2="3.01" y2="12"/><line x1="3" y1="18" x2="3.01" y2="18"/></svg>
+                <span>Dispatch Queue</span>
+                <span class="mobile-tab-badge" id="mobileTabQueueCount">0</span>
+            </button>
+            <button class="mobile-tab-btn" id="btnTabIncident" onclick="setMobileView('incident')">
+                <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M22 16.92v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07 19.5 19.5 0 0 1-6-6 19.79 19.79 0 0 1-3.07-8.67A2 2 0 0 1 4.11 2h3"/></svg>
+                <span>Incident Console</span>
+            </button>
+        </div>
+
+        <!-- Left: Ticket Queue -->
+        <section class="queue-panel">
+            <div class="queue-header">
+                <div class="queue-title-row">
+                    <h3>DISPATCH QUEUE</h3>
+                    <span class="queue-count-badge" id="queueCount">0 TICKETS</span>
+                </div>
+                
+                <div class="queue-search-wrap">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
+                    <input type="text" id="queueSearchInput" placeholder="Filter by tenant, unit (4B), issue..." oninput="handleQueueSearch(this.value)">
+                </div>
+
+                <div class="queue-filter-chips">
+                    <button class="filter-chip active" data-filter="all" onclick="setQueueFilter('all', this)">All</button>
+                    <button class="filter-chip" data-filter="urgent" onclick="setQueueFilter('urgent', this)">Emergency</button>
+                    <button class="filter-chip" data-filter="plumbing" onclick="setQueueFilter('plumbing', this)">Plumbing</button>
+                    <button class="filter-chip" data-filter="electrical" onclick="setQueueFilter('electrical', this)">Electrical</button>
+                    <button class="filter-chip" data-filter="hvac" onclick="setQueueFilter('hvac', this)">HVAC</button>
+                </div>
+            </div>
+
+            <div class="queue-list" id="requestsList">
+                <div class="queue-empty">
+                    <div class="empty-icon-shield">
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg>
+                    </div>
+                    <h4>No Active Maintenance Requests</h4>
+                    <p>Click <strong>"Standard Demo"</strong> or <strong>"Cascade Fallback"</strong> above to launch an autonomous phone call sequence.</p>
+                </div>
+            </div>
+        </section>
+
+        <!-- Right: Detail Console Panel -->
+        <section class="incident-panel" id="detailPanel">
+            <div class="incident-empty-state">
+                <div class="radar-scope">
+                    <div class="radar-circle c1"></div>
+                    <div class="radar-circle c2"></div>
+                    <div class="radar-circle c3"></div>
+                    <div class="radar-crosshair h"></div>
+                    <div class="radar-crosshair v"></div>
+                    <div class="radar-sweep"></div>
+                </div>
+                <h3>Awaiting Incident Selection</h3>
+                <p>Select a maintenance ticket from the left queue or trigger a demo run to view live telephony audio, CALL-E schemas, and transcripts.</p>
+            </div>
+        </section>
+    </main>
+
+    <!-- ─── 5. New Maintenance Request Modal ──────────────────── -->
+    <div class="modal-overlay" id="modalOverlay" onclick="hideNewRequestModal()">
+        <div class="command-modal" onclick="event.stopPropagation()">
+            <div class="modal-top">
+                <div class="modal-title-wrap">
+                    <span class="modal-tag">TELEPHONY DISPATCH</span>
+                    <h2>New Maintenance Ticket</h2>
+                </div>
+                <button class="modal-close-btn" onclick="hideNewRequestModal()" aria-label="Close modal">
+                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+                </button>
+            </div>
+
+            <form id="newRequestForm" onsubmit="submitNewRequest(event)">
+                <div class="form-grid-2">
+                    <div class="input-field">
+                        <label for="tenantName">RESIDENT FULL NAME</label>
+                        <input type="text" id="tenantName" placeholder="e.g. Sarah Chen" required autocomplete="name">
+                    </div>
+                    <div class="input-field">
+                        <label for="tenantPhone">PHONE NUMBER (E.164 TELEPHONY)</label>
+                        <input type="tel" id="tenantPhone" placeholder="+15550100012" required autocomplete="tel">
+                    </div>
+                </div>
+
+                <div class="form-grid-2">
+                    <div class="input-field">
+                        <label for="unitNumber">UNIT NUMBER</label>
+                        <input type="text" id="unitNumber" placeholder="4B" required>
+                    </div>
+                    <div class="input-field">
+                        <label for="propertyName">PROPERTY RESIDENCE</label>
+                        <input type="text" id="propertyName" value="Sunset Heights (Building A)">
+                    </div>
+                </div>
+
+                <div class="input-field">
+                    <label for="initialDescription">INCIDENT BRIEF / REPORTED ISSUE</label>
+                    <textarea id="initialDescription" rows="3" placeholder="Describe the symptom (e.g. Main kitchen pipe burst, water flooding baseboards)..."></textarea>
+                </div>
+
+                <div class="cascade-toggle-card">
+                    <label class="toggle-checkbox-label">
+                        <input type="checkbox" id="simulateCascade">
+                        <div class="toggle-track"></div>
+                        <div class="toggle-text-block">
+                            <div class="toggle-title">Simulate Contractor Busy (Multi-Vendor Cascade Fallback)</div>
+                            <div class="toggle-desc">Primary contractor reports unavailable &rarr; SmartRent automatically calls secondary backup contractor without human intervention.</div>
+                        </div>
+                    </label>
+                </div>
+
+                <div class="modal-actions">
+                    <button type="button" class="btn-cancel" onclick="hideNewRequestModal()">Cancel</button>
+                    <button type="submit" class="btn-submit" id="btnSubmit">
+                        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M22 16.92v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07 19.5 19.5 0 0 1-6-6 19.79 19.79 0 0 1-3.07-8.67A2 2 0 0 1 4.11 2h3a2 2 0 0 1 2 1.72"/></svg>
+                        <span>Initiate CALL-E Workflow</span>
+                    </button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <!-- ─── 6. Toast Notifications ────────────────────────────── -->
+    <div class="command-toast" id="toast"></div>
+
+    <!-- ─── 7. Work Order / SMS Preview Modal ────────────────── -->
+    <div class="modal-overlay" id="workOrderModal" onclick="hideWorkOrderModal()">
+        <div class="command-modal code-modal" onclick="event.stopPropagation()">
+            <div class="modal-top">
+                <div class="modal-title-wrap">
+                    <span class="modal-tag" id="extraModalTag">PAYLOAD INSPECTOR</span>
+                    <h2 id="extraModalTitle">Work Order Telemetry</h2>
+                </div>
+                <button class="modal-close-btn" onclick="hideWorkOrderModal()" aria-label="Close modal">
+                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+                </button>
+            </div>
+            <div class="modal-code-body" id="extraModalBody"></div>
+        </div>
+    </div>
+
+    <script src="/app.js"></script>
+</body>
+</html>

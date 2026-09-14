@@ -188,10 +188,12 @@ This project is an awesome list for AI-agent phone-call workflows. Add resources
 - [`no-show-shield`](skills/no-show-shield/) - Calls every booking on a given day to confirm it, writes yes/reschedule/cancel outcomes back to the operator's calendar, and returns a short list of only the slots that still need a human.
 - [`exception-resolution-calls`](skills/exception-resolution-calls/) - Resolves a blocked business workflow by phone (e.g. an overdue purchase-order acknowledgement), turning one CALL-E call task into per-recipient structured evidence and a deterministic state change. Gates any closing outcome on a self-reported `spoke_with` identity field, since an authorized phone number is not an authorized person, and differentiates escalation reasons instead of one generic needs-human flag; complements `exception-resolver`'s always-human-approval pattern by fully automating the unambiguous cases and escalating only what genuinely needs a person.
 - [`supply-chain-supplier-status`](skills/supply-chain-supplier-status/) - Autonomous outbound phone calls to suppliers to verify purchase order fulfillment, capture delay causes, calculate financial risk, and sync procurement records.
+- [`smartrent-maintenance`](skills/smartrent-maintenance/) - Multi-call AI maintenance coordination that intakes tenant issue reports, dispatches rostered vendors, and confirms appointments by phone using CALL-E.
 
 ### Apps
 
 
+- [SmartRent Maintenance](apps/python/smartrent-maintenance/) - Multi-call AI property maintenance coordinator with real-time glassmorphic dashboard, tenant intake, vendor dispatch, and appointment confirmation phone calls via CALL-E.
 - [SiteWitness](apps/typescript/sitewitness/) - Local site-history interview workspace that carries reviewed evidence gaps into individually approved CALL-E calls, with exact transcript quotations, human year review, and a no-call rehearsal mode.
 - [Rebuttal Dispute Call](apps/python/rebuttal-dispute-call/) - One disclosed CALL-E call to a disputing customer, cross-examined against its transcript before it becomes chargeback evidence, with six scripted no-call scenarios and a live path gated by per-run consent, an allowlist and local calling hours.
 - [Clinic Slot Assistant](apps/typescript/clinic-slot-assistant/) - Preview a consented appointment-availability call, review CALL-E results, and confirm a fictional booking; local simulation is the default.
