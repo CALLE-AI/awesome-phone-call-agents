@@ -681,12 +681,14 @@ async def verify_now(request: Request) -> JSONResponse:
     """"Verify before I go": a visitor asks for a record to be checked, now.
 
     This is the shortest path in the product from a person's doubt to a phone
-    ringing, and the one route where somebody with no account can spend call
+    ringing, and the one route where somebody with no account could spend call
     capacity an operator authorised. So it is bounded four ways: the five
     eligibility gates decide whether the call may happen at all, a per-address
     limiter slows one caller down, a deployment-wide daily budget bounds the
-    anonymous crowd, and a deployment that can dial a real number takes
-    anonymous requests only when its operator has said so in as many words.
+    anonymous crowd, and a deployment that can dial a real number takes no
+    anonymous request at all. Anonymous requests reach the pilot line only,
+    which dials nothing; on a live deployment the route wants a session, and
+    no setting reopens it.
     """
     try:
         user = signed_in_user(request)
@@ -698,7 +700,9 @@ async def verify_now(request: Request) -> JSONResponse:
     settings: Settings = request.app.state.settings
     if not user and not settings.public_verification:
         raise HTTPException(
-            401, "this deployment accepts verification requests from signed-in curators only"
+            401,
+            "this deployment can place real calls, so it accepts verification "
+            "requests from signed-in curators only",
         )
     ip = request.client.host if request.client else "unknown"
     if not user and not request.app.state.verify_limiter.allow(ip):

@@ -13,6 +13,7 @@ from starlette.testclient import TestClient
 
 from callibrate.api import create_app
 from callibrate.audit.chain import verify_chain
+from callibrate.config import Settings
 from callibrate.store import Store
 
 
@@ -184,12 +185,19 @@ def test_a_session_that_sends_no_csrf_token_is_served_as_a_visitor(client):
     wait_for(client, job["task_id"], ticket=job["ticket"])
 
 
-def test_a_deployment_that_can_dial_will_not_take_an_anonymous_request(settings, store):
-    """An anonymous request spends call capacity somebody else authorised."""
-    live = settings.model_copy(
-        update={"caller_mode": "calle", "call_allowlist": "+15550101101"}
+def test_a_deployment_that_can_dial_will_not_take_an_anonymous_request(
+    settings, store, monkeypatch
+):
+    """An anonymous request spends call capacity somebody else authorised, and
+    no setting hands that capacity to strangers: the switch that used to reopen
+    the route is gone, so a stale .env line changes nothing."""
+    monkeypatch.setenv("CBR_ALLOW_PUBLIC_VERIFICATION", "true")
+    live = Settings(
+        **{**settings.model_dump(), "caller_mode": "calle", "call_allowlist": "+15550101101"},
+        allow_public_verification=True,
     )
     assert live.public_verification is False
+    assert not hasattr(live, "allow_public_verification")
     with TestClient(create_app(live, store)) as client:
         refused = client.post(
             "/api/verify-now", json={"service_id": "svc_food", "fields": ["schedule"]}
@@ -197,8 +205,6 @@ def test_a_deployment_that_can_dial_will_not_take_an_anonymous_request(settings,
         assert refused.status_code == 401
         sign_in(client)
         assert client.get("/api/system").json()["public_verification"] is False
-    # An operator who wants the public path on a dialling deployment says so.
-    assert live.model_copy(update={"allow_public_verification": True}).public_verification is True
 
 
 def test_the_public_budget_refuses_a_call_the_address_limiter_would_allow(settings, store):

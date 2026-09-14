@@ -36,11 +36,12 @@ A refusal is written to the ledger as `call.refused` with its reason.
 The gates decide whether a number may be called. A separate question is who may
 spend that permission, because *Verify before I go* is the one thing in the
 product a stranger can press. A deployment that can dial a real number takes
-anonymous requests only when its operator has said so
-(`CBR_ALLOW_PUBLIC_VERIFICATION=true`); otherwise a visitor's press is refused
-before a task exists, and a curator runs the call from the queue instead. Where
-the route is open, a deployment-wide daily budget bounds the anonymous crowd, on
-top of a per-address limiter that only ever slowed one caller down.
+that press from signed-in curators only: a visitor's press is refused before a
+task exists, a curator runs the call from the queue instead, and no setting
+hands a stranger the phone. A visitor can only ever start a verification on the
+pilot line, which dials nothing; there, a deployment-wide daily budget bounds
+the anonymous crowd, on top of a per-address limiter that only ever slowed one
+caller down.
 
 What a visitor is told afterwards is the record's own new value and a sentence
 of progress. The transcript names a person who answered a phone, and it is read

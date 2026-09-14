@@ -173,16 +173,17 @@ says no, no plan is created and no telephone rings.
 
 The gates decide whether a call may happen. Who may ask for one is a separate
 boundary, because *Verify before I go* is the one route where somebody with no
-account can spend call capacity an operator authorised. A deployment that can
-dial a real number takes anonymous requests only when its operator sets
-`CBR_ALLOW_PUBLIC_VERIFICATION=true`; the pilot line, which dials nothing, is
-open by default. When the route is open, a per-address limiter slows one caller
-down and a deployment-wide budget (`CBR_PUBLIC_VERIFICATION_DAILY_LIMIT`, 25 a
-day) bounds the crowd, since addresses are cheap. And a visitor who asked for a
-call follows it with a ticket handed back at the time, which shows progress and
-whatever the directory now says in public. The transcript, the evidence, the
-contract and the CALL-E run id stay behind a curator session, as
-`/api/runs/{id}` always did.
+account could spend call capacity an operator authorised. So a deployment that
+can dial a real number takes verification requests from signed-in curators
+only, and no setting reopens the route to visitors; the pilot line, which dials
+nothing, is the only caller a visitor can reach. There, a per-address limiter
+slows one caller down and a deployment-wide budget
+(`CBR_PUBLIC_VERIFICATION_DAILY_LIMIT`, 25 a day) bounds the crowd, since
+addresses are cheap. And a visitor who asked for a verification follows it with
+a ticket handed back at the time, which shows progress and whatever the
+directory now says in public. The transcript, the evidence, the contract and
+the CALL-E run id stay behind a curator session, as `/api/runs/{id}` always
+did.
 
 On the call itself: the agent says it is automated before it asks anything, it
 never proposes a value the provider did not say, and it ends the call without

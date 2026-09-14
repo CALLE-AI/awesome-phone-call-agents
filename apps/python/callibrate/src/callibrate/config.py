@@ -56,16 +56,11 @@ class Settings(BaseSettings):
     minimum_call_interval_days: int = Field(default=1, ge=0, le=30)
 
     # -- Who may ask for a call -----------------------------------------------
-    #: Whether a visitor with no account may start a verification. Left unset,
-    #: the deployment answers for itself: open while the pilot line is
-    #: answering, closed once CALL-E can dial a real number, because an
-    #: anonymous request on a live deployment spends call capacity somebody
-    #: else authorised.
-    allow_public_verification: bool | None = None
-    #: How many verifications anonymous visitors may cause in one UTC day. The
-    #: per-address limiter only slows a single caller down; this bounds the
-    #: whole deployment, which is the number that matters when addresses are
-    #: cheap.
+    #: How many verifications anonymous visitors may cause in one UTC day on
+    #: the pilot line. The per-address limiter only slows a single caller
+    #: down; this bounds the whole deployment, which is the number that
+    #: matters when addresses are cheap. A deployment that can dial takes no
+    #: anonymous request at all, and no setting reopens that.
     public_verification_daily_limit: int = Field(default=25, ge=1, le=1000)
 
     # -- Demonstration directory ----------------------------------------------
@@ -139,10 +134,14 @@ class Settings(BaseSettings):
 
     @property
     def public_verification(self) -> bool:
-        """Whether an anonymous visitor may cause a call on this deployment."""
-        if self.allow_public_verification is None:
-            return not self.live_calling
-        return self.allow_public_verification
+        """Whether an anonymous visitor may start a verification here.
+
+        Only while the pilot line is answering. Once CALL-E can dial a real
+        number, an anonymous request would spend call capacity somebody else
+        authorised, so the route takes a session and nothing else; there is no
+        setting that opens it again.
+        """
+        return not self.live_calling
 
 
 def password_hash(password: str, *, salt: bytes | None = None) -> str:
