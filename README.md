@@ -224,6 +224,7 @@ This project is an awesome list for AI-agent phone-call workflows. Add resources
 - [Veyra](apps/web/veyra/) - Converts a plain-language outbound process into an editable, approval-gated CALL-E campaign with fake mode enabled by default.
 
 - [CareLoop AI](apps/typescript/careloop-ai/) - Consent-gated post-consultation CALL-E follow-ups that preserve uncertain patient reports and route concerning outcomes to human clinical review, with a no-call default.
+- [CareForMe](https://github.com/UdayasreeVadala/CareForMe) - Next.js web app for AI phone check-ins on elderly family members: one click places a CALL-E outbound call that holds a warm conversation in the person's language and style, then classifies the outcome (`normal`/`attention`/`urgent`) into summaries, alerts, and lasting memories.
 - [OpenLine Screening](apps/typescript/openline-screening/) - Recruiter console that places the first-round CALL-E screening call to each shortlisted candidate with a fixed disclosure-and-consent script, a three-pass prohibited-topic guard, and strict structured results; a person decides Interview or Reject, and the no-call fake mode runs the whole loop.
 - [Sparbird](apps/typescript/sparbird/) - Rings your own phone, plays the person you have to win over, and quotes back the line that lost them, with a recorded no-call default.
 - [Audition Agent](apps/python/audition-agent/) - Producer-reviewed CALL-E role-disclosure calls that collect performer interest, callback availability, and unanswered questions, with a no-call verification path.
