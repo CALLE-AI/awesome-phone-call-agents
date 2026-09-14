@@ -10,6 +10,12 @@ Use this skill when an agent needs to turn "call the customer after their order 
 
 This is a **post-delivery feedback callback**, not a reminder, a sales call, or a collections call. It assumes the order/service already completed and the business wants a short, low-pressure check-in call.
 
+## Setup
+
+- A configured CALL-E client (API key) with permission to create calls and read call results.
+- A publicly reachable webhook URL the host registers with CALL-E for call-result delivery; without one, poll `calls.get(id)` instead of relying on `handle_webhook`.
+- Nothing to install for the skill itself — `references/examples.md` shows the exact `calls.create(...)` call shape and a fake-client dry-run path with no live dependency.
+
 ## When To Use
 
 Use this skill for:
