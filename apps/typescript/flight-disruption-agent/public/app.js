@@ -138,20 +138,22 @@ function renderBoard() {
         ? `<span class="status-delayed">${esc(disruptionStatus(d))}</span>${d.cause === "force_majeure" ? ' <span class="dim">FM</span>' : ""}`
         : `<span class="status-ontime">ON TIME</span>`;
       let action = "";
-      if (f.passengers > 0 && !d) {
+      // A flight without a disruption can report one; a delayed flight can only get worse.
+      if (f.passengers > 0 && (!d || d.kind === "delay")) {
         const delayId = `delay-${f.id}`;
         const reasonId = `reason-${f.id}`;
-        const delay = draft[delayId] ?? "240";
+        const choices = [45, 90, 120, 240, 360].filter((m) => !d || m > d.delayMinutes);
+        const delay = draft[delayId] ?? (d ? "cancel" : "240");
         const reason = draft[reasonId] ?? "a late inbound aircraft";
         const opt = (v, label, cur) => `<option value="${esc(v)}"${String(cur) === String(v) ? " selected" : ""}>${esc(label)}</option>`;
         const group = (cause, label) =>
           `<optgroup label="${esc(label)}">${REASONS.filter(([, c]) => c === cause).map(([r]) => opt(r, r, reason)).join("")}</optgroup>`;
         action = `<form data-report="${esc(f.id)}">
           <label class="sr" for="${esc(delayId)}">Disruption</label>
-          <select id="${esc(delayId)}" name="delay">${[45, 90, 120, 240, 360].map((m) => opt(m, `+${hm(m)}`, delay)).join("")}${opt("cancel", "Cancelled", delay)}</select>
+          <select id="${esc(delayId)}" name="delay">${choices.map((m) => opt(m, `+${hm(m)}`, delay)).join("")}${opt("cancel", "Cancelled", delay)}</select>
           <label class="sr" for="${esc(reasonId)}">Reason</label>
           <select id="${esc(reasonId)}" name="reason">${group("operational", "Operational")}${group("force_majeure", "Force majeure")}</select>
-          <button type="submit">Report</button>
+          <button type="submit">${d ? "Escalate" : "Report"}</button>
         </form>`;
       }
       return `<tr>
@@ -167,7 +169,7 @@ function renderBoard() {
     .join("");
 }
 
-const FEED_CHIPS = { created: ["ok", "Recorded"], conflict: ["warn", "Conflict · check by hand"], rejected: ["bad", "Rejected"] };
+const FEED_CHIPS = { created: ["ok", "Recorded"], escalated: ["warn", "Escalated · call again"], conflict: ["warn", "Conflict · check by hand"], rejected: ["bad", "Rejected"] };
 
 function renderFeed() {
   const el = $("feed");
@@ -203,6 +205,11 @@ function statusChip(entry) {
   return `<span class="chip ${cls}">${esc(label)}</span>`;
 }
 
+/** Current disruptions first; replaced ones stay visible below for their call history. */
+function orderedDisruptions() {
+  return [...snap.disruptions].sort((a, b) => Number(Boolean(a.supersededBy)) - Number(Boolean(b.supersededBy)) || b.createdAt.localeCompare(a.createdAt));
+}
+
 function renderDesk() {
   const desk = $("desk");
   if (!snap.disruptions.length) {
@@ -212,10 +219,10 @@ function renderDesk() {
   }
   desk.hidden = false;
   if (!selected) {
-    const d = snap.disruptions[0];
+    const d = orderedDisruptions()[0];
     selected = { disruptionId: d.id, pnr: d.bookings[0].pnr };
   }
-  $("events").innerHTML = snap.disruptions
+  $("events").innerHTML = orderedDisruptions()
     .map((d) => {
       const c = d.bookings[0]?.quote.changeCase;
       const pricing =
@@ -247,11 +254,13 @@ function renderDesk() {
           </button>`;
         })
         .join("");
-      return `<article class="event">
+      return `<article class="event${d.supersededBy ? " superseded" : ""}">
         <div class="event-head">
           <h2>${esc(d.flight.code)} to ${esc(d.flight.destinationCity)} ${d.kind === "cancellation" ? "cancelled" : `delayed ${hm(d.delayMinutes)}`}</h2>
           <div class="facts">
             ${d.newDeparture ? `<span>New departure <b>${hhmm(d.newDeparture)}</b></span>` : "<span><b>Will not operate</b></span>"}
+            ${d.supersededBy ? `<span class="chip warn">Replaced by ${esc(d.supersededBy)}</span>` : ""}
+            ${d.supersedes ? `<span>Replaces <b class="mono">${esc(d.supersedes)}</b></span>` : ""}
             <span>Cause <b>${esc(d.reason)}</b></span>
             <span>Source <b>${d.source?.kind === "airline_webhook" ? `airline ops feed <span class="mono">${esc(d.source.eventId)}</span>` : "reported on this desk"}</b></span>
             <span><b>${esc(CASE_LABELS[c] ?? c)}</b> pricing ${pricing}</span>
@@ -312,9 +321,15 @@ function renderDetail() {
       <p class="note" style="margin-bottom:6px">Each party in the chain applies its own rule. CALL-E cannot look prices up mid-call, so these numbers are exactly what the passenger hears.</p>
       ${options}
     </div>
-    ${entry && entry.status !== "failed_to_submit" ? renderEntry(entry, b, key) : renderCallBox(d, b, key, entry)}
+    ${
+      entry && entry.status !== "failed_to_submit"
+        ? renderEntry(entry, b, key)
+        : d.supersededBy
+          ? `<p class="note">This disruption was replaced by <span class="mono">${esc(d.supersededBy)}</span>. Call ${esc(b.passenger)} from the new one.</p>`
+          : renderCallBox(d, b, key, entry)
+    }
   `;
-  if (!entry || entry.status === "failed_to_submit") ensurePreview(d.id, b.pnr, key);
+  if ((!entry || entry.status === "failed_to_submit") && !d.supersededBy) ensurePreview(d.id, b.pnr, key);
 }
 
 function renderCallBox(d, b, key, entry) {
@@ -383,7 +398,8 @@ function renderEntry(entry, b, key) {
     const actId = `action-${key}`;
     const noteId = `note-${key}`;
     const cur = draft[actId] ?? "none";
-    const opts = [["none", "Close without changing the booking"], ...(entry.quote.keep ? [["keep", "Keep on delayed flight"]] : []), ...entry.quote.moves.map((m) => [`move:${m.id}`, `Move to ${m.label} (${idr(m.total)})`]), ["refund", `Refund ${idr(entry.quote.refund.amount)}`]];
+    const replaced = snap.disruptions.find((x) => x.id === entry.disruptionId)?.supersededBy;
+    const opts = replaced ? [["none", "Close without changing the booking"]] : [["none", "Close without changing the booking"], ...(entry.quote.keep ? [["keep", "Keep on delayed flight"]] : []), ...entry.quote.moves.map((m) => [`move:${m.id}`, `Move to ${m.label} (${idr(m.total)})`]), ["refund", `Refund ${idr(entry.quote.refund.amount)}`]];
     parts.push(`<div class="callbox"><h3>Resolve as a person</h3>
       <label for="${esc(actId)}" class="note">After contacting the passenger yourself</label>
       <select id="${esc(actId)}">${opts.map(([v, l]) => `<option value="${esc(v)}"${cur === v ? " selected" : ""}>${esc(l)}</option>`).join("")}</select>
