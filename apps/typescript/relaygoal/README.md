@@ -146,6 +146,18 @@ Targets **WCAG 2.2 AA**. Geist body type with a Fraunces display face (17px base
 
 **Installable, phone-native.** RelayGoal is a PWA (web app manifest + service worker + offline shell) that installs to the home screen and opens standalone. On a phone the live call **takes over the whole screen** — a voice-made-visible waveform and large, high-contrast captions of the other party's words, so the call lives where calls live and every word is readable without ever being heard. Desktop keeps the inline call timeline.
 
+## Upstream contributions
+
+Filed to CALL-E while building on it:
+
+- **Submission** — RelayGoal in the awesome-list (this app, under `apps/typescript/relaygoal/`): [awesome-phone-call-agents#599](https://github.com/CALLE-AI/awesome-phone-call-agents/pull/599)
+- **[calle-docs#56](https://github.com/CALLE-AI/calle-docs/pull/56)** — the Goal Run create (`201`) example showed `in_progress` for an undialed run (`call_id: null`); fixed to `queued` to match the OpenAPI `acceptedDeliveryConfirmation` example and the `GoalRunStatus` enum.
+- **[server-sdk-typescript#25](https://github.com/CALLE-AI/server-sdk-typescript/pull/25)** — the Quickstart README's `calle_test_key` placeholder contradicted the documented `iams_live_` key prefix (a wrong-prefix key returns a `401` identical to a missing one); aligned it with the Authentication guide.
+
+## Links
+
+Live demo: https://call-e-2026.vercel.app · Demo video: https://youtu.be/WOpTlcSZ6io · Devpost: https://devpost.com/software/relaygoal
+
 ## License
 
 MIT
