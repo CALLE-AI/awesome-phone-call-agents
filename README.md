@@ -25,6 +25,7 @@ Awesome Phone Call Agents is an early community hub for developers and workflow 
 
 | Contribution area | Good examples | Where to contribute |
 | --- | --- | --- |
+| [`apps/typescript/avelis`](apps/typescript/avelis/) | JavaScript / Node.js | Breast follow-up evidence and clinician handoff; six fictional cases and an opt-in CALL-E / DeepSeek workflow with local recovery. |
 | [`apps/typescript/vouch`](apps/typescript/vouch/) | TypeScript / Next.js | Consent-scoped employment verification: no consent artifact, no dial. Requested vs permitted fields (California SB 1162 strips salary), third-party gatekeeper is a first-class disposition. Fixture replay by default. |
 | [`apps/typescript/headcount`](apps/typescript/headcount/) | TypeScript / Next.js | CDC CASPER-style disaster household needs assessment: the unreached count is the product, voicemail is not a reach, unsupported fields strike through, and fail-closed cards go to a human. Fixture replay by default. |
 | Agent Skills | Customer callbacks, appointment confirmation, lead qualification, order exception follow-up, service dispatch, incident escalation | `skills/` |
@@ -471,3 +472,4 @@ Out of scope:
 ## License
 
 MIT. See [`LICENSE`](LICENSE).
+
