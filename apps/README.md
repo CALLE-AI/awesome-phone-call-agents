@@ -10,6 +10,7 @@ Current apps:
 
 | App | Language | Purpose |
 | --- | --- | --- |
+| [`web/orma`](web/orma/) | TypeScript / SvelteKit / Deno / Supabase | Daily two-minute accountability calls. SQL briefs CALL-E, so the call leads with what you keep not doing, captures new items, and lets you drop one without argument. Consent rows, a one-time code call before any number is dialled daily, cancel and pause, plus Telegram and MCP surfaces. Dry run by default, with a local Supabase stack and recorded fixtures. |
 | [`web/callops`](web/callops/) | TypeScript / Vite / Node | Repair follow-up: separate supplier dates and prepare an evidence-linked customer update. No-call browser demo, reusable guarded CALL-E backend, and 214 hermetic tests; representative phone execution pending. |
 | [`typescript/readycheck`](typescript/readycheck/) | TypeScript / Node | Requirement-based local-service inquiries with CALL-E, source-linked evidence review, focused follow-ups, explicit budget revisions and durable recovery; fictional no-call demo by default. |
 | [`python/rebuttal-dispute-call`](python/rebuttal-dispute-call/) | Python | Merchant-side chargeback evidence call: one disclosed CALL-E call with a fixed script and a strict result schema, a yes used only when the customer's own words say yes, a no that stops the filing, and a masked evidence PDF; dry-run with six scripted scenarios by default, live only with per-run consent, an allowlist, local calling hours and one call per dispute. |
