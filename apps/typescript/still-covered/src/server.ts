@@ -10,7 +10,7 @@ import { createServer, type IncomingMessage, type Server, type ServerResponse } 
 import { existsSync, readdirSync, readFileSync, statSync } from "node:fs";
 import { basename, join } from "node:path";
 import type { Config } from "./config.js";
-import { Ledger, type LedgerEntry, type Projection } from "./ledger.js";
+import { CAMPAIGN_ID_RE, Ledger, type LedgerEntry, type Projection } from "./ledger.js";
 import { maskPhone } from "./mask.js";
 import type { CallInbox } from "./orchestrator.js";
 import { lintCallTask, RULES } from "./lint.js";
@@ -42,7 +42,6 @@ export interface ServerHandle {
   close(): Promise<void>;
 }
 
-const CAMPAIGN_ID_RE = /^[A-Za-z0-9._-]{1,120}$/;
 const TERMINAL = new Set(["completed", "failed", "canceled"]);
 const SCREENED: Outcome[] = ["likely_exempt", "likely_meets", "at_risk", "needs_review"];
 
@@ -130,6 +129,7 @@ export function toPublicState(projection: Projection, mode: Config["mode"], runn
       identityUnconfirmed: count("identity_unconfirmed"),
       unreachable: count("unreachable"),
       unverified: count("unverified"),
+      dialUnknown: count("dial_unknown"),
       notAttempted: count("not_attempted"),
       pending: states.filter((s) => s.outcome === null).length,
       pendingCalls: calls.filter((c) => !TERMINAL.has(c.status)).length,
@@ -218,7 +218,22 @@ export function startServer(ctx: ServerContext): Promise<ServerHandle> {
   let ledger: Ledger | null = null;
   let unsubscribe: (() => void) | null = null;
   const sseClients = new Set<ServerResponse>();
-  const seenWebhookIds = new Set<string>();
+  // Bounded on purpose. The webhook route is deliberately open (CALL-E does not sign deliveries),
+  // so an unbounded set of every id ever seen is memory anyone on the internet can spend. A Map in
+  // insertion order gives the same de-duplication for the window that matters - a redelivery
+  // arrives within minutes, not after ten thousand other events - and then forgets the oldest.
+  const seenWebhookIds = new Map<string, number>();
+  const SEEN_WEBHOOK_LIMIT = 10_000;
+  const rememberWebhookId = (id: string): void => {
+    seenWebhookIds.set(id, Date.now());
+    while (seenWebhookIds.size > SEEN_WEBHOOK_LIMIT) {
+      const oldest = seenWebhookIds.keys().next();
+      if (oldest.done === true) {
+        break;
+      }
+      seenWebhookIds.delete(oldest.value);
+    }
+  };
   const running = (): boolean => ctx.isRunning?.() ?? false;
   const emptyState = (): Record<string, unknown> => ({ campaign: null, mode: ctx.config.mode, running: running(), people: [], kpis: {}, work: [], timeline: [], exemptionCounts: [], languages: [], failedWaves: [] });
   const current = (): Record<string, unknown> => (ledger ? toPublicState(ledger.projection, ctx.config.mode, running()) : emptyState());
@@ -264,7 +279,7 @@ export function startServer(ctx: ServerContext): Promise<ServerHandle> {
           json(res, 200, { received: true, duplicate: true });
           return;
         }
-        seenWebhookIds.add(body.id);
+        rememberWebhookId(body.id);
         const callId = typeof body.data?.id === "string" ? body.data.id : null;
         if (callId !== null) {
           ledger?.note("info", `Webhook ${String(body.type)} received for ${callId}; re-fetching the call before acting on it`);

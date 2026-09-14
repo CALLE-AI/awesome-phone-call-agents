@@ -44,7 +44,7 @@ test("a dry-run campaign clears people by data, screens the rest, and turns ever
   server.setLedger(ledger);
   const summary = await new Orchestrator({ config, client, ledger, inbox, campaign, rules, state, people, registryReport: report, webhookUrl: `${server.url}/calle/webhook`, waveSize: 4, parallelWaves: 2, pollIntervalMs: 30, retryDelayMs: 0 }).run();
 
-  assert.deepEqual(summary.outcomes, { cleared_by_data: 2, likely_exempt: 3, likely_meets: 1, at_risk: 1, needs_review: 2, declined: 1, opted_out: 1, identity_unconfirmed: 1, unreachable: 1, unverified: 0, not_attempted: 0, pending: 0 });
+  assert.deepEqual(summary.outcomes, { cleared_by_data: 2, likely_exempt: 3, likely_meets: 1, at_risk: 1, needs_review: 2, declined: 1, opted_out: 1, identity_unconfirmed: 1, unreachable: 1, unverified: 0, dial_unknown: 0, not_attempted: 0, pending: 0 });
   const s = ledger.projection.states;
   assert.deepEqual(s.get("e001")?.exemptions, ["caregiver_disabled"]);
   assert.deepEqual(s.get("e003")?.exemptions, ["pregnant_postpartum"]);

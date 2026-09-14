@@ -5,6 +5,7 @@ import { dialAllowed, forceDryRun, loadConfig } from "../src/config.js";
 import { CallInbox } from "../src/orchestrator.js";
 import { formatWindow, isQuietNow, parseQuietHours } from "../src/quiet-hours.js";
 import { RULES } from "../src/lint.js";
+import { maskPhonesInText, maskResultText } from "../src/mask.js";
 import { loadEnrollees } from "../src/registry.js";
 import { loadRules, loadState } from "../src/rules.js";
 import { startServer } from "../src/server.js";
@@ -130,4 +131,48 @@ test("POST /api/lint is the one route safe to expose: token-gated, text only, an
   } finally {
     await server.close();
   }
+});
+
+test("a live API key is only ever sent to an approved https endpoint", () => {
+  const live = { SC_MODE: "live", CALLE_API_KEY: "iams_live_secret" };
+  assert.equal(loadConfig(live).baseUrl, "https://api.heycall-e.com", "the default needs no configuration");
+
+  assert.throws(() => loadConfig({ ...live, CALLE_BASE_URL: "http://api.heycall-e.com" }), /must be https/i,
+    "plain http would put the key on the wire");
+  assert.throws(() => loadConfig({ ...live, CALLE_BASE_URL: "https://evil.example.com" }), /not an approved live endpoint/i,
+    "a mistyped or hostile host must not receive the key");
+  assert.throws(() => loadConfig({ ...live, CALLE_BASE_URL: "not a url" }), /not a URL/i);
+
+  // An override is still possible, but only by naming it deliberately.
+  const staged = loadConfig({ ...live, CALLE_BASE_URL: "https://staging.example.com", SC_ALLOWED_BASE_URLS: "https://staging.example.com" });
+  assert.equal(staged.baseUrl, "https://staging.example.com");
+});
+
+test("a dashboard reachable from another machine always has a token, public URL or not", () => {
+  assert.equal(loadConfig({}).dashboardToken, null, "loopback only: nothing to protect from");
+  assert.equal(loadConfig({ SC_HOST: "localhost" }).dashboardToken, null);
+
+  for (const host of ["0.0.0.0", "192.168.1.20", "::"]) {
+    const config = loadConfig({ SC_HOST: host });
+    assert.ok(config.dashboardToken && config.dashboardToken.length >= 20, `${host} binds beyond this machine and must be closed`);
+  }
+  assert.equal(loadConfig({ SC_HOST: "0.0.0.0", SC_DASHBOARD_TOKEN: "mine" }).dashboardToken, "mine", "an explicit token is kept");
+});
+
+test("a phone number spoken into free text is masked, and nothing else is", () => {
+  // The agent writes down what the person said. Nobody dictates E.164 over the telephone.
+  assert.equal(maskPhonesInText("call me on 415-555-0100 after six"), "call me on +41******00 after six");
+  assert.equal(maskPhonesInText("Tuesday morning, (415) 555-0100 is best"), "Tuesday morning, +41******00 is best");
+  assert.equal(maskPhonesInText("my number is 4155550100"), "my number is +41******00");
+  assert.equal(maskPhonesInText("reach me at +14155550100"), "reach me at +14*******00");
+
+  // The same sentences are full of numbers that are not telephone numbers.
+  for (const keep of ["About 80 hours a month, around $580", "Coverage is checked around March 2027", "Worked 120 hours in 2026"]) {
+    assert.equal(maskPhonesInText(keep), keep, `left alone: ${keep}`);
+  }
+
+  const masked = maskResultText({ preferred_callback: "Tuesday, or 415-555-0100", notes: "Best number is 4155550100", monthly_hours: 80 });
+  assert.equal(masked.preferred_callback, "Tuesday, or +41******00");
+  assert.equal(masked.notes, "Best number is +41******00");
+  assert.equal(masked.monthly_hours, 80, "everything else is passed through untouched");
 });

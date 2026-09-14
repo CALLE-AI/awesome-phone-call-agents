@@ -14,12 +14,12 @@
 
 import type { Call, CalleClient } from "@call-e/calle";
 import { CalleAPIError, CalleConnectionError, CalleRateLimitError, CalleTimeoutError } from "@call-e/calle";
-import { createScreeningCall } from "./calle.js";
+import { createScreeningCall, screeningIdempotencyKey } from "./calle.js";
 import { DEFAULT_POLICY, HARD_CALL_CAP, nextAction, type CascadePolicy } from "./cascade.js";
 import { classifyScreening, isScreeningResult } from "./classify.js";
 import { dialAllowed, type Config } from "./config.js";
 import { suppressedIds, type Ledger } from "./ledger.js";
-import { maskPhone, maskPhonesInText } from "./mask.js";
+import { maskPhone, maskPhonesInText, maskResultText } from "./mask.js";
 import { planWaves, scoreEnrollee } from "./priority.js";
 import type { RegistryLoadReport } from "./registry.js";
 import { checklistFor, clearedByData, exemptionLabel, exemptionLabels, formatMonth, type Rules, type StateConfig } from "./rules.js";
@@ -82,6 +82,8 @@ export interface RunSummary {
   workItems: number;
   corrections: number;
   notAttempted: number;
+  /** Submissions that failed ambiguously: it is unknown whether a call went out. */
+  dialUnknown: number;
   pending: number;
   awareYes: number;
   awareNo: number;
@@ -141,9 +143,27 @@ function errorText(err: unknown): string {
   return (err as Error).message;
 }
 
-/** Transient platform trouble is retried; a request CALL-E rejects as invalid is not. */
-function isRetryable(err: unknown): boolean {
-  if (err instanceof CalleRateLimitError || err instanceof CalleConnectionError) {
+/**
+ * Did this failure happen before CALL-E could have dialled anybody?
+ *
+ * A 429 is the only refusal that says so plainly: the request was rejected at the door, no call
+ * exists, and re-sending it is safe. A dropped connection or a 5xx says nothing of the kind - the
+ * request may have arrived, created a task and started ringing a telephone before the failure
+ * reached us. Those are `submissionAmbiguous` below, and the campaign stops rather than guesses.
+ */
+function isDefinitelyNotDialled(err: unknown): boolean {
+  return err instanceof CalleRateLimitError;
+}
+
+/**
+ * A failure that leaves the outcome of the submission genuinely unknown.
+ *
+ * An idempotency key does make a retry safe against duplication, but it cannot tell an operator
+ * whether the first attempt rang. Re-sending is therefore not the problem; *claiming afterwards
+ * that nobody was dialled* is. We stop, record `dial_unknown`, and put it in front of a human.
+ */
+function submissionAmbiguous(err: unknown): boolean {
+  if (err instanceof CalleConnectionError) {
     return true;
   }
   if (err instanceof CalleAPIError) {
@@ -368,32 +388,55 @@ export class Orchestrator {
         return await fn();
       } catch (err) {
         attempt += 1;
-        if (!isRetryable(err) || attempt > this.o.createRetries) {
+        if (!isDefinitelyNotDialled(err) || attempt > this.o.createRetries) {
           throw err;
         }
         const delay = this.o.createRetryBaseMs * 2 ** (attempt - 1);
-        this.o.ledger.note("warning", `CALL-E did not accept ${label} (${maskPhonesInText(errorText(err))}); retry ${attempt}/${this.o.createRetries} in ${delay} ms`);
+        this.o.ledger.note("warning", `CALL-E rate-limited ${label} (${maskPhonesInText(errorText(err))}); retry ${attempt}/${this.o.createRetries} in ${delay} ms`);
         await sleep(delay);
       }
     }
   }
 
-  /** CALL-E never accepted the task: nobody was dialled, so nothing is inferred about the person. */
+  /**
+   * The submission failed. Which of the two things that means decides what we may write down.
+   *
+   * CALL-E refusing the task outright (a validation error) is a fact: nobody was dialled, and
+   * `not_attempted` says so. A connection that dropped, or a 5xx, is not a fact about the enrollee
+   * or about the telephone - the call may be ringing right now. Recording `not_attempted` there
+   * would be the system asserting something it does not know, which is the exact failure this app
+   * exists to avoid, so it records `dial_unknown` and sends it to a human to reconcile.
+   */
   private failPlacement(wave: Wave, person: Enrollee, err: unknown): void {
     const message = maskPhonesInText(errorText(err));
+    const ambiguous = submissionAmbiguous(err);
+    const outcome: Outcome = ambiguous ? "dial_unknown" : "not_attempted";
+    const key = screeningIdempotencyKey(this.o.campaign.id, person.id, wave.attempt);
     this.o.ledger.append({ type: "wave.failed", at: this.now(), wave: { ...wave, personIds: [person.id] }, personIds: [person.id], error: message });
-    this.o.log(`CALL-E did not accept the call to ${person.name}: ${message}. Marked not attempted.`);
+    this.o.log(
+      ambiguous
+        ? `The request to CALL-E for ${person.name} failed without saying whether the call went out: ${message}. Marked dial unknown; reconcile idempotency key ${key} in CALL-E before redialling.`
+        : `CALL-E did not accept the call to ${person.name}: ${message}. Marked not attempted.`,
+    );
     this.o.ledger.append({
       type: "person.classified",
       at: this.now(),
       personId: person.id,
       callId: "none",
-      classification: { outcome: "not_attempted", reasons: [`call task not accepted: ${message.slice(0, 140)}`], exemptions: [], correctionNeeded: false, agentSaid: null },
+      classification: {
+        outcome,
+        reasons: ambiguous
+          ? [`submission failed with an ambiguous error, so it is unknown whether a call was placed: ${message.slice(0, 120)}`, `reconcile idempotency key ${key} against CALL-E`]
+          : [`call task not accepted: ${message.slice(0, 140)}`],
+        exemptions: [],
+        correctionNeeded: false,
+        agentSaid: null,
+      },
       result: null,
       summary: null,
       evidence: [],
     });
-    const action = nextAction("not_attempted", this.states.get(person.id)?.attempts ?? 0, this.o.policy);
+    const action = nextAction(outcome, this.states.get(person.id)?.attempts ?? 0, this.o.policy);
     this.o.ledger.append({ type: "person.action", at: this.now(), personId: person.id, action, dueAt: null });
   }
 
@@ -415,7 +458,9 @@ export class Orchestrator {
     const classification = recipient
       ? classifyScreening({ recipient, confidenceLabel: terminal.completionConfidence?.label ?? null, hoursPerMonth: this.o.rules.requirement.hours_per_month })
       : { outcome: "unreachable" as const, reasons: ["recipient missing from the CALL-E response"], exemptions: [], correctionNeeded: false, agentSaid: null };
-    const result = recipient && isScreeningResult(recipient.structuredResult) ? recipient.structuredResult : null;
+    // Masked here, at the one place a result enters the ledger, so the dashboard, the report and
+    // every export downstream read the masked copy rather than each having to remember.
+    const result = recipient && isScreeningResult(recipient.structuredResult) ? maskResultText(recipient.structuredResult) : null;
     this.o.ledger.append({
       type: "person.classified",
       at: this.now(),
@@ -452,7 +497,8 @@ export class Orchestrator {
           consecutiveErrors = 0;
         } catch (err) {
           consecutiveErrors += 1;
-          if (!isRetryable(err) || consecutiveErrors > 5) {
+          // Reading a call places nothing, so both kinds of transient trouble are safe to re-read.
+          if (!(isDefinitelyNotDialled(err) || submissionAmbiguous(err)) || consecutiveErrors > 5) {
             throw err;
           }
           await sleep(this.o.pollIntervalMs);
@@ -553,6 +599,15 @@ export class Orchestrator {
         case "not_attempted":
           this.addWork(person, "operator_review", `${person.name}: CALL-E did not accept the call task; resume the campaign or call by hand.`, [], {});
           break;
+        case "dial_unknown":
+          this.addWork(
+            person,
+            "operator_review",
+            `${person.name}: the request to CALL-E failed without saying whether the call went out. Check CALL-E for this attempt before anyone dials again.`,
+            ["Look the attempt up in CALL-E by its idempotency key", "If a call exists, resume the campaign so its result is settled", "If no call exists, redial by hand or re-run the campaign"],
+            { highPriority: true, needsHumanReview: true },
+          );
+          break;
         case "cleared_by_data":
         case null:
           break;
@@ -594,7 +649,7 @@ export class Orchestrator {
     const s = this.summary();
     const o = s.outcomes;
     this.o.log(
-      `Campaign ${s.pending > 0 ? "paused" : "complete"}: likely exempt ${o.likely_exempt}, likely meets ${o.likely_meets}, at risk ${o.at_risk}, needs review ${o.needs_review}, cleared by data ${o.cleared_by_data}, not reached ${o.unreachable + o.identity_unconfirmed + o.unverified}. Had not heard of the rule: ${s.awareNo} of ${s.awareYes + s.awareNo}. Calls: ${s.calls}. Worklist: ${s.workItems}${s.corrections > 0 ? ` (${s.corrections} correction call${s.corrections === 1 ? "" : "s"})` : ""}.${s.pending > 0 ? ` ${s.pending} call(s) still pending; run resume.` : ""}`,
+      `Campaign ${s.pending > 0 ? "paused" : "complete"}: likely exempt ${o.likely_exempt}, likely meets ${o.likely_meets}, at risk ${o.at_risk}, needs review ${o.needs_review}, cleared by data ${o.cleared_by_data}, not reached ${o.unreachable + o.identity_unconfirmed + o.unverified}. Had not heard of the rule: ${s.awareNo} of ${s.awareYes + s.awareNo}. Calls: ${s.calls}. Worklist: ${s.workItems}${s.corrections > 0 ? ` (${s.corrections} correction call${s.corrections === 1 ? "" : "s"})` : ""}.${s.pending > 0 ? ` ${s.pending} call(s) still pending; run resume.` : ""}${o.dial_unknown > 0 ? ` ${o.dial_unknown} submission(s) failed ambiguously and need reconciling with CALL-E.` : ""}`,
     );
     return s;
   }
@@ -611,6 +666,7 @@ export class Orchestrator {
       identity_unconfirmed: 0,
       unreachable: 0,
       unverified: 0,
+      dial_unknown: 0,
       not_attempted: 0,
       pending: 0,
     };
@@ -634,6 +690,7 @@ export class Orchestrator {
       workItems: work.length,
       corrections: work.filter((w) => w.kind === "correction_call").length,
       notAttempted: outcomes.not_attempted,
+      dialUnknown: outcomes.dial_unknown,
       pending: calls.filter((c) => !TERMINAL.has(c.status)).length,
       awareYes,
       awareNo,

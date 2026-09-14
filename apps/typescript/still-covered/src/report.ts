@@ -21,6 +21,7 @@ export const OUTCOME_LABEL: Record<Outcome, string> = {
   identity_unconfirmed: "Identity not confirmed",
   unreachable: "Not reached",
   unverified: "Call did not finish",
+  dial_unknown: "Unknown whether a call was placed",
   not_attempted: "Not attempted: CALL-E did not accept the task",
 };
 
@@ -74,7 +75,7 @@ export function buildReport(projection: Projection): string {
   lines.push(`| Called | ${called} |`);
   lines.push(`| Screened by phone | ${screened} |`);
   lines.push(`| Had not heard of the rule before the call | ${awareNo} of ${awareYes + awareNo} who answered (${pct(awareNo, awareYes + awareNo)}) |`);
-  for (const o of ["likely_exempt", "likely_meets", "at_risk", "needs_review", "declined", "opted_out", "identity_unconfirmed", "unreachable", "unverified", "not_attempted"] as const) {
+  for (const o of ["likely_exempt", "likely_meets", "at_risk", "needs_review", "declined", "opted_out", "identity_unconfirmed", "unreachable", "unverified", "dial_unknown", "not_attempted"] as const) {
     lines.push(`| ${OUTCOME_LABEL[o]} | ${by(o).length} |`);
   }
   lines.push(`| Awaiting a result | ${pending.length} |`);
@@ -192,6 +193,7 @@ export function buildReport(projection: Projection): string {
   section("May qualify for an exemption", by("likely_exempt"));
   section("May already meet the requirement", by("likely_meets"));
   section("Not screened yet", [...by("identity_unconfirmed"), ...by("unreachable"), ...by("unverified")]);
+  section("Needs reconciliation with CALL-E", by("dial_unknown"));
   section("Asked to be called later", by("declined"));
   section("Asked not to be called again", by("opted_out"));
   section("Not attempted", by("not_attempted"));

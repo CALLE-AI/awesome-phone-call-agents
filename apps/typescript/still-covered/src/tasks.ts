@@ -64,7 +64,7 @@ export function renderScreeningTask(rules: Rules, state: StateConfig, person: En
     person.birthYear !== null
       ? `- If it is ${person.firstName}, ask them to confirm their year of birth. The correct year is ${person.birthYear}. Never say the year yourself.`
       : `- There is no birth year on file, so identity cannot be confirmed. Do not discuss coverage; give the message below for someone else and end the call.`,
-    `- Do not mention Medicaid, coverage details or any rule until the person has said they are ${person.firstName} and given the matching year. If someone else answered, or the year does not match, say: "I have an important message about ${person.firstName}'s health coverage. Please ask them to call ${state.callback_phone}." Then end the call politely.`,
+    `- Do not mention Medicaid, coverage details or any rule until the person has said they are ${person.firstName} and given the matching year. If someone else answered, or the year does not match, say: "Please ask ${person.firstName} to call ${state.callback_phone}. Thank you." Say nothing else - not the reason for the call, not that it is about coverage, not who we are calling on behalf of. Then end the call politely.`,
     `- If voicemail answers, say only: "${state.voicemail}" Then end the call.`,
     "",
     `Once identity is confirmed, say: "This call takes about two minutes. Is now a good time?" If not, ask when would be better, thank them, and end the call.`,
@@ -73,7 +73,11 @@ export function renderScreeningTask(rules: Rules, state: StateConfig, person: En
     `2. Explain in plain words: "${req.plain_language} Your coverage will be checked around ${checkWhen}. I can help you see whether you may be exempt."`,
   ];
   if (questions.length > 0) {
-    lines.push("3. Ask these questions in order, one short question at a time, and wait for each answer. As soon as the person answers yes to one of them, stop asking the others and go to step 5.");
+    lines.push(
+      frail?.follow_up
+        ? "3. Ask these questions in order, one short question at a time, and wait for each answer. As soon as the person answers yes to one of them, stop asking the others and go to step 5 - except for the health question, where you must ask the follow-up below before going anywhere, because a yes on its own does not settle it."
+        : "3. Ask these questions in order, one short question at a time, and wait for each answer. As soon as the person answers yes to one of them, stop asking the others and go to step 5.",
+    );
     for (const q of questions) {
       lines.push(`   - ${q.question}`);
     }
@@ -84,7 +88,7 @@ export function renderScreeningTask(rules: Rules, state: StateConfig, person: En
     lines.push("3. The state's records already answered the exemption questions for this person; go straight to step 4.");
   }
   lines.push(
-    `4. If no exemption applied, ask: "${req.hours_question}" If they are unsure about hours, ask: "${req.income_question}"`,
+    `4. If no exemption applied, ask: "${req.hours_question}" Then, if they said fewer than ${req.hours_per_month} hours, or they are unsure, also ask: "${req.income_question}" Earnings are a second way to meet the requirement, so someone below on hours can still meet it on income; never skip this question for them.`,
     "5. Tell them what it means, using only one of these three messages, and never anything stronger:",
     `   - If they said yes to an exemption question (for the health question, only if they also said it limits work or everyday activities): "Based on what you told me, you may qualify for an exemption. The state makes the final decision, and a caseworker will review it." Never say they are exempt.`,
     `   - If they reported ${req.hours_per_month} or more hours a month, or about ${req.income_per_month_usd} dollars a month or more: "It sounds like you may already meet the requirement. You will still need to report it."`,

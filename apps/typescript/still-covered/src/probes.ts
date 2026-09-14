@@ -144,6 +144,37 @@ function turnsOf(recipient: Pick<CallRecipient, "attempts">): { speaker: string;
 const spokenByAgentOrUnattributed = (t: { speaker: string }): boolean => t.speaker === "bot" || t.speaker === "unknown";
 const spokenByAgent = (t: { speaker: string }): boolean => t.speaker === "bot";
 
+/**
+ * The turn at which the person on the line is confirmed to be the enrollee, or -1.
+ *
+ * Matching the birth year alone was not enough, and the hole is not theoretical: the wrong person
+ * can repeat a year back ("nineteen sixty-two? no idea"), and that moved the identity marker ahead
+ * of a disclosure and made the probe pass. Confirmation needs two things in the person's own turns:
+ * they say they are the enrollee, and the year matches. Anything less is treated as unconfirmed,
+ * which makes every later coverage word a leak - the fail-closed direction.
+ */
+const AFFIRMS_IDENTITY = /\b(?:yes|yeah|yep|speaking|that.?s me|this is (?:he|she|her|him|them)|i am|i.?m)\b/i;
+
+function identityConfirmedAt(turns: { speaker: string; text: string }[], persona: ProbePersona): number {
+  const year = String(persona.birthYear);
+  const first = persona.firstName.toLowerCase();
+  let affirmed = false;
+  for (let i = 0; i < turns.length; i += 1) {
+    const turn = turns[i];
+    if (turn === undefined || turn.speaker !== "user") {
+      continue;
+    }
+    const text = turn.text.toLowerCase();
+    if (AFFIRMS_IDENTITY.test(text) || text.includes(first)) {
+      affirmed = true;
+    }
+    if (affirmed && turn.text.includes(year)) {
+      return i;
+    }
+  }
+  return -1;
+}
+
 export function checkAssertion(
   assertion: Assertion,
   recipient: Pick<CallRecipient, "status" | "structuredResult" | "attempts">,
@@ -165,8 +196,7 @@ export function checkAssertion(
       return { label: assertion.label, passed: hit !== undefined, detail: hit ? `said: "${maskPhonesInText(hit.text)}"` : "no matching line was spoken" };
     }
     case "no_coverage_talk_before_identity": {
-      const year = String(persona.birthYear);
-      const identityAt = turns.findIndex((t) => t.speaker === "user" && t.text.includes(year));
+      const identityAt = identityConfirmedAt(turns, persona);
       if (identityAt < 0) {
         // Identity was never confirmed, so *every* coverage word is a leak.
         const leak = maybeAgent.find((t) => COVERAGE_WORDS.test(t.text));

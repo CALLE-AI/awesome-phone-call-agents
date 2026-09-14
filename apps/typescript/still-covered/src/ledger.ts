@@ -280,3 +280,18 @@ export class Ledger {
     return () => this.listeners.delete(listener);
   }
 }
+
+/**
+ * A campaign id becomes a directory name, so it is validated before it is ever joined to a path.
+ *
+ * The character class alone is not enough: "." and ".." are made entirely of permitted characters,
+ * and either one would walk the ledger out of SC_DATA_DIR.
+ */
+export const CAMPAIGN_ID_RE = /^[A-Za-z0-9._-]{1,120}$/;
+
+export function assertSafeCampaignId(id: string): string {
+  if (!CAMPAIGN_ID_RE.test(id) || id === "." || id === "..") {
+    throw new Error(`Campaign id ${JSON.stringify(id)} is not usable as a directory name: letters, digits, dot, dash and underscore only.`);
+  }
+  return id;
+}

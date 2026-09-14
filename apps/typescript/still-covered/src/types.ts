@@ -129,6 +129,7 @@ export type Outcome =
   | "identity_unconfirmed"
   | "unreachable"
   | "unverified"
+  | "dial_unknown"
   | "not_attempted";
 
 export const OUTCOMES: readonly Outcome[] = [
@@ -142,6 +143,7 @@ export const OUTCOMES: readonly Outcome[] = [
   "identity_unconfirmed",
   "unreachable",
   "unverified",
+  "dial_unknown",
   "not_attempted",
 ];
 

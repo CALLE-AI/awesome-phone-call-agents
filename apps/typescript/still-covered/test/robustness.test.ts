@@ -15,7 +15,7 @@ import { loadEnrollees } from "../src/registry.js";
 import { loadRules, loadState } from "../src/rules.js";
 import type { Campaign } from "../src/types.js";
 
-const NORMAL = { cleared_by_data: 2, likely_exempt: 3, likely_meets: 1, at_risk: 1, needs_review: 2, declined: 1, opted_out: 1, identity_unconfirmed: 1, unreachable: 1, unverified: 0, not_attempted: 0, pending: 0 };
+const NORMAL = { cleared_by_data: 2, likely_exempt: 3, likely_meets: 1, at_risk: 1, needs_review: 2, declined: 1, opted_out: 1, identity_unconfirmed: 1, unreachable: 1, unverified: 0, dial_unknown: 0, not_attempted: 0, pending: 0 };
 
 async function harness(fakeOptions: FakeServerOptions, overrides: Partial<RunOptions> = {}) {
   const fake = await startFakeCalleServer({ port: 0, queueDelayMs: 30, perRecipientMs: 20, ...fakeOptions });
@@ -43,15 +43,41 @@ test("a transient 429 on create is retried and the campaign finishes normally", 
   }
 });
 
-test("an outage marks people not attempted: nobody gets a letter, a navigator call or a verdict they did not earn", async () => {
+test("a 503 outage is recorded as unknown, not as 'nobody was dialled', and is never auto-redialled", async () => {
+  // A 5xx does not say whether the request arrived. Claiming not_attempted there would assert
+  // something the system cannot know, and a redial could ring somebody who has already been rung.
   const h = await harness({ createFailures: { count: 10_000, status: 503, code: "provider_unavailable" } }, { createRetries: 1 });
   try {
     const s = await h.make().run();
-    assert.equal(s.outcomes.not_attempted, 11);
+    assert.equal(s.outcomes.dial_unknown, 11, "unknown, not not_attempted");
+    assert.equal(s.outcomes.not_attempted, 0, "the system never claims nobody was dialled after an ambiguous failure");
     assert.equal(s.outcomes.cleared_by_data, 2);
     assert.equal(s.calls, 0);
-    const kinds = new Set([...new Ledger(h.ledgerPath).projection.work.values()].map((w) => w.kind));
-    assert.deepEqual([...kinds], ["operator_review"]);
+
+    const ledger = new Ledger(h.ledgerPath);
+    assert.ok(!ledger.projection.timeline.some((t) => t.message.includes("retry 1/1")), "an ambiguous submission is not re-sent automatically");
+
+    const work = [...ledger.projection.work.values()];
+    assert.deepEqual([...new Set(work.map((w) => w.kind))], ["operator_review"]);
+    assert.ok(work.every((w) => w.needsHumanReview), "every one waits on a person");
+
+    for (const person of ledger.projection.states.values()) {
+      if (person.outcome === "dial_unknown") {
+        assert.ok(person.reasons.some((r) => r.includes("sc:robust:")), "the reason names the idempotency key to reconcile");
+        assert.notEqual(person.nextAction?.type, "retry", "never redial what may already have rung");
+      }
+    }
+  } finally {
+    await h.cleanup();
+  }
+});
+
+test("a request CALL-E refuses outright is still 'not attempted': that one really is a fact", async () => {
+  const h = await harness({ createFailures: { count: 10_000, status: 422, code: "invalid_request" } }, { createRetries: 1 });
+  try {
+    const s = await h.make().run();
+    assert.equal(s.outcomes.not_attempted, 11, "a validation refusal happens before anything is dialled");
+    assert.equal(s.outcomes.dial_unknown, 0);
   } finally {
     await h.cleanup();
   }
@@ -73,9 +99,11 @@ test("resume re-places refused tasks with the same keys and reaches the same end
   const h = await harness({ createFailures: { count: 3, status: 503, code: "provider_unavailable" } }, { createRetries: 0 });
   try {
     const first = await h.make().run();
-    assert.equal(first.notAttempted, 3);
+    assert.equal(first.dialUnknown, 3, "a 503 leaves it unknown whether these three were dialled");
     const refused = new Ledger(h.ledgerPath).projection.failedWaves.flatMap((f) => f.personIds);
     assert.equal(refused.length, 3);
+    // Resume is the reconciliation: the same idempotency key either settles the call CALL-E already
+    // has or creates the one it never got, so the unknown resolves without anybody being dialled twice.
     const resumed = await h.make().resume();
     assert.deepEqual(resumed.outcomes, NORMAL);
     assert.equal(new Ledger(h.ledgerPath).projection.failedWaves.length, 0);

@@ -66,6 +66,58 @@ function intEnv(env: NodeJS.ProcessEnv, name: string, fallback: number, allowZer
   return n;
 }
 
+/**
+ * Live endpoints the API key may be sent to.
+ *
+ * `CALLE_BASE_URL` used to be accepted as written, which means a mistyped or hostile environment
+ * could ship a live credential to an arbitrary host over plain HTTP. An override is still useful
+ * (a staging endpoint, a recorded proxy), so it is kept - but it must be HTTPS and it must be an
+ * origin someone deliberately approved, either by appearing below or by being named in
+ * `SC_ALLOWED_BASE_URLS`.
+ */
+const DEFAULT_LIVE_ORIGINS = ["https://api.heycall-e.com"];
+
+function resolveLiveBaseUrl(env: NodeJS.ProcessEnv): string {
+  const raw = (env["CALLE_BASE_URL"] ?? "").trim();
+  if (raw.length === 0) {
+    return DEFAULT_LIVE_ORIGINS[0]!;
+  }
+  let url: URL;
+  try {
+    url = new URL(raw);
+  } catch {
+    throw new Error(`CALLE_BASE_URL is not a URL: ${raw}`);
+  }
+  if (url.protocol !== "https:") {
+    throw new Error(`CALLE_BASE_URL must be https, got ${url.protocol.replace(":", "")}. The API key is sent on every request.`);
+  }
+  const extra = (env["SC_ALLOWED_BASE_URLS"] ?? "")
+    .split(",")
+    .map((s) => s.trim())
+    .filter((s) => s.length > 0);
+  const approved = new Set<string>();
+  for (const candidate of [...DEFAULT_LIVE_ORIGINS, ...extra]) {
+    try {
+      approved.add(new URL(candidate).origin);
+    } catch {
+      throw new Error(`SC_ALLOWED_BASE_URLS contains a value that is not a URL: ${candidate}`);
+    }
+  }
+  if (!approved.has(url.origin)) {
+    throw new Error(
+      `CALLE_BASE_URL ${url.origin} is not an approved live endpoint. Approved: ${[...approved].join(", ")}. ` +
+        "Add it to SC_ALLOWED_BASE_URLS if you meant it.",
+    );
+  }
+  return url.origin + (url.pathname === "/" ? "" : url.pathname.replace(/\/$/, ""));
+}
+
+/** Loopback only. Anything else is reachable by another machine and needs a token. */
+function isLoopbackHost(host: string): boolean {
+  const h = host.trim().toLowerCase().replace(/^\[|\]$/g, "");
+  return h === "127.0.0.1" || h === "localhost" || h === "::1" || h.startsWith("127.");
+}
+
 export function loadConfig(env: NodeJS.ProcessEnv = process.env): Config {
   const modeRaw = (env["SC_MODE"] ?? "dry-run").trim().toLowerCase();
   if (modeRaw !== "dry-run" && modeRaw !== "live") {
@@ -84,14 +136,18 @@ export function loadConfig(env: NodeJS.ProcessEnv = process.env): Config {
     throw new Error("SC_MAX_ATTEMPTS cannot exceed 3: at most three calls per person per campaign");
   }
   const publicUrl = (env["SC_PUBLIC_URL"] ?? "").trim() || null;
+  const host = (env["SC_HOST"] ?? "").trim() || "127.0.0.1";
   const tokenRaw = (env["SC_DASHBOARD_TOKEN"] ?? "").trim();
-  const dashboardToken = tokenRaw.length > 0 ? tokenRaw : publicUrl !== null ? randomBytes(18).toString("base64url") : null;
+  // A token is generated whenever the dashboard is reachable from another machine, not only when a
+  // public URL is set. Binding to 0.0.0.0 with no token used to expose enrollee data unauthenticated.
+  const needsToken = publicUrl !== null || !isLoopbackHost(host);
+  const dashboardToken = tokenRaw.length > 0 ? tokenRaw : needsToken ? randomBytes(18).toString("base64url") : null;
   return {
     mode,
     apiKey: apiKey.length > 0 ? apiKey : null,
-    baseUrl: mode === "live" ? (env["CALLE_BASE_URL"] ?? "https://api.heycall-e.com") : `http://127.0.0.1:${fakePort}`,
+    baseUrl: mode === "live" ? resolveLiveBaseUrl(env) : `http://127.0.0.1:${fakePort}`,
     publicUrl,
-    host: (env["SC_HOST"] ?? "").trim() || "127.0.0.1",
+    host,
     port: intEnv(env, "SC_PORT", intEnv(env, "PORT", 4800, true), true),
     fakePort,
     stateId: (env["SC_STATE"] ?? "").trim() || "example-state",

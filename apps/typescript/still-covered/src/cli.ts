@@ -13,7 +13,7 @@ import { createCalleClient, createScreeningCall } from "./calle.js";
 import { assertLiveAllowed, forceDryRun, loadConfig, loadDotEnv, type Config } from "./config.js";
 import { startFakeCalleServer, type FakeServerHandle } from "./fake-calle-server.js";
 import { formatLintReport, lintCallTask } from "./lint.js";
-import { Ledger } from "./ledger.js";
+import { assertSafeCampaignId, Ledger } from "./ledger.js";
 import { maskPhone } from "./mask.js";
 import { CallInbox, Orchestrator } from "./orchestrator.js";
 import { planWaves, scoreEnrollee } from "./priority.js";
@@ -91,7 +91,7 @@ function buildCampaign(config: Config, values: Record<string, string | boolean |
   const dueRaw = typeof values["due-within"] === "string" ? Number.parseInt(values["due-within"], 10) : Number.NaN;
   const stamp = new Date().toISOString().slice(0, 16).replace(/[-:T]/g, "");
   return {
-    id: typeof values["campaign-id"] === "string" ? values["campaign-id"] : `${state.id}-${asOf}-${stamp}`,
+    id: typeof values["campaign-id"] === "string" ? assertSafeCampaignId(values["campaign-id"]) : `${state.id}-${asOf}-${stamp}`,
     title: typeof values["title"] === "string" ? values["title"] : `${state.program_name} work-requirement outreach`,
     stateId: state.id,
     rulesId: rules.id,
@@ -266,6 +266,20 @@ function orchestratorFromLedger(deps: RunDeps, ledger: Ledger, settings: RunSett
     throw new Error("Ledger has no declared campaign.");
   }
   const people = [...projection.people.values()];
+  // Resume re-places calls that this campaign already declared. The caller, the voicemail, the
+  // questions and the classification thresholds must therefore be the ones the campaign was
+  // declared with - not whatever --state, --rules or the environment happen to say today, which
+  // would otherwise let a resumed call use a different caller or a different policy than the first.
+  const campaignState = deps.state.id === projection.campaign.stateId ? deps.state : loadState(projection.campaign.stateId);
+  if (campaignState.id !== deps.state.id) {
+    deps.log(`Campaign ${projection.campaign.id} was declared with state ${campaignState.id}; using it rather than ${deps.state.id}.`);
+  }
+  if (deps.rules.id !== projection.campaign.rulesId) {
+    throw new Error(
+      `Campaign ${projection.campaign.id} was declared under rules ${projection.campaign.rulesId}, but ${deps.rules.id} is loaded. ` +
+        "Resuming under different rules would classify the second half of a campaign by a different policy. Pass --rules for the original file.",
+    );
+  }
   return new Orchestrator({
     config: deps.config,
     client: createCalleClient(deps.config),
@@ -273,7 +287,7 @@ function orchestratorFromLedger(deps: RunDeps, ledger: Ledger, settings: RunSett
     inbox: deps.inbox,
     campaign: projection.campaign,
     rules: deps.rules,
-    state: deps.state,
+    state: campaignState,
     people,
     registryReport: { loaded: people.length, skippedNoConsent: 0, skippedDoNotCall: 0, skippedInvalidPhone: 0, skippedDuplicatePhone: 0, skippedMissingFields: 0, warnings: [] },
     webhookUrl: webhookUrlFor(deps.config, deps.server, deps.log),
@@ -342,7 +356,7 @@ async function main(): Promise<void> {
     if (!id) {
       throw new Error(`${command} needs --campaign-id.`);
     }
-    const ledgerPath = join(config.dataDir, id, "ledger.jsonl");
+    const ledgerPath = join(config.dataDir, assertSafeCampaignId(id), "ledger.jsonl");
     if (!existsSync(ledgerPath)) {
       throw new Error(`No ledger for campaign ${id}.`);
     }
@@ -476,7 +490,7 @@ async function main(): Promise<void> {
       });
       ref.server = server;
       if (values["campaign-id"]) {
-        const ledgerPath = join(config.dataDir, values["campaign-id"], "ledger.jsonl");
+        const ledgerPath = join(config.dataDir, assertSafeCampaignId(values["campaign-id"]), "ledger.jsonl");
         if (existsSync(ledgerPath)) {
           server.setLedger(new Ledger(ledgerPath));
         }

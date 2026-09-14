@@ -52,6 +52,14 @@ export function nextAction(outcome: Outcome | null, attempts: number, policy: Ca
         };
       }
       return { type: "mail", reason: "not screened after the maximum number of calls; send the plain-language letter and add to community outreach", highPriority: true };
+    case "dial_unknown":
+      // Deliberately never "retry". The request may have reached CALL-E and dialled, so a redial
+      // could call this person twice. A human reconciles against the CALL-E dashboard first.
+      return {
+        type: "operator-review",
+        reason: "the request to CALL-E failed in a way that does not say whether the call went out; reconcile against CALL-E before anyone dials again",
+        highPriority: true,
+      };
     case "not_attempted":
       return { type: "operator-review", reason: "CALL-E did not accept the call task; nobody was dialled. Resume the campaign or call by hand." };
     case null:
