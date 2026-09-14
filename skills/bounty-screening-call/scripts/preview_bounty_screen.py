@@ -27,6 +27,23 @@ RESULT_SCHEMA = {
         "notes",
         "evidence",
     ],
+    "properties": {
+        "reward_status": {"type": "string", "enum": ["confirmed", "unconfirmed", "contradicted"]},
+        "reward_amount": {"type": ["number", "null"]},
+        "reward_currency": {"type": ["string", "null"]},
+        "ai_use": {"type": "string", "enum": ["allowed", "limited", "forbidden", "unknown"]},
+        "eligibility": {"type": "string", "enum": ["eligible", "ineligible", "unknown"]},
+        "deadline": {"type": ["string", "null"]},
+        "payout_method": {"type": "string", "enum": ["fiat", "crypto", "other", "unknown"]},
+        "submission_url": {"type": ["string", "null"]},
+        "confidence": {"type": "string", "enum": ["high", "medium", "low"]},
+        "notes": {"type": "string"},
+        "evidence": {"type": "array", "items": {
+            "type": "object", "required": ["claim", "transcript_span"],
+            "properties": {"claim": {"type": "string"}, "transcript_span": {"type": "string"}},
+            "additionalProperties": False,
+        }},
+    },
     "additionalProperties": False,
 }
 
