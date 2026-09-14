@@ -268,6 +268,30 @@ clinic's own published number themselves, and quote the reference. Failing safe
 into an out-of-band check is the only honest answer to "how do I know this is
 really you."
 
+## Why the one-shot Calls API rather than Goals
+
+A published Goal owns its script. A Goal Run supplies a phone number, per-run
+variables and an idempotency key — not words. Sending task text with a Run is
+refused outright with `schema_override_not_allowed`: *"The request tried to
+supply task text, schemas, RunSpec selectors… owned by the Goal. Change the Goal
+in Chat and publish a new version instead."*
+
+This app chooses between **four different scripts** at runtime, from the
+patient's trajectory — a light rebook that is told not to ask why, a barrier hunt
+carrying the concession ladder, a final re-engagement, and a discharge
+confirmation that must not try to book anyone. Under Goals those are four
+separately authored and separately published objects that have to stay in step
+with the code that picks between them.
+
+The result schema is request-scoped for the same reason: `chosen_slot_id`'s enum
+is generated from *that course's* live slots, so a slot the clinician never
+offered cannot be expressed in the output at all. A pinned Goal schema turns that
+from unrepresentable into merely invalid.
+
+Both conditions in the platform's own dividing line apply — *"Use the one-shot
+Calls API when each request needs new task text or a request-scoped result
+schema"* — so that is the API this app uses.
+
 ## Running it live
 
 Live mode places real phone calls. Use it only with numbers you own or are
