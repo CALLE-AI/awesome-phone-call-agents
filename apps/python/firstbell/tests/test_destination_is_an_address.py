@@ -34,24 +34,24 @@ from tests.fixtures import IN_A
 # Spellings a real export writes for one number, and the address each denotes.
 GROUPED = [
     ("+915550000001", "+915550000001"),
-    ("+1, 800, 555, 0199", "+18005550199"),
+    ("+1, 555, 010, 0199", "+15550100199"),
     ("+1 555 010 0301", "+15550100301"),
-    ("+44 (0)20 7946 0958".replace("(0)", ""), "+442079460958"),
+    ("+44 (555) 010 0958", "+445550100958"),
     ("  +915550000001  ", "+915550000001"),
     ("+915550000001\n", "+915550000001"),
 ]
 
 # Text that reached a dialler and should not have.
 NOT_AN_ADDRESS = [
-    "٩٨٧٦٥٤٣٢١٠",  # Eastern Arabic
-    "९८७६५४३२१०",  # Devanagari
+    "٥٥٥٠١٠٠٣٠١",  # Eastern Arabic
+    "५५५०१००३०१",  # Devanagari
     "unknown²",                    # a superscript is a digit to str.isdigit()
     "see note⁵",
-    "ring mum on 9876543210 after three",
+    "ring mum on 5550100301 after three",
     "+91​5550000001",              # a zero-width space between the digits
     "+9155500–0001",               # an en dash where a hyphen was typed
     "ext. 4",
-    "+0155500001",                      # a country code may not start with zero
+    "+0123456789",                      # a country code may not start with zero
     "+1234567",                         # too short
     "+9155500000122222",                # too long
     "1,800,555,0199",                   # national format, no country code
@@ -75,7 +75,7 @@ def test_text_that_is_not_an_address_is_refused_rather_than_repaired(text):
 def test_a_cell_with_digits_in_it_is_not_a_number_the_run_will_guess_at(tmp_path):
     """The parser accepts it, so the boundary has to be the one that refuses it.
 
-    `ring mum on 9876543210 after three` carries more than seven ASCII digits, so
+    `ring mum on 5550100301 after three` carries more than seven ASCII digits, so
     `_split_phones` keeps it and used to hand the whole sentence to the platform as the
     destination. The refusal names the row and stops the file: dropping the entry quietly
     would shorten a fallback chain without saying so, and a chain one number shorter than
@@ -85,13 +85,13 @@ def test_a_cell_with_digits_in_it_is_not_a_number_the_run_will_guess_at(tmp_path
     path = tmp_path / "work.csv"
     path.write_text(
         "id,phones,consent,student_name\n"
-        'S-1,"ring mum on 9876543210 after three",yes,Ada\n',
+        'S-1,"ring mum on 5550100301 after three",yes,Ada\n',
         encoding="utf-8", newline="")
 
     with pytest.raises(SourceError) as raised:
         list(CsvSource(path).items())
     assert "not an E.164 number" in str(raised.value)
-    assert "9876543210" not in str(raised.value), (
+    assert "5550100301" not in str(raised.value), (
         "the refusal quotes the cell, so the digits in it are masked like any other")
 
 
@@ -150,7 +150,7 @@ def test_the_dial_command_refuses_a_number_no_network_carries(capsys):
     r"""`\d` accepted these and `$` accepted the newline. Both went to the platform."""
     from firstbell.dial import main
 
-    assert main(["٩٨٧٦٥٤٣٢١٠", "--i-consent"]) == 2
+    assert main(["٥٥٥٠١٠٠٣٠١", "--i-consent"]) == 2
     assert "not an E.164 number" in capsys.readouterr().out
 
     assert main(["+915550000001\n"]) == 2, (

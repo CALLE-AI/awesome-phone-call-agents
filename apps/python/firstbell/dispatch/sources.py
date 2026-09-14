@@ -114,7 +114,7 @@ def _split_phones(raw: str) -> tuple[str, ...]:
 # `+1, 800, 555, 0199` survives as one number written the way the export wrote it.
 # That string then went to the platform as the destination, which is a different
 # question with a worse failure: the filter is `seven ASCII digits somewhere inside`,
-# so `ring mum on 9876543210 after three` was a diallable number too.
+# so `ring mum on 5550100301 after three` was a diallable number too.
 #
 # So the spelling is resolved to the one address a telephone network carries before
 # anything downstream can dial it, and a spelling that resolves to no address stops

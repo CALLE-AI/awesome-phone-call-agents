@@ -5,7 +5,7 @@ Two checks decided that question before this file existed, and neither of them a
 `sources._split_phones` asks whether a cell contains at least seven ASCII digits somewhere
 inside it. That is the right question for a parser, because a district export writes
 `+1, 800, 555, 0199` and `(04) 1234-5678` and both of those are one telephone number. It is
-the wrong question for a dialler: `ring mum on 9876543210 after three` also contains seven
+the wrong question for a dialler: `ring mum on 5550100301 after three` also contains seven
 digits, and what got handed to the platform was the whole cell, sentence included.
 
 `consent.covers_number` compares the two sides on `str.isdigit()`, which is true for
