@@ -109,6 +109,9 @@ test("the task discloses the AI, states exact amounts, and forbids payment detai
   const disruption = {
     id: "evt",
     flightId: booking.flightId,
+    kind: "delay" as const,
+    cause: "operational" as const,
+    source: { kind: "manual" as const },
     delayMinutes: 240,
     reason: "weather",
     newDeparture: "2026-09-20T05:10:00.000Z",
@@ -137,4 +140,33 @@ test("live mode sends the airline desk call to the demo phone only, after typed 
   assert.equal(gateway.requests[0]?.phone, "+6591234567");
   assert.equal(gateway.requests[0]?.idempotencyKey, "fda-req_P3X9GA_1-airline");
   assert.equal(gateway.requests[0]?.metadata.purpose, "airline_forced_reissue");
+});
+
+test("a cancellation is called like a delay, offers no keep option, and never keeps the booking", async () => {
+  const desk = dryDesk();
+  const d = desk.reportCancellation("NA721-2026-09-20", "a crew shortage");
+  assert.equal(d.id, "evt_NA721-2026-09-20_cancelled");
+  assert.equal(d.newDeparture, null);
+  const preview = desk.preview(d.id, "K7Q2XA");
+  assert.match(preview.task, /is cancelled because of a crew shortage\. It will not operate\./);
+  assert.match(preview.task, /Offer exactly these two options:\n1\. Move to another flight:/);
+  assert.doesNotMatch(preview.task, /Keep the delayed flight/);
+  const schema = preview.resultSchema as { properties: { choice: { enum: string[] } } };
+  assert.ok(!schema.properties.choice.enum.includes("keep_delayed_flight"));
+
+  // K7Q2XA is scripted to keep; on a cancelled flight that has to go to a person.
+  await desk.startCall(d.id, "K7Q2XA");
+  const kept = await desk.refresh(`${d.id}:K7Q2XA`);
+  assert.equal(kept.status, "needs_review");
+  assert.throws(() => desk.resolve(kept.key, { kind: "keep" }, ""), /no flight to keep/);
+  await desk.startCall(d.id, "T5W1LC");
+  assert.equal((await desk.refresh(`${d.id}:T5W1LC`)).status, "applied");
+  assert.throws(() => desk.reportDelay("NA721-2026-09-20", 60, "late crew"), /already has a reported cancellation/);
+});
+
+test("force majeure disruptions get their own id and task wording", () => {
+  const desk = dryDesk();
+  const d = desk.reportDelay("NA721-2026-09-20", 240, "volcanic ash", "force_majeure");
+  assert.equal(d.id, "evt_NA721-2026-09-20_fm_240");
+  assert.match(desk.preview(d.id, "K7Q2XA").task, /outside the airline's control \(force majeure\)/);
 });

@@ -60,3 +60,8 @@ test("human requests, low confidence, and failed calls go to review", () => {
   assert.equal(decide(outcome({}, { state: "failed", result: null, failureCode: "no_answer" }), quote).kind, "review");
   assert.equal(decide(outcome({}, { result: null }), quote).kind, "review");
 });
+
+test("keeping a cancelled flight is never applied", () => {
+  const cancelledQuote: Quote = { ...quote, changeCase: "involuntary", keep: null };
+  assert.equal(decide(outcome({ choice: "keep_delayed_flight" }), cancelledQuote).kind, "review");
+});

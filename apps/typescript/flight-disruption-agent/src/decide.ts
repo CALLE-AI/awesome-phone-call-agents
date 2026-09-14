@@ -31,6 +31,7 @@ export function decide(outcome: CallOutcome, quote: Quote): Decision {
   if (reasons.length) return { kind: "review", reasons };
 
   if (result.choice === "keep_delayed_flight") {
+    if (!quote.keep) return { kind: "review", reasons: ["The flight is cancelled, but the passenger chose to keep it."] };
     return { kind: "apply", action: { kind: "keep" } };
   }
 

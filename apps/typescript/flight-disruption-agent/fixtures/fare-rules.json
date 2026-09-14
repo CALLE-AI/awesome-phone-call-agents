@@ -11,7 +11,8 @@
         "saver": { "rescheduleFee": 350000, "refundPercent": 50 },
         "basic": { "rescheduleFee": 500000, "refundPercent": 0 }
       },
-      "involuntary": { "rescheduleFee": 0, "refundPercent": 100, "waivesFareDifference": true }
+      "involuntary": { "rescheduleFee": 0, "refundPercent": 100, "waivesFareDifference": true },
+      "forceMajeure": { "rescheduleFee": 0, "refundPercent": 100, "waivesFareDifference": false }
     },
     "dist-lintas": {
       "name": "Lintas Consolidator",

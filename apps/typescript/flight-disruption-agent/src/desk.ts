@@ -12,7 +12,7 @@ import { addMinutes, idr, localTime } from "./format.ts";
 import { maskPhone, routeFor } from "./phone.ts";
 import { airlineOf, quoteFor, voluntaryQuoteFor } from "./rules.ts";
 import { buildResultSchema, buildTask } from "./task.ts";
-import type { Action, AirlineCall, BookingState, Disruption, LedgerEntry, Quote, RequestChannel, RequestEntry, RequestKind } from "./types.ts";
+import type { Action, AirlineCall, BookingState, Disruption, DisruptionCause, DisruptionKind, DisruptionSource, LedgerEntry, Quote, RequestChannel, RequestEntry, RequestKind } from "./types.ts";
 
 interface DeskState {
   disruptions: Disruption[];
@@ -32,6 +32,16 @@ export interface DeskOptions {
   now?: () => number;
   /** B2B portal or GDS used by Workflow B. Defaults to the fake portal. */
   gds?: Gds;
+}
+
+export interface DisruptionInput {
+  flightId: string;
+  kind: DisruptionKind;
+  cause: DisruptionCause;
+  /** Ignored for a cancellation. */
+  delayMinutes: number;
+  reason: string;
+  source?: DisruptionSource;
 }
 
 export class DeskError extends Error {
@@ -96,6 +106,12 @@ export class Desk {
     if (!path || !existsSync(path)) return null;
     const state = JSON.parse(readFileSync(path, "utf8")) as DeskState;
     state.requests ??= {};
+    // State saved before cancellations existed only held operator-reported delays.
+    for (const d of state.disruptions) {
+      d.kind ??= "delay";
+      d.cause ??= "operational";
+      d.source ??= { kind: "manual" };
+    }
     return state;
   }
 
@@ -143,22 +159,42 @@ export class Desk {
 
   // ------------------------------------------------------------ disruptions
 
-  reportDelay(flightId: string, delayMinutes: number, reason: string): Disruption {
-    const flight = findFlight(this.catalog, flightId);
-    if (!Number.isInteger(delayMinutes) || delayMinutes < 15 || delayMinutes > 24 * 60) {
+  reportDelay(flightId: string, delayMinutes: number, reason: string, cause: DisruptionCause = "operational"): Disruption {
+    return this.reportDisruption({ flightId, kind: "delay", cause, delayMinutes, reason });
+  }
+
+  reportCancellation(flightId: string, reason: string, cause: DisruptionCause = "operational"): Disruption {
+    return this.reportDisruption({ flightId, kind: "cancellation", cause, delayMinutes: 0, reason });
+  }
+
+  /** Records one disruption per flight, whether an operator typed it or the airline pushed it. */
+  reportDisruption(input: DisruptionInput): Disruption {
+    const { flightId, kind, cause } = input;
+    const flight = this.catalog.flights.find((f) => f.id === flightId);
+    if (!flight) throw new DeskError(`Unknown flight ${flightId}`, 404);
+    if (kind !== "delay" && kind !== "cancellation") throw new DeskError('kind must be "delay" or "cancellation".');
+    if (cause !== "operational" && cause !== "force_majeure") throw new DeskError('cause must be "operational" or "force_majeure".');
+    const delayMinutes = kind === "delay" ? input.delayMinutes : 0;
+    if (kind === "delay" && (!Number.isInteger(delayMinutes) || delayMinutes < 15 || delayMinutes > 24 * 60)) {
       throw new DeskError("Delay must be a whole number of minutes between 15 and 1440.");
     }
     const existing = this.state.disruptions.find((d) => d.flightId === flightId);
-    if (existing) throw new DeskError(`${flight.code} already has a reported delay. Reset the demo to report a new one.`, 409);
+    if (existing) {
+      throw new DeskError(`${flight.code} already has a reported ${existing.kind}. Reset the demo to report a new one.`, 409);
+    }
     if (!this.catalog.bookings.some((b) => b.flightId === flightId)) {
       throw new DeskError(`${flight.code} has no bookings in this demo.`);
     }
+    const suffix = kind === "cancellation" ? "cancelled" : String(delayMinutes);
     const disruption: Disruption = {
-      id: `evt_${flightId}_${delayMinutes}`,
+      id: `evt_${flightId}_${cause === "force_majeure" ? "fm_" : ""}${suffix}`,
       flightId,
+      kind,
+      cause,
       delayMinutes,
-      reason: reason.trim() || "an operational issue",
-      newDeparture: addMinutes(flight.departure, delayMinutes),
+      reason: input.reason.trim() || (cause === "force_majeure" ? "conditions outside the airline's control" : "an operational issue"),
+      newDeparture: kind === "delay" ? addMinutes(flight.departure, delayMinutes) : null,
+      source: input.source ?? { kind: "manual" },
       createdAt: new Date(this.now()).toISOString(),
     };
     this.state.disruptions.push(disruption);
@@ -169,7 +205,7 @@ export class Desk {
   quote(disruptionId: string, pnr: string): Quote {
     const disruption = this.disruption(disruptionId);
     const booking = findBooking(this.catalog, pnr);
-    if (booking.flightId !== disruption.flightId) throw new DeskError(`${pnr} is not on the delayed flight.`);
+    if (booking.flightId !== disruption.flightId) throw new DeskError(`${pnr} is not on the disrupted flight.`);
     return quoteFor(this.view(), booking, disruption);
   }
 
@@ -335,7 +371,11 @@ export class Desk {
       throw new DeskError(`This call is ${entry.status}; only review items can be resolved.`, 409);
     }
     const text = note.trim();
-    entry.applied = action ? this.apply(entry, action) : "Closed without changing the booking.";
+    try {
+      entry.applied = action ? this.apply(entry, action) : "Closed without changing the booking.";
+    } catch (error) {
+      throw new DeskError(error instanceof Error ? error.message : String(error), 409);
+    }
     if (text) this.state.bookings[entry.pnr]?.notes.push(`Agent note: ${text}`);
     entry.status = "resolved_by_human";
     this.save();
@@ -720,6 +760,7 @@ export class Desk {
     if (state.status !== "ticketed") throw new Error(`${pnr} was already changed (${state.status}).`);
 
     if (action.kind === "keep") {
+      if (!quote.keep) throw new Error("The flight is cancelled, so there is no flight to keep.");
       const departure = localTime(quote.keep.newDeparture);
       state.status = "kept_on_delayed_flight";
       state.notes.push(`Kept on delayed flight, new departure ${departure}. Ticket unchanged.`);

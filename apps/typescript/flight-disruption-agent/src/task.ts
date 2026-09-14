@@ -14,7 +14,19 @@ function spell(code: string): string {
  */
 export function buildTask(catalog: Catalog, booking: Booking, disruption: Disruption, quote: Quote): string {
   const flight = findFlight(catalog, booking.flightId);
-  const involuntary = quote.changeCase === "involuntary";
+  const scheduled = `Flight ${flight.code} from ${flight.originCity} to ${flight.destinationCity} on ${localDate(flight.departure)}, scheduled at ${localTime(flight.departure)} Jakarta time,`;
+  const what =
+    disruption.kind === "cancellation" || !disruption.newDeparture
+      ? `- ${scheduled} is cancelled because of ${disruption.reason}. It will not operate.`
+      : `- ${scheduled} is delayed by ${duration(disruption.delayMinutes)} because of ${disruption.reason}. New departure: ${localTime(disruption.newDeparture)} Jakarta time.`;
+  const rules =
+    quote.changeCase === "voluntary"
+      ? `- The delay is shorter than ${duration(quote.thresholdMinutes)}, so standard change and refund rules apply.`
+      : quote.changeCase === "force_majeure"
+        ? `- The cause is outside the airline's control (force majeure). The airline change fee is waived, but a fare difference may apply, and no compensation is offered.`
+        : disruption.kind === "cancellation"
+          ? `- The airline cancelled the flight, so it treats this as an airline-caused change and reduced fees apply.`
+          : `- The delay is longer than ${duration(quote.thresholdMinutes)}, so the airline treats it as an airline-caused change and reduced fees apply.`;
 
   const moveLines = quote.moves.length
     ? quote.moves
@@ -27,21 +39,22 @@ export function buildTask(catalog: Catalog, booking: Booking, disruption: Disrup
       ? `Cancel the trip and receive a refund of ${spokenRupiah(quote.refund.amount)} out of ${spokenRupiah(quote.refund.gross)} paid.`
       : `Cancel the trip. Under this fare there is no refund (0 rupiah). Say this plainly.`;
 
+  const options: string[] = [];
+  if (quote.keep) options.push(`Keep the delayed flight at ${localTime(quote.keep.newDeparture)}. No cost.`);
+  options.push(`Move to another flight:\n${moveLines}`);
+  options.push(refund);
+  const count = ["", "one", "two", "three"][options.length];
+
   return [
     `You are an AI assistant calling on behalf of ${OTA_NAME}, an online travel agency, about a flight booking. Say that you are an AI assistant calling for ${OTA_NAME} at the start of the call, and ask to speak with ${booking.passenger}. If someone else answers, do not discuss the booking; ask when ${booking.passenger} can be reached and end politely.`,
     ``,
     `Facts you may share with ${booking.passenger}:`,
     `- Booking code: ${spell(booking.pnr)}.`,
-    `- Flight ${flight.code} from ${flight.originCity} to ${flight.destinationCity} on ${localDate(flight.departure)}, scheduled at ${localTime(flight.departure)} Jakarta time, is delayed by ${duration(disruption.delayMinutes)} because of ${disruption.reason}. New departure: ${localTime(disruption.newDeparture)} Jakarta time.`,
-    involuntary
-      ? `- The delay is longer than ${duration(quote.thresholdMinutes)}, so the airline treats it as an airline-caused change and reduced fees apply.`
-      : `- The delay is shorter than ${duration(quote.thresholdMinutes)}, so standard change and refund rules apply.`,
+    what,
+    rules,
     ``,
-    `Offer exactly these three options:`,
-    `1. Keep the delayed flight at ${localTime(disruption.newDeparture)}. No cost.`,
-    `2. Move to another flight:`,
-    moveLines,
-    `3. ${refund}`,
+    `Offer exactly these ${count} options:`,
+    ...options.map((o, i) => `${i + 1}. ${o}`),
     ``,
     `Rules for this call:`,
     `- Use only the facts above. For anything else, say a ${OTA_NAME} agent will follow up.`,
@@ -63,7 +76,7 @@ export function buildResultSchema(quote: Quote): Record<string, unknown> {
     properties: {
       choice: {
         type: "string",
-        enum: ["keep_delayed_flight", "move_to_other_flight", "refund", "undecided", "unknown"],
+        enum: [...(quote.keep ? ["keep_delayed_flight"] : []), "move_to_other_flight", "refund", "undecided", "unknown"],
         description:
           "The option the passenger clearly chose. Use undecided if they want more time. Use unknown if the call did not reach the passenger or the answer is unclear.",
       },

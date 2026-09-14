@@ -28,10 +28,26 @@ function intermediariesOf(catalog: Catalog, booking: Booking): { id: string; rul
   });
 }
 
-export function changeCaseFor(catalog: Catalog, booking: Booking, delayMinutes: number): ChangeCase {
+/**
+ * Which rule set applies. A short delay is still the passenger's own choice to change
+ * (voluntary). A long delay or a cancellation is on the airline, unless the cause is
+ * force majeure, which most airlines price separately.
+ */
+export function changeCaseFor(
+  catalog: Catalog,
+  booking: Booking,
+  disruption: Pick<Disruption, "kind" | "cause" | "delayMinutes">,
+): ChangeCase {
   const { rules } = airlineOf(catalog, booking);
-  return delayMinutes >= rules.involuntaryDelayMinutes ? "involuntary" : "voluntary";
+  if (disruption.kind === "delay" && disruption.delayMinutes < rules.involuntaryDelayMinutes) return "voluntary";
+  return disruption.cause === "force_majeure" ? "force_majeure" : "involuntary";
 }
+
+const CASE_LABEL: Record<ChangeCase, string> = {
+  involuntary: "involuntary",
+  force_majeure: "force majeure",
+  voluntary: "voluntary",
+};
 
 function sum(lines: QuoteLine[]): number {
   return lines.reduce((total, line) => total + line.amount, 0);
@@ -42,8 +58,8 @@ function sum(lines: QuoteLine[]): number {
  * own rule, which is why the same delay costs different passengers different amounts.
  */
 export function quoteFor(catalog: Catalog, booking: Booking, disruption: Disruption): Quote {
-  const changeCase = changeCaseFor(catalog, booking, disruption.delayMinutes);
-  return priceOptions(catalog, booking, changeCase, disruption.newDeparture);
+  const changeCase = changeCaseFor(catalog, booking, disruption);
+  return priceOptions(catalog, booking, changeCase, disruption.kind === "cancellation" ? null : disruption.newDeparture);
 }
 
 /**
@@ -55,12 +71,20 @@ export function voluntaryQuoteFor(catalog: Catalog, booking: Booking): Quote {
   return priceOptions(catalog, booking, "voluntary", flight.departure);
 }
 
-function priceOptions(catalog: Catalog, booking: Booking, changeCase: ChangeCase, keepDeparture: string): Quote {
+function priceOptions(catalog: Catalog, booking: Booking, changeCase: ChangeCase, keepDeparture: string | null): Quote {
   const flight = findFlight(catalog, booking.flightId);
   const airline = airlineOf(catalog, booking);
   const middlemen = intermediariesOf(catalog, booking);
-  const involuntary = changeCase === "involuntary";
   const family = booking.fareFamily;
+  const airlineTerms =
+    changeCase === "voluntary"
+      ? { ...airline.rules.voluntary[family], waivesFareDifference: false }
+      : changeCase === "force_majeure"
+        ? airline.rules.forceMajeure
+        : airline.rules.involuntary;
+  const adminFees = (m: { rules: IntermediaryRules }) =>
+    changeCase === "voluntary" ? m.rules.voluntary : changeCase === "force_majeure" ? (m.rules.forceMajeure ?? m.rules.involuntary) : m.rules.involuntary;
+  const caseLabel = CASE_LABEL[changeCase];
 
   const alternatives = catalog.flights
     .filter(
@@ -75,27 +99,23 @@ function priceOptions(catalog: Catalog, booking: Booking, changeCase: ChangeCase
 
   const moves: MoveOption[] = alternatives.map((alt) => {
     const lines: QuoteLine[] = [];
-    const changeFee = involuntary ? airline.rules.involuntary.rescheduleFee : airline.rules.voluntary[family].rescheduleFee;
+    const changeFee = airlineTerms.rescheduleFee;
     lines.push({
       party: airline.rules.name,
-      label: changeFee === 0 && involuntary ? "Change fee (waived, involuntary)" : "Change fee",
+      label: changeFee === 0 && changeCase !== "voluntary" ? `Change fee (waived, ${caseLabel})` : "Change fee",
       amount: changeFee,
     });
     const difference = Math.max(0, alt.fares[family] - booking.farePaid);
-    const waived = involuntary && airline.rules.involuntary.waivesFareDifference;
+    const waived = airlineTerms.waivesFareDifference;
     if (difference > 0) {
       lines.push({
         party: airline.rules.name,
-        label: waived ? "Fare difference (waived, involuntary)" : "Fare difference",
+        label: waived ? `Fare difference (waived, ${caseLabel})` : "Fare difference",
         amount: waived ? 0 : difference,
       });
     }
     for (const m of middlemen) {
-      lines.push({
-        party: m.rules.name,
-        label: "Reschedule admin fee",
-        amount: involuntary ? m.rules.involuntary.rescheduleAdminFee : m.rules.voluntary.rescheduleAdminFee,
-      });
+      lines.push({ party: m.rules.name, label: "Reschedule admin fee", amount: adminFees(m).rescheduleAdminFee });
     }
     return {
       id: alt.id,
@@ -108,7 +128,7 @@ function priceOptions(catalog: Catalog, booking: Booking, changeCase: ChangeCase
     };
   });
 
-  const refundPercent = involuntary ? airline.rules.involuntary.refundPercent : airline.rules.voluntary[family].refundPercent;
+  const refundPercent = airlineTerms.refundPercent;
   const refundLines: QuoteLine[] = [];
   if (refundPercent < 100) {
     refundLines.push({
@@ -118,7 +138,7 @@ function priceOptions(catalog: Catalog, booking: Booking, changeCase: ChangeCase
     });
   }
   for (const m of middlemen) {
-    const fee = involuntary ? m.rules.involuntary.refundAdminFee : m.rules.voluntary.refundAdminFee;
+    const fee = adminFees(m).refundAdminFee;
     refundLines.push({ party: m.rules.name, label: "Refund admin fee", amount: fee === 0 ? 0 : -fee });
   }
   const refundAmount = Math.max(0, booking.farePaid + sum(refundLines));
@@ -127,7 +147,7 @@ function priceOptions(catalog: Catalog, booking: Booking, changeCase: ChangeCase
     pnr: booking.pnr,
     changeCase,
     thresholdMinutes: airline.rules.involuntaryDelayMinutes,
-    keep: { newDeparture: keepDeparture, total: 0 },
+    keep: keepDeparture === null ? null : { newDeparture: keepDeparture, total: 0 },
     moves,
     refund: { gross: booking.farePaid, lines: refundLines, amount: refundAmount },
   };

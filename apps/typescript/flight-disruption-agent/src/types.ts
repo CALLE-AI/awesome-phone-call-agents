@@ -47,6 +47,8 @@ export interface AirlineRules {
   involuntaryDelayMinutes: number;
   voluntary: Record<FareFamily, { rescheduleFee: number; refundPercent: number }>;
   involuntary: { rescheduleFee: number; refundPercent: number; waivesFareDifference: boolean };
+  /** Applies instead of `involuntary` when the cause is force majeure. */
+  forceMajeure: { rescheduleFee: number; refundPercent: number; waivesFareDifference: boolean };
 }
 
 export interface IntermediaryRules {
@@ -54,6 +56,8 @@ export interface IntermediaryRules {
   role: "distributor" | "ota";
   voluntary: { rescheduleAdminFee: number; refundAdminFee: number };
   involuntary: { rescheduleAdminFee: number; refundAdminFee: number };
+  /** Optional; falls back to `involuntary` when missing. */
+  forceMajeure?: { rescheduleAdminFee: number; refundAdminFee: number };
 }
 
 export type PartyRules = AirlineRules | IntermediaryRules;
@@ -63,16 +67,31 @@ export interface FareRules {
   parties: Record<string, PartyRules>;
 }
 
+export type DisruptionKind = "delay" | "cancellation";
+
+/** Force majeure (weather, volcanic ash, airport closure) is outside the airline's control. */
+export type DisruptionCause = "operational" | "force_majeure";
+
+export type DisruptionSource =
+  | { kind: "manual" }
+  /** Pushed by the airline or OTA operations system through the signed webhook. */
+  | { kind: "airline_webhook"; eventId: string; receivedAt: string };
+
 export interface Disruption {
   id: string;
   flightId: string;
+  kind: DisruptionKind;
+  cause: DisruptionCause;
+  /** Delay only; 0 for a cancellation. */
   delayMinutes: number;
   reason: string;
-  newDeparture: string;
+  /** Delay only; null when the flight is cancelled and there is nothing to keep. */
+  newDeparture: string | null;
+  source: DisruptionSource;
   createdAt: string;
 }
 
-export type ChangeCase = "involuntary" | "voluntary";
+export type ChangeCase = "involuntary" | "force_majeure" | "voluntary";
 
 export interface QuoteLine {
   party: string;
@@ -95,7 +114,8 @@ export interface Quote {
   pnr: string;
   changeCase: ChangeCase;
   thresholdMinutes: number;
-  keep: { newDeparture: string; total: 0 };
+  /** null when the flight is cancelled: there is no flight to keep. */
+  keep: { newDeparture: string; total: 0 } | null;
   moves: MoveOption[];
   refund: { gross: number; lines: QuoteLine[]; amount: number };
 }

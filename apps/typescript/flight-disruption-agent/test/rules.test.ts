@@ -11,9 +11,12 @@ function delay(minutes: number): Disruption {
   return {
     id: "evt_test",
     flightId: "NA721-2026-09-20",
+    kind: "delay",
+    cause: "operational",
     delayMinutes: minutes,
     reason: "test",
     newDeparture: addMinutes("2026-09-20T08:10:00+07:00", minutes),
+    source: { kind: "manual" },
     createdAt: "2026-09-19T00:00:00Z",
   };
 }
@@ -66,6 +69,38 @@ test("a passenger-requested change is always priced as voluntary, whatever the d
   const booking = findBooking(catalog, "M3P8RD");
   const quote = voluntaryQuoteFor(catalog, booking);
   assert.equal(quote.changeCase, "voluntary");
-  assert.equal(quote.keep.newDeparture, "2026-09-20T08:10:00+07:00");
+  assert.equal(quote.keep?.newDeparture, "2026-09-20T08:10:00+07:00");
   assert.deepEqual(quote, quoteFor(catalog, booking, { ...delay(90), newDeparture: "2026-09-20T08:10:00+07:00" }));
+});
+
+function cancelled(cause: Disruption["cause"]): Disruption {
+  return { ...delay(0), kind: "cancellation", cause, delayMinutes: 0, newDeparture: null };
+}
+
+test("a cancellation is involuntary whatever the delay threshold, and has nothing to keep", () => {
+  const quote = quoteFor(catalog, findBooking(catalog, "T5W1LC"), cancelled("operational"));
+  assert.equal(quote.changeCase, "involuntary");
+  assert.equal(quote.keep, null);
+  // basic fare via TripKita -> Lintas: every fee waived except Lintas' involuntary refund fee
+  assert.equal(quote.refund.amount, 1_320_000 - 25_000);
+  assert.ok(quote.moves.every((m) => m.total === 0));
+});
+
+test("force majeure waives the change fee but still charges the fare difference", () => {
+  const booking = findBooking(catalog, "T5W1LC"); // basic, paid 1,320,000
+  const fmDelay = quoteFor(catalog, booking, { ...delay(240), cause: "force_majeure" });
+  assert.equal(fmDelay.changeCase, "force_majeure");
+  const na725 = fmDelay.moves.find((m) => m.flightId === "NA725-2026-09-20");
+  assert.ok(na725);
+  assert.deepEqual(
+    na725.lines.map((l) => [l.label, l.amount]),
+    [
+      ["Change fee (waived, force majeure)", 0],
+      ["Fare difference", 130_000],
+      ["Reschedule admin fee", 0],
+      ["Reschedule admin fee", 0],
+    ],
+  );
+  assert.equal(quoteFor(catalog, booking, cancelled("force_majeure")).changeCase, "force_majeure");
+  assert.equal(quoteFor(catalog, booking, { ...delay(60), cause: "force_majeure" }).changeCase, "voluntary", "a short delay is still voluntary");
 });
