@@ -122,7 +122,7 @@ def main() -> int:
     print(f"authorized      {'yes' if authorized else f'NO - not in {ALLOWLIST_ENV}'}")
     print(f"api origin      {base_url}")
     print(f"idempotency_key {request['idempotency_key']}")
-    print(f"webhook_url     {body.get('webhook_url') or '(none - results will be polled)'}")
+    print(f"webhook_url     {'configured (secret URL hidden)' if body.get('webhook_url') else '(none - results will be polled)'}")
     print(RULE)
     print("task")
     print(RULE)

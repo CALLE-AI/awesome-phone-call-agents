@@ -27,6 +27,7 @@ from typing import Any, Callable, Iterator
 from fastapi import FastAPI, Header, HTTPException, Request
 
 from leadpulse.client import CalleAPIError, CalleClient
+from leadpulse.phone import mask_all
 from leadpulse.results import TERMINAL, decide
 
 TERMINAL_EVENTS = {"call.completed", "call.failed", "call.result_validation_failed"}
@@ -93,7 +94,8 @@ def _record(decision: dict[str, Any]) -> None:
                 decision.get("score"),
                 int(decision["hot_lead"]),
                 int(decision["send_booking_link"]),
-                json.dumps(decision),
+                json.dumps({key: mask_all(value) if isinstance(value, str) else value
+                            for key, value in decision.items()}),
                 datetime.now(timezone.utc).isoformat(),
             ),
         )
