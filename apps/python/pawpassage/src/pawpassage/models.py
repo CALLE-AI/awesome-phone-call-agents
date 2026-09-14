@@ -67,7 +67,7 @@ AUTHORIZATION_BASES = frozenset(
 )
 ANIMAL_CATEGORIES = frozenset({"CAT", "DOG", "OTHER_COMPANION_ANIMAL"})
 PROPOSITION_IDS = ("P1", "P2", "P3")
-E164_RE = re.compile(r"^\+[1-9]\d{7,14}$")
+E164_RE = re.compile(r"^\+[1-9][0-9]{7,14}$")
 LOCALE_RE = re.compile(r"^[a-z]{2,3}(?:-[A-Z]{2})?$")
 IDENTIFIER_RE = re.compile(r"^[A-Z0-9][A-Z0-9_-]{2,63}$")
 
