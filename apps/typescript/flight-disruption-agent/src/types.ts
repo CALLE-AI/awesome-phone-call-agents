@@ -174,3 +174,28 @@ export interface BookingState {
   refundAmount: number | null;
   notes: string[];
 }
+
+// ---------------------------------------------------------------- Workflow B
+
+export type RequestKind = "reschedule" | "refund";
+
+/** Where the passenger's request came in. Inbound calls are handled by that channel, not CALL-E. */
+export type RequestChannel = "chat" | "web_form" | "phone";
+
+export interface ChangeRequest {
+  id: string;
+  pnr: string;
+  kind: RequestKind;
+  /** Reschedule only: the flight the passenger asked for. */
+  targetFlightId: string | null;
+  channel: RequestChannel;
+  createdAt: string;
+}
+
+export interface Eligibility {
+  eligible: boolean;
+  /** Why the request cannot go ahead. Empty when eligible. */
+  reasons: string[];
+  /** Things the passenger must hear before confirming, such as a zero refund. */
+  warnings: string[];
+}
