@@ -1,0 +1,61 @@
+{
+ "id": "train-human-054",
+ "label": "human",
+ "source": "sim-train",
+ "meta": {
+  "task": "cancel a subscription",
+  "hard": false
+ },
+ "turns": [
+  {
+   "speaker": "user",
+   "text": "Cedar Hair Studio, Marcus speaking.",
+   "offset_seconds": 1.24
+  },
+  {
+   "speaker": "bot",
+   "text": "Hi, I'm an AI assistant calling on behalf of Alex Martin. I'd like to cancel the subscription for the account under Alex Martin.",
+   "offset_seconds": 4.26
+  },
+  {
+   "speaker": "user",
+   "text": "Right, let me um, pull up the account. Okay, that's cancelled.",
+   "offset_seconds": 13.07
+  },
+  {
+   "speaker": "user",
+   "text": "okay",
+   "offset_seconds": 17.65
+  },
+  {
+   "speaker": "bot",
+   "text": "Can you confirm the cancellation is effective today?",
+   "offset_seconds": 19.14
+  },
+  {
+   "speaker": "user",
+   "text": "Uh, five to seven business days usually.",
+   "offset_seconds": 22.75
+  },
+  {
+   "speaker": "bot",
+   "text": "Can you confirm the cancellation is effective today?",
+   "offset_seconds": 26.37
+  },
+  {
+   "speaker": "user",
+   "text": "Sure, yeah, so, confirmed.",
+   "offset_seconds": 29.65
+  },
+  {
+   "speaker": "bot",
+   "text": "Thank you so much, that's all I needed.",
+   "offset_seconds": 32.31
+  },
+  {
+   "speaker": "user",
+   "text": "No problem, bye now.",
+   "offset_seconds": 36.39
+  }
+ ]
+}

@@ -1,0 +1,66 @@
+{
+ "id": "train-agent-024",
+ "label": "agent",
+ "source": "sim-train",
+ "meta": {
+  "task": "request a refund for a double charge",
+  "hard": false
+ },
+ "turns": [
+  {
+   "speaker": "user",
+   "text": "Hello and thanks for calling Summit Fitness. I'm Max, the virtual assistant for Summit Fitness, and I can help with bookings, hours, and more. What can I do for you?",
+   "offset_seconds": 0.64
+  },
+  {
+   "speaker": "bot",
+   "text": "Hi, I'm an AI assistant calling on behalf of Alex Martin. Alex Martin was charged twice for the same order last week, and I'm calling to request a refund for the duplicate.",
+   "offset_seconds": 12.55
+  },
+  {
+   "speaker": "user",
+   "text": "I'm sorry about the double charge. I've submitted a refund request for the duplicate payment. It should be processed within five to seven business days.",
+   "offset_seconds": 25.88
+  },
+  {
+   "speaker": "bot",
+   "text": "How long will the refund take?",
+   "offset_seconds": 36.26
+  },
+  {
+   "speaker": "user",
+   "text": "I'd be happy to help with that. Everything is all set on our end.",
+   "offset_seconds": 39.6
+  },
+  {
+   "speaker": "bot",
+   "text": "Can you confirm the refund has been issued?",
+   "offset_seconds": 46.04
+  },
+  {
+   "speaker": "user",
+   "text": "Great question! Let me check that for you. Yes, that's correct.",
+   "offset_seconds": 50.1
+  },
+  {
+   "speaker": "bot",
+   "text": "Thank you, that's everything.",
+   "offset_seconds": 55.24
+  },
+  {
+   "speaker": "user",
+   "text": "Absolutely, that's confirmed. Is there anything else I can help you with today?",
+   "offset_seconds": 57.71
+  },
+  {
+   "speaker": "bot",
+   "text": "Thank you, that's everything.",
+   "offset_seconds": 63.42
+  },
+  {
+   "speaker": "user",
+   "text": "You're welcome! Have a wonderful day. Goodbye!",
+   "offset_seconds": 66.24
+  }
+ ]
+}

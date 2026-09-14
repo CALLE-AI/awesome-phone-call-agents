@@ -1,0 +1,46 @@
+{
+ "id": "train-ivr-035",
+ "label": "ivr",
+ "source": "sim-train",
+ "meta": {
+  "task": "reschedule an appointment from Tuesday to Thursday morning",
+  "hard": false
+ },
+ "turns": [
+  {
+   "speaker": "user",
+   "text": "Thank you for calling Summit Fitness. Your call is important to us. Please listen carefully, as our menu options have changed. For hours and directions, press 1. For appointments, press 2. For billing, press 3. To repeat these options, press 9.",
+   "offset_seconds": 0.49
+  },
+  {
+   "speaker": "bot",
+   "text": "[DTMF 3]",
+   "offset_seconds": 16.75
+  },
+  {
+   "speaker": "user",
+   "text": "Please enter your account number, followed by the pound key.",
+   "offset_seconds": 17.54
+  },
+  {
+   "speaker": "bot",
+   "text": "[DTMF 1]",
+   "offset_seconds": 22.37
+  },
+  {
+   "speaker": "user",
+   "text": "Please enter your account number, followed by the pound key.",
+   "offset_seconds": 23.18
+  },
+  {
+   "speaker": "bot",
+   "text": "[DTMF 2]",
+   "offset_seconds": 28.4
+  },
+  {
+   "speaker": "user",
+   "text": "Please hold while we connect you to the next available representative. Your call may be recorded for quality purposes.",
+   "offset_seconds": 29.17
+  }
+ ]
+}
