@@ -10,6 +10,7 @@ Current apps:
 
 | App | Language | Purpose |
 | --- | --- | --- |
+| [`go/callhook`](go/callhook/) | Go / TypeScript | Event-driven CALL-E calling platform: webhook in, structured outcome back, goal-driven campaigns with early-stop and budgets, 19 doc-verified platform webhooks, MCP server, and an embedded war-room UI. Dry-run by default. |
 | [`typescript/kol`](typescript/kol/) | TypeScript / Node | Evidence-gated healthcare claim-status calls that require transcript-grounded fields, the intended payer department, the actual question, and an independent IVR route receipt; includes a 640-case no-call evaluation and explicit live CALL-E path. |
 | [`typescript/speakeasy`](typescript/speakeasy/) | TypeScript / iOS | Multilingual "AI makes the call for you": speak a task in your language, confirm the read-back, then CALL-E places the English call with a live transcript and narrates the outcome back in your language; front-loaded preferences and a speculative two-call flow avoid holds; fake-transport no-call mode by default. |
 | [`python/holdfor-board`](python/holdfor-board/) | Python | Post-visit follow-up board for a GP practice: a check-in call's answers reach a human queue as a Review Item, the patient's own verbatim words travel with it, and no rebooking call exists without a prior human Release carrying a bounded date-and-mode envelope. Runs offline on a stored transcript fixture with no credentials. |
