@@ -86,7 +86,7 @@
     "farePaid": 2450000,
     "channel": ["tripkita", "nusantara-air"],
     "ticket": "000-2400000108",
-    "simulatedAnswer": { "kind": "keep" }
+    "simulatedAnswer": { "kind": "move", "flightId": "NA729-2026-09-20" }
   },
   {
     "pnr": "P3X9GA",
