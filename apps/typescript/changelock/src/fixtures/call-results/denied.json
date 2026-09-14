@@ -1,0 +1,17 @@
+{
+  "status": "completed",
+  "taskCompleted": true,
+  "recipientStatus": "completed",
+  "confidenceScore": 0.9,
+  "failureCode": null,
+  "structuredResult": {
+    "organization_identity": "confirmed",
+    "change_request_status": "not_initiated",
+    "safe_case_code_confirmed": "yes",
+    "sensitive_data_disclosed": "no",
+    "recipient_opt_out": "no"
+  },
+  "evidence": [
+    "Recipient identified the vendor organization and stated the organization did not initiate the payment-instruction change request."
+  ]
+}
