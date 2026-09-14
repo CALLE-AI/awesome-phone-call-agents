@@ -29,7 +29,7 @@ Awesome Phone Call Agents is an early community hub for developers and workflow 
 | [`apps/typescript/headcount`](apps/typescript/headcount/) | TypeScript / Next.js | CDC CASPER-style disaster household needs assessment: the unreached count is the product, voicemail is not a reach, unsupported fields strike through, and fail-closed cards go to a human. Fixture replay by default. |
 | Agent Skills | Customer callbacks, appointment confirmation, lead qualification, order exception follow-up, service dispatch, incident escalation | `skills/` |
 | Workflow Plugins | Dify tools, n8n nodes, Zapier actions, HubSpot workflow actions, Feishu/Lark automation nodes | `plugins/` |
-| User-facing Apps | Call chat, call review console, call scheduler UI, customer callback app, business call workbench | `apps/` |
+| User-facing Apps | Call chat, call review console, call scheduler UI, customer callback app, business call workbench | [Vanguard](apps/typescript/vanguard) | TypeScript / Vike | Real-time telemetry, orchestration, and AI telephony engine for Call-E calls & token usage. |
 
 The community roadmap is a direction guide, not a fixed release plan. Small examples, platform notes, workflow sketches, templates, and focused demos are all useful.
 
