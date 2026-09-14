@@ -224,6 +224,7 @@ This project is an awesome list for AI-agent phone-call workflows. Add resources
 - [Supply Chain Supplier Status Agent](https://github.com/mohSadiq90/call-e-hackathon) - Autonomous enterprise phone agent for supplier purchase order fulfillment verification, root cause delay capture, penalty estimation, and ERP dashboard sync with zero-credit mock simulation.
 
 - [WristCall AI](https://github.com/Baklolman69/WristCallAI) - Wear OS smartwatch assistant that searches Google via SerpApi, synthesizes call intent with Groq AI 120B, and dispatches autonomous phone calls via CALL-E with 3-bullet voice summaries.
+- [CareCall](apps/web/carecall/) — .NET 10 Blazor application for AI-assisted post-discharge follow-up. Uses CALL-E for explicit, E.164-validated phone calls, simulation mode by default, host-owned scheduling, longitudinal follow-up tracking, structured SBAR clinical summaries for professional review, adaptive follow-up planning, and auditable AgentTrace records.
 
 - [Churn-Rescue AI](https://github.com/NemesisDevX/Churn-Rescue-Agent) - Simulated retention-conversation prototype with a proposed CALL-E integration; the browser currently stands in for telephony, so no working CALL-E dialer, verified latency, or enterprise revenue outcome is claimed.
 - [RescueGrid](https://github.com/utkarshml/rescuegrid) - Experimental scripted disaster-response simulation with a proposed CALL-E dispatch integration; shelter, capacity, status, and route outputs are demonstration data, not verified evacuation guidance or emergency infrastructure.

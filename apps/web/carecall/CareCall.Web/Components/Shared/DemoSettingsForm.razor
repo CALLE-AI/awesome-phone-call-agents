@@ -1,0 +1,203 @@
+@using System.ComponentModel.DataAnnotations
+@inject DemoSettingsService Settings
+@inject IServiceScopeFactory ScopeFactory
+
+@if (_view is null)
+{
+    <HeartbeatLoader Message="Loading registration..." />
+}
+else
+{
+    <div class="setup-content">
+        @if (_view.Warning is not null)
+        {
+            <div class="alert alert-warning" role="alert">@_view.Warning</div>
+        }
+        @if (_error is not null)
+        {
+            <div class="alert alert-danger" role="alert">@_error</div>
+        }
+        @if (_result is { } result)
+        {
+            <div class="alert @(LiveTrial && !result.CallStarted ? "alert-warning" : "alert-success")" role="status">
+                @result.Message
+                <a href="@($"/patients/{result.PatientId}")">Open patient record</a>
+            </div>
+        }
+
+        @if (_result is null)
+        {
+        <section class="setup-form">
+            <EditForm Model="_input" OnValidSubmit="RequestSaveAsync" FormName="demo-settings">
+                <DataAnnotationsValidator />
+                <ValidationSummary />
+                <fieldset disabled="@_saving">
+                    <legend class="visually-hidden">Register patient</legend>
+                    <p class="form-text">@(LiveTrial ? "Try a live follow-up call using fictional clinical information and a phone number you are authorized to call." : "Register a patient discharged today and schedule follow-up for days 1, 3 and 7.")</p>
+                    <div class="mb-3">
+                        <label for="patient-name" class="form-label">Patient name</label>
+                        <InputText id="patient-name" class="form-control" @bind-Value="_input.Name" maxlength="200" />
+                        <ValidationMessage For="() => _input.Name" />
+                    </div>
+                    <div class="mb-3">
+                        <label for="demo-phone" class="form-label">Phone number</label>
+                        <InputText id="demo-phone" type="tel" class="form-control" @bind-Value="_input.PhoneNumber"
+                                   autocomplete="tel" placeholder="+12025550123" aria-describedby="phone-help" />
+                        <div id="phone-help" class="form-text">International format, e.g. +12025550123. Existing patients and their phone numbers are not changed.</div>
+                        <ValidationMessage For="() => _input.PhoneNumber" />
+                    </div>
+                    <div class="mb-3">
+                        <label for="patient-diagnosis" class="form-label">Discharge diagnosis</label>
+                        <InputTextArea id="patient-diagnosis" class="form-control" @bind-Value="_input.Diagnosis" maxlength="500" rows="2" />
+                        <ValidationMessage For="() => _input.Diagnosis" />
+                    </div>
+                    <details class="mb-3" open="@(!LiveTrial)">
+                        <summary>Clinical details@(LiveTrial ? " (fictional defaults)" : "")</summary>
+                        <div class="mb-3">
+                            <label for="patient-birthdate" class="form-label">Birth date</label>
+                            <InputDate id="patient-birthdate" class="form-control" @bind-Value="_input.BirthDate" />
+                            <ValidationMessage For="() => _input.BirthDate" />
+                        </div>
+                        <div class="mb-3">
+                            <label for="patient-risk" class="form-label">Initial risk level</label>
+                            <InputSelect id="patient-risk" class="form-select" @bind-Value="_input.RiskLevel">
+                                <option value="@RiskLevel.Low">Low</option>
+                                <option value="@RiskLevel.Medium">Medium</option>
+                                <option value="@RiskLevel.High">High</option>
+                            </InputSelect>
+                        </div>
+                        <p class="form-text">Discharge is recorded as today.</p>
+                    </details>
+                    @if (LiveTrial)
+                    {
+                        <div class="mb-3">
+                            <label for="trial-delay" class="form-label">Call delay (minutes)</label>
+                            <InputNumber id="trial-delay" class="form-control" @bind-Value="_input.TrialDelayMinutes" min="1" max="60" />
+                            <div class="form-text">Default: 1 minute. The call follows the mode shown above.</div>
+                            <ValidationMessage For="() => _input.TrialDelayMinutes" />
+                        </div>
+                    }
+                    else if (!_view.AutomaticCallsEnabled || !_view.HasApiKey)
+                    {
+                        <p class="alert alert-info">The follow-up plan will be saved, but automatic calling is currently disabled or not configured.</p>
+                    }
+                    <div class="d-flex justify-content-end gap-2">
+                        @if (OnCancel.HasDelegate)
+                        {
+                            <button type="button" class="btn btn-secondary" @onclick="() => OnCancel.InvokeAsync()">Cancel</button>
+                        }
+                        <button type="submit" class="btn btn-primary" disabled="@_saving">
+                            @(_saving ? (LiveTrial ? "Registering and submitting call..." : "Registering...") : (LiveTrial ? "Register patient and call now" : "Register patient"))
+                        </button>
+                    </div>
+                </fieldset>
+            </EditForm>
+        </section>
+        }
+    </div>
+}
+
+<JudgeAccessDialog Visible="_requestingJudgeAccess" ActionLabel="create this guided trial" Busy="_saving" Error="@_accessError"
+                   OnConfirm="ConfirmSaveAsync" OnCancel="CancelJudgeAccessAsync" />
+
+@code {
+    [Parameter] public bool LiveTrial { get; set; } = true;
+    [Parameter] public EventCallback<PatientRegistrationResult> OnSaved { get; set; }
+    [Parameter] public EventCallback OnCancel { get; set; }
+    [Parameter] public EventCallback<bool> SavingChanged { get; set; }
+
+    private PatientRegistrationInput _input = new();
+    private DemoSettingsView? _view;
+    private PatientRegistrationResult? _result;
+    private bool _saving;
+    private bool _requestingJudgeAccess;
+    private string? _error;
+    private string? _accessError;
+
+    protected override async Task OnInitializedAsync()
+    {
+        _view = await Settings.GetAsync();
+        if (LiveTrial)
+        {
+            var defaults = TrialDefaults[Random.Shared.Next(TrialDefaults.Length)];
+            _input.Name = defaults.Name;
+            _input.Diagnosis = defaults.Diagnosis;
+            _input.PhoneNumber = "+12025550123";
+            _input.BirthDate = new DateOnly(1980, 1, 1);
+        }
+    }
+
+    private Task RequestSaveAsync()
+    {
+        if (!LiveTrial)
+            return SaveAsync();
+
+        _accessError = null;
+        _requestingJudgeAccess = true;
+        return Task.CompletedTask;
+    }
+
+    private async Task ConfirmSaveAsync(string password)
+    {
+        _input.JudgePassword = password;
+        _error = null;
+        await SaveAsync();
+        if (_result is not null)
+            _requestingJudgeAccess = false;
+        else
+        {
+            _accessError = _error;
+            _error = null;
+        }
+    }
+
+    private Task CancelJudgeAccessAsync()
+    {
+        _requestingJudgeAccess = false;
+        _accessError = null;
+        return Task.CompletedTask;
+    }
+
+    private async Task SaveAsync()
+    {
+        if (_saving || _result is not null) return;
+        _saving = true;
+        await SavingChanged.InvokeAsync(true);
+        _error = null;
+        try
+        {
+            await using var scope = ScopeFactory.CreateAsyncScope();
+            _result = await scope.ServiceProvider.GetRequiredService<PatientRegistrationService>()
+                .RegisterAsync(_input, LiveTrial);
+            _input.JudgePassword = null;
+        }
+        catch (ValidationException ex)
+        {
+            _error = ex.Message;
+        }
+        catch (InvalidOperationException ex)
+        {
+            _error = ex.Message;
+        }
+        catch (Exception)
+        {
+            _error = "Registration could not be confirmed. Check the patient directory before trying again.";
+        }
+        finally
+        {
+            _saving = false;
+            await SavingChanged.InvokeAsync(false);
+        }
+        if (_result is not null)
+            await OnSaved.InvokeAsync(_result);
+    }
+
+    private static readonly (string Name, string Diagnosis)[] TrialDefaults =
+    [
+        ("Jordan Taylor", "Mild respiratory infection"),
+        ("Morgan Rivera", "Uncomplicated urinary tract infection"),
+        ("Casey Bennett", "Gastroenteritis with dehydration"),
+        ("Avery Chen", "Lower back pain"),
+        ("Riley Patel", "Migraine headache")
+    ];
+}

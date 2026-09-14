@@ -1,0 +1,19 @@
+<span class="badge-pill severity-@Severity.ToString().ToLowerInvariant()"><Icon Name="@Icon" Class="badge-icon" /> @Text</span>
+
+@code {
+    [Parameter, EditorRequired] public AlertSeverity Severity { get; set; }
+
+    private string Icon => Severity switch
+    {
+        AlertSeverity.Critical => "emergency_home",
+        AlertSeverity.Warning => "warning",
+        _ => "info"
+    };
+
+    private string Text => Severity switch
+    {
+        AlertSeverity.Critical => "Critical",
+        AlertSeverity.Warning => "Warning",
+        _ => "Info"
+    };
+}

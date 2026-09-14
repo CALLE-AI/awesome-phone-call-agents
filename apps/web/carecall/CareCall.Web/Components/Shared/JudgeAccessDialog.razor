@@ -1,0 +1,45 @@
+@if (Visible)
+{
+    <div class="modal-backdrop fade show"></div>
+    <div class="modal d-block" role="dialog" aria-modal="true" aria-labelledby="judge-access-title">
+        <div class="modal-dialog modal-dialog-centered">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h2 id="judge-access-title" class="modal-title fs-5">Judge access required</h2>
+                    <button type="button" class="btn-close" aria-label="Close" disabled="@Busy" @onclick="CancelAsync"></button>
+                </div>
+                <div class="modal-body">
+                    <p>Enter the judge password to @ActionLabel.</p>
+                    <InputText id="judge-access-password" type="password" class="form-control" aria-label="Judge password" @bind-Value="_password" autocomplete="off" autofocus />
+                    @if (!string.IsNullOrWhiteSpace(Error))
+                    {
+                        <p class="text-danger mt-2 mb-0" role="alert">@Error</p>
+                    }
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" disabled="@Busy" @onclick="CancelAsync">Cancel</button>
+                    <button type="button" class="btn btn-primary" disabled="@Busy" @onclick="ConfirmAsync">@(Busy ? "Confirming..." : "Confirm")</button>
+                </div>
+            </div>
+        </div>
+    </div>
+}
+
+@code {
+    [Parameter] public bool Visible { get; set; }
+    [Parameter] public bool Busy { get; set; }
+    [Parameter] public string ActionLabel { get; set; } = "continue";
+    [Parameter] public string? Error { get; set; }
+    [Parameter] public EventCallback<string> OnConfirm { get; set; }
+    [Parameter] public EventCallback OnCancel { get; set; }
+
+    private string _password = string.Empty;
+
+    private Task ConfirmAsync() => OnConfirm.InvokeAsync(_password);
+
+    private async Task CancelAsync()
+    {
+        _password = string.Empty;
+        await OnCancel.InvokeAsync();
+    }
+}

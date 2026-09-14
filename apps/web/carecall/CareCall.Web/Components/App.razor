@@ -1,0 +1,73 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <base href="/" />
+    <ResourcePreloader />
+    <link rel="stylesheet" href="@Assets["lib/bootstrap/dist/css/bootstrap.min.css"]" />
+    <link rel="stylesheet" href="@Assets["app.css"]" />
+    <link rel="stylesheet" href="@Assets["calle.css"]" />
+    <link rel="stylesheet" href="@Assets["CareCall.Web.styles.css"]" />
+    <ImportMap />
+    <link rel="icon" type="image/svg+xml" href="carecall-logo.svg" />
+    <HeadOutlet />
+</head>
+
+<body>
+    @* Pantalla de arranque: visible hasta que el circuito Blazor esta operativo.
+       data-permanent evita que la navegacion mejorada la reinyecte al cambiar de pagina. *@
+    <div id="app-splash" data-permanent>
+        <div class="splash-inner">
+            <div class="splash-logo-wrap">
+                <span class="splash-wave"></span>
+                <span class="splash-wave wave-2"></span>
+                <span class="splash-wave wave-3"></span>
+                <img class="splash-logo" src="carecall-logo.svg" alt="" />
+            </div>
+            <div class="splash-brand"><span class="brand-care">Care</span><span class="brand-call">Call</span></div>
+            <p class="splash-text">Starting follow-up dashboard...</p>
+        </div>
+    </div>
+
+    <Routes />
+    <ReconnectModal />
+    <script src="@Assets["_framework/blazor.web.js"]" autostart="false"></script>
+    <script>
+        // Starts Blazor manually so we can remove the splash once the
+        // interactive circuit is ready. Fully local, no external dependencies.
+        (function () {
+            // Safety net: never leave the splash blocking the UI.
+            var MAX_SPLASH_MS = 8000;
+            var splashDone = false;
+
+            function hideSplash() {
+                splashDone = true;
+                var splash = document.getElementById('app-splash');
+                if (!splash || splash.classList.contains('hidden')) return;
+                splash.classList.add('hidden');
+                setTimeout(function () {
+                    var s = document.getElementById('app-splash');
+                    if (s) s.remove();
+                }, 400);
+            }
+
+            Blazor.start({
+                circuit: {
+                    configureSignalR: function (b) { return b; }
+                }
+            }).then(hideSplash).catch(hideSplash);
+
+            // Enhanced navigation rewrites the body and can reinject the splash:
+            // if we already started, we remove it immediately on every navigation.
+            Blazor.addEventListener('enhancedload', function () {
+                if (splashDone) hideSplash();
+            });
+
+            setTimeout(hideSplash, MAX_SPLASH_MS);
+        })();
+    </script>
+</body>
+
+</html>

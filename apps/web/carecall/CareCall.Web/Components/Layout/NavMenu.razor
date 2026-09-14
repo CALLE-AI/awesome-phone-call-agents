@@ -1,0 +1,39 @@
+﻿<div class="top-row ps-3 navbar">
+    <div class="container-fluid">
+        <a class="brand" href="">
+            <img class="brand-logo" src="carecall-logo.svg" alt="CareCall" />
+            <span class="brand-name"><span class="brand-care">Care</span><span class="brand-call">Call</span></span>
+        </a>
+    </div>
+</div>
+
+<input type="checkbox" title="Navigation menu" class="navbar-toggler" />
+
+<div class="nav-scrollable" onclick="document.querySelector('.navbar-toggler').click()">
+    <nav class="nav flex-column">
+        <div class="nav-item px-3">
+            <NavLink class="nav-link" href="" Match="NavLinkMatch.All">
+                <Icon Name="monitoring" Class="nav-icon" /> Care monitor
+            </NavLink>
+        </div>
+
+        <div class="nav-item px-3">
+            <NavLink class="nav-link" href="patients">
+                <Icon Name="patient_list" Class="nav-icon" /> Patients
+            </NavLink>
+        </div>
+
+        <div class="nav-item px-3">
+            <NavLink class="nav-link" href="calls">
+                <Icon Name="phone_in_talk" Class="nav-icon" /> Call history
+            </NavLink>
+        </div>
+
+        <div class="nav-item px-3">
+            <NavLink class="nav-link" href="alerts">
+                <Icon Name="notification_important" Class="nav-icon" /> Alerts
+            </NavLink>
+        </div>
+    </nav>
+</div>
+

@@ -1,0 +1,5 @@
+<Solution>
+  <Project Path="CareCall.Core/CareCall.Core.csproj" />
+  <Project Path="CareCall.Web/CareCall.Web.csproj" />
+  <Project Path="CareCall.Tests/CareCall.Tests.csproj" />
+</Solution>

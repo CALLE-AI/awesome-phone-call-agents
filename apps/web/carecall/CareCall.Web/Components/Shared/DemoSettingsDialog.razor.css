@@ -1,0 +1,46 @@
+.demo-settings-dialog {
+    width: min(34rem, calc(100vw - 2rem));
+    max-height: calc(100dvh - 2rem);
+    margin: auto;
+    padding: 1.5rem;
+    overflow-y: auto;
+    overscroll-behavior: contain;
+    border: 1px solid #dce6ec;
+    border-radius: 1rem;
+    color: #173449;
+    background: white;
+    box-shadow: 0 1.5rem 4rem #17344940;
+}
+
+.demo-settings-dialog::backdrop {
+    background: #102a3a80;
+}
+
+.dialog-heading {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    gap: 1rem;
+    margin-bottom: 1rem;
+}
+
+.dialog-heading h2 {
+    margin: 0;
+    font-size: 1.35rem;
+}
+
+.demo-settings-dialog ::deep .setup-form {
+    padding: 0;
+    margin-bottom: 0;
+}
+
+.demo-settings-dialog ::deep summary {
+    cursor: pointer;
+    color: #17658a;
+}
+
+@media (max-width: 600px) {
+    .demo-settings-dialog {
+        padding: 1rem;
+    }
+}

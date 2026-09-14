@@ -1,0 +1,69 @@
+@using System.Text
+
+<ol class="transcript-thread" aria-label="Saved call conversation">
+    @foreach (var message in _messages)
+    {
+        <li class="message-row @message.Kind">
+            <span class="speaker-avatar" aria-hidden="true"><Icon Name="@message.Icon" /></span>
+            <div class="message-content">
+                <span class="speaker-label">@message.Label</span>
+                <div class="message-bubble">@message.Text</div>
+            </div>
+        </li>
+    }
+</ol>
+
+@code {
+    [Parameter, EditorRequired] public string Transcript { get; set; } = string.Empty;
+
+    private string? _previousTranscript;
+    private IReadOnlyList<ChatMessage> _messages = [];
+    private sealed record ChatMessage(string Kind, string Label, string Icon, string Text);
+
+    private static readonly (string Prefix, string Kind, string Label, string Icon)[] Speakers =
+    [
+        ("CALL-E:", "agent", "CALL-E · Care assistant", "support_agent"),
+        ("CareCall:", "agent", "CareCall · Care assistant", "support_agent"),
+        ("Patient:", "patient", "Patient", "person"),
+        ("Paciente:", "patient", "Patient", "person")
+    ];
+
+    protected override void OnParametersSet()
+    {
+        if (Transcript == _previousTranscript) return;
+        _previousTranscript = Transcript;
+        var messages = new List<ChatMessage>();
+        var body = new StringBuilder();
+        var kind = "neutral";
+        var label = "Transcript";
+        var icon = "description";
+
+        void Flush()
+        {
+            var text = body.ToString().TrimEnd('\n');
+            if (!string.IsNullOrWhiteSpace(text)) messages.Add(new(kind, label, icon, text));
+            body.Clear();
+        }
+
+        // Only explicit prefixes set the speaker. Keep undiarized text neutral,
+        // and preserve multiline turns and hyphens instead of guessing alternation.
+        foreach (var line in (Transcript ?? string.Empty).Replace("\r\n", "\n").Replace('\r', '\n').Split('\n'))
+        {
+            var candidate = line.TrimStart();
+            var index = Array.FindIndex(Speakers, s => candidate.StartsWith(s.Prefix, StringComparison.OrdinalIgnoreCase));
+            if (index >= 0)
+            {
+                Flush();
+                var speaker = Speakers[index];
+                (kind, label, icon) = (speaker.Kind, speaker.Label, speaker.Icon);
+                body.Append(candidate[speaker.Prefix.Length..].TrimStart()).Append('\n');
+            }
+            else
+            {
+                body.Append(line).Append('\n');
+            }
+        }
+        Flush();
+        _messages = messages;
+    }
+}

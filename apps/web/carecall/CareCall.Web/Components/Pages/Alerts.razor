@@ -1,0 +1,170 @@
+@page "/alerts"
+@rendermode InteractiveServer
+@inject DashboardService Dashboard
+
+<PageTitle>CareCall · Alerts</PageTitle>
+
+<div class="page-header">
+    <div>
+        <h1>Alerts</h1>
+        <p class="subtitle">Clinical attention queue · review patient context, then resolve the alert.</p>
+    </div>
+    <RefreshControl OnRefresh="LoadAsync" IntervalSeconds="30" />
+</div>
+
+<div class="filter-bar">
+    <div class="filter-group">
+        <span class="filter-label">Status</span>
+        <div class="segmented">
+            <button type="button" class="@(_onlyOpen ? "active" : null)" @onclick="() => SetOnlyOpen(true)">Open</button>
+            <button type="button" class="@(!_onlyOpen ? "active" : null)" @onclick="() => SetOnlyOpen(false)">All</button>
+        </div>
+    </div>
+
+    <div class="filter-group">
+        <span class="filter-label">Severity</span>
+        <select class="filter-select" aria-label="Alert severity" @bind="_severity">
+            <option value="">All</option>
+            <option value="@AlertSeverity.Critical">Critical</option>
+            <option value="@AlertSeverity.Warning">Warning</option>
+            <option value="@AlertSeverity.Info">Info</option>
+        </select>
+    </div>
+
+    <div class="filter-spacer"></div>
+
+    <span class="filter-count">@Filtered.Count of @_alerts.Count alerts</span>
+
+    @if (HasFilters)
+    {
+        <button type="button" class="filter-clear" @onclick="ClearFiltersAsync">Clear filters</button>
+    }
+</div>
+
+@if (_error is not null)
+{
+    <p class="list-error" role="alert">@_error</p>
+}
+<section class="panel panel-fill" aria-label="Alert resolution queue">
+    @if (_loading)
+    {
+        <HeartbeatLoader Message="Loading alerts..." />
+    }
+    else if (Filtered.Count == 0)
+    {
+        <p class="empty">No alerts to display.</p>
+    }
+    else
+    {
+        <div class="activity-list">
+            @foreach (var a in Filtered)
+            {
+                <article @key="a.Id" class="activity-card @(a.Resolved ? "resolved" : $"priority-{a.Severity.ToString().ToLowerInvariant()}")">
+                    <a class="activity-main" href="@($"/patients/{a.PatientId}#patient-alerts")">
+                        <h2>@a.PatientName</h2>
+                        <p>@a.Description</p>
+                        <div class="activity-meta"><span>@a.CreatedOn.ToLocalTime().ToString("dd MMM yyyy · HH:mm")</span><span>Review patient →</span></div>
+                    </a>
+                    <div class="activity-end">
+                        <SeverityBadge Severity="a.Severity" />
+                        @if (a.Resolved)
+                        {
+                            <span class="card-note">Resolved</span>
+                        }
+                        else
+                        {
+                            <button type="button" class="btn btn-sm btn-outline-success" disabled="@(_resolvingId is not null)" @onclick="() => ResolveAsync(a.Id)">
+                                @(_resolvingId == a.Id ? "Saving..." : "Resolve")
+                            </button>
+                        }
+                    </div>
+                </article>
+            }
+        </div>
+    }
+</section>
+
+<JudgeAccessDialog Visible="@(_resolvingId is not null)" ActionLabel="resolve this alert" Busy="_resolving" Error="@_accessError"
+                   OnConfirm="ConfirmResolveAsync" OnCancel="CancelResolveAsync" />
+
+@code {
+    private IReadOnlyList<AlertRow> _alerts = [];
+    private bool _onlyOpen = true;
+    private bool _loading = true;
+    private string _severity = string.Empty;
+    private bool _busy;
+    private bool _resolving;
+    private Guid? _resolvingId;
+    private string? _accessError;
+    private string? _error;
+
+    private IReadOnlyList<AlertRow> Filtered => _alerts
+        .Where(a => !_onlyOpen || !a.Resolved)
+        .Where(a => string.IsNullOrEmpty(_severity) || a.Severity.ToString() == _severity)
+        .OrderBy(a => a.Resolved).ThenByDescending(a => a.Severity).ThenByDescending(a => a.CreatedOn).ToList();
+
+    private bool HasFilters => !_onlyOpen || !string.IsNullOrEmpty(_severity);
+
+    protected override Task OnInitializedAsync() => LoadAsync();
+
+    private async Task SetOnlyOpen(bool value)
+    {
+        if (_onlyOpen == value) return;
+        _onlyOpen = value;
+        await LoadAsync();
+    }
+
+    private async Task ClearFiltersAsync()
+    {
+        _severity = string.Empty;
+        _onlyOpen = true;
+        await LoadAsync();
+    }
+
+    private async Task LoadAsync()
+    {
+        if (_busy) return;
+        _busy = true;
+        try
+        {
+            _alerts = await Dashboard.GetAlertsAsync(false);
+            _error = null;
+        }
+        catch (Exception)
+        {
+            _error = "Could not refresh alerts. Last received data is shown; use Refresh to retry.";
+        }
+        finally { _loading = false; _busy = false; }
+    }
+
+    private void ResolveAsync(Guid id)
+    {
+        if (_resolvingId is not null) return;
+        _resolvingId = id;
+        _accessError = null;
+    }
+
+    private async Task ConfirmResolveAsync(string password)
+    {
+        if (_resolvingId is not { } id || _resolving) return;
+        _resolving = true;
+        try
+        {
+            await Dashboard.ResolveAlertAsync(id, password);
+            await LoadAsync();
+            _resolvingId = null;
+        }
+        catch (Exception ex)
+        {
+            _accessError = ex.Message;
+        }
+        finally { _resolving = false; }
+    }
+
+    private Task CancelResolveAsync()
+    {
+        _resolvingId = null;
+        _accessError = null;
+        return Task.CompletedTask;
+    }
+}

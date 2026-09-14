@@ -1,0 +1,117 @@
+@implements IAsyncDisposable
+
+<div class="refresh-control">
+    <button type="button" class="refresh-btn" title="Refresh now"
+            disabled="@_busy" @onclick="RefreshAsync">
+        <Icon Name="refresh" Class="@(_busy ? "refresh-icon spin" : "refresh-icon")" />
+        <span>Refresh</span>
+    </button>
+
+    <span class="refresh-sep"></span>
+
+    <select class="refresh-select" title="Auto-refresh interval"
+            @bind="IntervalSeconds" @bind:after="RestartTimer">
+        @foreach (var option in Options)
+        {
+            <option value="@option.Seconds">@option.Label</option>
+        }
+    </select>
+
+    @if (_lastRefresh is { } stamp)
+    {
+        <span class="refresh-stamp" title="@stamp.ToLocalTime().ToString("dd/MM/yyyy HH:mm:ss")">
+            @stamp.ToLocalTime().ToString("HH:mm:ss")
+        </span>
+    }
+</div>
+
+@code {
+    /// <summary>Reload action executed by the hosting page.</summary>
+    [Parameter, EditorRequired]
+    public EventCallback OnRefresh { get; set; }
+
+    /// <summary>Initial interval in seconds; 0 disables automatic refresh.</summary>
+    [Parameter]
+    public int IntervalSeconds { get; set; }
+
+    private static readonly (int Seconds, string Label)[] Options =
+    [
+        (0, "Manual"),
+        (10, "Every 10s"),
+        (30, "Every 30s"),
+        (60, "Every 1m"),
+        (300, "Every 5m")
+    ];
+
+    private PeriodicTimer? _timer;
+    private CancellationTokenSource? _cts;
+    private DateTime? _lastRefresh;
+    private bool _busy;
+
+    protected override void OnInitialized() => RestartTimer();
+
+    private async Task RefreshAsync()
+    {
+        if (_busy) return;
+
+        _busy = true;
+        try
+        {
+            await OnRefresh.InvokeAsync();
+            _lastRefresh = DateTime.UtcNow;
+        }
+        catch (Exception)
+        {
+            // A refresh failure must not break the page or leave the control stuck.
+        }
+        finally
+        {
+            _busy = false;
+        }
+    }
+
+    private void RestartTimer()
+    {
+        StopTimer();
+
+        if (IntervalSeconds <= 0) return;
+
+        _cts = new CancellationTokenSource();
+        _timer = new PeriodicTimer(TimeSpan.FromSeconds(IntervalSeconds));
+        _ = RunTimerAsync(_timer, _cts.Token);
+    }
+
+    private async Task RunTimerAsync(PeriodicTimer timer, CancellationToken ct)
+    {
+        try
+        {
+            while (await timer.WaitForNextTickAsync(ct))
+            {
+                await InvokeAsync(async () =>
+                {
+                    await RefreshAsync();
+                    StateHasChanged();
+                });
+            }
+        }
+        catch (OperationCanceledException)
+        {
+            // Cambio de intervalo o navegacion: salida esperada.
+        }
+    }
+
+    private void StopTimer()
+    {
+        _cts?.Cancel();
+        _cts?.Dispose();
+        _cts = null;
+        _timer?.Dispose();
+        _timer = null;
+    }
+
+    public ValueTask DisposeAsync()
+    {
+        StopTimer();
+        return ValueTask.CompletedTask;
+    }
+}

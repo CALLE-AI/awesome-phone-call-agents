@@ -1,0 +1,128 @@
+@page "/patients"
+@rendermode InteractiveServer
+@inject DashboardService Dashboard
+@using Microsoft.AspNetCore.Components
+
+<PageTitle>CareCall · Patients</PageTitle>
+
+<div class="page-header">
+    <div>
+        <h1>Patients</h1>
+        <p class="subtitle">Patient directory · open alerts and higher risk first. Open a record for clinical history.</p>
+    </div>
+    <div class="d-flex gap-2 align-items-center">
+        <a class="btn btn-primary" href="/patients/new">Register patient</a>
+        <RefreshControl OnRefresh="LoadAsync" IntervalSeconds="60" />
+    </div>
+</div>
+
+<div class="filter-bar">
+    <label class="filter-search">
+        <Icon Name="search" />
+        <input aria-label="Search patients" placeholder="Search by name or diagnosis..."
+               @bind="_search" @bind:event="oninput" />
+    </label>
+
+    <div class="filter-group">
+        <span class="filter-label">Risk</span>
+        <select class="filter-select" aria-label="Patient risk" @bind="_risk">
+            <option value="">All</option>
+            <option value="@RiskLevel.High">High</option>
+            <option value="@RiskLevel.Medium">Medium</option>
+            <option value="@RiskLevel.Low">Low</option>
+        </select>
+    </div>
+
+    <div class="filter-group">
+        <span class="filter-label">Status</span>
+        <select class="filter-select" aria-label="Patient status" @bind="_status">
+            <option value="">All</option>
+            <option value="@PatientStatus.InFollowUp">In follow-up</option>
+            <option value="@PatientStatus.Escalated">Escalated</option>
+            <option value="@PatientStatus.Completed">Completed</option>
+            <option value="@PatientStatus.Discharged">Discharged</option>
+        </select>
+    </div>
+
+    <div class="filter-spacer"></div>
+
+    <span class="filter-count">@Filtered.Count of @_patients.Count patients</span>
+
+    @if (HasFilters)
+    {
+        <button type="button" class="filter-clear" @onclick="ClearFiltersAsync">Clear filters</button>
+    }
+</div>
+
+@if (_error is not null)
+{
+    <p class="list-error" role="alert">@_error</p>
+}
+@if (_loading)
+{
+    <HeartbeatLoader Message="Loading patients..." />
+}
+else
+{
+    <section class="panel panel-fill">
+        <PatientTable Patients="Filtered" />
+    </section>
+}
+
+@code {
+    [SupplyParameterFromQuery(Name = "status")]
+    public string? StatusFilter { get; set; }
+
+    private IReadOnlyList<PatientRow> _patients = [];
+    private string? _search;
+    private string _risk = string.Empty;
+    private string _status = string.Empty;
+    private bool _loading = true;
+    private bool _busy;
+    private string? _error;
+
+    private IReadOnlyList<PatientRow> Filtered =>
+        _patients
+            .Where(p => string.IsNullOrWhiteSpace(_search)
+                || p.Name.Contains(_search, StringComparison.OrdinalIgnoreCase)
+                || p.Diagnosis.Contains(_search, StringComparison.OrdinalIgnoreCase))
+            .Where(p => string.IsNullOrEmpty(_risk) || p.RiskLevel.ToString() == _risk)
+            .Where(p => string.IsNullOrEmpty(_status) || p.Status.ToString() == _status)
+            .ToList();
+
+    private bool HasFilters =>
+        !string.IsNullOrWhiteSpace(_search) || !string.IsNullOrEmpty(_risk) || !string.IsNullOrEmpty(_status);
+
+    protected override Task OnInitializedAsync() => LoadAsync();
+
+    protected override void OnParametersSet()
+    {
+        _status = Enum.TryParse<PatientStatus>(StatusFilter, out var status)
+            ? status.ToString()
+            : string.Empty;
+    }
+
+    private async Task ClearFiltersAsync()
+    {
+        _search = null;
+        _risk = string.Empty;
+        _status = string.Empty;
+        await LoadAsync();
+    }
+
+    private async Task LoadAsync()
+    {
+        if (_busy) return;
+        _busy = true;
+        try
+        {
+            _patients = await Dashboard.GetPatientsAsync();
+            _error = null;
+        }
+        catch (Exception)
+        {
+            _error = "Could not refresh patients. Last received data is shown; use Refresh to retry.";
+        }
+        finally { _loading = false; _busy = false; }
+    }
+}

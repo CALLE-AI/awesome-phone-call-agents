@@ -1,0 +1,21 @@
+<div class="stat-card @Accent">
+    @if (!string.IsNullOrWhiteSpace(IconName))
+    {
+        <Icon Name="@IconName" Class="stat-icon" />
+    }
+    <div class="stat-value">@Value</div>
+    <div class="stat-label">@Label</div>
+    @if (!string.IsNullOrWhiteSpace(Hint))
+    {
+        <div class="stat-hint">@Hint</div>
+    }
+</div>
+
+@code {
+    [Parameter, EditorRequired] public string Label { get; set; } = string.Empty;
+    [Parameter, EditorRequired] public object? Value { get; set; }
+    [Parameter] public string? Hint { get; set; }
+    [Parameter] public string? IconName { get; set; }
+    /// <summary>neutral | info | warn | danger | ok</summary>
+    [Parameter] public string Accent { get; set; } = "neutral";
+}

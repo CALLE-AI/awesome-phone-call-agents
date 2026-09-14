@@ -1,0 +1,78 @@
+@using System.ComponentModel.DataAnnotations
+@implements IDisposable
+@inject DemoSettingsService Settings
+
+<section class="alert @(Settings.RealCallsEnabled ? "alert-danger" : "alert-info") border border-2 mb-4" aria-label="Call mode">
+    <div class="d-flex flex-wrap align-items-center justify-content-between gap-2">
+        <div role="status" aria-live="polite">
+            <strong>@(Settings.RealCallsEnabled ? "REAL CALLS ENABLED — Calls use real phone numbers and provider quota." : "SIMULATION MODE — NO REAL CALLS")</strong>
+        </div>
+        <button type="button" class="btn @(Settings.RealCallsEnabled ? "btn-danger" : "btn-primary")" @onclick="ToggleForm">
+            @(Settings.RealCallsEnabled ? "Disable real calls" : "Activate real calls")
+        </button>
+    </div>
+    @if (Settings.RealCallsEnabled)
+    {
+        <small>Shared mode. Disabling does not cancel calls already submitted.</small>
+    }
+    @if (_showForm && !Settings.RealCallsEnabled)
+    {
+        <EditForm Model="_input" OnValidSubmit="EnableAsync" FormName="call-mode">
+            <DataAnnotationsValidator />
+            <ValidationSummary />
+            <fieldset disabled="@_busy" class="mt-3">
+                <label for="call-mode-key" class="form-label">CALL-E API key</label>
+                <InputText id="call-mode-key" type="password" class="form-control" @bind-Value="_input.NewApiKey" autocomplete="new-password" />
+                <p class="form-text">Leave blank to use the configured key. Stored encrypted on the server.</p>
+                <div class="form-check mb-3">
+                    <InputCheckbox id="call-mode-confirm" class="form-check-input" @bind-Value="_input.ConfirmRealCalls" />
+                    <label for="call-mode-confirm" class="form-check-label">I authorize real calls and will only call numbers I own or am permitted to call.</label>
+                </div>
+                <button type="submit" class="btn btn-danger">@(_busy ? "Activating..." : "Confirm activation")</button>
+            </fieldset>
+        </EditForm>
+    }
+    @if (_error is not null)
+    {
+        <p class="mb-0 mt-2" role="alert">@_error</p>
+    }
+</section>
+
+@code {
+    private CallActivationInput _input = new();
+    private bool _showForm;
+    private bool _busy;
+    private string? _error;
+
+    protected override void OnInitialized() => Settings.ModeChanged += Refresh;
+
+    private async Task ToggleForm()
+    {
+        _error = null;
+        if (Settings.RealCallsEnabled)
+            await Settings.DisableRealCallsAsync();
+        else
+            _showForm = !_showForm;
+    }
+
+    private async Task EnableAsync()
+    {
+        _busy = true;
+        _error = null;
+        try
+        {
+            await Settings.EnableRealCallsAsync(_input);
+            _showForm = false;
+        }
+        catch (ValidationException ex) { _error = ex.Message; }
+        catch (Exception) { _error = "Could not change call mode."; }
+        finally
+        {
+            _input = new();
+            _busy = false;
+        }
+    }
+
+    private void Refresh() => _ = InvokeAsync(StateHasChanged);
+    public void Dispose() => Settings.ModeChanged -= Refresh;
+}

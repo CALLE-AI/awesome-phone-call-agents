@@ -1,0 +1,92 @@
+@using CareCall.Core.Domain
+@using CareCall.Web.Services
+
+@* Panel de razonamiento: muestra que hizo cada agente en esta llamada. *@
+
+@if (Steps is { Count: > 0 })
+{
+    <details class="reasoning-details" open="@Open">
+        <summary>
+            <Icon Name="neurology" Class="title-icon" /> AI reasoning
+            <span class="reasoning-count">@Steps.Count</span>
+            @if (Steps.Any(s => s.RiskWasOverridden))
+            {
+                <span class="badge-pill severity-critical reasoning-flag">
+                    <Icon Name="gavel" Class="badge-icon" /> Risk raised by safety review
+                </span>
+            }
+        </summary>
+
+        <ol class="agent-chain">
+            @foreach (var step in Steps)
+            {
+                <li class="agent-step @(step.Succeeded ? null : "agent-step-failed") @(step.RiskWasOverridden ? "agent-step-override" : null)">
+                    <div class="agent-step-icon">
+                        <Icon Name="@step.Icon" Class="meta-icon" />
+                    </div>
+
+                    <div class="agent-step-body">
+                        <div class="agent-step-head">
+                            <strong>@step.Title</strong>
+                            <span class="agent-step-outcome">@step.Outcome</span>
+                            <span class="agent-step-time" title="Model latency">@FormatMs(step.ElapsedMs)</span>
+                            @if (!step.Succeeded)
+                            {
+                                <span class="badge-pill severity-warning" title="This agent failed; the pipeline continued without it.">
+                                    <Icon Name="warning" Class="badge-icon" /> Skipped
+                                </span>
+                            }
+                        </div>
+
+                        @if (step.SupportingQuote is { Length: > 0 } quote)
+                        {
+                            <blockquote class="agent-quote">
+                                <Icon Name="format_quote" Class="badge-icon" />
+                                <span>@quote</span>
+                                <span class="agent-quote-verified" title="This quote was verified against the call transcript.">
+                                    <Icon Name="verified" Class="badge-icon" /> verified in transcript
+                                </span>
+                            </blockquote>
+                        }
+
+                        @if (step.Highlights.Count > 0)
+                        {
+                            <dl class="agent-highlights">
+                                @foreach (var h in step.Highlights)
+                                {
+                                    <dt>@h.Label</dt>
+                                    <dd>@h.Value</dd>
+                                }
+                            </dl>
+                        }
+
+                        @if (step.Findings.Count > 0)
+                        {
+                            <div class="chips agent-findings">
+                                @foreach (var f in step.Findings)
+                                {
+                                    <span class="chip chip-symptom">@f</span>
+                                }
+                            </div>
+                        }
+
+                        @if (!string.IsNullOrWhiteSpace(step.Rationale))
+                        {
+                            <p class="agent-rationale">@step.Rationale</p>
+                        }
+                    </div>
+                </li>
+            }
+        </ol>
+    </details>
+}
+
+@code {
+    [Parameter, EditorRequired] public IReadOnlyList<AgentStepVm>? Steps { get; set; }
+
+    /// <summary>Open by default when there is something relevant to show.</summary>
+    [Parameter] public bool Open { get; set; }
+
+    private static string FormatMs(long ms) =>
+        ms >= 1000 ? $"{ms / 1000.0:0.0}s" : $"{ms}ms";
+}

@@ -1,0 +1,52 @@
+.transcript-thread {
+    display: flex;
+    flex-direction: column;
+    gap: 1rem;
+    list-style: none;
+    margin: 0;
+    padding: 1rem .75rem;
+    background: #f3f7f9;
+    border: 1px solid #e0e9ed;
+    border-radius: .9rem;
+    min-width: 0;
+}
+.message-row { display: flex; align-items: flex-start; gap: .55rem; min-width: 0; }
+.speaker-avatar {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    flex: 0 0 1.9rem;
+    height: 1.9rem;
+    margin-top: 1.25rem;
+    border-radius: 50%;
+    background: #e0edf4;
+    color: #245b78;
+    border: 1px solid #c6dce7;
+}
+.speaker-avatar ::deep .material-symbols-outlined { font-size: 1.1rem; }
+.message-content { min-width: 0; max-width: calc(88% - 2.45rem); }
+.speaker-label { display: block; margin: 0 .3rem .25rem; font-size: .71rem; font-weight: 650; color: #456477; letter-spacing: .015em; }
+.message-bubble {
+    background: white;
+    color: #173449;
+    border: 1px solid #d7e4eb;
+    border-radius: .2rem .9rem .9rem .9rem;
+    box-shadow: 0 2px 4px #17344905;
+    padding: .7rem .9rem;
+    font-size: .93rem;
+    line-height: 1.65;
+    white-space: pre-wrap;
+    overflow-wrap: anywhere;
+}
+.message-row.patient { flex-direction: row-reverse; }
+.patient .speaker-avatar { background: #dcefe8; border-color: #b8d8cd; color: #176454; }
+.patient .speaker-label { text-align: right; color: #276b5a; }
+.patient .message-bubble { background: #e0f1ea; border-color: #bcddcf; border-radius: .9rem .2rem .9rem .9rem; }
+.neutral .speaker-avatar { background: #ebeff2; border-color: #d3dde3; color: #526775; }
+.neutral .message-content { max-width: calc(100% - 2.45rem); }
+.neutral .message-bubble { background: #fafcfd; border-style: dashed; }
+@media (max-width: 600px) {
+    .transcript-thread { padding: .75rem .5rem; }
+    .message-content { max-width: calc(100% - 2.45rem); }
+    .message-bubble { padding: .6rem .7rem; font-size: .9rem; }
+}
