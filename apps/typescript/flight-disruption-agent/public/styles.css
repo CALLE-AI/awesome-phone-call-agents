@@ -185,6 +185,11 @@ pre {
 .transcript .turn .spk { color: var(--muted); font-family: var(--mono); font-size: 0.75rem; padding-top: 2px; }
 blockquote { margin: 0; padding-left: 12px; border-left: 3px solid var(--accent); font-size: 0.9rem; }
 
+.feed { background: var(--surface); border: 1px solid var(--rule); border-radius: 6px; padding: 14px 16px; display: grid; gap: 8px; }
+.feed ul { list-style: none; margin: 0; padding: 0; display: grid; gap: 8px; }
+.feed li { display: flex; flex-wrap: wrap; align-items: baseline; gap: 4px 10px; font-size: 0.88rem; border-top: 1px solid var(--rule); padding-top: 8px; }
+.feed .feed-msg { flex-basis: 100%; color: var(--muted); }
+
 .request-form { padding: 14px 16px; display: grid; gap: 10px; margin-bottom: 16px; }
 .request-form .fields { display: grid; grid-template-columns: repeat(auto-fit, minmax(160px, 1fr)); gap: 8px 12px; }
 .request-form label { display: grid; gap: 3px; font-size: 0.82rem; color: var(--muted); }

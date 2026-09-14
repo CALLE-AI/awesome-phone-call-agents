@@ -55,20 +55,35 @@ function showError(message) {
   el.hidden = !message;
 }
 
-async function load() {
+let lastSnapJson = "";
+let connectionLost = false;
+
+/** quiet: a background refresh that re-renders only when something changed, e.g. a webhook event arrived. */
+async function load({ quiet = false } = {}) {
+  let data;
   try {
-    snap = await api("/api/state");
-    showError("");
+    data = await api("/api/state");
   } catch (e) {
+    connectionLost = true;
     showError(`Could not reach the desk server: ${e.message}`);
+    clearTimeout(pollTimer);
+    pollTimer = setTimeout(() => load({ quiet: true }), 5000);
     return;
   }
-  render();
+  if (connectionLost) {
+    connectionLost = false;
+    showError("");
+  }
+  const json = JSON.stringify(data);
+  const changed = json !== lastSnapJson;
+  snap = data;
+  lastSnapJson = json;
+  if (!quiet || (changed && !busy)) render();
   clearTimeout(pollTimer);
   const running =
     snap.disruptions.some((d) => d.bookings.some((b) => b.entry && (b.entry.status === "in_progress" || b.entry.status === "submitted"))) ||
     snap.requests.some((r) => r.status === "airline_call_in_progress" || r.callback?.status === "in_progress");
-  if (running) pollTimer = setTimeout(load, snap.live ? 5000 : 1500);
+  pollTimer = setTimeout(() => load({ quiet: !running }), running ? (snap.live ? 5000 : 1500) : 5000);
 }
 
 async function act(fn) {
@@ -92,6 +107,7 @@ async function act(fn) {
 function render() {
   renderMode();
   renderBoard();
+  renderFeed();
   renderDesk();
   renderRequests();
 }
@@ -143,6 +159,27 @@ function renderBoard() {
       </tr>`;
     })
     .join("");
+}
+
+const FEED_CHIPS = { created: ["ok", "Recorded"], conflict: ["warn", "Conflict · check by hand"], rejected: ["bad", "Rejected"] };
+
+function renderFeed() {
+  const el = $("feed");
+  const events = snap.opsEvents ?? [];
+  el.hidden = events.length === 0;
+  if (!events.length) return;
+  const flightCode = (id) => snap.flights.find((f) => f.id === id)?.code ?? id ?? "unknown flight";
+  el.innerHTML = `<h2>Airline ops feed</h2>
+    <p class="note">Signed events pushed to <span class="mono">POST /api/webhooks/airline-ops</span>. Events record the disruption only; calls still start here.</p>
+    <ul>${events
+      .map((e) => {
+        const [cls, label] = FEED_CHIPS[e.status] || ["", e.status];
+        return `<li><span class="chip ${cls}">${esc(label)}</span>
+          <span class="mono">${esc(e.type)}</span> <b>${esc(flightCode(e.flightId))}</b>
+          <span class="muted">${hhmm(e.receivedAt)} · ${esc(e.eventId)}</span>
+          <span class="feed-msg">${esc(e.message)}</span></li>`;
+      })
+      .join("")}</ul>`;
 }
 
 function statusChip(entry) {
@@ -210,6 +247,7 @@ function renderDesk() {
           <div class="facts">
             ${d.newDeparture ? `<span>New departure <b>${hhmm(d.newDeparture)}</b></span>` : "<span><b>Will not operate</b></span>"}
             <span>Cause <b>${esc(d.reason)}</b></span>
+            <span>Source <b>${d.source?.kind === "airline_webhook" ? `airline ops feed <span class="mono">${esc(d.source.eventId)}</span>` : "reported on this desk"}</b></span>
             <span><b>${esc(CASE_LABELS[c] ?? c)}</b> pricing ${pricing}</span>
             <span><b>${handled}</b> handled · <b>${review}</b> need a person</span>
           </div>
