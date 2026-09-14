@@ -1,12 +1,7 @@
 ---
 name: call-e-booking
 description: "Book restaurant tables or medical appointments via CALL-E AI voice calls. Load when the user wants to book, reserve, or schedule anything over the phone."
-version: 1.0.0
-author: Hermes Agent
-license: MIT
-platforms: [macos, linux]
 tags: [booking, voice, call, restaurant, medical, calendar, calle-ai]
-related_skills: [google-workspace, phone-scout]
 ---
 
 # CALL-E Booking
@@ -187,6 +182,17 @@ and the generic booking template adapts to whatever `--kind` you pass.
 The user's name, email, and location should live in Hermes memory (user profile). Their caller-number (callback number given to the business) goes in `~/.hermes/.env` as `BOOKING_PHONE`. These are loaded by the skill during the gather phase — the skill should never hardcode PII in its body.
 
 ## Calendar availability (variant A: book within free windows)
+
+⚠️ **Unreadable calendar = unknown, not all-free.** If the calendar source
+is unavailable (e.g. TCC gate, expired OAuth token), treat availability as
+**unknown** and require the user to provide explicit windows or a preferred
+date/time. Never assume all time is free.
+
+⚠️ **Results are advisory until confirmed.** After the call returns a
+booked date/time/timezone, the agent MUST present it to the user for
+confirmation before writing it to any calendar. Do not mutate the calendar
+without explicit human sign-off on the specific slot/timezone.
+
 
 Instead of a hard `--date`/`--time`, read the user's calendar to find free
 windows and inject them into the task so CALL-E negotiates within them.
