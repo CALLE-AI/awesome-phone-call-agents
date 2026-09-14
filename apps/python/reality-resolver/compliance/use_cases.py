@@ -71,6 +71,10 @@ _COMMERCIAL_SOLICITATION_SUFFIXES = (
 _EXEMPT_SUFFIXES_BY_USE_CASE: dict[str, tuple[str, ...]] = {
     "appointment_confirmation": _COMMERCIAL_SOLICITATION_SUFFIXES,
     "critical_service_escalation": _COMMERCIAL_SOLICITATION_SUFFIXES,
+    # Custom cases are limited to factual state confirmation. They use the
+    # same non-solicitation applicability set as the shipped cases while the
+    # case's own evidence and actions remain fully data-driven.
+    "factual_state_confirmation": _COMMERCIAL_SOLICITATION_SUFFIXES,
 }
 
 
