@@ -480,21 +480,46 @@ function BriefScreen({ brief, mode, liveAvailability, livePhones, route, operato
     <div className="stack">
       <section className="hero-grid">
         <div className="hero-copy">
-          <p className="section-number">01 / Search brief</p>
-          <h2>Stop refreshing waitlists.<br /><i>Ask what is open now.</i></h2>
-          <p>TinySlot turns one privacy-minimized care need into a bounded CALL-E search. Facts come from center staff; the fit decision comes from deterministic rules.</p>
+          <p className="hero-badge"><span /> Phone-native childcare search / powered by CALL-E</p>
+          <h2>Find childcare openings<br /><i>that actually fit.</i></h2>
+          <p>TinySlot calls the centers a parent approves, asks the questions directories cannot answer, and returns evidence-backed matches for the exact days, hours, date, and budget.</p>
+          <div className="hero-actions">
+            <button className="button hero-primary" type="button" onClick={() => document.getElementById("search-brief")?.scrollIntoView({ behavior: "smooth" })}>Build my search</button>
+            <button className="hero-link" type="button" onClick={() => document.getElementById("how-it-works")?.scrollIntoView({ behavior: "smooth" })}>See how it works <span aria-hidden="true">↓</span></button>
+          </div>
+          <div className="hero-proof"><span><b>1</b> privacy-safe brief</span><span><b>3</b> calls per wave</span><span><b>{brief.targetMatches}</b> matches needed</span></div>
         </div>
-        <div className="promise-card">
-          <span className="orbit" aria-hidden="true" />
-          <p>Search target</p>
-          <strong>{brief.targetMatches}</strong>
-          <span>verified matches</span>
-          <small>Calls stop as soon as this target is met.</small>
+        <aside className="call-map" aria-label="Illustration of one care brief becoming a bounded call wave and two verified matches">
+          <div className="map-heading"><div><p className="kicker">Live information pipeline</p><h3>One brief. Three calls.<br />Two real options.</h3></div><span className="map-status"><i /> ready</span></div>
+          <div className="brief-node"><span className="node-mark">01</span><div><small>Parent need</small><strong>Toddler / Mon, Wed, Fri</strong><p>By Oct 15 · 08:30–17:30</p></div></div>
+          <div className="call-connector" aria-hidden="true"><i /><span>CALL-E wave 01</span><i /></div>
+          <div className="center-stack">
+            <div className="center-node match"><span>W</span><div><strong>Willow Room</strong><small>Opening confirmed</small></div><b>Fit</b></div>
+            <div className="center-node match"><span>A</span><div><strong>Alder House</strong><small>Opening confirmed</small></div><b>Fit</b></div>
+            <div className="center-node waitlist"><span>M</span><div><strong>Moss & Moon</strong><small>Waitlist only</small></div><b>Hold</b></div>
+          </div>
+          <div className="map-outcome"><div><small>Verified target reached</small><strong>{brief.targetMatches} matches</strong></div><span>3 calls avoided</span></div>
+        </aside>
+      </section>
+
+      <section className="trust-strip" aria-label="TinySlot safety boundaries">
+        <div><span>01</span><p><strong>No child identity</strong><small>Search with an age band, not personal records.</small></p></div>
+        <div><span>02</span><p><strong>Bounded call waves</strong><small>At most three approved centers at a time.</small></p></div>
+        <div><span>03</span><p><strong>Code verifies fit</strong><small>Unknown never becomes a convenient yes.</small></p></div>
+        <div><span>04</span><p><strong>Human-approved tours</strong><small>A second call needs separate authority.</small></p></div>
+      </section>
+
+      <section className="how-section" id="how-it-works">
+        <div className="how-heading"><div><p className="section-number">How TinySlot works</p><h2>From a need to a next step.</h2></div><p>CALL-E handles natural phone conversations. TinySlot controls who gets called, validates what came back, and stops the moment the search has enough evidence.</p></div>
+        <div className="how-flow">
+          <article><span>01</span><div className="step-illustration brief-illustration" aria-hidden="true"><i /><i /><i /></div><h3>Define the fit</h3><p>Set the age band, start date, weekdays, hours, and budget without sharing the child’s identity.</p></article>
+          <article><span>02</span><div className="step-illustration phone-illustration" aria-hidden="true"><i /><b /><i /></div><h3>CALL-E asks</h3><p>Approved centers receive a disclosed AI call with one strict, comparable result schema.</p></article>
+          <article><span>03</span><div className="step-illustration match-illustration" aria-hidden="true"><i>✓</i><i>✓</i><i>×</i></div><h3>Compare and stop</h3><p>Deterministic checks rank complete answers and stop later waves when the target is met.</p></article>
         </div>
       </section>
 
-      <section className="brief-card">
-        <div className="card-heading"><div><p className="kicker">Non-identifying profile</p><h3>What care must fit?</h3></div><span className="safe-pill">No child name</span></div>
+      <section className="brief-card" id="search-brief">
+        <div className="card-heading"><div><p className="section-number">01 / Start the search</p><h3>What must the opening fit?</h3></div><span className="safe-pill">No child name</span></div>
         <div className="form-grid">
           <label><span>Age band</span><select value={brief.ageBand} onChange={(event) => onBrief("ageBand", event.target.value as SearchBrief["ageBand"])}><option value="infant">Infant</option><option value="toddler">Toddler</option><option value="preschool">Preschool</option><option value="school-age">School age</option></select></label>
           <label><span>Needed by</span><input type="date" value={brief.desiredStartDate} onChange={(event) => onBrief("desiredStartDate", event.target.value)} /></label>
