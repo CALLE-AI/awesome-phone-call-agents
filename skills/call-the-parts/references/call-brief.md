@@ -19,7 +19,7 @@ This is an automated call on behalf of {ORGANIZATION}.
 I am checking used-part availability. Request {REQUEST_ID}.
 
 I need to know whether you have a {CONDITION} {PART} for a {YEAR} {MAKE} {MODEL}.
-If you need to walk the yard or check a computer, I can wait.
+If you need to check the shelves or a computer, I can wait.
 
 Please tell me:
 1. Do you have it in stock — yes, no, or you need to check and call back?

@@ -60,6 +60,6 @@ If the host can load a directory with `SKILL.md` + YAML frontmatter, this skill 
 | `node` | The user's machine, for preview/validate scripts |
 | CALL-E CLI or MCP | The user, via CALL-E's install guide |
 | CALL-E login | The user (`calle auth login` or host MCP OAuth) |
-| Yard search | Optional. The harness native web search only. No Firecrawl. No keys in this skill. |
+| Shop search | Optional. The harness native web search only. No Firecrawl. No keys in this skill. |
 
 This skill never phones home, never stores keys, and has no `.env`.

@@ -46,13 +46,13 @@ Run `scripts/validate-quote.mjs` on whatever comes back.
 - Drop undeclared fields.
 - Refuse out-of-enum values. Do not map `probably` to `maybe` or `yes`.
 - Keep prices as spoken text. Do not parse "$80 or 90" into `85`.
-- Empty string is allowed for spoken fields when the yard did not say that thing. Do not invent "none".
+- Empty string is allowed for spoken fields when the spare parts shop did not say that thing. Do not invent "none".
 - `maybe` routes to a human. It is not stock.
 - Missing confidence from the provider counts as low confidence.
 
 ## Why Spoken Money
 
-"Eighty, plus core, if it's the 1.8" has no correct numeric reading. Inventing one commits the shop to a figure nobody said.
+"Eighty, plus core, if it's the 1.8" has no correct numeric reading. Inventing one commits the dealership to a figure nobody said.
 
 ## Versioning
 

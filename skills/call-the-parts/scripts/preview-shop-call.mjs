@@ -34,7 +34,7 @@ const { values } = parseArgs({
 });
 
 if (values.help) {
-  console.log("Usage: node scripts/preview-yard-call.mjs [--input request.json]");
+  console.log("Usage: node scripts/preview-shop-call.mjs [--input request.json]");
   process.exit(0);
 }
 
@@ -46,7 +46,7 @@ const required = [
   "model",
   "part",
   "condition",
-  "yardName",
+  "shopName",
   "phone",
   "organization",
 ];
@@ -71,10 +71,10 @@ if (!Number.isInteger(year) || year < 1950 || year > 2030) {
 const notes = input.extraNotes ? ` Extra fitment note: ${input.extraNotes}.` : "";
 const goal = [
   `This is an automated call on behalf of ${input.organization}.`,
-  `I am checking used-part availability. Request ${input.requestId}.`,
-  `Call ${input.phone} at ${input.yardName}.`,
+  `I am checking used automotive part availability. Request ${input.requestId}.`,
+  `Call ${input.phone} at ${input.shopName}.`,
   `Ask whether they have a ${input.condition} ${input.part} for a ${year} ${input.make} ${input.model}.`,
-  `If they need to walk the yard or check a computer, wait.`,
+  `If they need to check the shelves or a computer, wait.`,
   `Ask for condition, the price as they say it, any core charge, whether they can hold it and until when, and pickup vs ship.`,
   `If they do not have this exact part, ask whether a similar interchange exists.`,
   `Do not negotiate. Do not agree to buy, hold, or pay.`,
@@ -89,7 +89,7 @@ const preview = {
   mode: "dry-run",
   dialed: false,
   requestId: input.requestId,
-  yardName: input.yardName,
+  shopName: input.shopName,
   phoneMasked: maskPhone(String(input.phone)),
   vehicle: `${year} ${input.make} ${input.model}`,
   part: input.part,

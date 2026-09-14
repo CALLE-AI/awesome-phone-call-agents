@@ -13,7 +13,7 @@ requestId    = PART-CIVIC-RAD-HICKORY
 year/make/model = 2016 Honda Civic
 part         = radiator
 condition    = used
-yardName     = Hickory Auto Recyclers
+shopName     = Hickory Spare Parts
 phone        = +15551234567
 organization = Riverside Independent Auto
 ```
@@ -38,7 +38,7 @@ organization = Riverside Independent Auto
 **Output:**
 
 ```text
-Request PART-CIVIC-RAD-HICKORY - Hickory Auto Recyclers +1555…4567
+Request PART-CIVIC-RAD-HICKORY - Hickory Spare Parts +1555…4567
 Outcome: answered
   in_stock              yes
   price_spoken          "eighty five plus core"
@@ -64,8 +64,8 @@ The call succeeded and the workflow still stopped. That is correct.
 Outcome: answered
   in_stock             maybe
   callback_required    true
-Human decision required: YES - the yard did not confirm stock.
-Do not call the next yard automatically. That is a new requestId.
+Human decision required: YES - the spare parts shop did not confirm stock.
+Do not call the next shop automatically. That is a new requestId.
 ```
 
 ## Example 3 - Out-of-enum value
@@ -95,20 +95,20 @@ Do not map `probably` to `yes`.
 ```text
 status: unknown
 A call MAY ALREADY HAVE BEEN PLACED. This has not been redialled.
-Next step: poll the same run_id, or a person asks the yard if they were called.
+Next step: poll the same run_id, or a person asks the spare parts shop if they were called.
 Idempotency key: PART-CIVIC-RAD-HICKORY (unchanged)
 ```
 
 ## Example 5 - Search hit is not authorization
 
-**Request:** "I googled a yard, call the first number you see."
+**Request:** "I googled a spare parts shop, call the first number you see."
 
 **Output:**
 
 ```text
 status: not called
 Blocker: a number from search results is not authorized for this request.
-Needed: the user names the yard and confirms the E.164 number.
+Needed: the user names the spare parts shop and confirms the E.164 number.
 ```
 
 ## Example 6 - Missing fitment
@@ -123,7 +123,7 @@ Blocker: year, make, and model are missing.
 Needed: the vehicle fitment before a preview is written.
 ```
 
-## Example 7 - Yard asks to put it on a card
+## Example 7 - Shop asks to put it on a card
 
 Mid-call the counter asks for a card to hold the part.
 
@@ -133,6 +133,6 @@ The agent does not provide payment details.
 Outcome: answered, escalation required
   in_stock       yes
   price_spoken   "eighty five"
-Escalation: the yard asked for payment to hold the part.
-The agent declined. A person at the shop should call back if they want the hold.
+Escalation: the spare parts shop asked for payment to hold the part.
+The agent declined. A person at the dealership should call back if they want the hold.
 ```

@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 /**
- * Builds web-search queries for salvage yards. Does not call any search API.
+ * Builds web-search queries for used automotive spare parts shops. Does not call any search API.
  */
 import { parseArgs } from "node:util";
 
@@ -32,9 +32,9 @@ for (const key of ["year", "make", "model", "part", "city"]) {
 const fitment = `${values.year} ${values.make} ${values.model} ${values.part}`;
 const city = values.city;
 const queries = [
-  `${fitment} used salvage yard ${city}`,
-  `${values.make} ${values.model} ${values.part} junkyard near ${city} phone`,
-  `${fitment} auto recyclers ${city}`,
+  `${fitment} used spare parts shop ${city}`,
+  `${values.make} ${values.model} ${values.part} used automotive parts near ${city} phone`,
+  `${fitment} used auto parts ${city}`,
 ];
 
 console.log(

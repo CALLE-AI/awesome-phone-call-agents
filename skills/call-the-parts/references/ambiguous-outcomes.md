@@ -6,14 +6,14 @@ A call whose outcome is unknown is the most expensive failure mode in this skill
 
 The host timed out, the CLI returned no terminal status, or the provider accepted a request and never reported whether a person was reached.
 
-A yard who already quoted a radiator will quote it again if you redial. Two conversations now exist for one `requestId`. Someone may have pulled the part off the shelf.
+A spare parts shop who already quoted a radiator will quote it again if you redial. Two conversations now exist for one `requestId`. Someone may have pulled the part off the shelf.
 
 ## Rules
 
 - Classify it as `outcome: unknown` and stop.
 - Do not call `calle call start` again for that `requestId`.
 - Keep the same `requestId`. If the user later resumes, poll the existing `run_id` with `calle call status`. Do not start a new run.
-- Tell a person to confirm with the yard whether they were called.
+- Tell a person to confirm with the spare parts shop whether they were called.
 
 ## Contrast With Terminal Misses
 
