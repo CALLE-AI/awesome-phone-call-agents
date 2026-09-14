@@ -94,3 +94,71 @@ test("malformed channel messages are refused", () => {
   assert.throws(() => parseChannelMessage({ id: "x", type: "request.confirmed", channel: "chat", conversation_id: "c", request_id: "r", confirmed_amount: "yes" }), ChannelMessageError);
   assert.throws(() => parseChannelMessage({ id: "x", type: "hello", channel: "chat", conversation_id: "c" }), /type/);
 });
+
+test("later changes are pushed to the passenger's conversation, once per status", async () => {
+  const sent: { status: string; reply: string; conversation_id: string }[] = [];
+  const desk = new Desk(catalog, new DryRunGateway(0), {
+    statePath: null,
+    liveCallBudget: 0,
+    now: () => DAY_BEFORE,
+    channelNotifier: async (p) => {
+      sent.push({ status: p.status, reply: p.reply, conversation_id: p.conversation_id });
+    },
+  });
+  desk.receiveChannelMessage(submit());
+  desk.receiveChannelMessage(
+    parseChannelMessage({ id: "msg-c", type: "request.confirmed", channel: "chat", conversation_id: "conv-1", request_id: "req_P3X9GA_1", confirmed_amount: 415000 }),
+  );
+  assert.equal(sent.length, 0, "the passenger already got the portal result as the reply");
+
+  await desk.callAirlineDesk("req_P3X9GA_1");
+  await desk.refreshRequest("req_P3X9GA_1");
+  await desk.refreshRequest("req_P3X9GA_1");
+  await new Promise((r) => setImmediate(r));
+  assert.deepEqual(sent.map((s) => [s.status, s.conversation_id]), [["completed", "conv-1"]]);
+  assert.match(sent[0]?.reply ?? "", /^Done\. Rebooked to NA 729.*Reissued by the airline desk/);
+  assert.equal(desk.snapshot().requests[0]?.channelUpdates?.[0]?.delivery, "sent");
+
+  // An operator confirming a channel request is also reported to the conversation.
+  desk.receiveChannelMessage(submit({ id: "msg-2", pnr: "L6F2KM", last_name: "Kusuma", conversation_id: "conv-2" }));
+  desk.confirmRequest("req_L6F2KM_1", 30_000);
+  await new Promise((r) => setImmediate(r));
+  assert.deepEqual(sent.map((s) => s.status), ["completed", "completed"]);
+  assert.equal(sent[1]?.conversation_id, "conv-2");
+});
+
+test("a failed delivery is recorded without blocking the desk, and requests typed by the operator send nothing", async () => {
+  const desk = new Desk(catalog, new DryRunGateway(0), {
+    statePath: null,
+    liveCallBudget: 0,
+    now: () => DAY_BEFORE,
+    channelNotifier: async () => {
+      throw new Error("Channel returned HTTP 502.");
+    },
+  });
+  desk.receiveChannelMessage(submit({ pnr: "C5V8EJ", last_name: "Halim" }));
+  desk.receiveChannelMessage(
+    parseChannelMessage({ id: "msg-c", type: "request.confirmed", channel: "chat", conversation_id: "conv-1", request_id: "req_C5V8EJ_1", confirmed_amount: 580000 }),
+  );
+  await desk.callAirlineDesk("req_C5V8EJ_1");
+  const review = await desk.refreshRequest("req_C5V8EJ_1");
+  assert.equal(review.status, "needs_review");
+  await new Promise((r) => setImmediate(r));
+  assert.deepEqual(
+    review.channelUpdates?.map((u) => [u.status, u.delivery, u.error]),
+    [["needs_review", "failed", "Channel returned HTTP 502."]],
+  );
+
+  const typed = desk.submitRequest("L6F2KM", "reschedule", "NA729-2026-09-20", "phone");
+  const done = desk.confirmRequest(typed.request.id, 30_000);
+  assert.equal(done.channelUpdates, undefined);
+});
+
+test("channel updates only go over https, or plain http to this machine", async () => {
+  const { channelNotifyUrlFromEnv } = await import("../src/config.ts");
+  assert.equal(channelNotifyUrlFromEnv({}), null);
+  assert.equal(channelNotifyUrlFromEnv({ CHANNEL_NOTIFY_URL: "https://bot.example.test/updates" }), "https://bot.example.test/updates");
+  assert.equal(channelNotifyUrlFromEnv({ CHANNEL_NOTIFY_URL: "http://127.0.0.1:4330/updates" }), "http://127.0.0.1:4330/updates");
+  assert.throws(() => channelNotifyUrlFromEnv({ CHANNEL_NOTIFY_URL: "http://bot.example.test/updates" }), /must use https/);
+  assert.throws(() => channelNotifyUrlFromEnv({ CHANNEL_NOTIFY_URL: "nope" }), /not a valid URL/);
+});

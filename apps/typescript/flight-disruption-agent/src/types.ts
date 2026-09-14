@@ -294,7 +294,7 @@ export interface ChannelUpdate {
   at: string;
   status: RequestStatus;
   reply: string;
-  delivery: "sent" | "failed" | "not_configured";
+  delivery: "sending" | "sent" | "failed" | "not_configured";
   error: string | null;
 }
 

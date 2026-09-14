@@ -2,9 +2,10 @@ import { createServer, type IncomingMessage, type ServerResponse } from "node:ht
 import { readFile } from "node:fs/promises";
 import { extname, join, normalize } from "node:path";
 import { checkAccess, isLoopbackBind } from "./access.ts";
-import { CHANNEL_SIGNATURE_HEADER, ChannelMessageError, parseChannelMessage } from "./channel.ts";
+import { CHANNEL_SIGNATURE_HEADER, ChannelMessageError, httpChannelNotifier, parseChannelMessage } from "./channel.ts";
 import {
   APP_ROOT,
+  channelNotifyUrlFromEnv,
   channelSecretFromEnv,
   demoClockFromEnv,
   gatewayFromEnv,
@@ -14,7 +15,7 @@ import {
 } from "./config.ts";
 import { loadCatalog } from "./data.ts";
 import { Desk, DeskError } from "./desk.ts";
-import { OpsEventError, parseOpsEvent, SIGNATURE_HEADER, verifySignature } from "./events.ts";
+import { OpsEventError, parseOpsEvent, SIGNATURE_HEADER, signPayload, verifySignature } from "./events.ts";
 import { FeedPoller, feedConfigFromEnv } from "./feed.ts";
 import type { Action, DisruptionCause, DisruptionKind, RequestChannel, RequestKind } from "./types.ts";
 
@@ -29,8 +30,11 @@ if (attestation) {
 const catalog = loadCatalog();
 const webhook = webhookSecretFromEnv(gateway.live);
 const channelWebhook = channelSecretFromEnv(gateway.live);
+const channelNotifyUrl = channelNotifyUrlFromEnv();
 const demoClock = demoClockFromEnv();
 const desk = new Desk(catalog, gateway, {
+  channelNotifier:
+    channelNotifyUrl && channelWebhook.secret ? httpChannelNotifier(channelNotifyUrl, channelWebhook.secret, signPayload) : undefined,
   demoNow: demoClock.now,
   // Live runs persist call ids so polling can resume after a restart. Dry runs start fresh.
   statePath: gateway.live ? join(APP_ROOT, ".data", `state-${gateway.mode}.json`) : null,
@@ -274,6 +278,7 @@ server.listen(PORT, HOST, () => {
   console.log(`Flight disruption desk on http://${HOST}:${PORT}  [${live}]`);
   console.log(OPERATOR_TOKEN ? "Dashboard requires the operator token (HTTP Basic, any user name)." : "Dashboard accepts loopback connections only.");
   if (demoClock.label) console.log(`Demo clock: passenger request cutoffs use ${demoClock.label}. Set DEMO_NOW=real for the real time.`);
+  if (channelNotifyUrl) console.log(`Request updates for passenger channels go to ${new URL(channelNotifyUrl).origin}.`);
   if (!channelWebhook.secret) console.log("Channel webhook disabled: set CHANNEL_WEBHOOK_SECRET to enable POST /api/webhooks/channel.");
   else if (channelWebhook.demo) console.log("Channel webhook uses the dry-run demo secret. Set CHANNEL_WEBHOOK_SECRET before connecting a real channel.");
   if (!webhook.secret) console.log("Airline ops webhook disabled: set AIRLINE_WEBHOOK_SECRET to enable POST /api/webhooks/airline-ops.");

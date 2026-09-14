@@ -15,7 +15,7 @@ import {
 import { buildCallbackResultSchema, buildCallbackTask, decideCallback } from "./callback.ts";
 import { decide } from "./decide.ts";
 import { checkEligibility } from "./eligibility.ts";
-import { NOT_FOUND_REPLY, passengerMatches, replyFor, type ChannelMessage } from "./channel.ts";
+import { NOT_FOUND_REPLY, passengerMatches, replyFor, type ChannelMessage, type ChannelNotifier } from "./channel.ts";
 import type { OpsEvent } from "./events.ts";
 import { FakeGds, type Gds } from "./gds.ts";
 import { addMinutes, idr, localTime } from "./format.ts";
@@ -23,7 +23,7 @@ import { maskPhone, routeFor } from "./phone.ts";
 import { redactOutcome, redactText } from "./redact.ts";
 import { airlineOf, quoteFor, voluntaryQuoteFor } from "./rules.ts";
 import { buildResultSchema, buildTask } from "./task.ts";
-import type { Action, AirlineCall, BookingState, CallOutcome, ChannelMessageRecord, Decision, Disruption, DisruptionCause, DisruptionKind, DisruptionSource, LedgerEntry, OpsEventRecord, OpsEventVia, Quote, RequestChannel, RequestEntry, RequestKind } from "./types.ts";
+import type { Action, AirlineCall, BookingState, CallOutcome, ChannelMessageRecord, ChannelUpdate, Decision, Disruption, DisruptionCause, DisruptionKind, DisruptionSource, LedgerEntry, OpsEventRecord, OpsEventVia, Quote, RequestChannel, RequestEntry, RequestKind } from "./types.ts";
 
 interface DeskState {
   disruptions: Disruption[];
@@ -54,6 +54,8 @@ export interface DeskOptions {
   now?: () => number;
   /** Clock for passenger request cutoffs only. Defaults to `now`. */
   demoNow?: () => number;
+  /** Pushes later request updates to the passenger's channel. Without it, updates are only recorded. */
+  channelNotifier?: ChannelNotifier;
   /** B2B portal or GDS used by Workflow B. Defaults to the fake portal. */
   gds?: Gds;
 }
@@ -679,16 +681,17 @@ export class Desk {
     if (portal.kind === "rejected") {
       // Both a refused reissue and a refused refund go to the airline service desk by phone.
       entry.status = "portal_rejected";
-      this.save();
-      return entry;
+    } else {
+      try {
+        entry.applied = this.applyChange(entry.request.pnr, entry.quote, entry.action);
+        entry.status = "completed";
+      } catch (error) {
+        entry.status = "needs_review";
+        entry.reviewReasons = [error instanceof Error ? error.message : String(error)];
+      }
     }
-    try {
-      entry.applied = this.applyChange(entry.request.pnr, entry.quote, entry.action);
-      entry.status = "completed";
-    } catch (error) {
-      entry.status = "needs_review";
-      entry.reviewReasons = [error instanceof Error ? error.message : String(error)];
-    }
+    // A passenger confirming in their channel gets this result as the reply; tell them if the operator confirmed.
+    if (confirmedBy.kind === "operator") this.notifyChannel(entry);
     this.save();
     return entry;
   }
@@ -747,7 +750,7 @@ export class Desk {
         if (entry.status !== "quoted") {
           refuse(replyFor(this.catalog, entry));
         } else if (message.type === "request.declined") {
-          record.reply = replyFor(this.catalog, this.declineRequest(message.requestId));
+          record.reply = replyFor(this.catalog, this.declineRequest(message.requestId, false));
         } else if (message.confirmedAmount !== entry.amount) {
           refuse(`The amount does not match the quote. To go ahead, reply YES ${entry.amount ?? 0}.`);
         } else {
@@ -765,11 +768,53 @@ export class Desk {
     return { record, duplicate: false };
   }
 
+  /**
+   * Tells the passenger's channel when a request that came in through it changes after the
+   * first reply: the airline desk answered, a person resolved it, or the operator acted.
+   * One update per status; delivery is recorded but never blocks the desk.
+   */
+  private notifyChannel(entry: RequestEntry, alreadyReplied?: RequestEntry["status"]): void {
+    const conversation = entry.request.conversation;
+    if (!conversation || entry.status === alreadyReplied) return;
+    entry.channelUpdates ??= [];
+    const last = entry.channelUpdates[entry.channelUpdates.length - 1];
+    if (last?.status === entry.status) return;
+    const update: ChannelUpdate = {
+      at: new Date(this.now()).toISOString(),
+      status: entry.status,
+      reply: replyFor(this.catalog, entry),
+      delivery: this.options.channelNotifier ? "sending" : "not_configured",
+      error: null,
+    };
+    entry.channelUpdates.push(update);
+    const notifier = this.options.channelNotifier;
+    if (!notifier) return;
+    notifier({
+      type: "request.updated",
+      request_id: entry.request.id,
+      channel: conversation.channel,
+      conversation_id: conversation.id,
+      status: entry.status,
+      reply: update.reply,
+    }).then(
+      () => {
+        update.delivery = "sent";
+        this.save();
+      },
+      (error: unknown) => {
+        update.delivery = "failed";
+        update.error = redactText(error instanceof Error ? error.message : String(error));
+        this.save();
+      },
+    );
+  }
+
   /** The passenger said no to the quote. Nothing changes. */
-  declineRequest(id: string): RequestEntry {
+  declineRequest(id: string, byOperator = true): RequestEntry {
     const entry = this.requestEntry(id);
     if (entry.status !== "quoted") throw new DeskError(`This request is ${entry.status}; only quoted requests can be declined.`, 409);
     entry.status = "declined";
+    if (byOperator) this.notifyChannel(entry);
     this.save();
     return entry;
   }
@@ -890,7 +935,8 @@ export class Desk {
       call.status = "uncertain";
       call.error = redactText(result.message);
       entry.status = "needs_review";
-      entry.reviewReasons = [`CALL-E may or may not have called the airline desk: ${result.message} It will not be redialed.`];
+      entry.reviewReasons = [`CALL-E may or may not have called the airline desk: ${call.error} It will not be redialed.`];
+      this.notifyChannel(entry);
     } else {
       call.status = "failed_to_submit";
       call.error = redactText(result.message);
@@ -933,6 +979,7 @@ export class Desk {
       entry.status = "needs_review";
       entry.reviewReasons = decision.kind === "review" ? decision.reasons : ["The request has no action to apply."];
     }
+    this.notifyChannel(entry);
     this.save();
     return entry;
   }
@@ -957,6 +1004,7 @@ export class Desk {
     const text = note.trim();
     if (text) this.state.bookings[entry.request.pnr]?.notes.push(`Agent note: ${text}`);
     entry.status = "resolved_by_human";
+    this.notifyChannel(entry);
     this.save();
     return entry;
   }

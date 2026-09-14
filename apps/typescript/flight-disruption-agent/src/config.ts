@@ -2,6 +2,7 @@ import { readFileSync, existsSync } from "node:fs";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 import { CliGateway, DryRunGateway, SdkGateway, type CallGateway } from "./calle.ts";
+import { isLoopbackBind } from "./access.ts";
 import { DRY_RUN_CHANNEL_SECRET } from "./channel.ts";
 import { DRY_RUN_WEBHOOK_SECRET } from "./events.ts";
 
@@ -78,4 +79,24 @@ export function liveAttestationError(live: boolean, env = process.env): string |
   if (!live) return null;
   if (env.LIVE_DEMO_PHONE_CONSENT?.trim().toLowerCase() === "yes") return null;
   return "Live mode needs LIVE_DEMO_PHONE_CONSENT=yes: confirm the owner of LIVE_DEMO_PHONE agreed to receive these test calls.";
+}
+
+/**
+ * Where the desk pushes request updates for the passenger's channel. The body carries the
+ * passenger's booking, so it must be HTTPS unless the channel runs on this machine.
+ */
+export function channelNotifyUrlFromEnv(env = process.env): string | null {
+  const raw = env.CHANNEL_NOTIFY_URL?.trim();
+  if (!raw) return null;
+  let url: URL;
+  try {
+    url = new URL(raw);
+  } catch {
+    throw new Error(`CHANNEL_NOTIFY_URL is not a valid URL: "${raw}".`);
+  }
+  const loopback = isLoopbackBind(url.hostname) || url.hostname === "[::1]";
+  if (url.protocol !== "https:" && !(url.protocol === "http:" && loopback)) {
+    throw new Error("CHANNEL_NOTIFY_URL must use https (plain http only to this machine).");
+  }
+  return url.toString();
 }

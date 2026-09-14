@@ -534,7 +534,8 @@ function renderRequestDetail() {
     <dl class="kv" style="margin-top:8px">
       <dt>Flight</dt><dd>${esc(r.flight.code)} · ${dayMonth(r.flight.departure)} ${hhmm(r.flight.departure)}</dd>
       <dt>Sold via</dt><dd>${r.channel.map((p) => esc(p.name)).join(" → ")}</dd>
-      <dt>Request</dt><dd>${esc(r.request.kind)} via ${esc(r.request.channel.replace("_", " "))}</dd>
+      <dt>Request</dt><dd>${esc(r.request.kind)} via ${esc(r.request.channel.replace("_", " "))}${r.request.conversation ? ` <span class="muted">(from the channel integration, conversation <span class="mono">${esc(r.request.conversation.id)}</span>)</span>` : " <span class=\"muted\">(typed by the operator)</span>"}</dd>
+      ${r.confirmedBy ? `<dt>Confirmed by</dt><dd>${r.confirmedBy.kind === "passenger" ? `the passenger in the ${esc(r.confirmedBy.channel.replace("_", " "))} <span class="mono muted">${esc(r.confirmedBy.messageId)}</span>` : "the operator"}</dd>` : ""}
       <dt>Booking</dt><dd>${esc(r.bookingState.status.replaceAll("_", " "))}${r.bookingState.currentPnr !== r.request.pnr ? ` · new code <b class="mono">${esc(r.bookingState.currentPnr)}</b>` : ""}</dd>
     </dl></div>`);
   parts.push(`<ol class="steps">${requestSteps(r).join("")}</ol>`);
@@ -549,7 +550,9 @@ function renderRequestDetail() {
   if (r.status === "quoted") {
     const amountId = `req-amount-${id}`;
     parts.push(`<div class="callbox"><h3>Passenger's answer</h3>
-      <p class="note">Send the quote through the ${esc(r.request.channel.replace("_", " "))}. When the passenger says yes, type the amount they agreed to.</p>
+      <p class="note">${r.request.conversation
+        ? `The quote was sent to the passenger's ${esc(r.request.channel.replace("_", " "))}. Their YES there confirms it automatically; only type the amount if they confirmed some other way.`
+        : `Send the quote through the ${esc(r.request.channel.replace("_", " "))}. When the passenger says yes, type the amount they agreed to.`}</p>
       <div class="row-inline"><label for="${esc(amountId)}" class="note">Confirmed amount (IDR)</label>
         <input id="${esc(amountId)}" class="wide" inputmode="numeric" autocomplete="off" value="${esc(draft[amountId] ?? "")}">
         <button type="button" class="btn" data-req-confirm="${esc(id)}">Confirm and submit</button>
@@ -562,6 +565,12 @@ function renderRequestDetail() {
   }
   if (r.airlineCall) parts.push(renderAirlineCall(r));
   if (r.applied && (r.status === "completed" || r.status === "resolved_by_human")) parts.push(`<p class="applied">${esc(r.applied)}</p>`);
+  if (r.channelUpdates?.length) {
+    const deliveryChip = { sent: "ok", sending: "run", failed: "bad", not_configured: "" };
+    parts.push(`<details><summary>Updates sent to the passenger's ${esc(r.request.channel.replace("_", " "))} (${r.channelUpdates.length})</summary><div class="transcript" style="padding:10px 12px">${r.channelUpdates
+      .map((u) => `<div class="turn"><span class="spk">${hhmm(u.at)}</span><span><span class="chip ${deliveryChip[u.delivery] ?? ""}">${esc(u.delivery.replace("_", " "))}</span> ${esc(u.reply)}${u.error ? ` <span class="note bad">${esc(u.error)}</span>` : ""}</span></div>`)
+      .join("")}</div></details>`);
+  }
   if (r.status === "needs_review") {
     parts.push(`<ul class="reasons">${r.reviewReasons.map((x) => `<li>${esc(x)}</li>`).join("")}</ul>`);
     const ids = { apply: `req-apply-${id}`, pnr: `req-newpnr-${id}`, ticket: `req-ticket-${id}`, note: `req-note-${id}` };

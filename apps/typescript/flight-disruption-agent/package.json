@@ -14,6 +14,7 @@
     "send-event": "node --import tsx src/send-event.ts",
     "fake-feed": "node --import tsx src/fake-feed.ts",
     "send-channel": "node --import tsx src/send-channel.ts",
+    "fake-channel": "node --import tsx src/fake-channel.ts",
     "check": "tsc --noEmit",
     "test": "node --import tsx --test test/*.test.ts"
   },

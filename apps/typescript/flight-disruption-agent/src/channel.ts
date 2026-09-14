@@ -116,3 +116,38 @@ export function replyFor(catalog: Catalog, entry: RequestEntry): string {
       return `Your request for booking ${pnr} is being handled.`;
   }
 }
+
+/** Status update pushed back to the channel after the first reply, e.g. once the airline desk answers. */
+export interface ChannelUpdatePayload {
+  type: "request.updated";
+  request_id: string;
+  channel: RequestChannel;
+  conversation_id: string;
+  status: RequestEntry["status"];
+  reply: string;
+}
+
+export type ChannelNotifier = (payload: ChannelUpdatePayload) => Promise<void>;
+
+/**
+ * Posts updates to CHANNEL_NOTIFY_URL, signed with the channel secret so the channel can
+ * trust them. The body names the passenger's booking, so it only travels over HTTPS or to this machine.
+ */
+export function httpChannelNotifier(url: string, secret: string, sign: (secret: string, body: string, t: number) => string): ChannelNotifier {
+  return async (payload) => {
+    const body = JSON.stringify(payload);
+    const controller = new AbortController();
+    const timeout = setTimeout(() => controller.abort(), 5_000);
+    try {
+      const res = await fetch(url, {
+        method: "POST",
+        headers: { "content-type": "application/json", [CHANNEL_SIGNATURE_HEADER]: sign(secret, body, Math.floor(Date.now() / 1000)) },
+        body,
+        signal: controller.signal,
+      });
+      if (!res.ok) throw new Error(`Channel returned HTTP ${res.status}.`);
+    } finally {
+      clearTimeout(timeout);
+    }
+  };
+}
