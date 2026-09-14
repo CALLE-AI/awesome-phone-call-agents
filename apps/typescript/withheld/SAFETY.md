@@ -21,9 +21,9 @@ agreed.
 - It never dials a number that is not `errand.callee.phone`.
 - `preview` shows the complete generated script and every gate result **before**
   anything can dial, so intent can be checked against what will actually be said.
-- Real calls require both `CALLE_API_KEY` *and* an explicit `--real` flag. Either
-  one missing means fixture replay. There is no configuration setting that makes
-  dialing the default.
+- Real calls require both a CALL-E credential (`CALLE_API_KEY`, or a logged-in
+  `calle` CLI) *and* an explicit `--real` flag. Either one missing means fixture
+  replay. There is no configuration setting that makes dialing the default.
 
 `src/core/errand.ts`, `src/core/script.ts`, `scripts/withheld.ts`
 
@@ -190,14 +190,22 @@ possible.
 
 ## 10. Credentials
 
+Two surfaces, two credentials; both are treated the same way.
+
 - `CALLE_API_KEY` is read from the environment, used server-side only.
-- It is never logged, never written to disk, and never sent to the browser.
+- The `calle` CLI's OAuth token is held by the CLI in its own cache. Withheld
+  never reads it, never copies it, and never passes it as an argument — it only
+  asks the CLI whether the login is `usable`.
+- Neither is ever logged, written to disk by this app, or sent to the browser.
 - No `.env` file is committed, and none is required.
 - The tests, the CLI in replay mode, and the console all run with no credential
   at all.
-- The base URL is pinned to `https://api.heycall-e.com` or a loopback simulator.
-  Anything else throws before the key is used, because a mistyped
+- The SDK base URL is pinned to `https://api.heycall-e.com` or a loopback
+  simulator. Anything else throws before the key is used, because a mistyped
   `CALLE_BASE_URL` is otherwise a silent credential leak.
+- The CLI binary is resolved explicitly, skipping `node_modules` on `PATH`,
+  because the SDK package installs a different binary under the same name.
+  `CALLE_CLI_BIN` overrides the choice.
 
 `CalleProvider` and `approvedBaseUrl` in `src/core/calle.ts`
 
@@ -207,13 +215,25 @@ possible.
 
 Every command except `run --real` replays recorded transcripts. The full test
 suite, the whole CLI, and the entire console run with no API key, no network,
-and no calls.
+and no calls. The CLI provider takes an injectable runner, so no test can shell
+out to the real `calle` binary even by accident.
 
 `run --real` is the only code path that can make a telephone ring. It:
 
-1. refuses to construct a provider without `CALLE_API_KEY`;
+1. refuses to construct a provider without a usable credential — `CALLE_API_KEY`
+   for `--via=sdk`, or a `calle auth status` reporting `usable: true` for
+   `--via=cli`. A pending or expired login is a refusal, not a retry;
 2. requires the literal `--real` flag;
-3. prints the callee's name and waits three seconds first.
+3. prints the callee's name and the surface it will dial through, then waits
+   three seconds first.
+
+### Re-dialling is not a safe default
+
+The CLI has no idempotency key, so a failed submission is genuinely ambiguous:
+the call may or may not already be placed. When the CLI reports
+`call_started: "unknown"` with `retry_safe: false`, Withheld stops and hands off
+to a human rather than resubmitting. The cost of stopping is a delayed errand;
+the cost of guessing is phoning a real person twice.
 
 ---
 

@@ -16,7 +16,9 @@ any reason, the answer is no; that is the entire product.
 ## House rules
 
 - **Fixture replay is the default.** Every test and every CLI command except
-  `run --real` must work with no API key and place no calls.
+  `run --real` must work with no credential and place no calls. The CLI provider
+  takes an injectable runner for exactly this reason — never let a test reach
+  the real `calle` binary.
 - **Nothing trusts the provider.** CALL-E's `structuredResult`, `taskCompleted`
   and `completionConfidence` are recorded, never used to decide anything. Every
   answer is re-derived from `transcriptTurns` and carries the turn that supports

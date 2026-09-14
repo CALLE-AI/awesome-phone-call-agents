@@ -3,7 +3,8 @@
  * Withheld CLI.
  *
  * Every command defaults to something that places no call. `--real` is the only
- * path to a phone ringing, and it refuses to run without CALLE_API_KEY.
+ * path to a phone ringing, and it refuses to run without a CALL-E credential —
+ * either CALLE_API_KEY for the developer API, or a logged-in `calle` CLI.
  */
 
 import { readFileSync } from 'node:fs';
@@ -13,6 +14,7 @@ import { loadErrand } from '../src/core/errand';
 import { buildScript, formatWindow } from '../src/core/script';
 import { runChain } from '../src/core/chain';
 import { CalleProvider, FixtureProvider } from '../src/core/calle';
+import { CalleCliProvider } from '../src/core/calle-cli';
 import type { CallProvider } from '../src/core/calle';
 import type { ChainState } from '../src/core/chain';
 import type { LegResult } from '../src/core/types';
@@ -40,8 +42,11 @@ ${c.bold('withheld')} — never accept a callback
       Run the errand chain against recorded transcripts. Places no call.
       Available fixtures: ${FixtureProvider.available(FIXTURES).join(', ')}
 
-  ${c.cyan('run')}     <errand.json> --real
-      Place real calls through CALL-E. Requires CALLE_API_KEY.
+  ${c.cyan('run')}     <errand.json> --real [--via=sdk|cli]
+      Place real calls through CALL-E.
+      --via=sdk  developer API, needs CALLE_API_KEY
+      --via=cli  the \`calle\` CLI you logged into, needs no key
+      Default: sdk if CALLE_API_KEY is set, otherwise cli.
 
   ${c.cyan('fixtures')}
       List the recorded transcripts and what each one is for.
@@ -146,6 +151,45 @@ function printChain(state: ChainState): void {
   console.log('');
 }
 
+/**
+ * Pick the live provider.
+ *
+ * CALL-E has two surfaces with two different credentials, and which one a
+ * person holds depends on how they installed it. The published installation
+ * guide ends at `calle auth login`, which authorises the CLI and produces no
+ * API key — so defaulting to the SDK would leave most people unable to place a
+ * call at all. Whichever credential is present wins; `--via` forces the choice.
+ */
+async function liveProvider(rest: string[]): Promise<CallProvider> {
+  const viaArg = rest.find((a) => a.startsWith('--via='));
+  const via = viaArg?.slice('--via='.length);
+  const apiKey = process.env.CALLE_API_KEY ?? '';
+
+  if (via && via !== 'sdk' && via !== 'cli') {
+    console.error(`\n  Unknown --via=${via}. Use --via=sdk or --via=cli.\n`);
+    process.exit(2);
+  }
+
+  if (via === 'sdk' || (!via && apiKey)) {
+    if (!apiKey) {
+      console.error(
+        '\n  --via=sdk needs CALLE_API_KEY. Leave it unset to use the CLI login instead.\n',
+      );
+      process.exit(2);
+    }
+    return new CalleProvider({ apiKey });
+  }
+
+  const provider = new CalleCliProvider();
+  try {
+    await provider.ensureAuthenticated();
+  } catch (error) {
+    console.error(`\n  ${(error as Error).message}\n`);
+    process.exit(2);
+  }
+  return provider;
+}
+
 async function main(): Promise<void> {
   const [command, ...rest] = process.argv.slice(2);
   if (!command) usage();
@@ -200,10 +244,11 @@ async function main(): Promise<void> {
   let provider: CallProvider;
 
   if (command === 'run' && real) {
-    const apiKey = process.env.CALLE_API_KEY ?? '';
-    provider = new CalleProvider({ apiKey });
+    provider = await liveProvider(rest);
     console.log(
-      `\n  ${c.red('REAL CALLS')} — dialing ${errand.callee.name}. Ctrl-C now if that is not what you meant.`,
+      `\n  ${c.red('REAL CALLS')} — dialing ${errand.callee.name} via ${c.bold(
+        provider.name,
+      )}. Ctrl-C now if that is not what you meant.`,
     );
     await new Promise((r) => setTimeout(r, 3000));
   } else {

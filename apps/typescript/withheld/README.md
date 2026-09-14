@@ -87,7 +87,7 @@ and never appears unmasked in any report.
 
 ```bash
 npm install
-npm test          # 87 tests. No API key, no network, no calls.
+npm test          # 123 tests. No API key, no network, no calls.
 npm run dev       # the console at http://localhost:3000
 ```
 
@@ -110,17 +110,36 @@ npm run withheld -- replay data/errands/clinic-referral.json --legs=number-deman
 # List the recorded calls and what each one stages.
 npm run withheld -- fixtures
 
-# Place real calls. Requires CALLE_API_KEY and the explicit flag.
+# Place real calls. Requires a CALL-E credential and the explicit flag.
 CALLE_API_KEY=sk_... npm run withheld -- run data/errands/clinic-referral.json --real
+
+# ...or use the `calle` CLI you already logged into, with no API key at all.
+npm run withheld -- run data/errands/clinic-referral.json --real --via=cli
 ```
 
 `run --real` is the only command that can make a telephone ring. It refuses to
-start without `CALLE_API_KEY`, prints the callee's name, and waits three seconds
-so you can stop it.
+start without a usable credential, prints the callee's name and which surface it
+will dial through, and waits three seconds so you can stop it.
 
 ---
 
 ## How CALL-E is used
+
+CALL-E ships two surfaces, and which one you can use depends on how you
+installed it. Withheld supports both, because the published installation guide
+ends at `calle auth login` and never produces an API key — so an SDK-only
+integration would be unreachable for most people following the official path.
+
+| Surface | Package | Endpoint | Credential | Flag |
+| --- | --- | --- | --- | --- |
+| Developer API | `@call-e/calle` `0.7.0` | `api.heycall-e.com` | `CALLE_API_KEY` | `--via=sdk` |
+| MCP CLI | `@call-e/cli` | `seleven-mcp-sg.airudder.com` | brokered OAuth | `--via=cli` |
+
+Default: `sdk` when `CALLE_API_KEY` is set, otherwise `cli`. Both go through one
+`CallProvider` interface, so the chain logic below is identical either way — and
+so every gate is enforced regardless of which surface placed the call.
+
+### The SDK path
 
 Withheld uses the official TypeScript SDK, [`@call-e/calle`](https://www.npmjs.com/package/@call-e/calle) `0.7.0`.
 
@@ -158,6 +177,37 @@ call-level "nobody picked up", because one call task can hold several recipients
 and several attempts. A `completed` task in which the callee never spoke is
 reported as a no-answer rather than as a call where nothing was agreed, because
 those are not the same thing and the second one quietly becomes *"they said no"*.
+
+### The CLI path
+
+`--via=cli` shells out to the `calle` binary with `execFile` and an argument
+array — never a shell, because the goal text is assembled from an errand file
+and a stray backtick in a clinic's name would otherwise be command execution.
+It starts a run, then polls `calle call status` every ten seconds until the
+status is terminal.
+
+The CLI gives less than the SDK does, and each gap is closed by giving up
+capability rather than by guessing:
+
+- **The transcript arrives as one string, not labelled turns.** The parser
+  attributes a line only when it carries a speaker label it recognises. Anything
+  else becomes an `unknown` turn, and — deliberately — an unlabelled line is
+  *not* appended to the previous speaker. The two ways of being wrong are not
+  symmetric: wrongly crediting the callee could confirm a booking nobody
+  offered. Unknown turns are still scanned for the number.
+- **There is no `recipientResultSchema`.** So there are no provider claims at
+  all on this path. It costs nothing, because Withheld never trusted them.
+- **There is no idempotency key.** When the CLI reports `retry_safe: false`, a
+  submission may already be in flight, so Withheld stops rather than retrying.
+  Re-dialling a person to be safe is not safe.
+
+> **A name collision worth knowing about.** Both `@call-e/cli` and the SDK
+> `@call-e/calle` install a binary called `calle`, and they are not
+> interchangeable. With the SDK as a project dependency, `node_modules/.bin`
+> shadows the real CLI and every command fails with `Unknown command: auth`,
+> which reads like a broken install. Withheld resolves the binary itself and
+> skips `node_modules` on `PATH`; `CALLE_CLI_BIN` overrides it. This is
+> reported in the feedback survey.
 
 ---
 
@@ -246,7 +296,8 @@ src/core/
   script.ts       script generation, and the gate that can refuse to dial
   leg.ts          one call → one verdict
   chain.ts        multi-leg errands and scheduled intents
-  calle.ts        FixtureProvider (default) and CalleProvider (behind --real)
+  calle.ts        FixtureProvider (default) and CalleProvider (SDK, --via=sdk)
+  calle-cli.ts    CalleCliProvider (the `calle` CLI, --via=cli)
 src/app/          the console; the server/client boundary the number cannot cross
 scripts/          the CLI
 fixtures/legs/    eight recorded calls, doubling as test vectors
