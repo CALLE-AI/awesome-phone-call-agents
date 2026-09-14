@@ -1,4 +1,6 @@
-import { execFile } from "node:child_process";
+import { execFile, execFileSync } from "node:child_process";
+import { existsSync } from "node:fs";
+import { join } from "node:path";
 import {
   CalleAPIError,
   CalleClient,
@@ -543,21 +545,100 @@ export class SdkGateway implements CallGateway {
 
 const CLI_TERMINAL_FAILED = new Set(["FAILED", "NO_ANSWER", "NO ANSWER", "DECLINED", "VOICEMAIL", "BUSY", "EXPIRED"]);
 
-function runCli(bin: string, args: string[], timeoutMs: number): Promise<Record<string, unknown>> {
+/**
+ * The CALL-E CLI (`@call-e/cli`). The SDK this app depends on also installs a `calle`
+ * command, and `npm run` puts it first on PATH, so the MCP CLI is located explicitly:
+ * CALLE_CLI if set, else the global @call-e/cli install, else `calle` on PATH.
+ */
+export function resolveCalleCli(configured?: string): string[] {
+  if (configured) return configured.endsWith(".js") ? [process.execPath, configured] : [configured];
+  try {
+    const root = execFileSync("npm", ["root", "-g"], { encoding: "utf8", stdio: ["ignore", "pipe", "ignore"] }).trim();
+    const entry = join(root, "@call-e", "cli", "bin", "calle.js");
+    if (existsSync(entry)) return [process.execPath, entry];
+  } catch {
+    // fall through to PATH
+  }
+  return ["calle"];
+}
+
+function runCli(command: string[], args: string[], timeoutMs: number): Promise<Record<string, unknown>> {
+  const [bin, ...prefix] = command;
   return new Promise((resolve, reject) => {
-    execFile(bin, args, { timeout: timeoutMs, maxBuffer: 4 * 1024 * 1024 }, (error, stdout) => {
+    execFile(bin as string, [...prefix, ...args], { timeout: timeoutMs, maxBuffer: 4 * 1024 * 1024 }, (error, stdout, stderr) => {
       const start = stdout.indexOf("{");
       if (start === -1) {
-        reject(error ?? new Error("calle CLI returned no JSON"));
+        // Report what the CLI said, not the whole command line (it contains the call task).
+        const said = String(stderr || "").trim().split("\n").pop();
+        reject(new Error(said || (error?.killed ? "calle CLI timed out" : "calle CLI returned no JSON")));
         return;
       }
-      try {
-        resolve(JSON.parse(stdout.slice(start)) as Record<string, unknown>);
-      } catch {
-        reject(error ?? new Error("calle CLI returned invalid JSON"));
-      }
+      const parsed = firstJsonObject(stdout.slice(start));
+      if (parsed) resolve(parsed);
+      else reject(error ?? new Error("calle CLI returned invalid JSON"));
     });
   });
+}
+
+/** The first complete JSON object in the text; the CLI may print a plain-text line after it. */
+function firstJsonObject(text: string): Record<string, unknown> | null {
+  for (let end = text.lastIndexOf("}"); end > 0; end = text.lastIndexOf("}", end - 1)) {
+    try {
+      return JSON.parse(text.slice(0, end + 1)) as Record<string, unknown>;
+    } catch {
+      // keep trimming
+    }
+  }
+  return null;
+}
+
+// ---------------------------------------------------------------- plan check (no call)
+
+export interface PlanCheck {
+  ready: boolean;
+  questions: string[];
+  /** CALL-E's own restatement of the call goal, with its success and failure criteria. */
+  goal: string | null;
+}
+
+/** Asks CALL-E to plan a call without running it. Never dials. */
+export interface Planner {
+  plan(input: { phone: string; region: string; task: string }): Promise<PlanCheck>;
+}
+
+/**
+ * Uses the local `calle` CLI and its browser login to call CALL-E's `plan_call` tool.
+ * Planning never places a call; the confirmation token CALL-E returns is dropped here,
+ * so this plan can never be run from the desk.
+ */
+export class CliPlanner implements Planner {
+  private readonly bin: string[];
+  constructor(configured?: string) {
+    this.bin = resolveCalleCli(configured);
+  }
+
+  async plan(input: { phone: string; region: string; task: string }): Promise<PlanCheck> {
+    const out = await runCli(
+      this.bin,
+      ["call", "plan", "--to-phone", input.phone, "--goal", input.task, "--region", input.region, "--language", "English"],
+      200_000,
+    );
+    if (out.ok === false) {
+      const err = (out.error ?? {}) as Record<string, unknown>;
+      if (err.code === "plan_not_ready") {
+        return { ready: false, questions: [String(err.message ?? "CALL-E needs more information.")], goal: null };
+      }
+      if (err.code === "auth_required") throw new Error("CALL-E login required: run `calle auth login`, then try again.");
+      throw new Error(String(err.message ?? "CALL-E could not plan this call."));
+    }
+    const result = (out.result ?? {}) as Record<string, unknown>;
+    const sc = (result.structuredContent ?? {}) as Record<string, unknown>;
+    return {
+      ready: sc.ready_to_run === true,
+      questions: Array.isArray(sc.clarifying_questions) ? sc.clarifying_questions.map(String) : [],
+      goal: typeof sc.display_goal === "string" ? sc.display_goal : null,
+    };
+  }
 }
 
 function choiceHint(text: string): string | undefined {
@@ -578,7 +659,10 @@ export class CliGateway implements CallGateway {
   readonly firstPollSeconds = 60;
   readonly pollSeconds = 10;
 
-  constructor(private readonly bin = "calle") {}
+  private readonly bin: string[];
+  constructor(configured?: string) {
+    this.bin = resolveCalleCli(configured);
+  }
 
   async start(request: StartRequest): Promise<StartResult> {
     let out: Record<string, unknown>;

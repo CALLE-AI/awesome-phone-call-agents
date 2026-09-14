@@ -409,6 +409,7 @@ function renderCallBox(d, b, key, entry) {
     ${blocked ? `<p class="note bad">${esc(blocked)}</p>` : ""}
     ${p ? `<details><summary>What CALL-E will be told</summary><pre>${esc(p.task)}</pre></details>
     <details><summary>Result schema CALL-E fills in after the call</summary><pre>${esc(JSON.stringify(p.resultSchema, null, 2))}</pre></details>` : ""}
+    ${planCheckHtml({ kind: "passenger", disruptionId: d.id, pnr: b.pnr }, `passenger:${key}`)}
     ${
       live
         ? `<div class="row-inline"><label for="${esc(last4Id)}">Type the last 4 digits of the destination to confirm</label>
@@ -489,6 +490,46 @@ async function ensurePreview(disruptionId, pnr, key) {
 }
 
 
+
+
+// ------------------------------------------------------------------ check with CALL-E (plan only)
+
+const planResults = new Map(); // key -> "loading" | { error } | plan result
+
+/** Sends this call's exact task to CALL-E's planner. CALL-E plans it; nothing is dialed. */
+function planCheckHtml(target, key) {
+  if (!snap.planCheck?.available) return "";
+  const r = planResults.get(key);
+  let out = "";
+  if (r === "loading") out = `<p class="note">Asking CALL-E's planner. This takes about 15 seconds; nothing is dialed.</p>`;
+  else if (r?.error) out = `<p class="note bad">${esc(r.error)}</p>`;
+  else if (r) {
+    out = `<p class="plan-verdict">${r.ready ? '<span class="chip ok">CALL-E: ready to run</span>' : '<span class="chip warn">CALL-E needs changes</span>'}
+      <span class="note">Planned for ${esc(r.destinationMasked)} (${esc(r.region)}). Not dialed.</span></p>
+      ${r.questions.length ? `<ul class="reasons">${r.questions.map((q) => `<li>${esc(q)}</li>`).join("")}</ul>` : ""}
+      ${r.goal ? `<details><summary>CALL-E's plan for this call</summary><pre>${esc(r.goal)}</pre></details>` : ""}`;
+  }
+  return `<div class="plan-check">
+    <div class="row-inline"><button type="button" class="btn ghost" data-plan="${esc(JSON.stringify(target))}" data-plan-key="${esc(key)}" ${r === "loading" || !snap.planCheck.phoneMasked ? "disabled" : ""}>Check with CALL-E (no call)</button>
+      <span class="note">${snap.planCheck.phoneMasked ? "Sends this exact task to CALL-E's planner using your CALL-E login." : "Set CALLE_PLAN_PHONE to your own number to check with CALL-E."}</span></div>
+    ${out}</div>`;
+}
+
+document.addEventListener("click", async (e) => {
+  const btn = e.target.closest("[data-plan]");
+  if (!btn) return;
+  const key = btn.dataset.planKey;
+  const target = JSON.parse(btn.dataset.plan);
+  planResults.set(key, "loading");
+  render();
+  try {
+    planResults.set(key, await api("/api/calle/plan", target));
+    showToast("CALL-E planned the call. Nothing was dialed.");
+  } catch (err) {
+    planResults.set(key, { error: err.message });
+  }
+  render();
+});
 
 // ------------------------------------------------------------------ call pop-up
 
@@ -814,6 +855,7 @@ function renderPassengerCallBox(r) {
     ${blocked ? `<p class="note bad">${esc(blocked)}</p>` : ""}
     ${p ? `<details><summary>What CALL-E will be told</summary><pre>${esc(p.task)}</pre></details>
     <details><summary>Result schema</summary><pre>${esc(JSON.stringify(p.resultSchema, null, 2))}</pre></details>` : ""}
+    ${planCheckHtml({ kind: "intake", id }, `intake:${id}`)}
     ${live
       ? `<div class="row-inline"><label for="${esc(last4Id)}">Type the last 4 digits of the destination to confirm</label>
           <input id="${esc(last4Id)}" inputmode="numeric" maxlength="4" autocomplete="off" value="${esc(draft[last4Id] ?? "")}">
@@ -917,6 +959,7 @@ function renderAirlineCallBox(r) {
     ${blocked ? `<p class="note bad">${esc(blocked)}</p>` : ""}
     ${p ? `<details><summary>What CALL-E will be told</summary><pre>${esc(p.task)}</pre></details>
     <details><summary>Result schema</summary><pre>${esc(JSON.stringify(p.resultSchema, null, 2))}</pre></details>` : ""}
+    ${planCheckHtml({ kind: "airline", id }, `airline:${id}`)}
     ${live
       ? `<div class="row-inline"><label for="${esc(last4Id)}">Type the last 4 digits of the destination to confirm</label>
           <input id="${esc(last4Id)}" inputmode="numeric" maxlength="4" autocomplete="off" value="${esc(draft[last4Id] ?? "")}">

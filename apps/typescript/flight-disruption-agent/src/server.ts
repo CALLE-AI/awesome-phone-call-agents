@@ -2,6 +2,7 @@ import { createServer, type IncomingMessage, type ServerResponse } from "node:ht
 import { readFile } from "node:fs/promises";
 import { extname, join, normalize } from "node:path";
 import { checkAccess, isLoopbackBind } from "./access.ts";
+import { CliPlanner } from "./calle.ts";
 import { CHANNEL_SIGNATURE_HEADER, ChannelMessageError, httpChannelNotifier, parseChannelMessage } from "./channel.ts";
 import {
   APP_ROOT,
@@ -36,6 +37,9 @@ const desk = new Desk(catalog, gateway, {
   channelNotifier:
     channelNotifyUrl && channelWebhook.secret ? httpChannelNotifier(channelNotifyUrl, channelWebhook.secret, signPayload) : undefined,
   demoNow: demoClock.now,
+  // "Check with CALL-E": plans a call with CALL-E through the local calle CLI login. Never dials.
+  planner: process.env.CALLE_PLAN_CHECK?.trim() === "off" ? undefined : new CliPlanner(process.env.CALLE_CLI?.trim() || undefined),
+  planPhone: process.env.CALLE_PLAN_PHONE?.trim() || process.env.LIVE_DEMO_PHONE?.trim() || undefined,
   // Live runs persist call ids so polling can resume after a restart. Dry runs start fresh.
   statePath: gateway.live ? join(APP_ROOT, ".data", `state-${gateway.mode}.json`) : null,
   liveDemoPhone: process.env.LIVE_DEMO_PHONE?.trim() || undefined,
@@ -190,6 +194,18 @@ async function api(req: IncomingMessage, res: ServerResponse, path: string): Pro
     const target = typeof body.targetFlightId === "string" && body.targetFlightId ? body.targetFlightId : null;
     const entry = desk.submitRequest(str(body, "pnr"), str(body, "kind") as RequestKind, target, str(body, "channel") as RequestChannel);
     return send(res, 201, entry);
+  }
+  if (req.method === "POST" && path === "/api/calle/plan") {
+    const body = await readJson(req);
+    const kind = str(body, "kind");
+    const target =
+      kind === "passenger"
+        ? { kind: "passenger" as const, disruptionId: str(body, "disruptionId"), pnr: str(body, "pnr") }
+        : kind === "intake" || kind === "airline"
+          ? { kind: kind as "intake" | "airline", id: str(body, "id") }
+          : null;
+    if (!target) throw new DeskError('kind must be "passenger", "intake", or "airline".');
+    return send(res, 200, await desk.checkWithCalle(target));
   }
   if (req.method === "POST" && path === "/api/requests/passenger/preview") {
     const body = await readJson(req);

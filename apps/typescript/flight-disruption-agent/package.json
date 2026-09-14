@@ -11,6 +11,7 @@
     "start": "node --import tsx src/server.ts",
     "demo": "node --import tsx src/demo.ts",
     "demo:requests": "node --import tsx src/demo-requests.ts",
+    "calle-plan": "node --import tsx src/calle-plan.ts",
     "send-event": "node --import tsx src/send-event.ts",
     "fake-feed": "node --import tsx src/fake-feed.ts",
     "send-channel": "node --import tsx src/send-channel.ts",

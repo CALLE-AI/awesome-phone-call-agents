@@ -28,7 +28,7 @@ export function gatewayFromEnv(env = process.env): CallGateway {
     if (!key) throw new Error("CALLE_MODE=sdk needs CALLE_API_KEY (dashboard.heycall-e.com/account/api-keys).");
     return new SdkGateway(key);
   }
-  if (mode === "cli") return new CliGateway(env.CALLE_CLI?.trim() || "calle");
+  if (mode === "cli") return new CliGateway(env.CALLE_CLI?.trim() || undefined);
   throw new Error(`Unknown CALLE_MODE "${mode}". Use dry-run, sdk, or cli.`);
 }
 

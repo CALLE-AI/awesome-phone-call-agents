@@ -232,6 +232,10 @@ blockquote { margin: 0; padding: 8px 12px; border-left: 4px solid var(--yellow-2
 .steps li.stop { color: var(--bad); }
 .steps li.todo { color: var(--muted); }
 
+.plan-check { border-top: 1.5px dashed var(--line); padding-top: 10px; display: grid; gap: 8px; }
+.plan-check .row-inline { display: flex; gap: 10px; flex-wrap: wrap; align-items: center; }
+.plan-verdict { display: flex; gap: 10px; flex-wrap: wrap; align-items: center; }
+
 /* ---------------------------------------------------------------- call pop-up */
 .call-backdrop {
   position: fixed; inset: 0; z-index: 50; display: grid; place-items: center; padding: 20px;

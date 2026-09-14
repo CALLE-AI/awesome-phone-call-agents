@@ -1,7 +1,7 @@
 import { randomBytes, randomInt } from "node:crypto";
 import { existsSync, mkdirSync, readFileSync, renameSync, writeFileSync } from "node:fs";
 import { dirname } from "node:path";
-import type { CallGateway } from "./calle.ts";
+import type { CallGateway, PlanCheck, Planner } from "./calle.ts";
 import { findBooking, findFlight, type Catalog } from "./data.ts";
 import {
   airlineRefundAmount,
@@ -52,6 +52,10 @@ export interface DeskOptions {
   liveDemoPhone?: string;
   liveCallBudget: number;
   now?: () => number;
+  /** Asks CALL-E to plan a call without running it (the "Check with CALL-E" button). */
+  planner?: Planner;
+  /** The number plan checks name. Planning never dials it. */
+  planPhone?: string;
   /** Clock for passenger request cutoffs only. Defaults to `now`. */
   demoNow?: () => number;
   /** Pushes later request updates to the passenger's channel. Without it, updates are only recorded. */
@@ -1164,6 +1168,44 @@ export class Desk {
     return entry;
   }
 
+  // ------------------------------------------------------------ CALL-E plan check (no call)
+
+  /**
+   * Sends the exact task a call would use to CALL-E's planner and returns its verdict.
+   * Works in every mode, including dry run; it never dials and changes nothing.
+   */
+  async checkWithCalle(
+    target: { kind: "passenger"; disruptionId: string; pnr: string } | { kind: "intake" | "airline"; id: string },
+  ): Promise<PlanCheck & { destinationMasked: string; region: string }> {
+    const planner = this.options.planner;
+    if (!planner) throw new DeskError("Checking with CALL-E is turned off (CALLE_PLAN_CHECK=off).", 503);
+    const phone = this.options.planPhone;
+    if (!phone) {
+      throw new DeskError("Set CALLE_PLAN_PHONE to your own number in a CALL-E supported region, then restart. Planning never dials it.");
+    }
+    const route = routeFor(phone);
+    if (!route.ok) throw new DeskError(route.reason);
+    const task =
+      target.kind === "passenger"
+        ? this.preview(target.disruptionId, target.pnr).task
+        : target.kind === "intake"
+          ? this.previewPassengerCall(target.id).task
+          : this.previewAirlineCall(target.id).task;
+    let plan: PlanCheck;
+    try {
+      plan = await planner.plan({ phone, region: route.region, task });
+    } catch (error) {
+      throw new DeskError(redactText(error instanceof Error ? error.message : String(error)), 502);
+    }
+    return {
+      ready: plan.ready,
+      questions: plan.questions.map((q) => redactText(q)),
+      goal: redactText(plan.goal),
+      destinationMasked: maskPhone(phone),
+      region: route.region,
+    };
+  }
+
   // ------------------------------------------------------------ fake GDS
 
   private apply(entry: LedgerEntry, action: Action): string {
@@ -1221,6 +1263,10 @@ export class Desk {
       liveDemoPhone: this.options.liveDemoPhone && this.gateway.live ? maskPhone(this.options.liveDemoPhone) : null,
       liveBudget: { used: this.state.liveCallsUsed, limit: this.options.liveCallBudget },
       demoNow: this.options.demoNow ? new Date(this.options.demoNow()).toISOString() : null,
+      planCheck: {
+        available: Boolean(this.options.planner),
+        phoneMasked: this.options.planPhone ? maskPhone(this.options.planPhone) : null,
+      },
       opsEvents: Object.values(this.state.opsEvents).sort((a, b) => b.receivedAt.localeCompare(a.receivedAt)),
       polling: { firstSeconds: this.gateway.firstPollSeconds, everySeconds: this.gateway.pollSeconds },
       flights: catalog.flights.map((f) => ({
