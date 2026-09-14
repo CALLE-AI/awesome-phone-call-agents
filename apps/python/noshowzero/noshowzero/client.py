@@ -138,12 +138,9 @@ class CalleClient:
         except httpx.HTTPError as exc:
             raise CalleAPIError(0, "connection_error", type(exc).__name__) from exc
         if not resp.is_success:
-            try:
-                err = resp.json().get("error") or {}
-            except ValueError:
-                err = {}
+            # Provider error bodies can echo credentials or destinations.
             raise CalleAPIError(
-                resp.status_code, err.get("code") or f"http_{resp.status_code}", err.get("message") or ""
+                resp.status_code, f"http_{resp.status_code}", "Provider request failed; response details suppressed"
             )
         return resp.json()
 

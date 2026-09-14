@@ -7,7 +7,8 @@ refill. NoShowZero calls each patient before their visit: a virtual receptionist
 itself as AI confirms the appointment - or captures when the patient would rather come - and returns
 a schema-validated result. When a patient reschedules or cancels, the released slot is offered by
 phone to the first waitlisted patient whose service, preferred times and consent match. If they say
-yes, the slot is booked; if they decline, the next matching patient can be offered it.
+yes, this reference records a provisional booking suggestion for front-desk confirmation;
+it does not itself book, release or remove an appointment or waitlist entry.
 
 This directory is the reusable CALL-E core of the full NoShowZero app (FastAPI + Next.js dashboard,
 Google Calendar sync, APScheduler reminders at 72h / 24h / 2h, Polar.sh billing).
@@ -182,7 +183,9 @@ Waitlist offer (`metadata.kind: waitlist_offer`):
 | `accepted: unknown`, or no `structured_result` | `needs_review` - the cascade stops; nobody else is offered the slot |
 | `failed` or `canceled` | `failed` - offer the next patient |
 
-Decisions are scheduling actions only. The agent gives no medical advice, and no decision is medical.
+The table describes suggested scheduling actions, not completed mutations. A front-desk
+operator must confirm a release, booking or waitlist removal in the scheduling system.
+The agent gives no medical advice, and no decision is medical.
 
 ## Side effects
 

@@ -66,8 +66,8 @@ HOW THE CALL GOES
 2. Remind {first} of the {service} appointment at {time_str} on {date_str} and ask if they can still make it.
 3. If they can: thank them warmly, ask them to arrive about ten minutes early, and end the call.
 4. If they cannot make it: be warm and non-judgmental. Ask which days and times would work better and
-   repeat the preference back. Tell them this slot will be released and the front desk will call to
-   confirm a new time. Do not promise a specific new slot.
+   repeat the preference back. Explain that the front desk must confirm any release or reschedule.
+   Do not say the appointment has changed or promise a specific new slot.
 5. If you reach voicemail: leave one short message that {clinic_name} called about their appointment on
    {date_str} and to call {callback} to confirm or reschedule. Do not mention the service. Then hang up.
 
@@ -101,9 +101,10 @@ HOW THE CALL GOES
    {clinic_name} at {callback}, and end the call.
 2. Share the news: a {service_type} appointment just opened at {time_str} on {date_str}. Ask if they would
    like to take it.
-3. If yes: confirm it is booked for {time_str} on {date_str} and thank them. Do not promise a text or email.
-4. If no: thank them and tell them they stay on the waitlist for the next opening, unless they ask to be
-   removed, in which case confirm that you will take them off.
+3. If yes: record their interest in {time_str} on {date_str} and explain that the offer is provisional
+   until the front desk confirms the booking. Do not say it is booked or promise a text or email.
+4. If no: thank them. If they ask to leave the waitlist, record that request for front-desk review;
+   do not claim the waitlist has already changed.
 5. If you reach voicemail: leave a short message that a slot opened up and to call {callback}, then hang up.
 
 {_RULES}

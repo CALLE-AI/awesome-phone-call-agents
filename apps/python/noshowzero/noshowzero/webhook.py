@@ -27,6 +27,7 @@ from typing import Any, Callable, Iterator
 from fastapi import FastAPI, Header, HTTPException, Request
 
 from noshowzero.client import CalleAPIError, CalleClient
+from noshowzero.phone import mask_all
 from noshowzero.results import TERMINAL, decide
 
 TERMINAL_EVENTS = {"call.completed", "call.failed", "call.result_validation_failed"}
@@ -106,7 +107,8 @@ def _record(decision: dict[str, Any]) -> str | None:
                 decision.get("appointment_id") or decision.get("entry_id"),
                 decision["outcome"],
                 action,
-                json.dumps(decision),
+                json.dumps({key: mask_all(value) if isinstance(value, str) else value
+                            for key, value in decision.items()}),
                 datetime.now(timezone.utc).isoformat(),
             ),
         )

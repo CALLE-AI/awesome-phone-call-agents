@@ -60,7 +60,7 @@ def _print_decision(call: dict, patient: str = "Patient") -> dict:
     for key in ("call_status", "outcome", "appointment_status", "reminder_status", "release_slot",
                 "reschedule_preference", "book", "entry_status", "offer_next"):
         if key in decision and decision[key] not in (None, False):
-            print(f"{key:<22}{decision[key]}")
+            print(f"{key:<22}{mask_all(str(decision[key]))}")
     for key in ("reason", "notes", "summary"):
         if decision.get(key):
             print(f"{key:<22}{mask_all(decision[key])}")
@@ -100,7 +100,7 @@ def _print_request(request: dict, destination: str, authorized: bool, consent: b
     print(f"authorized      {'yes' if authorized else f'NO - not in {ALLOWLIST_ENV}'}")
     print(f"api origin      {base_url}")
     print(f"idempotency_key {request['idempotency_key']}")
-    print(f"webhook_url     {body.get('webhook_url') or '(none - results will be polled)'}")
+    print(f"webhook_url     {'configured (secret URL hidden)' if body.get('webhook_url') else '(none - results will be polled)'}")
     print(RULE)
     print("task")
     print(RULE)
@@ -134,7 +134,7 @@ def main() -> int:
         if decision.get("release_slot"):
             if _candidate(clinic, appointment, waitlist):
                 print(RULE)
-                print("Slot released. Preview the offer:  python cli.py --offer")
+                print("Slot release suggested; confirm with the front desk before previewing: python cli.py --offer")
         return 0
 
     from noshowzero.client import (
@@ -229,7 +229,7 @@ def main() -> int:
     decision = _print_decision(final, patient=record["patient_name"].split()[0])
     if decision.get("release_slot") and _candidate(clinic, appointment, waitlist):
         print(RULE)
-        print("Slot released. Offer it (dials the waitlist patient):  python cli.py --offer --execute --i-have-consent")
+        print("Release suggested. After front-desk confirmation, offer it (places a call): python cli.py --offer --execute --i-have-consent")
     return 0
 
 
