@@ -33,3 +33,4 @@ This skill places real outbound phone calls and must be used with care.
 - Only E.164-formatted phone numbers sourced directly from a genuine customer enquiry are authorized destinations. No other number format or source is permitted.
 - If the qualification data is ambiguous (missing category match, no price found, unclear enquiry text), the skill returns call: false rather than guessing. Ambiguity always resolves to not calling.
 - Cancellation: since run_call has not yet been invoked at the qualification stage, cancellation is simply not running the call. Once a call is placed via CALL-E, this skill has no cancellation capability — that is a CALL-E platform-level constraint, not something this skill can override.
+- If call submission or status checking times out or returns an unknown outcome, stop. Do not redial or advance to another call automatically; have the operator check the original call status before explicitly authorizing any further call.
