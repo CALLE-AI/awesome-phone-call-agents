@@ -41,6 +41,7 @@ import { Store } from './store';
 import { ConnectionVerifier } from './connection';
 import { checkProgress, pendingFacts } from '../src/domain/progress';
 import { learnFromReview, learningSummary } from './learning';
+import { maskOutputPhones, maskOutputText } from './output';
 
 export function createApp(
   options: { store?: Store; config?: Config; transport?: CallTransport; origin?: string } = {},
@@ -77,7 +78,7 @@ export function createApp(
     assert(record, 404, 'Case not found.');
     return record;
   };
-  const output = (record: CaseRecord, userId: string) => ({
+  const output = (record: CaseRecord, userId: string) => maskOutputPhones({
     ...record,
     plans: casePlans(store, record.id, userId),
   });
@@ -713,7 +714,7 @@ export function createApp(
     res
       .type('text/plain')
       .attachment(`readycheck-${c.id}-v${revision.version}.txt`)
-      .send(lines.join('\n'));
+      .send(maskOutputText(lines.join('\n')));
   });
   app.use('/api', (_req, res) => res.status(404).json({ error: 'API route not found.' }));
   app.use((err: unknown, _req: Request, res: Response, _next: NextFunction) => {
