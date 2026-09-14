@@ -1,0 +1,424 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>HELO Voice Bridge — AI Phone Agent for Booking Confirmations</title>
+  <meta name="description" content="HELO sends an AI voice agent to call your customers when text fails — confirming, rescheduling, or escalating bookings on your behalf. Built with CALL-E." />
+
+  <!-- Fonts: Syne (display) + IBM Plex Sans (body) -->
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:wght@400;500;600&family=Syne:wght@700;800&display=swap" rel="stylesheet" />
+
+  <link rel="stylesheet" href="style.css" />
+</head>
+<body>
+
+<!-- Ambient warm glow -->
+<div class="glow-bg"></div>
+
+<!-- ── Navigation ──────────────────────────────────────────────────────── -->
+<nav>
+  <div class="landing-nav">
+    <a href="/" class="nav-logo">
+      <span class="logo-icon">📞</span>
+      <span>HELO <span style="color:var(--copper)">Voice Bridge</span></span>
+    </a>
+    <div class="nav-actions">
+      <button class="btn btn-ghost btn-sm" id="nav-login-btn">Log in</button>
+      <button class="btn btn-primary btn-sm" id="nav-register-btn">Register →</button>
+    </div>
+  </div>
+</nav>
+
+<!-- ── Hero — left-aligned, right preview card ─────────────────────────── -->
+<section>
+  <div class="hero-wrap">
+
+    <!-- Left: copy -->
+    <div class="hero-copy">
+      <h1>Voice that<br><em>follows through.</em></h1>
+      <p class="hero-sub">
+        When a text reminder goes unread, HELO sends an AI voice agent
+        to phone your customer — confirming the appointment, offering a
+        reschedule, or flagging it for your team. On your behalf. In minutes.
+      </p>
+      <div class="hero-actions">
+        <button class="btn btn-primary" id="hero-register-btn">Register your business</button>
+        <a href="#how" class="btn btn-ghost">See how it works ↓</a>
+      </div>
+      <div class="live-tag">
+        <span class="pulse-dot"></span>
+        Live demo running — no calls placed without mock mode off
+      </div>
+    </div>
+
+    <!-- Right: 3D tilted live-call preview card (the bold visual moment) -->
+    <div class="hero-preview">
+      <div class="preview-card" aria-hidden="true">
+        <div class="preview-live-row">
+          <span class="preview-live-badge">● LIVE</span>
+          <span class="preview-timer" id="preview-timer">00:00:00</span>
+        </div>
+        <div class="preview-name">Aarav Sharma</div>
+        <div class="preview-detail">+91 730 204 2763</div>
+        <div class="preview-detail">Table for 2 · 4:30 PM</div>
+        <div class="waveform">
+          <span></span><span></span><span></span><span></span>
+          <span></span><span></span><span></span><span></span>
+          <span></span><span></span><span></span><span></span>
+          <span></span><span></span><span></span><span></span>
+        </div>
+        <div class="preview-biz">The Grand Bistro</div>
+      </div>
+    </div>
+
+  </div>
+</section>
+
+<!-- ── Stat strip — honest, no fabricated numbers ─────────────────────── -->
+<div class="stat-strip">
+  <div class="stat-item">
+    <span class="stat-main">No-shows are preventable</span>
+    <span class="stat-sub">when someone actually follows up</span>
+  </div>
+  <div class="stat-item">
+    <span class="stat-main">~2 min</span>
+    <span class="stat-sub">typical call to confirm or reschedule</span>
+  </div>
+  <div class="stat-item">
+    <span class="stat-main">Any business type</span>
+    <span class="stat-sub">restaurant, clinic, salon, and beyond</span>
+  </div>
+</div>
+
+<!-- ── How a call happens ──────────────────────────────────────────────── -->
+<section id="how" class="landing-section">
+  <span class="eyebrow">How it works</span>
+  <h2 class="section-title-lg">Three steps.<br>One phone call.</h2>
+  <p class="section-sub">
+    HELO doesn't send another text. It picks up the phone — and has
+    a real conversation with your customer.
+  </p>
+
+  <div class="flow-track">
+    <div class="flow-step">
+      <div class="flow-dot"></div>
+      <h3>Booking created</h3>
+      <p>
+        Add a customer's name, phone number, and appointment time.
+        Takes under ten seconds. HELO starts watching the clock.
+      </p>
+    </div>
+    <div class="flow-step">
+      <div class="flow-dot"></div>
+      <h3>CALL-E dials</h3>
+      <p>
+        An AI voice agent phones the customer, conducts a natural
+        conversation, and works toward a confirmed outcome — no
+        scripts, no hold music.
+      </p>
+    </div>
+    <div class="flow-step">
+      <div class="flow-dot"></div>
+      <h3>Outcome reported</h3>
+      <p>
+        Booked, unavailable, or uncertain — your dashboard updates
+        the moment the call ends. If a retry is needed, it's
+        scheduled automatically.
+      </p>
+    </div>
+  </div>
+</section>
+
+<!-- ── Why voice — gap-as-border card grid ────────────────────────────── -->
+<section class="landing-section" style="padding-top: 0;">
+  <span class="eyebrow">Why voice, not text</span>
+  <h2 class="section-title-lg">Text gets ignored.<br>A call gets answered.</h2>
+  <p class="section-sub">
+    Reminder texts are easy to dismiss. A real voice in real time is
+    much harder to ignore — and much more likely to produce a decision.
+  </p>
+
+  <div class="why-grid">
+    <div class="why-card">
+      <span class="why-icon">📵</span>
+      <h3>Texts go unread</h3>
+      <p>
+        Notification fatigue means your reminder gets buried. Voice
+        cuts through because it demands a response in the moment.
+      </p>
+    </div>
+    <div class="why-card">
+      <span class="why-icon">🔄</span>
+      <h3>Reschedules happen in conversation</h3>
+      <p>
+        A customer who can't make it is more likely to reschedule when
+        talking to someone than when tapping a link no-one designed for them.
+      </p>
+    </div>
+    <div class="why-card">
+      <span class="why-icon">🏢</span>
+      <h3>Works for any booking business</h3>
+      <p>
+        Restaurant reservation, medical appointment, salon slot, repair
+        callout — HELO adapts its call goal to your business type.
+      </p>
+    </div>
+  </div>
+</section>
+
+<!-- ── CTA ─────────────────────────────────────────────────────────────── -->
+<section class="cta-section">
+  <div class="cta-inner">
+    <div class="cta-copy">
+      <h2>Ready to stop losing bookings?</h2>
+      <p>Register your business in under a minute. Start in mock mode — no real calls until you're confident.</p>
+    </div>
+    <button class="btn btn-primary" id="cta-register-btn" style="flex-shrink:0; padding: 0.9rem 2rem; font-size: 0.95rem;">
+      Register your business →
+    </button>
+  </div>
+</section>
+
+<!-- ── Footer ──────────────────────────────────────────────────────────── -->
+<footer>
+  <div class="footer-logo">📞 HELO Voice Bridge</div>
+  <div>Built with CALL-E · Hackathon Demo · Voice AI for booking verification</div>
+</footer>
+
+
+<!-- ══════════════════════════════════════════════════════
+     AUTH MODALS
+     ══════════════════════════════════════════════════════ -->
+
+<!-- Register Modal -->
+<div class="auth-modal" id="register-modal" role="dialog" aria-modal="true" aria-labelledby="reg-modal-title">
+  <div class="auth-modal-box">
+    <button class="auth-modal-close" id="close-register-modal" aria-label="Close">✕</button>
+    <h2 id="reg-modal-title">Register your business</h2>
+    <p class="modal-sub">Create an account to start verifying bookings with AI voice calls.</p>
+
+    <div class="auth-error" id="register-error"></div>
+    <div class="auth-success" id="register-success"></div>
+
+    <form id="register-form" autocomplete="off">
+      <div class="form-group">
+        <label for="reg-name">Business name</label>
+        <input type="text" id="reg-name" placeholder="e.g. The Grand Bistro" required />
+      </div>
+      <div class="form-group">
+        <label for="reg-type">Business type</label>
+        <select id="reg-type" required>
+          <option value="">Select a type…</option>
+          <option value="restaurant">Restaurant / dining</option>
+          <option value="clinic">Medical clinic</option>
+          <option value="salon">Salon / spa</option>
+          <option value="fitness">Gym / fitness studio</option>
+          <option value="repair">Repair / trades</option>
+          <option value="other">Other (specify below)</option>
+        </select>
+      </div>
+      <div class="form-group" id="custom-type-group" style="display:none;">
+        <label for="reg-custom-type">Specify type</label>
+        <input type="text" id="reg-custom-type" placeholder="e.g. pet grooming, legal consultancy…" />
+      </div>
+      <div class="form-group">
+        <label for="reg-email">Email address</label>
+        <input type="email" id="reg-email" placeholder="you@yourbusiness.com" required />
+      </div>
+      <div class="form-group">
+        <label for="reg-goal">Custom call goal <span style="color:var(--muted); font-weight:400;">(optional)</span></label>
+        <input type="text" id="reg-goal" placeholder="e.g. Confirm reservation for {name} at {dateTime}" />
+        <span class="hint">Leave blank to use the default goal for your business type. Supports {name} and {dateTime} placeholders.</span>
+      </div>
+      <button type="submit" class="btn btn-primary btn-full" id="register-submit-btn">
+        Create account &amp; go to dashboard →
+      </button>
+    </form>
+
+    <div class="modal-footer-link">
+      Already registered? <a id="switch-to-login">Log in instead</a>
+    </div>
+  </div>
+</div>
+
+<!-- Login Modal -->
+<div class="auth-modal" id="login-modal" role="dialog" aria-modal="true" aria-labelledby="login-modal-title">
+  <div class="auth-modal-box">
+    <button class="auth-modal-close" id="close-login-modal" aria-label="Close">✕</button>
+    <h2 id="login-modal-title">Welcome back</h2>
+    <p class="modal-sub">Enter your business email to pick up where you left off.</p>
+
+    <div class="auth-error" id="login-error"></div>
+    <div class="auth-success" id="login-success"></div>
+
+    <form id="login-form" autocomplete="off">
+      <div class="form-group">
+        <label for="login-email">Business email</label>
+        <input type="email" id="login-email" placeholder="you@yourbusiness.com" required />
+      </div>
+      <button type="submit" class="btn btn-primary btn-full" id="login-submit-btn">
+        Log in →
+      </button>
+    </form>
+
+    <div class="modal-footer-link">
+      New here? <a id="switch-to-register">Register your business</a>
+    </div>
+  </div>
+</div>
+
+
+<!-- ══════════════════════════════════════════════════════
+     SCRIPTS — auth logic unchanged, only timer added
+     ══════════════════════════════════════════════════════ -->
+<script>
+  /* ── Preview card timer (decorative, counts up) ── */
+  (function () {
+    const el = document.getElementById('preview-timer');
+    if (!el) return;
+    let s = 0;
+    setInterval(() => {
+      s++;
+      const mm = String(Math.floor(s / 60)).padStart(2, '0');
+      const ss = String(s % 60).padStart(2, '0');
+      el.textContent = `00:${mm}:${ss}`;
+    }, 1000);
+  })();
+
+  /* ── Session redirect — if already logged in, go to dashboard ── */
+  const SESSION_KEY = 'helo_token';
+  const token = localStorage.getItem(SESSION_KEY);
+  if (token) {
+    fetch('/api/auth/me', { headers: { 'x-session-token': token } })
+      .then(r => { if (r.ok) window.location.href = '/dashboard'; })
+      .catch(() => {});
+  }
+
+  /* ── Modal helpers ── */
+  const registerModal = document.getElementById('register-modal');
+  const loginModal    = document.getElementById('login-modal');
+
+  function openRegister() { registerModal.classList.add('open'); }
+  function closeRegister() { registerModal.classList.remove('open'); }
+  function openLogin()    { loginModal.classList.add('open'); }
+  function closeLogin()   { loginModal.classList.remove('open'); }
+
+  document.getElementById('nav-register-btn').addEventListener('click', openRegister);
+  document.getElementById('nav-login-btn').addEventListener('click', openLogin);
+  document.getElementById('hero-register-btn').addEventListener('click', openRegister);
+  document.getElementById('cta-register-btn').addEventListener('click', openRegister);
+  document.getElementById('close-register-modal').addEventListener('click', closeRegister);
+  document.getElementById('close-login-modal').addEventListener('click', closeLogin);
+  document.getElementById('switch-to-login').addEventListener('click', () => { closeRegister(); openLogin(); });
+  document.getElementById('switch-to-register').addEventListener('click', () => { closeLogin(); openRegister(); });
+
+  /* Close on backdrop click */
+  registerModal.addEventListener('click', e => { if (e.target === registerModal) closeRegister(); });
+  loginModal.addEventListener('click', e => { if (e.target === loginModal) closeLogin(); });
+
+  /* Show/hide custom type field */
+  document.getElementById('reg-type').addEventListener('change', function () {
+    const grp = document.getElementById('custom-type-group');
+    grp.style.display = this.value === 'other' ? 'block' : 'none';
+  });
+
+  /* ── Register form ── */
+  document.getElementById('register-form').addEventListener('submit', async (e) => {
+    e.preventDefault();
+    const errEl  = document.getElementById('register-error');
+    const succEl = document.getElementById('register-success');
+    const btn    = document.getElementById('register-submit-btn');
+    errEl.classList.remove('show');
+    succEl.classList.remove('show');
+
+    const name  = document.getElementById('reg-name').value.trim();
+    const typeRaw = document.getElementById('reg-type').value;
+    const type  = typeRaw === 'other'
+      ? (document.getElementById('reg-custom-type').value.trim() || 'other')
+      : typeRaw;
+    const email = document.getElementById('reg-email').value.trim();
+    const goal  = document.getElementById('reg-goal').value.trim();
+
+    if (!name || !type || !email) {
+      errEl.textContent = 'Please fill in all required fields.';
+      errEl.classList.add('show');
+      return;
+    }
+
+    btn.disabled = true;
+    btn.textContent = 'Creating account…';
+
+    try {
+      const res  = await fetch('/api/businesses', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ name, type, email, goalTemplate: goal || undefined })
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || 'Registration failed');
+
+      localStorage.setItem(SESSION_KEY, data.token);
+      localStorage.setItem('helo_biz_id', data.business.id);
+      localStorage.setItem('helo_biz_name', data.business.name);
+
+      succEl.textContent = 'Account created! Taking you to your dashboard…';
+      succEl.classList.add('show');
+
+      setTimeout(() => { window.location.href = '/dashboard'; }, 900);
+    } catch (err) {
+      errEl.textContent = err.message;
+      errEl.classList.add('show');
+      btn.disabled = false;
+      btn.textContent = 'Create account & go to dashboard →';
+    }
+  });
+
+  /* ── Login form ── */
+  document.getElementById('login-form').addEventListener('submit', async (e) => {
+    e.preventDefault();
+    const errEl  = document.getElementById('login-error');
+    const succEl = document.getElementById('login-success');
+    const btn    = document.getElementById('login-submit-btn');
+    errEl.classList.remove('show');
+    succEl.classList.remove('show');
+
+    const email = document.getElementById('login-email').value.trim();
+    if (!email) {
+      errEl.textContent = 'Please enter your email.';
+      errEl.classList.add('show');
+      return;
+    }
+
+    btn.disabled = true;
+    btn.textContent = 'Logging in…';
+
+    try {
+      const res  = await fetch('/api/auth/login', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ email })
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || 'Login failed');
+
+      localStorage.setItem(SESSION_KEY, data.token);
+      localStorage.setItem('helo_biz_id', data.business.id);
+      localStorage.setItem('helo_biz_name', data.business.name);
+
+      succEl.textContent = `Welcome back, ${data.business.name}!`;
+      succEl.classList.add('show');
+
+      setTimeout(() => { window.location.href = '/dashboard'; }, 800);
+    } catch (err) {
+      errEl.textContent = err.message;
+      errEl.classList.add('show');
+      btn.disabled = false;
+      btn.textContent = 'Log in →';
+    }
+  });
+</script>
+</body>
+</html>
