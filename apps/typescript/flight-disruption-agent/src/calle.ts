@@ -116,7 +116,13 @@ function scriptedOutcome(booking: Booking, quote: Quote): CallOutcome {
   const opening: TranscriptTurn[] = [
     { speaker: "bot", text: `Hi, this is an AI assistant calling for TripKita. May I speak with ${booking.passenger}?`, offsetSeconds: 0 },
     { speaker: "user", text: "Speaking.", offsetSeconds: 4 },
-    { speaker: "bot", text: "Your flight is delayed. You can keep the new time, move to another flight, or cancel for a refund.", offsetSeconds: 7 },
+    {
+      speaker: "bot",
+      text: quote.keep
+        ? "Your flight is delayed. You can keep the new time, move to another flight, or cancel for a refund."
+        : "Your flight is cancelled. You can move to another flight or cancel for a refund.",
+      offsetSeconds: 7,
+    },
   ];
   const base = {
     structured: null,

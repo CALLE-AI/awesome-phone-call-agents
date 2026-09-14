@@ -24,6 +24,20 @@ function hhmm(iso) {
 function dayMonth(iso) {
   return new Intl.DateTimeFormat("en-GB", { timeZone: "Asia/Jakarta", day: "numeric", month: "short" }).format(new Date(iso));
 }
+const REASONS = [
+  ["a late inbound aircraft", "operational"],
+  ["a technical inspection", "operational"],
+  ["a crew shortage", "operational"],
+  ["weather at the destination", "force_majeure"],
+  ["volcanic ash on the route", "force_majeure"],
+  ["air traffic control restrictions", "force_majeure"],
+];
+const CASE_LABELS = { involuntary: "Involuntary", force_majeure: "Force majeure", voluntary: "Voluntary" };
+
+function disruptionStatus(d) {
+  return d.kind === "cancellation" ? "CANCELLED" : `DELAYED ${hm(d.delayMinutes)} → ${hhmm(d.newDeparture)}`;
+}
+
 function hm(minutes) {
   return `${Math.floor(minutes / 60)}h ${String(minutes % 60).padStart(2, "0")}m`;
 }
@@ -99,7 +113,7 @@ function renderBoard() {
     .map((f) => {
       const d = f.disruption;
       const status = d
-        ? `<span class="status-delayed">DELAYED ${hm(d.delayMinutes)} → ${hhmm(d.newDeparture)}</span>`
+        ? `<span class="status-delayed">${esc(disruptionStatus(d))}</span>${d.cause === "force_majeure" ? ' <span class="dim">FM</span>' : ""}`
         : `<span class="status-ontime">ON TIME</span>`;
       let action = "";
       if (f.passengers > 0 && !d) {
@@ -108,12 +122,14 @@ function renderBoard() {
         const delay = draft[delayId] ?? "240";
         const reason = draft[reasonId] ?? "a late inbound aircraft";
         const opt = (v, label, cur) => `<option value="${esc(v)}"${String(cur) === String(v) ? " selected" : ""}>${esc(label)}</option>`;
+        const group = (cause, label) =>
+          `<optgroup label="${esc(label)}">${REASONS.filter(([, c]) => c === cause).map(([r]) => opt(r, r, reason)).join("")}</optgroup>`;
         action = `<form data-report="${esc(f.id)}">
-          <label class="sr" for="${esc(delayId)}">Delay</label>
-          <select id="${esc(delayId)}" name="delay">${[45, 90, 120, 240, 360].map((m) => opt(m, `+${hm(m)}`, delay)).join("")}</select>
+          <label class="sr" for="${esc(delayId)}">Disruption</label>
+          <select id="${esc(delayId)}" name="delay">${[45, 90, 120, 240, 360].map((m) => opt(m, `+${hm(m)}`, delay)).join("")}${opt("cancel", "Cancelled", delay)}</select>
           <label class="sr" for="${esc(reasonId)}">Reason</label>
-          <select id="${esc(reasonId)}" name="reason">${["a late inbound aircraft", "weather at the destination", "a technical inspection", "air traffic control restrictions"].map((r) => opt(r, r, reason)).join("")}</select>
-          <button type="submit">Report delay</button>
+          <select id="${esc(reasonId)}" name="reason">${group("operational", "Operational")}${group("force_majeure", "Force majeure")}</select>
+          <button type="submit">Report</button>
         </form>`;
       }
       return `<tr>
@@ -159,6 +175,14 @@ function renderDesk() {
   $("events").innerHTML = snap.disruptions
     .map((d) => {
       const c = d.bookings[0]?.quote.changeCase;
+      const pricing =
+        c === "voluntary"
+          ? `(&lt; ${hm(d.bookings[0]?.quote.thresholdMinutes ?? 120)})`
+          : c === "force_majeure"
+            ? "(outside the airline's control)"
+            : d.kind === "cancellation"
+              ? "(cancelled by the airline)"
+              : `(≥ ${hm(d.bookings[0]?.quote.thresholdMinutes ?? 120)})`;
       const handled = d.bookings.filter((b) => b.entry && ["applied", "resolved_by_human"].includes(b.entry.status)).length;
       const review = d.bookings.filter((b) => b.entry && ["needs_review", "uncertain"].includes(b.entry.status)).length;
       const rows = d.bookings
@@ -173,7 +197,7 @@ function renderDesk() {
             ${statusChip(b.entry)}
             <span class="chain"><span class="sr">Sold via</span>${chain}</span>
             <span class="prices">
-              <span>Keep <b>free</b></span>
+              ${b.quote.keep ? "<span>Keep <b>free</b></span>" : ""}
               <span>Move ${cheapest === null ? "<b>no seats</b>" : `from <b>${idr(cheapest)}</b>`}</span>
               <span>Refund <b>${idr(b.quote.refund.amount)}</b></span>
             </span>
@@ -182,11 +206,11 @@ function renderDesk() {
         .join("");
       return `<article class="event">
         <div class="event-head">
-          <h2>${esc(d.flight.code)} to ${esc(d.flight.destinationCity)} delayed ${hm(d.delayMinutes)}</h2>
+          <h2>${esc(d.flight.code)} to ${esc(d.flight.destinationCity)} ${d.kind === "cancellation" ? "cancelled" : `delayed ${hm(d.delayMinutes)}`}</h2>
           <div class="facts">
-            <span>New departure <b>${hhmm(d.newDeparture)}</b></span>
+            ${d.newDeparture ? `<span>New departure <b>${hhmm(d.newDeparture)}</b></span>` : "<span><b>Will not operate</b></span>"}
             <span>Cause <b>${esc(d.reason)}</b></span>
-            <span><b>${c === "involuntary" ? "Involuntary" : "Voluntary"}</b> pricing (${c === "involuntary" ? "≥" : "<"} ${hm(d.bookings[0]?.quote.thresholdMinutes ?? 120)})</span>
+            <span><b>${esc(CASE_LABELS[c] ?? c)}</b> pricing ${pricing}</span>
             <span><b>${handled}</b> handled · <b>${review}</b> need a person</span>
           </div>
         </div>
@@ -220,10 +244,13 @@ function renderDetail() {
   const entry = b.entry;
   const q = b.quote;
 
+  const n = q.keep ? 1 : 0;
   const options = [
-    `<table class="quote"><thead><tr><th colspan="2">1 · Keep delayed flight (${hhmm(q.keep.newDeparture)})</th><th class="amt">Cost</th></tr></thead><tbody><tr class="total"><td colspan="2">No change to the ticket</td><td class="amt">${idr(0)}</td></tr></tbody></table>`,
-    ...q.moves.map((m) => quoteTable(`2 · Move to ${m.label} (${m.seatsAvailable} seats)`, m.lines, "Passenger pays", m.total)),
-    quoteTable("3 · Cancel and refund", q.refund.lines, "Refund", q.refund.amount, ["Fare paid", q.refund.gross]),
+    q.keep
+      ? `<table class="quote"><thead><tr><th colspan="2">1 · Keep delayed flight (${hhmm(q.keep.newDeparture)})</th><th class="amt">Cost</th></tr></thead><tbody><tr class="total"><td colspan="2">No change to the ticket</td><td class="amt">${idr(0)}</td></tr></tbody></table>`
+      : "",
+    ...q.moves.map((m) => quoteTable(`${n + 1} · Move to ${m.label} (${m.seatsAvailable} seats)`, m.lines, "Passenger pays", m.total)),
+    quoteTable(`${n + 2} · Cancel and refund`, q.refund.lines, "Refund", q.refund.amount, ["Fare paid", q.refund.gross]),
   ].join("");
 
   el.innerHTML = `
@@ -312,7 +339,7 @@ function renderEntry(entry, b, key) {
     const actId = `action-${key}`;
     const noteId = `note-${key}`;
     const cur = draft[actId] ?? "none";
-    const opts = [["none", "Close without changing the booking"], ["keep", "Keep on delayed flight"], ...entry.quote.moves.map((m) => [`move:${m.id}`, `Move to ${m.label} (${idr(m.total)})`]), ["refund", `Refund ${idr(entry.quote.refund.amount)}`]];
+    const opts = [["none", "Close without changing the booking"], ...(entry.quote.keep ? [["keep", "Keep on delayed flight"]] : []), ...entry.quote.moves.map((m) => [`move:${m.id}`, `Move to ${m.label} (${idr(m.total)})`]), ["refund", `Refund ${idr(entry.quote.refund.amount)}`]];
     parts.push(`<div class="callbox"><h3>Resolve as a person</h3>
       <label for="${esc(actId)}" class="note">After contacting the passenger yourself</label>
       <select id="${esc(actId)}">${opts.map(([v, l]) => `<option value="${esc(v)}"${cur === v ? " selected" : ""}>${esc(l)}</option>`).join("")}</select>
@@ -373,7 +400,7 @@ function renderRequestForm() {
   const target = moves.some((m) => m.flightId === draft["req-target"]) ? draft["req-target"] : moves[0]?.flightId;
   form.innerHTML = `<h3>New request</h3>
     <div class="fields">
-      <label>Booking<select id="req-pnr">${bookings.map((b) => opt(b.pnr, `${b.pnr} · ${b.passenger} · ${b.flight.code}${b.disrupted ? " (delayed)" : ""}`, pnr)).join("")}</select></label>
+      <label>Booking<select id="req-pnr">${bookings.map((b) => opt(b.pnr, `${b.pnr} · ${b.passenger} · ${b.flight.code}${b.disrupted ? " (disrupted)" : ""}`, pnr)).join("")}</select></label>
       <label>Passenger wants<select id="req-kind">${opt("reschedule", "Reschedule", kind)}${opt("refund", "Refund", kind)}</select></label>
       ${kind === "reschedule" ? `<label>New flight<select id="req-target">${moves.length ? moves.map((m) => opt(m.flightId, `${m.label} · ${idr(m.total)}`, target)).join("") : `<option value="">No later flights with seats</option>`}</select></label>` : `<label>Refund<select disabled><option>${booking ? idr(booking.voluntary.refund) : "–"}</option></select></label>`}
       <label>Came in through<select id="req-channel">${opt("chat", "Chat", channel)}${opt("web_form", "Web form", channel)}${opt("phone", "Phone line", channel)}</select></label>
@@ -622,7 +649,16 @@ document.addEventListener("submit", (e) => {
   const flightId = form.dataset.report;
   const data = new FormData(form);
   act(async () => {
-    const d = await api("/api/disruptions", { flightId, delayMinutes: Number(data.get("delay")), reason: String(data.get("reason")) });
+    const choice = String(data.get("delay"));
+    const reason = String(data.get("reason"));
+    const cause = REASONS.find(([r]) => r === reason)?.[1] ?? "operational";
+    const d = await api("/api/disruptions", {
+      flightId,
+      kind: choice === "cancel" ? "cancellation" : "delay",
+      cause,
+      delayMinutes: choice === "cancel" ? 0 : Number(choice),
+      reason,
+    });
     selected = null;
     previews.clear();
     snap = null;

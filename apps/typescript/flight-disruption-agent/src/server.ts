@@ -4,7 +4,7 @@ import { extname, join, normalize } from "node:path";
 import { APP_ROOT, gatewayFromEnv, loadEnvFile } from "./config.ts";
 import { loadCatalog } from "./data.ts";
 import { Desk, DeskError } from "./desk.ts";
-import type { Action, RequestChannel, RequestKind } from "./types.ts";
+import type { Action, DisruptionCause, DisruptionKind, RequestChannel, RequestKind } from "./types.ts";
 
 loadEnvFile();
 
@@ -71,7 +71,13 @@ async function api(req: IncomingMessage, res: ServerResponse, path: string): Pro
   }
   if (req.method === "POST" && path === "/api/disruptions") {
     const body = await readJson(req);
-    const disruption = desk.reportDelay(str(body, "flightId"), Number(body.delayMinutes), String(body.reason ?? ""));
+    const disruption = desk.reportDisruption({
+      flightId: str(body, "flightId"),
+      kind: (body.kind ?? "delay") as DisruptionKind,
+      cause: (body.cause ?? "operational") as DisruptionCause,
+      delayMinutes: Number(body.delayMinutes ?? 0),
+      reason: String(body.reason ?? ""),
+    });
     return send(res, 201, disruption);
   }
   if (req.method === "POST" && path === "/api/calls/preview") {
