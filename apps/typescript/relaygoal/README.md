@@ -75,6 +75,33 @@ Get a key at https://dashboard.heycall-e.com/account/api-keys. Calls use CALL-E'
 
 ## Architecture
 
+```mermaid
+flowchart TD
+    U["User types a goal<br/>(plain language)"] --> APP["Next.js app<br/>composer + a11y controls"]
+    APP -->|"POST /api/call · /api/batch<br/>(browser routes: fake-only)"| CORE["verified-phone-outcome core"]
+
+    CORE --> SEL{"live opt-in?<br/>RELAYGOAL_LIVE=1 + Developer key"}
+    SEL -->|"no — default"| FAKE["FakeCalle stub<br/>canned 555 scenarios · never dials"]
+    SEL -->|"yes — authorized recipient,<br/>HTTPS-allowlisted host"| SDK["@call-e/calle SDK"]
+
+    FAKE --> RUN["runVerifiedGoal<br/>assertE164 → exactly one call"]
+    SDK --> RUN
+    RUN -->|createAndWait| CE[["CALL-E<br/>dials · discloses · converses · captions"]]
+    CE -->|"status · structuredResult<br/>completionConfidence · transcriptTurns"| VER["verifyOutcome<br/>bind each answer to the callee's<br/>verbatim transcript turn"]
+
+    VER --> D{"grounded in a<br/>callee quote?"}
+    D -->|yes| V["Verified<br/>(answer + its quote)"]
+    D -->|"no · failed · empty"| NC["Not confirmed<br/>“call them yourself”"]
+
+    V --> MASK["maskVerifiedOutcome<br/>mask phone-bearing text"]
+    NC --> MASK
+    MASK --> CARD["Proof-of-call receipt<br/>answer ↔ quote · transcript · live captions<br/>(full-screen on mobile)"]
+
+    EVAL["Eval harness — 9 fixtures + 54 adversarial<br/>mutations, offline · 0 false verifications"] -.->|guards| VER
+```
+
+`completion_confidence` is only ever a gate into the Verified/Not-confirmed decision — it is never shown to the user; the proof is the quote. File map:
+
 ```
 src/core/            the reusable verified-phone-outcome core (framework-free, fully unit-tested)
   types.ts           CalleLike — the one interface both clients implement
