@@ -364,6 +364,8 @@ The default e2e tests use a local fake broker/OAuth/MCP server or dry-run paths,
 
 ### Community apps
 
+- [Exception Broker](https://exception-broker-production.up.railway.app) - Execution-control app for CALL-E-acquired operational decisions, with exact review, controlled ALLOW/BLOCK/WAIT dispositions, and a deterministic no-call demo. See the [integration notes](docs/community-apps/exception-broker.md) and [demo video](https://youtu.be/Smw7aXyI0fI).
+
 - [Openline](https://openlinecall.vercel.app/) - Human-approved service-availability verification app that turns a request into an inspectable CALL-E phone plan and returns evidence-backed next steps, with a no-call simulation path. ([repository](https://github.com/Datwebguy/openline))
 
 Externally hosted user-facing apps built on CALL-E. They live in their own repositories, so review their setup, credential handling, and call side effects before running them.
