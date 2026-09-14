@@ -290,6 +290,13 @@ export function startServer(ctx: ServerContext): Promise<ServerHandle> {
         res.end(readFileSync(join(ctx.publicDir, "index.html"), "utf8"));
         return;
       }
+      // The call-task linter, generated from src/lint.ts. Self-contained and offline: everything it
+      // needs is in the page, so it works from the container, a file:// URL, or a static host.
+      if (req.method === "GET" && (url.pathname === "/lint" || url.pathname === "/lint.html")) {
+        res.writeHead(200, { "content-type": "text/html; charset=utf-8", "cache-control": "no-store", ...setCookie });
+        res.end(readFileSync(join(ctx.publicDir, "lint.html"), "utf8"));
+        return;
+      }
       if (req.method === "GET" && url.pathname === "/api/state") {
         json(res, 200, current(), setCookie);
         return;

@@ -19,7 +19,8 @@
     "fake-server": "node --import tsx src/cli.ts fake-server",
     "probe": "node --import tsx src/cli.ts probe --dry-run",
     "mcp": "node --import tsx src/mcp.ts",
-    "lint-task": "node --import tsx src/cli.ts lint-task --dry-run"
+    "lint-task": "node --import tsx src/cli.ts lint-task --dry-run",
+    "build:lint-page": "node --import tsx scripts/build-lint-page.mjs"
   },
   "dependencies": {
     "@call-e/calle": "0.7.0"

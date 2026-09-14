@@ -102,7 +102,7 @@ No credentials, no network, no phone call:
 
 ```bash
 npm install
-npm test        # 72 tests
+npm test        # 73 tests
 npm run plan    # who gets cleared without a call, the wave order, the exact call task
 npm run demo    # full campaign against the bundled fake CALL-E server
 npm run serve   # dashboard on http://127.0.0.1:4800
@@ -292,6 +292,16 @@ npm run lint-task                                  # lints this app's own render
 npm run sc -- lint-task --task-file your-task.txt  # lints yours
 ```
 
+**Or paste yours into a browser.** `public/lint.html` is a self-contained page — no server, no install,
+no network — that runs the same fourteen rules client-side. Open it from disk, from the container, or
+from the dashboard's **Call-task linter** button.
+
+It is generated from `src/lint.ts` by `npm run build:lint-page`, which inlines each rule predicate's
+own source rather than re-typing the rules in JavaScript. A test asserts the page carries exactly the
+rules the suite covers, so the two cannot drift. Verified in a real browser: a naive task scores
+**3 of 14**, this app's own rendered task scores **14 of 14**, and the client agrees with the server
+exactly.
+
 ```
 14 of 14 boundaries defended - 0 error(s), 0 warning(s).
 
@@ -348,7 +358,7 @@ The full list is in the skill: `skills/medicaid-exemption-screener/references/sa
 
 ```
 npm run check          # tsc --noEmit, strict + noUncheckedIndexedAccess + exactOptionalPropertyTypes
-npm test               # 72 tests, no network
+npm test               # 73 tests, no network
 npm run test:failures  # just the failure semantics - every test name is a guarantee
 ```
 

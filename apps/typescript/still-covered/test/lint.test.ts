@@ -7,6 +7,7 @@ import { formatLintReport, lintCallTask, RULES } from "../src/lint.js";
 import { loadRules, loadState } from "../src/rules.js";
 import { loadEnrollees } from "../src/registry.js";
 import { renderScreeningTask } from "../src/tasks.js";
+import { readFileSync } from "node:fs";
 import { join } from "node:path";
 
 const { people } = loadEnrollees(join(process.cwd(), "data", "enrollees.sample.csv"));
@@ -58,4 +59,18 @@ test("the report reads as guidance, and never claims the agent will obey", () =>
   const text = formatLintReport(lintCallTask(ours));
   assert.match(text, /boundaries defended/);
   assert.match(text, /whether the agent follows them on the day/, "a passing lint is not a passing call");
+});
+
+test("the generated linter page carries exactly the rules the tests cover", () => {
+  const page = readFileSync(join(process.cwd(), "public", "lint.html"), "utf8");
+  // The page inlines each predicate's own source, so drift shows up as a missing id or a changed
+  // body. Regenerate with: node --import tsx scripts/build-lint-page.mjs
+  for (const rule of RULES) {
+    assert.ok(page.includes(JSON.stringify(rule.id)), `${rule.id} is in the page`);
+    assert.ok(page.includes(JSON.stringify(rule.requirement)), `${rule.id}: requirement text matches`);
+    assert.ok(page.includes(JSON.stringify(rule.learnedFrom)), `${rule.id}: the call it was learned from is cited`);
+  }
+  const ids = [...page.matchAll(/id: "([a-z-]+)"/g)].map((m) => m[1]);
+  assert.deepEqual(ids.sort(), RULES.map((r) => r.id).sort(), "no extra or missing rules in the page");
+  assert.ok(!/<script src=|<link rel="stylesheet" href=/.test(page), "self-contained: no external fetches");
 });

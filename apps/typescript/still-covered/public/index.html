@@ -170,6 +170,7 @@
   <select id="registry"></select>
   <button class="primary" id="start">Start drill (dry-run)</button>
   <button id="reportBtn">Outreach report</button>
+  <button id="lintBtn">Call-task linter</button>
 </header>
 
 <div class="sub" style="padding: 8px 20px 0;" id="headline">No campaign yet</div>
@@ -455,6 +456,7 @@
   }
   $("campaign").onchange = async () => { if ($("campaign").value) { closeDrawer(); await api("/api/load", { method: "POST", body: JSON.stringify({ campaignId: $("campaign").value }) }); } };
   $("reportBtn").onclick = () => window.open(withToken("/api/report"), "_blank");
+  $("lintBtn").onclick = () => window.open(withToken("/lint"), "_blank");
   $("start").onclick = async () => {
     $("start").disabled = true;
     const original = $("start").textContent;
