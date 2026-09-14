@@ -37,6 +37,8 @@ NOTHING_PLACED = (
 
 ADVICE = {EXIT_UNVERIFIED: MISMATCH_ADVICE, EXIT_UNRESOLVED: UNRESOLVED_ADVICE}
 
+SILENT_CALLS = "{silent} of {placed} calls ended before they could ring"
+
 LADDER_VERDICT_TAIL = {
     "unacknowledged": "the ladder is exhausted and this incident has no owner",
     "unknown": "call state could not be established",
@@ -90,10 +92,26 @@ def reason_prose(attempt: Attempt, policy: Policy) -> tuple[str, ...]:
             f"label {snapshot.confidence_label} carried a score of "
             f"{snapshot.confidence_score}, below the {policy.min_confidence} floor",
         )
+    if attempt.reason == "callback_requested" and attempt.extraction is not None:
+        return (
+            f"asked to be called back in {attempt.extraction.callback_minutes} minutes,",
+            "which is a request to be called again, not a commitment to the incident",
+        )
+    if attempt.reason == "hedged_acknowledgement":
+        return (
+            "the words that would have taken the incident came with a condition attached,",
+            "and a commitment with a condition is not a commitment",
+        )
     if attempt.reason == "no_eta":
         return (
             "the call completed and the provider was confident,",
             "and no number of minutes was committed to when asked",
+        )
+    if attempt.reason == "zero_duration":
+        return (
+            "the attempt began and ended in the same second with nothing transcribed,",
+            "which is the shape of a call that never reached the network. The provider",
+            "reports it as the recipient hanging up; from here that cannot be told apart",
         )
     return ()
 
@@ -145,7 +163,12 @@ def _span_lines(attempt: Attempt) -> list[str]:
         else extraction.disposition
     )
     eta = _quoted(extraction.eta_span) if extraction.eta_span else "absent"
-    return [_span("disposition", disposition), _span("eta", eta)]
+    lines = [_span("disposition", disposition), _span("eta", eta)]
+    if extraction.callback_span:
+        lines.append(_span("callback", _quoted(extraction.callback_span)))
+    if extraction.hedge_span:
+        lines.append(_span("hedged", _quoted(extraction.hedge_span)))
+    return lines
 
 
 def _outcome_lines(attempt: Attempt, policy: Policy) -> list[str]:
@@ -170,6 +193,9 @@ def attempt_lines(attempt: Attempt, policy: Policy) -> list[str]:
 def verdict_lines(result: LadderResult) -> list[str]:
     last = result.deciding
     tail = LADDER_VERDICT_TAIL.get(result.verdict, "")
+    silent = sum(1 for attempt in result.attempts if attempt.reason == "zero_duration")
+    if silent:
+        tail = f"{SILENT_CALLS.format(silent=silent, placed=len(result.attempts))}, {tail}"
     if result.verdict == "acknowledged" and last is not None and last.extraction is not None:
         return [
             f"verdict acknowledged  owner {last.rung.contact.id}  "

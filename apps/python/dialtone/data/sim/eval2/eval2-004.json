@@ -1,0 +1,75 @@
+{
+  "id": "eval2-004",
+  "label": "ivr",
+  "difficulty": "typical",
+  "scenario": "Library renewal phone tree: card and PIN via DTMF, lists items, renews two and reads back new due dates, reports one item blocked by a hold.",
+  "task": "Renew the customer's library books that are due September 15th.",
+  "outcome": {
+    "task_completed_claimed": true,
+    "commitment_type": "reschedule",
+    "confirmation_artifact": "new due date October 6th read back for two items",
+    "expected_attestation": "system_asserted"
+  },
+  "turns": [
+    {
+      "speaker": "user",
+      "text": "Welcome to the Fairhaven Public Library automated renewal line. Please enter your fourteen-digit library card number now.",
+      "offset_seconds": 0.6
+    },
+    {
+      "speaker": "bot",
+      "text": "[DTMF 21447003918265]",
+      "offset_seconds": 8.5
+    },
+    {
+      "speaker": "user",
+      "text": "Please enter your four-digit PIN.",
+      "offset_seconds": 13.65
+    },
+    {
+      "speaker": "bot",
+      "text": "[DTMF 7302]",
+      "offset_seconds": 16.61
+    },
+    {
+      "speaker": "user",
+      "text": "You have three items checked out. To hear your items, press 1. To renew all items, press 2. To return to the main menu, press star.",
+      "offset_seconds": 18.89
+    },
+    {
+      "speaker": "bot",
+      "text": "[DTMF 1]",
+      "offset_seconds": 30.25
+    },
+    {
+      "speaker": "user",
+      "text": "Item 1. The Salt Road. Due September 15th. Item 2. A Field Guide to Eastern Mushrooms. Due September 15th. Item 3. Clockwork Harbor. Due September 22nd. To renew all items, press 2. To renew a single item, press 3.",
+      "offset_seconds": 31.69
+    },
+    {
+      "speaker": "bot",
+      "text": "[DTMF 2]",
+      "offset_seconds": 48.01
+    },
+    {
+      "speaker": "user",
+      "text": "Please wait while we process your request.",
+      "offset_seconds": 49.46
+    },
+    {
+      "speaker": "user",
+      "text": "Two items were renewed. The Salt Road is now due October 6th. A Field Guide to Eastern Mushrooms is now due October 6th. One item could not be renewed. Clockwork Harbor has a hold placed by another patron. To hear this information again, press 1. To end this call, press 9.",
+      "offset_seconds": 55.76
+    },
+    {
+      "speaker": "bot",
+      "text": "[DTMF 9]",
+      "offset_seconds": 76.77
+    },
+    {
+      "speaker": "user",
+      "text": "Thank you for calling Fairhaven Public Library. Goodbye.",
+      "offset_seconds": 78.2
+    }
+  ]
+}

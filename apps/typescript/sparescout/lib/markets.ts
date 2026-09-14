@@ -45,3 +45,9 @@ export function getSupportedMarket(countryCode: string): SupportedMarket | undef
 export function supportsMarketLocale(countryCode: string, locale: string): boolean {
   return getSupportedMarket(countryCode)?.locales.some((candidate) => candidate.code === locale) ?? false;
 }
+
+// CALL-E currently rejects English calls to Kenyan recipients. Kenya remains
+// available in the localized fixture without offering a live path that fails.
+export function supportsLiveMarketLocale(countryCode: string, locale: string): boolean {
+  return supportsMarketLocale(countryCode, locale) && countryCode !== "KE";
+}

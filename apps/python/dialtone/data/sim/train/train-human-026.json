@@ -1,0 +1,61 @@
+{
+ "id": "train-human-026",
+ "label": "human",
+ "source": "sim-train",
+ "meta": {
+  "task": "cancel a subscription",
+  "hard": true
+ },
+ "turns": [
+  {
+   "speaker": "user",
+   "text": "Parkview Auto Repair, Leah speaking.",
+   "offset_seconds": 0.78
+  },
+  {
+   "speaker": "bot",
+   "text": "Hi, I'm an AI assistant calling on behalf of Taylor Kim. I'd like to cancel the subscription for the account under Taylor Kim.",
+   "offset_seconds": 3.24
+  },
+  {
+   "speaker": "user",
+   "text": "Okay, I can",
+   "offset_seconds": 12.08
+  },
+  {
+   "speaker": "user",
+   "text": "right",
+   "offset_seconds": 13.66
+  },
+  {
+   "speaker": "bot",
+   "text": "Will there be a final charge?",
+   "offset_seconds": 14.86
+  },
+  {
+   "speaker": "user",
+   "text": "Okay, yeah that's",
+   "offset_seconds": 17.64
+  },
+  {
+   "speaker": "bot",
+   "text": "Will there be a final charge?",
+   "offset_seconds": 19.78
+  },
+  {
+   "speaker": "user",
+   "text": "Sure, yeah, confirmed.",
+   "offset_seconds": 22.6
+  },
+  {
+   "speaker": "bot",
+   "text": "Thank you so much, that's all I needed.",
+   "offset_seconds": 24.46
+  },
+  {
+   "speaker": "user",
+   "text": "yeah, um, Alright, take care.",
+   "offset_seconds": 28.35
+  }
+ ]
+}

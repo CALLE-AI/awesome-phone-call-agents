@@ -1,0 +1,46 @@
+{
+ "id": "train-agent-015",
+ "label": "agent",
+ "source": "sim-train",
+ "meta": {
+  "task": "reschedule an appointment from Tuesday to Thursday morning",
+  "hard": false
+ },
+ "turns": [
+  {
+   "speaker": "user",
+   "text": "Thank you for calling Harbor Hotel! I'm Sophie, the virtual assistant for Harbor Hotel. How can I help you today?",
+   "offset_seconds": 0.48
+  },
+  {
+   "speaker": "bot",
+   "text": "Hi, I'm an AI assistant calling on behalf of Casey Brown. I'm calling to move Casey Brown's appointment from Tuesday to Thursday morning.",
+   "offset_seconds": 8.69
+  },
+  {
+   "speaker": "user",
+   "text": "Absolutely, I'd be happy to help. I've moved Casey Brown's appointment from Tuesday to Thursday at 10 AM. Is there anything else?",
+   "offset_seconds": 18.21
+  },
+  {
+   "speaker": "bot",
+   "text": "Can you confirm the new time?",
+   "offset_seconds": 27.57
+  },
+  {
+   "speaker": "user",
+   "text": "Great question! Let me check that for you. Yes, that's correct.",
+   "offset_seconds": 30.89
+  },
+  {
+   "speaker": "bot",
+   "text": "Can you confirm the new time?",
+   "offset_seconds": 35.7
+  },
+  {
+   "speaker": "user",
+   "text": "You're welcome! Have a wonderful day. Goodbye!",
+   "offset_seconds": 38.72
+  }
+ ]
+}

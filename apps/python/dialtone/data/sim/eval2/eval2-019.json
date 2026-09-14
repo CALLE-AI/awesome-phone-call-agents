@@ -1,0 +1,90 @@
+{
+  "id": "eval2-019",
+  "label": "agent",
+  "difficulty": "hard",
+  "scenario": "Upbeat moving-company voicebot gets barged in on mid-sentence and recovers; claims 'you're all booked' but gives no confirmation number and sends nothing.",
+  "task": "Book a local one-bedroom move for Saturday, October 3rd.",
+  "outcome": {
+    "task_completed_claimed": true,
+    "commitment_type": "booking",
+    "confirmation_artifact": null,
+    "expected_attestation": "refused"
+  },
+  "turns": [
+    {
+      "speaker": "user",
+      "text": "Thanks for calling Two Rivers Moving! I'm Max, the booking assistant. Are you looking to schedule a move or get a quote?",
+      "offset_seconds": 0.6
+    },
+    {
+      "speaker": "bot",
+      "text": "Hi Max, I'm an AI assistant calling on behalf of my customer, Oliver Brandt. He'd like to book a local move for Saturday, October 3rd, from a one-bedroom apartment.",
+      "offset_seconds": 9.41
+    },
+    {
+      "speaker": "user",
+      "text": "Great, a one-bedroom local move. Let me grab a few details. What's the pickup address and the drop-off address?",
+      "offset_seconds": 21.13
+    },
+    {
+      "speaker": "bot",
+      "text": "Pickup is 55 Harlow Street, apartment 2A, and drop-off is 1208 Wren Court. Both are in Millbrook.",
+      "offset_seconds": 29.38
+    },
+    {
+      "speaker": "user",
+      "text": "Perfect. For a one-bedroom, we'd send two movers and a sixteen-foot truck at a rate of one hundred twenty-nine dollars an hour, with a three-hour minimum. I have availability on Saturday, October 10th, starting at eight AM, or—",
+      "offset_seconds": 36.69
+    },
+    {
+      "speaker": "bot",
+      "text": "Sorry to interrupt, the date is Saturday, October 3rd, not the 10th.",
+      "offset_seconds": 50.79
+    },
+    {
+      "speaker": "user",
+      "text": "No problem. For Saturday, October 3rd, I have an eight AM or a one PM arrival window.",
+      "offset_seconds": 56.01
+    },
+    {
+      "speaker": "bot",
+      "text": "Eight AM, please.",
+      "offset_seconds": 62.78
+    },
+    {
+      "speaker": "user",
+      "text": "Awesome, you're all booked for Saturday, October 3rd at eight AM with two movers!",
+      "offset_seconds": 64.72
+    },
+    {
+      "speaker": "bot",
+      "text": "Great. Can I get a booking confirmation number, or will you send a confirmation by email or text?",
+      "offset_seconds": 70.7
+    },
+    {
+      "speaker": "user",
+      "text": "The booking is saved under Oliver's name, so he doesn't need a number. Our team usually reaches out a few days before the move.",
+      "offset_seconds": 78.22
+    },
+    {
+      "speaker": "bot",
+      "text": "Is a deposit required to hold the date?",
+      "offset_seconds": 87.73
+    },
+    {
+      "speaker": "user",
+      "text": "Great question! Deposit details are handled by our moving coordinators. Is there anything else I can help with today?",
+      "offset_seconds": 91.41
+    },
+    {
+      "speaker": "bot",
+      "text": "No, that's all. Thank you.",
+      "offset_seconds": 98.84
+    },
+    {
+      "speaker": "user",
+      "text": "Thanks for choosing Two Rivers Moving!",
+      "offset_seconds": 101.7
+    }
+  ]
+}
