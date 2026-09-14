@@ -227,6 +227,8 @@ export interface ChangeRequest {
   targetFlightId: string | null;
   channel: RequestChannel;
   createdAt: string;
+  /** Set when the request came in through the channel webhook; only that conversation may confirm it. */
+  conversation?: { channel: RequestChannel; id: string };
 }
 
 export interface Eligibility {
@@ -275,6 +277,8 @@ export interface RequestEntry {
   amount: number | null;
   status: RequestStatus;
   confirmedAt: string | null;
+  /** Who recorded the passenger's yes: the operator typing it, or the passenger in their channel. */
+  confirmedBy?: { kind: "operator" } | { kind: "passenger"; channel: RequestChannel; messageId: string };
   portal: { kind: "accepted" } | { kind: "rejected"; code: string; message: string } | null;
   airlineCall: AirlineCall | null;
   reviewReasons: string[];
@@ -282,6 +286,29 @@ export interface RequestEntry {
   /** Optional call telling the passenger how the request ended. */
   callback: AirlineCall | null;
   callbackVerdict: { kind: "delivered" } | { kind: "follow_up"; reasons: string[] } | null;
+  /** Status updates sent back to the passenger's channel after the first reply. */
+  channelUpdates?: ChannelUpdate[];
+}
+
+export interface ChannelUpdate {
+  at: string;
+  status: RequestStatus;
+  reply: string;
+  delivery: "sent" | "failed" | "not_configured";
+  error: string | null;
+}
+
+/** One message from the chat, web form, or phone line integration, kept for dedupe and audit. */
+export interface ChannelMessageRecord {
+  messageId: string;
+  type: string;
+  channel: RequestChannel;
+  conversationId: string;
+  receivedAt: string;
+  requestId: string | null;
+  /** What the channel should show or say to the passenger. */
+  reply: string;
+  outcome: "accepted" | "refused";
 }
 
 /** One webhook delivery from the airline or OTA operations system, kept for dedupe and audit. */

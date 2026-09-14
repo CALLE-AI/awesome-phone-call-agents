@@ -15,6 +15,7 @@ import {
 import { buildCallbackResultSchema, buildCallbackTask, decideCallback } from "./callback.ts";
 import { decide } from "./decide.ts";
 import { checkEligibility } from "./eligibility.ts";
+import { NOT_FOUND_REPLY, passengerMatches, replyFor, type ChannelMessage } from "./channel.ts";
 import type { OpsEvent } from "./events.ts";
 import { FakeGds, type Gds } from "./gds.ts";
 import { addMinutes, idr, localTime } from "./format.ts";
@@ -22,7 +23,7 @@ import { maskPhone, routeFor } from "./phone.ts";
 import { redactOutcome, redactText } from "./redact.ts";
 import { airlineOf, quoteFor, voluntaryQuoteFor } from "./rules.ts";
 import { buildResultSchema, buildTask } from "./task.ts";
-import type { Action, AirlineCall, BookingState, CallOutcome, Decision, Disruption, DisruptionCause, DisruptionKind, DisruptionSource, LedgerEntry, OpsEventRecord, OpsEventVia, Quote, RequestChannel, RequestEntry, RequestKind } from "./types.ts";
+import type { Action, AirlineCall, BookingState, CallOutcome, ChannelMessageRecord, Decision, Disruption, DisruptionCause, DisruptionKind, DisruptionSource, LedgerEntry, OpsEventRecord, OpsEventVia, Quote, RequestChannel, RequestEntry, RequestKind } from "./types.ts";
 
 interface DeskState {
   disruptions: Disruption[];
@@ -32,6 +33,8 @@ interface DeskState {
   opsEvents: Record<string, OpsEventRecord>;
   /** Where the airline feed poller resumes. Kept across restarts so no event is missed or re-read. */
   feedCursor: string | null;
+  /** Chat, web form, and phone line messages by message id. */
+  channelMessages: Record<string, ChannelMessageRecord>;
   bookings: Record<string, BookingState>;
   seats: Record<string, number>;
   liveCallsUsed: number;
@@ -136,7 +139,7 @@ export class Desk {
     }
     const seats: Record<string, number> = {};
     for (const f of this.catalog.flights) seats[f.id] = f.seatsAvailable;
-    return { disruptions: [], ledger: {}, requests: {}, opsEvents: {}, feedCursor: null, bookings, seats, liveCallsUsed: 0, runId: newRunId() };
+    return { disruptions: [], ledger: {}, requests: {}, opsEvents: {}, feedCursor: null, channelMessages: {}, bookings, seats, liveCallsUsed: 0, runId: newRunId() };
   }
 
   private load(): DeskState | null {
@@ -146,6 +149,7 @@ export class Desk {
     state.requests ??= {};
     state.opsEvents ??= {};
     state.feedCursor ??= null;
+    state.channelMessages ??= {};
     for (const r of Object.values(state.opsEvents)) r.via ??= "webhook";
     state.runId ??= newRunId();
     // Provider text saved by an older version may be unmasked.
@@ -584,7 +588,13 @@ export class Desk {
    * Steps 1-2: a reschedule or refund request arrives through an existing channel.
    * The desk prices it and checks eligibility before anything reaches the passenger.
    */
-  submitRequest(pnr: string, kind: RequestKind, targetFlightId: string | null, channel: RequestChannel): RequestEntry {
+  submitRequest(
+    pnr: string,
+    kind: RequestKind,
+    targetFlightId: string | null,
+    channel: RequestChannel,
+    conversation?: { channel: RequestChannel; id: string },
+  ): RequestEntry {
     if (kind !== "reschedule" && kind !== "refund") throw new DeskError('kind must be "reschedule" or "refund".');
     if (!["chat", "web_form", "phone"].includes(channel)) throw new DeskError('channel must be "chat", "web_form", or "phone".');
     const booking = this.catalog.bookings.find((b) => b.pnr === pnr);
@@ -595,7 +605,15 @@ export class Desk {
     if (open) throw new DeskError(`${pnr} already has an open request (${open.status}).`, 409);
 
     const id = `req_${pnr}_${Object.values(this.state.requests).filter((r) => r.request.pnr === pnr).length + 1}`;
-    const request = { id, pnr, kind, targetFlightId: targetFlightId || null, channel, createdAt: new Date(this.now()).toISOString() };
+    const request = {
+      id,
+      pnr,
+      kind,
+      targetFlightId: targetFlightId || null,
+      channel,
+      createdAt: new Date(this.now()).toISOString(),
+      ...(conversation ? { conversation } : {}),
+    };
     const quote = voluntaryQuoteFor(this.view(), booking);
     const eligibility = checkEligibility({
       catalog: this.view(),
@@ -644,7 +662,7 @@ export class Desk {
    * Steps 3-4: the passenger confirmed the quoted amount through their channel.
    * The operator types that amount back, then the change goes to the portal.
    */
-  confirmRequest(id: string, confirmedAmount: number): RequestEntry {
+  confirmRequest(id: string, confirmedAmount: number, confirmedBy: NonNullable<RequestEntry["confirmedBy"]> = { kind: "operator" }): RequestEntry {
     const entry = this.requestEntry(id);
     if (entry.status !== "quoted" || !entry.action || entry.amount === null) {
       throw new DeskError(`This request is ${entry.status}; only quoted requests can be confirmed.`, 409);
@@ -654,6 +672,7 @@ export class Desk {
     }
     const booking = findBooking(this.catalog, entry.request.pnr);
     entry.confirmedAt = new Date(this.now()).toISOString();
+    entry.confirmedBy = confirmedBy;
 
     const portal = this.gds.submit(booking, entry.action);
     entry.portal = portal;
@@ -672,6 +691,79 @@ export class Desk {
     }
     this.save();
     return entry;
+  }
+
+  /**
+   * A message from the chat, web form, or phone line integration. Returns what the channel
+   * should tell the passenger. Each message id is processed once. A request that came in
+   * through a conversation can only be confirmed or declined from that same conversation.
+   */
+  receiveChannelMessage(message: ChannelMessage): { record: ChannelMessageRecord; duplicate: boolean } {
+    const seen = this.state.channelMessages[message.id];
+    if (seen) return { record: seen, duplicate: true };
+    const record: ChannelMessageRecord = {
+      messageId: message.id,
+      type: message.type,
+      channel: message.channel,
+      conversationId: message.conversationId,
+      receivedAt: new Date(this.now()).toISOString(),
+      requestId: null,
+      reply: "",
+      outcome: "accepted",
+    };
+    const refuse = (reply: string) => {
+      record.outcome = "refused";
+      record.reply = reply;
+    };
+
+    if (message.type === "request.submitted") {
+      const booking = this.catalog.bookings.find((b) => b.pnr === message.pnr);
+      if (!booking || !passengerMatches(booking, message.lastName)) {
+        refuse(NOT_FOUND_REPLY);
+      } else {
+        try {
+          const entry = this.submitRequest(message.pnr, message.kind, message.targetFlightId, message.channel, {
+            channel: message.channel,
+            id: message.conversationId,
+          });
+          record.requestId = entry.request.id;
+          record.reply = replyFor(this.catalog, entry);
+        } catch (error) {
+          refuse(
+            error instanceof DeskError && error.status === 409
+              ? `Booking ${message.pnr} already has a change in progress. We will update you in that conversation.`
+              : `We could not start this request: ${error instanceof Error ? error.message : String(error)}`,
+          );
+        }
+      }
+    } else {
+      const entry = this.state.requests[message.requestId];
+      const conversation = entry?.request.conversation;
+      record.requestId = entry ? message.requestId : null;
+      if (!entry || !conversation || conversation.channel !== message.channel || conversation.id !== message.conversationId) {
+        refuse("We could not find that request in this conversation. Start a new request with your booking code and last name.");
+      } else if (message.type === "request.declined") {
+        try {
+          record.reply = replyFor(this.catalog, this.declineRequest(message.requestId));
+        } catch {
+          refuse(replyFor(this.catalog, entry));
+        }
+      } else if (entry.status !== "quoted") {
+        refuse(replyFor(this.catalog, entry));
+      } else if (message.confirmedAmount !== entry.amount) {
+        refuse(`The amount does not match the quote. To go ahead, reply YES ${entry.amount ?? 0}.`);
+      } else {
+        const done = this.confirmRequest(message.requestId, message.confirmedAmount, {
+          kind: "passenger",
+          channel: message.channel,
+          messageId: message.id,
+        });
+        record.reply = replyFor(this.catalog, done);
+      }
+    }
+    this.state.channelMessages[message.id] = record;
+    this.save();
+    return { record, duplicate: false };
   }
 
   /** The passenger said no to the quote. Nothing changes. */
