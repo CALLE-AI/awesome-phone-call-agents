@@ -33,15 +33,22 @@ from __future__ import annotations
 
 import argparse
 import json
-import re
 import tempfile
 from datetime import date
 from pathlib import Path
 
-# E.164: a leading +, a country code that cannot start with zero, and up to fifteen digits
-# in total. Deliberately strict. A number this rejects is a number that would have become
-# a confusing failure several seconds and one charge later.
-E164 = re.compile(r"^\+[1-9]\d{7,14}$")
+from dispatch.e164 import canonical
+from dispatch.models import mask
+
+# What counts as a diallable number lives in `dispatch/e164.py`, and this command uses
+# it rather than keeping its own copy: this path and a district work file reach the same
+# dialler, and a second spelling of "diallable" is a second thing to get wrong.
+#
+# The rule it replaced was `re.match(r"^\+[1-9]\d{7,14}$", number)`, which had two holes.
+# `\d` on a str pattern matches Eastern Arabic and Devanagari numerals, so a number in
+# digits no telephone network carries was accepted. And `$` matches immediately before a
+# trailing newline as well as at the end, so a pasted `+915550000001` with the newline
+# still attached passed the check and went to the platform with the newline on it.
 
 CONSENT_ID = "CR-DIAL-{day}"
 
@@ -94,17 +101,22 @@ def consent_record(number: str, today: date) -> dict:
 
 def main(argv: list[str]) -> int:
     args = build_parser().parse_args(argv)
-    number = args.number.replace(" ", "")
+    # Grouping is stripped by `canonical`, not here, so this command accepts every
+    # spelling a work file does and dials the one exact string either way.
+    number = canonical(args.number)
 
-    if not E164.match(number):
-        print(f"{args.number!r} is not an E.164 number.\n"
-              "It needs a leading +, then a country code, then the number, with no "
-              "spaces or dashes: +915550000001.")
+    if number is None:
+        # Masked like any other destination. Text that fails this check is usually a
+        # typo, and a typo in a telephone number is still somebody's telephone number.
+        print(f"{mask(args.number.strip())} is not an E.164 number.\n"
+              "It needs a leading +, then a country code that does not start with "
+              "zero, then the number: +915550000001. ASCII digits only, eight to "
+              "fifteen of them, and no letters.")
         return 2
 
     if not args.i_consent:
         print(
-            f"Refusing to call {number} without --i-consent.\n"
+            f"Refusing to call {mask(number)} without --i-consent.\n"
             "\n"
             "This tool checks a dated consent record before every call it places, and "
             "this command is not an exception to that: it writes one for the number you "
@@ -114,7 +126,12 @@ def main(argv: list[str]) -> int:
             "on your own line. Nothing here makes a call lawful; see "
             "docs/consent-record.md.\n"
             "\n"
-            f"  python -m firstbell dial {number} --i-consent")
+            "  python -m firstbell dial <the number you gave> --i-consent\n"
+            "\n"
+            "The number is masked above deliberately. A refusal is printed to a "
+            "terminal that is often recorded or piped to a file, and a destination "
+            "nobody has consented to is the last thing that should outlive the "
+            "command in a scrollback.")
         return 2
 
     today = date.today()
@@ -149,7 +166,11 @@ def main(argv: list[str]) -> int:
     if not args.offline:
         argv2 += ["--live", "--yes-i-mean-it"]
 
-    print(f"consent record {record['id']} written for {number}, valid today only")
+    # Masked for the reason the refusal is. The record itself, in the temporary
+    # directory whose path is printed on the next line, carries the real number: this
+    # line is the copy that ends up in a terminal log or a screen recording.
+    print(f"consent record {record['id']} written for {mask(number)}, "
+          "valid today only")
     print(f"receipt will be at {receipt}")
     code = run(argv2)
     print(f"\nreceipt: {receipt}")

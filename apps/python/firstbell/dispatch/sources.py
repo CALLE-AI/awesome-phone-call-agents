@@ -36,7 +36,8 @@ from typing import Iterable, Iterator, Protocol, runtime_checkable
 
 from .consent import refusal as consent_refusal
 from .dialects import DialectError, consent_refusal as dialect_consent_refusal, recognise
-from .models import WorkItem
+from .e164 import canonical
+from .models import WorkItem, redact
 
 
 @runtime_checkable
@@ -106,6 +107,30 @@ def _split_phones(raw: str) -> tuple[str, ...]:
     for one in numbers:
         seen.setdefault(_ascii_digits(one), one)
     return tuple(seen.values())
+
+
+# `_split_phones` answers a parser's question: does this cell hold something
+# somebody could answer. It deliberately keeps the district's own spelling, so
+# `+1, 800, 555, 0199` survives as one number written the way the export wrote it.
+# That string then went to the platform as the destination, which is a different
+# question with a worse failure: the filter is `seven ASCII digits somewhere inside`,
+# so `ring mum on 9876543210 after three` was a diallable number too.
+#
+# So the spelling is resolved to the one address a telephone network carries before
+# anything downstream can dial it, and a spelling that resolves to no address stops
+# the file rather than being dropped. Dropping it would shorten a fallback chain
+# without saying so, and a chain one number shorter than the office believes is how
+# a family goes uncontacted while the receipt reports every number was tried.
+def _diallable(spellings: tuple[str, ...]) -> tuple[tuple[str, ...], tuple[str, ...]]:
+    numbers: dict[str, None] = {}
+    refused: list[str] = []
+    for one in spellings:
+        address = canonical(one)
+        if address is None:
+            refused.append(one)
+        else:
+            numbers.setdefault(address, None)
+    return tuple(numbers), tuple(refused)
 
 
 _YES = {"1", "true", "yes", "y", "granted"}
@@ -356,7 +381,19 @@ class CsvSource:
                 seen.add(item_id)
 
                 raw_phones = (row.get("phones") or "").strip()
-                phones = _split_phones(raw_phones)
+                spellings = _split_phones(raw_phones)
+                phones, unreachable = _diallable(spellings)
+                if unreachable:
+                    # Masked. This message names the cell the district wrote, and the
+                    # reason the cell is being quoted at all is that it contains digits.
+                    raise SourceError(
+                        f"{self.path.name} line {line_number}: {item_id!r} has a phone "
+                        f"entry that is not an E.164 number: {redact(unreachable[0])!r}. "
+                        "A destination needs a leading +, a country code that does not "
+                        "start with zero, and eight to fifteen ASCII digits. Fix the cell "
+                        "or remove the entry; this run will not guess which number was "
+                        "meant.")
+
                 if not phones:
                     # Two different things a reader has to tell apart: an empty cell, and
                     # a cell holding a word. The second one looks filled in on a

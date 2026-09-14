@@ -28,6 +28,8 @@ from __future__ import annotations
 from dataclasses import dataclass, field
 from datetime import date
 
+from .e164 import canonical
+
 # What a record must carry, and what it may. `id` is what a work file points at;
 # `student_id` is what stops one family's permission being read as another's.
 REQUIRED = ("id", "student_id", "channel", "purpose", "given_at")
@@ -105,23 +107,41 @@ class ConsentRecord:
     def covers_number(self, number: str) -> bool:
         """Whether this record names the number about to be dialled.
 
-        Compared on digits, so `+1 555 010 0301` in a register and `+15550100301` in a
-        work file are one telephone. A record naming no numbers covers none of them and
-        this returns False for every number, because the caller has to be able to tell
-        "this record does not cover that number" from "this record names no numbers at
-        all", and those are different sentences to a family.
+        The number about to be dialled has to be an address first. `canonical` returns
+        None for anything that is not exact ASCII E.164, and a None here is False: this
+        method answers "may we ring this", and there is nothing to ring.
 
-        Something with no digits in it is not a number and matches nothing, on either
-        side. `unknown` in a phone column strips to an empty string, an empty string
-        equals an empty string, and a record holding `unknown` would otherwise cover a row
-        carrying `unknown`. Both loaders now refuse that entry, and this still refuses it,
-        because a guard that relies on its callers is one a later caller removes.
+        The register side is still compared on digits, so `+1 555 010 0301` in a register
+        and `+15550100301` in a work file are one telephone. A record naming no numbers
+        covers none of them and this returns False for every number, because the caller
+        has to be able to tell "this record does not cover that number" from "this record
+        names no numbers at all", and those are different sentences to a family.
+
+        The digit comparison used `str.isdigit()`, which is true for Unicode decimal
+        digits and, worse, for superscripts. A record holding `see note` with a superscript
+        five stripped to a single character, a row carrying any other superscript five
+        stripped to the same one, and the two compared equal: a permission for nothing at
+        all covered a number nobody had checked. Both sides are ASCII digits now, and the
+        dialled side cannot reach this comparison at all unless it is already an address,
+        so the equality has nothing left to be accidental about.
         """
-        want = "".join(ch for ch in number if ch.isdigit())
-        if not want:
+        address = canonical(number)
+        if address is None:
             return False
-        return any("".join(ch for ch in held if ch.isdigit()) == want
-                   for held in self.phones)
+        want = _ascii_digits(address)
+        return any(_ascii_digits(held) == want for held in self.phones)
+
+
+
+def _ascii_digits(text: str) -> str:
+    """The digits a telephone network can carry, and only those.
+
+    `str.isdigit()` is the same trap `sources._ascii_digits` documents: it is true for
+    Eastern Arabic and Devanagari numerals and for superscripts, none of which are
+    addresses. This is the register-side copy of that function, kept here rather than
+    imported so `dispatch.consent` stays free of a cycle with `dispatch.sources`.
+    """
+    return "".join(ch for ch in text if "0" <= ch <= "9")
 
 
 def _as_date(value: object, field: str, where: str) -> date:
@@ -160,7 +180,7 @@ def _as_phones(value: object, where: str) -> tuple[str, ...]:
         if not isinstance(entry, str) or not entry.strip():
             raise RegisterError(f"{where}: phones contains {entry!r}, which is not a "
                                 "telephone number")
-        if not any(ch.isdigit() for ch in entry):
+        if not _ascii_digits(entry):
             raise RegisterError(
                 f"{where}: phones contains {entry!r}, which has no digits in it. A "
                 "district export writes 'unknown' and 'n/a' into a phone column, and a "
