@@ -166,6 +166,7 @@ This project is an awesome list for AI-agent phone-call workflows. Add resources
 
 ### Apps
 
+- [TinySlot](apps/typescript/tinyslot/) - Adaptive childcare-vacancy search that calls approved centers in bounded waves, verifies openings against a privacy-minimized care brief, stops when enough evidence-backed matches are found, and gates a tour request behind separate parent approval.
 - [ResolveCall](https://github.com/Arvindkumar006/RESOLVECALL) - Experimental external CALL-E operational-recovery reference for delivery-window conversations and transcript-derived policy checks; live calling has real side effects, and recovery, production-readiness, and cryptographic guarantees are not independently verified.
 - [PartFinder AI](https://github.com/atsushiyago/partfinder-ai) - External Next.js local-parts demo with a no-call mock default, explicit CALL-E call initiation, server-side credentials, and transcript-backed inventory comparisons for operator review.
 - [RELAY](https://github.com/eyadarshad/RELAY) - Experimental external business-operations demo with a sandbox default, supplier conversations via CALL-E, and threshold-based human approval for purchase-order commitments; not a production procurement guarantee.
@@ -199,6 +200,7 @@ Runnable demo apps live under [`apps/`](apps/). They are not a CALL-E SDK and do
 
 | App | Language | Purpose |
 | --- | --- | --- |
+| [`apps/typescript/tinyslot`](apps/typescript/tinyslot/) | TypeScript / Next.js | Adaptive childcare-vacancy search with bounded CALL-E waves, deterministic constraint checks, evidence-backed comparisons, and a separately approved tour request. |
 | [`apps/typescript/before-we-go`](apps/typescript/before-we-go/) | TypeScript / Node.js | Consent-gated restaurant enquiry callbacks grounded in a versioned fictional fact sheet, with transcript-linked customer needs, unresolved questions, and a reviewed staff handoff; synthetic no-call default. |
 | [`apps/typescript/kol`](apps/typescript/kol/) | TypeScript / Node | Evidence-gated healthcare claim-status calls that require transcript-grounded fields, the intended payer department, the actual question, and an independent IVR route receipt; includes a 640-case no-call evaluation and explicit live CALL-E path. |
 | [`apps/python/rolloff-scope`](apps/python/rolloff-scope/) | Python | Compares a fixed dumpster scope using evidence-bound mandatory fees; excludes incomplete or contradictory quotes, with no-call fixtures by default. |
