@@ -174,6 +174,7 @@ This project is an awesome list for AI-agent phone-call workflows. Add resources
 ### Apps
 
 
+- [CommonLot](https://github.com/kirmada1509/call-e-commonlot/tree/codex/commonlot-hackathon-submission) - Organizer-controlled pooled purchasing workbench that structures CALL-E buyer and supplier conversations, defaults to simulation, recomputes feasibility after revisions, and keeps orders human-approved. [Demo](https://commonlot.duckdns.org/about)
 - [BidPilot Voice](docs/bidpilot-voice.md) - External CALL-E procurement verification app with reviewed supplier questions, structured results, and a no-call preview.
 - [Callstack](https://github.com/RolexAlexander/callstack) - External codebase-ingesting technical support agent that reads repository documentation/source and proposes a CALL-E support-call task. The author reports previews against two repositories and one owned-destination live test; broad correctness is not independently established. No-call preview is the default; a real call requires an explicit `--dispatch` flag after human review of the diagnosis and call task.
 - [CallIQ](https://github.com/kk590/CallIQ) - Experimental offline sales-call workflow simulator for rehearsing lead qualification, objection handling, meeting booking, and local CRM updates; it does not place real calls or mutate a live CRM.
