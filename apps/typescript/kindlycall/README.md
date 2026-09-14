@@ -49,14 +49,17 @@ three tools in order:
 3. `get_call_run` is polled for status, the live activity feed (streamed into the
    app as a transcript), and the terminal structured result.
 
-The backend also supports CALL-E's REST Developer API (`POST /v1/calls`,
-`GET /v1/calls/{id}`) with an API key as an alternative transport, selectable
-with `CALLE_TRANSPORT=rest`; MCP over OAuth is the default.
+For real calls the backend has two transports. The recommended one is CALL-E's
+REST Developer API (`POST /v1/calls`, `GET /v1/calls/{id}`) with an API key
+(`CALLE_TRANSPORT=rest`). The MCP over OAuth path is the default for local
+development only: it reuses the same machine's `calle` CLI token cache
+(`calle auth login`), which is a private per-user credential store rather than a
+token-distribution API; the backend reads it locally and never copies, logs, or
+transmits it.
 
 The result is normalized, translated to the user's language, narrated, and saved.
-Auth uses the `calle` CLI token cache (`calle auth login`). Translation and
-multi-call ranking use Gemini when a key is present and fall back to offline
-behavior otherwise.
+Translation and multi-call ranking use Gemini when a key is present and fall back
+to offline behavior otherwise.
 
 ## Setup and usage
 
