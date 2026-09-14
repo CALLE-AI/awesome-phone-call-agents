@@ -87,9 +87,13 @@ and never appears unmasked in any report.
 
 ```bash
 npm install
-npm test          # 74 tests. No API key, no network, no calls.
+npm test          # 87 tests. No API key, no network, no calls.
 npm run dev       # the console at http://localhost:3000
 ```
+
+The console opens on the ordinary case and runs entirely on recorded calls. Each
+scenario is linkable — `?s=leaked` goes straight to the call where the number
+gets out, which is the one worth looking at.
 
 Nothing above places a phone call or needs a credential.
 
