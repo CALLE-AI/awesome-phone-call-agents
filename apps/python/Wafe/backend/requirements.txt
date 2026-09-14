@@ -1,0 +1,5 @@
+fastapi
+uvicorn[standard]
+python-dotenv
+pydantic
+calle-ai

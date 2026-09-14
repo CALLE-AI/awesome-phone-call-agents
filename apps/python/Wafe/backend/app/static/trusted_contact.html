@@ -1,0 +1,298 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+
+    <title>CALL-E Trusted Contact</title>
+
+    <style>
+        * {
+            box-sizing: border-box;
+        }
+
+        body {
+            margin: 0;
+            font-family: Arial, sans-serif;
+            background: #f4f6f8;
+            color: #222;
+        }
+
+        header {
+            background: #111827;
+            color: white;
+            padding: 20px;
+        }
+
+        header h1 {
+            margin: 0;
+        }
+
+        .container {
+            max-width: 900px;
+            margin: 30px auto;
+            padding: 20px;
+        }
+
+        .status {
+            background: white;
+            border-radius: 12px;
+            padding: 20px;
+            margin-bottom: 20px;
+            box-shadow: 0 2px 10px rgba(0, 0, 0, 0.08);
+        }
+
+        .safe {
+            border-left: 8px solid #16a34a;
+        }
+
+        .danger {
+            border-left: 8px solid #dc2626;
+        }
+
+        .alert {
+            background: #fee2e2;
+            border: 2px solid #dc2626;
+            border-radius: 12px;
+            padding: 24px;
+            margin-top: 20px;
+        }
+
+        .alert h2 {
+            margin-top: 0;
+            color: #b91c1c;
+        }
+
+        .location {
+            margin-top: 15px;
+        }
+
+        button {
+            border: none;
+            border-radius: 8px;
+            padding: 12px 18px;
+            font-size: 16px;
+            cursor: pointer;
+            margin-top: 15px;
+        }
+
+        .acknowledge {
+            background: #111827;
+            color: white;
+        }
+
+        .map {
+            background: #2563eb;
+            color: white;
+            text-decoration: none;
+            display: inline-block;
+            padding: 12px 18px;
+            border-radius: 8px;
+            margin-top: 15px;
+        }
+
+        #alerts {
+            margin-top: 20px;
+        }
+    </style>
+</head>
+
+<body>
+
+<header>
+    <h1>CALL-E Trusted Contact</h1>
+</header>
+
+<div class="container">
+
+    <div id="currentStatus" class="status safe">
+        <h2>🟢 No Active Alert</h2>
+        <p>Waiting for a safety event...</p>
+    </div>
+
+    <div id="alerts"></div>
+
+</div>
+
+<script>
+
+let knownAlertIds = new Set();
+
+
+async function fetchAlerts() {
+
+    try {
+
+        const response = await fetch("/api/alerts");
+
+        const data = await response.json();
+
+        renderAlerts(data.alerts || []);
+
+    } catch (error) {
+
+        console.error(
+            "Failed to fetch alerts:",
+            error
+        );
+    }
+}
+
+
+function renderAlerts(alerts) {
+
+    const container =
+        document.getElementById("alerts");
+
+    const currentStatus =
+        document.getElementById("currentStatus");
+
+    if (alerts.length === 0) {
+
+        currentStatus.className =
+            "status safe";
+
+        currentStatus.innerHTML = `
+            <h2>🟢 No Active Alert</h2>
+            <p>Waiting for a safety event...</p>
+        `;
+
+        container.innerHTML = "";
+
+        return;
+    }
+
+    const latest = alerts[0];
+
+    if (latest.status === "new") {
+
+        currentStatus.className =
+            "status danger";
+
+        currentStatus.innerHTML = `
+            <h2>🔴 ATTENTION REQUIRED</h2>
+            <p>
+                CALL-E detected a safety incident.
+            </p>
+        `;
+
+    } else {
+
+        currentStatus.className =
+            "status safe";
+
+        currentStatus.innerHTML = `
+            <h2>🟢 Alert Acknowledged</h2>
+            <p>
+                The trusted contact has acknowledged
+                the alert.
+            </p>
+        `;
+    }
+
+
+    container.innerHTML = alerts.map(alert => {
+
+        const mapMatch =
+            alert.message.match(
+                /https:\/\/www\.google\.com\/maps\?q=[^\s]+/
+            );
+
+        const mapLink =
+            mapMatch
+                ? mapMatch[0]
+                : null;
+
+        return `
+            <div class="alert">
+
+                <h2>🚨 CALL-E SAFETY ALERT</h2>
+
+                <p>
+                    ${escapeHtml(alert.message)}
+                </p>
+
+                ${
+                    mapLink
+                    ? `
+                        <a
+                            class="map"
+                            href="${mapLink}"
+                            target="_blank"
+                        >
+                            📍 Open Location
+                        </a>
+                    `
+                    : ""
+                }
+
+                ${
+                    alert.status === "new"
+                    ? `
+                        <br>
+                        <button
+                            class="acknowledge"
+                            onclick="acknowledgeAlert(${alert.id})"
+                        >
+                            Acknowledge Alert
+                        </button>
+                    `
+                    : `
+                        <p>
+                            ✅ Acknowledged
+                        </p>
+                    `
+                }
+
+            </div>
+        `;
+
+    }).join("");
+}
+
+
+async function acknowledgeAlert(id) {
+
+    try {
+
+        await fetch(
+            `/api/alerts/${id}/acknowledge`,
+            {
+                method: "POST"
+            }
+        );
+
+        fetchAlerts();
+
+    } catch (error) {
+
+        console.error(
+            "Failed to acknowledge:",
+            error
+        );
+    }
+}
+
+
+function escapeHtml(text) {
+
+    const div = document.createElement("div");
+
+    div.textContent = text;
+
+    return div.innerHTML;
+}
+
+
+fetchAlerts();
+
+setInterval(
+    fetchAlerts,
+    2000
+);
+
+</script>
+
+</body>
+</html>
