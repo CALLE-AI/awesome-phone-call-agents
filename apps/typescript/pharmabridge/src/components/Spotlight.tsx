@@ -1,10 +1,10 @@
 "use client";
 import { AnimatePresence, motion } from "framer-motion";
-import { Bot, Headphones, Radio } from "lucide-react";
+import { Bot, Headphones } from "lucide-react";
 import { useEffect, useRef } from "react";
 import { ACTIVE_PHASES, PHASE_META, type Slot } from "@/lib/mission";
 import { TIER_META, cx, formatClock } from "@/lib/ui";
-import { Card, Waveform } from "./ui";
+import { Card, ModeDot, Waveform } from "./ui";
 
 const turnCount = (s: Slot) => s.call?.attempts.reduce((n, a) => n + a.transcriptTurns.length, 0) ?? 0;
 
@@ -36,7 +36,7 @@ export function Spotlight({ slots, onOpen }: { slots: Slot[]; onOpen: (key: stri
             <Headphones className="h-4 w-4" />
           </div>
           <div className="min-w-0">
-            <div className="text-[10.5px] font-bold uppercase tracking-[0.14em] text-slate-400">Live conversation</div>
+            <div className="text-[10.5px] font-bold uppercase tracking-[0.14em] text-slate-400">Conversation</div>
             <div className="truncate text-sm font-bold text-slate-900">{slot ? slot.facility.name : "Waiting for a call to connect"}</div>
           </div>
         </div>
@@ -52,11 +52,7 @@ export function Spotlight({ slots, onOpen }: { slots: Slot[]; onOpen: (key: stri
                 </span>
               </>
             )}
-            {slot.mode === "live" && (
-              <span className="inline-flex items-center gap-1 rounded-full bg-emerald-50 px-2 py-0.5 text-[10px] font-bold text-emerald-700 ring-1 ring-emerald-200">
-                <Radio className="h-3 w-3" /> LIVE
-              </span>
-            )}
+            {slot.mode && <ModeDot live={slot.mode === "live"} />}
             <span className="font-mono text-[11px] tabular-nums text-slate-400">{slot.launchedAt ? formatClock((slot.finishedAt ?? Date.now()) - slot.launchedAt) : ""}</span>
           </div>
         )}

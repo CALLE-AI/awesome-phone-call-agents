@@ -36,7 +36,7 @@ export function BriefModal({
           >
             <div className="flex items-start justify-between border-b border-slate-100 p-5">
               <div>
-                <div className="text-[11px] font-bold uppercase tracking-[0.16em] text-violet-600">Dry run · nothing dialed</div>
+                <div className="text-[11px] font-bold uppercase tracking-[0.16em] text-violet-600">Before dispatch</div>
                 <div className="mt-1 font-display text-xl font-semibold text-slate-900">What each agent will be told</div>
               </div>
               <button onClick={onClose} className="rounded-lg p-1.5 text-slate-400 hover:bg-slate-100 hover:text-slate-700">
@@ -53,7 +53,7 @@ export function BriefModal({
               {plan?.brief && <BriefView brief={plan.brief} resultSchema={plan.resultSchema} />}
               {plan && (
                 <details className="mt-5 rounded-2xl bg-slate-50 p-4 ring-1 ring-slate-200">
-                  <summary className="cursor-pointer text-[12px] font-semibold text-slate-600">Exact text sent to CALL-E</summary>
+                  <summary className="cursor-pointer text-[12px] font-semibold text-slate-600">Exact task text</summary>
                   <pre className="mt-3 whitespace-pre-wrap font-mono text-[11.5px] leading-relaxed text-slate-700">{plan.task}</pre>
                 </details>
               )}

@@ -20,7 +20,7 @@ export async function GET(request: Request, { params }: { params: Promise<{ id: 
 
   if (isSimulatedId(id)) {
     const call = getSimulatedCall(id);
-    if (!call) return NextResponse.json({ error: { code: "not_found", message: "Unknown simulated call." } }, { status: 404 });
+    if (!call) return NextResponse.json({ error: { code: "not_found", message: "Unknown call." } }, { status: 404 });
     void recordSnapshot(id, { call });
     return NextResponse.json({ call: redactDeep(call), via: "simulation" });
   }

@@ -32,7 +32,7 @@ import { BLOOD_COMPONENTS, type AppConfig, type BloodInquiryResult, type Inquiry
 import { TIER_META, cx, directionsUrl, driveMinutes, formatClock, formatKm, onMap } from "@/lib/ui";
 import { CallDrawer, type DrawerData } from "./CallDrawer";
 import { LiveMap } from "./Map";
-import { Button, Card, Chip, ConfidenceMeter, inputClass, Label, Segmented, Stat, Toggle, Waveform } from "./ui";
+import { Button, Card, Chip, ConfidenceMeter, inputClass, Label, ModeDot, Segmented, Stat, Toggle, Waveform } from "./ui";
 
 type ShareLanguage = "en" | "ta" | "hi";
 type RouteMode = "transfer" | "prescriber";
@@ -57,7 +57,12 @@ function FollowUpStatus({ state, onOpen }: { state: FollowUpState; onOpen: () =>
           </button>
         )}
       </div>
-      {state.mode && <p className="mt-1 text-[11px] text-slate-400">{state.mode === "live" ? `LIVE → ${state.dialTarget}` : "Simulated · no call placed"}</p>}
+      {state.mode && (
+        <p className="mt-1 flex items-center gap-1.5 text-[11px] text-slate-400">
+          <ModeDot live={state.mode === "live"} />
+          {state.mode === "live" ? state.dialTarget : null}
+        </p>
+      )}
       {state.error && <p className="mt-2 text-sm text-rose-600">{state.error}</p>}
       {state.call?.summary && <p className="mt-2 text-[13px] leading-relaxed text-slate-700">{state.call.summary}</p>}
     </div>
@@ -154,7 +159,7 @@ export function ResultsStep({
     consent: false,
   });
   const [transferForm, setTransferForm] = useState({
-    fromPharmacy: "Corner Drug on 5th (fictional)",
+    fromPharmacy: "Corner Drug on 5th",
     phone: "",
     patientFullName: "Maya Rivera",
     patientDob: "2021-04-12",
@@ -595,7 +600,7 @@ export function ResultsStep({
                     </div>
                     <div className="mt-2">
                       <Toggle checked={transferForm.consent} onChange={(consent) => setTransferForm({ ...transferForm, consent })}>
-                        I&apos;m the patient or their caregiver and consent to sharing this name and date of birth with this pharmacy only. Sample values are fictional.
+                        I&apos;m the patient or their caregiver and consent to sharing this name and date of birth with this pharmacy only.
                       </Toggle>
                     </div>
                     <Button
@@ -657,7 +662,7 @@ export function ResultsStep({
                       </div>
                       <div className="mt-2">
                         <Toggle checked={rxForm.consent} onChange={(consent) => setRxForm({ ...rxForm, consent })}>
-                          I&apos;m the patient or their caregiver and consent to sharing this name and date of birth with this office only. Sample values are fictional.
+                          I&apos;m the patient or their caregiver and consent to sharing this name and date of birth with this office only.
                         </Toggle>
                       </div>
                       <Button

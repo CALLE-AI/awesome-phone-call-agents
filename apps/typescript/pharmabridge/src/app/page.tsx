@@ -199,7 +199,7 @@ export default function Home() {
         <StepHeader
           eyebrow="Step 3 · Mission control"
           title={`Agents on the line for ${needTitle(need)}`}
-          body="Each card is one CALL-E call working through phone menus and hold music to a schema-validated result. The spotlight streams the busiest conversation, and queued calls are cancelled the moment the target is reached."
+          body="Each card is one agent call working through phone menus and hold music to a schema-validated result. The spotlight streams the busiest conversation, and queued calls are cancelled the moment the target is reached."
         />
       )}
       {step === 4 && (

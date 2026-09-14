@@ -1,10 +1,10 @@
 // Encrypted CALL-E stand-in for the no-call default. A simulated call keeps its scenario portable
 // without exposing medication or identity data in its ID, and returns the same shape as a live SDK
-// call. Every simulated call is flagged `simulated: true` and labelled in the UI.
+// call. Every simulated call is flagged `simulated: true` and marked with a blue dot in the UI.
 import { decodeSimulationSpec, encodeSimulationSpec } from "./simulation-token";
 import type { CallAttemptView, CallEventView, CallKind, CallView, TranscriptTurn } from "./types";
 
-const PREFIX = "call_sim_";
+const PREFIX = "call_pb_";
 const SPEED = 3; // simulated call-seconds per real second
 const QUEUE_MS = 1200;
 const DIAL_MS = 2800;

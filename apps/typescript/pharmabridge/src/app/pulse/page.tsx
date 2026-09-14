@@ -4,7 +4,7 @@ import Link from "next/link";
 import { useEffect, useMemo, useState } from "react";
 import { Background, Footer, TopBar } from "@/components/Chrome";
 import { LiveMap } from "@/components/Map";
-import { Button, Card, Chip, Segmented, Stat } from "@/components/ui";
+import { Button, Card, Chip, ModeDot, Segmented, Stat } from "@/components/ui";
 import { ageLabel, freshHours, SIGHTING_META, type PulseResponse, type PulseSummary, type Sighting, type SightingStatus } from "@/lib/pulse-item";
 import type { AppConfig, NeedKind } from "@/lib/types";
 import { cx } from "@/lib/ui";
@@ -124,7 +124,7 @@ export default function PulsePage() {
             {pulse && items.length === 0 && (
               <div className="flex flex-col items-center gap-2 p-8 text-center text-sm text-slate-400">
                 <Activity className="h-6 w-6" />
-                No fresh answers yet. Run a mission (simulation works) and its answers appear here within seconds.
+                No fresh answers yet. Answers from PharmaBridge calls appear here within seconds.
                 <Link href="/">
                   <Button variant="secondary" className="mt-2">Start a search</Button>
                 </Link>
@@ -235,7 +235,7 @@ export default function PulsePage() {
                       <span className="line-clamp-2">{[s.quantity, s.restock ? `restock: ${s.restock}` : ""].filter(Boolean).join(" · ") || "—"}</span>
                     </td>
                     <td className="px-3 py-3">
-                      <Chip tone={s.live ? "emerald" : "indigo"}>{s.live ? "Live call" : "Simulated"}</Chip>
+                      <ModeDot live={s.live} className="ml-3" />
                     </td>
                   </tr>
                 ))}
@@ -255,9 +255,9 @@ export default function PulsePage() {
           <div className="flex gap-3">
             <ShieldCheck className="mt-0.5 h-5 w-5 shrink-0 text-emerald-500" />
             <p className="text-[12.5px] leading-relaxed text-slate-600">
-              <strong className="text-slate-800">Only the facility&apos;s own words.</strong> Every answer is a CALL-E result that passed PharmaBridge&apos;s schema, from a
-              live call to the facility&apos;s listed number or a fictional demo facility. Simulated and test-line answers about real businesses never appear, and
-              nobody can type a claim onto the Pulse.
+              <strong className="text-slate-800">Only the facility&apos;s own words.</strong> Every answer is a call result that passed PharmaBridge&apos;s schema, heard on
+              the facility&apos;s own listed number or from the built-in directory. Answers about a real business from any other line never appear, and nobody
+              can type a claim onto the Pulse.
             </p>
           </div>
           <div className="flex gap-3">

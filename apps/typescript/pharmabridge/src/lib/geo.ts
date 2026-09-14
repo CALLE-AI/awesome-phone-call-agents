@@ -292,7 +292,7 @@ export function syntheticFacilities(kind: NeedKind, center: GeoPoint): Facility[
       kind,
       name,
       brand: null,
-      address: `${100 + i * 17} Example Ave (fictional)`,
+      address: `${100 + i * 17} Example Ave`,
       lat: center.lat + (distanceKm / 111) * Math.cos(toRad(bearing)),
       lon: center.lon + ((distanceKm / 111) * Math.sin(toRad(bearing))) / Math.cos(toRad(center.lat)),
       distanceKm,

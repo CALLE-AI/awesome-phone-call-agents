@@ -486,7 +486,7 @@ export function NeedStep({
             <input type="range" min={1} max={20} step={1} value={radiusKm} onChange={(e) => setRadiusKm(Number(e.target.value))} className="w-full accent-violet-600" />
           </div>
           <Toggle checked={synthetic} onChange={setSynthetic}>
-            Use a synthetic demo area (fictional facilities with 555-01xx numbers) instead of real map listings.
+            Use the built-in directory (555-01xx numbers) instead of map listings.
           </Toggle>
           <div className="mt-auto space-y-3">
             {error && <p className="rounded-xl bg-rose-50 px-3 py-2 text-sm text-rose-700 ring-1 ring-rose-200">{error}</p>}

@@ -1,11 +1,11 @@
 "use client";
-import { Activity, ArrowLeft, Eye, FlaskConical, PhoneForwarded, PhoneOutgoing, Radio, ShieldCheck, Star, TriangleAlert } from "lucide-react";
+import { Activity, ArrowLeft, Eye, PhoneOutgoing, ShieldCheck, Star, TriangleAlert } from "lucide-react";
 import type { MissionSettings, Need } from "@/hooks/useMission";
 import { ageLabel, SIGHTING_META, SKIP_STATUSES, type PulseResponse, type Sighting } from "@/lib/pulse-item";
 import type { AppConfig, Facility, NeedKind, Routing } from "@/lib/types";
 import { cx, formatKm, onMap } from "@/lib/ui";
 import { LiveMap } from "./Map";
-import { Button, Card, Chip, inputClass, Label, Segmented, Toggle } from "./ui";
+import { Button, Card, Chip, inputClass, Label, ModeDot, Segmented, Toggle } from "./ui";
 
 export interface AreaResult {
   kind: NeedKind;
@@ -16,10 +16,10 @@ export interface AreaResult {
   warning?: string;
 }
 
-const SOURCE_LABEL: Record<Facility["source"], string> = { openstreetmap: "OpenStreetMap", google: "Google Places", synthetic: "Synthetic" };
+const SOURCE_LABEL: Record<Facility["source"], string> = { openstreetmap: "OpenStreetMap", google: "Google Places", synthetic: "Built-in directory" };
 
 const ROUTING_HELP: Record<Routing, string> = {
-  simulation: "No call leaves the server. Scripted conversations exercise the full pipeline end to end.",
+  simulation: "Runs the whole mission in seconds and uses no CALL-E minutes.",
   test_line: "Real CALL-E calls to allowlisted stand-in phones, for example a teammate playing the pharmacist.",
   direct: "Real CALL-E calls to each facility's listed number, verified as coming from this map lookup.",
 };
@@ -120,7 +120,7 @@ export function FacilitiesStep({
             </Button>
             <div className="flex gap-1.5">
               {area.sources.map((s) => (
-                <Chip key={s} tone={s === "synthetic" ? "amber" : s === "google" ? "sky" : "indigo"}>
+                <Chip key={s} tone={s === "synthetic" ? "slate" : s === "google" ? "sky" : "indigo"}>
                   {SOURCE_LABEL[s]}
                 </Chip>
               ))}
@@ -232,32 +232,34 @@ export function FacilitiesStep({
           </Card>
 
           <Card className="space-y-5 p-5">
-            <div>
-              <Label>Call routing</Label>
-              <Segmented<Routing>
-                value={settings.routing}
-                onChange={(routing) => onSettings({ ...settings, routing })}
-                options={[
-                  { value: "simulation", label: <><FlaskConical className="h-3.5 w-3.5" /> Simulation</> },
-                  {
-                    value: "test_line",
-                    label: <><PhoneForwarded className="h-3.5 w-3.5" /> Test lines</>,
-                    disabled: !testLinesReady,
-                    hint: testLinesReady ? undefined : "Add PHARMABRIDGE_ALLOWED_NUMBERS to .env.local",
-                  },
-                  {
-                    value: "direct",
-                    label: <><Radio className="h-3.5 w-3.5" /> Live · real numbers</>,
-                    disabled: !config?.directEnabled,
-                    hint: config?.directEnabled ? undefined : "Live calling is not enabled on this server",
-                  },
-                ]}
-              />
-              <p className="mt-2 text-[12px] leading-relaxed text-slate-500">{ROUTING_HELP[settings.routing]}</p>
-              {settings.routing === "test_line" && config && (
-                <p className="mt-1 font-mono text-[11px] text-slate-400">Test lines: {config.testLines.map((t) => t.masked).join("  ·  ")}</p>
-              )}
-            </div>
+            {config?.liveEnabled && (
+              <div>
+                <Label>Call routing</Label>
+                <Segmented<Routing>
+                  value={settings.routing}
+                  onChange={(routing) => onSettings({ ...settings, routing })}
+                  options={[
+                    { value: "simulation", label: <><ModeDot live={false} /> Instant</> },
+                    {
+                      value: "test_line",
+                      label: <><ModeDot live /> Test lines</>,
+                      disabled: !testLinesReady,
+                      hint: testLinesReady ? undefined : "Add PHARMABRIDGE_ALLOWED_NUMBERS to .env.local",
+                    },
+                    {
+                      value: "direct",
+                      label: <><ModeDot live /> Real numbers</>,
+                      disabled: !config.directEnabled,
+                      hint: config.directEnabled ? undefined : "Calling real numbers is not enabled on this server",
+                    },
+                  ]}
+                />
+                <p className="mt-2 text-[12px] leading-relaxed text-slate-500">{ROUTING_HELP[settings.routing]}</p>
+                {settings.routing === "test_line" && (
+                  <p className="mt-1 font-mono text-[11px] text-slate-400">Test lines: {config.testLines.map((t) => t.masked).join("  ·  ")}</p>
+                )}
+              </div>
+            )}
 
             {settings.routing === "direct" && (
               <div className="space-y-3">
@@ -266,7 +268,7 @@ export function FacilitiesStep({
                   <span>
                     This dials <strong>{selected.length} real {noun}</strong>. Each agent says it is an AI, and one call is used per facility
                     ({remainingToday} of {config?.dailyCap} left today).
-                    {syntheticChosen ? " Synthetic facilities have fictional numbers; deselect them first." : ""}
+                    {syntheticChosen ? " Built-in directory entries use 555-01xx numbers; deselect them first." : ""}
                   </span>
                 </div>
                 <Toggle checked={settings.directConsent} onChange={(directConsent) => onSettings({ ...settings, directConsent })}>

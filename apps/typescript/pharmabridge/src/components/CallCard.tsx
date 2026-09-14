@@ -3,7 +3,7 @@ import { motion } from "framer-motion";
 import { AlertTriangle, ChevronRight, Database, RotateCcw } from "lucide-react";
 import { PHASE_META, type Slot } from "@/lib/mission";
 import { TIER_META, cx, formatClock, formatKm } from "@/lib/ui";
-import { Chip, ConfidenceMeter, Waveform } from "./ui";
+import { Chip, ConfidenceMeter, ModeDot, Waveform } from "./ui";
 
 const PIPELINE = ["Dial", "Menu", "Talk", "Extract", "Result"];
 
@@ -39,16 +39,12 @@ export function CallCard({ slot, onOpen, onRetry }: { slot: Slot; onOpen: () => 
             </span>
             <div className="min-w-0">
               <div className="truncate text-sm font-bold text-slate-900">{slot.facility.name}</div>
-              <div className="truncate text-[11px] text-slate-500">
-                {formatKm(slot.facility.distanceKm)} ·{" "}
-                {slot.mode === "live" ? (
-                  <span className="font-semibold text-emerald-600">LIVE → {slot.dialTarget}</span>
-                ) : slot.mode === "simulation" ? (
-                  "Simulated"
-                ) : (
-                  slot.facility.phoneMasked
-                )}
-                {slot.attempt > 1 ? ` · attempt ${slot.attempt}` : ""}
+              <div className="flex items-center gap-1.5 text-[11px] text-slate-500">
+                {slot.mode && <ModeDot live={slot.mode === "live"} />}
+                <span className="truncate">
+                  {formatKm(slot.facility.distanceKm)} · {slot.mode === "live" ? slot.dialTarget : slot.facility.phoneMasked}
+                  {slot.attempt > 1 ? ` · attempt ${slot.attempt}` : ""}
+                </span>
               </div>
             </div>
           </div>

@@ -9,7 +9,7 @@ const querySchema = z.object({
   synthetic: z.enum(["0", "1"]).default("0"),
 });
 
-const FALLBACK_CENTER: GeoPoint = { lat: 40.6782, lon: -73.9442, label: "Brooklyn, NY (synthetic demo area)", countryCode: "US" };
+const FALLBACK_CENTER: GeoPoint = { lat: 40.6782, lon: -73.9442, label: "Brooklyn, NY", countryCode: "US" };
 
 export async function GET(request: Request) {
   const parsed = querySchema.safeParse(Object.fromEntries(new URL(request.url).searchParams));
@@ -39,7 +39,7 @@ export async function GET(request: Request) {
       facilities: syntheticFacilities(kind, center),
       withoutPhone: 0,
       sources: ["synthetic"],
-      warning: "Map data was unreachable, so these are clearly labelled fictional facilities.",
+      warning: "Map data was unreachable, so this list comes from the built-in directory.",
     });
   }
 }

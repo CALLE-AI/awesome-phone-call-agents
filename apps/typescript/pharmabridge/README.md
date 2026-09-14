@@ -39,7 +39,7 @@ family's current pharmacy or as a request to the prescriber.
 | Step | Medicine | Blood | Powered by |
 | --- | --- | --- | --- |
 | 1. Need | Exact product from RxNorm, live FDA shortage status, DEA schedule, strengths to *ask about* | Group, component, units, and the hospital where the patient is admitted | NLM RxNorm, openFDA |
-| 2. Discover | Dispensing pharmacies with a listed phone, marked with recent Pulse answers. Places that just said "out" or "won't say" are left out to save calls. | Blood banks and blood centres with a listed phone, same Pulse marks | OpenStreetMap (Nominatim, Overpass), optional Google Places, Leaflet + CARTO map, Shortage Pulse |
+| 2. Discover | Dispensing pharmacies with a listed phone, marked with recent Pulse answers. Places that just said "out" or "won't say" are left out to save calls. | Blood banks and blood centres with a listed phone, same Pulse marks | OpenStreetMap (Nominatim, Overpass), optional Google Places, Leaflet + OpenStreetMap tiles, Shortage Pulse |
 | 3. Dispatch | Parallel CALL-E agents work phone menus, wait on hold, and ask the counter. The live conversation streams on screen. Queued calls are cancelled once the target is reached. | Same, asking about units, reservations, requisition, cross-match, replacement donors, charges, and 24×7 issue | CALL-E Calls API and events |
 | 4. Secure | Hold call → **transfer call** to the family's current pharmacy, or a prescriber routing call → pickup checklist and directions | Reservation call → requirements checklist and a replacement-donor call-out → directions | CALL-E Calls API |
 | 5. Share | Every verified answer goes to the Shortage Pulse for 12 to 24 hours | Same, for 6 hours | Call ledger projection |
@@ -106,7 +106,7 @@ flowchart LR
 
 - **Stateless calls, recorded outcomes.** The browser orchestrates the mission (concurrency cap,
   early stop, retries, polling). The server holds the API key, the dial gate, and the ledger.
-- **Encrypted simulator.** A simulated call's spec is encrypted into its `call_sim_…` id, so the
+- **Encrypted simulator.** A simulated call's spec is encrypted into its `call_pb_…` id, so the
   no-call mode returns the exact SDK `Call` shape without a database.
 
 ## Live calling and routing
@@ -271,7 +271,7 @@ tests/
 - [openFDA](https://open.fda.gov/) for drug shortages and the NDC directory. openFDA data is
   unvalidated and must not be used for medical decisions; PharmaBridge uses it only as context.
 - Map data © [OpenStreetMap](https://www.openstreetmap.org/copyright) contributors (ODbL), via
-  Nominatim and Overpass; basemap tiles © [CARTO](https://carto.com/attributions).
+  Nominatim and Overpass; map tiles from the OpenStreetMap tile server.
 - Optional [Google Places API (New)](https://developers.google.com/maps/documentation/places/web-service).
   Per Google Maps Platform terms, Google-sourced places are listed with attribution and a Google
   Maps link but never drawn on the OpenStreetMap basemap.

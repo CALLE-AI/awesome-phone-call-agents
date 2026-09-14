@@ -1,5 +1,5 @@
 "use client";
-import { Activity, Archive, Check, FlaskConical, Radio } from "lucide-react";
+import { Activity, Archive, Check } from "lucide-react";
 import Link from "next/link";
 import type { AppConfig } from "@/lib/types";
 import { cx } from "@/lib/ui";
@@ -106,14 +106,16 @@ export function TopBar({ config, step, maxStep, onStep }: { config: AppConfig | 
 
 export function ModeBadge({ config }: { config: AppConfig | null }) {
   if (!config) return <span className="text-[11px] text-slate-400">connecting…</span>;
-  return config.liveEnabled ? (
-    <span className="inline-flex items-center gap-2 rounded-full bg-emerald-50 px-3 py-1.5 text-[11px] font-bold text-emerald-700 ring-1 ring-emerald-200">
-      <span className="live-dot h-2 w-2 rounded-full bg-emerald-500" />
-      <Radio className="h-3.5 w-3.5" /> Live ready · {config.liveCallsToday}/{config.dailyCap} today
-    </span>
-  ) : (
-    <span className="inline-flex items-center gap-2 rounded-full bg-indigo-50 px-3 py-1.5 text-[11px] font-bold text-indigo-700 ring-1 ring-indigo-200">
-      <FlaskConical className="h-3.5 w-3.5" /> Simulation only
+  const live = config.liveEnabled;
+  return (
+    <span
+      className={cx(
+        "inline-flex items-center gap-2 rounded-full px-3 py-1.5 text-[11px] font-bold ring-1",
+        live ? "bg-emerald-50 text-emerald-700 ring-emerald-200" : "bg-blue-50 text-blue-700 ring-blue-200",
+      )}
+    >
+      <span className={cx("live-dot h-2 w-2 rounded-full", live ? "bg-emerald-500" : "bg-blue-500")} />
+      {live ? `Agents ready · ${config.liveCallsToday}/${config.dailyCap} today` : "Agents ready"}
     </span>
   );
 }
@@ -123,7 +125,7 @@ export function Footer() {
     <footer className="mx-auto mt-16 max-w-7xl px-5 pb-10 text-[11.5px] leading-relaxed text-slate-500">
       <div className="flex flex-col gap-2 border-t border-slate-200/80 pt-6 md:flex-row md:items-center md:justify-between">
         <p>
-          Calls by <span className="font-semibold text-slate-700">CALL-E</span> · Drug data: NLM RxNorm, openFDA · Map data © OpenStreetMap contributors, © CARTO
+          Calls by <span className="font-semibold text-slate-700">CALL-E</span> · Drug data: NLM RxNorm, openFDA · Map data © OpenStreetMap contributors
         </p>
         <p>PharmaBridge checks availability only. It never gives medical advice or changes a prescription or blood order.</p>
       </div>

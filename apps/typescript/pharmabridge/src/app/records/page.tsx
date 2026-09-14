@@ -1,9 +1,9 @@
 "use client";
-import { Archive, Bot, Droplet, FileJson, FlaskConical, KeyRound, Pill, Radio, Search } from "lucide-react";
+import { Archive, Bot, Droplet, FileJson, KeyRound, Pill, Search } from "lucide-react";
 import { useEffect, useMemo, useState, type FormEvent } from "react";
 import { BriefView } from "@/components/BriefView";
 import { Background, Footer, TopBar } from "@/components/Chrome";
-import { Card, Chip, ConfidenceMeter, inputClass } from "@/components/ui";
+import { Card, Chip, ConfidenceMeter, inputClass, ModeDot } from "@/components/ui";
 import type { LedgerEntry, LedgerSummary } from "@/lib/ledger";
 import type { AppConfig } from "@/lib/types";
 import { cx } from "@/lib/ui";
@@ -118,8 +118,8 @@ export default function RecordsPage() {
         <h1 className="mt-2 font-display text-3xl font-bold tracking-tight text-slate-900">Every call, recorded</h1>
         <p className="mt-2 max-w-3xl text-sm leading-relaxed text-slate-500">
           PharmaBridge writes each call to a server-side ledger as it happens: the agent brief, routing, full transcript including phone-menu prompts and
-          keypad presses, CALL-E events, and the structured result, with phone numbers masked. Stored in{" "}
-          <span className="font-mono text-slate-700">data/ledger/</span>. Records can hold live transcripts, so they open only with the operator code, in every
+          keypad presses, call events, and the structured result, with phone numbers masked. Stored in{" "}
+          <span className="font-mono text-slate-700">data/ledger/</span>. Records hold call transcripts, so they open only with the operator code, in every
           environment.
         </p>
       </div>
@@ -161,7 +161,7 @@ export default function RecordsPage() {
                 {error && <p className="p-3 text-sm text-rose-600">{error}</p>}
                 {!error && records?.length === 0 && (
                   <div className="flex flex-col items-center gap-2 p-8 text-center text-sm text-slate-400">
-                    <Archive className="h-6 w-6" /> No calls recorded yet. Dispatch a mission and they appear here live.
+                    <Archive className="h-6 w-6" /> No calls recorded yet. Dispatch a mission and they appear here as they happen.
                   </div>
                 )}
                 {missions.map(([missionId, calls]) => (
@@ -184,7 +184,7 @@ export default function RecordsPage() {
                             {KIND_LABEL[r.kind]} · {r.status === "unknown" ? "outcome unknown" : r.status} · {r.turns} turns
                           </span>
                         </span>
-                        {r.mode === "live" ? <Radio className="h-4 w-4 text-emerald-500" /> : <FlaskConical className="h-4 w-4 text-indigo-300" />}
+                        <ModeDot live={r.mode === "live"} className="mr-1" />
                       </button>
                     ))}
                   </div>
@@ -207,7 +207,10 @@ export default function RecordsPage() {
                   <h2 className="font-display text-2xl font-bold text-slate-900">{entry.facility.name}</h2>
                   <p className="text-sm text-slate-500">{entry.needSummary}</p>
                   <div className="mt-2 flex flex-wrap gap-1.5">
-                    <Chip tone={entry.mode === "live" ? "emerald" : "indigo"}>{entry.mode === "live" ? `Live → ${entry.dialTarget}` : "Simulated"}</Chip>
+                    <Chip tone="white" className="px-2">
+                      <ModeDot live={entry.mode === "live"} />
+                      {entry.mode === "live" ? entry.dialTarget : null}
+                    </Chip>
                     <Chip tone={entry.status === "unknown" ? "amber" : "slate"}>{entry.status === "unknown" ? "Outcome unknown" : entry.status}</Chip>
                     <Chip>{new Date(entry.createdAt).toLocaleString()}</Chip>
                     {entry.providerCallIds.map((id) => (

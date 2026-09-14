@@ -1,5 +1,5 @@
 "use client";
-// Real map (Leaflet + CARTO Voyager tiles on OpenStreetMap data). Loaded client-side only via Map.tsx.
+// Real map (Leaflet + standard OpenStreetMap tiles; CARTO's free tiles now require a key). Loaded client-side only via Map.tsx.
 import "leaflet/dist/leaflet.css";
 import L from "leaflet";
 import { useEffect } from "react";
@@ -70,10 +70,9 @@ export function MapView({
   return (
     <MapContainer center={[center.lat, center.lon]} zoom={14} scrollWheelZoom className="h-full w-full" attributionControl>
       <TileLayer
-        url="https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r}.png"
-        subdomains="abcd"
-        maxZoom={20}
-        attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors &copy; <a href="https://carto.com/attributions">CARTO</a>'
+        url="https://tile.openstreetmap.org/{z}/{x}/{y}.png"
+        maxZoom={19}
+        attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
       />
       <Circle
         center={[center.lat, center.lon]}

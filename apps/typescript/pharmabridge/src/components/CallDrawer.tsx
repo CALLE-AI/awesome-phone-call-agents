@@ -2,12 +2,12 @@
 import { AnimatePresence, motion } from "framer-motion";
 import { Bot, Database, Quote, X } from "lucide-react";
 import Link from "next/link";
-import { useEffect, useState } from "react";
+import { useEffect, useState, type ReactNode } from "react";
 import type { CallPlan } from "@/lib/mission";
 import type { CallEventView, CallView } from "@/lib/types";
 import { cx } from "@/lib/ui";
 import { BriefView } from "./BriefView";
-import { Chip, ConfidenceMeter } from "./ui";
+import { Chip, ConfidenceMeter, ModeDot } from "./ui";
 
 export interface DrawerData {
   title: string;
@@ -77,7 +77,11 @@ export function CallDrawer({ data, onClose }: { data: DrawerData | null; onClose
                 <div className="truncate font-display text-lg font-semibold text-slate-900">{data.title}</div>
                 <div className="mt-0.5 truncate text-[11.5px] text-slate-500">{data.subtitle}</div>
                 <div className="mt-2 flex flex-wrap gap-1.5">
-                  <Chip tone={data.mode === "live" ? "emerald" : "indigo"}>{data.mode === "live" ? `LIVE → ${data.dialTarget}` : "Simulated · no call placed"}</Chip>
+                  {data.mode && (
+                    <Chip tone="white" className="px-2">
+                      <ModeDot live={data.mode === "live"} />
+                    </Chip>
+                  )}
                   {call && <Chip>status: {call.status}</Chip>}
                   {data.recordKey && (
                     <Chip tone="violet">
@@ -109,7 +113,7 @@ export function CallDrawer({ data, onClose }: { data: DrawerData | null; onClose
             <div className="scroll-thin flex-1 overflow-auto p-5">
               {tab === "conversation" && (
                 <div className="space-y-3">
-                  {turns.length === 0 && <p className="text-sm text-slate-400">No transcript yet. CALL-E publishes turns as the call progresses or once it ends.</p>}
+                  {turns.length === 0 && <p className="text-sm text-slate-400">No transcript yet. Turns appear as the call progresses or once it ends.</p>}
                   {turns.map((turn, i) => {
                     if (turn.speaker === "unknown") {
                       return (
@@ -178,7 +182,7 @@ export function CallDrawer({ data, onClose }: { data: DrawerData | null; onClose
                   )}
                   {call && call.evidence.length > 0 && (
                     <div>
-                      <div className="mb-2 text-[11px] font-bold uppercase tracking-[0.14em] text-slate-500">CALL-E evidence</div>
+                      <div className="mb-2 text-[11px] font-bold uppercase tracking-[0.14em] text-slate-500">Evidence</div>
                       <ul className="space-y-1.5 text-[13px] text-slate-600">
                         {call.evidence.map((e, i) => (
                           <li key={i} className="flex gap-2">
@@ -212,7 +216,7 @@ export function CallDrawer({ data, onClose }: { data: DrawerData | null; onClose
                   {data.plan?.brief ? <BriefView brief={data.plan.brief} resultSchema={data.plan.resultSchema} /> : <p className="text-sm text-slate-400">The brief is recorded when the call is placed.</p>}
                   {data.plan && (
                     <details className="rounded-2xl bg-slate-50 p-4 ring-1 ring-slate-200">
-                      <summary className="cursor-pointer text-[12px] font-semibold text-slate-600">Exact text sent to CALL-E</summary>
+                      <summary className="cursor-pointer text-[12px] font-semibold text-slate-600">Exact task text</summary>
                       <pre className="mt-3 whitespace-pre-wrap font-mono text-[11.5px] leading-relaxed text-slate-700">{data.plan.task}</pre>
                     </details>
                   )}
@@ -226,13 +230,21 @@ export function CallDrawer({ data, onClose }: { data: DrawerData | null; onClose
                     included), CALL-E events, and the structured result.
                   </p>
                   <div className="overflow-hidden rounded-2xl ring-1 ring-slate-200">
-                    {[
-                      ["Ledger record", data.recordKey ? `data/ledger/${data.recordKey}.json` : "not recorded"],
-                      ["CALL-E call id", call?.id ? `${call.id.slice(0, 40)}${call.id.length > 40 ? "…" : ""}` : "—"],
-                      ["Provider call ids", providerIds.length ? providerIds.join(", ") : data.mode === "live" ? "not yet assigned" : "none (simulated)"],
-                      ["Routing", data.mode === "live" ? `Live → ${data.dialTarget}` : "Simulation"],
-                      ["Transcript turns", String(turns.length)],
-                    ].map(([k, v]) => (
+                    {(
+                      [
+                        ["Ledger record", data.recordKey ? `data/ledger/${data.recordKey}.json` : "not recorded"],
+                        ["Call id", call?.id ? `${call.id.slice(0, 40)}${call.id.length > 40 ? "…" : ""}` : "—"],
+                        ["Provider call ids", providerIds.length ? providerIds.join(", ") : data.mode === "live" ? "not yet assigned" : "—"],
+                        [
+                          "Routing",
+                          <span key="routing" className="inline-flex items-center gap-1.5">
+                            <ModeDot live={data.mode === "live"} />
+                            {data.mode === "live" ? data.dialTarget : null}
+                          </span>,
+                        ],
+                        ["Transcript turns", String(turns.length)],
+                      ] as [string, ReactNode][]
+                    ).map(([k, v]) => (
                       <div key={k} className="grid grid-cols-[150px_1fr] gap-3 border-b border-slate-100 px-4 py-2.5 last:border-0">
                         <span className="text-[11.5px] font-semibold text-slate-500">{k}</span>
                         <span className="break-all font-mono text-[11.5px] text-slate-700">{v}</span>

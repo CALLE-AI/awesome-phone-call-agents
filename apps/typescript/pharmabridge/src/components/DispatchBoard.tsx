@@ -137,7 +137,7 @@ export function DispatchBoard({
 
       <Card className="p-5">
         <div className="mb-3 flex items-center gap-2 text-[11px] font-bold uppercase tracking-[0.14em] text-slate-500">
-          <Radio className="h-3.5 w-3.5 text-violet-500" /> CALL-E event stream
+          <Radio className="h-3.5 w-3.5 text-violet-500" /> Event stream
         </div>
         {events.length === 0 ? (
           <p className="text-sm text-slate-400">Waiting for the first events…</p>

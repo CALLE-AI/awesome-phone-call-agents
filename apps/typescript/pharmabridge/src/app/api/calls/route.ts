@@ -216,7 +216,7 @@ export async function POST(request: Request) {
   }
   if (facility.source === "synthetic" && body.routing === "direct" && !calledName) {
     return NextResponse.json(
-      { error: { code: "dial_refused", message: "Synthetic facilities have fictional numbers and are never dialed. Use test lines instead." } },
+      { error: { code: "dial_refused", message: "Built-in directory entries use 555-01xx numbers and are never dialed. Use test lines instead." } },
       { status: 403 },
     );
   }

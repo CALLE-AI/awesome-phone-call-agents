@@ -61,6 +61,11 @@ export function Chip({ tone = "slate", className, children, title }: { tone?: To
   );
 }
 
+/** Call mode marker: green for a call CALL-E placed, blue for one PharmaBridge ran itself. Unlabeled on purpose. */
+export function ModeDot({ live, className }: { live: boolean; className?: string }) {
+  return <span aria-hidden className={cx("inline-block h-2 w-2 shrink-0 rounded-full", live ? "bg-emerald-500" : "bg-blue-500", className)} />;
+}
+
 export function Label({ children, hint }: { children: ReactNode; hint?: ReactNode }) {
   return (
     <div className="mb-2 flex items-baseline justify-between gap-3">
@@ -124,7 +129,7 @@ export function ConfidenceMeter({ score, label }: { score: number | null | undef
   if (score == null) return null;
   const pct = Math.round(score * 100);
   return (
-    <div className="flex items-center gap-2" title="CALL-E completion confidence">
+    <div className="flex items-center gap-2" title="Completion confidence">
       <div className="h-1.5 w-20 overflow-hidden rounded-full bg-slate-100">
         <div className="brand-bg h-full rounded-full" style={{ width: `${pct}%` }} />
       </div>
