@@ -135,6 +135,10 @@ def infer_region(phone: str) -> Optional[str]:
     return None
 
 
+def mask_text(value: str) -> str:
+    return re.sub(r"\+?[0-9](?:[ .()-]*[0-9]){6,14}", "[phone redacted]", value)
+
+
 def is_reserved_fictional(phone: str) -> bool:
     return bool(_FICTIONAL_NANP_RE.match(phone.strip()))
 
@@ -438,9 +442,9 @@ def place_call(requests, base_url: str, api_key: str, hold: Hold) -> dict[str, A
             detail = err.get("message", "") if isinstance(err, dict) else str(err)
         except Exception:
             detail = exc.response.text[:200] if exc.response is not None else ""
-        return {"_local_error": f"CALL-E rejected the create: {detail or exc}"}
+        return {"_local_error": "CALL-E create returned an HTTP error; reconcile before another call."}
     except requests.exceptions.RequestException as exc:
-        return {"_local_error": f"transport error creating call: {exc}"}
+        return {"_local_error": "Transport error creating call; outcome unknown. Reconcile before another call."}
 
 
 def poll_call(requests, base_url: str, api_key: str, call_id: str,
@@ -457,7 +461,7 @@ def poll_call(requests, base_url: str, api_key: str, call_id: str,
             resp.raise_for_status()
             last = resp.json()
         except requests.exceptions.RequestException as exc:
-            return {"_local_error": f"transport error polling {call_id}: {exc}"}
+            return {"_local_error": "Transport error polling call; reconcile the existing call without redial."}
         status = str(last.get("status") or last.get("call_status") or "").lower()
         if status in _TERMINAL_STATUSES:
             return last
@@ -488,7 +492,7 @@ def decision_record(hold: Hold, result: Decision) -> dict[str, Any]:
         "still_coming": spoken.still_coming if spoken else None,
         "eta_minutes": spoken.eta_minutes if spoken else None,
         "released": spoken.released if spoken else None,
-        "confirmation_quote": spoken.confirmation_quote if spoken else None,
+        "confirmation_quote": mask_text(spoken.confirmation_quote) if spoken and spoken.confirmation_quote else None,
         "call_id": result.call_id,
     }
 

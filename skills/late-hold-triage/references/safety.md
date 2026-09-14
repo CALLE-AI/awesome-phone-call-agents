@@ -58,9 +58,10 @@ to guess, to release a table on silence, or to start calling the waitlist.
 ## Cancellation
 
 CALL-E's Developer API does not currently expose a call-cancellation
-endpoint. Exiting the script before `POST /v1/calls` returns a call id
-prevents the side effect. After a call id exists, report it and stop;
-do not pretend the call was never placed.
+endpoint. Exiting before submitting `POST /v1/calls` prevents the call.
+Once submitted, the provider may accept it even if no call ID returns.
+Stop and reconcile that uncertain outcome before another call; do not
+pretend an interrupted or unreadable response means no call was placed.
 
 There is no recurring job to disable. Each run is one-shot.
 
