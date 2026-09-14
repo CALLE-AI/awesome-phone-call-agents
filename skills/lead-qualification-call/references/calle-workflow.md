@@ -4,15 +4,14 @@ This reference describes the exact CALL-E sequence for a single lead-qualificati
 
 ## Transport and authentication
 
-- Base URL: `https://api.heycall-e.com`
-- API key: read from the environment as `CALLE_API_KEY`. Never place it in intake JSON, logs, fixtures, or repository files.
-- Allowlist the base URL. The key must never be sent to any other origin.
+- The CLI sequence below uses the CALL-E CLI's stored OAuth authentication; authenticate through the CLI's supported login flow. A developer API key is not a substitute for CLI login.
+- If using the separate REST API instead, read `CALLE_API_KEY` from the environment and pin requests to `https://api.heycall-e.com`. Never put the key in intake JSON, logs, fixtures, or repository files, or send it to another origin.
 
 ## Preflight
 
 1. Confirm the user authorized this one qualification call and `consent` is `true`.
 2. Confirm the phone is E.164 and came from the consent-gated lead record.
-3. Optional but recommended: verify connectivity with the read-only goals endpoint.
+3. For a separate REST integration, optionally verify connectivity with the read-only goals endpoint; this is not a CLI authentication step.
 
 ```text
 GET /v1/goals?limit=1
@@ -40,7 +39,7 @@ Review the returned plan, the task text, the result schema, the masked phone, an
 Only after a separate, explicit user confirmation:
 
 ```bash
-calle call start --plan <plan_id> --confirm
+calle call run --plan-id <plan_id> --confirm-token <confirm_token>
 ```
 
 Use exactly one call per lead per campaign. Preserve the idempotency key:
@@ -52,7 +51,7 @@ lead_qualification:{lead_id}:{campaign_id}
 ## Status and reconciliation
 
 ```bash
-calle call status --call <call_id>
+calle call status --run-id <run_id>
 ```
 
 Poll until a terminal state. Never automatically retry an error or an ambiguous timeout. An ambiguous create outcome is reported as "unknown and possibly created" and reconciled only with the **same** idempotency key.
@@ -67,7 +66,7 @@ Map terminal outcomes to the schema:
 
 ## Cancellation
 
-Before `calle call start`: cancel by not executing. After a call is created, use provider cancellation only if available. Never redial automatically to "fix" an unknown result.
+Before submitting `calle call run`: cancel by not executing. Use the plan's confirmation token only after user approval, and save the returned run ID for status. After submission, use provider cancellation only if available; losing the response does not prove no call exists. Never redial automatically to "fix" an unknown result.
 
 ## Recurrence boundary
 
