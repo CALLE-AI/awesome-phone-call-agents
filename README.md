@@ -170,6 +170,8 @@ This project is an awesome list for AI-agent phone-call workflows. Add resources
 - [`supply-chain-supplier-status`](skills/supply-chain-supplier-status/) - Autonomous outbound phone calls to suppliers to verify purchase order fulfillment, capture delay causes, calculate financial risk, and sync procurement records.
 
 ### Apps
+- [CallIQ](https://github.com/kk590/CallIQ) - Experimental offline sales-call workflow simulator for rehearsing lead qualification, objection handling, meeting booking, and local CRM updates; it does not place real calls or mutate a live CRM.
+
 - [NemoTheFinder](https://github.com/proggyaa/CallEHackathon) - Reusable Call-E agent workflow built for hassle free rental apartment hunting.
 - [ResolveCall](https://github.com/Arvindkumar006/RESOLVECALL) - Experimental external CALL-E operational-recovery reference for delivery-window conversations and transcript-derived policy checks; live calling has real side effects, and recovery, production-readiness, and cryptographic guarantees are not independently verified.
 - [PartFinder AI](https://github.com/atsushiyago/partfinder-ai) - External Next.js local-parts demo with a no-call mock default, explicit CALL-E call initiation, server-side credentials, and transcript-backed inventory comparisons for operator review.
