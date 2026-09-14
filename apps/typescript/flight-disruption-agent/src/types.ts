@@ -89,6 +89,10 @@ export interface Disruption {
   newDeparture: string | null;
   source: DisruptionSource;
   createdAt: string;
+  /** The earlier disruption on this flight that this one replaced (a delay that became worse). */
+  supersedes?: string;
+  /** Set when a later disruption replaced this one; its calls and quotes are no longer valid. */
+  supersededBy?: string;
 }
 
 export type ChangeCase = "involuntary" | "force_majeure" | "voluntary";
@@ -282,8 +286,9 @@ export interface OpsEventRecord {
   flightId: string | null;
   receivedAt: string;
   occurredAt: string | null;
-  /** created: a disruption was recorded. conflict: the flight already had one, so a person must look. */
-  status: "created" | "conflict" | "rejected";
+  /** created: a disruption was recorded. conflict: it contradicts the flight's current one, so a person must look. */
+  /** escalated: a worse disruption replaced the flight's earlier one. */
+  status: "created" | "escalated" | "conflict" | "rejected";
   disruptionId: string | null;
   message: string;
 }

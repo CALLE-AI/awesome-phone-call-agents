@@ -14,7 +14,7 @@ import { maskPhone, routeFor } from "./phone.ts";
 import { redactOutcome, redactText } from "./redact.ts";
 import { airlineOf, quoteFor, voluntaryQuoteFor } from "./rules.ts";
 import { buildResultSchema, buildTask } from "./task.ts";
-import type { Action, AirlineCall, BookingState, Disruption, DisruptionCause, DisruptionKind, DisruptionSource, LedgerEntry, OpsEventRecord, Quote, RequestChannel, RequestEntry, RequestKind } from "./types.ts";
+import type { Action, AirlineCall, BookingState, Decision, Disruption, DisruptionCause, DisruptionKind, DisruptionSource, LedgerEntry, OpsEventRecord, Quote, RequestChannel, RequestEntry, RequestKind } from "./types.ts";
 
 interface DeskState {
   disruptions: Disruption[];
@@ -201,6 +201,20 @@ export class Desk {
 
   // ------------------------------------------------------------ disruptions
 
+  /** The flight's current disruption. Superseded ones stay in history but no longer drive calls. */
+  private activeDisruption(flightId: string): Disruption | undefined {
+    return this.state.disruptions.find((d) => d.flightId === flightId && !d.supersededBy);
+  }
+
+  /**
+   * A disruption can only get worse automatically: a delay can become a longer delay or a
+   * cancellation. Anything else (a shorter delay, a cancelled flight reinstated) needs a person.
+   */
+  private escalates(existing: Disruption, kind: DisruptionKind, delayMinutes: number): boolean {
+    if (existing.kind !== "delay") return false;
+    return kind === "cancellation" || delayMinutes > existing.delayMinutes;
+  }
+
   reportDelay(flightId: string, delayMinutes: number, reason: string, cause: DisruptionCause = "operational"): Disruption {
     return this.reportDisruption({ flightId, kind: "delay", cause, delayMinutes, reason });
   }
@@ -209,7 +223,10 @@ export class Desk {
     return this.reportDisruption({ flightId, kind: "cancellation", cause, delayMinutes: 0, reason });
   }
 
-  /** Records one disruption per flight, whether an operator typed it or the airline pushed it. */
+  /**
+   * Records a flight's disruption, whether an operator typed it or the airline pushed it.
+   * If the flight already has a delay and this is worse, it replaces that delay: see supersede.
+   */
   reportDisruption(input: DisruptionInput): Disruption {
     const { flightId, kind, cause } = input;
     const flight = this.catalog.flights.find((f) => f.id === flightId);
@@ -220,16 +237,23 @@ export class Desk {
     if (kind === "delay" && (!Number.isInteger(delayMinutes) || delayMinutes < 15 || delayMinutes > 24 * 60)) {
       throw new DeskError("Delay must be a whole number of minutes between 15 and 1440.");
     }
-    const existing = this.state.disruptions.find((d) => d.flightId === flightId);
-    if (existing) {
-      throw new DeskError(`${flight.code} already has a reported ${existing.kind}. Reset the demo to report a new one.`, 409);
+    const existing = this.activeDisruption(flightId);
+    if (existing && !this.escalates(existing, kind, delayMinutes)) {
+      const what = existing.kind === "delay" ? `delay of ${existing.delayMinutes} minutes` : existing.kind;
+      throw new DeskError(
+        `${flight.code} already has a reported ${what}. Only a longer delay or a cancellation can replace it automatically.`,
+        409,
+      );
     }
     if (!this.catalog.bookings.some((b) => b.flightId === flightId)) {
       throw new DeskError(`${flight.code} has no bookings in this demo.`);
     }
     const suffix = kind === "cancellation" ? "cancelled" : String(delayMinutes);
+    const baseId = `evt_${flightId}_${cause === "force_majeure" ? "fm_" : ""}${suffix}`;
+    let id = baseId;
+    for (let n = 2; this.state.disruptions.some((d) => d.id === id); n += 1) id = `${baseId}_${n}`;
     const disruption: Disruption = {
-      id: `evt_${flightId}_${cause === "force_majeure" ? "fm_" : ""}${suffix}`,
+      id,
       flightId,
       kind,
       cause,
@@ -238,10 +262,42 @@ export class Desk {
       newDeparture: kind === "delay" ? addMinutes(flight.departure, delayMinutes) : null,
       source: input.source ?? { kind: "manual" },
       createdAt: new Date(this.now()).toISOString(),
+      ...(existing ? { supersedes: existing.id } : {}),
     };
     this.state.disruptions.push(disruption);
+    if (existing) this.supersede(existing, disruption);
     this.save();
     return disruption;
+  }
+
+  /**
+   * The earlier delay's calls quoted options that no longer exist (a later departure to
+   * keep, or voluntary prices). Nothing already rebooked or refunded is touched. Passengers
+   * who agreed to keep the delayed flight are put back in the queue to be called again,
+   * and calls still in flight or waiting for review can no longer apply their old choice.
+   */
+  private supersede(old: Disruption, next: Disruption): void {
+    old.supersededBy = next.id;
+    const why =
+      next.kind === "cancellation"
+        ? `The flight was cancelled after this call (${next.id}).`
+        : `The delay grew to ${next.delayMinutes} minutes after this call (${next.id}).`;
+    for (const entry of Object.values(this.state.ledger)) {
+      if (entry.disruptionId !== old.id) continue;
+      const booking = this.state.bookings[entry.pnr];
+      if (entry.status === "applied" || entry.status === "resolved_by_human") {
+        if (booking?.status === "kept_on_delayed_flight" && booking.flightId === old.flightId) {
+          booking.status = "ticketed";
+          booking.notes.push(`${why} The passenger had kept the delayed flight, so they must be called again with new options.`);
+          entry.applied = `${entry.applied ?? ""} Superseded: ${why} Call again under the new disruption.`.trim();
+        }
+        continue;
+      }
+      if (entry.status === "needs_review") {
+        entry.decision = { kind: "review", reasons: [why, "Close this item and call the passenger again under the new disruption."] };
+      }
+      // in_progress, submitted, and uncertain calls finish into review; see refresh.
+    }
   }
 
   /**
@@ -352,6 +408,9 @@ export class Desk {
       throw new DeskError(`${pnr} was already called for this delay (${previous.status}). One call per booking per event.`, 409);
     }
     const disruption = this.disruption(disruptionId);
+    if (disruption.supersededBy) {
+      throw new DeskError(`${disruptionId} was replaced by ${disruption.supersededBy}. Call from the new disruption.`, 409);
+    }
     const booking = findBooking(this.catalog, pnr);
     if (this.state.bookings[pnr]?.status !== "ticketed") {
       throw new DeskError(`${pnr} has already been handled.`, 409);
@@ -432,7 +491,10 @@ export class Desk {
       return entry;
     }
 
-    const decision = decide(outcome, entry.quote);
+    const replacedBy = this.disruption(entry.disruptionId).supersededBy;
+    const decision: Decision = replacedBy
+      ? { kind: "review", reasons: [`This call quoted options from ${entry.disruptionId}, which was replaced by ${replacedBy}. Close it and call the passenger again.`] }
+      : decide(outcome, entry.quote);
     entry.decision = decision;
     if (decision.kind === "apply") {
       try {
@@ -464,6 +526,10 @@ export class Desk {
     const entry = this.entry(key);
     if (entry.status !== "needs_review" && entry.status !== "uncertain") {
       throw new DeskError(`This call is ${entry.status}; only review items can be resolved.`, 409);
+    }
+    const replacedBy = this.disruption(entry.disruptionId).supersededBy;
+    if (action && replacedBy) {
+      throw new DeskError(`The options on this call are out of date: ${entry.disruptionId} was replaced by ${replacedBy}. Close it without a change and call again.`, 409);
     }
     const text = note.trim();
     try {
@@ -508,7 +574,7 @@ export class Desk {
       state: this.state.bookings[pnr],
       request,
       quote,
-      disrupted: this.state.disruptions.some((d) => d.flightId === booking.flightId),
+      disrupted: Boolean(this.activeDisruption(booking.flightId)),
       now: (this.options.demoNow ?? this.now)(),
     });
     let action: Action | null = null;
@@ -916,7 +982,7 @@ export class Desk {
       flights: catalog.flights.map((f) => ({
         ...f,
         passengers: this.catalog.bookings.filter((b) => b.flightId === f.id).length,
-        disruption: this.state.disruptions.find((d) => d.flightId === f.id) ?? null,
+        disruption: this.activeDisruption(f.id) ?? null,
       })),
       bookings: this.catalog.bookings.map((b) => {
         const state = this.state.bookings[b.pnr];
@@ -929,7 +995,7 @@ export class Desk {
           farePaid: b.farePaid,
           channel: b.channel.map((id) => ({ id, name: partyName(id), role: partyRole(id) })),
           state,
-          disrupted: this.state.disruptions.some((d) => d.flightId === b.flightId),
+          disrupted: Boolean(this.activeDisruption(b.flightId)),
           voluntary: { moves: quote.moves.map((m) => ({ flightId: m.flightId, label: m.label, total: m.total })), refund: quote.refund.amount },
         };
       }),

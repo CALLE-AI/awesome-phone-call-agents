@@ -183,3 +183,59 @@ test("a call after Reset demo gets a new idempotency key, so CALL-E places it ag
   assert.equal(gateway.requests.length, 2);
   assert.notEqual(gateway.requests[0]?.idempotencyKey, gateway.requests[1]?.idempotencyKey);
 });
+
+test("a delay that becomes a cancellation replaces the delay without undoing finished changes", async () => {
+  const desk = dryDesk();
+  const delay = desk.reportDelay("NA721-2026-09-20", 240, "a late inbound aircraft");
+  // keep, refund, rebook, asks for a person
+  for (const pnr of ["K7Q2XA", "M3P8RD", "T5W1LC", "B9H4ZN"]) {
+    await desk.startCall(delay.id, pnr);
+    await desk.refresh(`${delay.id}:${pnr}`);
+  }
+  const cancel = desk.reportCancellation("NA721-2026-09-20", "the aircraft is out of service");
+  assert.equal(cancel.supersedes, delay.id);
+
+  const snap = desk.snapshot();
+  const flight = snap.flights.find((f) => f.id === "NA721-2026-09-20");
+  assert.equal(flight?.disruption?.id, cancel.id);
+  const old = snap.disruptions.find((d) => d.id === delay.id);
+  assert.equal(old?.supersededBy, cancel.id);
+  const state = (pnr: string) => old?.bookings.find((b) => b.pnr === pnr)?.state?.status;
+  assert.equal(state("K7Q2XA"), "ticketed", "kept passengers are back in the queue");
+  assert.equal(state("M3P8RD"), "refunded");
+  assert.equal(state("T5W1LC"), "rebooked");
+
+  // The person-review item from the delay can no longer apply its old options.
+  const review = `${delay.id}:B9H4ZN`;
+  assert.throws(() => desk.resolve(review, { kind: "refund" }, ""), /out of date/);
+  assert.equal(desk.resolve(review, null, "Superseded by cancellation").status, "resolved_by_human");
+
+  // Calls now come from the cancellation, with no keep option; old calls are refused.
+  await assert.rejects(desk.startCall(delay.id, "R2D6YU"), /was replaced by/);
+  assert.doesNotMatch(desk.preview(cancel.id, "K7Q2XA").task, /Keep the delayed flight/);
+  await desk.startCall(cancel.id, "K7Q2XA");
+  assert.equal((await desk.refresh(`${cancel.id}:K7Q2XA`)).status, "needs_review", "keep is not an option on a cancelled flight");
+  await assert.rejects(desk.startCall(cancel.id, "M3P8RD"), /already been handled/);
+});
+
+test("a call still in progress when the delay grows finishes into review", async () => {
+  const gateway = new DryRunGateway(0);
+  let now = Date.parse("2026-09-19T08:00:00+07:00");
+  const desk = new Desk(loadCatalog(), gateway, { statePath: null, liveCallBudget: 0, now: () => now });
+  const short = desk.reportDelay("NA721-2026-09-20", 90, "a late inbound aircraft");
+  await desk.startCall(short.id, "T5W1LC");
+  const longer = desk.reportDelay("NA721-2026-09-20", 300, "a late inbound aircraft");
+  assert.equal(longer.supersedes, short.id);
+  now += 5_000;
+  const entry = await desk.refresh(`${short.id}:T5W1LC`);
+  assert.equal(entry.status, "needs_review");
+  assert.match(entry.decision?.kind === "review" ? entry.decision.reasons.join() : "", /replaced by evt_NA721-2026-09-20_300/);
+});
+
+test("a shorter delay or a reinstated flight never replaces a disruption automatically", () => {
+  const desk = dryDesk();
+  desk.reportDelay("NA721-2026-09-20", 240, "weather");
+  assert.throws(() => desk.reportDelay("NA721-2026-09-20", 120, "weather"), /Only a longer delay or a cancellation/);
+  desk.reportCancellation("NA721-2026-09-20", "weather");
+  assert.throws(() => desk.reportDelay("NA721-2026-09-20", 360, "weather"), /already has a reported cancellation/);
+});
