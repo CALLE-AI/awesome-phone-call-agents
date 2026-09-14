@@ -24,4 +24,4 @@ COPY --from=build /app/.next ./.next
 RUN mkdir -p /data && chown -R node:node /data /app
 USER node
 EXPOSE 3000
-CMD ["npm", "start"]
+CMD ["env", "-u", "CALLE_API_KEY", "CHANGELOCK_MODE=replay", "node", "node_modules/next/dist/bin/next", "start", "--hostname", "0.0.0.0"]
