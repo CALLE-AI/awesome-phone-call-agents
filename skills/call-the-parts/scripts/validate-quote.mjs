@@ -108,5 +108,7 @@ const report = {
   commitment: "none",
 };
 
-console.log(JSON.stringify(report, null, 2));
+// Sanitize display text without changing quote validation or private evidence.
+console.log(JSON.stringify(report, (_, value) => typeof value === "string"
+  ? value.replace(/\+?\d[\d ().-]{5,}\d/g, "[PHONE]") : value, 2));
 process.exit(rejected.length === 0 ? 0 : 2);

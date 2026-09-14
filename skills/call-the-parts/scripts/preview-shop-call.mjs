@@ -72,7 +72,7 @@ const notes = input.extraNotes ? ` Extra fitment note: ${input.extraNotes}.` : "
 const goal = [
   `This is an automated call on behalf of ${input.organization}.`,
   `I am checking used automotive part availability. Request ${input.requestId}.`,
-  `Call ${input.phone} at ${input.shopName}.`,
+  `Ask the authorized contact at ${input.shopName}.`,
   `Ask whether they have a ${input.condition} ${input.part} for a ${year} ${input.make} ${input.model}.`,
   `If they need to check the shelves or a computer, wait.`,
   `Ask for condition, the price as they say it, any core charge, whether they can hold it and until when, and pickup vs ship.`,
@@ -99,4 +99,6 @@ const preview = {
   next: "If the user authorizes this request, run calle call plan then calle call start with this phone and goal.",
 };
 
-console.log(JSON.stringify(preview, null, 2));
+// Only the displayed copy is masked; keep the private request unchanged.
+console.log(JSON.stringify(preview, (_, value) => typeof value === "string"
+  ? value.replace(/\+?\d[\d ().-]{5,}\d/g, "[PHONE]") : value, 2));
