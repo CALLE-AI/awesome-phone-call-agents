@@ -94,7 +94,7 @@ class Vapi:
     def _req(self, method: str, path: str, **kw) -> Any:
         r = self.http.request(method, path, **kw)
         if r.status_code >= 400:
-            raise SystemExit(f"Vapi {method} {path} -> {r.status_code}: {r.text[:300]}")
+            raise SystemExit(f"Vapi request failed (HTTP {r.status_code}); provider details omitted")
         return r.json() if r.content else None
 
     def assistants(self) -> dict[str, dict]:
@@ -127,7 +127,7 @@ class Vapi:
             # Free-number stock varies; Vapi's 400 names area codes that are available right now.
             tried += [c for c in re.findall(r"\b\d{3}\b", r.text) if c not in tried and c != area]
             if not tried:
-                raise SystemExit(f"Vapi POST /phone-number -> {r.status_code}: {r.text[:300]}")
+                raise SystemExit(f"Vapi number request failed (HTTP {r.status_code}); provider details omitted")
         raise SystemExit("no free Vapi number available")
 
     def use(self, persona: str) -> dict:

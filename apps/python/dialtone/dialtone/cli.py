@@ -17,9 +17,10 @@ import sys
 from pathlib import Path
 
 from dotenv import load_dotenv
+from .privacy import mask_text, public_value
 
 
-def main(argv: list[str] | None = None) -> int:
+def _main(argv: list[str] | None = None) -> int:
     load_dotenv()
     p = argparse.ArgumentParser(prog="dialtone", description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
     sub = p.add_subparsers(dest="cmd", required=True)
@@ -97,14 +98,14 @@ def main(argv: list[str] | None = None) -> int:
             outcome = t.meta.get("outcome") or {}
             out["verdict"] = attestation.evaluate(t, det, outcome.get("task_completed_claimed", True),
                                                   outcome.get("commitment_type"), protocol.inspect(t)).to_dict()
-        print(json.dumps(out, indent=2))
+        print(json.dumps(public_value(out), indent=2))
 
     elif args.cmd in ("preview", "call"):
         from . import protocol, runner
 
         nonce = args.nonce or protocol.new_nonce()
         request = runner.build_request(args.to, args.goal, args.principal, args.mode, nonce, args.region, args.locale)
-        shown = json.dumps(request, indent=2).replace(args.to, runner.mask(args.to))
+        shown = json.dumps(public_value(request), indent=2)
         print(shown)
         print(f"\nnonce: {nonce}  mode: {args.mode}  destination: {runner.mask(args.to)}")
         if args.cmd == "preview" or not args.live:
@@ -139,13 +140,13 @@ def main(argv: list[str] | None = None) -> int:
         if args.action == "setup":
             print(json.dumps(v.setup_assistants(), indent=2))
             n = v.ensure_number()
-            print(f"number: {n.get('number')} status: {n.get('status')}")
+            print(mask_text(f"number: {n.get('number')} status: {n.get('status')}"))
         elif args.action == "use":
             n = v.use(args.persona)
-            print(f"{n.get('number')} now answers as {args.persona}")
+            print(mask_text(f"{n.get('number')} now answers as {args.persona}"))
         elif args.action == "calls":
             for call in v.calls():
-                print(call.get("id"), call.get("status"), call.get("startedAt"), call.get("endedReason"))
+                print(mask_text(" ".join(str(call.get(key)) for key in ("id", "status", "startedAt", "endedReason"))))
         elif args.action == "inbound":
             # The AI Rudder view: the inbound line classifies its *caller*.
             from .classifier import Classifier
@@ -159,6 +160,14 @@ def main(argv: list[str] | None = None) -> int:
             print(json.dumps({"caller": clf.classify(t, use_protocol=False).to_dict(), "time_to_detection": ttd,
                               "turns": len(t.turns), "duration": round(t.duration, 1)}, indent=2))
     return 0
+
+
+def main(argv: list[str] | None = None) -> int:
+    try:
+        return _main(argv)
+    except Exception:
+        print("Operation failed; private provider details omitted. Check the provider dashboard before retrying.", file=sys.stderr)
+        return 1
 
 
 if __name__ == "__main__":

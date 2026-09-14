@@ -20,6 +20,7 @@ from typing import Any
 from . import attestation, features, protocol
 from .classifier import Classifier
 from .models import Transcript
+from .privacy import public_value
 
 RAW_DIR = Path("data/real/raw")
 RESULTS_DIR = Path("data/real/results")
@@ -32,7 +33,7 @@ def mask(phone: str) -> str:
 
 def build_request(to_phone: str, goal: str, principal: str, mode: str, nonce: str, region: str = "US",
                   locale: str = "en-US") -> dict[str, Any]:
-    if not re.fullmatch(r"\+[1-9]\d{7,14}", to_phone):
+    if not re.fullmatch(r"\+[1-9][0-9]{7,14}", to_phone):
         raise SystemExit("destination must be E.164, e.g. +14155550123")
     if mode == "dialtone":
         task = protocol.compile_task(goal, principal, nonce, language=locale)
@@ -91,7 +92,7 @@ def analyse(call: dict, name: str, label: str | None, mode: str, nonce: str | No
     structured = call.get("structured_result") or {}
     commitment = attestation.infer_commitment(t.meta.get("task"))
     verdict = attestation.evaluate(t, det, call.get("task_completed"), commitment, hs)
-    return {
+    return public_value({
         "name": name,
         "label": label,
         "mode": mode,
@@ -117,7 +118,7 @@ def analyse(call: dict, name: str, label: str | None, mode: str, nonce: str | No
                            "outcome": structured.get("outcome"),
                            "human_review": structured.get("human_review")},
         "verdict": verdict.to_dict(),
-    }
+    })
 
 
 def place(request: dict, name: str, timeout: float = 900, busy_wait: float = 1800) -> dict:
@@ -151,8 +152,8 @@ def place(request: dict, name: str, timeout: float = 900, busy_wait: float = 180
     (RAW_DIR / f"{name}.json").write_text(json.dumps(call, indent=1))
     try:
         (RAW_DIR / f"{name}.events.json").write_text(json.dumps(fetch_events(call["id"]), indent=1))
-    except Exception as exc:  # events improve timing but are not required
-        print(f"could not fetch events: {exc}")
+    except Exception:  # events improve timing but are not required
+        print("could not fetch events; provider details omitted")
     return call
 
 
@@ -169,5 +170,5 @@ def fetch(call_id: str, name: str) -> dict:
 def save_result(result: dict) -> Path:
     RESULTS_DIR.mkdir(parents=True, exist_ok=True)
     path = RESULTS_DIR / f"{result['name']}.json"
-    path.write_text(json.dumps(result, indent=1))
+    path.write_text(json.dumps(public_value(result), indent=1))
     return path
