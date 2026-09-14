@@ -106,6 +106,7 @@ async function act(fn) {
 // ------------------------------------------------------------------ render
 
 function render() {
+  if (callModal) renderCall(false);
   renderMode();
   renderBoard();
   renderFeed();
@@ -488,6 +489,158 @@ async function ensurePreview(disruptionId, pnr, key) {
 }
 
 
+
+// ------------------------------------------------------------------ call pop-up
+
+let callModal = null; // { kind, key, who, sub, openedAt, shown, phase, timer }
+let toastTimer = null;
+
+function showToast(message) {
+  const el = $("toast");
+  el.textContent = message;
+  el.hidden = false;
+  clearTimeout(toastTimer);
+  toastTimer = setTimeout(() => (el.hidden = true), 3200);
+}
+
+function openCall(kind, key, who, sub) {
+  closeCall();
+  callModal = { kind, key, who, sub, openedAt: Date.now(), shown: 0, phase: "", timer: null, lastFocus: document.activeElement };
+  callModal.timer = setInterval(tickCall, 250);
+  renderCall(true);
+  $("call-modal").querySelector("[data-call-close]")?.focus();
+}
+
+function closeCall() {
+  if (!callModal) return;
+  clearInterval(callModal.timer);
+  const back = callModal.lastFocus;
+  callModal = null;
+  $("call-modal").hidden = true;
+  $("call-modal").innerHTML = "";
+  back?.focus?.();
+}
+
+/** The latest state of the call the pop-up is showing, whatever kind it is. */
+function callState(m) {
+  if (!snap) return null;
+  if (m.kind === "passenger") {
+    const [disruptionId, pnr] = m.key.split(":");
+    const b = snap.disruptions.find((d) => d.id === disruptionId)?.bookings.find((x) => x.pnr === pnr);
+    const e = b?.entry;
+    if (!e) return null;
+    const live = e.status === "submitted" || e.status === "in_progress";
+    let verdict = "";
+    if (e.status === "applied") verdict = `<span class="chip ok">Done automatically</span><span>${esc(e.applied ?? "")}</span>`;
+    else if (e.status === "needs_review") verdict = `<span class="chip warn">Needs a person</span><span>${esc(e.decision?.reasons?.join(" ") ?? "")}</span>`;
+    else if (e.status === "uncertain" || e.status === "failed_to_submit") verdict = `<span class="chip bad">Not placed</span><span>${esc(e.error ?? "")}</span>`;
+    return { live, outcome: e.outcome, verdict, other: "Passenger" };
+  }
+  const r = snap.requests.find((x) => x.request.id === m.key);
+  if (!r) return null;
+  const call = m.kind === "intake" ? r.passengerCall : m.kind === "airline" ? r.airlineCall : r.callback;
+  if (!call) return null;
+  const live = call.status === "submitted" || call.status === "in_progress";
+  const reasons = r.reviewReasons?.join(" ") ?? "";
+  let verdict = "";
+  if (call.status === "uncertain" || call.status === "failed_to_submit") verdict = `<span class="chip bad">Not placed</span><span>${esc(call.error ?? "")}</span>`;
+  else if (m.kind === "intake") {
+    const move = r.action?.kind === "move" ? r.quote.moves.find((mv) => mv.id === r.action.optionId) : null;
+    if (r.status === "confirmed_on_call") verdict = `<span class="chip ok">Agreed on the call</span><span>${r.action?.kind === "refund" ? "Refund" : `Move to ${esc(move?.label ?? "")}`} for ${idr(r.amount ?? 0)}. Next: CALL-E calls the airline desk.</span>`;
+    else if (r.status === "declined") verdict = `<span class="chip">Kept the booking</span><span>Nothing changes.</span>`;
+    else if (r.status === "needs_review") verdict = `<span class="chip warn">Needs a person</span><span>${esc(reasons)}</span>`;
+  } else if (m.kind === "airline") {
+    if (r.status === "completed") verdict = `<span class="chip ok">Done</span><span>${esc(r.applied ?? "")}</span>`;
+    else if (r.status === "needs_review") verdict = `<span class="chip warn">Needs a person</span><span>${esc(reasons)}</span>`;
+  } else if (r.callbackVerdict) {
+    verdict = r.callbackVerdict.kind === "delivered"
+      ? `<span class="chip ok">Passenger heard the result</span>`
+      : `<span class="chip warn">Follow up in writing</span><span>${esc(r.callbackVerdict.reasons.join(" "))}</span>`;
+  }
+  return { live, outcome: call.outcome, verdict, other: m.kind === "airline" ? "Airline desk" : "Passenger" };
+}
+
+function clock(ms) {
+  const s = Math.max(0, Math.floor(ms / 1000));
+  return `${String(Math.floor(s / 60)).padStart(2, "0")}:${String(s % 60).padStart(2, "0")}`;
+}
+
+function tickCall() {
+  if (!callModal) return;
+  const st = callState(callModal);
+  const turns = st?.outcome?.transcript ?? [];
+  // Once the call has ended, play the conversation back one line at a time.
+  if (st && !st.live && callModal.shown < turns.length && Date.now() - (callModal.lastShown ?? 0) > 850) {
+    callModal.shown += 1;
+    callModal.lastShown = Date.now();
+    renderCall(true);
+    return;
+  }
+  renderCall(false);
+}
+
+function renderCall(full) {
+  const m = callModal;
+  if (!m) return;
+  const el = $("call-modal");
+  const st = callState(m);
+  const turns = st?.outcome?.transcript ?? [];
+  const elapsed = Date.now() - m.openedAt;
+  const ringing = !st || (st.live && elapsed < 2200);
+  const replaying = st && !st.live && m.shown < turns.length;
+  const ended = st && !st.live && !replaying;
+  const failed = ended && st.outcome && st.outcome.state !== "completed" && !turns.length;
+  const phase = ringing ? "ringing" : st.live ? "connected" : replaying ? "replay" : "ended";
+  const stateText = ringing ? "Ringing…" : st.live ? `On the call · ${clock(elapsed - 2200)}` : failed ? "No answer" : replaying ? "Call recording" : "Call ended";
+  if (!full && phase === m.phase) {
+    const pill = el.querySelector(".call-head .state");
+    if (pill) pill.textContent = stateText;
+    return;
+  }
+  m.phase = phase;
+  const body = turns.length && !st.live
+    ? turns
+        .slice(0, m.shown)
+        .map((t, i) => {
+          const bot = t.speaker === "bot";
+          return `<div class="bubble ${bot ? "bot" : "them"}${i === m.shown - 1 ? " new" : ""}"><span class="spk">${bot ? "CALL-E" : esc(st.other)}</span><span>${esc(t.text)}</span></div>`;
+        })
+        .join("")
+    : `<p class="waiting">${ringing ? `Calling ${esc(m.who)}…` : st?.live ? (snap.live ? "CALL-E is on the phone. The transcript arrives when the call ends." : `CALL-E is talking with ${esc(m.who)}…`) : failed ? "Nobody picked up." : "No transcript for this call."}</p>`;
+  const entering = !m.rendered;
+  m.rendered = true;
+  el.hidden = false;
+  el.innerHTML = `<div class="call-backdrop${entering ? " entering" : ""}" data-call-backdrop>
+    <div class="call ${ringing ? "ringing" : ""}" role="dialog" aria-modal="true" aria-labelledby="call-title">
+      <div class="call-head">
+        <div class="call-avatar"><img src="calle-icon.svg" alt="" width="54" height="54"></div>
+        <div class="who" id="call-title">${esc(m.who)}</div>
+        <div class="sub">${esc(m.sub)}</div>
+        <div class="state">${esc(stateText)}</div>
+      </div>
+      <div class="call-body">${body}</div>
+      <div class="call-result">
+        ${ended && st.verdict ? `<div class="verdict">${st.verdict}</div>` : ""}
+        <div class="row-inline"><button type="button" class="btn ${ended ? "" : "ghost"}" data-call-close>${ended ? "Done" : "Hide"}</button></div>
+      </div>
+    </div>
+  </div>`;
+  const b = el.querySelector(".call-body");
+  if (b) b.scrollTop = b.scrollHeight;
+}
+
+document.addEventListener("keydown", (e) => {
+  if (e.key === "Escape" && callModal) closeCall();
+});
+document.addEventListener("click", (e) => {
+  if (!callModal) return;
+  if (e.target.closest("[data-call-close]") || e.target.matches("[data-call-backdrop]")) closeCall();
+});
+
+function passengerName(pnr) {
+  return snap?.bookings?.find((b) => b.pnr === pnr)?.passenger ?? pnr;
+}
+
 // ------------------------------------------------------------------ passenger requests (Workflow B)
 
 const REQUEST_CHIPS = {
@@ -835,6 +988,7 @@ document.addEventListener("submit", (e) => {
     act(async () => {
       const entry = await api("/api/requests", body);
       selectedRequest = entry.request.id;
+      showToast(entry.status === "ineligible" ? "Request logged: not eligible." : "Request priced. CALL-E is ready to call the passenger.");
       document.activeElement?.blur();
     });
     return;
@@ -858,6 +1012,7 @@ document.addEventListener("submit", (e) => {
     selected = null;
     previews.clear();
     snap = null;
+    showToast(`${d.kind === "cancellation" ? "Cancellation" : "Delay"} reported. Every passenger's options are priced.`);
     return d;
   });
 });
@@ -874,7 +1029,10 @@ document.addEventListener("click", (e) => {
   if (call) {
     const [disruptionId, pnr] = call.dataset.call.split("|");
     const key = `${disruptionId}:${pnr}`;
-    act(() => api("/api/calls/start", { disruptionId, pnr, confirmLast4: draft[`last4-${key}`] }));
+    act(async () => {
+      await api("/api/calls/start", { disruptionId, pnr, confirmLast4: draft[`last4-${key}`] });
+      openCall("passenger", key, passengerName(pnr), `Flight change call · booking ${pnr}`);
+    });
     return;
   }
   if (e.target.closest("[data-feed-poll]")) {
@@ -890,19 +1048,28 @@ document.addEventListener("click", (e) => {
   const reqPassenger = e.target.closest("[data-req-passenger]");
   if (reqPassenger) {
     const id = reqPassenger.dataset.reqPassenger;
-    act(() => api("/api/requests/passenger/start", { id, confirmLast4: draft[`req-p-last4-${id}`] }));
+    act(async () => {
+      const r = await api("/api/requests/passenger/start", { id, confirmLast4: draft[`req-p-last4-${id}`] });
+      openCall("intake", id, passengerName(r.request.pnr), `Agreeing the change · booking ${r.request.pnr}`);
+    });
     return;
   }
   const reqAirline = e.target.closest("[data-req-airline]");
   if (reqAirline) {
     const id = reqAirline.dataset.reqAirline;
-    act(() => api("/api/requests/airline/start", { id, confirmLast4: draft[`req-last4-${id}`] }));
+    act(async () => {
+      const r = await api("/api/requests/airline/start", { id, confirmLast4: draft[`req-last4-${id}`] });
+      openCall("airline", id, "Nusantara Air agency desk", `Making the change · booking ${r.request.pnr}`);
+    });
     return;
   }
   const reqCallback = e.target.closest("[data-req-callback]");
   if (reqCallback) {
     const id = reqCallback.dataset.reqCallback;
-    act(() => api("/api/requests/callback/start", { id, confirmLast4: draft[`req-cb-last4-${id}`] }));
+    act(async () => {
+      const r = await api("/api/requests/callback/start", { id, confirmLast4: draft[`req-cb-last4-${id}`] });
+      openCall("callback", id, passengerName(r.request.pnr), `Result call · booking ${r.request.pnr}`);
+    });
     return;
   }
   const reqResolve = e.target.closest("[data-req-resolve]");
