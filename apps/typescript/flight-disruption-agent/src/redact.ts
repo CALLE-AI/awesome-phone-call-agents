@@ -5,7 +5,8 @@ import type { CallOutcome } from "./types.ts";
  * them. That covers phone numbers as CALL-E writes or transcribes them (and ticket numbers),
  * but not rupiah amounts, which use commas and stay under eight digits in this demo.
  */
-const PHONE_LIKE = /\+?\d(?:[\s\-()]*\d){7,}/g;
+// Not attached to letters or digits, so flight ids like NA729-2026-09-20 stay intact.
+const PHONE_LIKE = /(?<![A-Za-z0-9])\+?\d(?:[\s\-()]*\d){7,}/g;
 const ISO_DATE = /^\d{4}-\d{2}-\d{2}$/;
 
 /** Masks phone-like numbers in provider text, keeping the last four digits. */
@@ -21,8 +22,8 @@ export function redactText(text: string | null | undefined): string | null | und
   });
 }
 
-/** Structured fields that hold booking identifiers the desk must apply, not free text. */
-const IDENTIFIER_FIELDS = new Set(["new_booking_code", "new_ticket_number"]);
+/** Structured fields that hold identifiers the desk acts on, not free text. */
+const IDENTIFIER_FIELDS = new Set(["new_booking_code", "new_ticket_number", "selected_flight"]);
 
 /**
  * Applied to every provider outcome before it is stored, persisted, or returned by the API.

@@ -15,6 +15,7 @@ test("phone numbers in provider text are masked; amounts, times, and dates are n
   assert.equal(redactText("my number is 0812-3456-7890"), "my number is ••• 7890");
   assert.equal(redactText("refund of 1,605,000 rupiah at 19:45 on 2026-09-20"), "refund of 1,605,000 rupiah at 19:45 on 2026-09-20");
   assert.equal(redactText(null), null);
+  assert.equal(redactText("moved to NA729-2026-09-20"), "moved to NA729-2026-09-20");
 });
 
 test("outcomes are masked everywhere except the booking identifiers the desk applies", () => {
