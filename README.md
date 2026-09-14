@@ -123,6 +123,7 @@ This project is an awesome list for AI-agent phone-call workflows. Add resources
 - [`lesson-language-phone-practice`](skills/lesson-language-phone-practice/) - Consent-gated, lesson-derived phone rehearsal with a one-minute maximum, transcript-bound formative evidence, and no automatic redial.
 - [`accesscall`](skills/accesscall/) - Phone-based accessibility intake for VPAT 2.4/Section 508 audits. Run `npm install` in `skills/accesscall/` before using `scripts/format-to-vpat.js`, or it fails with `Cannot find module 'jszip'`.
 - [`appointment-confirm`](skills/appointment-confirm/) - Confirms one existing appointment by phone, captures yes/no plus time as structured JSON, and leaves calendar writes to a human.
+- [`cod-order-confirmation-call`](skills/cod-order-confirmation-call/) - Prepares an authorized cash-on-delivery confirmation call from order rows with an advisory result schema; validation and status changes belong to the host or a human. Dry-run preview needs no credentials.
 - [`candidate-availability-call`](skills/candidate-availability-call/) - Recruiting coordination skill that confirms candidate interview availability by phone, returns evidence-backed time windows, and leaves scheduling commitments to a human.
 - [`call-reminder`](skills/call-reminder/) - Scheduler wrapper skill for recurring CALL-E phone-call reminders.
 - [`callparity-claimkill`](skills/callparity-claimkill/) - ClaimKill (CallParity) compiles the next CALL-E call as a leak-scored refute of a quoted claim; pytest runs on fixtures with zero live calls.
@@ -363,6 +364,7 @@ The default e2e tests use a local fake broker/OAuth/MCP server or dry-run paths,
 
 Externally hosted user-facing apps built on CALL-E. They live in their own repositories, so review their setup, credential handling, and call side effects before running them.
 
+- [FrontDesk Phone Follow-Through](https://github.com/TayseerLaz/frontdesk-core) - Cash-on-delivery order confirmation calls inside a multi-tenant WhatsApp AI front desk: chat orders are confirmed by a CALL-E call briefed from the real order rows, results written back to the order and the inbox thread; dry-run default, verified-number override, per-tenant daily cap. See the [integration notes](docs/community-apps/frontdesk-phone-follow-through.md).
 - [Care Call AI](https://github.com/NeoSPU/care-call-ai) - Practical-support outreach app for charities with approved CALL-E rounds, no-call preflight, operator gates, and reviewed request/order handoff. [Demo video](https://youtu.be/Hc2bWjTnKFQ) · [Integration notes](docs/community-apps/care-call-ai.md).
 - [ProofMesh](https://github.com/fokrulanthro16-eng/proofmesh) - A consent-first CALL-E phone verification platform that turns supervised conversations into auditable, machine-readable facts with human approval, regional controls, and honest uncertainty handling. See the [integration notes](docs/community-apps/proofmesh.md).
 
