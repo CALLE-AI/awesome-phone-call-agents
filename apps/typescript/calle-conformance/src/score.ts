@@ -57,7 +57,7 @@ if (ALLOWED.includes(origin as (typeof ALLOWED)[number])) {
   process.exit(2);
 }
 
-const client = new CalleClient({ apiKey: process.env.CALLE_API_KEY ?? "scored-fake", baseUrl: base });
+const client = new CalleClient({ apiKey: "scored-fake", baseUrl: base });
 
 /**
  * Drives one call the way an application would: create, then poll until the
