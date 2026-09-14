@@ -120,7 +120,6 @@ This project is an awesome list for AI-agent phone-call workflows. Add resources
 
 ### Skills
 
-- [ridgecalle-active-listener](skills/bridgecalle-active-listener/) - Prompt-guided active-listening elder check-in skill that configures CALL-E phone calls to provide gentle verbal nods, extract nostalgic memories, and export family summaries.
 - [`lesson-language-phone-practice`](skills/lesson-language-phone-practice/) - Consent-gated, lesson-derived phone rehearsal with a one-minute maximum, transcript-bound formative evidence, and no automatic redial.
 - [`accesscall`](skills/accesscall/) - Phone-based accessibility intake for VPAT 2.4/Section 508 audits. Run `npm install` in `skills/accesscall/` before using `scripts/format-to-vpat.js`, or it fails with `Cannot find module 'jszip'`.
 - [`accessible-outing-verifier`](skills/accessible-outing-verifier/) - Offline accessibility-planning fixture and proposed bounded CALL-E workflow; demonstrates advisory handling of qualified answers without making calls or certifying venue safety.
@@ -192,7 +191,6 @@ This project is an awesome list for AI-agent phone-call workflows. Add resources
 
 ### Apps
 
-- [BridgeCalle](apps/typescript/bridgecalle/) - Senior-accessible active listening voice companion web app powered by CALL-E API & SDK.
 
 - [SiteWitness](apps/typescript/sitewitness/) - Local site-history interview workspace that carries reviewed evidence gaps into individually approved CALL-E calls, with exact transcript quotations, human year review, and a no-call rehearsal mode.
 - [Rebuttal Dispute Call](apps/python/rebuttal-dispute-call/) - One disclosed CALL-E call to a disputing customer, cross-examined against its transcript before it becomes chargeback evidence, with six scripted no-call scenarios and a live path gated by per-run consent, an allowlist and local calling hours.
