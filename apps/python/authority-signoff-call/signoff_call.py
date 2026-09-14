@@ -84,13 +84,14 @@ def build_task(
         "This is a routine administrative call about a decision already recorded by an "
         "automated system. It is not a live emergency, does not seek a real-time operational "
         "decision, and does not direct or affect any live incident, dispatch, or safety-critical "
-        f"process — say this plainly if asked. You are calling {authority_name} to review one "
-        f"log entry. Speak clearly and briefly. Context: {context}. The system's policy engine "
-        f"already recorded the following as authorized under {authorizing_tier}{amount_clause}: "
-        f"\"{decision_summary}\". Ask whether they want to CONFIRM this log entry as recorded, "
-        "or OVERRIDE it (flag it for correction). Politely end the call once you have a clear "
-        "answer. If they are unavailable or the line doesn't answer, record the outcome as "
-        "unclear."
+        f"process — say this plainly if asked. The purpose of this call is to get "
+        f"{authority_name}'s approval on one matter: reviewing one log entry. Speak clearly and "
+        f"briefly, and state up front that you're calling to get their approval on this matter. "
+        f"Context: {context}. The system's policy engine already recorded the following as "
+        f"authorized under {authorizing_tier}{amount_clause}: \"{decision_summary}\". Ask whether "
+        "they want to CONFIRM this log entry as recorded, or OVERRIDE it (flag it for correction). "
+        "Politely end the call once you have a clear answer. If they are unavailable or the line "
+        "doesn't answer, record the outcome as unclear."
     )
 
 

@@ -20,11 +20,13 @@ a person, by design.
 ## Where the sign-off call plugs in
 
 `backend/agents/signoff_call.py` in GovOS is this exact pattern — same
-safe-by-default dry-run behavior, same `create_and_wait` call shape — wired
-specifically to the DDMA tier, since that's the one chaired by a specific
-named accountable person (the Chief Minister). `backend/main.py` fires it as
-a background task the moment a DDMA-tier approval is created, and when the
-call resolves to `confirm` or `override`, it calls
+safe-by-default dry-run behavior, same `create_and_wait` call shape.
+`backend/main.py` fires it as a background task the moment *any*
+authority-tiered approval is created (District Magistrate, Police
+Commissioner, or DDMA — it was initially wired to DDMA only, then widened
+once real usage showed a reviewer expects a call whenever a decision needed
+sign-off, not only the highest tier), and when the call resolves to
+`confirm` or `override`, it calls
 `incident_engine.resolve_approval(incident, approval_id, approve, actor)` —
 the identical function GovOS's own dashboard "Override" button already
 calls. The phone call is not a separate decision-application path; it's
@@ -33,30 +35,62 @@ another caller of the one that already existed.
 ## A real captured dry run
 
 With no `CALLE_API_KEY` configured (the default state for local
-development), triggering a fire incident in GovOS that auto-authorizes a
-DDMA-tier action produces this log line, unmodified:
+development), calling GovOS's own `_build_task()` for a DDMA-tier
+auto-authorization produces this call script, unmodified (captured directly
+from the running function, not retyped):
 
 ```
-INFO:govos.signoff_call:[DRY RUN — CALLE_API_KEY not set] Would call Chief Minister,
-Government of NCT of Delhi to sign off: This is a routine administrative call about
-a decision already recorded by an automated system. It is not a live emergency,
-does not seek a real-time operational decision, and does not direct or affect any
-live incident, dispatch, or safety-critical process — say this plainly if asked.
-You are calling Chief Minister, Government of NCT of Delhi to review one log entry.
-Speak clearly and briefly. Context: Fire Response — Hauz Khas. The system's policy
-engine already recorded the following as authorized under City-wide disaster
-sanction / multi-district mutual aid (DDMA) (amount: approximately ₹2,500,000):
-"Deploy Medical/Ambulance Unit to Hauz Khas (hospital access blocked) + emergency
-procurement". Ask whether they want to CONFIRM this log entry as recorded, or
-OVERRIDE it (flag it for correction). Politely end the call once you have a clear
-answer. If they are unavailable or the line doesn't answer, record the outcome as
-unclear.
-INFO:govos:Sign-off call for inc-dcdb0ff0/appr-cbb94397 -> unclear (dry run)
+This is a routine administrative call about a software demo/simulation. It is
+NOT a real emergency, is not connected to any real emergency dispatch, and
+does not direct or affect any real-world incident response — say this plainly
+if asked. The purpose of this call is to get Chief Minister, Government of
+NCT of Delhi's approval on one matter: a government-operations simulation
+app's policy engine provisionally recorded the following as authorized under
+City-wide disaster sanction / multi-district mutual aid (DDMA) for
+approximately ₹2,500,000, pending their review: "Deploy Medical/Ambulance
+Unit to Hauz Khas (hospital access blocked) + emergency procurement"
+(simulated scenario: "Fire Response — Hauz Khas"). Speak clearly and briefly,
+state up front that you're calling to get their approval on this matter, then
+ask whether they CONFIRM (approve) it as recorded, or OVERRIDE (reject) it —
+flag a rejection for correction in the app. Politely end the call once you
+have a clear answer. If they are unavailable or the line doesn't answer,
+record the outcome as unclear.
 ```
 
 The equivalent, provider-agnostic version of this same run using the app in
 this repository is in
 [`../assets/dry-run-example.txt`](../assets/dry-run-example.txt).
+
+## A second real trigger for the same pattern: tag-notification calls
+
+The same accountable-person-reached-by-phone pattern this skill packages
+turned out to generalize to a second trigger in GovOS, not just auto-
+authorization: when one authority tags another office on a shared comment
+thread and needs an urgent reply, `backend/main.py` places the same kind of
+call — same safe-by-default gating, same single pre-registered number, same
+"say plainly this isn't a real emergency" framing — but asking for an
+acknowledgement and a short reply instead of a confirm/override. Captured
+directly from `_build_tag_task()`:
+
+```
+This is a routine administrative call about a comment left on a software
+demo/simulation record. It is NOT a real emergency and does not direct or
+affect any real-world action — say this plainly if asked. You are reaching
+the line registered for MCD Zone Office. Chief Minister, Government of NCT
+of Delhi tagged this office on a simulation record titled "Fire Response —
+Hauz Khas" and is requesting an urgent reply. Their comment: "Please confirm
+the ambulance unit reached the site.". Speak clearly and briefly: read the
+comment, ask if they can acknowledge it and give a short reply. Politely end
+the call once you have an answer. If they are unavailable or the line
+doesn't answer, record acknowledged as false.
+```
+
+This isn't part of the packaged skill's API (`request_signoff_call` still
+only returns `confirm`/`override`/`unclear`) — it's evidence that the
+underlying pattern (one real call, to one pre-consented number, framed
+plainly as non-emergency, with a structured result and a safe-by-default
+gate) is reusable beyond the single "post-hoc sign-off" use case this skill
+names.
 
 ## A real live call
 
