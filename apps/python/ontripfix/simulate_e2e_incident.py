@@ -2,8 +2,14 @@ import os
 import sys
 import time
 import multiprocessing
+
+# Ensure ontripfix root is on sys.path
+BASE_DIR = os.path.dirname(os.path.abspath(__file__))
+if BASE_DIR not in sys.path:
+    sys.path.insert(0, BASE_DIR)
+
 from db.init_sqlite import init_db
-from flask_app.app import app
+from fastapi_app.app import app
 from dags.retail_inventory_etl import run_retail_etl_task
 
 
@@ -40,9 +46,20 @@ def main():
         run_retail_etl_task()
     except Exception as e:
         print(f"\n[Simulation Engine] Expected DAG failure caught: {e}")
+        from dags.retail_inventory_etl import on_failure_callback
+
+        on_failure_callback(
+            {
+                "dag_id": "retail_inventory_etl",
+                "task_id": "transform_inventory_sql",
+                "execution_date": "2026-09-06T22:00:00",
+                "error_message": str(e),
+                "exception": str(e),
+            }
+        )
 
     # Wait for background queue processing, Jira/Confluence checks, Call-E call & LangGraph execution
-    time.sleep(6)
+    time.sleep(8)
 
     # Step 4: Re-trigger Airflow DAG task post-remediation
     print("\n--- PHASE 4: RE-RUNNING AIRFLOW DAG POST-REMEDIATION ---")
