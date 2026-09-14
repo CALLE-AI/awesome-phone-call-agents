@@ -205,6 +205,8 @@ This project is an awesome list for AI-agent phone-call workflows. Add resources
 - [Supply Chain Supplier Status Agent](https://github.com/mohSadiq90/call-e-hackathon) - Autonomous enterprise phone agent for supplier purchase order fulfillment verification, root cause delay capture, penalty estimation, and ERP dashboard sync with zero-credit mock simulation.
 
 - [WristCall AI](https://github.com/Baklolman69/WristCallAI) - Wear OS smartwatch assistant that searches Google via SerpApi, synthesizes call intent with Groq AI 120B, and dispatches autonomous phone calls via CALL-E with 3-bullet voice summaries.
+- [OOO-Pilot](https://github.com/balajianbalagan/ooopilot) - Slack-based AI work proxy that places real CALL-E phone calls on an absent employee's behalf, verifies coworker claims against Jira before treating them as fact, and reports discrepancies in a return-to-work summary.
+
 -  [VendorPulse](https://github.com/Eman2123/VendorPlus) - Autonomous CALL-E-powered vendor check-in tool that calls suppliers about order status, scores delivery risk, and escalates high-risk vendors for human review.
 Runnable demo apps live under [`apps/`](apps/). They are not a CALL-E SDK and do not define a supported application API.
 
