@@ -109,15 +109,23 @@ function narrate(event) {
         }.`,
       };
     }
-    case "node_spawned":
+    case "node_spawned": {
+      const spawned = snap?.nodes?.find((n) => n.id === event.nodeId);
+      if (spawned?.requiresApproval) {
+        return {
+          tone: "escalate",
+          text: `Proposed ${niceName(event.nodeId)} (from ${event.parentId}) — awaiting your authorization before it dials.`,
+        };
+      }
       return {
         tone: "escalate",
-        text: `Escalating: placing ${niceName(event.nodeId)} on behalf of ${event.parentId}.`,
+        text: `Next step: ${niceName(event.nodeId)} (from ${event.parentId}).`,
       };
+    }
     case "node_approved":
       return {
         tone: "approve",
-        text: `Reviewer approved ${niceName(event.nodeId)} — marked done.`,
+        text: `Authorized ${niceName(event.nodeId)} — placing the call.`,
       };
     case "graph_done": {
       const nodes = snap?.nodes ?? [];
@@ -125,6 +133,13 @@ function narrate(event) {
         (n) => n.result?.urgency === "high" || n.status === "needs_user"
       ).length;
       const review = nodes.filter((n) => n.status === "needs_review").length;
+      const awaiting = nodes.filter((n) => n.status === "awaiting_approval").length;
+      if (awaiting > 0) {
+        return {
+          tone: "alert",
+          text: `Paused: ${awaiting} call${awaiting === 1 ? "" : "s"} awaiting your authorization. Approve to continue.`,
+        };
+      }
       return {
         tone: "start",
         text: `Run complete. ${nodes.length} calls, ${attention} need attention now, ${review} need review.`,

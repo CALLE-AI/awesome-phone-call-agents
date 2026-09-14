@@ -223,6 +223,7 @@ export async function executeGraph(
       const settled = graph.nodes.filter(
         (n) =>
           !expandedIds.has(n.id) &&
+          n.expanded !== true &&
           (n.status === "done" ||
             n.status === "needs_review" ||
             n.status === "needs_user" ||
@@ -230,8 +231,13 @@ export async function executeGraph(
       );
       for (const node of settled) {
         expandedIds.add(node.id);
+        // Persist on the node too, so a later executeGraph pass (e.g. after a
+        // human approval resumes the run) never re-expands the same node.
+        node.expanded = true;
         const spawned = graph.expand(node, graph);
         for (const child of spawned) {
+          // Guard: never add a child id that already exists in the graph.
+          if (graph.nodes.some((n) => n.id === child.id)) continue;
           child.spawnedBy = node.id;
           graph.nodes.push(child);
           opts.onEvent?.({ type: "node_spawned", node: child, parentId: node.id });

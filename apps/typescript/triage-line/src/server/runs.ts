@@ -40,6 +40,10 @@ export interface NodeSnapshot {
   attemptedLocales?: string[];
   /** Why a consequential call was proposed (shown at the approval gate). */
   proposedReason?: string;
+  /** This call must be authorized by a human before it dials. */
+  requiresApproval?: boolean;
+  /** Whether a human has authorized it. */
+  approved?: boolean;
 }
 
 export interface RunSnapshot {
@@ -113,6 +117,8 @@ function snapshotNode(n: CallNode): NodeSnapshot {
     proposedReason: n.proposedReason
       ? redactPhones(n.proposedReason)
       : undefined,
+    requiresApproval: n.requiresApproval,
+    approved: n.approved,
   };
 }
 

@@ -87,6 +87,8 @@ export interface CallNode {
   approved?: boolean;
   /** Human-readable reason this call was proposed (shown at the approval gate). */
   proposedReason?: string;
+  /** Internal: this node has already been passed to expand() (never re-expand). */
+  expanded?: boolean;
 
   /** Locales already attempted, for language auto-retry bookkeeping. */
   attemptedLocales?: string[];
