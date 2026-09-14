@@ -1,0 +1,16 @@
+node_modules
+dist
+data
+*.db
+*.db-shm
+*.db-wal
+.env
+.env.local
+*.log
+test
+scripts
+.git
+.gitignore
+Dockerfile
+.dockerignore
+README.md

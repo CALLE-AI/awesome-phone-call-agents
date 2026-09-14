@@ -1,0 +1,29 @@
+{
+  "taskCompleted": true,
+  "completionConfidence": { "score": 0.91, "label": "high" },
+  "summary": "Dr. Anita Rao confirmed the patient was treated for a fractured left wrist and road-rash abrasions consistent with a bike accident. Wrist was casted; treatment is ongoing with a follow-up in 3 weeks. Expected full recovery in about 6-8 weeks.",
+  "evidence": [
+    "Doctor said: 'He came in with a fractured left wrist and some road rash.'",
+    "Doctor said: 'That's consistent with coming off a bike, yes.'",
+    "Doctor said: 'We've casted it; he's due back in about three weeks.'"
+  ],
+  "structuredResult": {
+    "injuries_summary": "Fractured left wrist and road-rash abrasions on the left forearm.",
+    "treatment_provided": "Wrist immobilized in a cast; wounds cleaned and dressed.",
+    "accident_consistent": "yes",
+    "treatment_ongoing": "yes",
+    "expected_recovery": "Full recovery expected in 6-8 weeks with follow-up.",
+    "contact_name": "Dr. Anita Rao"
+  },
+  "transcript": [
+    { "offsetSeconds": 0, "speaker": "bot", "text": "Hello, this is an AI assistant calling on behalf of the patient's insurer about a claim. This call is recorded. Do you have a moment to confirm some treatment details?" },
+    { "offsetSeconds": 8, "speaker": "user", "text": "Yes, this is Dr. Rao, go ahead." },
+    { "offsetSeconds": 11, "speaker": "bot", "text": "Thank you. Can you summarize the injuries treated?" },
+    { "offsetSeconds": 15, "speaker": "user", "text": "He came in with a fractured left wrist and some road rash." },
+    { "offsetSeconds": 21, "speaker": "bot", "text": "Are those injuries consistent with a bicycle accident?" },
+    { "offsetSeconds": 25, "speaker": "user", "text": "That's consistent with coming off a bike, yes." },
+    { "offsetSeconds": 30, "speaker": "bot", "text": "What treatment was provided, and is it ongoing?" },
+    { "offsetSeconds": 35, "speaker": "user", "text": "We've casted it; he's due back in about three weeks. Should be fully healed in a couple of months." },
+    { "offsetSeconds": 43, "speaker": "bot", "text": "Thank you, Dr. Rao. That's everything I need. Goodbye." }
+  ]
+}

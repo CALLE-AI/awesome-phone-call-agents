@@ -1,0 +1,49 @@
+# Render.com Blueprint for ClaimLine.
+#
+# Two ways to use this:
+#  A) One service, this folder as root — in the Render dashboard set
+#     "Root Directory" to apps/typescript/claimline, or copy this file to the
+#     root of the repo you connect to Render.
+#  B) Manual: New + Web Service -> Docker -> point at this folder's Dockerfile
+#     and add the env vars below.
+#
+# Free plan notes: the instance sleeps after inactivity and its disk is
+# ephemeral (resets on redeploy). ClaimLine auto-seeds demo data on an empty
+# boot, so the demo always looks populated. For durable storage use a paid
+# disk, or a host with a free volume (e.g. Fly.io).
+services:
+  - type: web
+    name: claimline
+    runtime: docker
+    plan: free
+    dockerfilePath: ./Dockerfile
+    dockerContext: .
+    healthCheckPath: /api/health
+    autoDeploy: true
+    envVars:
+      # Live by default on the hosted instance (real calls once a key is set).
+      - key: CLAIMLINE_MODE
+        value: live
+      # Secret — set the real value in the Render dashboard, never in git.
+      - key: CALLE_API_KEY
+        sync: false
+      # Owner login uses the server key above. Password is a dashboard secret.
+      - key: CLAIMLINE_OWNER_USER
+        value: garglakshay
+      - key: CLAIMLINE_OWNER_PASS
+        sync: false
+      # Render generates a strong random cookie-signing secret.
+      - key: CLAIMLINE_SESSION_SECRET
+        generateValue: true
+      - key: CLAIMLINE_INSURER_NAME
+        value: ClaimLine Insurance
+      - key: CLAIMLINE_DB
+        value: /app/data/claimline.db
+      - key: CLAIMLINE_AUTOSEED
+        value: "true"
+      # Optional integrations — set in the dashboard, or leave unset to use the
+      # built-in simulated fallbacks (Slack report / Stripe payout still work).
+      - key: SLACK_WEBHOOK_URL
+        sync: false
+      - key: STRIPE_SECRET_KEY
+        sync: false

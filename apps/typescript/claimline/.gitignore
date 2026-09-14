@@ -1,0 +1,18 @@
+# dependencies
+node_modules/
+
+# build output
+dist/
+
+# local runtime data (SQLite db + WAL files)
+*.db
+*.db-shm
+*.db-wal
+data/
+
+# env / secrets — never commit CALL-E credentials
+.env
+.env.local
+
+# logs
+*.log

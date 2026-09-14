@@ -1,0 +1,26 @@
+# Run ClaimLine as a container locally or on any Docker host:
+#   docker compose up --build
+# Then open http://localhost:8787
+#
+# Secrets are read from a local .env file (never commit it). Copy .env.example
+# to .env and fill in CALLE_API_KEY / CLAIMLINE_OWNER_PASS for live calls.
+services:
+  claimline:
+    build: .
+    ports:
+      - "8787:8787"
+    environment:
+      # Live once a key is present; falls back to fixture (no calls) without one.
+      CLAIMLINE_MODE: ${CLAIMLINE_MODE:-}
+      CALLE_API_KEY: ${CALLE_API_KEY:-}
+      CLAIMLINE_OWNER_USER: ${CLAIMLINE_OWNER_USER:-garglakshay}
+      CLAIMLINE_OWNER_PASS: ${CLAIMLINE_OWNER_PASS:-}
+      CLAIMLINE_SESSION_SECRET: ${CLAIMLINE_SESSION_SECRET:-change-me-in-production}
+      CLAIMLINE_INSURER_NAME: ${CLAIMLINE_INSURER_NAME:-ClaimLine Insurance}
+      CLAIMLINE_DB: /app/data/claimline.db
+      CLAIMLINE_AUTOSEED: "true"
+    volumes:
+      # Persist the SQLite database across container restarts.
+      - claimline-data:/app/data
+volumes:
+  claimline-data:

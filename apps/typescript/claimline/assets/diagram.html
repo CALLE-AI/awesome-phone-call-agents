@@ -1,0 +1,112 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<style>
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body { background: #ffffff; font-family: "Segoe UI", system-ui, -apple-system, Roboto, sans-serif; }
+  .diagram { display: inline-block; padding: 36px 40px; background: #ffffff; color: #0f172a; }
+  .title { font-size: 26px; font-weight: 800; letter-spacing: .2px; }
+  .subtitle { color: #64748b; font-size: 15px; margin-top: 4px; margin-bottom: 26px; }
+
+  .flow { display: flex; align-items: stretch; gap: 0; }
+  .node { border-radius: 16px; padding: 16px 18px; width: 200px; display: flex; flex-direction: column; gap: 6px;
+          box-shadow: 0 2px 6px rgba(15,23,42,.06); }
+  .node .k { font-size: 12px; font-weight: 700; text-transform: uppercase; letter-spacing: .05em; opacity: .8; }
+  .node .h { font-size: 18px; font-weight: 750; }
+  .node .d { font-size: 12.5px; line-height: 1.4; }
+
+  .app { background: #0f172a; color: #fff; }
+  .app .k { color: #93c5fd; }
+  .calle { background: #eef2ff; border: 2px solid #6366f1; }
+  .calle .k { color: #4338ca; }
+  .calle .h { color: #3730a3; }
+  .phone { background: #ecfeff; border: 2px solid #06b6d4; align-items: center; text-align: center; justify-content: center; }
+  .phone .big { font-size: 34px; }
+  .result { background: #ecfdf5; border: 2px solid #10b981; }
+  .result .k { color: #047857; }
+  .result .h { color: #065f46; }
+  .human { background: #fffbeb; border: 2px solid #f59e0b; }
+  .human .k { color: #b45309; }
+  .human .h { color: #92400e; }
+
+  .arrow { display: flex; flex-direction: column; align-items: center; justify-content: center; width: 74px; }
+  .arrow .lbl { font-size: 11px; color: #64748b; margin-bottom: 4px; text-align: center; font-weight: 600; }
+  .arrow .line { font-size: 26px; color: #94a3b8; line-height: 1; }
+
+  .steps { display: flex; gap: 12px; margin-top: 30px; }
+  .step { flex: 1; background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 12px; padding: 14px 16px; }
+  .step .num { display: inline-flex; width: 26px; height: 26px; align-items: center; justify-content: center;
+               border-radius: 50%; background: #6366f1; color: #fff; font-weight: 700; font-size: 14px; margin-bottom: 8px; }
+  .step .t { font-weight: 700; font-size: 15px; color: #3730a3; font-family: ui-monospace, "SF Mono", Menlo, monospace; }
+  .step .x { font-size: 13px; color: #475569; margin-top: 4px; line-height: 1.45; }
+
+  .foot { margin-top: 24px; font-size: 13px; color: #64748b; }
+  .foot b { color: #0f172a; }
+</style>
+</head>
+<body>
+<div class="diagram">
+  <div class="title">☎️ ClaimLine &rarr; CALL-E call flow</div>
+  <div class="subtitle">ClaimLine drives CALL-E's three-step agent: <b>plan_call &rarr; run_call &rarr; get_call_run</b>. It only gathers facts; a human sanctions the claim.</div>
+
+  <div class="flow">
+    <div class="node app">
+      <div class="k">ClaimLine</div>
+      <div class="h">Claim + party</div>
+      <div class="d">Goal, phone number &amp; result schema for one party (claimant, doctor, billing, shop).</div>
+    </div>
+    <div class="arrow"><div class="lbl">plan</div><div class="line">&rarr;</div></div>
+    <div class="node calle">
+      <div class="k">CALL-E &middot; 1</div>
+      <div class="h">plan_call</div>
+      <div class="d">Prepares the call &amp; returns a plan. No call placed — this is the preview you review.</div>
+    </div>
+    <div class="arrow"><div class="lbl">confirm</div><div class="line">&rarr;</div></div>
+    <div class="node calle">
+      <div class="k">CALL-E &middot; 2</div>
+      <div class="h">run_call</div>
+      <div class="d">Dials the party, discloses AI + consent, and talks in the chosen language.</div>
+    </div>
+    <div class="arrow"><div class="lbl">dials</div><div class="line">&rarr;</div></div>
+    <div class="node phone">
+      <div class="big">📞</div>
+      <div class="d">Real phone conversation</div>
+    </div>
+  </div>
+
+  <div class="flow" style="margin-top: 16px;">
+    <div class="node human">
+      <div class="k">Human</div>
+      <div class="h">Verify &amp; sanction</div>
+      <div class="d">Reviews gathered facts + total, then approves / holds / rejects.</div>
+    </div>
+    <div class="arrow"><div class="lbl">review</div><div class="line">&larr;</div></div>
+    <div class="node result">
+      <div class="k">ClaimLine</div>
+      <div class="h">Structured result</div>
+      <div class="d">Schema-validated answer + transcript + evidence, aggregated into the case.</div>
+    </div>
+    <div class="arrow"><div class="lbl">poll</div><div class="line">&larr;</div></div>
+    <div class="node calle">
+      <div class="k">CALL-E &middot; 3</div>
+      <div class="h">get_call_run</div>
+      <div class="d">Returns authoritative status, transcript &amp; result. Read-only, safe to poll.</div>
+    </div>
+    <div class="arrow"><div class="lbl"></div><div class="line">&larr;</div></div>
+    <div class="node phone">
+      <div class="big">📝</div>
+      <div class="d">Call ends</div>
+    </div>
+  </div>
+
+  <div class="steps">
+    <div class="step"><div class="num">1</div><div class="t">plan_call(goal, phone)</div><div class="x">Prepares the call and returns a plan id. Places no call.</div></div>
+    <div class="step"><div class="num">2</div><div class="t">run_call(plan, confirm)</div><div class="x">Starts the prepared call on explicit confirmation. Can ring a real phone.</div></div>
+    <div class="step"><div class="num">3</div><div class="t">get_call_run(run_id)</div><div class="x">Reads status, transcript &amp; structured result until terminal.</div></div>
+  </div>
+
+  <div class="foot">Fail-closed: voicemail, refusal, or low confidence &rarr; <b>flagged for a human</b>, never guessed. Languages: <b>English &middot; Hindi &middot; Spanish</b>.</div>
+</div>
+</body>
+</html>

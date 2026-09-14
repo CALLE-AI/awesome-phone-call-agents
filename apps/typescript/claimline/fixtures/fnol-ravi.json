@@ -1,0 +1,37 @@
+{
+  "taskCompleted": true,
+  "completionConfidence": { "score": 0.93, "label": "high" },
+  "summary": "Claimant Ravi confirmed a rear-end auto collision on 2026-08-30. No injuries. Front bumper and left headlight damaged. Other party involved; no police report filed. Consent and AI/recording disclosure acknowledged.",
+  "evidence": [
+    "Ravi said: 'Yeah that's fine, go ahead.' when asked for consent to record.",
+    "Ravi said: 'No, nobody was hurt.'",
+    "Ravi said: 'The front bumper and the left headlight are smashed.'"
+  ],
+  "structuredResult": {
+    "incident_type": "auto_collision",
+    "incident_datetime": "2026-08-30T18:15",
+    "incident_location": "Elm St & 4th Ave, Springfield",
+    "description": "Rear-ended while stopped at a red light; front bumper and left headlight damaged.",
+    "injuries": "no",
+    "damaged_items": ["front bumper", "left headlight"],
+    "other_party_involved": "yes",
+    "police_report_filed": "no",
+    "preferred_callback_window": "weekdays 5-7pm",
+    "consent_recorded": true
+  },
+  "transcript": [
+    { "offsetSeconds": 0, "speaker": "bot", "text": "Hello, this is an AI assistant calling from your insurer to take details of your recent claim. This call is recorded. Is it okay to continue?" },
+    { "offsetSeconds": 6, "speaker": "user", "text": "Yeah that's fine, go ahead." },
+    { "offsetSeconds": 9, "speaker": "bot", "text": "Thank you. Can you tell me what happened?" },
+    { "offsetSeconds": 13, "speaker": "user", "text": "I was rear-ended at a red light on Elm and 4th a few days ago, on the 30th around quarter past six in the evening." },
+    { "offsetSeconds": 22, "speaker": "bot", "text": "I'm sorry to hear that. Was anyone hurt?" },
+    { "offsetSeconds": 25, "speaker": "user", "text": "No, nobody was hurt." },
+    { "offsetSeconds": 28, "speaker": "bot", "text": "Which parts of the vehicle are damaged?" },
+    { "offsetSeconds": 31, "speaker": "user", "text": "The front bumper and the left headlight are smashed." },
+    { "offsetSeconds": 36, "speaker": "bot", "text": "Was another party involved, and did you file a police report?" },
+    { "offsetSeconds": 41, "speaker": "user", "text": "Yes the other driver was there, but no police report." },
+    { "offsetSeconds": 46, "speaker": "bot", "text": "Understood. When is a good time for a human adjuster to call you back?" },
+    { "offsetSeconds": 51, "speaker": "user", "text": "Weekdays between 5 and 7pm works." },
+    { "offsetSeconds": 55, "speaker": "bot", "text": "Thank you, that's everything I need. A claims handler will review this and follow up. Goodbye." }
+  ]
+}
