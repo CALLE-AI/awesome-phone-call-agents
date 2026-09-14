@@ -39,10 +39,10 @@ Most phone-agent projects are one workflow. callhook is the layer underneath:
 - **MCP server** — `POST /mcp` exposes six tools (`fire_event`,
   `launch_campaign`, `get_campaign`, `list_sessions`, `list_event_types`,
   `run_demo`) so any MCP client can operate the voice channel.
-- **Operational guarantees** — never double-dial (persisted idempotency),
-  crash-safe JSONL journals, polite calling hours (9:00–20:00
-  recipient-local, weekdays), courtesy retries that never redial a refusal,
-  per-source rate limiting, and a full audit trail per call.
+- **Demo safeguards** — persisted idempotency, JSONL journals, configured
+  calling hours (9:00–20:00 recipient-local, weekdays), refusal-aware retry
+  rules, per-source rate limiting, and per-call audit records. These are
+  implementation safeguards, not a crash-proof or universal exactly-once guarantee.
 
 ## Supported host and CALL-E integration
 
@@ -56,7 +56,9 @@ integration uses the Developer API directly, stdlib HTTP only:
 2. The customer record is prefetched from the business store and baked into
    the call task, so the voice agent never asks for account details.
 3. A call is placed via `POST /v1/calls` with a `result_schema` and a
-   per-attempt idempotency key, so a crash mid-retry can never double-dial.
+   per-attempt idempotency key intended to limit duplicate submission. A demo
+   replay does not establish crash-proof delivery; ambiguous outcomes require
+   operator reconciliation before another call.
 4. The terminal webhook (`POST /callhook/webhook`, event-id deduped) drives
    the outcome engine: unambiguous results write to the business store
    (`mark_promise`), uncertain ones escalate to a human. Transcripts are
