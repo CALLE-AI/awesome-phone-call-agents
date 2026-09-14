@@ -82,7 +82,9 @@ second sweep of no-answers should run once before giving up.
    lands — the business may want to intervene mid-cascade.
 7. On acceptance, place the single customer confirmation call. On exhaustion, tell the
    business the list is exhausted and a human must decide; do not call the customer
-   with no technician assigned.
+   with no technician assigned. In live mode, an accepted call is advisory only —
+   the customer is never called until a human operator confirms the assignment (see
+   Runtime Workflow).
 
 ## Runtime Workflow
 
@@ -103,13 +105,25 @@ Repeat until the cascade ends:
    never scored as a decline, because a decline advances the list, and advancing past
    someone who was actually agreeing means nobody comes.
 6. **On decline or no answer:** advance to the next technician.
-7. **On acceptance:** stop. Do not dial anyone else. Record the technician's name and
-   stated ETA.
+7. **On acceptance:** stop dialling. In dry-run mode the technician is recorded as
+   assigned immediately. In live mode, a "yes" heard on the call is **advisory
+   only** — see the confirmation gate below before treating anyone as booked.
 
 End conditions: a technician accepted; the roster is exhausted; the dispatch cutoff
 passed; or the business stopped it. A call held for a human to resolve an unreadable
 answer is **not** an end condition — the cascade is paused and resumes where it
 stopped.
+
+### Live-mode confirmation gate
+
+A heuristically-detected "yes" and a call transport that finished `COMPLETED` are
+signals, not a booking — a completed call only means the call finished normally, and
+a positive-sounding transcript can misfire. So in live mode, the reference script
+never proceeds to Phase 2 on its own: it prints the advisory acceptance and blocks on
+an operator prompt. Only a human typing `CONFIRM`, and then supplying the ETA
+themselves, turns an advisory acceptance into a real assignment. If the operator does
+not confirm, the run stops with nobody booked and no customer call placed. This gate
+does not run in dry-run mode, since nothing there is a real call.
 
 ### Phase 2 — Customer confirmation
 
@@ -145,6 +159,12 @@ cancellation behavior. In short:
 
 A dry-run demo script that replays the two-phase cascade against fixture data — with
 no live CALL-E calls and no account required — is at
-[`scripts/dispatch-cascade.mjs`](scripts/dispatch-cascade.mjs). Pass `--live` to route
-the same logic through the real `calle` CLI once CALL-E auth is configured. See
-[`references/examples.md`](references/examples.md) for sample fixtures and commands.
+[`scripts/dispatch-cascade.mjs`](scripts/dispatch-cascade.mjs). Pass `--live
+--confirm-live` to route the same logic through the real `calle` CLI once CALL-E auth
+is configured; both flags are required together, as the documented explicit-intent
+check before anything real is dialed. The script also validates every technician and
+customer number is a distinct, valid E.164 destination, refuses to dial the dry-run
+fixture range for real, masks phone numbers in subprocess errors, and withholds raw
+live transcripts from its own log output. See
+[`references/examples.md`](references/examples.md) for sample fixtures and commands,
+and [`references/safety.md`](references/safety.md) for the full rules.

@@ -7,20 +7,34 @@
 //          technician's name and ETA.
 //
 // Default mode is a written, fixture-based dry run: no network calls, no CALL-E
-// account required. Pass --live to route the same two phases through the
-// installed `calle` CLI instead.
+// account required, and the full two-phase pipeline runs automatically because
+// nothing here is real.
+//
+// Live mode (--live --confirm-live) places real CALL-E calls and is deliberately
+// NOT fully automatic: a live "yes" is advisory only. Phase 2 (the customer call)
+// never runs until a human operator types CONFIRM and supplies the ETA at a
+// prompt — a heuristically-detected "yes" and a completed call transport do not
+// by themselves establish a booked dispatch. See references/safety.md.
 //
 // Usage:
-//   node dispatch-cascade.mjs --job <path-to-job.json> [--live]
+//   node dispatch-cascade.mjs --job <path-to-job.json> [--live --confirm-live]
 
 import { spawnSync } from "node:child_process";
 import fs from "node:fs";
+import readline from "node:readline/promises";
 
 const LIFE_THREATENING_KEYWORDS = [
   "gas leak", "gas smell", "smell of gas", "fire", "smoke", "carbon monoxide",
   "co alarm", "arcing", "sparking", "burning smell", "electrocut", "flooding",
   "medical emergency", "unconscious", "life-threatening", "life threatening",
 ];
+
+// E.164: a leading "+", digits only, no leading zero after the "+".
+const E164_RE = /^\+[1-9]\d{6,14}$/;
+
+// Standards-reserved NANP fictional range used by this skill's own fixtures
+// (+1-555-01XX). These must never be dialed for real, so live mode refuses them.
+const RESERVED_FIXTURE_RE = /^\+1555\d{4}$/;
 
 // Written fixture outcomes for the dry-run path, keyed by technician phone.
 // These are authored, not recorded from a real call — see references/safety.md.
@@ -35,13 +49,21 @@ const DRY_RUN_CUSTOMER_OUTCOME = {
 };
 
 function parseArgs(argv) {
-  const args = { live: false, job: null };
+  const args = { live: false, confirmLive: false, job: null };
   for (let i = 0; i < argv.length; i++) {
     if (argv[i] === "--live") args.live = true;
+    else if (argv[i] === "--confirm-live") args.confirmLive = true;
     else if (argv[i] === "--job") args.job = argv[++i];
   }
   if (!args.job) {
-    throw new Error("Usage: dispatch-cascade.mjs --job <path-to-job.json> [--live]");
+    throw new Error("Usage: dispatch-cascade.mjs --job <path-to-job.json> [--live --confirm-live]");
+  }
+  if (args.live && !args.confirmLive) {
+    throw new Error(
+      "Refusing --live without --confirm-live. Pass both only after you have confirmed " +
+      "every technician and customer number in the job file is a real, authorized " +
+      "recipient for this run.",
+    );
   }
   return args;
 }
@@ -49,6 +71,22 @@ function parseArgs(argv) {
 function maskPhone(phone) {
   if (typeof phone !== "string" || phone.length < 6) return "•••";
   return `${phone.slice(0, 4)}•••${phone.slice(-4)}`;
+}
+
+// Defense in depth for free-text (subprocess errors, thrown messages): mask any
+// E.164-shaped substring rather than relying on every call site to remember to.
+function maskPhonesInText(text) {
+  if (typeof text !== "string") return text;
+  return text.replace(/\+\d{6,15}/g, (m) => maskPhone(m));
+}
+
+// Live transcripts can carry real, unredacted speech (addresses, other numbers
+// spoken aloud, unrelated PII). The authored dry-run fixtures are not real, so
+// they are safe to print in full for the demo; a live transcript is withheld
+// from logs entirely rather than trusting a best-effort scrub.
+function transcriptForLog(live, transcript) {
+  if (!live) return transcript;
+  return transcript ? "[live transcript withheld from logs — see references/safety.md]" : transcript;
 }
 
 // Naive substring matching would misfire on reassurances like "no flooding risk",
@@ -65,9 +103,46 @@ function refusalReason(description) {
   return null;
 }
 
+// Every technician and the customer must be a distinct, valid E.164 destination.
+// Catches typos, a technician accidentally re-used as the customer, and a
+// technician re-used twice in the roster — any of which risks calling the wrong
+// person or double-booking.
+function validateDestinations(job) {
+  const entries = [
+    { label: job.job.customer_name, phone: job.job.customer_phone },
+    ...job.technicians.map((t) => ({ label: t.name, phone: t.phone })),
+  ];
+  const seen = new Set();
+  for (const { label, phone } of entries) {
+    if (typeof phone !== "string" || !E164_RE.test(phone)) {
+      throw new Error(`${label}'s phone "${phone}" is not a valid E.164 number.`);
+    }
+    if (seen.has(phone)) {
+      throw new Error(
+        `Duplicate destination ${maskPhone(phone)} — every technician and the customer ` +
+        `must be a distinct number.`,
+      );
+    }
+    seen.add(phone);
+  }
+  return entries;
+}
+
+function rejectFixtureNumbersInLiveMode(entries) {
+  for (const { label, phone } of entries) {
+    if (RESERVED_FIXTURE_RE.test(phone)) {
+      throw new Error(
+        `${label}'s phone ${maskPhone(phone)} is in the standards-reserved fixture range ` +
+        `(+1-555-01XX) used by this skill's dry-run demo, and must never be dialed live.`,
+      );
+    }
+  }
+}
+
 // Deliberately conservative: only a clear positive signal counts as acceptance.
 // Anything else that isn't a clear decline/no-answer is reported as unreadable
-// and halts the cascade for a human, per references/safety.md.
+// and halts the cascade for a human, per references/safety.md. In live mode
+// this classification is advisory only — see the confirmation gate in main().
 function classifyOutcome(status, transcript) {
   const terminalNonAnswer = new Set(["NO_ANSWER", "FAILED", "BUSY", "VOICEMAIL", "EXPIRED", "CANCELED", "CANCELLED", "DECLINED"]);
   if (terminalNonAnswer.has(status)) return "declined";
@@ -91,7 +166,8 @@ function runCalleCommand(args) {
     },
   });
   if (result.error || result.status !== 0) {
-    throw new Error(`calle ${args.join(" ")} failed: ${result.stderr || result.error}`);
+    const detail = maskPhonesInText(String(result.stderr || result.error || "").trim());
+    throw new Error(`calle ${maskPhonesInText(args.join(" "))} failed: ${detail}`);
   }
   return JSON.parse(result.stdout);
 }
@@ -110,7 +186,31 @@ function log(step) {
   console.log(JSON.stringify(step));
 }
 
-function main() {
+// The confirmation gate for live mode: a heuristic "yes" and a COMPLETED call
+// transport are signals, not a booking. Nothing is assigned, and no customer
+// call is placed, until a human operator explicitly types CONFIRM and supplies
+// the ETA themselves.
+async function confirmAssignment(tech) {
+  log({
+    phase: "advisory_acceptance",
+    technician: tech.name,
+    note: "Live transcript suggests acceptance. This is advisory only — nobody is booked yet.",
+  });
+  const rl = readline.createInterface({ input: process.stdin, output: process.stdout });
+  try {
+    const proceed = await rl.question(
+      `Type CONFIRM to book ${tech.name} and call the customer, or anything else to stop: `,
+    );
+    if (proceed.trim() !== "CONFIRM") return null;
+    const etaRaw = await rl.question(`Confirmed ETA in minutes for ${tech.name} (leave blank if unknown): `);
+    const eta = etaRaw.trim() === "" ? null : Number(etaRaw.trim());
+    return { eta_minutes: Number.isFinite(eta) ? eta : null };
+  } finally {
+    rl.close();
+  }
+}
+
+async function main() {
   const args = parseArgs(process.argv.slice(2));
   const job = JSON.parse(fs.readFileSync(args.job, "utf8"));
 
@@ -123,6 +223,9 @@ function main() {
     });
     process.exit(1);
   }
+
+  const destinations = validateDestinations(job);
+  if (args.live) rejectFixtureNumbersInLiveMode(destinations);
 
   log({ phase: "start", mode: args.live ? "live" : "dry-run", job: job.job.description, address: job.job.address });
 
@@ -141,15 +244,28 @@ function main() {
     if (outcome === "unreadable") {
       log({
         phase: "halt",
-        reason: `${tech.name}'s answer was not a clear yes or no: "${result.transcript}".`,
+        reason: `${tech.name}'s answer was not a clear yes or no: "${transcriptForLog(args.live, result.transcript)}".`,
         action: "Cascade paused. A human must say whether this counts as accept, decline, or a callback.",
       });
       process.exit(2);
     }
 
     if (outcome === "accepted") {
-      assigned = { ...tech, eta_minutes: DRY_RUN_OUTCOMES[tech.phone]?.eta_minutes ?? result.raw?.eta_minutes ?? null };
-      log({ phase: "assigned", technician: tech.name, eta_minutes: assigned.eta_minutes });
+      if (args.live) {
+        const confirmed = await confirmAssignment(tech);
+        if (!confirmed) {
+          log({
+            phase: "assignment_not_confirmed",
+            technician: tech.name,
+            action: "Operator did not confirm. No one is booked; a human must decide next steps.",
+          });
+          process.exit(4);
+        }
+        assigned = { ...tech, eta_minutes: confirmed.eta_minutes };
+      } else {
+        assigned = { ...tech, eta_minutes: DRY_RUN_OUTCOMES[tech.phone]?.eta_minutes ?? null };
+      }
+      log({ phase: "assigned", technician: assigned.name, eta_minutes: assigned.eta_minutes });
       break;
     }
     // declined: fall through to the next technician
@@ -172,7 +288,7 @@ function main() {
     customer: job.job.customer_name,
     phone: maskPhone(job.job.customer_phone),
     status: confirmResult.status,
-    transcript: confirmResult.transcript,
+    transcript: transcriptForLog(args.live, confirmResult.transcript),
   });
 
   log({
@@ -183,4 +299,7 @@ function main() {
   });
 }
 
-main();
+main().catch((err) => {
+  console.error(err.message ?? String(err));
+  process.exit(1);
+});

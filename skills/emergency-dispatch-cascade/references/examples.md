@@ -35,14 +35,31 @@ network calls are made and no CALL-E credentials are required.
 
 ## Live mode (requires `calle auth login` first)
 
+Live mode needs its own job file with real, authorized, distinct E.164 numbers —
+the sample fixture above is in the standards-reserved `+1-555-01XX` range and is
+refused as a live destination on purpose:
+
 ```bash
 node skills/emergency-dispatch-cascade/scripts/dispatch-cascade.mjs \
-  --job skills/emergency-dispatch-cascade/assets/sample-job.json \
-  --live
+  --job path/to/real-job.json \
+  --live --confirm-live
 ```
 
+Both `--live` and `--confirm-live` are required together — `--live` alone is
+refused — as the explicit statement that every number in the job file is a real,
+authorized recipient for this run.
+
 In live mode, the script shells out to the installed `calle` CLI for each phase
-instead of replaying fixtures:
+instead of replaying fixtures. A detected acceptance is advisory only: the script
+prints an `advisory_acceptance` line and blocks on a prompt, and only proceeds to
+call the customer once the operator types `CONFIRM` and enters the ETA themselves.
+If the operator does not confirm, the run ends with nobody booked and no customer
+call placed. Raw live transcripts are withheld from the script's own log output
+(see [`references/safety.md`](safety.md)).
+
+Under the hood, each phase is one `calle` CLI invocation shaped like this (the
+fixture number below is illustrative only — the script itself refuses to dial it
+live; substitute a real, authorized number to actually run this by hand):
 
 ```bash
 calle call plan --to-phone "+15550101" \

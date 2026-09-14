@@ -38,18 +38,53 @@ accept and the business would need to un-book one of them.
   technician while the outcome is still open, because that risks double-booking or
   skipping someone who was actually agreeing.
 
+## Live dispatch is advisory until a human confirms it
+
+A heuristic match on the words in a transcript, and a call transport that finished
+with status `COMPLETED`, are both signals that a human should look at — neither one
+by itself is proof that a technician actually committed to the job. `COMPLETED`
+means the call finished normally; it does not mean the content of the call was a
+firm yes. For that reason, live dispatch must never auto-book:
+
+- An acceptance detected on a **live** call is reported as an advisory
+  `advisory_acceptance`, not a booking, and the customer confirmation call (Phase 2)
+  must not run until a human operator explicitly confirms it.
+- The ETA used for the booking and for the customer call must come from that human
+  confirmation, not from a fixture value or an unvalidated field in the call
+  transport's response. Never reuse a dry-run fixture ETA as a live result.
+- If the operator does not confirm, the run must end with nobody booked and no
+  customer call placed — reported distinctly from both "declined" and "exhausted."
+- This gate applies to live calls only. The dry-run path may keep its automatic
+  fixture-to-fixture pipeline, since nothing there has a real-world effect
+  ("fake-only" automation is acceptable; real automation is not).
+
 ## Phone numbers
 
 - Technician and customer numbers come only from the business-supplied roster and
   the business-confirmed customer contact. The skill never sources, guesses, or
   completes a phone number.
 - All numbers must be E.164 (`+` followed by country code and subscriber number).
+  The reference script validates this and refuses to run otherwise.
+- Every technician and the customer must be a distinct destination. A number reused
+  across two roles (or two technicians) is rejected before any call is placed —
+  it is far more likely to be a data error than an intentional dispatch.
 - Examples, fixtures, and documentation use only standards-reserved fictional
   numbers (North American Numbering Plan `+1-555-01XX` range). Never use a real
-  phone number, including your own, in a committed example.
+  phone number, including your own, in a committed example. Live mode refuses to
+  dial anything in that reserved range, so a fixture accidentally left in a live
+  job file fails closed instead of ringing nobody.
+- Live mode requires the operator to pass `--live` and `--confirm-live` together, as
+  the explicit per-run intent check that every destination in the job file is a
+  real, authorized recipient. `--live` alone is refused.
 - Any transcript, call summary, or log surfaced to a human must mask the middle
   digits of a real phone number (e.g. `+1555•••0123`) unless the recipient is the
-  number's owner.
+  number's owner. This includes subprocess/CLI error output, which can otherwise
+  echo a raw `--to-phone` argument back into a log or terminal; the reference
+  script masks phone numbers in every error it raises.
+- A live call's raw transcript is withheld from the script's own log output
+  entirely (not merely number-masked), since it may contain real, unredacted
+  speech beyond the phone number itself. Only the authored dry-run fixtures are
+  safe to print in full, because they are not real.
 
 ## No hidden recurring schedule, no duplicate jobs
 
