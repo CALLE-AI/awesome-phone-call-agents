@@ -664,6 +664,33 @@ export class Desk {
         passengers: this.catalog.bookings.filter((b) => b.flightId === f.id).length,
         disruption: this.state.disruptions.find((d) => d.flightId === f.id) ?? null,
       })),
+      bookings: this.catalog.bookings.map((b) => {
+        const state = this.state.bookings[b.pnr];
+        const quote = voluntaryQuoteFor(catalog, b);
+        return {
+          pnr: b.pnr,
+          passenger: b.passenger,
+          flight: findFlight(catalog, b.flightId),
+          fareFamily: b.fareFamily,
+          farePaid: b.farePaid,
+          channel: b.channel.map((id) => ({ id, name: partyName(id), role: partyRole(id) })),
+          state,
+          disrupted: this.state.disruptions.some((d) => d.flightId === b.flightId),
+          voluntary: { moves: quote.moves.map((m) => ({ flightId: m.flightId, label: m.label, total: m.total })), refund: quote.refund.amount },
+        };
+      }),
+      requests: Object.values(this.state.requests)
+        .sort((a, b) => b.request.createdAt.localeCompare(a.request.createdAt))
+        .map((r) => {
+          const booking = findBooking(this.catalog, r.request.pnr);
+          return {
+            ...r,
+            passenger: booking.passenger,
+            flight: findFlight(catalog, booking.flightId),
+            channel: booking.channel.map((id) => ({ id, name: partyName(id), role: partyRole(id) })),
+            bookingState: this.state.bookings[booking.pnr],
+          };
+        }),
       disruptions: this.state.disruptions.map((d) => {
         const flight = findFlight(catalog, d.flightId);
         return {

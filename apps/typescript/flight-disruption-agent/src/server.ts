@@ -4,7 +4,7 @@ import { extname, join, normalize } from "node:path";
 import { APP_ROOT, gatewayFromEnv, loadEnvFile } from "./config.ts";
 import { loadCatalog } from "./data.ts";
 import { Desk, DeskError } from "./desk.ts";
-import type { Action } from "./types.ts";
+import type { Action, RequestChannel, RequestKind } from "./types.ts";
 
 loadEnvFile();
 
@@ -86,6 +86,38 @@ async function api(req: IncomingMessage, res: ServerResponse, path: string): Pro
   if (req.method === "POST" && path === "/api/calls/resolve") {
     const body = await readJson(req);
     return send(res, 200, desk.resolve(str(body, "key"), parseAction(body.action), String(body.note ?? "")));
+  }
+  if (req.method === "POST" && path === "/api/requests") {
+    const body = await readJson(req);
+    const target = typeof body.targetFlightId === "string" && body.targetFlightId ? body.targetFlightId : null;
+    const entry = desk.submitRequest(str(body, "pnr"), str(body, "kind") as RequestKind, target, str(body, "channel") as RequestChannel);
+    return send(res, 201, entry);
+  }
+  if (req.method === "POST" && path === "/api/requests/confirm") {
+    const body = await readJson(req);
+    const amount = Number(body.confirmedAmount);
+    if (!Number.isFinite(amount)) throw new DeskError('Missing "confirmedAmount".');
+    return send(res, 200, desk.confirmRequest(str(body, "id"), amount));
+  }
+  if (req.method === "POST" && path === "/api/requests/decline") {
+    const body = await readJson(req);
+    return send(res, 200, desk.declineRequest(str(body, "id")));
+  }
+  if (req.method === "POST" && path === "/api/requests/airline/preview") {
+    const body = await readJson(req);
+    return send(res, 200, desk.previewAirlineCall(str(body, "id")));
+  }
+  if (req.method === "POST" && path === "/api/requests/airline/start") {
+    const body = await readJson(req);
+    const confirm = typeof body.confirmLast4 === "string" ? body.confirmLast4 : undefined;
+    return send(res, 201, await desk.callAirlineDesk(str(body, "id"), confirm));
+  }
+  if (req.method === "POST" && path === "/api/requests/resolve") {
+    const body = await readJson(req);
+    const newPnr = typeof body.newPnr === "string" ? body.newPnr.trim().toUpperCase() : "";
+    const ticket = typeof body.ticket === "string" ? body.ticket.trim() : "";
+    const reissue = newPnr || ticket ? { pnr: newPnr, ticket } : undefined;
+    return send(res, 200, desk.resolveRequest(str(body, "id"), body.apply === true, String(body.note ?? ""), reissue));
   }
   if (req.method === "POST" && path === "/api/reset") {
     desk.reset();
