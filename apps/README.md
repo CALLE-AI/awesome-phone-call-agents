@@ -10,6 +10,7 @@ Current apps:
 
 | App | Language | Purpose |
 | --- | --- | --- |
+| [`typescript/vouch`](typescript/vouch/) | TypeScript / Next.js | Consent-scoped employment verification: no consent artifact, no dial. Requested vs permitted fields (California SB 1162 strips salary), third-party gatekeeper is a first-class disposition. Fixture replay by default. |
 | [`typescript/headcount`](typescript/headcount/) | TypeScript / Next.js | CDC CASPER-style disaster household needs assessment: the unreached count is the product, voicemail is not a reach, unsupported fields strike through, and fail-closed cards go to a human. Fixture replay by default. |
 | [`typescript/clinic-slot-assistant`](typescript/clinic-slot-assistant/) | TypeScript / Next.js | Consent-aware appointment-availability calls with result review, staff-confirmed fictional bookings, and a no-call simulation default. |
 | [`typescript/macrodial`](typescript/macrodial/) | TypeScript / Node | No-call review of MacroDial's governed CALL-E playbook/task schema and persisted synthetic outcome transitions; includes hosted Auto Config and Smart Data Loader workflow documentation. |
