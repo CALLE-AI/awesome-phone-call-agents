@@ -321,6 +321,8 @@ Runnable demo apps live under [`apps/`](apps/). They are not a CALL-E SDK and do
 - [VERIFY](https://github.com/DivineDomokuma10/verifyam) - Disclosed listing-verification app that calls the agent or landlord behind a rental ad and returns a schema-validated transcript-backed claim (Verified/Warning/Inconclusive) with transcript evidence and an optional mock mode. Verdicts represent transcript-supported assessments, not independent authority verification.
 
 The default e2e tests use a local fake broker/OAuth/MCP server or dry-run paths, so they do not require real CALL-E credentials or browser login. Live verification is opt-in in each app README.
+- [callhook](apps/go/callhook/) - Event-driven CALL-E calling platform: webhook in, structured outcome back, with goal-driven campaigns that early-stop, 19 doc-verified platform integrations, an MCP server, and a war-room UI in one zero-dependency Go binary. Dry-run by default. [Demo](https://callhook.onrender.com) · [Video](https://youtu.be/66siB3kIYMk)
+
 
 ### Community apps
 
