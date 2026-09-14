@@ -135,3 +135,11 @@ test("a question that was interrupted must be re-asked in full, never counted as
   assert.match(task, /Never treat a question you did not finish asking as answered/);
   assert.match(task, /mark it unknown instead/, "an unfinished question falls through to review, not to a verdict");
 });
+
+test("the task forbids combining exemptions into one question, or inventing them", () => {
+  const task = renderScreeningTask(rules, state, byId("e001"), "2026-09-14");
+  assert.match(task, /Ask exactly one thing at a time/);
+  assert.match(task, /Never combine two exemptions into a single question/);
+  assert.match(task, /you must then mark both unknown/, "a bundled yes-or-no cannot be attributed to either part");
+  assert.match(task, /Never invent an exemption, a threshold or a reporting rule/);
+});

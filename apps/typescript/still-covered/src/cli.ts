@@ -511,6 +511,7 @@ async function main(): Promise<void> {
       const fake = await ensureFakeServer(config, log, true);
       const client = createCalleClient(config);
       const asOf = typeof values["as-of"] === "string" ? values["as-of"] : todayIn(config.timeZone);
+      const runStamp = new Date().toISOString().slice(11, 19).replace(/:/g, "");
       const rawSimulate = typeof values["simulate"] === "string" ? values["simulate"] : "compliant";
       if (rawSimulate !== "compliant" && rawSimulate !== "violating") {
         throw new Error(`--simulate must be "compliant" or "violating", got ${rawSimulate}`);
@@ -532,7 +533,9 @@ async function main(): Promise<void> {
             await rl.question(color.yellow(`Press Enter when you are ready for ${maskPhone(phone)} to ring. `));
           }
           const person = personaToEnrollee(probe, phone);
-          const campaign: Campaign = { id: `probe-${asOf}`, title: "Conformance probes", stateId: state.id, rulesId: rules.id, source: "manual", startedAt: new Date().toISOString(), asOf, dueWithinDays: null };
+          // Each probe run gets its own campaign id. The idempotency key is campaign+person+attempt, and a
+// probe is deliberately re-run whenever the task text changes - a reused key is correctly refused.
+const campaign: Campaign = { id: `probe-${asOf}-${runStamp}`, title: "Conformance probes", stateId: state.id, rulesId: rules.id, source: "manual", startedAt: new Date().toISOString(), asOf, dueWithinDays: null };
           const wave: Wave = { index: index + 1, priority: 1, personIds: [person.id], attempt: 1 };
           const { call } = await createScreeningCall({ config, client, campaign, rules, state, person, wave, webhookUrl: null, ...(simulateMode !== null ? { probeSimulation: { probeId: probe.id, mode: simulateMode } } : {}) });
           log(color.dim(`  CALL-E task ${call.id} placed; waiting for the call to finish...`));

@@ -43,6 +43,11 @@ export function renderScreeningTask(rules: Rules, state: StateConfig, person: En
     // acknowledgement was enough to stop the agent speaking, and the person was answering
     // half-questions. A half-asked question must never be treated as answered.
     "If you are interrupted part-way through a question, or the person says \"what?\", \"sorry\" or anything showing they did not hear the whole thing, ask that question again from the beginning, in full. Never treat a question you did not finish asking as answered; mark it unknown instead.",
+    // A live call bundled four exemptions into one sentence - "under 18, pregnant, or a caregiver
+    // for a child, an elderly person, or a person with a disability?" - and got a single "no". There
+    // is no way to know which part that "no" answered. The same call also invented exemptions that
+    // are not in the rules file at all.
+    "Ask exactly one thing at a time. Never combine two exemptions into a single question, even to save time: a single yes or no to a combined question cannot be attributed to either part, and you must then mark both unknown. Ask only the questions written below, word for word where you can. Never invent an exemption, a threshold or a reporting rule that is not written here.",
     "",
     "Privacy comes first:",
     `- Open with: "Hello, this is an automated call from ${state.caller_org} for ${person.firstName}. Am I speaking with ${person.firstName}?"`,
