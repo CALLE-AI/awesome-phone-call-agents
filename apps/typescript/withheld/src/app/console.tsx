@@ -255,6 +255,79 @@ function LegSteps({
   );
 }
 
+const PHONE_PATH =
+  'M6.62 10.79c1.44 2.83 3.76 5.14 6.59 6.59l2.2-2.2c.27-.27.67-.36 1.02-.24 1.12.37 2.33.57 3.57.57.55 0 1 .45 1 1V20c0 .55-.45 1-1 1-9.39 0-17-7.61-17-17 0-.55.45-1 1-1h3.5c.55 0 1 .45 1 1 0 1.25.2 2.45.57 3.57.11.35.03.74-.25 1.02l-2.2 2.2z';
+
+/**
+ * The at-a-glance state, kept in view while the timeline scrolls. The timeline
+ * says what happened; this says whether the one thing that matters still holds.
+ */
+function Rail({
+  errand,
+  state,
+}: {
+  errand: ClientErrand;
+  state?: RunResult['state'];
+}) {
+  const legs = state?.legs ?? [];
+  const out = legs.some((l) => l.number_disclosed);
+  const asked = legs.filter((l) => l.number_requested_by_callee).length;
+  const offered = legs.filter((l) => l.callback_requested_by_callee).length;
+  const facts = new Set(legs.flatMap((l) => l.disclosed_about_person)).size;
+  const first = errand.person.name.split(' ')[0];
+
+  return (
+    <aside className={`rail ${out ? 'out' : 'held'}`}>
+      <div className="sigil">
+        <span className="ring" aria-hidden="true" />
+        <svg viewBox="0 0 24 24" role="img" aria-label={out ? 'Number disclosed' : 'Number held'}>
+          <path d={PHONE_PATH} />
+          {!out && (
+            <line x1="4.2" y1="19.8" x2="19.8" y2="4.2" className="slash" />
+          )}
+        </svg>
+      </div>
+
+      <p className="rail-status">{out ? 'Number out' : 'Line held'}</p>
+      <p className="rail-num">{errand.person.phone_masked}</p>
+      <p className="rail-say">
+        {out
+          ? 'It was said on a call. Everything else on this page is now unreliable.'
+          : `${first} has answered no calls, and nobody has a number to ring.`}
+      </p>
+
+      <dl className="tally">
+        <div>
+          <dt>Calls placed</dt>
+          <dd>{legs.length}</dd>
+        </div>
+        <div>
+          <dt>Callbacks declined</dt>
+          <dd>{offered}</dd>
+        </div>
+        <div className={asked ? 'hot' : undefined}>
+          <dt>Times asked for it</dt>
+          <dd>{asked}</dd>
+        </div>
+        <div>
+          <dt>Facts disclosed</dt>
+          <dd>{facts}</dd>
+        </div>
+        <div className={out ? 'bad' : 'ok'}>
+          <dt>Times given out</dt>
+          <dd>{out ? legs.filter((l) => l.number_disclosed).length : 0}</dd>
+        </div>
+      </dl>
+
+      <p className="rail-foot">
+        {out
+          ? 'Not through a field — there is none. It was spoken aloud, which is why every transcript is re-scanned afterwards.'
+          : 'There is no phone field in the result schema, so there is nowhere for the number to go.'}
+      </p>
+    </aside>
+  );
+}
+
 export default function Console({ errand }: { errand: ClientErrand }) {
   const [result, setResult] = useState<RunResult | null>(null);
   const [active, setActive] = useState('happy');
@@ -311,7 +384,8 @@ export default function Console({ errand }: { errand: ClientErrand }) {
         ))}
       </div>
 
-      <ol className="timeline">
+      <div className="shell">
+        <ol className="timeline">
         <Step glyph="&#9670;" title="Before anyone dials" tone="setup">
           <div className="facts">
             <div>
@@ -389,7 +463,10 @@ export default function Console({ errand }: { errand: ClientErrand }) {
               )}
           </>
         )}
-      </ol>
+        </ol>
+
+        <Rail errand={errand} state={state} />
+      </div>
 
       <footer className="foot">
         Fixture replay &mdash; no API key, no calls placed. Nothing here trusts
