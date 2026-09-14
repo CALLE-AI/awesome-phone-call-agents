@@ -331,7 +331,7 @@ function scriptedAirlineRefundDesk(booking: Booking, airlineRefund: number): Cal
     { speaker: "bot", text: `Hi, I'm an AI assistant calling for TripKita. The passenger on booking ${booking.pnr} has cancelled. Can you approve a refund of ${amount} rupiah?`, offsetSeconds: 3 },
   ];
   const base = { state: "completed" as const, providerStatus: "completed", result: null, failureCode: null, failureMessage: null };
-  const answer = booking.simulatedAirlineDesk ?? "callback_later";
+  const answer = booking.simulatedAirlineDesk ?? "approves";
   if (answer === "approves") {
     const reference = `NA-RF-${booking.ticket.slice(-4)}`;
     return {
@@ -385,7 +385,7 @@ function scriptedAirlineDesk(booking: Booking, option: MoveOption): CallOutcome 
     failureCode: null,
     failureMessage: null,
   };
-  const answer = booking.simulatedAirlineDesk ?? "callback_later";
+  const answer = booking.simulatedAirlineDesk ?? "approves";
   if (answer === "approves") {
     const code = `Q${booking.pnr.slice(1, 5)}Z`;
     const ticket = `0002419${booking.ticket.slice(-6)}`;

@@ -126,20 +126,21 @@ test("the task discloses the AI, states exact amounts, and forbids payment detai
   assert.deepEqual(schema.properties.selected_flight.enum, [...quote.moves.map((m) => m.flightId), "none"]);
 });
 
-test("live mode sends the airline desk call to the demo phone only, after typed confirmation", async () => {
-  const gateway = new RecordingGateway({ kind: "started", callId: "call_airline" });
+test("live mode sends the request's passenger call to the demo phone only, and the airline waits for it", async () => {
+  const gateway = new RecordingGateway({ kind: "started", callId: "call_passenger" });
   const now = () => new Date("2026-09-19T08:00:00+07:00").getTime();
-  const desk = new Desk(loadCatalog(), gateway, { statePath: null, liveDemoPhone: "+6591234567", liveCallBudget: 1, now });
-  const entry = desk.submitRequest("P3X9GA", "reschedule", "NA729-2026-09-20", "chat");
-  desk.confirmRequest(entry.request.id, 415_000);
-  const preview = desk.previewAirlineCall(entry.request.id);
+  const desk = new Desk(loadCatalog(), gateway, { statePath: null, liveDemoPhone: "+6591234567", liveCallBudget: 2, now });
+  const id = desk.submitRequest("P3X9GA", "reschedule", "NA729-2026-09-20", "chat").request.id;
+  const preview = desk.previewPassengerCall(id);
   assert.equal(preview.redirected, true);
   assert.equal(preview.destinationMasked, "+65 ••• 4567");
-  await assert.rejects(desk.callAirlineDesk(entry.request.id), /last 4 digits/);
-  assert.equal((await desk.callAirlineDesk(entry.request.id, "4567")).status, "airline_call_in_progress");
+  await assert.rejects(desk.callPassengerForRequest(id), /last 4 digits/);
+  assert.equal((await desk.callPassengerForRequest(id, "4567")).status, "passenger_call_in_progress");
   assert.equal(gateway.requests[0]?.phone, "+6591234567");
-  assert.match(gateway.requests[0]?.idempotencyKey ?? "", /^fda-[0-9a-f]{8}-req_P3X9GA_1-airline$/);
-  assert.equal(gateway.requests[0]?.metadata.purpose, "airline_forced_reissue");
+  assert.match(gateway.requests[0]?.idempotencyKey ?? "", /^fda-[0-9a-f]{8}-req_P3X9GA_1-passenger$/);
+  assert.equal(gateway.requests[0]?.metadata.purpose, "request_intake");
+  await assert.rejects(desk.callAirlineDesk(id, "4567"), /only after the passenger agreed/);
+  assert.equal(gateway.requests.length, 1);
 });
 
 test("a cancellation is called like a delay, offers no keep option, and never keeps the booking", async () => {

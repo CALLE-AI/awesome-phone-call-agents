@@ -1,7 +1,7 @@
 import { findFlight, type Catalog } from "./data.ts";
 import type { Booking, BookingState, ChangeRequest, Eligibility, Quote } from "./types.ts";
 
-/** Changes this close to departure cannot be submitted through the B2B portal. */
+/** Changes this close to departure cannot be made with the airline in time. */
 export const CHANGE_CUTOFF_MINUTES = 60;
 
 export interface EligibilityInput {
@@ -38,14 +38,12 @@ export function checkEligibility(input: EligibilityInput): Eligibility {
     reasons.push(`${flight.code} departs in less than ${CHANGE_CUTOFF_MINUTES} minutes, past the change cutoff.`);
   }
 
-  if (request.kind === "reschedule") {
-    if (!request.targetFlightId) {
-      reasons.push("A reschedule needs the flight the passenger wants.");
-    } else if (!quote.moves.some((m) => m.flightId === request.targetFlightId)) {
+  // The passenger picks on the CALL-E call; a flight they named must still be one we can offer.
+  if (request.targetFlightId) {
+    if (request.kind !== "reschedule") reasons.push("Only a reschedule request can name a flight.");
+    else if (!quote.moves.some((m) => m.flightId === request.targetFlightId)) {
       reasons.push(`${request.targetFlightId} is not a later flight on the same route with seats.`);
     }
-  } else if (request.targetFlightId) {
-    reasons.push("A refund request must not name a flight.");
   }
 
   if (request.kind === "refund") {

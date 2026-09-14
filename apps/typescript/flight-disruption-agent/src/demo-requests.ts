@@ -1,21 +1,23 @@
 // Terminal walkthrough of Workflow B with the dry-run gateway. Places no calls.
+// Passenger -> CALL-E (agrees the change) -> CALL-E -> airline desk (makes it).
 import { DryRunGateway } from "./calle.ts";
 import { loadCatalog } from "./data.ts";
 import { Desk } from "./desk.ts";
 import { idr } from "./format.ts";
+import type { RequestKind } from "./types.ts";
 
 // Fixed "today" the day before the fixture flights, so the change cutoff never blocks the demo.
 const now = () => new Date("2026-09-19T08:00:00+07:00").getTime();
 const desk = new Desk(loadCatalog(), new DryRunGateway(0), { statePath: null, liveCallBudget: 0, now });
 
-const scripted = [
-  { pnr: "L6F2KM", kind: "reschedule", target: "NA729-2026-09-20", note: "portal accepts" },
-  { pnr: "P3X9GA", kind: "reschedule", target: "NA729-2026-09-20", note: "portal refuses, airline desk reissues" },
-  { pnr: "C5V8EJ", kind: "reschedule", target: "NA729-2026-09-20", note: "portal refuses, airline desk refuses" },
-  { pnr: "T5W1LC", kind: "refund", target: null, note: "non-refundable basic fare" },
-  { pnr: "W4N7QS", kind: "refund", target: null, note: "portal refuses the refund, airline desk approves" },
+const scripted: { pnr: string; kind: RequestKind; target: string | null; note: string }[] = [
+  { pnr: "L6F2KM", kind: "reschedule", target: "NA729-2026-09-20", note: "agrees on the call, airline desk reissues" },
+  { pnr: "C5V8EJ", kind: "reschedule", target: "NA729-2026-09-20", note: "agrees on the call, airline desk refuses" },
+  { pnr: "W4N7QS", kind: "refund", target: null, note: "accepts the refund, airline desk approves" },
+  { pnr: "K7Q2XA", kind: "change", target: null, note: "decides to keep the booking" },
+  { pnr: "B9H4ZN", kind: "change", target: null, note: "asks for a person" },
   { pnr: "H8J3PV", kind: "reschedule", target: "NA729-2026-09-20", note: "different route, not eligible" },
-] as const;
+];
 
 console.log("\nPassenger requests (Workflow B, dry run)\n");
 for (const s of scripted) {
@@ -26,14 +28,15 @@ for (const s of scripted) {
     console.log(`        not eligible: ${entry.eligibility.reasons.join(" ")}\n`);
     continue;
   }
-  console.log(`        quote ${idr(entry.amount ?? 0)}${entry.eligibility.warnings.length ? `  [${entry.eligibility.warnings.join(" ")}]` : ""}`);
-  const after = desk.confirmRequest(id, entry.amount ?? 0);
-  console.log(`        passenger confirmed -> portal ${after.portal?.kind}${after.portal?.kind === "rejected" ? ` (${after.portal.code})` : ""}`);
-  if (after.status === "portal_rejected") {
+  await desk.callPassengerForRequest(id);
+  const agreed = await desk.refreshPassengerCall(id);
+  console.log(`        CALL-E -> passenger: ${agreed.passengerCall?.outcome?.summary ?? agreed.status}`);
+  if (agreed.status === "confirmed_on_call") {
+    console.log(`        agreed ${agreed.action?.kind} for ${idr(agreed.amount ?? 0)}`);
     await desk.callAirlineDesk(id);
     const desked = await desk.refreshRequest(id);
-    console.log(`        airline desk: ${desked.airlineCall?.outcome?.summary ?? desked.status}`);
+    console.log(`        CALL-E -> airline desk: ${desked.airlineCall?.outcome?.summary ?? desked.status}`);
   }
   const final = desk.snapshot().requests.find((r) => r.request.id === id);
-  console.log(`        ${final?.status}: ${final?.applied ?? final?.reviewReasons.join(" ")}\n`);
+  console.log(`        ${final?.status}: ${final?.applied ?? (final?.reviewReasons.join(" ") || "nothing changed")}\n`);
 }

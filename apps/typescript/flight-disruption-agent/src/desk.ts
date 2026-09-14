@@ -15,6 +15,7 @@ import {
 import { buildCallbackResultSchema, buildCallbackTask, decideCallback } from "./callback.ts";
 import { decide } from "./decide.ts";
 import { checkEligibility } from "./eligibility.ts";
+import { buildIntakeResultSchema, buildIntakeTask, decideIntake } from "./intake.ts";
 import { NOT_FOUND_REPLY, passengerMatches, replyFor, type ChannelMessage, type ChannelNotifier } from "./channel.ts";
 import type { OpsEvent } from "./events.ts";
 import { FakeGds, type Gds } from "./gds.ts";
@@ -22,7 +23,7 @@ import { addMinutes, idr, localTime } from "./format.ts";
 import { maskPhone, routeFor } from "./phone.ts";
 import { redactOutcome, redactText } from "./redact.ts";
 import { airlineOf, quoteFor, voluntaryQuoteFor } from "./rules.ts";
-import { buildResultSchema, buildTask } from "./task.ts";
+import { buildResultSchema, buildTask, OTA_NAME } from "./task.ts";
 import type { Action, AirlineCall, BookingState, CallOutcome, ChannelMessageRecord, ChannelUpdate, Decision, Disruption, DisruptionCause, DisruptionKind, DisruptionSource, LedgerEntry, OpsEventRecord, OpsEventVia, Quote, RequestChannel, RequestEntry, RequestKind } from "./types.ts";
 
 interface DeskState {
@@ -187,7 +188,9 @@ export class Desk {
   reset(): void {
     const inFlight =
       Object.values(this.state.ledger).some((e) => e.status === "in_progress" || e.status === "submitted") ||
-      Object.values(this.state.requests).some((r) => r.status === "airline_call_in_progress" || r.callback?.status === "in_progress");
+      Object.values(this.state.requests).some(
+        (r) => r.status === "passenger_call_in_progress" || r.status === "airline_call_in_progress" || r.callback?.status === "in_progress",
+      );
     if (inFlight && this.gateway.live) {
       throw new DeskError("A live call is still in progress. Wait for it to finish before resetting.", 409);
     }
@@ -551,6 +554,7 @@ export class Desk {
       if (entry.status === "in_progress") await this.refresh(entry.key);
     }
     for (const entry of Object.values(this.state.requests)) {
+      if (entry.status === "passenger_call_in_progress") await this.refreshPassengerCall(entry.request.id);
       if (entry.status === "airline_call_in_progress") await this.refreshRequest(entry.request.id);
       if (entry.callback?.status === "in_progress") await this.refreshCallback(entry.request.id);
     }
@@ -587,8 +591,8 @@ export class Desk {
   }
 
   /**
-   * Steps 1-2: a reschedule or refund request arrives through an existing channel.
-   * The desk prices it and checks eligibility before anything reaches the passenger.
+   * Step 1: a passenger asks to change a booking through chat, the web form, or the phone line.
+   * The desk checks eligibility and prices every option; CALL-E then calls the passenger.
    */
   submitRequest(
     pnr: string,
@@ -597,7 +601,9 @@ export class Desk {
     channel: RequestChannel,
     conversation?: { channel: RequestChannel; id: string },
   ): RequestEntry {
-    if (kind !== "reschedule" && kind !== "refund") throw new DeskError('kind must be "reschedule" or "refund".');
+    if (kind !== "reschedule" && kind !== "refund" && kind !== "change") {
+      throw new DeskError('kind must be "reschedule", "refund", or "change".');
+    }
     if (!["chat", "web_form", "phone"].includes(channel)) throw new DeskError('channel must be "chat", "web_form", or "phone".');
     const booking = this.catalog.bookings.find((b) => b.pnr === pnr);
     if (!booking) throw new DeskError(`Unknown booking ${pnr}`, 404);
@@ -626,29 +632,15 @@ export class Desk {
       disrupted: Boolean(this.activeDisruption(booking.flightId)),
       now: (this.options.demoNow ?? this.now)(),
     });
-    let action: Action | null = null;
-    let amount: number | null = null;
-    if (eligibility.eligible) {
-      if (kind === "refund") {
-        action = { kind: "refund" };
-        amount = quote.refund.amount;
-      } else {
-        const move = quote.moves.find((m) => m.flightId === targetFlightId);
-        if (move) {
-          action = { kind: "move", optionId: move.id };
-          amount = move.total;
-        }
-      }
-    }
     const entry: RequestEntry = {
       request,
       eligibility,
       quote,
-      action,
-      amount,
-      status: eligibility.eligible ? "quoted" : "ineligible",
+      action: null,
+      amount: null,
+      status: eligibility.eligible ? "awaiting_call" : "ineligible",
       confirmedAt: null,
-      portal: null,
+      passengerCall: null,
       airlineCall: null,
       reviewReasons: [],
       applied: null,
@@ -660,38 +652,128 @@ export class Desk {
     return entry;
   }
 
-  /**
-   * Steps 3-4: the passenger confirmed the quoted amount through their channel.
-   * The operator types that amount back, then the change goes to the portal.
-   */
-  confirmRequest(id: string, confirmedAmount: number, confirmedBy: NonNullable<RequestEntry["confirmedBy"]> = { kind: "operator" }): RequestEntry {
+  private passengerCallContext(id: string) {
     const entry = this.requestEntry(id);
-    if (entry.status !== "quoted" || !entry.action || entry.amount === null) {
-      throw new DeskError(`This request is ${entry.status}; only quoted requests can be confirmed.`, 409);
-    }
-    if (confirmedAmount !== entry.amount) {
-      throw new DeskError(`The passenger must confirm the quoted amount of ${idr(entry.amount)}.`);
-    }
     const booking = findBooking(this.catalog, entry.request.pnr);
-    entry.confirmedAt = new Date(this.now()).toISOString();
-    entry.confirmedBy = confirmedBy;
+    const destination = this.route(booking.phone);
+    const task = buildIntakeTask(this.catalog, booking, entry.request, entry.quote);
+    return { entry, booking, destination, task, resultSchema: buildIntakeResultSchema(entry.quote) };
+  }
 
-    const portal = this.gds.submit(booking, entry.action);
-    entry.portal = portal;
-    if (portal.kind === "rejected") {
-      // Both a refused reissue and a refused refund go to the airline service desk by phone.
-      entry.status = "portal_rejected";
-    } else {
-      try {
-        entry.applied = this.applyChange(entry.request.pnr, entry.quote, entry.action);
-        entry.status = "completed";
-      } catch (error) {
-        entry.status = "needs_review";
-        entry.reviewReasons = [error instanceof Error ? error.message : String(error)];
-      }
+  previewPassengerCall(id: string) {
+    const { entry, destination, task, resultSchema } = this.passengerCallContext(id);
+    const route = routeFor(destination.phone);
+    return {
+      id,
+      mode: this.gateway.mode,
+      live: this.gateway.live,
+      destinationMasked: maskPhone(destination.phone),
+      redirected: destination.redirected,
+      blockedReason: route.ok ? null : route.reason,
+      task,
+      resultSchema,
+      existing: entry.passengerCall,
+      liveBudgetLeft: this.options.liveCallBudget - this.state.liveCallsUsed,
+    };
+  }
+
+  /**
+   * Step 2: CALL-E calls the passenger, offers every priced option, and records their choice
+   * and consent. Nothing is sent to the airline until this call ends. One call per request.
+   */
+  async callPassengerForRequest(id: string, confirmLast4?: string): Promise<RequestEntry> {
+    const { entry, booking, destination, task, resultSchema } = this.passengerCallContext(id);
+    if (entry.status !== "awaiting_call") {
+      throw new DeskError(`This request is ${entry.status}; CALL-E calls the passenger at most once per request.`, 409);
     }
-    // A passenger confirming in their channel gets this result as the reply; tell them if the operator confirmed.
-    if (confirmedBy.kind === "operator") this.notifyChannel(entry);
+    if (entry.passengerCall && entry.passengerCall.status !== "failed_to_submit") {
+      throw new DeskError(`The passenger was already called for this request (${entry.passengerCall.status}).`, 409);
+    }
+    const route = routeFor(destination.phone);
+    if (!route.ok) throw new DeskError(route.reason);
+    this.guardLiveCall(destination.phone, confirmLast4);
+
+    const idempotencyKey = `fda-${this.state.runId}-${id}-passenger`.replace(/[^A-Za-z0-9_-]/g, "_");
+    const call: AirlineCall = {
+      destinationMasked: maskPhone(destination.phone),
+      redirected: destination.redirected,
+      idempotencyKey,
+      task,
+      callId: null,
+      status: "submitted",
+      submittedAt: new Date(this.now()).toISOString(),
+      nextPollAt: new Date(this.now()).toISOString(),
+      outcome: null,
+      error: null,
+    };
+    // Record intent before dialing, as with every other call.
+    entry.passengerCall = call;
+    entry.status = "passenger_call_in_progress";
+    this.save();
+
+    const result = await this.gateway.start({
+      task,
+      phone: destination.phone,
+      region: route.region,
+      locale: route.locale,
+      resultSchema,
+      metadata: { request_id: id, pnr: booking.pnr, purpose: "request_intake" },
+      idempotencyKey,
+      simulation: { kind: "request_intake", booking, quote: entry.quote, request: entry.request },
+    });
+    if (result.kind === "started") {
+      call.callId = result.callId;
+      call.status = "in_progress";
+      call.nextPollAt = new Date(this.now() + this.gateway.firstPollSeconds * 1000).toISOString();
+    } else if (result.kind === "uncertain") {
+      call.status = "uncertain";
+      call.error = redactText(result.message);
+      entry.status = "needs_review";
+      entry.reviewReasons = [`CALL-E may or may not have called the passenger: ${call.error} It will not be redialed.`];
+      this.notifyChannel(entry);
+    } else {
+      call.status = "failed_to_submit";
+      call.error = redactText(result.message);
+      entry.status = "awaiting_call";
+    }
+    if (this.gateway.live && result.kind !== "rejected") this.state.liveCallsUsed += 1;
+    this.save();
+    return entry;
+  }
+
+  /** Polls the passenger call if it is due, then records the agreed change or asks a person. */
+  async refreshPassengerCall(id: string): Promise<RequestEntry> {
+    const entry = this.requestEntry(id);
+    return this.pollOnce(`intake:${id}`, entry, () => this.refreshPassengerCallUnlocked(entry));
+  }
+
+  private async refreshPassengerCallUnlocked(entry: RequestEntry): Promise<RequestEntry> {
+    const call = entry.passengerCall;
+    if (entry.status !== "passenger_call_in_progress" || !call?.callId || call.status !== "in_progress") return entry;
+    if (this.now() < new Date(call.nextPollAt).getTime()) return entry;
+
+    const outcome = redactOutcome(await this.gateway.get(call.callId));
+    call.outcome = outcome;
+    if (outcome.state === "in_progress") {
+      call.nextPollAt = new Date(this.now() + this.gateway.pollSeconds * 1000).toISOString();
+      this.save();
+      return entry;
+    }
+    call.status = "finished";
+    const decision = decideIntake(outcome, entry.quote);
+    if (decision.kind === "confirmed") {
+      entry.action = decision.action;
+      entry.amount = decision.amount;
+      entry.confirmedAt = new Date(this.now()).toISOString();
+      entry.confirmedBy = { kind: "call", callId: call.callId, reason: decision.reason };
+      entry.status = "confirmed_on_call";
+    } else if (decision.kind === "no_change") {
+      entry.status = "declined";
+    } else {
+      entry.status = "needs_review";
+      entry.reviewReasons = decision.reasons;
+    }
+    this.notifyChannel(entry);
     this.save();
     return entry;
   }
@@ -740,28 +822,8 @@ export class Desk {
         }
       }
     } else {
-      const entry = this.state.requests[message.requestId];
-      const conversation = entry?.request.conversation;
-      if (!entry || !conversation || conversation.channel !== message.channel || conversation.id !== message.conversationId) {
-        // Do not echo the request id: another conversation must not learn that it exists.
-        refuse("We could not find that request in this conversation. Start a new request with your booking code and last name.");
-      } else {
-        record.requestId = message.requestId;
-        if (entry.status !== "quoted") {
-          refuse(replyFor(this.catalog, entry));
-        } else if (message.type === "request.declined") {
-          record.reply = replyFor(this.catalog, this.declineRequest(message.requestId, false));
-        } else if (message.confirmedAmount !== entry.amount) {
-          refuse(`The amount does not match the quote. To go ahead, reply YES ${entry.amount ?? 0}.`);
-        } else {
-          const done = this.confirmRequest(message.requestId, message.confirmedAmount, {
-            kind: "passenger",
-            channel: message.channel,
-            messageId: message.id,
-          });
-          record.reply = replyFor(this.catalog, done);
-        }
-      }
+      // The passenger agrees the change on the CALL-E call, not by typing an amount in the channel.
+      refuse(`${OTA_NAME}'s AI assistant will call you to agree the change. Please answer that call.`);
     }
     this.state.channelMessages[message.id] = record;
     this.save();
@@ -809,21 +871,11 @@ export class Desk {
     );
   }
 
-  /** The passenger said no to the quote. Nothing changes. */
-  declineRequest(id: string, byOperator = true): RequestEntry {
-    const entry = this.requestEntry(id);
-    if (entry.status !== "quoted") throw new DeskError(`This request is ${entry.status}; only quoted requests can be declined.`, 409);
-    entry.status = "declined";
-    if (byOperator) this.notifyChannel(entry);
-    this.save();
-    return entry;
-  }
-
   private airlineDesk(id: string) {
     const entry = this.requestEntry(id);
     const booking = findBooking(this.catalog, entry.request.pnr);
-    if (entry.portal?.kind !== "rejected" || !entry.action) {
-      throw new DeskError("Only a change the portal refused needs the airline desk.", 409);
+    if (!entry.action) {
+      throw new DeskError("The airline desk is called only after the passenger agreed a change on the CALL-E call.", 409);
     }
     const airline = airlineOf(this.catalog, booking).rules;
     const destination = this.route(airline.supportPhone);
@@ -847,7 +899,7 @@ export class Desk {
     }
     const optionId = entry.action.kind === "move" ? entry.action.optionId : null;
     const option = entry.quote.moves.find((m) => m.id === optionId);
-    if (!option) throw new DeskError("Only a reissue or refund the portal refused needs the airline desk.", 409);
+    if (!option) throw new DeskError("The agreed flight is not in this request's quote.", 409);
     return {
       entry,
       booking,
@@ -885,11 +937,16 @@ export class Desk {
     };
   }
 
-  /** Step 5: the portal refused the reissue or refund, so ask the airline desk to push it through. One call per request. */
+  /** Step 3: CALL-E asks the airline desk to make the change the passenger agreed on the call. One call per request. */
   async callAirlineDesk(id: string, confirmLast4?: string): Promise<RequestEntry> {
     const { entry, booking, destination, task, resultSchema, simulation, purpose } = this.airlineDesk(id);
-    if (entry.status !== "portal_rejected") {
-      throw new DeskError(`This request is ${entry.status}; the airline desk is called at most once per request.`, 409);
+    if (entry.status !== "confirmed_on_call") {
+      throw new DeskError(
+        entry.status === "awaiting_call" || entry.status === "passenger_call_in_progress"
+          ? "CALL-E has to agree the change with the passenger before calling the airline desk."
+          : `This request is ${entry.status}; the airline desk is called at most once per request.`,
+        409,
+      );
     }
     if (entry.airlineCall && entry.airlineCall.status !== "failed_to_submit") {
       throw new DeskError(`The airline desk was already called for this request (${entry.airlineCall.status}).`, 409);
@@ -939,7 +996,7 @@ export class Desk {
     } else {
       call.status = "failed_to_submit";
       call.error = redactText(result.message);
-      entry.status = "portal_rejected";
+      entry.status = "confirmed_on_call";
     }
     if (this.gateway.live && result.kind !== "rejected") this.state.liveCallsUsed += 1;
     this.save();

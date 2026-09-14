@@ -38,9 +38,10 @@ test("a ticketed booking can move to a later flight with seats, and a cost is fl
   assert.deepEqual(result.warnings, ["The change has a cost the passenger must accept."]);
 });
 
-test("a flight that was not offered, or a missing target, is refused", () => {
+test("a named flight that cannot be offered is refused; no flight means the passenger picks on the call", () => {
   assert.equal(checkEligibility(input("T5W1LC", { request: { kind: "reschedule", targetFlightId: "NA816-2026-09-20" } })).eligible, false);
-  assert.equal(checkEligibility(input("T5W1LC", { request: { kind: "reschedule", targetFlightId: null } })).eligible, false);
+  assert.equal(checkEligibility(input("T5W1LC", { request: { kind: "reschedule", targetFlightId: null } })).eligible, true);
+  assert.equal(checkEligibility(input("T5W1LC", { request: { kind: "change", targetFlightId: null } })).eligible, true);
 });
 
 test("already changed, disrupted, departed, or inside the cutoff is refused", () => {

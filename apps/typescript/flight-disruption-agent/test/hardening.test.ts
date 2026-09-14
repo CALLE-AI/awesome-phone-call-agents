@@ -112,7 +112,7 @@ test("the demo clock keeps passenger requests eligible after the fixtures' real 
     now: () => judgingDay,
     demoNow: clock.now,
   });
-  assert.equal(desk.submitRequest("K7Q2XA", "reschedule", "NA729-2026-09-20", "chat").status, "quoted");
+  assert.equal(desk.submitRequest("K7Q2XA", "reschedule", "NA729-2026-09-20", "chat").status, "awaiting_call");
   assert.equal(demoClockFromEnv({ DEMO_NOW: "real" }).label, null);
   assert.throws(() => demoClockFromEnv({ DEMO_NOW: "tomorrow" }), /DEMO_NOW/);
 });

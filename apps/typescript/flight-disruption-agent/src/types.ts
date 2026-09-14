@@ -224,11 +224,11 @@ export interface ChangeRequest {
   id: string;
   pnr: string;
   kind: RequestKind;
-  /** Reschedule only: the flight the passenger asked for. */
+  /** Reschedule only: the flight the passenger mentioned. They choose for sure on the call. */
   targetFlightId: string | null;
   channel: RequestChannel;
   createdAt: string;
-  /** Set when the request came in through the channel webhook; only that conversation may confirm it. */
+  /** Set when the request came in through the channel webhook; updates go back to that conversation. */
   conversation?: { channel: RequestChannel; id: string };
 }
 
@@ -241,16 +241,18 @@ export interface Eligibility {
 }
 
 export type RequestStatus =
-  /** Refused at intake; nothing was quoted. */
+  /** Refused at intake; nothing was offered. */
   | "ineligible"
-  /** Quote sent through the passenger's channel; waiting for a yes. */
-  | "quoted"
+  /** Priced and eligible; CALL-E has not called the passenger yet. */
+  | "awaiting_call"
+  | "passenger_call_in_progress"
+  /** The passenger chose to keep the booking on the call. Nothing changes. */
   | "declined"
-  /** The portal accepted the change and the booking is updated. */
-  | "completed"
-  /** The portal refused a reissue; the airline desk has to be called. */
-  | "portal_rejected"
+  /** The passenger chose and consented on the call; the airline desk is next. */
+  | "confirmed_on_call"
   | "airline_call_in_progress"
+  /** The airline desk made the change and the booking is updated. */
+  | "completed"
   | "needs_review"
   | "resolved_by_human";
 
@@ -270,17 +272,18 @@ export interface AirlineCall {
 export interface RequestEntry {
   request: ChangeRequest;
   eligibility: Eligibility;
-  /** Priced once at intake; the passenger confirms exactly this. */
+  /** Priced once at intake; the CALL-E call offers exactly these options. */
   quote: Quote;
-  /** The action the request maps to, once eligible. */
+  /** The change the passenger chose on the call. Null until then. */
   action: Action | null;
-  /** What the passenger pays (reschedule) or receives (refund). */
+  /** What the passenger agreed to pay (move) or receive (refund) on the call. */
   amount: number | null;
   status: RequestStatus;
   confirmedAt: string | null;
-  /** Who recorded the passenger's yes: the operator typing it, or the passenger in their channel. */
-  confirmedBy?: { kind: "operator" } | { kind: "passenger"; channel: RequestChannel; messageId: string };
-  portal: { kind: "accepted" } | { kind: "rejected"; code: string; message: string } | null;
+  /** The passenger's consent is taken on the CALL-E call; the quoted reason is kept for audit. */
+  confirmedBy?: { kind: "call"; callId: string | null; reason: string };
+  /** CALL-E's call to the passenger: offers the options and records the choice. */
+  passengerCall: AirlineCall | null;
   airlineCall: AirlineCall | null;
   reviewReasons: string[];
   applied: string | null;

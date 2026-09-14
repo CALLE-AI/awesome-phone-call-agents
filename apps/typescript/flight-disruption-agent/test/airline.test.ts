@@ -73,7 +73,7 @@ test("dry run scripts the airline desk from the booking fixture", async () => {
   const expectations: [string, string][] = [
     ["P3X9GA", "reissued"],
     ["C5V8EJ", "review"],
-    ["L6F2KM", "review"],
+    ["L6F2KM", "reissued"], // unscripted bookings: the desk approves
   ];
   for (const [pnr, kind] of expectations) {
     const b = findBooking(catalog, pnr);

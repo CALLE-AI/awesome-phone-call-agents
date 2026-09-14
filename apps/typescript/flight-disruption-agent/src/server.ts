@@ -191,15 +191,14 @@ async function api(req: IncomingMessage, res: ServerResponse, path: string): Pro
     const entry = desk.submitRequest(str(body, "pnr"), str(body, "kind") as RequestKind, target, str(body, "channel") as RequestChannel);
     return send(res, 201, entry);
   }
-  if (req.method === "POST" && path === "/api/requests/confirm") {
+  if (req.method === "POST" && path === "/api/requests/passenger/preview") {
     const body = await readJson(req);
-    const amount = Number(body.confirmedAmount);
-    if (!Number.isFinite(amount)) throw new DeskError('Missing "confirmedAmount".');
-    return send(res, 200, desk.confirmRequest(str(body, "id"), amount));
+    return send(res, 200, desk.previewPassengerCall(str(body, "id")));
   }
-  if (req.method === "POST" && path === "/api/requests/decline") {
+  if (req.method === "POST" && path === "/api/requests/passenger/start") {
     const body = await readJson(req);
-    return send(res, 200, desk.declineRequest(str(body, "id")));
+    const confirm = typeof body.confirmLast4 === "string" ? body.confirmLast4 : undefined;
+    return send(res, 201, await desk.callPassengerForRequest(str(body, "id"), confirm));
   }
   if (req.method === "POST" && path === "/api/requests/airline/preview") {
     const body = await readJson(req);

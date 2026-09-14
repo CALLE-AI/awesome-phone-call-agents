@@ -78,6 +78,16 @@ export function passengerMatches(booking: Booking, lastName: string): boolean {
 /** Same words whether the booking does not exist or the name is wrong, so the channel cannot probe booking codes. */
 export const NOT_FOUND_REPLY = `We could not find a booking with that code and last name. Check both and try again, or contact ${OTA_NAME}.`;
 
+/** The change the passenger agreed on the call, in their words. */
+function agreedChange(catalog: Catalog, entry: RequestEntry): string {
+  if (entry.action?.kind === "refund") return `your refund of ${idr(entry.amount ?? 0)}`;
+  const optionId = entry.action?.kind === "move" ? entry.action.optionId : null;
+  const move = entry.quote.moves.find((m) => m.id === optionId);
+  if (!move) return "your change";
+  const flight = findFlight(catalog, move.flightId);
+  return `your move to ${flight.code} at ${localTime(flight.departure)} (${idr(entry.amount ?? 0)})`;
+}
+
 /**
  * What the channel tells the passenger at each step. Written for the passenger: no internal
  * ids, no other parties' contract details beyond the line items they pay.
@@ -87,31 +97,19 @@ export function replyFor(catalog: Catalog, entry: RequestEntry): string {
   switch (entry.status) {
     case "ineligible":
       return `We can't change booking ${pnr} online right now. A ${OTA_NAME} agent will contact you about your options.`;
-    case "quoted": {
-      const lines: string[] = [];
-      if (entry.request.kind === "refund") {
-        lines.push(`Cancelling booking ${pnr} refunds ${idr(entry.amount ?? 0)} of the ${idr(entry.quote.refund.gross)} you paid.`);
-        for (const l of entry.quote.refund.lines.filter((x) => x.amount !== 0)) lines.push(`- ${l.party}: ${l.label} ${idr(-l.amount)}`);
-      } else {
-        const move = entry.quote.moves.find((m) => m.flightId === entry.request.targetFlightId);
-        const flight = move ? findFlight(catalog, move.flightId) : null;
-        lines.push(`Moving booking ${pnr} to ${flight ? `${flight.code} at ${localTime(flight.departure)}` : move?.label ?? "the new flight"} costs ${idr(entry.amount ?? 0)}.`);
-        for (const l of move?.lines.filter((x) => x.amount !== 0) ?? []) lines.push(`- ${l.party}: ${l.label} ${idr(l.amount)}`);
-      }
-      if (entry.request.kind === "refund" && entry.amount === 0) lines.push("This fare is non-refundable, so the refund is IDR 0.");
-      lines.push(`To go ahead, reply YES ${entry.amount ?? 0}. To keep your booking as it is, reply NO.`);
-      return lines.join("\n");
-    }
+    case "awaiting_call":
+    case "passenger_call_in_progress":
+      return `Thanks. ${OTA_NAME}'s AI assistant will call you shortly to go through the options for booking ${pnr} and their exact costs. Nothing changes until you agree on that call.`;
     case "declined":
       return `OK, nothing changed. Booking ${pnr} stays as it was.`;
     case "completed":
     case "resolved_by_human":
       return entry.applied?.startsWith("Closed without") ? `A ${OTA_NAME} agent reviewed booking ${pnr}. Nothing was changed.` : `Done. ${entry.applied ?? ""}`.trim();
-    case "portal_rejected":
+    case "confirmed_on_call":
     case "airline_call_in_progress":
-      return `The airline has to approve this ${entry.request.kind} by hand. We are contacting the airline and will update you here.`;
+      return `Thanks for confirming on the call. We are now arranging ${agreedChange(catalog, entry)} with the airline and will update you here.`;
     case "needs_review":
-      return `We need a ${OTA_NAME} agent to finish this ${entry.request.kind}. They will contact you; nothing has been charged yet.`;
+      return `We need a ${OTA_NAME} agent to finish this request for booking ${pnr}. They will contact you; nothing has been charged yet.`;
     default:
       return `Your request for booking ${pnr} is being handled.`;
   }

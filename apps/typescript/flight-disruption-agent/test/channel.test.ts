@@ -25,16 +25,16 @@ const submit = (over: Record<string, unknown> = {}) =>
     ...over,
   });
 
-test("a chat request with the right last name is quoted back in passenger words", () => {
+test("a chat request with the right last name is told CALL-E will call to agree the change", () => {
   const desk = dryDesk();
   const { record } = desk.receiveChannelMessage(submit());
   assert.equal(record.outcome, "accepted");
   assert.equal(record.requestId, "req_P3X9GA_1");
-  assert.match(record.reply, /Moving booking P3X9GA to NA 729 at 19:45 costs IDR 415,000\./);
-  assert.match(record.reply, /- Nusantara Air: Change fee IDR 350,000/);
-  assert.match(record.reply, /reply YES 415000/);
+  assert.match(record.reply, /TripKita's AI assistant will call you shortly/);
+  assert.match(record.reply, /Nothing changes until you agree on that call/);
   assert.doesNotMatch(record.reply, /evt_|req_/, "no internal ids in passenger replies");
   const snap = desk.snapshot();
+  assert.equal(snap.requests[0]?.status, "awaiting_call");
   assert.deepEqual(snap.requests[0]?.request.conversation, { channel: "chat", id: "conv-1" });
 });
 
@@ -48,42 +48,15 @@ test("a wrong name and an unknown booking get the same reply, and nothing is cre
   assert.ok(passengerMatches(findBooking(catalog, "C5V8EJ"), "  HALIM "));
 });
 
-test("the passenger confirms in the same conversation; the amount must match and retries change nothing", () => {
+test("a typed confirmation changes nothing: the passenger agrees on the CALL-E call", () => {
   const desk = dryDesk();
   desk.receiveChannelMessage(submit({ pnr: "L6F2KM", last_name: "Kusuma" }));
-  const confirm = (over: Record<string, unknown>) =>
-    parseChannelMessage({ id: "msg-c1", type: "request.confirmed", channel: "chat", conversation_id: "conv-1", request_id: "req_L6F2KM_1", confirmed_amount: 30000, ...over });
-
-  const otherConversation = desk.receiveChannelMessage(confirm({ id: "msg-c0", conversation_id: "conv-evil" })).record;
-  assert.equal(otherConversation.outcome, "refused");
-  assert.equal(otherConversation.requestId, null, "another conversation does not learn the request exists");
-  const wrongAmount = desk.receiveChannelMessage(confirm({ id: "msg-c2", confirmed_amount: 0 })).record;
-  assert.match(wrongAmount.reply, /does not match the quote/);
-
-  const ok = desk.receiveChannelMessage(confirm({}));
-  assert.equal(ok.record.outcome, "accepted");
-  assert.match(ok.record.reply, /^Done\. Rebooked to NA 729/);
-  const retry = desk.receiveChannelMessage(confirm({}));
-  assert.equal(retry.duplicate, true);
-  const entry = desk.snapshot().requests[0];
-  assert.deepEqual(entry?.confirmedBy, { kind: "passenger", channel: "chat", messageId: "msg-c1" });
-  assert.equal(entry?.status, "completed");
-});
-
-test("a portal rejection tells the passenger the airline is being contacted; a decline changes nothing", () => {
-  const desk = dryDesk();
-  desk.receiveChannelMessage(submit());
-  const confirmed = desk.receiveChannelMessage(
-    parseChannelMessage({ id: "msg-c", type: "request.confirmed", channel: "chat", conversation_id: "conv-1", request_id: "req_P3X9GA_1", confirmed_amount: "IDR 415,000" }),
+  const typed = desk.receiveChannelMessage(
+    parseChannelMessage({ id: "msg-c1", type: "request.confirmed", channel: "chat", conversation_id: "conv-1", request_id: "req_L6F2KM_1", confirmed_amount: 30000 }),
   ).record;
-  assert.match(confirmed.reply, /We are contacting the airline/);
-
-  desk.receiveChannelMessage(submit({ id: "msg-w", channel: "web_form", conversation_id: "form-9", pnr: "L6F2KM", last_name: "Kusuma", kind: "refund", target_flight_id: "" }));
-  const declined = desk.receiveChannelMessage(
-    parseChannelMessage({ id: "msg-d", type: "request.declined", channel: "web_form", conversation_id: "form-9", request_id: "req_L6F2KM_1" }),
-  ).record;
-  assert.match(declined.reply, /nothing changed/);
-  assert.equal(desk.snapshot().bookings.find((b) => b.pnr === "L6F2KM")?.state?.status, "ticketed");
+  assert.equal(typed.outcome, "refused");
+  assert.match(typed.reply, /will call you to agree the change/);
+  assert.equal(desk.snapshot().requests[0]?.status, "awaiting_call");
 });
 
 test("malformed channel messages are refused", () => {
@@ -105,26 +78,20 @@ test("later changes are pushed to the passenger's conversation, once per status"
       sent.push({ status: p.status, reply: p.reply, conversation_id: p.conversation_id });
     },
   });
-  desk.receiveChannelMessage(submit());
-  desk.receiveChannelMessage(
-    parseChannelMessage({ id: "msg-c", type: "request.confirmed", channel: "chat", conversation_id: "conv-1", request_id: "req_P3X9GA_1", confirmed_amount: 415000 }),
-  );
-  assert.equal(sent.length, 0, "the passenger already got the portal result as the reply");
-
-  await desk.callAirlineDesk("req_P3X9GA_1");
-  await desk.refreshRequest("req_P3X9GA_1");
-  await desk.refreshRequest("req_P3X9GA_1");
+  desk.receiveChannelMessage(submit({ pnr: "L6F2KM", last_name: "Kusuma" }));
+  await desk.callPassengerForRequest("req_L6F2KM_1");
+  await desk.refreshPassengerCall("req_L6F2KM_1");
+  await desk.callAirlineDesk("req_L6F2KM_1");
+  await desk.refreshRequest("req_L6F2KM_1");
+  await desk.refreshRequest("req_L6F2KM_1");
   await new Promise((r) => setImmediate(r));
-  assert.deepEqual(sent.map((s) => [s.status, s.conversation_id]), [["completed", "conv-1"]]);
-  assert.match(sent[0]?.reply ?? "", /^Done\. Rebooked to NA 729.*Reissued by the airline desk/);
-  assert.equal(desk.snapshot().requests[0]?.channelUpdates?.[0]?.delivery, "sent");
-
-  // An operator confirming a channel request is also reported to the conversation.
-  desk.receiveChannelMessage(submit({ id: "msg-2", pnr: "L6F2KM", last_name: "Kusuma", conversation_id: "conv-2" }));
-  desk.confirmRequest("req_L6F2KM_1", 30_000);
-  await new Promise((r) => setImmediate(r));
-  assert.deepEqual(sent.map((s) => s.status), ["completed", "completed"]);
-  assert.equal(sent[1]?.conversation_id, "conv-2");
+  assert.deepEqual(sent.map((s) => [s.status, s.conversation_id]), [
+    ["confirmed_on_call", "conv-1"],
+    ["completed", "conv-1"],
+  ]);
+  assert.match(sent[0]?.reply ?? "", /arranging your move to NA 729 at 19:45 \(IDR 30,000\) with the airline/);
+  assert.match(sent[1]?.reply ?? "", /^Done\. Rebooked to NA 729.*Reissued by the airline desk/);
+  assert.equal(desk.snapshot().requests[0]?.channelUpdates?.[1]?.delivery, "sent");
 });
 
 test("a failed delivery is recorded without blocking the desk, and requests typed by the operator send nothing", async () => {
@@ -137,21 +104,25 @@ test("a failed delivery is recorded without blocking the desk, and requests type
     },
   });
   desk.receiveChannelMessage(submit({ pnr: "C5V8EJ", last_name: "Halim" }));
-  desk.receiveChannelMessage(
-    parseChannelMessage({ id: "msg-c", type: "request.confirmed", channel: "chat", conversation_id: "conv-1", request_id: "req_C5V8EJ_1", confirmed_amount: 580000 }),
-  );
+  await desk.callPassengerForRequest("req_C5V8EJ_1");
+  await desk.refreshPassengerCall("req_C5V8EJ_1");
   await desk.callAirlineDesk("req_C5V8EJ_1");
   const review = await desk.refreshRequest("req_C5V8EJ_1");
   assert.equal(review.status, "needs_review");
   await new Promise((r) => setImmediate(r));
   assert.deepEqual(
     review.channelUpdates?.map((u) => [u.status, u.delivery, u.error]),
-    [["needs_review", "failed", "Channel returned HTTP 502."]],
+    [
+      ["confirmed_on_call", "failed", "Channel returned HTTP 502."],
+      ["needs_review", "failed", "Channel returned HTTP 502."],
+    ],
   );
 
   const typed = desk.submitRequest("L6F2KM", "reschedule", "NA729-2026-09-20", "phone");
-  const done = desk.confirmRequest(typed.request.id, 30_000);
-  assert.equal(done.channelUpdates, undefined);
+  await desk.callPassengerForRequest(typed.request.id);
+  const agreed = await desk.refreshPassengerCall(typed.request.id);
+  assert.equal(agreed.status, "confirmed_on_call");
+  assert.equal(agreed.channelUpdates, undefined);
 });
 
 test("channel updates only go over https, or plain http to this machine", async () => {
