@@ -3,4 +3,5 @@ node_modules/
 .env
 .env.local
 coverage/
+demo-dist/
 *.log

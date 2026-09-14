@@ -89,13 +89,13 @@ function clearOperationId(stage: "search" | "tour") {
   window.sessionStorage.removeItem(operationStorageKey(stage));
 }
 
-export function TinySlotApp() {
+export function TinySlotApp({ publicDemo = false }: { publicDemo?: boolean }) {
   const [screen, setScreen] = useState<Screen>("brief");
   const [mode, setMode] = useState<Mode>("fixture");
   const [brief, setBrief] = useState<SearchBrief>(fixtureBrief);
   const [records, setRecords] = useState<CenterCallRecord[]>(initialRecords);
   const [runState, setRunState] = useState<RunState>("idle");
-  const [liveAvailability, setLiveAvailability] = useState<LiveAvailability>("checking");
+  const [liveAvailability, setLiveAvailability] = useState<LiveAvailability>(publicDemo ? "unavailable" : "checking");
   const [livePhones, setLivePhones] = useState<Record<string, string>>({});
   const [route, setRoute] = useState("US|en-US");
   const [operatorKey, setOperatorKey] = useState("");
@@ -120,6 +120,7 @@ export function TinySlotApp() {
   const selectedRecord = records.find((record) => record.candidateId === selectedCenter.id);
 
   useEffect(() => {
+    if (publicDemo) return;
     const controller = new AbortController();
     fetch("/api/calls/readiness", { cache: "no-store", signal: controller.signal })
       .then(async (response) => {
@@ -130,7 +131,7 @@ export function TinySlotApp() {
         if (!(error instanceof DOMException && error.name === "AbortError")) setLiveAvailability("unavailable");
       });
     return () => controller.abort();
-  }, []);
+  }, [publicDemo]);
 
   function updateBrief<K extends keyof SearchBrief>(key: K, value: SearchBrief[K]) {
     setBrief((current) => ({ ...current, [key]: value }));

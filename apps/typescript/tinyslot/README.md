@@ -29,6 +29,14 @@ npm run dev
 
 Open `http://localhost:3000`, leave **Demo** selected, and choose **Run simulated search**. Demo mode uses six fictional childcare centers and reserved non-working NANP numbers. It never contacts CALL-E, consumes credits, or places a phone call.
 
+Build the static public-demo artifact with:
+
+```bash
+npm run build:demo
+```
+
+The generated `demo-dist/` site reuses the product interface but forces live readiness off and contains no server routes or credentials.
+
 ## Live CALL-E setup
 
 Copy `.env.example` to `.env.local` and provide:

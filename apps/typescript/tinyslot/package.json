@@ -9,6 +9,7 @@
   "scripts": {
     "dev": "next dev",
     "build": "next build",
+    "build:demo": "vite build --config vite.demo.config.ts",
     "start": "next start",
     "lint": "eslint app lib tests",
     "test": "npm run test:unit && npm run lint && npm run build",
@@ -16,14 +17,14 @@
   },
   "dependencies": {
     "@call-e/calle": "0.7.0",
-    "next": "16.3.1",
+    "next": "16.3.5",
     "react": "19.2.8",
     "react-dom": "19.2.8",
     "zod": "4.3.6"
   },
   "devDependencies": {
     "@eslint/js": "9.39.4",
-    "@next/eslint-plugin-next": "16.3.1",
+    "@next/eslint-plugin-next": "16.3.5",
     "@types/node": "22.19.19",
     "@types/react": "19.2.18",
     "@types/react-dom": "19.2.4",
@@ -33,6 +34,7 @@
     "eslint-plugin-react-hooks": "7.1.1",
     "globals": "16.4.0",
     "typescript": "5.9.3",
-    "typescript-eslint": "8.59.3"
+    "typescript-eslint": "8.59.3",
+    "vite": "7.1.7"
   }
 }
