@@ -174,6 +174,7 @@ This project is an awesome list for AI-agent phone-call workflows. Add resources
 ### Apps
 
 
+- [DockBrief](apps/typescript/dockbrief/) - One authorized CALL-E receiving-dock call becomes an evidence-linked physical unloading checklist with reported mismatches and unresolved facts; offline synthetic examples are the default.
 - [DueCall](https://github.com/omkz/duecall) - Autonomous accounts-receivable workflow that uses CALL-E to follow up on overdue invoices, turn phone conversations into structured payment outcomes, and schedule guarded retries with business-hours, duplicate-call, and human-handoff controls.
 - [CommonLot](https://github.com/kirmada1509/call-e-commonlot/tree/codex/commonlot-hackathon-submission) - Organizer-controlled pooled purchasing workbench that structures CALL-E buyer and supplier conversations, defaults to simulation, recomputes feasibility after revisions, and keeps orders human-approved. [Demo](https://commonlot.duckdns.org/about)
 - [BidPilot Voice](docs/bidpilot-voice.md) - External CALL-E procurement verification app with reviewed supplier questions, structured results, and a no-call preview.
