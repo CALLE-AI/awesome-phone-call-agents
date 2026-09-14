@@ -12,6 +12,17 @@ TinySlot was validated with one authorized CALL-E call on September 14, 2026. No
 - TinySlot classification: `qualified`
 - Deterministic checks: 8 pass, 0 fail, 0 unknown
 
+## Reproduce the Sanitized Proof
+
+The proof command performs only `GET /v1/calls/{call_id}` through the CALL-E SDK. It never creates or repeats a call and prints no phone number, transcript text, credential, or personal data.
+
+```bash
+cd apps/typescript/tinyslot
+npm run proof:live -- --call-id call_YjAE3eI6e4yLBj_NecUmuQ
+```
+
+For the demo video, record the resulting table for 10-15 seconds. Keep the terminal tightly cropped so `.env.local` and unrelated shell history are not visible.
+
 The test recipient confirmed the fictional Willow Room Childcare scenario. The result contained the expected identity, age band, vacancy, date, weekdays, care hours, tuition, registration fee, subsidy, tour, and evidence fields.
 
 ## Recovery Observation

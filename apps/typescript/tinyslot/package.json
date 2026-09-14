@@ -11,7 +11,8 @@
     "build": "next build",
     "build:demo": "vite build --config vite.demo.config.ts",
     "start": "next start",
-    "lint": "eslint app lib tests",
+    "lint": "eslint app lib tests scripts",
+    "proof:live": "node --env-file=.env.local scripts/show-live-proof.mjs",
     "test": "npm run test:unit && npm run lint && npm run build",
     "test:unit": "node --test tests/*.test.ts"
   },

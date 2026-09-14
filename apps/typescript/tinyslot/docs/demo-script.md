@@ -70,7 +70,12 @@ Target runtime: **2:50-3:05**. Speak naturally at approximately 140-150 words pe
 
 ## 2:10-2:27 - Show Real CALL-E Validation
 
-**Show:** A sanitized overlay or `docs/live-validation.md`. Do not show the actual number or transcript.
+**Show:** Run the read-only proof command in a clean terminal and display its sanitized result for 10-15 seconds. Do not show `.env.local`, the actual number, or transcript text.
+
+```bash
+cd apps/typescript/tinyslot
+npm run proof:live -- --call-id call_YjAE3eI6e4yLBj_NecUmuQ
+```
 
 Display:
 
