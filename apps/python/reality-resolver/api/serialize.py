@@ -27,11 +27,9 @@ from evidence.model import Case, Evidence
 from pipeline import Resolution
 from verdict import Verdict
 
-# Case files are authored server-side, not by any client, so this is not
-# an injection boundary - it is a bound, so that one oversized claim in a
-# case file cannot turn into an unbounded HTTP response. json.dumps
-# already escapes control characters, which is the other half of the
-# problem the CLI's sanitize_for_display() solves for a terminal.
+# Custom cases can contain client-supplied text. Sanitize before truncating
+# so a secret cut at the length boundary cannot escape recognition.
+# json.dumps separately escapes control characters in HTTP responses.
 MAX_TEXT_CHARS = 2000
 
 # Status names, check names, rule names, jurisdiction ids: short by
@@ -43,6 +41,8 @@ TRUNCATION_MARKER = "...[truncated]"
 
 
 def _text(value: str, max_chars: int = MAX_TEXT_CHARS) -> str:
+    value = _OBVIOUS_SECRET.sub("[redacted]", value)
+    value = _PHONE_IN_TEXT.sub(lambda m: mask_phone(m.group(0)), value)
     if len(value) <= max_chars:
         return value
     return value[: max(0, max_chars - len(TRUNCATION_MARKER))] + TRUNCATION_MARKER
@@ -93,7 +93,7 @@ def case_metadata(case: Case) -> dict[str, Any]:
         "use_case": _text(case.use_case),
         "deadline": case.deadline.isoformat().replace("+00:00", "Z"),
         "decision_deadline_threshold_hours": _hours(case.decision_deadline_threshold.total_seconds()),
-        "decision_options": {str(k): _text(str(v)) for k, v in case.decision_options.items()},
+        "decision_options": {_text(str(k)): _text(str(v)) for k, v in case.decision_options.items()},
         "evidence": [evidence_item(item) for item in case.evidence.items],
         "call_phone_masked": mask_phone(case.call_phone),
     }
@@ -255,7 +255,7 @@ def case_summary(case: Case) -> dict[str, Any]:
     return {
         "name": _text(case.name),
         "use_case": _text(case.use_case),
-        "decision_options": {str(k): _text(str(v)) for k, v in case.decision_options.items()},
+        "decision_options": {_text(str(k)): _text(str(v)) for k, v in case.decision_options.items()},
     }
 
 
