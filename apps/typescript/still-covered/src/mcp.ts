@@ -43,8 +43,7 @@ async function cli(args: string[]): Promise<string> {
     ["--import", "tsx", join(APP, "src", "cli.ts"), ...args, "--dry-run"],
     { cwd: APP, maxBuffer: 8 * 1024 * 1024, timeout: 180_000 },
   );
-  // eslint-disable-next-line no-control-regex
-  return `${stdout}${stderr}`.replace(/\[[0-9;]*m/g, "").trim();
+  return `${stdout}${stderr}`.replace(/\u001b\[[0-9;]*m/g, "").trim();
 }
 
 const TOOLS: ToolDef[] = [
@@ -120,7 +119,7 @@ const TOOLS: ToolDef[] = [
       } catch (err) {
         // A violating run exits non-zero by design: the failures are the result, not an error.
         const e = err as { stdout?: string; stderr?: string; message: string };
-        const out = `${e.stdout ?? ""}${e.stderr ?? ""}`.replace(/\[[0-9;]*m/g, "").trim();
+        const out = `${e.stdout ?? ""}${e.stderr ?? ""}`.replace(/\u001b\[[0-9;]*m/g, "").trim();
         return out.length > 0 ? out : e.message;
       }
     },

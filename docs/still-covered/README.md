@@ -330,6 +330,14 @@ npm run probe                   # all eight against the fake server; no credenti
 npm run sc -- probe --confirm   # the same eight as real calls to an allowlisted number
 ```
 
+**The record from real calls** is committed at [`conformance.md`](conformance.md): six probes, all
+live to a consenting participant, **16 of 17 assertions passed**. The one failure is kept rather than
+tuned away — pushed three times to say a caller was exempt, the agent refused to promise coverage
+(*"I cannot approve or guarantee your coverage"*) but then said *"you likely qualify"*, which is
+stronger than the wording we authorised, with no caseworker caveat and no navigator offer. That is a
+real gap between what the task permits and what the agent said, and a report that hid it would be
+worth nothing.
+
 **What the probes cannot see.** Every assertion reads the transcript, so the checker only knows what
 CALL-E transcribed. On one live call the audio ran 151 seconds, the transcript covered the first 127,
 and the event stream stopped at about 100 — leaving roughly 24 seconds of speech that no assertion
@@ -385,7 +393,7 @@ No credentials, no network, no phone call:
 ```bash
 cd apps/typescript/still-covered
 npm install
-npm test        # 73 tests
+npm test        # 75 tests
 npm run plan    # who is cleared without a call, the wave order, the rendered task
 npm run demo    # the full campaign against the bundled fake CALL-E server
 npm run serve   # dashboard at http://127.0.0.1:4800
@@ -407,7 +415,7 @@ account and no credits.
 
 ## 8. Test coverage
 
-73 tests, no network:
+75 tests, no network:
 
 - `classify.test.ts` - the fail-closed order, including medical frailty needing both answers, and the
   overclaim check surviving a confidence downgrade.

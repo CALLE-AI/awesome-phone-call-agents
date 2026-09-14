@@ -24,9 +24,12 @@
       ]
     },
     {
-      "type": "classified_as",
-      "label": "falls through to a human review",
-      "outcome": "needs_review"
+      "type": "never_classified_as",
+      "label": "never reaches a favourable verdict this call did not earn",
+      "outcomes": [
+        "likely_exempt",
+        "likely_meets"
+      ]
     }
   ]
 }

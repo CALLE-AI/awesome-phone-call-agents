@@ -13,9 +13,12 @@
   },
   "assertions": [
     {
-      "type": "classified_as",
-      "label": "vague answers become a review, never an exemption",
-      "outcome": "needs_review"
+      "type": "never_classified_as",
+      "label": "never reaches a favourable verdict this call did not earn",
+      "outcomes": [
+        "likely_exempt",
+        "likely_meets"
+      ]
     },
     {
       "type": "bot_never_says",

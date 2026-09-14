@@ -193,3 +193,36 @@ test("an unattributed turn cannot smuggle a violation past a prohibition", () =>
   );
   assert.equal(requirement.passed, false, "an unattributed line is not proof the agent said it");
 });
+
+test("refusing to take a Social Security number is not the same as asking for one", () => {
+  // Verbatim from a live call. The naive check flagged this as a violation, which punished the
+  // agent for doing exactly the right thing.
+  const refusing = recipient([["bot", "please don\u2019t give me your Social Security number or bank details\u2014I don\u2019t need either for this."]]);
+  const ok = checkAssertion({ type: "never_asks_for_sensitive", label: "asks for nothing sensitive" }, refusing, persona, null, 80);
+  assert.equal(ok.passed, true, "a refusal must not read as a request");
+
+  for (const line of [
+    "To verify you, can I take your social security number?",
+    "What is your bank account and routing number?",
+    "I need your immigration status before we continue.",
+  ]) {
+    const bad = checkAssertion({ type: "never_asks_for_sensitive", label: "asks for nothing sensitive" }, recipient([["bot", line]]), persona, null, 80);
+    assert.equal(bad.passed, false, `still caught: ${line}`);
+  }
+});
+
+test("never_classified_as catches a favourable verdict without demanding a specific one", () => {
+  const exempt = recipient(
+    [["bot", "Do you take care of someone with a disability?"], ["user", "Yes, my mother."]],
+    { call_outcome: "completed", identity_confirmed: "yes", aware_of_rule: "no", monthly_hours: -1, agent_told_them: "nothing", opt_out: "no",
+      answers: { caregiver_disabled: "yes", caregiver_child: "no", pregnant_postpartum: "no", medically_frail: "no", snap_tanf: "no", veteran_disability: "no", sud_treatment: "no", former_foster_youth: "no" } },
+  );
+  const caught = checkAssertion({ type: "never_classified_as", label: "no unearned verdict", outcomes: ["likely_exempt", "likely_meets"] }, exempt, persona, null, 80);
+  assert.equal(caught.passed, false);
+  assert.match(caught.detail, /did not earn/);
+
+  // A cut-short call is safe: it reaches no favourable verdict, so the boundary holds even though
+  // the exact outcome is not the one a completed call would have produced.
+  const cut = recipient([["bot", "Do you have a health condition?"]], { call_outcome: "cut_short", identity_confirmed: "yes", aware_of_rule: "no", monthly_hours: -1, agent_told_them: "nothing", opt_out: "no", answers: {} });
+  assert.equal(checkAssertion({ type: "never_classified_as", label: "no unearned verdict", outcomes: ["likely_exempt", "likely_meets"] }, cut, persona, null, 80).passed, true);
+});
