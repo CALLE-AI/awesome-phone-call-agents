@@ -431,14 +431,44 @@ Compliance & Safety:
   }
 
   private isValidPrice(priceEstimate: any, priceNumeric: any): boolean {
-    if (typeof priceNumeric === 'number' && !isNaN(priceNumeric) && priceNumeric > 0) return true;
+    if (typeof priceNumeric === 'number' && !isNaN(priceNumeric) && priceNumeric > 0) {
+      if (priceEstimate && typeof priceEstimate === 'string') {
+        const lower = priceEstimate.toLowerCase();
+        if (/\b(?:seconds?|secs?|s|minutes?|mins?|min|hours?|hrs?|days?|sq\s*ft|sqft|ft|meters?)\b/i.test(lower)) {
+          return false;
+        }
+        if (['not_provided', 'not_discussed', 'none', 'n/a', 'declined', 'rejected', 'refused', 'unanswered', 'null', 'unknown', 'no', 'busy'].some(w => lower.includes(w))) {
+          return false;
+        }
+      }
+      // If the number is very small (< 50) and has no explicit currency, it's almost certainly duration or time, not a service quote
+      if (priceNumeric < 50 && (!priceEstimate || !/(?:₹|\$|€|£|Rs|rupee|dollar)/i.test(String(priceEstimate)))) {
+        return false;
+      }
+      return true;
+    }
+
     if (!priceEstimate || typeof priceEstimate !== 'string') return false;
     const lower = priceEstimate.toLowerCase().trim();
-    if (['not_provided', 'not_discussed', 'none', 'n/a', 'declined', 'unanswered', 'null', 'unknown', 'no'].includes(lower)) {
+
+    if (['not_provided', 'not_discussed', 'none', 'n/a', 'declined', 'rejected', 'refused', 'unanswered', 'null', 'unknown', 'no', 'busy', 'failed'].some(w => lower.includes(w))) {
       return false;
     }
+
+    // Must not be a time duration or square footage measurement
+    if (/\b(?:seconds?|secs?|s|minutes?|mins?|min|hours?|hrs?|days?|sq\s*ft|sqft|ft|meters?)\b/i.test(lower)) {
+      return false;
+    }
+
+    const hasCurrency = /(?:₹|\$|€|£|Rs\.?|INR|USD|rupees|dollars|bucks)/i.test(priceEstimate);
     const num = this.extractNumber(priceEstimate);
-    return typeof num === 'number' && !isNaN(num) && num > 0;
+    if (!num || isNaN(num) || num <= 0) return false;
+
+    if (!hasCurrency && num < 50) {
+      return false;
+    }
+
+    return true;
   }
 
   /**
@@ -449,15 +479,97 @@ Compliance & Safety:
     call: CalleApiResponse,
     onVendorUpdate: (vendorId: string, updates: Partial<TargetVendor>) => void
   ) {
-    // 1. Check top-level or recipient-level structured result
     const structured = call.structured_result || call.recipients?.[0]?.structured_result;
     const summary = call.summary || call.recipients?.[0]?.summary || call.transcript;
+    const summaryLower = (summary || '').toLowerCase();
     const confidenceLabel = ((call as any).completion_confidence?.label as 'high' | 'medium' | 'low') || 'high';
     const confidenceScore = (call as any).completion_confidence?.score || 0.95;
 
+    // STEP 1: Strict Check for Declined, Rejected, Refused, or Unanswered Calls FIRST
+    const isExplicitNoQuote = structured?.quote_provided === 'no' || 
+                             structured?.quote_provided === 'declined' || 
+                             structured?.quote_provided === 'refused';
+
+    const isDeclined = isExplicitNoQuote ||
+                       summaryLower.includes('declined') || 
+                       summaryLower.includes('rejected') || 
+                       summaryLower.includes('reject') ||
+                       summaryLower.includes('refused') ||
+                       summaryLower.includes('refuse') ||
+                       summaryLower.includes('busy') ||
+                       summaryLower.includes('not interested') ||
+                       summaryLower.includes('cannot take') ||
+                       summaryLower.includes("can't take") ||
+                       summaryLower.includes('not taking any') ||
+                       summaryLower.includes('fully booked') ||
+                       summaryLower.includes('hung up') ||
+                       summaryLower.includes('hang up') ||
+                       summaryLower.includes('0 seconds') || 
+                       summaryLower.includes('0s duration') ||
+                       call.status === 'canceled' || 
+                       call.recipients?.[0]?.status === 'refused';
+
+    const isNoAnswer = call.status === 'failed' || 
+                       Boolean(call.failure_code) || 
+                       call.recipients?.[0]?.status === 'no-answer' ||
+                       call.recipients?.[0]?.status === 'failed' ||
+                       summaryLower.includes('did not connect') ||
+                       summaryLower.includes("didn't connect") ||
+                       summaryLower.includes('unavailable') ||
+                       summaryLower.includes('may be unavailable') ||
+                       summaryLower.includes('unreachable') ||
+                       summaryLower.includes('no answer') ||
+                       summaryLower.includes('did not answer') ||
+                       summaryLower.includes('voicemail') ||
+                       summaryLower.includes('suggest retrying') ||
+                       summaryLower.includes('retrying') ||
+                       summaryLower.includes('retry in');
+
+    if (isDeclined) {
+      const meta = this.buildTurnsAndMetadata(vendor, call, undefined, undefined, summary, true);
+      onVendorUpdate(vendor.id, {
+        status: 'refused',
+        callHash: meta.callHash,
+        audioUrl: meta.audioUrl,
+        durationSeconds: meta.durationSeconds,
+        durationFormatted: meta.durationFormatted,
+        turns: meta.turns,
+        priceEstimate: undefined,
+        priceNumeric: undefined,
+        availability: 'Not Discussed',
+        providerNotes: structured?.provider_notes || summary || 'Call was declined by recipient.',
+        evidenceSnippet: structured?.evidence || summary,
+        transcriptSummary: summary || 'Contractor declined or rejected the call.',
+        confidence: 'low',
+        confidenceScore: 0.2,
+      });
+      return;
+    }
+
+    if (isNoAnswer) {
+      const failReason = summary || call.failure_message || call.failure_code || 'Call unreachable or unanswered';
+      const meta = this.buildTurnsAndMetadata(vendor, call, undefined, undefined, summary, true);
+      onVendorUpdate(vendor.id, {
+        status: 'no-answer',
+        callHash: meta.callHash,
+        audioUrl: meta.audioUrl,
+        durationSeconds: meta.durationSeconds,
+        durationFormatted: meta.durationFormatted,
+        turns: meta.turns,
+        priceEstimate: undefined,
+        priceNumeric: undefined,
+        availability: 'Not Discussed',
+        providerNotes: failReason,
+        transcriptSummary: summary || `Call could not be completed: ${failReason}`,
+        confidence: 'low',
+        confidenceScore: 0.3,
+      });
+      return;
+    }
+
+    // STEP 2: Process Valid Structured Quote
     const hasValidQuote = structured && (
-      (structured.quote_provided === 'yes' || structured.quote_provided === true) ||
-      this.isValidPrice(structured.price_estimate, structured.price_numeric)
+      structured.quote_provided === 'yes' || structured.quote_provided === true
     ) && this.isValidPrice(structured.price_estimate, structured.price_numeric);
 
     if (hasValidQuote && structured) {
@@ -500,7 +612,7 @@ Compliance & Safety:
       return;
     }
 
-    // 2. Graceful Degradation: If structured data is empty or not_provided but summary text contains explicit price
+    // STEP 3: Graceful Degradation: If structured data is empty but summary text contains an explicit currency price
     if (summary) {
       const fallbackPrice = this.extractPriceFromText(summary);
       if (fallbackPrice && this.isValidPrice(fallbackPrice, null)) {
@@ -527,61 +639,7 @@ Compliance & Safety:
       }
     }
 
-    // 3. Check for explicitly declined / 0-second / unanswered calls
-    const isDeclined = summary?.toLowerCase().includes('declined') || 
-                       summary?.toLowerCase().includes('0 seconds') || 
-                       call.status === 'canceled' || 
-                       call.recipients?.[0]?.status === 'refused';
-
-    const isNoAnswer = call.status === 'failed' || 
-                       call.failure_code || 
-                       call.recipients?.[0]?.status === 'no-answer' ||
-                       summary?.toLowerCase().includes('did not connect') ||
-                       summary?.toLowerCase().includes('unreachable');
-
-    if (isDeclined) {
-      const meta = this.buildTurnsAndMetadata(vendor, call, undefined, undefined, summary, true);
-      onVendorUpdate(vendor.id, {
-        status: 'refused',
-        callHash: meta.callHash,
-        audioUrl: meta.audioUrl,
-        durationSeconds: meta.durationSeconds,
-        durationFormatted: meta.durationFormatted,
-        turns: meta.turns,
-        priceEstimate: undefined,
-        priceNumeric: undefined,
-        availability: 'Not Discussed',
-        providerNotes: structured?.provider_notes || summary || 'Call was declined by recipient.',
-        evidenceSnippet: structured?.evidence || summary,
-        transcriptSummary: summary || 'Call declined immediately with 0s duration.',
-        confidence: 'low',
-        confidenceScore: 0.2,
-      });
-      return;
-    }
-
-    if (isNoAnswer) {
-      const failReason = call.failure_message || call.failure_code || 'Call unreachable or unanswered';
-      const meta = this.buildTurnsAndMetadata(vendor, call, undefined, undefined, summary, true);
-      onVendorUpdate(vendor.id, {
-        status: 'no-answer',
-        callHash: meta.callHash,
-        audioUrl: meta.audioUrl,
-        durationSeconds: meta.durationSeconds,
-        durationFormatted: meta.durationFormatted,
-        turns: meta.turns,
-        priceEstimate: undefined,
-        priceNumeric: undefined,
-        availability: 'Not Discussed',
-        providerNotes: failReason,
-        transcriptSummary: summary || `Call could not be completed: ${failReason}`,
-        confidence: 'low',
-        confidenceScore: 0.3,
-      });
-      return;
-    }
-
-    // General fallback: No quote offered
+    // STEP 4: General fallback: No quote offered
     const meta = this.buildTurnsAndMetadata(vendor, call, undefined, undefined, summary, false);
     onVendorUpdate(vendor.id, {
       status: 'refused',
@@ -896,8 +954,41 @@ Compliance & Safety:
   }
 
   private extractPriceFromText(text: string): string | null {
-    const match = text.match(/(?:₹|\$|Rs\.?|USD)?\s*([0-9]+(?:,[0-9]{3})*(?:\.[0-9]{2})?)\s*(?:dollars|rupees|bucks)?/i);
-    return match ? match[0].trim() : null;
+    if (!text || typeof text !== 'string') return null;
+
+    const lower = text.toLowerCase();
+    // Immediate rejection keywords: never extract price from failure/unanswered/retry summaries!
+    if ([
+      "didn't connect", 'did not connect', 'unavailable', 'retry', 'retrying',
+      'unreachable', 'failed', 'rejected', 'declined', 'refused', 'no-answer',
+      'busy', 'hung up', 'not interested', 'could not connect', 'call ended immediately'
+    ].some(w => lower.includes(w))) {
+      return null;
+    }
+
+    // Pattern 1: Explicit currency symbol prefix (e.g. ₹15,000, $350, Rs. 12000, Rs 9500)
+    // Negative lookahead strictly prevents matching time/measurements like "45 minutes", "10 seconds", "45 sq ft"
+    const symbolMatch = text.match(/(?:₹|\$|€|£|Rs\.?\s*|INR\s*|USD\s*)\s*([0-9]+(?:,[0-9]{3})*(?:\.[0-9]{2})?)\b(?!\s*(?:seconds?|secs?|s\b|minutes?|mins?|min\b|m\b|hours?|hrs?|h\b|days?|weeks?|months?|sq\s*ft|sqft|ft|pax))/i);
+    if (symbolMatch) {
+      return symbolMatch[0].trim();
+    }
+
+    // Pattern 2: Currency word suffix: "15000 rupees", "350 dollars", "400 bucks"
+    const wordMatch = text.match(/\b([0-9]+(?:,[0-9]{3})*(?:\.[0-9]{2})?)\s*(?:rupees|dollars|bucks|inr|usd)\b(?!\s*per\s*(?:hour|minute|sqft|sq\s*ft))/i);
+    if (wordMatch) {
+      return wordMatch[0].trim();
+    }
+
+    // Pattern 3: Explicit price keyword: "total cost is 15000", "quoted 12000"
+    const keywordMatch = text.match(/\b(?:price|quote|cost|rate|total)\s*(?:is|of|about|around|:)?\s*[\$₹]?\s*([0-9]+(?:,[0-9]{3})*(?:\.[0-9]{2})?)\b(?!\s*(?:seconds?|secs?|s\b|minutes?|mins?|min\b|m\b|hours?|hrs?|h\b|days?|weeks?|months?|sq\s*ft|sqft|ft|pax))/i);
+    if (keywordMatch) {
+      const num = parseInt(keywordMatch[1].replace(/,/g, ''), 10);
+      if (!isNaN(num) && num >= 50) {
+        return `₹${num}`;
+      }
+    }
+
+    return null;
   }
 }
 
