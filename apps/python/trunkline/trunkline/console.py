@@ -133,8 +133,14 @@ def _call_detail(ledger, record) -> Dict[str, Any]:
 # ---------------------------------------------------------------------------
 
 def serve(data_dir: str, host: str = "127.0.0.1", port: int = 8770) -> int:
-    if host not in LOOPBACK_HOSTS:
-        print("The console has no authentication and refuses to bind %s. Use 127.0.0.1." % host)
+    # Opt-in only, and off by default: setting this env var is a deliberate,
+    # informed choice to expose an unauthenticated console publicly (e.g. for a
+    # hosted demo). Nothing here ever places a live call regardless of who can
+    # reach it, but /add-claim and /call are otherwise open writes once public.
+    public_demo = os.environ.get("TRUNKLINE_PUBLIC_DEMO", "").strip() == "1"
+    if host not in LOOPBACK_HOSTS and not public_demo:
+        print("The console has no authentication and refuses to bind %s. Use 127.0.0.1," % host)
+        print("or set TRUNKLINE_PUBLIC_DEMO=1 to deliberately expose it publicly.")
         return 2
     if not os.path.exists(os.path.join(data_dir, "ledger.json")):
         print("No ledger at %s. Run `trunkline --data %s init-demo` first." % (data_dir, data_dir))
@@ -145,6 +151,8 @@ def serve(data_dir: str, host: str = "127.0.0.1", port: int = 8770) -> int:
             pass
 
         def _host_ok(self) -> bool:
+            if public_demo:
+                return True
             hostname = (self.headers.get("Host") or "").rsplit(":", 1)[0].strip("[]")
             return hostname in LOOPBACK_HOSTS
 
