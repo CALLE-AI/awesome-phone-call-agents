@@ -1,0 +1,14 @@
+{% extends "base.html" %}
+{% block body %}
+<div class="page-heading"><div><h2>Support desk</h2>
+<p class="sub">A resident asked for practical help and gave permission. A named operator chooses
+an approved provider; CALL-E asks only about general availability and never shares resident identity
+or clinical details.</p></div><span class="mode">operator approved</span></div>
+{% if message %}<div class="banner" role="status">{{ message }}</div>{% endif %}
+<div class="safety"><strong>Not emergency care.</strong> Immediate danger goes to 911 or the local
+emergency number and human review. A provider call does not place an order, reserve an item or
+promise availability.</div>
+<div hx-get="/support/rows" hx-trigger="every 5s" hx-swap="innerHTML">
+  {% include "_support_rows.html" %}
+</div>
+{% endblock %}

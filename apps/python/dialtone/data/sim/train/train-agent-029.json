@@ -1,0 +1,56 @@
+{
+ "id": "train-agent-029",
+ "label": "agent",
+ "source": "sim-train",
+ "meta": {
+  "task": "cancel a subscription",
+  "hard": false
+ },
+ "turns": [
+  {
+   "speaker": "user",
+   "text": "Hi there, I'm Max, the virtual assistant for Maple Vet Clinic. How may I assist you today?",
+   "offset_seconds": 0.9
+  },
+  {
+   "speaker": "bot",
+   "text": "Hi, I'm an AI assistant calling on behalf of Alex Martin. I'd like to cancel the subscription for the account under Alex Martin.",
+   "offset_seconds": 7.99
+  },
+  {
+   "speaker": "user",
+   "text": "I understand. I've processed the cancellation for the account under Alex Martin, effective today. Is there anything else I can help with?",
+   "offset_seconds": 18.59
+  },
+  {
+   "speaker": "bot",
+   "text": "Can you confirm the cancellation is effective today?",
+   "offset_seconds": 27.88
+  },
+  {
+   "speaker": "user",
+   "text": "I understand. Someone from our team will follow up to confirm the details.",
+   "offset_seconds": 33.36
+  },
+  {
+   "speaker": "bot",
+   "text": "Will there be a final charge?",
+   "offset_seconds": 39.26
+  },
+  {
+   "speaker": "user",
+   "text": "Certainly. You're all set. Thank you for calling, and have a wonderful day!",
+   "offset_seconds": 43.65
+  },
+  {
+   "speaker": "bot",
+   "text": "Thank you, that's everything.",
+   "offset_seconds": 49.84
+  },
+  {
+   "speaker": "user",
+   "text": "You're welcome! Have a wonderful day. Goodbye!",
+   "offset_seconds": 53.17
+  }
+ ]
+}

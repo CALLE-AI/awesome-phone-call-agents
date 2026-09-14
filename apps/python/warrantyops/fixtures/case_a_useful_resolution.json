@@ -1,0 +1,142 @@
+{
+  "scenario": "case_a_useful_resolution",
+  "description": "The returned claim the portal would not explain. The desk states the status, the reason, the document they need and a deadline, and confirms a case reference through its own read-back exchange.",
+  "envelope": {
+    "source_platform": "SYNTHETIC-DMS",
+    "source_claim_id": "CLM-1042",
+    "source_version": "v7",
+    "exception_status": "RETURNED",
+    "submitted_at": "2026-08-01",
+    "caller_organization": "Example Equipment Dealers",
+    "account_context": "dealer account 4471",
+    "counterparty_phone_e164": "+12025550142",
+    "economic_policy_id": "standard-pursuit",
+    "claim_face_value": "4820.50",
+    "claim_currency": "USD",
+    "documented_code": "R-114",
+    "documented_reason": "Returned: supporting documentation incomplete",
+    "documented_next_step": null,
+    "ordinary_remedies": [
+      {
+        "channel": "portal_status_check",
+        "outcome": "portal repeats code R-114 with no explanation of what is missing"
+      },
+      {
+        "channel": "documented_code_resolution",
+        "outcome": "published code sheet for R-114 does not cover this assembly"
+      },
+      {
+        "channel": "written_follow_up",
+        "outcome": "two emails to the claims desk over nine days, no reply"
+      }
+    ],
+    "exhaustion_manifest": {
+      "source_version": "v7",
+      "routes": [
+        {
+          "channel": "portal_status_check",
+          "outcome": "portal repeats code R-114 with no explanation of what is missing",
+          "attempted_at": "2026-08-18"
+        },
+        {
+          "channel": "documented_code_resolution",
+          "outcome": "published code sheet for R-114 does not cover this assembly",
+          "attempted_at": "2026-08-20"
+        },
+        {
+          "channel": "written_follow_up",
+          "outcome": "two emails to the claims desk over nine days, no reply",
+          "attempted_at": "2026-08-29"
+        }
+      ],
+      "information_gap": "none of the ordinary routes states what is missing from the return"
+    }
+  },
+  "recipient_e164": "+12025550142",
+  "transport": {
+    "state": "completed",
+    "call_id": "call_synthetic_case_a",
+    "failure_code": null,
+    "failure_message": null
+  },
+  "transcript_turns": [
+    {
+      "speaker": "bot",
+      "text": "I am an AI assistant calling for Example Equipment Dealers. May I ask about warranty claim CLM-1042?"
+    },
+    {
+      "speaker": "user",
+      "text": "I can look that up. Which dealer account is it under?"
+    },
+    {
+      "speaker": "bot",
+      "text": "Dealer account 4471."
+    },
+    {
+      "speaker": "user",
+      "text": "I have it here. It is showing returned in our system. The labour line has no operating-hours reading attached."
+    },
+    {
+      "speaker": "bot",
+      "text": "What do you need from us to move it forward?"
+    },
+    {
+      "speaker": "user",
+      "text": "Send a photograph of the hour meter with the reading visible and we can rework the claim."
+    },
+    {
+      "speaker": "bot",
+      "text": "Is there a deadline?"
+    },
+    {
+      "speaker": "user",
+      "text": "Yes, thirty days from today for the resubmission."
+    },
+    {
+      "speaker": "bot",
+      "text": "Does this have a case number on your side?"
+    },
+    {
+      "speaker": "user",
+      "text": "It is case nine zero two one zero."
+    },
+    {
+      "speaker": "bot",
+      "text": "Just to confirm, that is case nine zero two one zero, correct?"
+    },
+    {
+      "speaker": "user",
+      "text": "Correct, case nine zero two one zero."
+    }
+  ],
+  "structured_result": {
+    "claim_status": "STATED_RETURNED",
+    "claim_status_evidence_quote": "It is showing returned in our system. The labour line has no operating-hours reading attached.",
+    "stated_reason": "The labour line has no operating-hours reading attached.",
+    "required_correction": "Send a photograph of the hour meter with the reading visible and we can rework the claim.",
+    "required_documents": [
+      "photograph of the hour meter with the reading visible"
+    ],
+    "stated_deadline": "thirty days from today for the resubmission",
+    "escalation_path": null,
+    "stated_next_action": null,
+    "reference_kind": "CASE",
+    "reference_heard": "case nine zero two one zero",
+    "reference_readback_performed": true,
+    "reference_confirmed": "case nine zero two one zero",
+    "reference_confirmation_quote": "Correct, case nine zero two one zero."
+  },
+  "expected": {
+    "kind": "OUTCOME",
+    "terminal_state": "INFORMATION_OBTAINED",
+    "claim_status": "STATED_RETURNED",
+    "identifier_state": "CONFIRMED_IDENTIFIER",
+    "confirmed_reference": {
+      "value": "CASE90210",
+      "kind": "CASE",
+      "corrected": false
+    },
+    "provider_replays": 1,
+    "write_back": "RECEIPT"
+  }
+}
