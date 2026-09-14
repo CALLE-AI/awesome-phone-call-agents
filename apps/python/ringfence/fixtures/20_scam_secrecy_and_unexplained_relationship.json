@@ -1,0 +1,58 @@
+{
+  "_evidence_source": "synthetic: romance-scam-style variant combining a secrecy demand with an unexplained recipient relationship — a distinct red-flag combination from fixtures 13-15 (which pair secrecy+urgency, urgency+irreversible-payment, and unexplained-relationship+irreversible-payment respectively), modeled on the FTC-documented pattern where a supposed online partner asks the victim to keep the payment secret from family (see references/scam-red-flags.md)",
+  "category": "scam_pattern",
+  "case": {
+    "case_id": "case_f20",
+    "account_holder_name": "Deborah Lange",
+    "on_file_phone": "+14155550120",
+    "claimed_transaction_amount": "9200.00",
+    "claimed_recipient": "Unverified individual met online",
+    "claimed_payment_method": "wire",
+    "request_supplied_callback_number": null
+  },
+  "call": {
+    "id": "call_f20",
+    "status": "completed",
+    "task": "Verify a flagged $9,200 wire transaction to an individual the account holder met online.",
+    "failure_code": null,
+    "failure_message": null,
+    "task_completed": true,
+    "completion_confidence": {"score": 0.88, "label": "high"},
+    "summary": "Account holder reported being asked to keep the payment secret from family and could not confirm the recipient's identity beyond messages exchanged online."
+  },
+  "attempts": [
+    {
+      "id": "attempt_f20",
+      "phone": "+14155550120",
+      "status": "completed",
+      "started_at": "2026-09-10T15:05:00Z",
+      "completed_at": "2026-09-10T15:08:40Z",
+      "summary": "Account holder confirmed secrecy demand and could not explain the recipient relationship.",
+      "transcript_turns": [
+        {"speaker": "bot", "text": "This is an automated verification call from your bank about a flagged transaction. Did anyone ask you to keep this transaction private?"},
+        {"speaker": "user", "text": "Yes, he asked me not to mention it to my kids, said they wouldn't understand."},
+        {"speaker": "bot", "text": "Is there time pressure on this payment?"},
+        {"speaker": "user", "text": "Not really, he said whenever I could send it was fine."},
+        {"speaker": "bot", "text": "Can you describe your relationship to the recipient, in your own words?"},
+        {"speaker": "user", "text": "We met on a dating site about two months ago, we've only spoken online and by phone, I've never met him in person."},
+        {"speaker": "bot", "text": "Were you asked to pay by wire, gift card, or cryptocurrency specifically?"},
+        {"speaker": "user", "text": "Wire, he said it was for a business emergency overseas."}
+      ],
+      "provider_call_id": "prov_f20",
+      "failure_code": null,
+      "failure_message": null
+    }
+  ],
+  "events": [
+    {"id": "evt_f20a", "type": "call.dialing", "call_id": "call_f20", "created_at": "2026-09-10T15:05:00Z", "level": "info", "status": "in_progress", "message": "Dialing account holder.", "details": {"region": "US"}},
+    {"id": "evt_f20b", "type": "call.completed", "call_id": "call_f20", "created_at": "2026-09-10T15:08:40Z", "level": "info", "status": "completed", "message": "Call completed.", "details": {"region": "US", "locale": "en-US"}}
+  ],
+  "signals": {
+    "secrecy_demand_present": true,
+    "urgency_pressure_present": false,
+    "relationship_explained": false,
+    "irreversible_payment_demanded": false,
+    "explicit_hold_requested": false
+  },
+  "expected_disposition": "ADVISE_BLOCK"
+}

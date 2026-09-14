@@ -9,15 +9,36 @@ uncertainty, then reconciles what CALL-E learned back against the
 original evidence to reach a final verdict - never treating an
 unresolved outcome as if it were a negative answer.
 
-The demonstrated use case is **Ghost Appointment Resolution**: a
-scheduled appointment where contradictory or incomplete information
-about whether it will happen makes a decision impossible from the
-records alone (see "The Ghost Appointment scenario" below). The engine
-itself is generic - any domain with the same shape (a structured record,
-a conflicting human account, a decision deadline) fits the same four
-rules - but only this one use case is implemented today. Extending to
-other use cases is future work, not a reason to import logic from an
-unrelated use case now (see "Compliance by use case" below).
+The engine is generic: it knows about evidence, contradiction,
+deadlines and verdicts, and nothing about any particular domain. Any
+situation with the same shape - a structured record, a conflicting
+human account, no fresher evidence that settles it, and a decision
+deadline - runs through the same four rules, the same compliance gate,
+and the same reconciliation. Two use cases ship today, and the domain
+lives entirely in their JSON:
+
+| # | Case file | `use_case` | Subject | Actions |
+|---|---|---|---|---|
+| 1 | `cases/critical-service-escalation.json` | `critical_service_escalation` | A field technician assigned to a maintenance intervention on medical equipment | `CONTINUE_DISPATCH` / `REASSIGN_TECHNICIAN` |
+| 2 | `cases/ghost-appointment.json` | `appointment_confirmation` | A patient with a scheduled dental appointment | `KEEP_SLOT` / `RELEASE_SLOT` |
+
+**Critical Service Escalation - Medical Equipment** is the first use
+case and the one to look at first: the cost of guessing wrong is a
+technician who never shows up at a site whose equipment needed
+servicing.
+
+**Ghost Appointment** is the second use case, and it is here as the
+genericity proof rather than as a second product: a different
+industry, a different subject, a different pair of actions, running
+unchanged on the same engine. Adding it alongside the first cost one
+JSON file plus one entry in the compliance applicability table. No
+change was needed to `evidence/`, to the four rules, or to the
+compliance modules. `verdict.py` was touched once, and only to make
+the result schema's field descriptions domain-neutral - none of its
+reconciliation logic changed, and that edit serves both use cases
+rather than either one.
+
+Both are described below.
 
 The legal/compliance gate and the CALL-E task-hardening this uses were
 originally built for a different, commercial-outbound product on this
@@ -59,10 +80,48 @@ and answered, but CALL-E's own result did not cleanly confirm or cancel
 (voicemail, an IVR, or a genuinely uncertain answer) - see
 "Reconciliation and verdicts" below.
 
+## The Critical Service Escalation scenario - Medical Equipment
+
+`cases/critical-service-escalation.json` (`use_case:
+"critical_service_escalation"`): a maintenance system says a technician
+is assigned and the intervention on medical equipment is confirmed for
+08:00 (`type: structured`, low ambiguity). Six hours ago the technician
+messaged "I may no longer be able to make it today" (`type: human`,
+high ambiguity). A dispatch follow-up sent since then has had no reply
+(`type: absence`, high ambiguity - fresher than the technician's
+message, but it settles nothing, so R3 still holds).
+
+Nothing in the records answers the only question that matters: is
+someone going to show up. Dispatching anyway risks equipment left
+unserviced with nobody on site; reassigning pre-emptively burns a
+second technician's day and may be wrong. Neither action is safe to
+take on an assumption, and the intervention is 12 hours away - so the
+engine escalates to one phone call, asks the technician directly, and
+reconciles the answer into `CONTINUE_DISPATCH` or
+`REASSIGN_TECHNICIAN`.
+
+**What the medical framing is and is not.** It is narrative: it makes
+the cost of a wrong guess concrete, and it is why this case leads.
+It is not a claim about the software. Nothing here is a medical
+device, a certified clinical system, or aware of any healthcare
+regulation; no medical rule, exemption, or obligation exists anywhere
+in this codebase, and the compliance gate treats this case exactly as
+it treats the dental one. Swapping "medical equipment" for "HVAC
+unit" in the case file would change the stakes of the story and
+nothing whatsoever in the engine.
+
+If nobody picks up, or an answering machine does, or the answer is
+genuinely unclear, the verdict is `UNRESOLVED_AMBIGUOUS` and the action
+is `HUMAN_REVIEW` - never `REASSIGN_TECHNICIAN`. Silence is not a
+cancellation, and this is the case where that distinction has teeth: an
+engine that read voicemail as "they cancelled" would quietly reassign a
+technician who was going to turn up.
+
 ## The Ghost Appointment scenario
 
-`cases/ghost-appointment.json` is the shipped example (`use_case:
-"appointment_confirmation"`): a dental practice's calendar says a
+`cases/ghost-appointment.json` (`use_case:
+"appointment_confirmation"`) is the same pipeline in an unrelated
+industry: a dental practice's calendar says a
 patient's appointment is confirmed for 14:00 tomorrow (`type:
 structured`, low ambiguity). A separate email from the patient says "I
 may need to cancel" (`type: human`, high ambiguity). A scheduled
@@ -97,14 +156,22 @@ deciding `KEEP_SLOT` or `RELEASE_SLOT`.
   and `use_case` (which generic compliance rules apply - see
   "Compliance by use case" below).
 
-Cases are loaded from JSON - see `cases/ghost-appointment.json`. Fields
-map directly: `freshness_hours`, `decision_deadline_threshold_hours`,
-and `deadline` (ISO 8601 UTC) are plain numbers/strings, not relative
+Cases are loaded from JSON - see the two files in `cases/`. Fields map
+directly: `freshness_hours`, `decision_deadline_threshold_hours`, and
+`deadline` (ISO 8601 UTC) are plain numbers/strings, not relative
 phrases - "tomorrow 14:00" is not machine-meaningful without a fixed
 reference point, so a real case should pin a concrete date. The shipped
-fixture's deadline will need bumping as time passes; use `--now-utc` to
-pin a consistent "now" close to it for a reliable demo run (see
-"Running the demo" below).
+fixtures' deadlines will need bumping as time passes; use `--now-utc`
+to pin a consistent "now" close to them for a reliable demo run (see
+"Running the demo" below). Both shipped deadlines sit within 24h of
+`2026-09-10T20:00:00Z`, so a single `--now-utc` value drives either
+case.
+
+Nothing in `evidence/` is aware of appointments, technicians, patients
+or equipment: `claim` is free text, and `decision_options` supplies the
+two action labels. That is why adding the second use case required no
+change to this module - see "Compliance by use case" for the one place
+a new use case does have to be registered.
 
 ## The four rules
 
@@ -141,10 +208,10 @@ resolving.
 ## Reconciliation and verdicts
 
 Once a call is justified and permitted, `verdict.py` reconciles CALL-E's
-`structured_result` (using `patient_intent_result_schema()`) into a
+`structured_result` (using `subject_intent_result_schema()`) into a
 final verdict:
 
-| `patient_intent` | `answered_by` | Status | Action |
+| `subject_intent` | `answered_by` | Status | Action |
 |---|---|---|---|
 | `confirmed` | `human` | `RESOLVED` | `Case.decision_options["if_confirmed"]` |
 | `cancelled` | `human` | `RESOLVED_ALT` | `Case.decision_options["if_cancelled"]` |
@@ -153,7 +220,7 @@ final verdict:
 **Absolute rule: unresolved evidence is never treated as cancelled.**
 Every combination other than the exact `(confirmed, human)` and
 `(cancelled, human)` matches falls back to `HUMAN_REVIEW` - checked as
-an invariant over all 25 `(patient_intent, answered_by)` combinations in
+an invariant over all 25 `(subject_intent, answered_by)` combinations in
 `tests/test_verdict.py`, not left as a convention.
 
 The two paths before CALL-E is ever reached use their own fixed,
@@ -169,11 +236,13 @@ commercial outbound solicitation, so its checks include rules - calling
 windows, prior-consent requirements, do-not-call-registry scrubs,
 solicitation-frequency caps - that are scoped, in their own source
 statutes, specifically to *telephone solicitation* / *telemarketing*.
-Reality Resolver's appointment-confirmation calls are not that: they
-resolve a genuine uncertainty about an existing appointment, not
-prospect a stranger. Applying commercial-solicitation rules to that call
-would be wrong in the other direction - not "less safe," just
-inapplicable to what the call actually is.
+Neither shipped use case is that: both resolve a genuine uncertainty
+about an existing commitment - an appointment already on the calendar,
+an intervention already assigned to a technician under contract - and
+neither prospects a stranger or offers to sell anything. Applying
+commercial-solicitation rules to those calls would be wrong in the
+other direction - not "less safe," just inapplicable to what the call
+actually is.
 
 The architecture stays simple on purpose - no jurisdiction x use-case
 matrix:
@@ -194,44 +263,66 @@ for a phone number regardless of why the call is being made.
 `compliance/use_cases.py` is the one new, small piece: it filters that
 full set down to what's actually applicable to `case.use_case`, and
 recomputes whether the call is allowed from that filtered subset alone.
-For `appointment_confirmation`, the checks ending in `_calling_window`,
-`_consent`, `_dnc_scrub`, and `_solicitation_cap` are exempted; every
-other check - AI-disclosure, revocation, jurisdiction resolution itself,
-and (for EU numbers) a documented GDPR Art. 6 basis - stays applicable
-and hard-enforced, for every call, real or fake, with no mode or flag
-that bypasses or merely warns about a failing one.
+For both `appointment_confirmation` and `critical_service_escalation`,
+the checks ending in `_calling_window`, `_consent`, `_dnc_scrub`, and
+`_solicitation_cap` are exempted; every other check - AI-disclosure,
+revocation, jurisdiction resolution itself, and (for EU numbers) a
+documented GDPR Art. 6 basis - stays applicable and hard-enforced, for
+every call, real or fake, with no mode or flag that bypasses or merely
+warns about a failing one. An unregistered `use_case` raises
+`UnknownUseCaseError` and refuses the call rather than defaulting to
+either extreme, so adding a third use case is a deliberate act, not
+something a typo in a case file can do silently.
+
+**Why both entries point at the same exempt set, stated plainly.** The
+solicitation scoping is a property of the *statutes*, not of the use
+case, so any call that genuinely is not solicitation lands on the same
+set. Reviewing `critical_service_escalation` for a narrower or wider
+one found no honest basis for a difference - a dispatch call to an
+already-assigned technician is, if anything, further outside
+"telephone solicitation" than an appointment confirmation is (existing
+service contract, a business rather than residential subscriber, no
+offer to sell). Inventing a distinction so the two entries would look
+different would have been a fabricated legal claim. The use cases
+differ where the difference is real: in their evidence, their
+`decision_options`, and the actions the engine returns.
 
 For a EU number, `--gdpr-basis-documented` still gates the call exactly
 as before - GDPR Art. 6 requires a lawful basis for processing personal
 data regardless of whether the call is commercial, so this check is
 never exempted for any use case. Only the *meaning* of what's being
-attested changes: for `appointment_confirmation`, passing this flag
-attests that the operator has identified and documented a basis
-applicable to confirming an *existing* appointment - ordinarily Art.
-6(1)(b) (necessary to perform that appointment/service) or Art. 6(1)(f)
-(legitimate interest in confirming it) - not Art. 6(1)(a) (marketing
-consent), which has no place in this use case at all. The flag itself,
-and the requirement that an operator explicitly attest it before every
-real EU call, are unchanged: this stays a human attestation made at
-call time, never a value read from the case file, and never assumed
-true just because the use case is `appointment_confirmation` - a
-non-commercial purpose narrows *which* basis applies, it does not
-remove the need to have and document one.
+attested changes with the use case. For `appointment_confirmation`,
+passing this flag attests that the operator has identified and
+documented a basis applicable to confirming an *existing* appointment -
+ordinarily Art. 6(1)(b) (necessary to perform that appointment/service)
+or Art. 6(1)(f) (legitimate interest in confirming it). For
+`critical_service_escalation`, the basis an operator would ordinarily
+document is Art. 6(1)(b) again (performance of the service contract the
+technician is working under) or Art. 6(1)(f) (legitimate interest in
+keeping a committed intervention staffed). Neither is Art. 6(1)(a)
+(marketing consent), which has no place in either use case. The flag
+itself, and the requirement that an operator explicitly attest it
+before every real EU call, are unchanged: this stays a human
+attestation made at call time, never a value read from the case file,
+and never assumed true from the use case alone - a non-commercial
+purpose narrows *which* basis applies, it does not remove the need to
+have and document one.
 
-**Honest limit.** For a US number under `appointment_confirmation`, once
+**Honest limit.** For a US number under either shipped use case, once
 the commercial-specific checks are filtered out, the only checks left
 today are AI-disclosure (a static check that always passes) and
 revocation (not reachable through any CLI flag - see "Safety" below).
-In practice, the hard gate is very permissive for this exact
-combination with the current rule corpus - not because it was weakened,
-but because there simply is no US-federal rule in this codebase today
-that legitimately applies to a non-solicitation call. This is stated
+In practice, the hard gate is very permissive for that combination with
+the current rule corpus - not because it was weakened, but because
+there simply is no US-federal rule in this codebase today that
+legitimately applies to a non-solicitation call. This is stated
 here rather than left to be discovered later; adding a real, sourced,
 purpose-agnostic rule (if one is found) is a normal future addition to
 `compliance/jurisdictions/us_federal.py`, not a change to this filter.
 
-Adding a second use case means adding one entry to
-`compliance/use_cases.py`'s exemption table - not building a matrix.
+Adding a use case means adding one entry to `compliance/use_cases.py`'s
+exemption table - not building a matrix. That was the entire compliance
+cost of `critical_service_escalation`.
 
 ## CLI output
 
@@ -259,7 +350,7 @@ Adding a second use case means adding one entry to
 Against the fake server, three reserved phone numbers select which of
 the three CALL-E branches to simulate (see `fake_server.py`):
 
-| Phone | `patient_intent` | `answered_by` | Verdict |
+| Phone | `subject_intent` | `answered_by` | Verdict |
 |---|---|---|---|
 | any other phone (default) | `confirmed` | `human` | `RESOLVED` |
 | `+10000000004` | `cancelled` | `human` | `RESOLVED_ALT` |
@@ -275,22 +366,34 @@ uv run python fake_server.py
 then, against that `base_url`, in another terminal:
 
 ```bash
+uv run python resolver.py cases/critical-service-escalation.json \
+  --base-url http://127.0.0.1:PORT --execute \
+  --now-utc 2026-09-10T20:00:00Z
+```
+
+That resolves to `CONTINUE_DISPATCH`. The same command with the other
+case file is the genericity check - same engine, same rules, same
+`--now-utc`, different domain and different action:
+
+```bash
 uv run python resolver.py cases/ghost-appointment.json \
   --base-url http://127.0.0.1:PORT --execute \
   --now-utc 2026-09-10T20:00:00Z
 ```
 
-No compliance flags are needed for this shipped `appointment_confirmation`
-case - calling-window, consent, and DNC are exempted for this use case
-(see "Compliance by use case" above). Add `--phone +10000000004` or
-`--phone +10000000005` to see the `RESOLVED_ALT`/`UNRESOLVED_AMBIGUOUS`
-branches instead. Drop `--now-utc` far from the case's deadline to see
+which resolves to `KEEP_SLOT`.
+
+No compliance flags are needed for either shipped case -
+calling-window, consent, and DNC are exempted for both use cases (see
+"Compliance by use case" above). Add `--phone +10000000004` or `--phone
++10000000005` to see the `RESOLVED_ALT`/`UNRESOLVED_AMBIGUOUS` branches
+instead. Drop `--now-utc` far from the case's deadline to see
 `NO_CALL_NEEDED` instead - it needs no fake server at all, since it
 never reaches CALL-E.
 
-The shipped `cases/ghost-appointment.json` uses a reserved, non-routable
-NANP placeholder number (`+12025550123`) - never a real one. Pass
-`--phone` to override it for a real call; do not edit or commit a real
+Both shipped case files use reserved, non-routable NANP placeholder
+numbers (`+12025550123` and `+12025550187`) - never real ones. Pass
+`--phone` to override for a real call; do not edit or commit a real
 number into a case file.
 
 A real call additionally requires `--allow-live` and
@@ -308,7 +411,7 @@ authorizes. None of the fake-server commands above need them.
 > layer unmodified, as one component among several - the same way it
 > would reuse any other tested library. It is not an evolution of that
 > product, and the sections below describe what that reused layer does
-> in general, not what Reality Resolver's own use case needs (see
+> in general, not what Reality Resolver's own use cases need (see
 > "Compliance by use case" above for that).
 
 Resolving a phone number to its applicable jurisdiction(s) and running
@@ -322,7 +425,7 @@ Reality Resolver actually depends on:
 | EU common (27 member states) | AI Act Art. 50 disclosure of the AI interaction, ePrivacy Art. 13(1) opt-in consent, GDPR Art. 6 lawful basis documented |
 | France (stacks on EU common) | Opt-in consent required since 2026-08-11, calls only Mon-Fri 10h-13h and 14h-20h, Bloctel/opposition-list scrub |
 
-For `appointment_confirmation`, only the AI-disclosure, revocation, and
+For both shipped use cases, only the AI-disclosure, revocation, and
 (EU) GDPR-basis rows above stay applicable - see "Compliance by use
 case" above. The rest is real, generic infrastructure kept intact for
 whatever use case needs it next.
@@ -361,6 +464,45 @@ country.
    table for the use cases they don't apply to - do not leave a
    solicitation-specific rule silently blocking a non-commercial use
    case, or silently exempted from a commercial one.
+
+### Adding a use case
+
+The two shipped use cases differ only in data. Adding a third should
+too:
+
+1. Write `cases/<your-case>.json`. All eight fields are required -
+   `load_case` reads each with `data["..."]` and raises rather than
+   defaulting, so a typo fails loudly instead of silently changing
+   behavior. `deadline` is an absolute ISO 8601 UTC timestamp,
+   `decision_deadline_threshold_hours` is R4's proximity cutoff for
+   this case specifically, and `decision_options` supplies the two
+   domain action labels under `if_confirmed`/`if_cancelled`. Put the
+   domain vocabulary in `call_task_hint` - that is the text the call
+   is actually about.
+2. Register the `use_case` string in
+   `compliance/use_cases.py`'s `_EXEMPT_SUFFIXES_BY_USE_CASE`. An
+   unregistered value raises `UnknownUseCaseError` and refuses the
+   call, so this step is not optional. Exempt a check-name suffix only
+   when the source statute's own scoping justifies it for this use
+   case; if you cannot point at that scoping, map to the full check
+   set rather than inventing an exemption.
+3. Add end-to-end tests in `tests/test_resolver_e2e.py` via
+   `_run_resolver(..., case=<your case>)` against `FakeCalleServer`,
+   using its reserved phones to reach each branch. Cover
+   `NO_CALL_NEEDED`, both resolving branches, and - the one that
+   matters most - that voicemail yields `HUMAN_REVIEW` and never your
+   `if_cancelled` action.
+4. Add a row to the use-case table at the top of this README.
+
+Nothing in `evidence/`, `verdict.py`, or `compliance/jurisdictions/`
+should need to change. If it does, that is the signal to look at:
+something domain-specific has leaked into the generic layer. That is
+exactly what happened once already - the `subject_intent` field
+description in `verdict.py` was written in appointment vocabulary, and
+because `fake_server.py` selects its canned result by property name
+rather than by description, no test could see it. Field *descriptions*
+in the result schema are read by CALL-E's extraction model, so they
+have to stay domain-neutral even though nothing local depends on them.
 
 ## AI disclosure
 
