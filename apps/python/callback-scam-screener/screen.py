@@ -23,11 +23,11 @@ to see it in full.
 
 Usage:
   python screen.py --demo remote_access
-  python screen.py --email suspicious.txt --sender-domain example.com
-  python screen.py --email suspicious.txt --sender-domain example.com \\
+  python screen.py --email suspicious.txt
+  python screen.py --email suspicious.txt \\
       --live --confirm --to-phone "+18005550187" \\
       --allow-number "+18005550187"
-  python screen.py --email suspicious.txt --sender-domain example.com \\
+  python screen.py --email suspicious.txt \\
       --live --confirm --to-phone "+18005550187" \\
       --unrestricted --confirm-number "+18005550187"
 """
@@ -81,7 +81,6 @@ def main() -> int:
         "key, nothing is dialed.",
     )
     parser.add_argument("--email", type=Path, default=None, help="Path to the suspicious email body (text file). Required unless --demo.")
-    parser.add_argument("--sender-domain", default=None, help="Domain the email actually came from. Required unless --demo.")
     parser.add_argument("--official-number", default=None, help="The claimed company's real published support number, if known.")
     parser.add_argument("--live", action="store_true", help="Place a real call instead of previewing.")
     parser.add_argument("--confirm", action="store_true", help="Required alongside --live — explicit intent, not implied by --live alone.")
@@ -166,7 +165,6 @@ def main() -> int:
             warnings.simplefilter("always")
             result = run_pipeline(
                 email_body=email_body,
-                sender_domain="secure-alerts-billing.com",
                 call_client=MockCallEClient(canned_transcript=transcript),
             )
             for w in caught:
@@ -177,11 +175,11 @@ def main() -> int:
         print(json.dumps(result.to_dict(mask_numbers=not args.show_full_number), indent=2))
         return EXIT_OK
 
-    if not args.email or not args.sender_domain:
-        parser.error("--email and --sender-domain are required unless --demo is used.")
+    if not args.email:
+        parser.error("--email is required unless --demo is used.")
 
     email_body = args.email.read_text(encoding="utf-8-sig")
-    alert = extract_alert(email_body, args.sender_domain)
+    alert = extract_alert(email_body)
     if alert is None:
         print("Email did not meet the suspicious-alert threshold — nothing would be dialed.")
         return EXIT_NOT_SUSPICIOUS
@@ -285,7 +283,6 @@ def main() -> int:
             warnings.simplefilter("always")
             result = run_pipeline(
                 email_body=email_body,
-                sender_domain=args.sender_domain,
                 call_client=RealCallEClient(request_timeout_seconds=args.calle_request_timeout_seconds),
                 to_phone=args.to_phone,
                 official_support_number=args.official_number,

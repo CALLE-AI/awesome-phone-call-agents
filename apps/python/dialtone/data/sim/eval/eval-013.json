@@ -1,0 +1,40 @@
+{
+  "id": "eval-013",
+  "label": "ivr",
+  "difficulty": "typical",
+  "scenario": "Short department-store IVR: one menu, one keypress, recorded hours message.",
+  "task": "Find out whether Hollister and Grange at Westfield Plaza is open Sunday evening.",
+  "outcome": {
+    "task_completed_claimed": true,
+    "commitment_type": "information",
+    "confirmation_artifact": "recorded hours: Sunday 10 AM-6 PM",
+    "expected_attestation": "system_asserted"
+  },
+  "turns": [
+    {
+      "speaker": "user",
+      "text": "thank you for calling Hollister and Grange, Westfield Plaza. for store hours, press 1. for our pharmacy, press 2. for customer service, press 3. to hear these options again, press 9.",
+      "offset_seconds": 0.7
+    },
+    {
+      "speaker": "bot",
+      "text": "[DTMF 1]",
+      "offset_seconds": 16.83
+    },
+    {
+      "speaker": "user",
+      "text": "our store hours are. monday through saturday. nine A M to nine P M. and sunday. ten A M to six P M. holiday hours may vary. to return to the main menu, press star.",
+      "offset_seconds": 17.99
+    },
+    {
+      "speaker": "bot",
+      "text": "[DTMF *]",
+      "offset_seconds": 36.72
+    },
+    {
+      "speaker": "user",
+      "text": "thank you for calling Hollister and Grange, Westfield Plaza. for store hours, press 1. for our pharmacy, press 2. for customer service, press 3. to hear these options again, press 9.",
+      "offset_seconds": 37.87
+    }
+  ]
+}

@@ -1,0 +1,80 @@
+{
+  "id": "eval-003",
+  "label": "human",
+  "difficulty": "typical",
+  "scenario": "Dental receptionist looks up patient, offers slots, moves the appointment and verbally confirms both changes.",
+  "task": "Reschedule Priya Nandakumar's Monday 9 AM cleaning to a Thursday morning slot.",
+  "outcome": {
+    "task_completed_claimed": true,
+    "commitment_type": "reschedule",
+    "confirmation_artifact": null,
+    "expected_attestation": "human_attested"
+  },
+  "turns": [
+    {
+      "speaker": "user",
+      "text": "good morning, Brookside Family Dental, this is Karen.",
+      "offset_seconds": 1.1
+    },
+    {
+      "speaker": "bot",
+      "text": "good morning Karen. I'm an AI assistant calling on behalf of Priya Nandakumar. she has a cleaning on Monday the fourteenth at nine and needs to reschedule.",
+      "offset_seconds": 4.95
+    },
+    {
+      "speaker": "user",
+      "text": "okay, can I get her date of birth?",
+      "offset_seconds": 14.76
+    },
+    {
+      "speaker": "bot",
+      "text": "March third, nineteen eighty eight.",
+      "offset_seconds": 18.54
+    },
+    {
+      "speaker": "user",
+      "text": "mm-hmm... okay I see her. Monday at nine. what works better?",
+      "offset_seconds": 22.66
+    },
+    {
+      "speaker": "bot",
+      "text": "does anything later in the week work, ideally Thursday morning?",
+      "offset_seconds": 27.4
+    },
+    {
+      "speaker": "user",
+      "text": "Thursday I have ten fifteen or eleven forty five.",
+      "offset_seconds": 32.65
+    },
+    {
+      "speaker": "bot",
+      "text": "ten fifteen would be great.",
+      "offset_seconds": 36.58
+    },
+    {
+      "speaker": "user",
+      "text": "okay, so I moved her to Thursday the seventeenth at ten fifteen with doctor Osei. she'll get a text reminder the day before.",
+      "offset_seconds": 39.5
+    },
+    {
+      "speaker": "bot",
+      "text": "thank you. just to confirm, Thursday the seventeenth at ten fifteen, and the Monday appointment is cancelled?",
+      "offset_seconds": 48.88
+    },
+    {
+      "speaker": "user",
+      "text": "yep, Monday's cleared, she's on for Thursday.",
+      "offset_seconds": 54.54
+    },
+    {
+      "speaker": "bot",
+      "text": "perfect, thanks so much Karen.",
+      "offset_seconds": 58.1
+    },
+    {
+      "speaker": "user",
+      "text": "you're welcome, bye now.",
+      "offset_seconds": 60.12
+    }
+  ]
+}

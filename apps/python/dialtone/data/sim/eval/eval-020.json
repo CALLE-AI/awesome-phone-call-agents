@@ -1,0 +1,65 @@
+{
+  "id": "eval-020",
+  "label": "ivr",
+  "difficulty": "typical",
+  "scenario": "Medical group appointment-confirmation IVR: DOB and phone entry, reads appointment record, confirms on keypress.",
+  "task": "Confirm Thomas Reed's upcoming appointment at Cedar Ridge Medical Group.",
+  "outcome": {
+    "task_completed_claimed": true,
+    "commitment_type": "booking",
+    "confirmation_artifact": "system confirmation of existing appointment (Sept 21, 8:15 AM)",
+    "expected_attestation": "system_asserted"
+  },
+  "turns": [
+    {
+      "speaker": "user",
+      "text": "you have reached Cedar Ridge Medical Group. if this is a medical emergency, hang up and dial nine one one.",
+      "offset_seconds": 0.9
+    },
+    {
+      "speaker": "user",
+      "text": "to confirm, cancel, or reschedule an existing appointment, press 1. for prescription refills, press 2. for billing, press 3. to leave a message for a nurse, press 4.",
+      "offset_seconds": 11.09
+    },
+    {
+      "speaker": "bot",
+      "text": "[DTMF 1]",
+      "offset_seconds": 25.38
+    },
+    {
+      "speaker": "user",
+      "text": "please enter the patient's date of birth as two digit month, two digit day, and four digit year.",
+      "offset_seconds": 26.52
+    },
+    {
+      "speaker": "bot",
+      "text": "[DTMF 0 6 1 2 1 9 7 1]",
+      "offset_seconds": 35.55
+    },
+    {
+      "speaker": "user",
+      "text": "please enter the last four digits of the phone number on file.",
+      "offset_seconds": 38.63
+    },
+    {
+      "speaker": "bot",
+      "text": "[DTMF 0 1 7 4]",
+      "offset_seconds": 45.15
+    },
+    {
+      "speaker": "user",
+      "text": "we found one upcoming appointment. for. thomas. on. monday. september. twenty first. at. eight. fifteen. A M. with. doctor. Adeyemi. to confirm this appointment, press 1. to cancel, press 2. to reschedule, press 3.",
+      "offset_seconds": 47.14
+    },
+    {
+      "speaker": "bot",
+      "text": "[DTMF 1]",
+      "offset_seconds": 68.21
+    },
+    {
+      "speaker": "user",
+      "text": "your appointment has been confirmed. please arrive fifteen minutes early. thank you for calling Cedar Ridge Medical Group. goodbye.",
+      "offset_seconds": 69.35
+    }
+  ]
+}

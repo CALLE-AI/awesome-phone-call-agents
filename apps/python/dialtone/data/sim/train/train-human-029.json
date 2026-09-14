@@ -1,0 +1,81 @@
+{
+ "id": "train-human-029",
+ "label": "human",
+ "source": "sim-train",
+ "meta": {
+  "task": "request a refund for a double charge",
+  "hard": false
+ },
+ "turns": [
+  {
+   "speaker": "user",
+   "text": "Parkview Auto Repair, this is Marcus.",
+   "offset_seconds": 1.3
+  },
+  {
+   "speaker": "bot",
+   "text": "Hi, I'm an AI assistant calling on behalf of Jordan Lee. Jordan Lee was charged twice for the same order last week, and I'm calling to request a refund for the duplicate.",
+   "offset_seconds": 4.43
+  },
+  {
+   "speaker": "user",
+   "text": "Let me look. Yep, I've refunded the second charge.",
+   "offset_seconds": 16.87
+  },
+  {
+   "speaker": "user",
+   "text": "right",
+   "offset_seconds": 20.61
+  },
+  {
+   "speaker": "bot",
+   "text": "Can you confirm the refund has been issued?",
+   "offset_seconds": 21.91
+  },
+  {
+   "speaker": "user",
+   "text": "um, Okay, yeah that's fine.",
+   "offset_seconds": 25.21
+  },
+  {
+   "speaker": "user",
+   "text": "right",
+   "offset_seconds": 27.43
+  },
+  {
+   "speaker": "bot",
+   "text": "Can you confirm the refund has been issued?",
+   "offset_seconds": 28.95
+  },
+  {
+   "speaker": "user",
+   "text": "Uh, five to yeah, um, seven business days usually.",
+   "offset_seconds": 31.24
+  },
+  {
+   "speaker": "bot",
+   "text": "Thank you so much, that's all I needed.",
+   "offset_seconds": 35.75
+  },
+  {
+   "speaker": "user",
+   "text": "Mm-hmm.",
+   "offset_seconds": 39.22
+  },
+  {
+   "speaker": "user",
+   "text": "okay",
+   "offset_seconds": 39.87
+  },
+  {
+   "speaker": "bot",
+   "text": "Thank you so much, that's all I needed.",
+   "offset_seconds": 41.55
+  },
+  {
+   "speaker": "user",
+   "text": "You let me see, too, bye.",
+   "offset_seconds": 45.35
+  }
+ ]
+}
