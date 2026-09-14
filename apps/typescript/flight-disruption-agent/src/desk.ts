@@ -320,16 +320,23 @@ export class Desk {
   // ------------------------------------------------------------ fake GDS
 
   private apply(entry: LedgerEntry, action: Action): string {
-    const state = this.state.bookings[entry.pnr];
-    if (!state) throw new Error(`No booking state for ${entry.pnr}`);
-    if (state.status !== "ticketed") throw new Error(`${entry.pnr} was already changed (${state.status}).`);
-    const quote = entry.quote;
-    const disruption = this.disruption(entry.disruptionId);
+    return this.applyChange(entry.pnr, entry.quote, action);
+  }
+
+  /**
+   * Changes one booking in the fake GDS. `reissue` carries the booking code and
+   * ticket an airline desk issued by phone; otherwise the portal issues new ones.
+   */
+  private applyChange(pnr: string, quote: Quote, action: Action, reissue?: { pnr: string; ticket: string }): string {
+    const state = this.state.bookings[pnr];
+    if (!state) throw new Error(`No booking state for ${pnr}`);
+    if (state.status !== "ticketed") throw new Error(`${pnr} was already changed (${state.status}).`);
 
     if (action.kind === "keep") {
+      const departure = localTime(quote.keep.newDeparture);
       state.status = "kept_on_delayed_flight";
-      state.notes.push(`Kept on delayed flight, new departure ${localTime(disruption.newDeparture)}. Ticket unchanged.`);
-      return `Kept on the delayed flight (${localTime(disruption.newDeparture)}). Ticket ${state.ticket} stays valid.`;
+      state.notes.push(`Kept on delayed flight, new departure ${departure}. Ticket unchanged.`);
+      return `Kept on the delayed flight (${departure}). Ticket ${state.ticket} stays valid.`;
     }
 
     if (action.kind === "move") {
@@ -340,8 +347,8 @@ export class Desk {
       this.state.seats[option.flightId] = seats - 1;
       state.status = "rebooked";
       state.flightId = option.flightId;
-      state.currentPnr = newPnr();
-      state.ticket = newTicket();
+      state.currentPnr = reissue?.pnr ?? newPnr();
+      state.ticket = reissue?.ticket ?? newTicket();
       state.charges = option.lines.filter((l) => l.amount > 0);
       state.notes.push(`Rebooked to ${option.label}. New booking code ${state.currentPnr}, ticket ${state.ticket} reissued.`);
       return `Rebooked to ${option.label}: booking code ${state.currentPnr}, ticket ${state.ticket}, charged ${idr(option.total)}.`;
