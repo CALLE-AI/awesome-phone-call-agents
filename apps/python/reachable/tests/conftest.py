@@ -31,6 +31,19 @@ BASE_ENV = {
 }
 
 
+@pytest.fixture(autouse=True)
+def never_read_the_operators_env_file(monkeypatch):
+    """No test may pick up a real .env.
+
+    Without this, wiring python-dotenv into the CLI would make the suite read
+    the operator's actual CALL-E key -- which is both a bad test and a way to
+    place a real call from `pytest`.
+    """
+    monkeypatch.setenv("REACHABLE_SKIP_ENV_FILE", "1")
+    monkeypatch.delenv("CALLE_API_KEY", raising=False)
+    monkeypatch.delenv("REACHABLE_LIVE_CALLS", raising=False)
+
+
 @pytest.fixture
 def env() -> dict[str, str]:
     return dict(BASE_ENV)

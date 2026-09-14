@@ -563,3 +563,19 @@ def test_the_key_is_stable_across_a_preview_and_the_dial_it_previews(live):
     preview = live.preview(IVY_CASE)
     request, *_ = live.build_request(IVY_CASE)
     assert preview.idempotency_key == request.idempotency_key
+
+
+def test_the_test_suite_never_reads_a_real_env_file():
+    """Wiring python-dotenv must not let `pytest` pick up real credentials.
+
+    An autouse fixture sets REACHABLE_SKIP_ENV_FILE, so a developer with a live
+    key in .env cannot place a real call by running the suite.
+    """
+    import os
+
+    from reachable.config import load_env_file
+
+    assert os.environ.get("REACHABLE_SKIP_ENV_FILE") == "1"
+    assert load_env_file() is None
+    assert Config.from_env().calle_api_key == ""
+    assert Config.from_env().live_calls is False

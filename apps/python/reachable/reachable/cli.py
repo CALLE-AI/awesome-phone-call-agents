@@ -10,7 +10,7 @@ import argparse
 import sys
 from pathlib import Path
 
-from .config import Config, ConfigError
+from .config import Config, ConfigError, load_env_file
 from .phone import InvalidPhoneNumber, is_drama_number, mask, validate_e164
 
 APP_ROOT = Path(__file__).resolve().parent.parent
@@ -36,6 +36,9 @@ def cmd_config(args: argparse.Namespace) -> int:
         config = Config.from_env()
     except ConfigError as exc:
         return _fail(str(exc))
+    loaded = load_env_file()
+    if loaded is not None:
+        print(f"  env file               {loaded}")
     for key, value in config.redacted().items():
         print(f"  {key:<22} {value}")
     if not config.live_calls:
@@ -325,6 +328,7 @@ def _use_utf8_output() -> None:
 
 def main(argv: list[str] | None = None) -> int:
     _use_utf8_output()
+    load_env_file()
     args = build_parser().parse_args(argv)
     return int(args.func(args))
 

@@ -30,6 +30,42 @@ DEFAULT_DB_PATH = "data/reachable.sqlite3"
 DEFAULT_DATA_DIR = "sample_data"
 
 
+#: Where a local .env is looked for, in order. The package directory is included
+#: because that is where an operator following the quick start may reasonably put
+#: it, and silently ignoring their credentials would be worse than looking twice.
+ENV_FILE_LOCATIONS = (
+    Path.cwd() / ".env",
+    Path(__file__).resolve().parent.parent / ".env",
+    Path(__file__).resolve().parent / ".env",
+)
+
+
+def load_env_file(paths: tuple[Path, ...] = ENV_FILE_LOCATIONS) -> Path | None:
+    """Load the first ``.env`` found, without overriding the real environment.
+
+    ``override=False`` on purpose: a value exported in the shell is a deliberate
+    act for this run, and a stale file should never quietly win over it.
+
+    Returns the file that was loaded, so the CLI can say which one, or None.
+    The contents are never logged.
+
+    ``REACHABLE_SKIP_ENV_FILE=1`` disables it entirely. The test suite sets this,
+    because a suite that picks up the operator's real credentials is no longer
+    testing the thing it claims to test -- and could place a real call.
+    """
+    if os.environ.get("REACHABLE_SKIP_ENV_FILE", "").strip() == "1":
+        return None
+    try:
+        from dotenv import load_dotenv
+    except ImportError:  # pragma: no cover - python-dotenv is a dependency
+        return None
+    for path in paths:
+        if path.is_file():
+            load_dotenv(path, override=False)
+            return path
+    return None
+
+
 class ConfigError(ValueError):
     """A configuration value that cannot be safely repaired.
 

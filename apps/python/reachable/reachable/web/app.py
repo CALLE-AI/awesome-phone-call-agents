@@ -23,7 +23,7 @@ from fastapi.templating import Jinja2Templates
 
 from .. import exports, policy
 from ..calls.dryrun_client import DryRunClient
-from ..config import Config
+from ..config import Config, load_env_file
 from ..models import (
     FLAGGED_HEALTH,
     HEALTH_TEXT,
@@ -96,6 +96,8 @@ def create_app(
     ``Config.from_env()`` enforces the credential origin allowlist, so a
     misconfigured base URL raises here rather than when somebody tries to call.
     """
+    if config is None:
+        load_env_file()
     config = config or Config.from_env()
     app = FastAPI(title="Reachable", docs_url=None, redoc_url=None)
     templates = Jinja2Templates(directory=str(TEMPLATES))
