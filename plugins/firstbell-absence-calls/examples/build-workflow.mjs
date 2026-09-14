@@ -68,7 +68,62 @@ return [{
   },
 }];`;
 
-const VALIDATE = `// Fail before dialling, not halfway through a wave.
+const APPROVED_API_GATE = `// The only hosts this recipe will send a CALL-E key to.
+//
+// apiBaseUrl sits on the config screen so an operator can point the recipe at their own
+// tenant, and it was interpolated straight into the request URL. The Authorization header
+// is built from CALL_E_API_KEY on the same line, so whatever host ended up in that field
+// received a live credential: a typo, an http:// paste, or an edited export was enough.
+//
+// So the field is resolved against this list rather than trusted. Exact hostname match
+// rather than a suffix test, because api.heycall-e.com.example.net ends with the approved
+// name and is not the approved host. HTTPS only, no credentials in the URL, no query, no
+// fragment and no path, because a base URL carrying any of those is not a base URL.
+const APPROVED_API_HOSTS = ["api.heycall-e.com"];
+
+function approvedApiBaseUrl(raw) {
+  if (typeof raw !== "string" || raw.trim() === "") {
+    return { error: "apiBaseUrl is empty. Set it to https://api.heycall-e.com." };
+  }
+  let url;
+  try {
+    url = new URL(raw.trim());
+  } catch {
+    return { error: "apiBaseUrl " + JSON.stringify(raw) + " is not a URL." };
+  }
+  if (url.protocol !== "https:") {
+    return { error: "apiBaseUrl must use https, not " + url.protocol.replace(":", "")
+      + ". A CALL-E key sent over http is a key on the wire in clear text." };
+  }
+  if (url.username || url.password) {
+    return { error: "apiBaseUrl carries credentials in the URL. Remove them; the key is "
+      + "read from CALL_E_API_KEY at execution time." };
+  }
+  if (url.search || url.hash) {
+    return { error: "apiBaseUrl carries a query or a fragment. A base URL has neither." };
+  }
+  if (url.pathname !== "/" && url.pathname !== "") {
+    return { error: "apiBaseUrl carries the path " + JSON.stringify(url.pathname)
+      + ". Give the host only; the recipe appends /v1/calls itself." };
+  }
+  if (!APPROVED_API_HOSTS.includes(url.hostname)) {
+    return { error: "apiBaseUrl host " + JSON.stringify(url.hostname)
+      + " is not approved. Approved: " + APPROVED_API_HOSTS.join(", ") + "." };
+  }
+  return { url: "https://" + url.host };
+}
+
+// A redirect is the other way the key leaves the approved host. n8n's httpRequest follows
+// them by default and axios replays the request headers when it does, so one 302 from any
+// host is enough to hand the Authorization header to whatever the Location names. These
+// two options say no on both layers: disableFollowRedirect is n8n's own flag and
+// maxRedirects is the axios setting underneath it, and a redirect now surfaces as a
+// response to look at rather than a hop nobody sees.
+const NO_CREDENTIAL_REDIRECTS = { disableFollowRedirect: true, maxRedirects: 0 };
+`;
+
+const VALIDATE = `${APPROVED_API_GATE}
+// Fail before dialling, not halfway through a wave.
 const cfg = $input.first().json;
 const problems = [];
 
@@ -91,6 +146,15 @@ for (const student of cfg.students || []) {
   if (!Array.isArray(student.phones) || student.phones.length === 0) {
     problems.push(\`\${student.id}: no phone numbers\`);
   }
+}
+
+const base = approvedApiBaseUrl(cfg.apiBaseUrl);
+if (base.error) {
+  problems.push(base.error);
+} else {
+  // Normalised, so every node downstream carries the exact approved origin rather than
+  // whatever spelling was typed on the config screen.
+  cfg.apiBaseUrl = base.url;
 }
 
 if (problems.length > 0) {
@@ -166,7 +230,8 @@ return [{
   },
 }];`;
 
-const CREATE = `// Place the call and wait for it to finish, with a hard ceiling on the wait.
+const CREATE = `${APPROVED_API_GATE}
+// Place the call and wait for it to finish, with a hard ceiling on the wait.
 const row = $input.first().json;
 if (row.skip) {
   return [{ json: row }];
@@ -195,6 +260,16 @@ if (row.dryRun) {
   return [{ json: { ...row, recipient: { ...shape, attempts }, placedByThisRun: false } }];
 }
 
+// Resolved again here rather than trusted from the config node. This is the line that
+// builds the Authorization header, so this is where the destination has to be known good:
+// a node inserted between the two, or an edited export, changes the field without ever
+// passing the earlier check.
+const base = approvedApiBaseUrl(row.apiBaseUrl);
+if (base.error) {
+  throw new Error("Refusing to send a CALL-E key. " + base.error);
+}
+const apiBaseUrl = base.url;
+
 const headers = {
   Authorization: \`Bearer \${process.env.CALL_E_API_KEY}\`,
   "Idempotency-Key": row.idempotencyKey,
@@ -203,11 +278,12 @@ const headers = {
 
 const created = await this.helpers.httpRequest({
   method: "POST",
-  url: \`\${row.apiBaseUrl}/v1/calls\`,
+  url: \`\${apiBaseUrl}/v1/calls\`,
   headers,
   body: row.request,
   json: true,
   timeout: 30000,
+  ...NO_CREDENTIAL_REDIRECTS,
 });
 
 const callId = created.id || created.call_id;
@@ -223,10 +299,11 @@ while (Date.now() < deadline) {
   await new Promise((resolve) => setTimeout(resolve, 5000));
   call = await this.helpers.httpRequest({
     method: "GET",
-    url: \`\${row.apiBaseUrl}/v1/calls/\${callId}\`,
+    url: \`\${apiBaseUrl}/v1/calls/\${callId}\`,
     headers: { Authorization: headers.Authorization },
     json: true,
     timeout: 30000,
+    ...NO_CREDENTIAL_REDIRECTS,
   });
 }
 
