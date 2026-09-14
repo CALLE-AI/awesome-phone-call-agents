@@ -8,9 +8,9 @@ No model participates. Branch **order matters** — it encodes precedence.
 | # | Condition | Decision | Why it sits here |
 |---|---|---|---|
 | 1 | Workflow already terminal | `NOOP` | A late result is evidence, never an overwrite |
-| 2 | `call.status` is `failed` / `canceled` | `RETRY` or `HUMAN_REVIEW` | Branch on the published enum, never on `failure_code` |
-| 3 | Recipient status != `completed` | `RETRY` | No conversation happened, so no evidence exists -- whatever the result object contains |
-| 4 | `structured_result` is null or fails re-validation | `RECONCILE` -> `RETRY` -> `HUMAN_REVIEW` | Null is never success |
+| 2 | Call not completed, unreadable, or submission outcome unknown | `RECONCILE` / `HUMAN_REVIEW` | Stop automatic dispatch; status alone does not prove that no call occurred |
+| 3 | Recipient status != `completed` | `RECONCILE` / `HUMAN_REVIEW` | In-flight or incomplete outcomes are not eligible for automatic redial |
+| 4 | `structured_result` is null or fails re-validation | `RECONCILE` -> `HUMAN_REVIEW` | Null is never success or permission to dial again |
 | 5 | Recipient asked not to be called again | `HUMAN_REVIEW` + suppress this workflow record | Outranks everything else: it carries a consequence beyond this one call. (Scope note: suppressing every future call to that *number*, not just this one record, is a natural next step most first versions skip -- decide deliberately, not by omission.) |
 | 6 | Recipient disputes the record, or raises a commercial/contract change | `HUMAN_REVIEW`, distinctly coded | A generic `needs_human` flag cannot tell an operator which of these it is |
 | 7 | `needs_human == "yes"` (routine request for a person) | `HUMAN_REVIEW` | Outranks every positive answer |
@@ -34,6 +34,13 @@ desk but gets a confident "yes, on time" can close an order nobody who
 was actually authorized ever confirmed.
 
 ## Retry vs escalate
+
+An ambiguous create, unreadable status, or in-flight call stops automatic
+redial and conflicting follow-up effects. Reconcile the original call with
+status-only reads; if uncertainty remains, ask a human. A fresh call requires
+confirmed termination/no-dial evidence and new operator approval. A supported
+same-intent replay must retain the original payload and idempotency key and
+must never be an automatic timeout fallback.
 
 Escalate **only** when the attempt budget is genuinely exhausted. A backoff
 that has not elapsed, or an attempt already in flight, is a scheduling delay —

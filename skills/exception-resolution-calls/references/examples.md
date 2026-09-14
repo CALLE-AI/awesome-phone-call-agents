@@ -11,7 +11,7 @@ import os
 
 import httpx
 
-BASE = os.environ.get("CALLE_BASE_URL", "https://api.heycall-e.com")
+BASE = "https://api.heycall-e.com"  # never send credentials to an arbitrary override
 KEY = os.environ["CALLE_API_KEY"]
 
 RECIPIENT_SCHEMA = {
@@ -205,15 +205,14 @@ if call["status"] not in ("completed", "failed", "canceled"):
 
 for recipient in call["recipients"]:
     if recipient["status"] != "completed":
-        continue                     # no conversation, no evidence
+        continue                     # no verified result; do not infer that no call occurred
     result = recipient["structured_result"]
     if result is None:
         continue                     # null is never success
 
-    # The conversation lives on the nested attempt, not the call task.
-    for attempt in recipient["attempts"]:
-        for turn in attempt["transcript_turns"]:
-            print(turn["offset_seconds"], turn["speaker"], turn["text"])
+    # Keep raw transcript text private. Review it locally as needed; do not
+    # print provider speech into shared logs or public example output.
+    print("Recipient result available for private evidence review.")
 ```
 
 Task-level fields worth using: `task_completed`, `completion_confidence`
@@ -226,9 +225,8 @@ resolution but never grant one.
 ```python
 def decide(workflow, call, recipient, settings):
     if workflow.is_terminal:                 return NOOP
-    if call["status"] in ("failed", "canceled"):
-                                             return retry_or_escalate(workflow)
-    if recipient["status"] != "completed":   return RETRY
+    if call["status"] != "completed":        return RECONCILE
+    if recipient["status"] != "completed":   return RECONCILE
     if recipient["structured_result"] is None:
                                              return RECONCILE
 

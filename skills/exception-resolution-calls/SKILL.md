@@ -157,9 +157,8 @@ Persist the key **before** you dispatch, so a crash mid-flight is recoverable.
 ```python
 def decide(workflow, call, recipient, settings) -> Decision:
     if workflow.is_terminal:            return NOOP          # late results never overwrite
-    if call.status in ("failed", "canceled"):
-                                        return retry_or_escalate(workflow)
-    if recipient.status != "completed": return RETRY          # no conversation, no evidence
+    if call.status != "completed":     return RECONCILE      # stop ambiguous/in-flight dispatch
+    if recipient.status != "completed": return RECONCILE      # never infer no call occurred
     if recipient.structured_result is None:
                                         return RECONCILE      # null is never success
     ev = revalidate(recipient.structured_result)              # check enums again yourself
@@ -238,10 +237,10 @@ with no public URL at all.
 
 | Failure | Correct behaviour |
 |---|---|
-| Create times out | Retry with the **same** key |
+| Create times out | Stop automatic dispatch; reconcile the original call, then ask a human if still unknown. Any explicitly supported manual replay retains the same payload/key |
 | Webhook delivered twice | Second is a no-op |
 | Webhook never arrives | Reconciliation sweep finishes the call |
-| `structured_result: null` | Reconcile, then retry, then escalate — never resolve |
+| `structured_result: null` | Reconcile, then escalate — never resolve or automatically redial |
 | Recipient never answered | No evidence exists, whatever the result object says |
 | Right number, wrong person answers | Escalate even on a clean "yes" -- identity was never established |
 | Someone resolved it by hand mid-call | Keep the result as history; do not overwrite |
