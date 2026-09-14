@@ -41,6 +41,19 @@
       <div class="list" id="events"></div>
       <aside class="detail" id="detail" aria-live="polite"></aside>
     </section>
+    <section class="requests-wrap" aria-labelledby="requests-title">
+      <div class="section-head">
+        <h2 id="requests-title">Passenger requests · reschedule and refund</h2>
+        <p class="muted">Requests that arrive through chat, the web form, or the phone line. The desk checks eligibility and prices the change at voluntary rates, the passenger confirms the amount, and the change goes to the airline portal. If the portal refuses a reissue, CALL-E calls the airline service desk.</p>
+      </div>
+      <div class="desk">
+        <div class="list">
+          <form id="request-form" class="event request-form"></form>
+          <div id="request-list"></div>
+        </div>
+        <aside class="detail" id="request-detail" aria-live="polite"></aside>
+      </div>
+    </section>
   </main>
 
   <script src="app.js"></script>

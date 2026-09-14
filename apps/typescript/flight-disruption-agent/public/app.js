@@ -2,6 +2,8 @@
 
 let snap = null;
 let selected = null; // { disruptionId, pnr }
+let selectedRequest = null; // request id
+const airlinePreviews = new Map();
 const previews = new Map();
 const draft = {}; // form values by element id, kept across re-renders
 let pollTimer = null;
@@ -48,7 +50,9 @@ async function load() {
   }
   render();
   clearTimeout(pollTimer);
-  const running = snap.disruptions.some((d) => d.bookings.some((b) => b.entry && (b.entry.status === "in_progress" || b.entry.status === "submitted")));
+  const running =
+    snap.disruptions.some((d) => d.bookings.some((b) => b.entry && (b.entry.status === "in_progress" || b.entry.status === "submitted"))) ||
+    snap.requests.some((r) => r.status === "airline_call_in_progress");
   if (running) pollTimer = setTimeout(load, snap.live ? 5000 : 1500);
 }
 
@@ -74,6 +78,7 @@ function render() {
   renderMode();
   renderBoard();
   renderDesk();
+  renderRequests();
 }
 
 function renderMode() {
@@ -335,6 +340,195 @@ async function ensurePreview(disruptionId, pnr, key) {
   }
 }
 
+
+// ------------------------------------------------------------------ passenger requests (Workflow B)
+
+const REQUEST_CHIPS = {
+  ineligible: ["bad", "Not eligible"],
+  quoted: ["run", "Waiting for passenger"],
+  declined: ["", "Declined by passenger"],
+  completed: ["ok", "Done"],
+  portal_rejected: ["warn", "Portal refused · call airline"],
+  airline_call_in_progress: ["run", "Calling airline desk"],
+  needs_review: ["warn", "Needs a person"],
+  resolved_by_human: ["ok", "Resolved by agent"],
+};
+
+function requestChip(status) {
+  const [cls, label] = REQUEST_CHIPS[status] || ["", status];
+  return `<span class="chip ${cls}">${esc(label)}</span>`;
+}
+
+function renderRequestForm() {
+  const form = $("request-form");
+  if (form.contains(document.activeElement)) return; // don't rebuild under the operator's cursor
+  const bookings = snap.bookings.filter((b) => b.state.status === "ticketed");
+  const pnr = bookings.some((b) => b.pnr === draft["req-pnr"]) ? draft["req-pnr"] : bookings[0]?.pnr;
+  const booking = snap.bookings.find((b) => b.pnr === pnr);
+  const kind = draft["req-kind"] ?? "reschedule";
+  const channel = draft["req-channel"] ?? "chat";
+  const opt = (v, label, cur) => `<option value="${esc(v)}"${cur === v ? " selected" : ""}>${esc(label)}</option>`;
+  const moves = booking?.voluntary.moves ?? [];
+  const target = moves.some((m) => m.flightId === draft["req-target"]) ? draft["req-target"] : moves[0]?.flightId;
+  form.innerHTML = `<h3>New request</h3>
+    <div class="fields">
+      <label>Booking<select id="req-pnr">${bookings.map((b) => opt(b.pnr, `${b.pnr} · ${b.passenger} · ${b.flight.code}${b.disrupted ? " (delayed)" : ""}`, pnr)).join("")}</select></label>
+      <label>Passenger wants<select id="req-kind">${opt("reschedule", "Reschedule", kind)}${opt("refund", "Refund", kind)}</select></label>
+      ${kind === "reschedule" ? `<label>New flight<select id="req-target">${moves.length ? moves.map((m) => opt(m.flightId, `${m.label} · ${idr(m.total)}`, target)).join("") : `<option value="">No later flights with seats</option>`}</select></label>` : `<label>Refund<select disabled><option>${booking ? idr(booking.voluntary.refund) : "–"}</option></select></label>`}
+      <label>Came in through<select id="req-channel">${opt("chat", "Chat", channel)}${opt("web_form", "Web form", channel)}${opt("phone", "Phone line", channel)}</select></label>
+    </div>
+    <div class="row-inline"><button type="submit" class="btn" ${booking ? "" : "disabled"}>Check and quote</button>
+      <span class="note">Prices use voluntary rules. Nothing changes until the passenger confirms.</span></div>`;
+}
+
+function renderRequests() {
+  renderRequestForm();
+  const list = $("request-list");
+  if (!snap.requests.length) {
+    list.innerHTML = "";
+    $("request-detail").innerHTML = `<p class="empty">Log a request to see the eligibility check, the quote, and what happens at the airline portal.</p>`;
+    return;
+  }
+  if (!snap.requests.some((r) => r.request.id === selectedRequest)) selectedRequest = snap.requests[0].request.id;
+  list.innerHTML = `<article class="event">${snap.requests
+    .map((r) => {
+      const current = r.request.id === selectedRequest;
+      const what = r.request.kind === "refund" ? "Refund" : `Reschedule to ${r.quote.moves.find((m) => m.flightId === r.request.targetFlightId)?.label ?? r.request.targetFlightId ?? "?"}`;
+      return `<button type="button" class="row" data-req-select="${esc(r.request.id)}" aria-current="${current}">
+        <span class="who"><b>${esc(r.request.pnr)}</b> ${esc(r.passenger)} <span class="muted">${esc(r.flight.code)} · via ${esc(r.request.channel.replace("_", " "))}</span></span>
+        ${requestChip(r.status)}
+        <span class="prices"><span>${esc(what)}</span>${r.amount === null ? "" : `<span>${r.request.kind === "refund" ? "Refund" : "Passenger pays"} <b>${idr(r.amount)}</b></span>`}</span>
+      </button>`;
+    })
+    .join("")}</article>`;
+  renderRequestDetail();
+}
+
+function requestSteps(r) {
+  const step = (cls, text) => `<li class="${cls}">${text}</li>`;
+  const steps = [step(r.eligibility.eligible ? "done" : "stop", r.eligibility.eligible ? "Eligible and priced" : "Not eligible")];
+  if (!r.eligibility.eligible) return steps;
+  if (r.status === "quoted") steps.push(step("todo", "Passenger confirms the amount"));
+  else if (r.status === "declined") steps.push(step("stop", "Passenger declined"));
+  else steps.push(step("done", "Passenger confirmed the amount"));
+  if (r.portal) steps.push(step(r.portal.kind === "accepted" ? "done" : "stop", r.portal.kind === "accepted" ? "Portal accepted the change" : `Portal refused (${esc(r.portal.code)})`));
+  if (r.airlineCall) {
+    const done = r.status === "completed";
+    steps.push(step(done ? "done" : r.status === "airline_call_in_progress" ? "todo" : "stop", done ? "Airline desk reissued the ticket" : r.status === "airline_call_in_progress" ? "Calling the airline desk" : "Airline desk did not reissue"));
+  } else if (r.status === "portal_rejected") steps.push(step("todo", "Call the airline service desk"));
+  if (r.status === "needs_review") steps.push(step("todo", "A person resolves the request"));
+  if (r.status === "resolved_by_human") steps.push(step("done", "Resolved by an agent"));
+  return steps;
+}
+
+function renderRequestDetail() {
+  const el = $("request-detail");
+  const r = snap.requests.find((x) => x.request.id === selectedRequest);
+  if (!r) return;
+  const id = r.request.id;
+  const move = r.quote.moves.find((m) => m.flightId === r.request.targetFlightId);
+  const parts = [];
+  parts.push(`<div><h2>${esc(r.passenger)} <span class="mono muted">${esc(r.request.pnr)}</span></h2>
+    <dl class="kv" style="margin-top:8px">
+      <dt>Flight</dt><dd>${esc(r.flight.code)} · ${dayMonth(r.flight.departure)} ${hhmm(r.flight.departure)}</dd>
+      <dt>Sold via</dt><dd>${r.channel.map((p) => esc(p.name)).join(" → ")}</dd>
+      <dt>Request</dt><dd>${esc(r.request.kind)} via ${esc(r.request.channel.replace("_", " "))}</dd>
+      <dt>Booking</dt><dd>${esc(r.bookingState.status.replaceAll("_", " "))}${r.bookingState.currentPnr !== r.request.pnr ? ` · new code <b class="mono">${esc(r.bookingState.currentPnr)}</b>` : ""}</dd>
+    </dl></div>`);
+  parts.push(`<ol class="steps">${requestSteps(r).join("")}</ol>`);
+  if (r.eligibility.reasons.length) parts.push(`<ul class="reasons">${r.eligibility.reasons.map((x) => `<li>${esc(x)}</li>`).join("")}</ul>`);
+  if (r.eligibility.eligible) {
+    parts.push(r.request.kind === "refund"
+      ? quoteTable("Cancel and refund", r.quote.refund.lines, "Refund", r.quote.refund.amount, ["Fare paid", r.quote.refund.gross])
+      : move ? quoteTable(`Move to ${move.label}`, move.lines, "Passenger pays", move.total) : "");
+  }
+  if (r.eligibility.warnings.length) parts.push(`<ul class="reasons">${r.eligibility.warnings.map((x) => `<li>${esc(x)}</li>`).join("")}</ul>`);
+
+  if (r.status === "quoted") {
+    const amountId = `req-amount-${id}`;
+    parts.push(`<div class="callbox"><h3>Passenger's answer</h3>
+      <p class="note">Send the quote through the ${esc(r.request.channel.replace("_", " "))}. When the passenger says yes, type the amount they agreed to.</p>
+      <div class="row-inline"><label for="${esc(amountId)}" class="note">Confirmed amount (IDR)</label>
+        <input id="${esc(amountId)}" class="wide" inputmode="numeric" autocomplete="off" value="${esc(draft[amountId] ?? "")}">
+        <button type="button" class="btn" data-req-confirm="${esc(id)}">Confirm and submit</button>
+        <button type="button" class="btn ghost" data-req-decline="${esc(id)}">Passenger declined</button></div></div>`);
+  }
+  if (r.portal?.kind === "rejected") parts.push(`<p class="note bad">${esc(r.portal.message)}</p>`);
+  if (r.status === "portal_rejected") {
+    parts.push(renderAirlineCallBox(r));
+    ensureAirlinePreview(id);
+  }
+  if (r.airlineCall) parts.push(renderAirlineCall(r));
+  if (r.applied && (r.status === "completed" || r.status === "resolved_by_human")) parts.push(`<p class="applied">${esc(r.applied)}</p>`);
+  if (r.status === "needs_review") {
+    parts.push(`<ul class="reasons">${r.reviewReasons.map((x) => `<li>${esc(x)}</li>`).join("")}</ul>`);
+    const ids = { apply: `req-apply-${id}`, pnr: `req-newpnr-${id}`, ticket: `req-ticket-${id}`, note: `req-note-${id}` };
+    const apply = draft[ids.apply] ?? "none";
+    parts.push(`<div class="callbox"><h3>Resolve as a person</h3>
+      <select id="${esc(ids.apply)}"><option value="none"${apply === "none" ? " selected" : ""}>Close without changing the booking</option><option value="apply"${apply === "apply" ? " selected" : ""}>Apply the confirmed ${esc(r.request.kind)}</option></select>
+      ${r.request.kind === "reschedule" ? `<div class="row-inline"><label for="${esc(ids.pnr)}" class="note">Booking code from the airline</label><input id="${esc(ids.pnr)}" class="wide" maxlength="6" autocomplete="off" value="${esc(draft[ids.pnr] ?? "")}">
+        <label for="${esc(ids.ticket)}" class="note">Ticket</label><input id="${esc(ids.ticket)}" class="wide" placeholder="000-0000000000" autocomplete="off" value="${esc(draft[ids.ticket] ?? "")}"></div>` : ""}
+      <label for="${esc(ids.note)}" class="note">Note for the booking</label>
+      <textarea id="${esc(ids.note)}">${esc(draft[ids.note] ?? "")}</textarea>
+      <div class="row-inline"><button type="button" class="btn" data-req-resolve="${esc(id)}">Resolve</button></div></div>`);
+  }
+  el.innerHTML = parts.join("");
+}
+
+function renderAirlineCallBox(r) {
+  const id = r.request.id;
+  const p = airlinePreviews.get(id);
+  const live = snap.live;
+  const last4Id = `req-last4-${id}`;
+  const blocked = p?.blockedReason;
+  return `<div class="callbox ${live ? "live" : ""}">
+    <h3>${live ? "Call the airline desk for real" : "Simulate the airline desk call"}</h3>
+    ${r.airlineCall?.status === "failed_to_submit" ? `<p class="note bad">Last attempt was not started: ${esc(r.airlineCall.error)}</p>` : ""}
+    <dl class="kv"><dt>Desk</dt><dd>${esc(p?.airline ?? "…")}</dd><dt>Destination</dt><dd class="mono">${p ? `${esc(p.destinationMasked)}${p.redirected ? ' <span class="note">(live calls always go to LIVE_DEMO_PHONE)</span>' : ""}` : "…"}</dd></dl>
+    ${blocked ? `<p class="note bad">${esc(blocked)}</p>` : ""}
+    ${p ? `<details><summary>What CALL-E will be told</summary><pre>${esc(p.task)}</pre></details>
+    <details><summary>Result schema</summary><pre>${esc(JSON.stringify(p.resultSchema, null, 2))}</pre></details>` : ""}
+    ${live
+      ? `<div class="row-inline"><label for="${esc(last4Id)}">Type the last 4 digits of the destination to confirm</label>
+          <input id="${esc(last4Id)}" inputmode="numeric" maxlength="4" autocomplete="off" value="${esc(draft[last4Id] ?? "")}">
+          <button type="button" class="btn live" data-req-airline="${esc(id)}" ${blocked ? "disabled" : ""}>Place real call</button></div>`
+      : `<div class="row-inline"><button type="button" class="btn" data-req-airline="${esc(id)}" ${blocked ? "disabled" : ""}>Simulate airline call</button></div>`}
+  </div>`;
+}
+
+function renderAirlineCall(r) {
+  const c = r.airlineCall;
+  if (c.status === "failed_to_submit" && r.status === "portal_rejected") return "";
+  const o = c.outcome;
+  const s = o?.structured;
+  return `<div class="outcome"><h3>Airline desk call</h3>
+    <dl class="kv">
+      <dt>Status</dt><dd>${esc(c.status.replaceAll("_", " "))} <span class="muted">${esc(o?.providerStatus ?? "")}</span></dd>
+      <dt>Call id</dt><dd class="mono">${esc(c.callId ?? "none")}</dd>
+      <dt>Dialed</dt><dd class="mono">${esc(c.destinationMasked)}${c.redirected ? " (demo phone)" : ""}</dd>
+      <dt>Idempotency</dt><dd class="mono">${esc(c.idempotencyKey)}</dd>
+      ${o?.confidence ? `<dt>Confidence</dt><dd>${o.confidence.score.toFixed(2)} (${esc(o.confidence.label)})</dd>` : ""}
+      ${s ? `<dt>Outcome</dt><dd><b>${esc(String(s.outcome).replaceAll("_", " "))}</b></dd><dt>New code</dt><dd class="mono">${esc(s.new_booking_code)}</dd><dt>Ticket</dt><dd class="mono">${esc(s.new_ticket_number)}</dd><dt>Reference</dt><dd class="mono">${esc(s.airline_reference)}</dd>` : ""}
+    </dl>
+    ${s?.reason ? `<blockquote>${esc(s.reason)}</blockquote>` : ""}
+    ${o?.summary ? `<p><span class="muted">Summary:</span> ${esc(o.summary)}</p>` : ""}
+    ${o?.transcript?.length ? `<details><summary>Transcript (${o.transcript.length} turns)</summary><div class="transcript" style="padding:10px 12px">${o.transcript.map((t) => `<div class="turn"><span class="spk">${esc(t.speaker)}</span><span>${esc(t.text)}</span></div>`).join("")}</div></details>` : ""}
+    <details><summary>What CALL-E was told</summary><pre>${esc(c.task)}</pre></details>
+  </div>`;
+}
+
+async function ensureAirlinePreview(id) {
+  if (airlinePreviews.has(id)) return;
+  airlinePreviews.set(id, null);
+  try {
+    airlinePreviews.set(id, await api("/api/requests/airline/preview", { id }));
+    if (selectedRequest === id) renderRequestDetail();
+  } catch (e) {
+    airlinePreviews.delete(id);
+    showError(e.message);
+  }
+}
+
 // ------------------------------------------------------------------ events
 
 document.addEventListener("input", (e) => {
@@ -342,9 +536,29 @@ document.addEventListener("input", (e) => {
 });
 document.addEventListener("change", (e) => {
   if (e.target.id) draft[e.target.id] = e.target.value;
+  if (["req-pnr", "req-kind"].includes(e.target.id)) {
+    e.target.blur();
+    renderRequestForm();
+  }
 });
 
 document.addEventListener("submit", (e) => {
+  if (e.target.id === "request-form") {
+    e.preventDefault();
+    const kind = draft["req-kind"] ?? "reschedule";
+    const body = {
+      pnr: $("req-pnr")?.value,
+      kind,
+      targetFlightId: kind === "reschedule" ? $("req-target")?.value || null : null,
+      channel: $("req-channel")?.value ?? "chat",
+    };
+    act(async () => {
+      const entry = await api("/api/requests", body);
+      selectedRequest = entry.request.id;
+      document.activeElement?.blur();
+    });
+    return;
+  }
   const form = e.target.closest("[data-report]");
   if (!form) return;
   e.preventDefault();
@@ -374,6 +588,44 @@ document.addEventListener("click", (e) => {
     act(() => api("/api/calls/start", { disruptionId, pnr, confirmLast4: draft[`last4-${key}`] }));
     return;
   }
+  const reqSel = e.target.closest("[data-req-select]");
+  if (reqSel) {
+    selectedRequest = reqSel.dataset.reqSelect;
+    renderRequests();
+    return;
+  }
+  const reqConfirm = e.target.closest("[data-req-confirm]");
+  if (reqConfirm) {
+    const id = reqConfirm.dataset.reqConfirm;
+    const raw = String(draft[`req-amount-${id}`] ?? "").replace(/[^\d]/g, "");
+    act(() => api("/api/requests/confirm", { id, confirmedAmount: raw === "" ? NaN : Number(raw) }));
+    return;
+  }
+  const reqDecline = e.target.closest("[data-req-decline]");
+  if (reqDecline) {
+    act(() => api("/api/requests/decline", { id: reqDecline.dataset.reqDecline }));
+    return;
+  }
+  const reqAirline = e.target.closest("[data-req-airline]");
+  if (reqAirline) {
+    const id = reqAirline.dataset.reqAirline;
+    act(() => api("/api/requests/airline/start", { id, confirmLast4: draft[`req-last4-${id}`] }));
+    return;
+  }
+  const reqResolve = e.target.closest("[data-req-resolve]");
+  if (reqResolve) {
+    const id = reqResolve.dataset.reqResolve;
+    act(() =>
+      api("/api/requests/resolve", {
+        id,
+        apply: draft[`req-apply-${id}`] === "apply",
+        newPnr: draft[`req-newpnr-${id}`] ?? "",
+        ticket: draft[`req-ticket-${id}`] ?? "",
+        note: draft[`req-note-${id}`] ?? "",
+      }),
+    );
+    return;
+  }
   const res = e.target.closest("[data-resolve]");
   if (res) {
     const key = res.dataset.resolve;
@@ -387,7 +639,9 @@ $("reset").addEventListener("click", () => {
   act(async () => {
     await api("/api/reset", {});
     selected = null;
+    selectedRequest = null;
     previews.clear();
+    airlinePreviews.clear();
   });
 });
 

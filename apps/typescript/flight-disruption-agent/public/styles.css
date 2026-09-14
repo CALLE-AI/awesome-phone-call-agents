@@ -42,6 +42,7 @@
 }
 
 * { box-sizing: border-box; }
+[hidden] { display: none !important; }
 body {
   margin: 0;
   background: var(--ground);
@@ -67,12 +68,12 @@ p { margin: 0; }
 .brand span { color: var(--muted); font-size: 0.85rem; }
 .top-right { display: flex; align-items: center; gap: 10px; }
 
-main { padding: 20px; display: grid; gap: 20px; max-width: 1360px; margin: 0 auto; }
+main { padding: 20px; display: grid; grid-template-columns: minmax(0, 1fr); gap: 20px; max-width: 1360px; margin: 0 auto; }
 .section-head { display: grid; gap: 4px; margin-bottom: 12px; }
 .section-head p { max-width: 70ch; }
 
 /* Departure board: the one bold object on the page. */
-.board-scroll { overflow-x: auto; border-radius: 6px; background: var(--board); }
+.board-scroll { position: relative; overflow-x: auto; border-radius: 6px; background: var(--board); }
 .board { width: 100%; min-width: 760px; border-collapse: collapse; font-family: var(--mono); color: var(--board-ink); }
 .board th {
   text-align: left; font-size: 0.7rem; letter-spacing: 0.12em; text-transform: uppercase; color: var(--board-dim);
@@ -183,6 +184,18 @@ pre {
 .transcript .turn { display: grid; grid-template-columns: 5.5em 1fr; gap: 8px; }
 .transcript .turn .spk { color: var(--muted); font-family: var(--mono); font-size: 0.75rem; padding-top: 2px; }
 blockquote { margin: 0; padding-left: 12px; border-left: 3px solid var(--accent); font-size: 0.9rem; }
+
+.request-form { padding: 14px 16px; display: grid; gap: 10px; margin-bottom: 16px; }
+.request-form .fields { display: grid; grid-template-columns: repeat(auto-fit, minmax(160px, 1fr)); gap: 8px 12px; }
+.request-form label { display: grid; gap: 3px; font-size: 0.82rem; color: var(--muted); }
+.request-form select { width: 100%; min-width: 0; border: 1px solid var(--rule); border-radius: 5px; padding: 6px 8px; background: var(--surface); color: var(--ink); }
+.request-form .row-inline { display: flex; gap: 8px; flex-wrap: wrap; align-items: center; }
+#request-list .event { margin-top: 0; }
+.steps { margin: 0; padding-left: 1.2em; display: grid; gap: 4px; font-size: 0.88rem; }
+.steps li.done { color: var(--ok); }
+.steps li.stop { color: var(--bad); }
+.steps li.todo { color: var(--muted); }
+.callbox input.wide { width: 12ch; }
 
 @media (prefers-reduced-motion: no-preference) {
   .row { transition: background-color 0.12s; }
