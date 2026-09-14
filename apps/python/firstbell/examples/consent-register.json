@@ -1,0 +1,85 @@
+{
+  "_comment": "A worked consent register, covering every way a row is refused. Fictional: the student ids match examples/absences-with-consent.csv and the guardian names are placeholders, because a real register holds names and this repository publishes none. The schema is docs/consent-record.md and dispatch/consent.py enforces it. CR-2026-0401 names both numbers on its row and is dialled. CR-2026-0402 names none, which is what a register written before that field existed looks like, and the run prints how many rows rested on one. CR-2026-0407 names one of the two numbers its row carries and is refused, because the permission attaches to the number called.",
+  "records": [
+    {
+      "id": "CR-2026-0401",
+      "student_id": "S-1041",
+      "guardian_name": "guardian on file",
+      "channel": "voice",
+      "purpose": "attendance",
+      "given_at": "2026-08-14",
+      "expires_at": "2027-07-31",
+      "evidence": "enrolment pack 2026-27, section 4, signed",
+      "recorded_by": "attendance office",
+      "phones": [
+        "+91 555 000 0001",
+        "+91 555 000 0011"
+      ]
+    },
+    {
+      "id": "CR-2026-0402",
+      "student_id": "S-1042",
+      "guardian_name": "guardian on file",
+      "channel": "voice",
+      "purpose": "attendance",
+      "given_at": "2026-08-14",
+      "evidence": "enrolment pack 2026-27, section 4, signed",
+      "recorded_by": "attendance office"
+    },
+    {
+      "id": "CR-2026-0403",
+      "student_id": "S-1043",
+      "guardian_name": "guardian on file",
+      "channel": "voice",
+      "purpose": "attendance",
+      "given_at": "2026-08-14",
+      "withdrawn_at": "2026-09-01",
+      "evidence": "telephone request, logged",
+      "recorded_by": "attendance office"
+    },
+    {
+      "id": "CR-2025-0088",
+      "student_id": "S-1044",
+      "guardian_name": "guardian on file",
+      "channel": "voice",
+      "purpose": "attendance",
+      "given_at": "2025-08-20",
+      "expires_at": "2026-07-31",
+      "evidence": "enrolment pack 2025-26, section 4, signed",
+      "recorded_by": "attendance office"
+    },
+    {
+      "id": "CR-2026-0405",
+      "student_id": "S-1045",
+      "guardian_name": "guardian on file",
+      "channel": "sms",
+      "purpose": "attendance",
+      "given_at": "2026-08-14",
+      "evidence": "portal preference, text message only",
+      "recorded_by": "attendance office"
+    },
+    {
+      "id": "CR-2026-0406",
+      "student_id": "S-1046",
+      "guardian_name": "guardian on file",
+      "channel": "voice",
+      "purpose": "general",
+      "given_at": "2026-08-14",
+      "evidence": "enrolment pack 2026-27, section 2, general contact",
+      "recorded_by": "front office"
+    },
+    {
+      "id": "CR-2026-0407",
+      "student_id": "S-1048",
+      "guardian_name": "guardian on file",
+      "channel": "voice",
+      "purpose": "attendance",
+      "given_at": "2026-08-14",
+      "phones": [
+        "+915550000008"
+      ],
+      "evidence": "enrolment pack 2026-27, section 4, one number given",
+      "recorded_by": "attendance office"
+    }
+  ]
+}
