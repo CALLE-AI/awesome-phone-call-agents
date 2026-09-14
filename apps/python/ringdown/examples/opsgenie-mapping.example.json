@@ -1,0 +1,9 @@
+{
+  "id": "$.alert.alertId",
+  "title": "$.alert.message",
+  "severity": "$.alert.tags[0]",
+  "service": "$.integrationName",
+  "summary": "The Opsgenie Create payload carries no long-form description; write the sentence the on-call engineer should hear here.",
+  "ladder": ["primary", "secondary", "incident_commander"],
+  "timezone": "America/Argentina/Buenos_Aires"
+}

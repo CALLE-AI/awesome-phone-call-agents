@@ -1,0 +1,46 @@
+{
+ "id": "train-ivr-059",
+ "label": "ivr",
+ "source": "sim-train",
+ "meta": {
+  "task": "cancel a subscription",
+  "hard": true
+ },
+ "turns": [
+  {
+   "speaker": "user",
+   "text": "Welcome to Cedar Hair Studio. In a few words, tell me what you're calling about. You can say things like appointments, billing, or hours.",
+   "offset_seconds": 0.64
+  },
+  {
+   "speaker": "bot",
+   "text": "Representative.",
+   "offset_seconds": 10.43
+  },
+  {
+   "speaker": "user",
+   "text": "Okay, billing. Please hold while I transfer you. The current wait time is more than ten minutes.",
+   "offset_seconds": 11.44
+  },
+  {
+   "speaker": "bot",
+   "text": "Representative.",
+   "offset_seconds": 18.64
+  },
+  {
+   "speaker": "user",
+   "text": "I think you said appointments. Is that right? Say yes or no.",
+   "offset_seconds": 19.68
+  },
+  {
+   "speaker": "bot",
+   "text": "I'd like to cancel the subscription for the account under Alex Martin.",
+   "offset_seconds": 25.02
+  },
+  {
+   "speaker": "user",
+   "text": "Okay, billing. Please hold while I transfer you. The current wait time is more than ten minutes.",
+   "offset_seconds": 30.19
+  }
+ ]
+}

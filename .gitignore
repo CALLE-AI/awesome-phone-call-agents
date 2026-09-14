@@ -28,3 +28,11 @@ skills-lock.json
 **/.call-locks/
 docs/codex-implementation-plan.md
 docs/superpowers/
+/.idea/
+probe-log.json
+skills/ground-truth-gate/scripts/probe.py
+notes/
+video/
+.coverage
+released
+skills/ground-truth-gate/assets/live-claim.json

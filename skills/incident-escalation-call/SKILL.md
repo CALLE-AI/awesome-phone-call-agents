@@ -71,6 +71,11 @@ python -m ringdown verify --ledger ledger.jsonl
 
 # Turn a raw alert payload into an incident file via a field mapping.
 python -m ringdown adapt --payload alert.json --mapping mapping.json --out incident.json
+
+# Draft that mapping with a model when the vendor's payload is unfamiliar. Needs
+# GEMINI_API_KEY, sends the payload to Google, and the draft is validated before
+# it is written. Read the file before dialling with it.
+python -m ringdown suggest-mapping --payload alert.json --out mapping.json
 ```
 
 The incident file shape, the policy fields and the rotation format are

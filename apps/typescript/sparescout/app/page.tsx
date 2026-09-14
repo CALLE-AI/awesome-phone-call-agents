@@ -2,7 +2,7 @@
 
 import { FormEvent, useEffect, useMemo, useState } from "react";
 import { isTerminalExecution, type SourcingExecution } from "../lib/calle/contracts.ts";
-import { getSupportedMarket, SUPPORTED_MARKETS, type SupportedMarket } from "../lib/markets.ts";
+import { getSupportedMarket, SUPPORTED_MARKETS, supportsLiveMarketLocale, type SupportedMarket } from "../lib/markets.ts";
 import { rememberHistoryAccess } from "../lib/history-store.ts";
 import { SiteFooter, SiteHeader } from "./components/site-chrome";
 
@@ -148,8 +148,6 @@ export default function Home() {
   const [liveAvailable, setLiveAvailable] = useState(false);
   const [liveSuppliers, setLiveSuppliers] = useState<SupplierDraft[]>([
     { id: "live-supplier-1", name: "", area: "", phone: "" },
-    { id: "live-supplier-2", name: "", area: "", phone: "" },
-    { id: "live-supplier-3", name: "", area: "", phone: "" },
   ]);
   const [form, setForm] = useState({
     vehicle: "2014 Toyota Fielder",
@@ -163,6 +161,8 @@ export default function Home() {
   });
 
   const market = useMemo(() => getSupportedMarket(form.countryCode) ?? SUPPORTED_MARKETS[0], [form.countryCode]);
+  const liveMarketSupported = supportsLiveMarketLocale(market.countryCode, form.locale);
+  const liveAvailableForMarket = liveAvailable && liveMarketSupported;
   const fixtureSuppliers = useMemo(() => suppliersForMarket(market), [market]);
   const activeSuppliers = useMemo<UiSupplier[]>(() => executionMode === "fixture"
     ? fixtureSuppliers
@@ -202,6 +202,7 @@ export default function Home() {
   const updateMarket = (countryCode: string) => {
     const nextMarket = getSupportedMarket(countryCode);
     if (!nextMarket) return;
+    if (!supportsLiveMarketLocale(nextMarket.countryCode, nextMarket.defaultLocale)) setExecutionMode("fixture");
     setForm((current) => ({
       ...current,
       countryCode: nextMarket.countryCode,
@@ -363,7 +364,7 @@ export default function Home() {
           </p>
         </div>
         <div className="hero-proof" aria-label="Product metrics">
-          <div><strong>17</strong><span>CALL-E markets</span></div>
+          <div><strong>17</strong><span>localized demo markets</span></div>
           <div><strong>100%</strong><span>human-approved</span></div>
           <div><strong>0</strong><span>surprise purchases</span></div>
         </div>
@@ -374,8 +375,8 @@ export default function Home() {
         <div>
           <strong>{executionMode === "live" ? "Live pilot mode" : "Safe demo mode"}</strong>
           <span>{executionMode === "live"
-            ? "Approving the reviewed plan will place real calls to the three business numbers below."
-            : "Switch markets and call languages across the supported CALL-E network. No phone calls or reservations will be made."}</span>
+            ? `Approving the reviewed plan will place real calls to ${activeSuppliers.length} business ${activeSuppliers.length === 1 ? "contact" : "contacts"}.`
+            : "Explore localized simulated results. No phone calls or reservations will be made."}</span>
         </div>
         <span className="mode-chip">{executionMode === "live" ? "REAL CALLS" : "DRY RUN"}</span>
       </div>
@@ -412,10 +413,10 @@ export default function Home() {
                   <input id="execution-fixture" aria-label="Safe fixture execution" type="radio" name="execution-mode" checked={executionMode === "fixture"} onChange={() => setExecutionMode("fixture")} />
                   <span><strong>Safe fixture</strong><small>Structured demonstration; no dialing.</small></span>
                 </label>
-                <label className={`${executionMode === "live" ? "selected" : ""} ${!liveAvailable ? "disabled" : ""}`} htmlFor="execution-live">
+                <label className={`${executionMode === "live" ? "selected" : ""} ${!liveAvailableForMarket ? "disabled" : ""}`} htmlFor="execution-live">
                   <span className="sr-only">Live pilot execution</span>
-                  <input id="execution-live" aria-label="Live pilot execution" type="radio" name="execution-mode" checked={executionMode === "live"} disabled={!liveAvailable} onChange={() => setExecutionMode("live")} />
-                  <span><strong>Live pilot</strong><small>{liveAvailable ? "Real calls after plan approval." : "Requires trusted server configuration."}</small></span>
+                  <input id="execution-live" aria-label="Live pilot execution" type="radio" name="execution-mode" checked={executionMode === "live"} disabled={!liveAvailableForMarket} onChange={() => setExecutionMode("live")} />
+                  <span><strong>Live pilot</strong><small>{liveAvailableForMarket ? "Real calls after plan approval." : liveAvailable && !liveMarketSupported ? `${market.countryName} is fixture-only for this recipient/language combination.` : "Requires trusted server configuration."}</small></span>
                 </label>
               </fieldset>
               <label className="field field-wide">
@@ -465,10 +466,12 @@ export default function Home() {
                   {liveSuppliers.map((supplier, index) => (
                     <div className="supplier-editor-row" key={supplier.id}>
                       <label><span>Supplier {index + 1}</span><input value={supplier.name} onChange={(event) => updateLiveSupplier(index, "name", event.target.value)} placeholder="Business name" required /></label>
-                      <label><span>Area</span><input value={supplier.area} onChange={(event) => updateLiveSupplier(index, "area", event.target.value)} placeholder="City or district" required /></label>
+                      <label><span>Area</span><input value={supplier.area} onChange={(event) => updateLiveSupplier(index, "area", event.target.value)} placeholder="City or district" /></label>
                       <label><span>E.164 phone</span><input type="tel" value={supplier.phone} onChange={(event) => updateLiveSupplier(index, "phone", event.target.value)} placeholder="+12025550101" pattern="\+[1-9][0-9]{7,14}" required /></label>
+                      {liveSuppliers.length > 1 && <button type="button" className="text-button" onClick={() => setLiveSuppliers((current) => current.filter((_, supplierIndex) => supplierIndex !== index))}>Remove</button>}
                     </div>
                   ))}
+                  {liveSuppliers.length < 10 && <button type="button" className="secondary-button" onClick={() => setLiveSuppliers((current) => [...current, { id: crypto.randomUUID(), name: "", area: "", phone: "" }])}>+ Add supplier</button>}
                   <div className="consent-panel">
                     <label className="field">
                       <span>Authorized calling window</span>
@@ -540,7 +543,7 @@ export default function Home() {
                 </div>
               )}
               <div className="guardrail"><span>!</span><p><strong>No commitments</strong>Calls may gather quotes only. Payment, purchase, and reservation are blocked.</p></div>
-              <button className="primary-button light" type="button" onClick={approveCalls} disabled={isExecuting}>{executionMode === "live" ? "Approve 3 supplier calls" : "Approve 3 demo calls"} <span>→</span></button>
+              <button className="primary-button light" type="button" onClick={approveCalls} disabled={isExecuting}>{executionMode === "live" ? `Approve ${activeSuppliers.length} supplier ${activeSuppliers.length === 1 ? "call" : "calls"}` : "Approve 3 demo calls"} <span>→</span></button>
               {requestError && <p className="inline-error dark" role="alert">{requestError}</p>}
               <button className="text-button" type="button" onClick={() => setStage("request")}>Edit request</button>
             </div>
