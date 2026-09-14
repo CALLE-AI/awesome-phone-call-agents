@@ -120,6 +120,7 @@ This project is an awesome list for AI-agent phone-call workflows. Add resources
 
 ### Skills
 
+- [`neighbour-welfare-sweep`](skills/neighbour-welfare-sweep/) - Hazard-conditioned welfare-check calls to a registry of at-risk residents during a heat warning, outage or flood: triage the roster against that hazard so calls go out worst-first, compile hazard-critical facts into required CALL-E result-schema fields, treat an unanswered call as a finding that escalates, and stop every responder handoff and ambulance, fire or police dispatch at a named human.
 - [`lesson-language-phone-practice`](skills/lesson-language-phone-practice/) - Consent-gated, lesson-derived phone rehearsal with a one-minute maximum, transcript-bound formative evidence, and no automatic redial.
 - [`accesscall`](skills/accesscall/) - Phone-based accessibility intake for VPAT 2.4/Section 508 audits. Run `npm install` in `skills/accesscall/` before using `scripts/format-to-vpat.js`, or it fails with `Cannot find module 'jszip'`.
 - [`accessible-outing-verifier`](skills/accessible-outing-verifier/) - Offline accessibility-planning fixture and proposed bounded CALL-E workflow; demonstrates advisory handling of qualified answers without making calls or certifying venue safety.
@@ -193,6 +194,7 @@ This project is an awesome list for AI-agent phone-call workflows. Add resources
 
 
 - [SiteWitness](apps/typescript/sitewitness/) - Local site-history interview workspace that carries reviewed evidence gaps into individually approved CALL-E calls, with exact transcript quotations, human year review, and a no-call rehearsal mode.
+- [BuddyE](apps/python/buddye/) - Block-captain console that calls every vulnerable neighbour on a list during a heat warning or power outage, worst-first by hazard-conditioned triage, escalates unanswered calls as findings, sends community help on a live map, and keeps every ambulance, fire and police request proposed until a named human authorises it; mock provider, dial allowlist and call cap by default.
 - [Rebuttal Dispute Call](apps/python/rebuttal-dispute-call/) - One disclosed CALL-E call to a disputing customer, cross-examined against its transcript before it becomes chargeback evidence, with six scripted no-call scenarios and a live path gated by per-run consent, an allowlist and local calling hours.
 - [Clinic Slot Assistant](apps/typescript/clinic-slot-assistant/) - Preview a consented appointment-availability call, review CALL-E results, and confirm a fictional booking; local simulation is the default.
 - [MacroDial](apps/typescript/macrodial/) - No-call playbook review app using MacroDial's deployed CALL-E task compiler and outcome-to-state resolver, with synthetic persistence and a hosted-product workflow guide.
