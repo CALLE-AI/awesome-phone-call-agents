@@ -30,13 +30,26 @@ from .scripts import DEFERRED, SCRIPTS
 
 MAX_BODY_BYTES = 1_048_576
 
+#: The script an unscripted call gets, chosen so the result shape matches the
+#: task that was actually sent.
+DEFAULT_BY_WORKFLOW = {
+    "contact_check": "clean_identity",
+    "pattern_followup": "pattern_support",
+}
+
 
 @dataclass
 class FakeCalleState:
     """Shared, lock-guarded state."""
 
     #: Script name applied to the next create, or a per-key mapping.
-    default_script: str = "clean_identity"
+    #:
+    #: ``None`` means "pick one that matches the workflow being called", which
+    #: is what an unscripted run wants: a contact-check task answered with a
+    #: pattern-shaped result is a schema mismatch the app will rightly refuse,
+    #: and that is noise rather than a finding. Set it to a name to pin every
+    #: call to one script.
+    default_script: str | None = None
     by_key: dict[str, str] = field(default_factory=dict)
     scripts_for_key: dict[str, str] = field(default_factory=dict)
     calls: dict[str, dict[str, Any]] = field(default_factory=dict)
@@ -47,8 +60,11 @@ class FakeCalleState:
     fail_submission: str | None = None
     lock: threading.RLock = field(default_factory=threading.RLock)
 
-    def script_for(self, key: str) -> str:
-        return self.scripts_for_key.get(key, self.default_script)
+    def script_for(self, key: str, workflow: str = "") -> str:
+        pinned = self.scripts_for_key.get(key) or self.default_script
+        if pinned is not None:
+            return pinned
+        return DEFAULT_BY_WORKFLOW.get(workflow, "clean_identity")
 
     def queue(self, idempotency_key: str, script: str) -> None:
         """Bind a script to the call that a given idempotency key will create."""
@@ -81,7 +97,9 @@ class FakeCalleClient:
                 # Reusing the key returns the original call, as the real API does.
                 return CallHandle(existing, "queued")
 
-            script_name = state.script_for(request.idempotency_key)
+            script_name = state.script_for(
+                request.idempotency_key, str(request.metadata.get("workflow", ""))
+            )
             builder = SCRIPTS[script_name]
             call_id = f"call_{uuid.uuid4().hex[:12]}"
             metadata = {**request.metadata, "idempotency_key": request.idempotency_key}
