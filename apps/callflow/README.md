@@ -1,11 +1,12 @@
 # CallFlow
 
-**Universal AI phone agent platform for small businesses**
+**Experimental lead-routing prototype with a mock CALL-E adapter**
 
 ## What it does
-Any small business signs up, fills 5 fields, and gets 
-a live AI phone agent powered by CALL-E that auto-calls 
-new leads within 60 seconds of enquiry form submission.
+The prototype collects a small-business profile and models a lead follow-up
+workflow. The current CALL-E service returns dummy success; real HTTP calling
+is commented out. No working live-call integration or 60-second response
+guarantee is claimed by this reference.
 
 ## Business types supported
 - Coaching Centres
@@ -14,16 +15,17 @@ new leads within 60 seconds of enquiry form submission.
 - Real Estate Agents
 - Restaurants
 
-## How CALL-E is used
-CallFlow uses CALL-E REST API to make outbound calls 
-with dynamically generated conversation scripts per 
-business type.
+## Proposed CALL-E integration
+The intended adapter would use the CALL-E REST API with conversation scripts
+per business type. The linked prototype currently simulates this boundary;
+live intent, authorized destinations, credential handling and ambiguous-outcome
+stopping would need verification before enabling real calls.
 
 ## Tech stack
 - Frontend: Next.js 14, Tailwind CSS
 - Backend: FastAPI, Python
 - Database: Supabase
-- Calls: CALL-E REST API
+- Calls: mock adapter; CALL-E REST API integration proposed
 
 ## Links
 - GitHub: https://github.com/shikhon-rahaman/callflow
