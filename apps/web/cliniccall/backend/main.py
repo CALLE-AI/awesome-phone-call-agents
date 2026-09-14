@@ -1,10 +1,12 @@
-
 import os
+import re
+import secrets
 from typing import Optional
 
 from dotenv import load_dotenv
 from fastapi import FastAPI, HTTPException, Depends
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.security import HTTPBasic, HTTPBasicCredentials
 from pydantic import BaseModel
 from sqlmodel import Session, select
 
@@ -24,17 +26,53 @@ CALLE_API_KEY = (
     or os.getenv("CALL_E_API_KEY")
 )
 
-# Demo mode is OFF by default.
+# Demo mode is SAFE by default.
+# Real outbound calls require explicitly setting:
+# CLINICCALL_DEMO_MODE=false
 DEMO_MODE = os.getenv(
     "CLINICCALL_DEMO_MODE",
-    "false"
+    "true",
 ).lower() == "true"
 
 
-if CALLE_API_KEY:
-    print("CALL-E API key detected.")
-else:
-    print("WARNING: CALL-E API key is NOT configured.")
+# ============================================================
+# OPERATOR AUTHENTICATION
+# ============================================================
+
+OPERATOR_USERNAME = os.getenv(
+    "CLINICCALL_OPERATOR_USERNAME",
+    "demo",
+)
+
+OPERATOR_PASSWORD = os.getenv(
+    "CLINICCALL_OPERATOR_PASSWORD",
+    "demo-password",
+)
+
+security = HTTPBasic()
+
+
+def require_operator(
+    credentials: HTTPBasicCredentials = Depends(security),
+):
+    correct_username = secrets.compare_digest(
+        credentials.username,
+        OPERATOR_USERNAME,
+    )
+
+    correct_password = secrets.compare_digest(
+        credentials.password,
+        OPERATOR_PASSWORD,
+    )
+
+    if not (correct_username and correct_password):
+        raise HTTPException(
+            status_code=401,
+            detail="Authentication required.",
+            headers={"WWW-Authenticate": "Basic"},
+        )
+
+    return credentials.username
 
 
 # ============================================================
@@ -43,7 +81,7 @@ else:
 
 calle_client = None
 
-if CALLE_API_KEY:
+if CALLE_API_KEY and not DEMO_MODE:
     calle_client = CalleClient(
         api_key=CALLE_API_KEY
     )
@@ -120,6 +158,10 @@ class AppointmentCreate(BaseModel):
 class CallPatientRequest(BaseModel):
     patient_id: int
 
+    # The operator must explicitly confirm that
+    # the destination is authorized for this call.
+    destination_authorized: bool = False
+
 
 # ============================================================
 # ROOT
@@ -178,20 +220,72 @@ def normalize_phone_number(phone: str) -> str:
     return phone
 
 
+# ============================================================
+# STRICT ASCII E.164 VALIDATION
+# ============================================================
+
+E164_PATTERN = re.compile(
+    r"^\+[1-9][0-9]{7,14}$"
+)
+
+
 def validate_phone_number(phone: str) -> bool:
 
-    if not phone.startswith("+"):
-        return False
+    return E164_PATTERN.fullmatch(phone) is not None
 
-    digits = phone[1:]
 
-    if not digits.isdigit():
-        return False
+# ============================================================
+# PHONE MASKING
+# ============================================================
 
-    if len(digits) < 8 or len(digits) > 15:
-        return False
+def mask_phone_number(phone: str) -> str:
 
-    return True
+    if not phone:
+        return "••••"
+
+    if len(phone) <= 8:
+        return "••••"
+
+    return f"{phone[:4]}•••••{phone[-4:]}"
+
+
+# ============================================================
+# SAFE MODEL SERIALIZATION
+# ============================================================
+
+def model_to_dict(model):
+
+    if hasattr(model, "model_dump"):
+        return model.model_dump()
+
+    if hasattr(model, "dict"):
+        return model.dict()
+
+    return dict(model)
+
+
+def safe_patient_response(patient):
+
+    data = model_to_dict(patient)
+
+    if "phone_number" in data:
+        data["phone_number"] = mask_phone_number(
+            data["phone_number"]
+        )
+
+    return data
+
+
+def safe_call_history_response(call):
+
+    data = model_to_dict(call)
+
+    if "phone_number" in data:
+        data["phone_number"] = mask_phone_number(
+            data["phone_number"]
+        )
+
+    return data
 
 
 # ============================================================
@@ -201,19 +295,24 @@ def validate_phone_number(phone: str) -> bool:
 @app.get("/patients")
 def get_patients(
     session: Session = Depends(get_session),
+    operator: str = Depends(require_operator),
 ):
 
     patients = session.exec(
         select(Patient)
     ).all()
 
-    return patients
+    return [
+        safe_patient_response(patient)
+        for patient in patients
+    ]
 
 
 @app.post("/patients")
 def create_patient(
     patient_data: PatientCreate,
     session: Session = Depends(get_session),
+    operator: str = Depends(require_operator),
 ):
 
     name = patient_data.name.strip()
@@ -251,10 +350,13 @@ def create_patient(
     print("PATIENT CREATED")
     print(f"ID: {patient.id}")
     print(f"Name: {patient.name}")
-    print(f"Phone: {patient.phone_number}")
+    print(
+        f"Phone: "
+        f"{mask_phone_number(patient.phone_number)}"
+    )
     print("")
 
-    return patient
+    return safe_patient_response(patient)
 
 
 # ============================================================
@@ -264,6 +366,7 @@ def create_patient(
 @app.get("/appointments")
 def get_appointments(
     session: Session = Depends(get_session),
+    operator: str = Depends(require_operator),
 ):
 
     appointments = session.exec(
@@ -277,6 +380,7 @@ def get_appointments(
 def create_appointment(
     appointment_data: AppointmentCreate,
     session: Session = Depends(get_session),
+    operator: str = Depends(require_operator),
 ):
 
     patient = session.get(
@@ -320,13 +424,17 @@ def create_appointment(
 @app.get("/call-history")
 def get_call_history(
     session: Session = Depends(get_session),
+    operator: str = Depends(require_operator),
 ):
 
     calls = session.exec(
         select(CallHistory)
     ).all()
 
-    return calls
+    return [
+        safe_call_history_response(call)
+        for call in calls
+    ]
 
 
 # ============================================================
@@ -337,14 +445,28 @@ def get_call_history(
 def call_patient(
     request: CallPatientRequest,
     session: Session = Depends(get_session),
+    operator: str = Depends(require_operator),
 ):
+
+    # --------------------------------------------------------
+    # EXPLICIT DESTINATION AUTHORIZATION
+    # --------------------------------------------------------
+
+    if not request.destination_authorized:
+
+        raise HTTPException(
+            status_code=403,
+            detail="Destination authorization is required.",
+        )
 
     print("")
     print("========================================")
     print("CALL-PATIENT REQUEST RECEIVED")
     print("========================================")
     print(f"Patient ID: {request.patient_id}")
+    print("Destination authorization: CONFIRMED")
     print("")
+
 
     # --------------------------------------------------------
     # FIND PATIENT
@@ -356,6 +478,7 @@ def call_patient(
     )
 
     if patient is None:
+
         raise HTTPException(
             status_code=404,
             detail="Patient not found.",
@@ -364,8 +487,12 @@ def call_patient(
     print("----------------------------------------")
     print("PATIENT FOUND")
     print(f"Name: {patient.name}")
-    print(f"Phone: {patient.phone_number}")
+    print(
+        f"Phone: "
+        f"{mask_phone_number(patient.phone_number)}"
+    )
     print("----------------------------------------")
+
 
     # --------------------------------------------------------
     # FIND APPOINTMENT
@@ -379,6 +506,7 @@ def call_patient(
     ).all()
 
     if not appointments:
+
         raise HTTPException(
             status_code=404,
             detail=(
@@ -396,6 +524,7 @@ def call_patient(
     print(f"Clinic: {appointment.clinic_name}")
     print("----------------------------------------")
 
+
     # --------------------------------------------------------
     # NORMALIZE PHONE
     # --------------------------------------------------------
@@ -405,19 +534,28 @@ def call_patient(
     )
 
     print("PHONE CHECK")
-    print(f"Normalized phone: {phone_number}")
+    print(
+        f"Normalized phone: "
+        f"{mask_phone_number(phone_number)}"
+    )
     print("----------------------------------------")
+
+
+    # --------------------------------------------------------
+    # VALIDATE PHONE
+    # --------------------------------------------------------
 
     if not validate_phone_number(phone_number):
 
         raise HTTPException(
             status_code=422,
             detail=(
-                f"Invalid E.164 phone number: "
-                f"{phone_number}. "
-                f"Example: +254769710722"
+                "Invalid E.164 phone number. "
+                "Use a valid number such as "
+                "+254769710722."
             ),
         )
+
 
     # --------------------------------------------------------
     # AI TASK
@@ -472,6 +610,7 @@ Do not ask for sensitive medical information.
 Keep the call short, friendly and professional.
 """
 
+
     # --------------------------------------------------------
     # CREATE CALL HISTORY
     # --------------------------------------------------------
@@ -487,6 +626,7 @@ Keep the call short, friendly and professional.
     session.commit()
     session.refresh(call_history)
 
+
     # --------------------------------------------------------
     # DEMO MODE
     # --------------------------------------------------------
@@ -499,7 +639,10 @@ Keep the call short, friendly and professional.
         print("========================================")
         print("No real phone call will be placed.")
         print(f"Patient: {patient.name}")
-        print(f"Phone: {phone_number}")
+        print(
+            f"Phone: "
+            f"{mask_phone_number(phone_number)}"
+        )
         print(f"Appointment: {appointment.id}")
         print("")
 
@@ -527,25 +670,13 @@ Keep the call short, friendly and professional.
             ),
             "patient_id": patient.id,
             "patient_name": patient.name,
-            "phone_number": phone_number,
+            "phone_number": mask_phone_number(
+                phone_number
+            ),
             "appointment_id": appointment.id,
             "status": "demo_completed",
-            "call_result": {
-                "status": "completed",
-                "task_completed": True,
-                "completion_confidence": {
-                    "score": 1.0,
-                    "label": "high",
-                },
-                "evidence": [
-                    "Demo workflow successfully processed "
-                    "the patient's appointment reminder."
-                ],
-                "structured_result": {
-                    "appointment_reminder_processed": "yes"
-                },
-            },
         }
+
 
     # --------------------------------------------------------
     # CHECK CALL-E
@@ -560,11 +691,9 @@ Keep the call short, friendly and professional.
 
         raise HTTPException(
             status_code=500,
-            detail=(
-                "CALL-E is not configured. "
-                "Check your CALLE_API_KEY environment variable."
-            ),
+            detail="CALL-E is not configured.",
         )
+
 
     # --------------------------------------------------------
     # REAL CALL-E CALL
@@ -575,7 +704,10 @@ Keep the call short, friendly and professional.
     print("STARTING REAL CALL-E CALL")
     print("========================================")
     print(f"Patient: {patient.name}")
-    print(f"Phone: {phone_number}")
+    print(
+        f"Phone: "
+        f"{mask_phone_number(phone_number)}"
+    )
     print(f"Appointment: {appointment.id}")
     print("Region: KE")
     print("Locale: en-US")
@@ -584,13 +716,8 @@ Keep the call short, friendly and professional.
     print("========================================")
     print("")
 
-    try:
 
-        # Current CALL-E SDK format:
-        # recipients -> list
-        # phones -> list
-        # region -> ISO country code
-        # locale -> language/locale
+    try:
 
         result = calle_client.calls.create_and_wait(
             task=task,
@@ -603,23 +730,39 @@ Keep the call short, friendly and professional.
             ],
         )
 
+
+        # ----------------------------------------------------
+        # DO NOT LOG RAW PROVIDER RESPONSE
+        # ----------------------------------------------------
+
         print("")
         print("========================================")
         print("CALL-E RESULT RECEIVED")
         print("========================================")
-        print(result)
+        print("CALL-E response received successfully.")
         print("========================================")
         print("")
+
+
+        # ----------------------------------------------------
+        # GET STATUS
+        # ----------------------------------------------------
 
         call_status = "completed"
 
         if isinstance(result, dict):
+
             call_status = str(
                 result.get(
                     "status",
                     "completed",
                 )
             )
+
+
+        # ----------------------------------------------------
+        # UPDATE CALL HISTORY
+        # ----------------------------------------------------
 
         call_history.call_status = call_status
 
@@ -636,29 +779,35 @@ Keep the call short, friendly and professional.
         session.commit()
         session.refresh(call_history)
 
+
+        # ----------------------------------------------------
+        # SAFE SUCCESS RESPONSE
+        # ----------------------------------------------------
+
         return {
             "success": True,
             "mode": "real",
             "message": "CALL-E call completed.",
             "patient_id": patient.id,
             "patient_name": patient.name,
-            "phone_number": phone_number,
+            "phone_number": mask_phone_number(
+                phone_number
+            ),
             "appointment_id": appointment.id,
             "status": call_status,
-            "call_result": result,
         }
 
-    except Exception as error:
 
-        error_message = str(error)
+    except Exception:
 
         print("")
         print("========================================")
         print("CALL-E CALL ERROR")
         print("========================================")
-        print(error_message)
+        print("CALL-E call failed.")
         print("========================================")
         print("")
+
 
         # ----------------------------------------------------
         # SAVE FAILURE
@@ -681,16 +830,17 @@ Keep the call short, friendly and professional.
 
             print(
                 "Could not save call failure:",
-                str(database_error),
+                type(database_error).__name__,
             )
 
+
         # ----------------------------------------------------
-        # RETURN CLEAR ERROR
+        # RETURN SAFE ERROR
         # ----------------------------------------------------
 
         raise HTTPException(
             status_code=500,
-            detail=f"CALL-E call failed: {error_message}",
+            detail="CALL-E call failed. Please try again.",
         )
 
 
@@ -709,6 +859,7 @@ def demo():
         ),
         "real_calls_enabled": (
             CALLE_API_KEY is not None
+            and not DEMO_MODE
         ),
         "demo_mode": DEMO_MODE,
     }
