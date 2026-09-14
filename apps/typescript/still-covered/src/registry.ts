@@ -86,6 +86,29 @@ function truthy(value: string | undefined): boolean {
   return ["yes", "true", "1", "y"].includes((value ?? "").trim().toLowerCase());
 }
 
+/**
+ * Consent is the one column that is read strictly, and only `yes` is a yes.
+ *
+ * The permissive reading also accepted `true`, `1` and `y`, which meant a malformed export - or a
+ * column that happens to hold a truthy-looking value for some other reason - could carry a row
+ * through the mandatory consent gate and make it eligible for a real call. Nothing else in the file
+ * is as expensive to get wrong, so the loose spellings are refused rather than guessed at.
+ */
+function consentGiven(value: string | undefined): boolean {
+  return (value ?? "").trim().toLowerCase() === "yes";
+}
+
+/**
+ * Do-not-call reads the other way: anything that is not plainly a no suppresses the row.
+ *
+ * Both columns fail closed, which for one means "only an explicit yes lets us call" and for the
+ * other means "anything unrecognised stops us calling".
+ */
+function doNotCall(value: string | undefined): boolean {
+  const v = (value ?? "").trim().toLowerCase();
+  return v.length > 0 && !["no", "false", "0", "n"].includes(v);
+}
+
 function yesNoUnknown(value: string | undefined): YesNoUnknown {
   const v = (value ?? "").trim().toLowerCase();
   if (["yes", "true", "1", "y"].includes(v)) {
@@ -184,12 +207,12 @@ export function parseEnrollees(text: string): { people: Enrollee[]; report: Regi
       report.warnings.push(`Row ${id} skipped: phone is not E.164.`);
       continue;
     }
-    if (!truthy(get("consent"))) {
+    if (!consentGiven(get("consent"))) {
       report.skippedNoConsent += 1;
       report.warnings.push(`Row ${id} skipped: no consent to be called about coverage.`);
       continue;
     }
-    if (truthy(get("do_not_call"))) {
+    if (doNotCall(get("do_not_call"))) {
       report.skippedDoNotCall += 1;
       report.warnings.push(`Row ${id} skipped: on the do-not-call list.`);
       continue;
