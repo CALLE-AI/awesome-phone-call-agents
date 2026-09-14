@@ -194,7 +194,7 @@ This project is an awesome list for AI-agent phone-call workflows. Add resources
 - [ShohojSheba Voice](https://shohojsheba-call-e-preview.redwan-rahman.workers.dev/judge) - Consent-gated healthcare staffing dispatch that uses structured CALL-E results to advance after a verified decline, pauses on acceptance, and keeps final assignment human-controlled.
 
 - [WristCall AI](https://github.com/Baklolman69/WristCallAI) - Wear OS smartwatch assistant that searches Google via SerpApi, synthesizes call intent with Groq AI 120B, and dispatches autonomous phone calls via CALL-E with 3-bullet voice summaries.
-- [RescueGrid](https://github.com/utkarshml/rescuegrid) - External Next.js disaster response console that pairs Google Gemini with CALL-E outbound phone dispatch, live call telemetry, and dynamic safe-line evacuation routing.
+- [RescueGrid](https://github.com/utkarshml/rescuegrid) - Experimental scripted disaster-response simulation with a proposed CALL-E dispatch integration; shelter, capacity, status, and route outputs are demonstration data, not verified evacuation guidance or emergency infrastructure.
 
 Runnable demo apps live under [`apps/`](apps/). They are not a CALL-E SDK and do not define a supported application API.
 
