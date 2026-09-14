@@ -51,9 +51,9 @@ complete generated task, including all six numbered steps.)
 ## 2. Firing the call and reading the result
 
 ```js
-import { createCalleClient } from "@call-e/calle"; // or your own client setup
+import { CalleClient } from "@call-e/calle";
 
-const client = createCalleClient();
+const client = new CalleClient({ apiKey: process.env.CALLE_API_KEY });
 
 const call = await client.calls.createAndWait({
   task,
