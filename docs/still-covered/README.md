@@ -357,6 +357,32 @@ possible place to guess. The agent now stays in the recorded language unless the
 changes it more than once, and offers "I'm sorry, I didn't catch that" in *their* language rather
 than falling back to English.
 
+### 5.2 The part that outlives this app
+
+Four live calls produced six defects, and every one traced to something the call task either failed
+to forbid or forbade too loosely. None of those lessons are about Medicaid. They are packaged as
+fourteen rules that read **any** CALL-E call task and report which boundaries it leaves undefended -
+each rule naming the call that produced it and the line that fixes it.
+
+The same fourteen rules are reachable four ways, because the person who needs them is not always
+sitting where we are:
+
+| Surface | For | Command |
+| --- | --- | --- |
+| CLI | anyone with the repo | `npm run sc -- lint-task --task-file your-task.txt` |
+| Browser page | a reviewer with no toolchain | open `public/lint.html` from disk - no server, no network |
+| MCP server | another agent | `npm run mcp` - four tools, none of which can place a call |
+| HTTP API | a system that is neither | `POST /api/lint`, gated by `SC_DASHBOARD_TOKEN` |
+
+The HTTP route is the only one of ours we would be comfortable exposing to someone else's machine: it
+reads a string and returns a verdict, touches no enrollee data, makes no outbound request, and has no
+path to a telephone. The key is one you generate (`SC_DASHBOARD_TOKEN`) rather than one we issue,
+because there is nothing on our side worth an account - and because a call task is usually the most
+sensitive text in a benefits system, it should never have to leave your machine to be checked.
+
+A naive task scores 3 of 14. This app's own rendered task scores 14 of 14, and a test removes each
+defending clause in turn to prove that score is earned rather than asserted.
+
 ## 6. Safety
 
 Summarized here; the full list is
@@ -393,7 +419,7 @@ No credentials, no network, no phone call:
 ```bash
 cd apps/typescript/still-covered
 npm install
-npm test        # 75 tests
+npm test        # 76 tests
 npm run plan    # who is cleared without a call, the wave order, the rendered task
 npm run demo    # the full campaign against the bundled fake CALL-E server
 npm run serve   # dashboard at http://127.0.0.1:4800
@@ -415,7 +441,7 @@ account and no credits.
 
 ## 8. Test coverage
 
-75 tests, no network:
+76 tests, no network:
 
 - `classify.test.ts` - the fail-closed order, including medical frailty needing both answers, and the
   overclaim check surviving a confidence downgrade.
@@ -427,8 +453,13 @@ account and no credits.
   evidence assertion, worklist composition, report reproducibility, and a 403 on live drill start.
 - `robustness.test.ts` - a retried 429, a total outage, a 422 that is *not* retried, resume
   equivalence, resume idempotence, the three-call cap, and the opt-out.
-- `safety.test.ts` - quiet hours across time zones, refused configurations, the live allowlist, and
-  the dashboard token.
+- `safety.test.ts` - quiet hours across time zones, refused configurations, the live allowlist, the
+  dashboard token, and `POST /api/lint`: closed without the key, and still only a lint report when
+  the posted task asks it to dial a number.
+- `lint.test.ts` - our own task satisfies all fourteen rules, a naive task fails most of them, and
+  removing each defending clause in turn fails exactly its own rule.
+- `probes.test.ts` / `mcp.test.ts` - the conformance checker's fail-closed asymmetry, and that no
+  executable line in the MCP server can place a call.
 
 `npm run check` runs `tsc --noEmit` under `strict` plus `noUncheckedIndexedAccess` and
 `exactOptionalPropertyTypes`.

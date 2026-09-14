@@ -13,6 +13,7 @@ import type { Config } from "./config.js";
 import { Ledger, type LedgerEntry, type Projection } from "./ledger.js";
 import { maskPhone } from "./mask.js";
 import type { CallInbox } from "./orchestrator.js";
+import { lintCallTask, RULES } from "./lint.js";
 import { buildReport } from "./report.js";
 import { languageName } from "./tasks.js";
 import type { ExemptionCode, Outcome } from "./types.js";
@@ -283,6 +284,39 @@ export function startServer(ctx: ServerContext): Promise<ServerHandle> {
         if (url.searchParams.get("token") === token) {
           setCookie["set-cookie"] = `sc_token=${encodeURIComponent(token)}; Path=/; HttpOnly; SameSite=Strict`;
         }
+      }
+
+      // POST /api/lint - check any CALL-E call task against the safety boundaries.
+      //
+      // The one endpoint here worth exposing to other people's systems: it reads text, touches no
+      // enrollee data, and cannot place a call. It sits behind the same token as everything else, so
+      // `SC_DASHBOARD_TOKEN=<your key>` is the key a caller presents. Self-hosted on purpose - there
+      // is no account to create and no data of yours leaves your machine.
+      if (req.method === "POST" && url.pathname === "/api/lint") {
+        let task = "";
+        try {
+          const body = JSON.parse((await readBody(req)) || "{}") as { task?: unknown };
+          task = typeof body.task === "string" ? body.task : "";
+        } catch {
+          json(res, 400, { error: "body must be JSON: { \"task\": \"<your CALL-E call task>\" }" }, setCookie);
+          return;
+        }
+        if (task.trim().length === 0) {
+          json(res, 400, { error: "task is required and must be a non-empty string" }, setCookie);
+          return;
+        }
+        const report = lintCallTask(task);
+        json(res, 200, {
+          checked: RULES.length,
+          defended: report.passed.length,
+          errors: report.errors,
+          warnings: report.warnings,
+          passed: report.passed,
+          findings: report.findings,
+          // Said in the payload, not only the docs: a passing lint is not a passing call.
+          note: "This reads instructions, not transcripts. A task that passes every rule can still be ignored by a model on the call; that is what the conformance probes are for.",
+        }, setCookie);
+        return;
       }
 
       if (req.method === "GET" && (url.pathname === "/" || url.pathname === "/index.html")) {

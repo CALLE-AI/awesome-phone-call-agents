@@ -20,7 +20,8 @@
     "probe": "node --import tsx src/cli.ts probe --dry-run",
     "mcp": "node --import tsx src/mcp.ts",
     "lint-task": "node --import tsx src/cli.ts lint-task --dry-run",
-    "build:lint-page": "node --import tsx scripts/build-lint-page.mjs"
+    "build:lint-page": "node --import tsx scripts/build-lint-page.mjs",
+    "build:snapshot": "node --import tsx scripts/build-snapshot.mjs"
   },
   "dependencies": {
     "@call-e/calle": "0.7.0"
