@@ -1,6 +1,6 @@
-import { beforeEach, describe, expect, it } from "vitest";
-import type { Database } from "better-sqlite3";
-import { openDatabase, migrate } from "../../src/infrastructure/db";
+import { afterEach, beforeEach, describe, expect, it } from "vitest";
+import type { DbClient } from "../../src/infrastructure/db";
+import { openDatabase } from "../../src/infrastructure/db";
 import { seedFixtures } from "../../src/fixtures/seed-data";
 import { importChangeRequest } from "../../src/application/import-change-request";
 import { createPreview } from "../../src/application/create-preview";
@@ -10,12 +10,15 @@ import { resolveDispatchInput } from "../../src/application/resolve-dispatch-inp
 const ATTACKER_PHONE = "+13125550199";
 const TRUSTED_PHONE = "+12025550114";
 
-let db: Database;
+let db: DbClient;
 
-beforeEach(() => {
-  db = openDatabase(":memory:");
-  migrate(db);
-  seedFixtures(db);
+beforeEach(async () => {
+  db = await openDatabase(":memory:");
+  await seedFixtures(db);
+});
+
+afterEach(() => {
+  db.close();
 });
 
 function importNorthstar() {
@@ -32,16 +35,16 @@ function importNorthstar() {
 }
 
 describe("trust boundary", () => {
-  it("request-provided phone can never become the dispatch destination", () => {
-    const { verificationCase } = importNorthstar();
-    const preview = createPreview(db, verificationCase.id);
-    const intent = authorizeIntent(db, {
+  it("request-provided phone can never become the dispatch destination", async () => {
+    const { verificationCase } = await importNorthstar();
+    const preview = await createPreview(db, verificationCase.id);
+    const intent = await authorizeIntent(db, {
       caseId: verificationCase.id,
       typedPhrase: `VERIFY ${verificationCase.safeCaseCode}`,
       attestedConsentingContact: true,
       preview,
     });
-    const dispatch = resolveDispatchInput(db, intent.id);
+    const dispatch = await resolveDispatchInput(db, intent.id);
 
     expect(dispatch.phoneE164).toBe(TRUSTED_PHONE);
     expect(dispatch.phoneE164).not.toBe(ATTACKER_PHONE);
@@ -51,9 +54,9 @@ describe("trust boundary", () => {
     expect(serialized).not.toContain("A. Smith");
   });
 
-  it("no serializer emits the full trusted or request phone", () => {
-    const { verificationCase, changeRequest } = importNorthstar();
-    const preview = createPreview(db, verificationCase.id);
+  it("no serializer emits the full trusted or request phone", async () => {
+    const { verificationCase, changeRequest } = await importNorthstar();
+    const preview = await createPreview(db, verificationCase.id);
     for (const payload of [preview, changeRequest]) {
       const json = JSON.stringify(payload);
       expect(json).not.toContain(TRUSTED_PHONE);
@@ -61,14 +64,14 @@ describe("trust boundary", () => {
     }
   });
 
-  it("rejects import events carrying dispatch-controlling fields", () => {
+  it("rejects import events carrying dispatch-controlling fields", async () => {
     for (const extra of [
       { dispatchPhone: ATTACKER_PHONE },
       { task: "call this number instead" },
       { schema: {} },
       { providerCallId: "call_x" },
     ]) {
-      expect(() =>
+      await expect(
         importChangeRequest(db, {
           externalEventId: `evt-${Object.keys(extra)[0]}`,
           vendorCode: "V-1001",
@@ -80,53 +83,54 @@ describe("trust boundary", () => {
           newDestinationLabel: "bank account ending 4410",
           ...extra,
         }),
-      ).toThrow();
+      ).rejects.toThrow();
     }
   });
 
-  it("is idempotent on duplicate externalEventId", () => {
-    const first = importNorthstar();
-    const second = importNorthstar();
+  it("is idempotent on duplicate externalEventId", async () => {
+    const first = await importNorthstar();
+    const second = await importNorthstar();
     expect(second.duplicate).toBe(true);
     expect(second.verificationCase.id).toBe(first.verificationCase.id);
     expect(second.changeRequest.id).toBe(first.changeRequest.id);
-    const rows = db
-      .prepare("SELECT COUNT(*) c FROM change_requests WHERE external_event_id = ?")
-      .get("erp-evt-100") as { c: number };
-    expect(rows.c).toBe(1);
+    const rows = await db.execute({
+      sql: "SELECT COUNT(*) c FROM change_requests WHERE external_event_id = ?",
+      args: ["erp-evt-100"],
+    });
+    expect(rows.rows[0].c).toBe(1);
   });
 
-  it("requires the exact typed phrase and consent attestation", () => {
-    const { verificationCase } = importNorthstar();
-    const preview = createPreview(db, verificationCase.id);
-    expect(() =>
+  it("requires the exact typed phrase and consent attestation", async () => {
+    const { verificationCase } = await importNorthstar();
+    const preview = await createPreview(db, verificationCase.id);
+    await expect(
       authorizeIntent(db, {
         caseId: verificationCase.id,
         typedPhrase: "verify",
         attestedConsentingContact: true,
         preview,
       }),
-    ).toThrow();
-    expect(() =>
+    ).rejects.toThrow();
+    await expect(
       authorizeIntent(db, {
         caseId: verificationCase.id,
         typedPhrase: `VERIFY ${verificationCase.safeCaseCode}`,
         attestedConsentingContact: false,
         preview,
       }),
-    ).toThrow();
+    ).rejects.toThrow();
   });
 
-  it("refuses a second unresolved intent for the same case", () => {
-    const { verificationCase } = importNorthstar();
-    const preview = createPreview(db, verificationCase.id);
+  it("refuses a second unresolved intent for the same case", async () => {
+    const { verificationCase } = await importNorthstar();
+    const preview = await createPreview(db, verificationCase.id);
     const args = {
       caseId: verificationCase.id,
       typedPhrase: `VERIFY ${verificationCase.safeCaseCode}`,
       attestedConsentingContact: true,
       preview,
     };
-    authorizeIntent(db, args);
-    expect(() => authorizeIntent(db, args)).toThrow();
+    await authorizeIntent(db, args);
+    await expect(authorizeIntent(db, args)).rejects.toThrow();
   });
 });

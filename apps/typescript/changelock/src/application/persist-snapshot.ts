@@ -3,14 +3,14 @@ import { redactSensitiveText } from "../domain/redact";
 import type { NormalizedSnapshot } from "../domain/evaluate-result";
 import { insertSnapshot, newId, now, type Db } from "../infrastructure/db";
 
-export function persistSnapshot(
+export async function persistSnapshot(
   db: Db,
   intentId: string,
   snapshot: NormalizedSnapshot,
   verificationMode: "replay" | "live",
-): void {
+): Promise<void> {
   const parsed = structuredResultValidator.safeParse(snapshot.structuredResult);
-  insertSnapshot(db, {
+  await insertSnapshot(db, {
     id: newId("snap"),
     intentId,
     providerCallId: snapshot.callId,

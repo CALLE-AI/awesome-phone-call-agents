@@ -1,13 +1,14 @@
 import { maskPhone } from "../../domain/redact";
 import type { CaseState } from "../../domain/types";
 import {
+  getActiveTrustedContact,
   getAuditEvents,
   getCase,
   getChangeRequest,
-  getIntent,
   getSnapshotsForIntent,
-  getTrustedContact,
+  getVendor,
   listChangeRequests,
+  listIntentsForCase,
   type Db,
 } from "../../infrastructure/db";
 import { buildCallTask } from "../../domain/build-call-task";
@@ -26,23 +27,25 @@ export interface InboxRow {
   newDestinationLabel: string;
 }
 
-export function listInbox(db: Db): InboxRow[] {
-  return listChangeRequests(db).map((r) => {
-    const vendor = db
-      .prepare("SELECT vendor_code FROM vendors WHERE id = ?")
-      .get(r.vendorId) as { vendor_code: string };
-    return {
+export async function listInbox(db: Db): Promise<InboxRow[]> {
+  const rows = await listChangeRequests(db);
+  const result: InboxRow[] = [];
+  for (const r of rows) {
+    const vendor = await getVendor(db, r.vendorId);
+    if (!vendor) throw new Error("vendor missing for inbox row");
+    result.push({
       caseId: r.caseId,
       safeCaseCode: r.safeCaseCode,
       vendorName: r.vendorName,
-      vendorCode: vendor.vendor_code,
+      vendorCode: vendor.vendorCode,
       requestedAt: r.requestedAt,
       sourceReference: r.sourceReference,
       state: r.caseState,
       requestPhoneMasked: r.requestContactPhoneMasked,
       newDestinationLabel: r.newDestinationLabel,
-    };
-  });
+    });
+  }
+  return result;
 }
 
 export interface CaseDetail {
@@ -97,29 +100,46 @@ export interface CaseDetail {
   }[];
 }
 
-export function getCaseDetail(db: Db, caseId: string): CaseDetail | null {
-  const kase = getCase(db, caseId);
+export async function getCaseDetail(db: Db, caseId: string): Promise<CaseDetail | null> {
+  const kase = await getCase(db, caseId);
   if (!kase) return null;
-  const request = getChangeRequest(db, kase.changeRequestId);
+  const request = await getChangeRequest(db, kase.changeRequestId);
   if (!request) return null;
-  const vendor = db
-    .prepare("SELECT display_name, vendor_code FROM vendors WHERE id = ?")
-    .get(request.vendorId) as { display_name: string; vendor_code: string };
-  const contact = db
-    .prepare("SELECT id FROM trusted_contacts WHERE vendor_id = ? AND active = 1")
-    .get(request.vendorId) as { id: string } | undefined;
-  const trusted = contact ? getTrustedContact(db, contact.id) : null;
+  const vendor = await getVendor(db, request.vendorId);
+  if (!vendor) return null;
+  const trusted = await getActiveTrustedContact(db, request.vendorId);
+  const intents = await listIntentsForCase(db, kase.id);
+  const audit = await getAuditEvents(db, kase.id);
 
-  const intentRows = db
-    .prepare("SELECT id FROM call_intents WHERE case_id = ? ORDER BY version")
-    .all(kase.id) as { id: string }[];
+  const intentDetails = [];
+  for (const intent of intents) {
+    const snapshots = await getSnapshotsForIntent(db, intent.id);
+    intentDetails.push({
+      id: intent.id,
+      version: intent.version,
+      status: intent.status,
+      providerCallId: intent.providerCallId,
+      providerMode: intent.providerMode,
+      expiresAt: intent.expiresAt,
+      snapshots: snapshots.map((s) => ({
+        providerStatus: s.providerStatus,
+        confidenceScore: s.confidenceScore,
+        structuredResult: s.structuredResultJson
+          ? (JSON.parse(s.structuredResultJson) as Record<string, string>)
+          : null,
+        evidence: JSON.parse(s.evidenceJson) as string[],
+        receivedAt: s.receivedAt,
+        verificationMode: s.verificationMode,
+      })),
+    });
+  }
 
   return {
     caseId: kase.id,
     safeCaseCode: kase.safeCaseCode,
     state: kase.state,
     createdAt: kase.createdAt,
-    vendor: { displayName: vendor.display_name, vendorCode: vendor.vendor_code },
+    vendor: { displayName: vendor.displayName, vendorCode: vendor.vendorCode },
     request: {
       externalEventId: request.externalEventId,
       requestedAt: request.requestedAt,
@@ -140,7 +160,7 @@ export function getCaseDetail(db: Db, caseId: string): CaseDetail | null {
         }
       : null,
     taskText: buildCallTask({
-      vendorDisplayName: vendor.display_name,
+      vendorDisplayName: vendor.displayName,
       buyerOrgName: BUYER_ORG_NAME,
       safeCaseCode: kase.safeCaseCode,
     }),
@@ -148,28 +168,8 @@ export function getCaseDetail(db: Db, caseId: string): CaseDetail | null {
     schemaVersion: SCHEMA_VERSION,
     suggestedScenario:
       SEED_EVENTS.find((e) => e.externalEventId === request.externalEventId)?.scenario ?? null,
-    intents: intentRows.map((r) => {
-      const intent = getIntent(db, r.id)!;
-      return {
-        id: intent.id,
-        version: intent.version,
-        status: intent.status,
-        providerCallId: intent.providerCallId,
-        providerMode: intent.providerMode,
-        expiresAt: intent.expiresAt,
-        snapshots: getSnapshotsForIntent(db, intent.id).map((s) => ({
-          providerStatus: s.providerStatus,
-          confidenceScore: s.confidenceScore,
-          structuredResult: s.structuredResultJson
-            ? (JSON.parse(s.structuredResultJson) as Record<string, string>)
-            : null,
-          evidence: JSON.parse(s.evidenceJson) as string[],
-          receivedAt: s.receivedAt,
-          verificationMode: s.verificationMode,
-        })),
-      };
-    }),
-    audit: getAuditEvents(db, kase.id).map((e) => ({
+    intents: intentDetails,
+    audit: audit.map((e) => ({
       type: e.type,
       actor: e.actor,
       createdAt: e.createdAt,

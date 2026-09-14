@@ -13,9 +13,10 @@ import {
   getActiveTrustedContact,
   getCase,
   getChangeRequest,
-  getVendorByCode,
+  getVendor,
   setPreviewExpiry,
   updateCaseState,
+  withTransaction,
   type Db,
 } from "../infrastructure/db";
 
@@ -38,24 +39,21 @@ export interface CallPreview {
 
 const PREVIEW_TTL_MS = 30 * 60 * 1000;
 
-export function createPreview(db: Db, caseId: string): CallPreview {
-  const kase = getCase(db, caseId);
+export async function createPreview(db: Db, caseId: string): Promise<CallPreview> {
+  const kase = await getCase(db, caseId);
   if (!kase) throw new Error("case not found");
   if (kase.state !== "needs_review" && kase.state !== "preview_ready") {
     throw new Error(`cannot preview in state ${kase.state}`);
   }
-  const request = getChangeRequest(db, kase.changeRequestId);
+  const request = await getChangeRequest(db, kase.changeRequestId);
   if (!request) throw new Error("change request missing");
-  const vendor = db
-    .prepare("SELECT vendor_code FROM vendors WHERE id = ?")
-    .get(request.vendorId) as { vendor_code: string } | undefined;
+  const vendor = await getVendor(db, request.vendorId);
   if (!vendor) throw new Error("vendor missing");
-  const vendorRow = getVendorByCode(db, vendor.vendor_code);
-  const contact = getActiveTrustedContact(db, request.vendorId);
+  const contact = await getActiveTrustedContact(db, request.vendorId);
   if (!contact) throw new Error("no trusted contact on vendor record");
 
   const taskText = buildCallTask({
-    vendorDisplayName: vendorRow!.displayName,
+    vendorDisplayName: vendor.displayName,
     buyerOrgName: BUYER_ORG_NAME,
     safeCaseCode: kase.safeCaseCode,
   });
@@ -70,13 +68,13 @@ export function createPreview(db: Db, caseId: string): CallPreview {
   });
   const expiresAt = new Date(Date.now() + PREVIEW_TTL_MS).toISOString();
 
-  db.transaction(() => {
+  await withTransaction(db, async (tx) => {
     if (kase.state === "needs_review") {
       assertTransition(kase.state, "preview_ready");
-      updateCaseState(db, kase.id, "preview_ready");
+      await updateCaseState(tx, kase.id, "preview_ready");
     }
-    setPreviewExpiry(db, kase.id, expiresAt);
-    appendAudit(db, {
+    await setPreviewExpiry(tx, kase.id, expiresAt);
+    await appendAudit(tx, {
       caseId: kase.id,
       type: "preview.created",
       actor: "operator",
@@ -91,11 +89,11 @@ export function createPreview(db: Db, caseId: string): CallPreview {
         schemaVersion: SCHEMA_VERSION,
       },
     });
-  })();
+  });
 
   return {
     caseId: kase.id,
-    vendorName: vendorRow!.displayName,
+    vendorName: vendor.displayName,
     trustedContactName: contact.name,
     trustedContactRole: contact.role,
     trustedContactSource: contact.source,

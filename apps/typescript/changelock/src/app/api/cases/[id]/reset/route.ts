@@ -1,5 +1,6 @@
 import { getDb } from "../../../../server/get-db";
-import { createPreview } from "../../../../../application/create-preview";
+import { parseResetFormInput } from "../../../../../application/live-input";
+import { resetSyntheticCase } from "../../../../../application/reset-synthetic-case";
 import { errMessage, redirectToCase } from "../_shared";
 
 export async function POST(
@@ -7,8 +8,10 @@ export async function POST(
   { params }: { params: Promise<{ id: string }> },
 ): Promise<Response> {
   const { id } = await params;
+  const db = await getDb();
   try {
-    await createPreview(await getDb(), id);
+    parseResetFormInput(await req.formData());
+    await resetSyntheticCase(db, { caseId: id });
     return redirectToCase(req, id);
   } catch (err) {
     return redirectToCase(req, id, errMessage(err));

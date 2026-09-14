@@ -7,6 +7,8 @@ import {
   getCase,
   getIntent,
   updateCaseState,
+  updateIntentStatus,
+  withTransaction,
   type Db,
 } from "../infrastructure/db";
 import { persistSnapshot } from "./persist-snapshot";
@@ -19,15 +21,15 @@ export interface RecordResult {
   failedGates: string[];
 }
 
-export function recordCallOutcome(
+export async function recordCallOutcome(
   db: Db,
   intentId: string,
   snapshot: NormalizedSnapshot,
-): RecordResult {
-  return db.transaction(() => {
-    const intent = getIntent(db, intentId);
+): Promise<RecordResult> {
+  return withTransaction(db, async (tx) => {
+    const intent = await getIntent(tx, intentId);
     if (!intent) throw new Error("intent not found");
-    let kase = getCase(db, intent.caseId);
+    let kase = await getCase(tx, intent.caseId);
     if (!kase) throw new Error("case not found");
     if (
       kase.state !== "dispatch_reserved" &&
@@ -39,23 +41,23 @@ export function recordCallOutcome(
     }
 
     if (intent.providerCallId === null) {
-      bindProviderCallId(db, intent.id, snapshot.callId);
+      await bindProviderCallId(tx, intent.id, snapshot.callId);
       intent.providerCallId = snapshot.callId;
       if (intent.status === "reserved") {
-        db.prepare("UPDATE call_intents SET status = 'dispatched' WHERE id = ?").run(intent.id);
+        await updateIntentStatus(tx, intent.id, "dispatched");
       }
     }
 
-    persistSnapshot(db, intent.id, snapshot, intent.providerMode);
+    await persistSnapshot(tx, intent.id, snapshot, intent.providerMode);
 
     if (kase.state === "dispatch_reserved" || kase.state === "submission_unknown") {
       assertTransition(kase.state, "call_active");
-      updateCaseState(db, kase.id, "call_active");
-      kase = getCase(db, kase.id)!;
+      await updateCaseState(tx, kase.id, "call_active");
+      kase = (await getCase(tx, kase.id))!;
     }
 
     if (!TERMINAL.has(snapshot.status)) {
-      appendAudit(db, {
+      await appendAudit(tx, {
         caseId: kase.id,
         type: "call.in_progress",
         actor: "provider",
@@ -66,14 +68,14 @@ export function recordCallOutcome(
 
     if (kase.state === "call_active") {
       assertTransition(kase.state, "terminal_unverified");
-      updateCaseState(db, kase.id, "terminal_unverified");
-      kase = getCase(db, kase.id)!;
+      await updateCaseState(tx, kase.id, "terminal_unverified");
+      kase = (await getCase(tx, kase.id))!;
     }
 
     const evaluation = evaluateCallResult(intent, snapshot);
     assertTransition(kase.state, evaluation.caseState);
-    updateCaseState(db, kase.id, evaluation.caseState);
-    appendAudit(db, {
+    await updateCaseState(tx, kase.id, evaluation.caseState);
+    await appendAudit(tx, {
       caseId: kase.id,
       type: "result.evaluated",
       actor: "system",
@@ -87,5 +89,5 @@ export function recordCallOutcome(
       },
     });
     return evaluation;
-  })();
+  });
 }

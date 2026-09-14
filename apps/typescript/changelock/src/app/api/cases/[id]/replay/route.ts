@@ -9,14 +9,14 @@ export async function POST(
   { params }: { params: Promise<{ id: string }> },
 ): Promise<Response> {
   const { id } = await params;
-  const db = getDb();
+  const db = await getDb();
   try {
     const form = await req.formData();
     const scenario = String(form.get("scenario") ?? "");
     const typedPhrase = String(form.get("typedPhrase") ?? "");
     const attested = form.get("attestedConsentingContact") === "on";
-    const preview = createPreview(db, id);
-    const intent = authorizeIntent(db, {
+    const preview = await createPreview(db, id);
+    const intent = await authorizeIntent(db, {
       caseId: id,
       typedPhrase,
       attestedConsentingContact: attested,

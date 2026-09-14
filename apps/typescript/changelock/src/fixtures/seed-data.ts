@@ -1,5 +1,8 @@
 import type { Db } from "../infrastructure/db";
-import { insertTrustedContact, insertVendor } from "../infrastructure/db";
+import {
+  insertTrustedContactIfAbsentStmt,
+  insertVendorIfAbsentStmt,
+} from "../infrastructure/db";
 import type { TrustedContact, Vendor } from "../domain/types";
 
 export const BUYER_ORG_NAME = "Acme Manufacturing";
@@ -108,12 +111,16 @@ export const SEED_EVENTS: SeedEvent[] = [
   },
 ];
 
-export function seedFixtures(db: Db): void {
-  const existing = db.prepare("SELECT COUNT(*) c FROM vendors").get() as { c: number };
-  if (existing.c > 0) return;
-  const tx = db.transaction(() => {
-    for (const v of SEED_VENDORS) insertVendor(db, v);
-    for (const c of SEED_CONTACTS) insertTrustedContact(db, c);
-  });
-  tx();
+// Atomic and concurrency-safe: a single write batch of INSERT OR IGNORE
+// statements means two initializers racing on the same database both succeed,
+// and a partially seeded database is repaired rather than skipped. No
+// count-then-insert — the unique constraints own idempotency.
+export async function seedFixtures(db: Db): Promise<void> {
+  await db.batch(
+    [
+      ...SEED_VENDORS.map(insertVendorIfAbsentStmt),
+      ...SEED_CONTACTS.map(insertTrustedContactIfAbsentStmt),
+    ],
+    "write",
+  );
 }

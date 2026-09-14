@@ -16,8 +16,8 @@ const STATE_LABEL: Record<string, string> = {
   needs_human: "Needs human",
 };
 
-export default function InboxPage() {
-  const rows = listInbox(getDb());
+export default async function InboxPage() {
+  const rows = await listInbox(await getDb());
   return (
     <main>
       <div className="inbox-head">

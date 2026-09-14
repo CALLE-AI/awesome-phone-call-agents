@@ -1,11 +1,9 @@
 import { z } from "zod";
 import {
-  appendAudit,
   getCaseByRequestId,
   getChangeRequestByExternalEventId,
   getVendorByCode,
-  insertCase,
-  insertChangeRequest,
+  insertImportBundle,
   newId,
   now,
   type Db,
@@ -33,16 +31,16 @@ export interface ImportResult {
   duplicate: boolean;
 }
 
-export function importChangeRequest(db: Db, raw: unknown): ImportResult {
+export async function importChangeRequest(db: Db, raw: unknown): Promise<ImportResult> {
   const event = erpEventSchema.parse(raw);
-  const vendor = getVendorByCode(db, event.vendorCode);
+  const vendor = await getVendorByCode(db, event.vendorCode);
   if (!vendor || vendor.status !== "active") {
     throw new Error("unknown or inactive vendor code");
   }
 
-  const existing = getChangeRequestByExternalEventId(db, event.externalEventId);
+  const existing = await getChangeRequestByExternalEventId(db, event.externalEventId);
   if (existing) {
-    const verificationCase = getCaseByRequestId(db, existing.id);
+    const verificationCase = await getCaseByRequestId(db, existing.id);
     if (!verificationCase) throw new Error("orphaned change request");
     return { changeRequest: existing, verificationCase, duplicate: true };
   }
@@ -75,11 +73,14 @@ export function importChangeRequest(db: Db, raw: unknown): ImportResult {
     updatedAt: now(),
   };
 
-  db.transaction(() => {
-    insertChangeRequest(db, request);
-    insertCase(db, verificationCase);
-    appendAudit(db, {
-      caseId: verificationCase.id,
+  // One atomic write batch whose statements are self-guarding: a racing
+  // initializer running the identical batch writes nothing, so no window
+  // exists where a loser could observe a request without its case or fork a
+  // second audit chain. Afterwards we read the persisted rows back — the
+  // winner's ids win, so `duplicate` is decided by the stored row, not by
+  // which client happened to insert.
+  await insertImportBundle(db, request, verificationCase, [
+    {
       type: "change_request.imported",
       actor: "erp_import",
       payload: {
@@ -92,14 +93,21 @@ export function importChangeRequest(db: Db, raw: unknown): ImportResult {
         changeFingerprint: request.changeFingerprint,
         status: "held",
       },
-    });
-    appendAudit(db, {
-      caseId: verificationCase.id,
+    },
+    {
       type: "case.created",
       actor: "system",
       payload: { safeCaseCode: verificationCase.safeCaseCode, state: "needs_review" },
-    });
-  })();
+    },
+  ]);
 
-  return { changeRequest: request, verificationCase, duplicate: false };
+  const persisted = await getChangeRequestByExternalEventId(db, event.externalEventId);
+  if (!persisted) throw new Error("change request was not persisted");
+  const persistedCase = await getCaseByRequestId(db, persisted.id);
+  if (!persistedCase) throw new Error("orphaned change request");
+  return {
+    changeRequest: persisted,
+    verificationCase: persistedCase,
+    duplicate: persisted.id !== request.id,
+  };
 }

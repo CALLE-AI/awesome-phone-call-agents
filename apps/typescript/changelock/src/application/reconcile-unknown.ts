@@ -6,6 +6,8 @@ import {
   getCase,
   getIntent,
   updateCaseState,
+  updateIntentStatus,
+  withTransaction,
   type Db,
 } from "../infrastructure/db";
 import type { CallProvider } from "../provider/call-provider";
@@ -29,9 +31,9 @@ export async function reconcileUnknownCall(
   if (!liveModeEnabled()) {
     throw new Error("live mode is not enabled on this server");
   }
-  const intent = getIntent(db, input.intentId);
+  const intent = await getIntent(db, input.intentId);
   if (!intent) throw new Error("intent not found");
-  const kase = getCase(db, intent.caseId);
+  const kase = await getCase(db, intent.caseId);
   if (!kase) throw new Error("case not found");
   if (kase.state !== "submission_unknown") {
     throw new Error(`cannot reconcile in state ${kase.state}`);
@@ -47,17 +49,17 @@ export async function reconcileUnknownCall(
       : bindingFailures({ ...intent, providerCallId: input.providerCallId }, snapshot);
 
   if (mismatches.length > 0) {
-    db.transaction(() => {
+    await withTransaction(db, async (tx) => {
       assertTransition(kase.state, "needs_human");
-      updateCaseState(db, kase.id, "needs_human");
-      db.prepare("UPDATE call_intents SET status = 'expired' WHERE id = ?").run(intent.id);
-      appendAudit(db, {
+      await updateCaseState(tx, kase.id, "needs_human");
+      await updateIntentStatus(tx, intent.id, "expired");
+      await appendAudit(tx, {
         caseId: kase.id,
         type: "reconcile.binding_mismatch",
         actor: "operator",
         payload: { intentId: intent.id, failedGates: mismatches },
       });
-    })();
+    });
     return { disposition: "needs_human", caseState: "needs_human", failedGates: mismatches };
   }
 

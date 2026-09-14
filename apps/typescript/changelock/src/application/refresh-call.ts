@@ -8,14 +8,14 @@ export async function refreshCall(
   intentId: string,
   provider: CallProvider,
 ): Promise<RecordResult> {
-  const intent = getIntent(db, intentId);
+  const intent = await getIntent(db, intentId);
   if (!intent) throw new Error("intent not found");
-  const kase = getCase(db, intent.caseId);
+  const kase = await getCase(db, intent.caseId);
   if (!kase) throw new Error("case not found");
   if (!intent.providerCallId) throw new Error("intent has no bound call to refresh");
   const providerSnapshot = await provider.get(intent.providerCallId);
-  const result = recordCallOutcome(db, intent.id, mapProviderSnapshot(providerSnapshot));
-  appendAudit(db, {
+  const result = await recordCallOutcome(db, intent.id, mapProviderSnapshot(providerSnapshot));
+  await appendAudit(db, {
     caseId: kase.id,
     type: "call.refreshed",
     actor: "operator",

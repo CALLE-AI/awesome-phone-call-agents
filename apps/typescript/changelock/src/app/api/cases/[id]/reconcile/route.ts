@@ -1,4 +1,5 @@
 import { getDb } from "../../../../server/get-db";
+import { getIntentCaseId } from "../../../../../infrastructure/db";
 import { parseReconcileFormInput } from "../../../../../application/live-input";
 import { reconcileUnknownCall } from "../../../../../application/reconcile-unknown";
 import { createLiveCallProvider } from "../../../../../provider/calle-provider";
@@ -12,13 +13,11 @@ export async function POST(
   if (process.env.CHANGELOCK_MODE !== "live") {
     return redirectToCase(req, id, "live mode is not enabled on this server");
   }
-  const db = getDb();
+  const db = await getDb();
   try {
     const input = parseReconcileFormInput(await req.formData());
-    const row = db
-      .prepare("SELECT case_id FROM call_intents WHERE id = ?")
-      .get(input.intentId) as { case_id: string } | undefined;
-    if (row && row.case_id !== id) {
+    const ownerCaseId = await getIntentCaseId(db, input.intentId);
+    if (ownerCaseId && ownerCaseId !== id) {
       return redirectToCase(req, id, "intent does not belong to this case");
     }
     await reconcileUnknownCall(db, input, createLiveCallProvider());

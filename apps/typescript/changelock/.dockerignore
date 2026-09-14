@@ -13,3 +13,7 @@ research.md
 Dockerfile
 .dockerignore
 render.yaml
+.vercel
+.agents
+.claude
+skills-lock.json

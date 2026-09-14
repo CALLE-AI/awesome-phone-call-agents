@@ -102,7 +102,35 @@ the trusted contact's number and region are both allowlisted; without all of
 these, live dispatch refuses before any network I/O. Public/judge code paths
 only ever construct replay intents.
 
-## Public deployment (Docker)
+## Public deployment
+
+### Vercel + Turso
+
+Deploy the repo on Vercel with framework defaults (no `vercel.json` needed) and
+set three server-side environment variables:
+
+```
+CHANGELOCK_MODE=replay
+TURSO_DATABASE_URL=libsql://your-db.turso.io
+TURSO_AUTH_TOKEN=
+```
+
+(`TURSO_AUTH_TOKEN` takes the real token in the Vercel dashboard — never in the
+repo.)
+
+`TURSO_DATABASE_URL` + `TURSO_AUTH_TOKEN` select a remote Turso database over
+the `@tursodatabase/serverless` driver — required because `@libsql/client`'s
+SQL-over-HTTP path does not support concurrent writes on Turso. The token is
+required, never logged, and never exposed to the browser; the local file driver
+(`@libsql/client`) is only loaded when the Turso variables are absent, so the
+remote runtime never touches native SQLite bindings. On first request the app
+migrates and seeds the four fictional cases into Turso; initialization is
+idempotent and race-safe across concurrent cold starts. That state persists
+across deploys and instances — the demo contract relies on the replay-only
+`Reset synthetic case` action (visible on eligible terminal cases) rather than
+on state being wiped.
+
+### Docker (local file)
 
 ```bash
 docker build -t changelock .
@@ -110,12 +138,16 @@ docker run -p 3000:3000 changelock
 ```
 
 The image runs only judge replay mode: `CHANGELOCK_MODE=replay` is baked in and
-no `CALLE_API_KEY` or live allowlists exist inside it, so a public deployment is
-structurally replay-only. The SQLite database lives at `/data/changelock.db`
-and is intentionally ephemeral — on a fresh start the app re-seeds the four
-fictional demo cases automatically. Do not mount a persistent disk for judging;
-state resets are part of the demo contract. `render.yaml` deploys the same
-image as a free web service with health check `/` and no disk.
+no `CALLE_API_KEY`, Turso variables, or live allowlists exist inside it, so a
+public deployment is structurally replay-only. Without Turso env vars the app
+uses a local libSQL file at `/data/changelock.db`; on a fresh container the app
+re-seeds the four fictional demo cases automatically. `render.yaml` deploys the
+same image as a free web service with health check `/` and no disk — on that
+ephemeral filesystem, restarts simply re-seed.
+
+Locally, `CHANGELOCK_DB_PATH` picks the file location (default
+`./data/changelock.db`); `npm run db:migrate` and `npm run db:seed` work against
+whichever target `openDatabase` selects.
 
 ## Verification
 

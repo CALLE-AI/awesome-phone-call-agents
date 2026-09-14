@@ -13,11 +13,11 @@ export async function POST(
   if (process.env.CHANGELOCK_MODE !== "live") {
     return redirectToCase(req, id, "live mode is not enabled on this server");
   }
-  const db = getDb();
+  const db = await getDb();
   try {
     const input = parseLiveFormInput(await req.formData());
-    const preview = createPreview(db, id);
-    const intent = authorizeIntent(
+    const preview = await createPreview(db, id);
+    const intent = await authorizeIntent(
       db,
       {
         caseId: id,

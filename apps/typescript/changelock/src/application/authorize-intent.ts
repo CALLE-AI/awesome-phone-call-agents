@@ -13,11 +13,13 @@ import {
   getIntent,
   getPreviewExpiry,
   getUnresolvedIntentForCase,
+  getVendor,
   insertIntent,
   nextIntentVersion,
   newId,
   setPreviewExpiry,
   updateCaseState,
+  withTransaction,
   type Db,
 } from "../infrastructure/db";
 import type { CallIntent } from "../domain/types";
@@ -39,21 +41,21 @@ const authorizationSchema = z
 
 export type ProviderMode = "replay" | "live";
 
-export function authorizeIntent(
+export async function authorizeIntent(
   db: Db,
   raw: unknown,
   providerMode: ProviderMode = "replay",
-): CallIntent {
+): Promise<CallIntent> {
   const input = authorizationSchema.parse(raw);
   if (providerMode === "live" && process.env.CHANGELOCK_MODE !== "live") {
     throw new Error("live mode is not enabled on this server");
   }
-  const kase = getCase(db, input.caseId);
+  const kase = await getCase(db, input.caseId);
   if (!kase) throw new Error("case not found");
   if (kase.state !== "preview_ready") {
     throw new Error(`cannot authorize in state ${kase.state}`);
   }
-  const previewExpiry = getPreviewExpiry(db, kase.id);
+  const previewExpiry = await getPreviewExpiry(db, kase.id);
   const nowMs = Date.now();
   if (
     !previewExpiry ||
@@ -62,14 +64,14 @@ export function authorizeIntent(
     input.preview.caseId !== kase.id
   ) {
     assertTransition(kase.state, "needs_review");
-    updateCaseState(db, kase.id, "needs_review");
-    setPreviewExpiry(db, kase.id, null);
+    await updateCaseState(db, kase.id, "needs_review");
+    await setPreviewExpiry(db, kase.id, null);
     throw new Error("preview missing or expired; regenerate before authorizing");
   }
 
-  const request = getChangeRequest(db, kase.changeRequestId);
+  const request = await getChangeRequest(db, kase.changeRequestId);
   if (!request) throw new Error("change request missing");
-  const contact = getActiveTrustedContact(db, request.vendorId);
+  const contact = await getActiveTrustedContact(db, request.vendorId);
   if (!contact) throw new Error("no trusted contact on vendor record");
   if (providerMode === "live") {
     const policy = livePolicyCheck({
@@ -78,12 +80,11 @@ export function authorizeIntent(
     });
     if (!policy.ok) throw new Error(policy.reason);
   }
-  const vendor = db
-    .prepare("SELECT display_name FROM vendors WHERE id = ?")
-    .get(request.vendorId) as { display_name: string };
+  const vendor = await getVendor(db, request.vendorId);
+  if (!vendor) throw new Error("vendor missing");
 
   const taskText = buildCallTask({
-    vendorDisplayName: vendor.display_name,
+    vendorDisplayName: vendor.displayName,
     buyerOrgName: BUYER_ORG_NAME,
     safeCaseCode: kase.safeCaseCode,
   });
@@ -104,11 +105,11 @@ export function authorizeIntent(
   if (input.typedPhrase !== expected) {
     throw new Error(`typed phrase must be exactly "${expected}"`);
   }
-  if (getUnresolvedIntentForCase(db, kase.id)) {
+  if (await getUnresolvedIntentForCase(db, kase.id)) {
     throw new Error("an intent is already active for this case");
   }
 
-  const version = nextIntentVersion(db, kase.id);
+  const version = await nextIntentVersion(db, kase.id);
   const intent: CallIntent = {
     id: newId("intent"),
     caseId: kase.id,
@@ -128,11 +129,11 @@ export function authorizeIntent(
     createdAt: new Date(nowMs).toISOString(),
   };
 
-  db.transaction(() => {
+  await withTransaction(db, async (tx) => {
     assertTransition(kase.state, "dispatch_reserved");
-    insertIntent(db, intent);
-    updateCaseState(db, kase.id, "dispatch_reserved", intent.id);
-    appendAudit(db, {
+    await insertIntent(tx, intent);
+    await updateCaseState(tx, kase.id, "dispatch_reserved", intent.id);
+    await appendAudit(tx, {
       caseId: kase.id,
       type: "intent.reserved",
       actor: "operator",
@@ -147,7 +148,8 @@ export function authorizeIntent(
         attestedConsentingContact: true,
       },
     });
-  })();
+  });
 
-  return getIntent(db, intent.id)!;
+  const saved = await getIntent(db, intent.id);
+  return saved!;
 }

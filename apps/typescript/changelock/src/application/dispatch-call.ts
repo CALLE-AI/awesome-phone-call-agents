@@ -6,6 +6,8 @@ import {
   getIntent,
   bindProviderCallId,
   updateCaseState,
+  updateIntentStatus,
+  withTransaction,
   type Db,
 } from "../infrastructure/db";
 import { createLiveCallProvider } from "../provider/calle-provider";
@@ -58,9 +60,9 @@ export async function dispatchCall(
   injectedProvider?: CallProvider,
 ): Promise<DispatchResult> {
   const input = dispatchSchema.parse(raw);
-  const intent = getIntent(db, input.intentId);
+  const intent = await getIntent(db, input.intentId);
   if (!intent) throw new Error("intent not found");
-  const kase = getCase(db, intent.caseId);
+  const kase = await getCase(db, intent.caseId);
   if (!kase) throw new Error("case not found");
   if (intent.status !== "reserved") {
     throw new Error(`intent is ${intent.status}; refusing to dispatch again`);
@@ -69,17 +71,17 @@ export async function dispatchCall(
     throw new Error(`case is ${kase.state}; cannot dispatch`);
   }
   if (new Date(intent.expiresAt).getTime() <= Date.now()) {
-    db.transaction(() => {
-      db.prepare("UPDATE call_intents SET status = 'expired' WHERE id = ?").run(intent.id);
+    await withTransaction(db, async (tx) => {
+      await updateIntentStatus(tx, intent.id, "expired");
       assertTransition(kase.state, "needs_review");
-      updateCaseState(db, kase.id, "needs_review");
-      appendAudit(db, {
+      await updateCaseState(tx, kase.id, "needs_review");
+      await appendAudit(tx, {
         caseId: kase.id,
         type: "intent.expired",
         actor: "system",
         payload: { intentId: intent.id, reason: "authorization window elapsed" },
       });
-    })();
+    });
     throw new Error("authorization expired; create a new preview and re-authorize");
   }
   if (intent.providerMode === "live" && process.env.CHANGELOCK_MODE !== "live") {
@@ -87,35 +89,35 @@ export async function dispatchCall(
   }
 
   const provider = injectedProvider ?? resolveProvider(intent.providerMode, input.scenario);
-  const callInput = resolveDispatchInput(db, intent.id);
+  const callInput = await resolveDispatchInput(db, intent.id);
   const outcome = await provider.create(callInput);
 
   if (outcome.kind === "rejected") {
-    db.transaction(() => {
-      db.prepare("UPDATE call_intents SET status = 'expired' WHERE id = ?").run(intent.id);
+    await withTransaction(db, async (tx) => {
+      await updateIntentStatus(tx, intent.id, "expired");
       assertTransition(kase.state, "needs_review");
-      updateCaseState(db, kase.id, "needs_review");
-      appendAudit(db, {
+      await updateCaseState(tx, kase.id, "needs_review");
+      await appendAudit(tx, {
         caseId: kase.id,
         type: "dispatch.rejected",
         actor: "provider",
         payload: { intentId: intent.id, code: outcome.code },
       });
-    })();
+    });
     return { caseId: kase.id, providerCallId: null, outcome: "rejected", state: "needs_review" };
   }
 
   if (outcome.kind === "acceptance_unknown") {
-    db.transaction(() => {
+    await withTransaction(db, async (tx) => {
       assertTransition(kase.state, "submission_unknown");
-      updateCaseState(db, kase.id, "submission_unknown");
-      appendAudit(db, {
+      await updateCaseState(tx, kase.id, "submission_unknown");
+      await appendAudit(tx, {
         caseId: kase.id,
         type: "dispatch.acceptance_unknown",
         actor: "provider",
         payload: { intentId: intent.id, code: outcome.code, autoRetry: false },
       });
-    })();
+    });
     return {
       caseId: kase.id,
       providerCallId: null,
@@ -124,11 +126,11 @@ export async function dispatchCall(
     };
   }
 
-  db.transaction(() => {
-    bindProviderCallId(db, intent.id, outcome.snapshot.id);
+  await withTransaction(db, async (tx) => {
+    await bindProviderCallId(tx, intent.id, outcome.snapshot.id);
     assertTransition(kase.state, "call_active");
-    updateCaseState(db, kase.id, "call_active");
-    appendAudit(db, {
+    await updateCaseState(tx, kase.id, "call_active");
+    await appendAudit(tx, {
       caseId: kase.id,
       type: "dispatch.accepted",
       actor: "provider",
@@ -138,12 +140,12 @@ export async function dispatchCall(
         providerMode: intent.providerMode,
       },
     });
-  })();
+  });
 
   const snapshot = mapProviderSnapshot(outcome.snapshot);
-  recordCallOutcome(db, intent.id, snapshot);
+  await recordCallOutcome(db, intent.id, snapshot);
 
-  const after = getCase(db, kase.id)!;
+  const after = (await getCase(db, kase.id))!;
   return {
     caseId: kase.id,
     providerCallId: outcome.snapshot.id,

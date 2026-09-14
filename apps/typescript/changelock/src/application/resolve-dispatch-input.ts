@@ -2,10 +2,10 @@ import { recipientResultSchema } from "../domain/schemas";
 import { getIntent, getTrustedContact, type Db } from "../infrastructure/db";
 import type { ReservedCallInput } from "../provider/call-provider";
 
-export function resolveDispatchInput(db: Db, intentId: string): ReservedCallInput {
-  const intent = getIntent(db, intentId);
+export async function resolveDispatchInput(db: Db, intentId: string): Promise<ReservedCallInput> {
+  const intent = await getIntent(db, intentId);
   if (!intent) throw new Error("intent not found");
-  const contact = getTrustedContact(db, intent.trustedContactId);
+  const contact = await getTrustedContact(db, intent.trustedContactId);
   if (!contact || !contact.active) throw new Error("trusted contact unavailable");
   return {
     task: intent.taskText,

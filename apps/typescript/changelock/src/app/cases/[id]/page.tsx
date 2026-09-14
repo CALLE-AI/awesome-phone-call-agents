@@ -3,6 +3,7 @@ import { notFound } from "next/navigation";
 import { getDb } from "../../server/get-db";
 import { getCaseDetail } from "../../server/queries";
 import { gateRows } from "../../../domain/gates";
+import { isResettableSyntheticCase } from "../../../application/reset-synthetic-case";
 
 export const dynamic = "force-dynamic";
 
@@ -44,8 +45,8 @@ export default async function CasePage({
 }) {
   const { id } = await params;
   const { error } = await searchParams;
-  const db = getDb();
-  const detail = getCaseDetail(db, id);
+  const db = await getDb();
+  const detail = await getCaseDetail(db, id);
   if (!detail) notFound();
 
   const lastEval = [...detail.audit].reverse().find((e) => e.type === "result.evaluated");
@@ -62,6 +63,10 @@ export default async function CasePage({
       ? detail.intents.find((i) => i.status === "reserved" && !i.providerCallId)
       : undefined;
   const canReconcileLive = LIVE_MODE && unknownIntent?.providerMode === "live";
+  const canResetSynthetic =
+    !LIVE_MODE &&
+    detail.suggestedScenario !== null &&
+    isResettableSyntheticCase(detail.state, detail.request.externalEventId);
   const latestSnapshot = detail.intents.flatMap((i) => i.snapshots).at(-1);
 
   return (
@@ -346,6 +351,19 @@ export default async function CasePage({
                 >
                   <input type="hidden" name="intentId" value={refreshable[0].id} />
                   <button type="submit">Refresh call {refreshable[0].providerCallId}</button>
+                </form>
+              ) : null}
+              {canResetSynthetic ? (
+                <form
+                  method="post"
+                  action={`/api/cases/${detail.caseId}/reset`}
+                  className="u-mt-12"
+                >
+                  <button type="submit">Reset synthetic case</button>
+                  <div className="hint-inline">
+                    demo maintenance — clears this seeded case&apos;s call history so it can be
+                    replayed; the payment change stays held
+                  </div>
                 </form>
               ) : null}
             </div>

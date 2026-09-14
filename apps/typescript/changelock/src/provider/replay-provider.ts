@@ -7,7 +7,7 @@ import malformed from "../fixtures/call-results/malformed.json";
 import inProgress from "../fixtures/call-results/in-progress.json";
 import type { FixtureName } from "../fixtures/call-results";
 import { resolveDispatchInput } from "../application/resolve-dispatch-input";
-import type { Db } from "../infrastructure/db";
+import { getIntentByProviderCallId, type Db } from "../infrastructure/db";
 import type {
   CallProvider,
   CreateCallOutcome,
@@ -52,11 +52,9 @@ export function createReplayRefreshProvider(db: Db): CallProvider {
   return {
     create: () => Promise.reject(new Error("refresh-only provider cannot create calls")),
     get: async (callId) => {
-      const intent = db
-        .prepare("SELECT id FROM call_intents WHERE provider_call_id = ?")
-        .get(callId) as { id: string } | undefined;
+      const intent = await getIntentByProviderCallId(db, callId);
       if (!intent) throw new Error(`unknown replay call id ${callId}`);
-      return replaySnapshotFor(callId, resolveDispatchInput(db, intent.id));
+      return replaySnapshotFor(callId, await resolveDispatchInput(db, intent.id));
     },
   };
 }

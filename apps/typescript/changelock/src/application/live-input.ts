@@ -50,3 +50,7 @@ export function parseEscalateFormInput(form: FormData): EscalateFormInput {
   requireOnly(form, ["intentId"]);
   return { intentId: requireString(form, "intentId", "intent id is required") };
 }
+
+export function parseResetFormInput(form: FormData): void {
+  requireOnly(form, []);
+}

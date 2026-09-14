@@ -17,6 +17,8 @@ const SECRET_PATTERNS: [RegExp, string][] = [
   [/AKIA[0-9A-Z]{16}/, "AWS access key id"],
   [/-----BEGIN [A-Z ]*PRIVATE KEY-----/, "private key block"],
   [/CALLE_API_KEY[ \t]*=[ \t]*\S/, "assigned CALL-E API key"],
+  [/TURSO_AUTH_TOKEN[ \t]*=[ \t]*\S/, "assigned Turso auth token"],
+  [/eyJ[A-Za-z0-9_-]{10,}\.[A-Za-z0-9_-]{10,}\.[A-Za-z0-9_-]{10,}/, "JWT-shaped credential (Turso auth tokens are JWTs)"],
 ];
 
 const E164 = /\+[1-9]\d{7,14}/;
