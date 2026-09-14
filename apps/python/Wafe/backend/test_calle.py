@@ -5,7 +5,7 @@ from app.calle.tasks import (
 )
 
 
-PHONE_NUMBER = "+918527067677"
+PHONE_NUMBER = "+91xxxxxxxxxx"
 
 
 def main():
