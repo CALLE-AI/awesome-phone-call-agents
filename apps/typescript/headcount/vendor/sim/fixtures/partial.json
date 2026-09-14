@@ -1,0 +1,37 @@
+{
+  "id": "partial",
+  "status": "completed",
+  "task_completed": false,
+  "completion_confidence": { "score": 0.62, "label": "medium" },
+  "disposition": "answered_unknown",
+  "evidence": [
+    "The recipient said they were sheltering in place.",
+    "They said they do not have electricity.",
+    "They would not answer questions about water, medication, or household accounting."
+  ],
+  "structured_result": {
+    "dialed_count": 1,
+    "reached_count": 1,
+    "unreached_count": 0,
+    "critical_count": 0
+  },
+  "recipient_structured_result": {
+    "safety_status": "needs_assistance",
+    "evacuation": "sheltering_in_place",
+    "has_power": "no",
+    "has_water": "unknown",
+    "medication": "unknown",
+    "household": "unknown",
+    "needs_human": "unknown"
+  },
+  "transcript_turns": [
+    { "offset_seconds": 0, "speaker": "bot", "text": "This is an automated AI assistant from Sonoma County Emergency Management. This is a safety and needs check." },
+    { "offset_seconds": 8, "speaker": "user", "text": "Yeah?" },
+    { "offset_seconds": 10, "speaker": "bot", "text": "Is everyone in the household safe and accounted for?" },
+    { "offset_seconds": 14, "speaker": "user", "text": "I think so. Power is out though." },
+    { "offset_seconds": 18, "speaker": "bot", "text": "Are you sheltering in place, or have you evacuated?" },
+    { "offset_seconds": 22, "speaker": "user", "text": "We're staying here." },
+    { "offset_seconds": 26, "speaker": "bot", "text": "Do you have running water? Does anyone need medication you cannot get?" },
+    { "offset_seconds": 32, "speaker": "user", "text": "I don't want to answer more questions right now." }
+  ]
+}

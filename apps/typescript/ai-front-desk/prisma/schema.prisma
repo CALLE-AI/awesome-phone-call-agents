@@ -1,0 +1,142 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "sqlite"
+  url      = env("DATABASE_URL")
+}
+
+model Business {
+  id           String   @id @default(cuid())
+  name         String
+  timezone     String
+  phone        String
+  businessType String // CLINIC | SALON | TUTOR | HOME_SERVICE
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  contacts        Contact[]
+  slots           Slot[]
+  appointments    Appointment[]
+  waitlistEntries WaitlistEntry[]
+  leads           Lead[]
+  callLogs        CallLog[]
+}
+
+model Contact {
+  id         String   @id @default(cuid())
+  businessId String
+  name       String
+  phone      String // E.164
+  email      String?
+  notes      String?
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
+
+  business        Business        @relation(fields: [businessId], references: [id])
+  appointments    Appointment[]
+  waitlistEntries WaitlistEntry[]
+  leads           Lead[]
+}
+
+model Slot {
+  id          String   @id @default(cuid())
+  businessId  String
+  startsAt    DateTime
+  endsAt      DateTime
+  serviceType String
+  status      String   @default("OPEN") // OPEN | HELD | BOOKED | CANCELLED
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  business    Business     @relation(fields: [businessId], references: [id])
+  appointment Appointment?
+}
+
+model Appointment {
+  id                     String   @id @default(cuid())
+  businessId             String
+  slotId                 String?  @unique
+  contactId              String
+  status                 String   @default("SCHEDULED") // SCHEDULED | CONFIRMED | NEEDS_RESCHEDULE | CANCELLED | NO_SHOW | COMPLETED
+  confirmationCallStatus String   @default("NOT_CALLED") // NOT_CALLED | CALLING | CONFIRMED | DECLINED | NO_ANSWER | FAILED
+  createdAt              DateTime @default(now())
+  updatedAt              DateTime @updatedAt
+
+  business Business  @relation(fields: [businessId], references: [id])
+  slot     Slot?     @relation(fields: [slotId], references: [id])
+  contact  Contact   @relation(fields: [contactId], references: [id])
+  callLogs CallLog[]
+}
+
+model WaitlistEntry {
+  id                 String   @id @default(cuid())
+  businessId         String
+  contactId          String
+  desiredServiceType String
+  priority           Int // lower = called first
+  status             String   @default("WAITING") // WAITING | OFFERED | ACCEPTED | DECLINED | EXPIRED | BOOKED | NEEDS_REVIEW
+  createdAt          DateTime @default(now())
+  updatedAt          DateTime @updatedAt
+
+  business Business  @relation(fields: [businessId], references: [id])
+  contact  Contact   @relation(fields: [contactId], references: [id])
+  callLogs CallLog[]
+}
+
+model Lead {
+  id                 String   @id @default(cuid())
+  businessId         String
+  contactId          String?
+  rawInquiry         String
+  reasonForVisit     String?
+  preferredTimeframe String?
+  status             String   @default("NEW") // NEW | CALLING | QUALIFIED | NOT_QUALIFIED | BOOKED | WAITLISTED | FAILED
+  createdAt          DateTime @default(now())
+  updatedAt          DateTime @updatedAt
+
+  business Business  @relation(fields: [businessId], references: [id])
+  contact  Contact?  @relation(fields: [contactId], references: [id])
+  callLogs CallLog[]
+}
+
+model CallLog {
+  id                   String   @id @default(cuid())
+  businessId           String
+  flow                 String // CONFIRM | BACKFILL | QUALIFY | HELLO_WORLD
+  appointmentId        String?
+  waitlistEntryId      String?
+  leadId               String?
+  calleCallId          String? // null in dry run
+  task                 String
+  resultSchema         String // JSON
+  status               String // completed | failed | canceled | dry_run
+  taskCompleted        Boolean?
+  completionConfidence String? // JSON: { score, label }
+  structuredResult     String? // JSON
+  transcript           String? // JSON: TranscriptTurn[]
+  summary              String?
+  evidence             String? // JSON: string[]
+  dryRun               Boolean  @default(true)
+  createdAt            DateTime @default(now())
+
+  business      Business       @relation(fields: [businessId], references: [id])
+  appointment   Appointment?   @relation(fields: [appointmentId], references: [id])
+  waitlistEntry WaitlistEntry? @relation(fields: [waitlistEntryId], references: [id])
+  lead          Lead?          @relation(fields: [leadId], references: [id])
+}
+
+// Durable record that a CALL-E call was accepted for a given logical
+// operation, keyed by a deterministic idempotencyKey (e.g. `confirm:<id>`).
+// Looked up before every live call so a retry (after a crash, a duplicate
+// request, etc.) resumes waiting on the existing call instead of placing a
+// second one.
+model CallClaim {
+  id             String   @id @default(cuid())
+  idempotencyKey String   @unique
+  calleCallId    String? // set once client.calls.create() has accepted the call
+  status         String   @default("PENDING") // PENDING | CREATED | DONE
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+}

@@ -1,0 +1,31 @@
+{
+  "call_id": "call_mock_voicemail",
+  "status": "completed",
+  "task_completed": true,
+  "completion_confidence": {
+    "score": 0.88,
+    "label": "high"
+  },
+  "description": "Machine answers. Agent leaves a short message and does not treat silence as yes.",
+  "transcript_turns": [
+    {
+      "offset_seconds": 0,
+      "speaker": "user",
+      "text": "Hi, you've reached Amelia. I am not available, please leave a message after the beep."
+    },
+    {
+      "offset_seconds": 6,
+      "speaker": "bot",
+      "text": "This is an AI assistant calling from KAY2 Studios about a booked session on Thursday. Please call the studio back to confirm. Goodbye."
+    }
+  ],
+  "expected_structured_result": {
+    "can_attend": "unknown",
+    "confirmed_time": "",
+    "requested_time": "",
+    "disposition": "voicemail"
+  },
+  "evidence": [
+    "Hi, you've reached Amelia. I am not available, please leave a message after the beep."
+  ]
+}

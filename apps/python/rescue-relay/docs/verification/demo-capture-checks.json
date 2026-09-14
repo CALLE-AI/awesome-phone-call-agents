@@ -1,0 +1,142 @@
+{
+  "checks": [
+    "Opening the app does not create a report or inquiry",
+    "Walkthrough is accessible from the app",
+    "Loading the example saves contacts, not an incident or calls",
+    "Clarification is still an unsubmitted draft",
+    "The exact requested goal is visible before confirmation",
+    "Ready-to-confirm is not mistaken for permission to call",
+    "First full-plan quote is PKR 3,000",
+    "The over-budget warning is shown from the server result",
+    "An offer does not become an approved callback",
+    "Technical history is collapsed by default",
+    "Main dashboard contains user outcomes, not implementation commentary",
+    "Comparing does not silently switch the selected plan",
+    "Both complete plans are available for comparison",
+    "Selecting a plan does not call a helper back",
+    "Approval contains only the selected plan\u2019s responder",
+    "Only Kindred Rescue receives an approval callback",
+    "Confirmation does not invent travel or arrival",
+    "Writing a closure note does not close the rescue before confirmation",
+    "The complete start-to-finish rescue is saved",
+    "The reporter\u2019s closing note is visible on the finished rescue",
+    "Sound stays off until explicitly enabled"
+  ],
+  "cues": [
+    {
+      "title": "MEET RESCUE RELAY",
+      "text": "From finding an animal in need to bringing the right help together. Fictional example shown.",
+      "start": 0.0,
+      "end": 7.001
+    },
+    {
+      "title": "TRY A COMPLETE RESCUE",
+      "text": "Load the example, then make the same decisions you would in your own rescue.",
+      "start": 7.076,
+      "end": 14.078
+    },
+    {
+      "title": "DESCRIBE WHAT YOU SEE",
+      "text": "A dog cannot put weight on its rear leg. The location and a PKR 2,000 budget are ready to review.",
+      "start": 14.247,
+      "end": 23.251
+    },
+    {
+      "title": "CLARIFY THE OUTCOME",
+      "text": "Review the report. Describe what a successful rescue should include.",
+      "start": 23.347,
+      "end": 35.348
+    },
+    {
+      "title": "YOUR GOAL, YOUR CHOICE",
+      "text": "Check the goal and location. Edit anything that is not right before finding help.",
+      "start": 35.433,
+      "end": 44.434
+    },
+    {
+      "title": "FIND AVAILABLE HELP",
+      "text": "Confirm the goal to check your trusted contacts for availability and prices.",
+      "start": 44.482,
+      "end": 52.483
+    },
+    {
+      "title": "REVIEW THE FIRST OPTION",
+      "text": "Greenway Rescue covers all three tasks. Its PKR 3,000 quote is above your budget.",
+      "start": 52.484,
+      "end": 62.484
+    },
+    {
+      "title": "FIND ANOTHER OPTION",
+      "text": "Keep your first offer and ask for another option. Your selected plan stays unchanged.",
+      "start": 62.529,
+      "end": 70.53
+    },
+    {
+      "title": "COMPARE COMPLETE PLANS",
+      "text": "Kindred Rescue offers the same requested tasks for PKR 1,500, within your budget.",
+      "start": 70.53,
+      "end": 81.53
+    },
+    {
+      "title": "CHOOSE YOUR PLAN",
+      "text": "Choose the plan that works for you. You stay in control of the final approval.",
+      "start": 81.577,
+      "end": 88.578
+    },
+    {
+      "title": "REVIEW BEFORE APPROVAL",
+      "text": "Confirm the selected helper, included tasks and price limit.",
+      "start": 88.628,
+      "end": 98.629
+    },
+    {
+      "title": "CONFIRM YOUR HELPER",
+      "text": "Approve the plan. The chosen helper is asked to confirm the agreed work and price.",
+      "start": 98.714,
+      "end": 107.714
+    },
+    {
+      "title": "HELP IS CONFIRMED",
+      "text": "The helper is ready. Keep the rescue up to date as you hear from them.",
+      "start": 107.714,
+      "end": 116.714
+    },
+    {
+      "title": "ON THE WAY",
+      "text": "When the helper confirms departure, record \u201cOn the way\u201d.",
+      "start": 116.757,
+      "end": 124.757
+    },
+    {
+      "title": "ARRIVAL CONFIRMED",
+      "text": "Record arrival after it has been confirmed by you or the helper.",
+      "start": 124.757,
+      "end": 132.759
+    },
+    {
+      "title": "THEIR PART IS FINISHED",
+      "text": "Mark the helper\u2019s work as finished once their part of the rescue is complete.",
+      "start": 132.808,
+      "end": 140.809
+    },
+    {
+      "title": "CLOSE THE LOOP",
+      "text": "Add where the animal is now, and confirm that it is safe.",
+      "start": 140.809,
+      "end": 152.81
+    },
+    {
+      "title": "A SAFE PLACE. A FINISHED RESCUE.",
+      "text": "The closing note, helper updates and conversations remain with your report.",
+      "start": 152.956,
+      "end": 161.957
+    }
+  ],
+  "version": "5.4.0",
+  "mode": "demo",
+  "javascript_errors": [],
+  "http_bridge": true,
+  "real_calls": false,
+  "external_model_inference": false,
+  "source": "Unmodified live-app HTML, CSS and JS with the actual isolated mock API"
+}

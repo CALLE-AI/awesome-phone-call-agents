@@ -1,0 +1,42 @@
+{
+  "call_id": "call_mock_reschedule",
+  "status": "completed",
+  "task_completed": true,
+  "completion_confidence": {
+    "score": 0.91,
+    "label": "high"
+  },
+  "description": "Recipient cannot make 10:00 and asks for the 14:00 window.",
+  "transcript_turns": [
+    {
+      "offset_seconds": 0,
+      "speaker": "bot",
+      "text": "Hi Amelia, this is an AI assistant calling from KAY2 Studios about your 10:00 brand strategy session on Thursday 3 September. Can you still attend?"
+    },
+    {
+      "offset_seconds": 7,
+      "speaker": "user",
+      "text": "I can't make 10. Can we move it to 2pm instead?"
+    },
+    {
+      "offset_seconds": 12,
+      "speaker": "bot",
+      "text": "I can note 14:00 on Thursday 3 September as a request. A human will rebook if that slot is still free. I will not change the calendar myself."
+    },
+    {
+      "offset_seconds": 18,
+      "speaker": "user",
+      "text": "2pm works, thanks."
+    }
+  ],
+  "expected_structured_result": {
+    "can_attend": "no",
+    "confirmed_time": "",
+    "requested_time": "2026-09-03T14:00:00+01:00",
+    "disposition": "reschedule_requested"
+  },
+  "evidence": [
+    "I can't make 10. Can we move it to 2pm instead?",
+    "2pm works, thanks."
+  ]
+}

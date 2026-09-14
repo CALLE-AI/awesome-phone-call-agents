@@ -1,0 +1,60 @@
+{
+  "id": "eval-030",
+  "label": "agent",
+  "difficulty": "typical",
+  "scenario": "Dental clinic LLM voice assistant self-identifies as virtual, answers insurance, availability and hours questions in full sentences.",
+  "task": "Ask Maple Grove Dental whether they accept Delta Dental PPO and take new patients, and get Riverside hours.",
+  "outcome": {
+    "task_completed_claimed": true,
+    "commitment_type": "information",
+    "confirmation_artifact": null,
+    "expected_attestation": "agent_asserted"
+  },
+  "turns": [
+    {
+      "speaker": "user",
+      "text": "hi! thanks for calling Maple Grove Dental. I'm Ava, the virtual assistant. I can help with appointments, insurance questions, and office hours. how can I help today?",
+      "offset_seconds": 1.3
+    },
+    {
+      "speaker": "bot",
+      "text": "hi Ava, I'm an AI assistant calling on behalf of Brian Castillo. does your office accept Delta Dental PPO, and are you taking new patients?",
+      "offset_seconds": 11.13
+    },
+    {
+      "speaker": "user",
+      "text": "great questions. yes, Maple Grove Dental is in network with Delta Dental PPO. and we are currently accepting new patients at both our Elm Street and Riverside locations.",
+      "offset_seconds": 21.27
+    },
+    {
+      "speaker": "bot",
+      "text": "thank you. what's the soonest new patient exam at the Riverside location?",
+      "offset_seconds": 31.83
+    },
+    {
+      "speaker": "user",
+      "text": "the earliest new patient exam at Riverside is currently Tuesday, September twenty second at eight thirty AM. would you like me to help schedule that?",
+      "offset_seconds": 37.48
+    },
+    {
+      "speaker": "bot",
+      "text": "not right now, Brian wants to check his calendar first. what are the Riverside hours?",
+      "offset_seconds": 47.22
+    },
+    {
+      "speaker": "user",
+      "text": "Riverside is open Monday through Thursday from eight AM to five PM, and Friday from eight AM to one PM. is there anything else I can help you with?",
+      "offset_seconds": 53.53
+    },
+    {
+      "speaker": "bot",
+      "text": "no, that's all. thank you.",
+      "offset_seconds": 64.03
+    },
+    {
+      "speaker": "user",
+      "text": "you're welcome! have a great day, and we hope to see Brian soon.",
+      "offset_seconds": 66.99
+    }
+  ]
+}

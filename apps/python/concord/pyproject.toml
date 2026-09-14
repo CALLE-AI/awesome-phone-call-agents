@@ -1,0 +1,16 @@
+[project]
+name = "concord"
+version = "0.1.0"
+description = "Audit what your own branches tell patients, and judge the answer against written policy."
+requires-python = ">=3.11"
+dependencies = []
+
+[project.scripts]
+concord = "concord.cli:main"
+
+[build-system]
+requires = ["setuptools>=68"]
+build-backend = "setuptools.build_meta"
+
+[tool.setuptools.packages.find]
+where = ["src"]

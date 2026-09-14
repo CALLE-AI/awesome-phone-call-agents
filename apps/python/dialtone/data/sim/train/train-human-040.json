@@ -1,0 +1,56 @@
+{
+ "id": "train-human-040",
+ "label": "human",
+ "source": "sim-train",
+ "meta": {
+  "task": "book a table for two on Friday at 7 PM",
+  "hard": false
+ },
+ "turns": [
+  {
+   "speaker": "user",
+   "text": "Cedar Hair Studio, Kenji speaking.",
+   "offset_seconds": 1.88
+  },
+  {
+   "speaker": "bot",
+   "text": "Hi, I'm an AI assistant calling on behalf of Jordan Lee. I'd like to book a table for two people this Friday at 7 PM, under the name Jordan Lee.",
+   "offset_seconds": 4.49
+  },
+  {
+   "speaker": "user",
+   "text": "For two? so, Okay, I've got you down for Friday at seven.",
+   "offset_seconds": 15.94
+  },
+  {
+   "speaker": "user",
+   "text": "right",
+   "offset_seconds": 20.72
+  },
+  {
+   "speaker": "bot",
+   "text": "Could you confirm the booking under Jordan Lee?",
+   "offset_seconds": 22.26
+  },
+  {
+   "speaker": "user",
+   "text": "let me see, Mm-hmm.",
+   "offset_seconds": 25.91
+  },
+  {
+   "speaker": "user",
+   "text": "mm-hmm",
+   "offset_seconds": 27.91
+  },
+  {
+   "speaker": "bot",
+   "text": "Is Friday at 7 available?",
+   "offset_seconds": 29.55
+  },
+  {
+   "speaker": "user",
+   "text": "Okay, bye.",
+   "offset_seconds": 31.68
+  }
+ ]
+}

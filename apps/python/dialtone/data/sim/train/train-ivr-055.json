@@ -1,0 +1,56 @@
+{
+ "id": "train-ivr-055",
+ "label": "ivr",
+ "source": "sim-train",
+ "meta": {
+  "task": "cancel a subscription",
+  "hard": true
+ },
+ "turns": [
+  {
+   "speaker": "user",
+   "text": "Welcome to Brightline Internet. In a few words, tell me what you're calling about. You can say things like appointments, billing, or hours.",
+   "offset_seconds": 0.29
+  },
+  {
+   "speaker": "bot",
+   "text": "Billing, please.",
+   "offset_seconds": 9.71
+  },
+  {
+   "speaker": "user",
+   "text": "I think you said appointments. Is that right? Say yes or no.",
+   "offset_seconds": 11.18
+  },
+  {
+   "speaker": "bot",
+   "text": "Billing, please.",
+   "offset_seconds": 16.52
+  },
+  {
+   "speaker": "user",
+   "text": "I think you said appointments. Is that right? Say yes or no.",
+   "offset_seconds": 17.92
+  },
+  {
+   "speaker": "bot",
+   "text": "Billing, please.",
+   "offset_seconds": 23.27
+  },
+  {
+   "speaker": "user",
+   "text": "Okay, billing. Please hold while I transfer you. The current wait time is more than ten minutes.",
+   "offset_seconds": 24.7
+  },
+  {
+   "speaker": "bot",
+   "text": "Billing, please.",
+   "offset_seconds": 31.89
+  },
+  {
+   "speaker": "user",
+   "text": "Okay, billing. Please hold while I transfer you. The current wait time is more than ten minutes.",
+   "offset_seconds": 33.32
+  }
+ ]
+}

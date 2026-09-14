@@ -30,7 +30,9 @@ in configuration does not have a consent requirement.
 
 This is the collection edition: fixture-driven, no network, no telephone, no
 credentials, no scheduler. The full application lives at
-https://github.com/ellmos-ai/researchcall
+https://github.com/ellmos-ai/researchcall, field-tested live against the
+real CALL-E service on 2026-08-11 and 2026-08-22 -- see its README's "How We
+Tested" section.
 """
 
 from __future__ import annotations

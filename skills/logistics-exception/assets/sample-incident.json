@@ -1,0 +1,17 @@
+{
+  "incident_id": "DS-1042",
+  "shipment_ref": "SHP-88214",
+  "cargo_description": "18 pallets chilled produce, reefer set to 4C",
+  "promised_dock_at": "2026-09-08T14:00:00+08:00",
+  "receiving_cutoff_at": "2026-09-08T16:00:00+08:00",
+  "timezone": "Asia/Singapore",
+  "last_known_location": "Tracking shows last ping 09:52 near Tuas Checkpoint; no update since",
+  "org_name": "Northwind Freight Operations",
+  "operator_name": "Ops desk",
+  "authorization_confirmed": true,
+  "contacts": [
+    { "role": "driver", "name": "Driver on SHP-88214", "phone_e164": "+12025550100", "authorization_note": "Carrier-provided driver number (NANP-reserved fictional range)", "include": true },
+    { "role": "receiving_dock", "name": "Receiving desk, Dock 7", "phone_e164": "+12025550101", "authorization_note": "Consignee receiving line (NANP-reserved fictional range)", "include": true },
+    { "role": "dispatcher", "name": "Carrier dispatch", "phone_e164": "+12025550102", "authorization_note": "Carrier dispatch desk (NANP-reserved fictional range)", "include": false }
+  ]
+}

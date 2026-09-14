@@ -1,0 +1,85 @@
+{
+  "id": "eval2-006",
+  "label": "human",
+  "difficulty": "hard",
+  "scenario": "Heavily scripted call-center human: formulaic verification and closing lines, repeats 'anything else' verbatim, short silent lookup pause; gives claim status from the record.",
+  "task": "Find out the status of the policyholder's auto insurance claim filed August 28th.",
+  "outcome": {
+    "task_completed_claimed": true,
+    "commitment_type": "information",
+    "confirmation_artifact": "claim CL773058",
+    "expected_attestation": "human_attested"
+  },
+  "turns": [
+    {
+      "speaker": "user",
+      "text": "Thank you for calling Bellwether Mutual Insurance, my name is Gregory, may I have your policy number please?",
+      "offset_seconds": 0.5
+    },
+    {
+      "speaker": "bot",
+      "text": "Hi Gregory. I'm an AI assistant calling on behalf of a policyholder, Anika Sorensen. Her policy number is B M 4 4 0 7 2 9 1 5.",
+      "offset_seconds": 7.43
+    },
+    {
+      "speaker": "user",
+      "text": "Thank you. For verification purposes, may I please have the policyholder's date of birth and the ZIP code on the policy?",
+      "offset_seconds": 19.21
+    },
+    {
+      "speaker": "bot",
+      "text": "Her date of birth is March 3rd, 1986, and the ZIP code is 0 2 7 4 1.",
+      "offset_seconds": 27.42
+    },
+    {
+      "speaker": "user",
+      "text": "Thank you for that information. Before we proceed, I do need to let you know that since you are calling on behalf of the policyholder, I am able to provide claim status information only, and I will not be able to make any changes to the policy. Is that understood?",
+      "offset_seconds": 36.27
+    },
+    {
+      "speaker": "bot",
+      "text": "Yes, understood. We'd like the status of her auto claim filed on August 28th.",
+      "offset_seconds": 54.3
+    },
+    {
+      "speaker": "user",
+      "text": "Thank you. One moment while I pull up that claim.",
+      "offset_seconds": 59.99
+    },
+    {
+      "speaker": "user",
+      "text": "Thank you for your patience. I show claim number C L 7 7 3 0 5 8 for a rear-end collision on August 27th. The claim was approved on September 9th. A payment in the amount of two thousand, three hundred forty dollars and sixty cents was issued to Harborview Auto Body on September 11th.",
+      "offset_seconds": 70.84
+    },
+    {
+      "speaker": "bot",
+      "text": "Thank you. So the claim is approved, and payment of $2,340.60 went directly to Harborview Auto Body on September 11th?",
+      "offset_seconds": 91.18
+    },
+    {
+      "speaker": "user",
+      "text": "That is correct. Is there anything else I can assist you with today?",
+      "offset_seconds": 99.48
+    },
+    {
+      "speaker": "bot",
+      "text": "Is there any remaining deductible she owes?",
+      "offset_seconds": 104.76
+    },
+    {
+      "speaker": "user",
+      "text": "Per the claim record, the five hundred dollar deductible was applied to the payment, and the policyholder would pay that directly to the repair facility. Is there anything else I can assist you with today?",
+      "offset_seconds": 109.21
+    },
+    {
+      "speaker": "bot",
+      "text": "No, that's all. Thank you.",
+      "offset_seconds": 122.14
+    },
+    {
+      "speaker": "user",
+      "text": "Thank you for calling Bellwether Mutual Insurance. You may receive a brief survey about your experience today. Have a wonderful day.",
+      "offset_seconds": 124.16
+    }
+  ]
+}

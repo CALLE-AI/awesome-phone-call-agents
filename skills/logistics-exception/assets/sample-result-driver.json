@@ -1,0 +1,11 @@
+{
+  "contact_role": "driver",
+  "reached": "yes",
+  "shipment_recognized": "yes",
+  "current_status": "Stuck at Tuas Checkpoint, customs queue",
+  "revised_eta": "16:40",
+  "can_accept": "unknown",
+  "blocker": "Customs inspection queue",
+  "next_action": "Will call when 30 minutes out",
+  "certainty": "high"
+}
