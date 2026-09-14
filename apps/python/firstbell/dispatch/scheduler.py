@@ -431,6 +431,46 @@ class WaveDispatcher:
                        f"{type(exc).__name__}: {redact(str(exc))}",
             )
 
+    def _verdict(self, item: WorkItem, key: str, unanswered: bool,
+                 why: str, code: str | None) -> ItemResult:
+        """FAILED, or the third outcome when a request for this row already went missing.
+
+        Every exit from the create loop that is not a call object used to be FAILED, and
+        FAILED is a sentence: nobody was reached, nothing will be billed, and the office
+        can put the row on tomorrow's list. That sentence is false the moment an earlier
+        attempt has gone out and not come back, because that request may have arrived and
+        started a telephone ringing.
+
+        The sequence is ordinary rather than exotic. Attempt one times out. Attempt two
+        reaches the platform and is refused, most likely with `invalid_phone`, which is a
+        permanent error and returns immediately. The row was then reported FAILED with a
+        `failure_code` in `NEVER_CARRIED`, so the run told a reader the platform refused
+        the call and nothing was carried, about a call that may have been carried and will
+        appear on the bill. A later attempt answering does not retract an earlier attempt
+        that did not.
+
+        So once placement is unknown it stays unknown, and `possibly_placed_key` travels
+        with it: that key is the only handle anybody has to reconcile the row against the
+        vendor's own record, and it is what lets a re-run replay the request rather than
+        place a second call.
+
+        `failure_code` is deliberately left off this result. `NEVER_CARRIED` is already
+        gated on FAILED, so the arithmetic is safe either way, but `cli.py` collects
+        `idempotency_conflict` on the code alone and prints "nothing was dialled again"
+        about whatever it finds. A definite sentence about an ambiguous row is the defect
+        this method exists to stop, and it must not come back through a consumer that
+        reads the code without the resolution. The code is in the reason instead, where a
+        reader gets it and no branch keys on it.
+        """
+        if not unanswered:
+            return ItemResult(item=item, resolution=Resolution.FAILED,
+                              failure_code=code, reason=why)
+        return ItemResult(
+            item=item, resolution=Resolution.UNDETERMINED, possibly_placed_key=key,
+            reason="an earlier request for this row went unanswered and may already have "
+                   "placed the call, so this later refusal is not evidence that nobody "
+                   f"was rung. Reconcile under idempotency key {key!r}: {why}")
+
     def _create_with_retries(self, item: WorkItem) -> dict[str, Any] | ItemResult:
         from calle import CalleAPIError, CalleConnectionError, CalleTimeoutError
 
@@ -478,17 +518,17 @@ class WaveDispatcher:
                 # rejected, and this string is stored on the result and printed.
                 last = f"{err.code}: {redact(str(err))}"
                 if err.code in FATAL_ERRORS:
+                    # The run still stops: a fatal code is about the account, not this
+                    # row, and the other items must not go out after it. Only the verdict
+                    # on this row changes.
                     with self._lock:
                         self._fatal = err.code
                     self._cancel.set()
-                    return ItemResult(item=item, resolution=Resolution.FAILED,
-                                      failure_code=err.code, reason=last)
+                    return self._verdict(item, key, unanswered, last, err.code)
                 if err.code in PERMANENT_ERRORS:
-                    return ItemResult(item=item, resolution=Resolution.FAILED,
-                                      failure_code=err.code, reason=last)
+                    return self._verdict(item, key, unanswered, last, err.code)
                 if err.code not in RETRYABLE_ERRORS or attempt == self._retry.max_attempts:
-                    return ItemResult(item=item, resolution=Resolution.FAILED,
-                                      failure_code=err.code, reason=last)
+                    return self._verdict(item, key, unanswered, last, err.code)
                 self._sleep(self._retry.delay_for(attempt))
             except (CalleTimeoutError, CalleConnectionError,
                     json.JSONDecodeError, UnicodeDecodeError) as err:
@@ -531,7 +571,11 @@ class WaveDispatcher:
                 # The same key again, which is what makes this safe to repeat: if the
                 # first request did land, CALL-E replays it rather than calling twice.
                 self._sleep(self._retry.delay_for(attempt))
-        return ItemResult(item=item, resolution=Resolution.FAILED, reason=last)
+        # Unreachable while every branch above returns, and routed through `_verdict`
+        # anyway. A loop that falls out of its own bottom is a loop somebody has edited,
+        # and the edit must not be the one that reintroduces a definite verdict on a row
+        # whose request went missing.
+        return self._verdict(item, key, unanswered, last, None)
 
     def _await_terminal(self, call_id: str) -> dict[str, Any]:
         """Poll until the call reaches a terminal status, retrying a failed read.
