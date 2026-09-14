@@ -5,7 +5,7 @@ import type {
   ContactRole,
 } from "../domain/types.js";
 import { maskPhone } from "../domain/phone.js";
-import { languageFromLocale } from "../domain/language.js";
+import { languageFromLocale, regionLocaleForPhone } from "../domain/language.js";
 import {
   FNOL_SCHEMA_VERSION,
   fnolTransmitSchema,
@@ -88,11 +88,7 @@ export function planFnolCall(claim: Claim, options: TaskOptions): CallPlan {
     task,
     resultSchema: fnolTransmitSchema,
     schemaVersion: FNOL_SCHEMA_VERSION,
-    recipient: {
-      phone: claim.claimantPhone,
-      region: claim.region,
-      locale: claim.locale,
-    },
+    recipient: recipientFor(claim.claimantPhone, claim.region, claim.locale),
   };
 }
 
@@ -121,11 +117,7 @@ export function planStatusChaseCall(claim: Claim, options: TaskOptions): CallPla
     task,
     resultSchema: statusChaseTransmitSchema,
     schemaVersion: STATUS_CHASE_SCHEMA_VERSION,
-    recipient: {
-      phone: claim.providerPhone,
-      region: claim.region,
-      locale: claim.locale,
-    },
+    recipient: recipientFor(claim.providerPhone, claim.region, claim.locale),
   };
 }
 
@@ -249,12 +241,30 @@ export function planForContact(
   return withLanguage(base);
 }
 
-/** A contact may override the claim's region/locale (e.g. call this party in Hindi). */
+/** A contact may override the claim's region/locale, but the recipient's phone
+ * number's country ALWAYS wins for the region (CALL-E validates the number
+ * against it), so a +91 doctor is called as India even on a US claim. */
 function contactRegion(claim: Claim, contact: ClaimContact): string {
-  return contact.region ?? claim.region;
+  const fromPhone = regionLocaleForPhone(contact.phone, contact.locale ?? claim.locale);
+  return fromPhone?.region ?? contact.region ?? claim.region;
 }
 function contactLocale(claim: Claim, contact: ClaimContact): string {
-  return contact.locale ?? claim.locale;
+  const fromPhone = regionLocaleForPhone(contact.phone, contact.locale ?? claim.locale);
+  return fromPhone?.locale ?? contact.locale ?? claim.locale;
+}
+
+/** Build a recipient whose region/locale match the phone number's country. */
+function recipientFor(
+  phone: string,
+  fallbackRegion: string,
+  fallbackLocale: string,
+): { phone: string; region: string; locale: string } {
+  const fromPhone = regionLocaleForPhone(phone, fallbackLocale);
+  return {
+    phone,
+    region: fromPhone?.region ?? fallbackRegion,
+    locale: fromPhone?.locale ?? fallbackLocale,
+  };
 }
 
 function planFnolForContact(
