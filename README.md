@@ -217,6 +217,7 @@ This project is an awesome list for AI-agent phone-call workflows. Add resources
 
 - [WristCall AI](https://github.com/Baklolman69/WristCallAI) - Wear OS smartwatch assistant that searches Google via SerpApi, synthesizes call intent with Groq AI 120B, and dispatches autonomous phone calls via CALL-E with 3-bullet voice summaries.
 
+- [Churn-Rescue AI](https://github.com/NemesisDevX/Churn-Rescue-Agent) - Simulated retention-conversation prototype with a proposed CALL-E integration; the browser currently stands in for telephony, so no working CALL-E dialer, verified latency, or enterprise revenue outcome is claimed.
 - [RescueGrid](https://github.com/utkarshml/rescuegrid) - Experimental scripted disaster-response simulation with a proposed CALL-E dispatch integration; shelter, capacity, status, and route outputs are demonstration data, not verified evacuation guidance or emergency infrastructure.
 - [ScamShield](https://github.com/rimsha21-source/Scamshield-ui) - Experimental scripted anti-scam conversation simulator with fixed demonstration transcripts/scores and a placeholder CALL-E live adapter; it is not validated real-time fraud protection.
 - [Threshold](https://call-e-attention-gate.cohyme.chatgpt.site) - Japanese-language missed-call review demo with a public no-call fixture path, field-level evidence, and fail-closed handling for an unresolved CALL-E execution attempt. See the [judge guide](docs/threshold/).
