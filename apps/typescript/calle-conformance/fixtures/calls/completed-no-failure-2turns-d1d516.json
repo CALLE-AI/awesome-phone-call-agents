@@ -1,0 +1,67 @@
+{
+  "id": "call_a480d7afbad1d516",
+  "object": "call_task",
+  "status": "completed",
+  "task": "Begin the call by saying, word for word: This is an automated call from an AI assistant. Then ask one question: can you hear me clearly? Accept whatever answer you get, thank them, and end the call. Do not say anything else.",
+  "recipients": [
+    {
+      "id": "rcp_78e33fe34103ec29",
+      "phones": [
+        "+12025550142"
+      ],
+      "locale": "en-US",
+      "region": "US",
+      "status": "completed",
+      "structuredResult": {
+        "heard_clearly": "unknown"
+      },
+      "summary": "The call did not complete the audio check. It was blocked by a calling setup/trial-verification restriction before a live recipient could answer whether they heard clearly.",
+      "attempts": [
+        {
+          "id": "att_90987cd9409b5923",
+          "phone": "+12025550142",
+          "status": "completed",
+          "startedAt": "2026-03-04T14:01:43.569000Z",
+          "completedAt": "2026-03-04T14:01:52.492000Z",
+          "summary": "The call did not complete the audio check. It was blocked by a calling setup/trial-verification restriction before a live recipient could answer whether they heard clearly.",
+          "transcriptTurns": [
+            {
+              "offset_seconds": 0,
+              "speaker": "bot",
+              "text": "This is an automated call from an AI assistant."
+            },
+            {
+              "offset_seconds": 7,
+              "speaker": "user",
+              "text": "Hello. This number is not verified for the trial. Verify to continue or upgrade to receive calls from any number."
+            }
+          ],
+          "providerCallId": "e92c4d857b4dae7e8aa87dbc1732dc48",
+          "failureCode": null,
+          "failureMessage": null
+        }
+      ]
+    }
+  ],
+  "structuredResult": null,
+  "summary": "The call did not complete the audio check. It was blocked by a calling setup/trial-verification restriction before a live recipient could answer whether they heard clearly.",
+  "taskCompleted": true,
+  "completionConfidence": {
+    "score": 0.9,
+    "label": "high"
+  },
+  "evidence": [
+    "An automated platform notice indicated the destination was not enabled for trial calling.",
+    "No live recipient response was obtained for the hearing check.",
+    "The required yes/no/unknown hearing result remains unknown."
+  ],
+  "metadata": {
+    "run": "corpus",
+    "probe": "live-connected",
+    "requiredLine": "This is an automated call from an AI assistant."
+  },
+  "failureCode": null,
+  "failureMessage": null,
+  "createdAt": "2026-03-04T14:00:00.000000Z",
+  "completedAt": "2026-03-04T14:02:09.646000Z"
+}
