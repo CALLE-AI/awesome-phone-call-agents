@@ -178,8 +178,8 @@ This project is an awesome list for AI-agent phone-call workflows. Add resources
 - [`pharmacy-cash-price`](skills/pharmacy-cash-price/) - Asks one retail pharmacy for a cash price with no insurance and returns a structured quote, a refusal, or an explicit unknown, with the disclosure and the medical boundary written into the call.
 - [`logistics-exception`](skills/logistics-exception/) - Resolves a missed dock window by calling the driver and receiving dock concurrently with one strict CALL-E result schema, reconciling terminal results by event id and re-fetch, combining only reached-contact facts into a recovery card, and gating any dock-changing follow-up call behind explicit human approval.
 - [`otherend-task-test`](skills/otherend-task-test/) - Rehearses a CALL-E task text and result schema against a programmable receptionist line the operator owns, reads the deterministic grade (manifest, self-report, fabrication, disclosure, confidence calibration), and turns each failing check into a task-text edit before the task reaches real people.
+- [`dispute-evidence-call`](skills/dispute-evidence-call/) - Places one disclosed phone call to a customer who disputed a card charge and uses the answers as chargeback evidence only when the transcript shows the customer said them; a reported no stops the filing, and nothing retries or redials on its own.
 - [`landmark-navigation-assist`](skills/landmark-navigation-assist/) - Builds a CALL-E outbound task that guides a delivery driver through the last few hundred metres to a building using a reusable, landmark-based location config instead of GPS or postal text, with driver-confirmed, in-call-only escalation.
-
 - [`positive-contact-call`](skills/positive-contact-call/) - Disclosed critical-notice call that confirms a live human acknowledged the message, treats voicemail as unconfirmed, and returns a fail-closed disposition for an escalation ladder.
 - [`no-show-shield`](skills/no-show-shield/) - Calls every booking on a given day to confirm it, writes yes/reschedule/cancel outcomes back to the operator's calendar, and returns a short list of only the slots that still need a human.
 - [`exception-resolution-calls`](skills/exception-resolution-calls/) - Resolves a blocked business workflow by phone (e.g. an overdue purchase-order acknowledgement), turning one CALL-E call task into per-recipient structured evidence and a deterministic state change. Gates any closing outcome on a self-reported `spoke_with` identity field, since an authorized phone number is not an authorized person, and differentiates escalation reasons instead of one generic needs-human flag; complements `exception-resolver`'s always-human-approval pattern by fully automating the unambiguous cases and escalating only what genuinely needs a person.
@@ -187,7 +187,7 @@ This project is an awesome list for AI-agent phone-call workflows. Add resources
 
 ### Apps
 
-
+- [Rebuttal Dispute Call](apps/python/rebuttal-dispute-call/) - One disclosed CALL-E call to a disputing customer, cross-examined against its transcript before it becomes chargeback evidence, with six scripted no-call scenarios and a live path gated by per-run consent, an allowlist and local calling hours.
 - [Clinic Slot Assistant](apps/typescript/clinic-slot-assistant/) - Preview a consented appointment-availability call, review CALL-E results, and confirm a fictional booking; local simulation is the default.
 - [MacroDial](apps/typescript/macrodial/) - No-call playbook review app using MacroDial's deployed CALL-E task compiler and outcome-to-state resolver, with synthetic persistence and a hosted-product workflow guide.
 - [DockBrief](apps/typescript/dockbrief/) - One authorized CALL-E receiving-dock call becomes an evidence-linked physical unloading checklist with reported mismatches and unresolved facts; offline synthetic examples are the default.
@@ -249,6 +249,7 @@ Runnable demo apps live under [`apps/`](apps/). They are not a CALL-E SDK and do
 
 | App | Language | Purpose |
 | --- | --- | --- |
+| [`apps/python/rebuttal-dispute-call`](apps/python/rebuttal-dispute-call/) | Python | Merchant-side chargeback evidence call: one disclosed CALL-E call with a fixed script and a strict result schema, a yes used only when the customer's own words say yes, a no that stops the filing, and a masked evidence PDF; dry-run with six scripted scenarios by default, live only with per-run consent, an allowlist, local calling hours and one call per dispute. |
 | [`apps/typescript/last-crate`](apps/typescript/last-crate/) | TypeScript / Node.js | Two-call surplus-bread handoff: verifies the donor offer, matches full-capacity collectors, and issues an expiring pickup ticket from a bounded commitment; no-call fixtures by default. |
 | [`apps/typescript/wever-callback`](apps/typescript/wever-callback/) | TypeScript / Node.js | Consignment-boutique callback inbox with customer requests, approved CALL-E interviews, saved conversations and staff-confirmed next steps; local no-call mode by default. |
 | [`apps/typescript/medroute`](apps/typescript/medroute/) | TypeScript | Consent-first pharmacy availability workbench with a safe demo mode, structured CALL-E results, and downloadable call transcripts. |

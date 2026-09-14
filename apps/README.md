@@ -10,6 +10,7 @@ Current apps:
 
 | App | Language | Purpose |
 | --- | --- | --- |
+| [`python/rebuttal-dispute-call`](python/rebuttal-dispute-call/) | Python | Merchant-side chargeback evidence call: one disclosed CALL-E call with a fixed script and a strict result schema, a yes used only when the customer's own words say yes, a no that stops the filing, and a masked evidence PDF; dry-run with six scripted scenarios by default, live only with per-run consent, an allowlist, local calling hours and one call per dispute. |
 | [`typescript/vouch`](typescript/vouch/) | TypeScript / Next.js | Consent-scoped employment verification: no consent artifact, no dial. Requested vs permitted fields (California SB 1162 strips salary), third-party gatekeeper is a first-class disposition. Fixture replay by default. |
 | [`typescript/headcount`](typescript/headcount/) | TypeScript / Next.js | CDC CASPER-style disaster household needs assessment: the unreached count is the product, voicemail is not a reach, unsupported fields strike through, and fail-closed cards go to a human. Fixture replay by default. |
 | [`typescript/clinic-slot-assistant`](typescript/clinic-slot-assistant/) | TypeScript / Next.js | Consent-aware appointment-availability calls with result review, staff-confirmed fictional bookings, and a no-call simulation default. |
