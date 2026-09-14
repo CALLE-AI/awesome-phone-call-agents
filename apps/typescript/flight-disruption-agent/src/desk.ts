@@ -247,8 +247,7 @@ export class Desk {
       resultSchema: buildResultSchema(quote),
       metadata: { disruption_id: disruptionId, pnr, dedupe_key: key },
       idempotencyKey,
-      booking,
-      quote,
+      simulation: { kind: "passenger", booking, quote },
     });
 
     if (result.kind === "started") {

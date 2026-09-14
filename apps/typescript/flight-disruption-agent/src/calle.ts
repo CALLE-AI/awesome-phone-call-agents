@@ -4,7 +4,7 @@ import {
   CalleClient,
   type Call,
 } from "@call-e/calle";
-import type { Booking, CallOutcome, PassengerResult, Quote, TranscriptTurn } from "./types.ts";
+import type { Booking, CallOutcome, MoveOption, PassengerResult, Quote, TranscriptTurn } from "./types.ts";
 
 export interface StartRequest {
   task: string;
@@ -14,10 +14,13 @@ export interface StartRequest {
   resultSchema: Record<string, unknown>;
   metadata: Record<string, string>;
   idempotencyKey: string;
-  /** Dry-run only. */
-  booking: Booking;
-  quote: Quote;
+  /** Dry-run only: what the scripted call should play out. */
+  simulation: Simulation;
 }
+
+export type Simulation =
+  | { kind: "passenger"; booking: Booking; quote: Quote }
+  | { kind: "airline_desk"; booking: Booking; option: MoveOption };
 
 export type StartResult =
   | { kind: "started"; callId: string }
@@ -100,7 +103,8 @@ export class DryRunGateway implements CallGateway {
         failureMessage: null,
       };
     }
-    return scriptedOutcome(call.request.booking, call.request.quote);
+    const sim = call.request.simulation;
+    return sim.kind === "passenger" ? scriptedOutcome(sim.booking, sim.quote) : scriptedAirlineDesk(sim.booking, sim.option);
   }
 }
 
@@ -218,6 +222,76 @@ function scriptedOutcome(booking: Booking, quote: Quote): CallOutcome {
       { speaker: "bot", text: option.total > 0 ? `That costs ${option.total.toLocaleString("en-US")} rupiah. Do you agree?` : "That has no cost. Shall I confirm it?", offsetSeconds: 18 },
       { speaker: "user", text: "Yes, go ahead.", offsetSeconds: 22 },
     ],
+  };
+}
+
+function scriptedAirlineDesk(booking: Booking, option: MoveOption): CallOutcome {
+  const opening: TranscriptTurn[] = [
+    { speaker: "user", text: "Nusantara Air agency desk, how can I help?", offsetSeconds: 0 },
+    { speaker: "bot", text: `Hi, I'm an AI assistant calling for TripKita. The portal refused to reissue booking ${booking.pnr} to ${option.label}. Can you force the reissue?`, offsetSeconds: 3 },
+  ];
+  const base = {
+    state: "completed" as const,
+    providerStatus: "completed",
+    result: null,
+    failureCode: null,
+    failureMessage: null,
+  };
+  const answer = booking.simulatedAirlineDesk ?? "callback_later";
+  if (answer === "reissued") {
+    const code = `Q${booking.pnr.slice(1, 5)}Z`;
+    const ticket = `0002419${booking.ticket.slice(-6)}`;
+    return {
+      ...base,
+      taskCompleted: true,
+      confidence: { score: 0.92, label: "high" },
+      structured: {
+        outcome: "reissued",
+        new_booking_code: code,
+        new_ticket_number: ticket,
+        airline_reference: `NA-DESK-${booking.ticket.slice(-4)}`,
+        extra_charge_requested: "no",
+        reason: `Desk agent said: Done, I've reissued it to ${option.label}.`,
+      },
+      summary: `The Nusantara Air desk reissued ${booking.pnr} to ${option.label} with booking code ${code}.`,
+      transcript: [
+        ...opening,
+        { speaker: "user", text: `One moment. Done, I've reissued it to ${option.label}. New booking code ${code}, ticket ${ticket}.`, offsetSeconds: 40 },
+        { speaker: "bot", text: `Reading back: booking code ${code.split("").join(" ")}, ticket ${ticket}. Thank you.`, offsetSeconds: 48 },
+      ],
+    };
+  }
+  if (answer === "refused") {
+    return {
+      ...base,
+      taskCompleted: true,
+      confidence: { score: 0.88, label: "high" },
+      structured: {
+        outcome: "refused",
+        new_booking_code: "none",
+        new_ticket_number: "none",
+        airline_reference: "none",
+        extra_charge_requested: "no",
+        reason: "Desk agent said: Basic fares can't be reissued, not even manually.",
+      },
+      summary: `The Nusantara Air desk refused to reissue ${booking.pnr}.`,
+      transcript: [...opening, { speaker: "user", text: "Sorry, basic fares can't be reissued, not even manually.", offsetSeconds: 25 }],
+    };
+  }
+  return {
+    ...base,
+    taskCompleted: false,
+    confidence: { score: 0.8, label: "high" },
+    structured: {
+      outcome: "callback_later",
+      new_booking_code: "none",
+      new_ticket_number: "none",
+      airline_reference: "none",
+      extra_charge_requested: "unknown",
+      reason: "Desk agent said: The system is down, please call back in an hour.",
+    },
+    summary: "The Nusantara Air desk asked for a call back later.",
+    transcript: [...opening, { speaker: "user", text: "Our system is down, please call back in an hour.", offsetSeconds: 12 }],
   };
 }
 

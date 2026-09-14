@@ -1,6 +1,7 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
 import { buildAirlineResultSchema, buildAirlineTask, decideAirline } from "../src/airline.ts";
+import { DryRunGateway } from "../src/calle.ts";
 import { findBooking, loadCatalog } from "../src/data.ts";
 import { voluntaryQuoteFor } from "../src/rules.ts";
 import type { CallOutcome } from "../src/types.ts";
@@ -62,4 +63,32 @@ test("the airline task discloses the AI, caps the charge, and never shares payme
   assert.match(task, /Never give card numbers/);
   const schema = buildAirlineResultSchema() as { required: string[] };
   assert.ok(schema.required.includes("new_ticket_number"));
+});
+
+test("dry run scripts the airline desk from the booking fixture", async () => {
+  const booking = findBooking(catalog, "P3X9GA");
+  const option = voluntaryQuoteFor(catalog, booking).moves[0];
+  assert.ok(option);
+  const gateway = new DryRunGateway(0);
+  const expectations: [string, string][] = [
+    ["P3X9GA", "reissued"],
+    ["C5V8EJ", "review"],
+    ["L6F2KM", "review"],
+  ];
+  for (const [pnr, kind] of expectations) {
+    const b = findBooking(catalog, pnr);
+    const started = await gateway.start({
+      task: "",
+      phone: "+15550100900",
+      region: "US",
+      locale: "en-US",
+      resultSchema: buildAirlineResultSchema(),
+      metadata: {},
+      idempotencyKey: pnr,
+      simulation: { kind: "airline_desk", booking: b, option },
+    });
+    assert.equal(started.kind, "started");
+    const decision = decideAirline(await gateway.get(started.kind === "started" ? started.callId : ""));
+    assert.equal(decision.kind, kind, pnr);
+  }
 });
