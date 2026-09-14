@@ -35,6 +35,15 @@ an exemption packet a caseworker reviews, an hours-reporting reminder, a navigat
 mailed letter for anyone the phone could not reach. The agent proposes; the code decides; a person
 signs off.
 
+## In one minute
+
+| | |
+| --- | --- |
+| **The problem** | From January 2027, adults on Medicaid must prove 80 hours a month of work or study to keep coverage. When Arkansas tried this in 2018, 18,000+ people lost coverage in seven months and employment did not change: they were already working or already exempt, and simply never filed the paperwork. |
+| **What this does** | Reads a state's enrollee list, clears whoever the state's own data already clears without calling them, and phones the rest once, in their language, to ask only the exemption questions their record has not answered. |
+| **Who decides** | Not the agent. A documented, fail-closed classifier in code decides, and every call becomes a worklist item for a caseworker. Nothing here changes anyone's coverage. |
+| **Try it now** | `npm install && npm run demo` - a full campaign against a bundled fake CALL-E server. No API key, no network, no phone calls. |
+
 ## Why this is not a reminder bot
 
 Health plans are already buying AI voice agents to call Medicaid members about renewal paperwork.
@@ -180,27 +189,34 @@ Full flag list: `npm run sc -- --help`.
 | `SC_MAX_ATTEMPTS` | `2` | Calls per person including the redial. Values above 3 are rejected at load. |
 | `SC_WAVE_SIZE` | `4` | People per wave. |
 | `SC_PORT` / `SC_FAKE_PORT` | `4800` / `4848` | Dashboard and fake-server ports. |
-| `SC_PUBLIC_URL` | none | Tunnel URL for webhooks. Setting it auto-generates a dashboard token. |
-| `SC_DASHBOARD_TOKEN` | auto | Required on every dashboard route except the webhook. |
+| `SC_HOST` | `127.0.0.1` | Anything other than loopback auto-generates a dashboard token: a server other machines can reach is never left open. |
+| `SC_PUBLIC_URL` | none | Tunnel URL for webhooks. Setting it also auto-generates a dashboard token. |
+| `SC_DASHBOARD_TOKEN` | auto | Required on every dashboard route except the webhook. Also the key for `POST /api/lint`. |
+| `CALLE_BASE_URL` | CALL-E's API | Live only. Must be https and an approved origin: the API key travels on every request. |
+| `SC_ALLOWED_BASE_URLS` | none | Comma-separated extra origins `CALLE_BASE_URL` may point at, for a staging endpoint you meant. |
 
 ## How it works
 
+```mermaid
+flowchart TD
+  A["enrollees.csv<br/>consent, E.164, do-not-call"] --> B["registry<br/>refuses rows it should not call"]
+  B --> C{"Does the state's own<br/>data already clear them?"}
+  C -->|yes| D["cleared_by_data<br/>never dialled"]
+  C -->|no| E["priority<br/>deadline + paperwork risk"]
+  E --> F["CALL-E calls.create<br/>one task per person<br/>idempotency key per attempt"]
+  F --> G["webhook first,<br/>polling always"]
+  G --> H["classify<br/>fail-closed, 10 documented steps"]
+  H --> I["worklist item<br/>for a human"]
+  I --> J["caseworker<br/>makes the decision"]
+
+  style D fill:#1f6f43,stroke:#37d67a,color:#fff
+  style H fill:#7a5c12,stroke:#f5c518,color:#fff
+  style J fill:#1d5183,stroke:#4aa3e8,color:#fff
 ```
-enrollees.csv ──▶ registry ──▶ ex parte clear ──▶ priority ──▶ waves
-  (consent,       (masking)     (no call at all)   (deadline +    │
-   E.164,                                           paperwork     │
-   do-not-call)                                     risk)         ▼
-                                              CALL-E calls.create
-                                              one task per person
-                                              idempotency key per attempt
-                                                        │
-                          webhook ─────┐                ▼
-                          polling ─────┴──▶ classify (fail-closed, 10 steps)
-                                                        │
-                                                        ▼
-                                          cascade ──▶ worklist ──▶ caseworker
-                                          (retry / mail / navigator / packet)
-```
+
+The two shaded steps are the whole argument. **Clearing without a call** is where the money is: a
+call nobody needed is a cost and an intrusion. **Classifying in code** is where the safety is: the
+agent gathers facts, it never grants anything, and a human signs off.
 
 - **`rules/federal-2027.json`** is the rule as data: the hours threshold, the plain-language
   explanation, the awareness question, and all nine exemptions with their question text, their order,
@@ -239,9 +255,14 @@ The app is built around what the platform actually guarantees, not what would be
   If neither settles it in time, the person stays `pending` - never guessed.
 - **`completion_confidence` is per task, not per recipient**, so it is only attributed when the task
   has a single recipient.
-- **A refused task is `not_attempted`, never `unreachable`.** Nobody gets a letter, a navigator call
-  or a verdict they did not earn because our request failed. The robustness test drives a full
-  platform outage and asserts that all 11 people land in `operator_review` and nothing else.
+- **Our failure is never evidence about an enrollee.** A task CALL-E *refuses* is `not_attempted`:
+  nobody was dialled, and nobody gets a letter, a navigator call or a verdict they did not earn
+  because our request failed.
+- **And a failure that says nothing is recorded as saying nothing.** A dropped connection or a 5xx
+  does not tell us whether the call went out - it may be ringing right now. That is a separate
+  outcome, `dial_unknown`: it is never auto-retried, it prints the idempotency key for a human to
+  reconcile against CALL-E, and `resume` settles it with the same key rather than dialling twice.
+  Only a 429 is retried automatically, because that one plainly means nothing was placed.
 - **The result schema stays inside the documented JSON Schema subset** - no `$ref`, `oneOf`, `anyOf`,
   `allOf`, `format`, or open `additionalProperties`. `assertSupportedSchema` fails the build rather
   than the call if that ever drifts.
@@ -393,7 +414,14 @@ to leave your machine to be checked.
 - Nothing about coverage is said before the person confirms their birth year, and the agent never
   says the year first.
 - The agent never asks for a Social Security number, bank details, immigration status or a diagnosis.
-- Phone numbers are masked (`+14*******01`) in the ledger, the dashboard, the report and the logs.
+- Phone numbers are masked (`+14*******01`) in the ledger, the dashboard, the report and the logs -
+  including numbers the person *said* rather than ones we held, which is why the masker matches
+  `415-555-0100` and not only E.164.
+- Before identity is confirmed, whoever answered is given a callback number and nothing else: not
+  the reason for the call, not that it concerns coverage, not who is calling.
+- Our own infrastructure failing is never recorded as a fact about an enrollee, and a failure that
+  does not say whether a call went out is recorded as exactly that (`dial_unknown`) for a human to
+  reconcile, rather than guessed either way.
 - Real enrollee lists must be named `*.private.csv`, which is git-ignored.
 - Rows without consent, with an invalid phone, with a do-not-call flag, or duplicating another
   person's phone are never loaded.
@@ -409,13 +437,16 @@ The full list is in the skill: `skills/medicaid-exemption-screener/references/sa
 
 ```
 npm run check          # tsc --noEmit, strict + noUncheckedIndexedAccess + exactOptionalPropertyTypes
-npm test               # 76 tests, no network
+npm test               # 80 tests, no network, no credentials
 npm run test:failures  # just the failure semantics - every test name is a guarantee
 ```
 
+Every test name in the failure suite is a promise the system makes:
+
 ```
 ✔ a transient 429 on create is retried and the campaign finishes normally
-✔ an outage marks people not attempted: nobody gets a letter, a navigator call or a verdict they did not earn
+✔ a 503 outage is recorded as unknown, not as 'nobody was dialled', and is never auto-redialled
+✔ a request CALL-E refuses outright is still 'not attempted': that one really is a fact
 ✔ an invalid request is not retried
 ✔ resume re-places refused tasks with the same keys and reaches the same end state
 ✔ a call that has not finished is left awaiting, never guessed, and resume settles it
@@ -424,21 +455,41 @@ npm run test:failures  # just the failure semantics - every test name is a guara
 ✔ someone who asked not to be called again is never called again
 ```
 
-The suite covers the classifier's fail-closed order, the rule and state validators, registry parsing
-and masking, a full end-to-end campaign with webhook delivery and idempotency replay, and the failure
-semantics: a retried 429, a total outage, an invalid request that is *not* retried, a resumed
-campaign that reaches the identical end state, the three-call cap, and the opt-out.
+| File | What it pins down |
+| --- | --- |
+| `classify.test.ts` | The fail-closed order, medical frailty needing both facts, and the overclaim check surviving a confidence downgrade. |
+| `rules.test.ts` | The rule and state validators, question selection, age gates, and that the voicemail may not name the programme. |
+| `registry.test.ts` | Consent, E.164, duplicate phones, do-not-call, CSV quoting and CRLF, masking. |
+| `e2e.test.ts` | A full campaign: webhook delivery, idempotency replay, the Spanish-language evidence assertion, worklist composition, a reproducible report. |
+| `robustness.test.ts` | The failure semantics above. |
+| `safety.test.ts` | Quiet hours across time zones, refused configurations, the live allowlist, the approved-endpoint rule, the dashboard token, phone masking in free text, and `POST /api/lint`. |
+| `lint.test.ts` | Our own task satisfies all fourteen rules; a naive task fails most; removing each defending clause fails exactly its own rule. |
+| `probes.test.ts` / `mcp.test.ts` | The conformance checker's fail-closed asymmetry, and that no executable line in the MCP server can place a call. |
 
 ## Sources
 
-- Sommers BD et al. "Medicaid Work Requirements - Results from the First Year in Arkansas."
-  *N Engl J Med* 2019;381:1073-1082.
+**The rule**
+- Public Law 119-21 s.71119, community engagement requirement, effective 1 January 2027.
+- CMS interim final rule **CMS-2454-IFC** (June 2026), implementing the requirement: 80 hours a
+  month of work, education, volunteering or training, or roughly $580 in monthly earnings, and the
+  nine exemption categories encoded in `rules/federal-2027.json`.
+
+**Why silence, not fraud, is the failure mode**
+- Sommers BD, Goldman AL, Blendon RJ, Orav EJ, Epstein AM. "Medicaid Work Requirements - Results
+  from the First Year in Arkansas." *New England Journal of Medicine* 2019;381:1073-1082. More than
+  18,000 people lost coverage in seven months with **no significant change in employment**.
+- KFF, *Medicaid Enrollment and Unwinding Tracker*: **69%** of disenrollments during the 2023-24
+  unwinding were procedural - the state could not reach the person, not that the person did not
+  qualify.
 - Congressional Budget Office, coverage estimates for P.L. 119-21.
-- KFF, Medicaid Enrollment and Unwinding Tracker - 69% of disenrollments were procedural.
-- CMS interim final rule CMS-2454-IFC (June 2026), community engagement requirement.
-- GAO, reporting on Georgia Pathways administrative costs.
-- FCC DA 23-62 (Medicaid outreach consent); FCC 24-17 (AI voices under the TCPA).
+- GAO reporting on Georgia Pathways administrative costs, for the cost arithmetic in
+  [`docs/still-covered/`](../../../docs/still-covered/).
+
+**Why an automated call is permitted here at all**
+- FCC **DA 23-62**: outreach to existing enrollees about their own coverage is not marketing.
+- FCC **24-17**: AI-generated voices are "artificial" voices under the TCPA, which is why consent is
+  mandatory in the registry and cannot be overridden.
 
 This is a demonstration built for a hackathon. It is not legal advice, it is not a benefits
-determination, and the bundled rule file summarizes federal law as of the cited sources - check your
+determination, and the bundled rule file summarizes federal law as of the sources above. Check your
 own state's rules before any real use.

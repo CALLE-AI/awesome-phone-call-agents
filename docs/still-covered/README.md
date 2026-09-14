@@ -91,6 +91,23 @@ knows they need to act, and the Arkansas evidence is precisely that they do not.
 
 ## 3. What the system does
 
+```mermaid
+flowchart TD
+  A["enrollees.csv<br/>consent, E.164, do-not-call"] --> B["registry<br/>refuses rows it should not call"]
+  B --> C{"Does the state's own<br/>data already clear them?"}
+  C -->|yes| D["cleared_by_data<br/>never dialled"]
+  C -->|no| E["priority<br/>deadline + paperwork risk"]
+  E --> F["CALL-E calls.create<br/>one task per person<br/>idempotency key per attempt"]
+  F --> G["webhook first,<br/>polling always"]
+  G --> H["classify<br/>fail-closed, 10 documented steps"]
+  H --> I["worklist item<br/>for a human"]
+  I --> J["caseworker<br/>makes the decision"]
+
+  style D fill:#1f6f43,stroke:#37d67a,color:#fff
+  style H fill:#7a5c12,stroke:#f5c518,color:#fff
+  style J fill:#1d5183,stroke:#4aa3e8,color:#fff
+```
+
 ```
 enrollees.csv ──▶ registry ──▶ ex parte clear ──▶ priority ──▶ waves
   (consent,       (masking)     (no call at all)   (deadline +    │
