@@ -1,0 +1,614 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="color-scheme" content="light">
+  <title>HoldFast — Evidence Receipt</title>
+  <style>
+    :root {
+      --paper: #fbfaf6;
+      --canvas: #e9e5dc;
+      --ink: #17211d;
+      --muted: #667069;
+      --line: #cbc7bc;
+      --green: #0f6b46;
+      --green-pale: #e7f2ec;
+      --gray-pale: #eeeee9;
+      --amber: #985c13;
+      --amber-pale: #fbefd9;
+      --red: #a13c2e;
+      --sans: Inter, ui-sans-serif, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+      --mono: "SFMono-Regular", Consolas, "Liberation Mono", monospace;
+    }
+
+    * { box-sizing: border-box; }
+
+    body {
+      margin: 0;
+      background: var(--canvas);
+      color: var(--ink);
+      font-family: var(--sans);
+      line-height: 1.45;
+    }
+
+    .page {
+      width: min(1180px, calc(100% - 40px));
+      margin: 34px auto;
+      background: var(--paper);
+      border: 1px solid #aaa69c;
+      box-shadow: 0 22px 55px rgba(33, 38, 34, 0.12);
+    }
+
+    .masthead {
+      position: sticky;
+      top: 0;
+      z-index: 20;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 20px;
+      padding: 18px 28px;
+      border-bottom: 1px solid var(--line);
+      background: rgba(251, 250, 246, 0.96);
+      backdrop-filter: blur(12px);
+    }
+
+    .brand {
+      display: flex;
+      align-items: baseline;
+      gap: 12px;
+    }
+
+    .brand strong {
+      font-size: 20px;
+      letter-spacing: -0.03em;
+    }
+
+    .brand span,
+    .micro {
+      color: var(--muted);
+      font-family: var(--mono);
+      font-size: 11px;
+      letter-spacing: 0.08em;
+      text-transform: uppercase;
+    }
+
+    .fixture-stamp {
+      padding: 7px 10px;
+      border: 1px solid var(--amber);
+      background: var(--amber-pale);
+      color: #6f4109;
+      font-family: var(--mono);
+      font-size: 11px;
+      font-weight: 700;
+      letter-spacing: 0.06em;
+      text-transform: uppercase;
+    }
+
+    .capture-nav {
+      display: flex;
+      align-items: center;
+      gap: 14px;
+      margin-left: auto;
+    }
+
+    .capture-nav a {
+      color: var(--muted);
+      font-family: var(--mono);
+      font-size: 10px;
+      font-weight: 700;
+      letter-spacing: 0.06em;
+      text-decoration: underline;
+      text-decoration-thickness: 1px;
+      text-underline-offset: 4px;
+      text-transform: uppercase;
+    }
+
+    .capture-nav a:hover,
+    .capture-nav a:focus-visible { color: var(--ink); }
+
+    main { padding: 0 28px 28px; }
+
+    .hero {
+      display: grid;
+      grid-template-columns: minmax(0, 1.45fr) minmax(260px, 0.55fr);
+      gap: 42px;
+      align-items: end;
+      padding: 56px 0 42px;
+      border-bottom: 1px solid var(--line);
+    }
+
+    .eyebrow {
+      margin: 0 0 12px;
+      color: var(--green);
+      font-family: var(--mono);
+      font-size: 12px;
+      font-weight: 700;
+      letter-spacing: 0.08em;
+      text-transform: uppercase;
+    }
+
+    h1 {
+      max-width: 780px;
+      margin: 0;
+      font-size: clamp(42px, 6.2vw, 82px);
+      font-weight: 760;
+      letter-spacing: -0.065em;
+      line-height: 0.98;
+    }
+
+    .lede {
+      max-width: 720px;
+      margin: 24px 0 0;
+      color: #39443e;
+      font-size: clamp(17px, 2vw, 22px);
+      line-height: 1.5;
+    }
+
+    .hero-status {
+      padding: 22px 0 4px 24px;
+      border-left: 3px solid var(--green);
+    }
+
+    .provider-state {
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
+      margin-top: 8px;
+      color: var(--green);
+      font-family: var(--mono);
+      font-size: 15px;
+      font-weight: 750;
+    }
+
+    .provider-state::before {
+      width: 9px;
+      height: 9px;
+      border-radius: 50%;
+      background: var(--green);
+      content: "";
+    }
+
+    .hero-status p {
+      margin: 12px 0 0;
+      color: var(--muted);
+      font-size: 14px;
+    }
+
+    .flow {
+      display: grid;
+      grid-template-columns: 1fr 1fr 1.25fr;
+      margin: 0 -28px;
+      border-bottom: 1px solid var(--line);
+    }
+
+    .step {
+      min-width: 0;
+      padding: 28px;
+      border-right: 1px solid var(--line);
+    }
+
+    .step:last-child { border-right: 0; }
+
+    .step-number {
+      display: block;
+      margin-bottom: 22px;
+      color: var(--muted);
+      font-family: var(--mono);
+      font-size: 11px;
+      letter-spacing: 0.08em;
+      text-transform: uppercase;
+    }
+
+    h2, h3, p { overflow-wrap: anywhere; }
+
+    h2 {
+      margin: 0;
+      font-size: 26px;
+      letter-spacing: -0.035em;
+      line-height: 1.08;
+    }
+
+    .step p {
+      margin: 13px 0 0;
+      color: var(--muted);
+      font-size: 14px;
+    }
+
+    .plan-grid,
+    .timeline {
+      display: grid;
+      gap: 9px;
+      margin-top: 22px;
+    }
+
+    .plan-line,
+    .timeline-line {
+      display: grid;
+      grid-template-columns: 92px minmax(0, 1fr);
+      gap: 12px;
+      padding-top: 9px;
+      border-top: 1px solid var(--line);
+      font-size: 13px;
+    }
+
+    .plan-line dt,
+    .timeline-line time {
+      margin: 0;
+      color: var(--muted);
+      font-family: var(--mono);
+      font-size: 11px;
+      letter-spacing: 0.03em;
+    }
+
+    .plan-line dd { margin: 0; }
+
+    .timeline-line strong {
+      display: block;
+      margin-bottom: 2px;
+      font-size: 13px;
+    }
+
+    .timeline-line span { color: var(--muted); }
+
+    .receipt-intro {
+      margin-top: 17px;
+      padding: 13px 14px;
+      border-left: 3px solid var(--amber);
+      background: var(--amber-pale);
+      color: #5e3b11;
+      font-size: 13px;
+      font-weight: 640;
+    }
+
+    .receipt {
+      padding: 40px 0 0;
+      scroll-margin-top: 76px;
+    }
+
+    .receipt-heading {
+      display: grid;
+      grid-template-columns: minmax(0, 1fr) auto;
+      gap: 24px;
+      align-items: end;
+      padding-bottom: 20px;
+      border-bottom: 2px solid var(--ink);
+    }
+
+    .receipt-heading p {
+      max-width: 670px;
+      margin: 9px 0 0;
+      color: var(--muted);
+      font-size: 15px;
+    }
+
+    .receipt-state {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 8px 14px;
+      align-items: center;
+      margin-top: 15px;
+    }
+
+    .receipt-state strong {
+      color: var(--green);
+      font-family: var(--mono);
+      font-size: 13px;
+      letter-spacing: 0.04em;
+    }
+
+    .legend {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 7px;
+    }
+
+    .legend span {
+      padding: 3px 6px;
+      border: 1px solid currentColor;
+      font-family: var(--mono);
+      font-size: 9px;
+      font-weight: 800;
+      letter-spacing: 0.06em;
+    }
+
+    .legend .proven { color: var(--green); background: var(--green-pale); }
+    .legend .support { color: var(--amber); background: var(--amber-pale); }
+    .legend .not-proven { color: #686c68; background: var(--gray-pale); }
+
+    .receipt-id {
+      text-align: right;
+    }
+
+    .receipt-id strong {
+      display: block;
+      margin-top: 4px;
+      font-family: var(--mono);
+      font-size: 13px;
+    }
+
+    .field {
+      display: grid;
+      grid-template-columns: 150px minmax(160px, 0.55fr) minmax(260px, 1fr);
+      gap: 22px;
+      align-items: start;
+      padding: 22px 0;
+      border-bottom: 1px solid var(--line);
+    }
+
+    .verdict {
+      display: inline-flex;
+      width: fit-content;
+      align-items: center;
+      gap: 7px;
+      padding: 5px 8px;
+      border: 1px solid currentColor;
+      font-family: var(--mono);
+      font-size: 10px;
+      font-weight: 800;
+      letter-spacing: 0.08em;
+      text-transform: uppercase;
+    }
+
+    .verified .verdict { color: var(--green); background: var(--green-pale); }
+    .unverified .verdict { color: #666a66; background: var(--gray-pale); }
+
+    .field-name {
+      margin: 0;
+      font-size: 14px;
+      font-weight: 650;
+    }
+
+    .field-value {
+      margin: 3px 0 0;
+      font-size: 25px;
+      font-weight: 750;
+      letter-spacing: -0.035em;
+    }
+
+    .unverified .field-value {
+      color: #7e817d;
+      text-decoration: line-through;
+      text-decoration-thickness: 1px;
+    }
+
+    .anchor {
+      margin: 0;
+      padding-left: 16px;
+      border-left: 2px solid var(--green);
+      color: #38423c;
+      font-family: var(--mono);
+      font-size: 12px;
+      line-height: 1.6;
+    }
+
+    .unverified .anchor {
+      border-left-color: #aaaDA8;
+      color: #777b77;
+    }
+
+    .source {
+      display: block;
+      margin-top: 7px;
+      color: var(--muted);
+      font-family: var(--sans);
+      font-size: 11px;
+    }
+
+    .decision {
+      display: grid;
+      grid-template-columns: minmax(0, 1fr) minmax(280px, 0.68fr);
+      gap: 36px;
+      align-items: start;
+      padding: 34px 0 12px;
+    }
+
+    .decision h2 { font-size: clamp(28px, 4vw, 46px); }
+
+    .decision-copy {
+      margin: 16px 0 0;
+      color: #3d4942;
+      font-size: 17px;
+    }
+
+    .boundary {
+      padding: 20px;
+      border: 1px solid var(--line);
+      background: #f3f1ea;
+    }
+
+    .boundary h3 {
+      margin: 0;
+      font-size: 14px;
+      letter-spacing: -0.01em;
+    }
+
+    .boundary ul {
+      margin: 12px 0 0;
+      padding-left: 18px;
+      color: var(--muted);
+      font-size: 13px;
+    }
+
+    .boundary li + li { margin-top: 7px; }
+
+    footer {
+      display: flex;
+      justify-content: space-between;
+      gap: 20px;
+      padding: 20px 28px;
+      border-top: 1px solid var(--line);
+      color: var(--muted);
+      font-family: var(--mono);
+      font-size: 10px;
+      line-height: 1.5;
+      text-transform: uppercase;
+    }
+
+    code { font-family: var(--mono); }
+
+    @media (max-width: 900px) {
+      .hero { grid-template-columns: 1fr; gap: 24px; }
+      .hero-status { max-width: 520px; }
+      .flow { grid-template-columns: 1fr; }
+      .step { border-right: 0; border-bottom: 1px solid var(--line); }
+      .step:last-child { border-bottom: 0; }
+      .field { grid-template-columns: 120px minmax(150px, 0.6fr) minmax(220px, 1fr); }
+    }
+
+    @media (max-width: 680px) {
+      .page { width: 100%; margin: 0; border: 0; box-shadow: none; }
+      .masthead { align-items: flex-start; padding: 16px 18px; }
+      .brand span { display: none; }
+      .capture-nav { display: none; }
+      .fixture-stamp { max-width: 175px; text-align: center; }
+      main { padding: 0 18px 20px; }
+      .hero { padding: 40px 0 32px; }
+      h1 { font-size: 47px; }
+      .flow { margin: 0 -18px; }
+      .step { padding: 24px 18px; }
+      .receipt-heading { grid-template-columns: 1fr; }
+      .receipt-id { text-align: left; }
+      .field { grid-template-columns: 1fr; gap: 10px; }
+      .decision { grid-template-columns: 1fr; }
+      footer { flex-direction: column; padding: 18px; }
+    }
+
+    @media print {
+      body { background: white; }
+      .page { width: 100%; margin: 0; border: 0; box-shadow: none; }
+      .field, .decision, .step { break-inside: avoid; }
+    }
+  </style>
+</head>
+<body>
+  <article class="page" aria-labelledby="page-title">
+    <header class="masthead">
+      <div class="brand">
+        <strong>HoldFast</strong>
+        <span>Phone work, with proof</span>
+      </div>
+      <nav class="capture-nav" aria-label="Screenshot anchors">
+        <a href="#cover">Cover</a>
+        <a href="#receipt">Evidence receipt</a>
+      </nav>
+      <div class="fixture-stamp">Controlled fixture · No live call</div>
+    </header>
+
+    <main>
+      <section class="hero" id="cover" aria-labelledby="page-title">
+        <div>
+          <p class="eyebrow">Sam's three-person repair shop</p>
+          <h1 id="page-title">The call ended.<br>The proof starts here.</h1>
+          <p class="lede">A customer car is occupying a bay while order PX-204 sits behind a distributor's phone line. Sam needs a shipping answer he can schedule around, not a confident summary he cannot verify.</p>
+        </div>
+        <aside class="hero-status" aria-label="Provider state and evidence warning">
+          <span class="micro">CALL-E provider state</span>
+          <div class="provider-state">COMPLETED</div>
+          <p>Transport finished. HoldFast still checks every result field against what the other side actually said.</p>
+        </aside>
+      </section>
+
+      <section class="flow" aria-label="Approved plan, saved-result timeline, and evidence gate">
+        <div class="step">
+          <span class="step-number">01 · Approved plan</span>
+          <h2>One status call. No commercial decisions.</h2>
+          <dl class="plan-grid">
+            <div class="plan-line"><dt>Callee</dt><dd>+1******0123</dd></div>
+            <div class="plan-line"><dt>Order</dt><dd>PX-204</dd></div>
+            <div class="plan-line"><dt>Ask</dt><dd>Shipped? Arrival? Backorder? Tracking?</dd></div>
+            <div class="plan-line"><dt>OUT OF SCOPE / NEVER</dt><dd>Change the order, accept an upgrade, or pay.</dd></div>
+          </dl>
+        </div>
+
+        <div class="step">
+          <span class="step-number">02 · Fixture playback</span>
+          <h2>A readable call timeline.</h2>
+          <div class="timeline" aria-label="Illustrative timeline from the packaged saved result">
+            <div class="timeline-line"><time>DIALING</time><div><strong>Approved line</strong><span>Distributor number selected from the plan.</span></div></div>
+            <div class="timeline-line"><time>IN PROGRESS</time><div><strong>Parts-order menu</strong><span>Saved fixture records an existing-order route.</span></div></div>
+            <div class="timeline-line"><time>WAITING</time><div><strong>Parts desk</strong><span>The fixture reaches a representative.</span></div></div>
+            <div class="timeline-line"><time>COMPLETED</time><div><strong>Status returned</strong><span>Now the evidence gate begins.</span></div></div>
+          </div>
+        </div>
+
+        <div class="step">
+          <span class="step-number">03 · HoldFast reversal</span>
+          <h2>CALL-E completed ≠ proven.</h2>
+          <p>Provider completion says the call transport ended. It does not prove that every structured answer was spoken.</p>
+          <div class="receipt-intro">If the transcript cannot support a field, HoldFast withholds it from the actionable answer.</div>
+        </div>
+      </section>
+
+      <section class="receipt" id="receipt" aria-labelledby="receipt-title">
+        <div class="receipt-heading">
+          <div>
+            <p class="eyebrow">Evidence receipt</p>
+            <h2 id="receipt-title">What Sam can actually use</h2>
+            <p>Each green claim has a callee-side transcript anchor. Unsupported data stays visible, gray, and explicitly unverified.</p>
+            <div class="receipt-state" aria-label="Provider completion and evidence legend">
+              <strong>CALL-E: COMPLETED</strong>
+              <div class="legend">
+                <span class="proven">✓ PROVEN</span>
+                <span class="support">~ SUPPORT ONLY</span>
+                <span class="not-proven">— NOT PROVEN</span>
+              </div>
+            </div>
+          </div>
+          <div class="receipt-id">
+            <span class="micro">Saved result</span>
+            <strong>CONTROLLED-PARTS-1</strong>
+          </div>
+        </div>
+
+        <div class="field verified">
+          <div><span class="verdict">✓ PROVEN</span></div>
+          <div><p class="field-name">Shipping status</p><p class="field-value">Shipped</p></div>
+          <blockquote class="anchor">“The shipping status for order PX-204 is shipped.”<span class="source">Callee transcript anchor · exact field + value</span></blockquote>
+        </div>
+
+        <div class="field verified">
+          <div><span class="verdict">✓ PROVEN</span></div>
+          <div><p class="field-name">Expected arrival</p><p class="field-value">Tuesday</p></div>
+          <blockquote class="anchor">“The arrival is Tuesday.”<span class="source">Callee transcript anchor · exact field + value</span></blockquote>
+        </div>
+
+        <div class="field verified">
+          <div><span class="verdict">✓ PROVEN</span></div>
+          <div><p class="field-name">Backorder status</p><p class="field-value">Clear</p></div>
+          <blockquote class="anchor">“The backorder status is clear; no items are backordered.”<span class="source">Callee transcript anchor · exact field + value</span></blockquote>
+        </div>
+
+        <div class="field unverified">
+          <div><span class="verdict">— NOT PROVEN</span></div>
+          <div><p class="field-name">Tracking number</p><p class="field-value">ZX-9081</p></div>
+          <blockquote class="anchor">“A tracking number is not available on this line.”<span class="source">The structured payload contains ZX-9081, but the callee never speaks it. Withheld.</span></blockquote>
+        </div>
+
+        <section class="decision" aria-labelledby="decision-title">
+          <div>
+            <p class="eyebrow">Actionable answer</p>
+            <h2 id="decision-title">Plan around Tuesday. Do not rely on tracking.</h2>
+            <p class="decision-copy">In this illustrative fixture, Sam can schedule around a Tuesday arrival and knows the order is not backordered. The tracking number remains unresolved because the phone evidence does not prove it.</p>
+          </div>
+          <aside class="boundary">
+            <h3>Evidence boundary</h3>
+            <ul>
+              <li>This is a controlled saved-result fixture. It placed zero calls.</li>
+              <li>The number and organization are fictional reserved examples.</li>
+              <li>The timeline is fixture data, not current provider telemetry.</li>
+              <li>A real claim requires a current CALL-E start/status/final chain with one run ID.</li>
+            </ul>
+          </aside>
+        </section>
+      </section>
+    </main>
+
+    <footer>
+      <span>Illustrative fixture · no live call · no real customer or distributor data</span>
+      <span>Source: tests/fixtures/judge-parts-task.json + judge-parts-result.json</span>
+    </footer>
+  </article>
+</body>
+</html>

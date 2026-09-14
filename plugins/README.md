@@ -33,3 +33,4 @@ Each plugin should document:
 | [`@call-e/n8n-nodes-calle`](n8n-nodes-calle/) | n8n | Community node package for creating, waiting on, retrieving, and listing events for CALL-E AI-agent phone-call tasks. |
 | [`hubspot-calle`](hubspot-calle/) | HubSpot | Private static app with a direct-call workflow action and two explicitly confirmed CRM record App Cards; it does not write CALL-E state back to HubSpot. |
 | [`zapier-calle`](zapier-calle/) | Zapier | Zapier Platform CLI integration that places a CALL-E call, waits for the outcome through a Zapier callback URL, and returns a fail-closed disposition with the transcript, summary, and structured result. |
+| [`slack-calle-bridge`](slack-calle-bridge/) | Slack | Signed slash-command bridge with preview-by-default behavior, explicit one-call confirmation, deterministic idempotency, and privacy-minimized structured results. |
