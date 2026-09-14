@@ -1,0 +1,14 @@
+{
+  "name": "scam-mirror-calle-cli",
+  "version": "1.0.0",
+  "description": "Pinned CALL-E CLI dependency for the Scam Mirror dual-fly verifier.",
+  "private": true,
+  "scripts": {
+    "verify": "calle mcp config"
+  },
+  "keywords": ["call-e", "scam", "phone"],
+  "license": "MIT",
+  "dependencies": {
+    "@call-e/cli": "^0.5.1"
+  }
+}
