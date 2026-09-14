@@ -7,6 +7,21 @@ from typing import Optional, List, Dict, Any
 from pydantic import BaseModel, Field
 
 
+def mask_phone(phone: Optional[str]) -> str:
+    """Mask phone numbers to protect PII in logs, API responses, and client dashboards."""
+    if not phone or not isinstance(phone, str):
+        return "••••••••"
+    clean = phone.strip()
+    if len(clean) <= 5:
+        return "••••••••"
+    if clean.startswith("+"):
+        prefix = clean[:3]
+        suffix = clean[-3:]
+        return f"{prefix} •••• •••{suffix}"
+    suffix = clean[-3:]
+    return f"•••• •••{suffix}"
+
+
 class IncidentSeverity(str, Enum):
     P0_CRITICAL = "P0"
     P1_HIGH = "P1"
@@ -17,6 +32,7 @@ class IncidentState(str, Enum):
     # Primary lifecycle states
     UNASSIGNED = "UNASSIGNED"
     CALLING_PRIMARY = "CALLING_PRIMARY"
+    PRIMARY_PENDING = "PRIMARY_PENDING"
     PRIMARY_CONNECTED = "PRIMARY_CONNECTED"
     PRIMARY_VERIFIED = "PRIMARY_VERIFIED"
     PRIMARY_ACKNOWLEDGED = "PRIMARY_ACKNOWLEDGED"
@@ -53,23 +69,22 @@ class IncidentAlert(BaseModel):
     title: str
     description: str
     cluster: str = "prod-us-east-1"
-    runbook_url: Optional[str] = "https://wiki.corp.internal/runbooks/db-failover"
-    timestamp: float = Field(default_factory=time.time)
+    runbook_url: Optional[str] = None
+    created_at: float = Field(default_factory=time.time)
 
 
 class CallResultSchema(BaseModel):
-    """Deterministic structured schema enforced on CALL-E voice agent runtime."""
     incident_id: str
     callee_name: str
-    callee_verified: bool = True
-    pin_matched: bool = True
-    verdict: IncidentAction = IncidentAction.ACKNOWLEDGE
+    callee_verified: bool
+    pin_matched: bool
+    verdict: IncidentAction
     spoken_eta_minutes: int = 0
     dtmf_key_pressed: Optional[str] = None
     call_duration_seconds: float = 0.0
     transcript_summary: str = ""
     outcome: str = "ownership_established"
-    reason: Optional[str] = None
+    reason: str = ""
     call_completed: bool = True
     completion_confidence: float = 1.0
     notes: Optional[str] = None
@@ -114,3 +129,61 @@ class IncidentRecord(BaseModel):
         """Compute SHA-256 seal detecting modification of recorded evidence."""
         payload = f"{self.alert.id}|{self.state.value}|{self.owner}|{self.phone_dialed}|{self.updated_at}"
         return hashlib.sha256(payload.encode("utf-8")).hexdigest()
+
+    @property
+    def phone_dialed_masked(self) -> str:
+        return mask_phone(self.phone_dialed)
+
+
+# ==============================================================================
+# Multi-Tenant & Open-Source CRM (Twenty CRM / n8n) Integration Schemas
+# ==============================================================================
+
+class TenantConfig(BaseModel):
+    """Configuration for individual clients sharing a single OpsCall deployment."""
+    tenant_id: str
+    client_name: str
+    vertical: str = "ecommerce"  # "ecommerce", "clinic", "sre", "leadgen", "custom"
+    voice_agent_prompt: str = ""
+    webhook_callback_url: Optional[str] = None  # e.g., n8n webhook URL
+    crm_type: str = "twenty"  # "twenty", "hubspot", "webhook", "mock"
+    crm_endpoint: Optional[str] = None
+    created_at: float = Field(default_factory=time.time)
+
+
+class DispatchLeadRequest(BaseModel):
+    """Incoming dispatch request from n8n or external CRM."""
+    tenant_id: str = "default"
+    lead_id: str = Field(default_factory=lambda: f"LEAD-{int(time.time() * 1000) % 1000000:06d}")
+    customer_name: str
+    customer_phone: str
+    context: Dict[str, Any] = Field(default_factory=dict)
+    callback_url: Optional[str] = None  # Overrides tenant webhook if specified
+
+
+class DispatchLeadResponse(BaseModel):
+    """Response returned immediately to n8n upon queuing or starting call."""
+    success: bool
+    task_id: str
+    lead_id: str
+    status: str
+    callee: str
+    phone: str
+    message: str
+
+
+class CRMCallbackPayload(BaseModel):
+    """Structured callback payload delivered to n8n or Twenty CRM upon call completion."""
+    tenant_id: str
+    lead_id: str
+    task_id: str
+    status: str  # "COMPLETED", "FAILED", "NO_ANSWER"
+    duration_seconds: float
+    callee_name: str
+    callee_phone: str
+    verified: bool
+    dtmf_key_pressed: Optional[str] = None
+    spoken_intent: str = ""
+    transcript_summary: str = ""
+    audit_hash: str
+    timestamp: float = Field(default_factory=time.time)

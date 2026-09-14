@@ -68,72 +68,241 @@
   <!-- Main Grid -->
   <main class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6 space-y-6">
 
-    <!-- Metrics Cards -->
-    <section class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-      <div class="p-4 rounded-xl bg-slate-900 border border-slate-800">
-        <p class="text-xs font-medium text-slate-400 uppercase tracking-wider">Total Dispatches</p>
-        <p class="mt-2 text-2xl font-bold text-white" id="statTotalIncidents">1</p>
-        <p class="text-xs text-slate-500 mt-1">Autonomous calls placed</p>
-      </div>
-      <div class="p-4 rounded-xl bg-slate-900 border border-slate-800">
-        <p class="text-xs font-medium text-slate-400 uppercase tracking-wider">Avg Triage Latency</p>
-        <p class="mt-2 text-2xl font-bold text-emerald-400" id="statTriageLatency">42.5s</p>
-        <p class="text-xs text-slate-500 mt-1">Observed in live telephony test</p>
-      </div>
-      <div class="p-4 rounded-xl bg-slate-900 border border-slate-800">
-        <p class="text-xs font-medium text-slate-400 uppercase tracking-wider">Security Gate</p>
-        <p class="mt-2 text-2xl font-bold text-indigo-400">PIN 4829</p>
-        <p class="text-xs text-slate-500 mt-1">Voice & DTMF verified</p>
-      </div>
-      <div class="p-4 rounded-xl bg-slate-900 border border-slate-800">
-        <p class="text-xs font-medium text-slate-400 uppercase tracking-wider">Integrity Audit</p>
-        <p class="mt-2 text-2xl font-bold text-amber-400">SHA-256</p>
-        <p class="text-xs text-slate-500 mt-1">Tamper-evident forensic ledger</p>
-      </div>
-    </section>
+    <!-- Industry Solution Switcher -->
+    <div class="flex items-center space-x-2 border-b border-slate-800 pb-3 overflow-x-auto">
+      <button onclick="switchTab('sre')" id="tabBtn-sre" class="px-3.5 py-2 rounded-lg text-xs font-semibold flex items-center space-x-2 bg-emerald-500/20 text-emerald-400 border border-emerald-500/30 transition">
+        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z"/></svg>
+        <span>1. SRE Incident Sentinel</span>
+      </button>
+      <button onclick="switchTab('ecommerce')" id="tabBtn-ecommerce" class="px-3.5 py-2 rounded-lg text-xs font-semibold flex items-center space-x-2 bg-slate-900 text-slate-400 border border-slate-800 hover:text-white transition">
+        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M16 11V7a4 4 0 00-8 0v4M5 9h14l1 12H4L5 9z"/></svg>
+        <span>2. E-Commerce COD CRM</span>
+      </button>
+      <button onclick="switchTab('clinic')" id="tabBtn-clinic" class="px-3.5 py-2 rounded-lg text-xs font-semibold flex items-center space-x-2 bg-slate-900 text-slate-400 border border-slate-800 hover:text-white transition">
+        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4"/></svg>
+        <span>3. Clinic Appointment Concierge</span>
+      </button>
+      <button onclick="switchTab('dialer')" id="tabBtn-dialer" class="px-3.5 py-2 rounded-lg text-xs font-semibold flex items-center space-x-2 bg-slate-900 text-slate-400 border border-slate-800 hover:text-white transition">
+        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 5a2 2 0 012-2h3.28a1 1 0 01.948.684l1.498 4.493a1 1 0 01-.502 1.21l-2.257 1.13a11.042 11.042 0 005.516 5.516l1.13-2.257a1 1 0 011.21-.502l4.493 1.498a1 1 0 01.684.949V19a2 2 0 01-2 2h-1C9.716 21 3 14.284 3 6V5z"/></svg>
+        <span>4. Live Prospect Test Call</span>
+      </button>
+    </div>
 
-    <!-- Content Split: Incidents List & Incident Details -->
-    <section class="grid grid-cols-1 lg:grid-cols-12 gap-6">
+    <!-- VIEW 1: SRE Incident Ownership Sentinel -->
+    <div id="view-sre" class="space-y-6">
+      <!-- Metrics Cards -->
+      <section class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+        <div class="p-4 rounded-xl bg-slate-900 border border-slate-800">
+          <p class="text-xs font-medium text-slate-400 uppercase tracking-wider">Total Dispatches</p>
+          <p class="mt-2 text-2xl font-bold text-white" id="statTotalIncidents">1</p>
+          <p class="text-xs text-slate-500 mt-1">Autonomous calls placed</p>
+        </div>
+        <div class="p-4 rounded-xl bg-slate-900 border border-slate-800">
+          <p class="text-xs font-medium text-slate-400 uppercase tracking-wider">Avg Triage Latency</p>
+          <p class="mt-2 text-2xl font-bold text-emerald-400" id="statTriageLatency">42.5s</p>
+          <p class="text-xs text-slate-500 mt-1">Observed in live telephony test</p>
+        </div>
+        <div class="p-4 rounded-xl bg-slate-900 border border-slate-800">
+          <p class="text-xs font-medium text-slate-400 uppercase tracking-wider">Security Gate</p>
+          <p class="mt-2 text-2xl font-bold text-indigo-400">PIN 4829</p>
+          <p class="text-xs text-slate-500 mt-1">Voice & DTMF verified</p>
+        </div>
+        <div class="p-4 rounded-xl bg-slate-900 border border-slate-800">
+          <p class="text-xs font-medium text-slate-400 uppercase tracking-wider">Integrity Audit</p>
+          <p class="mt-2 text-2xl font-bold text-amber-400">SHA-256</p>
+          <p class="text-xs text-slate-500 mt-1">Tamper-evident forensic ledger</p>
+        </div>
+      </section>
 
-      <!-- Left Column: Incident Feed -->
-      <div class="lg:col-span-5 space-y-4">
-        <div class="flex items-center justify-between">
-          <h2 class="text-sm font-semibold uppercase tracking-wider text-slate-400">Incident Feed</h2>
-          <span class="text-xs text-slate-500" id="feedCount">1 incident</span>
+      <!-- Content Split: Incidents List & Incident Details -->
+      <section class="grid grid-cols-1 lg:grid-cols-12 gap-6">
+        <!-- Left Column: Incident Feed -->
+        <div class="lg:col-span-5 space-y-4">
+          <div class="flex items-center justify-between">
+            <h2 class="text-sm font-semibold uppercase tracking-wider text-slate-400">Incident Feed</h2>
+            <span class="text-xs text-slate-500" id="feedCount">1 incident</span>
+          </div>
+          <div id="incidentsList" class="space-y-3">
+            <!-- Rendered via JS -->
+          </div>
         </div>
 
-        <div id="incidentsList" class="space-y-3">
-          <!-- Rendered via JS -->
+        <!-- Right Column: Live Telemetry, Transcript & Escalation Ladder -->
+        <div class="lg:col-span-7 space-y-4">
+          <div class="flex items-center justify-between">
+            <h2 class="text-sm font-semibold uppercase tracking-wider text-slate-400">Ownership Resolution & Forensics</h2>
+            <span class="text-xs font-mono text-emerald-400 bg-emerald-500/10 px-2 py-0.5 rounded border border-emerald-500/20" id="selectedIncidentBadge">Select an Incident</span>
+          </div>
+          <div class="bg-slate-900 border border-slate-800 rounded-xl p-5 space-y-5" id="detailPanel">
+            <!-- Populated by JS -->
+          </div>
+        </div>
+      </section>
+    </div>
+
+    <!-- VIEW 2: E-Commerce Cash-on-Delivery (COD) CRM -->
+    <div id="view-ecommerce" class="hidden space-y-6">
+      <div class="p-5 rounded-xl bg-gradient-to-r from-slate-900 via-indigo-950/40 to-slate-900 border border-indigo-500/20 flex flex-col md:flex-row items-start md:items-center justify-between gap-4">
+        <div>
+          <div class="flex items-center space-x-2">
+            <span class="px-2 py-0.5 rounded text-[11px] font-mono font-bold bg-indigo-500/20 text-indigo-400 border border-indigo-500/30">D2C / SHOPIFY CRM</span>
+            <h2 class="text-lg font-bold text-white">Cash-on-Delivery (COD) Order Verification Sentinel</h2>
+          </div>
+          <p class="text-xs text-slate-400 mt-1">Autonomous outbound phone calls to customers within 60 seconds of order placement. DTMF Key [1] to confirm, [2] to cancel.</p>
+        </div>
+        <div class="flex items-center space-x-4 bg-slate-950/80 px-4 py-2.5 rounded-lg border border-slate-800 text-xs">
+          <div>
+            <p class="text-slate-500">Avg Return-To-Origin (RTO)</p>
+            <p class="text-rose-400 font-bold text-sm">Dropped 34% → 6.2%</p>
+          </div>
+          <div class="border-l border-slate-800 pl-4">
+            <p class="text-slate-500">Courier Shipping Saved</p>
+            <p class="text-emerald-400 font-bold text-sm">₹1,42,000 / mo</p>
+          </div>
         </div>
       </div>
 
-      <!-- Right Column: Live Telemetry, Transcript & Escalation Ladder -->
-      <div class="lg:col-span-7 space-y-4">
-        <div class="flex items-center justify-between">
-          <h2 class="text-sm font-semibold uppercase tracking-wider text-slate-400">Ownership Resolution & Forensics</h2>
-          <span class="text-xs font-mono text-emerald-400 bg-emerald-500/10 px-2 py-0.5 rounded border border-emerald-500/20" id="selectedIncidentBadge">Select an Incident</span>
+      <!-- Orders CRM Table -->
+      <div class="bg-slate-900 border border-slate-800 rounded-xl overflow-hidden shadow-lg">
+        <div class="px-5 py-4 border-b border-slate-800 flex items-center justify-between">
+          <h3 class="text-sm font-semibold uppercase tracking-wider text-slate-300">Live Orders Stream & Telephony Dispatch</h3>
+          <span class="text-xs text-slate-500">Auto-synced with Shopify Webhooks</span>
+        </div>
+        <div class="overflow-x-auto">
+          <table class="w-full text-left text-xs">
+            <thead class="bg-slate-950 text-slate-400 uppercase font-mono text-[10px] tracking-wider border-b border-slate-800">
+              <tr>
+                <th class="px-4 py-3">Order ID</th>
+                <th class="px-4 py-3">Customer & Phone</th>
+                <th class="px-4 py-3">Item & Value</th>
+                <th class="px-4 py-3">Address</th>
+                <th class="px-4 py-3">Verification Status</th>
+                <th class="px-4 py-3 text-right">Autonomous Voice Action</th>
+              </tr>
+            </thead>
+            <tbody id="ecommerceOrdersTbody" class="divide-y divide-slate-800/60 font-sans">
+              <!-- Rendered via JS -->
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+
+    <!-- VIEW 3: Healthcare & Clinic Appointment Concierge -->
+    <div id="view-clinic" class="hidden space-y-6">
+      <div class="p-5 rounded-xl bg-gradient-to-r from-slate-900 via-emerald-950/40 to-slate-900 border border-emerald-500/20 flex flex-col md:flex-row items-start md:items-center justify-between gap-4">
+        <div>
+          <div class="flex items-center space-x-2">
+            <span class="px-2 py-0.5 rounded text-[11px] font-mono font-bold bg-emerald-500/20 text-emerald-400 border border-emerald-500/30">CLINICAL PRACTICE CRM</span>
+            <h2 class="text-lg font-bold text-white">Patient Appointment Concierge & No-Show Shield</h2>
+          </div>
+          <p class="text-xs text-slate-400 mt-1">Autonomous reminder calls 24h & 2h prior to medical appointments with conversational voice rescheduling.</p>
+        </div>
+        <div class="flex items-center space-x-4 bg-slate-950/80 px-4 py-2.5 rounded-lg border border-slate-800 text-xs">
+          <div>
+            <p class="text-slate-500">Doctor Utilization</p>
+            <p class="text-emerald-400 font-bold text-sm">96.8% (Up from 74%)</p>
+          </div>
+          <div class="border-l border-slate-800 pl-4">
+            <p class="text-slate-500">Staff Calling Time</p>
+            <p class="text-indigo-400 font-bold text-sm">0 hrs / day automated</p>
+          </div>
+        </div>
+      </div>
+
+      <!-- Appointments CRM Table -->
+      <div class="bg-slate-900 border border-slate-800 rounded-xl overflow-hidden shadow-lg">
+        <div class="px-5 py-4 border-b border-slate-800 flex items-center justify-between">
+          <h3 class="text-sm font-semibold uppercase tracking-wider text-slate-300">Today & Tomorrow Consultations Schedule</h3>
+          <span class="text-xs text-slate-500">Auto-synced with Clinic Management Software</span>
+        </div>
+        <div class="overflow-x-auto">
+          <table class="w-full text-left text-xs">
+            <thead class="bg-slate-950 text-slate-400 uppercase font-mono text-[10px] tracking-wider border-b border-slate-800">
+              <tr>
+                <th class="px-4 py-3">Appt ID</th>
+                <th class="px-4 py-3">Patient & Contact</th>
+                <th class="px-4 py-3">Doctor & Specialty</th>
+                <th class="px-4 py-3">Scheduled Slot</th>
+                <th class="px-4 py-3">Confirmation Status</th>
+                <th class="px-4 py-3 text-right">Voice Reminder Action</th>
+              </tr>
+            </thead>
+            <tbody id="clinicAppointmentsTbody" class="divide-y divide-slate-800/60 font-sans">
+              <!-- Rendered via JS -->
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+
+    <!-- VIEW 4: Live Prospect Test Call Dialer -->
+    <div id="view-dialer" class="hidden space-y-6">
+      <div class="max-w-2xl mx-auto bg-slate-900 border border-slate-800 rounded-2xl p-6 shadow-2xl">
+        <div class="border-b border-slate-800 pb-4 mb-5">
+          <h2 class="text-base font-bold text-white flex items-center space-x-2">
+            <span class="w-3 h-3 rounded-full bg-emerald-400 pulse-glow"></span>
+            <span>Live Prospect Mobile Demo Call</span>
+          </h2>
+          <p class="text-xs text-slate-400 mt-1">Enter your prospect's name and mobile number. Click dispatch to demonstrate the autonomous voice agent live on their phone in 5 seconds.</p>
         </div>
 
-        <div class="bg-slate-900 border border-slate-800 rounded-xl p-5 space-y-5" id="detailPanel">
+        <form id="prospectForm" onsubmit="submitProspectCall(event)" class="space-y-4 text-xs">
+          <div>
+            <label class="block font-medium text-slate-300 mb-1">Prospect / Client Name</label>
+            <input type="text" id="prospectName" required placeholder="e.g. Rahul Gupta (Founder, StyleShop)" class="w-full px-3.5 py-2.5 rounded-lg bg-slate-950 border border-slate-800 text-white focus:border-emerald-500 focus:outline-none transition">
+          </div>
+          <div>
+            <label class="block font-medium text-slate-300 mb-1">Mobile Number (with country code)</label>
+            <input type="text" id="prospectPhone" required placeholder="+91 98765 43210" class="w-full px-3.5 py-2.5 rounded-lg bg-slate-950 border border-slate-800 text-white font-mono focus:border-emerald-500 focus:outline-none transition">
+          </div>
+          <div>
+            <label class="block font-medium text-slate-300 mb-1">Demonstration Vertical</label>
+            <select id="prospectVertical" class="w-full px-3.5 py-2.5 rounded-lg bg-slate-950 border border-slate-800 text-white focus:border-emerald-500 focus:outline-none transition">
+              <option value="sre">SRE Urgent Outage (P0 Incident & PIN Verification)</option>
+              <option value="ecommerce">E-Commerce COD Order Verification (Address Confirmation & Keypad [1])</option>
+              <option value="clinic">Clinic Appointment Concierge (Slot Confirmation)</option>
+            </select>
+          </div>
+          <button type="submit" class="w-full py-3 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white font-bold text-sm shadow-lg shadow-emerald-500/20 transition flex items-center justify-center space-x-2">
+            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M3 5a2 2 0 012-2h3.28a1 1 0 01.948.684l1.498 4.493a1 1 0 01-.502 1.21l-2.257 1.13a11.042 11.042 0 005.516 5.516l1.13-2.257a1 1 0 011.21-.502l4.493 1.498a1 1 0 01.684.949V19a2 2 0 01-2 2h-1C9.716 21 3 14.284 3 6V5z"/></svg>
+            <span>Dispatch Live Demo Call to Mobile Now</span>
+          </button>
+        </form>
+
+        <div id="dialerResult" class="hidden mt-5 p-4 rounded-xl bg-slate-950 border border-emerald-500/30 text-xs space-y-2">
           <!-- Populated by JS -->
         </div>
       </div>
-
-    </section>
+    </div>
 
   </main>
+
 
   <!-- Embedded JS Logic -->
   <script>
     let currentIncidents = [];
     let selectedIncidentId = null;
 
+    // Strict HTML Escaping to prevent Stored / Reflected DOM XSS
+    function escapeHtml(str) {
+      if (str === null || str === undefined) return '';
+      return String(str)
+        .replace(/&/g, '&amp;')
+        .replace(/</g, '&lt;')
+        .replace(/>/g, '&gt;')
+        .replace(/"/g, '&quot;')
+        .replace(/'/g, '&#39;');
+    }
+
     function maskPhone(phone) {
-      if (!phone) return '+91 •••• •••896';
-      if (phone.includes('62044') || phone.includes('896')) {
-        return '+91 •••• •••896';
+      if (!phone || typeof phone !== 'string') return '••••••••';
+      const clean = phone.trim();
+      if (clean.length <= 5) return '••••••••';
+      if (clean.startsWith('+')) {
+        return `${clean.slice(0, 3)} •••• •••${clean.slice(-3)}`;
       }
-      return phone;
+      return `•••• •••${clean.slice(-3)}`;
     }
 
     async function loadIncidents() {
@@ -158,8 +327,8 @@
         const res = await fetch('/api/v1/telemetry');
         if (res.ok) {
           const data = await res.json();
-          document.getElementById('statusMode').textContent = `Mode: ${data.calle_mode.toUpperCase()}`;
-          document.getElementById('statTotalIncidents').textContent = data.total_incidents;
+          document.getElementById('statusMode').textContent = `Mode: ${escapeHtml(data.calle_mode.toUpperCase())}`;
+          document.getElementById('statTotalIncidents').textContent = escapeHtml(data.total_incidents);
         }
       } catch (err) {
         console.error('Telemetry err:', err);
@@ -210,20 +379,20 @@
         const isSelected = inc.alert.id === selectedIncidentId;
         const isResolved = inc.state === 'OWNERSHIP_ESTABLISHED' || inc.state === 'ACKNOWLEDGED' || inc.state === 'RESOLVED';
         const stateColor = isResolved ? 'text-emerald-400 bg-emerald-500/10 border-emerald-500/20' :
-                           inc.state === 'ESCALATING' || inc.state === 'PRIMARY_UNAVAILABLE' ? 'text-amber-400 bg-amber-500/10 border-amber-500/20' :
+                           inc.state === 'ESCALATING' || inc.state === 'PRIMARY_UNAVAILABLE' || inc.state === 'PRIMARY_PENDING' ? 'text-amber-400 bg-amber-500/10 border-amber-500/20' :
                            'text-indigo-400 bg-indigo-500/10 border-indigo-500/20';
 
         return `
-          <div onclick="selectIncident('${inc.alert.id}')" class="p-4 rounded-xl border cursor-pointer transition ${isSelected ? 'bg-slate-800/80 border-emerald-500/50 shadow-md' : 'bg-slate-900 border-slate-800 hover:border-slate-700'}">
+          <div data-incident-id="${escapeHtml(inc.alert.id)}" class="incident-card p-4 rounded-xl border cursor-pointer transition ${isSelected ? 'bg-slate-800/80 border-emerald-500/50 shadow-md' : 'bg-slate-900 border-slate-800 hover:border-slate-700'}">
             <div class="flex items-center justify-between mb-2">
-              <span class="text-xs font-mono font-bold text-rose-400 bg-rose-500/10 px-2 py-0.5 rounded border border-rose-500/20">${inc.alert.severity}</span>
-              <span class="text-xs font-semibold px-2 py-0.5 rounded border ${stateColor}">${inc.state}</span>
+              <span class="text-xs font-mono font-bold text-rose-400 bg-rose-500/10 px-2 py-0.5 rounded border border-rose-500/20">${escapeHtml(inc.alert.severity)}</span>
+              <span class="text-xs font-semibold px-2 py-0.5 rounded border ${stateColor}">${escapeHtml(inc.state)}</span>
             </div>
-            <h3 class="text-sm font-semibold text-white truncate">${inc.alert.service}</h3>
-            <p class="text-xs text-slate-400 line-clamp-1 mt-1">${inc.alert.description}</p>
+            <h3 class="text-sm font-semibold text-white truncate">${escapeHtml(inc.alert.service)}</h3>
+            <p class="text-xs text-slate-400 line-clamp-1 mt-1">${escapeHtml(inc.alert.description)}</p>
             <div class="mt-3 pt-2 border-t border-slate-800/60 flex items-center justify-between text-[11px] text-slate-400">
-              <span class="text-emerald-400 font-medium">Owner: ${inc.owner || 'UNASSIGNED'}</span>
-              <span class="text-slate-500">Tier ${inc.escalation_level}</span>
+              <span class="text-emerald-400 font-medium">Owner: ${escapeHtml(inc.owner || 'UNASSIGNED')}</span>
+              <span class="text-slate-500">Tier ${escapeHtml(inc.escalation_level)}</span>
             </div>
           </div>
         `;
@@ -240,7 +409,7 @@
       const inc = currentIncidents.find(i => i.alert.id === id);
       if (!inc) return;
 
-      document.getElementById('selectedIncidentBadge').textContent = `${inc.alert.id} (${inc.alert.service})`;
+      document.getElementById('selectedIncidentBadge').textContent = `${escapeHtml(inc.alert.id)} (${escapeHtml(inc.alert.service)})`;
       const panel = document.getElementById('detailPanel');
       const latestCall = inc.calls[inc.calls.length - 1];
 
@@ -256,10 +425,10 @@
                   <span class="w-5 h-5 rounded-full flex items-center justify-center font-bold text-[10px] ${idx === inc.state_history.length - 1 ? 'bg-emerald-500 text-slate-950' : 'bg-slate-800 text-slate-400'}">${idx + 1}</span>
                   <div class="flex-1">
                     <div class="flex items-center space-x-2">
-                      <span class="font-mono font-semibold ${idx === inc.state_history.length - 1 ? 'text-emerald-400' : 'text-slate-300'}">${step.state}</span>
+                      <span class="font-mono font-semibold ${idx === inc.state_history.length - 1 ? 'text-emerald-400' : 'text-slate-300'}">${escapeHtml(step.state)}</span>
                       <span class="text-[10px] text-slate-500 font-mono">${new Date(step.timestamp * 1000).toLocaleTimeString()}</span>
                     </div>
-                    <p class="text-[11px] text-slate-400 mt-0.5">${step.detail}</p>
+                    <p class="text-[11px] text-slate-400 mt-0.5">${escapeHtml(step.detail)}</p>
                   </div>
                 </div>
               `).join('')}
@@ -271,11 +440,11 @@
       let transcriptHtml = '';
       if (latestCall && latestCall.transcript && latestCall.transcript.length > 0) {
         transcriptHtml = latestCall.transcript.map(t => {
-          const isAgent = t.speaker.toLowerCase() === 'agent';
+          const isAgent = String(t.speaker).toLowerCase() === 'agent';
           return `
             <div class="flex space-x-3 text-xs ${isAgent ? 'bg-slate-800/40' : 'bg-slate-800/80'} p-3 rounded-lg border border-slate-800">
-              <span class="font-bold uppercase tracking-wider ${isAgent ? 'text-emerald-400' : 'text-sky-400'} min-w-[50px]">${t.speaker}:</span>
-              <p class="text-slate-300 flex-1 leading-relaxed">${t.text}</p>
+              <span class="font-bold uppercase tracking-wider ${isAgent ? 'text-emerald-400' : 'text-sky-400'} min-w-[50px]">${escapeHtml(t.speaker)}:</span>
+              <p class="text-slate-300 flex-1 leading-relaxed">${escapeHtml(t.text)}</p>
             </div>
           `;
         }).join('');
@@ -287,15 +456,15 @@
         <!-- Outage Summary Header -->
         <div class="border-b border-slate-800 pb-4">
           <div class="flex items-center justify-between">
-            <h3 class="text-base font-bold text-white">${inc.alert.title}</h3>
-            <span class="text-xs font-mono text-emerald-400 bg-emerald-500/10 px-2.5 py-1 rounded border border-emerald-500/20 font-bold">✓ Owner: ${inc.owner}</span>
+            <h3 class="text-base font-bold text-white">${escapeHtml(inc.alert.title)}</h3>
+            <span class="text-xs font-mono text-emerald-400 bg-emerald-500/10 px-2.5 py-1 rounded border border-emerald-500/20 font-bold">✓ Owner: ${escapeHtml(inc.owner)}</span>
           </div>
-          <p class="text-xs text-slate-300 mt-1">${inc.alert.description}</p>
+          <p class="text-xs text-slate-300 mt-1">${escapeHtml(inc.alert.description)}</p>
           <div class="flex flex-wrap items-center gap-4 mt-3 text-xs text-slate-400">
-            <span>Cluster: <strong class="text-slate-200">${inc.alert.cluster}</strong></span>
-            <span>Target: <strong class="text-slate-200">${inc.assigned_engineer}</strong></span>
-            <span>Phone: <strong class="text-slate-200">${maskPhone(inc.phone_dialed)}</strong></span>
-            <span class="font-mono text-[11px] text-amber-400">Seal: ${inc.audit_hash.slice(0, 16)}...</span>
+            <span>Cluster: <strong class="text-slate-200">${escapeHtml(inc.alert.cluster)}</strong></span>
+            <span>Target: <strong class="text-slate-200">${escapeHtml(inc.assigned_engineer)}</strong></span>
+            <span>Phone: <strong class="text-slate-200">${escapeHtml(maskPhone(inc.phone_dialed))}</strong></span>
+            <span class="font-mono text-[11px] text-amber-400">Seal: ${escapeHtml(inc.audit_hash.slice(0, 16))}...</span>
           </div>
         </div>
 
@@ -305,7 +474,7 @@
         <div class="grid grid-cols-2 sm:grid-cols-4 gap-3 bg-slate-950/50 p-3.5 rounded-lg border border-slate-800/60 text-xs">
           <div>
             <p class="text-slate-500">Call ID</p>
-            <p class="font-mono text-slate-300 truncate">${latestCall ? latestCall.call_id : 'N/A'}</p>
+            <p class="font-mono text-slate-300 truncate">${escapeHtml(latestCall ? latestCall.call_id : 'N/A')}</p>
           </div>
           <div>
             <p class="text-slate-500">PIN Auth Status</p>
@@ -313,11 +482,11 @@
           </div>
           <div>
             <p class="text-slate-500">Ownership Verdict</p>
-            <p class="font-bold text-indigo-400">${latestCall && latestCall.result ? latestCall.result.verdict : 'PENDING'}</p>
+            <p class="font-bold text-indigo-400">${escapeHtml(latestCall && latestCall.result ? latestCall.result.verdict : 'PENDING')}</p>
           </div>
           <div>
             <p class="text-slate-500">Stated ETA</p>
-            <p class="font-bold text-emerald-400">${latestCall && latestCall.result ? latestCall.result.spoken_eta_minutes + ' minutes' : 'N/A'}</p>
+            <p class="font-bold text-emerald-400">${escapeHtml(latestCall && latestCall.result ? latestCall.result.spoken_eta_minutes + ' minutes' : 'N/A')}</p>
           </div>
         </div>
 
@@ -325,7 +494,7 @@
         <div class="space-y-2">
           <h4 class="text-xs font-semibold uppercase tracking-wider text-slate-400 flex items-center justify-between">
             <span>CALL-E Voice Dialog Stream</span>
-            <span class="text-[10px] text-slate-500">${latestCall ? latestCall.duration_seconds + 's duration' : ''}</span>
+            <span class="text-[10px] text-slate-500">${escapeHtml(latestCall ? latestCall.duration_seconds + 's duration' : '')}</span>
           </h4>
           <div class="space-y-2 max-h-56 overflow-y-auto pr-1">
             ${transcriptHtml}
@@ -335,10 +504,221 @@
         <!-- Strict Schema JSON Contract -->
         <div class="space-y-2">
           <h4 class="text-xs font-semibold uppercase tracking-wider text-slate-400">Strict result_schema Contract (JSON)</h4>
-          <pre class="bg-slate-950 p-3 rounded-lg border border-slate-800 text-[11px] font-mono text-emerald-300 overflow-x-auto">${latestCall && latestCall.result ? JSON.stringify(latestCall.result, null, 2) : '{}'}</pre>
+          <pre class="bg-slate-950 p-3 rounded-lg border border-slate-800 text-[11px] font-mono text-emerald-300 overflow-x-auto">${escapeHtml(latestCall && latestCall.result ? JSON.stringify(latestCall.result, null, 2) : '{}')}</pre>
         </div>
       `;
     }
+
+    // Tab Navigation Logic
+    function switchTab(tabId) {
+      const tabs = ['sre', 'ecommerce', 'clinic', 'dialer'];
+      tabs.forEach(t => {
+        const view = document.getElementById(`view-${t}`);
+        const btn = document.getElementById(`tabBtn-${t}`);
+        if (t === tabId) {
+          view.classList.remove('hidden');
+          btn.className = 'px-3.5 py-2 rounded-lg text-xs font-semibold flex items-center space-x-2 bg-emerald-500/20 text-emerald-400 border border-emerald-500/30 transition';
+        } else {
+          view.classList.add('hidden');
+          btn.className = 'px-3.5 py-2 rounded-lg text-xs font-semibold flex items-center space-x-2 bg-slate-900 text-slate-400 border border-slate-800 hover:text-white transition';
+        }
+      });
+      if (tabId === 'ecommerce') loadEcommerceOrders();
+      if (tabId === 'clinic') loadClinicAppointments();
+    }
+
+    // E-Commerce Orders CRM Logic
+    async function loadEcommerceOrders() {
+      try {
+        const res = await fetch('/api/v1/crm/orders');
+        if (res.ok) {
+          const orders = await res.json();
+          const tbody = document.getElementById('ecommerceOrdersTbody');
+          tbody.innerHTML = orders.map(ord => {
+            const isVerified = ord.status === 'VERIFIED_DISPATCHED';
+            const isCancelled = ord.status === 'CANCELLED_SAVED_RTO';
+            const statusClass = isVerified ? 'text-emerald-400 bg-emerald-500/10 border-emerald-500/20' :
+                                isCancelled ? 'text-rose-400 bg-rose-500/10 border-rose-500/20' :
+                                'text-amber-400 bg-amber-500/10 border-amber-500/20';
+            
+            return `
+              <tr class="hover:bg-slate-800/40 transition">
+                <td class="px-4 py-3 font-mono font-bold text-slate-200">${escapeHtml(ord.id)}</td>
+                <td class="px-4 py-3">
+                  <div class="font-medium text-white">${escapeHtml(ord.customer)}</div>
+                  <div class="text-[11px] text-slate-500 font-mono">${escapeHtml(maskPhone(ord.phone))}</div>
+                </td>
+                <td class="px-4 py-3">
+                  <div class="text-slate-300">${escapeHtml(ord.item)}</div>
+                  <div class="text-[11px] font-bold text-emerald-400">₹${Number(ord.amount).toLocaleString()} (COD)</div>
+                </td>
+                <td class="px-4 py-3 text-slate-400 max-w-xs truncate">${escapeHtml(ord.address)}</td>
+                <td class="px-4 py-3">
+                  <span class="px-2 py-0.5 rounded border text-[11px] font-semibold ${statusClass}">${escapeHtml(ord.status)}</span>
+                  ${ord.verification_log ? `<p class="text-[10px] text-slate-400 mt-1 max-w-xs leading-tight">${escapeHtml(ord.verification_log)}</p>` : ''}
+                </td>
+                <td class="px-4 py-3 text-right">
+                  ${!isVerified && !isCancelled ? `
+                    <div class="flex items-center justify-end space-x-1.5">
+                      <button data-order-id="${escapeHtml(ord.id)}" data-action="confirm" class="px-2.5 py-1 rounded bg-emerald-600 hover:bg-emerald-500 text-white font-medium text-[11px] shadow transition">
+                        ✓ Call & Confirm
+                      </button>
+                      <button data-order-id="${escapeHtml(ord.id)}" data-action="cancel" class="px-2.5 py-1 rounded bg-rose-900/60 hover:bg-rose-800 text-rose-300 font-medium text-[11px] border border-rose-700/50 transition">
+                        Cancel
+                      </button>
+                    </div>
+                  ` : `
+                    <span class="text-[11px] font-mono text-slate-500">Processed (${escapeHtml(ord.last_call_at || 'Recorded')})</span>
+                  `}
+                </td>
+              </tr>
+            `;
+          }).join('');
+        }
+      } catch (err) {
+        console.error('Error loading CRM orders:', err);
+      }
+    }
+
+    async function verifyOrder(orderId, action = 'confirm') {
+      try {
+        const res = await fetch(`/api/v1/crm/orders/${encodeURIComponent(orderId)}/verify?action=${encodeURIComponent(action)}`, { method: 'POST' });
+        if (res.ok) {
+          await loadEcommerceOrders();
+        }
+      } catch (err) {
+        alert('Order verification failed: ' + err.message);
+      }
+    }
+
+    // Clinic Appointments CRM Logic
+    async function loadClinicAppointments() {
+      try {
+        const res = await fetch('/api/v1/crm/appointments');
+        if (res.ok) {
+          const appts = await res.json();
+          const tbody = document.getElementById('clinicAppointmentsTbody');
+          tbody.innerHTML = appts.map(apt => {
+            const isConfirmed = apt.status === 'CONFIRMED_BY_PATIENT';
+            const statusClass = isConfirmed ? 'text-emerald-400 bg-emerald-500/10 border-emerald-500/20' :
+                                'text-amber-400 bg-amber-500/10 border-amber-500/20';
+            
+            return `
+              <tr class="hover:bg-slate-800/40 transition">
+                <td class="px-4 py-3 font-mono font-bold text-slate-200">${escapeHtml(apt.id)}</td>
+                <td class="px-4 py-3">
+                  <div class="font-medium text-white">${escapeHtml(apt.patient)}</div>
+                  <div class="text-[11px] text-slate-500 font-mono">${escapeHtml(maskPhone(apt.phone))}</div>
+                </td>
+                <td class="px-4 py-3 text-slate-300">${escapeHtml(apt.doctor)}</td>
+                <td class="px-4 py-3 font-medium text-indigo-400">${escapeHtml(apt.slot)}</td>
+                <td class="px-4 py-3">
+                  <span class="px-2 py-0.5 rounded border text-[11px] font-semibold ${statusClass}">${escapeHtml(apt.status)}</span>
+                  <p class="text-[10px] text-slate-400 mt-1 max-w-xs leading-tight">${escapeHtml(apt.notes)}</p>
+                </td>
+                <td class="px-4 py-3 text-right">
+                  ${!isConfirmed ? `
+                    <button data-appt-id="${escapeHtml(apt.id)}" class="px-3 py-1 rounded bg-indigo-600 hover:bg-indigo-500 text-white font-medium text-[11px] shadow transition">
+                      Dispatch Voice Reminder
+                    </button>
+                  ` : `
+                    <span class="text-[11px] font-mono text-emerald-400">✓ Cal Synced</span>
+                  `}
+                </td>
+              </tr>
+            `;
+          }).join('');
+        }
+      } catch (err) {
+        console.error('Error loading CRM appointments:', err);
+      }
+    }
+
+    async function remindAppointment(apptId) {
+      try {
+        const res = await fetch(`/api/v1/crm/appointments/${encodeURIComponent(apptId)}/remind`, { method: 'POST' });
+        if (res.ok) {
+          await loadClinicAppointments();
+        }
+      } catch (err) {
+        alert('Appointment reminder dispatch failed: ' + err.message);
+      }
+    }
+
+    // Live Prospect Dialer Logic
+    async function submitProspectCall(e) {
+      e.preventDefault();
+      const name = document.getElementById('prospectName').value;
+      const phone = document.getElementById('prospectPhone').value;
+      const vertical = document.getElementById('prospectVertical').value;
+      const resultBox = document.getElementById('dialerResult');
+
+      resultBox.classList.remove('hidden');
+      resultBox.innerHTML = `
+        <div class="flex items-center space-x-2 text-emerald-400">
+          <svg class="w-4 h-4 animate-spin" fill="none" stroke="currentColor" viewBox="0 0 24 24"><circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle><path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path></svg>
+          <span class="font-bold">Connecting autonomous voice gateway to ${escapeHtml(maskPhone(phone))}...</span>
+        </div>
+      `;
+
+      try {
+        const res = await fetch('/api/v1/crm/prospect-call', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ name, phone, vertical })
+        });
+        if (res.ok) {
+          const data = await res.json();
+          resultBox.innerHTML = `
+            <div class="space-y-2">
+              <div class="flex items-center justify-between">
+                <span class="text-emerald-400 font-bold">✓ Call Successfully Dispatched</span>
+                <span class="font-mono text-slate-500 text-[10px]">${escapeHtml(data.task_id)}</span>
+              </div>
+              <p class="text-slate-300">${escapeHtml(data.message)}</p>
+              <div class="p-2.5 rounded bg-slate-900 border border-slate-800 text-[11px] text-slate-400">
+                <strong class="text-slate-200">Expected Agent Dialogue:</strong> "${escapeHtml(data.expected_dialogue)}"
+              </div>
+            </div>
+          `;
+        }
+      } catch (err) {
+        resultBox.innerHTML = `<span class="text-rose-400">Error dispatching call: ${escapeHtml(err.message)}</span>`;
+      }
+    }
+
+    // Attach Event Delegation Listeners (Preventing Inline Onclick DOM XSS Vectors)
+    document.addEventListener('DOMContentLoaded', () => {
+      const incList = document.getElementById('incidentsList');
+      if (incList) {
+        incList.addEventListener('click', (e) => {
+          const card = e.target.closest('[data-incident-id]');
+          if (card) {
+            selectIncident(card.getAttribute('data-incident-id'));
+          }
+        });
+      }
+
+      const orderTbody = document.getElementById('ecommerceOrdersTbody');
+      if (orderTbody) {
+        orderTbody.addEventListener('click', (e) => {
+          const btn = e.target.closest('button[data-order-id]');
+          if (btn) {
+            verifyOrder(btn.getAttribute('data-order-id'), btn.getAttribute('data-action'));
+          }
+        });
+      }
+
+      const clinicTbody = document.getElementById('clinicAppointmentsTbody');
+      if (clinicTbody) {
+        clinicTbody.addEventListener('click', (e) => {
+          const btn = e.target.closest('button[data-appt-id]');
+          if (btn) {
+            remindAppointment(btn.getAttribute('data-appt-id'));
+          }
+        });
+      }
+    });
 
     // Polling every 5 seconds
     setInterval(loadIncidents, 5000);
@@ -349,3 +729,4 @@
 
 </body>
 </html>
+
