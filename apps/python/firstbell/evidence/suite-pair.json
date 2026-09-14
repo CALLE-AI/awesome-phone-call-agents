@@ -1,0 +1,13 @@
+{
+  "what_this_is": "What the suite did on the tree this was run against, written by tools/suite_pair.py rather than typed. The stat card on the reviewer page reads this file. A pass-and-skip pair cannot be measured by the builder itself, because the suite reads the page the builder writes, so it used to come out of a sentence in the README and was the one number on the front screen that nothing checked.",
+  "why_the_pair_is_not_one_number": "A skip here is a could-not-measure and not a pass. Some gates need a built page, the recordings that are held outside this repository, or a gate report from node tools/gates/run.mjs. A clean checkout skips more of them and its pair is equally true of it, so the README publishes both and this records which tree was measured.",
+  "collected": 887,
+  "passed": 885,
+  "skipped": 2,
+  "failed": 0,
+  "tree": "built",
+  "page_present": true,
+  "gate_report_present": true,
+  "measured_on": "2026-09-13",
+  "regenerate_with": "python tools/suite_pair.py"
+}

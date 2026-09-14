@@ -1,0 +1,25 @@
+{% extends "base.html" %}
+{% block content %}
+<h1>Dispatch history</h1>
+<p class="muted">Last 100 runs. Every call's full result, transcript, and raw CALL-E response is kept in the database for each of these.</p>
+{% if runs %}
+<div class="table-wrap">
+<table>
+  <tr><th>Filed</th><th>Request</th><th>Requester</th><th>Run status</th><th>Targets</th><th>Breakdown</th><th></th></tr>
+  {% for r in runs %}
+  <tr>
+    <td>{{ r.created_at.strftime('%b %d, %H:%M') }}</td>
+    <td><strong>{{ r.units_needed }}</strong> × {{ r.blood_group }} {{ r.rhesus }}</td>
+    <td>{{ r.requester or '—' }}</td>
+    <td><span class="badge {{ r.status }}">{{ r.status }}</span></td>
+    <td>{{ r.targets }}</td>
+    <td class="muted">{{ r.completed }} completed · {{ r.no_answer }} no answer · {{ r.callbacks }} callback · {{ r.failed }} failed</td>
+    <td><a href="/runs/{{ r.id }}">View</a></td>
+  </tr>
+  {% endfor %}
+</table>
+</div>
+{% else %}
+<p class="muted">No runs yet. File one from <a href="/request">New request</a>.</p>
+{% endif %}
+{% endblock %}

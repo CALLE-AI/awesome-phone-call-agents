@@ -1,0 +1,58 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <title>FreshChain Resolver</title>
+  <style>
+    :root{color-scheme:dark;--ink:#f5f7f2;--muted:#a8b2a4;--panel:#17211c;--line:#314137;--lime:#b8f34a;--red:#ff8d78}
+    *{box-sizing:border-box}body{margin:0;background:#0d1511;color:var(--ink);font:15px/1.45 system-ui,sans-serif}
+    header,main{max-width:1180px;margin:auto;padding:24px}header{display:flex;justify-content:space-between;align-items:end}
+    h1{margin:0;font-size:clamp(28px,4vw,52px);letter-spacing:-.04em}h2{margin-top:0}.eyebrow{color:var(--lime);text-transform:uppercase;letter-spacing:.14em;font-size:12px}
+    .grid{display:grid;grid-template-columns:minmax(320px,.9fr) minmax(420px,1.4fr);gap:20px}.panel{background:var(--panel);border:1px solid var(--line);border-radius:16px;padding:20px}
+    form{display:grid;grid-template-columns:1fr 1fr;gap:12px}label{display:grid;gap:5px;color:var(--muted);font-size:12px}.wide{grid-column:1/-1}
+    input,select,button{font:inherit;border-radius:8px;border:1px solid var(--line);padding:10px;background:#0e1712;color:var(--ink)}
+    button{cursor:pointer;background:var(--lime);color:#14200e;font-weight:750;border:0}button.secondary{background:#27362d;color:var(--ink)}
+    table{width:100%;border-collapse:collapse}th,td{text-align:left;padding:11px 8px;border-bottom:1px solid var(--line);font-size:13px}th{color:var(--muted)}
+    .badge{display:inline-block;border:1px solid var(--line);border-radius:999px;padding:3px 8px}.proceed{color:var(--lime)}.hold,.escalate{color:var(--red)}.message{min-height:24px;color:var(--lime)}
+    @media(max-width:800px){.grid{grid-template-columns:1fr}form{grid-template-columns:1fr}.wide{grid-column:auto}}
+  </style>
+</head>
+<body>
+<header><div><div class="eyebrow">CALL-E operations agent</div><h1>FreshChain Resolver</h1></div><p>Late load → phone resolution → dispatch decision</p></header>
+<main class="grid">
+  <section class="panel">
+    <h2>New delivery exception</h2>
+    <form id="case-form">
+      <label>Workflow ID<input name="workflow_id" value="delay-20260731-002" required></label>
+      <label>Shipment reference<input name="shipment_reference" value="DEMO-CC-2048" required></label>
+      <label class="wide">Authorized operations phone (E.164)<input name="phone" value="+12025550123" required></label>
+      <label>Caller business<input name="caller_business_name" value="FreshChain Demo Logistics" required></label>
+      <label>Receiving site<input name="receiving_site_name" value="North Harbor Distribution Center" required></label>
+      <label>Product category<input name="product_category" value="refrigerated produce" required></label>
+      <label>Timezone<input name="timezone" value="America/New_York" required></label>
+      <label>Window end<input type="datetime-local" name="scheduled_window_end_local" value="2026-07-31T17:00" required></label>
+      <label>Predicted arrival<input type="datetime-local" name="predicted_arrival_local" value="2026-07-31T18:30" required></label>
+      <label>Temperature status<select name="temperature_status"><option value="within_range">Within range</option><option value="unknown">Unknown</option><option value="excursion">Excursion</option></select></label>
+      <label>Locale<input name="locale" value="en-US"></label>
+      <label class="wide"><span><input type="checkbox" name="authorized_operational_contact" checked> I confirm this is an authorized operational contact.</span></label>
+      <button class="wide" type="submit">Create exception</button>
+    </form>
+    <p class="message" id="message"></p>
+  </section>
+  <section class="panel">
+    <h2>Call history & final decisions</h2>
+    <p>Simulation never places a call. Live execution is available through the protected API after environment setup.</p>
+    <table><thead><tr><th>Shipment</th><th>Status</th><th>Decision</th><th>No-call demo</th></tr></thead><tbody id="cases"></tbody></table>
+  </section>
+</main>
+<script>
+const message=document.querySelector('#message'), rows=document.querySelector('#cases');
+async function request(url,options={}){const r=await fetch(url,{headers:{'Content-Type':'application/json'},...options});const j=await r.json();if(!r.ok)throw new Error(j.detail||'Request failed');return j}
+async function refresh(){const data=await request('/api/cases');rows.innerHTML=data.cases.map(c=>`<tr><td>${c.request.shipment_reference}</td><td><span class="badge">${c.status}</span></td><td><span class="badge ${c.decision||''}">${c.decision||'pending'}</span><br><small>${c.decision_reason||''}</small></td><td><button class="secondary" onclick="simulate(${c.id},'accept')">Accept</button> <button class="secondary" onclick="simulate(${c.id},'rebook')">Rebook</button> <button class="secondary" onclick="simulate(${c.id},'no-consent')">Decline</button></td></tr>`).join('')}
+async function simulate(id,scenario){try{await request(`/api/cases/${id}/simulate`,{method:'POST',body:JSON.stringify({scenario})});message.textContent=`Simulation ${scenario} completed.`;refresh()}catch(e){message.textContent=e.message}}
+document.querySelector('#case-form').addEventListener('submit',async e=>{e.preventDefault();const d=Object.fromEntries(new FormData(e.target));d.authorized_operational_contact=d.authorized_operational_contact==='on';try{await request('/api/cases',{method:'POST',body:JSON.stringify(d)});message.textContent='Exception created. Choose a no-call demo path.';refresh()}catch(err){message.textContent=err.message}});
+refresh();
+</script>
+</body>
+</html>

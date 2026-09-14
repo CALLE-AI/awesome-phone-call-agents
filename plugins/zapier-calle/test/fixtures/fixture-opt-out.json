@@ -1,0 +1,46 @@
+{
+  "_comment": "A call that produced a perfectly good business answer AND a revocation of consent. CALL-E reports it as a clean success - the task was completed, the schema was satisfied, confidence is high. The revocation exists only inside the transcript. The integration must surface opt_out_requested, refuse to mark the call actionable, and route it to blocked_compliance so the number reaches a Do Not Call List instead of the next step of an outreach sequence.",
+  "id": "evt_fixture_opt_out",
+  "type": "call.completed",
+  "created_at": "2026-08-05T16:20:39Z",
+  "data": {
+    "id": "call_fixture_opt_out",
+    "object": "call_task",
+    "status": "completed",
+    "task": "Ask whether the customer wants to renew their annual plan.",
+    "task_completed": true,
+    "completion_confidence": { "score": 0.91, "label": "high" },
+    "structured_result": { "renewal_interest": "not_interested" },
+    "summary": "The customer declined renewal and asked not to be contacted again.",
+    "evidence": ["Customer said they were not interested and asked to be removed from the list."],
+    "failure_code": null,
+    "failure_message": null,
+    "metadata": { "source_platform": "zapier", "correlation_id": "row-106" },
+    "created_at": "2026-08-05T16:19:44Z",
+    "completed_at": "2026-08-05T16:20:39Z",
+    "recipients": [
+      {
+        "phone": "+15550123456",
+        "status": "completed",
+        "attempts": [
+          {
+            "id": "att_1",
+            "phone": "+15550123456",
+            "status": "completed",
+            "started_at": "2026-08-05T16:19:47Z",
+            "completed_at": "2026-08-05T16:20:36Z",
+            "summary": "Customer declined and requested removal.",
+            "provider_call_id": "prov_3",
+            "failure_code": null,
+            "failure_message": null,
+            "transcript_turns": [
+              { "offset_seconds": 2, "speaker": "bot", "text": "Hi, this is an automated assistant. If you'd like us to stop calling, just say so and we won't call again. I'm reaching out about your annual plan renewal." },
+              { "offset_seconds": 14, "speaker": "user", "text": "No, I'm not renewing. And please take me off your list, stop calling me." },
+              { "offset_seconds": 21, "speaker": "bot", "text": "Understood, I've noted that. Sorry to bother you. Goodbye." }
+            ]
+          }
+        ]
+      }
+    ]
+  }
+}

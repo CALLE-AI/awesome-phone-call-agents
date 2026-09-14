@@ -1,0 +1,29 @@
+{
+  "call_id": "call_2jcA9r17_ndyzxp8IYkkhA",
+  "purpose": "day-1 end-to-end smoke test: dispatch -> poll -> transcript -> commitment scoring",
+  "outcome": "firm_yes",
+  "commitment_score": 0.7148893610597074,
+  "evidence": "The recipient said, \"Yes, I can\" when asked if they could help right now, and then said \"15 minutes. 15 minutes\" for their ETA.",
+  "transcript": [
+    {"offset_seconds": 0, "speaker": "bot", "text": "Hi,"},
+    {"offset_seconds": 0, "speaker": "bot", "text": "I'm an AI assistant calling on behalf of a test lab."},
+    {"offset_seconds": 7, "speaker": "user", "text": "Hello."},
+    {"offset_seconds": 9, "speaker": "bot", "text": "The test lab needs urgent help with a quick system test;"},
+    {"offset_seconds": 12, "speaker": "bot", "text": "can you help right now?"},
+    {"offset_seconds": 16, "speaker": "user", "text": "Can you answer? Yes, I can."},
+    {"offset_seconds": 18, "speaker": "bot", "text": "Great—how soon could you arrive,"},
+    {"offset_seconds": 20, "speaker": "bot", "text": "in minutes?"},
+    {"offset_seconds": 20, "speaker": "user", "text": "What do you mean?"},
+    {"offset_seconds": 22, "speaker": "bot", "text": "Could you tell me your ETA in minutes?"},
+    {"offset_seconds": 25, "speaker": "user", "text": "I can arrive in."},
+    {"offset_seconds": 27, "speaker": "bot", "text": "Sorry,"},
+    {"offset_seconds": 28, "speaker": "bot", "text": "can you repeat that?"},
+    {"offset_seconds": 32, "speaker": "user", "text": "15 minutes. 15 minutes."},
+    {"offset_seconds": 33, "speaker": "bot", "text": "Got it, thanks."},
+    {"offset_seconds": 40, "speaker": "bot", "text": "Are you still with me?"},
+    {"offset_seconds": 44, "speaker": "user", "text": "Yes."},
+    {"offset_seconds": 45, "speaker": "bot", "text": "Thank you, bye."}
+  ],
+  "raw_status": "completed",
+  "phone_redacted": "[redacted]"
+}

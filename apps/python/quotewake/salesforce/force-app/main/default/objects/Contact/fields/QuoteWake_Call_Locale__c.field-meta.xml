@@ -1,0 +1,8 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<CustomField xmlns="http://soap.sforce.com/2006/04/metadata">
+    <fullName>QuoteWake_Call_Locale__c</fullName>
+    <description>Salesforce/CLDR locale used by QuoteWake for this Contact; QuoteWake normalizes it to BCP-47 before calling.</description>
+    <label>QuoteWake Call Locale</label>
+    <length>35</length>
+    <type>Text</type>
+</CustomField>

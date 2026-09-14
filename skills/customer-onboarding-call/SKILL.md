@@ -1,0 +1,493 @@
+---
+name: customer-onboarding-call
+description: Place a one-off welcome and onboarding call to a customer who just signed up, capture a structured result such as business type, goal, pain points, sentiment, and activation status, then write that result back to a CRM and queue a human follow-up task when the customer asks for one.
+license: MIT
+---
+
+# Customer Onboarding Call
+
+Use this skill when a new signup should receive a short welcome call and the business wants the
+conversation to end as structured data rather than as an unread recording.
+
+`customer-onboarding-call` turns one signup event into at most one **conversation**, one structured
+result, and at most one follow-up task. Obtaining that conversation may take up to three attempts on
+an unreliable corridor, with only one attempt in flight at a time; see *Attempts, Retries, and
+Cancellation*. It does not create recurring schedules, call campaigns, or contact lists. Recurrence,
+if the business wants it, belongs to the host scheduler; see [`call-reminder`](../call-reminder/).
+
+The workflow is deliberately narrow: welcome, consent, discovery, next-step offer, wrap-up. A call
+that tries to sell, negotiate, collect payment, or resolve a support ticket is out of scope.
+
+## When To Use
+
+Use this skill for:
+
+- welcoming a customer who just signed up and confirming they can get started
+- collecting first-party onboarding context: business type, goal, prior tooling, blockers
+- detecting whether a customer wants a human to follow up
+- turning a spoken answer into a CRM field and an assigned task
+- measuring activation coverage when a team cannot call every signup manually
+
+## When Not To Use
+
+Do not use this skill to:
+
+- call people who did not sign up or otherwise ask to be contacted
+- run sales, collections, renewal, or win-back calls
+- deliver medical, legal, financial, or emergency instructions
+- read pricing, delivery windows, contractual terms, or policy from memory
+- retry indefinitely after a customer declines or asks not to be called
+- re-call a customer who has already completed an onboarding call, unless the user explicitly asks
+
+## Required Fields
+
+For each call, require:
+
+- `customerName`
+- `phoneNumber` in E.164
+- `companyName` for the agent to introduce itself as
+- `companyDescription`, one sentence the agent may state as fact
+
+Optional:
+
+- `businessName`
+- `locale` and `region` hints for the conversation
+
+Ask for any missing required field. Do not infer a phone number, country code, or region from a
+locale, an IP address, an email domain, or unrelated prior context.
+
+## Core Workflow
+
+1. Confirm the signup is real and recent, and that this customer has not already been called.
+2. Build the call task from the required fields. Keep the script to roughly two minutes.
+3. Attach a structured result schema so the provider returns fields, not just a transcript. See
+   [`references/structured-result.md`](references/structured-result.md).
+4. Persist an attempt record under a uniqueness constraint on `(signup_id, attempt_no)` **before**
+   dialing, and derive the provider idempotency key from it. Refuse to start a new attempt while
+   another is in flight for the same signup.
+5. Place the call for that attempt.
+6. Receive the terminal result on a webhook. Treat delivery as at-least-once and key ingestion on
+   the provider event id.
+7. Classify the outcome before writing anything: Stage A decides whether a human took part, and only
+   then does Stage B read consent. See *Outcome Classification* below.
+8. Write only what the outcome permits, then queue a follow-up task only when the outcome is
+   `onboarded` and the customer asked for one.
+9. Schedule or cancel a retry according to *Attempts, Retries, and Cancellation*.
+
+Use this shape:
+
+```text
+signup -> attempt record -> call task + result schema -> attempt -> terminal webhook
+       -> classify -> permitted CRM write -> follow-up or retry or suppress
+```
+
+## Conversation Shape
+
+Keep the call in this order. Allow interruption at any point.
+
+1. **Greet and identify.** Name the customer, name the company, state that the call may be
+   recorded if that is true in your jurisdiction.
+2. **Ask consent.** Ask whether now is a good time for a short call. If the answer is no, offer to
+   call back later and end. Do not continue discovery after a soft refusal.
+3. **Discovery.** Ask what kind of business they run, why they signed up, what problem they want
+   solved, and whether they have used something similar before. One question at a time.
+4. **Offer the next step.** Invite the concrete first action, and offer a human if they prefer.
+5. **Wrap up.** Summarize what will happen next, thank them, end.
+
+The agent may answer only from `companyDescription` and any knowledge base you explicitly supply.
+For anything else — price, delivery time, policy, availability — it must say it will have a human
+follow up. Inventing these is the most common failure mode of onboarding-call agents.
+
+## State Machine
+
+The full contract in one view. Every arrow that ends in a call is guarded; every terminal state
+says what it permits.
+
+```text
+                         signup
+                            |
+                            v
+              [ allocate attempt  no >  cap? ]---- yes -->( manual handling )
+                            |                                   ^
+                            no                                  |
+                            v                                   |
+                  [ attempt live (leased) ]                     |
+                            |                                   |
+        +-------------------+--------------------+              |
+        |                   |                    |              |
+   terminal result    lease expires       create failed         |
+        |                   |                    |              |
+        |                   v                    |              |
+        |            [ reconcile with provider ] |              |
+        |             |         |        |       |              |
+        |      terminal    still live  unknown   |              |
+        |             |         |        |       |              |
+        +<------------+         v        |       |              |
+        |                  ( ambiguous )-+-------+              |
+        |                       |  (late result re-enters)      |
+        v                       |                               |
+  == STAGE A: was a human reached? ==                           |
+  reachability from CALL EVIDENCE, not from "is there a result" |
+        |                                                       |
+        +-- refusal evidence present? --> ( declined )          |
+        |                                                       |
+   no-human — CLOSED evidence set only: voicemail / carrier msg /
+   ring-out / no-answer / silence / provider machine signal      |
+        +--> ( not-reached ) ------------------ retry allowed ---+
+        |                                                        |
+        +--> ( failed ) provider positively says NO CALL PLACED --+
+        |
+        +--> ( needs-review )  indeterminate: provider unreachable,
+        |     unknown attempt, expired lease, extractor-only NotReached,
+        |     billing charge with no obtainable outcome.  NO RETRY.
+        |
+   human
+        v
+  == STAGE B: consent governs ==
+        |
+        +--> ( declined )     terminal. suppress per scope. no follow-up, no retry, ever.
+        +--> ( needs-review ) no result at all, unusable consent fields, or indeterminate
+        |                     reachability. terminal until a human decides. NO auto retry.
+        +--> ( partial )      write captured fields only. retry ONLY with callback consent
+        |                     or human authorisation, and only under the cap.
+        +--> ( onboarded )    write insight. follow-up only if requested.
+```
+
+Invariants the diagram encodes:
+
+- **A redial requires positive no-human evidence from a closed set.** A missing result, an
+  extractor-claimed `NotReached`, an unreachable provider, an expired lease, and a billing charge
+  are all *unknown* — they route to `needs-review`, never to a retry.
+- **Releasing a stuck attempt and authorising a redial are separate decisions.** Unblocking the
+  slot is bookkeeping; dialling again needs evidence.
+- **Refusal evidence dominates.** It routes to `declined` from anywhere, with or without a result.
+- **Only Stage B can suppress a number**, and only via `declined`.
+- **Only Stage A outcomes retry automatically.** Every Stage B redial needs consent or a human, and
+  anything uncertain lands in `needs-review`, which never retries.
+- **No state is permanent-by-accident.** A live attempt is leased, and `ambiguous` is provisional —
+  a late result re-enters classification from the top.
+- **The cap bounds every path**, including callback-consented redials.
+
+## Outcome Classification
+
+A call that reaches a terminal state has not necessarily reached a consenting human. Providers
+commonly return a completed call with an empty structured result when the agent talked to a carrier
+message, voicemail, or silence. A call can also produce a perfectly well-formed structured result
+while the customer was refusing to take part.
+
+**The presence of a structured result is not evidence of consent.** Classification is therefore
+driven by an evidence-backed `disposition` field, not by whether a result exists. See
+[`references/structured-result.md`](references/structured-result.md).
+
+Classify in **two stages, in this order**. Stage A decides whether a human took part at all.
+Only if one did does Stage B read consent.
+
+The staging is the contract, not a presentation choice. Consent fields are meaningless when nobody
+answered — a voicemail grants no consent, so `consent_granted` is `false` there. Reading consent
+before establishing that a human was reached turns every no-answer into a refusal.
+
+### Stage A — was a human reached?
+
+**Reachability is decided on call evidence, never on whether a structured result exists.** A real
+conversation can return no result at all: extraction failed, the result failed validation, or the
+customer refused and rang off before the model emitted anything. Inferring "nobody answered" from a
+missing result would auto-retry those calls and redial a person who may have just refused.
+
+#### The no-human evidence set
+
+Exactly one thing authorises an automatic redial: **observed evidence from the call itself that no
+person took part.** This is a closed list.
+
+| Counts as no-human evidence | |
+| --- | --- |
+| voicemail or answering-machine greeting | carrier or network announcement |
+| ring-out with no answer | the provider's own answered-by-machine / no-answer signal |
+| silence throughout after the agent spoke | |
+
+**Nothing else qualifies.** In particular these are *not* no-human evidence, however tempting:
+
+- a missing or empty structured result
+- the extractor's own `disposition: NotReached` — that is a model claim about the call, not an
+  observation of it, and the same extractor mislabels refusals
+- a provider that is unreachable, times out, or has no record of the attempt
+- an expired lease
+- a billing charge or usage record — that shows a call *was placed*, which if anything makes a
+  conversation more likely, not less
+
+Every one of those means **we do not know**. Unknown is `needs-review`, never a retry. The
+asymmetry is deliberate: a needless manual check costs a minute, and a wrong redial reaches someone
+who may have already refused.
+
+#### Establishing reachability
+
+| Reachability | Evidence |
+| --- | --- |
+| `human` | the provider reports a human answered, **or** the transcript contains customer speech that is not carrier or IVR audio |
+| `no-human` | at least one item from the no-human evidence set above, and no contradicting customer speech |
+| `indeterminate` | anything else, including every "not evidence" item listed above |
+
+#### Then classify
+
+| # | Outcome | Condition | Action |
+| --- | --- | --- | --- |
+| A1 | `not-reached` | reachability is `no-human` | write no insight; queue a retry; **never** suppress the number |
+| A2 | `ambiguous` | provider reported failure and reconciliation has not completed | write nothing; schedule reconciliation, not a retry |
+| A3 | `failed` | provider reported failure **and** reconciliation positively establishes that **no call was placed** | write no insight; queue a retry; **never** suppress the number |
+| A4 | `needs-review` | reachability is `indeterminate` — provider unreachable, unknown attempt, expired lease, extractor-only `NotReached` | write nothing beyond the raw record; **no automatic retry**; route to a human |
+
+`disposition: NotReached` may **corroborate** no-human evidence, and it may never substitute for it.
+On its own it yields `needs-review`, not `not-reached`.
+
+Note the strictness of A3: reconciliation must show the call *did not happen*. "The provider does
+not know" is not that; it is A4. Only a definite negative — no such call, never dialled — releases a
+retry.
+
+Where reachability is `human`, continue to Stage B; a missing or unusable result there resolves to
+`needs-review` (B2), which never retries automatically.
+
+**Refusal evidence outranks everything in this stage.** If the transcript or provider summary shows
+the customer refusing or asking not to be called — even with no structured result, and even where
+the provider labelled the call `NotReached` — classify as `declined` (B1) and apply the suppression
+scope. A refusal that lost its structured result is still a refusal.
+
+Stage A never suppresses a number and never records a refusal of its own accord. A customer who did
+not answer has not refused anything.
+
+### Stage B — a human took part, so consent governs
+
+| # | Outcome | Condition | Action |
+| --- | --- | --- | --- |
+| B1 | `declined` | `disposition` is `Declined` or `DoNotCall`, **or** `consent_granted` is false | record the refusal and its evidence; write no onboarding insight; queue **no** follow-up; cancel any pending retry; apply the suppression scope below |
+| B2 | `needs-review` | no structured result at all, **or** required consent or disposition fields are missing, malformed, or contradicting the transcript, **or** reachability was `indeterminate` | write nothing beyond the raw record; **no automatic retry**; route to a human |
+| B3 | `partial` | `disposition` is `EndedEarly` | write only the fields actually captured and mark the record partial; queue **no** follow-up unless the customer explicitly asked and evidence supports it; retry only under the callback-consent rule below |
+| B4 | `onboarded` | `disposition` is `Completed` **and** `consent_granted` is true **and** a structured result is present | write insight; queue a follow-up only when requested |
+
+### Suppression scope
+
+`Declined` and `DoNotCall` both end this signup, but they are not the same instruction and must not
+be recorded identically.
+
+| Disposition | The customer said | Scope |
+| --- | --- | --- |
+| `Declined` | not now, not this call | Suppress **this onboarding workflow** for this signup. Other contact the customer has separately opted into — transactional notices, support replies, a channel they initiated — is unaffected. |
+| `DoNotCall` | stop calling me | Suppress **all outbound calling** to that number, across every workflow, indefinitely. Propagate it to the shared do-not-call record, not just this signup's row. |
+
+If you cannot tell which the customer meant, record `DoNotCall`. Over-suppressing costs a
+conversation; under-suppressing means calling someone who told you to stop.
+
+Neither may be lifted by a later call result. Only an explicit opt-in from the customer through
+another channel can reverse a suppression, and that reversal belongs to whatever system owns
+consent — not to this skill.
+
+Rules that follow from the staging and must not be relaxed:
+
+- **Only Stage B can suppress a number.** A refusal requires a human who refused. `not-reached`,
+  `ambiguous`, and `failed` must never mark a number do-not-call.
+- **A follow-up task may only be created from `onboarded`, or from `partial` with explicit evidence
+  of a request.** Never from `declined`, `needs-review`, `not-reached`, `ambiguous`, or `failed`.
+- **A CRM write representing the customer as onboarded, interested, or requesting contact requires
+  `onboarded`.** `declined` and `partial` may write only their disposition and evidence.
+- **A malformed result from a call a human took part in is `needs-review`, never `not-reached`.**
+  Coercing it to `not-reached` would queue an automatic retry and could redial someone who actually
+  refused. When you cannot tell whether a human took part, treat the call as reached and route to
+  review — the failure mode of a needless manual check is trivial; the failure mode of redialling a
+  refusal is not.
+
+Never present `not-reached` as a success. A dropped signup that displays as onboarded is worse than
+a visible failure, because nobody follows up.
+
+## Attempts, Retries, and Cancellation
+
+International termination is unreliable in some corridors, and the same configuration can succeed
+and then fail minutes later. See
+[`references/international-routing.md`](references/international-routing.md).
+
+### The guarantee
+
+One signup yields **at most one conversation**, and **at most one attempt in flight at any moment**.
+It may take up to three *attempts* to obtain that one conversation.
+
+"One call per signup" would be the wrong guarantee — it cannot survive a corridor that drops half
+its calls. The guarantee that matters is that a customer is never called while another attempt for
+the same signup is live, and never called again once a conversation has happened.
+
+**A conversation is any call a human took part in — Stage B — including `partial`.** Retries exist
+to obtain a conversation, never to resume one. Once Stage B is reached, the attempt budget is spent
+and further automatic calling stops. The single exception is an explicit, evidence-backed callback
+request; see *Redialling after a conversation* below.
+
+### Durable per-attempt idempotency
+
+Retries are only safe if each attempt is durably recorded **before** the call is placed.
+
+1. Allocate the next `attempt_no` for the signup and persist an attempt record under a uniqueness
+   constraint on `(signup_id, attempt_no)`. If the insert conflicts, another worker owns this
+   attempt — stop.
+2. Enforce **at most one live attempt per signup** with its own constraint — a partial uniqueness
+   constraint on `signup_id` restricted to non-terminal states. Uniqueness on
+   `(signup_id, attempt_no)` alone does not provide this: two workers can allocate attempt 2 and
+   attempt 3 concurrently and both dial.
+3. **Bind the idempotency key to the canonical call payload**, not just to the attempt slot. Derive
+   it deterministically from the attempt identity *and* a digest of exactly what will be dialled:
+
+   ```text
+   attempt_key = onboarding:<signup_id>:<attempt_no>:<digest>
+   digest      = hash( E.164 destination + task/script version + result-schema version + locale )
+   ```
+
+   `onboarding:<signup_id>:<attempt_no>` alone identifies a slot, not a call. If the destination
+   number is corrected, the script revised, or the schema changed between attempts, that key would
+   silently cover a materially different call — and reconciliation would match a provider record
+   that is not the one you placed, which is how a "no record found" turns into a wrong redial.
+   Include the destination in the digest so a changed number can never inherit a prior attempt's
+   identity.
+4. Never derive an idempotency key from a timestamp, a random value, or a retry counter held only
+   in memory. A key that changes on redelivery is not an idempotency key.
+5. **Reconcile on the key, and verify the payload matches** before believing the answer. A provider
+   record whose destination or script digest differs from the attempt you are reconciling is not
+   evidence about that attempt — treat the attempt as `needs-review`.
+6. Key webhook ingestion on the provider event id so redelivery cannot advance state twice.
+7. **If placing the call fails after the attempt record exists — provider rejection, timeout,
+   crash — close that attempt out before returning.** An attempt left live because the call was
+   never actually placed blocks the signup forever.
+
+### Stuck attempts must expire
+
+Blocking new attempts while one is live is only safe if a live attempt cannot last forever. A
+terminal webhook can be lost to a deploy, a signature change, or a provider outage. Without an
+expiry the signup is stranded permanently: never resolved, never retried, and invisible because
+nothing failed.
+
+- Give every attempt a **lease** — a deadline by which it must reach a terminal state. A few
+  minutes beyond the provider's maximum call duration is enough.
+- When the lease expires, **reconcile before concluding anything.** Ask the provider for that
+  attempt's state by its idempotency key.
+  - **Terminal at the provider:** ingest that result through the normal path. The webhook was lost,
+    not the call.
+  - **Still live at the provider:** extend the lease once, then treat it as `ambiguous`.
+  - **The provider positively reports the call was never placed:** close the attempt as `failed`.
+    This is the only lease-expiry path that releases a retry, and it requires a definite negative.
+  - **Unknown to the provider, or the provider is unreachable:** close the attempt as
+    `needs-review`. Release the signup so it is no longer blocked, but **do not queue a retry.**
+- **An expired lease is not evidence about the customer.** It says our bookkeeping failed, not that
+  nobody answered. The call may well have connected and been refused. Expiry therefore resolves to
+  `ambiguous`, `needs-review`, or a reconciled terminal result — never `not-reached`, never
+  `declined`, never `onboarded`, and never a retry on its own.
+- Releasing the signup and authorising a redial are **separate decisions.** Unblocking the attempt
+  slot is bookkeeping; dialling again needs evidence. Do not let one imply the other.
+- Surface stranded attempts to operators. A signup silently stuck is the failure mode this whole
+  section exists to prevent.
+
+### Ambiguous outcomes must be reconciled before retrying
+
+A provider failure report is **not** proof that no call was placed. A degraded control plane can
+report failure and dial minutes later.
+
+- On a reported failure, mark the attempt `ambiguous` rather than `failed`, and schedule a
+  reconciliation check instead of a retry.
+- Wait a reconciliation window, default 15 minutes, then check the provider's billing records,
+  call logs, or platform logs for that idempotency key.
+- **A billing charge or usage record proves the call happened, not that it went unanswered.** It is
+  evidence *against* a retry, not for one. If the call was placed but you cannot obtain its outcome,
+  the attempt is `needs-review` — a human reads the record. It is never `not-reached`, because a
+  placed call may have reached someone who refused.
+- Only promote `ambiguous` to `failed`, and only then schedule a retry, when reconciliation
+  **positively establishes that no call was placed.** "The provider has no record" is not that;
+  absence in a log you cannot fully trust is `needs-review`.
+
+**`ambiguous` is provisional, not a verdict.** If a late result arrives — from the delayed webhook
+or from reconciliation — re-run the full classification on it, Stage A then Stage B. A call that
+looked failed can turn out to have been a real conversation, including a refusal, and that refusal
+must take effect exactly as if it had arrived on time. Never let a provisional `ambiguous` or a
+scheduled retry outrank a real outcome that shows up late; cancel the retry instead.
+
+### Retry rules
+
+Automatic retries are permitted **only for Stage A outcomes**, where no human took part and so no
+conversation has happened:
+
+- Retry `not-reached` and reconciled `failed`.
+- **Never** automatically retry `declined`, `partial`, or `needs-review`.
+- Cap at three attempts per signup, including the first. **The cap is absolute.** When it is
+  reached, stop and surface the signup for manual handling — including when the customer requested
+  a callback. A callback request is permission to call, not extra budget.
+- Space attempts by at least 30 minutes.
+- Confine attempts to the recipient's local working hours. A call at 01:40 local proves nothing
+  about reachability; it only proves the person was asleep.
+- **Working hours require a known timezone.** Take it from an explicit `timezone` field, or derive
+  it from the `region` supplied with the signup. Do not guess from the phone number's country code
+  when that country spans several zones, and do not fall back to the operator's own clock. If the
+  timezone cannot be established, do not schedule an automatic retry — surface it for manual
+  scheduling instead. An unknown timezone is a reason to ask, not a reason to dial.
+- Stop retrying the moment any attempt reaches Stage B.
+
+### Redialling after a conversation
+
+A `partial` call is a conversation that ended early. The customer may have hung up *because* they
+did not want to continue, and the workflow cannot tell the difference from a dropped line. So a
+partial does not license another call.
+
+Redialling after any Stage B outcome requires **one** of:
+
+1. **Evidence-backed callback consent.** The customer explicitly asked to be called back, captured
+   in `callback_consent` with supporting words in `callback_consent_evidence`. Honour a stated time
+   or window. Absent or generic evidence does not qualify — silence, politeness, and an
+   unfinished answer are not a callback request.
+2. **Manual review.** A human inspects the record and authorises the call. Record who authorised it.
+
+`needs-review` always takes route 2. A malformed or contradictory consent record must never be
+resolved by calling the customer again to find out.
+
+A redial authorised this way is a new attempt against the same cap. It never resets the budget, and
+`declined` remains terminal regardless of any later callback claim.
+
+### Cancelling a pending retry
+
+Every scheduled retry must be cancellable, and must carry a stable id so it can be addressed.
+
+Cancel automatically when any of these occur:
+
+- a conversation completes for that signup
+- the outcome is `declined`, or the customer requests do-not-call by any channel
+- the customer record is deleted, opts out, or is merged away
+- the attempt cap is reached
+- an operator cancels it manually
+
+Cancellation must be idempotent, must be safe to call for an already-cancelled or already-fired
+retry, and must record what triggered it. If the host cannot cancel a scheduled job, do not
+schedule one — surface the retry as a manual task instead, and say so rather than implying a retry
+is pending.
+
+## Safety Rules
+
+Read [`references/safety.md`](references/safety.md) for the full contract. Always:
+
+- Treat every call as a real-world side effect with a cost.
+- Call only the configured E.164 number, and only for a customer who signed up.
+- Ask consent at the start of the call and honor refusal immediately and permanently.
+- Mask phone numbers in summaries, dashboards, and logs.
+- Never expose API keys, tokens, or webhook secrets in output.
+- Never state pricing, delivery, policy, or legal or medical guidance from memory.
+- Keep transcripts and recordings inside the systems the customer was told about.
+
+## Output Format
+
+After an attempt, report:
+
+- outcome, one of `onboarded`, `partial`, `declined`, `needs-review`, `not-reached`, `failed`, or
+  `ambiguous` while reconciliation is pending
+- the stage that decided it, so a suppression is always traceable to a human who refused
+- masked phone number
+- `disposition` and the `disposition_evidence` that supports it
+- structured result fields the outcome permits you to write
+- whether a follow-up task was created, and why — or explicitly why not
+- attempt number out of the cap, and the retry decision: scheduled with its window, cancelled with
+  the trigger, blocked pending review, or not permitted
+- for any redial after a conversation, the callback consent evidence or the human who authorised it
+
+If no call was placed, report `status: not called`, the exact blocker, and what the user must
+supply next.
+
+Never claim a customer was onboarded, interested, or requesting contact without a `Completed`
+disposition and granted consent to support it. A populated structured result alone is not
+sufficient — a refusal can carry one.

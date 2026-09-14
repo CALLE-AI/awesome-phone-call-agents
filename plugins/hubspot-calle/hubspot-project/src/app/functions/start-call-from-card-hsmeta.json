@@ -1,0 +1,11 @@
+{
+  "uid": "calle_start_call_from_card",
+  "type": "app-function",
+  "config": {
+    "entrypoint": "/app/functions/startCallFromCard.bundle.js",
+    "secretKeys": [
+      "CALL_E_API_KEY",
+      "CALL_E_BASE_URL"
+    ]
+  }
+}

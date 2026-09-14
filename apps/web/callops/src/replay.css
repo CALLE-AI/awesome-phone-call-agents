@@ -1,0 +1,14 @@
+.replay-nav { display:flex; flex-wrap:wrap; gap:10px; margin:25px 0; }
+.replay-nav button { text-align:left; max-width:100%; }
+.replay-nav button[aria-pressed="true"] { background:var(--green); color:white; }
+.replay-context { margin:22px 0; }
+.replay-draft { display:grid; gap:18px; margin:24px 0; }
+.replay-draft p { max-width:72ch; }
+.replay-provenance { margin:28px 0; }
+.replay-provenance dl { display:grid; gap:18px; }
+.replay-provenance dt { font-weight:650; margin-bottom:5px; }
+.replay-provenance dd { margin:0; overflow-wrap:anywhere; line-height:1.5; font-size:.85rem; }
+.replay-evidence { margin-top:24px; }
+.replay-footer { display:flex; flex-wrap:wrap; gap:24px; margin:32px 0; font-size:.8rem; }
+.replay-error { margin-top:32px; }
+@media(max-width:600px) { .replay-nav button { width:100%; } }

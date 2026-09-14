@@ -1,0 +1,64 @@
+{
+  "schema_version": "1.0",
+  "plan_id": "rgcv_0a74a12de57f031a443cbfc257e1002cd85fcd3e3ac0f7e7552765bc90a13b24",
+  "request_id": "chicago-venue-demo",
+  "goal": "Find a private restaurant room in Chicago for 30 guests under $4,000.",
+  "constraints": ["Friday evening", "Private room", "Thirty guests"],
+  "dry_run": true,
+  "approval_required": true,
+  "provider": "CALL-E-compatible host",
+  "total_calls": 2,
+  "sourced_facts": [
+    {
+      "business_id": "lakeside-table",
+      "organization_name": "Lakeside Table",
+      "fact_id": "capacity",
+      "statement": "The private room seats up to 40 guests.",
+      "source_url": "https://example.com/lakeside-table/private-dining",
+      "status": "sourced"
+    }
+  ],
+  "calls": [
+    {
+      "call_id": "call_af34573fc52f44a65122f975",
+      "business_id": "lakeside-table",
+      "organization_name": "Lakeside Table",
+      "recipient_e164": "+12025550123",
+      "recipient_masked": "+12*****0123",
+      "source_url": "https://example.com/lakeside-table",
+      "purpose": "Find a private restaurant room in Chicago for 30 guests under $4,000.",
+      "opening_disclosure": "Hello, I am an automated AI assistant calling on behalf of a customer. I am calling to verify public business information. This call may be recorded.",
+      "questions": [
+        {
+          "gap_id": "availability",
+          "question": "Is the private room available Friday evening for 30 guests?"
+        },
+        {
+          "gap_id": "minimum-spend",
+          "question": "Is the food and beverage minimum at or below $4,000?"
+        }
+      ],
+      "idempotency_key": "rgcv_call_af34573fc52f44a65122f975ab3abfb22c54c4dd2461f3b3120c76f46b4fbcb9",
+      "attempt_limit": 1
+    },
+    {
+      "call_id": "call_bbf6f5bf93781ec0fd291710",
+      "business_id": "prairie-room",
+      "organization_name": "Prairie Room",
+      "recipient_e164": "+12025550124",
+      "recipient_masked": "+12*****0124",
+      "source_url": "https://example.com/prairie-room",
+      "purpose": "Find a private restaurant room in Chicago for 30 guests under $4,000.",
+      "opening_disclosure": "Hello, I am an automated AI assistant calling on behalf of a customer. I am calling to verify public business information. This call may be recorded.",
+      "questions": [
+        {
+          "gap_id": "availability",
+          "question": "Is a private room available Friday evening for 30 guests?"
+        }
+      ],
+      "idempotency_key": "rgcv_call_bbf6f5bf93781ec0fd291710d54a3303fadd9104608e1fb0763ea40b2e5bc3bd",
+      "attempt_limit": 1
+    }
+  ],
+  "side_effect": "None. This preview placed no calls and created no schedules."
+}

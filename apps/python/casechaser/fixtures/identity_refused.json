@@ -1,0 +1,76 @@
+{
+ "status": "completed",
+ "task_completed": false,
+ "completion_confidence": "high",
+ "summary": "The representative would not discuss the case with a third party.",
+ "evidence": [
+  "Representative said she 'cannot discuss the account with anyone other than the policyholder' and that a 'third-party authorisation form' is needed."
+ ],
+ "structured_result": {
+  "outcome": "unknown",
+  "status_statement": "",
+  "reference_number": "EXAMPLE-CLAIM-0001",
+  "representative": "Grace, Claims",
+  "commitment_action": "",
+  "commitment_by_date": "",
+  "commitment_quote": "",
+  "customer_action_required": "Submit the third-party authorisation form so an assistant may discuss the claim.",
+  "offer_quote": "",
+  "ivr_path": "2, 3, say 'existing claim'",
+  "needs_human": true,
+  "needs_human_reason": "Identity could not be verified for a third-party caller; the customer must authorise the assistant."
+ },
+ "recipients": [
+  {
+   "id": "rcp_1",
+   "phones": [
+    "+12125550100"
+   ],
+   "locale": "en-US",
+   "region": "US",
+   "status": "completed",
+   "structured_result": null,
+   "summary": "Third-party authorisation required.",
+   "attempts": [
+    {
+     "id": "att_1",
+     "phone": "+12125550100",
+     "status": "completed",
+     "started_at": "2026-09-02T09:00:10Z",
+     "completed_at": "2026-09-02T09:06:40Z",
+     "summary": "Third-party authorisation required.",
+     "transcript_turns": [
+      {
+       "offset_seconds": 0,
+       "speaker": "agent",
+       "text": "Hello, I'm an AI assistant calling on behalf of Alex Example about claim EXAMPLE-CLAIM-0001."
+      },
+      {
+       "offset_seconds": 12,
+       "speaker": "recipient",
+       "text": "I'm sorry, I cannot discuss the account with anyone other than the policyholder."
+      },
+      {
+       "offset_seconds": 24,
+       "speaker": "agent",
+       "text": "I understand. What does Alex need to do to authorise me?"
+      },
+      {
+       "offset_seconds": 36,
+       "speaker": "recipient",
+       "text": "There's a third-party authorisation form on the website."
+      },
+      {
+       "offset_seconds": 48,
+       "speaker": "agent",
+       "text": "Thank you, Grace. I'll pass that on."
+      }
+     ],
+     "provider_call_id": null,
+     "failure_code": null,
+     "failure_message": null
+    }
+   ]
+  }
+ ]
+}

@@ -1,0 +1,33 @@
+{
+  "name": "callback-coordinator",
+  "title": "Callback Coordinator",
+  "language": "Python",
+  "type": "workflow-plugin",
+  "description": "Consent-first callback triage engine that gates a callback request against quiet hours, do-not-call, and explicit consent flags, places one CALL-E call to learn why the person needs a callback, verifies terminal result binding (call id, metadata.workflow_id, recipients phone) against intake, classifies the outcome into a fail-closed disposition (requiring status=completed and task_completed=true), and routes it to a team.",
+  "entrypoints": [
+    {
+      "name": "CLI preview",
+      "path": "client.py"
+    }
+  ],
+  "side_effects": [
+    "Creates exactly one outbound CALL-E phone call per executed intake when the gate passes, the intake records consent:true, --confirm-consent is passed, and CALLE_API_KEY is set.",
+    "Performs no network access in preview mode (the default)."
+  ],
+  "credentials": [
+    "CALL-E API key read from the CALLE_API_KEY environment variable, used only in execute mode and sent only to https://api.heycall-e.com (trusted official HTTPS origin)."
+  ],
+  "safety": [
+    "Requires explicit --confirm-consent and a recorded consent:true field in the intake before any live call; missing/false consent is rejected and gates as consent_not_recorded.",
+    "Requires E.164 phone numbers with first digit 1-9 after +; +0... is rejected (pattern ^\\+[1-9]\\d{7,14}$).",
+    "Skips calls during quiet hours (recipient local time), for do_not_call=true, and for consent=false/missing.",
+    "Base URL is locked to https://api.heycall-e.com; arbitrary --base-url or CALLE_BASE_URL values are rejected before bearer credential use.",
+    "Uses a stable idempotency key derived from the workflow id to prevent duplicate calls.",
+    "Fail-closed disposition: strict binding requires every field present and matching exact approved payload – id == created call id (missing when expected → binding_call_id_mismatch), task == approved task, metadata exact (workflow_id, workflow_type=callback_triage, source), recipients exact (len==1, phones==[intake.phone], locale==intake.locale), optional result_schema == approved; requires status=completed and task_completed=true, validates all structured_result enums, and routes ambiguous, unbound, low-confidence, wrong-person, unconfirmed-consent, unknown-reason, and lookup-error outcomes to a human.",
+    "Masks phone numbers in previews and removes phone-like text from evidence output, including formatted forms like (202) 555-0123, 202-555-0123, 202.555.0123, +1 (202) 555-0123, +44 20 7123 4567.",
+    "Task prompt does not offer to book a specific callback time – the result schema cannot return a time, so booking is out-of-scope.",
+    "Excludes transcripts and provider evidence that may contain personal data.",
+    "Does not create recurring schedules."
+  ],
+  "template_version": "1.0.0"
+}

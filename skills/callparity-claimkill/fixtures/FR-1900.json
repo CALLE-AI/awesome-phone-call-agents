@@ -1,0 +1,66 @@
+{
+  "ticket_id": "FR-1900",
+  "sku": "PL-9F21",
+  "spoken_time_budget_s": 90,
+  "parties": [
+    {
+      "role": "warehouse",
+      "label": "A",
+      "phone": "+15550100190",
+      "consent": true
+    },
+    {
+      "role": "driver",
+      "label": "B",
+      "phone": "+15550100191",
+      "consent": true
+    }
+  ],
+  "nodes": [
+    {
+      "id": "dock",
+      "text": "Pallet may have cleared the dock.",
+      "evidence": {
+        "span": {
+          "quote": "maybe it left the dock"
+        }
+      },
+      "observable_of": "dock_location",
+      "status": "UNTESTED",
+      "confidence": 0.22,
+      "party": "A"
+    },
+    {
+      "id": "arrival",
+      "text": "Driver may have reached the gate.",
+      "evidence": {
+        "span": {
+          "quote": "someone thought the truck was here"
+        }
+      },
+      "observable_of": "driver_arrival",
+      "status": "UNTESTED",
+      "confidence": 0.18,
+      "party": "A"
+    }
+  ],
+  "candidate_questions": [
+    {
+      "id": "q-dock",
+      "text": "Was the receiving dock empty when you arrived?",
+      "targets": ["dock"]
+    }
+  ],
+  "call": {
+    "id": "call-nplus1-fr-1900",
+    "disposition": "completed",
+    "quotes": [
+      {
+        "claim_id": "dock",
+        "quote": "I am not sure which dock you mean.",
+        "polarity": "none",
+        "tested_by": "q-dock"
+      }
+    ]
+  }
+}

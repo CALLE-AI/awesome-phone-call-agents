@@ -1,0 +1,44 @@
+{
+  "id": "call_sample_0001",
+  "status": "completed",
+  "_comment": "FICTIONAL sample terminal payload, shipped so every step after the call runs with no credentials and no real call. The organization and the +1 555 0100 number are reserved fictional examples. It deliberately shows the shape a usable call has: the respondent confirms the practice by name BEFORE any question, and the agent asks one question at a time. A call missing either of those abstains, which is the point.",
+  "recipients": [
+    {
+      "phone": "+15550101234",
+      "attempts": [
+        {
+          "transcript_turns": [
+            {
+              "speaker": "bot",
+              "text": "Hi, this is an automated assistant calling to verify directory information for Example Family Medicine. This call may be recorded."
+            },
+            {
+              "speaker": "user",
+              "text": "Yes, this is Example Family Medicine, how can I help you?"
+            },
+            {
+              "speaker": "bot",
+              "text": "Thank you. Are you currently accepting new patients?"
+            },
+            {
+              "speaker": "user",
+              "text": "Yes, we are accepting new patients right now."
+            },
+            {
+              "speaker": "bot",
+              "text": "And does the practice currently accept the Example PPO plan?"
+            },
+            {
+              "speaker": "user",
+              "text": "No, we stopped taking that one at the start of the year."
+            },
+            {
+              "speaker": "bot",
+              "text": "That is everything I needed. Thank you for your time."
+            }
+          ]
+        }
+      ]
+    }
+  ]
+}

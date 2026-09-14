@@ -1,0 +1,18 @@
+{
+  "experiment_id": "smallbet-permit-ops-v1",
+  "segment": "small and midsize US commercial contractors that directly manage municipal permits",
+  "problem": "permit status ambiguity creates repeated manual portal checks, calls, emails, or internal coordination",
+  "hypothesis": "permit status ambiguity recurs often enough that contractors already spend operator time on a manual workaround",
+  "questions": [
+    "Tell me about the last time a permit status was unclear or did not match what your team expected.",
+    "What did your team do to resolve it?",
+    "Roughly how often has that kind of follow-up happened in the last month?",
+    "What happens operationally if nobody follows up?",
+    "Who or what currently keeps track of those exceptions?"
+  ],
+  "decision_rule": {
+    "min_answered": 8,
+    "support_if_at_least": 5,
+    "weaken_if_at_least": 3
+  }
+}

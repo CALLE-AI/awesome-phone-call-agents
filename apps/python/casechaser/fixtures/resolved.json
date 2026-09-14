@@ -1,0 +1,66 @@
+{
+ "status": "completed",
+ "task_completed": true,
+ "completion_confidence": "high",
+ "summary": "The company confirmed the refund was issued.",
+ "evidence": [
+  "Representative confirmed 'the refund of 140 dollars was issued on the 10th'."
+ ],
+ "structured_result": {
+  "outcome": "resolved",
+  "status_statement": "The refund of 140 dollars was issued on the 10th and will show within three to five days.",
+  "reference_number": "EXAMPLE-REFUND-0002",
+  "representative": "Sam, Billing",
+  "commitment_action": "",
+  "commitment_by_date": "",
+  "commitment_quote": "",
+  "customer_action_required": "",
+  "offer_quote": "",
+  "ivr_path": "1, 4",
+  "needs_human": false,
+  "needs_human_reason": ""
+ },
+ "recipients": [
+  {
+   "id": "rcp_1",
+   "phones": [
+    "+12125550100"
+   ],
+   "locale": "en-US",
+   "region": "US",
+   "status": "completed",
+   "structured_result": null,
+   "summary": "Refund confirmed as issued.",
+   "attempts": [
+    {
+     "id": "att_1",
+     "phone": "+12125550100",
+     "status": "completed",
+     "started_at": "2026-09-02T09:00:10Z",
+     "completed_at": "2026-09-02T09:06:40Z",
+     "summary": "Refund confirmed as issued.",
+     "transcript_turns": [
+      {
+       "offset_seconds": 0,
+       "speaker": "agent",
+       "text": "Hello, I'm an AI assistant calling on behalf of Jordan Sample about refund request EXAMPLE-REFUND-0002."
+      },
+      {
+       "offset_seconds": 12,
+       "speaker": "recipient",
+       "text": "The refund of 140 dollars was issued on the 10th and will show within three to five days."
+      },
+      {
+       "offset_seconds": 24,
+       "speaker": "agent",
+       "text": "Thank you, Sam. To confirm: full refund issued on the 10th."
+      }
+     ],
+     "provider_call_id": null,
+     "failure_code": null,
+     "failure_message": null
+    }
+   ]
+  }
+ ]
+}

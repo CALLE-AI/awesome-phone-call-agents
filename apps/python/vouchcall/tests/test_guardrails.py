@@ -1,0 +1,588 @@
+"""Credential-free unit tests for guardrails, validation, masking, and quality assessment.
+
+Run: python -m pytest tests/test_guardrails.py -v
+No API keys needed.
+"""
+import sys
+import os
+import pytest
+
+sys.path.insert(0, os.path.join(os.path.dirname(__file__), ".."))
+
+from config import mask_phone, validate_e164, sanitize_name
+from unittest.mock import patch, MagicMock
+
+from llm import (
+    _clamp_score,
+    _fuzzy_match,
+    _check_score_recommendation_coherence,
+    _compute_confidence,
+    _ref_weight,
+    _validate_call_analysis,
+    _validate_cross_analysis,
+    _count_transcript_turns,
+    _count_questions_answered,
+    _check_identity_confirmed,
+    _check_consent_given,
+    VALID_RECOMMENDATIONS,
+    VALID_HIRE_RECOMMENDATIONS,
+    VALID_SEVERITIES,
+    VALID_QUALITY_STATUSES,
+    QUESTION_MARKERS,
+)
+
+
+class TestMaskPhone:
+    def test_masks_like_credit_card(self):
+        assert mask_phone("+14155551234") == "********1234"
+
+    def test_preserves_last_four(self):
+        assert mask_phone("+919876543210") == "*********3210"
+
+    def test_short_phone(self):
+        assert mask_phone("123") == "****"
+
+    def test_empty_phone(self):
+        assert mask_phone("") == "****"
+
+    def test_exactly_five_chars(self):
+        result = mask_phone("12345")
+        assert result == "*2345"
+
+
+class TestValidateE164:
+    def test_valid_us(self):
+        assert validate_e164("+14155551234") == "+14155551234"
+
+    def test_valid_india(self):
+        assert validate_e164("+919876543210") == "+919876543210"
+
+    def test_strips_whitespace(self):
+        assert validate_e164("+1 415 555 1234") == "+14155551234"
+
+    def test_strips_dashes(self):
+        assert validate_e164("+1-415-555-1234") == "+14155551234"
+
+    def test_strips_parens(self):
+        assert validate_e164("+1 (415) 555-1234") == "+14155551234"
+
+    def test_rejects_no_plus(self):
+        with pytest.raises(ValueError):
+            validate_e164("14155551234")
+
+    def test_rejects_too_short(self):
+        with pytest.raises(ValueError):
+            validate_e164("+1234")
+
+    def test_rejects_leading_zero(self):
+        with pytest.raises(ValueError):
+            validate_e164("+0123456789")
+
+    def test_rejects_letters(self):
+        with pytest.raises(ValueError):
+            validate_e164("+1415abc1234")
+
+    def test_rejects_empty(self):
+        with pytest.raises(ValueError):
+            validate_e164("")
+
+
+class TestClampScore:
+    def test_normal_value(self):
+        assert _clamp_score(7, "test") == 7
+
+    def test_clamps_high(self):
+        assert _clamp_score(15, "test") == 10
+
+    def test_clamps_low(self):
+        assert _clamp_score(0, "test") == 1
+
+    def test_handles_string(self):
+        assert _clamp_score("8", "test") == 8
+
+    def test_handles_none(self):
+        assert _clamp_score(None, "test") == 0
+
+    def test_handles_garbage(self):
+        assert _clamp_score("not_a_number", "test") == 0
+
+    def test_handles_float_string(self):
+        assert _clamp_score("7.5", "test") == 0
+
+
+class TestFuzzyMatch:
+    TRANSCRIPT = "Bot: What are Alex's strengths? User: He was one of the best engineers in our team."
+
+    def test_exact_match(self):
+        assert _fuzzy_match("one of the best engineers", self.TRANSCRIPT)
+
+    def test_case_insensitive(self):
+        assert _fuzzy_match("ONE OF THE BEST ENGINEERS", self.TRANSCRIPT)
+
+    def test_close_match(self):
+        assert _fuzzy_match("one of the best engineer in our team", self.TRANSCRIPT)
+
+    def test_no_match(self):
+        assert not _fuzzy_match("terrible at everything", self.TRANSCRIPT)
+
+    def test_empty_quote(self):
+        assert not _fuzzy_match("", self.TRANSCRIPT)
+
+    def test_threshold_065_rejects_weak_match(self):
+        assert not _fuzzy_match("some random sentence about teams", self.TRANSCRIPT)
+
+    def test_threshold_065_accepts_strong_match(self):
+        assert _fuzzy_match("he was one of the best engineers in our team", self.TRANSCRIPT)
+
+
+class TestScoreRecommendationCoherence:
+    def test_high_scores_override_no(self):
+        scores = {"a": 9, "b": 8, "c": 9, "d": 8, "e": 9}
+        assert _check_score_recommendation_coherence(scores, "no") == "yes"
+
+    def test_high_scores_override_hesitant(self):
+        scores = {"a": 9, "b": 8, "c": 9, "d": 8, "e": 9}
+        assert _check_score_recommendation_coherence(scores, "hesitant") == "yes"
+
+    def test_low_scores_override_strong_yes(self):
+        scores = {"a": 2, "b": 3, "c": 1, "d": 2, "e": 3}
+        assert _check_score_recommendation_coherence(scores, "strong_yes") == "hesitant"
+
+    def test_low_scores_override_yes(self):
+        scores = {"a": 2, "b": 3, "c": 1, "d": 2, "e": 3}
+        assert _check_score_recommendation_coherence(scores, "yes") == "hesitant"
+
+    def test_mid_scores_keep_recommendation(self):
+        scores = {"a": 5, "b": 6, "c": 5, "d": 6, "e": 5}
+        assert _check_score_recommendation_coherence(scores, "neutral") == "neutral"
+
+    def test_empty_scores_keep_recommendation(self):
+        assert _check_score_recommendation_coherence({}, "strong_yes") == "strong_yes"
+
+    def test_single_high_score_overrides(self):
+        scores = {"a": 0, "b": 0, "c": 9}
+        assert _check_score_recommendation_coherence(scores, "no") == "yes"
+
+    def test_all_zero_scores_keeps_recommendation(self):
+        scores = {"a": 0, "b": 0, "c": 0}
+        assert _check_score_recommendation_coherence(scores, "no") == "no"
+
+
+class TestComputeConfidence:
+    def test_zero_completed(self):
+        assert _compute_confidence([]) == 30
+
+    def test_one_completed(self):
+        calls = [{"status": "completed", "collaboration_score": 8}]
+        result = _compute_confidence(calls)
+        assert 25 <= result <= 50
+
+    def test_consistent_refs_high_confidence(self):
+        calls = [
+            {"status": "completed", "collaboration_score": 8, "reliability_score": 7},
+            {"status": "completed", "collaboration_score": 8, "reliability_score": 8},
+            {"status": "completed", "collaboration_score": 7, "reliability_score": 7},
+        ]
+        result = _compute_confidence(calls)
+        assert result >= 75
+
+    def test_divergent_refs_low_confidence(self):
+        calls = [
+            {"status": "completed", "collaboration_score": 9, "reliability_score": 9},
+            {"status": "completed", "collaboration_score": 3, "reliability_score": 2},
+        ]
+        result = _compute_confidence(calls)
+        assert result <= 60
+
+    def test_skips_non_completed(self):
+        calls = [
+            {"status": "completed", "collaboration_score": 8},
+            {"status": "failed", "collaboration_score": 2},
+        ]
+        result = _compute_confidence(calls)
+        assert result <= 50
+
+    def test_capped_at_98(self):
+        calls = [
+            {"status": "completed", "collaboration_score": 5, "reliability_score": 5},
+            {"status": "completed", "collaboration_score": 5, "reliability_score": 5},
+            {"status": "completed", "collaboration_score": 5, "reliability_score": 5},
+            {"status": "completed", "collaboration_score": 5, "reliability_score": 5},
+            {"status": "completed", "collaboration_score": 5, "reliability_score": 5},
+        ]
+        assert _compute_confidence(calls) <= 98
+
+
+class TestValidateCallAnalysis:
+    TRANSCRIPT = "User: He was one of the best engineers. User: I'd hire him again in a heartbeat."
+
+    def test_clamps_scores(self):
+        raw = {"collaboration_score": 15, "technical_ability_score": -1,
+               "reliability_score": "abc", "communication_score": 5,
+               "leadership_score": None, "overall_recommendation": "yes",
+               "strengths": [], "growth_areas": [], "key_quotes": [], "ref_summary": "ok"}
+        result = _validate_call_analysis(raw, "")
+        assert result["collaboration_score"] == 10
+        assert result["technical_ability_score"] == 1
+        assert result["reliability_score"] == 0
+        assert result["communication_score"] == 5
+        assert result["leadership_score"] == 0
+
+    def test_invalid_recommendation_defaults(self):
+        raw = {"overall_recommendation": "maybe", "collaboration_score": 5,
+               "technical_ability_score": 5, "reliability_score": 5,
+               "communication_score": 5, "leadership_score": 5,
+               "strengths": [], "growth_areas": [], "key_quotes": [], "ref_summary": ""}
+        result = _validate_call_analysis(raw, "")
+        assert result["overall_recommendation"] in VALID_RECOMMENDATIONS
+
+    def test_verifies_quotes_against_transcript(self):
+        raw = {"collaboration_score": 7, "technical_ability_score": 7,
+               "reliability_score": 7, "communication_score": 7,
+               "leadership_score": 7, "overall_recommendation": "yes",
+               "strengths": [], "growth_areas": [],
+               "key_quotes": [
+                   "one of the best engineers",
+                   "this quote was completely fabricated by the LLM",
+               ],
+               "ref_summary": "Good."}
+        result = _validate_call_analysis(raw, self.TRANSCRIPT)
+        assert "one of the best engineers" in result["key_quotes"]
+        assert "this quote was completely fabricated by the LLM" not in result["key_quotes"]
+        assert result["_quotes_verified"] is True
+
+    def test_non_list_fields_default(self):
+        raw = {"collaboration_score": 5, "technical_ability_score": 5,
+               "reliability_score": 5, "communication_score": 5,
+               "leadership_score": 5, "overall_recommendation": "neutral",
+               "strengths": "not a list", "growth_areas": None,
+               "key_quotes": 42, "ref_summary": ""}
+        result = _validate_call_analysis(raw, "")
+        assert result["strengths"] == []
+        assert result["growth_areas"] == []
+        assert result["key_quotes"] == []
+
+    def test_coherence_override(self):
+        raw = {"collaboration_score": 9, "technical_ability_score": 9,
+               "reliability_score": 9, "communication_score": 9,
+               "leadership_score": 9, "overall_recommendation": "no",
+               "strengths": [], "growth_areas": [], "key_quotes": [], "ref_summary": ""}
+        result = _validate_call_analysis(raw, "")
+        assert result["overall_recommendation"] == "yes"
+
+    def test_evidence_validation_zeros_ungrounded_scores(self):
+        transcript = "Bot: How was collaboration? User: Alex was a great team player and helped everyone."
+        raw = {
+            "collaboration_score": 8, "technical_ability_score": 7,
+            "reliability_score": 7, "communication_score": 7,
+            "leadership_score": 7, "overall_recommendation": "yes",
+            "strengths": [], "growth_areas": [], "key_quotes": [], "ref_summary": "",
+            "evidence": {
+                "collaboration": "great team player and helped everyone",
+                "technical_ability": "completely fabricated evidence not in transcript",
+            },
+        }
+        result = _validate_call_analysis(raw, transcript)
+        assert result["collaboration_score"] == 8
+        assert result["technical_ability_score"] == 0
+        assert "collaboration" in result["evidence"]
+        assert "technical_ability" not in result["evidence"]
+
+    def test_evidence_non_dict_defaults_to_empty(self):
+        raw = {
+            "collaboration_score": 5, "technical_ability_score": 5,
+            "reliability_score": 5, "communication_score": 5,
+            "leadership_score": 5, "overall_recommendation": "neutral",
+            "strengths": [], "growth_areas": [], "key_quotes": [], "ref_summary": "",
+            "evidence": "not a dict",
+        }
+        result = _validate_call_analysis(raw, "some transcript")
+        assert result["evidence"] == {}
+
+    def test_ref_summary_defaults_to_empty_string(self):
+        raw = {
+            "collaboration_score": 5, "technical_ability_score": 5,
+            "reliability_score": 5, "communication_score": 5,
+            "leadership_score": 5, "overall_recommendation": "neutral",
+            "strengths": [], "growth_areas": [], "key_quotes": [],
+            "ref_summary": 42,
+        }
+        result = _validate_call_analysis(raw, "")
+        assert result["ref_summary"] == ""
+
+
+class TestValidateCrossAnalysis:
+    def test_invalid_hire_recommendation(self):
+        raw = {"hire_recommendation": "maybe_hire", "discrepancies": [],
+               "overall_summary": "ok", "confidence_score": 80}
+        calls = [{"status": "completed"}, {"status": "completed"}]
+        result = _validate_cross_analysis(raw, calls)
+        assert result["hire_recommendation"] in VALID_HIRE_RECOMMENDATIONS
+
+    def test_replaces_confidence_with_calculated(self):
+        raw = {"hire_recommendation": "hire", "discrepancies": [],
+               "overall_summary": "ok", "confidence_score": 99}
+        calls = [
+            {"status": "completed", "collaboration_score": 9, "reliability_score": 3},
+            {"status": "completed", "collaboration_score": 3, "reliability_score": 9},
+        ]
+        result = _validate_cross_analysis(raw, calls)
+        assert result["confidence_score"] != 99
+
+    def test_filters_invalid_discrepancies(self):
+        raw = {
+            "hire_recommendation": "hire",
+            "overall_summary": "ok",
+            "confidence_score": 80,
+            "discrepancies": [
+                {"dimension": "collaboration", "detail": "gap", "severity": "major"},
+                {"dimension": "", "detail": "no dimension", "severity": "minor"},
+                {"dimension": "leadership", "detail": "", "severity": "minor"},
+                "not a dict",
+                {"dimension": "reliability", "detail": "slipped", "severity": "extreme"},
+            ],
+        }
+        calls = [{"status": "completed"}, {"status": "completed"}]
+        result = _validate_cross_analysis(raw, calls)
+        assert len(result["discrepancies"]) == 2
+        assert result["discrepancies"][0]["dimension"] == "collaboration"
+        assert result["discrepancies"][1]["dimension"] == "reliability"
+        assert result["discrepancies"][1]["severity"] == "minor"
+
+    def test_non_list_discrepancies_default(self):
+        raw = {"hire_recommendation": "hire", "discrepancies": "not a list",
+               "overall_summary": "ok", "confidence_score": 80}
+        calls = [{"status": "completed"}, {"status": "completed"}]
+        result = _validate_cross_analysis(raw, calls)
+        assert result["discrepancies"] == []
+
+
+class TestSanitizeName:
+    def test_normal_name(self):
+        assert sanitize_name("Alex Morgan") == "Alex Morgan"
+
+    def test_strips_control_chars(self):
+        assert sanitize_name("Alex\nMorgan\t") == "AlexMorgan"
+
+    def test_strips_null_bytes(self):
+        assert sanitize_name("Alex\x00Morgan") == "AlexMorgan"
+
+    def test_truncates_long_name(self):
+        long_name = "A" * 200
+        assert len(sanitize_name(long_name)) == 100
+
+    def test_strips_whitespace(self):
+        assert sanitize_name("  Alex Morgan  ") == "Alex Morgan"
+
+    def test_empty_string(self):
+        assert sanitize_name("") == ""
+
+    def test_unicode_preserved(self):
+        assert sanitize_name("Priya Sharma") == "Priya Sharma"
+
+
+class TestCountTranscriptTurns:
+    def test_normal_transcript(self):
+        transcript = "Bot: Hello\nUser: Hi\nBot: How are you?\nUser: Good"
+        assert _count_transcript_turns(transcript) == 4
+
+    def test_empty_transcript(self):
+        assert _count_transcript_turns("") == 0
+
+    def test_none_transcript(self):
+        assert _count_transcript_turns(None) == 0
+
+    def test_no_prefixed_lines(self):
+        assert _count_transcript_turns("just some random text") == 0
+
+    def test_mixed_lines(self):
+        transcript = "Bot: Hi\nsome noise\nUser: Hello\nmore noise"
+        assert _count_transcript_turns(transcript) == 2
+
+
+class TestCountQuestionsAnswered:
+    def test_full_transcript(self):
+        transcript = """Bot: How long did you work with Alex, and in what capacity?
+User: I worked with him for 2 years as his manager.
+Bot: What would you say were Alex's greatest strengths?
+User: He was one of the best engineers in our team.
+Bot: How did Alex work with the team?
+User: Fantastic, he was a complete team player.
+Bot: Was Alex reliable with deadlines and commitments?
+User: Very reliable, never missed a deadline.
+Bot: Were there any areas where Alex could grow or improve?
+User: He could be more vocal in meetings.
+Bot: On a scale of 1 to 10, how strongly would you recommend?
+User: I'd say a 9."""
+        count = _count_questions_answered(transcript)
+        assert count >= 5
+
+    def test_empty_transcript(self):
+        assert _count_questions_answered("") == 0
+
+    def test_none_transcript(self):
+        assert _count_questions_answered(None) == 0
+
+    def test_questions_without_answers(self):
+        transcript = "Bot: What would you say were Alex's greatest strengths?\nBot: Next question."
+        assert _count_questions_answered(transcript) == 0
+
+    def test_short_answer_not_counted(self):
+        transcript = "Bot: What would you say were Alex's greatest strengths?\nUser: Ok."
+        assert _count_questions_answered(transcript) == 0
+
+
+class TestRefWeight:
+    def test_manager_higher_than_peer(self):
+        manager = {"ref_relation": "Former Manager", "questions_answered": 6}
+        peer = {"ref_relation": "Peer", "questions_answered": 6}
+        assert _ref_weight(manager) > _ref_weight(peer)
+
+    def test_partial_call_discounted(self):
+        full = {"ref_relation": "Peer", "questions_answered": 6}
+        partial = {"ref_relation": "Peer", "questions_answered": 3}
+        assert _ref_weight(full) > _ref_weight(partial)
+
+    def test_quality_discount_caps_at_one(self):
+        over = {"ref_relation": "Peer", "questions_answered": 10}
+        assert _ref_weight(over) == 1.0
+
+    def test_unknown_relation_defaults_to_one(self):
+        unknown = {"ref_relation": "Intern Buddy", "questions_answered": 6}
+        assert _ref_weight(unknown) == 1.0
+
+    def test_missing_relation_defaults_to_one(self):
+        empty = {"questions_answered": 6}
+        assert _ref_weight(empty) == 1.0
+
+    def test_case_insensitive_relation(self):
+        upper = {"ref_relation": "FORMER MANAGER", "questions_answered": 6}
+        lower = {"ref_relation": "former manager", "questions_answered": 6}
+        assert _ref_weight(upper) == _ref_weight(lower)
+
+    def test_skip_level_between_manager_and_peer(self):
+        manager = {"ref_relation": "Former Manager", "questions_answered": 6}
+        skip = {"ref_relation": "Skip-Level Manager", "questions_answered": 6}
+        peer = {"ref_relation": "Peer", "questions_answered": 6}
+        assert _ref_weight(manager) > _ref_weight(skip) > _ref_weight(peer)
+
+
+class TestWeightedConfidence:
+    def test_manager_agreement_boosts_confidence(self):
+        calls_with_manager = [
+            {"status": "completed", "ref_relation": "Former Manager",
+             "collaboration_score": 8, "reliability_score": 8, "questions_answered": 6},
+            {"status": "completed", "ref_relation": "Peer",
+             "collaboration_score": 8, "reliability_score": 8, "questions_answered": 6},
+        ]
+        calls_equal_weight = [
+            {"status": "completed", "ref_relation": "Peer",
+             "collaboration_score": 8, "reliability_score": 8, "questions_answered": 6},
+            {"status": "completed", "ref_relation": "Peer",
+             "collaboration_score": 8, "reliability_score": 8, "questions_answered": 6},
+        ]
+        assert _compute_confidence(calls_with_manager) >= _compute_confidence(calls_equal_weight)
+
+    def test_disagreement_keeps_confidence_low(self):
+        manager_disagrees = [
+            {"status": "completed", "ref_relation": "Former Manager",
+             "collaboration_score": 3, "reliability_score": 3, "questions_answered": 6},
+            {"status": "completed", "ref_relation": "Peer",
+             "collaboration_score": 9, "reliability_score": 9, "questions_answered": 6},
+        ]
+        assert _compute_confidence(manager_disagrees) <= 60
+
+
+class TestCheckIdentityConfirmed:
+    def _mock_llm(self, answer):
+        mock_response = MagicMock()
+        mock_response.text = answer
+        mock_client = MagicMock()
+        mock_client.models.generate_content.return_value = mock_response
+        return mock_client
+
+    def test_confirmed_via_llm(self):
+        transcript = "Bot: Am I speaking with Jordan Lee?\nUser: Yes, this is Jordan."
+        with patch("llm._get_client", return_value=self._mock_llm("yes")):
+            assert _check_identity_confirmed(transcript, "Jordan Lee") is True
+
+    def test_denied_via_llm(self):
+        transcript = "Bot: Am I speaking with Jordan Lee?\nUser: No, wrong number."
+        with patch("llm._get_client", return_value=self._mock_llm("no")):
+            assert _check_identity_confirmed(transcript, "Jordan Lee") is False
+
+    def test_empty_transcript_returns_false(self):
+        assert _check_identity_confirmed("", "Jordan Lee") is False
+
+    def test_empty_name_returns_false(self):
+        assert _check_identity_confirmed("Bot: Hi\nUser: Hello", "") is False
+
+    def test_none_transcript_returns_false(self):
+        assert _check_identity_confirmed(None, "Jordan Lee") is False
+
+    def test_llm_error_returns_false(self):
+        mock_client = MagicMock()
+        mock_client.models.generate_content.side_effect = Exception("API error")
+        with patch("llm._get_client", return_value=mock_client):
+            assert _check_identity_confirmed("Bot: Hi\nUser: Yes", "Jordan Lee") is False
+
+    def test_uses_first_10_lines_only(self):
+        lines = [f"Bot: line {i}" for i in range(20)]
+        transcript = "\n".join(lines)
+        with patch("llm._get_client", return_value=self._mock_llm("yes")) as mock_get:
+            _check_identity_confirmed(transcript, "Jordan Lee")
+            call_args = mock_get.return_value.models.generate_content.call_args
+            prompt = call_args.kwargs.get("contents", call_args[1].get("contents", ""))
+            assert "line 15" not in prompt
+
+
+class TestCheckConsentGiven:
+    def _mock_llm(self, answer):
+        mock_response = MagicMock()
+        mock_response.text = answer
+        mock_client = MagicMock()
+        mock_client.models.generate_content.return_value = mock_response
+        return mock_client
+
+    def test_consent_given_via_llm(self):
+        transcript = "Bot: This call will be analyzed by AI. Is that okay?\nUser: Yes, go ahead."
+        with patch("llm._get_client", return_value=self._mock_llm("yes")):
+            assert _check_consent_given(transcript) is True
+
+    def test_consent_denied_via_llm(self):
+        transcript = "Bot: This call will be analyzed by AI. Is that okay?\nUser: No, I'd rather not."
+        with patch("llm._get_client", return_value=self._mock_llm("no")):
+            assert _check_consent_given(transcript) is False
+
+    def test_empty_transcript_returns_false(self):
+        assert _check_consent_given("") is False
+
+    def test_none_transcript_returns_false(self):
+        assert _check_consent_given(None) is False
+
+    def test_llm_error_returns_false(self):
+        mock_client = MagicMock()
+        mock_client.models.generate_content.side_effect = Exception("API error")
+        with patch("llm._get_client", return_value=mock_client):
+            assert _check_consent_given("Bot: consent?\nUser: sure") is False
+
+
+class TestQualityConstants:
+    def test_valid_quality_statuses(self):
+        expected = {"verified", "partial", "insufficient", "no_consent", "wrong_person"}
+        assert VALID_QUALITY_STATUSES == expected
+
+    def test_question_markers_count(self):
+        assert len(QUESTION_MARKERS) == 6
+
+    def test_valid_recommendations(self):
+        expected = {"strong_yes", "yes", "neutral", "hesitant", "no"}
+        assert VALID_RECOMMENDATIONS == expected
+
+    def test_valid_hire_recommendations(self):
+        expected = {"strong_hire", "hire", "lean_hire", "lean_no", "no_hire"}
+        assert VALID_HIRE_RECOMMENDATIONS == expected
+
+    def test_valid_severities(self):
+        expected = {"minor", "notable", "major"}
+        assert VALID_SEVERITIES == expected

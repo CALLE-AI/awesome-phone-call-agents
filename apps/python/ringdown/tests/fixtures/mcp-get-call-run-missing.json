@@ -1,0 +1,16 @@
+{
+  "what": "get_call_run asked for a run that does not exist",
+  "source": "shape observed against the live MCP endpoint in August 2026. Every value in this payload was written for this repository; what is evidentiary is the shape",
+  "unobserved": "the JSON-RPC envelope around this payload was never captured, only the payload itself; the transcribed result object was elided, so fields beyond the three below may exist",
+  "why_it_matters": "the provider reports this failure inside an HTTP 200 with no JSON-RPC error key, so a parser that only looks for an error envelope reads it as a successful run and gets an empty one",
+  "payload": {
+    "run_id": "...",
+    "status": "FAILED",
+    "message": "run_id not found.",
+    "result": {
+      "call_id": null,
+      "call_ids": [],
+      "transcript": null
+    }
+  }
+}

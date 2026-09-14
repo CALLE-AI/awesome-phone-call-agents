@@ -1,0 +1,32 @@
+{
+  "INV-1007": {
+    "outcome": "promise_to_pay",
+    "right_party_reached": "yes",
+    "promise_made": "yes",
+    "promised_amount": "1500.00",
+    "promised_date": "+4d",
+    "payment_method": "bank_transfer",
+    "dispute_raised": "no",
+    "dispute_reason": "unknown",
+    "evidence_quote": "Our client paid us late. It goes out Friday, the sixth, the full fifteen hundred.",
+    "confidence": 0.88,
+    "transcript": [
+      [
+        "bot",
+        "On the twenty-fourth you agreed fifteen hundred dollars by the twenty-ninth of August, and that has not arrived."
+      ],
+      [
+        "user",
+        "Our client paid us late. It goes out Friday, the sixth, the full fifteen hundred."
+      ],
+      [
+        "bot",
+        "Fifteen hundred dollars on the sixth of September. Correct?"
+      ],
+      [
+        "user",
+        "Yes."
+      ]
+    ]
+  }
+}

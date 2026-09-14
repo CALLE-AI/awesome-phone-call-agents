@@ -1,0 +1,13 @@
+{
+  "name": "confirmcall-day-board",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "description": "Day-board appointment confirmations via CALL-E with fixture mode by default",
+  "license": "MIT",
+  "scripts": {
+    "fixture": "node confirmcall.js --fixture",
+    "preview": "node confirmcall.js --preview",
+    "live": "node confirmcall.js --live"
+  }
+}

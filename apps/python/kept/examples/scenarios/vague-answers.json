@@ -1,0 +1,38 @@
+{
+  "INV-1002": {
+    "outcome": "unclear",
+    "right_party_reached": "yes",
+    "promise_made": "no",
+    "promised_amount": "unknown",
+    "promised_date": "unknown",
+    "payment_method": "unknown",
+    "dispute_raised": "no",
+    "dispute_reason": "unknown",
+    "evidence_quote": "Yeah, we'll get to it soon, don't worry about it.",
+    "confidence": 0.82
+  },
+  "INV-1007": {
+    "outcome": "promise_to_pay",
+    "right_party_reached": "no",
+    "promise_made": "yes",
+    "promised_amount": "1500.00",
+    "promised_date": "+5d",
+    "payment_method": "bank_transfer",
+    "dispute_raised": "no",
+    "dispute_reason": "unknown",
+    "evidence_quote": "I'm not accounts, but I'm sure they'll pay it next week.",
+    "confidence": 0.9
+  },
+  "INV-1001": {
+    "outcome": "promise_to_pay",
+    "right_party_reached": "yes",
+    "promise_made": "yes",
+    "promised_amount": "most of it",
+    "promised_date": "+6d",
+    "payment_method": "bank_transfer",
+    "dispute_raised": "no",
+    "dispute_reason": "unknown",
+    "evidence_quote": "We'll clear most of it by the end of the week.",
+    "confidence": 0.86
+  }
+}

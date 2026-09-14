@@ -1,0 +1,22 @@
+{
+  "name": "calle-verify-contact-claim",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "description": "Verify a claimed contact event by calling the number printed on the customer's own card, never the number that contacted them.",
+  "scripts": {
+    "check": "tsc --noEmit",
+    "test": "node --import tsx --test test/*.test.ts",
+    "demo": "node --import tsx demo/run-local.ts",
+    "vcc": "node --import tsx src/cli.ts",
+    "preview": "node --import tsx src/cli.ts preview --claim examples/claim.example.json"
+  },
+  "dependencies": {
+    "@call-e/calle": "0.2.2"
+  },
+  "devDependencies": {
+    "@types/node": "^22.15.0",
+    "tsx": "^4.20.0",
+    "typescript": "^5.8.0"
+  }
+}

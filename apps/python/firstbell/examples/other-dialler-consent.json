@@ -1,0 +1,66 @@
+{
+  "_comment": "The consent register a district would already hold, paired with examples/other-dialler-records.jsonl so tools/adopt_call_records.py has something real to audit those calls against. Fictional, and the guardian names are placeholders, because a real register holds names and this repository publishes none. Chosen so three of the six calls come back as findings and each finding is a different reason: CR-2004 was withdrawn before the call, CR-2006 names a number the call did not use, and S-2005 rests on no record at all. The other three are covered and print as covered, because a gate that only ever finds fault is one nobody believes. The schema is docs/consent-record.md and dispatch/consent.py enforces it.",
+  "records": [
+    {
+      "id": "CR-2001",
+      "student_id": "S-2001",
+      "guardian_name": "guardian on file",
+      "channel": "voice",
+      "purpose": "attendance",
+      "given_at": "2026-08-14",
+      "expires_at": "2027-07-31",
+      "evidence": "enrolment pack 2026-27, section 4, signed",
+      "recorded_by": "attendance office",
+      "phones": ["+15550000101"]
+    },
+    {
+      "id": "CR-2002",
+      "student_id": "S-2002",
+      "guardian_name": "guardian on file",
+      "channel": "voice",
+      "purpose": "attendance",
+      "given_at": "2026-08-14",
+      "expires_at": "2027-07-31",
+      "evidence": "enrolment pack 2026-27, section 4, signed",
+      "recorded_by": "attendance office",
+      "phones": ["+15550000102"]
+    },
+    {
+      "id": "CR-2003",
+      "student_id": "S-2003",
+      "guardian_name": "guardian on file",
+      "channel": "voice",
+      "purpose": "attendance",
+      "given_at": "2026-08-14",
+      "expires_at": "2027-07-31",
+      "evidence": "enrolment pack 2026-27, section 4, signed",
+      "recorded_by": "attendance office",
+      "phones": ["+15550000103"]
+    },
+    {
+      "id": "CR-2004",
+      "student_id": "S-2004",
+      "guardian_name": "guardian on file",
+      "channel": "voice",
+      "purpose": "attendance",
+      "given_at": "2026-08-14",
+      "expires_at": "2027-07-31",
+      "withdrawn_at": "2026-09-01",
+      "evidence": "enrolment pack 2026-27, section 4, signed; withdrawn by telephone",
+      "recorded_by": "attendance office",
+      "phones": ["+15550000104"]
+    },
+    {
+      "id": "CR-2006",
+      "student_id": "S-2006",
+      "guardian_name": "guardian on file",
+      "channel": "voice",
+      "purpose": "attendance",
+      "given_at": "2026-08-14",
+      "expires_at": "2027-07-31",
+      "evidence": "enrolment pack 2026-27, section 4, signed",
+      "recorded_by": "attendance office",
+      "phones": ["+15550000199"]
+    }
+  ]
+}

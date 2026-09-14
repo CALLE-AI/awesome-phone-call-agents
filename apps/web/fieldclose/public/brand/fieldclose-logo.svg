@@ -1,0 +1,32 @@
+<svg
+  xmlns="http://www.w3.org/2000/svg"
+  viewBox="0 0 680 144"
+  role="img"
+  aria-labelledby="fieldclose-logo-title"
+>
+  <title id="fieldclose-logo-title">FieldClose</title>
+  <g aria-hidden="true">
+    <path
+      fill="#14221d"
+      d="M26 14h82l18 18v34h-24V42H50v64h38v24H26L8 112V32z"
+    />
+    <path
+      fill="#14221d"
+      d="M58 52h36v17H75v10h17v17H75v10H58z"
+    />
+    <path
+      fill="#d65f32"
+      d="M94 106h8V94h24v18l-18 18H94z"
+    />
+  </g>
+  <text
+    x="164"
+    y="104"
+    fill="#14221d"
+    font-family="'Arial Narrow', 'Roboto Condensed', 'Helvetica Neue', Arial, sans-serif"
+    font-size="78"
+    font-stretch="condensed"
+    font-weight="800"
+    letter-spacing="-2.5"
+  >FieldClose</text>
+</svg>

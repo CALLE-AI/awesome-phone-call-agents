@@ -1,0 +1,17 @@
+{
+  "id": "deployment-approval",
+  "task": "This is an automated approval call from the release pipeline. I am not a person and this call is being recorded in the change log. Before I read the request, who am I speaking with? Once the release owner is on the line, read the change once: deploy checkout-api 1.14.2 to production. Then ask for the decision: to approve, read back the six digit approval code shown on the request. To reject, say the word reject. Never say the approval code yourself.",
+  "locale": "en-IN",
+  "voiceId": "example-voice-id",
+  "maxSpokenSeconds": 45,
+  "locked": [
+    {
+      "text": "read back the six digit approval code shown on the request",
+      "reason": "the gate reports approval only when a live person returns the code, so a script that drops this sentence cannot be approved by anyone"
+    },
+    {
+      "text": "I am not a person",
+      "reason": "the FCC treats an AI generated voice as artificial under the TCPA, so the disclosure has to be spoken"
+    }
+  ]
+}

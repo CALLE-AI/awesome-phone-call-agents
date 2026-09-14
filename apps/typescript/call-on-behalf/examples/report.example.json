@@ -1,0 +1,100 @@
+{
+  "errand_id": "bayview-checkup-aug",
+  "on_behalf_of": "Fatima Haddad",
+  "callee_name": "Bayview Family Clinic",
+  "callee_phone_masked": "+14*******22",
+  "authorized_but_unused": [],
+  "outcome": "goal_met",
+  "commitment": "committed",
+  "committed_datetime": "2026-08-13T09:40:00-07:00",
+  "confirmation_code": "4471",
+  "answers": [
+    {
+      "id": "earliest",
+      "text": "What is the earliest appointment you have for a routine check-up?",
+      "answered": true,
+      "answer": "Thursday the thirteenth at nine forty in the morning",
+      "quote": "Thanks. Earliest for a new patient is Thursday the thirteenth at nine forty."
+    },
+    {
+      "id": "accepts_plan",
+      "text": "Do you take Blue Shield PPO?",
+      "answered": true,
+      "answer": "yes",
+      "quote": "Yes, we take Blue Shield PPO. I can hold that slot, reference four four seven one."
+    },
+    {
+      "id": "bring",
+      "text": "What should she bring to a first appointment?",
+      "answered": true,
+      "answer": "photo identification and the insurance card",
+      "quote": "Photo identification and the insurance card."
+    }
+  ],
+  "disclosed": [
+    "the caller's full name",
+    "date of birth",
+    "insurance plan name"
+  ],
+  "leaks": [],
+  "reached_person": true,
+  "callee_notes": "They agreed with: \"Yes, we take Blue Shield PPO. I can hold that slot, reference four four seven one.\"",
+  "next_step": "That is arranged. The confirmation, if they gave one, is in the report above.",
+  "call_id": "call_fake1",
+  "provider_call_id": "provider_fake1",
+  "call_status": "completed",
+  "started_at": "2026-08-04T17:02:00Z",
+  "completed_at": "2026-08-04T17:03:40Z",
+  "transcript": [
+    {
+      "offset_seconds": 0,
+      "speaker": "bot",
+      "text": "Hello, I am an automated assistant calling on behalf of Fatima Haddad, with their permission. I am not a person. I have one short administrative request."
+    },
+    {
+      "offset_seconds": 6,
+      "speaker": "user",
+      "text": "Bayview Family Clinic, how can I help?"
+    },
+    {
+      "offset_seconds": 13,
+      "speaker": "bot",
+      "text": "I am calling to book a routine check-up for Fatima Haddad, who is a new patient. What is the earliest appointment you have?"
+    },
+    {
+      "offset_seconds": 19,
+      "speaker": "user",
+      "text": "Let me look. Can I take the date of birth?"
+    },
+    {
+      "offset_seconds": 26,
+      "speaker": "bot",
+      "text": "Her date of birth is 12 April 1990."
+    },
+    {
+      "offset_seconds": 32,
+      "speaker": "user",
+      "text": "Thanks. Earliest for a new patient is Thursday the thirteenth at nine forty."
+    },
+    {
+      "offset_seconds": 39,
+      "speaker": "bot",
+      "text": "Thursday the thirteenth at nine forty in the morning works. Can you hold it? And do you take Blue Shield PPO?"
+    },
+    {
+      "offset_seconds": 45,
+      "speaker": "user",
+      "text": "Yes, we take Blue Shield PPO. I can hold that slot, reference four four seven one."
+    },
+    {
+      "offset_seconds": 52,
+      "speaker": "bot",
+      "text": "Thank you. What should she bring to a first appointment?"
+    },
+    {
+      "offset_seconds": 58,
+      "speaker": "user",
+      "text": "Photo identification and the insurance card."
+    }
+  ]
+}

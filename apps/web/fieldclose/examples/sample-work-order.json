@@ -1,0 +1,49 @@
+{
+  "fixture": {
+    "id": "resolved-clear-demo",
+    "fictional": true,
+    "liveCallAuthorized": false,
+    "description": "Fictional commercial HVAC closeout case for dry-run and fake-provider tests"
+  },
+  "case": {
+    "id": "018f7b56-8e66-7b4a-9e41-4d47f731a101",
+    "workspaceId": "018f7b56-8e66-7b4a-9e41-4d47f731a100",
+    "version": 1,
+    "status": "draft",
+    "workOrderRef": "WO-DEMO-1042",
+    "contractorDisplayName": "Example HVAC",
+    "siteLabel": "Demo Market - Store 12",
+    "timezone": "America/Chicago",
+    "contactId": "018f7b56-8e66-7b4a-9e41-4d47f731a102",
+    "requestedFields": [
+      "observed_operating_status",
+      "unresolved_issue",
+      "return_visit_request",
+      "preferred_return_window"
+    ],
+    "visitContext": {
+      "serviceDate": "2026-07-27",
+      "equipmentLabel": "Rooftop unit RTU-2",
+      "technicianCompletionNote": "Filter replaced and unit restarted",
+      "allowedReferenceText": "A technician visited yesterday to service rooftop unit RTU-2."
+    },
+    "currentAttemptId": null,
+    "createdBy": "operator_demo_01",
+    "createdAt": "2026-07-28T08:00:00Z",
+    "updatedAt": "2026-07-28T08:00:00Z",
+    "cancelledAt": null
+  },
+  "contact": {
+    "id": "018f7b56-8e66-7b4a-9e41-4d47f731a102",
+    "workspaceId": "018f7b56-8e66-7b4a-9e41-4d47f731a100",
+    "displayName": null,
+    "role": "site_manager",
+    "phoneE164": "+12025550142",
+    "phoneMasked": "+*******0142",
+    "authorizationBasis": "demo_fixture",
+    "authorizationNote": "Fictional fixture. Never use this record to place a live call.",
+    "doNotCallAt": null,
+    "createdAt": "2026-07-28T08:00:00Z",
+    "updatedAt": "2026-07-28T08:00:00Z"
+  }
+}

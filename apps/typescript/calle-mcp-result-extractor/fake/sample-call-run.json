@@ -1,0 +1,18 @@
+{
+  "run_id": "fake-run-a1b2c3",
+  "status": "COMPLETED",
+  "result": {
+    "summary": "Confirmed the rescheduled appointment and captured the new date.",
+    "outcome": {
+      "task_completed": true,
+      "completion_confidence": { "score": 0.94, "label": "high" },
+      "evidence": ["Recipient confirmed the new date aloud", "Recipient repeated the date back correctly"]
+    },
+    "extracted": {
+      "call_duration_seconds": 47,
+      "disposition": "answered"
+    },
+    "transcript": "[00:00:00] BOT: Hi, is this Riverside Dental?\n[00:00:03] USER: Yes, this is Dana speaking.\n[00:00:05] BOT: Hi Dana, I'm an automated assistant calling on behalf of Alex Rivera to confirm the appointment originally scheduled for this Thursday needs to move. Is a reschedule to next Monday at 10 AM available?\n[00:00:14] USER: Let me check... yes, Monday the 12th at 10 AM works.\n[00:00:19] BOT: Great, just to confirm: Monday the 12th at 10 AM. Is there anything Alex needs to bring or do beforehand?\n[00:00:26] USER: Just arrive 15 minutes early for paperwork, nothing else needed.\n[00:00:31] BOT: Understood. To confirm back: the appointment is now Monday the 12th at 10 AM, arrive 15 minutes early, no other prep needed. Is that correct?\n[00:00:40] USER: That's correct.\n[00:00:41] BOT: Thank you for your help, goodbye.",
+    "call_id": "fake-call-a1b2c3"
+  }
+}

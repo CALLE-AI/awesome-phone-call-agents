@@ -1,0 +1,116 @@
+[
+  {
+    "id": "MTR-2026-0042",
+    "serviceType": "SMART_METER_REPLACEMENT",
+    "sourceFailure": {
+      "summary": "Smart-meter replacement failed because the side gate was locked, a dog was unsecured, access was obstructed, and property presence was required.",
+      "lockedGate": true,
+      "unsecuredDog": true,
+      "obstruction": true,
+      "presenceRequired": true,
+      "accessControl": "CUSTOMER_CONTROLLED"
+    },
+    "riskFlags": {
+      "technicalOrSafetyDefect": false,
+      "hazardousMaterialSuspected": false,
+      "lifeSupportOrVulnerability": false,
+      "emergencyOrOutage": false,
+      "billingOrDisconnectionDispute": false
+    },
+    "recipient": {
+      "role": "AUTHORIZED_SERVICE_CONTACT",
+      "phoneE164": "+61491570006",
+      "authorized": true
+    },
+    "callWindow": {
+      "start": "2025-01-01T00:00:00+11:00",
+      "end": "2099-12-31T23:59:59+11:00"
+    },
+    "visitWindows": [
+      {
+        "id": "TUE_AM",
+        "label": "Tuesday 8:00am–12:00pm",
+        "start": "2099-01-06T08:00:00+11:00",
+        "end": "2099-01-06T12:00:00+11:00"
+      },
+      {
+        "id": "THU_PM",
+        "label": "Thursday 12:00pm–4:00pm",
+        "start": "2099-01-08T12:00:00+11:00",
+        "end": "2099-01-08T16:00:00+11:00"
+      }
+    ]
+  },
+  {
+    "id": "MTR-2026-0043",
+    "serviceType": "SMART_METER_REPLACEMENT",
+    "sourceFailure": {
+      "summary": "The shared locked meter room is controlled by the body corporate.",
+      "lockedGate": false,
+      "unsecuredDog": false,
+      "obstruction": false,
+      "presenceRequired": false,
+      "accessControl": "EXTERNAL_PARTY"
+    },
+    "riskFlags": {
+      "technicalOrSafetyDefect": false,
+      "hazardousMaterialSuspected": false,
+      "lifeSupportOrVulnerability": false,
+      "emergencyOrOutage": false,
+      "billingOrDisconnectionDispute": false
+    },
+    "recipient": {
+      "role": "AUTHORIZED_SERVICE_CONTACT",
+      "phoneE164": "+61491570156",
+      "authorized": true
+    },
+    "callWindow": {
+      "start": "2025-01-01T00:00:00+11:00",
+      "end": "2099-12-31T23:59:59+11:00"
+    },
+    "visitWindows": [
+      {
+        "id": "WED_AM",
+        "label": "Wednesday 8:00am–12:00pm",
+        "start": "2099-01-07T08:00:00+11:00",
+        "end": "2099-01-07T12:00:00+11:00"
+      }
+    ]
+  },
+  {
+    "id": "MTR-2026-0044",
+    "serviceType": "SMART_METER_REPLACEMENT",
+    "sourceFailure": {
+      "summary": "The technician recorded a suspected electrical or site defect.",
+      "lockedGate": false,
+      "unsecuredDog": false,
+      "obstruction": false,
+      "presenceRequired": false,
+      "accessControl": "CUSTOMER_CONTROLLED"
+    },
+    "riskFlags": {
+      "technicalOrSafetyDefect": true,
+      "hazardousMaterialSuspected": false,
+      "lifeSupportOrVulnerability": false,
+      "emergencyOrOutage": false,
+      "billingOrDisconnectionDispute": false
+    },
+    "recipient": {
+      "role": "AUTHORIZED_SERVICE_CONTACT",
+      "phoneE164": "+61491570157",
+      "authorized": true
+    },
+    "callWindow": {
+      "start": "2025-01-01T00:00:00+11:00",
+      "end": "2099-12-31T23:59:59+11:00"
+    },
+    "visitWindows": [
+      {
+        "id": "FRI_PM",
+        "label": "Friday 12:00pm–4:00pm",
+        "start": "2099-01-09T12:00:00+11:00",
+        "end": "2099-01-09T16:00:00+11:00"
+      }
+    ]
+  }
+]
