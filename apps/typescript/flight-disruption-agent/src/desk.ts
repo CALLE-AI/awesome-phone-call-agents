@@ -319,14 +319,15 @@ export class Desk {
       disruptionId: null,
       message: "",
     };
-    const existing = this.state.disruptions.find((d) => d.flightId === event.flightId);
-    if (existing) {
-      const same = existing.kind === event.kind && existing.cause === event.cause && existing.delayMinutes === event.delayMinutes;
+    const existing = this.activeDisruption(event.flightId);
+    const same =
+      existing && existing.kind === event.kind && existing.cause === event.cause && existing.delayMinutes === event.delayMinutes;
+    if (existing && (same || !this.escalates(existing, event.kind, event.delayMinutes))) {
       record.status = "conflict";
       record.disruptionId = existing.id;
       record.message = same
         ? `Same ${existing.kind} as ${existing.id}, already recorded. Nothing changed.`
-        : `Flight already has ${existing.id} (${existing.kind}). This ${event.kind} was not applied automatically: calls may already quote the earlier options. Check with the airline, then handle affected passengers by hand.`;
+        : `Flight already has ${existing.id} (${existing.kind}). This ${event.kind} does not make it worse, so it was not applied automatically: calls may already quote the current options. Check with the airline, then handle affected passengers by hand.`;
     } else {
       try {
         const disruption = this.reportDisruption({
@@ -338,7 +339,12 @@ export class Desk {
           source: { kind: "airline_webhook", eventId: event.eventId, receivedAt: record.receivedAt },
         });
         record.disruptionId = disruption.id;
-        record.message = `Recorded ${disruption.id}.`;
+        if (disruption.supersedes) {
+          record.status = "escalated";
+          record.message = `Recorded ${disruption.id}, replacing ${disruption.supersedes}. Passengers who kept the delayed flight must be called again.`;
+        } else {
+          record.message = `Recorded ${disruption.id}.`;
+        }
       } catch (error) {
         record.status = "rejected";
         record.message = error instanceof Error ? error.message : String(error);

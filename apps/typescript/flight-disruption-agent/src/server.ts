@@ -109,7 +109,7 @@ async function api(req: IncomingMessage, res: ServerResponse, path: string): Pro
       throw error;
     }
     const { record, duplicate } = desk.receiveOpsEvent(event);
-    const status = duplicate ? 200 : record.status === "created" ? 201 : record.status === "conflict" ? 409 : 422;
+    const status = duplicate ? 200 : record.status === "created" || record.status === "escalated" ? 201 : record.status === "conflict" ? 409 : 422;
     return send(res, status, { duplicate, ...record });
   }
 

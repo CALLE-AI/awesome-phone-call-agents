@@ -82,13 +82,19 @@ test("an ops event records a disruption once, and a retried delivery changes not
   assert.equal(snap.disruptions[0]?.bookings.every((b) => b.entry === null), true, "events never start calls");
 });
 
-test("a different event for an already disrupted flight is flagged, not applied", () => {
+test("a cancellation event for a delayed flight escalates it; a milder event is flagged", () => {
   const desk = dryDesk();
   desk.reportDelay("NA721-2026-09-20", 240, "a late inbound aircraft");
   const { record } = desk.receiveOpsEvent(cancelEvent());
-  assert.equal(record.status, "conflict");
-  assert.match(record.message, /not applied automatically/);
-  assert.equal(desk.snapshot().disruptions[0]?.kind, "delay");
+  assert.equal(record.status, "escalated");
+  assert.equal(record.disruptionId, "evt_NA721-2026-09-20_fm_cancelled");
+  assert.match(record.message, /replacing evt_NA721-2026-09-20_240/);
+  assert.equal(desk.snapshot().flights.find((f) => f.id === "NA721-2026-09-20")?.disruption?.kind, "cancellation");
+
+  const milder = parseOpsEvent(catalog, { id: "ops-200", type: "flight.delayed", occurred_at: "2026-09-19T07:58:00Z", flight: { id: "NA721-2026-09-20" }, delay_minutes: 60 });
+  const flagged = desk.receiveOpsEvent(milder).record;
+  assert.equal(flagged.status, "conflict");
+  assert.match(flagged.message, /does not make it worse/);
 });
 
 test("an event the desk cannot record is kept as rejected with the reason", () => {
