@@ -952,14 +952,14 @@ def test_a_retry_policy_that_would_place_no_calls_is_refused():
     assert "no calls" in str(caught.value)
 
 
-def test_a_timeout_creating_a_call_is_retried_and_never_called_a_failure():
+def test_a_timeout_creating_a_call_stops_and_is_never_called_a_failure():
     """A timeout is not an answer.
 
     `CalleTimeoutError` and `CalleConnectionError` subclass `Exception`, not
     `CalleAPIError`, so they missed the only `except` in the create loop and landed in the
     dispatcher's catch-all as FAILED, which reads as "nobody was reached" about a request
-    that may well have arrived. The same key goes out again, which is what makes retrying
-    safe: if the first request did land, CALL-E replays it instead of ringing twice.
+    that may well have arrived. Stop submitting and preserve the same key for manual
+    provider reconciliation rather than assuming a repeat is harmless.
     """
     from calle import CalleTimeoutError
 
@@ -979,8 +979,8 @@ def test_a_timeout_creating_a_call_is_retried_and_never_called_a_failure():
     report = dispatcher.run([WorkItem(id="S-91", phones=(IN_A,), consented=True)])
     result = report.results[0]
 
-    assert len(keys) == 3, f"the timeout was not retried: {len(keys)} attempt(s)"
-    assert len(set(keys)) == 1, "a retry after a timeout must reuse the key, or it rings twice"
+    assert len(keys) == 1, "a timeout must stop automatic submission"
+    assert result.possibly_placed_key == keys[0]
     assert result.resolution is Resolution.UNDETERMINED, (
         f"a call that may have been placed was reported {result.resolution.value}")
     assert dispatcher.api_responded is False, "nothing answered, so nothing was reached"
@@ -1440,9 +1440,8 @@ def test_an_interrupt_stops_a_handler_that_is_between_attempts():
     assert slow[0].resolution is Resolution.UNDETERMINED, (
         "an item whose attempt timed out and was then cancelled came back as "
         f"{slow[0].resolution}, and a timeout is not an answer: {slow[0].reason}")
-    assert "waiting to be retried" in (slow[0].reason or ""), (
-        "the row does not say it was cancelled between attempts, so a clerk reading it "
-        f"cannot tell it from a call nobody answered: {slow[0].reason}")
+    assert "automatic submission stopped" in (slow[0].reason or ""), (
+        "the row must explain that submission stopped and reconciliation is required")
     assert slow[0].possibly_placed_key, (
         "the row carries no idempotency key, so a person picking it up tomorrow cannot "
         "retry it without risking a second call to the same house")

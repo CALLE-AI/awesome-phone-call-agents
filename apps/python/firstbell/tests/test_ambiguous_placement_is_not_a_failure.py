@@ -1,8 +1,8 @@
 """A later refusal does not retract an earlier request that went missing.
 
-The create loop retries a timeout on purpose, with the same idempotency key, because a
-timeout is not an answer and the key is what makes repeating the request safe. That much
-was right. What was wrong is what happened when the *next* attempt got an answer.
+The create loop now stops immediately after a timeout, retaining the idempotency key
+for manual reconciliation. A fixture that would refuse the next attempt proves that
+the dispatcher never reaches that attempt or mistakes it for proof of non-placement.
 
 Every non-call exit from the loop returned FAILED, and FAILED is a sentence with three
 claims in it: nobody was reached, nothing will be billed, and the row can go on tomorrow's
@@ -65,15 +65,15 @@ def test_a_refusal_after_an_unanswered_request_stays_undetermined(code):
 
     result = _run(create)
 
-    assert sent["n"] == 2, f"the fixture sent {sent['n']} request(s), not two"
+    assert sent["n"] == 1, "an unknown submission must not be automatically repeated"
     assert result.resolution is Resolution.UNDETERMINED, (
         f"a request that may already have placed a call was reported "
         f"{result.resolution.value} once a later attempt was refused with {code}")
     assert result.possibly_placed_key, (
         "the row carries no idempotency key, and without it there is nothing to "
         "reconcile the possible call against")
-    assert code in result.reason, (
-        "the refusal itself is still worth reading; it is the verdict that changed")
+    assert "automatic submission stopped" in result.reason
+    assert "read timed out" in result.reason
 
 
 def test_the_refusal_code_does_not_travel_as_a_definite_failure_code():

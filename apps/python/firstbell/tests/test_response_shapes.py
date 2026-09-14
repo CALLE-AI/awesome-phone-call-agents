@@ -127,7 +127,7 @@ def test_attempts_as_a_list_of_strings_is_undetermined_with_the_call_id_kept():
 # Defect 4: a 5xx with a non-JSON body was not retried and was reported FAILED.
 # --------------------------------------------------------------------------
 
-def test_a_malformed_5xx_body_is_retried_and_never_called_a_failure():
+def test_a_malformed_5xx_body_stops_submission_and_is_never_called_a_failure():
     """The SDK calls `response.json()` unconditionally on a 4xx/5xx. A proxy's own error
     page for a bad gateway is HTML, so this raised `json.JSONDecodeError`, which is
     neither `CalleAPIError` nor `CalleTimeoutError` nor `CalleConnectionError`, so it
@@ -152,8 +152,8 @@ def test_a_malformed_5xx_body_is_retried_and_never_called_a_failure():
     report = dispatcher.run([WorkItem(id="S-5", phones=(IN_A,))])
     result = report.results[0]
 
-    assert len(keys) == 3, f"a non-JSON 5xx body was not retried: {len(keys)} attempt(s)"
-    assert len(set(keys)) == 1, "a retry after a malformed body must reuse the key"
+    assert len(keys) == 1, "a malformed submission response must stop automatic retries"
+    assert result.possibly_placed_key == keys[0]
     assert result.resolution is Resolution.UNDETERMINED, (
         f"a request that may have reached CALL-E came back {result.resolution.value}")
 # --------------------------------------------------------------------------
@@ -165,7 +165,7 @@ def test_a_malformed_5xx_body_is_retried_and_never_called_a_failure():
 # may have arrived and started a telephone ringing.
 # --------------------------------------------------------------------------
 
-def test_a_5xx_body_that_is_not_utf8_is_retried_and_never_called_a_failure():
+def test_a_5xx_body_that_is_not_utf8_stops_and_is_never_called_a_failure():
     """A proxy error page in another encoding. `latin-1` bytes through `json.loads` raise
     UnicodeDecodeError, which is a ValueError and is not a JSONDecodeError."""
     keys = []
@@ -192,10 +192,8 @@ def test_a_5xx_body_that_is_not_utf8_is_retried_and_never_called_a_failure():
     report = dispatcher.run([WorkItem(id="S-6", phones=(IN_A,))])
     result = report.results[0]
 
-    assert len(keys) == 3, (
-        f"a body that will not decode was not retried: {len(keys)} attempt(s). This is the "
-        f"class of failure a retry exists to absorb")
-    assert len(set(keys)) == 1, "a retry after an undecodable body must reuse the key"
+    assert len(keys) == 1, "an undecodable submission response must stop automatic retries"
+    assert result.possibly_placed_key == keys[0]
     assert result.resolution is Resolution.UNDETERMINED, (
         f"a request that may have reached CALL-E came back {result.resolution.value}, "
         f"which prints as nobody reached on any number")

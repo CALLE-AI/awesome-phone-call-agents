@@ -562,15 +562,15 @@ class WaveDispatcher:
                 # it matters, so the two cannot drift apart.
                 unanswered = True
                 last = f"{type(err).__name__}: {redact(str(err))}"
-                if attempt == self._retry.max_attempts:
-                    return ItemResult(
-                        item=item, resolution=Resolution.UNDETERMINED,
-                        possibly_placed_key=key,
-                        reason="the call may have been placed and the service did not "
-                               "answer: " + last)
-                # The same key again, which is what makes this safe to repeat: if the
-                # first request did land, CALL-E replays it rather than calling twice.
-                self._sleep(self._retry.delay_for(attempt))
+                # Stop automatic submission at the first unknown outcome. Keep the
+                # intent key for an operator's provider-side reconciliation; even a
+                # same-key retry is not a substitute for checking the accepted call.
+                return ItemResult(
+                    item=item, resolution=Resolution.UNDETERMINED,
+                    possibly_placed_key=key,
+                    reason="the call may have been placed and the service did not "
+                           "answer; automatic submission stopped, reconcile before "
+                           "any retry: " + last)
         # Unreachable while every branch above returns, and routed through `_verdict`
         # anyway. A loop that falls out of its own bottom is a loop somebody has edited,
         # and the edit must not be the one that reintroduces a definite verdict on a row
