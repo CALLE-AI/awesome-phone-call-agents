@@ -141,7 +141,12 @@ export function sanitizeCall(call: Call, expectedRunId: string): CallSnapshot {
     callId: call.id,
     maskedPhone: maskPhone(firstPhone(call)),
     status: statusFor(call, Boolean(resultIsUsable)),
-    result: parsedResult,
+    result: parsedResult ? {
+      ...parsedResult,
+      reported_time: redactText(parsedResult.reported_time),
+      blocker: redactText(parsedResult.blocker),
+      evidence_summary: redactText(parsedResult.evidence_summary),
+    } : null,
     taskCompleted: call.taskCompleted,
     completionConfidence: call.completionConfidence,
     evidence: call.evidence.map(redactText).filter(Boolean).slice(0, 8),

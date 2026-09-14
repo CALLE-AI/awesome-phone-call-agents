@@ -72,6 +72,7 @@ function parseContacts(value: unknown, region: Region): ContactInput[] {
     throw new InputError("Exactly four role contacts are required.");
   }
   const seen = new Set<ContactRole>();
+  const phones = new Set<string>();
   const contacts = value.map((item, index) => {
     const input = record(item, `Contact ${index + 1}`);
     if (
@@ -88,6 +89,8 @@ function parseContacts(value: unknown, region: Region): ContactInput[] {
     if (!E164.test(phone)) {
       throw new InputError(`${role} phone must use E.164 format.`);
     }
+    if (phones.has(phone)) throw new InputError('Use a distinct destination for each role; do not place concurrent calls to the same person.');
+    phones.add(phone);
     if (!phone.startsWith(REGION_CONFIG[region].phonePrefix)) {
       throw new InputError(
         `${role} phone must match the ${region} project region.`,

@@ -45,6 +45,9 @@ installing this pinned dependency set; it does not change runtime behavior.
 
 ## Enable authorized live calls locally
 
+The supplied dev/start commands bind to `127.0.0.1`. Keep live operation local;
+do not expose it through a tunnel or reverse proxy without adding operator authentication.
+
 1. Copy `.env.example` to `.env.local`.
 2. Set `CALLE_API_KEY` to your server-side CALL-E API key.
 3. Set `ENABLE_LIVE_CALLS=true`.
