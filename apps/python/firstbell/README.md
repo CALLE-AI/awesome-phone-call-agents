@@ -41,7 +41,7 @@ call** is the price above which the desk is cheaper. A thousand calls against th
 [![Offline by default](https://img.shields.io/badge/offline-dials%20nobody%2C%20no%20account-1a7f5a?style=flat-square)](#run-it)
 [![Real calls](https://img.shields.io/badge/real%20calls-20%20placed%20through%20CALL--E-1a7f5a?style=flat-square)](https://firstbell-evidence.vercel.app)
 <br>
-[![Tests](https://img.shields.io/badge/tests-855%20collected-444?style=flat-square)](#tests)
+[![Tests](https://img.shields.io/badge/tests-887%20collected-444?style=flat-square)](#tests)
 [![Mutations](https://img.shields.io/badge/gates%20broken%20on%20purpose-358-444?style=flat-square)](evidence/MUTATIONS.md)
 [![Licence](https://img.shields.io/badge/licence-MIT-444?style=flat-square)](../../../LICENSE)
 
@@ -136,17 +136,17 @@ Five lines do all of it, and the default offline run reaches three of them. Ever
 below is checked by a test, so a line number here cannot quietly rot, and the count in this
 sentence is checked against the list under it.
 
-- The call is placed at `self._client.calls.create` at `dispatch/scheduler.py:464`, with
+- The call is placed at `self._client.calls.create` at `dispatch/scheduler.py:504`, with
   the whole phone fallback chain and the per-family `locale` in one request.
-- Completion is polled at `self._client.calls.get` at `dispatch/scheduler.py:554`, under a
+- Completion is polled at `self._client.calls.get` at `dispatch/scheduler.py:598`, under a
   hard ceiling rather than an open loop.
 - Failures arrive as the SDK's own type, `from calle import CalleAPIError` at
-  `dispatch/scheduler.py:435`, rather than as a string match on a message.
+  `dispatch/scheduler.py:475`, rather than as a string match on a message.
 - The client is built from an api key on the live path only, `from calle import CalleClient` at
   `firstbell/cli.py:391`.
 - `--webhook-url` asks CALL-E to POST `call.completed` and `call.failed` to a district's own
   endpoint as they happen, forwarded at `webhook_url=self._webhook_url` at
-  `dispatch/scheduler.py:469`. The run still polls, because a report cannot be printed from
+  `dispatch/scheduler.py:509`. The run still polls, because a report cannot be printed from
   an event that has not arrived. `tests/test_webhook_delivery.py` drives the whole path
   against a real HTTP receiver with nothing mocked in between, offline.
 
@@ -1217,27 +1217,27 @@ already pay for, and the receipt shape is documented for exactly that.
 
 ```bash
 pip install -r requirements-dev.txt
-python -m pytest tests/ -q          # 855 tests collected
+python -m pytest tests/ -q          # 887 tests collected
 python -m pytest tests/ -q -rs      # and the reason for every one that skips
 ```
 
-**855 is the number collected, and three different pairs add up to it.** Some of these gates
+**887 is the number collected, and three different pairs add up to it.** Some of these gates
 need something this repository cannot ship: the call recordings, which are held
 outside the tree ([`evidence/README.md`](evidence/README.md) says why), a built copy of the
 page under `out/`, or a gate report from `node tools/gates/run.mjs`.
 
-A clean checkout of this commit into an empty directory reports **796 passed, 59
+A clean checkout of this commit into an empty directory reports **828 passed, 59
 skipped**. The fifty-nine name what is missing rather than passing quietly: thirty-eight
 want a built page, four of those thirty-eight also wanting its Content-Security-Policy,
 eighteen want the recordings, and three want a gate report. Build the page and run the
-gates and the same suite reports **853 passed, 2 skipped**. Do both but leave the
+gates and the same suite reports **885 passed, 2 skipped**. Do both but leave the
 recordings where they are, which is the state a reviewer who clones this and builds it
-will be in, and it reports **836 passed, 19 skipped**: the eighteen that want the
+will be in, and it reports **868 passed, 19 skipped**: the eighteen that want the
 recordings, and one more that can only run when no gate report is there to read. All three
-pairs are measured, all three add up to 855, and the difference between them is what a
+pairs are measured, all three add up to 887, and the difference between them is what a
 reader has on their disk.
 
-The very first run in a fresh clone reports one more skip and one fewer pass, 795 and 60.
+The very first run in a fresh clone reports one more skip and one fewer pass, 827 and 60.
 The figure on the first screen is generated rather than committed, so
 `tools/make_figure.py --check` has nothing to compare its output against until it has run
 once: it reports could-not-measure, writes the figure while checking for it, and passes on
