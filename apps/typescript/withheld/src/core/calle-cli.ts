@@ -33,6 +33,7 @@ import { accessSync, constants } from 'node:fs';
 import path from 'node:path';
 import { promisify } from 'node:util';
 import type { CallStatus, Turn } from './types';
+import { normalizeClaims } from './calle';
 import type { CallOutcome, CallProvider, CallRequest } from './calle';
 
 const exec = promisify(execFile);
@@ -105,6 +106,23 @@ export function explainCliFailure(error: unknown, binary: string): string {
   return `Could not read CALL-E auth status: ${message}`;
 }
 
+/**
+ * Normalise a run status for comparison.
+ *
+ * The live `get_call_run` schema documents statuses as space-separated
+ * (`NO ANSWER`), while the CLI reference writes them with underscores
+ * (`NO_ANSWER`). Both spellings appear in CALL-E's own documentation, so accept
+ * either. Getting this wrong is not cosmetic: an unrecognised terminal status
+ * is treated as "still ringing", and the poll loop spins until it times out on
+ * every single unanswered call.
+ */
+export function normalizeCliStatus(raw: unknown): string {
+  return String(raw ?? '')
+    .trim()
+    .toUpperCase()
+    .replace(/[\s-]+/g, '_');
+}
+
 /** Terminal run statuses, as documented by the CLI skill reference. */
 export const TERMINAL_CLI_STATUSES = new Set([
   'COMPLETED',
@@ -119,7 +137,7 @@ export const TERMINAL_CLI_STATUSES = new Set([
 ]);
 
 export function isTerminalCliStatus(raw: unknown): boolean {
-  return TERMINAL_CLI_STATUSES.has(String(raw ?? '').toUpperCase());
+  return TERMINAL_CLI_STATUSES.has(normalizeCliStatus(raw));
 }
 
 /**
@@ -137,7 +155,7 @@ export function isTerminalCliStatus(raw: unknown): boolean {
  * said no".
  */
 export function mapCliStatus(raw: unknown, anyHumanSpeech: boolean): CallStatus {
-  const status = String(raw ?? '').toUpperCase();
+  const status = normalizeCliStatus(raw);
 
   switch (status) {
     case 'COMPLETED':
@@ -158,6 +176,9 @@ export function mapCliStatus(raw: unknown, anyHumanSpeech: boolean): CallStatus 
     case 'RUNNING':
     case 'CALLING':
       return 'in_progress';
+    // PREPARING and SCHEDULED appear in the live get_call_run schema. They are
+    // pre-dial states, so they fold in with the default: nothing has happened
+    // yet, and nothing may be concluded.
     default:
       return 'queued';
   }
@@ -247,6 +268,21 @@ function toSeconds(stamp: string): number | undefined {
   if (parts.length === 3) return parts[0] * 3600 + parts[1] * 60 + parts[2];
   if (parts.length === 2) return parts[0] * 60 + parts[1];
   return undefined;
+}
+
+/**
+ * Pull the transcript out of a run payload.
+ *
+ * The live `get_call_run` output schema nests it as `result.transcript`, while
+ * the CLI reference shows a flat `transcript`. Accept either. Reading the wrong
+ * one is silent and total: the transcript comes back empty, which looks exactly
+ * like a call where nobody spoke — so every errand would be reported as a
+ * no-answer instead of failing loudly.
+ */
+export function callTranscript(content: Record<string, unknown>): unknown {
+  const nested = (content.result as Record<string, unknown> | undefined)
+    ?.transcript;
+  return nested ?? content.transcript;
 }
 
 /** Pull the run payload out of either command's JSON envelope. */
@@ -369,7 +405,8 @@ export class CalleCliProvider implements CallProvider {
       );
     }
 
-    const turns = parseCliTranscript(content.transcript);
+    const turns = parseCliTranscript(callTranscript(content));
+    const result = (content.result ?? {}) as Record<string, any>;
 
     return {
       status: mapCliStatus(
@@ -377,10 +414,15 @@ export class CalleCliProvider implements CallProvider {
         turns.some((t) => t.speaker === 'callee' && t.text.trim().length > 0),
       ),
       turns,
-      // The CLI exposes no structured-result schema, so there is nothing for the
-      // provider to claim. Withheld never read these anyway.
-      providerClaims: [],
+      // Recorded for the audit trail, exactly as on the SDK path, and read by
+      // nothing. `extracted` is the run's own account of what it heard; every
+      // answer Withheld reports is re-derived from the turns above.
+      providerClaims: normalizeClaims(result.extracted),
       ref: `calle-cli:${runId}`,
+      providerSelfAssessment: {
+        taskCompleted: result.outcome?.task_completed ?? null,
+        confidence: result.outcome?.completion_confidence?.score ?? null,
+      },
     };
   }
 }

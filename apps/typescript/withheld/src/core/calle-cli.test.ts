@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import {
   CalleCliProvider,
+  callTranscript,
   explainCliFailure,
   isTerminalCliStatus,
   mapCliStatus,
@@ -9,6 +10,7 @@ import {
   structuredContent,
 } from './calle-cli';
 import { containsNumber } from './budget';
+import { normalizeClaims } from './calle';
 
 const PERSON = '+447700900456';
 
@@ -287,8 +289,14 @@ describe('placing a call', () => {
     ]);
     const p = new CalleCliProvider({ runner, pollIntervalMs: 0 });
     const out = await p.placeCall(base);
+    // SDK-shaped keys the CLI does not actually use are ignored rather than
+    // scavenged: `taskCompleted` and `structuredResult` are not where the live
+    // schema puts these, so reading them would be inventing a claim.
     expect(out.providerClaims).toEqual([]);
-    expect(out.providerSelfAssessment).toBeUndefined();
+    expect(out.providerSelfAssessment).toEqual({
+      taskCompleted: null,
+      confidence: null,
+    });
   });
 
   it('declares that it places real calls', () => {
@@ -403,5 +411,74 @@ describe('CalleCliProvider.ensureAuthenticated', () => {
     });
     await expect(provider.ensureAuthenticated()).rejects.toThrow();
     expect(calls).toEqual([['auth', 'status']]);
+  });
+});
+
+/**
+ * Checked against the live `get_call_run` output schema after authenticating.
+ * Three things differed from the CLI reference doc, and all three fail silently
+ * rather than loudly, which is why each one gets a test.
+ */
+describe('conformance with the live get_call_run schema', () => {
+  it('treats "NO ANSWER" with a space as terminal', () => {
+    // The schema documents statuses space-separated; the CLI reference uses
+    // underscores. Miss this and the poll loop spins to timeout on every
+    // unanswered call.
+    expect(isTerminalCliStatus('NO ANSWER')).toBe(true);
+    expect(isTerminalCliStatus('NO_ANSWER')).toBe(true);
+    expect(isTerminalCliStatus('no answer')).toBe(true);
+  });
+
+  it('maps the spaced spelling to the same outcome as the underscored one', () => {
+    expect(mapCliStatus('NO ANSWER', false)).toBe('no_answer');
+    expect(mapCliStatus('NO_ANSWER', false)).toBe('no_answer');
+  });
+
+  it('keeps the pre-dial states non-terminal and verdict-free', () => {
+    for (const s of ['PREPARING', 'SCHEDULED']) {
+      expect(isTerminalCliStatus(s)).toBe(false);
+      expect(mapCliStatus(s, false)).toBe('queued');
+    }
+  });
+
+  it('reads the transcript from result.transcript, where the schema puts it', () => {
+    expect(callTranscript({ result: { transcript: 'bot: hello' } })).toBe(
+      'bot: hello',
+    );
+  });
+
+  it('still reads a flat transcript, as the CLI reference shows it', () => {
+    expect(callTranscript({ transcript: 'bot: hello' })).toBe('bot: hello');
+  });
+
+  it('prefers the nested transcript when both are present', () => {
+    expect(
+      callTranscript({ transcript: 'flat', result: { transcript: 'nested' } }),
+    ).toBe('nested');
+  });
+
+  it('returns nothing rather than guessing when neither is present', () => {
+    expect(callTranscript({})).toBeUndefined();
+    expect(parseCliTranscript(callTranscript({}))).toEqual([]);
+  });
+
+  it('records the run outcome without letting it decide anything', () => {
+    const content = {
+      status: 'COMPLETED',
+      result: {
+        transcript: 'bot: are you open?\nuser: yes, until six.',
+        outcome: {
+          task_completed: true,
+          completion_confidence: { score: 0.91, label: 'high' },
+        },
+        extracted: { errand_resolved: 'yes', note: '   ' },
+      },
+    };
+    const turns = parseCliTranscript(callTranscript(content));
+    expect(turns.filter((t) => t.speaker === 'callee')).toHaveLength(1);
+    // Blank claims are dropped; real ones are recorded but never consulted.
+    expect(normalizeClaims(content.result.extracted)).toEqual([
+      { question_id: 'errand_resolved', answer: 'yes' },
+    ]);
   });
 });

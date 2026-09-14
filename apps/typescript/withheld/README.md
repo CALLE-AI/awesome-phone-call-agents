@@ -87,7 +87,7 @@ and never appears unmasked in any report.
 
 ```bash
 npm install
-npm test          # 123 tests. No API key, no network, no calls.
+npm test          # 131 tests. No API key, no network, no calls.
 npm run dev       # the console at http://localhost:3000
 ```
 
@@ -195,8 +195,10 @@ capability rather than by guessing:
   *not* appended to the previous speaker. The two ways of being wrong are not
   symmetric: wrongly crediting the callee could confirm a booking nobody
   offered. Unknown turns are still scanned for the number.
-- **There is no `recipientResultSchema`.** So there are no provider claims at
-  all on this path. It costs nothing, because Withheld never trusted them.
+- **There is no `recipientResultSchema`.** You cannot hand the CLI a result
+  shape to fill in, so its `extracted` block is whatever the run decided to
+  report rather than a contract you specified. It is recorded like the SDK's,
+  and read by nothing — which is why the difference costs this app nothing.
 - **There is no idempotency key.** When the CLI reports `retry_safe: false`, a
   submission may already be in flight, so Withheld stops rather than retrying.
   Re-dialling a person to be safe is not safe.
@@ -208,6 +210,20 @@ capability rather than by guessing:
 > which reads like a broken install. Withheld resolves the binary itself and
 > skips `node_modules` on `PATH`; `CALLE_CLI_BIN` overrides it. This is
 > reported in the feedback survey.
+
+Both paths were then checked against the live `get_call_run` output schema,
+read back from the authenticated MCP endpoint rather than from documentation.
+Three things differed from the CLI reference, and each one fails *silently*:
+
+- statuses are spelled `NO ANSWER`, not `NO_ANSWER` — an unrecognised terminal
+  status reads as "still ringing", so every unanswered call would poll until it
+  timed out;
+- the transcript is at `result.transcript`, not `transcript` — reading the wrong
+  key returns nothing, which is indistinguishable from a call where nobody
+  spoke;
+- `PREPARING` and `SCHEDULED` are real statuses the reference does not list.
+
+All three are covered by tests named after the schema they came from.
 
 ---
 
