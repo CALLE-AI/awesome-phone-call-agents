@@ -15,8 +15,10 @@ It differs from [`appointment-confirm`](../appointment-confirm/) in scope
 rather than intent: that skill confirms one appointment and deliberately
 leaves the diary alone. This one walks a whole day's book, applies each
 outcome to a calendar file, and reports only the exceptions. Use
-`appointment-confirm` when a human is reviewing every result; use this when
-the operator wants an unattended evening run and a short morning list.
+`appointment-confirm` when reviewing one result. This external implementation
+is an experimental batch reference: evaluate with mock/preview and fictional
+calendar data. Optional live evaluation is a supervised, operator-controlled
+handset demonstration, not an unattended customer campaign.
 
 ## What it does
 

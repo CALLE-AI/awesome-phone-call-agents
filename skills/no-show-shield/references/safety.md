@@ -1,8 +1,11 @@
 # Safety rules
 
-These are the rules the reference implementation enforces in code, not
-aspirations. Where a rule is enforced by a specific mechanism, the mechanism
-is named.
+These are the intended operating boundaries of an experimental external
+reference, not a guarantee that every rule is enforced. Evaluate with mock
+data and preview. The current live loop can advance after provider/network
+failure; do not use it for unattended customer campaigns. Supervised live
+handset demonstrations require operator approval and manual reconciliation
+of uncertain calls before any further dispatch.
 
 ## Explicit user intent
 
@@ -53,9 +56,10 @@ is named.
 
 ## Cancellation
 
-- A run is a foreground process; interrupting it stops further calls.
-  Outcomes already returned are already written, so state is never
-  half-applied in a way that hides what happened.
+- A run is a foreground process; interrupting it stops further local work,
+  but cannot recall an accepted call. Provider acceptance can precede the
+  response or calendar write; inspect the original call and reconcile local
+  state manually before another run. Crash-proof recovery is not claimed.
 - Any booking the agent could not resolve is surfaced in `Needs you:` rather
   than retried silently.
 
