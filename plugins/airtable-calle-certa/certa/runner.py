@@ -46,7 +46,7 @@ from .dialplan import UnsupportedRegion, resolve
 from .schema import DerivedSchema, SchemaError, derive_recipient_schema
 from .tasks import TASK_SPEC_VERSION, TaskError, build_task
 from .transport import Transport
-from .types import BoundaryError, ConsentedEmployerContact, Relationship
+from .types import BoundaryError, ConsentedEmployerContact, Relationship, redact
 
 # CALL-E's published early-stage price per billable call. Used only to show an
 # operator what a run would cost; the API exposes no balance endpoint
@@ -458,7 +458,8 @@ def _write_back(
             column = current.derived.field_names.get(key)
             if not column:
                 continue
-            values[column] = current.derived.choice_labels.get((key, value), value)
+            displayed = current.derived.choice_labels.get((key, value), value)
+            values[column] = redact(displayed) if isinstance(displayed, str) else displayed
         updates.append({"id": outcome.record_id, "fields": values})
 
     for skipped in current.skipped:

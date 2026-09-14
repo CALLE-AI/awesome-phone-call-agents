@@ -68,6 +68,11 @@ class Interpretation:
     evidence: tuple[str, ...] = ()
     answers: dict[str, Any] = field(default_factory=dict)
 
+    def __post_init__(self) -> None:
+        # Reasons are displayed in the CLI, panel, audit and Airtable. Keep
+        # private answers intact for interpretation and second-read comparison.
+        object.__setattr__(self, "reason", redact(self.reason))
+
     @property
     def is_terminal(self) -> bool:
         return self.disposition is not Disposition.PENDING

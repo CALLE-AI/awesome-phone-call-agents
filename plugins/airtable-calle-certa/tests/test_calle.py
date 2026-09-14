@@ -199,6 +199,22 @@ class ContactGate(unittest.TestCase):
         self.assertNotEqual(result.disposition, Disposition.VERIFIED)
 
 
+class ProviderReasonMasking(unittest.TestCase):
+    def test_malformed_answers_are_masked_in_reasons_not_private_inputs(self):
+        phone = "+12025550100"
+        for argument, answer_key in (
+            ("reached", CONTACT_GATE_KEY),
+            ("employment", "employment_confirmed"),
+            ("title", "title_matches"),
+        ):
+            with self.subTest(argument=argument):
+                call = a_call(**{argument: phone})
+                result = interpret(call, DERIVED)
+                self.assertNotIn(phone, result.reason)
+                self.assertEqual(result.answers[answer_key], phone)
+                self.assertEqual(call["recipients"][0]["structured_result"][answer_key], phone)
+
+
 class RefusalIsTerminal(unittest.TestCase):
     def test_declined_is_a_final_outcome(self):
         result = interpret(a_call(declined="yes"), DERIVED)

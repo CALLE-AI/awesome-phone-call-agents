@@ -190,6 +190,16 @@ class Ordering(Base):
 
 
 class Execution(Base):
+    def test_provider_answers_are_masked_in_writeback_not_private_comparison(self):
+        phone = "+12025550100"
+        self.transport = FixtureTransport(scenario(title_matches=phone))
+        client = self.client([consented()])
+        report = self.run_it(client)
+        self.assertEqual(report.outcomes[0].interpretation.answers["title_matches"], phone)
+        self.assertNotIn(phone, report.outcomes[0].interpretation.reason)
+        self.assertTrue(client.writes)
+        self.assertNotIn(phone, json.dumps(client.writes))
+
     def test_clean_run_verifies_and_writes_back(self):
         client = self.client([consented()])
         report = self.run_it(client)

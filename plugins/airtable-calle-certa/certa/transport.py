@@ -25,8 +25,8 @@ from .net import CredentialRoutingError, check_base_url, urlopen as net_urlopen
 
 DEFAULT_BASE_URL = "https://api.heycall-e.com"
 
-# A credential-bearing request may only go here. Overriding the base URL is
-# allowed for a local fake server, but then no Authorization header is sent.
+# A credential-bearing request may only go here. Use FixtureTransport for
+# credential-free local testing instead of overriding a live client's origin.
 ALLOWED_CREDENTIAL_ORIGINS = frozenset({"api.heycall-e.com"})
 
 USER_AGENT = "certa/0.1 (+awesome-phone-call-agents)"

@@ -23,10 +23,6 @@ import urllib.error
 import urllib.parse
 import urllib.request
 
-# Loopback is allowed to be plain HTTP so a fake server can be pointed at in
-# a test; nothing else can.
-LOOPBACK = frozenset({"localhost", "127.0.0.1", "::1"})
-
 
 class CredentialRoutingError(Exception):
     """A credential was about to travel somewhere it should not."""
@@ -44,7 +40,7 @@ class _RefuseRedirect(urllib.request.HTTPRedirectHandler):
 
     def redirect_request(self, req, fp, code, msg, headers, newurl):  # noqa: D102
         raise CredentialRoutingError(
-            f"{req.get_full_url()} answered {code} redirecting to {newurl!r}. "
+            f"A credentialed request answered with redirect status {code}. "
             "A credentialed request is not followed across a redirect, "
             "because the Authorization header would travel with it."
         )
@@ -56,18 +52,14 @@ _OPENER = urllib.request.build_opener(_RefuseRedirect)
 def check_base_url(base_url: str, allowed: frozenset[str] | set[str], *, what: str) -> None:
     """Refuse a base URL that is not HTTPS, or not an allowed origin."""
     parts = urllib.parse.urlsplit(base_url)
-    host = (parts.hostname or "").lower()
-    loopback = host in LOOPBACK
-
-    if parts.scheme != "https" and not loopback:
+    if parts.scheme != "https":
         raise CredentialRoutingError(
-            f"refusing to send {what} over {parts.scheme or 'an unset scheme'!r} "
-            f"to {base_url!r}; HTTPS is required."
+            f"refusing to send {what}; HTTPS is required."
         )
     origin = (parts.netloc or "").lower()
-    if origin not in allowed and not loopback:
+    if origin not in allowed:
         raise CredentialRoutingError(
-            f"refusing to send {what} to {origin!r}; credentialed requests are "
+            f"refusing to send {what} to an unapproved origin; credentialed requests are "
             f"restricted to {sorted(allowed)}."
         )
 
