@@ -26,8 +26,8 @@ under-detect hedges: *"Tuesday tak ho jayega, **shayad**"* is a hedged answer th
 English lexicon grades `asserted`. This exact case ships as fixture
 `23-codeswitch-hindi-hedge-missed.json` and is the single red cell in the
 confusion matrix — kept red on purpose, as the honest measurement of this gap.
-The lexicon is a swappable JSON file (`scripts/lexicon/`); a drafted Hindi file
-(`hi.json`) ships **unvalidated** and must not be trusted until it has its own
+The lexicon is a swappable JSON file (`scripts/lexicon/en.json`); a drafted Hindi
+file (`scripts/lexicon/hi.json`) ships **unvalidated** and must not be trusted until it has its own
 labelled fixture set.
 
 ## 4. Directness is cultural

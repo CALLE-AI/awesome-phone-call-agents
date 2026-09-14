@@ -13,6 +13,10 @@ throws that signal away. This skill puts it back: it reads
 a knowledge grade to every extracted field, with the exact transcript span that
 supports it.
 
+This skill **never places calls**: it lints a task before a host dispatches it and
+grades a transcript after a call has completed. It contains no dialing code, no
+phone numbers, and no network calls of any kind.
+
 Two calls can both answer *"Tuesday."* In one, the person said *"hold on, let me
 check"*, went quiet for eleven seconds, and came back with *"Tuesday — we're holding
 eleven units at the Bhiwandi warehouse."* In the other, they said *"should be
@@ -180,7 +184,7 @@ Stated, not hidden — the full list with reasoning is
 [references/limitations.md](references/limitations.md). Headlines: `offset_seconds`
 marks turn start at integer resolution, so the latency signal is weak and weighted
 accordingly; ASR errors corrupt hedge detection; the lexicon is English-centric and
-swappable (`scripts/lexicon/`), with the Hindi file shipped **unvalidated**;
+swappable (`scripts/lexicon/en.json`), with the Hindi file (`scripts/lexicon/hi.json`) shipped **unvalidated**;
 directness is cultural — a terse answer is not necessarily a guess; and the grades
 are not yet validated against outcomes.
 
