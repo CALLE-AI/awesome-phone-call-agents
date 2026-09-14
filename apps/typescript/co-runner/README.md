@@ -10,7 +10,7 @@ For international business travelers and cross-border entrepreneurs, language ba
 **Co-Runner** bridges this gap. It provides an intuitive, web-based control dashboard that allows global travelers to instantly deploy fluent, localized AI voice agents to make real-time business calls anywhere in the world. By handling the interaction in the local recipient's native language while dynamically streaming structured, English-translated evidence back to the traveler, business never has to compromise.
 
 ## 🛠️ Key Capabilities & Features
-- **Smart Localization Matrices:** Dynamically maps target global languages (Hindi, Tamil, German, Spanish, French, Japanese) directly to their respective E.164 country codes and regions (+91, +49, +34, etc.) to prevent user formatting errors.
+- **Smart Localization Matrices:** Dynamically maps target global languages (English, Hindi, German, Spanish, French, Japanese) directly to their respective E.164 country codes and regions (+91, +49, +34, etc.) to prevent user formatting errors.
 - **Pre-baked Query Templates:** Instant action chips for high-frequency business tasks like *Store Hours tracking*, *Reservation booking*, and *Stock checks*.
 - **Asynchronous Lifecycle Polling:** Seamlessly monitors long-running CALL-E call cycles via state synchronization (`completed`, `failed`, `canceled`) to report verified downstream events.
 - **Resilient Regional Fallbacks:** Built-in network logic catches connection timeouts after 90 seconds, intelligently warning the traveler if high-congestion or regional carrier restrictions (such as current local limits in India) are delaying the agent's connection.
