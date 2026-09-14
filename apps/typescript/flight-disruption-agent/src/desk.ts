@@ -4,15 +4,18 @@ import { dirname } from "node:path";
 import type { CallGateway } from "./calle.ts";
 import { findBooking, findFlight, type Catalog } from "./data.ts";
 import { decide } from "./decide.ts";
+import { checkEligibility } from "./eligibility.ts";
+import { FakeGds, type Gds } from "./gds.ts";
 import { addMinutes, idr, localTime } from "./format.ts";
 import { maskPhone, routeFor } from "./phone.ts";
-import { quoteFor } from "./rules.ts";
+import { quoteFor, voluntaryQuoteFor } from "./rules.ts";
 import { buildResultSchema, buildTask } from "./task.ts";
-import type { Action, BookingState, Disruption, LedgerEntry, Quote } from "./types.ts";
+import type { Action, BookingState, Disruption, LedgerEntry, Quote, RequestChannel, RequestEntry, RequestKind } from "./types.ts";
 
 interface DeskState {
   disruptions: Disruption[];
   ledger: Record<string, LedgerEntry>;
+  requests: Record<string, RequestEntry>;
   bookings: Record<string, BookingState>;
   seats: Record<string, number>;
   liveCallsUsed: number;
@@ -25,6 +28,8 @@ export interface DeskOptions {
   liveDemoPhone?: string;
   liveCallBudget: number;
   now?: () => number;
+  /** B2B portal or GDS used by Workflow B. Defaults to the fake portal. */
+  gds?: Gds;
 }
 
 export class DeskError extends Error {
@@ -46,6 +51,7 @@ function newTicket(): string {
 export class Desk {
   private state: DeskState;
   private readonly now: () => number;
+  private readonly gds: Gds;
 
   constructor(
     private readonly catalog: Catalog,
@@ -53,6 +59,7 @@ export class Desk {
     private readonly options: DeskOptions,
   ) {
     this.now = options.now ?? Date.now;
+    this.gds = options.gds ?? new FakeGds();
     this.state = this.load() ?? this.initialState();
     if (gateway.live) {
       if (!options.liveDemoPhone) throw new Error("Live mode needs LIVE_DEMO_PHONE: the one number live calls may reach.");
@@ -79,13 +86,15 @@ export class Desk {
     }
     const seats: Record<string, number> = {};
     for (const f of this.catalog.flights) seats[f.id] = f.seatsAvailable;
-    return { disruptions: [], ledger: {}, bookings, seats, liveCallsUsed: 0 };
+    return { disruptions: [], ledger: {}, requests: {}, bookings, seats, liveCallsUsed: 0 };
   }
 
   private load(): DeskState | null {
     const path = this.options.statePath;
     if (!path || !existsSync(path)) return null;
-    return JSON.parse(readFileSync(path, "utf8")) as DeskState;
+    const state = JSON.parse(readFileSync(path, "utf8")) as DeskState;
+    state.requests ??= {};
+    return state;
   }
 
   private save(): void {
@@ -313,6 +322,119 @@ export class Desk {
     entry.applied = action ? this.apply(entry, action) : "Closed without changing the booking.";
     if (text) this.state.bookings[entry.pnr]?.notes.push(`Agent note: ${text}`);
     entry.status = "resolved_by_human";
+    this.save();
+    return entry;
+  }
+
+  // ------------------------------------------------------------ passenger requests (Workflow B)
+
+  private requestEntry(id: string): RequestEntry {
+    const r = this.state.requests[id];
+    if (!r) throw new DeskError(`Unknown request ${id}`, 404);
+    return r;
+  }
+
+  /**
+   * Steps 1-2: a reschedule or refund request arrives through an existing channel.
+   * The desk prices it and checks eligibility before anything reaches the passenger.
+   */
+  submitRequest(pnr: string, kind: RequestKind, targetFlightId: string | null, channel: RequestChannel): RequestEntry {
+    if (kind !== "reschedule" && kind !== "refund") throw new DeskError('kind must be "reschedule" or "refund".');
+    if (!["chat", "web_form", "phone"].includes(channel)) throw new DeskError('channel must be "chat", "web_form", or "phone".');
+    const booking = this.catalog.bookings.find((b) => b.pnr === pnr);
+    if (!booking) throw new DeskError(`Unknown booking ${pnr}`, 404);
+    const open = Object.values(this.state.requests).find(
+      (r) => r.request.pnr === pnr && !["ineligible", "declined", "completed", "resolved_by_human"].includes(r.status),
+    );
+    if (open) throw new DeskError(`${pnr} already has an open request (${open.status}).`, 409);
+
+    const id = `req_${pnr}_${Object.values(this.state.requests).filter((r) => r.request.pnr === pnr).length + 1}`;
+    const request = { id, pnr, kind, targetFlightId: targetFlightId || null, channel, createdAt: new Date(this.now()).toISOString() };
+    const quote = voluntaryQuoteFor(this.view(), booking);
+    const eligibility = checkEligibility({
+      catalog: this.view(),
+      booking,
+      state: this.state.bookings[pnr],
+      request,
+      quote,
+      disrupted: this.state.disruptions.some((d) => d.flightId === booking.flightId),
+      now: this.now(),
+    });
+    let action: Action | null = null;
+    let amount: number | null = null;
+    if (eligibility.eligible) {
+      if (kind === "refund") {
+        action = { kind: "refund" };
+        amount = quote.refund.amount;
+      } else {
+        const move = quote.moves.find((m) => m.flightId === targetFlightId);
+        if (move) {
+          action = { kind: "move", optionId: move.id };
+          amount = move.total;
+        }
+      }
+    }
+    const entry: RequestEntry = {
+      request,
+      eligibility,
+      quote,
+      action,
+      amount,
+      status: eligibility.eligible ? "quoted" : "ineligible",
+      confirmedAt: null,
+      portal: null,
+      airlineCall: null,
+      reviewReasons: [],
+      applied: null,
+    };
+    this.state.requests[id] = entry;
+    this.save();
+    return entry;
+  }
+
+  /**
+   * Steps 3-4: the passenger confirmed the quoted amount through their channel.
+   * The operator types that amount back, then the change goes to the portal.
+   */
+  confirmRequest(id: string, confirmedAmount: number): RequestEntry {
+    const entry = this.requestEntry(id);
+    if (entry.status !== "quoted" || !entry.action || entry.amount === null) {
+      throw new DeskError(`This request is ${entry.status}; only quoted requests can be confirmed.`, 409);
+    }
+    if (confirmedAmount !== entry.amount) {
+      throw new DeskError(`The passenger must confirm the quoted amount of ${idr(entry.amount)}.`);
+    }
+    const booking = findBooking(this.catalog, entry.request.pnr);
+    entry.confirmedAt = new Date(this.now()).toISOString();
+
+    const portal = this.gds.submit(booking, entry.action);
+    entry.portal = portal;
+    if (portal.kind === "rejected") {
+      if (entry.action.kind === "move") {
+        entry.status = "portal_rejected";
+      } else {
+        entry.status = "needs_review";
+        entry.reviewReasons = [`${portal.message} Ask the airline to approve the refund, then resolve this request.`];
+      }
+      this.save();
+      return entry;
+    }
+    try {
+      entry.applied = this.applyChange(entry.request.pnr, entry.quote, entry.action);
+      entry.status = "completed";
+    } catch (error) {
+      entry.status = "needs_review";
+      entry.reviewReasons = [error instanceof Error ? error.message : String(error)];
+    }
+    this.save();
+    return entry;
+  }
+
+  /** The passenger said no to the quote. Nothing changes. */
+  declineRequest(id: string): RequestEntry {
+    const entry = this.requestEntry(id);
+    if (entry.status !== "quoted") throw new DeskError(`This request is ${entry.status}; only quoted requests can be declined.`, 409);
+    entry.status = "declined";
     this.save();
     return entry;
   }

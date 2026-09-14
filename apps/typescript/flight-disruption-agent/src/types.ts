@@ -207,3 +207,47 @@ export interface Eligibility {
   /** Things the passenger must hear before confirming, such as a zero refund. */
   warnings: string[];
 }
+
+export type RequestStatus =
+  /** Refused at intake; nothing was quoted. */
+  | "ineligible"
+  /** Quote sent through the passenger's channel; waiting for a yes. */
+  | "quoted"
+  | "declined"
+  /** The portal accepted the change and the booking is updated. */
+  | "completed"
+  /** The portal refused a reissue; the airline desk has to be called. */
+  | "portal_rejected"
+  | "airline_call_in_progress"
+  | "needs_review"
+  | "resolved_by_human";
+
+export interface AirlineCall {
+  destinationMasked: string;
+  redirected: boolean;
+  idempotencyKey: string;
+  task: string;
+  callId: string | null;
+  status: "submitted" | "in_progress" | "finished" | "uncertain" | "failed_to_submit";
+  submittedAt: string;
+  nextPollAt: string;
+  outcome: CallOutcome | null;
+  error: string | null;
+}
+
+export interface RequestEntry {
+  request: ChangeRequest;
+  eligibility: Eligibility;
+  /** Priced once at intake; the passenger confirms exactly this. */
+  quote: Quote;
+  /** The action the request maps to, once eligible. */
+  action: Action | null;
+  /** What the passenger pays (reschedule) or receives (refund). */
+  amount: number | null;
+  status: RequestStatus;
+  confirmedAt: string | null;
+  portal: { kind: "accepted" } | { kind: "rejected"; code: string; message: string } | null;
+  airlineCall: AirlineCall | null;
+  reviewReasons: string[];
+  applied: string | null;
+}
