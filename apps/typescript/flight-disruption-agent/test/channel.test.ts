@@ -48,15 +48,11 @@ test("a wrong name and an unknown booking get the same reply, and nothing is cre
   assert.ok(passengerMatches(findBooking(catalog, "C5V8EJ"), "  HALIM "));
 });
 
-test("a typed confirmation changes nothing: the passenger agrees on the CALL-E call", () => {
+test("an open request needs no kind; the passenger picks on the call", () => {
   const desk = dryDesk();
-  desk.receiveChannelMessage(submit({ pnr: "L6F2KM", last_name: "Kusuma" }));
-  const typed = desk.receiveChannelMessage(
-    parseChannelMessage({ id: "msg-c1", type: "request.confirmed", channel: "chat", conversation_id: "conv-1", request_id: "req_L6F2KM_1", confirmed_amount: 30000 }),
-  ).record;
-  assert.equal(typed.outcome, "refused");
-  assert.match(typed.reply, /will call you to agree the change/);
-  assert.equal(desk.snapshot().requests[0]?.status, "awaiting_call");
+  const { record } = desk.receiveChannelMessage(submit({ kind: undefined, target_flight_id: undefined }));
+  assert.equal(record.outcome, "accepted");
+  assert.equal(desk.snapshot().requests[0]?.request.kind, "change");
 });
 
 test("malformed channel messages are refused", () => {
@@ -64,7 +60,7 @@ test("malformed channel messages are refused", () => {
   assert.throws(() => submit({ pnr: "ABC" }), /6-character/);
   assert.throws(() => submit({ kind: "upgrade" }), /kind/);
   assert.throws(() => submit({ last_name: "" }), /last_name/);
-  assert.throws(() => parseChannelMessage({ id: "x", type: "request.confirmed", channel: "chat", conversation_id: "c", request_id: "r", confirmed_amount: "yes" }), ChannelMessageError);
+  assert.throws(() => parseChannelMessage({ id: "x", type: "request.confirmed", channel: "chat", conversation_id: "c", request_id: "r", confirmed_amount: 1 }), ChannelMessageError, "consent is taken on the call, not typed");
   assert.throws(() => parseChannelMessage({ id: "x", type: "hello", channel: "chat", conversation_id: "c" }), /type/);
 });
 

@@ -1,7 +1,6 @@
 // Plays a passenger channel (chat bot, web form backend, or phone IVR): signs a message and posts it.
 // npm run send-channel -- submit P3X9GA Saputra reschedule NA729-2026-09-20
-// npm run send-channel -- confirm req_P3X9GA_1 415000
-// npm run send-channel -- decline req_P3X9GA_1
+// npm run send-channel -- submit L6F2KM Kusuma            (open "change": the passenger picks on the call)
 // CHANNEL=web_form CONVERSATION_ID=form-42 npm run send-channel -- ...
 import { randomUUID } from "node:crypto";
 import { CHANNEL_SIGNATURE_HEADER } from "./channel.ts";
@@ -16,15 +15,11 @@ const base = {
   conversation_id: process.env.CONVERSATION_ID ?? "conv-demo-1",
 };
 let message: Record<string, unknown>;
-if (action === "submit" && args.length >= 3) {
+if (action === "submit" && args.length >= 2) {
   const [pnr, lastName, kind, target] = args;
-  message = { ...base, type: "request.submitted", pnr, last_name: lastName, kind, ...(target ? { target_flight_id: target } : {}) };
-} else if (action === "confirm" && args.length === 2) {
-  message = { ...base, type: "request.confirmed", request_id: args[0], confirmed_amount: Number(args[1]) };
-} else if (action === "decline" && args.length === 1) {
-  message = { ...base, type: "request.declined", request_id: args[0] };
+  message = { ...base, type: "request.submitted", pnr, last_name: lastName, ...(kind ? { kind } : {}), ...(target ? { target_flight_id: target } : {}) };
 } else {
-  console.error("Usage: npm run send-channel -- submit <pnr> <last name> <reschedule|refund> [flightId] | confirm <requestId> <amount> | decline <requestId>");
+  console.error("Usage: npm run send-channel -- submit <pnr> <last name> [reschedule|refund|change] [flightId]");
   process.exit(2);
 }
 

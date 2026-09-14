@@ -23,7 +23,7 @@ import { addMinutes, idr, localTime } from "./format.ts";
 import { maskPhone, routeFor } from "./phone.ts";
 import { redactOutcome, redactText } from "./redact.ts";
 import { airlineOf, quoteFor, voluntaryQuoteFor } from "./rules.ts";
-import { buildResultSchema, buildTask, OTA_NAME } from "./task.ts";
+import { buildResultSchema, buildTask } from "./task.ts";
 import type { Action, AirlineCall, BookingState, CallOutcome, ChannelMessageRecord, ChannelUpdate, Decision, Disruption, DisruptionCause, DisruptionKind, DisruptionSource, LedgerEntry, OpsEventRecord, OpsEventVia, Quote, RequestChannel, RequestEntry, RequestKind } from "./types.ts";
 
 interface DeskState {
@@ -780,8 +780,8 @@ export class Desk {
 
   /**
    * A message from the chat, web form, or phone line integration. Returns what the channel
-   * should tell the passenger. Each message id is processed once. A request that came in
-   * through a conversation can only be confirmed or declined from that same conversation.
+   * should tell the passenger. Each message id is processed once. CALL-E then calls the passenger
+   * to agree the change; later updates go back to the same conversation.
    */
   receiveChannelMessage(message: ChannelMessage): { record: ChannelMessageRecord; duplicate: boolean } {
     const seen = this.state.channelMessages[message.id];
@@ -801,30 +801,26 @@ export class Desk {
       record.reply = reply;
     };
 
-    if (message.type === "request.submitted") {
-      const booking = this.catalog.bookings.find((b) => b.pnr === message.pnr);
-      if (!booking || !passengerMatches(booking, message.lastName)) {
-        refuse(NOT_FOUND_REPLY);
-      } else {
-        try {
-          const entry = this.submitRequest(message.pnr, message.kind, message.targetFlightId, message.channel, {
-            channel: message.channel,
-            id: message.conversationId,
-          });
-          record.requestId = entry.request.id;
-          record.reply = replyFor(this.catalog, entry);
-        } catch (error) {
-          refuse(
-            error instanceof DeskError && error.status === 409
-              ? `Booking ${message.pnr} already has a change in progress. We will update you in that conversation.`
-              : `We could not start this request: ${error instanceof Error ? error.message : String(error)}`,
-          );
-        }
-      }
+    const booking = this.catalog.bookings.find((b) => b.pnr === message.pnr);
+    if (!booking || !passengerMatches(booking, message.lastName)) {
+      refuse(NOT_FOUND_REPLY);
     } else {
-      // The passenger agrees the change on the CALL-E call, not by typing an amount in the channel.
-      refuse(`${OTA_NAME}'s AI assistant will call you to agree the change. Please answer that call.`);
+      try {
+        const entry = this.submitRequest(message.pnr, message.kind, message.targetFlightId, message.channel, {
+          channel: message.channel,
+          id: message.conversationId,
+        });
+        record.requestId = entry.request.id;
+        record.reply = replyFor(this.catalog, entry);
+      } catch (error) {
+        refuse(
+          error instanceof DeskError && error.status === 409
+            ? `Booking ${message.pnr} already has a change in progress. We will update you in that conversation.`
+            : `We could not start this request: ${error instanceof Error ? error.message : String(error)}`,
+        );
+      }
     }
+
     this.state.channelMessages[message.id] = record;
     this.save();
     return { record, duplicate: false };

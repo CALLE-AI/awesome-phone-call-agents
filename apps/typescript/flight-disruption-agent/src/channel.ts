@@ -10,7 +10,8 @@ export const DRY_RUN_CHANNEL_SECRET = "dry-run-channel-secret";
 
 /**
  * Messages from the passenger-facing channels: a chat bot, the web form backend, or the
- * phone line's IVR or contact center. The channel talks to the passenger; the desk decides.
+ * phone line's IVR or contact center. The channel takes the request; CALL-E then calls the
+ * passenger to agree the change, so there is no typed confirmation message.
  */
 export type ChannelMessage =
   | {
@@ -22,9 +23,7 @@ export type ChannelMessage =
       lastName: string;
       kind: RequestKind;
       targetFlightId: string | null;
-    }
-  | { id: string; type: "request.confirmed"; channel: RequestChannel; conversationId: string; requestId: string; confirmedAmount: number }
-  | { id: string; type: "request.declined"; channel: RequestChannel; conversationId: string; requestId: string };
+    };
 
 export class ChannelMessageError extends Error {}
 
@@ -48,20 +47,14 @@ export function parseChannelMessage(body: unknown): ChannelMessage {
     if (!/^[A-Z0-9]{6}$/.test(pnr)) throw new ChannelMessageError('"pnr" must be a 6-character booking code.');
     const lastName = str("last_name");
     if (!lastName || lastName.length > 100) throw new ChannelMessageError('"last_name" is required.');
-    const kind = str("kind");
-    if (kind !== "reschedule" && kind !== "refund") throw new ChannelMessageError('"kind" must be "reschedule" or "refund".');
+    const kind = str("kind") || "change";
+    if (kind !== "reschedule" && kind !== "refund" && kind !== "change") {
+      throw new ChannelMessageError('"kind" must be "reschedule", "refund", or "change".');
+    }
     const target = str("target_flight_id");
     return { id, type: b.type, channel, conversationId, pnr, lastName, kind, targetFlightId: target || null };
   }
-  if (b.type === "request.confirmed" || b.type === "request.declined") {
-    const requestId = str("request_id");
-    if (!ID.test(requestId)) throw new ChannelMessageError('"request_id" is required.');
-    if (b.type === "request.declined") return { id, type: b.type, channel, conversationId, requestId };
-    const amount = typeof b.confirmed_amount === "number" ? b.confirmed_amount : Number(String(b.confirmed_amount ?? "").replace(/[^\d]/g, "") || NaN);
-    if (!Number.isInteger(amount) || amount < 0) throw new ChannelMessageError('"confirmed_amount" must be the whole rupiah amount the passenger agreed to.');
-    return { id, type: b.type, channel, conversationId, requestId, confirmedAmount: amount };
-  }
-  throw new ChannelMessageError('"type" must be "request.submitted", "request.confirmed", or "request.declined".');
+  throw new ChannelMessageError('"type" must be "request.submitted". The passenger agrees the change on the CALL-E call.');
 }
 
 function normalizeName(name: string): string {
