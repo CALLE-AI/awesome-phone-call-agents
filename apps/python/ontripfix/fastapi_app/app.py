@@ -55,7 +55,7 @@ from services.resolution_queue_worker import (
     enqueue_resolution,
     process_resolution_queue,
 )
-from services.confluence_service import get_weekend_on_call_engineer
+from services.confluence_service import get_ontripfix_on_call_engineer
 from db.telemetry_db import (
     init_telemetry_db,
     get_dashboard_stats,
@@ -161,9 +161,9 @@ def airflow_failure_webhook(payload: AirflowWebhookPayload):
 def dashboard_stats():
     """Returns aggregate metrics, queue counts, and recent incidents for the React Dashboard."""
     stats = get_dashboard_stats()
-    oncall = get_weekend_on_call_engineer()
+    oncall = get_ontripfix_on_call_engineer()
     stats["oncall_engineer"] = oncall.get("engineer", {})
-    stats["shift_name"] = oncall.get("shift_name", "Weekend On-Call Shift")
+    stats["shift_name"] = oncall.get("shift_name", "OnTripFix On-Call Shift")
     return stats
 
 
@@ -199,7 +199,7 @@ def audit_logs(limit: int = 60):
 @app.get("/api/roster", summary="Get Active On-Call Roster")
 def get_roster():
     """Returns active on-call engineer roster configuration."""
-    return get_weekend_on_call_engineer()
+    return get_ontripfix_on_call_engineer()
 
 
 @app.post(

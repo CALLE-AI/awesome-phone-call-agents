@@ -1,10 +1,10 @@
 {
-  "shift_name": "Sunday IST Retail Data Platform On-Call Roster",
+  "shift_name": "Retail Data Platform OnTripFix On-Call Roster",
   "date": "2026-09-14",
   "timezone": "IST",
   "engineer": {
     "name": "Kruthika",
-    "role": "Senior Software Engineer (Weekend On-Call)",
+    "role": "Senior Software Engineer (OnTripFix On-Call)",
     "phone": "+917892-663990",
     "email": "[EMAIL_ADDRESS]",
     "calle_id": "user_kruthika_01",

@@ -225,7 +225,7 @@ export default function App() {
     {
       id: 1,
       name: stats.oncall_engineer?.name || 'Santhoshkumar Dhanasekaran',
-      role: 'Primary Weekend Lead Engineer',
+      role: 'Primary OnTripFix Lead Engineer',
       phone: stats.oncall_engineer?.phone || '+919003939495',
       region: stats.oncall_engineer?.region || 'IN',
       locale: stats.oncall_engineer?.locale || 'en-IN',
@@ -269,7 +269,7 @@ export default function App() {
     {
       id: 5,
       name: 'Elena Rostova',
-      role: 'APAC Weekend Incident Lead',
+      role: 'APAC OnTripFix Incident Lead',
       phone: '+81355550143',
       region: 'JP',
       locale: 'ja-JP',

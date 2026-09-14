@@ -99,7 +99,7 @@ def fetch_confluence_playbook(
     }
 
 
-def get_weekend_on_call_engineer():
+def get_ontripfix_on_call_engineer():
     """
     Checks Confluence Team Calendar for the on-call person for the day.
     If unable to find on-call details (or if env vars missing), reads local config/oncall_config.json file.
@@ -161,10 +161,14 @@ def get_weekend_on_call_engineer():
     return config.oncall_config
 
 
+# Backward-compatible alias
+get_weekend_on_call_engineer = get_ontripfix_on_call_engineer
+
+
 if __name__ == "__main__":
     pb = fetch_confluence_playbook(
         "table daily_store_inventory_agg has no column named inventory_status"
     )
-    oncall = get_weekend_on_call_engineer()
+    oncall = get_ontripfix_on_call_engineer()
     logger.info(f"Playbook: {pb}")
     logger.info(f"OnCall: {oncall}")
