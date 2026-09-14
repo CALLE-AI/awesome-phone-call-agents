@@ -64,6 +64,7 @@
   .t-complete{background:var(--ok-soft);color:var(--ok)}
   .t-dry_run,.t-neutral{background:rgba(255,255,255,.08);color:var(--muted)}
   .t-rejected,.t-cancelled,.t-failed,.t-expired{background:var(--stop-soft);color:var(--stop)}
+  .t-unconfirmed{background:var(--warn-soft);color:var(--warn)}
   .actions{margin-top:14px;display:flex;gap:8px;flex-wrap:wrap}
   pre{background:rgba(0,0,0,.55);border:1px solid var(--line);color:rgba(255,255,255,.75);font-family:var(--m);border-radius:10px;padding:12px 14px;overflow:auto;
     font-size:12px;line-height:1.5;margin:12px 0 0}
@@ -165,6 +166,9 @@ function jobCard(j) {
   const selectable = ['pending','scheduled','needs_info'].indexOf(j.status) !== -1;
   let body = '';
 
+  if (j.status === 'unconfirmed') {
+    body += '<div class="warnbox"><b>Unconfirmed.</b> ' + esc(j.error || '') + '</div>';
+  }
   if (j.wouldBeBlocked || j.blocked) {
     body += '<div class="blocked"><b>Blocked.</b> '
       + esc(((j.policy && j.policy.reasons) || [j.error]).filter(Boolean).join(' / ')) + '</div>';
@@ -221,7 +225,7 @@ function jobCard(j) {
   if (j.status === 'pending') {
     actions = '<button class="btn btn-dark" onclick="act(\'' + j.id + '\',\'approve\')">Approve and dial</button>'
             + '<button class="btn btn-ghost" onclick="act(\'' + j.id + '\',\'reject\')">Reject</button>';
-  } else if (['approved','dialing','needs_info','needs_human','scheduled'].indexOf(j.status) !== -1) {
+  } else if (['approved','dialing','needs_info','needs_human','scheduled','unconfirmed'].indexOf(j.status) !== -1) {
     actions = '<button class="btn btn-ghost" onclick="act(\'' + j.id + '\',\'cancel\')">Cancel</button>';
   }
 

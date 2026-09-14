@@ -25,7 +25,10 @@ function mcpCall(tool, args, opts = {}) {
       maxBuffer: 20 * 1024 * 1024,
       timeout: ((opts.timeoutSeconds || TIMEOUTS[tool] || 30) + 15) * 1000
     }, (err, stdout, stderr) => {
-      if (err && !stdout) return reject(new Error(stderr || err.message));
+      if (err && !stdout) {
+        const safe = String(stderr || err.message || '').slice(0, 160);
+        return reject(new Error('calle CLI call failed: ' + safe));
+      }
       let parsed;
       try { parsed = JSON.parse(stdout); }
       catch { return reject(new Error('Non-JSON response from calle: ' + String(stdout).slice(0, 400))); }

@@ -85,3 +85,17 @@ Tests write to `data/test-jobs.json` and never touch the live queue.
 - A human approving without reading. At high volume this is likely.
 - A call that is polite, on time, in-region and still wrong.
 - Anything after `run_call` has been sent.
+
+## Ambiguous outcomes
+
+If polling a run times out before a terminal status is reached, the job is
+marked `unconfirmed`, not `failed`. The call may have completed on CALL-E's
+side with the result simply not yet synced. Treat `unconfirmed` as needing a
+manual check with `calle call status`, not as proof nothing happened.
+
+## Recipient data
+
+Job output masks phone numbers to the last 4 digits. Call transcripts and
+summaries are not masked. Anyone with access to this machine, or to the
+loopback-only console, can read them. Acceptable for a single-operator local
+tool; not acceptable if this were ever exposed beyond localhost.

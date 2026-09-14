@@ -70,9 +70,14 @@ function audit(db, jobId, action, actor) {
 function killAll(actor) {
   const db = load();
   let n = 0;
+  // Matches what the console button actually promises: everything not yet
+  // dispatched, including scheduled jobs and ones still waiting on CALL-E's
+  // clarifying questions.
+  const cancellable = ['pending', 'approved', 'scheduled', 'needs_info'];
   for (const job of db.jobs) {
-    if (['pending', 'approved'].includes(job.status)) {
+    if (cancellable.includes(job.status)) {
       job.status = 'cancelled';
+      job.confirmToken = null;
       job.updatedAt = new Date().toISOString();
       audit(db, job.id, 'kill_switch', actor || 'operator');
       n++;

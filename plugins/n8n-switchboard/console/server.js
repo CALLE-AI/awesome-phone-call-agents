@@ -129,8 +129,8 @@ const server = http.createServer(async (req, res) => {
   send(res, 404, { error: 'Not found' });
 });
 
-server.listen(PORT, () => {
-  console.log('\n  Switchboard console  http://localhost:' + PORT + '\n');
+server.listen(PORT, '127.0.0.1', () => {
+  console.log('\n  Switchboard console  http://localhost:' + PORT + '  (loopback only)\n');
   setInterval(tick, 30000);
   tick();
 });

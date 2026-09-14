@@ -186,7 +186,10 @@ async function follow(jobId, { maxSeconds = 300 } = {}) {
     job = store.getJob(jobId);
     if (job.status === 'cancelled') return job;
   }
-  return store.updateJob(jobId, { status: 'failed', error: 'Follow timed out' }, 'follow_timeout', 'system');
+  return store.updateJob(jobId, {
+    status: 'unconfirmed',
+    error: 'Timed out waiting for a terminal result. The call may still have completed on CALL-E\'s side. Check with `calle call status`.'
+  }, 'follow_timeout_unconfirmed', 'system');
 }
 
 // Minimal schema check against result.extracted. No dependency, no build step.
@@ -228,11 +231,18 @@ function validate(extracted, schema) {
   return { checked: true, ok: errors.length === 0, errors };
 }
 
-// Never let the token out of the building.
+function maskPhone(phone) {
+  if (!phone || phone.length < 5) return phone;
+  return phone.slice(0, 1) + '•'.repeat(Math.max(0, phone.length - 5)) + phone.slice(-4);
+}
+
 function redact(job) {
   if (!job) return job;
   const { confirmToken, ...safe } = job;
-  return { ...safe, hasConfirmToken: Boolean(confirmToken) };
+  const recipient = safe.recipient
+    ? { ...safe.recipient, phone: maskPhone(safe.recipient.phone) }
+    : safe.recipient;
+  return { ...safe, recipient, hasConfirmToken: Boolean(confirmToken) };
 }
 
 const sleep = ms => new Promise(r => setTimeout(r, ms));
@@ -240,17 +250,19 @@ const sleep = ms => new Promise(r => setTimeout(r, ms));
 // Queue many calls at once. Each recipient gets its own job and its own policy
 // verdict, so one bad number does not stop the batch.
 async function queueBatch({ recipients = [], userInput, resultSchema, mode = 'require_approval',
-                            timezone, campaignId, scheduledFor }) {
+                            timezone, campaignId, scheduledFor, haltOnError = false }) {
   const jobs = [];
   for (const r of recipients) {
     const text = typeof userInput === 'function' ? userInput(r) : interpolate(userInput, r);
     try {
-      jobs.push(await queue({
+      const job = await queue({
         userInput: text, recipient: r, resultSchema, mode, timezone, campaignId,
         scheduledFor: r.scheduledFor || scheduledFor
-      }));
+      });
+      jobs.push(job);
     } catch (err) {
-      jobs.push({ error: err.message, recipient: r });
+      jobs.push({ error: err.message, recipient: r, queueFailed: true });
+      if (haltOnError) break;
     }
   }
   return jobs;

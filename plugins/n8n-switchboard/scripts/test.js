@@ -163,6 +163,18 @@ const runner = require('../core/runner');
   assert.ok(stopped.cancelled >= 1);
   assert.strictEqual(campaign.checkBudget(camp.id).ok, false);
   console.log('  pass  stopping a campaign cancels everything not yet sent');
+
+  const masked = runner.redact({ id: 'j1', status: 'pending', confirmToken: 'secret', recipient: { phone: '+15550101234', region: 'US' } });
+  assert.strictEqual(masked.recipient.phone.includes('5550101234'), false);
+  assert.ok(masked.recipient.phone.endsWith('1234'));
+  console.log('  pass  redacted job masks the phone number');
+
+  const batchResult = await runner.queueBatch({
+    recipients: [ { phone: '+15550101234', region: 'US' } ],
+    userInput: 'Call about the invoice.', mode: 'dry_run'
+  });
+  assert.strictEqual(batchResult.length, 1);
+  console.log('  pass  queueBatch still works with default halt behaviour');
 })();
 
   const wrapped = { ok: true, result: { structuredContent: { plan_id: 'pYA3952KG', ready_to_run: false, confirm_token: null, questions: [{ key: 'to_phones', question: 'What number?' }], display_goal: 'Call the dentist' } } };

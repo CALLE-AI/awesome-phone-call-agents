@@ -15,6 +15,16 @@ const BLOCKLIST = new Set(
   (process.env.SWITCHBOARD_BLOCKLIST || '').split(',').map(s => s.trim()).filter(Boolean)
 );
 
+// Loose E.164 check. Not a full validator, just catches obviously malformed
+// input before it burns a plan_call request.
+const E164 = /^\+[1-9]\d{7,14}$/;
+function checkDestinationFormat(phone) {
+  if (!phone || !E164.test(phone)) {
+    return { ok: false, reason: `"${phone || ''}" is not a valid E.164 number` };
+  }
+  return { ok: true };
+}
+
 function checkRegion(region) {
   if (!region) return { ok: false, reason: 'No recipient region supplied' };
   if (!SUPPORTED_REGIONS.includes(region.toUpperCase())) {
@@ -55,6 +65,7 @@ function checkRateLimit(phone) {
 
 function evaluate(recipient, now = new Date()) {
   const checks = [
+    ['destination_format', checkDestinationFormat(recipient.phone)],
     ['region', checkRegion(recipient.region)],
     ['blocklist', checkBlocklist(recipient.phone)],
     ['quiet_hours', checkQuietHours(now)],
