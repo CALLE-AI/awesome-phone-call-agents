@@ -19,6 +19,28 @@ instructions target revision
 This is not the unrelated [Openline](https://github.com/Datwebguy/openline)
 service-verification app already listed in this repository.
 
+## Where to look
+
+Nine files show the CALL-E work; the rest of the repository is the console around them.
+
+| File | What it shows |
+| --- | --- |
+| [`lib/calle/port.ts`](https://github.com/padmanabhan-r/OpenLine/blob/7ae9f989b5e811a2f7ad09e11d468ab9e0e48249/lib/calle/port.ts) | The only module that imports the CALL-E SDK: `calls.create` with `resultSchema`, `metadata`, `locale` and an idempotency key, `calls.waitForResult`, `calls.get`, plus the final guard and E.164 checks before dialing. |
+| [`lib/screening/dispatch.ts`](https://github.com/padmanabhan-r/OpenLine/blob/7ae9f989b5e811a2f7ad09e11d468ab9e0e48249/lib/screening/dispatch.ts) | One call per click: operator and confirmation check, atomic claim of the row, dial, then the detached wait that stores the transcript and structured result. |
+| [`lib/screening/gate.ts`](https://github.com/padmanabhan-r/OpenLine/blob/7ae9f989b5e811a2f7ad09e11d468ab9e0e48249/lib/screening/gate.ts) | The dial gate: the confirmation must name the candidate and script version, and production with a live key refuses to dial without an operator token. |
+| [`lib/script/build.ts`](https://github.com/padmanabhan-r/OpenLine/blob/7ae9f989b5e811a2f7ad09e11d468ab9e0e48249/lib/script/build.ts) | The task text CALL-E receives: AI disclosure, consent request, fixed questions, and the job fact sheet, assembled by a pure function. |
+| [`lib/script/guard.ts`](https://github.com/padmanabhan-r/OpenLine/blob/7ae9f989b5e811a2f7ad09e11d468ab9e0e48249/lib/script/guard.ts) | Prohibited-topic inspection of the script before the call and of the agent's own turns after it. |
+| [`lib/script/schema.ts`](https://github.com/padmanabhan-r/OpenLine/blob/7ae9f989b5e811a2f7ad09e11d468ab9e0e48249/lib/script/schema.ts) | The structured result schema and the rules that route a call to a human. |
+| [`lib/screening/reconcile.ts`](https://github.com/padmanabhan-r/OpenLine/blob/7ae9f989b5e811a2f7ad09e11d468ab9e0e48249/lib/screening/reconcile.ts) | Recovery for a call whose waiter died: re-read by stored id, never redialed. |
+| [`app/(app)/try/actions.ts`](https://github.com/padmanabhan-r/OpenLine/blob/7ae9f989b5e811a2f7ad09e11d468ab9e0e48249/app/%28app%29/try/actions.ts) | Try a call: the same safety steps for one call to your own number, with nothing stored. |
+| [`lib/calle/fake-server.ts`](https://github.com/padmanabhan-r/OpenLine/blob/7ae9f989b5e811a2f7ad09e11d468ab9e0e48249/lib/calle/fake-server.ts) | The in-process fake CALL-E API used by the no-call mode and the tests. |
+
+Tests for these sit beside them, for example
+[`port.test.ts`](https://github.com/padmanabhan-r/OpenLine/blob/7ae9f989b5e811a2f7ad09e11d468ab9e0e48249/lib/calle/port.test.ts),
+[`build.test.ts`](https://github.com/padmanabhan-r/OpenLine/blob/7ae9f989b5e811a2f7ad09e11d468ab9e0e48249/lib/script/build.test.ts),
+[`guard.test.ts`](https://github.com/padmanabhan-r/OpenLine/blob/7ae9f989b5e811a2f7ad09e11d468ab9e0e48249/lib/script/guard.test.ts), and
+[`gate.test.ts`](https://github.com/padmanabhan-r/OpenLine/blob/7ae9f989b5e811a2f7ad09e11d468ab9e0e48249/lib/screening/gate.test.ts).
+
 ## Workflow boundary
 
 OpenLine handles the recruiter-side workflow around one screening call per candidate:
