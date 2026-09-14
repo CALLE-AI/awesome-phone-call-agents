@@ -255,6 +255,8 @@ This project is an awesome list for AI-agent phone-call workflows. Add resources
 -  [VendorPulse](https://github.com/Eman2123/VendorPlus) - Autonomous CALL-E-powered vendor check-in tool that calls suppliers about order status, scores delivery risk, and escalates high-risk vendors for human review.
 Runnable demo apps live under [`apps/`](apps/). They are not a CALL-E SDK and do not define a supported application API.
 
+- [PostBridge](https://github.com/shahmas01/CALL-E) - Daily post-discharge patient check-in calls via CALL-E that capture recovery status and symptoms as structured results, with concerning responses routed for clinical review.
+
 | App | Language | Purpose |
 | --- | --- | --- |
 | [`apps/typescript/readycheck`](apps/typescript/readycheck/) | TypeScript / Node | Requirement-based local-service inquiries with CALL-E, source-linked evidence review, focused follow-ups, explicit budget revisions and durable recovery; fictional no-call demo by default. |
