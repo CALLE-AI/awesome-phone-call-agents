@@ -186,13 +186,21 @@
     ];
 
     function loadData() {
-      const savedSelfPhone = localStorage.getItem('bc_self_phone_v5');
+      // Clear old unmasked keys to ensure no unmasked numbers linger
+      localStorage.removeItem('bc_persons');
+      localStorage.removeItem('bc_persons_v2');
+      localStorage.removeItem('bc_persons_v3');
+      localStorage.removeItem('bc_persons_v4');
+
+      const savedSelfPhone = localStorage.getItem('bc_self_phone_v6');
       if (savedSelfPhone && isValidE164(savedSelfPhone)) {
         selfPhone = savedSelfPhone;
         document.getElementById('self-phone-input').value = selfPhone;
+      } else {
+        document.getElementById('self-phone-input').value = '+15550100000';
       }
 
-      const savedPersons = localStorage.getItem('bc_persons_v5');
+      const savedPersons = localStorage.getItem('bc_persons_v6');
       if (savedPersons) {
         try { 
           const parsed = JSON.parse(savedPersons);
@@ -211,12 +219,12 @@
       const val = document.getElementById('self-phone-input').value.trim();
       if (isValidE164(val)) {
         selfPhone = val;
-        localStorage.setItem('bc_self_phone_v5', selfPhone);
+        localStorage.setItem('bc_self_phone_v6', selfPhone);
       }
     }
 
     function saveData() {
-      localStorage.setItem('bc_persons_v5', JSON.stringify(persons));
+      localStorage.setItem('bc_persons_v6', JSON.stringify(persons));
       renderCards();
     }
 
@@ -284,7 +292,7 @@
       const startTimeStr = new Date().toLocaleString([], { day: '2-digit', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit' });
       const callNum = (person.callLogs ? person.callLogs.length : 0) + 1;
 
-      // Construct Initial Log Entry
+      // Construct Initial Log Entry with Masked Target Phone
       const newCallLog = {
         id: `call_${Date.now()}`,
         callNumber: callNum,
@@ -305,7 +313,7 @@
       saveData();
 
       try {
-        // Always dispatch through local backend API (never direct client fallback redial)
+        // Always dispatch through local backend API
         const response = await fetch('/api/calls/trigger', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
@@ -505,6 +513,7 @@
 
         const logs = person.callLogs || [];
         const currentWaNum = person.waPhone || selfPhone;
+        const maskedWaNum = maskPhone(currentWaNum);
         const safePersonName = escapeHtml(person.name || 'Human');
 
         if (logs.length === 0) {
@@ -565,7 +574,10 @@
 
             <!-- Single Configurable WhatsApp Destination Input for This Person in Summary Modal -->
             <div class="bg-emerald-50/80 rounded-xl p-3 border border-emerald-200 space-y-2 mt-2">
-              <label class="block text-[11px] font-bold text-emerald-800 uppercase tracking-wider">Target WhatsApp Number for Summaries:</label>
+              <div class="flex items-center justify-between">
+                <label class="block text-[11px] font-bold text-emerald-800 uppercase tracking-wider">Target WhatsApp Number for Summaries:</label>
+                <span class="text-[11px] font-extrabold text-emerald-900 bg-emerald-100 px-2 py-0.5 rounded">Masked: ${maskedWaNum}</span>
+              </div>
               <div class="flex items-center space-x-2">
                 <input type="tel" id="wa-input-${person.id}" value="${escapeHtml(currentWaNum)}" placeholder="+15550100000" class="flex-1 bg-white border border-emerald-300 text-slate-900 text-xs font-bold rounded-lg p-2 focus:ring-2 focus:ring-emerald-500 focus:outline-none" onchange="updatePersonWhatsAppNumber('${person.id}', this.value)">
                 
