@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
-import { database, env, invoke } from './helpers/route-runtime.mjs';
+import { database, env, invoke, authorizedRequest } from './helpers/route-runtime.mjs';
 import { normalizeEvidenceResult, extractTranscript, citeQuote, evidenceIsVisible } from '../app/lib/evidence.ts';
 import { demoFixture } from '../app/lib/demo-fixtures.ts';
 const workflow = await import('../app/api/workflow/route.ts');
@@ -8,15 +8,15 @@ const contacts = await import('../app/api/case-file/route.ts');
 const calls = await import('../app/api/calle/route.ts');
 const evidence = await import('../app/api/case-evidence/route.ts');
 const brief = { interview_id:'INT-047-BAKER-LIVE-002', authorization_version:1, site_key:'dry_cleaner', selected_channel:'automated_callback', automated_call_allowed:true, transcription_allowed:true, contact_id:'morgan' };
-async function setup() { env.CALL_PROVIDER='fake'; env.LIVE_CALLS_ENABLED='false'; const db=database(); await workflow.GET(); return db; }
+async function setup() { env.CALL_PROVIDER='fake'; env.LIVE_CALLS_ENABLED='false'; const db=database(); await workflow.GET(authorizedRequest()); return db; }
 async function ready() { const saved=await invoke(contacts,{action:'save_contact',id:'morgan',version:0,name:'Morgan Lee',role:'Former manager',source:'referral',expectedPeriod:'1991–1996',phone:'+15550123456',phoneSource:'Rehearsal participant',permissionNote:'Test participant permission for synthetic rehearsal',automatedAllowed:true,transcriptionAllowed:true,permissionReconfirmed:true}); assert.equal(saved.status,200); return saved.data.contacts[0]; }
 async function launch(scenario='bounded') { const contact=await ready(); const prepared=await invoke(calls,{...brief,action:'prepare',contact_version:contact.version,scenario}); assert.equal(prepared.status,200); const launched=await invoke(calls,{...brief,action:'launch',contact_version:contact.version,authorization_version:prepared.data.authorization_version,preview_fingerprint:prepared.data.variables_fingerprint,preview_confirmed:true}); assert.equal(launched.status,200); return {contact,prepared:prepared.data,runId:launched.data.run_id}; }
 
 test('records referral starts without a callable number and supports a durable owned task',async()=>{
- await setup(); const state=await (await contacts.GET()).json(); assert.equal(state.contacts[0].hasPhone,false); assert.equal(state.contacts[0].readiness,'Contact details needed');
+ await setup(); const state=await (await contacts.GET(authorizedRequest())).json(); assert.equal(state.contacts[0].hasPhone,false); assert.equal(state.contacts[0].readiness,'Contact details needed');
  assert.equal((await invoke(calls,{...brief,action:'prepare',contact_version:0})).status,422);
  const task=await invoke(contacts,{action:'create_task',title:'Find a respondent',summary:'Ask the property team for a suitable prior manager and permission.',assignee:'Pamela',contactId:null}); assert.equal(task.status,200);
- assert.equal((await (await contacts.GET()).json()).tasks[0].assignee,'Pamela');
+ assert.equal((await (await contacts.GET(authorizedRequest())).json()).tasks[0].assignee,'Pamela');
  assert.equal(env.DB.sqlite.prepare('SELECT COUNT(*) AS n FROM call_runs WHERE goal_run_id IS NOT NULL').get().n,0);
 });
 test('a coordinator can narrow the next approved brief without placing a call', async()=>{
@@ -43,8 +43,8 @@ test('rejects overlong phones and stale contact changes; new number needs renewe
 test('bounded rehearsal yields cited evidence and a named lead with no invented contact details; poll is idempotent',async()=>{
  const db=await setup(); const {runId}=await launch(); assert.equal((await invoke(calls,{...brief,action:'prepare'})).status,409);
  assert.equal((await invoke(calls,{action:'poll',run_id:String(runId)})).data.terminal,true);
- const result=await (await evidence.GET()).json(); assert.equal(result.statements.length,3); assert.ok(result.statements.every(s=>s.citation.status==='matched')); assert.equal(result.runs[0].evidence.outcome,'bounded');
- const leads=(await (await contacts.GET()).json()).contacts; const lead=leads.find(item=>item.sourceRun===runId); assert.equal(lead.name,'Carol'); assert.equal(lead.hasPhone,false); assert.match(lead.source,/Synthetic rehearsal/);
+ const result=await (await evidence.GET(authorizedRequest())).json(); assert.equal(result.statements.length,3); assert.ok(result.statements.every(s=>s.citation.status==='matched')); assert.equal(result.runs[0].evidence.outcome,'bounded');
+ const leads=(await (await contacts.GET(authorizedRequest())).json()).contacts; const lead=leads.find(item=>item.sourceRun===runId); assert.equal(lead.name,'Carol'); assert.equal(lead.hasPhone,false); assert.match(lead.source,/Synthetic rehearsal/);
  db.sqlite.prepare("UPDATE case_workflow SET assigned_role='coordinator', status='FOLLOW_UP_REQUIRED'").run();
  await invoke(calls,{action:'poll',run_id:String(runId)}); assert.equal(db.sqlite.prepare('SELECT assigned_role FROM case_workflow').get().assigned_role,'coordinator');
  assert.equal(db.sqlite.prepare('SELECT COUNT(*) AS n FROM ingested_statements').get().n,3);
@@ -53,13 +53,13 @@ test('database interruption retains provider evidence and resumes atomic ingesti
  const db=await setup(); const {runId}=await launch(); db.failBatch=true;
  assert.equal((await invoke(calls,{action:'poll',run_id:String(runId)})).status,503);
  assert.ok(db.sqlite.prepare('SELECT goal_result FROM call_runs').get().goal_result); assert.equal(db.sqlite.prepare('SELECT COUNT(*) AS n FROM ingested_statements').get().n,0);
- assert.equal((await (await evidence.GET()).json()).runs[0].terminal,false);
+ assert.equal((await (await evidence.GET(authorizedRequest())).json()).runs[0].terminal,false);
  assert.equal((await invoke(calls,{action:'poll',run_id:String(runId)})).data.terminal,true);
  assert.equal(db.sqlite.prepare('SELECT COUNT(*) AS n FROM ingested_statements').get().n,3);
 });
 test('direct observations preserve actual years and decline returns no fabricated factual statements',async()=>{
- await setup(); let run=await launch('direct'); await invoke(calls,{action:'poll',run_id:String(run.runId)}); let data=await (await evidence.GET()).json(); assert.match(data.statements[0].fact,/1992–1993/); assert.doesNotMatch(data.statements[0].fact,/1991–1994/); assert.equal(data.runs[0].evidence.leads.length,0);
- await setup(); run=await launch('declined'); await invoke(calls,{action:'poll',run_id:String(run.runId)}); data=await (await evidence.GET()).json(); assert.equal(data.statements.length,0); assert.equal(data.runs[0].evidence.outcome,'human_follow_up'); assert.equal((await (await workflow.GET()).json()).workflow.assigned_role,'coordinator');
+ await setup(); let run=await launch('direct'); await invoke(calls,{action:'poll',run_id:String(run.runId)}); let data=await (await evidence.GET(authorizedRequest())).json(); assert.match(data.statements[0].fact,/1992–1993/); assert.doesNotMatch(data.statements[0].fact,/1991–1994/); assert.equal(data.runs[0].evidence.leads.length,0);
+ await setup(); run=await launch('declined'); await invoke(calls,{action:'poll',run_id:String(run.runId)}); data=await (await evidence.GET(authorizedRequest())).json(); assert.equal(data.statements.length,0); assert.equal(data.runs[0].evidence.outcome,'human_follow_up'); assert.equal((await (await workflow.GET(authorizedRequest())).json()).workflow.assigned_role,'coordinator');
 });
 test('reviews enforce real IDs, actual quotes, revisions and complete human review',async()=>{
  const db=await setup(); const {runId}=await launch(); await invoke(calls,{action:'poll',run_id:String(runId)});
@@ -71,11 +71,11 @@ test('reviews enforce real IDs, actual quotes, revisions and complete human revi
  const edit={action:'edit',statement_id:base.statement_id,expected_revision:1,fact:'The respondent managed the property from 1991 through 1996.',note:'Preserve respondent attribution.'};
  assert.equal((await invoke(workflow,edit,'reviewer')).status,201);
  assert.equal((await invoke(workflow,base,'reviewer')).status,409);
- let data=await (await evidence.GET()).json(); assert.equal(data.statements[0].status,'pending'); assert.equal(data.statements[0].revision,2);
+ let data=await (await evidence.GET(authorizedRequest())).json(); assert.equal(data.statements[0].status,'pending'); assert.equal(data.statements[0].revision,2);
  for(const s of data.statements) assert.equal((await invoke(workflow,{action:'review',statement_id:s.id,status:'accepted',expected_revision:s.revision},'reviewer')).status,201);
  // Old reviews remain durable even after more than 100 later actions.
  for(let i=0;i<101;i++) db.sqlite.prepare("INSERT INTO review_actions (statement_id,action,expected_revision,payload,reviewer_role,created_at) VALUES ('unrelated','rejected',1,'{}','reviewer','2026-09-07')").run();
- data=await (await evidence.GET()).json(); assert.equal(data.statements[0].status,'accepted'); assert.equal(data.statements[0].revision,2);
+ data=await (await evidence.GET(authorizedRequest())).json(); assert.equal(data.statements[0].status,'accepted'); assert.equal(data.statements[0].revision,2);
  assert.equal((await invoke(workflow,{action:'disposition',disposition:'PARTIALLY_RESOLVED',rationale:'Reviewed observations are supported; earlier operations still need another source.'},'reviewer')).status,201);
 });
 test('malformed profile, missing/duplicate branches, unsupported bounds and assistant quotes fail checks',()=>{
@@ -88,7 +88,7 @@ test('malformed profile, missing/duplicate branches, unsupported bounds and assi
 
 test('unfinished ingestion remains visible and blocks a new authorization after reload',async()=>{
  const db=await setup(); const {runId}=await launch(); db.failBatch=true; await invoke(calls,{action:'poll',run_id:String(runId)});
- const readiness=await (await calls.GET()).json(); assert.equal(readiness.pending_attempt.run_id,runId); assert.equal(readiness.pending_attempt.has_provider_id,true);
+ const readiness=await (await calls.GET(authorizedRequest())).json(); assert.equal(readiness.pending_attempt.run_id,runId); assert.equal(readiness.pending_attempt.has_provider_id,true);
  assert.equal((await invoke(calls,{...brief,action:'prepare'})).status,409);
 });
 test('concurrent polls commit evidence and workflow transition once',async()=>{
@@ -100,13 +100,13 @@ test('invalid extraction retains original transcript without fabricated fallback
  const db=await setup(); const {runId}=await launch(); const fixture=demoFixture('bounded');delete fixture.result.schema_version;
  db.sqlite.prepare('UPDATE call_runs SET goal_result=?,response_payload=? WHERE id=?').run(JSON.stringify(fixture.result),JSON.stringify(fixture.raw),runId);
  const result=await invoke(calls,{action:'poll',run_id:String(runId)}); assert.equal(result.data.status,'INVALID_RESULT'); assert.equal(result.data.terminal,true);
- const data=await (await evidence.GET()).json(); assert.equal(data.statements.length,0);assert.ok(data.runs[0].turns.length);assert.ok(data.runs[0].validationError);
+ const data=await (await evidence.GET(authorizedRequest())).json(); assert.equal(data.statements.length,0);assert.ok(data.runs[0].turns.length);assert.ok(data.runs[0].validationError);
 });
 test('an unverified quote cannot be accepted and open contact work prevents full resolution',async()=>{
  const db=await setup(); const {runId}=await launch();await invoke(calls,{action:'poll',run_id:String(runId)});
  db.sqlite.prepare("UPDATE ingested_statements SET evidence='Words never spoken' WHERE id=?").run(`CALLE-GOAL-${runId}-1`);
  assert.equal((await invoke(workflow,{action:'review',statement_id:`CALLE-GOAL-${runId}-1`,status:'accepted',expected_revision:1},'reviewer')).status,409);
- for(const s of (await (await evidence.GET()).json()).statements) await invoke(workflow,{action:'review',statement_id:s.id,status:s.id.endsWith('-1')?'rejected':'accepted',expected_revision:1},'reviewer');
+ for(const s of (await (await evidence.GET(authorizedRequest())).json()).statements) await invoke(workflow,{action:'review',statement_id:s.id,status:s.id.endsWith('-1')?'rejected':'accepted',expected_revision:1},'reviewer');
  await invoke(contacts,{action:'create_task',title:'Obtain source',summary:'Ask the prior manager for records about the missing years.',assignee:'Coordinator'});
  assert.equal((await invoke(workflow,{action:'disposition',disposition:'RESOLVED_BY_REVIEWER',rationale:'The reviewed evidence has been considered for the case.'},'reviewer')).status,409);
 });
@@ -117,9 +117,9 @@ test('ambiguous submission keeps its reservation; retry uses the same task/key a
  try {
   const prep=(await invoke(calls,{...brief,action:'prepare',contact_version:contact.version})).data;
   const body={...brief,action:'launch',contact_version:contact.version,authorization_version:prep.authorization_version,preview_fingerprint:prep.variables_fingerprint,preview_confirmed:true,live_confirmation:'PLACE LIVE CALL'};
-  assert.equal((await invoke(calls,body)).status,502);assert.equal((await (await calls.GET()).json()).live_call_slots_remaining,19);
+  assert.equal((await invoke(calls,body)).status,502);assert.equal((await (await calls.GET(authorizedRequest())).json()).live_call_slots_remaining,19);
   const launched=await invoke(calls,body);assert.equal(launched.status,200);assert.equal(captured[0].task,prep.task);assert.deepEqual(captured[1],captured[0]);
-  const result=await invoke(calls,{action:'poll',run_id:String(launched.data.run_id)});assert.equal(result.data.terminal,true);assert.equal(result.data.error,null);assert.equal((await (await evidence.GET()).json()).statements.length,3);
+  const result=await invoke(calls,{action:'poll',run_id:String(launched.data.run_id)});assert.equal(result.data.terminal,true);assert.equal(result.data.error,null);assert.equal((await (await evidence.GET(authorizedRequest())).json()).statements.length,3);
  }finally{globalThis.fetch=originalFetch;env.CALL_PROVIDER='fake';env.LIVE_CALLS_ENABLED='false';delete env.CALLE_API_KEY;}
 });
 

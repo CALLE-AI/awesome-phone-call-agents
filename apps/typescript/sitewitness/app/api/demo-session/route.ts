@@ -1,3 +1,4 @@
+import { privateRoute } from "../../lib/private-route";
 import { env } from "cloudflare:workers";
 import { initializeCase } from "../workflow/route";
 import {
@@ -11,7 +12,7 @@ import {
   staleDemoResponse,
 } from "../../lib/demo-session";
 
-export async function GET() {
+async function getHandler(request: Request) {
   const session = await initializeCase();
   const sessions = await demoSessions(env.DB);
   const pending = await pendingDemoCall(env.DB, session);
@@ -22,7 +23,7 @@ export async function GET() {
   });
 }
 
-export async function POST(request: Request) {
+async function postHandler(request: Request) {
   const session = await initializeCase();
   if (request.headers.get("x-demo-role") !== "coordinator")
     return Response.json(
@@ -83,3 +84,6 @@ export async function POST(request: Request) {
     archivedCaseId: session.caseId,
   });
 }
+
+export const GET = privateRoute(getHandler);
+export const POST = privateRoute(postHandler);

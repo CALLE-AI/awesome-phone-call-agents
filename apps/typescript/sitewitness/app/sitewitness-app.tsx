@@ -1,4 +1,5 @@
 "use client";
+import { redactText } from "./lib/output-privacy";
 /* eslint-disable jsx-a11y/label-has-associated-control, jsx-a11y/click-events-have-key-events, jsx-a11y/no-noninteractive-element-interactions */
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import AdvancedReview from "./advanced-review";
@@ -1069,7 +1070,7 @@ function Case({
       </div>
       <section className="caseTimeline">
         <div className="sectionHead"><div><p className="panelLabel">AUDIT HISTORY</p><h2>Case activity timeline</h2></div><button className="secondary" onClick={() => {
-          const blob = new Blob([JSON.stringify({ schema_version: "sitewitness.case.v1", exported_at: new Date().toISOString(), property: { id: "PROP-047", address: "47 Baker Street", evidence_gap_id: "GAP-DRY-001" }, workflow, tasks: followUpTasks, audit }, null, 2)], { type: "application/json" });
+          const blob = new Blob([redactText(JSON.stringify({ schema_version: "sitewitness.case.v1", exported_at: new Date().toISOString(), property: { id: "PROP-047", address: "47 Baker Street", evidence_gap_id: "GAP-DRY-001" }, workflow, tasks: followUpTasks, audit }, null, 2))], { type: "application/json" });
           const url = URL.createObjectURL(blob); const anchor = document.createElement("a"); anchor.href = url; anchor.download = "sitewitness-47-baker-integration.json"; anchor.click(); URL.revokeObjectURL(url);
         }}>Export integration JSON</button></div>
         {audit.length === 0 ? <p>No recorded activity yet.</p> : audit.map((event) => (

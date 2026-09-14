@@ -1,3 +1,4 @@
+import { privateRoute } from "../../lib/private-route";
 import { initializeCase } from "../workflow/route";
 import { env } from "cloudflare:workers";
 
@@ -15,7 +16,7 @@ async function ensureSchema() {
   await env.DB.prepare("CREATE TABLE IF NOT EXISTS ingested_statements (id TEXT PRIMARY KEY, evidence_gap_id TEXT NOT NULL, origin TEXT NOT NULL, fact TEXT NOT NULL, source TEXT NOT NULL, certainty TEXT NOT NULL, evidence TEXT NOT NULL, limitations TEXT NOT NULL, created_at TEXT NOT NULL)").run();
 }
 
-export async function GET(request: Request) {
+async function getHandler(request: Request) {
   await ensureSchema();
   const session = await initializeCase();
   const id = new URL(request.url).searchParams.get("task_id");
@@ -33,7 +34,7 @@ export async function GET(request: Request) {
   return Response.json({ task, submitted: Boolean(record), submitted_at: record?.submitted_at || null });
 }
 
-export async function POST(request: Request) {
+async function postHandler(request: Request) {
   await ensureSchema();
   const session = await initializeCase();
   if (request.headers.get("x-demo-role") !== "coordinator")
@@ -67,3 +68,6 @@ export async function POST(request: Request) {
   } catch { return Response.json({ error: "This interview has already been submitted." }, { status: 409 }); }
   return Response.json({ ok: true, submitted_at: now, statements_created: 2, workflow_status: "AWAITING_EP_REVIEW" }, { status: 201 });
 }
+
+export const GET = privateRoute(getHandler);
+export const POST = privateRoute(postHandler);

@@ -1,3 +1,4 @@
+import { privateRoute } from "../../lib/private-route";
 import { sessionMismatch, staleDemoResponse } from "../../lib/demo-session";
 import { env } from "cloudflare:workers";
 import { initializeCase } from "../workflow/route";
@@ -13,11 +14,11 @@ import {
   type SourceTask,
 } from "../../lib/case-file";
 
-export async function GET() {
+async function getHandler(request: Request) {
   const session = await initializeCase();
   return Response.json(await publicCaseFile(env.DB, session));
 }
-export async function POST(request: Request) {
+async function postHandler(request: Request) {
   const session = await initializeCase();
   if (sessionMismatch(request, session)) return staleDemoResponse();
   const role = request.headers.get("x-demo-role");
@@ -174,3 +175,6 @@ export async function POST(request: Request) {
   }
   return fail("This action is not supported.");
 }
+
+export const GET = privateRoute(getHandler);
+export const POST = privateRoute(postHandler);

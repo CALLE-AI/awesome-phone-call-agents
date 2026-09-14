@@ -1,3 +1,4 @@
+import { privateRoute } from "../../lib/private-route";
 import { initializeCase } from "../workflow/route";
 import { env } from "cloudflare:workers";
 
@@ -28,7 +29,7 @@ async function ensureResponseSchema() {
   await env.DB.prepare("CREATE INDEX IF NOT EXISTS idx_ingested_statements_gap_id ON ingested_statements(evidence_gap_id)").run();
 }
 
-export async function GET(request: Request) {
+async function getHandler(request: Request) {
   await ensureResponseSchema();
   const session = await initializeCase();
   const token = new URL(request.url).searchParams.get("token");
@@ -58,7 +59,7 @@ export async function GET(request: Request) {
   });
 }
 
-export async function POST(request: Request) {
+async function postHandler(request: Request) {
   await ensureResponseSchema();
   const session = await initializeCase();
   let body: Submission;
@@ -98,3 +99,6 @@ export async function POST(request: Request) {
   }
   return Response.json({ ok: true, submitted_at: now, statements_created: 2, workflow_status: "AWAITING_EP_REVIEW" }, { status: 201 });
 }
+
+export const GET = privateRoute(getHandler);
+export const POST = privateRoute(postHandler);

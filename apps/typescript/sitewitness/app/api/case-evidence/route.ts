@@ -1,3 +1,5 @@
+import { privateRoute } from "../../lib/private-route";
+import { publicCallStatus, publicProviderError } from "../../lib/output-privacy";
 import { demoSessions } from "../../lib/demo-session";
 import { publicCaseFile } from "../../lib/case-file-store";
 import { env } from "cloudflare:workers";
@@ -14,6 +16,7 @@ import {
   readCoverage,
   followUpSuggestion,
   emptyCoverage,
+  defaultCoverageQuote,
 } from "../../lib/case-coverage";
 import { readCaseFile } from "../../lib/case-file-store";
 
@@ -28,7 +31,7 @@ type RunRow = {
   launched_at: string | null;
   updated_at: string;
 };
-export async function GET(request?: Request) {
+async function getHandler(request: Request) {
   const archived = request
     ? new URL(request.url).searchParams.get("archive") === "1"
     : false;
@@ -122,8 +125,8 @@ export async function GET(request?: Request) {
           stored?.plan?.respondentRole?.split(",")[0] ||
           "Earlier test participant",
         provider: row.provider_mode,
-        status: row.status,
-        error: parse(row.goal_error),
+        status: publicCallStatus(row.status),
+        error: publicProviderError(row.goal_error),
         validationError,
         evidence,
         turns,
@@ -131,6 +134,9 @@ export async function GET(request?: Request) {
         plan: stored?.plan || null,
         recordedAt: row.launched_at || row.updated_at,
         knowledgeCitation: citeQuote(evidence?.knowledge_quote || "", turns),
+        suggestedCoverage: defaultCoverageQuote(evidence?.knowledge_quote || "", turns),
+        noteCitations: [...(evidence?.limitation_items || []), ...(evidence?.unknown_items || [])].map(item => citeQuote(item.quote, turns)),
+        leadCitations: (evidence?.leads || []).map(item => citeQuote(item.quote, turns)),
         terminal: Boolean(
           row.goal_error ||
           (row.goal_result &&
@@ -177,3 +183,5 @@ export async function GET(request?: Request) {
     suggestion,
   });
 }
+
+export const GET = privateRoute(getHandler);

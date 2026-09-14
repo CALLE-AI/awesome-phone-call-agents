@@ -7,3 +7,8 @@ LIVE_CALLS_ENABLED=false
 # LIVE_CALLS_ENABLED=true
 # CALLE_API_KEY=
 # CALLE_BASE_URL=https://api.heycall-e.com
+
+# Remote/production use requires BOTH values and HTTPS. Set a unique random
+# password of at least 16 characters as a server secret; never commit it.
+# SITEWITNESS_BASIC_USER=
+# SITEWITNESS_BASIC_PASSWORD=

@@ -1,3 +1,4 @@
+import { publicProviderError } from "./output-privacy.ts";
 import { demoFixture } from "./demo-fixtures.ts";
 import { CALL_EVIDENCE_SCHEMA, normalizeEvidenceResult } from "./evidence.ts";
 export type ProviderMode = "fake" | "calle_goal" | "calle_calls";
@@ -7,6 +8,35 @@ export type GoalRunLaunchRequest = { goalId: string; interviewId: string; author
 export type PublishedGoal = { id: string; title: string; status: string; runSpecId: string; runSpecVersion: number; inputSchema: Record<string, unknown>; resultSchema: Record<string, unknown> };
 export type GoalRun = { goalRunId: string; telephoneRunId: string | null; status: string; runSpecId: string | null; runSpecVersion: number | null; result: Record<string, unknown> | null; error: { code: string; message: string } | null; terminal: boolean; raw: unknown };
 export interface GoalRunProvider { readonly mode: ProviderMode; getGoal(goalId: string): Promise<PublishedGoal>; create(request: GoalRunLaunchRequest): Promise<GoalRun>; get(goalId: string, goalRunId: string): Promise<GoalRun> }
+
+const APPROVED_PROVIDER_ORIGINS = new Set(["https://api.heycall-e.com"]);
+export function approvedProviderBase(base: string): string {
+  let url: URL;
+  try { url = new URL(base); } catch { throw new Error("CALL-E requires an approved HTTPS API origin."); }
+  if (!APPROVED_PROVIDER_ORIGINS.has(url.origin) || url.protocol !== "https:" || url.username || url.password || url.pathname !== "/" || url.search || url.hash)
+    throw new Error("CALL-E requires an approved HTTPS API origin.");
+  return url.origin;
+}
+
+function providerStatus(value: unknown): string {
+  const status = String(value || "").toUpperCase();
+  return ["QUEUED", "PENDING", "CREATED", "IN_PROGRESS", "DIALING", "RINGING", "COMPLETED", "FAILED", "CANCELED", "CANCELLED"].includes(status) ? status : "UNKNOWN";
+}
+
+function credentialedFetch(request: typeof fetch): typeof fetch {
+  return async (input, init) => {
+    const url = new URL(String(input));
+    if (!APPROVED_PROVIDER_ORIGINS.has(url.origin) || url.protocol !== "https:" || url.username || url.password)
+      throw new Error("CALL-E request destination is not approved.");
+    let response: Response;
+    try { response = await request(input, { ...init, redirect: "error" }); }
+    catch { throw new Error("CALL-E request could not be completed. Check the private provider workspace."); }
+    // Fail closed even for transports that do not honor redirect: error.
+    if (response.redirected || (response.status >= 300 && response.status < 400) || (response.url && new URL(response.url).origin !== url.origin))
+      throw new Error("CALL-E redirects are not permitted.");
+    return response;
+  };
+}
 
 function object(value: unknown): Record<string, unknown> {
   if (!value || typeof value !== "object" || Array.isArray(value)) throw new Error("CALL-E returned an invalid object.");
@@ -26,28 +56,24 @@ function normalizeRun(payload: unknown): GoalRun {
   const spec = root.run_spec && typeof root.run_spec === "object" ? root.run_spec as Record<string, unknown> : {};
   const apiError = root.error && typeof root.error === "object" ? root.error as Record<string, unknown> : null;
   const result = root.result && typeof root.result === "object" && !Array.isArray(root.result) ? root.result as Record<string, unknown> : null;
-  return { goalRunId: root.id, telephoneRunId: typeof root.run_id === "string" ? root.run_id : null, status: String(root.status || "unknown").toUpperCase(), runSpecId: typeof spec.id === "string" ? spec.id : null, runSpecVersion: typeof spec.version === "number" ? spec.version : null, result, error: apiError ? { code: String(apiError.code || "call_failed"), message: String(apiError.message || "CALL-E Goal Run failed.") } : null, terminal: result !== null || apiError !== null, raw: payload };
+  return { goalRunId: root.id, telephoneRunId: typeof root.run_id === "string" ? root.run_id : null, status: providerStatus(root.status), runSpecId: typeof spec.id === "string" ? spec.id : null, runSpecVersion: typeof spec.version === "number" ? spec.version : null, result, error: publicProviderError(apiError), terminal: result !== null || apiError !== null, raw: payload };
 }
 
 export class CalleApiError extends Error {
   readonly status: number;
   readonly code: string;
   constructor(operation: string, status: number, code: string, message: string) {
-    super(`${operation} failed: ${message}`);
+    super(`${operation} failed (HTTP ${status}). Check the private CALL-E workspace.`);
     this.name = "CalleApiError";
     this.status = status;
-    this.code = code;
+    this.code = `HTTP_${status}`;
   }
 }
 
 async function jsonOrError(response: Response, operation: string): Promise<unknown> {
   const payload: unknown = await response.json().catch(() => null);
   if (!response.ok) {
-    const detail = payload && typeof payload === "object" ? payload as Record<string, unknown> : {};
-    const apiError = detail.error && typeof detail.error === "object" ? detail.error as Record<string, unknown> : detail;
-    const code = String(apiError.code || response.status);
-    const message = String(apiError.message || apiError.detail || code);
-    throw new CalleApiError(operation, response.status, code, message);
+    throw new CalleApiError(operation, response.status, "", "");
   }
   return payload;
 }
@@ -57,7 +83,7 @@ export class CalleGoalRunProvider implements GoalRunProvider {
   private readonly apiKey: string;
   private readonly baseUrl: string;
   private readonly request: typeof fetch;
-  constructor(apiKey: string, baseUrl = "https://api.heycall-e.com", request: typeof fetch = fetch) { this.apiKey = apiKey; this.baseUrl = baseUrl.replace(/\/$/, ""); this.request = request; }
+  constructor(apiKey: string, baseUrl = "https://api.heycall-e.com", request: typeof fetch = fetch) { this.apiKey = apiKey; this.baseUrl = approvedProviderBase(baseUrl); this.request = credentialedFetch(request); }
   private headers(extra: Record<string, string> = {}) { return { authorization: `Bearer ${this.apiKey}`, ...extra }; }
   async getGoal(goalId: string): Promise<PublishedGoal> {
     const response = await this.request(`${this.baseUrl}/v1/goals/${encodeURIComponent(goalId)}`, { headers: this.headers() });
@@ -76,7 +102,7 @@ export class CalleGoalRunProvider implements GoalRunProvider {
 function normalizeCall(payload: unknown, events: Record<string, unknown>[] = []): GoalRun {
   const root = object(payload);
   if (typeof root.id !== "string") throw new Error("CALL-E did not return a Call identifier.");
-  const taskStatus = String(root.status || "unknown").toUpperCase();
+  const taskStatus = providerStatus(root.status);
   let status = taskStatus;
   const result = root.structured_result && typeof root.structured_result === "object" && !Array.isArray(root.structured_result)
     ? root.structured_result as Record<string, unknown>
@@ -91,14 +117,14 @@ function normalizeCall(payload: unknown, events: Record<string, unknown>[] = [])
     // Telephone completion precedes post-call extraction. Keep polling for the result.
     const recipientsEnded = recipients.length > 0 && recipients.every((r) => {
       const lastAttempt = Array.isArray(r.attempts) ? r.attempts.at(-1) as Record<string, unknown> | undefined : undefined;
-      return ["COMPLETED", "FAILED", "CANCELED", "CANCELLED"].includes(String(r.status).toUpperCase()) || String(lastAttempt?.status).toUpperCase() === "COMPLETED";
+      return ["COMPLETED", "FAILED", "CANCELED", "CANCELLED"].includes(providerStatus(r.status)) || providerStatus(lastAttempt?.status) === "COMPLETED";
     });
     if (recipientsEnded || ["COMPLETED", "FAILED", "CANCELED", "CANCELLED"].includes(eventStatus)) status = "PROCESSING_EVIDENCE";
     else if (states.includes("IN_PROGRESS") || eventStatus === "IN_PROGRESS") status = "IN_PROGRESS";
     else if (states.includes("RINGING") || states.includes("DIALING")) status = "DIALING";
   }
   const failure = typeof root.failure_message === "string" && root.failure_message
-    ? { code: String(root.failure_code || "call_failed"), message: root.failure_message }
+    ? publicProviderError({ code: root.failure_code })
     : terminal && !result
       ? { code: "result_failed", message: "CALL-E completed the call but did not return a schema-valid structured result." }
       : null;
@@ -110,7 +136,7 @@ export class CalleCallsProvider implements GoalRunProvider {
   private readonly apiKey: string;
   private readonly baseUrl: string;
   private readonly request: typeof fetch;
-  constructor(apiKey: string, baseUrl = "https://api.heycall-e.com", request: typeof fetch = fetch) { this.apiKey = apiKey; this.baseUrl = baseUrl.replace(/\/$/, ""); this.request = request; }
+  constructor(apiKey: string, baseUrl = "https://api.heycall-e.com", request: typeof fetch = fetch) { this.apiKey = apiKey; this.baseUrl = approvedProviderBase(baseUrl); this.request = credentialedFetch(request); }
   private headers(extra: Record<string, string> = {}) { return { authorization: `Bearer ${this.apiKey}`, ...extra }; }
   async getGoal(): Promise<PublishedGoal> {
     return { ...FAKE_PUBLISHED_GOAL, id: "calls_api_v1", title: "CALL-E Calls API evidence interview", runSpecId: "calls_api_v1" };

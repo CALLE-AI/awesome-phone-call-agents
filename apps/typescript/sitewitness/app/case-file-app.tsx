@@ -1,5 +1,6 @@
 "use client";
 import Link from "next/link";
+import { redactText } from "./lib/output-privacy";
 
 import {
   useCallback,
@@ -18,7 +19,6 @@ import {
 } from "./lib/case-file";
 import { INTERVIEW_BRANCHES } from "./lib/call-instructions";
 import {
-  citeQuote,
   type EvidenceRecord,
   type Citation,
   type TranscriptTurn,
@@ -31,7 +31,6 @@ import {
   yearsInText,
   emptyCoverage,
   coverageQuoteCitation,
-  defaultCoverageQuote,
   type CaseCoverage,
 } from "./lib/case-coverage";
 import "./case-file.css";
@@ -70,6 +69,9 @@ type Run = {
   plan: GoalPlan | null;
   recordedAt: string;
   knowledgeCitation: Citation;
+  suggestedCoverage: { quote: string; sourceTurnId: string };
+  noteCitations: Citation[];
+  leadCitations: Citation[];
   terminal: boolean;
 };
 type EvidenceData = {
@@ -413,10 +415,7 @@ export default function CaseFileApp() {
   const savedRunCoverage = evidence.coverage.records.find(
     (record) => record.runId === selectedRun?.id,
   );
-  const suggestedQuote = defaultCoverageQuote(
-    savedRunCoverage?.quote || selectedRun?.evidence?.knowledge_quote || "",
-    selectedRun?.turns || [],
-  );
+  const suggestedQuote = selectedRun?.suggestedCoverage || { quote: "", sourceTurnId: "" };
   const coverageForm = {
     runId: selectedRun?.id || 0,
     quote: savedRunCoverage?.quote || suggestedQuote.quote,
@@ -601,7 +600,7 @@ export default function CaseFileApp() {
   const exportEvidence = () => {
     const blob = new Blob(
       [
-        JSON.stringify(
+        redactText(JSON.stringify(
           {
             caseId: session?.caseId,
             original_sources: SOURCE_RECORDS,
@@ -621,7 +620,7 @@ export default function CaseFileApp() {
           },
           null,
           2,
-        ),
+        )),
       ],
       { type: "application/json" },
     );
@@ -1719,9 +1718,9 @@ export default function CaseFileApp() {
                   <p key={i}>
                     <strong>{item.label}:</strong> {item.text}{" "}
                     <CitationButton
-                      citation={citeQuote(item.quote, selectedRun.turns)}
+                      citation={selectedRun.noteCitations[i]}
                       onClick={() =>
-                        showQuote(citeQuote(item.quote, selectedRun.turns))
+                        showQuote(selectedRun.noteCitations[i])
                       }
                     />
                   </p>
@@ -1730,9 +1729,9 @@ export default function CaseFileApp() {
                   <p key={i}>
                     <strong>Named lead:</strong> {lead.name} — {lead.reason}{" "}
                     <CitationButton
-                      citation={citeQuote(lead.quote, selectedRun.turns)}
+                      citation={selectedRun.leadCitations[i]}
                       onClick={() =>
-                        showQuote(citeQuote(lead.quote, selectedRun.turns))
+                        showQuote(selectedRun.leadCitations[i])
                       }
                     />
                   </p>

@@ -1,6 +1,6 @@
 import { sites } from "@openai/sites-vite-plugin";
 import vinext from "vinext";
-import { defineConfig } from "vite";
+import { defineConfig, type ResolvedConfig } from "vite";
 import hostingConfig from "./.openai/hosting.json";
 
 const SITE_CREATOR_PLACEHOLDER_DATABASE_ID =
@@ -44,10 +44,17 @@ export default defineConfig(async () => {
   const { cloudflare } = await import("@cloudflare/vite-plugin");
 
   return {
-    server: isCodexSeatbeltSandbox
-      ? { watch: { useFsEvents: false, usePolling: true } }
-      : undefined,
+    // The unauthenticated development bypass is safe only on loopback.
+    server: { host: "127.0.0.1", ...(isCodexSeatbeltSandbox ? { watch: { useFsEvents: false, usePolling: true } } : {}) },
+    preview: { host: "127.0.0.1" },
     plugins: [
+      {
+        name: "sitewitness-loopback-only",
+        configResolved(config: ResolvedConfig) {
+          if (config.command === "serve" && config.server.host !== "127.0.0.1")
+            throw new Error("The unauthenticated development server must bind to 127.0.0.1. Use an authenticated HTTPS production deployment for remote access.");
+        },
+      },
       vinext(),
       sites(),
       cloudflare({

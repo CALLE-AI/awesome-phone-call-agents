@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
-import { database, env } from './helpers/route-runtime.mjs';
+import { database, env, authorizedRequest } from './helpers/route-runtime.mjs';
 import { demoFixture } from '../app/lib/demo-fixtures.ts';
 import { CalleCallsProvider, FakeGoalRunProvider } from '../app/lib/call-provider.ts';
 import { Miniflare } from 'miniflare';
@@ -12,9 +12,9 @@ const coverage = await import('../app/api/case-coverage/route.ts');
 const demo = await import('../app/api/demo-session/route.ts');
 const human = await import('../app/api/human-interview/route.ts');
 const respondent = await import('../app/api/respondent/route.ts');
-const get = async route => (await route.GET()).json();
+const get = async route => (await route.GET(authorizedRequest())).json();
 async function post(route, session, body, role='coordinator') {
- const response = await route.POST(new Request('http://demo.test/api', {method:'POST', headers:{'content-type':'application/json','x-demo-role':role,...(session ? {'x-demo-case':session.caseId} : {})},body:JSON.stringify(body)}));
+ const response = await route.POST(authorizedRequest('http://demo.test/api', {method:'POST', headers:{'content-type':'application/json','x-demo-role':role,...(session ? {'x-demo-case':session.caseId} : {})},body:JSON.stringify(body)}));
  return {status:response.status,data:await response.json()};
 }
 async function setup() { env.CALL_PROVIDER='fake';env.LIVE_CALLS_ENABLED='false';delete env.CALLE_API_KEY;const db=database();const {session}=await get(workflow);await get(calls);return {db,session}; }
@@ -29,7 +29,7 @@ async function prepare(session,person,scenario='direct') {
 }
 function launch(session,person,preview) {return post(calls,session,{...base(session),action:'launch',contact_id:person.id,contact_version:person.version,authorization_version:preview.authorization_version,preview_fingerprint:preview.variables_fingerprint,preview_confirmed:true,live_confirmation:'PLACE LIVE CALL'});}
 const restart = session => post(demo,session,{action:'start_new_demo',expectedCaseId:session.caseId});
-const archived = async session => (await evidence.GET(new Request(`http://demo.test/api/case-evidence?archive=1&case=${session.caseId}`))).json();
+const archived = async session => (await evidence.GET(authorizedRequest(`http://demo.test/api/case-evidence?archive=1&case=${session.caseId}`))).json();
 async function finish(session,person) {
  const preview=await prepare(session,person);const started=await launch(session,person,preview);assert.equal(started.status,200,JSON.stringify(started.data));
  assert.equal((await post(calls,session,{action:'poll',run_id:String(started.data.run_id)})).status,200);

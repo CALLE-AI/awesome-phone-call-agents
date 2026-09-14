@@ -117,7 +117,17 @@ Tests use isolated in-memory SQLite and mocked HTTP responses. A Miniflare D1 re
 
 Main files: `app/case-file-app.tsx` (demo), `app/api/case-file/route.ts` (contacts/tasks), `app/api/calle/route.ts` (authorization, submissions and recovery), `app/api/case-evidence/route.ts` (evidence), and `app/lib/call-provider.ts` (adapters). New contact/task and processing state uses append-only events in the existing database; no schema migration is needed. Existing source schemas and migrations remain in `db/` and `drizzle/`.
 
-This is a local presentation MVP with synthetic case records and a demo role selector, not production authentication.
+This is a local presentation MVP. **Demo role is a workflow selector, not authorization.** All contact, call, evidence, review, workflow, respondent and history APIs require the access boundary described below, even in synthetic mode.
+
+## Private access and output
+
+`npm run dev` binds to `127.0.0.1`; the unauthenticated convenience path exists only in development and requires a loopback request; only the local runtime’s matching host/loopback metadata is allowed. Do not expose that development server through a tunnel or reverse proxy. Cross-origin browser requests are rejected. Changing `x-demo-role` cannot grant access. Production builds deny private access by default, including archived real calls after switching to fake mode.
+
+For remote access, configure both `SITEWITNESS_BASIC_USER` and `SITEWITNESS_BASIC_PASSWORD` as server-side secrets and serve the production Worker over HTTPS. Use a unique random password of at least 16 characters. Configuring either setting disables the local bypass; incomplete settings fail closed. The browser's Basic authentication prompt protects the workspace. This is shared operator access, not separate reviewer accounts or a production identity system. Never send the password over HTTP or include it in a URL, source code, or a public submission.
+
+CALL-E bearer credentials are sent only to the exact approved origin `https://api.heycall-e.com`. Alternate hosts, HTTP, embedded URL credentials, nondefault ports, base paths and query strings are rejected before a request. Credentialed requests never follow redirects, including status/event polling. An alternate provider origin requires a deliberate reviewed code change.
+
+Private originals remain in local storage for quotation matching, review validation and call recovery. API responses, displayed transcripts/evidence, nested audit notes and JSON/Markdown exports mask phone numbers; provider errors use application-written messages. Masking does not prove evidence: citations are computed against the original private text first. To review a masked quotation, select its original respondent turn; ambiguous masked matches are rejected. Existing saved records are masked on read without rewriting or accepting evidence. `.dev.vars` and `.wrangler/` remain private and must not be uploaded.
 
 ## Live-call side effects and cancellation
 

@@ -1,3 +1,5 @@
+import { privateRoute } from "../../lib/private-route";
+import { publicCallStatus, publicProviderError } from "../../lib/output-privacy";
 import {
   sessionMismatch,
   staleDemoResponse,
@@ -29,6 +31,7 @@ import {
 } from "../../lib/evidence";
 import {
   CalleApiError,
+  approvedProviderBase,
   CalleCallsProvider,
   CalleGoalRunProvider,
   FakeGoalRunProvider,
@@ -126,6 +129,8 @@ async function ensureLocalCallCompatibility(db: D1Database) {
 
 function configuration() {
   const e = runtime();
+  let approvedOrigin = false;
+  try { approvedProviderBase(e.CALLE_BASE_URL || "https://api.heycall-e.com"); approvedOrigin = true; } catch { /* Fail before preview or reservation. */ }
   const mode: ProviderMode =
     e.CALL_PROVIDER === "calle_calls"
       ? "calle_calls"
@@ -142,7 +147,7 @@ function configuration() {
           : e.CALLE_GOAL_ID || "",
     configured:
       mode === "fake" ||
-      Boolean(e.CALLE_API_KEY && (mode === "calle_calls" || e.CALLE_GOAL_ID)),
+      Boolean(approvedOrigin && e.CALLE_API_KEY && (mode === "calle_calls" || e.CALLE_GOAL_ID)),
     liveCallsEnabled: e.LIVE_CALLS_ENABLED === "true",
   };
 }
@@ -317,6 +322,7 @@ async function recordGoalError(
   token: string,
   session: DemoSession,
 ) {
+  error = publicProviderError(error)!;
   const next =
     error.code === "declined"
       ? "The respondent declined. Choose a human or written follow-up only if appropriate."
@@ -339,7 +345,7 @@ async function recordGoalError(
   ]);
 }
 
-export async function GET() {
+async function getHandler(request: Request) {
   const e = runtime();
   const session = await initializeCase();
   await ensureLocalCallCompatibility(e.DB);
@@ -395,7 +401,7 @@ export async function GET() {
         ...JSON.parse(pending.request_payload),
         authorization_version: pending.authorization_version,
         run_id: pending.id,
-        status: pending.status,
+        status: publicCallStatus(pending.status),
         has_provider_id: Boolean(pending.goal_run_id),
       }
     : null;
@@ -421,7 +427,7 @@ export async function GET() {
   });
 }
 
-export async function POST(request: Request) {
+async function postHandler(request: Request) {
   const e = runtime();
   const session = await initializeCase();
   if (sessionMismatch(request, session)) return staleDemoResponse();
@@ -672,7 +678,7 @@ export async function POST(request: Request) {
         ok: true,
         duplicate: true,
         run_id: row.id,
-        status: row.status,
+        status: publicCallStatus(row.status),
       });
     const stored = JSON.parse(row.request_payload) as StoredPreview;
     if (
@@ -753,7 +759,7 @@ export async function POST(request: Request) {
           ok: true,
           duplicate: true,
           run_id: duplicate.id,
-          status: duplicate.status,
+          status: publicCallStatus(duplicate.status),
         });
       const allowance = await e.DB.prepare(
         "SELECT COUNT(*) AS used FROM call_runs WHERE provider_mode IN ('calle_goal','calle_calls') AND live_call_budget_reserved_at IS NOT NULL",
@@ -795,7 +801,7 @@ export async function POST(request: Request) {
             ok: true,
             duplicate: true,
             run_id: confirmed.id,
-            status: confirmed.status,
+            status: publicCallStatus(confirmed.status),
           });
         if (
           live &&
@@ -906,10 +912,10 @@ export async function POST(request: Request) {
       return Response.json({
         ok: true,
         run_id: row.id,
-        status: row.status,
+        status: publicCallStatus(row.status),
         terminal: true,
         result_ready: Boolean(row.goal_result),
-        error: row.goal_error ? JSON.parse(row.goal_error) : null,
+        error: publicProviderError(row.goal_error),
       });
     if (row.provider_mode !== config.mode)
       return failure(
@@ -946,7 +952,7 @@ export async function POST(request: Request) {
       return Response.json({
         ok: true,
         run_id: row.id,
-        status: row.status,
+        status: publicCallStatus(row.status),
         terminal: false,
         result_ready: false,
         checking_elsewhere: true,
@@ -957,7 +963,7 @@ export async function POST(request: Request) {
         "status" | "raw" | "result" | "error" | "terminal" | "telephoneRunId"
       > = row.goal_result
         ? {
-            status: row.status,
+            status: publicCallStatus(row.status),
             raw: row.response_payload ? JSON.parse(row.response_payload) : null,
             result: JSON.parse(row.goal_result),
             error: null,
@@ -1070,3 +1076,6 @@ export async function POST(request: Request) {
     400,
   );
 }
+
+export const GET = privateRoute(getHandler);
+export const POST = privateRoute(postHandler);

@@ -2,7 +2,11 @@ import { DatabaseSync } from 'node:sqlite';
 import { registerHooks } from 'node:module';
 import { existsSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
-export const env = { CALL_PROVIDER: 'fake', LIVE_CALLS_ENABLED: 'false' };
+export const env = { CALL_PROVIDER: 'fake', LIVE_CALLS_ENABLED: 'false', SITEWITNESS_BASIC_USER: 'test-reviewer', SITEWITNESS_BASIC_PASSWORD: 'test-password-not-a-real-secret' };
+export function authorizedRequest(url = 'https://demo.test/api', init = {}) {
+  const target = new URL(url); target.protocol = 'https:';
+  return new Request(target, { ...init, headers: { authorization: 'Basic ' + Buffer.from(env.SITEWITNESS_BASIC_USER + ':' + env.SITEWITNESS_BASIC_PASSWORD).toString('base64'), ...init.headers } });
+}
 globalThis.__sitewitnessTestEnv = env;
 registerHooks({ resolve(specifier, context, next) {
   if (specifier === 'cloudflare:workers') return { url: 'data:text/javascript,export const env=globalThis.__sitewitnessTestEnv;', shortCircuit: true };
@@ -29,6 +33,6 @@ export function database() {
   env.DB=db; return db;
 }
 export async function invoke(route, body, role='coordinator') {
-  const response = await route.POST(new Request('http://demo.test/api', { method:'POST', headers:{'content-type':'application/json','x-demo-role':role}, body:JSON.stringify(body) }));
+  const response = await route.POST(authorizedRequest('https://demo.test/api', { method:'POST', headers:{'content-type':'application/json','x-demo-role':role}, body:JSON.stringify(body) }));
   return { status: response.status, data: await response.json() };
 }

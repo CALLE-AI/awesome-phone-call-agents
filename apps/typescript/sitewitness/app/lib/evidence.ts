@@ -210,7 +210,7 @@ function text(value: unknown, maximum = 1600): string {
 function choice(value: unknown, values: readonly string[]) {
   const result = text(value);
   if (!values.includes(result))
-    throw new Error(`Unsupported evidence classification: ${result}`);
+    throw new Error("Unsupported evidence classification.");
   return result;
 }
 function list<T>(

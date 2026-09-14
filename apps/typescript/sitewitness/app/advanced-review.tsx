@@ -1,4 +1,5 @@
 "use client";
+import { redactText } from "./lib/output-privacy";
 /* eslint-disable jsx-a11y/no-noninteractive-element-to-interactive-role */
 
 import {
@@ -303,7 +304,7 @@ export default function AdvancedReview(p: Props) {
             2,
           )
         : `# SiteWitness evidence packet\n\n${disclaimer}\n\n## Human disposition\n\n${saved ? `${saved.disposition}: ${saved.rationale}` : "Not yet saved."}\n\n## Reviewed factual statements\n\n${accepted.map((s) => `- **${s.id}** ${s.fact}\n  - Source: ${s.source}; certainty: ${s.certainty}\n  - Evidence: respondent transcript turn ${s.turn}`).join("\n") || "No statements have been accepted or edited."}`;
-    const blob = new Blob([value], {
+    const blob = new Blob([redactText(value)], {
       type: format === "json" ? "application/json" : "text/markdown",
     });
     const url = URL.createObjectURL(blob);

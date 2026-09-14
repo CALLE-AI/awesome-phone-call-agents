@@ -1,3 +1,6 @@
+import { privateRoute } from "../../lib/private-route";
+import { publicCallStatus, publicProviderError, redactText } from "../../lib/output-privacy";
+import { resolvePrivateQuote } from "../../lib/private-quote";
 import { env } from "cloudflare:workers";
 import {
   readDemoSession,
@@ -158,7 +161,7 @@ export async function initializeCase() {
     .run();
   return session;
 }
-export async function GET() {
+async function getHandler(request: Request) {
   return Response.json(await readWorkflow(await initializeCase()));
 }
 export async function readWorkflow(session: DemoSession) {
@@ -262,7 +265,7 @@ export async function readWorkflow(session: DemoSession) {
     latest_call: latestCall
       ? {
           id: latestCall.id,
-          status: latestCall.status,
+          status: publicCallStatus(latestCall.status),
           terminal:
             Boolean(latestCall.goal_result || latestCall.goal_error) ||
             [
@@ -272,14 +275,14 @@ export async function readWorkflow(session: DemoSession) {
               "CANCELLED",
               "INVALID_RESULT",
             ].includes(latestCall.status),
-          goal_error: latestCall.goal_error,
+          goal_error: latestCall.goal_error ? JSON.stringify(publicProviderError(latestCall.goal_error)) : null,
           updated_at: latestCall.updated_at,
         }
       : null,
     latest_transcript: latestTranscript,
   };
 }
-export async function POST(request: Request) {
+async function postHandler(request: Request) {
   const session = await initializeCase();
   if (sessionMismatch(request, session)) return staleDemoResponse();
   const role = request.headers.get("x-demo-role");
@@ -717,6 +720,9 @@ export async function POST(request: Request) {
     );
   }
   if (body.action === "edit") {
+    const secrets = [String(env.CALLE_API_KEY || ""), String(env.SITEWITNESS_BASIC_PASSWORD || "")];
+    if (currentStatement && body.evidence_quote === redactText(currentStatement.evidence, secrets))
+      body.evidence_quote = currentStatement.evidence;
     if (
       body.evidence_quote !== undefined &&
       body.evidence_quote !== currentStatement?.evidence
@@ -729,6 +735,12 @@ export async function POST(request: Request) {
             .bind(runId, session.interviewId)
             .first<{ response_payload: string }>()
         : null;
+      if (run && typeof body.evidence_quote === "string") {
+        const original = resolvePrivateQuote(body.evidence_quote,
+          extractTranscript(JSON.parse(run.response_payload || "{}"), Number(runId)), "", [], secrets);
+        if (original === null) return error("QUOTE_NOT_VERIFIED", "Choose one unambiguous original respondent quotation.", 409);
+        body.evidence_quote = original;
+      }
       if (
         typeof body.evidence_quote !== "string" ||
         body.evidence_quote.length > 2000 ||
@@ -912,3 +924,6 @@ export async function POST(request: Request) {
     400,
   );
 }
+
+export const GET = privateRoute(getHandler);
+export const POST = privateRoute(postHandler);

@@ -1,3 +1,4 @@
+import { privateRoute } from "../../lib/private-route";
 import { sessionMismatch, staleDemoResponse } from "../../lib/demo-session";
 import { env } from "cloudflare:workers";
 import { initializeCase } from "../workflow/route";
@@ -10,8 +11,9 @@ import {
   yearsInText,
 } from "../../lib/case-coverage";
 import { extractTranscript } from "../../lib/evidence";
+import { resolvePrivateQuote } from "../../lib/private-quote";
 
-export async function POST(request: Request) {
+async function postHandler(request: Request) {
   const session = await initializeCase();
   if (sessionMismatch(request, session)) return staleDemoResponse();
   const fail = (message: string, status = 422) =>
@@ -58,19 +60,26 @@ export async function POST(request: Request) {
   )
     return fail("Explain the year correction in 10 to 1,000 characters.");
   const run = await env.DB.prepare(
-    "SELECT id, response_payload FROM call_runs WHERE id = ? AND interview_id = ? AND goal_result IS NOT NULL AND goal_error IS NULL AND EXISTS (SELECT 1 FROM audit_events WHERE entity_id = 'CALL-EVIDENCE-' || call_runs.id)",
+    "SELECT id, response_payload, goal_result FROM call_runs WHERE id = ? AND interview_id = ? AND goal_result IS NOT NULL AND goal_error IS NULL AND EXISTS (SELECT 1 FROM audit_events WHERE entity_id = 'CALL-EVIDENCE-' || call_runs.id)",
   )
     .bind(body.runId, session.interviewId)
-    .first<{ id: number; response_payload: string | null }>();
+    .first<{ id: number; response_payload: string | null; goal_result: string }>();
   if (!run)
     return fail(
       "A completed, processed interview in this case is required.",
       409,
     );
+  const turns = extractTranscript(JSON.parse(run.response_payload || "{}"), run.id);
+  const returned = JSON.parse(run.goal_result);
+  const originalQuote = resolvePrivateQuote(body.quote, turns, sourceTurnId,
+    typeof returned.knowledge_period?.quote === "string" ? [returned.knowledge_period.quote] : [],
+    [String(env.CALLE_API_KEY || ""), String(env.SITEWITNESS_BASIC_PASSWORD || "")]);
+  if (!originalQuote) return fail("Select one original respondent answer before saving this redacted quotation.");
+  body.quote = originalQuote;
   if (
     coverageQuoteCitation(
       body.quote,
-      extractTranscript(JSON.parse(run.response_payload || "{}"), run.id),
+      turns,
       sourceTurnId,
     ).status !== "matched"
   )
@@ -140,3 +149,5 @@ export async function POST(request: Request) {
     coverage: await readCoverage(env.DB, mode, session),
   });
 }
+
+export const POST = privateRoute(postHandler);

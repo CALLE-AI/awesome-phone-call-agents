@@ -9,7 +9,7 @@ const request = { goalId: "goal-phase1", interviewId: "INT-047", authorizationVe
 
 test("call attempt progress overrides a stale queued task without prematurely ending extraction", async () => {
   for (const [attempt, expected] of [["in_progress", "IN_PROGRESS"], ["completed", "PROCESSING_EVIDENCE"]]) {
-    const provider = new CalleCallsProvider("test", "https://mock.invalid", async (url) => Response.json(url.includes("/events")
+    const provider = new CalleCallsProvider("test", "https://api.heycall-e.com", async (url) => Response.json(url.includes("/events")
       ? { data: [], next_cursor: null }
       : { id: "call_test", status: "queued", recipients: [{ status: "queued", attempts: [{ status: attempt }] }], structured_result: null }));
     const result = await provider.get("", "call_test");
@@ -20,11 +20,11 @@ test("call attempt progress overrides a stale queued task without prematurely en
 });
 
 test("event progress advances a stale snapshot and event failures preserve snapshot progress", async () => {
-  const provider = new CalleCallsProvider("test", "https://mock.invalid", async (url) => Response.json(url.includes("/events")
+  const provider = new CalleCallsProvider("test", "https://api.heycall-e.com", async (url) => Response.json(url.includes("/events")
     ? { data: [{ status: "in_progress" }], next_cursor: null }
     : { id: "call_test", status: "queued", recipients: [] }));
   assert.equal((await provider.get("", "call_test")).status, "IN_PROGRESS");
-  const unavailable = new CalleCallsProvider("test", "https://mock.invalid", async (url) => {
+  const unavailable = new CalleCallsProvider("test", "https://api.heycall-e.com", async (url) => {
     if (url.includes("/events")) throw new Error("network unavailable");
     return Response.json({ id: "call_test", status: "in_progress", recipients: [] });
   });
@@ -33,7 +33,7 @@ test("event progress advances a stale snapshot and event failures preserve snaps
 
 test("completed calls retain evidence and stop requesting progress events", async () => {
   let requests = 0;
-  const provider = new CalleCallsProvider("test", "https://mock.invalid", async () => {
+  const provider = new CalleCallsProvider("test", "https://api.heycall-e.com", async () => {
     requests++;
     return Response.json({ id: "call_test", status: "completed", structured_result: { factual_statements: "Observed equipment" } });
   });
@@ -61,10 +61,10 @@ test("CALL-E Goal Run adapter sends only phone and scalar variables", async () =
     captured = { url, init };
     return Response.json({ id: "goal-run-test", run_id: "telephone-run-test", status: "in_progress", run_spec: { id: "rspec-v1", version: 1 }, result: null, error: null }, { status: 201 });
   };
-  const provider = new CalleGoalRunProvider("secret-test-key", "https://mock.invalid", mockFetch);
+  const provider = new CalleGoalRunProvider("secret-test-key", "https://api.heycall-e.com", mockFetch);
   const result = await provider.create(request);
   assert.equal(result.goalRunId, "goal-run-test");
-  assert.equal(captured.url, "https://mock.invalid/v1/goals/goal-phase1/runs");
+  assert.equal(captured.url, "https://api.heycall-e.com/v1/goals/goal-phase1/runs");
   assert.equal(captured.init.headers["idempotency-key"], "sitewitness:INT-047:3");
   assert.equal(captured.init.headers.authorization, "Bearer secret-test-key");
   const payload = JSON.parse(captured.init.body);
@@ -74,7 +74,7 @@ test("CALL-E Goal Run adapter sends only phone and scalar variables", async () =
 
 test("Goal Run remains active until result or error is present", async () => {
   let responsePayload = { id: "gr-1", run_id: "run-1", status: "completed", run_spec: { id: "rspec-v1", version: 1 }, result: null, error: null };
-  const provider = new CalleGoalRunProvider("key", "https://mock.invalid", async () => Response.json(responsePayload));
+  const provider = new CalleGoalRunProvider("key", "https://api.heycall-e.com", async () => Response.json(responsePayload));
   assert.equal((await provider.get("goal-1", "gr-1")).terminal, false);
   responsePayload = { ...responsePayload, result: { outcome: "bounded" } };
   assert.equal((await provider.get("goal-1", "gr-1")).terminal, true);
@@ -86,11 +86,11 @@ test("CALL-E Calls adapter requests structured evidence and preserves transcript
     captured = { url, init };
     return Response.json({ id: "call_test", status: "queued", structured_result: null, recipients: [] }, { status: 201 });
   };
-  const provider = new CalleCallsProvider("secret-test-key", "https://mock.invalid", mockFetch);
+  const provider = new CalleCallsProvider("secret-test-key", "https://api.heycall-e.com", mockFetch);
   const created = await provider.create(request);
   assert.equal(created.goalRunId, "call_test");
   assert.equal(created.terminal, false);
-  assert.equal(captured.url, "https://mock.invalid/v1/calls");
+  assert.equal(captured.url, "https://api.heycall-e.com/v1/calls");
   const payload = JSON.parse(captured.init.body);
   assert.deepEqual(payload.recipients, [{ phones: [request.phone] }]);
   assert.deepEqual(payload.result_schema, CALL_EVIDENCE_SCHEMA);
