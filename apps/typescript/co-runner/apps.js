@@ -1,12 +1,57 @@
 const LANGUAGE_TO_RECIPIENT = {
     English:  { region: "IN", locale: "en-IN", code: "+91" },
     Hindi:    { region: "IN", locale: "hi-IN", code: "+91" },
-    Tamil:    { region: "IN", locale: "ta-IN", code: "+91" },
     German:   { region: "DE", locale: "de-DE", code: "+49" },
     Spanish:  { region: "ES", locale: "es-ES", code: "+34" },
     French:   { region: "FR", locale: "fr-FR", code: "+33" },
     Japanese: { region: "JP", locale: "ja-JP", code: "+81" }
+    // stuck at "queued" and never executed — treating it as unsupported in
+    // practice until that's resolved on their end.
 };
+
+// Only this exact origin is ever sent the API key. If CALLE_CONFIG.BASE_URL
+// in config.js is ever misconfigured, corrupted, or pointed somewhere else
+// (accidentally or maliciously), requests are refused rather than silently
+// leaking the Authorization header to an unapproved host.
+const APPROVED_CALLE_BASE_URL = "https://api.heycall-e.com";
+
+// --- Known limitations of this app (documented, not silently assumed) ---
+// 1. Storage: call history lives in this browser's localStorage. That is
+//    NOT encrypted and NOT a secure secret store — anyone with access to
+//    this browser profile (or an XSS bug) can read it. Don't rely on it
+//    for anything sensitive.
+// 2. Language: selecting a locale tells CALL-E which language to *attempt*
+//    on the call. It is not a guarantee the agent will speak flawlessly,
+//    nor that the recipient will respond in kind — always check
+//    `task_completed` rather than assuming success from language selection.
+// 3. Cancellation: CALL-E's public API reference does not document an
+//    endpoint to cancel/stop an in-progress call. There is no "hang up"
+//    button in this app because there is nothing reliable to wire it to.
+//    If a call needs to be stopped, that has to happen from CALL-E's own
+//    dashboard, not from here.
+// 4. Ambiguous outcomes: if a call is still queued/in_progress after 90s
+//    of polling, this app STOPS polling and reports it as unresolved
+//    rather than guessing or waiting indefinitely. That's a deliberate
+//    stop, not a bug — check the CALL-E dashboard for the real outcome.
+// 5. Not for high-stakes or urgent use: outcomes aren't guaranteed, calls
+//    can fail or hang, and there is no cancellation path. Do not use this
+//    for emergencies, time-critical, or high-stakes calls.
+
+// Escapes text before it's ever inserted via innerHTML, so stored task
+// text, phone numbers, IDs, or API-returned evidence can never be
+// interpreted as HTML/script — even though today it's all same-origin data.
+function escapeHtml(str) {
+    return String(str ?? '').replace(/[&<>"']/g, (c) => ({
+        '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;'
+    }[c]));
+}
+
+// Masks a phone number for display so a shared screenshot/recording of the
+// history screen doesn't expose the full destination number.
+function maskPhone(phone) {
+    if (!phone || phone.length < 6) return phone || '';
+    return phone.slice(0, 3) + '•'.repeat(Math.max(phone.length - 6, 3)) + phone.slice(-3);
+}
 
 window.addEventListener('DOMContentLoaded', () => {
     const mainMenuScreen = document.getElementById('mainMenuScreen');
@@ -26,34 +71,42 @@ window.addEventListener('DOMContentLoaded', () => {
     const englishPrompt = document.getElementById('englishPrompt');
     const historyList = document.getElementById('historyList');
 
-    function updatePhonePrefix() {
+    // Only prefills the country code when the field is EMPTY. It never
+    // rewrites a number the user has already entered — a business's phone
+    // number must not silently change just because a different language
+    // was picked afterward. If the code doesn't match the new language's
+    // country, that's now the user's call to notice and fix, not something
+    // this app does invisibly for them.
+    function prefillPhonePrefix() {
         const selectedLang = targetLanguageDropdown.value;
         const config = LANGUAGE_TO_RECIPIENT[selectedLang];
-        if (config) {
-            const currentVal = targetPhoneInput.value.trim();
-            const hasExistingCode = Object.values(LANGUAGE_TO_RECIPIENT).some(l => currentVal.startsWith(l.code));
-            
-            if (currentVal === "" || !hasExistingCode) {
-                targetPhoneInput.value = config.code;
-            } else {
-                for (let lang in LANGUAGE_TO_RECIPIENT) {
-                    if (currentVal.startsWith(LANGUAGE_TO_RECIPIENT[lang].code)) {
-                        targetPhoneInput.value = currentVal.replace(LANGUAGE_TO_RECIPIENT[lang].code, config.code);
-                        break;
-                    }
-                }
-            }
+        if (config && targetPhoneInput.value.trim() === "") {
+            targetPhoneInput.value = config.code;
         }
     }
 
-    targetLanguageDropdown.addEventListener('change', updatePhonePrefix);
+    targetLanguageDropdown.addEventListener('change', prefillPhonePrefix);
+
+    // Credential-free preview: if config.js is missing or still has
+    // placeholder values, the UI still loads and is fully browsable —
+    // only actually dialing requires real credentials.
+    function isConfigReady() {
+        return typeof CALLE_CONFIG !== 'undefined'
+            && CALLE_CONFIG.API_KEY && !CALLE_CONFIG.API_KEY.startsWith('PASTE_')
+            && CALLE_CONFIG.BASE_URL === APPROVED_CALLE_BASE_URL;
+    }
+
+    const previewBanner = document.getElementById('previewBanner');
+    if (previewBanner && !isConfigReady()) {
+        previewBanner.style.display = 'block';
+    }
 
     if (newCallBtn) {
         newCallBtn.addEventListener('click', () => {
             mainMenuScreen.style.display = 'none';
             newCallScreen.style.display = 'block';
             statusLog.innerText = "";
-            updatePhonePrefix();
+            prefillPhonePrefix();
         });
     }
 
@@ -93,10 +146,10 @@ window.addEventListener('DOMContentLoaded', () => {
                 <div style="display: flex; align-items: flex-start; gap: 8px;">
                     <input type="checkbox" class="history-checkbox" data-index="${index}" style="margin-top: 4px;">
                     <div class="history-content" data-index="${index}" style="cursor: pointer; flex: 1;">
-                        <b>ID:</b> ${call.id} | <b>Status:</b> ${call.status || 'unknown'}<br>
-                        <b>Lang:</b> ${call.language} | <b>Phone:</b> ${call.phone}<br>
-                        <b>Task:</b> ${call.task}<br>
-                        <span style="color: #888; font-size: 11px;">${call.time}</span>
+                        <b>ID:</b> ${escapeHtml(call.id)} | <b>Status:</b> ${escapeHtml(call.status || 'unknown')}<br>
+                        <b>Lang:</b> ${escapeHtml(call.language)} | <b>Phone:</b> ${escapeHtml(maskPhone(call.phone))}<br>
+                        <b>Task:</b> ${escapeHtml(call.task)}<br>
+                        <span style="color: #888; font-size: 11px;">${escapeHtml(call.time)}</span>
                     </div>
                 </div>
             </div>
@@ -107,7 +160,9 @@ window.addEventListener('DOMContentLoaded', () => {
                 const idx = parseInt(el.getAttribute('data-index'), 10);
                 const currentHistory = JSON.parse(localStorage.getItem('co_runner_calls') || '[]');
                 const call = currentHistory[idx];
-                replyLogContent.innerText = call.reply || 'No reply captured for this call yet.';
+                // textContent, not innerHTML — the reply text comes from
+                // CALL-E's API and must never be interpreted as markup.
+                replyLogContent.textContent = call.reply || 'No reply captured for this call yet.';
                 replyLogBox.style.display = 'block';
             });
         });
@@ -149,8 +204,16 @@ window.addEventListener('DOMContentLoaded', () => {
             while (Date.now() < deadline) {
                 await new Promise(r => setTimeout(r, intervalMs));
                 try {
-                    const res = await fetch(`${CALLE_CONFIG.BASE_URL}/v1/calls/${callId}`, {
-                        headers: { 'Authorization': `Bearer ${CALLE_CONFIG.API_KEY}` }
+                    // Never attach the API key to anything but the approved
+                    // CALL-E host, even if CALLE_CONFIG.BASE_URL were ever
+                    // wrong, corrupted, or pointed elsewhere.
+                    if (CALLE_CONFIG.BASE_URL !== APPROVED_CALLE_BASE_URL) {
+                        onUpdate('blocked: BASE_URL is not the approved CALL-E host');
+                        return null;
+                    }
+                    const res = await fetch(`${APPROVED_CALLE_BASE_URL}/v1/calls/${encodeURIComponent(callId)}`, {
+                        headers: { 'Authorization': `Bearer ${CALLE_CONFIG.API_KEY}` },
+                        redirect: 'error' // never silently follow a redirect off the approved host
                     });
                     if (!res.ok) continue; // transient error, keep polling
                     const call = await res.json();
@@ -191,7 +254,7 @@ window.addEventListener('DOMContentLoaded', () => {
             // just get rejected server-side anyway.
             if (!/^\+[1-9]\d{6,14}$/.test(phoneValue)) {
                 statusLog.style.color = "red";
-                statusLog.innerText = "! Error: Enter a valid number";
+                statusLog.innerText = "! Error: Enter a valid number in E.164 format, e.g. +919746175295.";
                 return;
             }
 
@@ -202,11 +265,21 @@ window.addEventListener('DOMContentLoaded', () => {
                 return;
             }
 
-            if (typeof CALLE_CONFIG === 'undefined' || !CALLE_CONFIG.API_KEY || !CALLE_CONFIG.BASE_URL) {
+            if (!isConfigReady()) {
                 statusLog.style.color = "red";
-                statusLog.innerText = "! Error: config.js is missing your CALLE_CONFIG.API_KEY / BASE_URL.";
+                statusLog.innerText = typeof CALLE_CONFIG === 'undefined'
+                    ? "! Error: config.js is missing. Copy config.example.js to config.js and add your real API key."
+                    : "! Error: config.js still has a placeholder key/URL — add your real CALLE_CONFIG.API_KEY.";
                 return;
             }
+
+            // Explicit destination authorization: the user must see and
+            // confirm the exact number and language before a real call (and
+            // a real credit) goes out. Nothing dials automatically.
+            const authorized = window.confirm(
+                `You're about to call ${phoneValue} in ${selectedLanguage}. This will use one CALL-E credit. Continue?`
+            );
+            if (!authorized) return;
 
             submitCallBtn.disabled = true;
             statusLog.style.color = "#555";
@@ -222,13 +295,14 @@ window.addEventListener('DOMContentLoaded', () => {
                 const taskWithReportingInstruction =
                     `${promptValue} After the call, report your findings and evidence in English, regardless of the language the conversation was conducted in.`;
 
-                const response = await fetch(`${CALLE_CONFIG.BASE_URL}/v1/calls`, {
+                const response = await fetch(`${APPROVED_CALLE_BASE_URL}/v1/calls`, {
                     method: 'POST',
                     headers: {
                         'Authorization': `Bearer ${CALLE_CONFIG.API_KEY}`,
                         'Content-Type': 'application/json',
                         'Idempotency-Key': `web_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`
                     },
+                    redirect: 'error', // never silently follow a redirect off the approved host
                     body: JSON.stringify({
                         task: taskWithReportingInstruction,
                         recipients: [
