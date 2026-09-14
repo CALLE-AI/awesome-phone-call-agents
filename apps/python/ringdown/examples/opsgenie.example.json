@@ -1,0 +1,24 @@
+{
+  "action": "Create",
+  "integrationId": "3f0a1c72-9d41-4e58-b0a7-2c6d8f11ab34",
+  "integrationName": "checkout-api",
+  "source": {
+    "name": "prometheus",
+    "type": "API"
+  },
+  "alert": {
+    "alertId": "052652ac-5d1c-464a-812a-7dd18bbfba8c",
+    "alias": "checkout-p99-latency",
+    "createdAt": 1786331580000,
+    "updatedAt": 1786331580000,
+    "entity": "checkout-api",
+    "message": "checkout p99 latency above 3s",
+    "recipients": ["checkout-oncall"],
+    "source": "prometheus",
+    "tags": ["p2", "checkout", "latency"],
+    "teams": ["checkout"],
+    "tinyId": "1713",
+    "userId": "daed1180-0ce8-438b-8f8e-57e1a5920a2d",
+    "username": "prometheus@example.com"
+  }
+}
