@@ -2,7 +2,7 @@ import { createServer, type IncomingMessage, type ServerResponse } from "node:ht
 import { readFile } from "node:fs/promises";
 import { extname, join, normalize } from "node:path";
 import { checkAccess, isLoopbackBind } from "./access.ts";
-import { APP_ROOT, demoClockFromEnv, gatewayFromEnv, loadEnvFile, webhookSecretFromEnv } from "./config.ts";
+import { APP_ROOT, demoClockFromEnv, gatewayFromEnv, liveAttestationError, loadEnvFile, webhookSecretFromEnv } from "./config.ts";
 import { loadCatalog } from "./data.ts";
 import { Desk, DeskError } from "./desk.ts";
 import { OpsEventError, parseOpsEvent, SIGNATURE_HEADER, verifySignature } from "./events.ts";
@@ -11,6 +11,11 @@ import type { Action, DisruptionCause, DisruptionKind, RequestChannel, RequestKi
 loadEnvFile();
 
 const gateway = gatewayFromEnv();
+const attestation = liveAttestationError(gateway.live);
+if (attestation) {
+  console.error(attestation);
+  process.exit(1);
+}
 const catalog = loadCatalog();
 const webhook = webhookSecretFromEnv(gateway.live);
 const demoClock = demoClockFromEnv();

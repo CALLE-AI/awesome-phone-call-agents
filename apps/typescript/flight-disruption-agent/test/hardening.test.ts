@@ -115,3 +115,21 @@ test("the demo clock keeps passenger requests eligible after the fixtures' real 
   assert.equal(demoClockFromEnv({ DEMO_NOW: "real" }).label, null);
   assert.throws(() => demoClockFromEnv({ DEMO_NOW: "tomorrow" }), /DEMO_NOW/);
 });
+
+test("overlapping status checks apply a finished call once and leave it applied", async () => {
+  const desk = new Desk(loadCatalog(), new DryRunGateway(0), { statePath: null, liveCallBudget: 0 });
+  const d = desk.reportDelay("NA721-2026-09-20", 240, "weather");
+  await desk.startCall(d.id, "K7Q2XA");
+  const key = `${d.id}:K7Q2XA`;
+  await Promise.all([desk.refresh(key), desk.refresh(key), desk.refreshAll()]);
+  const entry = desk.snapshot().disruptions[0]?.bookings.find((b) => b.pnr === "K7Q2XA")?.entry;
+  assert.equal(entry?.status, "applied");
+  assert.equal(entry?.decision?.kind, "apply");
+});
+
+test("live mode needs the operator's consent statement for the demo phone", async () => {
+  const { liveAttestationError } = await import("../src/config.ts");
+  assert.equal(liveAttestationError(false, {}), null);
+  assert.match(liveAttestationError(true, {}) ?? "", /LIVE_DEMO_PHONE_CONSENT=yes/);
+  assert.equal(liveAttestationError(true, { LIVE_DEMO_PHONE_CONSENT: "yes" }), null);
+});

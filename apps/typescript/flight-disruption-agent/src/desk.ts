@@ -79,6 +79,19 @@ export class Desk {
   private state: DeskState;
   private readonly now: () => number;
   private readonly gds: Gds;
+  /** Calls whose status check is running. Overlapping polls (two tabs, slow CALL-E) wait their turn. */
+  private readonly polling = new Set<string>();
+
+  /** Runs one status check per call at a time; a concurrent caller gets the current state instead. */
+  private async pollOnce<T>(lock: string, current: T, poll: () => Promise<T>): Promise<T> {
+    if (this.polling.has(lock)) return current;
+    this.polling.add(lock);
+    try {
+      return await poll();
+    } finally {
+      this.polling.delete(lock);
+    }
+  }
 
   constructor(
     private readonly catalog: Catalog,
@@ -404,6 +417,10 @@ export class Desk {
   /** Polls one call if it is due. Safe to call as often as you like. */
   async refresh(key: string): Promise<LedgerEntry> {
     const entry = this.entry(key);
+    return this.pollOnce(`passenger:${key}`, entry, () => this.refreshUnlocked(entry));
+  }
+
+  private async refreshUnlocked(entry: LedgerEntry): Promise<LedgerEntry> {
     if (entry.status !== "in_progress" || !entry.callId) return entry;
     if (this.now() < new Date(entry.nextPollAt).getTime()) return entry;
 
@@ -672,6 +689,10 @@ export class Desk {
   /** Polls the airline desk call if it is due, then applies a confirmed reissue or asks a person. */
   async refreshRequest(id: string): Promise<RequestEntry> {
     const entry = this.requestEntry(id);
+    return this.pollOnce(`airline:${id}`, entry, () => this.refreshRequestUnlocked(entry));
+  }
+
+  private async refreshRequestUnlocked(entry: RequestEntry): Promise<RequestEntry> {
     const call = entry.airlineCall;
     if (entry.status !== "airline_call_in_progress" || !call?.callId || call.status !== "in_progress") return entry;
     if (this.now() < new Date(call.nextPollAt).getTime()) return entry;
@@ -814,6 +835,10 @@ export class Desk {
 
   async refreshCallback(id: string): Promise<RequestEntry> {
     const entry = this.requestEntry(id);
+    return this.pollOnce(`callback:${id}`, entry, () => this.refreshCallbackUnlocked(entry));
+  }
+
+  private async refreshCallbackUnlocked(entry: RequestEntry): Promise<RequestEntry> {
     const call = entry.callback;
     if (!call?.callId || call.status !== "in_progress") return entry;
     if (this.now() < new Date(call.nextPollAt).getTime()) return entry;

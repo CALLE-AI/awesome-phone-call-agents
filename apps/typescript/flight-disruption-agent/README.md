@@ -188,6 +188,7 @@ Then set:
 
 - `CALLE_MODE=sdk` and `CALLE_API_KEY` from the [CALL-E dashboard](https://dashboard.heycall-e.com/account/api-keys), or `CALLE_MODE=cli` after `calle auth login`.
 - `LIVE_DEMO_PHONE`: the one E.164 number that live calls (passenger, airline desk, and callback) may reach, owned by someone who has agreed to take a test call. It must be in a region CALL-E supports. Indonesian (+62) numbers are currently refused by CALL-E, and the desk refuses them before any request is sent.
+- `LIVE_DEMO_PHONE_CONSENT=yes`: your statement that the owner of `LIVE_DEMO_PHONE` agreed to receive these test calls. Live mode refuses to start without it.
 - `LIVE_CALL_BUDGET`: maximum live calls per server run (default 3).
 
 Restart with `npm start`. The header turns red and shows the destination masked.
@@ -196,7 +197,7 @@ Restart with `npm start`. The header turns red and shows the destination masked.
 
 - **No live calls by default.** Dry run never touches the network.
 - **One destination in live mode.** Every live call, including airline desk calls and result callbacks, goes to `LIVE_DEMO_PHONE`. The fictional fixture numbers (the reserved +1 555-01xx range, including the airline desk) are never dialed, and the UI says when a call is redirected.
-- **Per-call confirmation.** Each live call requires typing the last four digits of the destination.
+- **Consent and per-call confirmation.** Live mode starts only with `LIVE_DEMO_PHONE_CONSENT=yes`, the operator's statement that the destination's owner agreed to test calls. Each live call then requires typing the last four digits of the destination.
 - **Call budget.** A live call budget caps credit use.
 - **No duplicate calls.**
   - Each booking is called at most once per disruption (dedupe key `<event>:<booking>`), and the call is recorded before dialing.

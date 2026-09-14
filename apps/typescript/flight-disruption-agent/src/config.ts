@@ -59,3 +59,13 @@ export function demoClockFromEnv(env = process.env, bootMs = Date.now()): { now:
   const offset = start - bootMs;
   return { now: () => Date.now() + offset, label: raw };
 }
+
+/**
+ * Live modes need the operator's explicit statement that the owner of LIVE_DEMO_PHONE agreed
+ * to receive these test calls. Returns an error message, or null when calls may start.
+ */
+export function liveAttestationError(live: boolean, env = process.env): string | null {
+  if (!live) return null;
+  if (env.LIVE_DEMO_PHONE_CONSENT?.trim().toLowerCase() === "yes") return null;
+  return "Live mode needs LIVE_DEMO_PHONE_CONSENT=yes: confirm the owner of LIVE_DEMO_PHONE agreed to receive these test calls.";
+}
