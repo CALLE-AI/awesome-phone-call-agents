@@ -3,7 +3,7 @@
 **The procurement agent for businesses whose supplier data still lives on the phone.**
 
 SupplyScout Voice helps small businesses source urgent parts by turning supplier phone calls into a structured procurement workflow.
-
+- [SupplyScout Voice](apps/web/supplyscout-voice/) - Approval-gated procurement workflow that uses CALL-E to collect structured supplier quotes, preserves unknown facts, ranks options deterministically, and leaves supplier selection and reservation to a human.
 ## Problem
 
 A repair shop looking for an urgent part often has to manually call several suppliers to ask about:
