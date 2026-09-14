@@ -8,7 +8,7 @@ export function settings(): Settings {
   const hasApiKey = Boolean(process.env.CALLE_API_KEY?.trim());
   const hasTestPhone = /^\+91[6-9]\d{9}$/.test(phone);
   const liveEnabled = process.env.CALLE_LIVE_ENABLED === 'true';
-  return {liveReady: hasApiKey && hasTestPhone && liveEnabled, liveEnabled, hasApiKey, hasTestPhone, testPhoneHint: hasTestPhone ? `+91 •••••• ${phone.slice(-4)}` : '', testPhone: hasTestPhone ? phone : ''};
+  return {liveReady: hasApiKey && hasTestPhone && liveEnabled, liveEnabled, hasApiKey, hasTestPhone, testPhoneHint: hasTestPhone ? `+91 •••••• ${phone.slice(-4)}` : '', testPhone: ''};
 }
 function client() {
   if (publicDemoEnabled()) throw new WorkflowError('CALL-E requests are disabled in the public demo.', 403);

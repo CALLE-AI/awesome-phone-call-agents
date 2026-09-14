@@ -58,11 +58,11 @@ Run `npm run build` again to restore a regular local build. Public hosting demon
 1. Create or sign in to your account at https://dashboard.heycall-e.com/ and obtain an API key.
 2. Copy `.env.example` to `.env.local`; enter the key privately, never in a public repository or project submission.
 3. Set `CALLE_TEST_PHONE` to one consenting adult volunteer's India mobile number in E.164 format. Set `CALLE_LIVE_ENABLED=true`. Restart the application.
-4. In the call preview, choose **Live test**, check the exact destination, and explicitly approve that particular call. Real calls can consume CALL-E credits.
+4. Verify the destination in your private server configuration. In the call preview, choose **Live test**, check the masked destination hint, and explicitly approve that particular call. Real calls can consume CALL-E credits.
 5. The call identifies itself as an AI-led test about a fictional appointment. It does not ask about medical conditions or confirm a real booking.
 6. Review CALL-E's returned response and evidence. The final booking action affects only this prototype.
 
-The API key stays server-side. The volunteer number is shown locally for informed approval. Returned phone strings are masked before saving result excerpts, but this is not a comprehensive personal-data scrubber. Review all recordings/screenshots before publishing them.
+The API key and full volunteer number stay server-side; the browser receives only a masked destination hint for approval. Returned phone strings are masked before saving result excerpts, but this is not a comprehensive personal-data scrubber. Review all recordings/screenshots before publishing them.
 
 To stop *future* calls, set `CALLE_LIVE_ENABLED=false` and restart. This does not cancel an already-running call. Closing the browser also does not cancel a submitted call. This app has no in-flight cancellation control; check the CALL-E dashboard for its terminal status before considering another call. The app does not automatically redial or retry a creation request when the provider outcome is uncertain. It retains the workflow ID and locks the slot; check the dashboard to reconcile that state. A process interruption before receiving the provider ID is also treated as uncertain.
 
