@@ -331,7 +331,7 @@ def test_the_voicemail_line_names_no_child_and_gives_no_reason():
     from reachable.calls.contracts import IDENTITY_GATE_BLOCK
 
     block = IDENTITY_GATE_BLOCK.format(
-        school_name="Fernhollow Primary School", contact_name="Marie Dunn"
+        school_name="Fernhollow Primary School", contact_name="Martin Dunn"
     )
     voicemail = block[block.index("If you reach a voicemail") :]
     assert "Please call the school office" in voicemail
@@ -381,3 +381,37 @@ def test_no_rendered_task_body_threatens_or_advises(live, forbidden):
     task = live.preview(IVY_CASE).task
     body = task[: task.index("You are gathering information only")]
     assert forbidden not in body.lower()
+
+
+def test_a_provider_error_is_reported_without_ever_carrying_the_key():
+    """The message is needed to diagnose; the key must never ride along with it.
+
+    "CalleAPIError" alone tells an operator nothing about whether they are out
+    of credit or sending a bad region. The message says which -- but a provider
+    message can echo the request, and this string is written to the event log
+    and rendered in the dashboard.
+    """
+    from reachable.calls.calle_client import CalleClient
+
+    key = "sk-" + "z" * 92
+    client = CalleClient(Config(calle_api_key=key, live_calls=True))
+
+    class CalleAPIError(Exception):
+        pass
+
+    described = client._describe(CalleAPIError(f"400 bad region (auth {key})"))
+    assert "CalleAPIError" in described
+    assert "bad region" in described, "the message has to survive, or it is useless"
+    assert key not in described
+    assert "[redacted]" in described
+
+
+def test_an_error_with_no_message_still_names_its_type():
+    from reachable.calls.calle_client import CalleClient
+
+    client = CalleClient(Config(calle_api_key="k" * 40, live_calls=True))
+
+    class CalleConnectionError(Exception):
+        pass
+
+    assert client._describe(CalleConnectionError()) == "CalleConnectionError"

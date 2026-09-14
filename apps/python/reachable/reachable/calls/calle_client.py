@@ -23,6 +23,7 @@ import threading
 from typing import Any, Mapping
 
 from ..config import Config, validate_calle_origin
+from ..sanitize import clean_text
 from .client import CallError, CallHandle, CallRequest, CallSubmissionUnknown
 
 #: SDK exception names that mean the request may already have been accepted.
@@ -67,6 +68,23 @@ class CalleClient:
                 )
             return self._client
 
+    def _describe(self, exc: Exception) -> str:
+        """The exception class plus its message, with the key removed.
+
+        The class name on its own is not diagnosable: "CalleAPIError" tells an
+        operator nothing about whether they are out of credit, sending a bad
+        region, or hitting a concurrency cap. The message is what says which.
+
+        It is sanitised and the bearer key is stripped out of it first, because
+        a provider message may echo parts of the request, and this string is
+        written to the event log and shown in the dashboard.
+        """
+        detail = clean_text(str(exc), max_length=300)
+        key = self._config.calle_api_key
+        if key and len(key) >= 8:
+            detail = detail.replace(key, "[redacted]")
+        return f"{type(exc).__name__}: {detail}" if detail else type(exc).__name__
+
     def create(self, request: CallRequest) -> CallHandle:
         """Submit one call and return its id, without waiting for the outcome."""
         client = self._sdk()
@@ -86,8 +104,8 @@ class CalleClient:
             )
         except Exception as exc:  # noqa: BLE001 - classified, never re-raised raw
             if type(exc).__name__ in _AMBIGUOUS:
-                raise CallSubmissionUnknown(type(exc).__name__) from exc
-            raise CallError(type(exc).__name__) from exc
+                raise CallSubmissionUnknown(self._describe(exc)) from exc
+            raise CallError(self._describe(exc)) from exc
 
         if not isinstance(created, Mapping) or not isinstance(created.get("id"), str):
             # A malformed success is still an unknown submission: the call may
@@ -101,7 +119,7 @@ class CalleClient:
         try:
             snapshot = client.calls.get(call_id)
         except Exception as exc:  # noqa: BLE001
-            raise CallError(type(exc).__name__) from exc
+            raise CallError(self._describe(exc)) from exc
         if not isinstance(snapshot, Mapping):
             raise CallError("calls.get returned a non-object")
         return dict(snapshot)
