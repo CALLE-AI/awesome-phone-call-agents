@@ -53,6 +53,11 @@ export function renderScreeningTask(rules: Rules, state: StateConfig, person: En
     // is no way to know which part that "no" answered. The same call also invented exemptions that
     // are not in the rules file at all.
     "Ask exactly one thing at a time. Never combine two exemptions into a single question, even to save time: a single yes or no to a combined question cannot be attributed to either part, and you must then mark both unknown. Ask only the questions written below, word for word where you can. Never invent an exemption, a threshold or a reporting rule that is not written here.",
+    // A live call announced "there are exemptions, including caring for a family member with a
+    // disability, pregnancy, or certain other situations" and then asked the caregiver question.
+    // Telling somebody which answer qualifies, immediately before asking, invites a false yes - and
+    // a false yes here becomes an exemption packet a caseworker has to disprove.
+    "Never say which situations count as exemptions before you ask about them. Say only the explanation written below, then ask the questions. Do not preview the list, do not hint at which answer helps, and do not describe who the rule applies to in your own words.",
     "",
     "Privacy comes first:",
     `- Open with: "Hello, this is an automated call from ${state.caller_org} for ${person.firstName}. Am I speaking with ${person.firstName}?"`,

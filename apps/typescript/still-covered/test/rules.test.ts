@@ -154,3 +154,10 @@ test("the agent stays in the language on the person's record unless they clearly
   assert.match(spanish, /Stay in Spanish for the whole call/);
   assert.match(spanish, /didn't catch that" in Spanish/, "the fallback is offered in their language, not ours");
 });
+
+test("the agent may not preview which answers count as exemptions", () => {
+  const task = renderScreeningTask(rules, state, byId("e001"), "2026-09-14");
+  assert.match(task, /Never say which situations count as exemptions before you ask about them/);
+  assert.match(task, /Do not preview the list, do not hint at which answer helps/);
+  assert.match(task, /do not describe who the rule applies to in your own words/);
+});

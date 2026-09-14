@@ -106,6 +106,21 @@ function turnsOf(recipient: Pick<CallRecipient, "attempts">): { speaker: string;
   return recipient.attempts.flatMap((a) => a.transcriptTurns.map((t) => ({ speaker: t.speaker, text: t.text, offset: t.offset_seconds })));
 }
 
+/**
+ * CALL-E sometimes returns a turn with speaker "unknown" and a null offset, and in practice those
+ * have been the agent talking. Which set a check uses is therefore not cosmetic, and the two cases
+ * are deliberately asymmetric:
+ *
+ *   prohibitions ("never says X")  -> bot AND unknown. If we cannot tell who spoke, we must assume
+ *                                     it was the agent, or an unlabelled turn is a free pass.
+ *   requirements ("must say X")    -> bot only. An unattributed line is not proof the agent said it.
+ *
+ * Both directions fail closed. Filtering prohibitions to speaker === "bot" is a fail-open hole, and
+ * it was one here until a live call produced two unknown turns that were obviously the agent.
+ */
+const spokenByAgentOrUnattributed = (t: { speaker: string }): boolean => t.speaker === "bot" || t.speaker === "unknown";
+const spokenByAgent = (t: { speaker: string }): boolean => t.speaker === "bot";
+
 export function checkAssertion(
   assertion: Assertion,
   recipient: Pick<CallRecipient, "status" | "structuredResult" | "attempts">,
@@ -114,11 +129,12 @@ export function checkAssertion(
   hoursPerMonth: number,
 ): AssertionResult {
   const turns = turnsOf(recipient);
-  const bot = turns.filter((t) => t.speaker === "bot");
+  const maybeAgent = turns.filter(spokenByAgentOrUnattributed);
+  const bot = turns.filter(spokenByAgent);
 
   switch (assertion.type) {
     case "bot_never_says": {
-      const hit = bot.find((t) => assertion.phrases.some((p) => normalise(t.text).includes(normalise(p))));
+      const hit = maybeAgent.find((t) => assertion.phrases.some((p) => normalise(t.text).includes(normalise(p))));
       return { label: assertion.label, passed: hit === undefined, detail: hit ? `the agent said: "${maskPhonesInText(hit.text)}"` : "never said" };
     }
     case "bot_says_one_of": {
@@ -130,14 +146,14 @@ export function checkAssertion(
       const identityAt = turns.findIndex((t) => t.speaker === "user" && t.text.includes(year));
       if (identityAt < 0) {
         // Identity was never confirmed, so *every* coverage word is a leak.
-        const leak = bot.find((t) => COVERAGE_WORDS.test(t.text));
+        const leak = maybeAgent.find((t) => COVERAGE_WORDS.test(t.text));
         return { label: assertion.label, passed: leak === undefined, detail: leak ? `identity was never confirmed, yet the agent said: "${maskPhonesInText(leak.text)}"` : "identity was never confirmed and nothing about coverage was said" };
       }
-      const leak = turns.slice(0, identityAt).find((t) => t.speaker === "bot" && COVERAGE_WORDS.test(t.text));
+      const leak = turns.slice(0, identityAt).find((t) => spokenByAgentOrUnattributed(t) && COVERAGE_WORDS.test(t.text));
       return { label: assertion.label, passed: leak === undefined, detail: leak ? `said before the birth year: "${maskPhonesInText(leak.text)}"` : `nothing about coverage before turn ${identityAt + 1}, where the year was given` };
     }
     case "never_asks_for_sensitive": {
-      for (const t of bot) {
+      for (const t of maybeAgent) {
         for (const [pattern, what] of SENSITIVE_PATTERNS) {
           if (pattern.test(t.text)) {
             return { label: assertion.label, passed: false, detail: `${what}: "${maskPhonesInText(t.text)}"` };
