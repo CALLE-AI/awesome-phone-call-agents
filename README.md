@@ -25,7 +25,6 @@ Awesome Phone Call Agents is an early community hub for developers and workflow 
 
 | Contribution area | Good examples | Where to contribute |
 | --- | --- | --- |
-| [`apps/typescript/avelis`](apps/typescript/avelis/) | JavaScript / Node.js | Breast follow-up evidence and clinician handoff; six fictional cases and an opt-in CALL-E / DeepSeek workflow with local recovery. |
 | [`apps/typescript/vouch`](apps/typescript/vouch/) | TypeScript / Next.js | Consent-scoped employment verification: no consent artifact, no dial. Requested vs permitted fields (California SB 1162 strips salary), third-party gatekeeper is a first-class disposition. Fixture replay by default. |
 | [`apps/typescript/headcount`](apps/typescript/headcount/) | TypeScript / Next.js | CDC CASPER-style disaster household needs assessment: the unreached count is the product, voicemail is not a reach, unsupported fields strike through, and fail-closed cards go to a human. Fixture replay by default. |
 | Agent Skills | Customer callbacks, appointment confirmation, lead qualification, order exception follow-up, service dispatch, incident escalation | `skills/` |
@@ -258,6 +257,7 @@ Runnable demo apps live under [`apps/`](apps/). They are not a CALL-E SDK and do
 
 | App | Language | Purpose |
 | --- | --- | --- |
+| [`apps/typescript/avelis`](apps/typescript/avelis/) | JavaScript / Node.js | Breast follow-up evidence and clinician handoff; six fictional cases and an opt-in CALL-E / DeepSeek workflow with local recovery. |
 | [`apps/typescript/readycheck`](apps/typescript/readycheck/) | TypeScript / Node | Requirement-based local-service inquiries with CALL-E, source-linked evidence review, focused follow-ups, explicit budget revisions and durable recovery; fictional no-call demo by default. |
 | [`apps/python/rebuttal-dispute-call`](apps/python/rebuttal-dispute-call/) | Python | Merchant-side chargeback evidence call: one disclosed CALL-E call with a fixed script and a strict result schema, a yes used only when the customer's own words say yes, a no that stops the filing, and a masked evidence PDF; dry-run with six scripted scenarios by default, live only with per-run consent, an allowlist, local calling hours and one call per dispute. |
 | [`apps/typescript/last-crate`](apps/typescript/last-crate/) | TypeScript / Node.js | Two-call surplus-bread handoff: verifies the donor offer, matches full-capacity collectors, and issues an expiring pickup ticket from a bounded commitment; no-call fixtures by default. |
@@ -472,4 +472,3 @@ Out of scope:
 ## License
 
 MIT. See [`LICENSE`](LICENSE).
-
