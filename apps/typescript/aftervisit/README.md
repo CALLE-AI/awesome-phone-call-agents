@@ -12,29 +12,26 @@ own words. It never gives clinical advice and never diagnoses.
 guide for the runnable [AfterVisit application](https://github.com/sharmilaraghu/Aftervisit).
 The application source and tests are maintained there under the MIT license. These
 instructions target revision
-[`1c80338`](https://github.com/sharmilaraghu/Aftervisit/tree/1c80338653542b765c98e5139b2f779b098ad343).
+[`d2dbfb8`](https://github.com/sharmilaraghu/Aftervisit/tree/d2dbfb8de2806e10b1590a9a573c524df27da80d).
 
 - [Source repository](https://github.com/sharmilaraghu/Aftervisit)
 - [Hosted demo](https://aftervisit-calle.vercel.app) (fictional patients; the judges' Try a call needs a passcode)
-- [CALL-E port](https://github.com/sharmilaraghu/Aftervisit/blob/1c80338653542b765c98e5139b2f779b098ad343/lib/calle/port.ts), the only module that imports the CALL-E SDK
-
-This is not the unrelated [CareLoop AI](../careloop-ai/) app already listed in this
-repository. The two were built independently.
+- [CALL-E port](https://github.com/sharmilaraghu/Aftervisit/blob/d2dbfb8de2806e10b1590a9a573c524df27da80d/lib/calle/port.ts), the only module that imports the CALL-E SDK
 
 ## Where to look
 
 | File | What it shows |
 | --- | --- |
-| [`lib/calle/port.ts`](https://github.com/sharmilaraghu/Aftervisit/blob/1c80338653542b765c98e5139b2f779b098ad343/lib/calle/port.ts) | The only module that imports `@call-e/calle`: `calls.create` with `task`, per-recipient `locale` and `region`, `resultSchema`, `recipientResultSchema`, `metadata`, optional `webhookUrl` and an idempotency key; `calls.get`; `calls.waitForResult`. The guard, E.164, consent and dial-allowlist checks all run inside `dial()`, so no call site can skip them. |
-| [`lib/schedule/tick.ts`](https://github.com/sharmilaraghu/Aftervisit/blob/1c80338653542b765c98e5139b2f779b098ad343/lib/schedule/tick.ts) | One scheduler pass: reconcile abandoned calls, retire calls too late to place, claim due calls, assemble and guard the task, record it, dial, persist the CALL-E call id immediately, then extract, evaluate, triage, escalate and retry when a call finishes. |
-| [`lib/schedule/store.ts`](https://github.com/sharmilaraghu/Aftervisit/blob/1c80338653542b765c98e5139b2f779b098ad343/lib/schedule/store.ts) | Every scheduler write as one conditional `UPDATE … RETURNING` or idempotent insert, because the Neon HTTP driver has no transactions: claims, retries, reschedule, skip and the extra call a doctor places now. |
-| [`lib/plan/compile.ts`](https://github.com/sharmilaraghu/Aftervisit/blob/1c80338653542b765c98e5139b2f779b098ad343/lib/plan/compile.ts) | The note read by an OpenAI structured output with every defaultable field nullable; [`defaults.ts`](https://github.com/sharmilaraghu/Aftervisit/blob/1c80338653542b765c98e5139b2f779b098ad343/lib/plan/defaults.ts) fills gaps in code and marks each value *from the note* or *default*; [`grounding.ts`](https://github.com/sharmilaraghu/Aftervisit/blob/1c80338653542b765c98e5139b2f779b098ad343/lib/plan/grounding.ts) refuses a medication the note does not name. |
-| [`lib/script/build.ts`](https://github.com/sharmilaraghu/Aftervisit/blob/1c80338653542b765c98e5139b2f779b098ad343/lib/script/build.ts) | The task text, assembled by a pure function: the goal and topics with the AI disclosure, the non-advice statement, and the instruction to stop the call and hand off when a patient describes anything urgent. |
-| [`lib/script/guard.ts`](https://github.com/sharmilaraghu/Aftervisit/blob/1c80338653542b765c98e5139b2f779b098ad343/lib/script/guard.ts) | The three-phase guard: on each topic when the note is read, on the assembled task, and on the agent's own transcript turns afterwards. It rejects advice, diagnosis, dosage changes, prognosis and reassurance, and fails a task missing any required safety clause. |
-| [`lib/rules/engine.ts`](https://github.com/sharmilaraghu/Aftervisit/blob/1c80338653542b765c98e5139b2f779b098ad343/lib/rules/engine.ts) | Four pure rules under the model: the patient asked for a person, emergency language, a reached call that did not find out what it set out to, and nobody answering. No IO, no clock, no model. |
-| [`lib/triage/triage.ts`](https://github.com/sharmilaraghu/Aftervisit/blob/1c80338653542b765c98e5139b2f779b098ad343/lib/triage/triage.ts) | A model's reading of each finished call — severity, a one-sentence summary, the doctor's own escalating conditions. It fails closed: an outage or an unreadable answer queues the call for a clinician. |
-| [`app/api/calle/webhook/route.ts`](https://github.com/sharmilaraghu/Aftervisit/blob/1c80338653542b765c98e5139b2f779b098ad343/app/api/calle/webhook/route.ts) | The unsigned webhook: takes only a call id and re-fetches the call through the authenticated API before trusting anything. |
-| [`lib/calle/fake-server.ts`](https://github.com/sharmilaraghu/Aftervisit/blob/1c80338653542b765c98e5139b2f779b098ad343/lib/calle/fake-server.ts) | An in-process stand-in for CALL-E's HTTP API that the test suite dials instead of a phone. |
+| [`lib/calle/port.ts`](https://github.com/sharmilaraghu/Aftervisit/blob/d2dbfb8de2806e10b1590a9a573c524df27da80d/lib/calle/port.ts) | The only module that imports `@call-e/calle`: `calls.create` with `task`, per-recipient `locale` and `region`, `resultSchema`, `recipientResultSchema`, `metadata`, optional `webhookUrl` and an idempotency key; `calls.get`; `calls.waitForResult`. The guard, E.164, consent and dial-allowlist checks all run inside `dial()`, so no call site can skip them. |
+| [`lib/schedule/tick.ts`](https://github.com/sharmilaraghu/Aftervisit/blob/d2dbfb8de2806e10b1590a9a573c524df27da80d/lib/schedule/tick.ts) | One scheduler pass: reconcile abandoned calls, retire calls too late to place, claim due calls, assemble and guard the task, record it, dial, persist the CALL-E call id immediately, then extract, evaluate, triage, escalate and retry when a call finishes. |
+| [`lib/schedule/store.ts`](https://github.com/sharmilaraghu/Aftervisit/blob/d2dbfb8de2806e10b1590a9a573c524df27da80d/lib/schedule/store.ts) | Every scheduler write as one conditional `UPDATE … RETURNING` or idempotent insert, because the Neon HTTP driver has no transactions: claims, retries, reschedule, skip and the extra call a doctor places now. |
+| [`lib/plan/compile.ts`](https://github.com/sharmilaraghu/Aftervisit/blob/d2dbfb8de2806e10b1590a9a573c524df27da80d/lib/plan/compile.ts) | The note read by an OpenAI structured output with every defaultable field nullable; [`defaults.ts`](https://github.com/sharmilaraghu/Aftervisit/blob/d2dbfb8de2806e10b1590a9a573c524df27da80d/lib/plan/defaults.ts) fills gaps in code and marks each value *from the note* or *default*; [`grounding.ts`](https://github.com/sharmilaraghu/Aftervisit/blob/d2dbfb8de2806e10b1590a9a573c524df27da80d/lib/plan/grounding.ts) refuses a medication the note does not name. |
+| [`lib/script/build.ts`](https://github.com/sharmilaraghu/Aftervisit/blob/d2dbfb8de2806e10b1590a9a573c524df27da80d/lib/script/build.ts) | The task text, assembled by a pure function: the goal and topics with the AI disclosure, the non-advice statement, and the instruction to stop the call and hand off when a patient describes anything urgent. |
+| [`lib/script/guard.ts`](https://github.com/sharmilaraghu/Aftervisit/blob/d2dbfb8de2806e10b1590a9a573c524df27da80d/lib/script/guard.ts) | The three-phase guard: on each topic when the note is read, on the assembled task, and on the agent's own transcript turns afterwards. It rejects advice, diagnosis, dosage changes, prognosis and reassurance, and fails a task missing any required safety clause. |
+| [`lib/rules/engine.ts`](https://github.com/sharmilaraghu/Aftervisit/blob/d2dbfb8de2806e10b1590a9a573c524df27da80d/lib/rules/engine.ts) | Four pure rules under the model: the patient asked for a person, emergency language, a reached call that did not find out what it set out to, and nobody answering. No IO, no clock, no model. |
+| [`lib/triage/triage.ts`](https://github.com/sharmilaraghu/Aftervisit/blob/d2dbfb8de2806e10b1590a9a573c524df27da80d/lib/triage/triage.ts) | A model's reading of each finished call — severity, a one-sentence summary, the doctor's own escalating conditions. It fails closed: an outage or an unreadable answer queues the call for a clinician. |
+| [`app/api/calle/webhook/route.ts`](https://github.com/sharmilaraghu/Aftervisit/blob/d2dbfb8de2806e10b1590a9a573c524df27da80d/app/api/calle/webhook/route.ts) | The unsigned webhook: takes only a call id and re-fetches the call through the authenticated API before trusting anything. |
+| [`lib/calle/fake-server.ts`](https://github.com/sharmilaraghu/Aftervisit/blob/d2dbfb8de2806e10b1590a9a573c524df27da80d/lib/calle/fake-server.ts) | An in-process stand-in for CALL-E's HTTP API that the test suite dials instead of a phone. |
 
 ## Workflow boundary
 
@@ -80,7 +77,7 @@ Use Node.js 20 or newer and pnpm.
 ```bash
 git clone https://github.com/sharmilaraghu/Aftervisit.git
 cd AfterVisit
-git checkout --detach 1c80338653542b765c98e5139b2f779b098ad343
+git checkout --detach d2dbfb8de2806e10b1590a9a573c524df27da80d
 pnpm install --frozen-lockfile
 pnpm run verify   # vitest, typecheck, eslint
 ```
@@ -120,7 +117,7 @@ Three independent locks each stop a dial, and all three are closed by default:
 | Lock | Default | Effect |
 | --- | --- | --- |
 | `CALLE_API_KEY` | unset | No key, no calls; the follow-up page says so. |
-| `CARELOOP_CALL_ALLOWLIST` | unset = locked | Every dial is refused `not_allowlisted` until an operator lists numbers, or sets `*` for any consenting patient. |
+| `AFTER_VISIT_CALL_ALLOWLIST` | unset = locked | Every dial is refused `not_allowlisted` until an operator lists numbers, or sets `*` for any consenting patient. |
 | Patient consent | `unknown` | `dial()` refuses anyone whose consent is not an explicit `granted`. |
 
 A refused dial is written as a visible row with its reason, never silently skipped. Every
@@ -132,14 +129,14 @@ fictional, with US fiction-reserved `555-01xx` numbers that cannot connect.
 Live mode places a real phone call and spends CALL-E credit. Only call your own number or
 someone who has agreed to an automated call from an AI assistant.
 
-1. Set `CALLE_API_KEY` and `CARELOOP_CALL_ALLOWLIST` to your own E.164 number.
+1. Set `CALLE_API_KEY` and `AFTER_VISIT_CALL_ALLOWLIST` to your own E.164 number.
 2. Register yourself as a patient with consent recorded, write a note, and start the
    follow-up.
 3. Use **Try a call** on the follow-up page, or run a scheduler pass
    (`./demo-tick.sh --every 5`, or keep the Follow-ups page open).
 
 The hosted demo instead runs with the allowlist at `*` and a separate judges' page that
-rings a typed number with nothing saved, behind `CARELOOP_TRY_PASSCODE`.
+rings a typed number with nothing saved, behind `AFTER_VISIT_TRY_PASSCODE`.
 
 ## Side effects
 
@@ -151,7 +148,7 @@ rings a typed number with nothing saved, behind `CARELOOP_TRY_PASSCODE`.
 - Note text and call transcripts are sent to OpenAI to read the note and triage the call.
   Use only fictional or appropriately governed data.
 - `POST /api/tick` runs a scheduler pass and can place due calls; it is closed unless
-  `CARELOOP_TICK_TOKEN` is set and the request carries it.
+  `AFTER_VISIT_TICK_TOKEN` is set and the request carries it.
 
 ## Credential handling
 
@@ -159,7 +156,7 @@ rings a typed number with nothing saved, behind `CARELOOP_TRY_PASSCODE`.
   written to the database, logged, or sent to the browser.
 - `CALLE_API_KEY` is read only by the server-side port. `OPENAI_API_KEY` is used server-side
   for reading notes and triage only.
-- `CARELOOP_TICK_TOKEN`, `CRON_SECRET` and `CARELOOP_WEBHOOK_TOKEN` each guard one endpoint,
+- `AFTER_VISIT_TICK_TOKEN`, `CRON_SECRET` and `AFTER_VISIT_WEBHOOK_TOKEN` each guard one endpoint,
   and an unset value keeps that endpoint closed. Webhook payloads are never trusted; the call
   is re-fetched through the authenticated API.
 - Phone numbers are masked everywhere in the console and hidden as they are typed.
@@ -170,7 +167,7 @@ rings a typed number with nothing saved, behind `CARELOOP_TRY_PASSCODE`.
 - **Skip** drops one scheduled call; **Stop all calls** on the patient record pauses the
   follow-up and skips every pending call.
 - An urgent escalation pauses the follow-up until a clinician resolves it.
-- Instance-wide, unsetting `CALLE_API_KEY` or `CARELOOP_CALL_ALLOWLIST` refuses every dial,
+- Instance-wide, unsetting `CALLE_API_KEY` or `AFTER_VISIT_CALL_ALLOWLIST` refuses every dial,
   and disabling the cron stops unattended scheduler passes.
 - AfterVisit does not use a hang-up API. A call CALL-E has accepted cannot be recalled; the
   patient can end it. No records are deleted by any of the above.
