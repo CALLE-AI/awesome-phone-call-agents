@@ -122,6 +122,7 @@ This project is an awesome list for AI-agent phone-call workflows. Add resources
 
 - [`lesson-language-phone-practice`](skills/lesson-language-phone-practice/) - Consent-gated, lesson-derived phone rehearsal with a one-minute maximum, transcript-bound formative evidence, and no automatic redial.
 - [`accesscall`](skills/accesscall/) - Phone-based accessibility intake for VPAT 2.4/Section 508 audits. Run `npm install` in `skills/accesscall/` before using `scripts/format-to-vpat.js`, or it fails with `Cannot find module 'jszip'`.
+- [`accessible-outing-verifier`](skills/accessible-outing-verifier/) - Offline accessibility-planning fixture and proposed bounded CALL-E workflow; demonstrates advisory handling of qualified answers without making calls or certifying venue safety.
 - [`appointment-confirm`](skills/appointment-confirm/) - Confirms one existing appointment by phone, captures yes/no plus time as structured JSON, and leaves calendar writes to a human.
 - [`cod-order-confirmation-call`](skills/cod-order-confirmation-call/) - Prepares an authorized cash-on-delivery confirmation call from order rows with an advisory result schema; validation and status changes belong to the host or a human. Dry-run preview needs no credentials.
 - [`candidate-availability-call`](skills/candidate-availability-call/) - Recruiting coordination skill that confirms candidate interview availability by phone, returns evidence-backed time windows, and leaves scheduling commitments to a human.
