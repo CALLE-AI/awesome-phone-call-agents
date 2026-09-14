@@ -1,0 +1,65 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 680 484" role="img" aria-labelledby="ccar-title ccar-desc" font-family="system-ui, -apple-system, 'Segoe UI', sans-serif">
+<title id="ccar-title">ClaimCall module map</title>
+<desc id="ccar-desc">CLI and dashboard drive the engine. The engine uses analysis, call plan, and policy, places calls through the CALL-E client, and persists the case to a JSON store.</desc>
+<defs>
+<marker id="ccar-arrow" viewBox="0 0 8 8" refX="7" refY="4" markerWidth="8" markerHeight="8" orient="auto">
+<path d="M0,0 L8,4 L0,8" fill="none" stroke="#4f5d75" stroke-width="1.2"/>
+</marker>
+<marker id="ccar-arrow-link" viewBox="0 0 8 8" refX="7" refY="4" markerWidth="8" markerHeight="8" orient="auto">
+<path d="M0,0 L8,4 L0,8" fill="none" stroke="#2e5aa8" stroke-width="1.2"/>
+</marker>
+</defs>
+<rect x="0" y="0" width="680" height="484" fill="#f5f5f5"/>
+<text x="32" y="36" font-family="ui-monospace, monospace" font-size="8" letter-spacing="2" fill="#7a8399">CLAIMCALL MODULES</text>
+
+<rect x="32" y="52" width="300" height="64" rx="6" fill="#4f5d75" fill-opacity="0.10" stroke="#7a8399" stroke-width="1"/>
+<text x="182" y="78" text-anchor="middle" font-size="13" font-weight="600" fill="#2d3142">CLI</text>
+<text x="182" y="96" text-anchor="middle" font-family="ui-monospace, monospace" font-size="9" fill="#4f5d75">init-demo, analyze, plan, run</text>
+
+<rect x="348" y="52" width="300" height="64" rx="6" fill="#4f5d75" fill-opacity="0.10" stroke="#7a8399" stroke-width="1"/>
+<text x="498" y="78" text-anchor="middle" font-size="13" font-weight="600" fill="#2d3142">Dashboard</text>
+<text x="498" y="96" text-anchor="middle" font-family="ui-monospace, monospace" font-size="9" fill="#4f5d75">loopback UI, 7-step demo</text>
+
+<line x1="182" y1="116" x2="260" y2="148" stroke="#4f5d75" stroke-width="1" marker-end="url(#ccar-arrow)"/>
+<line x1="498" y1="116" x2="420" y2="148" stroke="#4f5d75" stroke-width="1" marker-end="url(#ccar-arrow)"/>
+
+<rect x="32" y="148" width="616" height="64" rx="6" fill="#ffffff" stroke="#2d3142" stroke-width="1"/>
+<text x="340" y="174" text-anchor="middle" font-size="13" font-weight="600" fill="#2d3142">Engine</text>
+<text x="340" y="192" text-anchor="middle" font-family="ui-monospace, monospace" font-size="9" fill="#4f5d75">preview, run, validate, apply, before-after, next action</text>
+
+<line x1="130" y1="212" x2="130" y2="244" stroke="#4f5d75" stroke-width="1" marker-end="url(#ccar-arrow)"/>
+<line x1="340" y1="212" x2="340" y2="244" stroke="#4f5d75" stroke-width="1" marker-end="url(#ccar-arrow)"/>
+<line x1="550" y1="212" x2="550" y2="244" stroke="#4f5d75" stroke-width="1" marker-end="url(#ccar-arrow)"/>
+
+<rect x="32" y="244" width="196" height="64" rx="6" fill="#ffffff" stroke="#2d3142" stroke-width="1"/>
+<text x="130" y="270" text-anchor="middle" font-size="13" font-weight="600" fill="#2d3142">Analysis</text>
+<text x="130" y="288" text-anchor="middle" font-family="ui-monospace, monospace" font-size="9" fill="#4f5d75">missing facts, no LLM</text>
+
+<rect x="244" y="244" width="192" height="64" rx="6" fill="#ffffff" stroke="#2d3142" stroke-width="1"/>
+<text x="340" y="270" text-anchor="middle" font-size="13" font-weight="600" fill="#2d3142">Call plan</text>
+<text x="340" y="288" text-anchor="middle" font-family="ui-monospace, monospace" font-size="9" fill="#4f5d75">task text + schema</text>
+
+<rect x="452" y="244" width="196" height="64" rx="6" fill="#eb6c36" fill-opacity="0.05" stroke="#eb6c36" stroke-opacity="0.5" stroke-width="1.2" stroke-dasharray="4,4"/>
+<text x="550" y="270" text-anchor="middle" font-size="13" font-weight="600" fill="#2d3142">Policy</text>
+<text x="550" y="288" text-anchor="middle" font-family="ui-monospace, monospace" font-size="9" fill="#4f5d75">E.164, approval gate</text>
+
+<line x1="130" y1="308" x2="130" y2="340" stroke="#4f5d75" stroke-width="1" marker-end="url(#ccar-arrow)"/>
+<line x1="550" y1="308" x2="550" y2="340" stroke="#4f5d75" stroke-width="1" marker-end="url(#ccar-arrow)"/>
+
+<rect x="32" y="340" width="196" height="64" rx="6" fill="#ffffff" stroke="#2d3142" stroke-width="1"/>
+<text x="130" y="366" text-anchor="middle" font-size="13" font-weight="600" fill="#2d3142">CALL-E client</text>
+<text x="130" y="384" text-anchor="middle" font-family="ui-monospace, monospace" font-size="9" fill="#4f5d75">urllib + fake server</text>
+
+<rect x="244" y="340" width="192" height="64" rx="6" fill="#2d3142" fill-opacity="0.05" stroke="#4f5d75" stroke-width="1"/>
+<text x="340" y="366" text-anchor="middle" font-size="13" font-weight="600" fill="#2d3142">JSON store</text>
+<text x="340" y="384" text-anchor="middle" font-family="ui-monospace, monospace" font-size="9" fill="#4f5d75">one case file</text>
+
+<rect x="452" y="340" width="196" height="64" rx="6" fill="#eb6c36" fill-opacity="0.08" stroke="#eb6c36" stroke-width="1.2"/>
+<text x="550" y="366" text-anchor="middle" font-size="13" font-weight="600" fill="#2d3142">CALL-E API</text>
+<text x="550" y="384" text-anchor="middle" font-family="ui-monospace, monospace" font-size="9" fill="#4f5d75">one call per approval</text>
+
+<line x1="228" y1="372" x2="440" y2="372" stroke="#4f5d75" stroke-width="1" marker-end="url(#ccar-arrow)"/>
+<line x1="130" y1="404" x2="130" y2="436" stroke="#2e5aa8" stroke-width="1.2" marker-end="url(#ccar-arrow-link)"/>
+<line x1="228" y1="436" x2="452" y2="436" stroke="#2e5aa8" stroke-width="1.2" marker-end="url(#ccar-arrow-link)"/>
+<text x="340" y="456" text-anchor="middle" font-family="ui-monospace, monospace" font-size="8" letter-spacing="1" fill="#2e5aa8">LIVE PATH: KEY ONLY TO api.heycall-e.com</text>
+</svg>

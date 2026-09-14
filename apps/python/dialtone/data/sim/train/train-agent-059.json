@@ -1,0 +1,56 @@
+{
+ "id": "train-agent-059",
+ "label": "agent",
+ "source": "sim-train",
+ "meta": {
+  "task": "reschedule an appointment from Tuesday to Thursday morning",
+  "hard": false
+ },
+ "turns": [
+  {
+   "speaker": "user",
+   "text": "Thank you for calling Summit Fitness! I'm Nova, the virtual assistant for Summit Fitness. How can I help you today?",
+   "offset_seconds": 0.83
+  },
+  {
+   "speaker": "bot",
+   "text": "Hi, I'm an AI assistant calling on behalf of Taylor Kim. I'm calling to move Taylor Kim's appointment from Tuesday to Thursday morning.",
+   "offset_seconds": 9.04
+  },
+  {
+   "speaker": "user",
+   "text": "Absolutely, I'd be happy to help. I've moved Taylor Kim's appointment from Tuesday to Thursday at 10 AM. Is there anything else?",
+   "offset_seconds": 19.82
+  },
+  {
+   "speaker": "bot",
+   "text": "Is 10 AM on Thursday possible?",
+   "offset_seconds": 28.83
+  },
+  {
+   "speaker": "user",
+   "text": "Of course. One moment please. Yes, that works.",
+   "offset_seconds": 33.01
+  },
+  {
+   "speaker": "bot",
+   "text": "Can you confirm the new time?",
+   "offset_seconds": 37.04
+  },
+  {
+   "speaker": "user",
+   "text": "Certainly. You're all set. Thank you for calling, and have a wonderful day!",
+   "offset_seconds": 41.74
+  },
+  {
+   "speaker": "bot",
+   "text": "Thank you, that's everything.",
+   "offset_seconds": 47.73
+  },
+  {
+   "speaker": "user",
+   "text": "You're welcome! Have a wonderful day. Goodbye!",
+   "offset_seconds": 51.18
+  }
+ ]
+}
