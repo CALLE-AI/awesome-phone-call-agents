@@ -1,0 +1,101 @@
+@import "tailwindcss";
+
+:root {
+  --background: #ffffff;
+  --foreground: #0a0a0a;
+}
+
+@theme inline {
+  --color-background: var(--background);
+  --color-foreground: var(--foreground);
+  --font-sans: var(--font-inter);
+  --font-display: var(--font-fraunces);
+}
+
+@media (prefers-color-scheme: dark) {
+  :root {
+    --background: #0a0a0a;
+    --foreground: #ededed;
+  }
+}
+
+body {
+  background: var(--background);
+  color: var(--foreground);
+  font-family: var(--font-sans), Arial, Helvetica, sans-serif;
+}
+
+/* --- Hero ring animation (app/page.tsx) ---
+ * The phone icon fades in once on load. The 3 rings around it loop
+ * continuously afterward: a slow (3.6s), subtle pulse, staggered so
+ * they radiate outward and fade at offset times rather than all firing
+ * together. Purely decorative, so it's skipped entirely (static state
+ * shown instead) when the user prefers reduced motion.
+ */
+.hero-phone {
+  opacity: 1;
+}
+
+.hero-ring {
+  transform-origin: 120px 120px;
+}
+
+.hero-ring-1 {
+  opacity: 0.35;
+}
+.hero-ring-2 {
+  opacity: 0.2;
+}
+.hero-ring-3 {
+  opacity: 0.1;
+}
+
+@media (prefers-reduced-motion: no-preference) {
+  .hero-phone {
+    opacity: 0;
+    animation: hero-phone-in 0.5s ease-out 0.1s forwards;
+  }
+
+  .hero-ring {
+    opacity: 0;
+    animation: hero-ring-pulse 3.6s ease-in-out infinite;
+  }
+
+  .hero-ring-1 {
+    animation-delay: 0s;
+  }
+  .hero-ring-2 {
+    animation-delay: 1.2s;
+  }
+  .hero-ring-3 {
+    animation-delay: 2.4s;
+  }
+}
+
+@keyframes hero-phone-in {
+  from {
+    opacity: 0;
+    transform: scale(0.85);
+  }
+  to {
+    opacity: 1;
+    transform: scale(1);
+  }
+}
+
+@keyframes hero-ring-pulse {
+  0% {
+    opacity: 0;
+    transform: scale(0.85);
+  }
+  20% {
+    opacity: 0.4;
+  }
+  70% {
+    opacity: 0.1;
+  }
+  100% {
+    opacity: 0;
+    transform: scale(1.35);
+  }
+}
