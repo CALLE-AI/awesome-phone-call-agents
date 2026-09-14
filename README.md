@@ -369,7 +369,7 @@ The default e2e tests use a local fake broker/OAuth/MCP server or dry-run paths,
 
 
 ### Community apps
-
+* [DocuFollow AI](https://github.com/naadai/docufollow-ai) - Consent-first document collection workflow for admissions and professional teams that records CALL-E follow-up outcomes and keeps live calls behind an explicit staff-controlled safety setting.
 - [Exception Broker](https://exception-broker-production.up.railway.app) - Execution-control app for CALL-E-acquired operational decisions, with exact review, controlled ALLOW/BLOCK/WAIT dispositions, and a deterministic no-call demo. See the [integration notes](docs/community-apps/exception-broker.md) and [demo video](https://youtu.be/Smw7aXyI0fI).
 
 - [Openline](https://openlinecall.vercel.app/) - Human-approved service-availability verification app that turns a request into an inspectable CALL-E phone plan and returns evidence-backed next steps, with a no-call simulation path. ([repository](https://github.com/Datwebguy/openline))
