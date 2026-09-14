@@ -18,6 +18,7 @@ Childcare websites and directory listings often do not expose current age-band o
 4. TinySlot evaluates identity, age band, vacancy, days, hours, subsidy, budget, and evidence with deterministic code.
 5. Once the requested number of qualified matches exists, held centers are not called.
 6. A parent can review a separate disclosure envelope and authorize one tour-request call by typing `REQUEST TOUR`.
+7. Each completed center exposes CALL-E's call summary and can be included in a privacy-masked conversation PDF.
 
 ## Run the no-call demo
 
@@ -73,6 +74,7 @@ If a create request has an ambiguous outcome, do not invent a new operation ID. 
 - Live calls are disabled unless `TINYSLOT_LIVE_ENABLED=true` and all credentials and allowlists are configured.
 - Every live destination must be valid E.164, present in `CALLE_ALLOWED_NUMBERS`, non-fictional, and covered by the operator's authorization attestation.
 - UI and exported reports mask or omit live destination numbers.
+- Conversation PDFs include call summaries, structured outcomes, checks, evidence, and available transcript turns; phone-like values are masked before rendering.
 - The search uses an age band, not a child's name or birth date.
 - The call task prohibits collecting medical details, enrolling a child, accepting policies, making payments, negotiating, or promising a place.
 - A waitlist is never classified as an opening.
@@ -116,6 +118,7 @@ The default tests use no credentials, network access, or real calls. They cover 
 4. Inspect the evidence matrix and explain that matching is deterministic.
 5. Select Willow Room, review the disclosure envelope, type `REQUEST TOUR`, and run the synthetic follow-up.
 6. Export the evidence report and show the separate tour outcome.
+7. Expand **Call summary** or choose **Download conversation PDF** to export the completed center conversations without phone numbers.
 
 Detailed submission assets are available in:
 

@@ -2,14 +2,17 @@
 
 import { useEffect, useState } from "react";
 import { campaignSummary, evaluateCenter, nextWave } from "@/lib/matching";
+import { downloadConversationPdf } from "@/lib/conversation-pdf";
 import {
   fixtureBrief,
   fixtureCandidates,
   fixtureResults,
+  fixtureSummaries,
+  fixtureTranscripts,
   fixtureTourResult,
   initialRecords,
 } from "@/lib/fixtures";
-import { WEEKDAYS, type CenterCallRecord, type CenterResult, type MatchTier, type SearchBrief, type TourRequest, type Weekday } from "@/lib/types";
+import { WEEKDAYS, type CenterCallRecord, type CenterResult, type MatchTier, type SearchBrief, type TourRequest, type TranscriptTurn, type Weekday } from "@/lib/types";
 
 type Screen = "brief" | "mission" | "matches" | "tour";
 type Mode = "fixture" | "live";
@@ -29,6 +32,8 @@ type LiveResponse = {
     candidateId: string;
     status: string;
     structuredResult: CenterResult | TourResult | null;
+    summary?: string | null;
+    transcriptTurns?: TranscriptTurn[];
   }>;
   message?: string;
   error?: string;
@@ -178,6 +183,8 @@ export function TinySlotApp({ publicDemo = false }: { publicDemo?: boolean }) {
       source: "fixture",
       verifiedAt: "2026-09-14T10:24:00Z",
       confidence: 0.94,
+      summary: fixtureSummaries[record.candidateId] ?? "No fixture summary was available.",
+      transcriptTurns: fixtureTranscripts[record.candidateId] ?? [],
     } : record));
     setRunState("complete");
     setNotice("The simulated wave is complete. TinySlot kept every unknown separate from a verified opening.");
@@ -229,6 +236,8 @@ export function TinySlotApp({ publicDemo = false }: { publicDemo?: boolean }) {
         callId: completed.callId,
         verifiedAt: new Date().toISOString(),
         confidence,
+        summary: recipient?.summary ?? undefined,
+        transcriptTurns: recipient?.transcriptTurns ?? [],
       };
     }));
     setNotice("Live CALL-E results are bound to this search and ready for deterministic comparison.");
@@ -347,6 +356,15 @@ export function TinySlotApp({ publicDemo = false }: { publicDemo?: boolean }) {
     setNotice("The masked evidence report has been exported.");
   }
 
+  async function downloadPdf() {
+    try {
+      await downloadConversationPdf(brief, fixtureCandidates, records);
+      setNotice("The privacy-masked conversation PDF has been downloaded.");
+    } catch (error) {
+      setNotice(error instanceof Error ? error.message : "The conversation PDF could not be generated.");
+    }
+  }
+
   return (
     <main className="shell">
       <aside className="side-rail" aria-label="TinySlot navigation">
@@ -417,6 +435,7 @@ export function TinySlotApp({ publicDemo = false }: { publicDemo?: boolean }) {
             summary={summary}
             onTour={openTour}
             onDownload={downloadReport}
+            onDownloadPdf={downloadPdf}
           />
         )}
         {screen === "tour" && (
@@ -552,12 +571,13 @@ function MissionScreen({ brief, records, mode, livePhones, summary, runState, ca
   );
 }
 
-function MatchesScreen({ brief, records, summary, onTour, onDownload }: {
+function MatchesScreen({ brief, records, summary, onTour, onDownload, onDownloadPdf }: {
   brief: SearchBrief;
   records: CenterCallRecord[];
   summary: ReturnType<typeof campaignSummary>;
   onTour: (candidateId: string) => void;
   onDownload: () => void;
+  onDownloadPdf: () => void;
 }) {
   const completed = records.filter((record) => record.status === "completed");
   return (
@@ -576,12 +596,13 @@ function MatchesScreen({ brief, records, summary, onTour, onDownload }: {
                 <div className="price"><strong>{formatMoney(record.result?.monthlyTuitionMinor ?? -1, brief.currency)}</strong><small>monthly</small>{evaluation.tier === "qualified" && record.result?.tourStatus === "offered" && <button className="text-button" type="button" onClick={() => onTour(candidate.id)}>Review tour request</button>}</div>
               </div>
               <div className="checks">{evaluation.checks.map((item) => <div key={item.key}><span className={item.status}>{item.status === "pass" ? "OK" : item.status === "fail" ? "X" : "?"}</span><p><strong>{item.label}</strong><small>{item.detail}</small></p></div>)}</div>
+              <details className="call-summary"><summary>Call summary</summary><p>{record.summary || "No call summary was available."}</p><small>{record.transcriptTurns?.length ?? 0} transcript turns available for the PDF report.</small></details>
               {record.result && <div className="evidence"><span>Staff-reported evidence</span><blockquote>&ldquo;{record.result.availabilityEvidence || "No availability quote."}&rdquo;<br />&ldquo;{record.result.scheduleEvidence || "No schedule quote."}&rdquo;</blockquote></div>}
             </article>
           );
         })}
       </section>
-      <div className="report-bar"><div><strong>Portable evidence report</strong><span>Exports the care brief, outcomes, checks, and evidence without live phone numbers.</span></div><button className="button ghost" type="button" onClick={onDownload}>Export JSON</button></div>
+      <div className="report-bar"><div><strong>Portable conversation report</strong><span>Exports summaries, conversations, outcomes, checks, and evidence without live phone numbers.</span></div><div className="report-actions"><button className="button ghost" type="button" onClick={onDownload}>Export JSON</button><button className="button primary" type="button" onClick={onDownloadPdf}>Download conversation PDF</button></div></div>
     </div>
   );
 }

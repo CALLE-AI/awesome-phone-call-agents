@@ -26,6 +26,8 @@ TinySlot ranks an operator-provided center list and calls at most three authoriz
 
 Application code then evaluates every center against the same rules. A waitlist is not an opening, voicemail is not evidence, and missing hard-constraint evidence routes to review. Once the requested number of qualified matches is reached, TinySlot stops and leaves the remaining centers undisturbed.
 
+Each completed result also exposes CALL-E's post-call summary. The operator can download a privacy-masked PDF containing the care brief, summaries, structured outcomes, deterministic checks, evidence quotations, and available transcript turns without including live destination numbers.
+
 A qualified result does not authorize another side effect. The parent selects a center, reviews a disclosure envelope, and types `REQUEST TOUR` before CALL-E can place a separate tour-request call. TinySlot cannot enroll, accept policies, pay fees, or disclose the child's identity.
 
 ## How We Built It

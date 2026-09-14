@@ -19,6 +19,7 @@
 - [x] CALL-E feedback draft prepared
 - [x] Devpost description prepared
 - [x] Public demo deployed without live credentials
+- [x] Privacy-masked conversation PDF and call-summary UI available
 
 ## Requires Maintainer Approval or Account Access
 

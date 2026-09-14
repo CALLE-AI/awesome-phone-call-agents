@@ -253,6 +253,7 @@ export async function GET(request: Request) {
         candidateId: recipient.candidateId,
         status: recipient.status,
         summary: recipient.summary,
+        transcriptTurns: recipient.transcriptTurns,
         structuredResult: stage === "search" ? parseCenterResult(recipient.structuredResult) : parseTourResult(recipient.structuredResult),
       })) : [],
     });

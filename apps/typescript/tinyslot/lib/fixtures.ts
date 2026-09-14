@@ -1,4 +1,4 @@
-import type { CenterCallRecord, CenterCandidate, CenterResult, SearchBrief } from "./types.ts";
+import type { CenterCallRecord, CenterCandidate, CenterResult, SearchBrief, TranscriptTurn } from "./types.ts";
 
 export const fixtureBrief: SearchBrief = {
   ageBand: "toddler",
@@ -130,6 +130,42 @@ export const fixtureResults: Record<string, CenterResult> = {
     scheduleEvidence: "It can cover all five weekdays from eight until six thirty.",
     feeEvidence: "The monthly fee is fourteen sixty, plus fifty dollars to register.",
   },
+};
+
+export const fixtureSummaries: Record<string, string> = {
+  "willow-room": "Staff confirmed one toddler opening before the requested start date, full weekday coverage, compatible hours, current tuition, subsidy acceptance, and two possible tour windows.",
+  "alder-house": "Staff confirmed a Monday, Wednesday, and Friday toddler opening with compatible hours and tuition below the stated monthly budget. Subsidy acceptance was not established.",
+  "moss-and-moon": "Staff confirmed the center serves toddlers but reported no current opening. The only option described was an estimated four-month waitlist.",
+  "little-atlas": "Staff reported an opening, but only on Tuesday and Thursday, which does not cover the requested weekdays.",
+  "juniper-yard": "Staff reported that the toddler room is full for the remainder of the year.",
+  "hearthside": "Staff confirmed an opening that fits the requested date, weekdays, hours, and monthly budget.",
+};
+
+export const fixtureTranscripts: Record<string, TranscriptTurn[]> = {
+  "willow-room": [
+    { offsetSeconds: 0, speaker: "agent", text: "Hello, I am TinySlot, an AI assistant making a childcare availability enquiry for a parent. Are you willing to continue?" },
+    { offsetSeconds: 7, speaker: "recipient", text: "Yes, this is Willow Room Childcare. I can help." },
+    { offsetSeconds: 12, speaker: "agent", text: "Do you have a toddler opening by October fifteenth for Monday, Wednesday, and Friday from eight thirty to five thirty?" },
+    { offsetSeconds: 22, speaker: "recipient", text: "We have one toddler opening from October fifth, and it is available Monday through Friday from eight to six." },
+    { offsetSeconds: 33, speaker: "agent", text: "What are the current monthly tuition, registration fee, subsidy status, and possible tour times?" },
+    { offsetSeconds: 41, speaker: "recipient", text: "Tuition is fourteen hundred and twenty dollars monthly, registration is seventy-five, we accept subsidies, and tours are Thursday at ten or Friday at three thirty." },
+  ],
+  "alder-house": [
+    { offsetSeconds: 0, speaker: "agent", text: "Hello, I am TinySlot, an AI assistant calling about current toddler availability. May I continue?" },
+    { offsetSeconds: 6, speaker: "recipient", text: "Yes, you have reached Alder House Early Learning." },
+    { offsetSeconds: 11, speaker: "agent", text: "Is there an opening by October fifteenth for Monday, Wednesday, and Friday care from eight thirty to five thirty?" },
+    { offsetSeconds: 20, speaker: "recipient", text: "A three-day toddler place opens October twelfth. We are open from seven thirty until five forty-five." },
+    { offsetSeconds: 29, speaker: "agent", text: "What is the current tuition and can a parent arrange a tour?" },
+    { offsetSeconds: 35, speaker: "recipient", text: "It is thirteen eighty per month and one hundred to register. Tours are Wednesday morning or Thursday at four." },
+  ],
+  "moss-and-moon": [
+    { offsetSeconds: 0, speaker: "agent", text: "Hello, I am TinySlot, an AI assistant making a childcare availability enquiry. Are you willing to continue?" },
+    { offsetSeconds: 7, speaker: "recipient", text: "Yes, this is Moss and Moon Nursery." },
+    { offsetSeconds: 11, speaker: "agent", text: "Do you have a current toddler opening for Monday, Wednesday, and Friday?" },
+    { offsetSeconds: 18, speaker: "recipient", text: "No, there is no current toddler opening. The waitlist is about four months." },
+    { offsetSeconds: 25, speaker: "agent", text: "What are your normal hours and current monthly rate?" },
+    { offsetSeconds: 30, speaker: "recipient", text: "Our normal hours are eight until five, and the toddler rate is twelve ninety per month." },
+  ],
 };
 
 export const initialRecords: CenterCallRecord[] = fixtureCandidates.map((candidate, index) => ({

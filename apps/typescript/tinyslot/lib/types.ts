@@ -56,6 +56,12 @@ export interface CenterResult {
   feeEvidence: string;
 }
 
+export interface TranscriptTurn {
+  offsetSeconds: number | null;
+  speaker: "agent" | "recipient" | "unknown";
+  text: string;
+}
+
 export interface CenterCallRecord {
   candidateId: string;
   status: "planned" | "calling" | "completed" | "failed" | "held";
@@ -64,6 +70,8 @@ export interface CenterCallRecord {
   callId?: string;
   verifiedAt?: string;
   confidence?: number | null;
+  summary?: string;
+  transcriptTurns?: TranscriptTurn[];
 }
 
 export type MatchTier = "qualified" | "partial" | "waitlist" | "unavailable" | "review";

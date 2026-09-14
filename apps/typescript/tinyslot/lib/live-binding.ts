@@ -7,6 +7,11 @@ export type VerifiedRecipient = {
   status: string;
   structuredResult: Record<string, unknown> | null;
   summary: string | null;
+  transcriptTurns: Array<{
+    offsetSeconds: number | null;
+    speaker: "agent" | "recipient" | "unknown";
+    text: string;
+  }>;
 };
 
 type StoredBinding = { candidate_id: string; phone_fingerprint: string };
@@ -15,7 +20,15 @@ type CallSnapshot = {
   status: string;
   taskCompleted: boolean | null;
   metadata: Record<string, unknown>;
-  recipients: Array<{ phones: string[]; status: string; structuredResult: Record<string, unknown> | null; summary: string | null }>;
+  recipients: Array<{
+    phones: string[];
+    status: string;
+    structuredResult: Record<string, unknown> | null;
+    summary: string | null;
+    attempts: Array<{
+      transcriptTurns: Array<{ offset_seconds: number | null; speaker: "bot" | "user" | "unknown"; text: string }>;
+    }>;
+  }>;
 };
 
 function toHex(value: ArrayBuffer) {
@@ -71,7 +84,16 @@ export async function verifyCallBinding(
     if (!binding || seen.has(fingerprint)) return { ok: false, error: "recipient_phone_mismatch" };
     if (call.status === "completed" && recipient.status !== "completed") return { ok: false, error: "recipient_not_completed" };
     seen.add(fingerprint);
-    recipients.push({ candidateId: binding.candidate_id, status: recipient.status, structuredResult: recipient.structuredResult, summary: recipient.summary });
+    const transcriptTurns = recipient.attempts
+      .flatMap((attempt) => attempt.transcriptTurns)
+      .filter((turn) => typeof turn.text === "string" && turn.text.trim().length > 0)
+      .slice(0, 200)
+      .map((turn) => ({
+        offsetSeconds: turn.offset_seconds,
+        speaker: turn.speaker === "bot" ? "agent" as const : turn.speaker === "user" ? "recipient" as const : "unknown" as const,
+        text: turn.text.trim(),
+      }));
+    recipients.push({ candidateId: binding.candidate_id, status: recipient.status, structuredResult: recipient.structuredResult, summary: recipient.summary, transcriptTurns });
   }
   if (call.status === "completed" && call.taskCompleted !== true) return { ok: false, error: "call_task_not_completed" };
   return { ok: true, recipients };
