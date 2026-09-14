@@ -199,6 +199,7 @@ Runnable demo apps live under [`apps/`](apps/). They are not a CALL-E SDK and do
 
 | App | Language | Purpose |
 | --- | --- | --- |
+| [Benchline](https://github.com/aamir-azeez/benchline) · [Demo](https://aamir-azeez.github.io/benchline/) | TypeScript / JavaScript | External hardware-parts sourcing rehearsal: compiles requirement briefs into CALL-E tasks and compares fictional supplier quotes with transcript-linked evidence and explicit unknowns. The official SDK is exercised through a local fake transport; no live calls are enabled or claimed. |
 | [`apps/typescript/before-we-go`](apps/typescript/before-we-go/) | TypeScript / Node.js | Consent-gated restaurant enquiry callbacks grounded in a versioned fictional fact sheet, with transcript-linked customer needs, unresolved questions, and a reviewed staff handoff; synthetic no-call default. |
 | [`apps/typescript/kol`](apps/typescript/kol/) | TypeScript / Node | Evidence-gated healthcare claim-status calls that require transcript-grounded fields, the intended payer department, the actual question, and an independent IVR route receipt; includes a 640-case no-call evaluation and explicit live CALL-E path. |
 | [`apps/python/rolloff-scope`](apps/python/rolloff-scope/) | Python | Compares a fixed dumpster scope using evidence-bound mandatory fees; excludes incomplete or contradictory quotes, with no-call fixtures by default. |
