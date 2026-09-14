@@ -191,6 +191,7 @@ This project is an awesome list for AI-agent phone-call workflows. Add resources
 
 ### Apps
 
+- [TinySlot](apps/typescript/tinyslot/) - Adaptive childcare-vacancy search that calls approved centers in bounded waves, verifies openings against a privacy-minimized care brief, stops when enough evidence-backed matches are found, and gates a tour request behind separate parent approval. [Demo](https://utpal-kalita.github.io/tinyslot-demo/)
 
 - [SiteWitness](apps/typescript/sitewitness/) - Local site-history interview workspace that carries reviewed evidence gaps into individually approved CALL-E calls, with exact transcript quotations, human year review, and a no-call rehearsal mode.
 - [Rebuttal Dispute Call](apps/python/rebuttal-dispute-call/) - One disclosed CALL-E call to a disputing customer, cross-examined against its transcript before it becomes chargeback evidence, with six scripted no-call scenarios and a live path gated by per-run consent, an allowlist and local calling hours.
@@ -257,6 +258,7 @@ Runnable demo apps live under [`apps/`](apps/). They are not a CALL-E SDK and do
 
 | App | Language | Purpose |
 | --- | --- | --- |
+| [`apps/typescript/tinyslot`](apps/typescript/tinyslot/) | TypeScript / Next.js | Adaptive childcare-vacancy search with bounded CALL-E waves, deterministic constraint checks, evidence-backed comparisons, and a separately approved tour request. |
 | [`apps/typescript/readycheck`](apps/typescript/readycheck/) | TypeScript / Node | Requirement-based local-service inquiries with CALL-E, source-linked evidence review, focused follow-ups, explicit budget revisions and durable recovery; fictional no-call demo by default. |
 | [`apps/python/rebuttal-dispute-call`](apps/python/rebuttal-dispute-call/) | Python | Merchant-side chargeback evidence call: one disclosed CALL-E call with a fixed script and a strict result schema, a yes used only when the customer's own words say yes, a no that stops the filing, and a masked evidence PDF; dry-run with six scripted scenarios by default, live only with per-run consent, an allowlist, local calling hours and one call per dispute. |
 | [`apps/typescript/last-crate`](apps/typescript/last-crate/) | TypeScript / Node.js | Two-call surplus-bread handoff: verifies the donor offer, matches full-capacity collectors, and issues an expiring pickup ticket from a bounded commitment; no-call fixtures by default. |

@@ -10,6 +10,7 @@ Current apps:
 
 | App | Language | Purpose |
 | --- | --- | --- |
+| [`typescript/tinyslot`](typescript/tinyslot/) | TypeScript / Next.js | Adaptive childcare-vacancy search that calls approved centers in bounded waves, verifies openings against a privacy-minimized care brief, stops when enough evidence-backed matches are found, and gates a tour request behind separate parent approval. [Demo](https://utpal-kalita.github.io/tinyslot-demo/) |
 | [`web/callops`](web/callops/) | TypeScript / Vite / Node | Repair follow-up: separate supplier dates and prepare an evidence-linked customer update. No-call browser demo, reusable guarded CALL-E backend, and 214 hermetic tests; representative phone execution pending. |
 | [`typescript/readycheck`](typescript/readycheck/) | TypeScript / Node | Requirement-based local-service inquiries with CALL-E, source-linked evidence review, focused follow-ups, explicit budget revisions and durable recovery; fictional no-call demo by default. |
 | [`python/rebuttal-dispute-call`](python/rebuttal-dispute-call/) | Python | Merchant-side chargeback evidence call: one disclosed CALL-E call with a fixed script and a strict result schema, a yes used only when the customer's own words say yes, a no that stops the filing, and a masked evidence PDF; dry-run with six scripted scenarios by default, live only with per-run consent, an allowlist, local calling hours and one call per dispute. |
