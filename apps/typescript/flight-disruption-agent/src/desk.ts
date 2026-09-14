@@ -14,7 +14,7 @@ import { maskPhone, routeFor } from "./phone.ts";
 import { redactOutcome, redactText } from "./redact.ts";
 import { airlineOf, quoteFor, voluntaryQuoteFor } from "./rules.ts";
 import { buildResultSchema, buildTask } from "./task.ts";
-import type { Action, AirlineCall, BookingState, Decision, Disruption, DisruptionCause, DisruptionKind, DisruptionSource, LedgerEntry, OpsEventRecord, Quote, RequestChannel, RequestEntry, RequestKind } from "./types.ts";
+import type { Action, AirlineCall, BookingState, Decision, Disruption, DisruptionCause, DisruptionKind, DisruptionSource, LedgerEntry, OpsEventRecord, OpsEventVia, Quote, RequestChannel, RequestEntry, RequestKind } from "./types.ts";
 
 interface DeskState {
   disruptions: Disruption[];
@@ -22,6 +22,8 @@ interface DeskState {
   requests: Record<string, RequestEntry>;
   /** Airline ops webhook deliveries by event id. */
   opsEvents: Record<string, OpsEventRecord>;
+  /** Where the airline feed poller resumes. Kept across restarts so no event is missed or re-read. */
+  feedCursor: string | null;
   bookings: Record<string, BookingState>;
   seats: Record<string, number>;
   liveCallsUsed: number;
@@ -126,7 +128,7 @@ export class Desk {
     }
     const seats: Record<string, number> = {};
     for (const f of this.catalog.flights) seats[f.id] = f.seatsAvailable;
-    return { disruptions: [], ledger: {}, requests: {}, opsEvents: {}, bookings, seats, liveCallsUsed: 0, runId: newRunId() };
+    return { disruptions: [], ledger: {}, requests: {}, opsEvents: {}, feedCursor: null, bookings, seats, liveCallsUsed: 0, runId: newRunId() };
   }
 
   private load(): DeskState | null {
@@ -135,6 +137,8 @@ export class Desk {
     const state = JSON.parse(readFileSync(path, "utf8")) as DeskState;
     state.requests ??= {};
     state.opsEvents ??= {};
+    state.feedCursor ??= null;
+    for (const r of Object.values(state.opsEvents)) r.via ??= "webhook";
     state.runId ??= newRunId();
     // Provider text saved by an older version may be unmasked.
     for (const e of Object.values(state.ledger)) {
@@ -305,12 +309,13 @@ export class Desk {
    * once: a retried delivery returns the first result and changes nothing. Events never
    * start calls; an operator still reviews the priced options and calls passengers.
    */
-  receiveOpsEvent(event: OpsEvent): { record: OpsEventRecord; duplicate: boolean } {
+  receiveOpsEvent(event: OpsEvent, via: OpsEventVia = "webhook"): { record: OpsEventRecord; duplicate: boolean } {
     const seen = this.state.opsEvents[event.eventId];
     if (seen) return { record: seen, duplicate: true };
 
     const record: OpsEventRecord = {
       eventId: event.eventId,
+      via,
       type: event.type,
       flightId: event.flightId,
       receivedAt: new Date(this.now()).toISOString(),
@@ -336,7 +341,7 @@ export class Desk {
           cause: event.cause,
           delayMinutes: event.delayMinutes,
           reason: event.reason,
-          source: { kind: "airline_webhook", eventId: event.eventId, receivedAt: record.receivedAt },
+          source: { kind: via === "feed" ? "airline_feed" : "airline_webhook", eventId: event.eventId, receivedAt: record.receivedAt },
         });
         record.disruptionId = disruption.id;
         if (disruption.supersedes) {
@@ -353,6 +358,16 @@ export class Desk {
     this.state.opsEvents[event.eventId] = record;
     this.save();
     return { record, duplicate: false };
+  }
+
+  get feedCursor(): string | null {
+    return this.state.feedCursor;
+  }
+
+  /** Called by the feed poller after a page is fully processed. */
+  saveFeedCursor(cursor: string | null): void {
+    this.state.feedCursor = cursor;
+    this.save();
   }
 
   quote(disruptionId: string, pnr: string): Quote {

@@ -75,7 +75,12 @@ export type DisruptionCause = "operational" | "force_majeure";
 export type DisruptionSource =
   | { kind: "manual" }
   /** Pushed by the airline or OTA operations system through the signed webhook. */
-  | { kind: "airline_webhook"; eventId: string; receivedAt: string };
+  | { kind: "airline_webhook"; eventId: string; receivedAt: string }
+  /** Pulled by the desk from the airline's event feed. */
+  | { kind: "airline_feed"; eventId: string; receivedAt: string };
+
+/** How an ops event reached the desk. */
+export type OpsEventVia = "webhook" | "feed";
 
 export interface Disruption {
   id: string;
@@ -282,6 +287,7 @@ export interface RequestEntry {
 /** One webhook delivery from the airline or OTA operations system, kept for dedupe and audit. */
 export interface OpsEventRecord {
   eventId: string;
+  via: OpsEventVia;
   type: string;
   flightId: string | null;
   receivedAt: string;
