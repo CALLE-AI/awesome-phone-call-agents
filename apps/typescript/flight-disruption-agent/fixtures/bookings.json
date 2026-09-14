@@ -75,7 +75,6 @@
     "channel": ["tripkita", "nusantara-air"],
     "ticket": "000-2400000107",
     "simulatedAnswer": { "kind": "refund" },
-    "simulatedGds": "reject_refund",
     "simulatedAirlineDesk": "approves"
   },
   {
@@ -99,7 +98,6 @@
     "channel": ["tripkita", "dist-samudra", "nusantara-air"],
     "ticket": "000-2400000109",
     "simulatedAnswer": { "kind": "refund" },
-    "simulatedGds": "reject_reschedule",
     "simulatedAirlineDesk": "approves"
   },
   {
@@ -112,7 +110,6 @@
     "channel": ["tripkita", "dist-lintas", "nusantara-air"],
     "ticket": "000-2400000110",
     "simulatedAnswer": { "kind": "human" },
-    "simulatedGds": "reject_reschedule",
     "simulatedAirlineDesk": "refused"
   }
 ]

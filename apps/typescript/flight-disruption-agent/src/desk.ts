@@ -18,7 +18,6 @@ import { checkEligibility } from "./eligibility.ts";
 import { buildIntakeResultSchema, buildIntakeTask, decideIntake } from "./intake.ts";
 import { NOT_FOUND_REPLY, passengerMatches, replyFor, type ChannelMessage, type ChannelNotifier } from "./channel.ts";
 import type { OpsEvent } from "./events.ts";
-import { FakeGds, type Gds } from "./gds.ts";
 import { addMinutes, idr, localTime } from "./format.ts";
 import { maskPhone, routeFor } from "./phone.ts";
 import { redactOutcome, redactText } from "./redact.ts";
@@ -57,8 +56,6 @@ export interface DeskOptions {
   demoNow?: () => number;
   /** Pushes later request updates to the passenger's channel. Without it, updates are only recorded. */
   channelNotifier?: ChannelNotifier;
-  /** B2B portal or GDS used by Workflow B. Defaults to the fake portal. */
-  gds?: Gds;
 }
 
 export interface DisruptionInput {
@@ -94,7 +91,6 @@ function newTicket(): string {
 export class Desk {
   private state: DeskState;
   private readonly now: () => number;
-  private readonly gds: Gds;
   /** Calls whose status check is running. Overlapping polls (two tabs, slow CALL-E) wait their turn. */
   private readonly polling = new Set<string>();
 
@@ -115,7 +111,6 @@ export class Desk {
     private readonly options: DeskOptions,
   ) {
     this.now = options.now ?? Date.now;
-    this.gds = options.gds ?? new FakeGds();
     this.state = this.load() ?? this.initialState();
     if (gateway.live) {
       if (!options.liveDemoPhone) throw new Error("Live mode needs LIVE_DEMO_PHONE: the one number live calls may reach.");
@@ -1177,7 +1172,7 @@ export class Desk {
 
   /**
    * Changes one booking in the fake GDS. `reissue` carries the booking code and
-   * ticket an airline desk issued by phone; otherwise the portal issues new ones.
+   * ticket an airline desk issued by phone; otherwise the fake GDS issues new ones.
    */
   private applyChange(pnr: string, quote: Quote, action: Action, reissue?: { pnr: string; ticket: string }): string {
     const state = this.state.bookings[pnr];
