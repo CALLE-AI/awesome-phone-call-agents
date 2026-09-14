@@ -127,19 +127,21 @@ function narrate(event) {
         tone: "approve",
         text: `Authorized ${niceName(event.nodeId)} — placing the call.`,
       };
+    case "run_paused": {
+      const awaiting = (snap?.nodes ?? []).filter(
+        (n) => n.status === "awaiting_approval"
+      ).length;
+      return {
+        tone: "alert",
+        text: `Paused: ${awaiting} call${awaiting === 1 ? "" : "s"} awaiting your authorization. Approve to continue.`,
+      };
+    }
     case "graph_done": {
       const nodes = snap?.nodes ?? [];
       const attention = nodes.filter(
         (n) => n.result?.urgency === "high" || n.status === "needs_user"
       ).length;
       const review = nodes.filter((n) => n.status === "needs_review").length;
-      const awaiting = nodes.filter((n) => n.status === "awaiting_approval").length;
-      if (awaiting > 0) {
-        return {
-          tone: "alert",
-          text: `Paused: ${awaiting} call${awaiting === 1 ? "" : "s"} awaiting your authorization. Approve to continue.`,
-        };
-      }
       return {
         tone: "start",
         text: `Run complete. ${nodes.length} calls, ${attention} need attention now, ${review} need review.`,
@@ -526,7 +528,11 @@ function App() {
       pushActivity(line);
       if (line) announce(line.text);
 
-      if (event.type === "graph_done") {
+      if (event.type === "run_paused") {
+        // Paused for human authorization. Keep the stream OPEN so approving a
+        // node resumes and we receive the follow-on events.
+        setRunning(false);
+      } else if (event.type === "graph_done") {
         setRunning(false);
         closeStream();
       }

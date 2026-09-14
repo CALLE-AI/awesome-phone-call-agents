@@ -60,7 +60,7 @@ export interface RunSnapshot {
 /** A serialized event pushed to SSE clients. */
 export interface RunEvent {
   seq: number;
-  type: ExecutorEvent["type"] | "snapshot" | "node_approved";
+  type: ExecutorEvent["type"] | "snapshot" | "node_approved" | "run_paused";
   nodeId?: string;
   from?: string;
   to?: string;
@@ -286,12 +286,21 @@ class Run {
       const parked = this.graph.nodes.some(
         (n) => n.status === "awaiting_approval"
       );
-      this.state = parked ? "running" : "done";
+      this.executing = false;
+      if (parked) {
+        // Do NOT signal graph_done while paused — the client keeps the SSE
+        // stream open so it receives events when a human approval resumes it.
+        this.state = "running";
+        this.emit({ type: "run_paused" });
+      } else {
+        this.state = "done";
+        this.finishedAt = Date.now();
+        this.emit({ type: "graph_done" });
+      }
     } catch (err) {
+      this.executing = false;
       this.state = "error";
       this.error = err instanceof Error ? err.message : String(err);
-    } finally {
-      this.executing = false;
       this.finishedAt = Date.now();
       this.emit({ type: "graph_done" });
     }
