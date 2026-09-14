@@ -68,7 +68,6 @@ exactly what was said."""
 
 def run_pipeline(
     email_body: str,
-    sender_domain: str,
     call_client: CallEClient,
     to_phone: str | None = None,
     official_support_number: str | None = None,
@@ -91,7 +90,7 @@ def run_pipeline(
     555-0187"), which is not guaranteed to be a strict, unambiguous E.164
     number — --to-phone is what a human actually typed and CALL-E's
     guardrails validated."""
-    alert = extract_alert(email_body, sender_domain)
+    alert = extract_alert(email_body)
     if alert is None:
         return None  # not flagged as suspicious — pipeline never dials
 

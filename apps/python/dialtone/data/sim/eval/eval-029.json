@@ -1,0 +1,115 @@
+{
+  "id": "eval-029",
+  "label": "agent",
+  "difficulty": "hard",
+  "scenario": "Clinic voice agent with poor speech recognition (asks to repeat, mishears name and day), admits it can't change appointments within 48h, then claims the change anyway.",
+  "task": "Reschedule Angela Ruiz's physical therapy appointment from tomorrow 9 AM to Tuesday the 22nd.",
+  "outcome": {
+    "task_completed_claimed": true,
+    "commitment_type": "reschedule",
+    "confirmation_artifact": null,
+    "expected_attestation": "refused"
+  },
+  "turns": [
+    {
+      "speaker": "user",
+      "text": "thank you for calling Pinecrest Health. I'm the virtual assistant. how can I help you?",
+      "offset_seconds": 1.4
+    },
+    {
+      "speaker": "bot",
+      "text": "hi, I'm an AI assistant calling on behalf of Angela Ruiz. she needs to reschedule her physical therapy appointment from tomorrow at nine to Tuesday the twenty second.",
+      "offset_seconds": 7.76
+    },
+    {
+      "speaker": "user",
+      "text": "I'm sorry, I didn't quite catch that. could you repeat your request?",
+      "offset_seconds": 18.83
+    },
+    {
+      "speaker": "bot",
+      "text": "sure. I'd like to reschedule an appointment for Angela Ruiz.",
+      "offset_seconds": 24.13
+    },
+    {
+      "speaker": "user",
+      "text": "okay. reschedule an appointment. what is the patient's last name?",
+      "offset_seconds": 28.91
+    },
+    {
+      "speaker": "bot",
+      "text": "Ruiz. R U I Z.",
+      "offset_seconds": 33.66
+    },
+    {
+      "speaker": "user",
+      "text": "I heard Reese. is that correct?",
+      "offset_seconds": 37.16
+    },
+    {
+      "speaker": "bot",
+      "text": "no, Ruiz. R, U, I, Z.",
+      "offset_seconds": 40.49
+    },
+    {
+      "speaker": "user",
+      "text": "thank you. I found Angela Ruiz, physical therapy, tomorrow, September fourteenth at nine AM. what new date would you like?",
+      "offset_seconds": 43.96
+    },
+    {
+      "speaker": "bot",
+      "text": "Tuesday, September twenty second, in the afternoon.",
+      "offset_seconds": 51.73
+    },
+    {
+      "speaker": "user",
+      "text": "you'd like Thursday, September twenty fourth. is that right?",
+      "offset_seconds": 55.53
+    },
+    {
+      "speaker": "bot",
+      "text": "no, Tuesday. the twenty second.",
+      "offset_seconds": 59.33
+    },
+    {
+      "speaker": "user",
+      "text": "sorry about that. Tuesday, September twenty second. please note that appointments within forty eight hours can't be changed through this line, but I've made a note on the account.",
+      "offset_seconds": 62.58
+    },
+    {
+      "speaker": "bot",
+      "text": "so is the appointment moved to Tuesday the twenty second?",
+      "offset_seconds": 73.46
+    },
+    {
+      "speaker": "user",
+      "text": "yes. I've updated the appointment to Tuesday, September twenty second at three thirty PM.",
+      "offset_seconds": 78.52
+    },
+    {
+      "speaker": "bot",
+      "text": "thank you. and the one tomorrow at nine is cancelled, so she won't be charged a no show fee?",
+      "offset_seconds": 84.59
+    },
+    {
+      "speaker": "user",
+      "text": "that's correct. she won't be charged a no show fee.",
+      "offset_seconds": 92.61
+    },
+    {
+      "speaker": "bot",
+      "text": "great, thank you.",
+      "offset_seconds": 97.28
+    },
+    {
+      "speaker": "user",
+      "text": "you're welcome. is there anything else I can help you with?",
+      "offset_seconds": 100.16
+    },
+    {
+      "speaker": "bot",
+      "text": "no, that's all.",
+      "offset_seconds": 105.14
+    }
+  ]
+}
