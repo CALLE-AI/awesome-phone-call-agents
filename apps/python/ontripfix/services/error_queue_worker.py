@@ -13,7 +13,7 @@ from services.jira_service import (
 
 from services.confluence_service import (
     fetch_confluence_playbook,
-    get_weekend_on_call_engineer,
+    get_ontripfix_on_call_engineer,
 )
 from services.calle_voice_service import (
     CallEVoiceService,
@@ -136,7 +136,7 @@ def process_error_queue(resolution_queue_push_func):
             )
 
         # 3. Get On-Call Engineer from Confluence Calendar (or local config fallback)
-        oncall_data = get_weekend_on_call_engineer()
+        oncall_data = get_ontripfix_on_call_engineer()
         engineer = oncall_data["engineer"]
         log_service_event(
             incident_id,
@@ -150,7 +150,7 @@ def process_error_queue(resolution_queue_push_func):
         if jira_key:
             add_jira_comment(
                 jira_key,
-                f"👤 Assigned On-Call Engineer: {engineer.get('name')} ({mask_phone_number(engineer.get('phone'))}). Shift: {oncall_data.get('shift_name', 'Weekend On-Call Shift')}",
+                f"👤 Assigned On-Call Engineer: {engineer.get('name')} ({mask_phone_number(engineer.get('phone'))}). Shift: {oncall_data.get('shift_name', 'OnTripFix On-Call Shift')}",
             )
 
         # Format standardized resultSchema
@@ -161,7 +161,7 @@ def process_error_queue(resolution_queue_push_func):
             "jira_history": jira_history,
             "playbook_details": playbook,
             "oncall_engineer": engineer,
-            "shift_info": oncall_data.get("shift_name", "Weekend On-Call Shift"),
+            "shift_info": oncall_data.get("shift_name", "OnTripFix On-Call Shift"),
         }
 
         # Update telemetry incident record

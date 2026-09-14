@@ -9,7 +9,7 @@ sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
 from db.init_sqlite import init_db, DB_PATH
 from services.jira_service import search_jira, create_jira_ticket, add_jira_comment, update_jira_ticket_status
 
-from services.confluence_service import fetch_confluence_playbook, get_weekend_on_call_engineer
+from services.confluence_service import fetch_confluence_playbook, get_ontripfix_on_call_engineer
 from services.calle_voice_service import CallEVoiceService
 from services.langgraph_remediation import run_langgraph_remediation
 from services.error_queue_worker import enqueue_error_payload
@@ -56,7 +56,7 @@ def test_confluence_service_and_oncall_fallback():
     assert playbook is not None
     assert "ALTER TABLE" in playbook['recommended_sql']
 
-    oncall = get_weekend_on_call_engineer()
+    oncall = get_ontripfix_on_call_engineer()
     assert 'name' in oncall['engineer'] and len(oncall['engineer']['name']) > 0
     assert 'phone' in oncall['engineer'] and len(oncall['engineer']['phone']) > 0
 
