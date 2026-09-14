@@ -370,6 +370,8 @@ The default e2e tests use a local fake broker/OAuth/MCP server or dry-run paths,
 
 ### Community apps
 
+- [DwellGuard](https://github.com/Syedsaadhhh/DwellGuard-AI) - Late-arrival dispatch coordination with CALL-E: a driver-verified arrival window feeds a bounded dock call, and only an in-policy commitment becomes a driver handoff. Includes a credential-free deterministic replay and fail-closed fee handling. See the [integration notes](docs/community-apps/dwellguard.md).
+
 - [Exception Broker](https://exception-broker-production.up.railway.app) - Execution-control app for CALL-E-acquired operational decisions, with exact review, controlled ALLOW/BLOCK/WAIT dispositions, and a deterministic no-call demo. See the [integration notes](docs/community-apps/exception-broker.md) and [demo video](https://youtu.be/Smw7aXyI0fI).
 
 - [Openline](https://openlinecall.vercel.app/) - Human-approved service-availability verification app that turns a request into an inspectable CALL-E phone plan and returns evidence-backed next steps, with a no-call simulation path. ([repository](https://github.com/Datwebguy/openline))
