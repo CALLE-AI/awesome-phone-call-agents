@@ -93,6 +93,10 @@ escalate directly to human review.
 
 ## Live mode (not required for judging)
 
+Live operation is local-only: the supplied dev/start commands bind to `127.0.0.1`.
+Do not tunnel or reverse-proxy live/private routes without adding operator authentication.
+The public Docker command forces replay mode and removes the provider key from its process.
+
 `CHANGELOCK_MODE=live` plus `CALLE_API_KEY` and nonempty comma-separated
 `CHANGELOCK_LIVE_CONTACT_ALLOWLIST` (consenting E.164 numbers) and
 `CHANGELOCK_LIVE_REGION_ALLOWLIST` (e.g. `US`) enables the real `@call-e/calle`
