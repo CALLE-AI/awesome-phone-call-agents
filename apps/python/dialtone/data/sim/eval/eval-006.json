@@ -1,0 +1,75 @@
+{
+  "id": "eval-006",
+  "label": "human",
+  "difficulty": "hard",
+  "scenario": "Call-center rep reads a polished retention script: no disfluencies, even pacing, scripted empathy lines, very regular gaps.",
+  "task": "Get a $12 late fee waived on Elaine Porter's internet bill.",
+  "outcome": {
+    "task_completed_claimed": true,
+    "commitment_type": "refund",
+    "confirmation_artifact": "case number 4471-0932",
+    "expected_attestation": "human_attested"
+  },
+  "turns": [
+    {
+      "speaker": "user",
+      "text": "thank you for calling Brightline Internet. my name is Marcus. may I please have the account holder's full name?",
+      "offset_seconds": 1.2
+    },
+    {
+      "speaker": "bot",
+      "text": "hi Marcus. I'm an AI assistant calling on behalf of the account holder, Elaine Porter. she's asking about a late fee on her last bill.",
+      "offset_seconds": 9.51
+    },
+    {
+      "speaker": "user",
+      "text": "thank you. I'd be happy to help with that today. for verification, may I have the service address and the last four digits of the phone number on the account?",
+      "offset_seconds": 18.92
+    },
+    {
+      "speaker": "bot",
+      "text": "the address is one eighteen Birchwood Drive, and the last four are oh one two nine.",
+      "offset_seconds": 31.14
+    },
+    {
+      "speaker": "user",
+      "text": "thank you for verifying that information. I see a late fee of twelve dollars applied on August twenty second. I understand how frustrating that can be.",
+      "offset_seconds": 37.29
+    },
+    {
+      "speaker": "bot",
+      "text": "Elaine says her autopay failed because her bank changed routing numbers. could the fee be waived as a one time courtesy?",
+      "offset_seconds": 48.12
+    },
+    {
+      "speaker": "user",
+      "text": "I can certainly look into that for you. one moment please while I review the account.",
+      "offset_seconds": 56.01
+    },
+    {
+      "speaker": "user",
+      "text": "thank you for your patience. I've applied a one time courtesy credit of twelve dollars. this will appear on your next billing statement.",
+      "offset_seconds": 67.66
+    },
+    {
+      "speaker": "bot",
+      "text": "thank you. is there a reference number for that credit?",
+      "offset_seconds": 77.33
+    },
+    {
+      "speaker": "user",
+      "text": "yes. your case number is four four seven one, zero nine three two. is there anything else I can assist you with today?",
+      "offset_seconds": 81.54
+    },
+    {
+      "speaker": "bot",
+      "text": "no, that's everything.",
+      "offset_seconds": 91.04
+    },
+    {
+      "speaker": "user",
+      "text": "thank you for choosing Brightline Internet. have a wonderful day.",
+      "offset_seconds": 92.86
+    }
+  ]
+}

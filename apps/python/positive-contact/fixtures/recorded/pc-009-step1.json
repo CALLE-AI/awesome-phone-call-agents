@@ -1,0 +1,101 @@
+{
+  "source": "synthetic-contract-shape",
+  "note": "live acknowledgement plus a medical question. Written against CALL-E Developer API 0.7.0. Replace with a payload captured by `pc record` after the first live call.",
+  "match": {
+    "contact_id": "pc-009",
+    "ladder_step": 1
+  },
+  "call_task": {
+    "id": "call_fx_pc-009_1",
+    "object": "call_task",
+    "status": "completed",
+    "task": "This is an automated safety notification from Northbay Power about a possible Public Safety Power Shutoff. This call may be recorded. Confirm the customer heard the notice.",
+    "recipients": [
+      {
+        "id": "rcp_1",
+        "phones": [
+          "+14155550109"
+        ],
+        "locale": "en-US",
+        "region": "US",
+        "status": "completed",
+        "structured_result": {
+          "contact_type": "live_person",
+          "acknowledged": "yes",
+          "spoke_with": "customer",
+          "needs_assistance": "medical_question",
+          "callback_window": "this afternoon",
+          "preferred_language": "",
+          "notify_alternate_contact": "unknown",
+          "notes_for_human": "Asked what to do about powered medical equipment. Routed to a human; no advice given."
+        },
+        "summary": "The customer confirmed the notice and asked a medical question, which was routed to a person.",
+        "attempts": [
+          {
+            "id": "att_1",
+            "phone": "+14155550109",
+            "status": "completed",
+            "started_at": "2026-09-11T15:00:05Z",
+            "completed_at": "2026-09-11T15:01:12Z",
+            "summary": "The customer confirmed the notice and asked a medical question, which was routed to a person.",
+            "transcript_turns": [
+              {
+                "offset_seconds": 0,
+                "speaker": "bot",
+                "text": "This is an automated safety notification from Northbay Power about a possible Public Safety Power Shutoff. This call may be recorded. Am I speaking with Walter or someone in the household?"
+              },
+              {
+                "offset_seconds": 7,
+                "speaker": "user",
+                "text": "Speaking, this is Walter."
+              },
+              {
+                "offset_seconds": 14,
+                "speaker": "bot",
+                "text": "Power at 540 block of Willow St may be turned off starting Friday September 11 at 6:00 PM PDT to reduce wildfire risk, and could stay off until Saturday September 12 at 8:00 PM PDT. Because this account is enrolled in the Medical Baseline program, we are calling to make sure you have received this notice. Can you confirm that you heard it?"
+              },
+              {
+                "offset_seconds": 21,
+                "speaker": "user",
+                "text": "Yes, I heard you. I run an oxygen concentrator at night. What am I supposed to do about that?"
+              },
+              {
+                "offset_seconds": 28,
+                "speaker": "bot",
+                "text": "I am not able to advise on medical equipment. A member of our team will call you back about that. The Community Resource Center at the Glen Ellen Community Hall will be open during the outage."
+              },
+              {
+                "offset_seconds": 35,
+                "speaker": "user",
+                "text": "Alright, please have somebody call me."
+              },
+              {
+                "offset_seconds": 42,
+                "speaker": "bot",
+                "text": "We will never ask for payment or account information on this call. Thank you."
+              }
+            ],
+            "provider_call_id": "provider_call_fx_pc-009_1",
+            "failure_code": null,
+            "failure_message": null
+          }
+        ]
+      }
+    ],
+    "structured_result": null,
+    "summary": "The customer confirmed the notice and asked a medical question, which was routed to a person.",
+    "task_completed": true,
+    "completion_confidence": {
+      "score": 0.93,
+      "label": "high"
+    },
+    "evidence": [
+      "The customer confirmed the notice and asked a medical question, which was routed to a person."
+    ],
+    "metadata": {},
+    "failure_code": null,
+    "failure_message": null,
+    "created_at": "2026-09-11T15:00:00Z",
+    "completed_at": "2026-09-11T15:01:12Z"
+  }
+}
