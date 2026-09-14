@@ -1,0 +1,56 @@
+{
+ "id": "train-ivr-006",
+ "label": "ivr",
+ "source": "sim-train",
+ "meta": {
+  "task": "book a table for two on Friday at 7 PM",
+  "hard": true
+ },
+ "turns": [
+  {
+   "speaker": "user",
+   "text": "Welcome to Northside Dental. In a few words, tell me what you're calling about. You can say things like appointments, billing, or hours.",
+   "offset_seconds": 0.47
+  },
+  {
+   "speaker": "bot",
+   "text": "Billing, please.",
+   "offset_seconds": 9.89
+  },
+  {
+   "speaker": "user",
+   "text": "I think you said appointments. Is that right? Say yes or no.",
+   "offset_seconds": 11.33
+  },
+  {
+   "speaker": "bot",
+   "text": "Billing, please.",
+   "offset_seconds": 16.67
+  },
+  {
+   "speaker": "user",
+   "text": "Okay, billing. Please hold while I transfer you. The current wait time is more than ten minutes.",
+   "offset_seconds": 18.12
+  },
+  {
+   "speaker": "bot",
+   "text": "I'd like to book a table for two people this Friday at 7 PM, under the name Jordan Lee.",
+   "offset_seconds": 25.31
+  },
+  {
+   "speaker": "user",
+   "text": "I think you said appointments. Is that right? Say yes or no.",
+   "offset_seconds": 32.99
+  },
+  {
+   "speaker": "bot",
+   "text": "Representative.",
+   "offset_seconds": 38.34
+  },
+  {
+   "speaker": "user",
+   "text": "Sorry, I didn't get that. You can say appointments, billing, or hours.",
+   "offset_seconds": 39.41
+  }
+ ]
+}

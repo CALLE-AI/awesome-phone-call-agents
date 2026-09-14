@@ -1,0 +1,82 @@
+{
+  "_provenance": "Authored, not recorded. Emitted by tools/make_shape_fixtures.py from calle_double, whose likeness to the production API is measured by tools/double_conformance.py and gated by test_the_double_emits_every_field_the_real_api_returns. The spoken turns were written for this fixture and are not a transcript of any call. No real-call artifact is committed to this repository. The recordings and transcripts of the calls that were placed are on the linked evidence page; their receipt files are in neither place, and the counts those receipts produced are in evidence/recorded-calls.json.",
+  "id": "call_2",
+  "object": "call_task",
+  "created_at": "2026-09-04T09:15:00Z",
+  "status": "completed",
+  "task": "Ask why the student was absent and when they will return.",
+  "task_completed": true,
+  "completion_confidence": {
+    "score": 0.9,
+    "label": "high"
+  },
+  "evidence": [
+    "Reached a parent, who gave a reason and a return date."
+  ],
+  "structured_result": {
+    "reason_category": "illness",
+    "expected_return": "tomorrow",
+    "parent_confirmed_aware": "yes",
+    "free_text_note": "Fever since last night; a parent is at home."
+  },
+  "recipients": [
+    {
+      "id": "rcp_1",
+      "phones": [
+        "+915550000002"
+      ],
+      "locale": "ta-IN",
+      "region": "IN",
+      "status": "completed",
+      "structured_result": null,
+      "summary": "Reached a parent, who gave a reason and a return date.",
+      "attempts": [
+        {
+          "id": "att_4",
+          "phone": "+915550000002",
+          "status": "completed",
+          "started_at": "2026-09-04T09:15:30Z",
+          "completed_at": "2026-09-04T09:16:12Z",
+          "summary": "Reached a parent, who gave a reason and a return date.",
+          "transcript_turns": [
+            {
+              "offset_seconds": 0,
+              "speaker": "bot",
+              "text": "வணக்கம், இது பள்ளி அலுவலகத்திலிருந்து அழைக்கிறோம். இன்று உங்கள் மகள் பள்ளிக்கு வரவில்லை. காரணம் தெரியுமா?"
+            },
+            {
+              "offset_seconds": 4,
+              "speaker": "user",
+              "text": "அவளுக்கு உடம்பு சரியில்லை. நேற்று இரவு முதல் காய்ச்சல் இருக்கிறது."
+            },
+            {
+              "offset_seconds": 8,
+              "speaker": "bot",
+              "text": "புரிந்தது. நாளை பள்ளிக்கு வர முடியுமா?"
+            },
+            {
+              "offset_seconds": 12,
+              "speaker": "user",
+              "text": "ஆம், நாளை வருவாள். நான் அவளுடன் இருக்கிறேன்."
+            },
+            {
+              "offset_seconds": 16,
+              "speaker": "bot",
+              "text": "நன்றி. குணமாக வாழ்த்துகள்."
+            }
+          ],
+          "provider_call_id": "prov_5",
+          "failure_code": null,
+          "failure_message": null
+        }
+      ]
+    }
+  ],
+  "metadata": {
+    "work_item": "S-2002"
+  },
+  "summary": "Reached 1 of 1 recipient(s).",
+  "completed_at": "2026-09-04T09:15:30Z",
+  "failure_code": null,
+  "failure_message": null
+}

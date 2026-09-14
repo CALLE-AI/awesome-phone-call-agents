@@ -1,0 +1,18 @@
+{
+  "status": "completed",
+  "taskCompleted": true,
+  "recipientStatus": "completed",
+  "confidenceScore": 0.94,
+  "failureCode": null,
+  "structuredResult": {
+    "organization_identity": "confirmed",
+    "change_request_status": "initiated",
+    "safe_case_code_confirmed": "yes",
+    "sensitive_data_disclosed": "no",
+    "recipient_opt_out": "no"
+  },
+  "evidence": [
+    "Recipient identified the vendor organization and confirmed the finance team initiated the payment-instruction change request.",
+    "Recipient restated the safe case code when asked and understood the call does not approve the change."
+  ]
+}

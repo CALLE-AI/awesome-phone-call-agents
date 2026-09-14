@@ -1,0 +1,18 @@
+node_modules/
+dist/
+.env
+.env.*
+!.env.example
+data/
+*.sqlite*
+artifacts/
+coverage/
+playwright-report/
+.DS_Store
+
+# Local planning documents and private installation records
+/ReadyCheck_PRD.docx
+/ReadyCheck_Review_and_Build_Blueprint.docx
+/ReadyCheck_Review_and_Build_Blueprint.pdf
+/ReadyCheck_Review_and_Build_Blueprint.md
+/docs/CALLE_INSTALLATION.md

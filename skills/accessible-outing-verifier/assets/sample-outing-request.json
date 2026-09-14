@@ -1,0 +1,27 @@
+{
+  "venue_name": "The Grand Theater",
+  "phone": "+15555550199",
+  "persona": "Power Wheelchair User",
+  "constraints": [
+    {
+      "id": "step_free_entrance",
+      "label": "Step-Free Main Entrance",
+      "category": "static_facility",
+      "critical": true
+    },
+    {
+      "id": "elevator_operational_today",
+      "label": "Main Elevator Operating Today",
+      "category": "daily_operational",
+      "critical": true
+    }
+  ],
+  "digital_evidence": [
+    {
+      "constraint_id": "step_free_entrance",
+      "status": "confirmed",
+      "source": "OpenStreetMap Nominatim",
+      "confidence": 0.95
+    }
+  ]
+}
