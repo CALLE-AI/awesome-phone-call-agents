@@ -17,8 +17,13 @@ from datetime import date
 from pathlib import Path
 from typing import Any
 
-from fastapi import FastAPI, Form, Request
-from fastapi.responses import HTMLResponse, PlainTextResponse, RedirectResponse
+from fastapi import Body, FastAPI, Form, Request
+from fastapi.responses import (
+    HTMLResponse,
+    JSONResponse,
+    PlainTextResponse,
+    RedirectResponse,
+)
 from fastapi.templating import Jinja2Templates
 
 from .. import exports, policy
@@ -29,6 +34,7 @@ from ..models import (
     HEALTH_TEXT,
     ContactCheckState,
     ContactHealth,
+    Disposition,
     PatternState,
     Workflow,
 )
@@ -54,6 +60,63 @@ RESOLVE_OPTIONS = {
         PatternState.PF_NOT_CALLED.value,
     ],
 }
+
+#: Plain-English versions of the vocabulary, for the demo view only. The
+#: dashboard deliberately shows the real state names, because an office needs to
+#: be able to match what it sees against the documentation; the demo view is for
+#: somebody seeing the app for the first time.
+OUTCOME_TEXT = {
+    "reached": "Reachable spoke to them",
+    "wrong_person": "Wrong person",
+    "voicemail": "Went to voicemail",
+    "no_answer": "Nobody answered",
+    "not_in_service": "Number not in service",
+}
+
+STATE_TEXT = {
+    ContactCheckState.CC_VERIFIED.value: "Contact verified",
+    ContactCheckState.CC_WRONG_PERSON.value: "Flagged: wrong person",
+    ContactCheckState.CC_NUMBER_NOT_WORKING.value: "Flagged: number not working",
+    ContactCheckState.CC_UNREACHED.value: "Not reached",
+    ContactCheckState.CC_NEEDS_HUMAN.value: "Sent to a person",
+    PatternState.PF_REASON_GIVEN.value: "Reason suggested, awaiting approval",
+    PatternState.PF_SUPPORT_REQUESTED.value: "Support requested",
+    PatternState.PF_URGENT_HUMAN.value: "Escalated to a person, urgently",
+    PatternState.PF_CASCADE_READY.value: "Moving to the next contact",
+    PatternState.PF_UNREACHED.value: "Nobody reached",
+    PatternState.PF_NEEDS_HUMAN.value: "Sent to a person",
+}
+
+#: Refusals, in words an onlooker can follow. A refusal is a feature here, so it
+#: should read like one rather than like an error.
+REFUSAL_TEXT = {
+    "dry_run": "Dry run: nothing is dialled until live mode is switched on.",
+    "awaiting_confirmation": "This call still needs to be confirmed.",
+    "outside_calling_window": "It is outside the school's calling window.",
+    "non_school_day": "Today is not a school day.",
+    "pupil_vulnerable": "This pupil is flagged vulnerable, so Reachable never calls.",
+    "language_not_supported": "This contact needs a language the UK line cannot serve.",
+    "do_not_call": "This contact has asked not to be called.",
+    "invalid_number": "This number is not valid, and is never repaired or guessed.",
+    "attempt_budget_spent": "The attempt budget for this household is spent.",
+    "call_in_progress": "A call for this case is already in flight.",
+    "cascade_limit_reached": "Every contact in the cascade has been tried.",
+}
+
+
+#: How many cards the demo view shows at once.
+DEMO_CARD_LIMIT = 6
+
+
+def _diallable(case: Any, workflow: Workflow) -> bool:
+    """Whether this case is in a state a call may be placed from."""
+    if workflow is Workflow.CONTACT_CHECK:
+        return ContactCheckState(case["state"]) in {
+            ContactCheckState.CC_PENDING,
+            ContactCheckState.CC_READY,
+        }
+    return PatternState(case["state"]) is PatternState.PF_CASCADE_READY
+
 
 TONE = {
     ContactHealth.VERIFIED: "ok",
@@ -383,6 +446,160 @@ def create_app(
         return csv_response(
             exports.contact_health_report(orc.store, orc.dataset),
             "contact-health-report.csv",
+        )
+
+    # -------------------------------------------------------------- demo view
+    #
+    # A single, calmer surface for showing the app to somebody. It places the
+    # same call through the same orchestrator and the same guards as the
+    # dashboard -- there is no separate path to the telephone -- but it does not
+    # block on the result. A real call sat in `queued` for about a minute during
+    # live verification, so this starts the call, returns, and lets the page
+    # poll until the transcript exists.
+
+    def _demo_people() -> list[dict[str, Any]]:
+        """Every case that could be dialled right now, as a friendly card."""
+        people: list[dict[str, Any]] = []
+        for workflow in (Workflow.PATTERN_FOLLOWUP, Workflow.CONTACT_CHECK):
+            for case in orc.store.cases(workflow):
+                if not _diallable(case, workflow) or not case["contact_id"]:
+                    continue
+                contact = orc._contact(case["contact_id"])
+                pupil = orc.dataset.pupils.get(case["pupil_id"])
+                if contact is None or pupil is None:
+                    continue
+                pattern = workflow is Workflow.PATTERN_FOLLOWUP
+                people.append(
+                    {
+                        "case_id": case["case_id"],
+                        "contact_name": contact.contact_name,
+                        "first_name": contact.contact_name.split()[0],
+                        "initials": "".join(
+                            part[0] for part in contact.contact_name.split()[:2]
+                        ).upper(),
+                        "relationship": contact.relationship,
+                        "contact_order": contact.contact_order,
+                        "masked": mask(contact.phone_e164),
+                        "pupil_first_name": pupil.first_name,
+                        "kind": "Absence follow-up" if pattern else "Contact check",
+                        "tone": "warm" if pattern else "",
+                        "why": (
+                            f"{pupil.first_name} has two sessions with no reason given."
+                            if pattern
+                            else f"Checking this number still reaches "
+                            f"{contact.contact_name.split()[0]}."
+                        ),
+                    }
+                )
+        # Absence follow-ups are already first, because the workflows are
+        # iterated in that order, and they are the story worth telling first.
+        # Capped: a termly sweep opens a case per contact, and twenty-one cards
+        # is a list to scroll rather than a thing to look at.
+        return people[:DEMO_CARD_LIMIT]
+
+    @app.get("/demo", response_class=HTMLResponse)
+    def demo(request: Request):
+        return render(
+            request,
+            "demo.html",
+            people=_demo_people(),
+            mode_class=orc.config.mode_banner.split("-")[0].lower(),
+        )
+
+    @app.post("/demo/call")
+    async def demo_call(payload: dict = Body(default={})):
+        """Start the call and return immediately. The page polls for the rest."""
+        case_id = str(payload.get("case_id", ""))
+        case = orc.store.case(case_id)
+        if case is None:
+            return JSONResponse({"placed": False, "reason": "Unknown case."})
+        pupil = orc.dataset.pupils.get(case["pupil_id"])
+        confirmed = bool(
+            pupil
+            and str(payload.get("confirm", "")).strip().casefold()
+            == pupil.first_name.casefold()
+        )
+        if not confirmed:
+            return JSONResponse(
+                {
+                    "placed": False,
+                    "reason": (
+                        f"That did not match. Type {pupil.first_name} exactly to confirm."
+                        if pupil
+                        else "This case has no pupil to confirm against."
+                    ),
+                }
+            )
+        outcome = await asyncio.to_thread(
+            orc.place_call, case_id, confirmed=True, actor="demo"
+        )
+        if not outcome.placed:
+            reason = outcome.reason.value if outcome.reason else "refused"
+            # The plain-English sentence first, then whatever detail the guard
+            # added -- the time of day, the language, the spreadsheet row.
+            words = REFUSAL_TEXT.get(reason.lower(), reason.lower().replace("_", " "))
+            if outcome.detail:
+                words = f"{words} ({outcome.detail})"
+            return JSONResponse({"placed": False, "reason": words})
+        return JSONResponse({"placed": True, "attempt_id": outcome.attempt_id})
+
+    @app.get("/demo/attempt/{attempt_id}")
+    async def demo_attempt(attempt_id: int):
+        """Read the call back and describe it in plain words."""
+        await asyncio.to_thread(orc.reconcile, attempt_id)
+        row = orc.store.attempt(attempt_id)
+        if row is None:
+            return JSONResponse({"finished": True, "good": False,
+                                 "headline": "Call not found", "status_text": "",
+                                 "turns": [], "facts": []})
+
+        turns = from_json(row["transcript"], []) or []
+        disposition = row["disposition"]
+        case = orc.store.case(row["case_id"])
+        state = case["state"] if case else ""
+
+        # Still ringing: no disposition yet, or the provider says not ready.
+        if not disposition or disposition == Disposition.OUTCOME_UNKNOWN.value:
+            return JSONResponse(
+                {
+                    "finished": False,
+                    "status_text": "Ringing. The transcript appears here as soon as the call ends.",
+                    "turns": turns,
+                    "facts": [],
+                }
+            )
+
+        result = from_json(row["structured_result"], {}) or {}
+        good = disposition == Disposition.CONFIRMED.value and result.get(
+            "outcome"
+        ) == "reached"
+
+        facts: list[dict[str, str]] = []
+        if result.get("identity_confirmed") == "yes":
+            facts.append({"text": "Identity confirmed", "tone": "good"})
+        elif result.get("outcome") == "wrong_person":
+            facts.append({"text": "Not the right person", "tone": "stop"})
+        if result.get("still_willing_to_be_contact") == "yes":
+            facts.append({"text": "Still happy to be a contact", "tone": "good"})
+        if result.get("best_number_for_school") == "this_number":
+            facts.append({"text": "Number is correct", "tone": "good"})
+        if result.get("reason_category") and result["reason_category"] != "unknown":
+            facts.append({"text": result["reason_category"].replace("_", " "), "tone": "warm"})
+        if result.get("barrier_mentioned") == "yes":
+            facts.append({"text": "Mentioned a barrier", "tone": "warm"})
+        facts.append({"text": STATE_TEXT.get(state, state), "tone": ""})
+
+        return JSONResponse(
+            {
+                "finished": True,
+                "good": good,
+                "headline": OUTCOME_TEXT.get(
+                    str(result.get("outcome", "")), "Call finished"
+                ),
+                "status_text": row["disposition_reason"] or "",
+                "turns": turns,
+                "facts": facts,
+            }
         )
 
     @app.get("/healthz")

@@ -270,3 +270,78 @@ def test_import_page_shows_the_validation_report(client):
 def test_healthz_reports_the_mode(client):
     http, _ = client
     assert http.get("/healthz").json() == {"ok": True, "mode": "FAKE"}
+
+
+# ---------------------------------------------------------------------------
+# The demo view. Same orchestrator, same guards, same confirmation -- it just
+# does not block on the result, because a real call sat queued for a minute.
+# ---------------------------------------------------------------------------
+
+
+def test_the_demo_page_renders_with_callable_people(client):
+    http, _ = client
+    body = http.get("/demo").text
+    assert "Ready to call" in body
+    assert 'class="person"' in body
+    # Masked everywhere, including here.
+    assert "+4477009" not in body
+
+
+def test_the_demo_page_shows_the_mode(client, dry_client):
+    http, _ = client
+    assert "FAKE" in http.get("/demo").text
+    dry_http, _ = dry_client
+    assert "DRY-RUN" in dry_http.get("/demo").text
+
+
+def test_the_demo_never_implies_a_person_is_making_the_call(client):
+    """It is an automated call, and every label has to say so.
+
+    "Call now" on a button reads as though the office is about to be connected.
+    Reachable is the one that rings, and the person clicking is authorising it.
+    """
+    body = client[0].get("/demo").text
+    assert "Ask Reachable to ring" in body
+    assert "Let it call" in body
+    assert ">Call now<" not in body
+    assert "not a person" in body
+
+
+def test_the_demo_still_requires_the_typed_confirmation(client, fake_client):
+    """The gate is the same one. A demo surface must not be a softer door."""
+    http, _ = client
+    body = http.post("/demo/call", json={"case_id": IVY_CASE, "confirm": "nope"}).json()
+    assert body["placed"] is False
+    assert "Ivy" in body["reason"]
+    assert fake_client.state.requests == []
+
+
+def test_the_demo_places_a_call_and_returns_the_transcript(client):
+    http, _ = client
+    started = http.post("/demo/call", json={"case_id": IVY_CASE, "confirm": "Ivy"}).json()
+    assert started["placed"] is True
+
+    state = http.get(f"/demo/attempt/{started['attempt_id']}").json()
+    assert state["finished"] is True
+    assert state["turns"], "the transcript is the point of this view"
+    assert {t["speaker"] for t in state["turns"]} <= {"bot", "user", "unknown"}
+    assert state["headline"] == "Reachable spoke to them"
+
+
+def test_a_demo_refusal_is_explained_in_plain_words(dry_client):
+    """A refusal is a feature, so it reads like one rather than like an error."""
+    http, _ = dry_client
+    body = http.post("/demo/call", json={"case_id": IVY_CASE, "confirm": "Ivy"}).json()
+    assert body["placed"] is False
+    assert "dry_run" not in body["reason"].lower()
+    assert "nothing is dialled" in body["reason"].lower()
+
+
+def test_the_demo_reports_a_call_that_is_still_ringing(client, fake_client):
+    """The whole reason this view polls instead of blocking."""
+    http, _ = client
+    fake_client.state.default_script = "timeout_then_complete"
+    started = http.post("/demo/call", json={"case_id": IVY_CASE, "confirm": "Ivy"}).json()
+    state = http.get(f"/demo/attempt/{started['attempt_id']}").json()
+    assert state["finished"] is False
+    assert "Ringing" in state["status_text"]
