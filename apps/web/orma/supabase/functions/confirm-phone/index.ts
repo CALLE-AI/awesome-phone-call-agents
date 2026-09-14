@@ -10,8 +10,14 @@ function headers(key: string, authorization?: string): HeadersInit {
 function url(base: string, path: string, query = ""): string {
   return `${base.replace(/\/+$/, "")}/rest/v1/${path}${query ? `?${query}` : ""}`;
 }
+// The web app calls this from the browser, so every response carries CORS headers.
+const CORS_HEADERS: Record<string, string> = {
+  "Access-Control-Allow-Origin": "https://orma.nryn.dev",
+  "Access-Control-Allow-Methods": "POST, OPTIONS",
+  "Access-Control-Allow-Headers": "content-type, authorization, apikey",
+};
 function publicResponse(body: Record<string, unknown>, status = 200): Response {
-  return Response.json(body, { status });
+  return Response.json(body, { status, headers: CORS_HEADERS });
 }
 function code(): string {
   const bytes = crypto.getRandomValues(new Uint32Array(1));
@@ -31,7 +37,8 @@ async function one<T>(fetchImpl: typeof fetch, apiUrl: string, key: string, tabl
 
 export function createConfirmPhoneHandler(deps = depsFromEnv()): (request: Request) => Promise<Response> {
   return async (request) => {
-    if (request.method !== "POST") return new Response(null, { status: 405, headers: { allow: "POST" } });
+    if (request.method === "OPTIONS") return new Response(null, { status: 204, headers: CORS_HEADERS });
+    if (request.method !== "POST") return new Response(null, { status: 405, headers: { ...CORS_HEADERS, allow: "POST, OPTIONS" } });
     const authorization = request.headers.get("authorization");
     if (!authorization?.startsWith("Bearer ")) return publicResponse({ error: "authentication required" }, 401);
     const identity = await deps.fetch(`${deps.apiUrl.replace(/\/+$/, "")}/auth/v1/user`, { headers: headers(deps.serviceRoleKey, authorization) });
@@ -81,4 +88,14 @@ export function createConfirmPhoneHandler(deps = depsFromEnv()): (request: Reque
     }
   };
 }
-if (import.meta.main) Deno.serve(createConfirmPhoneHandler());
+if (import.meta.main) {
+  const handler = createConfirmPhoneHandler();
+  // An unexpected error still answers with CORS headers, so the browser shows the error.
+  Deno.serve(async (request) => {
+    try {
+      return await handler(request);
+    } catch {
+      return publicResponse({ error: "confirmation request failed" }, 500);
+    }
+  });
+}
