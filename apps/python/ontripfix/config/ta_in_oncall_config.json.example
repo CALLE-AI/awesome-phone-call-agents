@@ -1,0 +1,16 @@
+{
+  "shift_name": "India Retail Data Platform On-Call Roster (Tamil)",
+  "date": "2026-09-06",
+  "timezone": "Asia/Kolkata (IST)",
+  "engineer": {
+    "name": "Kavitha Raman",
+    "role": "Senior Retail Data Platform Engineer (OnTripFix On-Call)",
+    "phone": "+919876543212",
+    "email": "kavitha.raman@example.com",
+    "calle_id": "user_kavitha_01",
+    "source": "local_config_file",
+    "region": "IN",
+    "locale": "ta-IN",
+    "userid": "k8r5m2"
+  }
+}

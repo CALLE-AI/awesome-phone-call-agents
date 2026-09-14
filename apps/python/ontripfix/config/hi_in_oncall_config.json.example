@@ -1,12 +1,12 @@
 {
-  "shift_name": "Retail Data Platform OnTripFix On-Call Roster",
-  "date": "2026-09-14",
-  "timezone": "IST",
+  "shift_name": "India Retail Data Platform On-Call Roster (Hindi)",
+  "date": "2026-09-06",
+  "timezone": "Asia/Kolkata (IST)",
   "engineer": {
     "name": "Aarav Patel",
     "role": "Senior Software Engineer (OnTripFix On-Call)",
     "phone": "+919876543211",
-    "email": "[EMAIL_ADDRESS]",
+    "email": "aarav.patel@example.com",
     "calle_id": "user_aarav_01",
     "source": "local_config_file",
     "region": "IN",

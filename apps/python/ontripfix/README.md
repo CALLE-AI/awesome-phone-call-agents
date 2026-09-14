@@ -66,7 +66,10 @@ apps/python/ontripfix/
 ├── requirements.txt                   # Production dependencies
 ├── project-requirements.txt           # Detailed dependency manifest
 ├── config/
-│   └── oncall_config.json             # On-call roster fallback configuration
+│   ├── oncall_config.json.example     # Sample on-call roster fallback configuration
+│   ├── en_in_oncall_config.json.example # India EN regional roster template
+│   ├── hi_in_oncall_config.json.example # India HI regional roster template
+│   └── ta_in_oncall_config.json.example # India TA regional roster template
 ├── dags/
 │   └── retail_Friday_inventory_etl.py # Airflow DAG with on_failure_callback
 ├── db/
@@ -188,7 +191,7 @@ The application works out-of-the-box using local fallback mechanisms (mock voice
 | `JIRA_USER_EMAIL` | Atlassian Jira | User email for Jira REST API authentication | Local fallback data |
 | `JIRA_API_TOKEN` | Atlassian Jira | API token for Jira REST API authentication | Local fallback data |
 | `CONFLUENCE_PLAYBOOK_URL` | Confluence | URL to Confluence runbook page | Local `playbook/playbook.json` |
-| `CONFLUENCE_CALENDAR_URL` | Confluence | URL to Confluence Team Calendar API | Local `config/oncall_config.json` |
+| `CONFLUENCE_CALENDAR_URL` | Confluence | URL to Confluence Team Calendar API | Local `config/oncall_config.json` (or `.example`) |
 | `CONFLUENCE_USER_EMAIL` | Confluence | User email for Confluence API authentication | Local fallback data |
 | `CONFLUENCE_API_TOKEN` | Confluence | API token for Confluence API authentication | Local fallback data |
 
