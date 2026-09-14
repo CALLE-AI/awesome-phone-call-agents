@@ -54,10 +54,10 @@ flowchart LR
 4. **Call.** The result schema asks CALL-E to return `choice`, `selected_flight`, `fee_accepted`, `human_requested`, and a quoted `reason`.
 5. **Decide after the call.** The desk applies the choice automatically only when all of these hold:
    - the call completed
-   - CALL-E reports the task completed, with confidence of at least 0.7
+   - CALL-E explicitly reports `task_completed: true` (a missing value counts as no), with confidence of at least 0.7
    - the passenger chose an option that was actually offered (keeping a cancelled flight never is)
    - they explicitly accepted any cost or reduced refund
-   - they did not ask for a person
+   - `human_requested` is explicitly `no` (`unknown` goes to review)
 
    Everything else lands in the review queue with the reasons.
 6. **Apply** in the fake booking system: keep the ticket, rebook with a new booking code and reissued ticket (and one fewer seat), or record the refund and void the ticket. A human can resolve any review item with one of the offered options.
@@ -127,10 +127,10 @@ flowchart LR
 2. **Check and quote.** The desk refuses bookings that were already changed, are on a flight with a reported delay or cancellation (Workflow A owns those), have departed, or depart within 60 minutes. It also refuses a reschedule to any flight that is not a later flight on the same route with seats. Eligible requests are priced at voluntary rates across the sales chain, with warnings for a cost or a reduced or zero refund.
 3. **Confirm.** Send the quote through the passenger's channel. To submit, the operator types back the exact amount the passenger agreed to; any other amount is refused.
 4. **Submit to the portal.** The fake portal accepts most changes. It is scripted to refuse the reissue for two NA 725 bookings.
-5. **Call the airline desk** when a reissue is refused. The task gives the booking code, ticket, requested flight, and error, caps any airline charge at the quoted airline fees, and never shares payment details. The result schema returns `outcome`, `new_booking_code`, `new_ticket_number`, `airline_reference`, `extra_charge_requested`, and `reason`. The booking is updated with the desk's codes only when the desk confirmed the reissue, the codes are well formed, no extra charge was asked, and confidence is at least 0.7. Everything else goes to review, where a person can close the request or apply the reissue with codes they got from the airline.
+5. **Call the airline desk** when a reissue is refused. The task gives the booking code, ticket, requested flight, and error, caps any airline charge at the quoted airline fees, and never shares payment details. The result schema returns `outcome`, `new_booking_code`, `new_ticket_number`, `airline_reference`, `extra_charge_requested`, and `reason`. The booking is updated with the desk's codes only when the desk confirmed the reissue, the codes are well formed, `extra_charge_requested` is explicitly `no`, CALL-E explicitly reports the task completed, and confidence is at least 0.7. Everything else goes to review, where a person can close the request or apply the reissue with codes they got from the airline.
 6. **Call the passenger back (optional)** once the request is finished. The call only reports the new booking code and amount, the refund, or that the change could not be made. It changes nothing; if the passenger was not reached or wants a person, the desk flags written follow-up.
 
-Each request allows one airline desk call and one callback. Both use idempotency keys (`fda-<request>-airline`, `fda-<request>-callback`).
+Each request allows one airline desk call and one callback. Both use idempotency keys (`fda-<run>-<request>-airline`, `fda-<run>-<request>-callback`).
 
 ### Where CALL-E is used
 
@@ -140,7 +140,7 @@ Each request allows one airline desk call and one callback. Both use idempotency
 | `sdk` | `@call-e/calle` `calls.create` + `calls.get` | `CALLE_API_KEY` | Structured `recipientResultSchema` result, confidence, transcript |
 | `cli` | Local `calle call start` / `call status` | `calle auth login` (browser) | Summary and transcript only, so every call goes to human review with a hint |
 
-SDK calls send a stable `Idempotency-Key` (`fda-<event>-<booking>`) and `metadata` with the event and booking code.
+SDK calls send a stable `Idempotency-Key` (`fda-<run>-<event>-<booking>`) and `metadata` with the event and booking code. `<run>` changes on every Reset demo, so a call placed after a reset is a new call rather than a replay of the earlier one.
 
 ## Run it (dry run, no calls)
 
@@ -167,7 +167,7 @@ npm run demo cancel fm  # Workflow A, force majeure cancellation
 npm run demo:requests   # Workflow B: five scripted passenger requests
 ```
 
-The fixture flights depart on 20 September 2026. After that date, Workflow B requests in the dashboard are refused as departed; the terminal demo and tests pin the clock to the day before.
+The fixture flights depart on 20 September 2026. Passenger request cutoffs in the dashboard therefore run on a demo clock that starts at `DEMO_NOW` (default `2026-09-19T09:00:00+07:00`) when the server boots and then ticks normally; the header shows it. Set `DEMO_NOW=real` to use the wall clock. Call polling and webhook signatures always use real time.
 
 Tests and type check:
 
@@ -203,11 +203,11 @@ Restart with `npm start`. The header turns red and shows the destination masked.
   - Each booking has at most one open request, and each request allows one airline desk call and one result callback.
   - A submission with an uncertain outcome is marked `uncertain` and never retried automatically.
   - SDK calls also carry an idempotency key.
-- **Masked numbers** everywhere in the UI and API responses.
+- **Masked numbers.** Destinations are masked in the UI and API. CALL-E's summaries, transcripts, failure messages, free-text result fields, and submission errors are masked (any run of eight or more digits keeps only its last four) before they are stored, written to `.data/`, or returned by the API, for passenger, airline desk, and callback calls alike. Only the new booking code and ticket number from an airline desk result are kept as returned, because the desk applies them.
 - **AI disclosure and consent** are in the task text. The agent must say it is an AI assistant and must get an explicit yes to any cost. It never asks for card numbers, passport numbers, passwords, or one-time codes.
 - **Human in the loop.** Unclear, low-confidence, or unconsented results are never applied automatically.
 - **Confirmed amounts only.** A Workflow B change is submitted only after the operator types the exact quoted amount the passenger agreed to. The airline desk call may not accept charges above the quoted airline fees.
-- **Local only.** The server binds to `127.0.0.1` and rejects cross-origin POSTs. The dashboard API has no authentication, so do not expose it to a network. The webhook is authenticated by signature, but it lives on the same server.
+- **Loopback only, enforced.** Without `OPERATOR_TOKEN`, the dashboard and its API accept only loopback clients that address the desk as `127.0.0.1` or `localhost` (other `Host` headers are refused, which blocks DNS-rebinding pages), and cross-origin POSTs are rejected. The server refuses to bind to a non-loopback `HOST` unless `OPERATOR_TOKEN` is set, in which case every dashboard route requires HTTP Basic auth with that token as the password. The airline webhook is the only route outside this check; it is authenticated by its HMAC signature.
 - **Credentials** stay in `.env` (gitignored), are only read on the server, and are never sent to the browser.
 
 ### Cancellation and recovery

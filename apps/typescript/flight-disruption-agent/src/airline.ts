@@ -126,7 +126,10 @@ export function decideAirline(outcome: CallOutcome): AirlineDecision {
   if (result.outcome === "callback_later") reasons.push(`The airline desk asked for a call back: ${said || "no detail"}.`);
   if (result.outcome === "unknown") reasons.push("The airline desk outcome is unclear.");
   if (result.extra_charge_requested === "yes") reasons.push("The desk asked for more than the quoted airline fees.");
-  if (outcome.taskCompleted === false) reasons.push("CALL-E reports the task was not completed.");
+  else if (result.extra_charge_requested !== "no") reasons.push("Could not confirm the desk asked for no extra charge.");
+  if (outcome.taskCompleted !== true) {
+    reasons.push(outcome.taskCompleted === false ? "CALL-E reports the task was not completed." : "CALL-E did not confirm the task was completed.");
+  }
   if (!outcome.confidence) reasons.push("No confidence score was returned.");
   else if (outcome.confidence.score < MIN_AIRLINE_CONFIDENCE) {
     reasons.push(`Low confidence (${outcome.confidence.score.toFixed(2)} < ${MIN_AIRLINE_CONFIDENCE}).`);

@@ -4,7 +4,9 @@ export const MIN_CONFIDENCE = 0.7;
 
 /**
  * Turns a finished call into either an automatic action or a human review item.
- * Anything short of a clear, consented choice goes to a person.
+ * Automatic only when CALL-E explicitly reports the task completed with enough confidence,
+ * the passenger explicitly did not ask for a person, and chose an offered, consented option.
+ * Anything else goes to a person.
  */
 export function decide(outcome: CallOutcome, quote: Quote): Decision {
   if (outcome.state !== "completed") {
@@ -20,9 +22,13 @@ export function decide(outcome: CallOutcome, quote: Quote): Decision {
 
   const reasons: string[] = [];
   if (result.human_requested === "yes") reasons.push("Passenger asked for a human agent.");
+  else if (result.human_requested !== "no") reasons.push("Could not confirm the passenger does not want a person.");
   if (result.choice === "undecided") reasons.push("Passenger wants more time to decide.");
   if (result.choice === "unknown") reasons.push("The passenger's choice is unclear.");
-  if (outcome.taskCompleted === false) reasons.push("CALL-E reports the task was not completed.");
+  // Only an explicit completion counts; a missing flag is not a yes.
+  if (outcome.taskCompleted !== true) {
+    reasons.push(outcome.taskCompleted === false ? "CALL-E reports the task was not completed." : "CALL-E did not confirm the task was completed.");
+  }
   if (!outcome.confidence) {
     reasons.push("No confidence score was returned.");
   } else if (outcome.confidence.score < MIN_CONFIDENCE) {

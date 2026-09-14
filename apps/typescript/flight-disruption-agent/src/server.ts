@@ -1,7 +1,8 @@
 import { createServer, type IncomingMessage, type ServerResponse } from "node:http";
 import { readFile } from "node:fs/promises";
 import { extname, join, normalize } from "node:path";
-import { APP_ROOT, gatewayFromEnv, loadEnvFile, webhookSecretFromEnv } from "./config.ts";
+import { checkAccess, isLoopbackBind } from "./access.ts";
+import { APP_ROOT, demoClockFromEnv, gatewayFromEnv, loadEnvFile, webhookSecretFromEnv } from "./config.ts";
 import { loadCatalog } from "./data.ts";
 import { Desk, DeskError } from "./desk.ts";
 import { OpsEventError, parseOpsEvent, SIGNATURE_HEADER, verifySignature } from "./events.ts";
@@ -12,7 +13,9 @@ loadEnvFile();
 const gateway = gatewayFromEnv();
 const catalog = loadCatalog();
 const webhook = webhookSecretFromEnv(gateway.live);
+const demoClock = demoClockFromEnv();
 const desk = new Desk(catalog, gateway, {
+  demoNow: demoClock.now,
   // Live runs persist call ids so polling can resume after a restart. Dry runs start fresh.
   statePath: gateway.live ? join(APP_ROOT, ".data", `state-${gateway.mode}.json`) : null,
   liveDemoPhone: process.env.LIVE_DEMO_PHONE?.trim() || undefined,
@@ -21,6 +24,13 @@ const desk = new Desk(catalog, gateway, {
 
 const HOST = process.env.HOST ?? "127.0.0.1";
 const PORT = Number(process.env.PORT ?? 4310);
+const OPERATOR_TOKEN = process.env.OPERATOR_TOKEN?.trim() || null;
+const WEBHOOK_PATH = "/api/webhooks/airline-ops";
+
+if (!isLoopbackBind(HOST) && !OPERATOR_TOKEN) {
+  console.error(`Refusing to listen on ${HOST}: the dashboard can place calls. Keep HOST=127.0.0.1 or set OPERATOR_TOKEN.`);
+  process.exit(1);
+}
 const PUBLIC = join(APP_ROOT, "public");
 const TYPES: Record<string, string> = {
   ".html": "text/html; charset=utf-8",
@@ -74,7 +84,7 @@ async function api(req: IncomingMessage, res: ServerResponse, path: string): Pro
   }
 
   // Server-to-server: authenticated by signature, not by the browser Origin check above.
-  if (req.method === "POST" && path === "/api/webhooks/airline-ops") {
+  if (req.method === "POST" && path === WEBHOOK_PATH) {
     if (!webhook.secret) throw new DeskError("Airline ops webhook is disabled: set AIRLINE_WEBHOOK_SECRET.", 503);
     const raw = await readRaw(req);
     const header = req.headers[SIGNATURE_HEADER];
@@ -188,6 +198,17 @@ async function staticFile(res: ServerResponse, path: string): Promise<void> {
 
 const server = createServer(async (req, res) => {
   const path = new URL(req.url ?? "/", "http://localhost").pathname;
+  // Every route except the signed webhook is the operator dashboard.
+  if (!(req.method === "POST" && path === WEBHOOK_PATH)) {
+    const access = checkAccess(
+      { remoteAddress: req.socket.remoteAddress, host: req.headers.host, authorization: req.headers.authorization },
+      OPERATOR_TOKEN,
+    );
+    if (!access.ok) {
+      if (access.challenge) res.setHeader("www-authenticate", 'Basic realm="Disruption Desk", charset="UTF-8"');
+      return send(res, access.status, { error: access.message });
+    }
+  }
   try {
     if (path.startsWith("/api/")) await api(req, res, path);
     else await staticFile(res, path);
@@ -202,6 +223,8 @@ const server = createServer(async (req, res) => {
 server.listen(PORT, HOST, () => {
   const live = gateway.live ? `LIVE (${gateway.mode}) - real calls go to LIVE_DEMO_PHONE only` : "dry-run - no calls are placed";
   console.log(`Flight disruption desk on http://${HOST}:${PORT}  [${live}]`);
+  console.log(OPERATOR_TOKEN ? "Dashboard requires the operator token (HTTP Basic, any user name)." : "Dashboard accepts loopback connections only.");
+  if (demoClock.label) console.log(`Demo clock: passenger request cutoffs use ${demoClock.label}. Set DEMO_NOW=real for the real time.`);
   if (!webhook.secret) console.log("Airline ops webhook disabled: set AIRLINE_WEBHOOK_SECRET to enable POST /api/webhooks/airline-ops.");
   else if (webhook.demo) console.log("Airline ops webhook uses the dry-run demo secret. Set AIRLINE_WEBHOOK_SECRET before exposing it anywhere.");
 });

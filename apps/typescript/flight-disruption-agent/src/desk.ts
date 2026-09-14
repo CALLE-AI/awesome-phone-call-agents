@@ -1,4 +1,4 @@
-import { randomInt } from "node:crypto";
+import { randomBytes, randomInt } from "node:crypto";
 import { existsSync, mkdirSync, readFileSync, renameSync, writeFileSync } from "node:fs";
 import { dirname } from "node:path";
 import type { CallGateway } from "./calle.ts";
@@ -11,6 +11,7 @@ import type { OpsEvent } from "./events.ts";
 import { FakeGds, type Gds } from "./gds.ts";
 import { addMinutes, idr, localTime } from "./format.ts";
 import { maskPhone, routeFor } from "./phone.ts";
+import { redactOutcome, redactText } from "./redact.ts";
 import { airlineOf, quoteFor, voluntaryQuoteFor } from "./rules.ts";
 import { buildResultSchema, buildTask } from "./task.ts";
 import type { Action, AirlineCall, BookingState, Disruption, DisruptionCause, DisruptionKind, DisruptionSource, LedgerEntry, OpsEventRecord, Quote, RequestChannel, RequestEntry, RequestKind } from "./types.ts";
@@ -24,6 +25,11 @@ interface DeskState {
   bookings: Record<string, BookingState>;
   seats: Record<string, number>;
   liveCallsUsed: number;
+  /**
+   * New on every reset. Part of every idempotency key, so a call placed after "Reset demo"
+   * is a new call to CALL-E rather than a replay of the one before the reset.
+   */
+  runId: string;
 }
 
 export interface DeskOptions {
@@ -33,6 +39,8 @@ export interface DeskOptions {
   liveDemoPhone?: string;
   liveCallBudget: number;
   now?: () => number;
+  /** Clock for passenger request cutoffs only. Defaults to `now`. */
+  demoNow?: () => number;
   /** B2B portal or GDS used by Workflow B. Defaults to the fake portal. */
   gds?: Gds;
 }
@@ -57,6 +65,10 @@ const PNR_ALPHABET = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789";
 
 function newPnr(): string {
   return Array.from({ length: 6 }, () => PNR_ALPHABET[randomInt(PNR_ALPHABET.length)]).join("");
+}
+
+function newRunId(): string {
+  return randomBytes(4).toString("hex");
 }
 
 function newTicket(): string {
@@ -101,7 +113,7 @@ export class Desk {
     }
     const seats: Record<string, number> = {};
     for (const f of this.catalog.flights) seats[f.id] = f.seatsAvailable;
-    return { disruptions: [], ledger: {}, requests: {}, opsEvents: {}, bookings, seats, liveCallsUsed: 0 };
+    return { disruptions: [], ledger: {}, requests: {}, opsEvents: {}, bookings, seats, liveCallsUsed: 0, runId: newRunId() };
   }
 
   private load(): DeskState | null {
@@ -110,6 +122,19 @@ export class Desk {
     const state = JSON.parse(readFileSync(path, "utf8")) as DeskState;
     state.requests ??= {};
     state.opsEvents ??= {};
+    state.runId ??= newRunId();
+    // Provider text saved by an older version may be unmasked.
+    for (const e of Object.values(state.ledger)) {
+      if (e.outcome) e.outcome = redactOutcome(e.outcome);
+      e.error = redactText(e.error);
+    }
+    for (const r of Object.values(state.requests)) {
+      for (const call of [r.airlineCall, r.callback]) {
+        if (!call) continue;
+        if (call.outcome) call.outcome = redactOutcome(call.outcome);
+        call.error = redactText(call.error);
+      }
+    }
     // State saved before cancellations existed only held operator-reported delays.
     for (const d of state.disruptions) {
       d.kind ??= "delay";
@@ -325,7 +350,7 @@ export class Desk {
 
     const quote = quoteFor(this.view(), booking, disruption);
     const task = buildTask(this.catalog, booking, disruption, quote);
-    const idempotencyKey = `fda-${disruptionId}-${pnr}`.replace(/[^A-Za-z0-9_-]/g, "_");
+    const idempotencyKey = `fda-${this.state.runId}-${disruptionId}-${pnr}`.replace(/[^A-Za-z0-9_-]/g, "_");
     const entry: LedgerEntry = {
       key,
       disruptionId,
@@ -366,10 +391,10 @@ export class Desk {
       entry.nextPollAt = new Date(this.now() + this.gateway.firstPollSeconds * 1000).toISOString();
     } else if (result.kind === "uncertain") {
       entry.status = "uncertain";
-      entry.error = result.message;
+      entry.error = redactText(result.message);
     } else {
       entry.status = "failed_to_submit";
-      entry.error = result.message;
+      entry.error = redactText(result.message);
     }
     if (this.gateway.live && result.kind !== "rejected") this.state.liveCallsUsed += 1;
     this.save();
@@ -382,7 +407,7 @@ export class Desk {
     if (entry.status !== "in_progress" || !entry.callId) return entry;
     if (this.now() < new Date(entry.nextPollAt).getTime()) return entry;
 
-    const outcome = await this.gateway.get(entry.callId);
+    const outcome = redactOutcome(await this.gateway.get(entry.callId));
     entry.outcome = outcome;
     if (outcome.state === "in_progress") {
       entry.nextPollAt = new Date(this.now() + this.gateway.pollSeconds * 1000).toISOString();
@@ -467,7 +492,7 @@ export class Desk {
       request,
       quote,
       disrupted: this.state.disruptions.some((d) => d.flightId === booking.flightId),
-      now: this.now(),
+      now: (this.options.demoNow ?? this.now)(),
     });
     let action: Action | null = null;
     let amount: number | null = null;
@@ -597,7 +622,7 @@ export class Desk {
     if (!route.ok) throw new DeskError(route.reason);
     this.guardLiveCall(destination.phone, confirmLast4);
 
-    const idempotencyKey = `fda-${id}-airline`.replace(/[^A-Za-z0-9_-]/g, "_");
+    const idempotencyKey = `fda-${this.state.runId}-${id}-airline`.replace(/[^A-Za-z0-9_-]/g, "_");
     const call: AirlineCall = {
       destinationMasked: maskPhone(destination.phone),
       redirected: destination.redirected,
@@ -631,12 +656,12 @@ export class Desk {
       call.nextPollAt = new Date(this.now() + this.gateway.firstPollSeconds * 1000).toISOString();
     } else if (result.kind === "uncertain") {
       call.status = "uncertain";
-      call.error = result.message;
+      call.error = redactText(result.message);
       entry.status = "needs_review";
       entry.reviewReasons = [`CALL-E may or may not have called the airline desk: ${result.message} It will not be redialed.`];
     } else {
       call.status = "failed_to_submit";
-      call.error = result.message;
+      call.error = redactText(result.message);
       entry.status = "portal_rejected";
     }
     if (this.gateway.live && result.kind !== "rejected") this.state.liveCallsUsed += 1;
@@ -651,7 +676,7 @@ export class Desk {
     if (entry.status !== "airline_call_in_progress" || !call?.callId || call.status !== "in_progress") return entry;
     if (this.now() < new Date(call.nextPollAt).getTime()) return entry;
 
-    const outcome = await this.gateway.get(call.callId);
+    const outcome = redactOutcome(await this.gateway.get(call.callId));
     call.outcome = outcome;
     if (outcome.state === "in_progress") {
       call.nextPollAt = new Date(this.now() + this.gateway.pollSeconds * 1000).toISOString();
@@ -740,7 +765,7 @@ export class Desk {
     if (!route.ok) throw new DeskError(route.reason);
     this.guardLiveCall(destination.phone, confirmLast4);
 
-    const idempotencyKey = `fda-${id}-callback`.replace(/[^A-Za-z0-9_-]/g, "_");
+    const idempotencyKey = `fda-${this.state.runId}-${id}-callback`.replace(/[^A-Za-z0-9_-]/g, "_");
     const call: AirlineCall = {
       destinationMasked: maskPhone(destination.phone),
       redirected: destination.redirected,
@@ -773,7 +798,14 @@ export class Desk {
       call.nextPollAt = new Date(this.now() + this.gateway.firstPollSeconds * 1000).toISOString();
     } else {
       call.status = result.kind === "uncertain" ? "uncertain" : "failed_to_submit";
-      call.error = result.message;
+      call.error = redactText(result.message);
+      if (result.kind === "uncertain") {
+        // Surface it: the passenger may or may not have heard the result, and it is never redialed.
+        entry.callbackVerdict = {
+          kind: "follow_up",
+          reasons: [`CALL-E may or may not have called the passenger back: ${call.error} It will not be redialed. Send the result in writing.`],
+        };
+      }
     }
     if (this.gateway.live && result.kind !== "rejected") this.state.liveCallsUsed += 1;
     this.save();
@@ -785,7 +817,7 @@ export class Desk {
     const call = entry.callback;
     if (!call?.callId || call.status !== "in_progress") return entry;
     if (this.now() < new Date(call.nextPollAt).getTime()) return entry;
-    const outcome = await this.gateway.get(call.callId);
+    const outcome = redactOutcome(await this.gateway.get(call.callId));
     call.outcome = outcome;
     if (outcome.state === "in_progress") {
       call.nextPollAt = new Date(this.now() + this.gateway.pollSeconds * 1000).toISOString();
@@ -853,6 +885,7 @@ export class Desk {
       live: this.gateway.live,
       liveDemoPhone: this.options.liveDemoPhone && this.gateway.live ? maskPhone(this.options.liveDemoPhone) : null,
       liveBudget: { used: this.state.liveCallsUsed, limit: this.options.liveCallBudget },
+      demoNow: this.options.demoNow ? new Date(this.options.demoNow()).toISOString() : null,
       opsEvents: Object.values(this.state.opsEvents).sort((a, b) => b.receivedAt.localeCompare(a.receivedAt)),
       polling: { firstSeconds: this.gateway.firstPollSeconds, everySeconds: this.gateway.pollSeconds },
       flights: catalog.flights.map((f) => ({

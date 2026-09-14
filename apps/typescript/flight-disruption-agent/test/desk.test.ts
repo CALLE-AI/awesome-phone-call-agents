@@ -80,7 +80,7 @@ test("live mode dials only the configured demo phone, after typed confirmation, 
   assert.equal(entry.status, "in_progress");
   assert.equal(gateway.requests[0]?.phone, "+6591234567");
   assert.equal(gateway.requests[0]?.region, "SG");
-  assert.equal(gateway.requests[0]?.idempotencyKey, "fda-evt_NA721-2026-09-20_240-K7Q2XA");
+  assert.match(gateway.requests[0]?.idempotencyKey ?? "", /^fda-[0-9a-f]{8}-evt_NA721-2026-09-20_240-K7Q2XA$/);
   await assert.rejects(desk.startCall(d.id, "M3P8RD", "4567"), /budget/);
 });
 
@@ -138,7 +138,7 @@ test("live mode sends the airline desk call to the demo phone only, after typed 
   await assert.rejects(desk.callAirlineDesk(entry.request.id), /last 4 digits/);
   assert.equal((await desk.callAirlineDesk(entry.request.id, "4567")).status, "airline_call_in_progress");
   assert.equal(gateway.requests[0]?.phone, "+6591234567");
-  assert.equal(gateway.requests[0]?.idempotencyKey, "fda-req_P3X9GA_1-airline");
+  assert.match(gateway.requests[0]?.idempotencyKey ?? "", /^fda-[0-9a-f]{8}-req_P3X9GA_1-airline$/);
   assert.equal(gateway.requests[0]?.metadata.purpose, "airline_forced_reissue");
 });
 
@@ -169,4 +169,17 @@ test("force majeure disruptions get their own id and task wording", () => {
   const d = desk.reportDelay("NA721-2026-09-20", 240, "volcanic ash", "force_majeure");
   assert.equal(d.id, "evt_NA721-2026-09-20_fm_240");
   assert.match(desk.preview(d.id, "K7Q2XA").task, /outside the airline's control \(force majeure\)/);
+});
+
+test("a call after Reset demo gets a new idempotency key, so CALL-E places it again", async () => {
+  const gateway = new RecordingGateway({ kind: "started", callId: "call_1" });
+  const desk = new Desk(loadCatalog(), gateway, { statePath: null, liveDemoPhone: "+6591234567", liveCallBudget: 5 });
+  let d = desk.reportDelay("NA721-2026-09-20", 240, "weather");
+  const first = await desk.startCall(d.id, "K7Q2XA", "4567");
+  first.status = "applied"; // finished, so reset is allowed
+  desk.reset();
+  d = desk.reportDelay("NA721-2026-09-20", 240, "weather");
+  await desk.startCall(d.id, "K7Q2XA", "4567");
+  assert.equal(gateway.requests.length, 2);
+  assert.notEqual(gateway.requests[0]?.idempotencyKey, gateway.requests[1]?.idempotencyKey);
 });

@@ -113,6 +113,12 @@ function render() {
 }
 
 function renderMode() {
+  const clock = $("clock");
+  clock.hidden = !snap.demoNow;
+  if (snap.demoNow) {
+    clock.textContent = `Demo clock ${dayMonth(snap.demoNow)} ${hhmm(snap.demoNow)} WIB`;
+    clock.title = "Passenger request cutoffs use this demo clock because the fictional flights are on 20 September 2026.";
+  }
   const el = $("mode");
   if (snap.live) {
     el.className = "pill live";

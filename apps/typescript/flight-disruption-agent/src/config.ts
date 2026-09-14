@@ -42,3 +42,20 @@ export function webhookSecretFromEnv(live: boolean, env = process.env): { secret
   }
   return live ? { secret: null, demo: false } : { secret: DRY_RUN_WEBHOOK_SECRET, demo: true };
 }
+
+/** The demo schedule is fixed on 20 September 2026, so request cutoffs run on a demo clock. */
+export const DEFAULT_DEMO_NOW = "2026-09-19T09:00:00+07:00";
+
+/**
+ * A clock that starts at DEMO_NOW when the server boots and then ticks in real time, so
+ * passenger request eligibility keeps working after the fictional flights' real dates pass.
+ * DEMO_NOW=real uses the wall clock. Only eligibility reads it; call polling uses real time.
+ */
+export function demoClockFromEnv(env = process.env, bootMs = Date.now()): { now: () => number; label: string | null } {
+  const raw = env.DEMO_NOW?.trim() || DEFAULT_DEMO_NOW;
+  if (raw === "real") return { now: () => Date.now(), label: null };
+  const start = Date.parse(raw);
+  if (Number.isNaN(start)) throw new Error(`DEMO_NOW must be an ISO timestamp or "real", got "${raw}".`);
+  const offset = start - bootMs;
+  return { now: () => Date.now() + offset, label: raw };
+}
