@@ -1,0 +1,25 @@
+# Supplier capacity is insufficient -> multi-supplier strategy.
+input:
+  mission: { objective: "Secure 5,000 units before the production cutoff", deadline: "14:00" }
+  constraints:
+    - { key: quantity, operator: gte, value: 5000, mandatory: true }
+  strategy: { id: strategy_01, type: single_supplier, target: "Supplier A" }
+  call_result:
+    call_id: call_112
+    target: "Supplier A"
+    status: completed
+    facts: { quantity: 2000 }
+  available_targets: ["Supplier B", "Supplier C"]
+
+output:
+  strategy_status: invalid
+  constraint_results:
+    - { constraint: quantity, required: 5000, observed: 2000, status: violated }
+  replan:
+    required: true
+    reason: "Supplier A covers 2,000 of the 5,000 units required."
+    proposed_strategy: { type: multi_supplier, target: "Supplier B" }
+  next_operation:
+    type: phone_call
+    objective: "Verify how many units Supplier B can cover."
+    required_information: [quantity, delivery_time]
