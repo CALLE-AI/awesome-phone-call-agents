@@ -235,6 +235,8 @@ This project is an awesome list for AI-agent phone-call workflows. Add resources
 - [OOO-Pilot](https://github.com/balajianbalagan/ooopilot) - Slack-based AI work proxy that places real CALL-E phone calls on an absent employee's behalf, verifies coworker claims against Jira before treating them as fact, and reports discrepancies in a return-to-work summary.
 
 -  [VendorPulse](https://github.com/Eman2123/VendorPlus) - Autonomous CALL-E-powered vendor check-in tool that calls suppliers about order status, scores delivery risk, and escalates high-risk vendors for human review.
+- [Ringbolt](https://github.com/voyagi/ringbolt) - On-call line that phones a human when production breaks, holds a two-way conversation about the incident, and runs the authorized runbook fix only after verifying the spoken confirmation against the call transcript, with a no-call local stand-in by default. [Demo](https://ringbolt.taranity.com) · [Video](https://www.youtube.com/watch?v=EIm87clsks8)
+
 Runnable demo apps live under [`apps/`](apps/). They are not a CALL-E SDK and do not define a supported application API.
 
 | App | Language | Purpose |
