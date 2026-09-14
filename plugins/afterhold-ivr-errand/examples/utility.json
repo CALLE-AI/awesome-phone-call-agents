@@ -1,0 +1,27 @@
+{
+  "archetype": "utility",
+  "e164": "+911155500011",
+  "display_name": "Tata Power — Mumbai",
+  "goal": "Confirm the electricity outage status in our area, capture the expected restoration time, and ask for a reference number.",
+  "language": "en-IN",
+  "extract_schema": {
+    "type": "object",
+    "required": ["outcome", "summary_for_user"],
+    "properties": {
+      "outcome": { "type": "string", "enum": ["resolved", "needs_human", "voicemail", "unavailable", "refused", "failed"] },
+      "summary_for_user": { "type": "string" },
+      "facts": {
+        "type": "object",
+        "properties": {
+          "account_number": { "type": "string" },
+          "service_type": { "type": "string" },
+          "reference_number": { "type": "string" },
+          "next_action_by_user": { "type": "string" }
+        },
+        "additionalProperties": true
+      },
+      "next_step": { "type": "string" },
+      "callee_role": { "type": "string" }
+    }
+  }
+}

@@ -1,0 +1,16 @@
+﻿# apps/typescript/afterhold-api runtime
+apps/typescript/afterhold-api/data/*.db
+apps/typescript/afterhold-api/data/*.db-journal
+apps/typescript/afterhold-api/*.log
+apps/typescript/afterhold-api/.env
+apps/typescript/afterhold-api/.env.*
+!apps/typescript/afterhold-api/.env.example
+apps/typescript/afterhold-api/node_modules/
+apps/typescript/afterhold-api/dist/
+
+# scripts that hit live APIs
+skills/afterhold-ivr-errand/scripts/.cache/
+
+# OS noise
+.DS_Store
+Thumbs.db

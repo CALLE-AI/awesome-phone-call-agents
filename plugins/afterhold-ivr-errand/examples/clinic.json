@@ -1,0 +1,27 @@
+{
+  "archetype": "clinic",
+  "e164": "+914400003344",
+  "display_name": "Dr. Mehta Clinic",
+  "goal": "Confirm tomorrow's 4:30 PM appointment with Dr. Mehta, ask for any prep instructions, and reschedule if unavailable.",
+  "language": "en-IN",
+  "extract_schema": {
+    "type": "object",
+    "required": ["outcome", "summary_for_user"],
+    "properties": {
+      "outcome": { "type": "string", "enum": ["resolved", "needs_human", "voicemail", "unavailable", "refused", "failed"] },
+      "summary_for_user": { "type": "string" },
+      "facts": {
+        "type": "object",
+        "properties": {
+          "appointment_time": { "type": "string" },
+          "doctor_name": { "type": "string" },
+          "prep_instructions": { "type": "string" },
+          "insurance_required": { "type": "boolean" }
+        },
+        "additionalProperties": true
+      },
+      "next_step": { "type": "string" },
+      "callee_role": { "type": "string" }
+    }
+  }
+}
