@@ -8,6 +8,10 @@
 import { createHash, randomUUID } from "node:crypto";
 
 export const CALLE_BASE_URL = "https://api.heycall-e.com";
+/** Display-only phone masking; private request payloads stay unchanged. */
+export function maskText(text: string): string {
+  return text.replace(/\+[1-9][0-9]{7,14}/g, (phone) => maskPhone(phone));
+}
 const CALL_MONTH_LIMIT = 10; // per person, per calendar month
 const CALL_GLOBAL_MONTH_LIMIT = 300; // circuit breaker across everyone
 const POLL_REFRESH_MS = 3000; // a status read asks CALL-E at most this often
@@ -204,6 +208,7 @@ export function httpProvider(apiKey: string, baseUrl: string = CALLE_BASE_URL): 
       try {
         response = await fetch(`${url.origin}/v1/calls`, {
           method: "POST",
+          redirect: "error",
           headers: { ...auth, "Content-Type": "application/json", "Idempotency-Key": idempotencyKey },
           body: JSON.stringify(body),
         });
@@ -218,7 +223,7 @@ export function httpProvider(apiKey: string, baseUrl: string = CALLE_BASE_URL): 
     },
     async getCall(callId) {
       try {
-        const response = await fetch(`${url.origin}/v1/calls/${encodeURIComponent(callId)}`, { headers: auth });
+        const response = await fetch(`${url.origin}/v1/calls/${encodeURIComponent(callId)}`, { headers: auth, redirect: "error" });
         return response.ok ? { ok: true, call: (await response.json()) as CalleCall } : { ok: false };
       } catch {
         return { ok: false };
@@ -576,11 +581,12 @@ export class CallService {
     const turns = call.recipients?.[0]?.attempts?.flatMap((attempt) => attempt.transcript_turns ?? []) ?? [];
     const finished = call.status === "completed" || call.status === "failed" || call.status === "canceled";
     record.status = finished ? (call.status as ActionStatus) : "in_progress";
-    record.summary = call.summary ?? null;
-    record.structured = call.structured_result ?? call.recipients?.[0]?.structured_result ?? null;
+    record.summary = call.summary ? maskText(call.summary) : null;
+    const structured = call.structured_result ?? call.recipients?.[0]?.structured_result ?? null;
+    record.structured = structured ? JSON.parse(maskText(JSON.stringify(structured))) : null;
     record.transcript = turns.length
-      ? turns.map((turn) => `${turn.speaker === "bot" ? "Tadah" : "Them"}: ${turn.text}`).join("\n")
+      ? turns.map((turn) => `${turn.speaker === "bot" ? "Tadah" : "Them"}: ${maskText(turn.text)}`).join("\n")
       : null;
-    record.failureCode = call.failure_code ?? null;
+    record.failureCode = call.failure_code ? maskText(call.failure_code) : null;
   }
 }

@@ -34,7 +34,7 @@ Enforced in code, before dialling:
 - US numbering rules; 211 to 911, 900 and 976 numbers are refused.
 - Card numbers (Luhn check), SSNs, and requests for bank, PIN or date-of-birth details are refused.
 - One live call per person, a monthly limit reserved before dialling, and no automatic retries.
-- An `Idempotency-Key` derived from the request, so a retry can't ring the business twice.
+- An `Idempotency-Key` derived from the request and UTC hour. It only deduplicates the same request within that hour; it is not a guarantee across hours or restarts.
 - Webhooks: a secret path, duplicate events ignored, and the result always re-read from CALL-E.
 
 Asked of the agent in the task text: say it is an AI first, speak English, never give personal numbers, never agree to a charge, commit to nothing beyond `mayAgreeTo`, and hang up after four minutes.
@@ -47,6 +47,6 @@ Asked of the agent in the task text: say it is an AI first, speak English, never
 
 ## Known limits
 
-- If CALL-E's answer to a create request is lost, the call is marked failed even though it may be ringing; the idempotency key still blocks a second call.
+- If CALL-E's answer to a create request is lost, the call is marked failed even though it may be ringing. Stop and reconcile in the provider dashboard before another call; do not retry based on that label. The hour-scoped key and in-memory state do not provide cross-hour or restart recovery.
 - The answer is not yet requested in the user's own language.
 - Call length is limited only by the task text.
