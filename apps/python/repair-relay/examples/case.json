@@ -1,0 +1,11 @@
+{
+  "case_id": "synthetic-repair-001",
+  "synthetic": true,
+  "organization": "Demo Community Workshop",
+  "repair": "Bicycle brake adjustment",
+  "contact": {"phone": "+12025550123", "consent": true},
+  "windows": [
+    {"id": "friday-am", "start": "2026-09-18T09:00:00-04:00", "end": "2026-09-18T11:00:00-04:00"},
+    {"id": "saturday-pm", "start": "2026-09-19T13:00:00-04:00", "end": "2026-09-19T15:00:00-04:00"}
+  ]
+}

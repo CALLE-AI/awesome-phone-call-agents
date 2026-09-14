@@ -1,0 +1,46 @@
+{
+ "id": "train-agent-044",
+ "label": "agent",
+ "source": "sim-train",
+ "meta": {
+  "task": "request a refund for a double charge",
+  "hard": false
+ },
+ "turns": [
+  {
+   "speaker": "user",
+   "text": "Thank you for calling Maple Vet Clinic! I'm Ava, the virtual assistant for Maple Vet Clinic. How can I help you today?",
+   "offset_seconds": 0.64
+  },
+  {
+   "speaker": "bot",
+   "text": "Hi, I'm an AI assistant calling on behalf of Alex Martin. Alex Martin was charged twice for the same order last week, and I'm calling to request a refund for the duplicate.",
+   "offset_seconds": 9.58
+  },
+  {
+   "speaker": "user",
+   "text": "I'm sorry about the double charge. I've submitted a refund request for the duplicate payment. It should be processed within five to seven business days.",
+   "offset_seconds": 22.7
+  },
+  {
+   "speaker": "bot",
+   "text": "How long will the refund take?",
+   "offset_seconds": 33.17
+  },
+  {
+   "speaker": "user",
+   "text": "I'd be happy to help with that. Everything is all set on our end.",
+   "offset_seconds": 36.78
+  },
+  {
+   "speaker": "bot",
+   "text": "How long will the refund take?",
+   "offset_seconds": 43.26
+  },
+  {
+   "speaker": "user",
+   "text": "You're welcome! Have a wonderful day. Goodbye!",
+   "offset_seconds": 46.88
+  }
+ ]
+}

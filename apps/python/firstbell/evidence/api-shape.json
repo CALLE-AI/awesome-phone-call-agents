@@ -1,0 +1,265 @@
+{
+  "what": "Key paths and JSON types returned by the CALL-E production API, and by the offline double, compared. Paths and type names only: no transcript text, no phone number, no provider call id, and no field value of any kind.",
+  "why": "The offline suite measures our code against our own model of the API. This record is the evidence that the model matches the real thing, and it is what keeps a future edit from quietly narrowing it.",
+  "generated": "2026-09-04T19:11:56+00:00",
+  "responses_compared": 11,
+  "recorded_files_read": [
+    "stage1-raw-call.json",
+    "ambiguous-raw.json",
+    "noanswer-raw.json",
+    "exp-raw-all.json"
+  ],
+  "api_paths": {
+    ".completed_at": [
+      "str"
+    ],
+    ".completion_confidence.label": [
+      "str"
+    ],
+    ".completion_confidence.score": [
+      "float"
+    ],
+    ".created_at": [
+      "str"
+    ],
+    ".evidence[]": [
+      "str"
+    ],
+    ".failure_code": [
+      "NoneType",
+      "str"
+    ],
+    ".failure_message": [
+      "NoneType",
+      "str"
+    ],
+    ".id": [
+      "str"
+    ],
+    ".metadata.work_item": [
+      "str"
+    ],
+    ".object": [
+      "str"
+    ],
+    ".recipients[].attempts[].completed_at": [
+      "str"
+    ],
+    ".recipients[].attempts[].failure_code": [
+      "NoneType",
+      "str"
+    ],
+    ".recipients[].attempts[].failure_message": [
+      "NoneType"
+    ],
+    ".recipients[].attempts[].id": [
+      "str"
+    ],
+    ".recipients[].attempts[].phone": [
+      "str"
+    ],
+    ".recipients[].attempts[].provider_call_id": [
+      "str"
+    ],
+    ".recipients[].attempts[].started_at": [
+      "str"
+    ],
+    ".recipients[].attempts[].status": [
+      "str"
+    ],
+    ".recipients[].attempts[].summary": [
+      "str"
+    ],
+    ".recipients[].attempts[].transcript_turns[]": [
+      "empty_array"
+    ],
+    ".recipients[].attempts[].transcript_turns[].offset_seconds": [
+      "int"
+    ],
+    ".recipients[].attempts[].transcript_turns[].speaker": [
+      "str"
+    ],
+    ".recipients[].attempts[].transcript_turns[].text": [
+      "str"
+    ],
+    ".recipients[].id": [
+      "str"
+    ],
+    ".recipients[].locale": [
+      "str"
+    ],
+    ".recipients[].phones[]": [
+      "str"
+    ],
+    ".recipients[].region": [
+      "str"
+    ],
+    ".recipients[].status": [
+      "str"
+    ],
+    ".recipients[].structured_result": [
+      "NoneType"
+    ],
+    ".recipients[].summary": [
+      "str"
+    ],
+    ".status": [
+      "str"
+    ],
+    ".structured_result.expected_return": [
+      "str"
+    ],
+    ".structured_result.free_text_note": [
+      "str"
+    ],
+    ".structured_result.parent_confirmed_aware": [
+      "str"
+    ],
+    ".structured_result.reason_category": [
+      "str"
+    ],
+    ".summary": [
+      "str"
+    ],
+    ".task": [
+      "str"
+    ],
+    ".task_completed": [
+      "bool"
+    ]
+  },
+  "double_paths": {
+    ".completed_at": [
+      "str"
+    ],
+    ".completion_confidence": [
+      "NoneType"
+    ],
+    ".completion_confidence.label": [
+      "str"
+    ],
+    ".completion_confidence.score": [
+      "float"
+    ],
+    ".created_at": [
+      "str"
+    ],
+    ".evidence[]": [
+      "empty_array",
+      "str"
+    ],
+    ".failure_code": [
+      "NoneType",
+      "str"
+    ],
+    ".failure_message": [
+      "NoneType",
+      "str"
+    ],
+    ".id": [
+      "str"
+    ],
+    ".metadata.work_item": [
+      "str"
+    ],
+    ".object": [
+      "str"
+    ],
+    ".recipients[].attempts[].completed_at": [
+      "str"
+    ],
+    ".recipients[].attempts[].failure_code": [
+      "NoneType",
+      "str"
+    ],
+    ".recipients[].attempts[].failure_message": [
+      "NoneType",
+      "str"
+    ],
+    ".recipients[].attempts[].id": [
+      "str"
+    ],
+    ".recipients[].attempts[].phone": [
+      "str"
+    ],
+    ".recipients[].attempts[].provider_call_id": [
+      "str"
+    ],
+    ".recipients[].attempts[].started_at": [
+      "str"
+    ],
+    ".recipients[].attempts[].status": [
+      "str"
+    ],
+    ".recipients[].attempts[].summary": [
+      "NoneType",
+      "str"
+    ],
+    ".recipients[].attempts[].transcript_turns[]": [
+      "empty_array"
+    ],
+    ".recipients[].attempts[].transcript_turns[].offset_seconds": [
+      "int"
+    ],
+    ".recipients[].attempts[].transcript_turns[].speaker": [
+      "str"
+    ],
+    ".recipients[].attempts[].transcript_turns[].text": [
+      "str"
+    ],
+    ".recipients[].id": [
+      "str"
+    ],
+    ".recipients[].locale": [
+      "str"
+    ],
+    ".recipients[].phones[]": [
+      "str"
+    ],
+    ".recipients[].region": [
+      "str"
+    ],
+    ".recipients[].status": [
+      "str"
+    ],
+    ".recipients[].structured_result": [
+      "NoneType"
+    ],
+    ".recipients[].summary": [
+      "str"
+    ],
+    ".status": [
+      "str"
+    ],
+    ".structured_result": [
+      "NoneType"
+    ],
+    ".structured_result.expected_return": [
+      "str"
+    ],
+    ".structured_result.free_text_note": [
+      "str"
+    ],
+    ".structured_result.parent_confirmed_aware": [
+      "str"
+    ],
+    ".structured_result.reason_category": [
+      "str"
+    ],
+    ".summary": [
+      "str"
+    ],
+    ".task": [
+      "str"
+    ],
+    ".task_completed": [
+      "bool"
+    ]
+  },
+  "missing_in_double": [],
+  "extra_in_double": [
+    ".completion_confidence",
+    ".structured_result"
+  ],
+  "type_mismatches": []
+}

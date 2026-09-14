@@ -1,0 +1,46 @@
+{
+ "id": "train-agent-001",
+ "label": "agent",
+ "source": "sim-train",
+ "meta": {
+  "task": "check whether the store is open on Sunday",
+  "hard": false
+ },
+ "turns": [
+  {
+   "speaker": "user",
+   "text": "Hello and thanks for calling Bloom Florists. I'm Max, the virtual assistant for Bloom Florists, and I can help with bookings, hours, and more. What can I do for you?",
+   "offset_seconds": 1.07
+  },
+  {
+   "speaker": "bot",
+   "text": "Hi, I'm an AI assistant calling on behalf of Jordan Lee. Could you tell me your opening hours this Sunday?",
+   "offset_seconds": 12.98
+  },
+  {
+   "speaker": "user",
+   "text": "Of course! Bloom Florists is open on Sunday from 10 AM to 4 PM. Is there anything else I can help you with?",
+   "offset_seconds": 22.28
+  },
+  {
+   "speaker": "bot",
+   "text": "Thanks, and is parking available?",
+   "offset_seconds": 31.97
+  },
+  {
+   "speaker": "user",
+   "text": "I'd be happy to help with that. Everything is all set on our end.",
+   "offset_seconds": 35.62
+  },
+  {
+   "speaker": "bot",
+   "text": "Do you close earlier on holidays?",
+   "offset_seconds": 42.14
+  },
+  {
+   "speaker": "user",
+   "text": "You're welcome! Have a wonderful day. Goodbye!",
+   "offset_seconds": 45.9
+  }
+ ]
+}
