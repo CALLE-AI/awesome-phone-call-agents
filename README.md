@@ -191,6 +191,7 @@ This project is an awesome list for AI-agent phone-call workflows. Add resources
 
 ### Apps
 
+- [AcreVoice](https://github.com/dj-DeepakJadhav/acrevoice-farmer-support) - Consent-first farmer-support workspace that turns a focused CALL-E callback into confirmed, reviewable evidence for an agricultural adviser; the local deterministic workflow is no-call by default.
 
 - [SiteWitness](apps/typescript/sitewitness/) - Local site-history interview workspace that carries reviewed evidence gaps into individually approved CALL-E calls, with exact transcript quotations, human year review, and a no-call rehearsal mode.
 - [Rebuttal Dispute Call](apps/python/rebuttal-dispute-call/) - One disclosed CALL-E call to a disputing customer, cross-examined against its transcript before it becomes chargeback evidence, with six scripted no-call scenarios and a live path gated by per-run consent, an allowlist and local calling hours.
