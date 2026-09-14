@@ -1,0 +1,21 @@
+{
+  "call_id": "fixture_no_answer",
+  "status": "no_answer",
+  "task_completed": false,
+  "completion_confidence": 0.0,
+  "duration_seconds": 45,
+  "result": {
+    "outcome": "no_answer",
+    "recipient_verified": "unknown",
+    "claim_reference": null,
+    "coverage_status": "unknown",
+    "documents_requested": [],
+    "appointment_options": [],
+    "fee": null,
+    "follow_up_by": null,
+    "needs_human": false,
+    "uncertainty_reasons": ["The line rang out after 45 seconds and nobody answered."]
+  },
+  "evidence": [],
+  "transcript": []
+}

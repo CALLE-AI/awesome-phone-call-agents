@@ -1,0 +1,24 @@
+{
+  "call_id": "fixture_fabricated_reference",
+  "status": "completed",
+  "task_completed": true,
+  "completion_confidence": 0.79,
+  "note": "Adversarial fixture: the structured result asserts a reference number that was never said on the call. The verifier must refuse to mark this VERIFIED.",
+  "result": {
+    "outcome": "claim_registered",
+    "recipient_verified": "yes",
+    "claim_reference": "AUR-SVC-2026-99999",
+    "coverage_status": "confirmed_covered",
+    "documents_requested": [],
+    "appointment_options": [],
+    "fee": null,
+    "follow_up_by": null,
+    "needs_human": false,
+    "uncertainty_reasons": []
+  },
+  "evidence": ["Representative said a case would be created and that someone would call back with the number."],
+  "transcript": [
+    { "speaker": "agent", "at_seconds": 2, "text": "Hello, I am an automated assistant calling on behalf of Ravi about a warranty service request." },
+    { "speaker": "representative", "at_seconds": 30, "text": "I will create a case and someone will call you back with the reference number. I do not have it in front of me right now." }
+  ]
+}
