@@ -501,3 +501,80 @@ def test_every_script_produces_the_contract_shape():
         assert attempts and attempts[0]["phone"] == DEST, name
         for t in attempts[0]["transcript_turns"]:
             assert t["speaker"] in {"bot", "user", "unknown"}, name
+
+
+# ---------------------------------------------------------------------------
+# task_completed False with a clear non-contact outcome
+#
+# Observed on a live call: CALL-E returned status "completed", task_completed
+# False, and a schema-valid structured_result whose outcome was "no_answer".
+# Before this, the classifier read task_completed first, so every unanswered
+# call became NEEDS_HUMAN -- the cascade never advanced to the next contact and
+# the attempt budget never engaged.
+# ---------------------------------------------------------------------------
+
+
+@pytest.mark.parametrize("script", ["no_answer", "voicemail", "not_in_service"])
+def test_the_no_contact_scripts_report_the_task_as_not_completed(script):
+    """The fake tracks the live API here, or these tests prove nothing."""
+    assert SCRIPTS[script](DEST, metadata())["task_completed"] is False
+
+
+@pytest.mark.parametrize("script", ["no_answer", "voicemail", "not_in_service"])
+def test_a_non_contact_outcome_is_read_even_when_the_task_did_not_complete(script):
+    """Nobody picked up *is* the task completing, in the only way it could."""
+    snapshot = SCRIPTS[script](DEST, metadata())
+    result = classify(
+        snapshot,
+        workflow=Workflow.CONTACT_CHECK,
+        intent=intent(snapshot["id"]),
+        confidence_floor=0.6,
+    )
+    assert result.disposition is Disposition.CONFIRMED
+    assert script in result.reason
+    assert contact_check_event(result) is not cc.CCEvent.RESULT_NEEDS_HUMAN
+
+
+def test_the_cascade_advances_on_an_incomplete_no_answer():
+    """The point of the relaxation: the case moves on instead of queueing."""
+    meta = metadata(workflow="pattern_followup")
+    snapshot = SCRIPTS["no_answer"](DEST, meta)
+    result = classify(
+        snapshot,
+        workflow=Workflow.PATTERN_FOLLOWUP,
+        intent=intent(snapshot["id"], workflow="pattern_followup"),
+        confidence_floor=0.6,
+    )
+    assert pattern_event(result) is pf.PFEvent.RESULT_NO_CONTACT
+
+
+def test_an_incomplete_reached_result_still_needs_a_human():
+    """The relaxation is narrow. A conversation that did not finish is not a fact."""
+    snapshot = SCRIPTS["clean_identity"](DEST, metadata())
+    snapshot["task_completed"] = False
+    result = classify(
+        snapshot,
+        workflow=Workflow.CONTACT_CHECK,
+        intent=intent(snapshot["id"]),
+        confidence_floor=0.6,
+    )
+    assert result.disposition is Disposition.REVIEW_REQUIRED
+    assert contact_check_event(result) is cc.CCEvent.RESULT_NEEDS_HUMAN
+
+
+def test_an_incomplete_malformed_non_contact_result_still_needs_a_human():
+    """A result that fails its own schema never takes the relaxed path."""
+    snapshot = call_task(
+        "call_1",
+        destination=DEST,
+        metadata=metadata(),
+        task_completed=False,
+        structured_result={"outcome": "no_answer"},
+    )
+    result = classify(
+        snapshot,
+        workflow=Workflow.CONTACT_CHECK,
+        intent=intent(),
+        confidence_floor=0.6,
+    )
+    assert result.disposition is Disposition.REVIEW_REQUIRED

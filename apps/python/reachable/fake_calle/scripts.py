@@ -147,6 +147,9 @@ def not_in_service(destination: str, metadata: dict[str, Any]) -> dict[str, Any]
         destination=destination,
         metadata=metadata,
         structured_result=_shared_result(metadata, outcome="not_in_service", identity="unknown"),
+        # Observed live: the provider reports the task as not completed when
+        # nobody was reached, while still returning a clear outcome.
+        task_completed=False,
         score=0.95,
         label="high",
         summary="Number unobtainable.",
@@ -161,6 +164,9 @@ def voicemail(destination: str, metadata: dict[str, Any]) -> dict[str, Any]:
         destination=destination,
         metadata=metadata,
         structured_result=_shared_result(metadata, outcome="voicemail", identity="unknown"),
+        # Observed live: the provider reports the task as not completed when
+        # nobody was reached, while still returning a clear outcome.
+        task_completed=False,
         score=0.91,
         label="high",
         summary="Answering machine.",
@@ -177,6 +183,9 @@ def no_answer(destination: str, metadata: dict[str, Any]) -> dict[str, Any]:
         destination=destination,
         metadata=metadata,
         structured_result=_shared_result(metadata, outcome="no_answer", identity="unknown"),
+        # Observed live: the provider reports the task as not completed when
+        # nobody was reached, while still returning a clear outcome.
+        task_completed=False,
         score=0.94,
         label="high",
         summary="Nobody answered.",

@@ -52,6 +52,26 @@ class Classification:
         return self.disposition is Disposition.CONFIRMED
 
 
+#: Outcomes where no conversation took place. Nothing was said, so there is
+#: nothing to misinterpret, and the only action that follows is to try the next
+#: contact or stop.
+NON_CONTACT_OUTCOMES = frozenset({"voicemail", "no_answer", "not_in_service"})
+
+
+def _non_contact_outcome(workflow: Workflow, result: Any) -> str | None:
+    """Return the outcome when the result is a schema-valid non-contact one.
+
+    Returns None for anything else, including a malformed result -- so a result
+    that cannot be validated never takes this relaxed path.
+    """
+    if not isinstance(result, Mapping) or not result:
+        return None
+    if validate_result(workflow, result):
+        return None
+    outcome = result.get("outcome")
+    return outcome if outcome in NON_CONTACT_OUTCOMES else None
+
+
 def _confidence(snapshot: Mapping[str, Any]) -> tuple[float | None, str | None]:
     raw = snapshot.get("completion_confidence")
     if not isinstance(raw, Mapping):
@@ -118,10 +138,31 @@ def classify(
 
     task_completed = snapshot.get("task_completed")
     if task_completed is not True:
+        # Observed on a live call: CALL-E reports task_completed False when
+        # nobody answered, while still returning a schema-valid result whose
+        # outcome says exactly that. "Nobody picked up" is the task completing
+        # in the only way it could, and reading it is what lets the cascade
+        # advance and the attempt budget mean something -- otherwise every
+        # ordinary no-answer lands in the human queue.
+        #
+        # Deliberately narrow: this applies only to outcomes where no
+        # conversation happened, so there is nothing to misinterpret and no
+        # action follows except trying the next contact or giving up. A
+        # `reached` result still requires task_completed True before anything
+        # can be concluded from what was said.
+        non_contact = _non_contact_outcome(workflow, snapshot.get("structured_result"))
+        if non_contact is None:
+            return Classification(
+                Disposition.REVIEW_REQUIRED,
+                f"task_completed is {task_completed!r}, not a clear completion",
+                evidence=evidence,
+            )
         return Classification(
-            Disposition.REVIEW_REQUIRED,
-            f"task_completed is {task_completed!r}, not a clear completion",
+            Disposition.CONFIRMED,
+            f"no contact established ({non_contact}); the provider reported it clearly",
+            fields=tuple(sorted(snapshot["structured_result"])),
             evidence=evidence,
+            result=snapshot["structured_result"],
         )
 
     score, label = _confidence(snapshot)
