@@ -54,9 +54,9 @@ page = page.replace(
     if (el) { el.disabled = true; el.title = "Disabled in the static snapshot"; }
   }
   $("start").textContent = "Drills disabled (snapshot)";
-  // The linter is a separate self-contained page; in a snapshot it is opened from the branch
-  // rather than served, so the button still works for someone who only has this one file.
-  $("lintBtn").onclick = () => window.open("https://raw.githack.com/usv240/awesome-phone-call-agents/feat/still-covered-medicaid-screener/apps/typescript/still-covered/public/lint.html", "_blank");`,
+  // The linter is a separate self-contained page that sits beside this one - in public/, in the
+  // container, and on the published site - so a relative link works from all three.
+  $("lintBtn").onclick = () => window.open("lint.html", "_blank");`,
 );
 
 // The review buttons would POST; make them explain instead of failing.

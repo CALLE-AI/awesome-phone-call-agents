@@ -98,14 +98,16 @@ supported was caught and turned into a correction call from a human.
 
 ## See it without installing anything
 
-Two self-contained pages, served straight from this branch. No account, no server, no network calls
-once they load.
+Two pages in [`public/`](public/) are entirely self-contained: save either one and open it, and it
+makes no network request at all. No server, no toolchain, no account.
 
-- **[The dashboard, from a real campaign](https://raw.githack.com/usv240/awesome-phone-call-agents/feat/still-covered-medicaid-screener/apps/typescript/still-covered/public/snapshot.html)** - the actual `/api/state` output of a
-  completed dry-run, baked into the real dashboard with the network turned off. Every number, person
-  and worklist item is that run's output, not a mock-up.
-- **[The call-task linter](https://raw.githack.com/usv240/awesome-phone-call-agents/feat/still-covered-medicaid-screener/apps/typescript/still-covered/public/lint.html)** - paste any CALL-E call task and get the fourteen
-  boundaries it leaves undefended, each naming the live call that produced the rule.
+| Page | What it is |
+| --- | --- |
+| [`public/snapshot.html`](https://github.com/usv240/awesome-phone-call-agents/blob/feat/still-covered-medicaid-screener/apps/typescript/still-covered/public/snapshot.html) | The real dashboard with the real `/api/state` output of a completed dry-run baked in and the network turned off. Every number, person and worklist item is that run's output, not a mock-up. |
+| [`public/lint.html`](https://github.com/usv240/awesome-phone-call-agents/blob/feat/still-covered-medicaid-screener/apps/typescript/still-covered/public/lint.html) | Paste any CALL-E call task and get the fourteen boundaries it leaves undefended, each naming the live call that produced the rule. |
+
+GitHub shows these as source; use the **Download raw file** button, or `npm run serve` (or the Docker
+image below) to have them served.
 
 ## Run it
 
