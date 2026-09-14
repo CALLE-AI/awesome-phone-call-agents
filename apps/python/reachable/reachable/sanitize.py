@@ -14,6 +14,8 @@ from __future__ import annotations
 import re
 import unicodedata
 
+from .phone import mask_display
+
 #: Default cap for a free-text field. Long enough for a sentence a parent said,
 #: short enough that nothing can be smuggled in bulk.
 DEFAULT_MAX_LENGTH = 500
@@ -95,7 +97,7 @@ def clean_for_csv(value: object, *, max_length: int = DEFAULT_MAX_LENGTH) -> str
     ``=``, ``+``, ``-`` or ``@`` is prefixed with an apostrophe so a spreadsheet
     shows the text instead of evaluating it.
     """
-    text = clean_text(value, max_length=max_length)
+    text = clean_text(mask_display(value), max_length=max_length)
     if text.startswith(_CSV_FORMULA_PREFIXES):
         return "'" + text
     return text

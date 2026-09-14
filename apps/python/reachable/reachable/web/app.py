@@ -33,7 +33,7 @@ from ..models import (
     Workflow,
 )
 from ..orchestrator import Orchestrator
-from ..phone import mask
+from ..phone import mask, mask_display
 from ..store import Store, from_json
 
 TEMPLATES = Path(__file__).parent / "templates"
@@ -102,6 +102,9 @@ def create_app(
     app = FastAPI(title="Reachable", docs_url=None, redoc_url=None)
     templates = Jinja2Templates(directory=str(TEMPLATES))
     templates.env.filters["mask"] = mask
+    # Mask only evaluated display values; template control flow and the
+    # orchestrator's evidence/identity comparisons keep their original inputs.
+    templates.env.finalize = mask_display
 
     orc = orchestrator or build_orchestrator(config)
     if orchestrator is None:

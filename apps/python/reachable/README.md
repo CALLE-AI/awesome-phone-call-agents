@@ -50,10 +50,11 @@ Citations, with page numbers and the primary legislation, are in
 Calls each emergency contact and establishes one thing: is this still a good
 number for this named person, and are they still willing to be a contact?
 
-It **never collects a new phone number by voice**. Not "is discouraged from" —
-there is no field in the result schema that can hold one, so it cannot. Somebody
-who wants their details changed produces an office task instead, confirmed
-through a channel the school already trusts.
+It does not ask for or automatically adopt a new phone number by voice.
+The schema has no dedicated replacement-number field, but free-text results and
+transcripts can still contain unsolicited numbers. Somebody who wants their
+details changed produces an office task instead, confirmed through a channel
+the school already trusts.
 
 ### Workflow B — pattern follow-up (triggered by the register)
 
@@ -290,9 +291,15 @@ every variable and carries no secret values.
 
 ### Phone numbers
 
-Stored in E.164 in exactly one column and **masked everywhere else** — dashboard,
-logs, exports, CLI output, validation reports. A test sweeps every page and every
-export asserting no full number appears. Fixtures use only Ofcom's reserved drama
+Private destination records use E.164; stored call evidence can also contain
+numbers. Dashboard expressions, CSV cells, and CLI output mask E.164 and common
+national phone formats, including numbers in quotes and provider free text.
+This display-only heuristic preserves private evidence for identity checks; it
+does not anonymise spelled-out numbers, names, or all possible personal data.
+Use synthetic records for public demos and review exports before sharing.
+The unauthenticated dashboard's `serve` command accepts loopback hosts only;
+do not expose it through a public tunnel or a separately configured server.
+Fixtures use only Ofcom's reserved drama
 range `+447700900000`–`+447700900999`, with fictional pupils at a fictional
 school; a test fails if any number in the repository could reach a real
 subscriber.

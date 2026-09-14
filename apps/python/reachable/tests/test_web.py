@@ -6,6 +6,7 @@ import pytest
 from fastapi.testclient import TestClient
 
 from reachable.models import ContactHealth, PatternState
+from reachable.store import from_json, to_json
 from reachable.web.app import create_app
 
 from .conftest import SCHOOL_DAY_IN_WINDOW
@@ -71,6 +72,41 @@ def test_the_case_page_never_shows_a_full_number(client):
     for contact in orc.dataset.contacts:
         assert contact.phone_e164 not in body
     assert "…377" in body
+
+
+def test_free_text_display_mask_preserves_private_evidence(client, fake_state):
+    http, orc = client
+    request, *_ = orc.build_request(IVY_CASE)
+    fake_state.queue(request.idempotency_key, "pattern_reason_only")
+    outcome = orc.place_call(IVY_CASE, confirmed=True, now=SCHOOL_DAY_IN_WINDOW)
+    orc.reconcile(outcome.attempt_id)
+    number = "+447700900101"  # reserved fictional fixture
+    evidence = f"Please use {number}. <script>alert(1)</script>"
+    original = orc.store.attempt(outcome.attempt_id)
+    result = from_json(original["structured_result"], {})
+    result.update(reason_note=evidence, verbatim_quotes=[evidence])
+    if "verbatim_identity_quote" in result:
+        result["verbatim_identity_quote"] = evidence
+    orc.store.update_attempt(
+        outcome.attempt_id, structured_result=to_json(result), disposition_reason=evidence
+    )
+    orc.store.add_task("display-test", pupil_id="P-1041", kind="support", detail=evidence)
+    orc.store.record_event("display.test", case_id=IVY_CASE, reason=evidence)
+    before = dict(orc.store.attempt(outcome.attempt_id))
+
+    for response in (
+        http.get(f"/cases/{IVY_CASE}"), http.get("/tasks"),
+        http.post("/export/register-reasons")
+    ):
+        assert response.status_code == 200
+        assert number not in response.text
+        assert "…101" in response.text
+        if response.headers["content-type"].startswith("text/html"):
+            assert "<script>alert(1)</script>" not in response.text
+            assert "&lt;script&gt;" in response.text
+    assert dict(orc.store.attempt(outcome.attempt_id)) == before
+    assert number in before["structured_result"]
+    assert f'/cases/{IVY_CASE}/resolve' in http.get(f"/cases/{IVY_CASE}").text
 
 
 def test_no_page_ever_leaks_a_full_number(client, fake_state):

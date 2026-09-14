@@ -5,8 +5,9 @@ placeholder values listed per contract; it never authors policy.
 
 Two properties are enforced here rather than asked for in a prompt:
 
-* **No schema field can carry a phone number.** ``best_number_for_school`` is an
-  enum, so a new number cannot be captured by voice -- there is nowhere to put it.
+* **No dedicated replacement-number field.** ``best_number_for_school`` is an
+  enum and no contact update is automatic. Free-text evidence can still contain
+  unsolicited numbers; presentation masking is separate from private storage.
 * **Forbidden content cannot reach a rendered task.** Fines, penalties, legal
   action and medical advice are refused at render time.
 """

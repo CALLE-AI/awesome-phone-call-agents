@@ -112,7 +112,7 @@ def mask(raw: str | None) -> str:
     """Render a number for display: the last three digits only.
 
     Used in the dashboard, logs, audit rows, exports and CLI output -- every
-    surface except the single storage column. An unusable value masks to a
+    display surface, not private destination/evidence storage. An unusable value masks to a
     placeholder rather than raising: a masking helper must never be the thing
     that takes the dashboard down.
     """
@@ -120,3 +120,26 @@ def mask(raw: str | None) -> str:
     if len(value) < 3:
         return "***"
     return "…" + value[-3:]
+
+
+# Display-only heuristic for E.164 and common national formatting. Leave ISO
+# dates intact. This is not an anonymiser for spelled-out numbers or other PII.
+_DISPLAY_PHONE_RE = re.compile(
+    r"(?<![\w-])(?:\+[1-9](?:[ ().-]*[0-9]){7,14}|"
+    r"(?![0-9]{4}-[0-9]{2}-[0-9]{2})\(?[0-9](?:[ ().-]*[0-9]){9,14})(?!\w)"
+)
+
+
+def mask_display(value: object) -> object:
+    """Return a masked presentation copy without changing private evidence."""
+    if isinstance(value, str):
+        return _DISPLAY_PHONE_RE.sub(
+            lambda match: mask(re.sub(r"[^0-9]", "", match.group())), value
+        )
+    if isinstance(value, dict):
+        return {key: mask_display(item) for key, item in value.items()}
+    if isinstance(value, list):
+        return [mask_display(item) for item in value]
+    if isinstance(value, tuple):
+        return tuple(mask_display(item) for item in value)
+    return value

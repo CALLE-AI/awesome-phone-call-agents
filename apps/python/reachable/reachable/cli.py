@@ -7,13 +7,19 @@ types a confirmation for that specific call.
 from __future__ import annotations
 
 import argparse
+import builtins
 import sys
 from pathlib import Path
 
 from .config import Config, ConfigError, load_env_file
-from .phone import InvalidPhoneNumber, is_drama_number, mask, validate_e164
+from .phone import InvalidPhoneNumber, is_drama_number, mask, mask_display, validate_e164
 
 APP_ROOT = Path(__file__).resolve().parent.parent
+
+
+def print(*values: object, **kwargs) -> None:
+    """Apply the shared display mask to every CLI output, not stored evidence."""
+    builtins.print(*mask_display(values), **kwargs)
 
 
 def _orchestrator(config: Config | None = None):
@@ -23,7 +29,7 @@ def _orchestrator(config: Config | None = None):
 
 
 def _fail(message: str) -> int:
-    sys.stderr.write(f"error: {message}\n")
+    sys.stderr.write(f"error: {mask_display(message)}\n")
     return 2
 
 
@@ -207,7 +213,7 @@ def cmd_live_contact(args: argparse.Namespace) -> int:
     print("  number you own and have offered for testing.\n")
 
     if not args.yes:
-        typed = input(f"  Type {args.contact} to confirm: ").strip()
+        typed = input(mask_display(f"  Type {args.contact} to confirm: ")).strip()
         if typed != args.contact:
             print("  Cancelled. Nothing was changed.")
             return 1
@@ -224,6 +230,9 @@ def cmd_live_contact(args: argparse.Namespace) -> int:
 
 
 def cmd_serve(args: argparse.Namespace) -> int:  # pragma: no cover - operator path
+    if args.host not in {"127.0.0.1", "localhost", "::1"}:
+        return _fail("the unauthenticated office dashboard must bind to loopback")
+
     import uvicorn
 
     from .web.app import create_app

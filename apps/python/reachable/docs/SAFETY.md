@@ -148,10 +148,11 @@ makes it safe to dial a list that we already suspect is partly wrong.
 
 This is the central design claim and the thing to check when reviewing a change.
 
-- **There is no field in either result schema that can carry a phone number.** A
-  new number cannot be captured because there is nowhere to put it. The task text
-  additionally instructs the agent not to ask, but that instruction is the second
-  line of defence, not the first.
+- **There is no dedicated replacement-number field or automatic contact update.**
+  The task text tells the agent not to request a new number. Free-text results
+  and transcripts can nevertheless contain unsolicited numbers; display masking
+  is a heuristic, not proof that a number was never captured. Contact changes
+  require office follow-up through a trusted channel.
 - **There is no code path that writes to a register or an attendance code.** The
   forbidden actions are not blocked by a check — they are not implemented. The
   output side of Reachable is: a task row, an outcome row, and a CSV file.
@@ -206,9 +207,14 @@ No fixture contains a number that can ring a real subscriber.
 
 ## 5. Numbers, names and masking
 
-- Phone numbers are stored in E.164 in exactly one column and **masked
-  everywhere else**: dashboard, logs, audit rows, error messages, previews, CSV
-  exports, and CLI output. The mask shows the last three digits.
+- Private destination records and call evidence may contain full numbers.
+  Dashboard expressions, CSV cells, and CLI output use a shared display-only
+  mask for E.164 and common national phone formats, showing the last three digits.
+  Stored evidence and identity comparisons are unchanged. This heuristic does
+  not anonymise spelled-out numbers or other personal data; use synthetic data
+  for public demos and review exports before sharing.
+- The unauthenticated dashboard's `serve` command refuses non-loopback hosts.
+  Do not expose it using a public tunnel or a separately configured server.
 - Pupil surnames, year groups and form groups exist in staff views only and are
   never spoken on a call and never placed in a task text.
 - Audit rows name the fields that came back, not their values
