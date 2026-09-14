@@ -118,3 +118,34 @@ def test_drama_range_detection():
     assert not is_drama_number("+441632960123")
     assert not is_drama_number("+12025550123")  # US 555 reserved range
     assert not is_drama_number("+12025550123")
+
+
+@pytest.mark.parametrize(
+    "number",
+    [
+        "+4407700900123",   # a drama number with the trunk 0 left in
+        "+440123456789",
+    ],
+)
+def test_a_uk_trunk_prefix_is_refused_not_repaired(number):
+    """E.164 syntax alone accepts "+44" followed by the leading 0.
+
+    It is structurally valid and is not the number anybody meant. This was found
+    when an operator pasted their number in national form: it passed validation
+    and was written into a fixture before being reverted. Dropping the zero
+    would be guessing whose telephone rings, so it is refused instead.
+    """
+    assert not is_e164(number)
+    with pytest.raises(InvalidPhoneNumber) as excinfo:
+        validate_e164(number)
+    assert "trunk prefix" in excinfo.value.reason
+    assert "drop the leading 0" in excinfo.value.reason
+
+
+def test_the_same_number_without_the_trunk_prefix_is_accepted():
+    assert validate_e164("+447700900123") == "+447700900123"
+
+
+def test_a_leading_zero_is_only_refused_for_the_codes_that_need_it():
+    """Some plans legitimately have a 0 after the country code; do not over-reach."""
+    assert is_e164("+390212345678")   # Italy keeps its leading 0

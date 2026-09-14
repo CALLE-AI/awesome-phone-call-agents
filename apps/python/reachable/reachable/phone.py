@@ -19,6 +19,11 @@ E164_RE = re.compile(r"^\+[1-9][0-9]{7,14}$")
 #: a real subscriber.
 DRAMA_RE = re.compile(r"^\+447700900[0-9]{3}$")
 
+#: Country codes whose national numbering plan uses a leading 0 as a trunk
+#: prefix that must be dropped in E.164. Kept deliberately narrow: only codes
+#: where a leading 0 in the national part is unambiguously a mistake.
+TRUNK_PREFIX_COUNTRY_CODES = ("44",)
+
 #: Ofcom also reserves landline ranges for drama, including 01632 960000-960999.
 #: Kept separate from DRAMA_RE because the fixture range in docs/SAFETY.md is the
 #: mobile one; this exists so tests that need a number *outside* the fixture
@@ -62,6 +67,20 @@ def validate_e164(raw: str | None) -> str:
         raise InvalidPhoneNumber("phone number must start with + and a country code")
     if not E164_RE.match(value):
         raise InvalidPhoneNumber("phone number is not valid E.164")
+
+    # E.164 syntax alone cannot catch a trunk prefix left in by mistake:
+    # "+44" followed by the national number *including* its leading 0 is
+    # structurally valid and is not the number anybody meant. It is the most
+    # common way a UK number gets mistyped, and dialling it would reach
+    # something unintended. Refused, not repaired -- dropping the zero would be
+    # guessing whose telephone rings.
+    for country_code in TRUNK_PREFIX_COUNTRY_CODES:
+        rest = value[1:]
+        if rest.startswith(country_code) and rest[len(country_code) :].startswith("0"):
+            raise InvalidPhoneNumber(
+                f"phone number has a national trunk prefix after +{country_code}; "
+                "drop the leading 0 from the national number"
+            )
     return value
 
 
