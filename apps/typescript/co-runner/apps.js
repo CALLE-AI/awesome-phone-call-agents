@@ -265,6 +265,18 @@ window.addEventListener('DOMContentLoaded', () => {
                 return;
             }
 
+            // The language dropdown and the phone number are independent
+            // fields now (on purpose — see prefillPhonePrefix above). That
+            // means nothing else stops a mismatched combination, like a
+            // French number paired with Hindi selected. Catch that here
+            // instead of silently sending an inconsistent region/locale
+            // pair to CALL-E.
+            if (!phoneValue.startsWith(recipient.code)) {
+                statusLog.style.color = "red";
+                statusLog.innerText = `! Error: ${selectedLanguage} expects a number starting with ${recipient.code}, but this number doesn't. Fix the number or change the language.`;
+                return;
+            }
+
             if (!isConfigReady()) {
                 statusLog.style.color = "red";
                 statusLog.innerText = typeof CALLE_CONFIG === 'undefined'
