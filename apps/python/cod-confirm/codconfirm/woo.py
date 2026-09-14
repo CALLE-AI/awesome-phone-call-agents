@@ -69,6 +69,13 @@ class WooError(RuntimeError):
     """The store could not be reached, or answered with something unusable."""
 
 
+class _NoRedirect(urllib.request.HTTPRedirectHandler):
+    """Never forward the store's Basic credentials to a redirect target."""
+
+    def redirect_request(self, req, fp, code, msg, headers, newurl):
+        return None
+
+
 def _csv(value: str) -> tuple[str, ...]:
     return tuple(part.strip() for part in value.split(",") if part.strip())
 
@@ -176,7 +183,8 @@ class WooStore:
 
         request = urllib.request.Request(url, data=data, headers=headers, method=method)
         try:
-            with urllib.request.urlopen(request, timeout=self.config.timeout) as response:
+            opener = urllib.request.build_opener(_NoRedirect())
+            with opener.open(request, timeout=self.config.timeout) as response:
                 return json.loads(response.read().decode() or "null")
         except urllib.error.HTTPError as exc:
             exc.close()
