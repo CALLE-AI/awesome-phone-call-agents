@@ -176,9 +176,12 @@ export function buildReachbackGraph(): CallGraph {
     })
   );
 
-  const gpPhone = (process.env.GP_PHONE ?? "").trim() || "+14155550199";
-  const emergencyContactPhone =
-    (process.env.EMERGENCY_CONTACT_PHONE ?? "").trim() || "+14155550188";
+  // Escalation targets come from configuration only. There is NO synthetic
+  // default: if unset, the value is empty and the E.164 guard will refuse to
+  // dial it, so an unconfigured escalation is surfaced for a human rather than
+  // dialing a made-up number.
+  const gpPhone = (process.env.GP_PHONE ?? "").trim();
+  const emergencyContactPhone = (process.env.EMERGENCY_CONTACT_PHONE ?? "").trim();
   const nameById: Record<string, string> = Object.fromEntries(
     residents.map((r) => [r.id, r.name])
   );
@@ -215,6 +218,13 @@ export function buildReachbackGraph(): CallGraph {
             resultSchema: GP_SCHEMA,
             dependsOn: [node.id],
             spawnedBy: node.id,
+            // Consequential medical/referral call: a human must authorize it
+            // before it dials. The triggering welfare result is a signal, not
+            // an authorization.
+            requiresApproval: true,
+            proposedReason:
+              `${name} reported needing help (${needs || "urgent assistance"}); ` +
+              `propose a GP follow-up call.`,
           }),
         ];
       }
@@ -241,6 +251,11 @@ export function buildReachbackGraph(): CallGraph {
             resultSchema: EMERGENCY_CONTACT_SCHEMA,
             dependsOn: [node.id],
             spawnedBy: node.id,
+            // Consequential call to a third party: a human must authorize it.
+            requiresApproval: true,
+            proposedReason:
+              `${name} was unreachable (${why}); propose calling their ` +
+              `emergency contact.`,
           }),
         ];
       }

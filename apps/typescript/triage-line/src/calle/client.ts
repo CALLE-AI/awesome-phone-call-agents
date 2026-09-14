@@ -17,6 +17,13 @@ export interface CalleCallRequest {
   resultSchema: ResultSchema;
   /** Opaque node id, useful for the mock to pick a canned scenario. */
   nodeId?: string;
+  /**
+   * Idempotency key for this specific call attempt. Must be distinct per real
+   * dial: a language-retry of the same node uses a different key (it includes
+   * the locale and attempt index) so it is a genuinely new call, not a cached
+   * replay of the first attempt.
+   */
+  idempotencyKey?: string;
 }
 
 export interface CalleClient {

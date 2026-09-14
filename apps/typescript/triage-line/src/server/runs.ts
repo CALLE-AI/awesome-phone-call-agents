@@ -14,11 +14,13 @@ import { randomUUID } from "node:crypto";
 import type { CalleClient } from "../calle/client.js";
 import { executeGraph, type ExecutorEvent } from "../graph/executor.js";
 import type { CallGraph, CallNode } from "../graph/types.js";
+import { maskPhone, redactPhones } from "../util/phone.js";
 
 /** A UI-facing, JSON-safe view of a node (drops functions, trims heavy fields). */
 export interface NodeSnapshot {
   id: string;
-  phone: string;
+  /** Masked phone (e.g. +1•••••••88). Full numbers are never serialized. */
+  phoneMasked: string;
   region: string;
   locale: string;
   goal: string;
@@ -63,22 +65,38 @@ export interface RunEvent {
 
 type Listener = (event: RunEvent) => void;
 
+/**
+ * Redact phone-like values from a structured result before it's serialized.
+ * Provider-discovered numbers (e.g. referral_phone) must never leak in full.
+ */
+function redactResult(
+  result: Record<string, unknown> | undefined
+): Record<string, unknown> | undefined {
+  if (!result) return undefined;
+  const out: Record<string, unknown> = {};
+  for (const [k, v] of Object.entries(result)) {
+    out[k] = typeof v === "string" ? redactPhones(v) : v;
+  }
+  return out;
+}
+
 function snapshotNode(n: CallNode): NodeSnapshot {
   return {
     id: n.id,
-    phone: n.phone,
+    // Personal data: never expose the full number in a snapshot/event.
+    phoneMasked: maskPhone(n.phone),
     region: n.region,
     locale: n.locale,
-    goal: n.goal,
+    goal: redactPhones(n.goal),
     dependsOn: n.dependsOn,
     spawnedBy: n.spawnedBy,
     status: n.status,
     confidence: n.confidence,
-    result: n.result as Record<string, unknown> | undefined,
-    evidence: n.evidence,
+    result: redactResult(n.result as Record<string, unknown> | undefined),
+    evidence: n.evidence?.map((e) => redactPhones(e)),
     transcript: n.transcript?.map((t) => ({
       speaker: t.speaker,
-      text: t.text,
+      text: redactPhones(t.text),
       at: t.at,
     })),
     verification: n.verification
@@ -104,6 +122,12 @@ class Run {
   private readonly listeners = new Set<Listener>();
   private seq = 0;
 
+  // Retained so a human approval can resume execution (dial a now-authorized
+  // consequential call and any dependents).
+  private client?: CalleClient;
+  private maxConcurrency = 4;
+  private executing = false;
+
   constructor(
     readonly scenario: string,
     private readonly graph: CallGraph
@@ -123,39 +147,62 @@ class Run {
   }
 
   /**
-   * Human review: approve a flagged node, marking it done.
+   * Human decision on a node awaiting a person.
    *
-   * Only nodes currently awaiting review (needs_review / needs_user) can be
-   * approved. We record the human decision in the verification report so the
-   * audit trail is preserved, then flip the status and emit a live event.
-   * Returns false if the node doesn't exist or isn't in a reviewable state.
+   * Two cases:
+   *   1. awaiting_approval — a consequential call (e.g. GP / emergency contact)
+   *      proposed by escalation but not yet authorized to dial. Approving marks
+   *      it approved and RESUMES execution so it (and any dependents) are placed.
+   *   2. needs_review / needs_user — a completed call whose result a human
+   *      accepts. Approving marks it done and records the decision.
+   *
+   * Returns false if the node doesn't exist or isn't awaiting a decision.
    */
   approveNode(nodeId: string, note?: string): boolean {
     const node = this.graph.nodes.find((n) => n.id === nodeId);
     if (!node) return false;
-    if (node.status !== "needs_review" && node.status !== "needs_user") {
-      return false;
-    }
 
-    node.status = "done";
     const stamp = note?.trim()
       ? `Approved by reviewer: ${note.trim()}`
       : "Approved by reviewer.";
-    if (node.verification) {
-      node.verification.status = "done";
-      node.verification.trusted = true;
-      node.verification.notes = [...node.verification.notes, stamp];
-    } else {
-      node.verification = {
-        trusted: true,
-        status: "done",
-        notes: [stamp],
-        policyFlags: [],
-      };
+
+    // Case 1: authorize a proposed consequential call, then resume the run.
+    if (node.status === "awaiting_approval") {
+      node.approved = true;
+      node.status = "pending"; // becomes runnable on the next execute pass
+      this.emit({ type: "node_approved", nodeId });
+      void this.resume();
+      return true;
     }
 
-    this.emit({ type: "node_approved", nodeId });
-    return true;
+    // Case 2: accept a completed-but-flagged result.
+    if (node.status === "needs_review" || node.status === "needs_user") {
+      node.status = "done";
+      if (node.verification) {
+        node.verification.status = "done";
+        node.verification.trusted = true;
+        node.verification.notes = [...node.verification.notes, stamp];
+      } else {
+        node.verification = {
+          trusted: true,
+          status: "done",
+          notes: [stamp],
+          policyFlags: [],
+        };
+      }
+      this.emit({ type: "node_approved", nodeId });
+      // A resolved dependency may unblock dependents (e.g. a chain step); resume.
+      void this.resume();
+      return true;
+    }
+
+    return false;
+  }
+
+  /** Re-run the executor to pick up newly-authorized or unblocked nodes. */
+  private async resume(): Promise<void> {
+    if (!this.client || this.executing) return;
+    await this.runExecutor(this.client, this.maxConcurrency);
   }
 
   /** Buffered history for late joiners. */
@@ -179,8 +226,19 @@ class Run {
   }
 
   async execute(client: CalleClient, maxConcurrency: number): Promise<void> {
+    this.client = client;
+    this.maxConcurrency = maxConcurrency;
     // Emit an initial snapshot so clients see the starting graph.
     this.emit({ type: "snapshot" });
+    await this.runExecutor(client, maxConcurrency);
+  }
+
+  private async runExecutor(
+    client: CalleClient,
+    maxConcurrency: number
+  ): Promise<void> {
+    this.executing = true;
+    this.state = "running";
     try {
       await executeGraph(this.graph, {
         client,
@@ -208,16 +266,21 @@ class Run {
               });
               break;
             case "graph_done":
-              // handled below after execution resolves
               break;
           }
         },
       });
-      this.state = "done";
+      // If nothing is left awaiting a human, the run is done; otherwise it
+      // stays "running" so the UI shows it's parked for approval.
+      const parked = this.graph.nodes.some(
+        (n) => n.status === "awaiting_approval"
+      );
+      this.state = parked ? "running" : "done";
     } catch (err) {
       this.state = "error";
       this.error = err instanceof Error ? err.message : String(err);
     } finally {
+      this.executing = false;
       this.finishedAt = Date.now();
       this.emit({ type: "graph_done" });
     }

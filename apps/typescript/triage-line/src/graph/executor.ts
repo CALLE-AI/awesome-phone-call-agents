@@ -64,19 +64,34 @@ function depsSatisfied(node: CallNode, graph: CallGraph): boolean {
   });
 }
 
+/** Is this node still awaiting human authorization before it may dial? */
+function awaitingApproval(n: CallNode): boolean {
+  return n.requiresApproval === true && n.approved !== true;
+}
+
 /** Nodes eligible to run right now. */
 function runnableNodes(graph: CallGraph): CallNode[] {
   return graph.nodes.filter(
     (n) =>
-      (n.status === "pending" || n.status === "blocked") &&
+      (n.status === "pending" ||
+        n.status === "blocked" ||
+        // An approved node that had been parked at the gate becomes runnable.
+        (n.status === "awaiting_approval" && n.approved === true)) &&
+      !awaitingApproval(n) &&
       depsSatisfied(n, graph)
   );
 }
 
-/** Mark nodes whose deps aren't yet satisfied as blocked (for UI clarity). */
+/**
+ * Reflect gating in node status for UI clarity:
+ *   - a consequential call still needing authorization -> awaiting_approval
+ *   - a node whose deps aren't yet satisfied -> blocked
+ */
 function markBlocked(graph: CallGraph): void {
   for (const n of graph.nodes) {
-    if (n.status === "pending" && !depsSatisfied(n, graph)) {
+    if (n.status === "pending" && depsSatisfied(n, graph) && awaitingApproval(n)) {
+      n.status = "awaiting_approval";
+    } else if (n.status === "pending" && !depsSatisfied(n, graph)) {
       n.status = "blocked";
     }
   }
@@ -117,6 +132,9 @@ async function runNode(
     locale: node.locale,
     resultSchema: node.resultSchema,
     nodeId: node.id,
+    // Distinct per attempt: node + locale + attempt index. A retry in another
+    // locale must not reuse the first attempt's idempotency key.
+    idempotencyKey: `${node.id}:${node.locale}:1`,
   });
 
   // Language auto-retry: if the first attempt suggests a barrier, try the next
@@ -139,6 +157,8 @@ async function runNode(
         locale: to,
         resultSchema: node.resultSchema,
         nodeId: node.id,
+        // New locale -> distinct key so this is a genuinely new call.
+        idempotencyKey: `${node.id}:${to}:2`,
       });
     }
   }

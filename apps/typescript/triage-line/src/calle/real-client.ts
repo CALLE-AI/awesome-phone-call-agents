@@ -22,6 +22,7 @@ import type {
   StructuredResult,
   TranscriptTurn,
 } from "../graph/types.js";
+import { assertValidE164, redactPhones } from "../util/phone.js";
 
 export interface RealCalleClientOptions {
   apiKey: string;
@@ -114,6 +115,23 @@ export class RealCalleClient implements CalleClient {
     if (!options.apiKey) {
       throw new Error("RealCalleClient requires a CALL-E apiKey.");
     }
+    // Never send real credentials over a non-HTTPS origin. If a baseUrl is
+    // provided it must be https; otherwise we fall back to the SDK default
+    // (the official HTTPS API).
+    if (options.baseUrl !== undefined) {
+      let url: URL;
+      try {
+        url = new URL(options.baseUrl);
+      } catch {
+        throw new Error(`Invalid CALLE_BASE_URL: "${options.baseUrl}".`);
+      }
+      if (url.protocol !== "https:") {
+        throw new Error(
+          `Refusing to send CALL-E credentials over a non-HTTPS origin ` +
+            `(${url.protocol}//). Use an https:// base URL.`
+        );
+      }
+    }
     this.sdk = new SdkClient({
       apiKey: options.apiKey,
       baseUrl: options.baseUrl,
@@ -121,12 +139,17 @@ export class RealCalleClient implements CalleClient {
   }
 
   async createAndWait(req: CalleCallRequest): Promise<CalleCallOutcome> {
+    // Every live dial leg must be a valid, authorized E.164 number. This fails
+    // closed for synthetic defaults, empty strings, or unvalidated numbers
+    // discovered mid-call.
+    const phone = assertValidE164(req.phone, `node ${req.nodeId ?? "?"}`);
+
     const call = await this.sdk.calls.createAndWait(
       {
         task: req.task,
         recipients: [
           {
-            phones: [req.phone],
+            phones: [phone],
             region: req.region,
             locale: req.locale,
           },
@@ -140,10 +163,12 @@ export class RealCalleClient implements CalleClient {
         metadata: req.nodeId ? { switchboard_node_id: req.nodeId } : undefined,
       },
       {
-        // Unique per run so a fresh call is always placed (reusing a fixed key
-        // like the node id makes CALL-E return the prior call's result).
-        idempotencyKey: req.nodeId
-          ? `${req.nodeId}:${this.runToken}`
+        // Idempotency key must be unique per distinct call attempt. It includes
+        // the locale and attempt index so a language-retry (same node, new
+        // locale) is treated as a genuinely new call rather than returning the
+        // cached first-attempt result.
+        idempotencyKey: req.idempotencyKey
+          ? `${req.idempotencyKey}:${this.runToken}`
           : undefined,
         timeoutMs: this.options.timeoutMs,
         intervalMs: this.options.intervalMs,
@@ -151,10 +176,10 @@ export class RealCalleClient implements CalleClient {
     );
 
     if (process.env.CALLE_DEBUG === "true") {
-      // Full raw response so we can see exactly what CALL-E returned.
+      // Debug dump with phone numbers redacted — never log raw personal data.
       console.error(
-        `[CALLE_DEBUG] ${req.nodeId} raw response:\n` +
-          JSON.stringify(call, null, 2)
+        `[CALLE_DEBUG] ${req.nodeId} raw response (phones redacted):\n` +
+          redactPhones(JSON.stringify(call, null, 2))
       );
     }
 

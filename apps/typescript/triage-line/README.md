@@ -123,7 +123,9 @@ cp .env.example .env
 | --- | --- |
 | `CALL_MODE` | `mock` (default, free), `live` (all real calls), or `hybrid` (some real, rest mock) |
 | `CALLE_API_KEY` | Your key from the [CALL-E dashboard](https://dashboard.heycall-e.com/account/api-keys) (needed for `live`/`hybrid`) |
-| `CALLE_BASE_URL` | `https://api.heycall-e.com` |
+| `CALLE_BASE_URL` | Must be `https://...` (non-HTTPS is refused). Defaults to the official API |
+| `HOST` | Bind address (default `127.0.0.1`). Live/hybrid is refused off loopback |
+| `LIVE_CONFIRM` | Must equal `i-understand-this-places-real-calls` to allow any real call |
 | `MAX_CONCURRENCY` | Max parallel calls in fan-out |
 | `MOCK_MIN_DELAY_MS` / `MOCK_MAX_DELAY_MS` | Timelapse: how gradually mock calls complete |
 | `REACHBACK_PHONES` | Comma-separated E.164 numbers for real recipients |
@@ -189,12 +191,25 @@ The web UI is built with accessibility in mind: semantic landmarks and headings,
 
 ---
 
+## Safety model
+
+Real phone calls have real-world side effects, so the real-call path is gated at every layer:
+
+- **Mock by default.** The served app runs in mock (no-call) mode unless explicitly reconfigured. A public/hosted deployment can only run in mock mode.
+- **Live requires loopback + explicit opt-in.** `CALL_MODE=live`/`hybrid` is refused unless the server is bound to loopback (`HOST=127.0.0.1`) **and** `LIVE_CONFIRM=i-understand-this-places-real-calls` is set. Each real run also requires per-request intent: `POST /api/runs` with `{ "confirmLive": true }`.
+- **Every dial leg is validated E.164.** No synthetic default numbers and no unvalidated provider-discovered numbers are ever dialed; the number is checked immediately before the call and fails closed otherwise.
+- **Consequential calls need human authorization.** Escalations (GP follow-up, emergency contact) and chain steps that dial a number discovered mid-call are **proposed**, not placed. They park as `awaiting_approval` until a human approves via `POST /api/runs/:id/nodes/:nodeId/approve`. A presence-only field in a prior result is never treated as authorization.
+- **Credentials only over HTTPS.** A non-HTTPS `CALLE_BASE_URL` is rejected.
+- **Phones are masked everywhere.** Snapshots, SSE events, structured results, transcripts, and debug output mask phone numbers (e.g. `+1••••••••88`); full numbers are never serialized or logged.
+
 ## Limitations & honesty notes
 
-- **Language auto-retry** re-dials once in the next locale, not a full loop over every language.
+- **Language auto-retry** re-dials once in the next locale for the region, not a full loop over every language. Each attempt uses a distinct idempotency key (node + locale + attempt), so a retry is a genuinely new call rather than a cached replay of the first attempt.
+- **No mid-call cancellation.** A call in flight cannot currently be cancelled from TriageLine; it runs until CALL-E returns or the wait times out. There is no kill-switch for an individual leg once dialed.
+- **Ambiguity does not auto-stop.** Low confidence and unverifiable results are flagged (`needs_review`) and never treated as success, but the system does not halt an entire run on ambiguity; a human reviews flagged items. Unknown never becomes "safe".
 - The real client's mapping of `voicemail` vs `no_answer` from CALL-E failure codes is best-effort; confirm against live calls if you rely on the distinction.
 - International CALL-E regions are primarily for testing; production local lines may require enabling with the CALL-E team.
-- Run state is in-memory (no database); restarting the server clears runs.
+- Run state is in-memory (no database); restarting the server clears runs and any pending approvals.
 
 ---
 

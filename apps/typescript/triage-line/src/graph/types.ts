@@ -9,6 +9,7 @@
 export type CallNodeStatus =
   | "pending" // not yet eligible to run
   | "blocked" // waiting on dependencies
+  | "awaiting_approval" // consequential call proposed; a human must authorize it before it dials
   | "running" // call in flight
   | "done" // completed and verified ok
   | "failed" // call failed / unrecoverable
@@ -73,6 +74,19 @@ export interface CallNode {
 
   /** Policy constraints encoded into the task and asserted after the call. */
   policy?: PolicyConstraints;
+
+  /**
+   * Consequential call (e.g. a medical/referral follow-up or a call to a third
+   * party like an emergency contact) that MUST be authorized by a human before
+   * it is placed. Such nodes start as "awaiting_approval" and are only dialed
+   * after approveNode() marks them approved. A presence-only field in a prior
+   * result is never treated as authorization to place these.
+   */
+  requiresApproval?: boolean;
+  /** Set true once a human has authorized a requiresApproval node to dial. */
+  approved?: boolean;
+  /** Human-readable reason this call was proposed (shown at the approval gate). */
+  proposedReason?: string;
 
   /** Locales already attempted, for language auto-retry bookkeeping. */
   attemptedLocales?: string[];

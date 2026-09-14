@@ -59,6 +59,18 @@ function currentMode(): Mode {
   return useMock ? "mock" : "live";
 }
 
+/** Host to bind. Live/hybrid are only allowed on loopback. */
+const HOST = process.env.HOST ?? "127.0.0.1";
+
+function isLoopbackHost(host: string): boolean {
+  return host === "127.0.0.1" || host === "::1" || host === "localhost";
+}
+
+/** Explicit operator opt-in required to place any real calls from the server. */
+function liveConfirmed(): boolean {
+  return (process.env.LIVE_CONFIRM ?? "") === "i-understand-this-places-real-calls";
+}
+
 function makeClient(): { client: CalleClient; mode: Mode } {
   const mode = currentMode();
 
@@ -67,11 +79,25 @@ function makeClient(): { client: CalleClient; mode: Mode } {
     return { client: new MockCalleClient(mockTiming()), mode };
   }
 
+  // From here on the server would place REAL calls. Enforce three gates:
+  //   1. the server must be bound to loopback (never exposed to a network),
+  //   2. an explicit LIVE_CONFIRM operator opt-in must be set,
+  //   3. a valid API key must be present.
+  if (!isLoopbackHost(HOST)) {
+    throw new Error(
+      `CALL_MODE=${mode} is only permitted when bound to loopback ` +
+        `(HOST=127.0.0.1). Refusing to serve real calls on ${HOST}.`
+    );
+  }
+  if (!liveConfirmed()) {
+    throw new Error(
+      `CALL_MODE=${mode} requires explicit operator opt-in: set ` +
+        `LIVE_CONFIRM=i-understand-this-places-real-calls.`
+    );
+  }
   const apiKey = process.env.CALLE_API_KEY;
   if (!apiKey) {
-    throw new Error(
-      `CALL_MODE=${mode} requires CALLE_API_KEY to be set.`
-    );
+    throw new Error(`CALL_MODE=${mode} requires CALLE_API_KEY to be set.`);
   }
   const real = new RealCalleClient({
     apiKey,
@@ -122,6 +148,19 @@ app.post("/api/runs", (req, res) => {
   const graph = buildGraph(scenario);
   if (!graph) {
     res.status(400).json({ error: `Unknown scenario "${scenario}".` });
+    return;
+  }
+
+  // A run that would place real calls (live/hybrid) requires explicit per-run
+  // intent in the request body, on top of the server-level gates. Mock runs
+  // never need it.
+  const mode = currentMode();
+  if (mode !== "mock" && req.body?.confirmLive !== true) {
+    res.status(403).json({
+      error:
+        `This server is in ${mode} mode and would place real calls. Resend ` +
+        `with { "confirmLive": true } to explicitly authorize this run.`,
+    });
     return;
   }
 
@@ -202,16 +241,17 @@ app.get("/api/runs/:id/events", (req, res) => {
 });
 
 const PORT = Number(process.env.PORT ?? "3000");
-app.listen(PORT, () => {
-  let mode: string;
-  try {
-    mode = makeClient().mode;
-  } catch {
-    mode = `${currentMode()} (missing key)`;
-  }
+// Bind to loopback by default. Real-call modes are refused on any non-loopback
+// host (see makeClient); a deployed public demo must run in mock mode.
+app.listen(PORT, HOST, () => {
+  const mode = currentMode();
   const extra =
-    currentMode() === "hybrid" ? ` real=[${[...realNodeIds()].join(",")}]` : "";
+    mode === "hybrid" ? ` real=[${[...realNodeIds()].join(",")}]` : "";
+  const liveNote =
+    mode !== "mock" && (!isLoopbackHost(HOST) || !liveConfirmed())
+      ? " — real calls DISABLED (needs loopback + LIVE_CONFIRM)"
+      : "";
   console.log(
-    `Switchboard server on http://localhost:${PORT}  (mode=${mode}, concurrency=${maxConcurrency}${extra})`
+    `TriageLine server on http://${HOST}:${PORT}  (mode=${mode}, concurrency=${maxConcurrency}${extra}${liveNote})`
   );
 });

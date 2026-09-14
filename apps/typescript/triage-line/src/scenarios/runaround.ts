@@ -10,6 +10,7 @@
  */
 
 import { makeNode, type CallGraph, type CallNode, type ResultSchema } from "../graph/types.js";
+import { maskPhone } from "../util/phone.js";
 
 const STEP_SCHEMA: ResultSchema = {
   type: "object",
@@ -66,28 +67,44 @@ export function buildRunaroundGraph(): CallGraph {
       const next = String(r["next_step"] ?? "");
 
       if (node.id === "runaround-clinic" && next === "gp_referral") {
+        const discovered = String(r["referral_phone"] ?? "");
         return [
           chainNode(
             "runaround-gp",
-            String(r["referral_phone"] ?? ""),
+            discovered,
             "Request a referral to the specialist for the patient. If the " +
               "insurer must pre-authorize first, get the insurer's phone number.",
-            { dependsOn: [node.id] }
+            {
+              dependsOn: [node.id],
+              // The number was discovered from a prior call, not pre-authorized.
+              // A human must approve before we dial it, and the E.164 guard
+              // validates it at dial time.
+              requiresApproval: true,
+              proposedReason:
+                `Prior call reported a GP referral line (${maskPhone(discovered)}); ` +
+                `propose calling it.`,
+            }
           ),
         ];
       }
 
       if (node.id === "runaround-gp" && next === "insurer_preauth") {
+        const discovered = String(r["insurer_phone"] ?? "");
         return [
           chainNode(
             "runaround-insurer",
-            String(r["insurer_phone"] ?? ""),
+            discovered,
             "Obtain pre-authorization for the specialist visit and get the " +
               "pre-authorization code.",
             {
               dependsOn: [node.id],
               // Consent boundary: never agree to a fee on the patient's behalf.
               policy: { noFees: true },
+              // Discovered number -> human approval required before dialing.
+              requiresApproval: true,
+              proposedReason:
+                `Prior call reported an insurer line (${maskPhone(discovered)}); ` +
+                `propose calling it.`,
             }
           ),
         ];
