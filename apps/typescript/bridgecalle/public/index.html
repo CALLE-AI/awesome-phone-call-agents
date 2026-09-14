@@ -16,7 +16,7 @@
   <header class="bg-indigo-900 text-white rounded-2xl p-4 sm:p-5 shadow-md flex items-center justify-between gap-2">
     <div>
       <h1 class="text-2xl sm:text-3xl font-extrabold tracking-tight">BridgeCalle</h1>
-      <p class="text-xs sm:text-sm text-indigo-200 font-medium">Active-Listening Voice Companion for Seniors</p>
+      <p class="text-xs sm:text-sm text-indigo-200 font-medium">1-Tap Voice Companion for Seniors</p>
     </div>
     
     <!-- Top Action Area: Self-Calling Number Badge + Summary & Plus Buttons -->
@@ -111,7 +111,7 @@
 
       <!-- Summaries List Container -->
       <div id="summaries-list" class="space-y-4 overflow-y-auto pr-1 flex-1">
-        <!-- Rendered via JS -->
+        <!-- Rendered via DOM Nodes JS -->
       </div>
     </div>
   </div>
@@ -132,17 +132,6 @@
       const prefix = clean.slice(0, 3);
       const suffix = clean.slice(-4);
       return `${prefix} ***** *${suffix}`;
-    }
-
-    // Security: Escape HTML to prevent provider summary XSS
-    function escapeHtml(str) {
-      if (!str) return '';
-      return String(str)
-        .replace(/&/g, '&amp;')
-        .replace(/</g, '&lt;')
-        .replace(/>/g, '&gt;')
-        .replace(/"/g, '&quot;')
-        .replace(/'/g, '&#39;');
     }
 
     function isValidE164(phone) {
@@ -187,12 +176,9 @@
 
     function loadData() {
       // Clear old unmasked keys to ensure no unmasked numbers linger
-      localStorage.removeItem('bc_persons');
-      localStorage.removeItem('bc_persons_v2');
-      localStorage.removeItem('bc_persons_v3');
-      localStorage.removeItem('bc_persons_v4');
+      ['bc_persons', 'bc_persons_v2', 'bc_persons_v3', 'bc_persons_v4', 'bc_persons_v5'].forEach(k => localStorage.removeItem(k));
 
-      const savedSelfPhone = localStorage.getItem('bc_self_phone_v6');
+      const savedSelfPhone = localStorage.getItem('bc_self_phone_v7');
       if (savedSelfPhone && isValidE164(savedSelfPhone)) {
         selfPhone = savedSelfPhone;
         document.getElementById('self-phone-input').value = selfPhone;
@@ -200,7 +186,7 @@
         document.getElementById('self-phone-input').value = '+15550100000';
       }
 
-      const savedPersons = localStorage.getItem('bc_persons_v6');
+      const savedPersons = localStorage.getItem('bc_persons_v7');
       if (savedPersons) {
         try { 
           const parsed = JSON.parse(savedPersons);
@@ -219,12 +205,12 @@
       const val = document.getElementById('self-phone-input').value.trim();
       if (isValidE164(val)) {
         selfPhone = val;
-        localStorage.setItem('bc_self_phone_v6', selfPhone);
+        localStorage.setItem('bc_self_phone_v7', selfPhone);
       }
     }
 
     function saveData() {
-      localStorage.setItem('bc_persons_v6', JSON.stringify(persons));
+      localStorage.setItem('bc_persons_v7', JSON.stringify(persons));
       renderCards();
     }
 
@@ -245,30 +231,52 @@
         const card = document.createElement('div');
         card.className = 'relative bg-white rounded-3xl p-6 sm:p-8 shadow-md border-2 border-slate-200 hover:border-indigo-500 transition flex flex-col items-center text-center space-y-4 group';
 
-        const safeName = escapeHtml(person.name || 'Human');
+        // Pencil Edit Button
+        const editBtn = document.createElement('button');
+        editBtn.type = 'button';
+        editBtn.title = 'Edit Person';
+        editBtn.className = 'absolute top-3 right-3 w-10 h-10 rounded-full bg-slate-100 hover:bg-indigo-100 text-slate-600 hover:text-indigo-700 flex items-center justify-center text-base transition shadow-sm z-20 cursor-pointer';
+        editBtn.textContent = '✏️';
+        editBtn.onclick = (e) => {
+          e.stopPropagation();
+          e.preventDefault();
+          openEditModal(person.id);
+        };
 
-        card.innerHTML = `
-          <!-- Pencil Icon Strictly For Editing -->
-          <button type="button" onclick="openEditModal('${person.id}')" title="Edit Person" class="absolute top-3 right-3 w-10 h-10 rounded-full bg-slate-100 hover:bg-indigo-100 text-slate-600 hover:text-indigo-700 flex items-center justify-center text-base transition shadow-sm z-20 cursor-pointer">
-            ✏️
-          </button>
+        // Clickable Call Wrapper
+        const callArea = document.createElement('div');
+        callArea.className = 'w-full flex flex-col items-center cursor-pointer space-y-4 active:scale-95 transform transition duration-150';
+        callArea.onclick = () => triggerCallForPerson(person.id);
 
-          <!-- Clickable Calling Area: Big Photo & Small Name -->
-          <div onclick="triggerCallForPerson('${person.id}')" class="w-full flex flex-col items-center cursor-pointer space-y-4 active:scale-95 transform transition duration-150">
-            <!-- Big Photo -->
-            <div class="relative w-36 h-36 sm:w-44 sm:h-44 rounded-3xl overflow-hidden bg-slate-100 border-4 border-indigo-100 flex-shrink-0 flex items-center justify-center shadow-md group-hover:border-indigo-400 transition">
-              <img src="${person.photo || DEFAULT_AVATAR}" class="w-full h-full object-cover">
-            </div>
+        // Photo
+        const photoDiv = document.createElement('div');
+        photoDiv.className = 'relative w-36 h-36 sm:w-44 sm:h-44 rounded-3xl overflow-hidden bg-slate-100 border-4 border-indigo-100 flex-shrink-0 flex items-center justify-center shadow-md group-hover:border-indigo-400 transition';
+        const img = document.createElement('img');
+        img.src = person.photo || DEFAULT_AVATAR;
+        img.className = 'w-full h-full object-cover';
+        photoDiv.appendChild(img);
 
-            <!-- Small Name below pic (Click Name to View Summary) -->
-            <h2 onclick="event.stopPropagation(); openPersonSummary('${person.id}')" title="Click name to view summary" class="text-xl sm:text-2xl font-extrabold text-slate-900 leading-tight hover:text-indigo-600 underline decoration-indigo-300 underline-offset-4 cursor-pointer z-10">${safeName}</h2>
+        // Name
+        const nameH2 = document.createElement('h2');
+        nameH2.className = 'text-xl sm:text-2xl font-extrabold text-slate-900 leading-tight hover:text-indigo-600 underline decoration-indigo-300 underline-offset-4 cursor-pointer z-10';
+        nameH2.textContent = person.name || 'Human';
+        nameH2.title = 'Click name to view summary';
+        nameH2.onclick = (e) => {
+          e.stopPropagation();
+          openPersonSummary(person.id);
+        };
 
-            <!-- Tap instruction badge -->
-            <span class="inline-block bg-emerald-50 text-emerald-700 text-xs sm:text-sm font-bold px-4 py-1.5 rounded-full border border-emerald-200">
-              📞 Tap Photo or Name To Call
-            </span>
-          </div>
-        `;
+        // Badge
+        const badge = document.createElement('span');
+        badge.className = 'inline-block bg-emerald-50 text-emerald-700 text-xs sm:text-sm font-bold px-4 py-1.5 rounded-full border border-emerald-200';
+        badge.textContent = '📞 Tap Photo or Name To Call';
+
+        callArea.appendChild(photoDiv);
+        callArea.appendChild(nameH2);
+        callArea.appendChild(badge);
+
+        card.appendChild(editBtn);
+        card.appendChild(callArea);
 
         container.appendChild(card);
       });
@@ -286,13 +294,13 @@
 
       const maskedTarget = maskPhone(userPhone);
       const banner = document.getElementById('active-banner');
-      document.getElementById('calling-target').innerText = maskedTarget;
+      document.getElementById('calling-target').textContent = maskedTarget;
       banner.classList.remove('hidden');
 
       const startTimeStr = new Date().toLocaleString([], { day: '2-digit', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit' });
       const callNum = (person.callLogs ? person.callLogs.length : 0) + 1;
 
-      // Construct Initial Log Entry with Masked Target Phone
+      // Construct Initial Log Entry
       const newCallLog = {
         id: `call_${Date.now()}`,
         callNumber: callNum,
@@ -313,7 +321,6 @@
       saveData();
 
       try {
-        // Always dispatch through local backend API
         const response = await fetch('/api/calls/trigger', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
@@ -365,7 +372,7 @@
 
     // Modal Handlers
     function openAddModal() {
-      document.getElementById('modal-title').innerText = 'Add Person';
+      document.getElementById('modal-title').textContent = 'Add Person';
       document.getElementById('modal-person-id').value = '';
       document.getElementById('modal-name-input').value = 'Human';
       document.getElementById('modal-photo-preview').src = DEFAULT_AVATAR;
@@ -377,7 +384,7 @@
       const person = persons.find(p => p.id === personId);
       if (!person) return;
 
-      document.getElementById('modal-title').innerText = 'Edit Person Details';
+      document.getElementById('modal-title').textContent = 'Edit Person Details';
       document.getElementById('modal-person-id').value = person.id;
       document.getElementById('modal-name-input').value = person.name || 'Human';
       document.getElementById('modal-photo-preview').src = person.photo || DEFAULT_AVATAR;
@@ -484,8 +491,8 @@
       person.waPhone = waNum;
       saveData();
 
-      const summaryContent = `Call #${log.callNumber}\nStart Time: ${escapeHtml(log.startTime)}\nDuration: ${escapeHtml(log.duration)}\nStatus: ${escapeHtml(log.status)}\n\nKey Points:\n` + 
-        (log.points || []).map(p => `• ${escapeHtml(p)}`).join('\n');
+      const summaryContent = `Call #${log.callNumber}\nStart Time: ${log.startTime}\nDuration: ${log.duration}\nStatus: ${log.status}\n\nKey Points:\n` + 
+        (log.points || []).map(p => `• ${p}`).join('\n');
 
       const waMessage = encodeURIComponent(`💌 BridgeCalle Call Summary for ${person.name || 'Human'}:\n\n${summaryContent}\n\nSent via BridgeCalle Voice AI.`);
       const cleanWaNum = waNum.replace(/[^+\d]/g, '').replace('+', '');
@@ -494,6 +501,7 @@
       window.open(waUrl, '_blank');
     }
 
+    // Strict DOM construction using textContent for 100% XSS immunity
     function renderSummariesList(filterPersonId = null) {
       const listEl = document.getElementById('summaries-list');
       listEl.innerHTML = '';
@@ -503,7 +511,10 @@
         : persons;
 
       if (targetPersons.length === 0) {
-        listEl.innerHTML = '<div class="text-sm text-slate-500 text-center py-6">No records available.</div>';
+        const emptyDiv = document.createElement('div');
+        emptyDiv.className = 'text-sm text-slate-500 text-center py-6';
+        emptyDiv.textContent = 'No records available.';
+        listEl.appendChild(emptyDiv);
         return;
       }
 
@@ -514,79 +525,149 @@
         const logs = person.callLogs || [];
         const currentWaNum = person.waPhone || selfPhone;
         const maskedWaNum = maskPhone(currentWaNum);
-        const safePersonName = escapeHtml(person.name || 'Human');
+
+        // Header
+        const headerDiv = document.createElement('div');
+        headerDiv.className = 'flex items-center justify-between border-b border-slate-200 pb-2';
+
+        const personInfo = document.createElement('div');
+        personInfo.className = 'flex items-center space-x-2';
+
+        const avatarImg = document.createElement('img');
+        avatarImg.src = person.photo || DEFAULT_AVATAR;
+        avatarImg.className = 'w-8 h-8 rounded-full object-cover border';
+
+        const nameSpan = document.createElement('span');
+        nameSpan.className = 'font-extrabold text-slate-900 text-base';
+        nameSpan.textContent = person.name || 'Human';
+
+        personInfo.appendChild(avatarImg);
+        personInfo.appendChild(nameSpan);
+
+        const callBadge = document.createElement('span');
+        callBadge.className = 'text-xs bg-indigo-100 text-indigo-800 font-bold px-2.5 py-1 rounded-lg';
+        callBadge.textContent = `${logs.length} Call(s) Logged`;
+
+        headerDiv.appendChild(personInfo);
+        headerDiv.appendChild(callBadge);
+
+        personBox.appendChild(headerDiv);
 
         if (logs.length === 0) {
-          personBox.innerHTML = `
-            <div class="flex items-center justify-between border-b border-slate-200 pb-2">
-              <div class="flex items-center space-x-2">
-                <img src="${person.photo || DEFAULT_AVATAR}" class="w-8 h-8 rounded-full object-cover border">
-                <span class="font-extrabold text-slate-900 text-base">${safePersonName}</span>
-              </div>
-              <span class="text-xs text-slate-400 font-bold">0 Calls</span>
-            </div>
-            <div class="text-sm font-bold text-slate-500 py-3 italic text-center bg-white rounded-xl border border-slate-200">
-              🚫 Not connected / Not answered
-            </div>
-          `;
+          const noCallDiv = document.createElement('div');
+          noCallDiv.className = 'text-sm font-bold text-slate-500 py-3 italic text-center bg-white rounded-xl border border-slate-200';
+          noCallDiv.textContent = '🚫 Not connected / Not answered';
+          personBox.appendChild(noCallDiv);
         } else {
-          let logsHtml = '';
+          const logsContainer = document.createElement('div');
+          logsContainer.className = 'space-y-3';
+
           logs.forEach(log => {
             const isNotConn = log.status && (log.status.includes('NOT') || log.status.includes('FAILED'));
             const badgeClass = isNotConn ? 'bg-red-100 text-red-800' : 'bg-emerald-100 text-emerald-800';
-            const statusLabel = escapeHtml(isNotConn ? 'NOT CONNECTED' : (log.status || 'COMPLETED'));
+            const statusLabel = isNotConn ? 'NOT CONNECTED' : (log.status || 'COMPLETED');
 
-            const pointsList = (log.points && log.points.length > 0)
-              ? log.points.map(pt => `<li class="flex items-start gap-1.5"><span class="text-indigo-600 font-bold">•</span> <span>${escapeHtml(pt)}</span></li>`).join('')
-              : `<li>Not connected / Not answered</li>`;
+            const logCard = document.createElement('div');
+            logCard.className = 'bg-white p-3.5 rounded-xl border border-slate-200 space-y-2 text-xs sm:text-sm';
 
-            logsHtml += `
-              <div class="bg-white p-3.5 rounded-xl border border-slate-200 space-y-2 text-xs sm:text-sm">
-                <div class="flex items-center justify-between border-b border-slate-100 pb-1.5 font-bold">
-                  <div class="flex items-center space-x-2">
-                    <span class="text-indigo-900">📞 Call #${log.callNumber}</span>
-                    <span class="text-[10px] px-2 py-0.5 rounded font-extrabold uppercase ${badgeClass}">
-                      ${statusLabel}
-                    </span>
-                  </div>
-                  <span class="text-slate-500 text-xs">⏱️ ${escapeHtml(log.startTime)} | ⌛ ${escapeHtml(log.duration)}</span>
-                </div>
-                <div class="font-bold text-slate-800 text-xs uppercase tracking-wider">Summary Points:</div>
-                <ul class="space-y-1 text-slate-700 font-medium leading-relaxed">
-                  ${pointsList}
-                </ul>
-              </div>
-            `;
+            const logHeader = document.createElement('div');
+            logHeader.className = 'flex items-center justify-between border-b border-slate-100 pb-1.5 font-bold';
+
+            const titleWrap = document.createElement('div');
+            titleWrap.className = 'flex items-center space-x-2';
+
+            const titleSpan = document.createElement('span');
+            titleSpan.className = 'text-indigo-900';
+            titleSpan.textContent = `📞 Call #${log.callNumber}`;
+
+            const statusSpan = document.createElement('span');
+            statusSpan.className = `text-[10px] px-2 py-0.5 rounded font-extrabold uppercase ${badgeClass}`;
+            statusSpan.textContent = statusLabel;
+
+            titleWrap.appendChild(titleSpan);
+            titleWrap.appendChild(statusSpan);
+
+            const timeSpan = document.createElement('span');
+            timeSpan.className = 'text-slate-500 text-xs';
+            timeSpan.textContent = `⏱️ ${log.startTime} | ⌛ ${log.duration}`;
+
+            logHeader.appendChild(titleWrap);
+            logHeader.appendChild(timeSpan);
+
+            const pointsHeader = document.createElement('div');
+            pointsHeader.className = 'font-bold text-slate-800 text-xs uppercase tracking-wider';
+            pointsHeader.textContent = 'Summary Points:';
+
+            const ul = document.createElement('ul');
+            ul.className = 'space-y-1 text-slate-700 font-medium leading-relaxed';
+
+            const pointsArr = (log.points && log.points.length > 0) ? log.points : ['Not connected / Not answered'];
+            pointsArr.forEach(pt => {
+              const li = document.createElement('li');
+              li.className = 'flex items-start gap-1.5';
+              
+              const bullet = document.createElement('span');
+              bullet.className = 'text-indigo-600 font-bold';
+              bullet.textContent = '•';
+
+              const ptText = document.createElement('span');
+              ptText.textContent = pt;
+
+              li.appendChild(bullet);
+              li.appendChild(ptText);
+              ul.appendChild(li);
+            });
+
+            logCard.appendChild(logHeader);
+            logCard.appendChild(pointsHeader);
+            logCard.appendChild(ul);
+
+            logsContainer.appendChild(logCard);
           });
 
-          personBox.innerHTML = `
-            <div class="flex items-center justify-between border-b border-slate-200 pb-2">
-              <div class="flex items-center space-x-2">
-                <img src="${person.photo || DEFAULT_AVATAR}" class="w-8 h-8 rounded-full object-cover border">
-                <span class="font-extrabold text-slate-900 text-base">${safePersonName}</span>
-              </div>
-              <span class="text-xs bg-indigo-100 text-indigo-800 font-bold px-2.5 py-1 rounded-lg">${logs.length} Call(s) Logged</span>
-            </div>
+          personBox.appendChild(logsContainer);
 
-            <div class="space-y-3">
-              ${logsHtml}
-            </div>
+          // Configurable WhatsApp Export Box
+          const waExportBox = document.createElement('div');
+          waExportBox.className = 'bg-emerald-50/80 rounded-xl p-3 border border-emerald-200 space-y-2 mt-2';
 
-            <!-- Single Configurable WhatsApp Destination Input for This Person in Summary Modal -->
-            <div class="bg-emerald-50/80 rounded-xl p-3 border border-emerald-200 space-y-2 mt-2">
-              <div class="flex items-center justify-between">
-                <label class="block text-[11px] font-bold text-emerald-800 uppercase tracking-wider">Target WhatsApp Number for Summaries:</label>
-                <span class="text-[11px] font-extrabold text-emerald-900 bg-emerald-100 px-2 py-0.5 rounded">Masked: ${maskedWaNum}</span>
-              </div>
-              <div class="flex items-center space-x-2">
-                <input type="tel" id="wa-input-${person.id}" value="${escapeHtml(currentWaNum)}" placeholder="+15550100000" class="flex-1 bg-white border border-emerald-300 text-slate-900 text-xs font-bold rounded-lg p-2 focus:ring-2 focus:ring-emerald-500 focus:outline-none" onchange="updatePersonWhatsAppNumber('${person.id}', this.value)">
-                
-                <button onclick="shareCallLogToWhatsApp('${person.id}', '${logs[0] ? logs[0].id : ''}')" class="bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-xs px-3.5 py-2 rounded-lg transition shadow-sm flex items-center gap-1.5 flex-shrink-0">
-                  <span>💬 Share Latest</span>
-                </button>
-              </div>
-            </div>
-          `;
+          const waHeader = document.createElement('div');
+          waHeader.className = 'flex items-center justify-between';
+
+          const waLabel = document.createElement('label');
+          waLabel.className = 'block text-[11px] font-bold text-emerald-800 uppercase tracking-wider';
+          waLabel.textContent = 'Target WhatsApp Number for Summaries:';
+
+          const waBadge = document.createElement('span');
+          waBadge.className = 'text-[11px] font-extrabold text-emerald-900 bg-emerald-100 px-2 py-0.5 rounded';
+          waBadge.textContent = `Masked: ${maskedWaNum}`;
+
+          waHeader.appendChild(waLabel);
+          waHeader.appendChild(waBadge);
+
+          const waInputRow = document.createElement('div');
+          waInputRow.className = 'flex items-center space-x-2';
+
+          const waInput = document.createElement('input');
+          waInput.type = 'tel';
+          waInput.id = `wa-input-${person.id}`;
+          waInput.value = currentWaNum;
+          waInput.placeholder = '+15550100000';
+          waInput.className = 'flex-1 bg-white border border-emerald-300 text-slate-900 text-xs font-bold rounded-lg p-2 focus:ring-2 focus:ring-emerald-500 focus:outline-none';
+          waInput.onchange = (e) => updatePersonWhatsAppNumber(person.id, e.target.value);
+
+          const waBtn = document.createElement('button');
+          waBtn.className = 'bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-xs px-3.5 py-2 rounded-lg transition shadow-sm flex items-center gap-1.5 flex-shrink-0';
+          waBtn.textContent = '💬 Share Latest';
+          waBtn.onclick = () => shareCallLogToWhatsApp(person.id, logs[0] ? logs[0].id : '');
+
+          waInputRow.appendChild(waInput);
+          waInputRow.appendChild(waBtn);
+
+          waExportBox.appendChild(waHeader);
+          waExportBox.appendChild(waInputRow);
+
+          personBox.appendChild(waExportBox);
         }
 
         listEl.appendChild(personBox);
