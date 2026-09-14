@@ -1,0 +1,40 @@
+{
+  "name": "vaultcall",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Autonomous out-of-band BEC wire defense and vendor bank-change verification console powered by CALL-E.",
+  "engines": {
+    "node": ">=20"
+  },
+  "scripts": {
+    "dev": "next dev",
+    "build": "next build",
+    "start": "next start",
+    "typecheck": "tsc --noEmit",
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "db:seed": "node --import tsx src/fixtures/seed-runner.ts",
+    "call:live": "tsx scripts/make-live-call.ts"
+  },
+  "dependencies": {
+    "@call-e/calle": "^0.7.0",
+    "clsx": "^2.1.1",
+    "lucide-react": "^0.474.0",
+    "next": "^14.2.24",
+    "react": "^18.3.1",
+    "react-dom": "^18.3.1",
+    "tailwind-merge": "^2.6.0"
+  },
+  "devDependencies": {
+    "@netlify/plugin-nextjs": "^5.15.13",
+    "@types/node": "^20.17.14",
+    "@types/react": "^18.3.18",
+    "@types/react-dom": "^18.3.5",
+    "autoprefixer": "^10.4.20",
+    "postcss": "^8.4.49",
+    "tailwindcss": "^3.4.17",
+    "tsx": "^4.19.2",
+    "typescript": "^5.7.3",
+    "vitest": "^2.1.8"
+  }
+}
