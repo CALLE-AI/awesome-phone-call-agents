@@ -1,12 +1,12 @@
 # SiteSignal CALL-E
 
-> When a worker has no signal, CALL-E reaches out to them. Voice-first incident coordination for environments where internet and SMS don't reach.
+> Voice-first incident coordination for workers without internet/mobile-data access. A functioning telephone voice connection is still required; CALL-E cannot reach a handset in a complete voice-coverage dead zone.
 
 SiteSignal CALL-E is an operator coordination console that closes the loop for offline maintenance workers. When an incident is reported, the operator dispatches CALL-E to call the worker directly. CALL-E collects status, identifies what resource is needed, finds nearby suppliers, and calls the worker back with options. The operator then dispatches a runner to deliver the item — all without the worker needing internet access.
 
 ## The problem
 
-Maintenance workers operate in dead zones — elevator shafts, basements, utility tunnels. When something goes wrong they cannot open a ticket, send a message, or search for help. Existing incident management tools assume the worker has connectivity. CALL-E inverts this: the system reaches out to the worker, not the other way around.
+Maintenance workers may lack mobile data or access to an internet-based ticketing tool. Where telephone voice service remains available, the operator can arrange a call to collect an update. Workers in elevator shafts, basements, or tunnels without voice coverage must first use another established communication route or reach a covered location.
 
 ## What it does
 
@@ -16,7 +16,7 @@ Maintenance workers operate in dead zones — elevator shafts, basements, utilit
 4. **CALL-E calls back** — operator selects a supplier; CALL-E calls the worker with the option details
 5. **Runner dispatched** — operator assigns a runner to collect the item from the front desk and deliver to the worker's floor
 
-The worker gets help with no internet, no SMS, voice only.
+The worker can receive help without internet or SMS, provided telephone voice service is available.
 
 ## Live demo
 
@@ -41,6 +41,8 @@ The worker gets help with no internet, no SMS, voice only.
 ## Source
 
 https://github.com/alexzerg/sitesignal/tree/hackathon/call-e
+
+The source link was unavailable during review. This contribution is an external hosted-demo reference, not an independently verified runnable source package. The frontend link above was reachable; its call buttons can have real side effects and should only be used by an authorized operator with the recipient's consent.
 
 ## CALL-E usage
 
