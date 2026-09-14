@@ -15,6 +15,21 @@ By placing non-invasive, consent-first qualifying calls via CALL-E, Muster asks 
 
 ---
 
+## Prerequisites & Engine Setup
+
+This skill orchestrates the open-source **Muster** directory auditor engine. To run audits locally:
+
+```bash
+# Clone and install the Muster engine
+git clone https://github.com/omshukla24/Muster.git
+cd Muster
+pip install -e .
+```
+
+*Note: For lightweight workflow exploration, the skill operates in **mock mode by default**, allowing zero-cost simulated audits with bundled sample schemas without needing live telephony credits.*
+
+---
+
 ## When to Use This Skill
 
 Activate Muster when an agent or auditor needs to:
@@ -62,7 +77,7 @@ PROV-102,Summit Psychological Associates,+15552340102,In-Network - Aetna Choice,
 
 ## Outputs & Artifacts
 
-Muster produces definitive classifications and three compliance reports:
+Muster produces experimental, advisory classifications intended for human review and operational triage (not definitive legal or regulatory compliance verdicts):
 
 ### Verdict Definitions
 - **`PRESENT`**: Authorized respondent affirmed in-network participation and intake availability.
@@ -73,7 +88,7 @@ Muster produces definitive classifications and three compliance reports:
 ### Generated Artifacts
 1. **`reports/muster_audit_<job_id>.csv`**: Tabular dataset with entry IDs, phone numbers, verdicts, confidence scores, and cited evidence quotes.
 2. **`reports/muster_audit_<job_id>.json`**: Machine-readable audit package including verbatim transcripts and full schema extractions.
-3. **`reports/muster_audit_<job_id>.md`**: Executive Audit Certificate with methodology and patient access ratios.
+3. **`reports/muster_audit_<job_id>.md`**: Executive Audit Report (Advisory) summarizing findings, confidence scores, and patient access ratios for human audit review.
 
 ---
 
@@ -117,7 +132,10 @@ Open `http://127.0.0.1:8000` to inspect the live switchboard, telegraph typing, 
 
 ---
 
-## Guardrails & Ethical Standards
+## Safety & Telephony Contract
+
+All live operations are strictly governed by our [Safety Contract](references/safety.md), enforcing authorized E.164 recipients, per-run human preview/approval, privacy phone masking, no auto-retries on ambiguity, and honest cancellation limits.
+
 - **Benign Qualifying Questions Only**: Muster strictly verifies administrative network status. Never request patient health information, medical history, or payment details.
 - **Rate-Limited Gateways**: Concurrency defaults to 2 simultaneous calls to respect cellular gateways and medical front desks.
 - **Transparent Identification**: Verification inquiries explicitly introduce themselves as directory verification checks.
