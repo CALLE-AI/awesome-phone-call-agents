@@ -1,5 +1,9 @@
-from dataclasses import dataclass
+﻿from dataclasses import dataclass
 from typing import Optional
+
+# Status values used across the application.
+# UNKNOWN is used whenever the outcome of an API call cannot be confirmed.
+TERMINAL_STATUSES = {"completed", "failed", "cancelled", "canceled", "unknown"}
 
 
 @dataclass

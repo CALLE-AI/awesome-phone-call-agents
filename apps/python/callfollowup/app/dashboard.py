@@ -1,7 +1,26 @@
+﻿"""
+dashboard.py
+============
+CallFollowUp - Streamlit dashboard.
+
+Security & behaviour guarantees (Ray-56 review fixes)
+------------------------------------------------------
+Req 1  Preview is credential-free: CalleClient is never instantiated just to
+       prepare or preview a call.
+Req 2  Phone numbers must be exact E.164 before preview OR live call.
+       Remote credential-bearing deployments require basic auth.
+Req 3  No raw provider responses (st.json removed). Phone numbers are masked
+       in history. Transcript text is sanitised. Generic error messages only.
+Req 4  Mode (DRY RUN / LIVE) and terminal status are shown accurately.
+Req 5  Ambiguous creation -> status UNKNOWN, workflow halts, no auto-retry.
+Req 6  Closing the UI does not cancel an accepted call (shown in UI + README).
+"""
+
 import streamlit as st
 
+from config import has_api_key, require_auth, APP_USERNAME, APP_PASSWORD
 from models import FollowUp
-from call_service import CallService
+from call_service import CallService, prepare_call, validate_e164
 from storage import load_follow_ups, save_follow_up, update_follow_up
 
 
@@ -13,9 +32,39 @@ st.set_page_config(
 )
 
 
-# =========================
-# Styling
-# =========================
+# =============================================================================
+# Req 2 — Remote basic authentication
+# =============================================================================
+if require_auth():
+    # Streamlit secrets take precedence over env vars; both are already loaded
+    # by config.py via os.getenv.  Only show the login gate when auth is needed.
+    if "authenticated" not in st.session_state:
+        st.session_state.authenticated = False
+
+    if not st.session_state.authenticated:
+        st.title("🔒 CallFollowUp — Login Required")
+        st.info(
+            "This deployment carries live credentials and is accessible from "
+            "a non-private network.  Please authenticate to continue."
+        )
+        with st.form("auth_form"):
+            u = st.text_input("Username")
+            p = st.text_input("Password", type="password")
+            submitted = st.form_submit_button("Log in")
+
+        if submitted:
+            if u == APP_USERNAME and p == APP_PASSWORD:
+                st.session_state.authenticated = True
+                st.rerun()
+            else:
+                st.error("Invalid credentials.")
+
+        st.stop()
+
+
+# =============================================================================
+# Styling (preserved from original)
+# =============================================================================
 
 st.markdown("""
 <style>
@@ -169,9 +218,9 @@ div[data-testid="stVerticalBlockBorderWrapper"] {
 """, unsafe_allow_html=True)
 
 
-# =========================
+# =============================================================================
 # Session state
-# =========================
+# =============================================================================
 
 if "prepared_follow_up" not in st.session_state:
     st.session_state.prepared_follow_up = None
@@ -180,9 +229,9 @@ if "prepared_call" not in st.session_state:
     st.session_state.prepared_call = None
 
 
-# =========================
+# =============================================================================
 # Hero
-# =========================
+# =============================================================================
 
 st.markdown("""
 <div class="hero">
@@ -194,16 +243,20 @@ st.markdown("""
 """, unsafe_allow_html=True)
 
 
-# =========================
-# Metrics
-# =========================
+# =============================================================================
+# Metrics (Req 4 — show actual mode)
+# =============================================================================
 
 history = load_follow_ups()
 
 completed_calls = sum(
     1 for item in history
-    if item.get("status") in ["completed", "success"]
+    if item.get("status") in {"completed", "success"}
 )
+
+# Determine actual mode label for the status metric.
+_mode_label = "LIVE" if has_api_key() else "DRY RUN"
+_mode_delta = "API key configured" if has_api_key() else "No API key — preview only"
 
 col1, col2 = st.columns(2)
 
@@ -216,9 +269,9 @@ with col1:
 
 with col2:
     st.metric(
-        "✨ Status",
-        "DRY RUN",
-        "Safe mode"
+        "✨ Mode",
+        _mode_label,
+        _mode_delta,
     )
 
 st.markdown("<br>", unsafe_allow_html=True)
@@ -230,9 +283,9 @@ st.metric(
 )
 
 
-# =========================
-# Create follow-up
-# =========================
+# =============================================================================
+# Create follow-up form
+# =============================================================================
 
 st.markdown(
     '<div class="section-title">Create a follow-up</div>',
@@ -248,7 +301,7 @@ with st.form("follow_up_form"):
 
     phone_number = st.text_input(
         "Phone number",
-        placeholder="e.g. +91XXXXXXXXXX"
+        placeholder="E.164 format required, e.g. +91XXXXXXXXXX"
     )
 
     call_goal = st.text_area(
@@ -263,9 +316,9 @@ with st.form("follow_up_form"):
     )
 
 
-# =========================
-# Prepare call
-# =========================
+# =============================================================================
+# Req 1 + Req 2 — Credential-free preview with strict E.164 validation
+# =============================================================================
 
 if submitted:
 
@@ -274,44 +327,55 @@ if submitted:
         or not phone_number.strip()
         or not call_goal.strip()
     ):
-
         st.warning("Please fill in all fields.")
 
-    elif not phone_number.strip().startswith("+"):
-
+    elif not validate_e164(phone_number.strip()):
         st.warning(
-            "Please enter the phone number with country code, "
-            "for example: +91XXXXXXXXXX"
+            "📵 Invalid phone number format. "
+            "Please use exact E.164 format: + followed by 1-15 digits, "
+            "first digit after + cannot be 0. "
+            "Example: +14155552671 or +919876543210. "
+            "Spaces, hyphens, and parentheses are not accepted."
         )
 
     else:
-
         follow_up = FollowUp(
             contact_name=contact_name.strip(),
             phone_number=phone_number.strip(),
             call_goal=call_goal.strip(),
         )
 
-        service = CallService()
-        prepared = service.prepare_call(follow_up)
+        # Req 1: prepare_call() is a plain function — no CalleClient created.
+        prepared = prepare_call(follow_up)
 
         st.session_state.prepared_follow_up = follow_up
         st.session_state.prepared_call = prepared
 
-        st.success("✓ Call prepared successfully — DRY RUN")
+        st.success("✓ Call prepared successfully — DRY RUN (no call made, no credits used)")
 
         st.markdown("### Call Preview")
-        st.json(prepared)
+
+        # Show only safe preview fields — never raw provider data.
+        col_a, col_b = st.columns(2)
+        with col_a:
+            st.write("**Contact:**", follow_up.contact_name)
+            st.write("**Phone (masked):**", prepared["recipient_masked"])
+        with col_b:
+            st.write("**Mode:**", prepared["mode"].upper())
+            st.write("**Status:**", "READY")
+
+        st.write("**Goal:**", follow_up.call_goal)
 
         st.info(
             "📵 No phone call has been made. "
-            "Your CALL-E credits are safe."
+            "Your CALL-E credits are safe. "
+            "Review the details above, then use the section below to start a live call."
         )
 
 
-# =========================
-# Real call section
-# =========================
+# =============================================================================
+# Req 1 / Req 3 / Req 4 / Req 5 — Live CALL-E call section
+# =============================================================================
 
 if st.session_state.prepared_follow_up:
 
@@ -320,12 +384,26 @@ if st.session_state.prepared_follow_up:
         unsafe_allow_html=True
     )
 
+    if not has_api_key():
+        st.error(
+            "⚙️ No CALLE_API_KEY found. "
+            "Add your API key to .env or Streamlit Secrets to make live calls."
+        )
+        st.stop()
+
     st.warning(
         "⚠️ This will make a real phone call and use one CALL-E credit."
     )
 
     confirm_real_call = st.checkbox(
         "I am ready to make a real CALL-E call"
+    )
+
+    # Req 6 — closing notice shown alongside the confirm checkbox.
+    st.caption(
+        "ℹ️ Note: Closing, refreshing, or disconnecting from this UI does NOT cancel "
+        "a call that has already been accepted by CALL-E. "
+        "Accepted calls continue according to the CALL-E provider-side lifecycle."
     )
 
     if confirm_real_call:
@@ -344,135 +422,133 @@ if st.session_state.prepared_follow_up:
 
             follow_up = st.session_state.prepared_follow_up
 
-            try:
-                service = CallService()
-
-                with st.spinner("📞 CALL-E is starting the call..."):
-                    call_response = service.create_call(follow_up)
-
-                call_id = (
-                    call_response.get("id")
-                    or call_response.get("call_id")
-                )
-
-                if not call_id:
-                    st.error("CALL-E did not return a call ID.")
-                    st.json(call_response)
-                    st.stop()
-
-                follow_up.call_id = call_id
-                follow_up.status = "calling"
-
-                save_follow_up(follow_up)
-
-                st.success(
-                    f"📞 Call started successfully. Call ID: {call_id}"
-                )
-
-                with st.spinner(
-                    "⏳ Waiting for the conversation to finish..."
-                ):
-                    try:
-                        result = service.wait_for_result(call_id)
-
-                    except Exception:
-                        st.info(
-                            "⏳ The waiting request timed out. "
-                            "Checking CALL-E for the latest call status..."
-                        )
-
-                        result = service.get_call(call_id)
-
-                        if not isinstance(result, dict):
-                            st.error(
-                                "❌ Could not retrieve the CALL-E call result."
-                            )
-                            st.stop()
-
-                        if result.get("status") != "completed":
-                            st.error(
-                                "❌ CALL-E call did not complete. "
-                                f"Status: {result.get('status')}"
-                            )
-                            st.json(result)
-                            st.stop()
-
-                st.success("✅ Call completed!")
-
-                st.markdown("### 📋 CALL-E Result")
-                st.json(result)
-
-                if isinstance(result, dict):
-
-                    result_data = result.get(
-                        "structured_result",
-                        result.get("result", result)
-                    )
-
-                    if isinstance(result_data, dict):
-
-                        extracted = {
-                            "outcome": result_data.get("outcome", ""),
-                            "notes": result_data.get("notes", ""),
-                            "next_action": result_data.get("next_action", ""),
-                            "callback_at": result_data.get("callback_at", ""),
-                        }
-
-                        update_follow_up(
-                            call_id,
-                            extracted
-                        )
-
-                        st.markdown("### ✨ Follow-up Summary")
-
-                        col1, col2 = st.columns(2)
-
-                        with col1:
-                            st.write(
-                                "**Outcome:**",
-                                extracted["outcome"]
-                            )
-
-                            st.write(
-                                "**Next action:**",
-                                extracted["next_action"]
-                            )
-
-                        with col2:
-                            st.write(
-                                "**Notes:**",
-                                extracted["notes"]
-                            )
-
-                            st.write(
-                                "**Callback:**",
-                                extracted["callback_at"] or "None"
-                            )
-
-                        st.success(
-                            "💾 Follow-up saved successfully."
-                        )
-
-                        st.session_state.prepared_follow_up = None
-                        st.session_state.prepared_call = None
-
-                        st.rerun()
-
-                    else:
-                        st.warning(
-                            "The call completed, but CALL-E returned "
-                            "an unexpected result format."
-                        )
-
-            except Exception as e:
-
+            # Final E.164 guard before live call (Req 2).
+            if not validate_e164(follow_up.phone_number):
                 st.error(
-                    f"❌ CALL-E call failed: {e}"
+                    "❌ The stored phone number is not valid E.164. "
+                    "Please restart and re-enter the number."
                 )
+                st.stop()
 
-# =========================
-# Call History
-# =========================
+            try:
+                # Req 1 — CalleClient is only created here, at live-call time.
+                service = CallService()
+            except RuntimeError as e:
+                st.error(f"⚙️ Configuration error: {e}")
+                st.stop()
+
+            # =================================================================
+            # Req 4 — Show CREATING status while submitting.
+            # =================================================================
+            with st.spinner("📞 CALL-E is submitting the call... (CREATING)"):
+                call_response = service.create_call(follow_up)
+
+            # =================================================================
+            # Req 5 — UNKNOWN on ambiguous creation.
+            # =================================================================
+            if call_response.get("status") == "UNKNOWN":
+                st.error(
+                    "⚠️ **UNKNOWN — Ambiguous call creation**\n\n"
+                    + call_response.get("error", "The call outcome is unknown.")
+                    + "\n\n"
+                    "**Do not retry.** The call may have already been accepted "
+                    "by the provider. Please check your CALL-E dashboard to "
+                    "confirm whether a call was created before attempting again."
+                )
+                # Record the UNKNOWN state in history so the user can track it.
+                follow_up.status = "unknown"
+                save_follow_up(follow_up)
+                st.stop()
+
+            call_id = call_response.get("id")
+
+            if not call_id:
+                # Defensive: create_call should always return id or UNKNOWN,
+                # but handle this path safely.
+                st.error(
+                    "❌ The provider did not return a call ID. "
+                    "The call outcome is unknown. "
+                    "Check your CALL-E dashboard before retrying."
+                )
+                follow_up.status = "unknown"
+                save_follow_up(follow_up)
+                st.stop()
+
+            # Definitive acceptance — start tracking the call.
+            follow_up.call_id = call_id
+            follow_up.status = "calling"
+            save_follow_up(follow_up)
+
+            # Req 4 — Show CALLING status.
+            st.success("📞 Call accepted by CALL-E. Status: CALLING")
+
+            with st.spinner(
+                "⏳ Waiting for the conversation to finish... (CALLING)"
+            ):
+                result = service.wait_for_result(call_id)
+
+            terminal_status = result.get("status", "UNKNOWN").upper()
+
+            # =================================================================
+            # Req 4 + Req 5 — Show real terminal status; handle UNKNOWN.
+            # =================================================================
+            if terminal_status == "UNKNOWN":
+                st.warning(
+                    "⏳ **UNKNOWN — Call status could not be confirmed**\n\n"
+                    "The call was accepted but its final status could not be "
+                    "retrieved (e.g. the poll timed out). "
+                    "Check your CALL-E dashboard for the real outcome. "
+                    "The record has been saved with status UNKNOWN."
+                )
+                update_follow_up(call_id, result)
+                st.stop()
+
+            elif terminal_status in {"FAILED", "CANCELLED", "CANCELED"}:
+                st.error(
+                    f"❌ Call ended with status: **{terminal_status}**. "
+                    "No follow-up data was captured."
+                )
+                update_follow_up(call_id, result)
+                st.stop()
+
+            # Req 4 — Confirmed COMPLETED.
+            st.success(f"✅ Call completed! Status: {terminal_status}")
+
+            # =================================================================
+            # Req 3 — Never display raw provider result. Show safe fields only.
+            # =================================================================
+            extracted = {
+                "outcome": result.get("outcome", ""),
+                "notes": result.get("notes", ""),
+                "next_action": result.get("next_action", ""),
+                "callback_at": result.get("callback_at", ""),
+            }
+
+            update_follow_up(call_id, result)
+
+            st.markdown("### ✨ Follow-up Summary")
+
+            col1, col2 = st.columns(2)
+
+            with col1:
+                st.write("**Outcome:**", extracted["outcome"] or "—")
+                st.write("**Next action:**", extracted["next_action"] or "—")
+
+            with col2:
+                st.write("**Notes:**", extracted["notes"] or "—")
+                st.write("**Callback:**", extracted["callback_at"] or "None")
+
+            st.success("💾 Follow-up saved successfully.")
+
+            st.session_state.prepared_follow_up = None
+            st.session_state.prepared_call = None
+
+            st.rerun()
+
+
+# =============================================================================
+# Req 3 / Req 4 — Call History (masked phones, masked transcript, real status)
+# =============================================================================
 
 st.markdown(
     '<div class="section-title">Call History</div>',
@@ -493,6 +569,7 @@ if history:
                 f"**{item.get('contact_name', 'Unknown')}** — `{status}`"
             )
 
+            # Req 3 — phone_number in storage is already masked.
             st.write(
                 f"📞 {item.get('phone_number', 'Not available')}"
             )
@@ -501,31 +578,27 @@ if history:
                 f"🎯 {item.get('call_goal', 'Not available')}"
             )
 
-            # Outcome
             st.write(
                 f"✅ **Outcome:** "
                 f"{item.get('outcome') or 'Not available yet'}"
             )
 
-            # Notes
             st.write(
                 f"📝 **Notes:** "
                 f"{item.get('notes') or 'Not available yet'}"
             )
 
-            # Next action
             st.write(
                 f"➡️ **Next action:** "
                 f"{item.get('next_action') or 'Not available yet'}"
             )
 
-            # Callback
             st.write(
                 f"📅 **Callback:** "
                 f"{item.get('callback_at') or 'None'}"
             )
 
-            # Transcript
+            # Transcript viewer — only for records that have a call_id.
             call_id = item.get("call_id")
 
             if call_id:
@@ -537,79 +610,42 @@ if history:
                 ):
 
                     try:
-
                         service = CallService()
-
-                        with st.spinner(
-                            "Loading CALL-E conversation..."
-                        ):
-                            call_data = service.get_call(call_id)
-
-                        if not isinstance(call_data, dict):
-
-                            st.error(
-                                "Could not retrieve the CALL-E call."
-                            )
-
-                        else:
-
-                            st.markdown("#### 📞 CALL-E Conversation")
-
-                            st.write(
-                                f"**Call status:** "
-                                f"{call_data.get('status', 'Unknown').upper()}"
-                            )
-
-                            attempts = []
-
-                            for recipient in call_data.get("recipients", []):
-                                attempts.extend(recipient.get("attempts", []))
-
-                            transcript = []
-
-                            if attempts:
-
-                                transcript = attempts[0].get(
-                                    "transcript_turns",
-                                    []
-                                )
-
-                            if transcript:
-
-                                for turn in transcript:
-
-                                    speaker = turn.get(
-                                        "speaker",
-                                        "unknown"
-                                    )
-
-                                    text = turn.get(
-                                        "text",
-                                        ""
-                                    )
-
-                                    if speaker == "bot":
-                                        st.markdown(
-                                            f"🤖 **CALL-E:** {text}"
-                                        )
-
-                                    else:
-                                        st.markdown(
-                                            f"👤 **Answering party:** {text}"
-                                        )
-
-                            else:
-
-                                st.info(
-                                    "No transcript was returned by CALL-E."
-                                )
-
-                    except Exception as e:
-
+                    except RuntimeError:
                         st.error(
-                            f"Could not load conversation: {e}"
+                            "⚙️ CALLE_API_KEY is not configured. "
+                            "Cannot fetch transcript."
                         )
+                        continue
+
+                    with st.spinner("Loading CALL-E conversation..."):
+                        # get_transcript() returns sanitised turns.
+                        transcript = service.get_transcript(call_id)
+
+                    if not transcript:
+                        st.info("No transcript was returned by CALL-E.")
+                    else:
+                        st.markdown("#### 📞 CALL-E Conversation")
+
+                        for turn in transcript:
+                            speaker = turn.get("speaker", "unknown")
+                            text = turn.get("text", "")
+
+                            if speaker == "bot":
+                                st.markdown(f"🤖 **CALL-E:** {text}")
+                            else:
+                                st.markdown(f"👤 **Answering party:** {text}")
 
 else:
 
     st.info("No follow-ups yet.")
+
+
+# =============================================================================
+# Footer
+# =============================================================================
+
+st.markdown(
+    '<div class="app-footer">CallFollowUp · Built for the CALL-E Hackathon</div>',
+    unsafe_allow_html=True,
+)
