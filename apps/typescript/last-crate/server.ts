@@ -21,7 +21,7 @@ const json = (res: any, status: number, data: any) => {
     "Content-Type": "application/json",
     "Cache-Control": "no-store",
   });
-  res.end(JSON.stringify(data));
+  res.end(JSON.stringify(data).replace(/\+[1-9]\d{7,14}/g, (n) => mask(n)));
 };
 function publicRun(run: any) {
   if (!run) return null;
