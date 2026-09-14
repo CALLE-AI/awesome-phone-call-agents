@@ -1,0 +1,109 @@
+.form-page {
+  max-width: 52rem;
+}
+.form-page h1 {
+  margin: 0.55rem 0;
+  font-size: clamp(1.9rem, 6vw, 3.2rem);
+}
+.page-intro {
+  color: var(--muted);
+}
+.form-error {
+  margin: 1.25rem 0;
+  padding: 0.75rem;
+  border-left: 2px solid var(--red);
+  background: rgb(255 98 98/0.08);
+  color: #ffd2d2;
+}
+.form-page form {
+  display: grid;
+  gap: 1.2rem;
+  margin-top: 1.5rem;
+}
+.form-grid {
+  display: grid;
+  gap: 1rem;
+}
+.form-page label {
+  display: grid;
+  gap: 0.42rem;
+  color: #dce6eb;
+  font-size: 0.86rem;
+}
+.form-page input,
+.form-page textarea {
+  width: 100%;
+  min-height: 44px;
+  border: 1px solid var(--line);
+  border-radius: 0;
+  background: #0c1219;
+  color: var(--text);
+  padding: 0.7rem;
+}
+.form-page textarea {
+  min-height: 100px;
+  resize: vertical;
+}
+.form-page input:focus,
+.form-page textarea:focus {
+  outline: 2px solid var(--cyan);
+  outline-offset: 2px;
+}
+.form-page small {
+  color: var(--muted);
+}
+.form-page fieldset {
+  display: flex;
+  gap: 1rem;
+  border: 1px solid var(--line);
+  padding: 1rem;
+}
+.form-page section { display: grid; gap: 0.75rem; }
+.alternate-fields { margin-top: 0.85rem; padding: 0.9rem; border-left: 2px solid var(--amber); background: rgb(241 184 79 / 0.06); }
+.alternate-warning { margin: 0; color: #f3deb0; font-size: 0.82rem; line-height: 1.45; }
+.form-page fieldset label {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+.form-page fieldset input {
+  width: auto;
+  min-height: auto;
+}
+.consent-group {
+  padding: 0.7rem;
+  border-left: 2px solid transparent;
+}
+.consent-group--error {
+  border-left-color: var(--red);
+  background: rgb(255 98 98/0.07);
+}
+.consent {
+  grid-template-columns: auto 1fr;
+}
+.consent input {
+  width: auto;
+  min-height: auto;
+  margin-top: 0.2rem;
+}
+.consent-error {
+  margin: 0.6rem 0 0;
+  color: #ffd2d2;
+  font-size: 0.84rem;
+  line-height: 1.45;
+}
+.form-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.75rem;
+}
+@media (min-width: 640px) {
+  .form-grid {
+    grid-template-columns: 1fr 1fr;
+  }
+  .form-grid label:nth-child(2),
+  .form-grid label:nth-child(3),
+  .form-grid label:nth-child(4) {
+    grid-column: span 1;
+  }
+}

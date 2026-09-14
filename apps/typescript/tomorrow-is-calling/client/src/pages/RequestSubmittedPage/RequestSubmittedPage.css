@@ -1,0 +1,40 @@
+.request-submitted {
+  max-width: 980px;
+}
+
+.request-submitted__lead {
+  max-width: 720px;
+  font-size: 1.15rem;
+  line-height: 1.7;
+}
+
+.request-submitted__card {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 16px;
+  margin: 32px 0;
+}
+
+.request-submitted__card > div {
+  padding: 22px;
+  border: 1px solid var(--line, rgba(255, 255, 255, 0.14));
+  background: rgba(255, 255, 255, 0.025);
+}
+
+.request-submitted__card small,
+.request-submitted__card strong {
+  display: block;
+}
+
+.request-submitted__card small {
+  margin-bottom: 8px;
+  opacity: 0.55;
+}
+
+.request-submitted__card strong {
+  line-height: 1.5;
+}
+
+@media (max-width: 720px) {
+  .request-submitted__card { grid-template-columns: 1fr; }
+}

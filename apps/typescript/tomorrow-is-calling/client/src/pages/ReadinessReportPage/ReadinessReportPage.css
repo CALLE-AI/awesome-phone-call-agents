@@ -1,0 +1,76 @@
+.report {
+  max-width: 62rem;
+}
+.report__title {
+  display: flex;
+  justify-content: space-between;
+  gap: 1rem;
+  align-items: start;
+}
+.report h1 {
+  margin: 0.45rem 0;
+  font-size: clamp(1.9rem, 6vw, 3.2rem);
+}
+.report h1 span {
+  color: var(--cyan);
+  font-family: var(--mono);
+  font-size: 0.65em;
+}
+.report__title p {
+  margin: 0;
+  color: var(--muted);
+}
+.report-metrics {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 1px;
+  margin: 1.5rem 0;
+  background: var(--line);
+  border: 1px solid var(--line);
+}
+.report-metrics div {
+  display: grid;
+  gap: 0.25rem;
+  padding: 1rem;
+  background: var(--surface);
+}
+.report-metrics b {
+  color: var(--cyan);
+  font-family: var(--mono);
+  font-size: 1.2rem;
+  font-weight: 400;
+}
+.report-metrics span {
+  color: var(--muted);
+  font-size: 0.7rem;
+}
+.report section {
+  margin: 2rem 0;
+}
+.risk-list {
+  display: grid;
+  gap: 0.7rem;
+  margin-top: 1rem;
+}
+.action-list {
+  margin: 1rem 0;
+  padding: 0;
+  list-style: none;
+}
+.projection {
+  padding: 1.2rem;
+  border: 1px solid #5f527c;
+  background: rgb(111 91 154/0.08);
+}
+.projection div {
+  color: #ddd6ee;
+  line-height: 1.55;
+}
+.projection b {
+  color: #d7c5ff;
+}
+@media (min-width: 650px) {
+  .report-metrics {
+    grid-template-columns: repeat(5, 1fr);
+  }
+}

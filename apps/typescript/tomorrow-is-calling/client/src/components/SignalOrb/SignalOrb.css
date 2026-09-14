@@ -1,0 +1,70 @@
+.signal-orb {
+  position: relative;
+  display: grid;
+  width: min(55vw, 17rem);
+  aspect-ratio: 1;
+  place-items: center;
+}
+.signal-orb span {
+  position: absolute;
+  border: 1px solid rgb(119 224 238/0.35);
+  border-radius: 50%;
+}
+.signal-orb span:nth-child(1) {
+  inset: 0;
+  border-top-color: var(--cyan);
+  animation: orb 5s linear infinite;
+}
+.signal-orb span:nth-child(2) {
+  inset: 14%;
+  border-right-color: var(--cyan);
+  animation: orb 3.8s linear infinite reverse;
+}
+.signal-orb span:nth-child(3) {
+  inset: 30%;
+}
+.signal-orb i {
+  width: 18%;
+  aspect-ratio: 1;
+  border-radius: 50%;
+  background: var(--cyan);
+  box-shadow: 0 0 25px rgb(96 220 238/0.6);
+}
+.signal-orb--ringing i {
+  animation: signal-pulse 1.2s ease-in-out infinite;
+}
+.signal-orb--assessment span:nth-child(3) {
+  animation: signal-pulse 1.7s ease-in-out infinite;
+}
+.signal-orb--processing span {
+  border-color: rgb(199 174 255/0.55);
+}
+.signal-orb--processing i {
+  background: var(--violet);
+  box-shadow: 0 0 25px rgb(199 174 255/0.55);
+}
+.signal-orb--complete span {
+  border-color: rgb(120 214 172/0.5);
+  animation: none;
+}
+.signal-orb--complete i {
+  background: var(--green);
+  box-shadow: 0 0 20px rgb(120 214 172/0.45);
+}
+@keyframes orb {
+  to {
+    transform: rotate(360deg);
+  }
+}
+@keyframes signal-pulse {
+  50% {
+    transform: scale(1.08);
+    opacity: 0.55;
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .signal-orb span,
+  .signal-orb i {
+    animation: none;
+  }
+}

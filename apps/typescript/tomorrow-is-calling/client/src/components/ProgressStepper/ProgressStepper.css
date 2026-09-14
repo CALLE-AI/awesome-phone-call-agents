@@ -1,0 +1,38 @@
+.stepper {
+  display: flex;
+  justify-content: space-between;
+  gap: 0.25rem;
+  margin: 1.25rem 0 1.5rem;
+  padding: 0;
+  list-style: none;
+}
+.stepper li {
+  display: grid;
+  gap: 0.3rem;
+  justify-items: center;
+  flex: 1;
+  color: var(--muted);
+  font-family: var(--mono);
+  font-size: 0.58rem;
+}
+.stepper li:not(:last-child)::after {
+  position: absolute;
+  content: "";
+  height: 1px;
+  background: var(--line);
+}
+.stepper span {
+  display: grid;
+  width: 1.35rem;
+  height: 1.35rem;
+  place-items: center;
+  border: 1px solid var(--line);
+  border-radius: 50%;
+}
+.stepper .done {
+  color: var(--cyan);
+}
+.stepper .done span {
+  border-color: var(--cyan);
+  background: rgb(96 220 238/0.1);
+}

@@ -1,0 +1,23 @@
+.status-badge {
+  display: inline-flex;
+  align-items: center;
+  min-height: 1.7rem;
+  padding: 0 0.6rem;
+  border: 1px solid currentColor;
+  font-family: var(--mono);
+  font-size: 0.68rem;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+}
+.status-badge--attention {
+  color: var(--amber);
+}
+.status-badge--critical {
+  color: var(--red);
+}
+.status-badge--ready {
+  color: var(--green);
+}
+.status-badge--active {
+  color: var(--cyan);
+}

@@ -1,0 +1,58 @@
+.operation-summary {
+  border: 1px solid var(--line);
+  padding: 1.25rem;
+  background: linear-gradient(135deg, rgb(18 29 39/0.8), rgb(11 15 21/0.8));
+}
+.section-label,
+.meta-label {
+  color: var(--muted);
+  font-family: var(--mono);
+  font-size: 0.67rem;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+}
+.operation-summary__head {
+  display: flex;
+  justify-content: space-between;
+  gap: 1rem;
+  margin-top: 0.6rem;
+}
+.operation-summary h2 {
+  margin: 0;
+  font-size: clamp(1.15rem, 4vw, 1.5rem);
+  line-height: 1.25;
+}
+.operation-summary h2 span {
+  color: var(--cyan);
+  font-family: var(--mono);
+  font-size: 0.8em;
+}
+.operation-summary p {
+  margin: 0.5rem 0 0;
+  color: var(--muted);
+}
+.operation-summary p b {
+  color: var(--cyan);
+}
+.operation-summary dl {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 1rem;
+  margin: 1.35rem 0 0;
+  padding-top: 1rem;
+  border-top: 1px solid var(--line);
+}
+.operation-summary dt {
+  color: var(--muted);
+  font-size: 0.72rem;
+}
+.operation-summary dd {
+  margin: 0.22rem 0 0;
+  font-size: 0.88rem;
+}
+.critical-text {
+  color: var(--red);
+}
+.operation-summary__action {
+  margin-top: 1.25rem;
+}

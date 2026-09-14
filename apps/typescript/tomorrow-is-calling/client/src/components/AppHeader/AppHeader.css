@@ -1,0 +1,60 @@
+.app-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+  padding: 1rem 0;
+  border-bottom: 1px solid var(--line);
+}
+.brand {
+  display: grid;
+  gap: 0.15rem;
+  padding: 0;
+  border: 0;
+  background: none;
+  color: var(--text);
+  text-align: left;
+  letter-spacing: 0.12em;
+  font-size: 0.72rem;
+}
+.brand small {
+  color: var(--muted);
+  letter-spacing: 0.04em;
+  font-size: 0.68rem;
+}
+.app-header nav {
+  display: none;
+  gap: 0.2rem;
+}
+.app-header nav button {
+  min-height: 36px;
+  border: 0;
+  background: none;
+  color: var(--muted);
+  font-size: 0.78rem;
+}
+.app-header nav button.active {
+  color: var(--cyan);
+}
+.app-header nav button:disabled {
+  opacity: 0.55;
+}
+.app-header nav small {
+  font-size: 0.55rem;
+}
+.mock-flag {
+  color: var(--amber);
+  font-family: var(--mono);
+  font-size: 0.6rem;
+  letter-spacing: 0.08em;
+}
+@media (min-width: 720px) {
+  .app-header nav {
+    display: flex;
+  }
+}
+@media (max-width: 420px) {
+  .mock-flag {
+    display: none;
+  }
+}

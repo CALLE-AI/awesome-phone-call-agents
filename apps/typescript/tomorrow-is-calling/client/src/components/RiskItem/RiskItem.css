@@ -1,0 +1,14 @@
+.risk-item {
+  padding: 1rem;
+  border: 1px solid var(--line);
+}
+.risk-item h3 {
+  margin: 0.65rem 0 0;
+  font-size: 1rem;
+  line-height: 1.35;
+}
+.risk-item p {
+  margin: 0.75rem 0 0;
+  color: var(--muted);
+  line-height: 1.5;
+}

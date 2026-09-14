@@ -1,0 +1,147 @@
+.review {
+  max-width: 52rem;
+}
+
+.review h1 {
+  margin: 0.55rem 0 1rem;
+  font-size: clamp(1.9rem, 6vw, 3rem);
+}
+
+.prototype-notice {
+  padding: 0.85rem;
+  border-left: 2px solid var(--amber);
+  background: rgb(241 184 79 / 0.08);
+  color: #f5dca4;
+}
+
+.review dl {
+  display: grid;
+  gap: 0;
+  margin: 1.5rem 0;
+  border: 1px solid var(--line);
+}
+
+.review dl div {
+  display: grid;
+  grid-template-columns: 38% 1fr;
+  gap: 0.8rem;
+  padding: 0.9rem;
+  border-bottom: 1px solid var(--line);
+}
+
+.review dl div:last-child {
+  border: 0;
+}
+
+.review dt {
+  color: var(--muted);
+  font-size: 0.78rem;
+}
+
+.review dd {
+  margin: 0;
+}
+
+.review section {
+  margin: 1.5rem 0;
+}
+
+.review ul {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(12rem, 1fr));
+  gap: 0.6rem;
+  margin: 1rem 0;
+  padding: 0;
+  list-style: none;
+}
+
+.review li {
+  padding: 0.75rem;
+  border: 1px solid var(--line);
+  color: #dbe7eb;
+  font-size: 0.88rem;
+}
+
+.quote-card {
+  padding: 1.2rem;
+  border: 1px solid rgb(104 220 199 / 0.45);
+  background: linear-gradient(145deg, rgb(21 42 45 / 0.9), rgb(13 27 31 / 0.92));
+}
+
+.quote-card__heading {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 1rem;
+}
+
+.quote-card__heading strong {
+  display: block;
+  margin-top: 0.25rem;
+  font-size: clamp(2.2rem, 8vw, 4rem);
+  line-height: 1;
+}
+
+.quote-card__heading > span {
+  padding: 0.45rem 0.65rem;
+  border: 1px solid var(--line);
+  border-radius: 999px;
+  color: #d7e7e8;
+  font-size: 0.72rem;
+}
+
+.quote-card__estimate {
+  margin: 0.8rem 0 1rem;
+  color: var(--muted);
+  font-size: 0.86rem;
+}
+
+.quote-card__payments {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 0.8rem;
+}
+
+.quote-card__payments div {
+  display: grid;
+  gap: 0.3rem;
+  padding: 0.9rem;
+  border: 1px solid var(--line);
+  background: rgb(255 255 255 / 0.025);
+}
+
+.quote-card__payments small,
+.quote-card__payments span {
+  color: var(--muted);
+}
+
+.quote-card__payments b {
+  font-size: 1.45rem;
+}
+
+.quote-card__methods {
+  margin: 1rem 0 0;
+  color: #dbe7eb;
+  font-size: 0.88rem;
+}
+
+.call-rules {
+  padding: 1rem;
+  border-left: 2px solid #69dcc7;
+  background: rgb(105 220 199 / 0.06);
+}
+
+.call-rules p:last-child {
+  margin-bottom: 0;
+}
+
+@media (max-width: 640px) {
+  .review dl div,
+  .quote-card__payments {
+    grid-template-columns: 1fr;
+  }
+
+  .quote-card__heading {
+    flex-direction: column;
+  }
+}

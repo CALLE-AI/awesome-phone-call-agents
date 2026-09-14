@@ -1,0 +1,198 @@
+.call-overlay-backdrop {
+  position: fixed;
+  z-index: 30;
+  inset: 0;
+  display: grid;
+  min-height: 100svh;
+  padding: max(0px, env(safe-area-inset-top))
+    max(0px, env(safe-area-inset-right)) max(0px, env(safe-area-inset-bottom))
+    max(0px, env(safe-area-inset-left));
+  background: #050a0f;
+}
+.call-overlay {
+  display: flex;
+  flex-direction: column;
+  min-height: 100svh;
+  overflow: auto;
+  background:
+    radial-gradient(circle at 50% 42%, rgb(41 105 120/0.18), transparent 40rem),
+    repeating-linear-gradient(
+      90deg,
+      transparent 0 58px,
+      rgb(93 180 197/0.04) 58px 59px
+    ),
+    #091119;
+  color: var(--text);
+}
+.call-overlay__top {
+  display: flex;
+  justify-content: space-between;
+  gap: 1rem;
+  align-items: start;
+  padding: 1rem;
+  border-bottom: 1px solid var(--line);
+}
+.call-overlay__prototype {
+  color: var(--amber);
+  font-family: var(--mono);
+  font-size: 0.61rem;
+  letter-spacing: 0.07em;
+}
+.overlay-close {
+  min-height: 44px;
+  padding: 0.5rem 0.75rem;
+  border: 1px solid var(--line);
+  background: none;
+  color: var(--text);
+}
+.call-overlay__shipment {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 1px;
+  border-bottom: 1px solid var(--line);
+  background: var(--line);
+}
+.call-overlay__shipment div {
+  display: grid;
+  gap: 0.3rem;
+  padding: 0.75rem;
+  background: #0b141d;
+}
+.call-overlay__shipment small {
+  color: var(--muted);
+  font-family: var(--mono);
+  font-size: 0.6rem;
+  letter-spacing: 0.07em;
+  text-transform: uppercase;
+}
+.call-overlay__shipment strong {
+  color: var(--cyan);
+  font-family: var(--mono);
+  font-weight: 500;
+}
+.call-overlay__shipment span {
+  font-size: 0.78rem;
+  line-height: 1.35;
+}
+.call-overlay__monitor {
+  display: grid;
+  flex: 1;
+  align-content: center;
+  justify-items: center;
+  gap: 1.5rem;
+  padding: 2rem 1.1rem;
+  text-align: center;
+}
+.call-overlay__monitor .signal-orb {
+  width: min(52vw, 13rem);
+}
+.call-overlay__status {
+  display: grid;
+  justify-items: center;
+  gap: 0.75rem;
+  max-width: 36rem;
+}
+.call-overlay h2 {
+  margin: 0;
+  font-size: clamp(1.65rem, 7vw, 3rem);
+  line-height: 1.08;
+}
+.call-overlay__scenario,
+.call-overlay__guidance {
+  margin: 0;
+  color: var(--muted);
+  line-height: 1.5;
+}
+.call-overlay__timer {
+  color: var(--cyan);
+  font-family: var(--mono);
+  font-size: clamp(2rem, 10vw, 3.75rem);
+  letter-spacing: 0.05em;
+}
+.call-overlay__review {
+  display: grid;
+  gap: 0.25rem;
+  margin: 0;
+  color: var(--text);
+  font-size: 1rem;
+}
+.call-overlay__review span {
+  color: var(--muted);
+  font-family: var(--mono);
+  font-size: 0.65rem;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+.prototype-notice {
+  margin: 0;
+  padding: 0.75rem;
+  border-left: 2px solid var(--amber);
+  background: rgb(241 184 79/0.08);
+  color: #f3deb0;
+  text-align: left;
+  font-size: 0.82rem;
+}
+.call-overlay__controls {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: 0.75rem;
+  padding: 1rem;
+  border-top: 1px solid var(--line);
+}
+.call-overlay__controls .button {
+  min-width: min(100%, 15rem);
+}
+.call-overlay__interruption {
+  display: grid;
+  align-content: center;
+  justify-items: center;
+  gap: 1rem;
+  flex: 1;
+  padding: 2rem;
+  text-align: center;
+}
+.call-overlay__interruption > p:not(.meta-label) {
+  max-width: 36rem;
+  margin: 0;
+  color: var(--muted);
+  line-height: 1.5;
+}
+.call-overlay .button:focus-visible,
+.overlay-close:focus-visible {
+  outline: 2px solid var(--cyan);
+  outline-offset: 3px;
+}
+@media (min-width: 760px) {
+  .call-overlay {
+    width: min(100%, 74rem);
+    min-height: min(88svh, 52rem);
+    max-height: 88svh;
+    margin: auto;
+    border: 1px solid #315666;
+    box-shadow: 0 24px 80px rgb(0 0 0/0.55);
+  }
+  .call-overlay-backdrop {
+    place-items: center;
+    padding: 1.5rem;
+  }
+  .call-overlay__shipment {
+    grid-template-columns: 0.7fr 1.5fr 1fr 1fr;
+  }
+  .call-overlay__monitor {
+    grid-template-columns: minmax(13rem, 1fr) minmax(18rem, 1fr);
+    align-items: center;
+    text-align: left;
+  }
+  .call-overlay__status {
+    justify-items: start;
+  }
+  .prototype-notice {
+    text-align: left;
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .call-overlay {
+    scroll-behavior: auto;
+  }
+}

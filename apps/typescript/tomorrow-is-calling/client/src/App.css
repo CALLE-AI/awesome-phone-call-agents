@@ -1,0 +1,69 @@
+:root {
+  --bg: #080d12;
+  --surface: #0d151d;
+  --line: #263746;
+  --text: #eff5f7;
+  --muted: #93a5b0;
+  --cyan: #60dcee;
+  --green: #78d6ac;
+  --amber: #f1b84f;
+  --red: #ff7171;
+  --violet: #c7aeff;
+  --mono: ui-monospace, SFMono-Regular, Consolas, monospace;
+}
+.app-shell {
+  min-height: 100svh;
+  padding: 0 max(1rem, env(safe-area-inset-right))
+    max(1.25rem, env(safe-area-inset-bottom))
+    max(1rem, env(safe-area-inset-left));
+  background:
+    linear-gradient(rgb(8 13 18/0.96), rgb(8 13 18/0.98)),
+    repeating-linear-gradient(
+      90deg,
+      transparent 0 46px,
+      rgb(105 177 192/0.035) 46px 47px
+    );
+}
+.workspace {
+  width: min(100%, 74rem);
+  margin: 0 auto;
+}
+.page {
+  padding: 1.25rem 0 3rem;
+}
+.button {
+  min-height: 44px;
+  padding: 0.7rem 1rem;
+  border: 1px solid transparent;
+  font: inherit;
+  font-weight: 600;
+  cursor: pointer;
+}
+.button:focus-visible,
+.app-header button:focus-visible {
+  outline: 2px solid var(--cyan);
+  outline-offset: 3px;
+}
+.button--primary {
+  background: var(--cyan);
+  color: #061116;
+}
+.button--secondary,
+.button--quiet {
+  border-color: var(--line);
+  background: transparent;
+  color: var(--text);
+}
+.button--secondary:hover,
+.button--quiet:hover {
+  border-color: var(--cyan);
+  color: var(--cyan);
+}
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    scroll-behavior: auto !important;
+    transition-duration: 1ms !important;
+  }
+}
