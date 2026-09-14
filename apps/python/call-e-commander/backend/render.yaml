@@ -9,6 +9,10 @@ services:
     envVars:
       - key: CALLE_API_KEY
         sync: false
+      - key: CALLE_ALLOWED_HOSTS
+        value: api.heycall-e.com
+      - key: CALLE_MOCK_MODE
+        value: "0"
       - key: FIREBASE_PROJECT_ID
         sync: false
       - key: FIREBASE_PRIVATE_KEY

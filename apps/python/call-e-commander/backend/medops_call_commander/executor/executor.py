@@ -3,30 +3,34 @@ CallExecutor
 ============
 Dispatches an approved CallPlan to CALL-E and polls for the outcome.
 
-Production behaviour:
-- Polls CALL-E at most POLL_MAX_ATTEMPTS times (default: 20, env: CALLE_POLL_MAX_ATTEMPTS).
-- Sleeps POLL_INTERVAL_SECONDS between attempts (default: 3s, env: CALLE_POLL_INTERVAL).
-- Raises CallDispatchError if the call does not complete within the polling window.
-  The plan is marked FAILED so the admin can investigate in the audit log.
+Failure semantics:
+- A provider-confirmed failure (CALL-E itself reports the call failed)
+  results in outcome=FAILED.
+- A network/read error while dispatching or polling does NOT prove the
+  call failed — CALL-E may have accepted or even completed it while we
+  simply could not confirm the result. Those cases surface as
+  OUTCOME_UNKNOWN via the provider layer and this executor keeps polling
+  rather than assuming failure.
+- Only after the polling window is exhausted without ANY confirmed
+  outcome do we mark the plan FAILED, and even then the message is
+  explicit that this reflects "unresolved", not "confirmed failed".
 """
 
 import os
 import time
 from datetime import datetime, timezone
 
-from apps.python.medops_call_commander.core.enums import CallOutcome, PlanState
-from apps.python.medops_call_commander.core.models import CallPlan, CallResult
-from apps.python.medops_call_commander.providers.calle_mcp import CalleMcpProvider
+from medops_call_commander.core.enums import CallOutcome, PlanState
+from medops_call_commander.core.models import CallPlan, CallResult
+from medops_call_commander.providers.calle_mcp import CalleMcpProvider
 
 
 class CallDispatchError(Exception):
-    """Raised when CALL-E dispatch or polling fails in production."""
+    """Raised when CALL-E dispatch or polling could not confirm an outcome."""
 
 
 class CallExecutor:
     def __init__(self, provider: CalleMcpProvider | None = None) -> None:
-        # Provider may be None in test mode; tests replace _provider after construction.
-        # In production, always pass a fully configured CalleMcpProvider.
         self._provider: CalleMcpProvider = provider  # type: ignore[assignment]
         self._max_attempts = int(os.environ.get("CALLE_POLL_MAX_ATTEMPTS", "20"))
         self._poll_interval = float(os.environ.get("CALLE_POLL_INTERVAL", "3.0"))
@@ -35,42 +39,30 @@ class CallExecutor:
         if not plan.is_dispatchable():
             raise CallDispatchError("CallPlan is not in a dispatchable state.")
 
-        # Dispatch to CALL-E
-        try:
-            external_id = self._provider.dispatch(plan)
-        except Exception as exc:
-            plan.state = PlanState.FAILED
-            raise CallDispatchError(f"CALL-E dispatch failed: {exc}") from exc
+        external_id = self._provider.dispatch(plan)
 
         plan.result_ref = external_id
         plan.dispatched_at = datetime.now(timezone.utc)
         plan.state = PlanState.DISPATCHED
 
-        # Poll for outcome
         for attempt in range(1, self._max_attempts + 1):
-            try:
-                result = self._provider.get_result(plan.plan_id, external_id)
-            except Exception as exc:
+            result = self._provider.get_result(plan.plan_id, external_id)
+
+            if result.outcome == CallOutcome.FAILED:
                 plan.state = PlanState.FAILED
-                raise CallDispatchError(
-                    f"CALL-E polling failed on attempt {attempt}: {exc}"
-                ) from exc
+                return result
 
             if result.outcome != CallOutcome.OUTCOME_UNKNOWN:
-                plan.state = (
-                    PlanState.FAILED
-                    if result.outcome == CallOutcome.FAILED
-                    else PlanState.COMPLETED
-                )
+                plan.state = PlanState.COMPLETED
                 return result
 
             time.sleep(self._poll_interval)
 
-        # Polling window exhausted — do not silently succeed
         plan.state = PlanState.FAILED
         raise CallDispatchError(
-            f"CALL-E call '{external_id}' did not resolve after "
+            f"CALL-E call '{external_id}' did not resolve to a confirmed outcome after "
             f"{self._max_attempts} polling attempts "
-            f"({self._max_attempts * self._poll_interval:.0f}s). "
-            f"Check the CALL-E dashboard for call status and re-queue if needed."
+            f"({self._max_attempts * self._poll_interval:.0f}s). This means the outcome is "
+            f"UNKNOWN, not that the call is confirmed failed. Check the CALL-E dashboard "
+            f"directly for the call's actual status before re-queuing."
         )

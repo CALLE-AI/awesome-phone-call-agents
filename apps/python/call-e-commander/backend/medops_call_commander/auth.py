@@ -6,18 +6,13 @@ from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
 
 security = HTTPBearer()
 
-# Initialize Firebase Admin SDK
-# In production, this uses GOOGLE_APPLICATION_CREDENTIALS or FIREBASE_CONFIG env vars.
-# If those aren't present and we're not in test mode, it might fail. We'll catch and log.
 try:
     if not firebase_admin._apps:
-        # If FIREBASE_SERVICE_ACCOUNT_JSON is provided, use it. Otherwise, default credentials.
         cert_path = os.environ.get("FIREBASE_SERVICE_ACCOUNT_JSON")
         if cert_path and os.path.exists(cert_path):
             cred = credentials.Certificate(cert_path)
             firebase_admin.initialize_app(cred)
         else:
-            # For token verification only, we just need the project ID
             firebase_admin.initialize_app(options={'projectId': 'gen-lang-client-0574518291'})
 except Exception as e:
     print(f"Warning: Firebase Admin SDK initialization failed: {e}")
@@ -25,14 +20,31 @@ except Exception as e:
 EXPECTED_PROJECT_ID = os.environ.get("FIREBASE_PROJECT_ID", "gen-lang-client-0574518291")
 ALLOWED_CLINICAL_ROLES = {"admin", "super_admin", "clinician"}
 
+
+def _bypass_active() -> bool:
+    return os.environ.get("MEDOPS_BYPASS_AUTH", "").lower() in ("1", "true", "yes", "on") or \
+        os.environ.get("MEDOPS_TEST_MODE", "").lower() in ("1", "true", "yes", "on")
+
+
+def _require_mock_mode_for_bypass() -> None:
+    """
+    Auth-bypass/test mode must never be able to place a real call or reach a
+    real private record. If someone enables MEDOPS_BYPASS_AUTH /
+    MEDOPS_TEST_MODE without also forcing CALLE_MOCK_MODE, we force it here
+    rather than silently allowing live calls under a fake identity.
+    """
+    if os.environ.get("CALLE_MOCK_MODE", "").lower() not in ("1", "true", "yes", "on"):
+        os.environ["CALLE_MOCK_MODE"] = "1"
+
+
 def verify_jwt_token(credentials: HTTPAuthorizationCredentials = Security(security)):
     """
     Verifies a Firebase ID token and validates origin audience/issuer.
-    Bypasses verification if MEDOPS_TEST_MODE or MEDOPS_BYPASS_AUTH is active for dev/test.
+    In bypass/test mode, CALLE_MOCK_MODE is force-enabled so bypassed
+    requests can never dispatch a live call or touch real patient records.
     """
-    bypass_auth = os.environ.get("MEDOPS_BYPASS_AUTH", "").lower() in ("1", "true", "yes", "on")
-    test_mode = os.environ.get("MEDOPS_TEST_MODE", "").lower() in ("1", "true", "yes", "on")
-    if bypass_auth or test_mode:
+    if _bypass_active():
+        _require_mock_mode_for_bypass()
         token = credentials.credentials
         if "unauthorized" in token or "forbidden" in token:
             role = "unauthorized_guest"
@@ -63,12 +75,13 @@ def verify_jwt_token(credentials: HTTPAuthorizationCredentials = Security(securi
 def verify_clinical_admin_role(payload: dict = Security(verify_jwt_token)) -> dict:
     """
     Enforces bounded role authorization for sensitive clinical actions.
+    A missing/unrecognized role is rejected outright — it is never treated
+    as an implicit "clinician" grant.
     """
-    role = payload.get("role") or payload.get("custom_claims", {}).get("role", "clinician")
-    if role not in ALLOWED_CLINICAL_ROLES:
+    role = payload.get("role") or payload.get("custom_claims", {}).get("role")
+    if not role or role not in ALLOWED_CLINICAL_ROLES:
         raise HTTPException(
             status_code=403,
-            detail=f"Role '{role}' is not authorized for sensitive clinical actions"
+            detail=f"Role '{role or 'missing'}' is not authorized for sensitive clinical actions"
         )
     return payload
-

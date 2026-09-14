@@ -1,11 +1,11 @@
 from datetime import datetime
 from typing import Any, Dict
 
-from apps.python.medops_call_commander.config import load_calle_config
-from apps.python.medops_call_commander.core.enums import CallOutcome
-from apps.python.medops_call_commander.core.models import CallPlan, CallResult
-from apps.python.medops_call_commander.providers.base import CallProvider
-from apps.python.medops_call_commander.providers.calle_client import CalleClient
+from medops_call_commander.config import load_calle_config
+from medops_call_commander.core.enums import CallOutcome
+from medops_call_commander.core.models import CallPlan, CallResult
+from medops_call_commander.providers.base import CallProvider
+from medops_call_commander.providers.calle_client import CalleClient
 
 
 class CalleMcpProvider(CallProvider):
@@ -24,7 +24,7 @@ class CalleMcpProvider(CallProvider):
     def get_result(self, plan_id: str, external_id: str) -> CallResult:
         payload: Dict[str, Any] = self._client.calls_get(external_id)
         status = payload.get("status")
-        task_completed = bool(payload.get("task_completed"))
+        task_completed = payload.get("task_completed")
 
         if status == "completed" and task_completed:
             outcome = CallOutcome.ANSWERED
