@@ -1,4 +1,4 @@
-﻿import ipaddress
+import ipaddress
 import os
 import socket
 

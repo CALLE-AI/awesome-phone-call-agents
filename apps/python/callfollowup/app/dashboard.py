@@ -1,4 +1,4 @@
-﻿"""
+"""
 dashboard.py
 ============
 CallFollowUp - Streamlit dashboard.

@@ -1,4 +1,4 @@
-﻿"""
+"""
 storage.py
 ==========
 Persists follow-up records to data/calls.json.

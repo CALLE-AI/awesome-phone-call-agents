@@ -1,4 +1,4 @@
-﻿"""
+"""
 call_service.py
 ===============
 Handles all CALL-E interactions for CallFollowUp.
