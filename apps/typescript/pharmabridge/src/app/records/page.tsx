@@ -46,8 +46,9 @@ export default function RecordsPage() {
       .catch(() => setConfig(null));
   }, []);
 
+  // Poll only while unlocked; a locked ledger waits for the operator code instead of retrying.
   useEffect(() => {
-    if (code === null) return;
+    if (code === null || locked) return;
     const headers = { "x-pharmabridge-operator-code": code };
     const load = () =>
       fetch("/api/records", { cache: "no-store", headers })
@@ -67,7 +68,7 @@ export default function RecordsPage() {
     void load();
     const timer = setInterval(load, 5000);
     return () => clearInterval(timer);
-  }, [code]);
+  }, [code, locked]);
 
   useEffect(() => {
     if (!selected || code === null) return;
@@ -84,6 +85,7 @@ export default function RecordsPage() {
     } catch {
       // Storage can be blocked; the code then lasts only for this page view.
     }
+    setLocked(false);
     setCode(draft);
   }
 
