@@ -195,7 +195,29 @@ function placeCallsForSelectedRows() {
     }
 
     const account = rowToAccount_(header, rowValues);
-    const { ok, code, body } = callApi_("/api/gate/place-call-external", account);
+
+    // Mark the row as dispatched-but-unresolved BEFORE the network call, and flush
+    // immediately so it's durably written even if the request times out or the script is
+    // killed mid-flight. Any failure mode from here — a thrown exception, a client-side
+    // timeout, a response body that isn't valid JSON — is genuinely ambiguous: the request
+    // may or may not have reached CALL-E. Leaving Call Outcome non-empty means the skip
+    // guard above refuses to redial this row on a rerun; only a human clearing the cell,
+    // having reconciled what actually happened (e.g. against the audit log), authorizes a
+    // retry.
+    sheet.getRange(r, statusCol).setValue("DISPATCHING");
+    sheet.getRange(r, outcomeCol).setValue("UNKNOWN — dispatch in progress; do not rerun");
+    SpreadsheetApp.flush();
+
+    let ok, code, body;
+    try {
+      ({ ok, code, body } = callApi_("/api/gate/place-call-external", account));
+    } catch (err) {
+      sheet.getRange(r, statusCol).setValue("UNKNOWN");
+      sheet.getRange(r, outcomeCol).setValue(
+        "UNKNOWN — " + redactText_(err.message, 120) + ". Do not rerun; reconcile against the audit log first.");
+      return;
+    }
+
     if (!ok) {
       // A 409 carries the same {status, reasons: [{code, message}, ...]} shape
       // checkSelectedRows already renders cleanly — reuse that instead of dumping raw
