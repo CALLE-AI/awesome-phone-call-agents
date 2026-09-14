@@ -824,6 +824,12 @@ button {
   font-weight: 700;
 }
 
+a.ghost {
+  display: block;
+  text-align: center;
+  text-decoration: none;
+}
+
 .ghost:disabled {
   opacity: 0.45;
   cursor: not-allowed;

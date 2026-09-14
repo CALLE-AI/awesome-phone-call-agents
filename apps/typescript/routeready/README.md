@@ -27,6 +27,21 @@ Each time something changes on the route:
 | Not today | Taken off the route; rescheduling needs dispatcher approval |
 | Anything unclear, no answer, low confidence, no quote | No change, no redial |
 
+## Your route with real calls
+
+Hosted: https://awesome-phone-call-agents-xloz.onrender.com/route (free instance; the first visit can take a minute to wake up). Locally: `npm start`, then open `http://127.0.0.1:3000/route`.
+
+1. **Paste your CALL-E API key.** It is checked with a read-only request, held only inside that route's CALL-E client in server memory, never saved, logged or sent back to the browser, and dropped when the route ends.
+2. **Pin 1 to 5 stops on the map.** Each stop has a customer name, a phone number with its country, an optional address and cash to collect. Place the rider 🛵 where the route starts.
+3. **Choose the call-ahead time** (3 to 20 minutes), the rider's average speed and whether each call says it is a test with no real parcel.
+4. **Choose the rider's location source.** *Drag on the map* moves the rider by dragging or tapping, so the route can be tested from a desk. *My phone's GPS* follows the phone's position while the page is open.
+5. **Ride.** Arrival times come from road-adjusted distance at the chosen speed. When the next uncalled customer is within the call-ahead time, `client.calls.create` places the call with the same task, result schema and idempotency key pattern as the demo day, and the transcript streams into the app. The answer goes through the same evidence gate, and a verified answer re-orders the remaining stops with the same search. Press **Delivered** or **Nobody home** at each door.
+6. **End the route** with ✕. No new calls start and the key is discarded. A route nobody has open ends after 20 minutes, and every route ends after 3 hours.
+
+Each visitor's route is separate. The browser holds a random session id for it; CALL-E only ever sees a separate public run id in the metadata and idempotency key. On this screen the re-ordering also weighs how long each customer waits for their parcel, so a customer who asked for half an hour never sends the rider past a ready customer next door.
+
+To try the whole flow without real calls, point the server at a local fake of the CALL-E API with `CALLE_BASE_URL`.
+
 ## Try it without an account
 
 Node 20.12 or later. Nothing below places a call or needs a CALL-E key.
@@ -36,7 +51,7 @@ cd apps/typescript/routeready
 npm install
 npm test          # re-ordering checked against exhaustive search, evidence gate, answer rules, engine, schema sync
 npm run sim       # the demo day twice, without calls and with RouteReady, then a comparison
-npm start         # rider app at http://127.0.0.1:3000/app, two-phone showcase at http://127.0.0.1:3000/
+npm start         # rider app at /app, two-phone showcase at /, your own route at /route on http://127.0.0.1:3000
 ```
 
 In the app, press **Start the day**. The demo day is a fictional Dhaka route with eight stops, reserved `+1 555-01xx` numbers and scripted customers. `npm run sim` prints the same comparison:
@@ -93,11 +108,12 @@ Sent as `recipientResultSchema` on every call; defined in [`src/calle/task.ts`](
 
 ## Safety and side effects
 
-- Preview, simulation and tests never contact CALL-E. Live calls need the environment switch, the start token and the consent statement.
+- Preview, simulation and tests never contact CALL-E. Live calls on the demo day need the environment switch, the start token and the consent statement. Your own route needs the visitor's own API key and the consent statement, and calls go to the numbers they entered, charged to their own account.
 - Calls disclose that they are an AI assistant in the first sentence, never ask for card, bank, password or identity details, and never promise an exact delivery time.
 - One call at a time; each customer at most once a day; no automatic redial after a failed, unclear or ambiguous call.
 - An answer changes the route only through the evidence gate. "Not today" is a recommendation that a dispatcher must approve; RouteReady writes nothing to any courier, shop or payment system.
 - Phone numbers are masked in the browser, the event log and the terminal. The API key stays on the server. Transcripts are shown as untrusted text and escaped.
+- On your own route, text a visitor types (names, addresses, shop name) is cut to one short line before it reaches a call task. At most 5 stops per route and 30 routes per server; idle routes end after 20 minutes and every route after 3 hours.
 - Smoke-test results are saved under `results/`, which is git-ignored.
 
 ## Cancellation
@@ -106,7 +122,8 @@ CALL-E has no cancel endpoint. **Stop** ends the day loop so no further calls ar
 
 ## Limitations
 
-- The route, the rider's movement and the scripted customers are simulated; only live targets are real calls.
+- On the demo day the route, the rider's movement and the scripted customers are simulated; only live targets are real calls.
+- On your own route, arrival times are estimates from straight-line distance times 1.35 at a fixed speed, not live traffic, and routes live in server memory, so a server restart ends them.
 - Travel times come from the public OSRM demo server with free-flow speeds, scaled by a fixed traffic factor of 2. They were downloaded once into `fixtures/` with `npm run build:travel`.
 - One rider and at most nine stops searched exhaustively; later stops keep their order.
 - A customer who does not answer is not called again that day; the rider tries the door as usual.
@@ -115,11 +132,12 @@ CALL-E has no cancel endpoint. **Stop** ends the day loop so no further calls ar
 ## Layout
 
 ```
-src/core/     arrival times, call picker, evidence gate, answer rules, re-ordering, fixture loading
+src/core/     arrival times, call picker, evidence gate, answer rules, re-ordering, distance estimates, fixture loading
 src/calle/    call task text and result schema; live (CALL-E SDK) and scripted call ports
-src/engine/   the day loop and event descriptions
+src/engine/   the demo day loop and event descriptions
+src/field/    your own route: real-time session, setup validation, per-visitor registry
 src/server/   web server, run controller and live-mode configuration
-web/          the rider app (route, stops, calls, today) and the two-phone showcase page
+web/          the rider app (route, stops, calls, today), your-route setup and riding screens, the two-phone showcase page
 fixtures/     the Dhaka demo day and its saved road data
 scripts/      smoke call, simulation and road-data download
 tests/        unit and engine tests

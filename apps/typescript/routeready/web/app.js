@@ -62,10 +62,10 @@ function render(snap) {
     : '<svg viewBox="0 0 24 24" fill="currentColor"><rect x="6" y="5" width="4" height="14" rx="1.5"/><rect x="14" y="5" width="4" height="14" rx="1.5"/></svg>';
   $("start").hidden = snap.started;
   $("start-sub").textContent = `${day.stops.length} stops in ${day.city} · shift starts ${day.shiftStart}`;
-  $("start-live").disabled = !snap.liveAvailable;
+  $("start-live").hidden = !snap.liveAvailable;
   $("start-note").textContent = snap.liveAvailable
     ? "Live calls are set up on this server."
-    : "Live calls are off, so the day runs with scripted customers.";
+    : "This day runs with scripted customers. For real CALL-E calls, plan your own route.";
 
   rider.setLatLng([snap.rider.lat, snap.rider.lng]);
   if (snap.routeVersion > routeVersion) {

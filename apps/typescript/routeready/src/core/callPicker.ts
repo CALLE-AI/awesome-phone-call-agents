@@ -19,15 +19,25 @@ export const MIN_LEAD_MINUTES = 6;
 /** An answer given much earlier than this goes stale before the rider arrives. */
 export const MAX_LEAD_MINUTES = 45;
 
+export interface LeadWindow {
+  min: number;
+  max: number;
+}
+
 /**
  * Picks the one stop to call next. There is only one line, so nothing is
  * picked while a call is in flight. Among uncalled stops the rider will reach
- * between MIN_LEAD and MAX_LEAD minutes from now, the soonest wins.
+ * between `lead.min` and `lead.max` minutes from now, the soonest wins.
  */
-export function pickNextCall(now: number, candidates: CallCandidate[], lineBusy: boolean): CallPick | null {
+export function pickNextCall(
+  now: number,
+  candidates: CallCandidate[],
+  lineBusy: boolean,
+  lead: LeadWindow = { min: MIN_LEAD_MINUTES, max: MAX_LEAD_MINUTES },
+): CallPick | null {
   if (lineBusy) return null;
   const eligible = candidates
-    .filter((c) => !c.called && c.eta - now >= MIN_LEAD_MINUTES && c.eta - now <= MAX_LEAD_MINUTES)
+    .filter((c) => !c.called && c.eta - now >= lead.min && c.eta - now <= lead.max)
     .sort((a, b) => a.eta - b.eta);
   const next = eligible[0];
   if (!next) return null;

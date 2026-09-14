@@ -82,6 +82,18 @@
         font-size: 13px;
         color: var(--muted);
       }
+      .try {
+        display: inline-flex;
+        gap: 10px;
+        align-items: center;
+        margin: 0 0 18px;
+        background: var(--ink);
+        color: var(--lime);
+        border-radius: 999px;
+        padding: 13px 20px;
+        font-weight: 800;
+        text-decoration: none;
+      }
       .phones {
         display: flex;
         gap: 28px;
@@ -135,7 +147,9 @@
         <li><b>2</b><span>An answer only counts when the customer's own words back it, so voicemail and receptionists change nothing.</span></li>
         <li><b>3</b><span>"I need 15 minutes" moves that stop later, "not today" takes the trip off the route.</span></li>
       </ul>
-      <p class="foot">Open the rider app on a phone at <strong>/app</strong>. Press Start the day on either phone.</p>
+      <a class="try" href="/route">Try it with real calls: plan your own route →</a>
+      <p class="foot">Bring your CALL-E API key, pin your stops on a map, and move the rider: each customer gets a real call before the rider arrives.</p>
+      <p class="foot">The phones on the right play a scripted day. Press Start the day on either phone, or open <strong>/app</strong> on a phone.</p>
     </section>
     <div class="phones">
       <div class="phone"><iframe src="/app?tab=route" title="RouteReady rider app, route"></iframe></div>

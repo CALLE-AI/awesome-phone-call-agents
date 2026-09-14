@@ -35,6 +35,12 @@ export interface ResequenceInput {
   /** Remaining stops in the order the rider currently follows. */
   current: RouteStopInput[];
   travel: TravelTimes;
+  /**
+   * Cost per minute each stop waits for its delivery, on top of the finish
+   * time. Zero by default. A small weight matters when a customer who asked
+   * for more time fixes the finish time: ready customers are still served first.
+   */
+  deliveryWeight?: number;
 }
 
 export interface ResequenceResult {
@@ -59,11 +65,13 @@ export function evaluate(order: RouteStopInput[], input: ResequenceInput): Route
   let at = input.from;
   let waiting = 0;
   let lateness = 0;
+  let delivered = 0;
   const visits: Visit[] = [];
   for (const stop of order) {
     const arrive = time + input.travel.minutes(at, stop.id);
     const wait = stop.earliest === null ? 0 : Math.max(0, stop.earliest - arrive);
     const start = arrive + wait;
+    delivered += start - input.now;
     const late = stop.windowEnd === null ? 0 : Math.max(0, start - stop.windowEnd);
     time = start + stop.serviceMinutes;
     at = stop.id;
@@ -80,7 +88,7 @@ export function evaluate(order: RouteStopInput[], input: ResequenceInput): Route
     waiting,
     lateness,
     changes,
-    cost: time + LATE_WEIGHT * lateness + CHANGE_PENALTY * changes,
+    cost: time + LATE_WEIGHT * lateness + CHANGE_PENALTY * changes + (input.deliveryWeight ?? 0) * delivered,
   };
 }
 
