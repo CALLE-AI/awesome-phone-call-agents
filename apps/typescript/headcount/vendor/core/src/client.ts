@@ -18,16 +18,27 @@ export function resolveCalleMode(env: NodeJS.ProcessEnv = process.env): CalleMod
 }
 
 export function resolveCalleBaseUrl(env: NodeJS.ProcessEnv = process.env): string {
-  if (env.CALLE_BASE_URL) return env.CALLE_BASE_URL;
-  return resolveCalleMode(env) === "live" ? LIVE_API_URL : DEFAULT_SIM_URL;
+  return approvedBaseUrl(env.CALLE_BASE_URL ?? (resolveCalleMode(env) === "live" ? LIVE_API_URL : DEFAULT_SIM_URL), resolveCalleMode(env));
+}
+
+function approvedBaseUrl(value: string, mode: CalleMode): string {
+  const url = new URL(value);
+  const local = ["localhost", "127.0.0.1", "[::1]"].includes(url.hostname);
+  if (url.username || url.password || url.search || url.hash || url.pathname !== "/" ||
+      (mode === "live" ? url.origin !== LIVE_API_URL : !local || !["http:", "https:"].includes(url.protocol))) {
+    throw new Error("Refusing an unapproved CALL-E origin; use the official HTTPS API or a loopback simulator.");
+  }
+  return url.origin;
 }
 
 export function createCalleClient(
   options: { apiKey?: string; baseUrl?: string } = {},
   env: NodeJS.ProcessEnv = process.env,
 ): CalleClient {
-  const baseUrl = options.baseUrl ?? resolveCalleBaseUrl(env);
-  const apiKey = options.apiKey ?? env.CALLE_API_KEY ?? "sim-local";
+  const mode = resolveCalleMode(env);
+  const baseUrl = approvedBaseUrl(options.baseUrl ?? resolveCalleBaseUrl(env), mode);
+  const apiKey = mode === "sim" ? "sim-local" : options.apiKey ?? env.CALLE_API_KEY;
+  if (!apiKey) throw new Error("Live CALL-E requires an API key.");
 
-  return new CalleClient({ apiKey, baseUrl });
+  return new CalleClient({ apiKey, baseUrl, fetch: (input) => globalThis.fetch(input, { redirect: "error" }) });
 }
