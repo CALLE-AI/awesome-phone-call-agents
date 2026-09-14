@@ -4,7 +4,7 @@ import type { LoadedDay } from "../core/day.js";
 import type { CallLedger } from "../core/ledger.js";
 import { maskPhone } from "../core/phone.js";
 import { minutesToClock } from "../core/readiness.js";
-import { maskPhonesInText } from "../core/redact.js";
+import { maskPhonesDeep, maskPhonesInText } from "../core/redact.js";
 import type { GeoPoint, Stop } from "../core/types.js";
 import { LivePort, ScriptedPort, type LiveLine } from "../calle/ports.js";
 import { describeEvent } from "../engine/describe.js";
@@ -228,7 +228,7 @@ export class RunController {
     const engine = this.engine;
     const etas = engine?.etas() ?? new Map<string, number>();
     const clock = (minutes: number) => minutesToClock(minutes, day.shiftStart);
-    return {
+    return maskPhonesDeep({
       started: engine !== null,
       mode: this.mode,
       pace: this.pace,
@@ -274,7 +274,7 @@ export class RunController {
       log: this.log.slice(-80),
       metrics: engine?.metrics ?? emptyMetrics(),
       baseline: this.baseline,
-    };
+    });
   }
 
   private rate(): number {

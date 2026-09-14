@@ -3,6 +3,7 @@ import type { CallPort } from "../calle/ports.js";
 import { haversineMeters } from "../core/geo.js";
 import type { CallLedger } from "../core/ledger.js";
 import { maskPhone } from "../core/phone.js";
+import { maskPhonesDeep } from "../core/redact.js";
 import { FieldSession, type FieldSetup } from "./session.js";
 
 /** Everything the rider's screen needs. Phone numbers are masked and the API key never appears. */
@@ -12,7 +13,7 @@ export function fieldSnapshot(session: FieldSession) {
   const clockIn = (minutes: number) => session.localClock(session.startedAt + minutes * 60_000);
   const door = session.doorStopId();
   const nowMinutes = session.now();
-  return {
+  return maskPhonesDeep({
     ended: session.endedReason,
     finished: session.finished,
     live: true,
@@ -57,7 +58,7 @@ export function fieldSnapshot(session: FieldSession) {
     toast: session.toast,
     log: session.log.map((entry) => ({ clock: session.localClock(entry.at), kind: entry.kind, text: entry.text })),
     metrics: session.metrics,
-  };
+  });
 }
 
 export type FieldSnapshot = ReturnType<typeof fieldSnapshot>;
