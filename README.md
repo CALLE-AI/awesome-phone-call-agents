@@ -299,6 +299,8 @@ Externally hosted user-facing apps built on CALL-E. They live in their own repos
 - [ProofMesh](https://github.com/fokrulanthro16-eng/proofmesh) - A consent-first CALL-E phone verification platform that turns supervised conversations into auditable, machine-readable facts with human approval, regional controls, and honest uncertainty handling. See the [integration notes](docs/community-apps/proofmesh.md).
 - [DischargePulse](https://github.com/Temake/DischargePulse) - Hospital discharge placement agent that calls skilled nursing facility admissions lines through CALL-E, verifies each care requirement from a runtime result schema, re-plans when a facility contradicts its directory record, and stops at a human approval gate, with replay and scripted no-call modes. See the [integration notes](docs/community-apps/dischargepulse.md).
 
+- [Off the Hook: The Memory Line](https://github.com/tivastreasures-ops/off-the-hook) - Operator-character message-taking line: CALL-E conducts an in-character disclosed-automation call (free tier) that can terminate on a physical rotary phone via SIP/ATA, with structured results rendered as a keepsake Message Slip; paid tier adds a custom ElevenLabs voice, Stripe billing, and email-keyed call balances. Live:[The Memory Line](https://off-the-hook.replit.app)
+
 ### Plugins
 
 No-code and low-code workflow plugins live under [`plugins/`](plugins/). They are for workflow-platform nodes, actions, connectors, and recipes that help operators connect business events to phone-call agent workflows without writing a full app.
