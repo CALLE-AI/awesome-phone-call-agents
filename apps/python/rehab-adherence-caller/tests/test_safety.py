@@ -134,6 +134,19 @@ def test_preview_never_prints_a_full_number(course_file: CourseFile) -> None:
         rendered = json.dumps(masked_call_arguments(course_file, decision.patient_id, decision))
         patient = next(p for p in course_file.patients if p.id == decision.patient_id)
         assert patient.phone_e164 not in rendered
+        assert course_file.clinic.public_callback_number not in rendered
+
+
+def test_preview_masks_the_callback_without_changing_the_private_task(course_file: CourseFile) -> None:
+    decision = next(decision for decision, _ in plan(course_file, TODAY) if decision.will_call)
+    private = build_call_arguments(course_file, decision.patient_id, decision)
+    preview = masked_call_arguments(course_file, decision.patient_id, decision)
+    assert course_file.clinic.public_callback_number in private["task"]
+    assert course_file.clinic.public_callback_number not in preview["task"]
+    assert "[phone-redacted]" in preview["task"]
+    assert build_call_arguments(course_file, decision.patient_id, decision) == private
+    assert preview["result_schema"] == private["result_schema"]
+    assert preview["idempotency_key"] == private["idempotency_key"]
 
 
 def test_live_arguments_do_carry_the_real_number(course_file: CourseFile) -> None:

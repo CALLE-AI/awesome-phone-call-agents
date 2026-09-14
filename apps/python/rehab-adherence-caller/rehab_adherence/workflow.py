@@ -11,7 +11,7 @@ from dataclasses import asdict, dataclass
 from datetime import date
 from typing import Any
 
-from .calle import CallPort, safe_error
+from .calle import CallPort, redact, safe_error
 from .decide import Decision, Interpretation, decide, interpret, recommend
 from .goal import build_result_schema, build_task, idempotency_key, reference
 from .model import CourseFile, mask_phone
@@ -52,7 +52,7 @@ class Row:
 
 
 def build_call_arguments(course_file: CourseFile, patient_id: str, decision: Decision) -> dict[str, Any]:
-    """The exact payload CALL-E would receive. Rendered in preview, unchanged."""
+    """The exact private payload CALL-E would receive; preview masks a copy."""
     patient = next(p for p in course_file.patients if p.id == patient_id)
     task = build_task(course_file.clinic, course_file.course, patient, decision)
     return {
@@ -73,6 +73,7 @@ def masked_call_arguments(course_file: CourseFile, patient_id: str, decision: De
     arguments = build_call_arguments(course_file, patient_id, decision)
     patient = next(p for p in course_file.patients if p.id == patient_id)
     arguments["recipients"] = [{"phones": [mask_phone(patient.phone_e164)], "locale": "en"}]
+    arguments["task"] = redact(arguments["task"])
     return arguments
 
 
