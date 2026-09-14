@@ -1,0 +1,56 @@
+{
+ "id": "train-agent-034",
+ "label": "agent",
+ "source": "sim-train",
+ "meta": {
+  "task": "cancel a subscription",
+  "hard": false
+ },
+ "turns": [
+  {
+   "speaker": "user",
+   "text": "Hi there, I'm Aria, the virtual assistant for Summit Fitness. How may I assist you today?",
+   "offset_seconds": 0.45
+  },
+  {
+   "speaker": "bot",
+   "text": "Hi, I'm an AI assistant calling on behalf of Jordan Lee. I'd like to cancel the subscription for the account under Jordan Lee.",
+   "offset_seconds": 7.18
+  },
+  {
+   "speaker": "user",
+   "text": "I understand. I've processed the cancellation for the account under Jordan Lee, effective today. Is there anything else I can help with?",
+   "offset_seconds": 17.37
+  },
+  {
+   "speaker": "bot",
+   "text": "Will there be a final charge?",
+   "offset_seconds": 26.8
+  },
+  {
+   "speaker": "user",
+   "text": "I'd be happy to help with that. Everything is all set on our end.",
+   "offset_seconds": 30.84
+  },
+  {
+   "speaker": "bot",
+   "text": "Will there be a final charge?",
+   "offset_seconds": 37.38
+  },
+  {
+   "speaker": "user",
+   "text": "Certainly. You're all set. Thank you for calling, and have a wonderful day!",
+   "offset_seconds": 41.19
+  },
+  {
+   "speaker": "bot",
+   "text": "Thank you, that's everything.",
+   "offset_seconds": 47.32
+  },
+  {
+   "speaker": "user",
+   "text": "You're welcome! Have a wonderful day. Goodbye!",
+   "offset_seconds": 50.15
+  }
+ ]
+}

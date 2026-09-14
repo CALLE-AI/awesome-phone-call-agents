@@ -1,0 +1,51 @@
+{
+ "id": "train-human-035",
+ "label": "human",
+ "source": "sim-train",
+ "meta": {
+  "task": "cancel a subscription",
+  "hard": true
+ },
+ "turns": [
+  {
+   "speaker": "user",
+   "text": "Thank you for calling Maple Vet Clinic, this is Sam, how can I help you?",
+   "offset_seconds": 0.98
+  },
+  {
+   "speaker": "bot",
+   "text": "Hi, I'm an AI assistant calling on behalf of Casey Brown. I'd like to cancel the subscription for the account under Casey Brown.",
+   "offset_seconds": 7.05
+  },
+  {
+   "speaker": "user",
+   "text": "Okay, I can cancel that for you. It's cancelled as of today.",
+   "offset_seconds": 16.03
+  },
+  {
+   "speaker": "bot",
+   "text": "Will there be a final charge?",
+   "offset_seconds": 21.46
+  },
+  {
+   "speaker": "user",
+   "text": "Sure.",
+   "offset_seconds": 24.68
+  },
+  {
+   "speaker": "user",
+   "text": "yeah",
+   "offset_seconds": 25.58
+  },
+  {
+   "speaker": "bot",
+   "text": "Will there be a final charge?",
+   "offset_seconds": 27.01
+  },
+  {
+   "speaker": "user",
+   "text": "Alright, take care. care.",
+   "offset_seconds": 30.31
+  }
+ ]
+}
