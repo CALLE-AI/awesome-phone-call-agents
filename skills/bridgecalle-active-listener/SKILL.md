@@ -1,50 +1,51 @@
 ---
 name: bridgecalle-active-listener
-description: Active-listening voice companion skill for seniors that enforces a 90/10 active listening ratio, extracts nostalgic memories, and exports family summaries.
+description: Prompt-guided active-listening phone check-in companion skill for seniors that uses CALL-E outbound phone calls to provide gentle verbal nods, extract nostalgic memories, and export family summaries.
 license: MIT
 ---
 
 # BridgeCalle Active Listener
 
-Use this skill when an **elderly person, family member, or caregiver** wants an empathetic, active-listening phone companion call to reduce loneliness and foster emotional connection between visits.
+Use this skill when an **elderly person, family member, or caregiver** (with explicit recipient consent) wants an empathetic, active-listening phone check-in call to reduce loneliness and foster emotional connection between visits.
 
-BridgeCalle flips the traditional voice-agent paradigm: instead of an AI that talks at the user, it enforces a strict **90/10 active listening ratio** where the senior speaks for 90% of the conversation while the AI listens quietly with gentle verbal nods.
+BridgeCalle flips the traditional voice-agent paradigm: instead of an AI that talks at the user, it configures CALL-E task instructions for **prompt-guided active listening**, encouraging the AI agent to speak 90-95% less than the senior and offer short gentle verbal nods (*"Mmhmm"*, *"I hear you"*, *"How lovely"*).
 
 ## When to use
 
-- Friendly outbound phone check-ins for elderly loved ones or seniors living alone.
+- Outbound phone check-ins for elderly loved ones or seniors living alone.
 - Capturing nostalgic memories, daily reflections, and emotional state in a structured post-call summary.
-- Exporting warm 2-sentence call summaries to family members via SMS or WhatsApp.
+- Exporting warm call summaries to family members via SMS or WhatsApp.
 
 ## When not to use
 
 - Emergency medical response, crisis intervention, or suicide prevention hotline replacement.
-- Unsolicited cold outreach or telemarketing.
+- Unsolicited cold outreach, marketing, or telemarketing.
 - Clinical diagnosis or medical advice.
 
 ## Workflow
 
-1. Read `references/safety.md` and confirm **recipient consent**.
-2. Pass **E.164** phone number, explicit CALL-E `region` (e.g., `IN` or `US`), and `locale` (e.g., `en-IN` or `en-US`).
-3. Execute the call task prompt:
+1. Read `references/safety.md` and confirm **explicit recipient consent** and **authorized E.164 phone number**.
+2. Require explicit live execution flags (`--execute` and `--confirm-recipient-opt-in`); default to dry-run preview mode when credentials or execution confirmation are omitted.
+3. Pass valid **E.164** phone number, explicit CALL-E `region` (e.g., `IN` or `US`), and `locale` (e.g., `en-IN` or `en-US`).
+4. Execute the call task prompt:
    ```text
    Call <E164_PHONE> in English. Ask gently if they drank water and ate food today. Then listen quietly with short nods like 'Mmhmm' and 'How lovely'.
    ```
-4. Capture structured call summary, start time, duration, and key memory points.
-5. Provide a 1-tap export link for authorized family WhatsApp or SMS contacts.
+5. Capture structured call summary, start time, duration, and key memory points.
+6. Display masked phone numbers in user-facing summaries.
 
 ## Persona and Rules
 
 - **Initial Greeting:** Short 1-sentence gentle inquiry (e.g. water and meal check-in).
-- **Active Listening:** Speak 90-95% less than the user. Use 1-2 word verbal nods (*"Mmhmm"*, *"I hear you"*, *"How lovely"*).
-- **Patient Silence:** Allow 3,500ms silence threshold before speaking.
+- **Prompt-Guided Active Listening:** System instructions instruct the AI agent to listen quietly, offering 1-2 word verbal nods (*"Mmhmm"*, *"I hear you"*, *"How lovely"*).
+- **Patient Silence:** Configures a patient silence threshold before speaking.
 
 ## Output
 
-After a call attempt, expect JSON/structured fields:
+After a call attempt, expect structured output fields:
 
 - `call_number` — sequential call attempt index
 - `start_time` — call initiation timestamp
 - `duration` — call duration (e.g., `2 mins 10 secs` or `0s` if unplaced)
 - `status` — `COMPLETED` | `NOT CONNECTED` | `DISPATCHED`
-- `points` — array of key summary points
+- `points` — array of key summary points (XSS-escaped and masked)

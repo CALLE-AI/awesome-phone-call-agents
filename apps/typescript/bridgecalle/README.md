@@ -1,17 +1,18 @@
 # BridgeCalle — Senior Voice Companion App
 
 > **Category:** Apps / TypeScript / Healthcare & Elder Care  
-> **Platform:** CALL-E API & SDK  
+> **Platform:** CALL-E REST API & SDK  
 > **Author:** BridgeCalle Team  
 
 ## Overview
-**BridgeCalle** is a senior-accessible web application built for CALL-E. It turns CALL-E voice agent technology into an active listening companion for elderly loved ones.
+**BridgeCalle** is a senior-accessible web application built for CALL-E. It turns CALL-E voice agent technology into a prompt-guided active listening companion for elderly loved ones.
 
 ### Features
-- **1-Tap Photo-First Dialing:** Large avatar cards with photo upload; clicking anywhere on a photo or name immediately triggers a CALL-E phone call.
-- **90/10 Active Listener Persona:** The AI speaks sparingly (1-2 word verbal nods) so seniors hold 90-95% of the conversation.
-- **Call Summaries & WhatsApp Export:** Logged call entries with start times, durations, and 1-tap WhatsApp summary export.
+- **1-Tap Photo-First Interface:** Large avatar cards with photo upload; clicking anywhere on a photo or name triggers a CALL-E phone call task via the local backend.
+- **Prompt-Guided Active Listener Persona:** Task instructions instruct the AI to speak sparingly (short 1-2 word verbal nods) so seniors hold 90-95% of the conversation.
+- **Call Summaries & WhatsApp Export:** Logged call entries with start times, durations, masked phone numbers, and 1-tap WhatsApp summary export.
 - **Local Persistence:** Saves profiles, photos, and settings locally in browser `localStorage`.
+- **Masked Numbers & XSS Prevention:** Phone numbers are masked in user-facing logs (`+1 *** *** 0000`), and summaries use HTML escaping.
 
 ---
 
@@ -23,9 +24,9 @@ pnpm install # or npm install
 ```
 
 ### 2. Configure Environment
-Set `CALLE_API_KEY` in environment:
+Set `CALLE_API_KEY` in environment (server-side only; never committed to git):
 ```bash
-export CALLE_API_KEY="iams_live_your_api_key_here"
+export CALLE_API_KEY="your_calle_api_key_here"
 ```
 
 ### 3. Run Application
@@ -37,5 +38,5 @@ Open `http://localhost:3000` in your browser.
 ---
 
 ## Side Effects & Dry-Run Mode
-- Clicking a card triggers a **real outbound call** via CALL-E's REST API (`POST /v1/calls`).
-- If no `CALLE_API_KEY` is provided, the app operates in a preview/demo mode without placing network calls.
+- Live network execution requires server-side `CALLE_API_KEY`, explicit `execute: true` confirmation, and authorized E.164 phone numbers.
+- When `CALLE_API_KEY` is not set or execution confirmation is omitted, the app operates safely in a **dry-run preview mode** (no network call placed).

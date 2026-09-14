@@ -16,15 +16,15 @@
   <header class="bg-indigo-900 text-white rounded-2xl p-4 sm:p-5 shadow-md flex items-center justify-between gap-2">
     <div>
       <h1 class="text-2xl sm:text-3xl font-extrabold tracking-tight">BridgeCalle</h1>
-      <p class="text-xs sm:text-sm text-indigo-200 font-medium">1-Tap Voice Companion for Seniors</p>
+      <p class="text-xs sm:text-sm text-indigo-200 font-medium">Active-Listening Voice Companion for Seniors</p>
     </div>
     
     <!-- Top Action Area: Self-Calling Number Badge + Summary & Plus Buttons -->
     <div class="flex items-center space-x-2">
       <!-- Compact Self Calling Phone Number Input -->
       <div class="flex items-center bg-indigo-800/90 border border-indigo-700 rounded-2xl px-2.5 py-1 text-xs space-x-1">
-        <span class="text-indigo-200 font-bold hidden sm:inline">📞 Call:</span>
-        <input type="tel" id="self-phone-input" value="+919265408610" placeholder="+919265408610" class="bg-transparent text-white font-extrabold text-xs w-28 sm:w-32 focus:outline-none" oninput="saveSelfPhone()">
+        <span class="text-indigo-200 font-bold hidden sm:inline">📞 Phone:</span>
+        <input type="tel" id="self-phone-input" value="+15550100000" placeholder="+15550100000" class="bg-transparent text-white font-extrabold text-xs w-28 sm:w-32 focus:outline-none" oninput="saveSelfPhone()">
       </div>
 
       <!-- Summary Icon -->
@@ -46,9 +46,9 @@
     <div id="active-banner" class="hidden bg-slate-900 text-white rounded-2xl p-5 shadow-lg space-y-2 text-center">
       <div class="flex items-center justify-center space-x-2 text-emerald-400 font-bold text-base sm:text-lg">
         <span class="w-3 h-3 rounded-full bg-emerald-400 animate-ping"></span>
-        <span>Calling Phone Now via CALL-E!</span>
+        <span>Initiating CALL-E Phone Task...</span>
       </div>
-      <p class="text-xs sm:text-sm text-slate-300">Your phone should ring shortly at <strong id="calling-target" class="text-white">+919265408610</strong>.</p>
+      <p class="text-xs sm:text-sm text-slate-300">Target Phone: <strong id="calling-target" class="text-white">+1 *** *** 0000</strong></p>
     </div>
 
     <!-- Cards Dynamic Grid Container -->
@@ -118,38 +118,40 @@
 
   <!-- Footer -->
   <footer class="text-center text-xs text-slate-500 py-3">
-    BridgeCalle Voice AI — Active Listening Companion for Seniors.
+    BridgeCalle Voice AI — Active-Listening Companion for Seniors.
   </footer>
 
   <script>
     const DEFAULT_AVATAR = "data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' fill='%2394a3b8' viewBox='0 0 24 24'><path d='M12 12c2.21 0 4-1.79 4-4s-1.79-4-4-4-4 1.79-4 4 1.79 4 4 4zm0 2c-2.67 0-8 1.34-8 4v2h16v-2c0-2.66-5.33-4-8-4z'/></svg>";
 
+    // Safety: Mask phone numbers in user interface
+    function maskPhone(phone) {
+      if (!phone) return '****';
+      const clean = String(phone).trim();
+      if (clean.length < 6) return '****';
+      const prefix = clean.slice(0, 3);
+      const suffix = clean.slice(-4);
+      return `${prefix} ***** *${suffix}`;
+    }
+
+    // Security: Escape HTML to prevent provider summary XSS
+    function escapeHtml(str) {
+      if (!str) return '';
+      return String(str)
+        .replace(/&/g, '&amp;')
+        .replace(/</g, '&lt;')
+        .replace(/>/g, '&gt;')
+        .replace(/"/g, '&quot;')
+        .replace(/'/g, '&#39;');
+    }
+
+    function isValidE164(phone) {
+      return /^\+[1-9]\d{1,14}$/.test(String(phone).trim());
+    }
+
     const DEFAULT_CALL_LOGS = [
       {
-        id: 'call_calle_1oMoqkWuXCJuiPN_PV0QoQ',
-        callNumber: 4,
-        startTime: '13 Sept 2026, 8:14 PM',
-        duration: '0s (Ended)',
-        status: 'DISPATCHED',
-        points: [
-          'Call #4 dispatched via CALL-E.',
-          'Target Phone: +919265408610',
-          'Greeting: Water & meal check-in.',
-          'Outcome: Call dispatched and ended after connection.'
-        ]
-      },
-      {
-        id: 'call_calle_SB-65hvhJt88oEvOV6cNyQ',
-        callNumber: 3,
-        startTime: '13 Sept 2026, 8:01 PM',
-        duration: '0s',
-        status: 'NOT CONNECTED',
-        points: [
-          'Not connected / Not answered'
-        ]
-      },
-      {
-        id: 'call_calle_7f7cd0decdaa4b83bf04b2fa995e0e9f',
+        id: 'call_sample_002',
         callNumber: 2,
         startTime: '13 Sept 2026, 6:38 PM',
         duration: '17s',
@@ -160,7 +162,7 @@
         ]
       },
       {
-        id: 'call_calle_e5fcaf01293d443ba93bbc86ed216530',
+        id: 'call_sample_001',
         callNumber: 1,
         startTime: '10 Sept 2026, 8:25 PM',
         duration: '27s',
@@ -172,49 +174,29 @@
       }
     ];
 
-    let selfPhone = '+919265408610';
+    let selfPhone = '+15550100000';
     let persons = [
       {
         id: 'p_1',
         name: 'Human',
-        waPhone: '+919265408610',
+        waPhone: '+15550100000',
         photo: DEFAULT_AVATAR,
         callLogs: DEFAULT_CALL_LOGS
       }
     ];
 
-    function sanitizeLogPoints(points) {
-      if (!points || !Array.isArray(points)) return ['Not connected / Not answered'];
-      return points.map(p => {
-        if (!p) return 'Not connected / Not answered';
-        const lower = p.toLowerCase();
-        if (lower.includes('did not connect') || lower.includes('did not complete') || lower.includes('failed') || lower.includes('cancelled') || lower.includes('busy') || lower.includes('unavailable') || lower.includes('no answer') || lower.includes('retry')) {
-          return 'Not connected / Not answered';
-        }
-        return p;
-      });
-    }
-
     function loadData() {
-      const savedSelfPhone = localStorage.getItem('bc_self_phone');
-      if (savedSelfPhone) {
+      const savedSelfPhone = localStorage.getItem('bc_self_phone_v5');
+      if (savedSelfPhone && isValidE164(savedSelfPhone)) {
         selfPhone = savedSelfPhone;
         document.getElementById('self-phone-input').value = selfPhone;
       }
 
-      const savedPersons = localStorage.getItem('bc_persons_v4');
+      const savedPersons = localStorage.getItem('bc_persons_v5');
       if (savedPersons) {
         try { 
           const parsed = JSON.parse(savedPersons);
           if (Array.isArray(parsed) && parsed.length > 0) {
-            parsed.forEach(p => {
-              if (!p.name || p.name === 'Ramesh Patel') p.name = 'Human';
-              if (p.callLogs && Array.isArray(p.callLogs)) {
-                p.callLogs.forEach(log => {
-                  log.points = sanitizeLogPoints(log.points);
-                });
-              }
-            });
             persons = parsed;
           }
         } catch(e) {}
@@ -226,12 +208,15 @@
     }
 
     function saveSelfPhone() {
-      selfPhone = document.getElementById('self-phone-input').value.trim() || '+919265408610';
-      localStorage.setItem('bc_self_phone', selfPhone);
+      const val = document.getElementById('self-phone-input').value.trim();
+      if (isValidE164(val)) {
+        selfPhone = val;
+        localStorage.setItem('bc_self_phone_v5', selfPhone);
+      }
     }
 
     function saveData() {
-      localStorage.setItem('bc_persons_v4', JSON.stringify(persons));
+      localStorage.setItem('bc_persons_v5', JSON.stringify(persons));
       renderCards();
     }
 
@@ -252,6 +237,8 @@
         const card = document.createElement('div');
         card.className = 'relative bg-white rounded-3xl p-6 sm:p-8 shadow-md border-2 border-slate-200 hover:border-indigo-500 transition flex flex-col items-center text-center space-y-4 group';
 
+        const safeName = escapeHtml(person.name || 'Human');
+
         card.innerHTML = `
           <!-- Pencil Icon Strictly For Editing -->
           <button type="button" onclick="openEditModal('${person.id}')" title="Edit Person" class="absolute top-3 right-3 w-10 h-10 rounded-full bg-slate-100 hover:bg-indigo-100 text-slate-600 hover:text-indigo-700 flex items-center justify-center text-base transition shadow-sm z-20 cursor-pointer">
@@ -266,7 +253,7 @@
             </div>
 
             <!-- Small Name below pic (Click Name to View Summary) -->
-            <h2 onclick="event.stopPropagation(); openPersonSummary('${person.id}')" title="Click name to view summary" class="text-xl sm:text-2xl font-extrabold text-slate-900 leading-tight hover:text-indigo-600 underline decoration-indigo-300 underline-offset-4 cursor-pointer z-10">${person.name || 'Human'}</h2>
+            <h2 onclick="event.stopPropagation(); openPersonSummary('${person.id}')" title="Click name to view summary" class="text-xl sm:text-2xl font-extrabold text-slate-900 leading-tight hover:text-indigo-600 underline decoration-indigo-300 underline-offset-4 cursor-pointer z-10">${safeName}</h2>
 
             <!-- Tap instruction badge -->
             <span class="inline-block bg-emerald-50 text-emerald-700 text-xs sm:text-sm font-bold px-4 py-1.5 rounded-full border border-emerald-200">
@@ -282,15 +269,16 @@
     async function triggerCallForPerson(personId) {
       const person = persons.find(p => p.id === personId) || persons[0];
       
-      const userPhone = document.getElementById('self-phone-input').value.trim() || selfPhone || '+919265408610';
+      const userPhone = document.getElementById('self-phone-input').value.trim() || selfPhone;
       
-      if (!userPhone) {
-        alert('Please enter your phone number in the header!');
+      if (!isValidE164(userPhone)) {
+        alert('Please enter a valid E.164 phone number (e.g. +15550100000 or +919876543210) in the header input.');
         return;
       }
 
+      const maskedTarget = maskPhone(userPhone);
       const banner = document.getElementById('active-banner');
-      document.getElementById('calling-target').innerText = userPhone;
+      document.getElementById('calling-target').innerText = maskedTarget;
       banner.classList.remove('hidden');
 
       const startTimeStr = new Date().toLocaleString([], { day: '2-digit', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit' });
@@ -305,10 +293,10 @@
         status: 'DISPATCHED',
         calleTaskId: null,
         points: [
-          `Call #${callNum} dispatched via CALL-E at ${startTimeStr}.`,
-          `Target Phone: ${userPhone}`,
-          `Greeting: Water & meal check-in.`,
-          `AI Persona: Quiet active listener (95% listening ratio).`
+          `Call #${callNum} task initiated at ${startTimeStr}.`,
+          `Target Phone: ${maskedTarget}`,
+          `Greeting: Gentle check-in on water & meal intake.`,
+          `AI Persona: Quiet active listener.`
         ]
       };
 
@@ -317,72 +305,45 @@
       saveData();
 
       try {
+        // Always dispatch through local backend API (never direct client fallback redial)
         const response = await fetch('/api/calls/trigger', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({
             seniorName: person.name || 'Human',
             seniorPhone: userPhone,
-            customTopic: 'daily_reflection'
+            execute: true,
+            confirmOptIn: true
           })
-        }).catch(() => null);
+        });
 
-        let taskId = null;
+        const data = await response.json();
+        banner.classList.add('hidden');
 
-        if (!response || !response.ok) {
-          const apiKey = 'iams_live_2yEKIUCh7wwkEhur6hrg_efff7ad44485789d72a989db013b801d1c86aa11ec5ba600584d9b28a9e82602';
-          const cleanPhone = userPhone.replace(/[^+\d]/g, '');
-          const isIndia = cleanPhone.startsWith('+91');
-
-          const directRes = await fetch('https://api.heycall-e.com/v1/calls', {
-            method: 'POST',
-            headers: {
-              'Authorization': `Bearer ${apiKey}`,
-              'Content-Type': 'application/json',
-              'Idempotency-Key': `bridgecalle_${Date.now()}`
-            },
-            body: JSON.stringify({
-              task: `Call ${cleanPhone} in ${isIndia ? 'English (India)' : 'English'}. Ask gently if they drank water and ate food today. Then listen quietly with short nods like Mmhmm.`,
-              recipients: [{ phones: [cleanPhone], region: isIndia ? 'IN' : 'US', locale: isIndia ? 'en-IN' : 'en-US' }]
-            })
-          });
-
-          const directData = await directRes.json();
-          if (directRes.ok && directData.id) {
-            taskId = directData.id;
-            newCallLog.calleTaskId = taskId;
-            newCallLog.points[3] = `CALL-E Task ID: ${taskId}`;
+        if (response.ok && data.success) {
+          if (data.mode === 'preview') {
+            newCallLog.status = 'DRY_RUN_PREVIEW';
+            newCallLog.duration = 'Preview Only';
+            newCallLog.points = [
+              'Dry-run preview mode executed (no network call placed).',
+              `Target Phone: ${maskedTarget}`,
+              'Configure CALLE_API_KEY on server for live network calls.'
+            ];
             saveData();
+            alert(`ℹ️ Dry-run preview mode complete for ${person.name || 'Human'}. (Set CALLE_API_KEY on backend server for live calls).`);
           } else {
-            newCallLog.status = 'NOT CONNECTED';
-            newCallLog.duration = '0s';
-            newCallLog.points = ['Not connected / Not answered'];
+            newCallLog.status = 'DISPATCHED';
+            newCallLog.calleTaskId = data.call ? data.call.calleCallId : null;
             saveData();
+            alert(`✅ CALL-E Initiated Call #${callNum} to ${maskedTarget}! Check your phone.`);
           }
         } else {
-          const data = await response.json();
-          if (data.call && data.call.calleCallId) {
-            taskId = data.call.calleCallId;
-            newCallLog.calleTaskId = taskId;
-            newCallLog.points[3] = `CALL-E Task ID: ${taskId}`;
-            saveData();
-          } else {
-            newCallLog.status = 'NOT CONNECTED';
-            newCallLog.duration = '0s';
-            newCallLog.points = ['Not connected / Not answered'];
-            saveData();
-          }
+          newCallLog.status = 'NOT CONNECTED';
+          newCallLog.duration = '0s';
+          newCallLog.points = ['Not connected / Not answered'];
+          saveData();
+          alert('Call task response: ' + (data.message || 'Not connected'));
         }
-
-        setTimeout(() => {
-          banner.classList.add('hidden');
-          if (taskId) {
-            alert(`✅ CALL-E Initiated Call #${callNum} to your phone (${userPhone})! Your phone will ring shortly.`);
-            pollCallCompletion(person.id, newCallLog.id, taskId);
-          } else {
-            alert(`⚠️ Call status: Not connected.`);
-          }
-        }, 1500);
 
       } catch (err) {
         newCallLog.status = 'NOT CONNECTED';
@@ -390,57 +351,8 @@
         newCallLog.points = ['Not connected / Not answered'];
         saveData();
         banner.classList.add('hidden');
-        alert('Not connected: ' + err.message);
+        alert('Call task note: ' + err.message);
       }
-    }
-
-    async function pollCallCompletion(personId, logId, taskId) {
-      const apiKey = 'iams_live_2yEKIUCh7wwkEhur6hrg_efff7ad44485789d72a989db013b801d1c86aa11ec5ba600584d9b28a9e82602';
-      const person = persons.find(p => p.id === personId);
-      if (!person || !person.callLogs) return;
-
-      const log = person.callLogs.find(l => l.id === logId);
-      if (!log) return;
-
-      [15000, 30000, 60000, 90000, 120000].forEach(delay => {
-        setTimeout(async () => {
-          try {
-            const res = await fetch(`https://api.heycall-e.com/v1/calls/${taskId}`, {
-              headers: { 'Authorization': `Bearer ${apiKey}` }
-            });
-            const data = await res.json();
-            if (res.ok && data) {
-              const summaryText = data.summary || (data.recipients && data.recipients[0] ? data.recipients[0].summary : null);
-              const statusStr = (data.status || '').toLowerCase();
-
-              if (statusStr === 'failed' || statusStr === 'cancelled' || data.failure_code) {
-                log.status = 'NOT CONNECTED';
-                log.duration = '0s';
-                log.points = ['Not connected / Not answered'];
-                saveData();
-                return;
-              }
-
-              if (summaryText) {
-                const lower = summaryText.toLowerCase();
-                if (lower.includes('did not connect') || lower.includes('did not complete') || lower.includes('failed') || lower.includes('busy') || lower.includes('unavailable') || lower.includes('no answer') || lower.includes('retry')) {
-                  log.status = 'NOT CONNECTED';
-                  log.duration = '0s';
-                  log.points = ['Not connected / Not answered'];
-                } else {
-                  log.status = 'COMPLETED';
-                  log.duration = 'Completed';
-                  log.points = [
-                    `CALL-E Task ID: ${data.id}`,
-                    `Summary: ${summaryText}`
-                  ];
-                }
-                saveData();
-              }
-            }
-          } catch(e) {}
-        }, delay);
-      });
     }
 
     // Modal Handlers
@@ -498,7 +410,7 @@
         persons.push({
           id: `p_${Date.now()}`,
           name,
-          waPhone: selfPhone || '+919265408610',
+          waPhone: selfPhone,
           photo,
           callLogs: []
         });
@@ -537,8 +449,12 @@
     function updatePersonWhatsAppNumber(personId, newWaNumber) {
       const person = persons.find(p => p.id === personId);
       if (person) {
-        person.waPhone = newWaNumber.trim();
-        saveData();
+        if (isValidE164(newWaNumber.trim())) {
+          person.waPhone = newWaNumber.trim();
+          saveData();
+        } else {
+          alert('Please enter a valid E.164 phone number (e.g. +15550100000 or +919876543210).');
+        }
       }
     }
 
@@ -550,13 +466,18 @@
       if (!log) return;
 
       const inputEl = document.getElementById(`wa-input-${person.id}`);
-      const waNum = inputEl ? inputEl.value.trim() : (person.waPhone || selfPhone || '+919265408610');
+      const waNum = inputEl ? inputEl.value.trim() : (person.waPhone || selfPhone);
+
+      if (!isValidE164(waNum)) {
+        alert('Please enter a valid E.164 WhatsApp number (e.g. +15550100000 or +919876543210).');
+        return;
+      }
 
       person.waPhone = waNum;
       saveData();
 
-      const summaryContent = `Call #${log.callNumber}\nStart Time: ${log.startTime}\nDuration: ${log.duration}\nStatus: ${log.status}\n\nKey Points:\n` + 
-        (log.points || []).map(p => `• ${p}`).join('\n');
+      const summaryContent = `Call #${log.callNumber}\nStart Time: ${escapeHtml(log.startTime)}\nDuration: ${escapeHtml(log.duration)}\nStatus: ${escapeHtml(log.status)}\n\nKey Points:\n` + 
+        (log.points || []).map(p => `• ${escapeHtml(p)}`).join('\n');
 
       const waMessage = encodeURIComponent(`💌 BridgeCalle Call Summary for ${person.name || 'Human'}:\n\n${summaryContent}\n\nSent via BridgeCalle Voice AI.`);
       const cleanWaNum = waNum.replace(/[^+\d]/g, '').replace('+', '');
@@ -583,14 +504,15 @@
         personBox.className = 'bg-slate-50 rounded-2xl p-4 border border-slate-200 space-y-3';
 
         const logs = person.callLogs || [];
-        const currentWaNum = person.waPhone || selfPhone || '+919265408610';
+        const currentWaNum = person.waPhone || selfPhone;
+        const safePersonName = escapeHtml(person.name || 'Human');
 
         if (logs.length === 0) {
           personBox.innerHTML = `
             <div class="flex items-center justify-between border-b border-slate-200 pb-2">
               <div class="flex items-center space-x-2">
                 <img src="${person.photo || DEFAULT_AVATAR}" class="w-8 h-8 rounded-full object-cover border">
-                <span class="font-extrabold text-slate-900 text-base">${person.name || 'Human'}</span>
+                <span class="font-extrabold text-slate-900 text-base">${safePersonName}</span>
               </div>
               <span class="text-xs text-slate-400 font-bold">0 Calls</span>
             </div>
@@ -603,10 +525,10 @@
           logs.forEach(log => {
             const isNotConn = log.status && (log.status.includes('NOT') || log.status.includes('FAILED'));
             const badgeClass = isNotConn ? 'bg-red-100 text-red-800' : 'bg-emerald-100 text-emerald-800';
-            const statusLabel = isNotConn ? 'NOT CONNECTED' : (log.status || 'COMPLETED');
+            const statusLabel = escapeHtml(isNotConn ? 'NOT CONNECTED' : (log.status || 'COMPLETED'));
 
             const pointsList = (log.points && log.points.length > 0)
-              ? log.points.map(pt => `<li class="flex items-start gap-1.5"><span class="text-indigo-600 font-bold">•</span> <span>${pt}</span></li>`).join('')
+              ? log.points.map(pt => `<li class="flex items-start gap-1.5"><span class="text-indigo-600 font-bold">•</span> <span>${escapeHtml(pt)}</span></li>`).join('')
               : `<li>Not connected / Not answered</li>`;
 
             logsHtml += `
@@ -618,7 +540,7 @@
                       ${statusLabel}
                     </span>
                   </div>
-                  <span class="text-slate-500 text-xs">⏱️ ${log.startTime} | ⌛ ${log.duration}</span>
+                  <span class="text-slate-500 text-xs">⏱️ ${escapeHtml(log.startTime)} | ⌛ ${escapeHtml(log.duration)}</span>
                 </div>
                 <div class="font-bold text-slate-800 text-xs uppercase tracking-wider">Summary Points:</div>
                 <ul class="space-y-1 text-slate-700 font-medium leading-relaxed">
@@ -632,7 +554,7 @@
             <div class="flex items-center justify-between border-b border-slate-200 pb-2">
               <div class="flex items-center space-x-2">
                 <img src="${person.photo || DEFAULT_AVATAR}" class="w-8 h-8 rounded-full object-cover border">
-                <span class="font-extrabold text-slate-900 text-base">${person.name || 'Human'}</span>
+                <span class="font-extrabold text-slate-900 text-base">${safePersonName}</span>
               </div>
               <span class="text-xs bg-indigo-100 text-indigo-800 font-bold px-2.5 py-1 rounded-lg">${logs.length} Call(s) Logged</span>
             </div>
@@ -645,7 +567,7 @@
             <div class="bg-emerald-50/80 rounded-xl p-3 border border-emerald-200 space-y-2 mt-2">
               <label class="block text-[11px] font-bold text-emerald-800 uppercase tracking-wider">Target WhatsApp Number for Summaries:</label>
               <div class="flex items-center space-x-2">
-                <input type="tel" id="wa-input-${person.id}" value="${currentWaNum}" placeholder="+919265408610" class="flex-1 bg-white border border-emerald-300 text-slate-900 text-xs font-bold rounded-lg p-2 focus:ring-2 focus:ring-emerald-500 focus:outline-none" onchange="updatePersonWhatsAppNumber('${person.id}', this.value)">
+                <input type="tel" id="wa-input-${person.id}" value="${escapeHtml(currentWaNum)}" placeholder="+15550100000" class="flex-1 bg-white border border-emerald-300 text-slate-900 text-xs font-bold rounded-lg p-2 focus:ring-2 focus:ring-emerald-500 focus:outline-none" onchange="updatePersonWhatsAppNumber('${person.id}', this.value)">
                 
                 <button onclick="shareCallLogToWhatsApp('${person.id}', '${logs[0] ? logs[0].id : ''}')" class="bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-xs px-3.5 py-2 rounded-lg transition shadow-sm flex items-center gap-1.5 flex-shrink-0">
                   <span>💬 Share Latest</span>
