@@ -1,4 +1,4 @@
-"""A loopback-only review console.
+"""A local review console with an isolated synthetic public demo mode.
 
 The console is where a biller reads what the plan said, sees the words that
 support it, and signs off. It has no authentication, so it refuses to be
@@ -10,7 +10,9 @@ The page itself is a shell. Everything a reader sees is fetched from the JSON
 endpoints below and written into the document as text rather than as markup, so
 a value that came off a phone call cannot become part of the page. Approving a
 claim, adding a claim, and placing a *fixture* call are the only things it can
-do. It cannot place a live call — that still requires the CLI and a written,
+do locally. Public demo mode starts with a fresh temporary copy of the committed
+synthetic records and disables claim intake. It cannot place a live call — that
+still requires the CLI and a written,
 expiring, budgeted authorization record, on purpose: an unauthenticated local
 server is not where a real outbound phone call and a real charge should
 originate.
@@ -19,12 +21,13 @@ from __future__ import annotations
 
 import json
 import os
+import tempfile
 from datetime import date, timedelta
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from typing import Any, Callable, Dict, List, Optional
 from urllib.parse import parse_qs, urlparse
 
-from . import audit, client as calle_client, demo, engine, hold, policy, ui, vault, workqueue
+from . import audit, client as calle_client, demo, engine, hold, policy, redact, ui, vault, workqueue
 from .models import ANSWERED, NEEDS_HUMAN, QUEUED, UNKNOWN, Claim, load_ledger, new_id, save_ledger
 
 LOOPBACK_HOSTS = ("127.0.0.1", "localhost", "::1")
@@ -64,7 +67,12 @@ def _claim_row(ledger, claim) -> Dict[str, Any]:
 
 def _claim_detail(ledger, claim) -> Dict[str, Any]:
     row = _claim_row(ledger, claim)
-    row["result"] = {k: v for k, v in claim.result.items() if not k.startswith("_")}
+    payer = ledger.payer(claim.payer_id)
+    phone_patterns = redact.build_phone_patterns([payer.phone])
+    row["result"] = redact.scrub_value(
+        {k: v for k, v in claim.result.items() if not k.startswith("_")},
+        [], phone_patterns,
+    )
     row["call_id"] = ""
     for record in reversed(ledger.calls):
         if claim.id in record.claim_ids:
@@ -75,6 +83,7 @@ def _claim_detail(ledger, claim) -> Dict[str, Any]:
 
 def _call_row(ledger, record) -> Dict[str, Any]:
     payer = ledger.payer(record.payer_id)
+    phone_patterns = redact.build_phone_patterns([payer.phone])
     return {
         "id": record.id,
         "payer": payer.name,
@@ -84,8 +93,8 @@ def _call_row(ledger, record) -> Dict[str, Any]:
         "reached": record.outcome in ui.REACHED_OUTCOMES,
         "mode": record.mode,
         "created_at": record.created_at,
-        "reference_number": record.reference_number,
-        "rep_name": record.rep_name,
+        "reference_number": redact.mask_phone_text(record.reference_number, phone_patterns),
+        "rep_name": redact.mask_phone_text(record.rep_name, phone_patterns),
         "hold_human": hold.format_duration(record.hold_seconds),
         "talk_human": hold.format_duration(record.talk_seconds),
         "total_human": hold.format_duration(record.total_seconds),
@@ -96,7 +105,13 @@ def _call_row(ledger, record) -> Dict[str, Any]:
 
 def _call_detail(ledger, record) -> Dict[str, Any]:
     row = _call_row(ledger, record)
-    row["findings"] = list(record.findings)
+    payer = ledger.payer(record.payer_id)
+    phone_patterns = redact.build_phone_patterns([payer.phone])
+    row["reference_number"] = redact.mask_phone_text(
+        str(row["reference_number"]), phone_patterns,
+    )
+    row["rep_name"] = redact.mask_phone_text(str(row["rep_name"]), phone_patterns)
+    row["findings"] = redact.scrub_value(list(record.findings), [], phone_patterns)
     row["claims"] = []
     for claim_id in record.claim_ids:
         claim = ledger.claim(claim_id)
@@ -105,7 +120,10 @@ def _call_detail(ledger, record) -> Dict[str, Any]:
             "claim_number": claim.claim_number,
             "state": claim.state,
             "grounded": _grounded(fields),
-            "fields": {k: v for k, v in fields.items() if not k.startswith("_")},
+            "fields": redact.scrub_value(
+                {k: v for k, v in fields.items() if not k.startswith("_")},
+                [], phone_patterns,
+            ),
         })
 
     # The hold gaps are recomputed here rather than stored, for the same reason
@@ -120,7 +138,7 @@ def _call_detail(ledger, record) -> Dict[str, Any]:
         turns.append({
             "at": hold.format_duration(offset),
             "speaker": str(turn.get("speaker", "")),
-            "text": str(turn.get("text", "")),
+            "text": redact.mask_phone_text(str(turn.get("text", "")), phone_patterns),
             "hold_before": gap,
         })
         previous = offset
@@ -132,17 +150,32 @@ def _call_detail(ledger, record) -> Dict[str, Any]:
 # Server
 # ---------------------------------------------------------------------------
 
+def _synthetic_public_data() -> tempfile.TemporaryDirectory:
+    """Create the only ledger the unauthenticated public console may expose."""
+    directory = tempfile.TemporaryDirectory(prefix="trunkline-public-demo-")
+    ledger, records = demo.build()
+    workqueue.rescore(ledger)
+    save_ledger(directory.name, ledger)
+    for patient_ref, values in records.items():
+        vault.put(directory.name, patient_ref, values)
+    return directory
+
+
+def _public_write_allowed(path: str) -> bool:
+    """Public visitors may operate fixtures, but may not submit arbitrary data."""
+    return path in ("/approve", "/call")
+
 def serve(data_dir: str, host: str = "127.0.0.1", port: int = 8770) -> int:
-    # Opt-in only, and off by default: setting this env var is a deliberate,
-    # informed choice to expose an unauthenticated console publicly (e.g. for a
-    # hosted demo). Nothing here ever places a live call regardless of who can
-    # reach it, but /add-claim and /call are otherwise open writes once public.
     public_demo = os.environ.get("TRUNKLINE_PUBLIC_DEMO", "").strip() == "1"
     if host not in LOOPBACK_HOSTS and not public_demo:
         print("The console has no authentication and refuses to bind %s. Use 127.0.0.1," % host)
-        print("or set TRUNKLINE_PUBLIC_DEMO=1 to deliberately expose it publicly.")
+        print("or set TRUNKLINE_PUBLIC_DEMO=1 to serve the isolated synthetic demo.")
         return 2
-    if not os.path.exists(os.path.join(data_dir, "ledger.json")):
+    public_directory = None
+    if public_demo:
+        public_directory = _synthetic_public_data()
+        data_dir = public_directory.name
+    elif not os.path.exists(os.path.join(data_dir, "ledger.json")):
         print("No ledger at %s. Run `trunkline --data %s init-demo` first." % (data_dir, data_dir))
         return 1
 
@@ -194,6 +227,7 @@ def serve(data_dir: str, host: str = "127.0.0.1", port: int = 8770) -> int:
             if path == "/api/graph":
                 payload = ui.graph(ledger)
                 payload["practice"] = ledger.practices[0].name if ledger.practices else ""
+                payload["public_demo"] = public_demo
                 return self._json(payload)
 
             if path == "/api/claims":
@@ -240,6 +274,8 @@ def serve(data_dir: str, host: str = "127.0.0.1", port: int = 8770) -> int:
             if self.headers.get(WRITE_HEADER) is None:
                 return self._text(403, "missing write header")
             path = urlparse(self.path).path
+            if public_demo and not _public_write_allowed(path):
+                return self._text(403, "public demo accepts synthetic records only")
             length = int(self.headers.get("Content-Length", "0"))
             form = parse_qs(self.rfile.read(length).decode("utf-8"))
 
@@ -364,8 +400,8 @@ def serve(data_dir: str, host: str = "127.0.0.1", port: int = 8770) -> int:
                     ctx, bundle, mode=engine.MODE_FIXTURE, api_key="fixture-local-key",
                     base_url=server.base_url, fixture_scenario=scenario, first_poll_delay=0.0,
                 )
-            except Exception as error:  # noqa: BLE001 - surfaced to the operator, not swallowed
-                return self._text(500, "call failed: %s" % error)
+            except Exception:  # noqa: BLE001 - failure is returned without provider details
+                return self._text(500, "fixture call failed")
             finally:
                 server.stop()
 
@@ -382,11 +418,14 @@ def serve(data_dir: str, host: str = "127.0.0.1", port: int = 8770) -> int:
     httpd = ThreadingHTTPServer((host, port), Handler)
     audit.record(data_dir, actor="console", action="console.started",
                  subject="%s:%d" % (host, port), detail={})
-    print("Trunkline console on http://%s:%d  (loopback only, Ctrl-C to stop)" % (host, port))
+    scope = "synthetic public demo" if public_demo else "loopback only"
+    print("Trunkline console on http://%s:%d  (%s, Ctrl-C to stop)" % (host, port, scope))
     try:
         httpd.serve_forever()
     except KeyboardInterrupt:
         print("")
     finally:
         httpd.server_close()
+        if public_directory is not None:
+            public_directory.cleanup()
     return 0

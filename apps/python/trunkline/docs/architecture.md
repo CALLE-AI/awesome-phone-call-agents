@@ -38,7 +38,7 @@ Trunkline is a small pipeline with one unusual property: the order of its stages
 
 ## Three orderings that matter
 
-**Claims are marked `pending_call` and written to disk before the request leaves.** A process killed mid-call leaves evidence that a call may exist. Nothing redials a claim in that state; `reconcile` resolves it against CALL-E instead. Marking after the request would make a crash indistinguishable from a call that never happened.
+**Claims are marked `pending_call` and written to disk before the request leaves.** A process killed mid-call leaves evidence that a call may exist. A request error becomes `submission_unknown`, keeps the claims in `pending_reconciliation`, and halts the live batch. Nothing redials a claim in either state; `reconcile` resolves it against CALL-E instead. Marking after the request would make a crash indistinguishable from a call that never happened.
 
 **Verification runs before scrubbing.** The groundedness check needs the transcript as spoken, because that is where the representative's words are. Scrubbing first would delete the evidence the check depends on and every answer would fail. So the transcript is used, then scrubbed, then stored.
 

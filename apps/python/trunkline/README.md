@@ -42,7 +42,7 @@ python3 -m trunkline --data ./data vault-check      # no identifier escaped the 
 python3 -m trunkline --data ./data audit --verify   # the audit chain is intact
 python3 -m trunkline --data ./data console          # http://127.0.0.1:8770, loopback only
 
-python3 -m pytest                                   # 90 tests, all offline
+python3 -m pytest                                   # 102 tests, all offline
 ```
 
 Python 3.9 or newer, standard library only. `pytest` is the only development dependency.
@@ -167,7 +167,7 @@ python3 -m trunkline --data ./data authorize \
 
 A live run refuses without that record, after it expires, once its call budget is spent, or if the payer's number no longer matches the authorized destination character for character. `--force` is refused in live mode. Revoke with `trunkline revoke --payer <id>`, or engage `trunkline kill-switch on` to refuse every call at once.
 
-Before the request leaves the machine the claims are marked `pending_call` and written to disk with a fresh idempotency key. If the process dies after CALL-E accepted the call, those claims sit in `pending_reconciliation` and nothing redials them until `trunkline reconcile` fetches the recorded call, or `--clear` after you have confirmed in the CALL-E dashboard that no call exists.
+Before the request leaves the machine the claims are marked `pending_call` and written to disk with a fresh idempotency key. If submission fails before Trunkline receives a usable call id, the call becomes `submission_unknown` and its claims move to `pending_reconciliation`; they are never returned to the queue automatically. The live batch stops, and every later live call is refused until an operator reconciles the record. Attach an id found in the CALL-E dashboard with `trunkline reconcile --call <local_id> --provider-call-id <CALL-E_id>`, or use `--clear` only after confirming that no call exists.
 
 **Side effects.** One outbound phone call per bundle, to the payer number on the payer record, disclosed at the open as an AI assistant calling for a provider billing office. Nothing else: no appeals, no resubmissions, no writes to any practice system, no email.
 
@@ -190,7 +190,7 @@ Nothing leaves Trunkline on its own. An answered claim sits in `answered` until 
 | **Call history** | Every call with its measured hold receipt, cost estimate, reference number, findings, and scrubbed transcript |
 | **Review** | A focused split view with the queue on the left and extracted fields, supporting evidence, and the human approval action on the right |
 
-The console is local only. It has no authentication, so it refuses to bind anything but loopback, rejects a request whose `Host` is not loopback, requires a header on writes that a cross-site form post cannot set, and cannot place a call. The page is a shell: every value a reader sees is fetched as JSON and written into the document as text rather than as markup, so a sentence spoken on a phone call can never become part of the page.
+The console is local by default. It has no authentication, so it refuses to bind anything but loopback, rejects a request whose `Host` is not loopback, requires a header on writes that a cross-site form post cannot set, and cannot place a live call. `TRUNKLINE_PUBLIC_DEMO=1` is a separate synthetic mode: it ignores the configured ledger, creates a fresh temporary copy of the committed fictional records, disables claim intake, and removes the copy when the server stops. It can never publish an operator's ledger. The page is a shell: every value a reader sees is fetched as JSON and written into the document as text rather than as markup, so a sentence spoken on a phone call can never become part of the page.
 
 ## Layout
 
@@ -206,10 +206,10 @@ trunkline/hold.py        hold derivation from transcript offsets, and the cost g
 trunkline/workqueue.py   bundling, priority, the deadline guardrail
 trunkline/engine.py      one call end to end, and reconciliation
 trunkline/audit.py       hash-chained, append-only audit log
-trunkline/console.py     loopback review console: JSON endpoints and the one write
+trunkline/console.py     local review console and isolated synthetic public demo
 trunkline/ui.py          the operations workspace, stylesheet, and browser client
 fixtures/                fourteen terminal call fixtures, two of them adversarial
-tests/                   90 tests, offline, no credentials
+tests/                   102 tests, offline, no credentials
 docs/safety.md, docs/scheduler.md, docs/architecture.md
 ```
 

@@ -19,7 +19,7 @@ import urllib.error
 import urllib.request
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from typing import Any, Dict, Optional
-from urllib.parse import urlparse
+from urllib.parse import quote, urlparse
 
 OFFICIAL_ORIGIN = "https://api.heycall-e.com"
 TERMINAL_STATUSES = ("completed", "failed", "canceled", "cancelled")
@@ -33,6 +33,21 @@ POLL_INTERVAL_SECONDS = 8.0
 
 class CalleError(RuntimeError):
     pass
+
+
+class _OriginLockedRedirectHandler(urllib.request.HTTPRedirectHandler):
+    """Allow redirects only while the bearer credential stays on its origin."""
+
+    def __init__(self, allowed_origin: str) -> None:
+        super().__init__()
+        self.allowed_origin = allowed_origin
+
+    def redirect_request(self, req, fp, code, msg, headers, newurl):
+        parsed = urlparse(newurl)
+        redirect_origin = "%s://%s" % (parsed.scheme, parsed.netloc)
+        if redirect_origin != self.allowed_origin:
+            raise CalleError("refusing a CALL-E redirect beyond the approved origin")
+        return super().redirect_request(req, fp, code, msg, headers, newurl)
 
 
 def check_origin(base_url: str, allow_local_fake: bool) -> str:
@@ -66,6 +81,7 @@ class CalleClient:
         self.api_key = api_key
         self.base_url = check_origin(base_url, allow_local_fake)
         self.timeout = timeout
+        self._opener = urllib.request.build_opener(_OriginLockedRedirectHandler(self.base_url))
 
     def _request(
         self,
@@ -83,19 +99,27 @@ class CalleClient:
         for key, value in (headers or {}).items():
             request.add_header(key, value)
         try:
-            with urllib.request.urlopen(request, timeout=self.timeout) as response:
-                return json.loads(response.read().decode("utf-8") or "{}")
+            with self._opener.open(request, timeout=self.timeout) as response:
+                try:
+                    payload = json.loads(response.read().decode("utf-8") or "{}")
+                except (UnicodeDecodeError, json.JSONDecodeError):
+                    raise CalleError("CALL-E returned an invalid JSON response") from None
+                if not isinstance(payload, dict):
+                    raise CalleError("CALL-E returned an invalid JSON object")
+                return payload
         except urllib.error.HTTPError as error:
-            detail = error.read().decode("utf-8", "replace")[:400]
-            raise CalleError("CALL-E %s %s failed: HTTP %s %s" % (method, path, error.code, detail)) from None
-        except urllib.error.URLError as error:
-            raise CalleError("CALL-E unreachable at %s: %s" % (self.base_url, error.reason)) from None
+            error.close()
+            raise CalleError("CALL-E request failed with HTTP %s" % error.code) from None
+        except urllib.error.URLError:
+            raise CalleError("CALL-E request failed before a response was received") from None
+        except (TimeoutError, OSError):
+            raise CalleError("CALL-E request failed before a response was received") from None
 
     def create_call(self, request: Dict[str, Any], idempotency_key: str) -> Dict[str, Any]:
         return self._request("POST", "/v1/calls", request, {"Idempotency-Key": idempotency_key})
 
     def get_call(self, call_id: str) -> Dict[str, Any]:
-        return self._request("GET", "/v1/calls/%s" % call_id)
+        return self._request("GET", "/v1/calls/%s" % quote(str(call_id), safe=""))
 
     def wait(
         self,
@@ -115,8 +139,8 @@ class CalleClient:
                 return call
             if time.time() > deadline:
                 raise CalleError(
-                    "call %s is still %r after %d seconds; it is not lost, resume with "
-                    "`trunkline reconcile`" % (call_id, call.get("status"), int(max_seconds))
+                    "CALL-E call has not reached a terminal status after %d seconds; "
+                    "resume with `trunkline reconcile`" % int(max_seconds)
                 )
             sleep(poll_seconds)
 

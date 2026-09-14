@@ -55,7 +55,7 @@ A call already accepted by CALL-E completes; `trunkline reconcile` folds the res
 
 ## Duplicate calls
 
-Claims are marked `pending_call` and written to disk before the request leaves the machine, with a fresh idempotency key sent as `Idempotency-Key`. A crash leaves them in `pending_reconciliation`, and nothing redials them until `reconcile` resolves the call against CALL-E or an operator clears it after confirming in the dashboard that no call exists.
+Claims are marked `pending_call` and written to disk before the request leaves the machine, with a fresh idempotency key sent as `Idempotency-Key`. If no usable submission response comes back, the call is marked `submission_unknown` and its claims stay in `pending_reconciliation`. The live batch halts and all later live calls are refused until `reconcile` resolves the call against CALL-E or an operator clears it after confirming in the dashboard that no call exists.
 
 ## Medical, legal, financial, and emergency boundaries
 
@@ -68,7 +68,11 @@ Trunkline is an administrative product. It discusses claim adjudication with a c
 
 ## Credentials
 
-The CALL-E key is read from the environment or a local `.env`, never committed, and sent only to `https://api.heycall-e.com`. A base URL pointing anywhere else is refused, except a loopback address while running in fixture mode. Nothing else reads the key: the console cannot place calls and has no access to it.
+The CALL-E key is read from the environment or a local `.env`, never committed, and sent only to `https://api.heycall-e.com`. A base URL pointing anywhere else is refused, except a loopback address while running in fixture mode. Redirects are followed only when they remain on the already approved origin, and provider error response bodies are never copied into exceptions. Nothing else reads the key: the console cannot place live calls and has no access to it.
+
+Phone numbers in provider summaries, transcript turns, structured values, findings, command output, exports, and console responses are masked. The destination still appears where an operator needs it, but only in the existing masked form.
+
+The unauthenticated console is loopback only by default. When `TRUNKLINE_PUBLIC_DEMO=1` is enabled, it serves a fresh temporary ledger created from the committed fictional records instead of the configured data directory, and it rejects claim intake. The temporary copy is removed when the server stops, so a real operator ledger cannot be exposed through public demo mode.
 
 ## What is stored, and where
 

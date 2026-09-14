@@ -17,7 +17,7 @@ import sys
 from datetime import date
 from typing import Dict, List, Optional, Sequence
 
-from . import audit, authz, client as calle_client, demo, engine, hold, plan as plan_mod, policy, vault, workflows, workqueue
+from . import audit, authz, client as calle_client, demo, engine, hold, plan as plan_mod, policy, redact, vault, workflows, workqueue
 from .models import (
     ANSWERED,
     CLOSED,
@@ -70,7 +70,7 @@ def context(args: argparse.Namespace) -> engine.Context:
 
 
 def out(text: str = "") -> None:
-    print(text)
+    print(redact.mask_phone_text(text))
 
 
 # ---------------------------------------------------------------------------
@@ -215,11 +215,17 @@ def cmd_run(args: argparse.Namespace) -> int:
                 )
             except calle_client.CalleError as error:
                 out("  call failed: %s" % error)
+                if args.mode == engine.MODE_LIVE:
+                    out("  Live batch halted. Reconcile the unresolved call before running again.")
+                    return 3
                 continue
             if outcome.suppressed:
                 out("  held: %s" % ", ".join(outcome.suppressed))
                 for reason in outcome.suppressed:
                     out("     - %s" % policy.describe_suppression(reason))
+                if args.mode == engine.MODE_LIVE and "pending_reconciliation" in outcome.suppressed:
+                    out("  Live batch halted. Reconcile the unresolved call before running again.")
+                    return 2
                 continue
             placed += 1
             _print_call(ctx, outcome)
@@ -239,15 +245,23 @@ def _print_call(ctx: engine.Context, outcome: engine.RunOutcome) -> None:
     if record is None:
         return
     profile = outcome.hold_profile
+    payer = ctx.ledger.payer(record.payer_id)
+    phone_patterns = redact.build_phone_patterns([payer.phone])
+
+    def safe(value) -> str:
+        return redact.mask_phone_text(str(value), phone_patterns)
+
     out("  outcome:   %s" % record.outcome)
     if profile:
         out("  %s" % profile.receipt())
         out("  talking:   %s of a %s call" % (
             hold.format_duration(record.talk_seconds), hold.format_duration(record.total_seconds)))
-    out("  reference: %s   representative: %s" % (record.reference_number, record.rep_name))
+    out("  reference: %s   representative: %s" % (
+        safe(record.reference_number), safe(record.rep_name),
+    ))
     out("  estimated cost: $%.2f" % record.cost_estimate_usd)
     for finding in record.findings:
-        out("  ! %s" % finding)
+        out("  ! %s" % safe(finding))
     for claim_id in record.claim_ids:
         claim = ctx.ledger.claim(claim_id)
         fields = record.per_claim.get(claim_id, {})
@@ -256,10 +270,10 @@ def _print_call(ctx: engine.Context, outcome: engine.RunOutcome) -> None:
         for name in sorted(fields):
             if name.startswith("_") or name in ("claim_number", "evidence_quote"):
                 continue
-            out("      %-24s %s" % (name, fields[name]))
+            out("      %-24s %s" % (name, safe(fields[name])))
         quote = fields.get("evidence_quote", UNKNOWN)
         if quote and quote != UNKNOWN:
-            out("      evidence: \"%s\"" % quote)
+            out("      evidence: \"%s\"" % safe(quote))
 
 
 # ---------------------------------------------------------------------------
@@ -275,11 +289,13 @@ def cmd_review(args: argparse.Namespace) -> int:
     pending.sort(key=lambda c: (c.state != NEEDS_HUMAN, c.claim_number))
     for claim in pending:
         payer = ctx.ledger.payer(claim.payer_id)
+        phone_patterns = redact.build_phone_patterns([payer.phone])
         out("%s  %s  %s  %s  $%.2f" % (claim.id, claim.state, claim.claim_number, payer.name, claim.billed_amount))
         for name in sorted(claim.result):
             if name.startswith("_") or name == "claim_number":
                 continue
-            out("    %-24s %s" % (name, claim.result[name]))
+            value = redact.mask_phone_text(str(claim.result[name]), phone_patterns)
+            out("    %-24s %s" % (name, value))
         if not claim.result.get("_grounded", True):
             out("    reason for review: the answer had no quotable support on the call")
         out("")
@@ -339,7 +355,8 @@ def cmd_export(args: argparse.Namespace) -> int:
         for name in sorted(claim.result):
             if not name.startswith("_") and name != "claim_number":
                 row[name] = claim.result[name]
-        rows.append(row)
+        phone_patterns = redact.build_phone_patterns([payer.phone])
+        rows.append(redact.scrub_value(row, [], phone_patterns))
 
     if not rows:
         out("Nothing to export yet.")
@@ -450,9 +467,15 @@ def cmd_revoke(args: argparse.Namespace) -> int:
 
 def cmd_reconcile(args: argparse.Namespace) -> int:
     ctx = context(args)
-    stuck = [c for c in ctx.ledger.calls if c.status in ("submitting", "in_progress")]
+    stuck = [c for c in ctx.ledger.calls if c.status in engine.UNRESOLVED_CALL_STATUSES]
     if args.call:
         stuck = [c for c in stuck if c.id == args.call]
+    if args.provider_call_id and not args.call:
+        out("--provider-call-id requires --call so it cannot attach to the wrong record.")
+        return 2
+    if args.provider_call_id and args.clear:
+        out("--provider-call-id and --clear cannot be used together.")
+        return 2
     if not stuck:
         out("Nothing to reconcile.")
         return 0
@@ -463,7 +486,8 @@ def cmd_reconcile(args: argparse.Namespace) -> int:
             continue
         try:
             profile = engine.reconcile(ctx, record, api_key=api_key(), base_url=base_url(),
-                                       allow_local_fake=args.allow_local_fake)
+                                       allow_local_fake=args.allow_local_fake,
+                                       provider_call_id=args.provider_call_id)
         except (calle_client.CalleError, engine.EngineError) as error:
             out("%s: %s" % (record.id, error))
             continue
@@ -643,6 +667,8 @@ def build_parser() -> argparse.ArgumentParser:
     reconcile.add_argument("--call")
     reconcile.add_argument("--clear", action="store_true",
                            help="assert no call exists at the provider and requeue its claims")
+    reconcile.add_argument("--provider-call-id",
+                           help="attach the CALL-E id found in the provider dashboard")
     reconcile.add_argument("--allow-local-fake", action="store_true")
 
     audit_cmd = add("audit", cmd_audit, "read the hash-chained audit log")
@@ -655,7 +681,7 @@ def build_parser() -> argparse.ArgumentParser:
     kill = add("kill-switch", cmd_kill_switch, "refuse every call, or stop refusing")
     kill.add_argument("state", choices=("on", "off"))
 
-    console = add("console", cmd_console, "serve the loopback review console")
+    console = add("console", cmd_console, "serve the local review console or synthetic public demo")
     console.add_argument("--host", default="127.0.0.1")
     console.add_argument("--port", type=int, default=8770)
 

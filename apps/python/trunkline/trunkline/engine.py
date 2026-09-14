@@ -46,6 +46,8 @@ MODE_LIVE = "live"
 MODES = (MODE_PREVIEW, MODE_FIXTURE, MODE_LIVE)
 
 KILL_SWITCH_FILENAME = "KILL_SWITCH"
+SUBMISSION_UNKNOWN = "submission_unknown"
+UNRESOLVED_CALL_STATUSES = ("submitting", SUBMISSION_UNKNOWN, "in_progress")
 
 
 class EngineError(RuntimeError):
@@ -119,6 +121,12 @@ def suppression_for(
     """Every named reason this bundle may not be called right now."""
     reasons: List[str] = []
     payer = ctx.ledger.payer(bundle.payer_id)
+
+    if mode == MODE_LIVE and any(
+        record.mode == MODE_LIVE and record.status in UNRESOLVED_CALL_STATUSES
+        for record in ctx.ledger.calls
+    ):
+        reasons.append("pending_reconciliation")
 
     if kill_switch_engaged(ctx.data_dir):
         reasons.append("kill_switch")
@@ -261,14 +269,36 @@ def run_bundle(
         created = api.create_call(plan.request, idempotency_key)
     except calle_client.CalleError:
         for claim in bundle.claims:
-            claim.state = QUEUED
+            claim.state = PENDING_RECONCILIATION
             claim.updated_at = now_iso()
-        record.status = "submit_failed"
+        record.status = SUBMISSION_UNKNOWN
+        record.outcome = UNKNOWN
         ctx.save()
-        audit.record(ctx.data_dir, actor=ctx.actor, action="call.submit_failed", subject=record.id, detail={})
-        raise
+        audit.record(
+            ctx.data_dir, actor=ctx.actor, action="call.submission_unknown",
+            subject=record.id, detail={"mode": mode},
+        )
+        raise calle_client.CalleError(
+            "CALL-E submission outcome is unknown; reconcile local call %s before another live call"
+            % record.id
+        ) from None
 
-    record.calle_call_id = str(created.get("id", ""))
+    record.calle_call_id = str(created.get("id", "")).strip()
+    if not record.calle_call_id:
+        for claim in bundle.claims:
+            claim.state = PENDING_RECONCILIATION
+            claim.updated_at = now_iso()
+        record.status = SUBMISSION_UNKNOWN
+        record.outcome = UNKNOWN
+        ctx.save()
+        audit.record(
+            ctx.data_dir, actor=ctx.actor, action="call.submission_unknown",
+            subject=record.id, detail={"mode": mode},
+        )
+        raise calle_client.CalleError(
+            "CALL-E submission outcome is unknown; reconcile local call %s before another live call"
+            % record.id
+        )
     record.status = "in_progress"
     ctx.ledger.calls_placed += 1
     for claim in bundle.claims:
@@ -313,6 +343,8 @@ def ingest_terminal(ctx: Context, record: CallRecord, payload: Dict[str, Any]) -
     for claim in claims:
         secrets.extend(vault.all_secrets_for(ctx.data_dir, claim.patient_ref))
     patterns = redact.build_patterns(secrets)
+    payer = ctx.ledger.payer(record.payer_id)
+    phone_patterns = redact.build_phone_patterns([payer.phone])
 
     record.status = str(payload.get("status", "completed"))
     record.outcome = verified.outcome
@@ -320,13 +352,19 @@ def ingest_terminal(ctx: Context, record: CallRecord, payload: Dict[str, Any]) -
     record.talk_seconds = profile.talk_seconds
     record.total_seconds = profile.total_seconds
     record.cost_estimate_usd = ctx.config.cost.estimate(profile.total_seconds / 60.0)
-    record.reference_number = redact.scrub_text(verified.reference_number, patterns)
-    record.rep_name = redact.scrub_text(verified.representative_name, patterns)
-    record.confidence = payload.get("completion_confidence") or {}
-    record.per_claim = redact.scrub_value(verified.per_claim, patterns)
-    record.findings = [redact.scrub_text(item, patterns) for item in verified.findings]
-    record.transcript = redact.scrub_transcript(turns, patterns)
-    record.summary = redact.scrub_text(str(payload.get("summary") or ""), patterns)
+    record.reference_number = redact.scrub_text(verified.reference_number, patterns, phone_patterns)
+    record.rep_name = redact.scrub_text(verified.representative_name, patterns, phone_patterns)
+    record.confidence = redact.scrub_value(
+        payload.get("completion_confidence") or {}, patterns, phone_patterns,
+    )
+    record.per_claim = redact.scrub_value(verified.per_claim, patterns, phone_patterns)
+    record.findings = [
+        redact.scrub_text(item, patterns, phone_patterns) for item in verified.findings
+    ]
+    record.transcript = redact.scrub_transcript(turns, patterns, phone_patterns)
+    record.summary = redact.scrub_text(
+        str(payload.get("summary") or ""), patterns, phone_patterns,
+    )
     record.completed_at = now_iso()
 
     ctx.ledger.hold_seconds_used += profile.hold_seconds
@@ -371,12 +409,29 @@ def reconcile(
     api_key: str,
     base_url: str = calle_client.OFFICIAL_ORIGIN,
     allow_local_fake: bool = False,
+    provider_call_id: str = "",
 ) -> Optional[hold_mod.HoldProfile]:
     """Resolve a call that was submitted but never folded back into the ledger."""
-    if not record.calle_call_id:
-        raise EngineError("call %s has no CALL-E id; clear it with `trunkline reconcile --clear`" % record.id)
     api = calle_client.CalleClient(api_key=api_key, base_url=base_url, allow_local_fake=allow_local_fake)
-    payload = api.get_call(record.calle_call_id)
+    if provider_call_id and record.calle_call_id and provider_call_id != record.calle_call_id:
+        raise EngineError("the supplied CALL-E id does not match the recorded call id")
+    lookup_id = record.calle_call_id or provider_call_id
+    if not lookup_id:
+        raise EngineError(
+            "call %s has an unknown submission outcome; attach the id from CALL-E with "
+            "`trunkline reconcile --call %s --provider-call-id <id>`, or use --clear only "
+            "after confirming that no call exists" % (record.id, record.id)
+        )
+    payload = api.get_call(lookup_id)
+    if not record.calle_call_id:
+        record.calle_call_id = lookup_id
+        record.status = "in_progress"
+        ctx.ledger.calls_placed += 1
+        ctx.save()
+        audit.record(
+            ctx.data_dir, actor=ctx.actor, action="call.provider_id_attached",
+            subject=record.id, detail={"calle_call_id": lookup_id},
+        )
     status = str(payload.get("status", "")).lower()
     if status not in calle_client.TERMINAL_STATUSES:
         return None

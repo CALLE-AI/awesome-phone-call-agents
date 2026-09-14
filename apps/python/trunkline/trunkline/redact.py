@@ -13,7 +13,9 @@ from __future__ import annotations
 
 import re
 from datetime import datetime
-from typing import Any, Dict, Iterable, List, Sequence
+from typing import Any, Dict, Iterable, List, Sequence, Tuple
+
+from . import policy
 
 REDACTION = "[redacted]"
 
@@ -34,6 +36,10 @@ LOOSE_MATCH_MIN_ALNUM = 6
 
 SSN_RE = re.compile(r"\b[0-9]{3}[-\s][0-9]{2}[-\s][0-9]{4}\b")
 EMAIL_RE = re.compile(r"\b[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Za-z]{2,}\b")
+E164_PHONE_RE = re.compile(r"(?<![\w])\+[1-9](?:[\s().-]*[0-9]){7,14}(?![\w])")
+NANP_PHONE_RE = re.compile(
+    r"(?<![\w])(?:\+?1[\s.-]*)?(?:\([0-9]{3}\)|[0-9]{3})[\s.-]+[0-9]{3}[\s.-]+[0-9]{4}(?![\w])"
+)
 
 # Separators a transcript may insert between characters of an identifier:
 # whitespace from digit-by-digit speech, and the punctuation of a written date.
@@ -93,7 +99,35 @@ def build_patterns(secrets: Iterable[str]) -> List["re.Pattern[str]"]:
     return patterns
 
 
-def scrub_text(text: str, patterns: Sequence["re.Pattern[str]"]) -> str:
+def build_phone_patterns(phones: Iterable[str]) -> List[Tuple["re.Pattern[str]", str]]:
+    """Match known destinations even when a transcript spaces every digit."""
+    patterns: List[Tuple["re.Pattern[str]", str]] = []
+    ordered = sorted({phone.strip() for phone in phones if isinstance(phone, str) and phone.strip()})
+    for phone in ordered:
+        patterns.append((_pattern_for(phone), policy.mask_phone(phone)))
+    return patterns
+
+
+def mask_phone_text(
+    text: str,
+    phone_patterns: Sequence[Tuple["re.Pattern[str]", str]] = (),
+) -> str:
+    """Mask known, E.164, and conventionally formatted phone numbers in text."""
+    if not isinstance(text, str) or not text:
+        return text
+    out = text
+    for pattern, masked in phone_patterns:
+        out = pattern.sub(masked, out)
+    out = E164_PHONE_RE.sub(lambda match: policy.mask_phone(match.group(0)), out)
+    out = NANP_PHONE_RE.sub(lambda match: policy.mask_phone(match.group(0)), out)
+    return out
+
+
+def scrub_text(
+    text: str,
+    patterns: Sequence["re.Pattern[str]"],
+    phone_patterns: Sequence[Tuple["re.Pattern[str]", str]] = (),
+) -> str:
     if not isinstance(text, str) or not text:
         return text
     out = text
@@ -101,25 +135,33 @@ def scrub_text(text: str, patterns: Sequence["re.Pattern[str]"]) -> str:
         out = pattern.sub(REDACTION, out)
     out = SSN_RE.sub(REDACTION, out)
     out = EMAIL_RE.sub(REDACTION, out)
-    return out
+    return mask_phone_text(out, phone_patterns)
 
 
-def scrub_value(value: Any, patterns: Sequence["re.Pattern[str]"]) -> Any:
+def scrub_value(
+    value: Any,
+    patterns: Sequence["re.Pattern[str]"],
+    phone_patterns: Sequence[Tuple["re.Pattern[str]", str]] = (),
+) -> Any:
     """Recursively scrub every string inside a JSON-shaped value."""
     if isinstance(value, str):
-        return scrub_text(value, patterns)
+        return scrub_text(value, patterns, phone_patterns)
     if isinstance(value, list):
-        return [scrub_value(item, patterns) for item in value]
+        return [scrub_value(item, patterns, phone_patterns) for item in value]
     if isinstance(value, dict):
-        return {key: scrub_value(item, patterns) for key, item in value.items()}
+        return {key: scrub_value(item, patterns, phone_patterns) for key, item in value.items()}
     return value
 
 
-def scrub_transcript(turns: Sequence[Dict[str, Any]], patterns: Sequence["re.Pattern[str]"]) -> List[Dict[str, Any]]:
+def scrub_transcript(
+    turns: Sequence[Dict[str, Any]],
+    patterns: Sequence["re.Pattern[str]"],
+    phone_patterns: Sequence[Tuple["re.Pattern[str]", str]] = (),
+) -> List[Dict[str, Any]]:
     scrubbed: List[Dict[str, Any]] = []
     for turn in turns:
         item = dict(turn)
-        item["text"] = scrub_text(str(item.get("text", "")), patterns)
+        item["text"] = scrub_text(str(item.get("text", "")), patterns, phone_patterns)
         scrubbed.append(item)
     return scrubbed
 

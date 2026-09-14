@@ -79,4 +79,4 @@ Never disclosed by any workflow: Social Security numbers or fragments, medical r
 
 ## Related
 
-A full runnable implementation, with bundling, hold accounting, a review console, a hash-chained audit log, and 85 offline tests, is at [`apps/python/trunkline`](../../apps/python/trunkline/).
+A full runnable implementation, with bundling, hold accounting, a review console, a hash-chained audit log, and 102 offline tests, is at [`apps/python/trunkline`](../../apps/python/trunkline/).
