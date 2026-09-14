@@ -1,10 +1,10 @@
-# Weekend Saviour 🆘📞
+# OnTripFix 🆘📞
 
 **Autonomous Apache Airflow Incident Remediation with Call-E Voice AI & LangGraph StateGraph**
 
-`weekend-saviour` is a production-grade demonstration app that solves a critical weekend operational challenge: automated incident response for data pipelines failing outside regular office hours.
+`ontripfix` is a production-grade demonstration app that solves a critical on-call operational challenge: automated incident response for data pipelines failing outside regular office hours.
 
-When a Friday night batch ETL pipeline fails in Apache Airflow, **Weekend Saviour** intercepts the failure, enriches the incident context using Jira and Confluence, places an outbound voice call to the on-call engineer using **Call-E Voice AI**, collects remediation approval, and executes schema fixes automatically using a **LangGraph StateGraph** powered by Google Gemini tools.
+When a batch ETL pipeline fails in Apache Airflow, **OnTripFix** intercepts the failure, enriches the incident context using Jira and Confluence, places an outbound voice call to the on-call engineer using **Call-E Voice AI**, collects remediation approval, and executes schema fixes automatically using a **LangGraph StateGraph** powered by Google Gemini tools.
 
 ---
 
@@ -60,7 +60,7 @@ When a Friday night batch ETL pipeline fails in Apache Airflow, **Weekend Saviou
 ## 📁 Repository Structure
 
 ```text
-apps/python/weekend-saviour/
+apps/python/ontripfix/
 ├── README.md                          # Application documentation
 ├── simulate_e2e_incident.py           # End-to-end incident response simulation script
 ├── requirements.txt                   # Production dependencies
@@ -108,7 +108,7 @@ source venv/bin/activate
 ### 2. Install Dependencies
 
 ```bash
-pip install -r apps/python/weekend-saviour/requirements.txt
+pip install -r apps/python/ontripfix/requirements.txt
 ```
 
 ---
@@ -120,7 +120,7 @@ pip install -r apps/python/weekend-saviour/requirements.txt
 Run the automated simulation script to execute all four phases in sequence:
 
 ```bash
-python apps/python/weekend-saviour/simulate_e2e_incident.py
+python apps/python/ontripfix/simulate_e2e_incident.py
 ```
 
 #### What happens during simulation:
@@ -136,7 +136,7 @@ python apps/python/weekend-saviour/simulate_e2e_incident.py
 Run the full automated test suite:
 
 ```bash
-pytest apps/python/weekend-saviour/tests/test_flow.py
+pytest apps/python/ontripfix/tests/test_flow.py
 ```
 
 ---
@@ -146,15 +146,13 @@ pytest apps/python/weekend-saviour/tests/test_flow.py
 Start the Flask webhook server on port `7071`:
 
 ```bash
-python ./apps/python/weekend-saviour/flask_app/app.py
+python ./apps/python/ontripfix/fastapi_app/app.py
 ```
 
 Run with live auto-reload enabled:
 
 ```bash
-FLASK_DEBUG=1 python ./apps/python/weekend-saviour/flask_app/app.py
-# Or via flask CLI
-python -m flask --app ./apps/python/weekend-saviour/flask_app/app.py run --reload --port 7071 --host 0.0.0.0
+python -m uvicorn fastapi_app.app:app --host 0.0.0.0 --port 7071
 ```
 
 **Health Check Endpoint:**
@@ -202,5 +200,5 @@ The application works out-of-the-box using local fallback mechanisms (mock voice
 - **Controlled Database Side Effects**: All database modifications target local SQLite instance (`db/retail_data.db`).
 - **Database Reset / Rollback**: Reset schema and seed data to initial state at any time by running:
   ```bash
-  python apps/python/weekend-saviour/db/init_sqlite.py
+  python apps/python/ontripfix/db/init_sqlite.py
   ```
