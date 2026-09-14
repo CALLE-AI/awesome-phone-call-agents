@@ -106,3 +106,11 @@ The default tests use no credentials, network access, or real calls. They cover 
 4. Inspect the evidence matrix and explain that matching is deterministic.
 5. Select Willow Room, review the disclosure envelope, type `REQUEST TOUR`, and run the synthetic follow-up.
 6. Export the evidence report and show the separate tour outcome.
+
+Detailed submission assets are available in:
+
+- [`docs/demo-script.md`](docs/demo-script.md)
+- [`docs/live-validation.md`](docs/live-validation.md)
+- [`docs/call-e-feedback.md`](docs/call-e-feedback.md)
+- [`docs/devpost-draft.md`](docs/devpost-draft.md)
+- [`docs/submission-checklist.md`](docs/submission-checklist.md)
