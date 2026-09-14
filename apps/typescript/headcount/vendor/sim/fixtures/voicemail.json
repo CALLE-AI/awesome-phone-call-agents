@@ -1,0 +1,30 @@
+{
+  "id": "voicemail",
+  "status": "completed",
+  "task_completed": false,
+  "completion_confidence": { "score": 0.91, "label": "high" },
+  "disposition": "voicemail_left",
+  "evidence": [
+    "The call reached a voicemail greeting. A short callback message was left. No questions were asked."
+  ],
+  "structured_result": {
+    "dialed_count": 1,
+    "reached_count": 0,
+    "unreached_count": 1,
+    "critical_count": 0
+  },
+  "recipient_structured_result": {
+    "safety_status": "unknown",
+    "evacuation": "unknown",
+    "has_power": "unknown",
+    "has_water": "unknown",
+    "medication": "unknown",
+    "household": "unknown",
+    "needs_human": "unknown"
+  },
+  "transcript_turns": [
+    { "offset_seconds": 0, "speaker": "bot", "text": "This is an automated AI assistant from Sonoma County Emergency Management." },
+    { "offset_seconds": 6, "speaker": "user", "text": "Hi, you've reached the voicemail of this number. Please leave a message after the tone." },
+    { "offset_seconds": 12, "speaker": "bot", "text": "This is a safety check, not an emergency service. Please call us back at the callback number on file. We are not asking any questions on this message." }
+  ]
+}

@@ -1,0 +1,20 @@
+<div class="table-wrap"><table>
+  <thead>
+    <tr><th>Contact</th><th>Name</th><th>Number</th><th>Locale</th><th>Step</th>
+        <th>State</th><th>Reason</th><th>Next step</th></tr>
+  </thead>
+  <tbody>
+  {% for row in rows %}
+    <tr>
+      <td><code>{{ row.contact_id }}</code></td>
+      <td>{{ row.first_name }}</td>
+      <td><code>{{ row.phone }}</code></td>
+      <td>{{ row.locale }}</td>
+      <td>{{ row.step }}</td>
+      <td><span class="pill {{ row.tone }}">{{ row.state }}</span></td>
+      <td class="note">{{ row.reason }}</td>
+      <td class="note">{{ row.next_at.isoformat() if row.next_at else '-' }}</td>
+    </tr>
+  {% endfor %}
+  </tbody>
+</table></div>
