@@ -1,0 +1,85 @@
+{
+  "id": "eval-037",
+  "label": "ivr",
+  "difficulty": "hard",
+  "scenario": "Conversational speech-recognition IVR ('tell me in a few words'), misrecognizes intent, confirms by yes/no, reads claim record and texts a copy.",
+  "task": "Check the status of Susan Achebe's auto insurance claim.",
+  "outcome": {
+    "task_completed_claimed": true,
+    "commitment_type": "information",
+    "confirmation_artifact": "system read-back of claim CL47729105; SMS copy sent to number on policy",
+    "expected_attestation": "system_asserted"
+  },
+  "turns": [
+    {
+      "speaker": "user",
+      "text": "thanks for calling Northgate Insurance. I can help with most things right here. so, tell me in a few words what you're calling about.",
+      "offset_seconds": 0.7
+    },
+    {
+      "speaker": "bot",
+      "text": "hi, I'm an AI assistant calling on behalf of Susan Achebe to check the status of her auto claim.",
+      "offset_seconds": 11.69
+    },
+    {
+      "speaker": "user",
+      "text": "okay. I think you're calling about billing. is that right?",
+      "offset_seconds": 19.14
+    },
+    {
+      "speaker": "bot",
+      "text": "no, claim status.",
+      "offset_seconds": 24.84
+    },
+    {
+      "speaker": "user",
+      "text": "got it. claim status. please say or enter your claim number. it starts with the letters C L.",
+      "offset_seconds": 26.77
+    },
+    {
+      "speaker": "bot",
+      "text": "C L, four seven seven two, nine one oh five.",
+      "offset_seconds": 35.32
+    },
+    {
+      "speaker": "user",
+      "text": "I heard. C L. four seven seven two. nine one zero five. is that right?",
+      "offset_seconds": 39.71
+    },
+    {
+      "speaker": "bot",
+      "text": "yes.",
+      "offset_seconds": 47.56
+    },
+    {
+      "speaker": "user",
+      "text": "thanks. one moment while I pull that up.",
+      "offset_seconds": 48.83
+    },
+    {
+      "speaker": "user",
+      "text": "claim C L four seven seven two nine one zero five, was approved on september ninth. a payment of. two thousand. one hundred. forty dollars. was issued by direct deposit on. september eleventh. would you like me to text you a copy of this information?",
+      "offset_seconds": 54.68
+    },
+    {
+      "speaker": "bot",
+      "text": "yes please.",
+      "offset_seconds": 75.25
+    },
+    {
+      "speaker": "user",
+      "text": "okay. I'll text it to the mobile number on your policy. is there anything else I can help you with? you can say, file a claim, make a payment, or, I'm done.",
+      "offset_seconds": 76.83
+    },
+    {
+      "speaker": "bot",
+      "text": "I'm done.",
+      "offset_seconds": 90.77
+    },
+    {
+      "speaker": "user",
+      "text": "thanks for calling Northgate Insurance. goodbye.",
+      "offset_seconds": 92.41
+    }
+  ]
+}

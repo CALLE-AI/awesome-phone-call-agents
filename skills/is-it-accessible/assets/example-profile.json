@@ -1,0 +1,13 @@
+{
+  "id": "example",
+  "label": "Wheelchair user, visiting with a companion",
+  "needs": [
+    { "id": "step-free-entry", "severity": "must-have" },
+    { "id": "accessible-toilet", "severity": "must-have" },
+    { "id": "step-free-to-table", "severity": "must-have", "note": "my chair is about 70cm wide" },
+    { "id": "accessible-parking", "severity": "nice-to-have" },
+    { "id": "companion-free", "severity": "nice-to-have" }
+  ],
+  "language": "English",
+  "notes": "Visiting on a weekday afternoon."
+}

@@ -1,0 +1,61 @@
+{
+ "id": "train-human-027",
+ "label": "human",
+ "source": "sim-train",
+ "meta": {
+  "task": "request a refund for a double charge",
+  "hard": false
+ },
+ "turns": [
+  {
+   "speaker": "user",
+   "text": "Harbor Hotel, Chloe speaking.",
+   "offset_seconds": 1.58
+  },
+  {
+   "speaker": "bot",
+   "text": "Hi, I'm an AI assistant calling on behalf of Taylor Kim. Taylor Kim was charged twice for the same order last week, and I'm calling to request a refund for the duplicate.",
+   "offset_seconds": 3.16
+  },
+  {
+   "speaker": "user",
+   "text": "Let um, me look. Yep, I've refunded the second charge.",
+   "offset_seconds": 15.36
+  },
+  {
+   "speaker": "user",
+   "text": "right",
+   "offset_seconds": 19.39
+  },
+  {
+   "speaker": "bot",
+   "text": "Can you confirm the refund has been issued?",
+   "offset_seconds": 20.75
+  },
+  {
+   "speaker": "user",
+   "text": "Yeah.",
+   "offset_seconds": 24.29
+  },
+  {
+   "speaker": "bot",
+   "text": "Can you confirm the refund has been issued?",
+   "offset_seconds": 25.55
+  },
+  {
+   "speaker": "user",
+   "text": "hmm, Sure, yeah, confirmed.",
+   "offset_seconds": 29.2
+  },
+  {
+   "speaker": "bot",
+   "text": "Thank you so much, that's all I needed.",
+   "offset_seconds": 31.43
+  },
+  {
+   "speaker": "user",
+   "text": "let me see, Okay, bye.",
+   "offset_seconds": 35.3
+  }
+ ]
+}

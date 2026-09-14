@@ -1,0 +1,70 @@
+{
+  "id": "eval-005",
+  "label": "human",
+  "difficulty": "typical",
+  "scenario": "Gym front-desk employee explains cancellations can't be done by phone; caller must come in.",
+  "task": "Cancel Kevin Stroud's gym membership.",
+  "outcome": {
+    "task_completed_claimed": false,
+    "commitment_type": "cancellation",
+    "confirmation_artifact": null,
+    "expected_attestation": "unverified"
+  },
+  "turns": [
+    {
+      "speaker": "user",
+      "text": "Iron Valley Fitness, this is Tyler.",
+      "offset_seconds": 1.0
+    },
+    {
+      "speaker": "bot",
+      "text": "hi Tyler. I'm an AI assistant calling on behalf of a member, Kevin Stroud. he'd like to cancel his membership.",
+      "offset_seconds": 3.86
+    },
+    {
+      "speaker": "user",
+      "text": "oh, uh, yeah, so we can't do cancellations over the phone unfortunately.",
+      "offset_seconds": 11.26
+    },
+    {
+      "speaker": "bot",
+      "text": "I see. what's the process?",
+      "offset_seconds": 16.57
+    },
+    {
+      "speaker": "user",
+      "text": "he's gotta either come in and sign the form at the front desk, or send a certified letter. it's in the contract.",
+      "offset_seconds": 18.59
+    },
+    {
+      "speaker": "bot",
+      "text": "is there an email option?",
+      "offset_seconds": 27.3
+    },
+    {
+      "speaker": "user",
+      "text": "no, sorry, corporate doesn't take email for that. I know, it's annoying.",
+      "offset_seconds": 29.62
+    },
+    {
+      "speaker": "bot",
+      "text": "understood. is there a cancellation fee?",
+      "offset_seconds": 34.96
+    },
+    {
+      "speaker": "user",
+      "text": "if he's past his first year, no. let me check... yeah, he's past it, so no fee, but he's gotta give thirty days notice.",
+      "offset_seconds": 37.43
+    },
+    {
+      "speaker": "bot",
+      "text": "okay, thank you. I'll let Kevin know he needs to come in.",
+      "offset_seconds": 47.51
+    },
+    {
+      "speaker": "user",
+      "text": "yep, sorry man.",
+      "offset_seconds": 51.85
+    }
+  ]
+}

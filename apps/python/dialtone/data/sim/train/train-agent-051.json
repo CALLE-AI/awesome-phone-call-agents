@@ -1,0 +1,66 @@
+{
+ "id": "train-agent-051",
+ "label": "agent",
+ "source": "sim-train",
+ "meta": {
+  "task": "request a refund for a double charge",
+  "hard": false
+ },
+ "turns": [
+  {
+   "speaker": "user",
+   "text": "Thank you for calling Harbor Hotel! I'm Nova, the virtual assistant for Harbor Hotel. How can I help you today?",
+   "offset_seconds": 0.92
+  },
+  {
+   "speaker": "bot",
+   "text": "Hi, I'm an AI assistant calling on behalf of Alex Martin. Alex Martin was charged twice for the same order last week, and I'm calling to request a refund for the duplicate.",
+   "offset_seconds": 9.13
+  },
+  {
+   "speaker": "user",
+   "text": "I'm sorry about the double charge. I've submitted a refund request for the duplicate payment. It should be processed within five to seven business days.",
+   "offset_seconds": 22.07
+  },
+  {
+   "speaker": "bot",
+   "text": "How long will the refund take?",
+   "offset_seconds": 32.22
+  },
+  {
+   "speaker": "user",
+   "text": "Great question! Let me check that for you. Yes, that's correct.",
+   "offset_seconds": 35.31
+  },
+  {
+   "speaker": "bot",
+   "text": "How long will the refund take?",
+   "offset_seconds": 40.24
+  },
+  {
+   "speaker": "user",
+   "text": "I'd be happy to help with that. Everything is all set on our end.",
+   "offset_seconds": 43.25
+  },
+  {
+   "speaker": "bot",
+   "text": "Thank you, that's everything.",
+   "offset_seconds": 49.28
+  },
+  {
+   "speaker": "user",
+   "text": "I'd be happy to help with that. Everything is all set on our end.",
+   "offset_seconds": 51.53
+  },
+  {
+   "speaker": "bot",
+   "text": "Thank you, that's everything.",
+   "offset_seconds": 57.63
+  },
+  {
+   "speaker": "user",
+   "text": "You're welcome! Have a wonderful day. Goodbye!",
+   "offset_seconds": 60.09
+  }
+ ]
+}

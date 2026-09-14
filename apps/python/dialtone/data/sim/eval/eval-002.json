@@ -1,0 +1,60 @@
+{
+  "id": "eval-002",
+  "label": "human",
+  "difficulty": "typical",
+  "scenario": "Florist checks the delivery board and gives an informal ETA for a bouquet.",
+  "task": "Check delivery status of Nathan Cole's bouquet order to Linden Avenue.",
+  "outcome": {
+    "task_completed_claimed": true,
+    "commitment_type": "information",
+    "confirmation_artifact": null,
+    "expected_attestation": "human_attested"
+  },
+  "turns": [
+    {
+      "speaker": "user",
+      "text": "hi, Bloom and Stem.",
+      "offset_seconds": 0.6
+    },
+    {
+      "speaker": "bot",
+      "text": "hi, I'm an AI assistant calling on behalf of Nathan Cole. he ordered a bouquet for delivery today to Grace Cole on Linden Avenue and wanted to check the status.",
+      "offset_seconds": 2.97
+    },
+    {
+      "speaker": "user",
+      "text": "sure, hold on... Cole, Linden... the peonies?",
+      "offset_seconds": 15.91
+    },
+    {
+      "speaker": "bot",
+      "text": "yes, I believe it's the peony arrangement.",
+      "offset_seconds": 19.72
+    },
+    {
+      "speaker": "user",
+      "text": "okay yeah that went out with Marco about an hour ago. he's got like four stops before, so I'd say by three at the latest.",
+      "offset_seconds": 22.63
+    },
+    {
+      "speaker": "bot",
+      "text": "by three o'clock. and the card message is included?",
+      "offset_seconds": 32.64
+    },
+    {
+      "speaker": "user",
+      "text": "yeah the card's in there, I wrote it myself.",
+      "offset_seconds": 35.94
+    },
+    {
+      "speaker": "bot",
+      "text": "perfect, thank you.",
+      "offset_seconds": 40.3
+    },
+    {
+      "speaker": "user",
+      "text": "mm-hmm, bye.",
+      "offset_seconds": 41.43
+    }
+  ]
+}

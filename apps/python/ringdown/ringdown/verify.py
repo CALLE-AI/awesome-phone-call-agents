@@ -5,10 +5,10 @@ from datetime import datetime
 from ringdown.calle import CalleError, McpClient
 from ringdown.calls import STATUS_MAP
 from ringdown.checks import Block, Check
-from ringdown.dispositions import ground
+from ringdown.dispositions import ground, owner_matches
 from ringdown.escalate import Attempt, LadderResult
-from ringdown.extract import extract, minutes_in, normalise
-from ringdown.incident import first_name, mask_phone
+from ringdown.extract import extract, minutes_in
+from ringdown.incident import mask_phone
 
 
 def inside(completed_at: str | None, window: tuple[datetime, datetime]) -> bool:
@@ -63,7 +63,7 @@ def ack_checks(
         ),
         (grounded.disposition, "the recorded disposition span is spoken by the recipient"),
         (
-            grounded.owner and first_name(contact) in normalise(extraction.owner_span),
+            grounded.owner and owner_matches(extraction, contact),
             f"the recorded owner {contact.name} is spoken by the recipient",
         ),
         (
