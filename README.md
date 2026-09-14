@@ -214,6 +214,8 @@ This project is an awesome list for AI-agent phone-call workflows. Add resources
 - [Supply Chain Supplier Status Agent](https://github.com/mohSadiq90/call-e-hackathon) - Autonomous enterprise phone agent for supplier purchase order fulfillment verification, root cause delay capture, penalty estimation, and ERP dashboard sync with zero-credit mock simulation.
 
 - [WristCall AI](https://github.com/Baklolman69/WristCallAI) - Wear OS smartwatch assistant that searches Google via SerpApi, synthesizes call intent with Groq AI 120B, and dispatches autonomous phone calls via CALL-E with 3-bullet voice summaries.
+
+- [Threshold](https://call-e-attention-gate.cohyme.chatgpt.site) - Japanese-language missed-call review demo with a public no-call fixture path, field-level evidence, and fail-closed handling for an unresolved CALL-E execution attempt. See the [judge guide](docs/threshold/).
 - [SafeOps](https://github.com/saikumar040060/safeops) - Experimental runtime authorization layer for CALL-E outcomes using policy checks and human approval; author-reported evidence covers one real outbound call controlling a seeded local demo refund and a blocked manipulated-transcript case, not a real payment refund or a production exactly-once guarantee. Evidence is not independently verified: [`submissions/calle.md`](https://github.com/saikumar040060/safeops/blob/main/submissions/calle.md).
 - [OOO-Pilot](https://github.com/balajianbalagan/ooopilot) - Slack-based AI work proxy that places real CALL-E phone calls on an absent employee's behalf, verifies coworker claims against Jira before treating them as fact, and reports discrepancies in a return-to-work summary.
 
