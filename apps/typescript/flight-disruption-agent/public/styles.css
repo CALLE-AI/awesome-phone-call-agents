@@ -189,6 +189,8 @@ blockquote { margin: 0; padding-left: 12px; border-left: 3px solid var(--accent)
 .feed { background: var(--surface); border: 1px solid var(--rule); border-radius: 6px; padding: 14px 16px; display: grid; gap: 8px; }
 .feed ul { list-style: none; margin: 0; padding: 0; display: grid; gap: 8px; }
 .feed li { display: flex; flex-wrap: wrap; align-items: baseline; gap: 4px 10px; font-size: 0.88rem; border-top: 1px solid var(--rule); padding-top: 8px; }
+.feed-pull { display: flex; flex-wrap: wrap; align-items: center; gap: 4px 12px; font-size: 0.88rem; }
+.feed-pull .btn { padding: 3px 10px; font-size: 0.8rem; }
 .feed .feed-msg { flex-basis: 100%; color: var(--muted); }
 
 .request-form { padding: 14px 16px; display: grid; gap: 10px; margin-bottom: 16px; }

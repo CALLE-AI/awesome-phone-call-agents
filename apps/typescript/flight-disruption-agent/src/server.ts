@@ -6,6 +6,7 @@ import { APP_ROOT, demoClockFromEnv, gatewayFromEnv, liveAttestationError, loadE
 import { loadCatalog } from "./data.ts";
 import { Desk, DeskError } from "./desk.ts";
 import { OpsEventError, parseOpsEvent, SIGNATURE_HEADER, verifySignature } from "./events.ts";
+import { FeedPoller, feedConfigFromEnv } from "./feed.ts";
 import type { Action, DisruptionCause, DisruptionKind, RequestChannel, RequestKind } from "./types.ts";
 
 loadEnvFile();
@@ -26,6 +27,8 @@ const desk = new Desk(catalog, gateway, {
   liveDemoPhone: process.env.LIVE_DEMO_PHONE?.trim() || undefined,
   liveCallBudget: Number(process.env.LIVE_CALL_BUDGET ?? 3),
 });
+const feedConfig = feedConfigFromEnv();
+const feed = feedConfig ? new FeedPoller(desk, catalog, feedConfig) : null;
 
 const HOST = process.env.HOST ?? "127.0.0.1";
 const PORT = Number(process.env.PORT ?? 4310);
@@ -115,7 +118,12 @@ async function api(req: IncomingMessage, res: ServerResponse, path: string): Pro
 
   if (req.method === "GET" && path === "/api/state") {
     await desk.refreshAll();
-    return send(res, 200, desk.snapshot());
+    return send(res, 200, { ...desk.snapshot(), feed: feed?.status() ?? null });
+  }
+  if (req.method === "POST" && path === "/api/feed/poll") {
+    if (!feed) throw new DeskError("No airline feed configured: set AIRLINE_FEED_URL.", 404);
+    await feed.poll();
+    return send(res, 200, feed.status());
   }
   if (req.method === "POST" && path === "/api/disruptions") {
     const body = await readJson(req);
@@ -227,6 +235,10 @@ const server = createServer(async (req, res) => {
 
 server.listen(PORT, HOST, () => {
   const live = gateway.live ? `LIVE (${gateway.mode}) - real calls go to LIVE_DEMO_PHONE only` : "dry-run - no calls are placed";
+  if (feed && feedConfig) {
+    feed.start();
+    console.log(`Polling the airline event feed ${new URL(feedConfig.url).origin} every ${feedConfig.intervalSeconds}s.`);
+  }
   console.log(`Flight disruption desk on http://${HOST}:${PORT}  [${live}]`);
   console.log(OPERATOR_TOKEN ? "Dashboard requires the operator token (HTTP Basic, any user name)." : "Dashboard accepts loopback connections only.");
   if (demoClock.label) console.log(`Demo clock: passenger request cutoffs use ${demoClock.label}. Set DEMO_NOW=real for the real time.`);

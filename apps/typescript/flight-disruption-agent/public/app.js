@@ -174,17 +174,28 @@ const FEED_CHIPS = { created: ["ok", "Recorded"], escalated: ["warn", "Escalated
 function renderFeed() {
   const el = $("feed");
   const events = snap.opsEvents ?? [];
-  el.hidden = events.length === 0;
-  if (!events.length) return;
+  const pull = snap.feed;
+  el.hidden = events.length === 0 && !pull;
+  if (el.hidden) return;
   const flightCode = (id) => snap.flights.find((f) => f.id === id)?.code ?? id ?? "unknown flight";
+  const pullStatus = pull
+    ? `<div class="feed-pull">
+        <span>Pulling <span class="mono">${esc(new URL(pull.url).origin)}</span> every ${pull.intervalSeconds}s</span>
+        <span class="muted">last poll ${pull.lastPolledAt ? hhmm(pull.lastPolledAt) : "not yet"} · cursor <span class="mono">${esc(pull.cursor ?? "start")}</span> · ${pull.eventsRead} read</span>
+        ${pull.lastError ? `<span class="chip bad">${esc(pull.lastError)}</span>` : pull.lastSuccessAt ? '<span class="chip ok">Feed OK</span>' : ""}
+        <button type="button" class="btn ghost" data-feed-poll>Poll now</button>
+        ${pull.invalid.length ? `<span class="feed-msg">Ignored ${pull.invalid.length} invalid event(s), latest: ${esc(pull.invalid[0].eventId ?? "no id")}: ${esc(pull.invalid[0].message)}</span>` : ""}
+      </div>`
+    : "";
   el.innerHTML = `<h2>Airline ops feed</h2>
-    <p class="note">Signed events pushed to <span class="mono">POST /api/webhooks/airline-ops</span>. Events record the disruption only; calls still start here.</p>
+    <p class="note">Events pushed to <span class="mono">POST /api/webhooks/airline-ops</span>${pull ? " or pulled from the airline feed" : ""}. Events record the disruption only; calls still start here.</p>
+    ${pullStatus}
     <ul>${events
       .map((e) => {
         const [cls, label] = FEED_CHIPS[e.status] || ["", e.status];
         return `<li><span class="chip ${cls}">${esc(label)}</span>
           <span class="mono">${esc(e.type)}</span> <b>${esc(flightCode(e.flightId))}</b>
-          <span class="muted">${hhmm(e.receivedAt)} · ${esc(e.eventId)}</span>
+          <span class="muted">${hhmm(e.receivedAt)} · ${e.via === "feed" ? "pulled" : "pushed"} · ${esc(e.eventId)}</span>
           <span class="feed-msg">${esc(e.message)}</span></li>`;
       })
       .join("")}</ul>`;
@@ -262,7 +273,7 @@ function renderDesk() {
             ${d.supersededBy ? `<span class="chip warn">Replaced by ${esc(d.supersededBy)}</span>` : ""}
             ${d.supersedes ? `<span>Replaces <b class="mono">${esc(d.supersedes)}</b></span>` : ""}
             <span>Cause <b>${esc(d.reason)}</b></span>
-            <span>Source <b>${d.source?.kind === "airline_webhook" ? `airline ops feed <span class="mono">${esc(d.source.eventId)}</span>` : "reported on this desk"}</b></span>
+            <span>Source <b>${d.source?.kind === "airline_webhook" || d.source?.kind === "airline_feed" ? `airline ops ${d.source.kind === "airline_feed" ? "feed (pulled)" : "webhook"} <span class="mono">${esc(d.source.eventId)}</span>` : "reported on this desk"}</b></span>
             <span><b>${esc(CASE_LABELS[c] ?? c)}</b> pricing ${pricing}</span>
             <span><b>${handled}</b> handled · <b>${review}</b> need a person</span>
           </div>
@@ -739,6 +750,10 @@ document.addEventListener("click", (e) => {
     const [disruptionId, pnr] = call.dataset.call.split("|");
     const key = `${disruptionId}:${pnr}`;
     act(() => api("/api/calls/start", { disruptionId, pnr, confirmLast4: draft[`last4-${key}`] }));
+    return;
+  }
+  if (e.target.closest("[data-feed-poll]")) {
+    act(() => api("/api/feed/poll", {}));
     return;
   }
   const reqSel = e.target.closest("[data-req-select]");
