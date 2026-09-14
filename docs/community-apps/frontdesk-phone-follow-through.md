@@ -5,7 +5,8 @@ a business loads its catalogue, hours and policies, and an AI assistant answers
 customers, takes orders and bookings, and hands off to a shared human inbox.
 Phone Follow-Through adds the step chat cannot do: when a record needs closing,
 the AI **picks up the phone** through CALL-E and writes the structured result
-back to the same order, booking and conversation.
+back to the same order, booking and conversation. This is an external experimental
+integration reference, not a production-safety certification.
 
 - Repository: [https://github.com/TayseerLaz/frontdesk-core](https://github.com/TayseerLaz/frontdesk-core)
 
@@ -87,9 +88,11 @@ A live call rings a real phone, spends one CALL-E call credit, stores the
 summary, structured result and transcript on the tenant's `phone_tasks` row
 (protected by Postgres row-level security), posts an internal note in the
 customer's inbox thread, raises a bell notification, and may change an order or
-booking status. A status only changes when CALL-E reports `task_completed` with
-confidence ≥ 0.7 **and** an unambiguous disposition; anything else becomes
-`needs_review` and a human decides.
+booking status. The external implementation uses task completion, confidence ≥ 0.7
+and heuristic result rules. In particular, its COD rule can cancel an order when
+`confirmed = no` even if the disposition is `changed`. These rules are not proof of
+customer intent or a guarantee that every ambiguous answer reaches `needs_review`;
+operators must assess them before enabling real order or booking mutations.
 
 ## Cancellation and duplicate-call protections
 
@@ -99,8 +102,12 @@ confidence ≥ 0.7 **and** an unambiguous disposition; anything else becomes
   cap; turning it off stops new calls immediately.
 - Contacts who opted out or are blocked are refused before a row exists, as are
   numbers outside CALL-E's supported countries.
-- Each task persists its `Idempotency-Key` before the first request, so a crash
-  or network retry can never place a second call.
+- Each task persists an attempt-scoped `Idempotency-Key` before the first request.
+  Protection depends on reusing that key and the provider's dedupe behavior; a
+  new attempt has a new key. This is not crash-proof recovery or permanent dedupe.
+- Disabling auto-confirm stops future tasks, not calls already accepted by the
+  provider. Closing the page does not hang up a call. Reconcile unknown outcomes
+  before another attempt, and do not report cancellation without provider confirmation.
 
 ## Scope notes
 

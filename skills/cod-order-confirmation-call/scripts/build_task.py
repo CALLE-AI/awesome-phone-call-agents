@@ -10,6 +10,7 @@ the result_schema and the idempotency key. Never dials, never needs a key.
 from __future__ import annotations
 
 import json
+import re
 import sys
 from datetime import datetime, timezone
 from pathlib import Path
@@ -18,7 +19,7 @@ GUARDRAILS = (
     "Rules: never invent items, prices, discounts or delivery times that are not in this brief. "
     "If asked something you do not know, say a team member will follow up. "
     "Be brief and natural — this call should take under two minutes. "
-    "If you reach voicemail, leave a short message saying who you are and that we will try again, then end the call."
+    "If you reach voicemail, leave a short message saying who you are, then end the call without promising another attempt."
 )
 
 RESULT_SCHEMA = {
@@ -57,6 +58,20 @@ def mask_phone(phone: str) -> str:
     if len(digits) < 6:
         return "***"
     return f"+{digits[:3]}****{digits[-3:]}"
+
+
+PHONE_TEXT = re.compile(r"(?<![0-9])\+?[0-9](?:[ ()\t.-]*[0-9]){7,14}(?![0-9])")
+
+
+def display_copy(value):
+    """Mask phone-like text in preview copies; do not alter the private task."""
+    if isinstance(value, str):
+        return PHONE_TEXT.sub(lambda match: mask_phone(match.group(0)), value)
+    if isinstance(value, dict):
+        return {key: display_copy(item) for key, item in value.items()}
+    if isinstance(value, list):
+        return [display_copy(item) for item in value]
+    return value
 
 
 def build(order: dict) -> dict:
@@ -111,7 +126,7 @@ def main(argv: list[str]) -> int:
         print(__doc__)
         return 2
     order = json.loads(Path(argv[1]).read_text(encoding="utf-8"))
-    out = build(order)
+    out = display_copy(build(order))
     if "--json" in argv:
         print(json.dumps(out, indent=2))
         return 0

@@ -1,6 +1,6 @@
 ---
 name: cod-order-confirmation-call
-description: Confirm one cash-on-delivery order by phone with CALL-E. Compiles the spoken brief from the real order rows, returns a fail-closed structured disposition, and leaves the order status change to the calling system or a human. Dry-run preview by default.
+description: Prepare one authorized cash-on-delivery order confirmation call. Compiles a CALL-E brief and advisory result schema from order rows, leaving result validation and status changes to the calling system or a human. Dry-run preview by default.
 license: MIT
 ---
 
@@ -8,7 +8,7 @@ license: MIT
 
 Use this skill when a shop, marketplace or chat-commerce system has explicit authority to place **one** disclosed phone call to confirm a **cash-on-delivery order the customer already placed**. The call reads back the items and total exactly as recorded, confirms the delivery address, records requested changes, and returns a structured disposition. It never invents items, prices or delivery promises.
 
-This skill does not change an order status itself. The calling system applies the result under its own rules (the reference implementation only flips an order on `disposition = confirmed` with `confirmed = yes` and high confidence; everything else is parked for a human).
+This skill does not execute calls, validate returned results or change order status itself. The compiler prepares a task and schema; the host must review the advisory result before applying its own rules. The external reference uses heuristic confirmation and cancellation rules, not a guarantee that every ambiguous answer reaches a human.
 
 ## When To Use
 
@@ -52,7 +52,7 @@ From the repository root (no CALL-E credentials, no network):
 python3 skills/cod-order-confirmation-call/scripts/build_task.py skills/cod-order-confirmation-call/assets/sample-order.json
 ```
 
-Prints a masked phone, the compiled CALL-E task text, the `result_schema`, and the idempotency key. It does not dial.
+Prints display copies of the compiled CALL-E task, `result_schema`, and idempotency key with phone-like text masked throughout. It does not dial. The internal `build(order)` result retains the private task for a separately authorized host integration; do not treat masked preview output as an approved live payload.
 
 ## CALL-E Goal Template
 
@@ -88,9 +88,9 @@ On voicemail, leave a short message saying who you are and end the call.
 
 Only `disposition = confirmed` **and** `confirmed = yes` with high completion confidence should flip an order to confirmed. `changed`, `voicemail`, `no_answer`, `wrong_number`, `needs_human` and any low-confidence result need a human. `cancelled` may cancel the order only if the calling system's rules allow it.
 
-## Live Planning
+## Live Planning And Execution
 
-Only after explicit authorization and CALL-E authentication. With the TypeScript SDK:
+The following SDK call **executes a real call; it is not a plan**. Run it only after final per-call approval of the reviewed task and authorized E.164 destination, and CALL-E authentication:
 
 ```ts
 import { CalleClient } from "@call-e/calle";
@@ -107,11 +107,13 @@ Planning via the CALL-E CLI is also valid and is not execution:
 calle call plan --to-phone <E164_PHONE> --goal "<reviewed task text>" --timezone Asia/Beirut --language English --region GB
 ```
 
-Do not start the call unless the operator or the calling system separately confirms.
+For the CLI, do not execute the resulting plan unless the operator or calling system separately confirms this call. Creating a plan alone is not that approval.
 
 ## Cancellation And Idempotency
 
 Idempotency key: `cod-confirm:{order_ref}:{attempt}`. Persist it before the first request and reuse it on retries. One call per order per attempt; never retry automatically on `unknown`, voicemail or no answer — route to a human.
+
+Before submission, cancel by discarding the preview or plan. After submission, stopping this script or closing a page does not recall an accepted call. Use supported provider controls and treat cancellation as unconfirmed until the provider confirms it. Reconcile an unknown outcome before authorizing another attempt; a stable key is not a crash-proof or permanent duplicate-prevention guarantee.
 
 ## Reference Implementation
 
