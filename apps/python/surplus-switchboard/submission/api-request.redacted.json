@@ -1,0 +1,83 @@
+{
+  "method": "POST",
+  "endpoint": "https://api.heycall-e.com/v1/calls",
+  "headers": {
+    "Idempotency-Key": "<ORIGINAL_PRIVATE_REQUEST_DIGEST>",
+    "Authorization": "Bearer <SERVER_ONLY_API_KEY>"
+  },
+  "body": {
+    "task": "You are an AI assistant calling a consenting test participant on behalf of Belal, for the Surplus Switchboard fictional demonstration. At the beginning say clearly: \"I am an AI assistant. This is a recorded and transcribed role-play test using fictional quantities, not a real food or donation request.\" Ask whether the participant is still willing to take part before asking the role-play question. If they agree, ask them to imagine accepting up to 12 fictional portions in category produce, and state the fictional maximum they would accept in this scenario. Do not assume they represent an organization or have any real receiving capacity. Explain that no real food, donation, pickup, delivery, purchase or reservation is involved. Keep the conversation brief, target under 60 seconds, and end the call by 120 seconds. These are requested conversational timing instructions, not a provider-enforced duration limit. Do not make claims about ingredients, allergens, temperature, quality or suitability. Any food-safety, timing or logistical question goes to the human operator. Read back the number and request confirmation. If the person declines, asks you to stop, or says it is the wrong contact, politely stop; do not persuade or retry. For voicemail or uncertainty report willing=unknown and capacity_portions=0. For refusal report willing=no and capacity_portions=0. Only report willing=yes with an explicitly affirmed positive quantity within the offered amount. Return an exact recipient quote supporting willingness and capacity, or an empty evidence_quote when no such statement was made. Never use your own words as recipient evidence.",
+    "recipients": [
+      {
+        "phones": [
+          "<CONSENTING_RECIPIENT_E164>"
+        ],
+        "region": "US",
+        "locale": "en-US"
+      }
+    ],
+    "result_schema": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "willing",
+        "capacity_portions",
+        "evidence_quote"
+      ],
+      "properties": {
+        "willing": {
+          "type": "string",
+          "enum": [
+            "yes",
+            "no",
+            "unknown"
+          ]
+        },
+        "capacity_portions": {
+          "type": "integer",
+          "description": "Exact affirmed capacity. Use 0 when willing is no or unknown; never guess a quantity."
+        },
+        "evidence_quote": {
+          "type": "string"
+        }
+      }
+    },
+    "recipient_result_schema": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "willing",
+        "capacity_portions",
+        "evidence_quote"
+      ],
+      "properties": {
+        "willing": {
+          "type": "string",
+          "enum": [
+            "yes",
+            "no",
+            "unknown"
+          ]
+        },
+        "capacity_portions": {
+          "type": "integer",
+          "description": "Exact affirmed capacity. Use 0 when willing is no or unknown; never guess a quantity."
+        },
+        "evidence_quote": {
+          "type": "string"
+        }
+      }
+    },
+    "metadata": {
+      "workflow": "surplus-switchboard",
+      "partner_id": "test-participant",
+      "batch_id": "fictional-produce",
+      "test_mode": true,
+      "evidence_scope": "fictional_role_play",
+      "target_under_seconds": 60,
+      "requested_end_by_seconds": 120,
+      "duration_limit_enforced": false
+    }
+  },
+  "note": "Sanitized copy of actual request; not executable without private authorized configuration. Actual call completed; create response did not supply confirmed logical task ID."
+}

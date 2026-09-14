@@ -14,6 +14,12 @@ from test_live_workflow import FakeProvider
 
 
 class RolePlayTests(unittest.TestCase):
+    def test_screening_does_not_replace_ai_identity_or_consent(self):
+        ctx=context();ctx['test_mode']=True
+        task=build_request(ctx,10000)[0]['task']
+        self.assertIn('never as the operator or a human',task)
+        self.assertIn('repeat the full AI, recording and fictional-role-play disclosure before seeking consent',task)
+
     def setUp(self):
         self.temp=tempfile.TemporaryDirectory()
         self.path=Path(self.temp.name)/'role-play.sqlite3'
