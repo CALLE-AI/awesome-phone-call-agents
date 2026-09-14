@@ -166,7 +166,7 @@ This project is an awesome list for AI-agent phone-call workflows. Add resources
 
 ### Apps
 
-- [CommonLot](https://github.com/kirmada1509/call-e-commonlot/tree/codex/commonlot-hackathon-submission) - Organizer-controlled pooled purchasing workbench that structures CALL-E buyer and supplier conversations, defaults to simulation, recomputes feasibility after revisions, and keeps orders human-approved.
+- [CommonLot](https://github.com/kirmada1509/call-e-commonlot/tree/codex/commonlot-hackathon-submission) - Organizer-controlled pooled purchasing workbench that structures CALL-E buyer and supplier conversations, defaults to simulation, recomputes feasibility after revisions, and keeps orders human-approved. [Demo](https://commonlot.duckdns.org/about)
 
 - [ResolveCall](https://github.com/Arvindkumar006/RESOLVECALL) - Experimental external CALL-E operational-recovery reference for delivery-window conversations and transcript-derived policy checks; live calling has real side effects, and recovery, production-readiness, and cryptographic guarantees are not independently verified.
 - [PartFinder AI](https://github.com/atsushiyago/partfinder-ai) - External Next.js local-parts demo with a no-call mock default, explicit CALL-E call initiation, server-side credentials, and transcript-backed inventory comparisons for operator review.
