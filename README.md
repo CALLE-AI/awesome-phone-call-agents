@@ -222,7 +222,7 @@ This project is an awesome list for AI-agent phone-call workflows. Add resources
 - [CallPermit](apps/typescript/callpermit/) - Bounded appointment calls where CALL-E handles the conversation, a Tethers-backed envelope decides permission before dispatch, and provider evidence is reconciled against the same authority; deterministic no-call mode by default.
 - [OneReach service follow-up](apps/typescript/onereach-service-followup/) - Turns an authorized CALL-E service appointment conversation into a validated Operations handoff, with a no-call default and standalone public integration example.
 - [Veyra](apps/web/veyra/) - Converts a plain-language outbound process into an editable, approval-gated CALL-E campaign with fake mode enabled by default.
-
+- [CallePilot](https://github.com/legendstechgh/callepilot) - Mobile business call workbench that turns a reviewed business objective into an approval-gated CALL-E lead-qualification workflow with structured results and a clearly labeled demo mode.
 - [CareLoop AI](apps/typescript/careloop-ai/) - Consent-gated post-consultation CALL-E follow-ups that preserve uncertain patient reports and route concerning outcomes to human clinical review, with a no-call default.
 - [OpenLine Screening](apps/typescript/openline-screening/) - Recruiter console that places the first-round CALL-E screening call to each shortlisted candidate with a fixed disclosure-and-consent script, a three-pass prohibited-topic guard, and strict structured results; a person decides Interview or Reject, and the no-call fake mode runs the whole loop.
 - [Sparbird](apps/typescript/sparbird/) - Rings your own phone, plays the person you have to win over, and quotes back the line that lost them, with a recorded no-call default.
