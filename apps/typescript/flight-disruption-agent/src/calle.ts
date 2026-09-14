@@ -51,6 +51,10 @@ function asPassengerResult(value: unknown): PassengerResult | null {
   };
 }
 
+function asRecord(value: unknown): Record<string, unknown> | null {
+  return value && typeof value === "object" && !Array.isArray(value) ? (value as Record<string, unknown>) : null;
+}
+
 // ---------------------------------------------------------------- dry run
 
 interface FakeCall {
@@ -89,6 +93,7 @@ export class DryRunGateway implements CallGateway {
         taskCompleted: null,
         confidence: null,
         result: null,
+        structured: null,
         summary: null,
         transcript: [],
         failureCode: null,
@@ -107,6 +112,7 @@ function scriptedOutcome(booking: Booking, quote: Quote): CallOutcome {
     { speaker: "bot", text: "Your flight is delayed. You can keep the new time, move to another flight, or cancel for a refund.", offsetSeconds: 7 },
   ];
   const base = {
+    structured: null,
     state: "completed" as const,
     providerStatus: "completed",
     failureCode: null,
@@ -122,6 +128,7 @@ function scriptedOutcome(booking: Booking, quote: Quote): CallOutcome {
       taskCompleted: false,
       confidence: null,
       result: null,
+      structured: null,
       summary: "No one answered the call.",
       transcript: [],
       failureCode: "no_answer",
@@ -239,6 +246,7 @@ function normalizeSdkCall(call: Call): CallOutcome {
     taskCompleted: call.taskCompleted,
     confidence: call.completionConfidence ? { score: call.completionConfidence.score, label: call.completionConfidence.label } : null,
     result: asPassengerResult(recipient?.structuredResult),
+    structured: asRecord(recipient?.structuredResult),
     summary: recipient?.summary ?? call.summary,
     transcript,
     failureCode: lastAttempt?.failureCode ?? call.failureCode,
@@ -368,6 +376,7 @@ export class CliGateway implements CallGateway {
       taskCompleted: null,
       confidence: null,
       result: null,
+      structured: null,
       summary: summary ?? null,
       transcript,
       failureCode: state === "failed" ? status.toLowerCase() : null,

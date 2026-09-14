@@ -22,6 +22,7 @@ function outcome(result: Partial<PassengerResult>, extra: Partial<CallOutcome> =
     taskCompleted: true,
     confidence: { score: 0.9, label: "high" },
     result: { choice: "keep_delayed_flight", selected_flight: "none", fee_accepted: "not_applicable", human_requested: "no", reason: "", ...result },
+    structured: null,
     summary: null,
     transcript: [],
     failureCode: null,

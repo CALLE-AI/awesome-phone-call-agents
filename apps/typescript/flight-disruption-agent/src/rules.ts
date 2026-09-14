@@ -11,7 +11,7 @@ import type {
   QuoteLine,
 } from "./types.ts";
 
-function airlineOf(catalog: Catalog, booking: Booking): { id: string; rules: AirlineRules } {
+export function airlineOf(catalog: Catalog, booking: Booking): { id: string; rules: AirlineRules } {
   const id = booking.channel[booking.channel.length - 1];
   const rules = id ? catalog.rules.parties[id] : undefined;
   if (!id || !rules || rules.role !== "airline") {

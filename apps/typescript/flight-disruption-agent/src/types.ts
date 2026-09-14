@@ -123,6 +123,8 @@ export interface CallOutcome {
   taskCompleted: boolean | null;
   confidence: { score: number; label: string } | null;
   result: PassengerResult | null;
+  /** The recipient's structured result as returned, for calls that are not passenger calls. */
+  structured: Record<string, unknown> | null;
   summary: string | null;
   transcript: TranscriptTurn[];
   failureCode: string | null;
