@@ -1,0 +1,56 @@
+{
+ "id": "train-ivr-013",
+ "label": "ivr",
+ "source": "sim-train",
+ "meta": {
+  "task": "ask for a quote for a brake replacement",
+  "hard": false
+ },
+ "turns": [
+  {
+   "speaker": "user",
+   "text": "Thank you for calling Parkview Auto Repair. Your call is important to us. Please listen carefully, as our menu options have changed. For hours and directions, press 1. For appointments, press 2. For billing, press 3. To repeat these options, press 9.",
+   "offset_seconds": 0.28
+  },
+  {
+   "speaker": "bot",
+   "text": "Could you give me a rough quote for replacing the front brake pads on a 2018 sedan?",
+   "offset_seconds": 17.12
+  },
+  {
+   "speaker": "user",
+   "text": "Our hours are Monday through Friday, 9 AM to 6 PM. To return to the main menu, press star.",
+   "offset_seconds": 24.08
+  },
+  {
+   "speaker": "bot",
+   "text": "Could you give me a rough quote for replacing the front brake pads on a 2018 sedan?",
+   "offset_seconds": 32.57
+  },
+  {
+   "speaker": "user",
+   "text": "Our hours are Monday through Friday, 9 AM to 6 PM. To return to the main menu, press star.",
+   "offset_seconds": 39.55
+  },
+  {
+   "speaker": "bot",
+   "text": "[DTMF 1]",
+   "offset_seconds": 48.34
+  },
+  {
+   "speaker": "user",
+   "text": "Sorry, I didn't get that. Thank you for calling Parkview Auto Repair. Your call is important to us. Please listen carefully, as our menu options have changed. For hours and directions, press 1. For appointments, press 2. For billing, press 3. To repeat these options, press 9.",
+   "offset_seconds": 49.09
+  },
+  {
+   "speaker": "bot",
+   "text": "Could you give me a rough quote for replacing the front brake pads on a 2018 sedan?",
+   "offset_seconds": 67.61
+  },
+  {
+   "speaker": "user",
+   "text": "Please enter your account number, followed by the pound key.",
+   "offset_seconds": 74.61
+  }
+ ]
+}
