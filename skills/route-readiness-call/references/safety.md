@@ -16,8 +16,9 @@ Phone calls are real-world side effects. A readiness call reaches a person who i
 ## One line, one call per customer
 
 - One call in flight at a time.
-- Each customer at most once a day. A missed call is not redialled; the rider tries the door as usual.
-- After a timeout, a network error or any ambiguous outcome, do not retry with a new idempotency key. Reconcile the existing call id first.
+- Each customer at most once a day, counted by destination number across stops, routes and restarted days. A number shared by two stops is a planning error. A repeat call to a number already called today needs a person's explicit approval for a different reason.
+- A missed call is not redialled; the rider tries the door as usual.
+- After a timeout, a network error, a 5xx or any other ambiguous outcome, do not retry with a new idempotency key and do not call the next stop. Stop the queue and reconcile the existing call first. A call still not terminal after 15 minutes stops the queue the same way.
 
 ## Acting on answers
 
@@ -27,8 +28,9 @@ Phone calls are real-world side effects. A readiness call reaches a person who i
 
 ## Privacy
 
-- Mask phone numbers in logs, summaries and screens, for example `+155****0102`. Full numbers appear only in the execution payload.
-- Keep the CALL-E API key on the server.
+- Mask phone numbers in logs, summaries, screens, error messages and saved artifacts, for example `+155****0102`, including numbers that appear inside provider transcripts, event messages and errors. Full numbers appear only in the execution payload.
+- Keep the CALL-E API key on the server, and send a real key only to an approved HTTPS CALL-E origin. A test fake of the API receives dummy keys only.
+- A shared screen that shows live transcripts or controls live calls needs authentication, or must stay on a loopback address.
 - Keep only the structured result and the short quote the route needs; do not store recordings.
 
 ## Regions

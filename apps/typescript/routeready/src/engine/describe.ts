@@ -23,6 +23,8 @@ export function describeEvent(event: EngineEvent, day: DayFixture): string | nul
       return `Failed attempt at ${name(event.stopId)}: ${event.reason}`;
     case "call_error":
       return `${name(event.stopId)}: ${event.message}`;
+    case "calls_halted":
+      return `Calls stopped for today: ${event.reason}. Check the call in the CALL-E dashboard before calling anyone else.`;
     case "day_done":
       return "Route finished";
     case "leg":

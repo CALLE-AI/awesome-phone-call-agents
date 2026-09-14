@@ -1,7 +1,10 @@
 import { CalleClient } from "@call-e/calle";
+import { calleClientOptions } from "../calle/endpoint.js";
 import type { LoadedDay } from "../core/day.js";
+import type { CallLedger } from "../core/ledger.js";
 import { maskPhone } from "../core/phone.js";
 import { minutesToClock } from "../core/readiness.js";
+import { maskPhonesInText } from "../core/redact.js";
 import type { GeoPoint, Stop } from "../core/types.js";
 import { LivePort, ScriptedPort, type LiveLine } from "../calle/ports.js";
 import { describeEvent } from "../engine/describe.js";
@@ -9,12 +12,23 @@ import { RouteEngine, runDay, type CallTarget, type DayMetrics, type EngineEvent
 
 export interface LiveConfig {
   apiKey: string;
+  /** Optional CALL-E base URL; real keys only go to approved HTTPS origins. */
+  baseUrl?: string;
   language: string;
   /** Real destination per stop; stops without one keep scripted customers. */
   targets: Map<string, CallTarget>;
 }
 
 export type Mode = "simulate" | "live";
+
+/** Thrown when a live day would call numbers already called today and nobody approved the repeat. */
+export class RepeatCallError extends Error {
+  constructor(readonly numbers: string[]) {
+    super(
+      `Already called today on this server: ${numbers.join(", ")}. Each customer is called at most once a day; approve a repeat call for a different reason to go ahead.`,
+    );
+  }
+}
 export type Pace = "slow" | "normal" | "fast";
 
 /**
@@ -101,6 +115,8 @@ export interface Snapshot {
   /** Newest first; the first card is on the line while its result is null. */
   calls: CallCard[];
   toast: Toast | null;
+  /** Why no further call starts today, if the queue stopped. */
+  callsHalted: string | null;
   log: { clock: string; kind: string; text: string }[];
   metrics: DayMetrics;
   baseline: DayMetrics | null;
@@ -129,6 +145,7 @@ export class RunController {
   constructor(
     private readonly loaded: LoadedDay,
     private readonly live: LiveConfig | null,
+    private readonly ledger: CallLedger,
   ) {}
 
   get liveCallInFlight(): boolean {
@@ -142,9 +159,14 @@ export class RunController {
     return () => this.subscribers.delete(listener);
   }
 
-  async start(mode: Mode, pace: Pace): Promise<void> {
+  async start(mode: Mode, pace: Pace, repeatApproved = false): Promise<void> {
     if (this.liveCallInFlight) throw new Error("A live call is still in progress. Wait for it to finish before starting again.");
     if (mode === "live" && !this.live) throw new Error("Live mode is not configured on this server.");
+    const offset = -new Date().getTimezoneOffset();
+    const livePhones = mode === "live" && this.live ? [...this.live.targets.values()].map((target) => target.phone) : [];
+    const repeats = this.ledger.alreadyCalled(livePhones, offset);
+    if (repeats.length > 0 && !repeatApproved) throw new RepeatCallError(repeats);
+    const approvedRepeats = new Set(livePhones.filter((phone) => this.ledger.calledToday(phone, offset)));
     this.running = false;
     await this.loop;
 
@@ -152,7 +174,7 @@ export class RunController {
     this.baseline = (await runDay({ day, travel, runId: "baseline" })).metrics;
     const scripted = new ScriptedPort(new Map(day.stops.map((stop) => [stop.id, stop])), day.truth, day.merchant);
     const live = mode === "live" && this.live ? this.live : null;
-    const livePort = live ? new LivePort(new CalleClient({ apiKey: live.apiKey })) : null;
+    const livePort = live ? new LivePort(new CalleClient(calleClientOptions(live.apiKey, live.baseUrl))) : null;
     this.engine = new RouteEngine({
       day,
       travel,
@@ -162,6 +184,13 @@ export class RunController {
         const target = live?.targets.get(stop.id);
         if (livePort && target) return { port: livePort, target };
         return { port: scripted, target: { phone: stop.phone, region: "BD" } };
+      },
+      destinations: {
+        allowed: (phone) => approvedRepeats.has(phone) || !this.ledger.calledToday(phone, offset),
+        record: (phone) => {
+          approvedRepeats.delete(phone);
+          this.ledger.record(phone, offset);
+        },
       },
     });
     this.mode = mode;
@@ -241,6 +270,7 @@ export class RunController {
       }),
       calls: this.calls,
       toast: this.toast,
+      callsHalted: engine?.callsHalted ?? null,
       log: this.log.slice(-80),
       metrics: engine?.metrics ?? emptyMetrics(),
       baseline: this.baseline,
@@ -266,7 +296,7 @@ export class RunController {
       try {
         await engine.advance(minute);
       } catch (error) {
-        this.log.push({ clock: minutesToClock(engine.now, this.loaded.day.shiftStart), kind: "error", text: (error as Error).message });
+        this.log.push({ clock: minutesToClock(engine.now, this.loaded.day.shiftStart), kind: "error", text: maskPhonesInText((error as Error).message) });
         this.running = false;
       }
       this.broadcast();
@@ -304,7 +334,7 @@ export class RunController {
     if (event.type === "call_result" || (event.type === "call_error" && event.final)) {
       const card = openCard(event.stopId);
       if (card) {
-        card.result = event.type === "call_result" ? event.note : event.message;
+        card.result = maskPhonesInText(event.type === "call_result" ? event.note : event.message);
         card.verified = event.type === "call_result" ? event.verified : false;
         if (card.live) this.liveHoldUntil = Date.now() + LIVE_RESULT_HOLD_MS;
         else this.holdUntil = Date.now() + ANSWER_HOLD_MS;
@@ -318,8 +348,9 @@ export class RunController {
       const why = this.lastAnswer ? `${this.lastAnswer.customer}: ${this.lastAnswer.note}` : "Route updated";
       this.showToast("route", `${why} · saves ${Math.max(1, Math.round(event.savedMinutes))} min`);
     }
+    if (event.type === "calls_halted") this.showToast("avoided", "Calls stopped for today");
     const text = describeEvent(event, day);
-    if (text) this.log.push({ clock: minutesToClock(event.at, day.shiftStart), kind: event.type, text });
+    if (text) this.log.push({ clock: minutesToClock(event.at, day.shiftStart), kind: event.type, text: maskPhonesInText(text) });
   }
 
   private showToast(tone: Toast["tone"], title: string): void {

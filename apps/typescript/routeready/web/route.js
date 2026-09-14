@@ -234,7 +234,9 @@ $("go").addEventListener("click", async () => {
   try {
     if (draft.source === "gps") placeRider(await currentPosition());
     if (!draft.rider) throw new Error("Place the rider on the map first.");
+    const repeatApproved = !$("repeat").hidden && $("repeat-ok").checked;
     const { sessionId } = await post("/api/route/start", {
+      repeatApproval: repeatApproved ? config.repeatApproval : "",
       apiKey: $("api-key").value,
       consent: $("consent").checked ? config.consent : "",
       rider: draft.rider,
@@ -248,10 +250,19 @@ $("go").addEventListener("click", async () => {
       locationSource: draft.source,
     });
     $("api-key").value = "";
+    $("repeat").hidden = true;
+    $("repeat-ok").checked = false;
     store.set("sessionStorage", SESSION_KEY, sessionId);
     openRide(sessionId);
   } catch (error) {
-    $("setup-error").textContent = error.message;
+    if (error.data?.repeat) {
+      $("repeat").hidden = false;
+      $("repeat-numbers").textContent = error.data.repeat.join(", ");
+      $("repeat-text").textContent = error.data.approval;
+      $("setup-error").textContent = "Tick the box to call these numbers again, or change the stops.";
+    } else {
+      $("setup-error").textContent = error.message;
+    }
   } finally {
     button.disabled = false;
   }
@@ -378,7 +389,7 @@ function render(snap) {
     }
   }
 
-  draw("sheet", [snap.order, snap.door, snap.stops, call, snap.finished], () => ($("route-sheet").innerHTML = routeSheet(snap, next, call)));
+  draw("sheet", [snap.order, snap.door, snap.stops, call, snap.finished, snap.callsHalted], () => ($("route-sheet").innerHTML = routeSheet(snap, next, call)));
   draw("stops", [snap.order, snap.stops], () => ($("screen-stops").innerHTML = stopsScreen(snap)));
   draw("calls", snap.calls, () => ($("screen-calls").innerHTML = callsScreen(snap)));
   draw("log", [snap.metrics, snap.log], () => ($("screen-log").innerHTML = logScreen(snap)));
@@ -418,7 +429,9 @@ function routeSheet(snap, next, call) {
       ? "🛡️ A guard or neighbour can receive it"
       : "";
   let tip = "";
-  if (!next.called && !call) {
+  if (snap.callsHalted) {
+    tip = `<p class="tip halted"><b>Calls stopped on this route.</b> ${escapeHtml(snap.callsHalted)}. Check the call in your CALL-E dashboard. You can still mark each door.</p>`;
+  } else if (!next.called && !call) {
     const move = source === "drag" ? " Drag 🛵 closer to test it." : "";
     tip = `<p class="tip">RouteReady calls <b>${escapeHtml(next.customer)}</b> when the rider is ${snap.callAheadMinutes} min away. Now ${minutes(next.minutesAway)}.${move}</p>`;
   }

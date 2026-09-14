@@ -29,6 +29,8 @@ export function parseFieldStart(body: Record<string, unknown>): ParsedStart {
     if (!customer) return fail(`Stop ${number}: enter the customer's name.`);
     const phone = typeof entry.phone === "string" ? entry.phone.replace(/[\s()-]/g, "") : "";
     if (!isE164(phone)) return fail(`Stop ${number}: enter the phone number with its country code, for example +14155550123.`);
+    const same = stops.find((earlier) => earlier.phone === phone);
+    if (same) return fail(`Stop ${number} has the same number as stop ${same.id.slice(1)}. Each customer is called at most once a day.`);
     const region = typeof entry.region === "string" ? entry.region.trim().toUpperCase() : "";
     if (!/^[A-Z]{2}$/.test(region)) return fail(`Stop ${number}: choose the phone number's country.`);
     const location = point(entry);

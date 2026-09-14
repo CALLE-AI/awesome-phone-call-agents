@@ -86,6 +86,10 @@
       </section>
 
       <label class="check consent"><input type="checkbox" id="consent" /><span id="consent-text"></span></label>
+      <div class="repeat" id="repeat" hidden>
+        <p><b>Already called today:</b> <span id="repeat-numbers"></span>. Each customer is called at most once a day.</p>
+        <label class="check"><input type="checkbox" id="repeat-ok" /><span id="repeat-text"></span></label>
+      </div>
       <p class="error" id="setup-error"></p>
       <button class="cta" id="go" type="button"><span>Start the route</span><span>→</span></button>
       <p class="help center">Each customer is called at most once, one call at a time, and never redialled.</p>

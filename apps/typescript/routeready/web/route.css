@@ -148,6 +148,24 @@
   margin: 0;
 }
 
+.repeat {
+  background: #fff4d6;
+  border-radius: 18px;
+  padding: 14px;
+  font-size: 13.5px;
+}
+
+.repeat p {
+  margin: 0;
+}
+
+.tip.halted {
+  background: #ffe3dd;
+  color: #7a2415;
+  border-radius: 14px;
+  padding: 10px 12px;
+}
+
 .error {
   margin: 0 2px;
   min-height: 1.2em;
@@ -283,4 +301,8 @@
 .rider-marker.draggable {
   cursor: grab;
   outline: 3px solid var(--lime);
+}
+
+.tip.halted b {
+  color: inherit;
 }

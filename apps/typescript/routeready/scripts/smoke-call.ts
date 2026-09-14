@@ -3,8 +3,10 @@
 // Preview by default (no call). Pass --live to place the call.
 import { mkdirSync, writeFileSync } from "node:fs";
 import { CalleAPIError, CalleClient, type Call } from "@call-e/calle";
+import { calleClientOptions } from "../src/calle/endpoint.js";
 import { READINESS_SCHEMA, buildReadinessTask } from "../src/calle/task.js";
 import { isE164, maskPhone } from "../src/core/phone.js";
+import { maskPhonesDeep, maskPhonesInText } from "../src/core/redact.js";
 
 const TERMINAL = new Set(["completed", "failed", "canceled"]);
 const POLL_MS = 5_000;
@@ -47,7 +49,12 @@ if (!live) {
 }
 if (!apiKey) fail("CALLE_API_KEY is not set.");
 
-const client = new CalleClient({ apiKey });
+let client: CalleClient;
+try {
+  client = new CalleClient(calleClientOptions(apiKey, process.env.CALLE_BASE_URL));
+} catch (error) {
+  fail((error as Error).message);
+}
 mkdirSync("results", { recursive: true });
 const outFile = `results/${runId}.json`;
 const startedAt = Date.now();
@@ -65,11 +72,11 @@ try {
   );
 } catch (error) {
   if (error instanceof CalleAPIError) {
-    fail(`CALL-E refused the request (${error.status} ${error.code}): ${error.message}`);
+    fail(`CALL-E refused the request (${error.status} ${error.code}): ${maskPhonesInText(error.message)}`);
   }
   console.error("The request failed before a response came back, so the call may or may not have been placed.");
   console.error(`Re-run with the same SMOKE_ID (${runId}): the idempotency key returns the existing call instead of dialling again.`);
-  throw error;
+  fail(maskPhonesInText((error as Error).message));
 }
 
 writeFileSync(outFile, JSON.stringify({ callId: call.id, idempotencyKey }, null, 2));
@@ -84,27 +91,28 @@ while (!TERMINAL.has(call.status) && Date.now() - startedAt < MAX_WAIT_MS) {
     for (const event of events.data) {
       if (seen.has(event.id)) continue;
       seen.add(event.id);
-      console.log(`  +${elapsed()}s  ${event.type}  ${event.status}  ${event.message}`);
+      console.log(`  +${elapsed()}s  ${event.type}  ${event.status}  ${maskPhonesInText(event.message)}`);
     }
   } catch (error) {
-    console.error(`  +${elapsed()}s  poll failed, retrying: ${(error as Error).message}`);
+    console.error(`  +${elapsed()}s  poll failed, retrying: ${maskPhonesInText((error as Error).message)}`);
   }
 }
 
-writeFileSync(outFile, JSON.stringify(call, null, 2));
-console.log(`\nStatus: ${call.status} after ${elapsed()}s (full result saved to ${outFile}, git-ignored)`);
-if (call.failureCode) console.log(`Failure: ${call.failureCode}: ${call.failureMessage ?? ""}`);
+// Saved with every phone number masked, including numbers inside provider text.
+writeFileSync(outFile, JSON.stringify(maskPhonesDeep(call), null, 2));
+console.log(`\nStatus: ${call.status} after ${elapsed()}s (result with masked numbers saved to ${outFile}, git-ignored)`);
+if (call.failureCode) console.log(`Failure: ${call.failureCode}: ${maskPhonesInText(call.failureMessage ?? "")}`);
 console.log(
   `Task completed: ${call.taskCompleted}  confidence: ${call.completionConfidence?.label ?? "n/a"} ${call.completionConfidence?.score ?? ""}`,
 );
 for (const recipient of call.recipients) {
   console.log(`\nRecipient ${maskPhone(recipient.phones[0] ?? "")}: ${recipient.status}`);
-  console.log(`Structured result: ${JSON.stringify(recipient.structuredResult, null, 2)}`);
+  console.log(`Structured result: ${JSON.stringify(maskPhonesDeep(recipient.structuredResult), null, 2)}`);
   for (const attempt of recipient.attempts) {
     const failure = attempt.failureCode ? ` (${attempt.failureCode})` : "";
     console.log(`Attempt ${attempt.status}: ${attempt.startedAt ?? "?"} -> ${attempt.completedAt ?? "?"}${failure}`);
     for (const turn of attempt.transcriptTurns) {
-      console.log(`  [${turn.offset_seconds ?? "?"}s] ${turn.speaker}: ${turn.text}`);
+      console.log(`  [${turn.offset_seconds ?? "?"}s] ${turn.speaker}: ${maskPhonesInText(turn.text)}`);
     }
   }
 }

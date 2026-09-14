@@ -14,7 +14,7 @@ export function onSnapshot(handler) {
 export async function post(path, body = {}) {
   const response = await fetch(path, { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify(body) });
   const data = await response.json().catch(() => ({}));
-  if (!response.ok) throw new Error(data.error ?? `Request failed (${response.status})`);
+  if (!response.ok) throw Object.assign(new Error(data.error ?? `Request failed (${response.status})`), { data });
   return data;
 }
 

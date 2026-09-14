@@ -1,4 +1,5 @@
-import type { Call, CalleClient, JsonObject } from "@call-e/calle";
+import { CalleAPIError, type Call, type CalleClient, type JsonObject } from "@call-e/calle";
+import { maskPhonesInText } from "../core/redact.js";
 import type { Stop, Truth } from "../core/types.js";
 import { READINESS_SCHEMA } from "./task.js";
 
@@ -34,6 +35,18 @@ export interface CallPort {
 }
 
 const TERMINAL = new Set(["completed", "failed", "canceled"]);
+
+/** A live call that has not reached a terminal status after this many minutes stops the queue. */
+export const MAX_LIVE_CALL_MINUTES = 15;
+
+/**
+ * True only when CALL-E answered a create request with a refusal, so no call
+ * exists. Network errors, timeouts, 5xx, 408 and 409 leave it unknown whether
+ * a call was placed; the queue must stop instead of moving on.
+ */
+export function creationRefused(error: unknown): boolean {
+  return error instanceof CalleAPIError && error.status >= 400 && error.status < 500 && error.status !== 408 && error.status !== 409;
+}
 
 /** Places real calls through the CALL-E SDK. */
 export class LivePort implements CallPort {
@@ -105,7 +118,7 @@ const SYSTEM_MESSAGES = new Set(["Call is ringing.", "Call connected."]);
 /** Maps a CALL-E event message to a transcript line; internal progress messages are dropped. */
 export function toLine(message: string, now: number): LiveLine | null {
   for (const [prefix, speaker] of SPEAKER_PREFIXES) {
-    if (message.startsWith(prefix)) return { at: now, speaker, text: message.slice(prefix.length).trim() };
+    if (message.startsWith(prefix)) return { at: now, speaker, text: maskPhonesInText(message.slice(prefix.length).trim()) };
   }
   return SYSTEM_MESSAGES.has(message) ? { at: now, speaker: "system", text: message } : null;
 }

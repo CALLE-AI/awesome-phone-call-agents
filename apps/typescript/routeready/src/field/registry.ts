@@ -1,6 +1,7 @@
 import { randomBytes } from "node:crypto";
 import type { CallPort } from "../calle/ports.js";
 import { haversineMeters } from "../core/geo.js";
+import type { CallLedger } from "../core/ledger.js";
 import { maskPhone } from "../core/phone.js";
 import { FieldSession, type FieldSetup } from "./session.js";
 
@@ -26,6 +27,7 @@ export function fieldSnapshot(session: FieldSession) {
     routeVersion: session.routeVersion,
     door,
     lineBusy: session.lineBusy,
+    callsHalted: session.callsHalted,
     stops: session.setup.stops.map((stop) => {
       const state = session.states.get(stop.id);
       const eta = etas.get(stop.id);
@@ -87,6 +89,7 @@ export class FieldRegistry {
 
   constructor(
     private readonly makePort: (apiKey: string) => CallPort,
+    private readonly ledger: CallLedger,
     private readonly limits: RegistryLimits = DEFAULT_LIMITS,
   ) {}
 
@@ -94,12 +97,21 @@ export class FieldRegistry {
     return this.entries.size;
   }
 
-  create(apiKey: string, setup: FieldSetup): { sessionId: string; session: FieldSession } {
+  /** @param approvedRepeats numbers already called today that the visitor explicitly approved calling again */
+  create(apiKey: string, setup: FieldSetup, approvedRepeats: ReadonlySet<string> = new Set()): { sessionId: string; session: FieldSession } {
     this.sweep();
     if (this.entries.size >= this.limits.maxSessions) throw new Error("Too many routes are running on this server right now. Try again in a few minutes.");
     const sessionId = randomBytes(24).toString("base64url");
     const runId = `field-${randomBytes(6).toString("hex")}`;
-    const session = new FieldSession(runId, setup, this.makePort(apiKey));
+    const approved = new Set(approvedRepeats);
+    const offset = setup.utcOffsetMinutes;
+    const session = new FieldSession(runId, setup, this.makePort(apiKey), Date.now, {
+      allowed: (phone) => approved.has(phone) || !this.ledger.calledToday(phone, offset),
+      record: (phone) => {
+        approved.delete(phone);
+        this.ledger.record(phone, offset);
+      },
+    });
     this.entries.set(sessionId, { session, listeners: new Set(), lastSeen: Date.now() });
     return { sessionId, session };
   }

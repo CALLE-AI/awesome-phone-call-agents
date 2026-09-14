@@ -5,9 +5,10 @@ import { maskPhone } from "../core/phone.js";
 import { planFromAnswer, type StopPlan } from "../core/readiness.js";
 import { resequence, type RouteStopInput } from "../core/resequence.js";
 import type { ReadinessAnswer, Stop } from "../core/types.js";
-import type { CallPort, CallRequest, LiveLine } from "../calle/ports.js";
+import { creationRefused, MAX_LIVE_CALL_MINUTES, type CallPort, type CallRequest, type LiveLine } from "../calle/ports.js";
+import { maskPhonesInText } from "../core/redact.js";
 import { buildReadinessTask } from "../calle/task.js";
-import type { StopStatus } from "../engine/engine.js";
+import type { DestinationGuard, StopStatus } from "../engine/engine.js";
 
 /** A stop the rider entered: a real customer, a real number and a point on the map. */
 export interface FieldStop extends Stop {
@@ -68,6 +69,7 @@ interface InFlight {
   callId: string;
   phone: string;
   promisedEta: number;
+  startedAt: number;
   lastError: string;
 }
 
@@ -87,6 +89,8 @@ export class FieldSession {
   toast: { id: number; tone: "route" | "avoided"; title: string } | null = null;
   routeVersion = 0;
   endedReason: string | null = null;
+  /** Set once no further call may start on this route, with the reason. */
+  callsHalted: string | null = null;
   readonly metrics = { delivered: 0, nobodyHome: 0, tripsAvoided: 0, calls: 0 };
   private inFlight: InFlight | null = null;
   private ticking = false;
@@ -95,12 +99,14 @@ export class FieldSession {
   /**
    * @param runId public id sent to CALL-E in metadata and idempotency keys; never the session secret
    * @param clock milliseconds since the epoch; tests pass a fake clock
+   * @param destinations one call per number per day across routes on this server
    */
   constructor(
     readonly runId: string,
     readonly setup: FieldSetup,
     private readonly port: CallPort,
     private readonly clock: () => number = Date.now,
+    private readonly destinations?: DestinationGuard,
   ) {
     this.startedAt = clock();
     this.rider = { ...setup.rider, accuracy: null, updatedAt: this.startedAt };
@@ -203,7 +209,7 @@ export class FieldSession {
   }
 
   private async startCallIfDue(): Promise<void> {
-    if (this.inFlight || this.order.length === 0) return;
+    if (this.inFlight || this.callsHalted || this.order.length === 0) return;
     const now = this.now();
     const etas = this.etas();
     const candidates = this.order.map((id) => ({ stop: this.state(id).stop, eta: etas.get(id) ?? Infinity, called: this.state(id).called }));
@@ -214,6 +220,14 @@ export class FieldSession {
     const { stop } = state;
     const minutesAway = Math.max(1, Math.round(pick.eta - now));
     state.called = true;
+    if (this.destinations && !this.destinations.allowed(stop.phone)) {
+      state.status = "unverified";
+      state.note = "number already called today; not called again";
+      this.record("call_error", `${stop.customer}: ${state.note}`);
+      return;
+    }
+    // Recorded before the request, so an ambiguous creation still counts as today's call.
+    this.destinations?.record(stop.phone);
     state.status = "calling";
     const request: CallRequest = {
       stopId: stop.id,
@@ -247,16 +261,23 @@ export class FieldSession {
     this.record("call_started", `Calling ${stop.customer} (${card.reason})`);
     try {
       const { callId } = await this.port.start(request, now);
-      this.inFlight = { stopId: stop.id, callId, phone: stop.phone, promisedEta: pick.eta, lastError: "" };
+      this.inFlight = { stopId: stop.id, callId, phone: stop.phone, promisedEta: pick.eta, startedAt: now, lastError: "" };
       this.metrics.calls++;
     } catch (error) {
-      // The call may or may not have been placed; it is never redialled.
-      const message = (error as Error).message;
+      const message = maskPhonesInText((error as Error).message);
       state.status = "unverified";
-      state.note = "call not placed; never redialled";
-      card.result = `CALL-E did not start the call: ${message}`;
       card.verified = false;
-      this.record("call_error", `${stop.customer}: CALL-E did not start the call (${message})`);
+      if (creationRefused(error)) {
+        state.note = "CALL-E refused the call; never redialled";
+        card.result = `CALL-E refused the call: ${message}`;
+        this.record("call_error", `${stop.customer}: CALL-E refused the call (${message})`);
+        return;
+      }
+      // The call may or may not exist, so nobody else is called while it might be ringing.
+      state.note = "call not confirmed; calls stopped";
+      card.result = `CALL-E did not confirm the call: ${message}`;
+      this.record("call_error", `${stop.customer}: CALL-E did not confirm the call (${message})`);
+      this.halt(`CALL-E did not confirm whether the call to ${stop.customer} was placed`);
     }
   }
 
@@ -268,15 +289,32 @@ export class FieldSession {
     try {
       update = await this.port.poll(flight.callId, this.now());
     } catch (error) {
-      const message = (error as Error).message;
+      const message = maskPhonesInText((error as Error).message);
       if (message !== flight.lastError) this.record("call_error", `Status check failed, retrying: ${message}`);
       flight.lastError = message;
+      this.haltIfOverdue(flight);
       return;
     }
     if (card) for (const line of update.lines) addLine(card.lines, line);
-    if (!update.final) return;
+    if (!update.final) {
+      this.haltIfOverdue(flight);
+      return;
+    }
     this.inFlight = null;
     this.applyResult(flight, gateCall(update.final, flight.phone), card);
+  }
+
+  /** A live call still not finished keeps the line busy and stops the queue; it is never treated as over. */
+  private haltIfOverdue(flight: InFlight): void {
+    if (this.port.mode !== "live" || this.now() - flight.startedAt < MAX_LIVE_CALL_MINUTES) return;
+    this.halt(`the call to ${this.state(flight.stopId).stop.customer} has not finished after ${MAX_LIVE_CALL_MINUTES} minutes`);
+  }
+
+  private halt(reason: string): void {
+    if (this.callsHalted) return;
+    this.callsHalted = reason;
+    this.record("calls_halted", `Calls stopped on this route: ${reason}. Check the call in the CALL-E dashboard before calling anyone else.`);
+    this.showToast("avoided", "Calls stopped on this route");
   }
 
   private applyResult(flight: InFlight, gate: GateResult, card: FieldCallCard | undefined): void {
@@ -288,7 +326,7 @@ export class FieldSession {
       if (stillAhead) state.status = "unverified";
       state.note = gate.verified ? "answer arrived after the stop was finished" : gate.reason;
       if (card) {
-        card.result = state.note;
+        card.result = maskPhonesInText(state.note);
         card.verified = false;
       }
       this.record("call_result", `${customer}: unverified, route unchanged (${state.note})`);
@@ -376,7 +414,7 @@ export class FieldSession {
   }
 
   private record(kind: string, text: string): void {
-    this.log.push({ at: this.clock(), kind, text });
+    this.log.push({ at: this.clock(), kind, text: maskPhonesInText(text) });
     if (this.log.length > LOG_LIMIT) this.log.splice(0, this.log.length - LOG_LIMIT);
   }
 }

@@ -145,5 +145,8 @@ export function todayScreen(snap, day) {
     snap.done || !snap.running
       ? `<button class="cta" data-action="restart" style="margin-top:12px"><span>Run the day again</span><span>↻</span></button>`
       : "";
-  return `<h2>Today</h2>${kpis}${compare}<div class="panel"><h3>What happened</h3>${log}</div>${again}`;
+  const halted = snap.callsHalted
+    ? `<div class="panel"><h3>Calls stopped for today</h3><p class="muted">${escapeHtml(snap.callsHalted)}. Check the call in the CALL-E dashboard before calling anyone else.</p></div>`
+    : "";
+  return `<h2>Today</h2>${halted}${kpis}${compare}<div class="panel"><h3>What happened</h3>${log}</div>${again}`;
 }

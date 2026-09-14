@@ -1,5 +1,7 @@
+import { CalleAPIError } from "@call-e/calle";
 import { describe, expect, it } from "vitest";
 import { ScriptedPort, type CallPort } from "../src/calle/ports.js";
+import { CallLedger } from "../src/core/ledger.js";
 import type { Truth } from "../src/core/types.js";
 import { FieldRegistry, fieldSnapshot } from "../src/field/registry.js";
 import { FieldSession, type FieldSetup, type FieldStop } from "../src/field/session.js";
@@ -146,7 +148,7 @@ describe("FieldSession", () => {
       mode: "live",
       start: async () => {
         starts++;
-        throw new Error("call_not_ready");
+        throw new CalleAPIError({ code: "call_not_ready", message: "call_not_ready", status: 422 });
       },
       poll: async () => ({ lines: [], final: null }),
     };
@@ -173,7 +175,7 @@ describe("FieldSession", () => {
 
 describe("route snapshots and setup", () => {
   it("never exposes the API key or a full phone number", () => {
-    const registry = new FieldRegistry(() => ({ mode: "live", start: async () => ({ callId: "x" }), poll: async () => ({ lines: [], final: null }) }));
+    const registry = new FieldRegistry(() => ({ mode: "live", start: async () => ({ callId: "x" }), poll: async () => ({ lines: [], final: null }) }), new CallLedger());
     const parsed = parseFieldStart(validBody());
     if (!parsed.ok) throw new Error(parsed.error);
     const { session } = registry.create(parsed.apiKey, parsed.setup);

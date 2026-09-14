@@ -4,7 +4,8 @@ import { clockToMinutes, minutesToClock, planFromAnswer, type StopPlan } from ".
 import { resequence, type RouteStopInput } from "../core/resequence.js";
 import type { TravelTimes } from "../core/travel.js";
 import type { DayFixture, ReadinessAnswer, Stop } from "../core/types.js";
-import type { CallPort, CallRequest, LiveLine } from "../calle/ports.js";
+import { creationRefused, MAX_LIVE_CALL_MINUTES, type CallPort, type CallRequest, type LiveLine } from "../calle/ports.js";
+import { maskPhonesInText } from "../core/redact.js";
 import { buildReadinessTask } from "../calle/task.js";
 
 export type StopStatus = "planned" | "calling" | "confirmed" | "unverified" | "revisit" | "removed" | "delivered" | "failed";
@@ -32,6 +33,8 @@ export type EngineEvent =
   /** `final` is false for a failed status check while the call is still going. */
   | { type: "call_error"; at: number; stopId: string; message: string; final: boolean }
   | { type: "reordered"; at: number; before: string[]; after: string[]; savedMinutes: number; because: string }
+  /** No further call starts today: a creation was ambiguous or a live call never finished. */
+  | { type: "calls_halted"; at: number; stopId: string; reason: string }
   | { type: "delivered"; at: number; stopId: string; waited: number }
   | { type: "failed_attempt"; at: number; stopId: string; reason: string }
   | { type: "day_done"; at: number };
@@ -42,6 +45,12 @@ export interface CallTarget {
   locale?: string;
 }
 
+/** Enforces one call per destination per day across stops and restarted days; used for live calls. */
+export interface DestinationGuard {
+  allowed(phone: string): boolean;
+  record(phone: string): void;
+}
+
 export interface EngineOptions {
   day: DayFixture;
   travel: TravelTimes;
@@ -49,6 +58,7 @@ export interface EngineOptions {
   language?: string;
   /** How each stop is called; null leaves a stop uncalled. Omit it to run the baseline day with no calls. */
   routeCall?: (stop: Stop) => { port: CallPort; target: CallTarget } | null;
+  destinations?: DestinationGuard;
 }
 
 export interface DayMetrics {
@@ -82,6 +92,7 @@ interface InFlight {
   port: CallPort;
   phone: string;
   promisedEta: number;
+  startedAt: number;
 }
 
 /**
@@ -111,6 +122,8 @@ export class RouteEngine {
   door: { stopId: string; readyAt: number; until: number; failed: boolean } | null = null;
   /** While true no new call starts; screens set it briefly so each answer can be read. */
   holdCalls = false;
+  /** Set once no further call may start today, with the reason. */
+  callsHalted: string | null = null;
   private busyUntil = 0;
   private serving: { stopId: string; waited: number } | null = null;
   private inFlight: InFlight | null = null;
@@ -237,7 +250,7 @@ export class RouteEngine {
 
   private async startCallIfDue(): Promise<void> {
     const { routeCall, day, runId, language } = this.options;
-    if (!routeCall || this.inFlight || this.holdCalls) return;
+    if (!routeCall || this.inFlight || this.holdCalls || this.callsHalted) return;
     const etas = this.etas();
     if (this.leg) etas.delete(this.leg.to); // the rider is already on the way
     const candidates = [...etas].map(([id, eta]) => ({ stop: this.state(id).stop, eta, called: this.state(id).called }));
@@ -248,6 +261,17 @@ export class RouteEngine {
     state.called = true;
     const route = routeCall(state.stop);
     if (!route) return;
+    const { destinations } = this.options;
+    if (route.port.mode === "live" && destinations) {
+      if (!destinations.allowed(route.target.phone)) {
+        state.status = "unverified";
+        state.note = "number already called today; not called again";
+        this.emit({ type: "call_error", at: this.now, stopId: pick.stopId, message: state.note, final: true });
+        return;
+      }
+      // Recorded before the request, so an ambiguous creation still counts as today's call.
+      destinations.record(route.target.phone);
+    }
 
     const etaMinutes = pick.eta - this.now;
     const request: CallRequest = {
@@ -271,14 +295,21 @@ export class RouteEngine {
       const { callId } = await route.port.start(request, this.now);
       state.callId = callId;
       state.live = route.port.mode === "live";
-      this.inFlight = { stopId: pick.stopId, callId, port: route.port, phone: route.target.phone, promisedEta: pick.eta };
+      this.inFlight = { stopId: pick.stopId, callId, port: route.port, phone: route.target.phone, promisedEta: pick.eta, startedAt: this.now };
       this.metrics.calls++;
       this.emit({ type: "call_started", at: this.now, stopId: pick.stopId, callId, live: state.live, reason: pick.reason });
     } catch (error) {
-      // The call may or may not have been placed; it is never redialled.
+      const message = maskPhonesInText((error as Error).message);
       state.status = "unverified";
-      state.note = "call not confirmed; never redialled";
-      this.emit({ type: "call_error", at: this.now, stopId: pick.stopId, message: (error as Error).message, final: true });
+      if (creationRefused(error)) {
+        state.note = "CALL-E refused the call; never redialled";
+        this.emit({ type: "call_error", at: this.now, stopId: pick.stopId, message: `CALL-E refused the call: ${message}`, final: true });
+        return;
+      }
+      // The call may or may not exist, so nobody else is called while it might be ringing.
+      state.note = "call not confirmed; calls stopped";
+      this.emit({ type: "call_error", at: this.now, stopId: pick.stopId, message: `CALL-E did not confirm the call: ${message}`, final: true });
+      this.halt(pick.stopId, `CALL-E did not confirm whether the call to ${state.stop.customer} was placed`);
     }
   }
 
@@ -293,15 +324,31 @@ export class RouteEngine {
         type: "call_error",
         at: this.now,
         stopId: flight.stopId,
-        message: `status check failed, retrying: ${(error as Error).message}`,
+        message: `status check failed, retrying: ${maskPhonesInText((error as Error).message)}`,
         final: false,
       });
+      this.haltIfOverdue(flight);
       return;
     }
     for (const line of update.lines) this.emit({ type: "call_line", at: line.at, stopId: flight.stopId, line });
-    if (!update.final) return;
+    if (!update.final) {
+      this.haltIfOverdue(flight);
+      return;
+    }
     this.inFlight = null;
     this.applyResult(flight, gateCall(update.final, flight.phone));
+  }
+
+  /** A live call still not finished keeps the line busy and stops the queue; it is never treated as over. */
+  private haltIfOverdue(flight: InFlight): void {
+    if (flight.port.mode !== "live" || this.now - flight.startedAt < MAX_LIVE_CALL_MINUTES) return;
+    this.halt(flight.stopId, `the call to ${this.state(flight.stopId).stop.customer} has not finished after ${MAX_LIVE_CALL_MINUTES} minutes`);
+  }
+
+  private halt(stopId: string, reason: string): void {
+    if (this.callsHalted) return;
+    this.callsHalted = reason;
+    this.emit({ type: "calls_halted", at: this.now, stopId, reason });
   }
 
   private applyResult(flight: InFlight, gate: GateResult): void {

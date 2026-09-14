@@ -8,13 +8,16 @@ import { randomBytes, timingSafeEqual } from "node:crypto";
 import { readFileSync } from "node:fs";
 import { createServer, type IncomingMessage, type ServerResponse } from "node:http";
 import { fileURLToPath } from "node:url";
+import { calleClientOptions } from "../calle/endpoint.js";
 import { LivePort } from "../calle/ports.js";
 import { loadDay } from "../core/day.js";
+import { CallLedger, REPEAT_APPROVAL } from "../core/ledger.js";
 import { maskPhone } from "../core/phone.js";
+import { maskPhonesInText } from "../core/redact.js";
 import { FieldRegistry } from "../field/registry.js";
 import { FIELD_CONSENT, MAX_FIELD_STOPS, parseFieldStart, point } from "../field/setup.js";
-import { loadLiveConfig } from "./config.js";
-import { PACES, RunController, type Mode, type Pace } from "./run.js";
+import { isLoopbackHost, loadLiveConfig } from "./config.js";
+import { PACES, RepeatCallError, RunController, type Mode, type Pace } from "./run.js";
 
 try {
   process.loadEnvFile(".env");
@@ -42,13 +45,15 @@ const CONSENT = "Every live number belongs to me or to someone who agreed to tak
 const host = process.env.HOST?.trim() || "127.0.0.1";
 const port = Number(process.env.PORT ?? 3000);
 const loaded = loadDay();
-const live = loadLiveConfig(process.env, loaded.day);
+const live = loadLiveConfig(process.env, loaded.day, host);
 const startToken = process.env.ROUTEREADY_TOKEN?.trim() || randomBytes(9).toString("base64url");
-const controller = new RunController(loaded, live.config);
-/** Optional override for tests against a local fake of the CALL-E API; unset means the real API. */
+/** One call per destination per day, shared by the demo day and every visitor route on this server. */
+const ledger = new CallLedger();
+const controller = new RunController(loaded, live.config, ledger);
+/** Optional override for tests against a local fake of the CALL-E API. Real keys only go to approved HTTPS origins. */
 const calleBaseUrl = process.env.CALLE_BASE_URL?.trim() || undefined;
-const calleClient = (apiKey: string) => new CalleClient({ apiKey, ...(calleBaseUrl ? { baseUrl: calleBaseUrl } : {}) });
-const routes = new FieldRegistry((apiKey) => new LivePort(calleClient(apiKey)));
+const calleClient = (apiKey: string) => new CalleClient(calleClientOptions(apiKey, calleBaseUrl));
+const routes = new FieldRegistry((apiKey) => new LivePort(calleClient(apiKey)), ledger);
 routes.startLoop();
 
 const server = createServer((request, response) => {
@@ -57,6 +62,8 @@ const server = createServer((request, response) => {
 
 async function handle(request: IncomingMessage, response: ServerResponse): Promise<void> {
   const path = new URL(request.url ?? "/", "http://localhost").pathname;
+  const refusal = refuseRequest(request);
+  if (refusal) return sendJson(response, 403, { error: refusal });
 
   if (request.method === "GET" && PAGES[path]) {
     const [file, type] = PAGES[path];
@@ -85,8 +92,11 @@ async function handle(request: IncomingMessage, response: ServerResponse): Promi
       if (body.consent !== CONSENT) return sendJson(response, 400, { error: "Confirm that every live number agreed to take these calls." });
     }
     try {
-      await controller.start(mode, parsePace(body.pace));
+      await controller.start(mode, parsePace(body.pace), body.repeatApproval === REPEAT_APPROVAL);
     } catch (error) {
+      if (error instanceof RepeatCallError) {
+        return sendJson(response, 409, { error: error.message, repeat: error.numbers, approval: REPEAT_APPROVAL });
+      }
       return sendJson(response, 409, { error: (error as Error).message });
     }
     sendJson(response, 200, { ok: true, mode });
@@ -114,7 +124,7 @@ async function handle(request: IncomingMessage, response: ServerResponse): Promi
 /** Your own route: a visitor's CALL-E key, their stops, and their rider position. */
 async function handleRoute(request: IncomingMessage, response: ServerResponse, path: string): Promise<void> {
   if (request.method === "GET" && path === "/api/route/config") {
-    sendJson(response, 200, { consent: FIELD_CONSENT, maxStops: MAX_FIELD_STOPS });
+    sendJson(response, 200, { consent: FIELD_CONSENT, maxStops: MAX_FIELD_STOPS, repeatApproval: REPEAT_APPROVAL });
     return;
   }
   if (request.method === "GET" && path === "/api/route/stream") {
@@ -139,13 +149,29 @@ async function handleRoute(request: IncomingMessage, response: ServerResponse, p
     const parsed = parseFieldStart(body);
     if (!parsed.ok) return sendJson(response, 400, { error: parsed.error });
     try {
+      calleClientOptions(parsed.apiKey, calleBaseUrl);
+    } catch (error) {
+      return sendJson(response, 400, { error: (error as Error).message });
+    }
+    const phones = parsed.setup.stops.map((stop) => stop.phone);
+    const repeats = ledger.alreadyCalled(phones, parsed.setup.utcOffsetMinutes);
+    const repeatApproved = body.repeatApproval === REPEAT_APPROVAL;
+    if (repeats.length > 0 && !repeatApproved) {
+      return sendJson(response, 409, {
+        error: `Already called today on this server: ${repeats.join(", ")}. Each customer is called at most once a day.`,
+        repeat: repeats,
+        approval: REPEAT_APPROVAL,
+      });
+    }
+    const approvedRepeats = new Set(repeatApproved ? phones.filter((phone) => ledger.calledToday(phone, parsed.setup.utcOffsetMinutes)) : []);
+    try {
       // A read-only request, so a mistyped key is caught before the rider sets off.
       await calleClient(parsed.apiKey).goals.list({ limit: 1 });
     } catch (error) {
       if (error instanceof CalleAuthenticationError) return sendJson(response, 401, { error: "CALL-E did not accept this API key." });
     }
     try {
-      const { sessionId } = routes.create(parsed.apiKey, parsed.setup);
+      const { sessionId } = routes.create(parsed.apiKey, parsed.setup, approvedRepeats);
       sendJson(response, 200, { sessionId });
     } catch (error) {
       sendJson(response, 503, { error: (error as Error).message });
@@ -178,6 +204,30 @@ async function handleRoute(request: IncomingMessage, response: ServerResponse, p
   sendJson(response, 200, { ok: true });
 }
 
+/**
+ * Refuses requests a browser sends from another site, and, while the server
+ * listens on loopback, requests that name a non-loopback host (DNS rebinding).
+ */
+function refuseRequest(request: IncomingMessage): string | null {
+  const hostHeader = request.headers.host ?? "";
+  if (isLoopbackHost(host)) {
+    const name = hostHeader.replace(/:\d+$/, "");
+    if (!isLoopbackHost(name)) return "This server only answers on its loopback address.";
+  }
+  if (request.method === "POST") {
+    const origin = request.headers.origin;
+    if (origin && origin !== "null") {
+      try {
+        if (new URL(origin).host !== hostHeader) return "Cross-site request refused.";
+      } catch {
+        return "Cross-site request refused.";
+      }
+    }
+    if (request.headers["sec-fetch-site"] === "cross-site") return "Cross-site request refused.";
+  }
+  return null;
+}
+
 function parsePace(value: unknown): Pace {
   return typeof value === "string" && value in PACES ? (value as Pace) : "normal";
 }
@@ -195,6 +245,7 @@ function dayForScreens() {
       available: live.config !== null,
       problem: live.problem,
       consent: CONSENT,
+      repeatApproval: REPEAT_APPROVAL,
       targets: [...(live.config?.targets ?? new Map())].map(([stopId, target]) => ({
         stopId,
         maskedPhone: maskPhone(target.phone),
@@ -229,8 +280,10 @@ async function readJson(request: IncomingMessage): Promise<Record<string, unknow
 }
 
 function sendJson(response: ServerResponse, status: number, body: unknown): void {
+  const record = body as { error?: unknown };
+  const safe = typeof record?.error === "string" ? { ...record, error: maskPhonesInText(record.error) } : body;
   response.writeHead(status, { "content-type": "application/json; charset=utf-8", "cache-control": "no-store" });
-  response.end(JSON.stringify(body));
+  response.end(JSON.stringify(safe));
 }
 
 function sameSecret(given: string, expected: string): boolean {

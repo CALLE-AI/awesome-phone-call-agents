@@ -35,9 +35,11 @@ Use this skill when a delivery rider is already on the route and an upcoming cus
 
 There is one line, so only one call may be in flight. Among stops not called today whose projected arrival is 6 to 45 minutes away, call the soonest. Skip the stop the rider is already driving to.
 
+"Called today" is decided by destination number, not by stop: skip a number already called today, even from another stop, route or restarted day, unless a person explicitly approved a repeat call for a different reason. Record the number when the call is attempted, before the create request, so an ambiguous creation counts as today's call.
+
 ## Preflight
 
-1. Validate the phone against `^\+[1-9]\d{6,14}$` and reject emergency numbers.
+1. Validate the phone against `^\+[1-9]\d{6,14}$` and reject emergency numbers. Reject a plan in which two stops share a number.
 2. Before the first live call of a day, show the operator the masked number, the exact task text and the idempotency key.
 3. Persist the idempotency key before calling CALL-E, and the returned call id immediately after.
 
@@ -88,6 +90,13 @@ Then re-plan the remaining stops with these earliest times. The reference app tr
 ## Cancellation And Idempotency
 
 The CALL-E Calls API has no cancel endpoint: once created, a call rings and finishes. Keep one idempotency key per run and stop and reuse it on any retry of the same request, so a lost response never dials twice. Stopping a day stops new calls only. Nothing recurs; every day is started by an operator.
+
+Stop the queue whenever it is unknown whether a call exists:
+
+- A create request that fails with anything other than a CALL-E 4xx refusal (a network error, a timeout, a 5xx, 408 or 409) may have placed the call. Do not move on to the next stop. Stop starting calls for the rest of the day and ask the operator to check the call in the CALL-E dashboard.
+- A call that has not reached `completed`, `failed` or `canceled` after 15 minutes is not over. Keep the line busy, keep reconciling that call id, and start no other call.
+
+Only a definite 4xx refusal, such as `422 call_not_ready`, means no call exists and the next stop may be called.
 
 ## Safety Notes
 

@@ -95,7 +95,7 @@ function render(snap) {
   draw("calls", snap.calls, () => {
     $("screen-calls").innerHTML = callsScreen(snap);
   });
-  draw("today", [snap.metrics, snap.baseline, snap.log, snap.done, snap.running], () => {
+  draw("today", [snap.metrics, snap.baseline, snap.log, snap.done, snap.running, snap.callsHalted], () => {
     $("screen-today").innerHTML = todayScreen(snap, day);
   });
 
@@ -165,10 +165,15 @@ $("live-go").addEventListener("click", async () => {
       pace,
       token: $("live-token").value.trim(),
       consent: $("live-consent").checked ? day.live.consent : "",
+      repeatApproval: !$("live-repeat").hidden && $("live-repeat-ok").checked ? day.live.repeatApproval : "",
     });
     modal.hidden = true;
     showTab("route");
   } catch (error) {
+    if (error.data?.repeat) {
+      $("live-repeat").hidden = false;
+      $("live-repeat-text").textContent = `${error.data.repeat.join(", ")}: ${error.data.approval}`;
+    }
     $("live-error").textContent = error.message;
   }
 });

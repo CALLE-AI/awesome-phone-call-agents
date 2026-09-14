@@ -75,9 +75,10 @@ A day is meant to be watched. Scripted calls play out line by line over about se
 Live calls are off unless all of the following are true:
 
 1. `.env` (git-ignored) contains `ROUTEREADY_LIVE=1`, a server-side `CALLE_API_KEY`, and `LIVE_TARGETS` mapping stops to numbers you own or whose owners agreed, for example `LIVE_TARGETS=s2=+1XXXXXXXXXX@US,s3=+1XXXXXXXXXX@US`. Stops without a target keep scripted customers, so a demo can mix a few real calls into the simulated day.
-2. The rider app's **Start with live calls** button asks for the start token printed in the terminal and the consent statement.
+2. The server listens on a loopback address (`HOST=127.0.0.1`, the default). The shared demo day's transcripts and controls have no login, so with any other `HOST` live calls on the demo day are turned off. Visitor routes at `/route` are separate: each is reached only with its own random session id.
+3. The rider app's **Start with live calls** button asks for the start token printed in the terminal and the consent statement.
 
-Copy `.env.example` to `.env` to start. The API key never reaches the browser, every number on screen and in logs is masked, and the server binds to `127.0.0.1` unless `HOST` says otherwise; even then a live day cannot start without the token.
+Copy `.env.example` to `.env` to start. The API key never reaches the browser and every number on screen and in logs is masked. While the server listens on loopback it also refuses requests that name another host, and every `POST` from another site is refused.
 
 While a live call is in flight the day clock drops to real time, so a call is never shown shorter than it was, and it holds there for twelve seconds afterwards so the result stays on screen.
 
@@ -85,7 +86,7 @@ While a live call is in flight the day clock drops to real time, so a call is ne
 
 ### One-call smoke test
 
-`npm run smoke` previews one readiness call (masked number, full task text, idempotency key) without calling. `npm run smoke:live` places it to `SMOKE_PHONE` and prints the streamed events, the structured result and the transcript. Changing `SMOKE_ID` is the only way to place a second smoke call.
+`npm run smoke` previews one readiness call (masked number, full task text, idempotency key) without calling. `npm run smoke:live` places it to `SMOKE_PHONE` and prints the streamed events, the structured result and the transcript, with every phone number masked, including numbers inside provider messages and transcripts; the saved result under `results/` is masked the same way. The idempotency key comes from `SMOKE_ID`, so re-running never dials twice. Changing `SMOKE_ID` is the only way to place a second smoke call, and doing so is the operator's explicit approval of a repeat call.
 
 Author-reported result against CALL-E's US test hotline: accepted immediately, ringing after about 60 seconds, a 54-second conversation, final result after 137 seconds. The hotline is an AI receptionist, so CALL-E correctly returned `reached_recipient: "no"` and `readiness: "unknown"`, and the gate would leave the route unchanged, even though CALL-E also reported `taskCompleted: true` with high confidence.
 
@@ -110,11 +111,14 @@ Sent as `recipientResultSchema` on every call; defined in [`src/calle/task.ts`](
 
 - Preview, simulation and tests never contact CALL-E. Live calls on the demo day need the environment switch, the start token and the consent statement. Your own route needs the visitor's own API key and the consent statement, and calls go to the numbers they entered, charged to their own account.
 - Calls disclose that they are an AI assistant in the first sentence, never ask for card, bank, password or identity details, and never promise an exact delivery time.
-- One call at a time; each customer at most once a day; no automatic redial after a failed, unclear or ambiguous call.
+- One call at a time, and no automatic redial after a failed, unclear or ambiguous call.
+- **The queue stops on ambiguity.** If CALL-E answers a create request with a 4xx refusal (other than 408 or 409), no call exists and the next stop may be called. Any other failure (network error, timeout, 5xx, 408, 409) leaves it unknown whether the call was placed, so no further call starts that day or on that route, and the screen says to check the call in the CALL-E dashboard. A live call that has not reached a terminal status after 15 minutes keeps the line busy and stops the queue the same way; it is never treated as over.
+- **Each customer at most once a day, by number.** A destination number is recorded when its call is attempted, so an ambiguous creation counts. Two stops with the same number are rejected, on a route and in `LIVE_TARGETS`. A number already called today on this server, by any route or an earlier demo day, is not called again unless a person ticks an explicit approval for a repeat call for a different reason. The record is in memory, keeps numbers only as hashes, and is forgotten on a server restart.
+- **Keys only go to CALL-E.** A real API key, whether a visitor's or the server's, is only sent to an approved HTTPS CALL-E origin. `CALLE_BASE_URL` pointing anywhere else, such as a local fake, accepts keys starting with `dummy-` only.
 - An answer changes the route only through the evidence gate. "Not today" is a recommendation that a dispatcher must approve; RouteReady writes nothing to any courier, shop or payment system.
-- Phone numbers are masked in the browser, the event log and the terminal. The API key stays on the server. Transcripts are shown as untrusted text and escaped.
+- Phone numbers are masked in the browser, the event log, the terminal and error responses, including numbers that appear inside CALL-E transcripts, event messages and errors. The API key stays on the server. Transcripts are shown as untrusted text and escaped.
 - On your own route, text a visitor types (names, addresses, shop name) is cut to one short line before it reaches a call task. At most 5 stops per route and 30 routes per server; idle routes end after 20 minutes and every route after 3 hours.
-- Smoke-test results are saved under `results/`, which is git-ignored.
+- Smoke-test results are saved under `results/`, which is git-ignored, with phone numbers masked.
 
 ## Cancellation
 
@@ -127,6 +131,8 @@ CALL-E has no cancel endpoint. **Stop** ends the day loop so no further calls ar
 - Travel times come from the public OSRM demo server with free-flow speeds, scaled by a fixed traffic factor of 2. They were downloaded once into `fixtures/` with `npm run build:travel`.
 - One rider and at most nine stops searched exhaustively; later stops keep their order.
 - A customer who does not answer is not called again that day; the rider tries the door as usual.
+- The once-a-day record lives in one server's memory. Two servers, or a restart, do not share it.
+- Phone numbers spoken as words in a transcript cannot be recognised and masked.
 - This is a hackathon reference app, not a production dispatch system.
 
 ## Layout
