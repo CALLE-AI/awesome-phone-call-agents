@@ -36,6 +36,13 @@ Anything that is not a clear answer routes away from success:
 - Unknown or unrecognised outcome: `needs_human`.
 - Silence is never read as yes.
 
+The grounding check that gates an `answered`/`partial` result is advisory: it
+confirms the callee spoke a non-empty turn and that AI was disclosed, not that
+the answer is true or semantically entailed. The enforced guarantee is the
+downgrade to `needs_human`, not correctness of a surfaced answer. Recovery of a
+held (uncertain) reservation is a manual `calle call recover` step; the client
+does not recover or redial automatically.
+
 ## Third-party privacy
 
 The person who answers the phone did not consent to the call. Disclose only the

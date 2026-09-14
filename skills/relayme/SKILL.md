@@ -183,12 +183,25 @@ RelayMe returns a text-first, fail-closed result. The user reads `answer` and
 `needs_human`-style handling: RelayMe never reports an answer it did not hear,
 and never treats silence or a machine as a yes.
 
+The grounding check behind this is advisory, not proof. The classifier confirms
+the callee actually spoke a non-empty turn and that the call disclosed it was AI;
+it does not verify by entailment that the surfaced `answer` is what they meant or
+that it is true. Treat a returned `answer` as advisory. The strong, code-enforced
+guarantee is the fail-closed downgrade to `needs_human`, not correctness of the
+answer.
+
 ## Cancellation And Idempotency
 
 Idempotency key: `relayme:{task_id}`. Reserve it before dialling. If the user
 cancels before the call is placed, do not dial. If a `run_call` outcome is
 uncertain, use `calle call recover --recovery-id <id>` rather than starting a new
 plan, so the same authorization is never dialled twice.
+
+Recovery is a manual operator step. The runnable client holds the reservation on
+an uncertain outcome (it will not redial from a fresh plan) but does not invoke
+`calle call recover` for you. Mock/preview and live runs are reserved under
+separate namespaces, so previewing a task does not consume its one live
+reservation.
 
 ## Safety Notes
 

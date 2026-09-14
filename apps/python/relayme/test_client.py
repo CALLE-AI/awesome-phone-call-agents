@@ -4,7 +4,7 @@ import sys
 from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).parent))
-from client import validate_task, mask_phone, build_goal  # noqa: E402
+from client import validate_task, mask_phone, build_goal, _locale_for  # noqa: E402
 
 failures = []
 
@@ -25,6 +25,7 @@ good = {
 check("valid task passes", validate_task(good) == [])
 check("consent false is rejected", any("consent" in p for p in validate_task({**good, "consent": False})))
 check("bad phone is rejected", any("E.164" in p for p in validate_task({**good, "to_phone_e164": "5550123"})))
+check("spaced phone is rejected (strict E.164)", any("E.164" in p for p in validate_task({**good, "to_phone_e164": "+1 555 000 0123"})))
 check("missing question is rejected", any("question" in p for p in validate_task({**good, "question": ""})))
 check("too many followups rejected", any("followups" in p for p in validate_task({**good, "allowed_followups": ["a", "b", "c", "d"]})))
 
@@ -37,6 +38,12 @@ goal = build_goal(good)
 check("goal discloses AI", "AI assistant" in goal)
 check("goal contains the question", "Open?" in goal)
 check("goal forbids commitments", "cancel anything" in goal)
+
+# --- region/locale derivation for the REST path ---
+check("English/US derives en-US", _locale_for(good) == ("US", "en-US"))
+check("explicit locale is trusted", _locale_for({**good, "locale": "es-419", "region": "MX"}) == ("MX", "es-419"))
+check("Spanish/US derives es-US", _locale_for({**good, "language": "Spanish"}) == ("US", "es-US"))
+check("unknown language falls back to en", _locale_for({**good, "language": "Klingon"}) == ("US", "en-US"))
 
 print()
 if failures:

@@ -20,9 +20,22 @@ from __future__ import annotations
 
 import json
 import os
+import re
 import tempfile
 from dataclasses import dataclass
 from pathlib import Path
+
+# Full ASCII E.164: a leading '+', a nonzero country-code digit, then up to 14
+# more ASCII digits (8-15 digits total). Rejects spaces, punctuation, and
+# non-ASCII digit lookalikes, which a live transport must never receive.
+_E164_RE = re.compile(r"^\+[1-9][0-9]{7,14}$")
+
+
+def is_e164(phone: str) -> bool:
+    """True only for a full, ASCII-only E.164 number (+ then 8-15 digits)."""
+    if not phone or not phone.isascii():
+        return False
+    return bool(_E164_RE.match(phone))
 
 VALID_OUTCOMES = {
     "answered", "partial", "refused", "voicemail",
@@ -43,15 +56,27 @@ class Reservation:
     task_id: str
     state: str  # "reserved" | "done"
     outcome: str | None = None
+    intent: str = "live"  # "live" | "preview"
 
 
 class ReservationStore:
-    """Durable, JSON-backed reserve-before-dial store keyed on task_id."""
+    """Durable, JSON-backed reserve-before-dial store keyed on (intent, task_id).
+
+    The key is namespaced by `intent` so a mock/preview run and a live run of the
+    same task_id do not collide. A preview reserves under "preview:"; a live dial
+    reserves under "live:". This is what lets the documented preview-then-live
+    flow work: previewing a task does not consume its one live reservation. Two
+    live runs of the same task_id still collide and the second is refused.
+    """
 
     def __init__(self, path: str | os.PathLike):
         self.path = Path(path)
         if not self.path.exists():
             self._write({})
+
+    @staticmethod
+    def _key(intent: str, task_id: str) -> str:
+        return f"{intent}:{task_id}"
 
     def _read(self) -> dict:
         try:
@@ -71,46 +96,60 @@ class ReservationStore:
             if os.path.exists(tmp):
                 os.unlink(tmp)
 
-    def reserve(self, task_id: str) -> None:
-        """Reserve a task before dialling. Refuse if already reserved or done."""
+    def reserve(self, task_id: str, intent: str = "live") -> None:
+        """Reserve a task before dialling. Refuse if already reserved or done.
+
+        `intent` namespaces the reservation ("live" or "preview"), so a preview
+        never blocks the one live dial for the same task_id.
+        """
         if not task_id:
             raise DispatchError("task_id is required to reserve a dial")
+        key = self._key(intent, task_id)
         data = self._read()
-        existing = data.get(task_id)
+        existing = data.get(key)
         if existing is not None:
             state = existing.get("state")
             raise DispatchError(
-                f"task {task_id} already {state}; refusing to dial again "
+                f"{intent} task {task_id} already {state}; refusing to run again "
                 f"(recover the prior attempt instead of starting over)"
             )
-        data[task_id] = {"task_id": task_id, "state": "reserved", "outcome": None}
+        data[key] = {"task_id": task_id, "intent": intent,
+                     "state": "reserved", "outcome": None}
         self._write(data)
 
-    def complete(self, task_id: str, outcome: str) -> None:
+    def complete(self, task_id: str, outcome: str, intent: str = "live") -> None:
         """Mark a reserved task done once a terminal outcome is confirmed.
 
         A non-terminal (uncertain) outcome leaves the reservation held, so the
         task cannot be redialled from a fresh plan; it must be recovered.
         """
+        key = self._key(intent, task_id)
         data = self._read()
-        if task_id not in data:
-            raise DispatchError(f"task {task_id} was never reserved")
+        if key not in data:
+            raise DispatchError(f"{intent} task {task_id} was never reserved")
         if outcome in _TERMINAL:
-            data[task_id] = {"task_id": task_id, "state": "done", "outcome": outcome}
+            data[key] = {"task_id": task_id, "intent": intent,
+                         "state": "done", "outcome": outcome}
             self._write(data)
         # else: leave it reserved (held) for recovery.
 
-    def status(self, task_id: str) -> Reservation | None:
-        rec = self._read().get(task_id)
-        return Reservation(**rec) if rec else None
+    def status(self, task_id: str, intent: str = "live") -> Reservation | None:
+        rec = self._read().get(self._key(intent, task_id))
+        if not rec:
+            return None
+        return Reservation(task_id=rec["task_id"], state=rec["state"],
+                           outcome=rec.get("outcome"), intent=rec.get("intent", intent))
 
 
 def _transcript_supports(answer: str, transcript: list[dict] | None) -> bool:
-    """A conservative check that the answer is grounded in what was actually said.
+    """Advisory-only heuristic that the answer is grounded in what was said.
 
-    We do not try to prove semantic entailment. We require that the callee spoke
-    at least once and that the answer is not obviously invented. If there is no
-    callee turn at all, an 'answer' cannot be trusted.
+    This is NOT semantic entailment and does not verify the answer is correct.
+    It only checks that the callee actually spoke at least one non-empty turn,
+    so an "answer" with no callee turn behind it cannot be reported as confirmed.
+    A live deployment should treat a surfaced answer as advisory and leave final
+    judgement to the user; the strong guarantee here is the fail-closed downgrade
+    to needs_human, not proof that the answer is true.
     """
     if not transcript:
         return False
@@ -124,10 +163,15 @@ def classify(raw: dict, transcript: list[dict] | None = None) -> dict:
     Rules:
     - Unknown/missing outcome -> needs_human.
     - Only answered/partial may carry an answer; others are blanked.
-    - An answered/partial result with no supporting callee turn is downgraded to
-      needs_human: the agent must not report an answer no one confirmed.
+    - An answered/partial result whose transcript has no callee turn is
+      downgraded to needs_human: the agent must not report an answer no one
+      spoke. This grounding check is advisory (see `_transcript_supports`); it
+      confirms a callee spoke, not that the answer is true or entailed.
     - disclosed_ai must be explicitly true; otherwise the call is not trustworthy
       as a completed relay and routes to needs_human.
+
+    Recovery of a held (uncertain) reservation is a manual operator step; this
+    module does not invoke `calle call recover` automatically.
     """
     outcome = raw.get("outcome")
     if outcome not in VALID_OUTCOMES:

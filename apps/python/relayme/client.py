@@ -31,7 +31,7 @@ from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).parent))
 from dispatch import (  # noqa: E402
-    ReservationStore, DispatchError, classify, enforce_followup_budget,
+    ReservationStore, DispatchError, classify, enforce_followup_budget, is_e164,
 )
 from thread import build_thread, thread_to_dicts, render_plaintext  # noqa: E402
 
@@ -75,8 +75,8 @@ def validate_task(task: dict) -> list[str]:
     if task.get("consent") is not True:
         problems.append("consent must be true (the user must authorize this one call)")
     phone = task.get("to_phone_e164", "")
-    if phone and not (phone.startswith("+") and phone[1:].isdigit()):
-        problems.append("to_phone_e164 must be E.164, e.g. +15550000123")
+    if phone and not is_e164(phone):
+        problems.append("to_phone_e164 must be full ASCII E.164, e.g. +15550000123")
     followups = task.get("allowed_followups") or []
     if len(followups) > 3:
         problems.append("allowed_followups is capped at 3")
@@ -99,11 +99,16 @@ def print_preview(task: dict, goal: str) -> None:
     print("=" * 68)
 
 
-def _calle(argv: list[str]) -> dict:
-    """Run a `calle` CLI command and return parsed JSON stdout."""
+def _calle(argv: list[str], _action: str = "calle") -> dict:
+    """Run a `calle` CLI command and return parsed JSON stdout.
+
+    On failure we surface only the sub-command name and its exit code. The full
+    argv is never echoed: it carries the goal text, the destination number, and a
+    confirm token, none of which belong in an error message or a log.
+    """
     proc = subprocess.run(["calle", *argv], capture_output=True, text=True, check=False)
     if proc.returncode != 0:
-        raise RuntimeError(f"calle {' '.join(argv)} failed: {proc.stderr.strip()}")
+        raise RuntimeError(f"calle {_action} failed (exit {proc.returncode})")
     return json.loads(proc.stdout)
 
 
@@ -113,20 +118,21 @@ def run_live(task: dict, goal: str, poll_seconds: int = 10, max_polls: int = 30)
     for opt in ("language", "region", "timezone"):
         if task.get(opt):
             plan_argv += [f"--{opt}", task[opt]]
-    plan = _calle(plan_argv).get("result", {}).get("structuredContent", {})
+    plan = _calle(plan_argv, "call plan").get("result", {}).get("structuredContent", {})
     if not plan.get("plan_id") or plan.get("ready_to_run") is False:
         return {"outcome": "needs_human",
                 "transcript_summary": "Call could not be planned; clarification needed."}, []
 
+    # plan["confirm_token"] is a one-time secret: pass it through, never print it.
     run = _calle(["call", "run", "--plan-id", plan["plan_id"],
-                  "--confirm-token", plan["confirm_token"]])
+                  "--confirm-token", plan["confirm_token"]], "call run")
     run_id = run.get("run_id") or run.get("status_result", {}).get("structuredContent", {}).get("run_id")
     if not run_id:
         return {"outcome": "needs_human",
                 "transcript_summary": "Call run did not return a stable run_id; recover manually."}, []
 
     for _ in range(max_polls):
-        status = _calle(["call", "status", "--run-id", run_id])
+        status = _calle(["call", "status", "--run-id", run_id], "call status")
         sc = status.get("status_result", {}).get("structuredContent", {})
         if sc.get("state") in {"completed", "failed", "ended"} or sc.get("structured_result"):
             raw = sc.get("structured_result", sc)
@@ -154,10 +160,30 @@ def _load_api_key() -> str:
     raise RuntimeError("no CALL-E api_key found (set CALLE_API_KEY or add api_key= to .env)")
 
 
+def _locale_for(task: dict) -> tuple[str, str]:
+    """Derive (region, locale) for the REST recipient from the task.
+
+    region is an ISO country code (task['region'], default "US"). locale is
+    BCP-47: if task['locale'] is given we trust it, otherwise we map a small set
+    of known language names to a language subtag and combine with the region.
+    """
+    region = (task.get("region") or "US").strip()
+    if task.get("locale"):
+        return region, str(task["locale"]).strip()
+    lang_map = {
+        "english": "en", "spanish": "es", "french": "fr", "german": "de",
+        "portuguese": "pt", "italian": "it", "mandarin": "zh", "chinese": "zh",
+    }
+    lang_name = (task.get("language") or "English").strip().lower()
+    subtag = lang_map.get(lang_name, "en")
+    return region, f"{subtag}-{region}"
+
+
 def run_live_rest(task: dict, goal: str) -> tuple[dict, list[dict]]:
-    """Drive the real CALL-E REST flow (create -> poll). Returns (raw_result, transcript)."""
+    """Drive the real CALL-E REST flow (create -> poll -> map). Returns (raw_result, transcript)."""
     import calle_rest
     key = _load_api_key()
+    region, locale = _locale_for(task)
     result_schema = {
         "answer": "string", "outcome": "string",
         "transcript_summary": "string", "follow_up_needed": "boolean",
@@ -169,15 +195,17 @@ def run_live_rest(task: dict, goal: str) -> tuple[dict, list[dict]]:
         task=goal,
         result_schema=result_schema,
         idempotency_key=f"relayme:{task['task_id']}",
+        region=region,
+        locale=locale,
         metadata={"task_id": task["task_id"]},
     )
     if created.get("_outcome") == "unknown_possibly_created":
         return {"outcome": "needs_human",
                 "transcript_summary": "Create outcome unknown; reconcile with the same idempotency key before retrying."}, []
     call = calle_rest.poll_call(key, created["id"])
-    raw = call.get("structured_result", call)
-    transcript = call.get("transcript") or raw.get("transcript") or []
-    return raw, transcript
+    # Map the terminal CALL-E result (recipients[].attempts[].transcript_turns,
+    # per-recipient structured_result, speaker bot|user -> agent|callee) here.
+    return calle_rest.parse_terminal(call)
 
 
 def main() -> int:
@@ -201,19 +229,35 @@ def main() -> int:
             print(f"  - {p}")
         return 2
 
+    live = args.execute or args.execute_rest
+    intent = "live" if live else "preview"
+
+    # MF1: hard E.164 gate immediately before either live transport. The soft
+    # preflight above catches a bad number early; this refuses to dial even if
+    # something downstream changed the number after preflight.
+    if live and not is_e164(task.get("to_phone_e164", "")):
+        print("\nRefusing to dial: destination is not a full ASCII E.164 number.")
+        return 2
+
     goal = build_goal(task)
     print_preview(task, goal)
 
-    # Reserve before any dial. A second run of the same task_id is refused.
+    # Reserve before any dial, namespaced by intent so a preview does not consume
+    # the one live reservation (preview-then-live works). A second *live* run of
+    # the same task_id is still refused.
     store = ReservationStore(args.store)
     try:
-        store.reserve(task["task_id"])
+        store.reserve(task["task_id"], intent=intent)
     except DispatchError as e:
-        print(f"\nRefusing to dial: {e}")
+        print(f"\nRefusing to proceed: {e}")
         return 3
 
+    result = {"outcome": "needs_human", "answer": "",
+              "transcript_summary": "", "follow_up_needed": True,
+              "disclosed_ai": False}
+    transcript: list[dict] = []
     try:
-        if not args.execute and not args.execute_rest:
+        if not live:
             fixture_path = Path(args.fixture) if args.fixture else (
                 Path(__file__).parent / "fixtures" / "answered.json"
             )
@@ -233,9 +277,10 @@ def main() -> int:
 
         result = classify(raw, transcript)
     finally:
-        # Terminal outcome releases the reservation; uncertain holds it for recovery.
+        # Terminal outcome releases the reservation; uncertain holds it for a
+        # manual recovery step (this tool does not auto-redial or auto-recover).
         try:
-            store.complete(task["task_id"], result["outcome"] if "result" in dir() else "needs_human")
+            store.complete(task["task_id"], result["outcome"], intent=intent)
         except Exception:
             pass
 

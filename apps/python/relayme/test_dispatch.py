@@ -6,7 +6,7 @@ from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).parent))
 from dispatch import (  # noqa: E402
-    ReservationStore, DispatchError, classify, enforce_followup_budget,
+    ReservationStore, DispatchError, classify, enforce_followup_budget, is_e164,
 )
 
 failures = []
@@ -47,6 +47,30 @@ with tempfile.TemporaryDirectory() as d:
     expect_raises("held task cannot be redialled", lambda: store.reserve("task-2"))
 
     expect_raises("empty task_id refused", lambda: store.reserve(""))
+
+# preview and live reservations are namespaced so preview-then-live works
+with tempfile.TemporaryDirectory() as d:
+    store = ReservationStore(Path(d) / "res.json")
+    store.reserve("task-p", intent="preview")
+    check("preview reserve does not block the live dial",
+          store.status("task-p", intent="live") is None)
+    store.reserve("task-p", intent="live")  # must not raise
+    check("live reserve after preview succeeds",
+          store.status("task-p", intent="live").state == "reserved")
+    expect_raises("second live reserve of same task is refused",
+                  lambda: store.reserve("task-p", intent="live"))
+
+# --- full ASCII E.164 gate ---
+check("valid US E.164 accepted", is_e164("+15550000123"))
+check("valid E.164 min length accepted", is_e164("+12345678"))
+check("no plus rejected", not is_e164("15550000123"))
+check("spaces rejected", not is_e164("+1 555 000 0123"))
+check("punctuation rejected", not is_e164("+1-555-000-0123"))
+check("leading zero country code rejected", not is_e164("+0123456789"))
+check("too short rejected", not is_e164("+1234567"))
+check("too long rejected", not is_e164("+1234567890123456"))
+check("empty rejected", not is_e164(""))
+check("non-ascii digits rejected", not is_e164("+\uff11\uff15\uff15\uff10\uff10\uff10\uff10\uff10"))
 
 # corrupt journal fails closed
 with tempfile.TemporaryDirectory() as d:

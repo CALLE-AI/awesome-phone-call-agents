@@ -24,6 +24,13 @@ import urllib.error
 from typing import Any
 
 DEFAULT_API_BASE = "https://api.heycall-e.com"
+# Credentials (the Bearer key) may only ever be sent to an approved HTTPS origin.
+# A urllib redirect could otherwise bounce the Authorization header to an
+# attacker-controlled host; we pin the origin and refuse redirects entirely.
+APPROVED_ORIGINS = frozenset({
+    "https://api.heycall-e.com",
+    "https://api.calle.ai",
+})
 TERMINAL_STATUSES = {"completed", "failed", "no_answer", "canceled", "cancelled",
                      "voicemail", "busy", "expired", "ended"}
 
@@ -32,8 +39,68 @@ class RestError(RuntimeError):
     pass
 
 
+def _origin(url: str) -> str:
+    """Return scheme://host[:port] for url, lowercased scheme+host."""
+    from urllib.parse import urlsplit
+    parts = urlsplit(url)
+    scheme = (parts.scheme or "").lower()
+    netloc = (parts.netloc or "").lower()
+    return f"{scheme}://{netloc}"
+
+
+def _require_approved_origin(api_base: str) -> None:
+    """Fail closed unless api_base is an approved HTTPS origin.
+
+    This is checked before any request so the Bearer key is never sent to an
+    unexpected or plaintext-HTTP host.
+    """
+    origin = _origin(api_base.rstrip("/"))
+    if not origin.startswith("https://"):
+        raise RestError("refusing to send credentials over a non-HTTPS origin")
+    if origin not in APPROVED_ORIGINS:
+        raise RestError(
+            "refusing to send credentials to an unapproved origin "
+            "(set api_base to an approved CALL-E HTTPS endpoint)"
+        )
+
+
+class _NoRedirect(urllib.request.HTTPRedirectHandler):
+    """Refuse every redirect so a 3xx cannot leak the Bearer token off-origin."""
+
+    def redirect_request(self, req, fp, code, msg, headers, newurl):  # noqa: D401
+        raise RestError(
+            f"refusing to follow a {code} redirect to {_origin(newurl)}; "
+            "credentials must not leave the approved origin"
+        )
+
+
+# A shared opener that never follows redirects. Requests carrying the Bearer key
+# go through this so a redirect cannot forward the Authorization header.
+_OPENER = urllib.request.build_opener(_NoRedirect())
+
+
+def _safe_status_message(status: int) -> str:
+    """A user-safe description of a provider HTTP status, with no raw body.
+
+    Provider error bodies can echo the request (task text, phone) or internal
+    detail; we never surface them. The caller logs only this coarse message.
+    """
+    if status in (401, 403):
+        return "authentication or authorization was rejected by CALL-E"
+    if status == 404:
+        return "the call was not found"
+    if status == 422:
+        return "the request was rejected as invalid by CALL-E"
+    if status == 429:
+        return "CALL-E rate-limited the request"
+    if 500 <= status < 600:
+        return "CALL-E returned a server error"
+    return f"CALL-E returned HTTP {status}"
+
+
 def _request(method: str, url: str, api_key: str, body: dict | None = None,
              timeout: int = 30) -> tuple[int, dict]:
+    _require_approved_origin(url)
     data = json.dumps(body).encode() if body is not None else None
     req = urllib.request.Request(url, data=data, method=method)
     req.add_header("Authorization", f"Bearer {api_key}")
@@ -41,18 +108,14 @@ def _request(method: str, url: str, api_key: str, body: dict | None = None,
     if data is not None:
         req.add_header("Content-Type", "application/json")
     try:
-        with urllib.request.urlopen(req, timeout=timeout) as resp:
+        with _OPENER.open(req, timeout=timeout) as resp:
             raw = resp.read().decode()
             return resp.status, (json.loads(raw) if raw.strip() else {})
     except urllib.error.HTTPError as e:
-        raw = e.read().decode() if e.fp else ""
-        try:
-            parsed = json.loads(raw) if raw.strip() else {}
-        except json.JSONDecodeError:
-            parsed = {"error": raw[:200]}
-        return e.code, parsed
+        # Do not parse or surface the raw error body; return a safe summary only.
+        return e.code, {"_safe_message": _safe_status_message(e.code)}
     except urllib.error.URLError as e:
-        raise RestError(f"network error reaching {url}: {e.reason}")
+        raise RestError(f"network error reaching the CALL-E API: {e.reason}")
 
 
 def preflight(api_key: str, api_base: str = DEFAULT_API_BASE) -> bool:
@@ -62,16 +125,25 @@ def preflight(api_key: str, api_base: str = DEFAULT_API_BASE) -> bool:
 
 
 def create_call(api_key: str, to_phone_e164: str, task: str, result_schema: dict,
-                idempotency_key: str, region: str = "US", locale: str = "en-US",
+                idempotency_key: str, region: str, locale: str,
                 recipient_result_schema: dict | None = None,
                 metadata: dict | None = None,
                 api_base: str = DEFAULT_API_BASE) -> dict:
     """Create one outbound call. PLACES A REAL CALL. Returns the CallTask dict.
 
-    Uses the documented recipients[] schema with explicit region/locale, which is
-    required so CALL-E does not have to guess the destination region. Fails closed:
-    a 2xx without a documented call id is reported as unknown-possibly-created.
+    Uses the documented recipients[] schema with explicit `region` (ISO country,
+    e.g. "US") and `locale` (BCP-47, e.g. "en-US"), which the caller must supply
+    from the task so CALL-E never guesses the destination. Fails closed: a
+    non-2xx or a 2xx without a documented call id is reported as
+    unknown-possibly-created, and no raw provider error body is surfaced.
     """
+    from dispatch import is_e164
+    if not is_e164(to_phone_e164):
+        raise RestError("destination is not a full ASCII E.164 number; not creating a call")
+    if not region or not locale:
+        raise RestError("region and locale are required to create a call")
+    _require_approved_origin(api_base)
+
     body: dict[str, Any] = {
         "task": task,
         "recipients": [{
@@ -94,23 +166,21 @@ def create_call(api_key: str, to_phone_e164: str, task: str, result_schema: dict
     req.add_header("Content-Type", "application/json")
     req.add_header("Idempotency-Key", idempotency_key)
     try:
-        with urllib.request.urlopen(req, timeout=600) as resp:
+        # Redirect-refusing opener: a 3xx must not forward the Bearer key.
+        with _OPENER.open(req, timeout=600) as resp:
             status = resp.status
             parsed = json.loads(resp.read().decode() or "{}")
     except urllib.error.HTTPError as e:
-        raw = e.read().decode() if e.fp else ""
-        try:
-            err = json.loads(raw) if raw.strip() else {}
-        except json.JSONDecodeError:
-            err = {"error": raw[:300]}
         return {"_outcome": "unknown_possibly_created", "_status": e.code,
-                "_idempotency_key": idempotency_key, "_error": err}
+                "_idempotency_key": idempotency_key,
+                "_message": _safe_status_message(e.code)}
     except urllib.error.URLError as e:
         raise RestError(f"network error creating call: {e.reason}")
 
     if not (200 <= status < 300) or not parsed.get("id"):
         return {"_outcome": "unknown_possibly_created", "_status": status,
-                "_idempotency_key": idempotency_key, "_raw": parsed}
+                "_idempotency_key": idempotency_key,
+                "_message": _safe_status_message(status)}
     return parsed
 
 

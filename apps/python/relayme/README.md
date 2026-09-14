@@ -31,10 +31,15 @@ python3 apps/python/relayme/client.py --task skills/relayme/assets/sample-task.j
 ## Tests
 
 ```
+python3 apps/python/relayme/test_dispatch.py
+python3 apps/python/relayme/test_thread.py
 python3 apps/python/relayme/test_client.py
+python3 apps/python/relayme/test_calle_rest.py
 ```
 
-No network. Covers fail-closed normalization and preflight validation.
+No network. Covers fail-closed normalization, preflight validation, full ASCII
+E.164 gating, preview-vs-live reservation namespacing, approved-origin pinning,
+credential-redirect refusal, and the recipient/attempt result mapping.
 
 ## Live mode (places a real call)
 
@@ -59,15 +64,21 @@ python3 apps/python/relayme/client.py --task <authorized-task.json> --execute-re
 Drives `GET /v1/goals` preflight -> `POST /v1/calls` (documented `recipients[]`
 schema with `region`/`locale`) -> `GET /v1/calls/{id}` poll, then maps the
 `recipients[].attempts[].transcript_turns` result through the same classifier and
-thread builder as every other path. The destination `region`/`locale` come from
-the task's `region`/`language`; the recipient must be in a supported region.
+thread builder as every other path. The destination `region`/`locale` are derived
+from the task's `region`/`language` (or an explicit `locale`); the recipient must
+be in a supported region. Credentials are only ever sent to an approved HTTPS
+origin, and redirects are refused so a 3xx cannot forward the Bearer key
+off-origin. Provider error bodies are never surfaced; only a safe status summary
+is shown.
 
 ## Side effects and cancellation
 
 - **Side effect:** `--execute` places one real outbound phone call and consumes
   one CALL-E call from the account.
-- **No hidden retries:** one authorized task is one call. An uncertain outcome is
-  recovered with `calle call recover --recovery-id <id>`, not re-dialled.
+- **No hidden retries:** one authorized task is one call. An uncertain outcome
+  holds the reservation and is recovered manually with
+  `calle call recover --recovery-id <id>`; the client never auto-redials or
+  auto-recovers.
 - **Cancellation:** if the user cancels before `--execute`, nothing is dialled.
   Mock mode never dials.
 - **Idempotency key:** `relayme:{task_id}`.
