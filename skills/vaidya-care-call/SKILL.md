@@ -106,3 +106,144 @@ A result may contain fields such as:
   "notes": "",
   "next_action": "continue_followup"
 }
+
+Possible patient_reached values include:
+
+yes
+no
+voicemail
+wrong_number
+
+Possible health_status values include:
+
+improved
+stable
+worsened
+unknown
+
+The exact schema may vary by implementation.
+
+Do not infer a successful health assessment when the patient was not reached.
+
+Post-Call Processing
+
+A completed call is not the end of the workflow.
+
+After receiving the structured CALL-E result:
+
+Store the call result.
+Create exactly one patient event for the call outcome.
+Associate the event with the call record.
+Reassess the patient's longitudinal state.
+Determine whether follow-up should be maintained, increased, escalated, or otherwise adjusted.
+Surface cases requiring human attention to the healthcare worker.
+
+Call-result processing must be idempotent.
+
+If the same CALL-E result is received or processed more than once, the system must not create duplicate patient events or duplicate care actions.
+
+Human Oversight
+
+Automated routine follow-up should not be presented as replacing healthcare workers.
+
+The purpose of this workflow is to reduce repetitive follow-up work while preserving human oversight for patients who require additional attention.
+
+Urgent or clinically concerning situations should follow the application's escalation policy rather than being treated as ordinary automated follow-up calls.
+
+A system may automate routine communication while keeping clinically significant escalation under human control.
+
+Privacy
+
+Do not place real patient information in source code, examples, tests, screenshots, or documentation.
+
+Never publish:
+
+real patient names
+real patient phone numbers
+medical records
+API keys
+authentication tokens
+private database identifiers
+
+Use synthetic or masked patient data in examples.
+
+Example:
+
+Patient: Example Patient
+Phone: +91XXXXXXXXXX
+Failure Handling
+
+If CALL-E cannot initiate the call:
+
+Record the failure.
+Do not report that the patient was contacted.
+Surface the failure to the appropriate healthcare workflow.
+Retry only according to an explicit retry policy.
+
+If the patient cannot be reached:
+
+Record the actual outcome.
+Do not interpret the failed contact as a successful health assessment.
+Follow the application's retry or human-review policy.
+
+If the call result is incomplete or ambiguous:
+
+Preserve the uncertainty.
+Do not invent missing clinical information.
+Allow the healthcare workflow to determine whether human review is required.
+Idempotency
+
+Call initiation and result processing should be protected against duplicate execution.
+
+A repeated callback, webhook, or processing attempt must not:
+
+create duplicate patient events
+create duplicate care decisions
+initiate duplicate calls
+overwrite a valid result with an older result
+
+Use a stable call identifier or equivalent idempotency mechanism when available.
+
+Auditability
+
+A healthcare communication workflow should make it possible to determine why a call was made.
+
+Record sufficient metadata to trace the action, including:
+
+patient identifier
+care decision identifier
+call reason
+risk level
+priority
+CALL-E call identifier
+call status
+timestamps
+structured call outcome
+
+Avoid storing unnecessary sensitive information.
+
+Core Principle
+
+The upstream healthcare agent may identify that a follow-up action is appropriate.
+
+A deterministic safety layer decides whether an automated call is permitted.
+
+CALL-E performs the communication action.
+
+The call result becomes new information in the patient's longitudinal care timeline.
+
+The healthcare workflow then reassesses the patient and determines what should happen next.
+
+The goal is not simply to make a phone call.
+
+The goal is to close the loop between patient information, care decisions, communication, and reassessment.
+
+
+### Then do this
+
+1. **Paste** it into `SKILL.md`.
+2. Scroll to the bottom.
+3. Commit message:
+
+```text
+Add Vaidya care call skill
