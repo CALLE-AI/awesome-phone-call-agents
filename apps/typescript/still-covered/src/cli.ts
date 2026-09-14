@@ -12,6 +12,7 @@ import type { Call, CalleClient } from "@call-e/calle";
 import { createCalleClient, createScreeningCall } from "./calle.js";
 import { assertLiveAllowed, forceDryRun, loadConfig, loadDotEnv, type Config } from "./config.js";
 import { startFakeCalleServer, type FakeServerHandle } from "./fake-calle-server.js";
+import { formatLintReport, lintCallTask } from "./lint.js";
 import { Ledger } from "./ledger.js";
 import { maskPhone } from "./mask.js";
 import { CallInbox, Orchestrator } from "./orchestrator.js";
@@ -51,6 +52,7 @@ Commands
   follow-up    Call back the people who asked for a better time and are due.
   serve        Dashboard and webhook receiver; drills can be started from the browser (dry-run only).
   report       Rebuild the outreach report from a campaign ledger.
+  lint-task    Check a CALL-E call task for undefended safety boundaries. Reads text; places no call.
   probe        Run the conformance probes: scripted adversarial calls, checked against the transcript.
   fake-server  Run the local fake CALL-E API in the foreground.
 
@@ -70,6 +72,7 @@ Options
   --keep-server           Keep the dashboard running after run finishes
   --now                   follow-up: ignore due times
   --only <probe-id>       probe: run a single probe
+  --task-file <path>      lint-task: check this file instead of the rendered task
   --simulate <mode>       probe, dry-run only: "compliant" (default) or "violating" to prove the
                           harness reports a failure when the agent misbehaves
 `);
@@ -303,6 +306,7 @@ async function main(): Promise<void> {
       now: { type: "boolean", default: false },
       only: { type: "string" },
       simulate: { type: "string" },
+      "task-file": { type: "string" },
       quiet: { type: "boolean", default: false },
       help: { type: "boolean", default: false },
     },
@@ -573,6 +577,37 @@ const campaign: Campaign = { id: `probe-${asOf}-${runStamp}`, title: "Conformanc
       log(failed === 0 ? color.green(`All ${results.length} probes held every boundary.`) : color.red(`${failed} of ${results.length} probes failed at least one assertion.`));
       log(`Report: ${join(dir, `${stem}.md`)}`);
       process.exitCode = failed === 0 ? 0 : 1;
+      return;
+    }
+
+    case "lint-task": {
+      // Lints any CALL-E call task, not only ours: pass --task-file to check your own. With no
+      // file it renders this app's task for the first person on the list and lints that, which is
+      // the quickest way to see what the rules are actually asking for.
+      const file = typeof values["task-file"] === "string" ? values["task-file"] : null;
+      let task: string;
+      let subject: string;
+      if (file !== null) {
+        task = readFileSync(file, "utf8");
+        subject = file;
+      } else {
+        const campaign = buildCampaign(config, values, rules, state);
+        const { people } = loadPeople(config, registryPath, campaign, () => undefined);
+        const person = people[0];
+        if (!person) {
+          throw new Error("No people loaded, so there is no task to lint. Pass --task-file instead.");
+        }
+        task = renderScreeningTask(rules, state, person, campaign.asOf);
+        subject = `rendered task for ${person.name} (${state.id})`;
+      }
+      const report = lintCallTask(task);
+      log(color.bold(`Call-task lint: ${subject}`));
+      log("");
+      const text = formatLintReport(report);
+      for (const line of text.split("\n")) {
+        log(line.startsWith("ERROR") ? color.red(line) : line.startsWith("WARNING") ? color.yellow(line) : line);
+      }
+      process.exitCode = report.errors > 0 ? 1 : 0;
       return;
     }
 

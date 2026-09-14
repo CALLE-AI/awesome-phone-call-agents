@@ -102,7 +102,7 @@ No credentials, no network, no phone call:
 
 ```bash
 npm install
-npm test        # 61 tests
+npm test        # 72 tests
 npm run plan    # who gets cleared without a call, the wave order, the exact call task
 npm run demo    # full campaign against the bundled fake CALL-E server
 npm run serve   # dashboard on http://127.0.0.1:4800
@@ -280,6 +280,53 @@ fake API and asserts the verdicts are opposite.
 placed no real calls and proves nothing about how a live model behaves — and it omits the latency
 measurement entirely rather than reporting a fabricated one.
 
+## The part that is useful to everybody else
+
+Four live calls produced six defects, and every one traced back to something the call task either
+failed to forbid or forbade too loosely. None of those lessons are specific to Medicaid, so they are
+packaged as a linter that reads **any** CALL-E call task and reports which boundaries it leaves
+undefended.
+
+```bash
+npm run lint-task                                  # lints this app's own rendered task
+npm run sc -- lint-task --task-file your-task.txt  # lints yours
+```
+
+```
+14 of 14 boundaries defended - 0 error(s), 0 warning(s).
+
+Every rule is satisfied. The instructions exist; whether the agent follows them on the day is
+what the conformance probes are for.
+```
+
+Point it at a naive task and it reports nine errors, each naming the real call that produced the
+rule — disclosure before identity, the agent stating a determination, compound eligibility questions,
+invented criteria, coaching the answer, unhandled interruptions, a loose language rule, a voicemail
+that names the programme.
+
+### As an MCP server
+
+The same thing, exposed to any agent that speaks MCP:
+
+```bash
+npm run mcp        # JSON-RPC over stdio
+```
+
+| Tool | What it does |
+| --- | --- |
+| `lint_call_task` | Check any CALL-E task text for undefended boundaries |
+| `list_call_task_rules` | Every rule, the call that produced it, and how to satisfy it |
+| `plan_outreach` | Dry-run a plan for an enrollee list |
+| `run_conformance_probes` | Run the adversarial probes, compliant or violating |
+
+**No tool here can place a phone call.** The two that shell out are pinned to `--dry-run` by the
+server rather than by their arguments, and a test asserts that no executable line in the file
+contains `--confirm` or `SC_MODE`. A live campaign still needs a human at a terminal.
+
+The server is hand-written JSON-RPC — about 150 lines — for the same reason the rest of this app has
+no runtime dependencies beyond the CALL-E SDK. The protocol surface needed here is three methods, and
+a dependency that ships a thousand lines to save fifty is a liability in a benefits system.
+
 ## Safety
 
 - Nothing about coverage is said before the person confirms their birth year, and the agent never
@@ -301,7 +348,7 @@ The full list is in the skill: `skills/medicaid-exemption-screener/references/sa
 
 ```
 npm run check          # tsc --noEmit, strict + noUncheckedIndexedAccess + exactOptionalPropertyTypes
-npm test               # 61 tests, no network
+npm test               # 72 tests, no network
 npm run test:failures  # just the failure semantics - every test name is a guarantee
 ```
 
