@@ -208,6 +208,8 @@ SDK calls send a stable `Idempotency-Key` (`fda-<run>-<event>-<booking>`) and `m
 
 ## Run it (dry run, no calls)
 
+Step-by-step scenarios with expected results are in [TESTING.md](TESTING.md).
+
 Requires Node.js 22+.
 
 ```bash
