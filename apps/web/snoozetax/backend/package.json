@@ -1,0 +1,21 @@
+{
+  "name": "snoozetax-backend",
+  "version": "1.0.0",
+  "description": "SnoozeTax: an accountability alarm clock that uses CALL-E to prove a human is awake",
+  "main": "index.js",
+  "scripts": {
+    "start": "node index.js",
+    "test": "node test-flow.js",
+    "live-call": "node test-live-call.js"
+  },
+  "keywords": ["calle", "phone-call-agent", "alarm", "accountability", "voice"],
+  "author": "Javier Cristobal",
+  "license": "MIT",
+  "type": "commonjs",
+  "dependencies": {
+    "better-sqlite3": "^11.10.0",
+    "cors": "^2.8.6",
+    "express": "^5.2.1",
+    "node-cron": "^4.6.0"
+  }
+}
