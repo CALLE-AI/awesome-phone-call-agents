@@ -1,0 +1,9 @@
+# Safe local rehearsal: no phone calls and no API credential required.
+CALL_PROVIDER=fake
+LIVE_CALLS_ENABLED=false
+
+# To use live calls, follow README.md and supply your own server-side key.
+# CALL_PROVIDER=calle_calls
+# LIVE_CALLS_ENABLED=true
+# CALLE_API_KEY=
+# CALLE_BASE_URL=https://api.heycall-e.com
