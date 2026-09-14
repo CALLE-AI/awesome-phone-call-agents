@@ -310,6 +310,7 @@ class IrActionsServer(models.Model):
             rule_rec = new_env[rule_rec_model].browse(rule_rec_id) if (rule_rec_model and rule_rec_id) else False
             target_rec = new_env[target_rec_model].browse(target_rec_id) if (target_rec_model and target_rec_id) else False
 
+            res_status = None
             status = 'failed'
             result_text = ""
             call_id = False
@@ -345,12 +346,12 @@ class IrActionsServer(models.Model):
                     fail_msg = getattr(call_res, 'failure_message', "")
                     conf_val = getattr(call_res, 'completion_confidence', None)
 
-                if res_status in ('failed', 'error', 'canceled'):
-                    status = 'failed'
-                elif res_status == 'completed':
+                if res_status == 'completed':
                     status = 'completed'
+                elif res_status == 'pending':
+                    status = 'pending'
                 else:
-                    status = 'completed' if task_completed else 'failed'
+                    status = 'failed'
 
                 res_parts = []
                 if summary_val:
@@ -423,7 +424,7 @@ class IrActionsServer(models.Model):
 
             # Execute any matching response Python code actions on thread (completed & task_completed & bound record only)
             if (
-                status == 'completed'
+                res_status == 'completed'
                 and task_completed
                 and rule_rec
                 and rule_rec.exists()
