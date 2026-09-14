@@ -1,4 +1,5 @@
 import { PhoneAgentProvider } from './PhoneAgentProvider.js';
+import { maskPhoneNumber } from '../utils/phone.js';
 import {
   CallRecord,
   CallState,
@@ -44,7 +45,7 @@ export class MockProvider implements PhoneAgentProvider {
           id: 'turn_init',
           timestamp: '00:00',
           speaker: 'AI',
-          text: `[MOCK DEMO] Initializing simulated verification call to ${task.target.organizationName} (${task.target.phoneNumber})...`,
+          text: `[MOCK DEMO] Initializing simulated verification call to ${task.target.organizationName} (${maskPhoneNumber(task.target.phoneNumber)})...`,
           isSimulated: true,
         },
       ],

@@ -302,7 +302,7 @@ describe('TRACE Supply-Chain Verification Engine Integration & Rules', () => {
     // Verify CSV output
     const csv = generateTasksCsv([sampleTask]);
     expect(csv).toContain('Vanguard Industrial Valves');
-    expect(csv).toContain('+14155550182');
+    expect(csv).toContain('+1******0182');
     expect(csv).toContain('2-inch Stainless Ball Valves');
   });
 
@@ -441,6 +441,188 @@ describe('TRACE Supply-Chain Verification Engine Integration & Rules', () => {
       // Test Case 4: Standard sentence without part codes is untouched
       const input4 = 'All 40 units of 2-inch Stainless Ball Valves (ANSI 150) are packed.';
       expect(formatNaturalTranscriptText(input4)).toBe('All 40 units of 2-inch Stainless Ball Valves (ANSI 150) are packed.');
+    });
+  });
+
+  // 20. Reviewer Hardening & Safety Policy Tests (Ray-56 Must-Fix Items)
+  describe('Reviewer Safety & Integrity Hardening (PR #565 Must-Fix Requirements)', () => {
+    // 20.1 Forced MOCK mode & Default NO-CALL
+    test('Safety Rule 1: Forced MOCK environment cannot be overridden to LIVE at runtime', () => {
+      const origEnv = process.env.PHONE_PROVIDER_MODE;
+      try {
+        process.env.PHONE_PROVIDER_MODE = 'mock';
+        expect(() => callService.setMode('LIVE')).toThrow(/forced PHONE_PROVIDER_MODE=mock/);
+
+        const active = callService.getActiveProvider();
+        expect(active.mode).toBe('MOCK');
+      } finally {
+        process.env.PHONE_PROVIDER_MODE = origEnv;
+      }
+    });
+
+    test('Safety Rule 2: Default behavior without explicit LIVE configuration is MOCK / NO-CALL', () => {
+      const origEnv = process.env.PHONE_PROVIDER_MODE;
+      try {
+        delete process.env.PHONE_PROVIDER_MODE;
+        callService.setMode('MOCK');
+        const active = callService.getActiveProvider();
+        expect(active.mode).toBe('MOCK');
+      } finally {
+        process.env.PHONE_PROVIDER_MODE = origEnv;
+      }
+    });
+
+    // 20.2 Destination Authorization
+    test('Safety Rule 3: Unauthorized live destinations are strictly rejected before dialing', async () => {
+      const { isDestinationAuthorized } = await import('../utils/phone.js');
+      const origAllowed = process.env.ALLOWED_DESTINATIONS;
+
+      try {
+        // Without ALLOWED_DESTINATIONS configured, live calls are blocked
+        delete process.env.ALLOWED_DESTINATIONS;
+        const check1 = isDestinationAuthorized('+14155550199', 'LIVE');
+        expect(check1.authorized).toBe(false);
+        expect(check1.reason).toContain('blocked');
+
+        // With explicit allowlist
+        process.env.ALLOWED_DESTINATIONS = '+14155550181,+14155550182';
+        const check2 = isDestinationAuthorized('+14155550181', 'LIVE');
+        expect(check2.authorized).toBe(true);
+
+        const check3 = isDestinationAuthorized('+19999999999', 'LIVE');
+        expect(check3.authorized).toBe(false);
+      } finally {
+        process.env.ALLOWED_DESTINATIONS = origAllowed;
+      }
+    });
+
+    // 20.3 Phone Number Redaction / Masking Helper
+    test('Safety Rule 4: Phone number masking helper redacts middle digits consistently', async () => {
+      const { maskPhoneNumber } = await import('../utils/phone.js');
+
+      expect(maskPhoneNumber('+14155550181')).toBe('+1******0181');
+      expect(maskPhoneNumber('+919876543210')).toBe('+91******3210');
+      expect(maskPhoneNumber('+447911123456')).toBe('+44******3456');
+      expect(maskPhoneNumber('14155550181')).toBe('14******0181');
+      expect(maskPhoneNumber('')).toBe('');
+      expect(maskPhoneNumber(null as any)).toBe('');
+    });
+
+    // 20.4 Ambiguous Submissions Retain Stable Idempotency Key & Stop Batch
+    test('Safety Rule 5: Ambiguous submission preserves task and stable idempotency key under PENDING_RECONCILIATION', async () => {
+      const { recordCallAmbiguous } = await import('../utils/idempotency.js');
+      const testTaskId = `ambig_task_${Date.now()}`;
+
+      const key1 = getOrCreateIdempotencyKey(testTaskId);
+      recordCallAmbiguous(key1, 'Network timeout awaiting provider ACK');
+
+      // Subsequent retrieval must preserve the SAME key rather than generating a new one
+      const key2 = getOrCreateIdempotencyKey(testTaskId);
+      expect(key1).toBe(key2);
+
+      const reconciliation = reconcileVerificationResult(
+        { claimedStatus: 'AVAILABLE', claimText: 'Listing says 500 units in stock' },
+        null,
+        'PENDING_RECONCILIATION'
+      );
+      expect(reconciliation.outcome).toBe('UNKNOWN / INCONCLUSIVE');
+      expect(reconciliation.reviewStatus).toBe('NEEDS_REVIEW');
+      expect(reconciliation.recommendation).toContain('Verify existing submission status');
+    });
+
+    // 20.5 Speaker Identity & Evidence Attribution
+    test('Safety Rule 6: Unknown speakers remain UNKNOWN and agent speech is excluded from supplier evidence', async () => {
+      const { CallEProvider } = await import('../providers/CallEProvider.js');
+      const provider = new CallEProvider();
+
+      // Test progress extraction with unknown and AI turns
+      const mockTask: VerificationTask = {
+        id: 'task_speaker_test',
+        createdAt: new Date().toISOString(),
+        updatedAt: new Date().toISOString(),
+        target: { organizationName: 'Test Corp', phoneNumber: '+14155550181' },
+        item: 'Resistors',
+        verificationType: 'Inventory / Availability',
+        subject: 'Stock test',
+        verificationGoal: 'Verify stock',
+        questions: [{ id: 'q1', order: 1, question: 'How many units?', expectedType: 'number', required: true }],
+        status: 'UNKNOWN / INCONCLUSIVE',
+        reviewStatus: 'NONE',
+        callState: 'IDLE',
+        mode: 'MOCK',
+      };
+
+      // Mock client returning transcript turns with ambiguous roles
+      const dummyClient = {
+        calls: {
+          get: async () => ({
+            id: 'call_dummy_1',
+            status: 'completed',
+            recipients: [
+              {
+                status: 'completed',
+                attempts: [
+                  {
+                    status: 'completed',
+                    transcriptTurns: [
+                      { role: 'assistant', text: 'Hello, I am calling from TRACE Verification.' },
+                      { role: 'unidentified_audio', text: '500 units might be in the back room.' },
+                    ],
+                  },
+                ],
+              },
+            ],
+          }),
+        },
+      };
+
+      (provider as any).getClient = () => dummyClient as any;
+
+      const progress = await provider.getCallProgress('call_dummy_1', mockTask);
+      expect(progress.transcriptTurns[0]?.speaker).toBe('AI');
+      expect(progress.transcriptTurns[1]?.speaker).toBe('UNKNOWN'); // Unbound: not automatically mapped to STAFF
+      expect(progress.structuredResult?.call_outcome).toBe('unknown'); // Not positive verification
+      expect(progress.structuredResult?.verification_confidence).toBe('low');
+    });
+
+    // 20.6 Local-Only / Authenticated Route Security Middleware
+    test('Safety Rule 7: enforceLocalOrAuthenticated permits local requests and rejects non-local unauthorized requests', async () => {
+      const { enforceLocalOrAuthenticated } = await import('../utils/phone.js');
+
+      let nextCalled = false;
+      const next = () => {
+        nextCalled = true;
+      };
+
+      // Local request (127.0.0.1)
+      const reqLocal: any = { socket: { remoteAddress: '127.0.0.1' }, headers: {} };
+      const resLocal: any = { status: () => ({ json: () => {} }) };
+      enforceLocalOrAuthenticated(reqLocal, resLocal, next);
+      expect(nextCalled).toBe(true);
+
+      // Remote request without token -> 403 Forbidden
+      nextCalled = false;
+      let statusCode = 0;
+      let jsonResponse: any = null;
+      const reqRemote: any = {
+        socket: { remoteAddress: '203.0.113.195' },
+        headers: {},
+      };
+      const resRemote: any = {
+        status: (code: number) => {
+          statusCode = code;
+          return {
+            json: (payload: any) => {
+              jsonResponse = payload;
+            },
+          };
+        },
+      };
+
+      enforceLocalOrAuthenticated(reqRemote, resRemote, next);
+      expect(nextCalled).toBe(false);
+      expect(statusCode).toBe(403);
+      expect(jsonResponse.error).toContain('Access Forbidden');
     });
   });
 });

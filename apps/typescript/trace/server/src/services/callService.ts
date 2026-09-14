@@ -5,7 +5,8 @@ import { MockProvider } from '../providers/MockProvider.js';
 import { PhoneAgentProvider } from '../providers/PhoneAgentProvider.js';
 import { taskService } from './taskService.js';
 import { reconcileVerificationResult } from './reconciliation.js';
-import { getOrCreateIdempotencyKey, recordCallDispatched, recordCallFailed } from '../utils/idempotency.js';
+import { getOrCreateIdempotencyKey, recordCallDispatched, recordCallFailed, recordCallAmbiguous } from '../utils/idempotency.js';
+import { isDestinationAuthorized, maskPhoneNumber } from '../utils/phone.js';
 import { CallRecord, VerificationTask } from '../types/index.js';
 
 const WEBHOOKS_FILE = path.resolve(process.cwd(), 'data', 'processed_webhooks.json');
@@ -49,31 +50,49 @@ class CallService {
   private modeOverride: 'LIVE' | 'MOCK' | null = null;
 
   public setMode(mode: 'LIVE' | 'MOCK') {
+    const isForcedMock = process.env.PHONE_PROVIDER_MODE === 'mock';
+    if (isForcedMock && mode === 'LIVE') {
+      throw new Error('Cannot switch to LIVE mode: Environment has forced PHONE_PROVIDER_MODE=mock.');
+    }
     this.modeOverride = mode;
   }
 
   public getActiveProvider(forceMock = false): { provider: PhoneAgentProvider; mode: 'LIVE' | 'MOCK' } {
-    if (this.modeOverride) {
-      return {
-        provider: this.modeOverride === 'LIVE' ? this.callEProvider : this.mockProvider,
-        mode: this.modeOverride,
-      };
+    // 1. If environment strictly forces mock mode, runtime override MUST NOT be able to bypass it
+    const isForcedMock = process.env.PHONE_PROVIDER_MODE === 'mock';
+    if (isForcedMock || forceMock) {
+      return { provider: this.mockProvider, mode: 'MOCK' };
     }
-    const isMockEnv = process.env.PHONE_PROVIDER_MODE === 'mock';
-    if (!forceMock && !isMockEnv && this.callEProvider.isConfigured()) {
+
+    // 2. Explicit runtime override
+    if (this.modeOverride) {
+      if (this.modeOverride === 'LIVE' && this.callEProvider.isConfigured()) {
+        return { provider: this.callEProvider, mode: 'LIVE' };
+      }
+      return { provider: this.mockProvider, mode: 'MOCK' };
+    }
+
+    // 3. Environment configuration: must be explicitly 'calle' to use LIVE mode
+    const isExplicitCalleEnv = process.env.PHONE_PROVIDER_MODE === 'calle';
+    if (isExplicitCalleEnv && this.callEProvider.isConfigured()) {
       return { provider: this.callEProvider, mode: 'LIVE' };
     }
+
+    // 4. Default to NO-CALL / MOCK behavior
     return { provider: this.mockProvider, mode: 'MOCK' };
   }
 
   public isLiveAvailable(): boolean {
+    const isForcedMock = process.env.PHONE_PROVIDER_MODE === 'mock';
+    if (isForcedMock) return false;
     return this.callEProvider.isConfigured();
   }
 
   public async startVerification(
     taskId: string,
-    forceMock = false
-  ): Promise<{ success: boolean; task?: VerificationTask; error?: string }> {
+    forceMock = false,
+    explicitLive = false
+  ): Promise<{ success: boolean; task?: VerificationTask; error?: string; isAmbiguous?: boolean }> {
     const task = taskService.getTaskById(taskId);
     if (!task) {
       return { success: false, error: `Verification task ${taskId} not found.` };
@@ -85,6 +104,41 @@ class CallService {
 
     const { provider, mode } = this.getActiveProvider(forceMock);
     const idempotencyKey = getOrCreateIdempotencyKey(taskId);
+
+    // Validate authorized destination for the active mode
+    const authCheck = isDestinationAuthorized(task.target.phoneNumber, mode);
+    if (!authCheck.authorized) {
+      recordCallFailed(idempotencyKey, authCheck.reason);
+      task.mode = mode;
+      task.callState = 'FAILED';
+      task.status = 'UNREACHABLE';
+      task.reviewStatus = 'NONE';
+      task.callRecord = {
+        id: `call_${task.id}`,
+        taskId: task.id,
+        idempotencyKey,
+        phoneNumber: authCheck.formatted,
+        mode,
+        callState: 'FAILED',
+        startedAt: new Date().toISOString(),
+        durationSeconds: 0,
+        transcriptTurns: [],
+        structuredResult: null,
+        error: authCheck.reason,
+      };
+      task.reconciliation = reconcileVerificationResult(
+        task.digitalClaim,
+        null,
+        'FAILED',
+        task.callRecord,
+        task.item
+      );
+      task.status = task.reconciliation.outcome;
+      task.reviewStatus = task.reconciliation.reviewStatus;
+      task.evidenceChain = task.reconciliation.evidenceChain;
+      taskService.updateTask(task);
+      return { success: false, error: authCheck.reason, task };
+    }
 
     try {
       task.mode = mode;
@@ -99,14 +153,51 @@ class CallService {
 
       return { success: true, task };
     } catch (err: any) {
-      recordCallFailed(idempotencyKey);
+      const isDefinitiveRejection = Boolean(err.isDefinitiveRejection);
+      const isAmbiguous = !isDefinitiveRejection || Boolean(err.isAmbiguous);
+
+      if (isAmbiguous) {
+        // Ambiguous submission (timeout / connection reset / 5xx): NEVER assume call was never accepted
+        recordCallAmbiguous(idempotencyKey, err.message);
+        task.callState = 'PENDING_RECONCILIATION';
+        task.status = 'UNKNOWN / INCONCLUSIVE';
+        task.reviewStatus = 'NEEDS_REVIEW';
+        task.callRecord = {
+          id: `call_${task.id}`,
+          taskId: task.id,
+          idempotencyKey,
+          phoneNumber: authCheck.formatted,
+          mode,
+          callState: 'PENDING_RECONCILIATION',
+          startedAt: new Date().toISOString(),
+          durationSeconds: 0,
+          transcriptTurns: [],
+          structuredResult: null,
+          error: `Ambiguous call submission (${err.message}). Preserving task record & stable idempotency key for reconciliation before retry.`,
+        };
+        task.reconciliation = reconcileVerificationResult(
+          task.digitalClaim,
+          null,
+          'PENDING_RECONCILIATION',
+          task.callRecord,
+          task.item
+        );
+        task.status = task.reconciliation.outcome;
+        task.reviewStatus = task.reconciliation.reviewStatus;
+        task.evidenceChain = task.reconciliation.evidenceChain;
+        taskService.updateTask(task);
+        return { success: false, error: err.message, isAmbiguous: true, task };
+      }
+
+      // Definitive rejection (e.g. 401 auth failed, 422 invalid schema before dispatch)
+      recordCallFailed(idempotencyKey, err.message);
       task.callState = 'FAILED';
       task.status = 'UNREACHABLE';
       task.callRecord = {
         id: `call_${task.id}`,
         taskId: task.id,
         idempotencyKey,
-        phoneNumber: task.target.phoneNumber,
+        phoneNumber: authCheck.formatted,
         mode,
         callState: 'FAILED',
         startedAt: new Date().toISOString(),

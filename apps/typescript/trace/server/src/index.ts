@@ -5,6 +5,7 @@ import path from 'node:path';
 import { taskService } from './services/taskService.js';
 import { callService } from './services/callService.js';
 import { generateTasksExcelWorkbook, generateTasksCsv } from './services/exportService.js';
+import { enforceLocalOrAuthenticated } from './utils/phone.js';
 
 // Load dotenv from local dir or parent dir
 dotenv.config({ path: path.resolve(process.cwd(), '.env') });
@@ -34,24 +35,28 @@ app.get('/api/health', (req, res) => {
   });
 });
 
-app.post('/api/mode', (req, res) => {
+app.post('/api/mode', enforceLocalOrAuthenticated, (req, res) => {
   const { mode } = req.body;
   if (mode !== 'LIVE' && mode !== 'MOCK') {
     return res.status(400).json({ error: 'Mode must be either LIVE or MOCK.' });
   }
 
-  if (mode === 'LIVE' && !callService.isLiveAvailable()) {
-    return res.status(400).json({
-      error: 'Cannot switch to LIVE mode: CALL-E API key is not configured on the server.',
-    });
-  }
+  try {
+    if (mode === 'LIVE' && !callService.isLiveAvailable()) {
+      return res.status(400).json({
+        error: 'Cannot switch to LIVE mode: CALL-E API key is not configured or mock mode is forced on server.',
+      });
+    }
 
-  callService.setMode(mode);
-  res.json({
-    success: true,
-    mode,
-    message: `Switched telephony engine to ${mode} mode.`,
-  });
+    callService.setMode(mode);
+    res.json({
+      success: true,
+      mode,
+      message: `Switched telephony engine to ${mode} mode.`,
+    });
+  } catch (err: any) {
+    return res.status(400).json({ error: err.message || 'Failed to switch mode.' });
+  }
 });
 
 // -------------------------------------------------------------
@@ -63,7 +68,7 @@ app.get('/api/tasks', (req, res) => {
   res.json({ tasks, stats });
 });
 
-app.post('/api/tasks', (req, res) => {
+app.post('/api/tasks', enforceLocalOrAuthenticated, (req, res) => {
   const {
     target,
     item,
@@ -96,7 +101,7 @@ app.post('/api/tasks', (req, res) => {
 // -------------------------------------------------------------
 // 3. EXPORT ENDPOINTS (Defined before :id wildcards)
 // -------------------------------------------------------------
-app.get('/api/tasks/export.xlsx', async (req, res) => {
+app.get('/api/tasks/export.xlsx', enforceLocalOrAuthenticated, async (req, res) => {
   try {
     const tasks = taskService.getAllTasks();
     const buffer = await generateTasksExcelWorkbook(tasks);
@@ -116,7 +121,7 @@ app.get('/api/tasks/export.xlsx', async (req, res) => {
   }
 });
 
-app.get('/api/tasks/export.csv', (req, res) => {
+app.get('/api/tasks/export.csv', enforceLocalOrAuthenticated, (req, res) => {
   try {
     const tasks = taskService.getAllTasks();
     const csv = generateTasksCsv(tasks);
@@ -133,7 +138,7 @@ app.get('/api/tasks/export.csv', (req, res) => {
   }
 });
 
-app.get('/api/tasks/export.json', (req, res) => {
+app.get('/api/tasks/export.json', enforceLocalOrAuthenticated, (req, res) => {
   try {
     const tasks = taskService.getAllTasks();
     const stats = taskService.getStats();
@@ -149,7 +154,7 @@ app.get('/api/tasks/export.json', (req, res) => {
   }
 });
 
-app.post('/api/tasks/verify-all', async (req, res) => {
+app.post('/api/tasks/verify-all', enforceLocalOrAuthenticated, async (req, res) => {
   const tasks = taskService.getAllTasks();
   const pending = tasks.filter((t) => t.callState === 'IDLE');
 
@@ -157,6 +162,10 @@ app.post('/api/tasks/verify-all', async (req, res) => {
   for (const t of pending) {
     const outcome = await callService.startVerification(t.id);
     results.push(outcome);
+    // Batch processing stops immediately if any submission is ambiguous or fails
+    if (!outcome.success || outcome.isAmbiguous) {
+      break;
+    }
   }
 
   res.json({
@@ -169,7 +178,7 @@ app.post('/api/tasks/verify-all', async (req, res) => {
 // -------------------------------------------------------------
 // 3. SINGLE TASK ACTIONS & CRUD
 // -------------------------------------------------------------
-app.get('/api/tasks/:id/export.xlsx', async (req, res) => {
+app.get('/api/tasks/:id/export.xlsx', enforceLocalOrAuthenticated, async (req, res) => {
   try {
     const task = taskService.getTaskById(req.params.id);
     if (!task) {
@@ -192,7 +201,7 @@ app.get('/api/tasks/:id/export.xlsx', async (req, res) => {
   }
 });
 
-app.get('/api/tasks/:id/export.json', (req, res) => {
+app.get('/api/tasks/:id/export.json', enforceLocalOrAuthenticated, (req, res) => {
   try {
     const task = taskService.getTaskById(req.params.id);
     if (!task) {
@@ -218,7 +227,7 @@ app.get('/api/tasks/:id', (req, res) => {
   res.json(task);
 });
 
-app.delete('/api/tasks/:id', (req, res) => {
+app.delete('/api/tasks/:id', enforceLocalOrAuthenticated, (req, res) => {
   const deleted = taskService.deleteTask(req.params.id);
   if (!deleted) {
     return res.status(404).json({ error: `Task ${req.params.id} not found.` });
@@ -229,30 +238,36 @@ app.delete('/api/tasks/:id', (req, res) => {
 // -------------------------------------------------------------
 // 4. CALL TRIGGERING & POLLING
 // -------------------------------------------------------------
-app.post('/api/tasks/:id/verify', async (req, res) => {
+app.post('/api/tasks/:id/verify', enforceLocalOrAuthenticated, async (req, res) => {
   const taskId = req.params.id;
   const forceMock = req.query.mock === 'true';
+  const explicitLive = req.body?.explicitLive === true;
 
-  const outcome = await callService.startVerification(taskId, forceMock);
+  const outcome = await callService.startVerification(taskId, forceMock, explicitLive);
   if (!outcome.success) {
-    return res.status(500).json({ error: outcome.error, task: outcome.task });
+    return res.status(outcome.isAmbiguous ? 202 : 500).json({
+      error: outcome.error,
+      isAmbiguous: outcome.isAmbiguous,
+      task: outcome.task,
+    });
   }
 
   res.json(outcome.task);
 });
 
-app.get('/api/calls/:id', async (req, res) => {
+app.get('/api/calls/:id', (req, res) => {
   const callId = req.params.id;
   const taskId = req.query.taskId as string | undefined;
 
-  const progress = await callService.pollCallProgress(callId, taskId);
-  if (!progress.success) {
-    return res.status(404).json({ error: progress.error });
-  }
+  callService.pollCallProgress(callId, taskId).then((progress) => {
+    if (!progress.success) {
+      return res.status(404).json({ error: progress.error });
+    }
 
-  res.json({
-    task: progress.task,
-    record: progress.record,
+    res.json({
+      task: progress.task,
+      record: progress.record,
+    });
   });
 });
 
@@ -272,7 +287,7 @@ app.post('/api/calle/webhook', async (req, res) => {
 // -------------------------------------------------------------
 // 6. DEMO DATA MANAGEMENT
 // -------------------------------------------------------------
-app.post('/api/demo/load', (req, res) => {
+app.post('/api/demo/load', enforceLocalOrAuthenticated, (req, res) => {
   const tasks = taskService.loadDemoCampaign();
   res.json({
     message: 'Generic safe demo benchmark campaign loaded.',
@@ -281,7 +296,7 @@ app.post('/api/demo/load', (req, res) => {
   });
 });
 
-app.post('/api/demo/clear', (req, res) => {
+app.post('/api/demo/clear', enforceLocalOrAuthenticated, (req, res) => {
   taskService.clearTasks();
   res.json({
     message: 'Tasks cleared.',

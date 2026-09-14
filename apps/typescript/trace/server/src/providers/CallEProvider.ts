@@ -1,5 +1,6 @@
 import { CalleClient, CalleAuthenticationError, CalleRateLimitError, CalleAPIError } from '@call-e/calle';
 import { PhoneAgentProvider } from './PhoneAgentProvider.js';
+import { isDestinationAuthorized, maskPhoneNumber } from '../utils/phone.js';
 import {
   CallRecord,
   CallState,
@@ -158,21 +159,29 @@ export class CallEProvider implements PhoneAgentProvider {
       );
     }
 
+    // Safety policy: check if destination is authorized for live calling
+    const authCheck = isDestinationAuthorized(task.target.phoneNumber, 'LIVE');
+    if (!authCheck.authorized) {
+      const err = new Error(authCheck.reason || `Destination ${maskPhoneNumber(task.target.phoneNumber)} is not authorized for live outbound calls.`);
+      (err as any).isDefinitiveRejection = true;
+      throw err;
+    }
+
     const taskPrompt = this.buildDynamicTaskPrompt(task);
     const resultSchema = this.buildDynamicResultSchema(task);
 
     const webhookUrl = process.env.CALLE_WEBHOOK_URL || undefined;
 
     try {
-      // Direct CALL-E API call with exact user phone number
+      // Direct CALL-E API call with exact validated user phone number
       const call = await client.calls.create(
         {
           task: taskPrompt,
           recipients: [
             {
-              phone: task.target.phoneNumber,
-              phones: [task.target.phoneNumber], // GUARANTEED USER PHONE NUMBER
-              region: task.target.phoneNumber.startsWith('+91') ? 'IN' : undefined,
+              phone: authCheck.formatted,
+              phones: [authCheck.formatted],
+              region: authCheck.formatted.startsWith('+91') ? 'IN' : undefined,
             },
           ],
           metadata: {
@@ -193,7 +202,7 @@ export class CallEProvider implements PhoneAgentProvider {
         taskId: task.id,
         providerCallId: call.id,
         idempotencyKey,
-        phoneNumber: task.target.phoneNumber,
+        phoneNumber: authCheck.formatted,
         mode: 'LIVE',
         callState: this.mapCallEStatusToCallState(call.status),
         startedAt: call.createdAt || new Date().toISOString(),
@@ -204,22 +213,34 @@ export class CallEProvider implements PhoneAgentProvider {
 
       return { callId: call.id, initialRecord: record };
     } catch (err: any) {
-      console.error('CALL-E API call creation error:', err);
+      console.error('CALL-E API call creation error:', err?.message || err);
+      const isDefinitiveRejection =
+        Boolean(err.isDefinitiveRejection) ||
+        err instanceof CalleAuthenticationError ||
+        err?.status === 401 ||
+        err?.status === 403 ||
+        err?.status === 422 ||
+        err?.status === 400;
+
+      const maskedNum = maskPhoneNumber(task.target.phoneNumber);
+      let errorMsg: string;
+
       if (err instanceof CalleAuthenticationError || err?.status === 401 || err?.status === 403) {
-        throw new Error('CALL-E authentication failed (401/403). Please verify your CALLE_API_KEY.');
+        errorMsg = 'CALL-E authentication failed (401/403). Please verify your CALLE_API_KEY.';
+      } else if (err?.status === 422) {
+        errorMsg = `CALL-E rejected the request parameters (422). Please verify phone number format: ${maskedNum}`;
+      } else if (err instanceof CalleRateLimitError || err?.status === 429) {
+        errorMsg = 'CALL-E API rate limit reached (429). Please retry shortly.';
+      } else if (err instanceof CalleAPIError) {
+        errorMsg = `CALL-E API error (${err.status}): ${err.message}`;
+      } else {
+        errorMsg = err.message || 'Failed to initiate real CALL-E phone call';
       }
-      if (err?.status === 422) {
-        throw new Error(
-          `CALL-E rejected the request parameters (422). Please verify phone number format: ${task.target.phoneNumber}`
-        );
-      }
-      if (err instanceof CalleRateLimitError || err?.status === 429) {
-        throw new Error('CALL-E API rate limit reached (429). Please retry shortly.');
-      }
-      if (err instanceof CalleAPIError) {
-        throw new Error(`CALL-E API error (${err.status}): ${err.message}`);
-      }
-      throw new Error(`Failed to initiate real CALL-E phone call: ${err.message || String(err)}`);
+
+      const wrappedErr = new Error(errorMsg);
+      (wrappedErr as any).isDefinitiveRejection = isDefinitiveRejection;
+      (wrappedErr as any).isAmbiguous = !isDefinitiveRejection;
+      throw wrappedErr;
     }
   }
 
@@ -287,7 +308,7 @@ export class CallEProvider implements PhoneAgentProvider {
           ) {
             speaker = 'STAFF';
           } else {
-            // Conversational text heuristic
+            // Conversational text heuristic: only classify as AI if matching unmistakable AI agent patterns
             const textLower = (turn.text || '').toLowerCase();
             if (
               textLower.includes('i am calling from trace') ||
@@ -299,7 +320,8 @@ export class CallEProvider implements PhoneAgentProvider {
             ) {
               speaker = 'AI';
             } else {
-              speaker = 'STAFF';
+              // Unrecognized speaker remains strictly UNKNOWN (do not guess STAFF)
+              speaker = 'UNKNOWN';
             }
           }
 
@@ -359,141 +381,168 @@ export class CallEProvider implements PhoneAgentProvider {
         const staffSpeech = staffTurns.map((t) => t.text).join(' ');
         const staffLower = staffSpeech.toLowerCase();
 
-        // 1. Explicitly check for inability to verify / hotline / no inventory info
-        const isUnverifiable =
-          staffLower.includes("don't have inventory") ||
-          staffLower.includes('no inventory') ||
-          staffLower.includes("can't verify") ||
-          staffLower.includes('cannot verify') ||
-          staffLower.includes('unable to verify') ||
-          staffLower.includes('test hotline') ||
-          staffLower.includes('hotline') ||
-          staffLower.includes('wrong number') ||
-          staffLower.includes('wrong department') ||
-          staffLower.includes("don't know") ||
-          staffLower.includes('no information') ||
-          staffLower.includes('not able to check') ||
-          staffLower.includes('call back later');
+        if (staffTurns.length === 0) {
+          const answersMap: Record<string, any> = {};
+          task.questions.forEach((q) => {
+            answersMap[q.id] = {
+              questionId: q.id,
+              question: q.question,
+              expectedType: q.expectedType,
+              answer: null,
+              confidence: 'low',
+              evidence: undefined,
+            };
+          });
 
-        // 2. Explicitly check for unavailable / out of stock
-        const isUnavailable =
-          !isUnverifiable &&
-          (staffLower.includes('out of stock') ||
-            staffLower.includes('zero stock') ||
-            staffLower.includes('0 units') ||
-            staffLower.includes('none available') ||
-            staffLower.includes('sold out') ||
-            staffLower.includes('unavailable') ||
-            staffLower.includes('not available') ||
-            staffLower.includes('no stock') ||
-            staffLower.includes('closed'));
+          structuredResult = {
+            call_outcome: 'unknown',
+            verification_confidence: 'low',
+            availability_status: 'unknown',
+            quantity_or_capacity: null,
+            next_available_time: null,
+            contact_name: null,
+            notes: 'No verified staff responses were identified in conversation transcript; status is advisory and unverified.',
+            evidence: transcriptTurns.map((t) => `[${t.speaker}] ${t.text}`).slice(0, 3),
+            question_answers: answersMap,
+            raw_response: call,
+          };
+        } else {
+          // 1. Explicitly check for inability to verify / hotline / no inventory info
+          const isUnverifiable =
+            staffLower.includes("don't have inventory") ||
+            staffLower.includes('no inventory') ||
+            staffLower.includes("can't verify") ||
+            staffLower.includes('cannot verify') ||
+            staffLower.includes('unable to verify') ||
+            staffLower.includes('test hotline') ||
+            staffLower.includes('hotline') ||
+            staffLower.includes('wrong number') ||
+            staffLower.includes('wrong department') ||
+            staffLower.includes("don't know") ||
+            staffLower.includes('no information') ||
+            staffLower.includes('not able to check') ||
+            staffLower.includes('call back later');
 
-        // 3. Check for restricted / conditional availability
-        const isRestricted =
-          !isUnverifiable &&
-          !isUnavailable &&
-          (staffLower.includes('deposit') ||
-            staffLower.includes('minimum') ||
-            staffLower.includes('conditional') ||
-            staffLower.includes('limited') ||
-            staffLower.includes('hold'));
+          // 2. Explicitly check for unavailable / out of stock
+          const isUnavailable =
+            !isUnverifiable &&
+            (staffLower.includes('out of stock') ||
+              staffLower.includes('zero stock') ||
+              staffLower.includes('0 units') ||
+              staffLower.includes('none available') ||
+              staffLower.includes('sold out') ||
+              staffLower.includes('unavailable') ||
+              staffLower.includes('not available') ||
+              staffLower.includes('no stock') ||
+              staffLower.includes('closed'));
 
-        // 4. Check for positive availability stated by staff
-        const isAvailable =
-          !isUnverifiable &&
-          !isUnavailable &&
-          !isRestricted &&
-          (staffLower.includes('in stock') ||
-            staffLower.includes('ready to ship') ||
-            staffLower.includes('yes we have') ||
-            staffLower.includes('we have') ||
-            staffLower.includes('we can ship') ||
-            staffLower.includes('available'));
+          // 3. Check for restricted / conditional availability
+          const isRestricted =
+            !isUnverifiable &&
+            !isUnavailable &&
+            (staffLower.includes('deposit') ||
+              staffLower.includes('minimum') ||
+              staffLower.includes('conditional') ||
+              staffLower.includes('limited') ||
+              staffLower.includes('hold'));
 
-        const availability_status: AvailabilityStatus = isUnverifiable
-          ? 'unknown'
-          : isUnavailable
-          ? 'unavailable'
-          : isRestricted
-          ? 'limited'
-          : isAvailable
-          ? 'available'
-          : 'unknown';
+          // 4. Check for positive availability stated by staff
+          const isAvailable =
+            !isUnverifiable &&
+            !isUnavailable &&
+            !isRestricted &&
+            (staffLower.includes('in stock') ||
+              staffLower.includes('ready to ship') ||
+              staffLower.includes('yes we have') ||
+              staffLower.includes('we have') ||
+              staffLower.includes('we can ship') ||
+              staffLower.includes('available'));
 
-        const call_outcome: CallOutcome =
-          availability_status === 'available'
-            ? 'confirmed'
-            : availability_status === 'unavailable'
-            ? 'contradicted'
-            : availability_status === 'limited'
-            ? 'partial'
+          const availability_status: AvailabilityStatus = isUnverifiable
+            ? 'unknown'
+            : isUnavailable
+            ? 'unavailable'
+            : isRestricted
+            ? 'limited'
+            : isAvailable
+            ? 'available'
             : 'unknown';
 
-        const confidence: VerificationConfidence = isUnverifiable
-          ? 'low'
-          : isAvailable || isUnavailable
-          ? 'high'
-          : 'medium';
+          const call_outcome: CallOutcome =
+            availability_status === 'available'
+              ? 'confirmed'
+              : availability_status === 'unavailable'
+              ? 'contradicted'
+              : availability_status === 'limited'
+              ? 'partial'
+              : 'unknown';
 
-        // Extract numbers stated specifically by staff (e.g. "we have 320 units")
-        let staffQuantity: string | null = null;
-        if (isUnavailable) {
-          staffQuantity = '0';
-        } else if (isAvailable || isRestricted) {
-          const qtyMatch = staffSpeech.match(/(\d+[\d,\.]*)\s*(units|pcs|pieces|items|boxes|kg)?/i);
-          if (qtyMatch) {
-            staffQuantity = `${qtyMatch[1]}${qtyMatch[2] ? ` ${qtyMatch[2]}` : ' units'}`;
-          }
-        }
+          const confidence: VerificationConfidence = isUnverifiable
+            ? 'low'
+            : isAvailable || isUnavailable
+            ? 'high'
+            : 'medium';
 
-        const answersMap: Record<string, any> = {};
-        task.questions.forEach((q) => {
-          let ans: any = isUnverifiable
-            ? 'Unverifiable / No inventory info provided by representative'
-            : isAvailable
-            ? (staffQuantity ? `${staffQuantity} available` : 'Confirmed available with representative')
-            : isUnavailable
-            ? 'Unavailable / Out of stock'
-            : 'Unknown';
-
-          if (q.expectedType === 'boolean') {
-            ans = isUnverifiable ? null : isAvailable ? true : isUnavailable ? false : null;
-          } else if (q.expectedType === 'number' && staffQuantity) {
-            const num = parseFloat(staffQuantity.replace(/,/g, ''));
-            if (!isNaN(num)) ans = num;
+          // Extract numbers stated specifically by staff (e.g. "we have 320 units")
+          let staffQuantity: string | null = null;
+          if (isUnavailable) {
+            staffQuantity = '0';
+          } else if (isAvailable || isRestricted) {
+            const qtyMatch = staffSpeech.match(/(\d+[\d,\.]*)\s*(units|pcs|pieces|items|boxes|kg)?/i);
+            if (qtyMatch) {
+              staffQuantity = `${qtyMatch[1]}${qtyMatch[2] ? ` ${qtyMatch[2]}` : ' units'}`;
+            }
           }
 
-          answersMap[q.id] = {
-            questionId: q.id,
-            question: q.question,
-            expectedType: q.expectedType,
-            answer: ans,
-            confidence,
-            evidence: staffTurns[0]?.text || undefined,
+          const answersMap: Record<string, any> = {};
+          task.questions.forEach((q) => {
+            let ans: any = isUnverifiable
+              ? 'Unverifiable / No inventory info provided by representative'
+              : isAvailable
+              ? (staffQuantity ? `${staffQuantity} available` : 'Confirmed available with representative')
+              : isUnavailable
+              ? 'Unavailable / Out of stock'
+              : 'Unknown';
+
+            if (q.expectedType === 'boolean') {
+              ans = isUnverifiable ? null : isAvailable ? true : isUnavailable ? false : null;
+            } else if (q.expectedType === 'number' && staffQuantity) {
+              const num = parseFloat(staffQuantity.replace(/,/g, ''));
+              if (!isNaN(num)) ans = num;
+            }
+
+            answersMap[q.id] = {
+              questionId: q.id,
+              question: q.question,
+              expectedType: q.expectedType,
+              answer: ans,
+              confidence,
+              evidence: staffTurns[0]?.text || undefined,
+            };
+          });
+
+          structuredResult = {
+            call_outcome,
+            verification_confidence: confidence,
+            availability_status,
+            quantity_or_capacity: staffQuantity,
+            next_available_time: null,
+            contact_name: task.target.contactPerson || 'Staff',
+            notes: isUnverifiable
+              ? 'Supplier explicitly stated they do not have inventory information and cannot verify physical stock.'
+              : isUnavailable
+              ? 'Supplier confirmed physical stock is unavailable / out of stock.'
+              : isAvailable
+              ? 'Supplier confirmed physical stock availability.'
+              : 'Call completed, but representative could not confirm physical availability.',
+            evidence:
+              staffTurns.length > 0
+                ? staffTurns.map((t) => t.text).slice(0, 3)
+                : [call.summary || 'Call completed with representative.'],
+            question_answers: answersMap,
+            raw_response: call,
           };
-        });
-
-        structuredResult = {
-          call_outcome,
-          verification_confidence: confidence,
-          availability_status,
-          quantity_or_capacity: staffQuantity,
-          next_available_time: null,
-          contact_name: task.target.contactPerson || 'Staff',
-          notes: isUnverifiable
-            ? 'Supplier explicitly stated they do not have inventory information and cannot verify physical stock.'
-            : isUnavailable
-            ? 'Supplier confirmed physical stock is unavailable / out of stock.'
-            : isAvailable
-            ? 'Supplier confirmed physical stock availability.'
-            : 'Call completed, but representative could not confirm physical availability.',
-          evidence:
-            staffTurns.length > 0
-              ? staffTurns.map((t) => t.text).slice(0, 3)
-              : [call.summary || 'Call completed with representative.'],
-          question_answers: answersMap,
-          raw_response: call,
-        };
+        }
       }
 
       // Safeguard: sanitize structuredResult against transcript and call summary to eliminate false positive confirmations

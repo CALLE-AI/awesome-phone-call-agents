@@ -8,7 +8,8 @@ interface IdempotencyRecord {
   taskId: string;
   providerCallId?: string;
   createdAt: string;
-  status: 'PENDING' | 'DISPATCHED' | 'FAILED';
+  status: 'PENDING' | 'DISPATCHED' | 'FAILED' | 'SUBMISSION_UNKNOWN' | 'PENDING_RECONCILIATION';
+  errorReason?: string;
 }
 
 function ensureDataDir() {
@@ -37,12 +38,12 @@ function saveRecords(records: Record<string, IdempotencyRecord>) {
 }
 
 /**
- * Get or create an idempotency key for a verification task.
- * Guarantees that retrying the same task execution reuses the existing idempotency key.
+ * Get or create a stable idempotency key for a verification task.
+ * Guarantees that retrying the same task execution or handling ambiguous responses reuses the existing idempotency key.
  */
 export function getOrCreateIdempotencyKey(taskId: string): string {
   const records = loadRecords();
-  const existing = Object.values(records).find((r) => r.taskId === taskId && r.status !== 'FAILED');
+  const existing = Object.values(records).find((r) => r.taskId === taskId);
   if (existing) {
     return existing.key;
   }
@@ -67,10 +68,20 @@ export function recordCallDispatched(key: string, providerCallId: string) {
   }
 }
 
-export function recordCallFailed(key: string) {
+export function recordCallAmbiguous(key: string, reason?: string) {
+  const records = loadRecords();
+  if (records[key]) {
+    records[key].status = 'SUBMISSION_UNKNOWN';
+    records[key].errorReason = reason;
+    saveRecords(records);
+  }
+}
+
+export function recordCallFailed(key: string, reason?: string) {
   const records = loadRecords();
   if (records[key]) {
     records[key].status = 'FAILED';
+    records[key].errorReason = reason;
     saveRecords(records);
   }
 }

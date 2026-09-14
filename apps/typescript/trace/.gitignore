@@ -12,5 +12,3 @@ pnpm-debug.log*
 lerna-debug.log*
 .DS_Store
 .eslintcache
-
-server/data/*.json

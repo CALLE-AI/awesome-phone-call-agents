@@ -26,6 +26,49 @@ export function reconcileVerificationResult(
   const timestamp = new Date().toISOString();
   const itemLabel = itemScope || 'requested item/material';
 
+  // 0. Ambiguous / Pending Reconciliation Submissions
+  if (callState === 'PENDING_RECONCILIATION' || callState === 'SUBMISSION_UNKNOWN') {
+    const ambigDetail =
+      callRecord?.error ||
+      structuredResult?.notes ||
+      'Call submission status is ambiguous or pending provider confirmation. Stable idempotency key is preserved.';
+
+    const evidenceChain: EvidenceChain = {
+      sourceClaim: digitalClaim?.claimText || 'Direct inquiry with supplier.',
+      phoneEvidence: `Submission Pending Reconciliation: ${ambigDetail}`,
+      structuredFact: {
+        availableQuantity: null,
+        confirmedDeliveryDate: null,
+        confirmedLeadTime: null,
+        confirmedUnitPrice: null,
+        contactName: null,
+      },
+      comparison: 'Submission status is pending confirmation from provider. Re-dispatch is held.',
+      outcome: 'UNKNOWN / INCONCLUSIVE',
+      reviewStatus: 'NEEDS_REVIEW',
+      difference: null,
+      operationalImpact:
+        'Call submission was ambiguous (e.g. network timeout). The call may have been placed upstream. Do not dispatch duplicate calls.',
+      recommendation:
+        'Verify existing submission status with provider or wait for webhook callback before re-initiating.',
+    };
+
+    return {
+      outcome: 'UNKNOWN / INCONCLUSIVE',
+      reviewStatus: 'NEEDS_REVIEW',
+      match: null,
+      explanation: ambigDetail,
+      confidence: 'low',
+      digitalClaimStatus: digitalClaim?.claimedStatus,
+      phoneVerifiedStatus: 'unknown',
+      evidenceChain,
+      difference: null,
+      operationalImpact: evidenceChain.operationalImpact,
+      recommendation: evidenceChain.recommendation,
+      timestamp,
+    };
+  }
+
   // 1. Connection / Dialing Failures & Unreachable Rule
   const isFailedCall =
     callState === 'FAILED' ||
@@ -430,31 +473,44 @@ export function reconcileVerificationResult(
     }
   }
 
-  // Default fallback for UNKNOWN / RESTRICTED claims
-  const outcome: VerificationOutcome = 'VERIFIED';
+  // Fallback for UNKNOWN / RESTRICTED claims: reflect actual phone evidence quality
+  const isPositiveAvail = phoneStatus === 'available';
+  const isExplicitUnavail = phoneStatus === 'unavailable';
+  const outcome: VerificationOutcome = isPositiveAvail
+    ? 'VERIFIED'
+    : isExplicitUnavail
+    ? 'CONTRADICTED'
+    : 'UNKNOWN / INCONCLUSIVE';
+  const reviewStatus: ReviewStatus = outcome === 'UNKNOWN / INCONCLUSIVE' ? 'NEEDS_REVIEW' : 'NONE';
+  const match = isPositiveAvail ? true : isExplicitUnavail ? false : null;
+
   const evidenceChain: EvidenceChain = {
     sourceClaim: digitalClaim.claimText,
-    phoneEvidence: `Supplier confirmed ${phoneStatus}. Quote: "${primaryEvidence}"`,
+    phoneEvidence: `Supplier stated ${phoneStatus}. Quote: "${primaryEvidence}"`,
     structuredFact: {
-      availableQuantity: structuredResult.quantity_or_capacity || 'Confirmed',
+      availableQuantity: structuredResult.quantity_or_capacity || (isPositiveAvail ? 'Confirmed' : null),
       confirmedDeliveryDate: structuredResult.next_available_time || null,
       confirmedLeadTime: structuredResult.lead_time || null,
       confirmedUnitPrice: structuredResult.unit_price || null,
       contactName: structuredResult.contact_name || 'Staff',
     },
-    comparison: `Phone verification resolved baseline: confirmed ${phoneStatus}.`,
+    comparison: `Phone verification result: ${phoneStatus}.`,
     outcome,
-    reviewStatus: 'NONE',
+    reviewStatus,
     difference: null,
-    operationalImpact: `Phone verification established clear operational status: ${phoneStatus}.`,
-    recommendation: 'Apply verified operational facts to fulfillment workflow.',
+    operationalImpact: isPositiveAvail
+      ? `Phone verification confirmed operational status: ${phoneStatus}.`
+      : `Phone evidence was ${phoneStatus}; caution required before proceeding.`,
+    recommendation: isPositiveAvail
+      ? 'Apply verified operational facts to fulfillment workflow.'
+      : 'Conduct manual verification or hold order placement pending further confirmation.',
   };
 
   return {
     outcome,
-    reviewStatus: 'NONE',
-    match: true,
-    explanation: `Phone verification resolved prior digital claim: confirmed ${phoneStatus}.`,
+    reviewStatus,
+    match,
+    explanation: `Phone verification for prior claim: confirmed ${phoneStatus}.`,
     confidence,
     digitalClaimStatus: claimStatus,
     phoneVerifiedStatus: phoneStatus,

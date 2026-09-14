@@ -8,6 +8,8 @@ export type CallState =
   | 'COMPLETED'
   | 'FAILED'
   | 'CANCELED'
+  | 'SUBMISSION_UNKNOWN'
+  | 'PENDING_RECONCILIATION'
   | 'UNKNOWN';
 
 export type VerificationOutcome =

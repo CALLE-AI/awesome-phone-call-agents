@@ -1,5 +1,6 @@
 import ExcelJS from 'exceljs';
 import { VerificationTask } from '../types/index.js';
+import { maskPhoneNumber } from '../utils/phone.js';
 
 /**
  * Excel & CSV Export Service
@@ -51,7 +52,7 @@ export async function generateTasksExcelWorkbook(
       organization: t.target.organizationName,
       item: t.item || 'N/A',
       verificationType: t.verificationType || 'General',
-      phone: t.target.phoneNumber,
+      phone: maskPhoneNumber(t.target.phoneNumber),
       callState: t.callState,
       outcome: t.status,
       reviewStatus: t.reviewStatus || 'NONE',
@@ -236,7 +237,7 @@ export function generateTasksCsv(tasks: VerificationTask[]): string {
     `"${t.target.organizationName.replace(/"/g, '""')}"`,
     `"${(t.item || '').replace(/"/g, '""')}"`,
     `"${(t.verificationType || '').replace(/"/g, '""')}"`,
-    `"${t.target.phoneNumber}"`,
+    `"${maskPhoneNumber(t.target.phoneNumber)}"`,
     `"${t.callState}"`,
     `"${t.status}"`,
     `"${t.reviewStatus || 'NONE'}"`,

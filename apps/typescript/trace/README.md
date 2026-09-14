@@ -39,9 +39,9 @@ TRACE automates phone verification with strict evidence integrity:
 - **Dynamic Inquiries**: Supports numeric, boolean, text, and multiple-choice verification questions.
 - **CALL-E Telephony**: Direct integration with `@call-e/calle` SDK for outbound conversational calls.
 - **Deterministic Mock Mode**: Offline simulation provider with 4 canonical benchmark scenarios.
-- **Speaker-Aware Extraction**: Strictly isolates AI questions from human answers to prevent self-confirmation.
+- **Speaker-Aware Extraction**: Separates `AI`, `STAFF`, and `UNKNOWN` speech turns to prevent self-confirmation.
 - **Deterministic Reconciliation**: Rule-based mathematical matrix assigning formal verification outcomes.
-- **Multi-Sheet Audit Export**: Exports full 5-sheet Excel workbooks (`.xlsx`), CSV, and JSON records.
+- **Multi-Sheet Audit Export**: Exports full 5-sheet Excel workbooks (`.xlsx`), CSV, and JSON records with phone redaction.
 
 ---
 
@@ -62,8 +62,8 @@ Frontend (React/Vite) → Backend (Express) → Provider Layer → CALL-E / Mock
 ```
 
 - **`PhoneAgentProvider`**: Abstract interface implemented by:
-  - **`CallEProvider`**: Live `@call-e/calle` voice runtime with transcript sanitization.
-  - **`MockProvider`**: Local deterministic simulator for zero-cost offline testing.
+  - **`CallEProvider`**: Live `@call-e/calle` voice runtime with destination allowlisting and transcript sanitization.
+  - **`MockProvider`**: Local deterministic simulator for zero-cost offline testing (default).
 
 ---
 
@@ -71,7 +71,7 @@ Frontend (React/Vite) → Backend (Express) → Provider Layer → CALL-E / Mock
 
 CALL-E provides the live voice runtime:
 
-- **Outbound Dialing**: Connects to target E.164 phone numbers over carrier networks.
+- **Outbound Dialing**: Connects to pre-authorized target E.164 phone numbers over carrier networks.
 - **Conversational AI**: Executes dynamic task prompts with strict operational guardrails.
 - **Structured Answers**: Returns structured JSON answers and transcript turns.
 - **Lifecycle**: Backend polls `GET /api/calls/:id` and handles webhook callbacks (`POST /api/calle/webhook`).
@@ -91,9 +91,10 @@ CALL-E provides the live voice runtime:
 
 ## 9. Evidence Integrity / Trust Model
 
-- **No Self-Confirmation**: The agent's own questions are never parsed as supplier evidence.
-- **Speaker Attribution**: Speaker roles (`AI` vs `STAFF`) are strictly preserved in transcript logs.
-- **Ambiguity Is Inconclusive**: Unverifiable responses (e.g., test hotlines, wrong departments) strictly yield `UNKNOWN / INCONCLUSIVE` with a `NEEDS_REVIEW` badge.
+- **No Self-Confirmation**: The agent's own speech is strictly excluded from supplier evidence.
+- **Speaker Attribution**: Speaker roles (`AI` vs `STAFF` vs `UNKNOWN`) are preserved. Unbound roles remain `UNKNOWN` rather than assumed `STAFF`.
+- **Ambiguity Is Inconclusive**: Unverifiable responses strictly yield `UNKNOWN / INCONCLUSIVE` with a `NEEDS_REVIEW` badge.
+- **Ambiguous Submissions**: Submissions with unconfirmed provider status are retained as `PENDING_RECONCILIATION` with stable idempotency keys; batches halt immediately.
 - **No Phantom Numbers**: Quantities evaluate to `null` unless explicitly stated by the respondent.
 - **Phone-Derived Evidence**: Phone confirmations are recorded as phone-derived operational evidence, not absolute physical ground truth.
 
@@ -119,22 +120,24 @@ npm install
 
 ## 12. Environment Variables
 
-Configure `server/.env` (and optionally `trace/.env`):
+Configure `server/.env`:
 
 ```env
 PORT=3001
-PHONE_PROVIDER_MODE=calle   # 'calle' for live calls, 'mock' for local simulation
-CALLE_API_KEY=your_key_here # Required for live calls (also supports CALL_E_API_KEY)
-CALLE_WEBHOOK_URL=          # Optional webhook endpoint for async call events
+PHONE_PROVIDER_MODE=mock       # Default: 'mock' (safe simulation). Set to 'calle' for live calls.
+CALLE_API_KEY=your_key_here     # Required for live calls (also supports CALL_E_API_KEY)
+ALLOWED_DESTINATIONS=+14155550181 # Required allowlist for live calls (comma-separated E.164)
+TRACE_API_TOKEN=                # Optional bearer token for non-local administrative/export access
+CALLE_WEBHOOK_URL=              # Optional webhook endpoint for async call events
 ```
 
 ---
 
-## 13. Mock Mode
+## 13. Mock Mode (Default)
 
 Mock Mode runs locally with zero carrier costs and no API key:
 
-1. Set `PHONE_PROVIDER_MODE=mock` in `server/.env` (or click **Switch** in the UI header).
+1. Ensure `PHONE_PROVIDER_MODE=mock` in `server/.env`.
 2. Start development servers:
    ```bash
    npm run dev
@@ -148,13 +151,13 @@ Mock Mode runs locally with zero carrier costs and no API key:
 Live Mode dials real telephone numbers through CALL-E:
 
 1. Ensure your CALL-E account has active credits (https://dashboard.heycall-e.com/account/billing).
-2. Set `PHONE_PROVIDER_MODE=calle` and `CALLE_API_KEY` in `server/.env`.
+2. Set `PHONE_PROVIDER_MODE=calle`, `CALLE_API_KEY`, and `ALLOWED_DESTINATIONS` in `server/.env`.
 3. Build and launch:
    ```bash
    npm run build
    npm run dev
    ```
-4. Click **+ New Verification**, enter a target phone number (e.g. `+14155550181`), and trigger the call.
+4. Click **+ New Verification**, enter an authorized E.164 number, and trigger the call.
 
 ---
 
@@ -168,12 +171,13 @@ Live Mode dials real telephone numbers through CALL-E:
 
 ---
 
-## 16. Safety / Real-World Side Effects
+## 16. Safety / Security Policies
 
-- **Live Calls**: In Live Mode, TRACE places real calls that consume CALL-E account credits.
-- **Target Numbers**: Verify destination numbers before launching calls to avoid reaching unintended parties.
-- **Credential Safety**: Never commit API keys or `.env` files to source control.
-- **Hotline Detection**: TRACE detects non-inventory hotlines and automatically flags them as `UNKNOWN / INCONCLUSIVE`.
+- **Default No-Call Policy**: Defaults strictly to Mock Mode. Forced mock configurations reject live overrides.
+- **Explicit Live Intent & Destination Allowlist**: Live calls require explicit configuration and pre-authorization via `ALLOWED_DESTINATIONS`.
+- **Sensitive Route Security**: Dial, runtime mode changes, and export endpoints are restricted to local loopback (`127.0.0.1`) or require `Bearer <TRACE_API_TOKEN>`.
+- **Phone Redaction**: Phone numbers are masked across provider logs, task records, and export files (`+1******0181`).
+- **Idempotency & Batch Safety**: Ambiguous submissions preserve stable idempotency keys and halt batch execution for reconciliation.
 
 ---
 
@@ -191,7 +195,7 @@ Run server unit and integration test suites:
 npm test
 ```
 
-Current test status: **2 test suites passed, 24/24 tests passing** (`reconciliation.test.ts`, `full_product.test.ts`).
+Current test status: **2 test suites passed, 31/31 tests passing** (`reconciliation.test.ts`, `full_product.test.ts`).
 
 ---
 
@@ -223,7 +227,7 @@ trace/
 ## 21. Project Status
 
 - **Status**: Developer Preview / Community Contribution for CALL-E.
-- **Tests**: 24/24 passing unit & integration tests.
+- **Tests**: 31/31 passing unit & integration tests across 2 test suites.
 - **SDK**: Integrated with `@call-e/calle` v0.7.0.
 
 ---
