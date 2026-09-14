@@ -40,6 +40,7 @@ export async function POST(request: Request) {
         destinationE164: typeof body.destinationE164 === "string" ? body.destinationE164 : "",
         idempotencyKey: typeof body.idempotencyKey === "string" ? body.idempotencyKey : "",
         purpose: typeof body.purpose === "string" ? body.purpose : "",
+        briefingId: typeof body.briefingId === "string" ? body.briefingId : undefined,
       }, typeof body.scheduledFor === "string" ? body.scheduledFor : "", secret);
       return NextResponse.json({ call }, { status: 201, headers: noStoreHeaders });
     }

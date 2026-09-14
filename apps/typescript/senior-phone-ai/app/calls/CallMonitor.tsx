@@ -2,6 +2,8 @@
 
 import { useCallback, useEffect, useRef, useState } from "react";
 
+import type { DailyBriefing } from "@/lib/briefings/model";
+import type { CalleFollowupView } from "@/lib/calle/followup-service";
 import type { CalleCallSnapshot } from "@/lib/calle/status";
 import type { ScheduledCallSummary } from "@/lib/calle/schedule-types";
 import { toE164FromNationalNumber } from "@/lib/safety/phone";
@@ -26,14 +28,55 @@ interface CallListResponse {
 }
 
 interface CallReview {
+  readonly briefingId?: string;
   readonly destinationE164: string;
   readonly destinationSummary: string;
   readonly idempotencyKey: string;
+  readonly knowledgeSummary?: string;
   readonly purpose: string;
   readonly scheduledFor?: string;
 }
 
 interface ScheduleListResponse { readonly calls: ScheduledCallSummary[] }
+
+interface FollowupListResponse {
+  readonly calls: CalleFollowupView[];
+  readonly enabled: boolean;
+  readonly preview?: boolean;
+}
+
+interface BriefingListResponse {
+  readonly briefings: DailyBriefing[];
+}
+
+const FOLLOWUP_LABELS: Record<CalleFollowupView["status"], string> = {
+  previewed: "Preview — not sent",
+  waiting: "Waiting for call completion",
+  checking: "Reading call result",
+  searching: "Preparing SMS / searching",
+  no_permission: "No verified SMS permission",
+  search_failed: "Answer unavailable — no SMS",
+  unknown: "Send uncertain — do not retry",
+  queued: "Accepted; awaiting receipt",
+  sent: "Delivered",
+  failed: "Failed",
+  cancelled: "Cancelled",
+  expired: "Expired",
+};
+
+const followupIsActive = (call: CalleFollowupView) =>
+  ["waiting", "checking", "searching", "queued"].includes(call.status);
+
+function localDateInTimezone(date: Date, timezone: string): string {
+  const parts = new Intl.DateTimeFormat("en-AU", {
+    day: "2-digit",
+    month: "2-digit",
+    timeZone: timezone,
+    year: "numeric",
+  }).formatToParts(date);
+  const value = (type: Intl.DateTimeFormatPartTypes) => parts.find((part) => part.type === type)?.value ?? "";
+  return `${value("year")}-${value("month")}-${value("day")}`;
+}
 
 async function loadCalls(signal: AbortSignal): Promise<CallListResponse> {
   const response = await fetch("/api/calls/status", {
@@ -47,15 +90,66 @@ async function loadCalls(signal: AbortSignal): Promise<CallListResponse> {
   return response.json() as Promise<CallListResponse>;
 }
 
-export function CallMonitor() {
+async function loadFollowups(signal: AbortSignal): Promise<FollowupListResponse> {
+  const response = await fetch("/api/followups", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ action: "list" }),
+    cache: "no-store",
+    signal,
+  });
+  if (!response.ok) throw new Error("SMS follow-up status is unavailable");
+  return response.json() as Promise<FollowupListResponse>;
+}
+
+async function briefingApi(body: object): Promise<BriefingListResponse & { briefing?: DailyBriefing }> {
+  const response = await fetch("/api/briefings", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(body),
+    cache: "no-store",
+  });
+  const result = await response.json() as BriefingListResponse & { briefing?: DailyBriefing; error?: string };
+  if (!response.ok) throw new Error(result.error ?? "Daily knowledge is unavailable");
+  return result;
+}
+
+function SmsFollowupCell({ followup }: { followup?: CalleFollowupView }) {
+  if (!followup) return <span className="sms-none">No SMS follow-up</span>;
+  const label = followup.status === "queued" && followup.receipt?.status === "sent"
+    ? "Sent to carrier; delivery pending"
+    : FOLLOWUP_LABELS[followup.status];
+  return <div className="sms-followup-cell">
+    <strong className="status-pill">{label}</strong>
+    <small>{followup.destination}</small>
+    {followup.message ? <details>
+      <summary>{followup.status === "previewed" ? "View SMS preview" : "View SMS message"}</summary>
+      {followup.query ? <p><strong>Customer request:</strong> {followup.query}</p> : null}
+      <pre className="sms-message">{followup.message}</pre>
+    </details> : null}
+    <small>
+      Recorded {new Date(followup.createdAt).toLocaleString()}
+      {followup.dispatchedAt ? ` · ${followup.status === "previewed" ? "Prepared" : "Attempted"} ${new Date(followup.dispatchedAt).toLocaleString()}` : ""}
+    </small>
+    {followup.receipt?.errorCode ? <small>Twilio error {followup.receipt.errorCode}</small> : null}
+    {followup.priorAttempt ? <details><summary>Earlier failed attempt</summary><pre className="sms-message">{followup.priorAttempt.message}</pre></details> : null}
+  </div>;
+}
+
+export function CallMonitor({ previewSms = false }: { previewSms?: boolean }) {
   const [countryId, setCountryId] = useState("au");
   const [nationalNumber, setNationalNumber] = useState("");
   const [purpose, setPurpose] = useState("");
+  const [knowledgeEnabled, setKnowledgeEnabled] = useState(false);
+  const [knowledgeMessage, setKnowledgeMessage] = useState("");
+  const [preparingKnowledge, setPreparingKnowledge] = useState(false);
   const [scheduledLocal, setScheduledLocal] = useState("");
   const [review, setReview] = useState<CallReview>();
   const [dispatching, setDispatching] = useState(false);
   const [dispatchMessage, setDispatchMessage] = useState<string>();
   const [calls, setCalls] = useState<CalleCallSnapshot[]>([]);
+  const [followups, setFollowups] = useState<CalleFollowupView[]>([]);
+  const [followupsPreview, setFollowupsPreview] = useState(previewSms);
   const [scheduledCalls, setScheduledCalls] = useState<ScheduledCallSummary[]>([]);
   const [unavailableCount, setUnavailableCount] = useState(0);
   const [error, setError] = useState<string>();
@@ -64,7 +158,7 @@ export function CallMonitor() {
 
   const refresh = useCallback(() => setRefreshVersion((version) => version + 1), []);
 
-  const reviewCall = (schedule: boolean) => {
+  const reviewCall = async (schedule: boolean) => {
     const callPurpose = purpose.trim();
     const country = COUNTRY_OPTIONS.find((option) => option.id === countryId);
     let destination: string;
@@ -94,10 +188,37 @@ export function CallMonitor() {
     }
     setError(undefined);
     setDispatchMessage(undefined);
+    let briefingId: string | undefined;
+    let knowledgeSummary: string | undefined;
+    if (knowledgeEnabled) {
+      if (scheduledFor
+        && localDateInTimezone(new Date(scheduledFor), "Australia/Sydney") !== localDateInTimezone(new Date(), "Australia/Sydney")) {
+        setError("Daily knowledge calls can only be scheduled for later today. Prepare the briefing on the day of a future call.");
+        return;
+      }
+      setPreparingKnowledge(true);
+      setKnowledgeMessage("Preparing today’s source-backed knowledge…");
+      try {
+        const result = await briefingApi({ action: "prepare-shared", refresh: false });
+        const briefing = result.briefing;
+        if (!briefing || briefing.status === "unavailable") throw new Error("No verified Australian daily knowledge is available today.");
+        briefingId = briefing.id;
+        knowledgeSummary = `Shared Australian briefing · ${briefing.localDate} · ${briefing.status}`;
+        setKnowledgeMessage(`Ready: ${knowledgeSummary}`);
+      } catch (cause) {
+        setError(cause instanceof Error ? cause.message : "Daily knowledge could not be prepared.");
+        setKnowledgeMessage("");
+        return;
+      } finally {
+        setPreparingKnowledge(false);
+      }
+    }
     setReview({
+      briefingId,
       destinationE164: destination,
       destinationSummary: `[phone ending ${destination.slice(-4)}]`,
       idempotencyKey: crypto.randomUUID(),
+      knowledgeSummary,
       purpose: callPurpose,
       scheduledFor,
     });
@@ -115,6 +236,7 @@ export function CallMonitor() {
           ...review,
           action: review.scheduledFor ? "create" : undefined,
           destinationSummary: undefined,
+          knowledgeSummary: undefined,
           confirmed: true,
         }),
       });
@@ -162,24 +284,32 @@ export function CallMonitor() {
       const controller = new AbortController();
       requestRef.current = controller;
       try {
-        const scheduleResponse = await fetch("/api/calls/schedule", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ action: "list" }),
-          cache: "no-store",
-          signal: controller.signal,
-        });
+        const [scheduleResponse, result, followupResult] = await Promise.all([
+          fetch("/api/calls/schedule", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ action: "list" }),
+            cache: "no-store",
+            signal: controller.signal,
+          }),
+          loadCalls(controller.signal),
+          loadFollowups(controller.signal).catch(() => undefined),
+        ]);
         if (!scheduleResponse.ok) throw new Error("Scheduled calls are unavailable");
         const scheduleResult = await scheduleResponse.json() as ScheduleListResponse;
-        const result = await loadCalls(controller.signal);
         if (!active) return;
         failures = 0;
         setCalls(result.calls);
         setScheduledCalls(scheduleResult.calls);
+        if (followupResult) {
+          setFollowups(followupResult.calls);
+          setFollowupsPreview(followupResult.preview === true);
+        }
         setUnavailableCount(result.unavailableCount);
         setError(undefined);
         if (result.calls.some((call) => ["queued", "in_progress", "unknown"].includes(call.status))
-          || scheduleResult.calls.some((call) => call.status === "pending" || call.status === "claimed")) {
+          || scheduleResult.calls.some((call) => call.status === "pending" || call.status === "claimed")
+          || followupResult?.calls.some(followupIsActive)) {
           timer = setTimeout(poll, POLL_INTERVAL_MS);
         }
       } catch (cause) {
@@ -198,7 +328,7 @@ export function CallMonitor() {
   }, [refreshVersion]);
 
   return (
-    <main className="monitor-page">
+    <div className="monitor-page">
       <div className="page-context"><span className="mode">local operator view</span></div>
       <section className="monitor-card" aria-labelledby="monitor-heading">
         <p className="eyebrow">Live call visibility</p>
@@ -239,12 +369,32 @@ export function CallMonitor() {
             Select the country, then enter or paste the number. Local, +61, 0061 and 0011 61 formats
             are corrected automatically when Australia is selected.
           </small>
-          <label htmlFor="purpose">Purpose of the call <span className="optional-label">(optional)</span></label>
+          <div className="knowledge-toggle">
+            <label htmlFor="daily-knowledge">
+              <input
+                checked={knowledgeEnabled}
+                id="daily-knowledge"
+                onChange={(event) => {
+                  setKnowledgeEnabled(event.target.checked);
+                  setReview(undefined);
+                  setKnowledgeMessage(event.target.checked ? "The shared Australian briefing will be prepared or reused before call review." : "");
+                }}
+                role="switch"
+                type="checkbox"
+              />
+              Use today’s knowledge briefing
+            </label>
+            <small>
+              Equip CALL-E with the same current Australian news, alerts, services and retirement information for every senior. <a href="/briefings">Review daily knowledge</a>.
+            </small>
+            {knowledgeMessage ? <small role="status">{knowledgeMessage}</small> : null}
+          </div>
+          <label htmlFor="purpose">Additional call instruction <span className="optional-label">(optional)</span></label>
           <textarea
             id="purpose"
             maxLength={300}
             onChange={(event) => { setPurpose(event.target.value); setReview(undefined); }}
-            placeholder="Optional: Ask whether they can hear clearly and thank them."
+            placeholder="Optional: Ask about a particular topic or share a one-time message."
             rows={3}
             value={purpose}
           />
@@ -257,16 +407,19 @@ export function CallMonitor() {
           />
           <small>The time uses this browser&apos;s timezone: {Intl.DateTimeFormat().resolvedOptions().timeZone}.</small>
           <div className="controls">
-            <button onClick={() => reviewCall(false)} type="button">Review call now</button>
-            <button disabled={!scheduledLocal} onClick={() => reviewCall(true)} type="button">Review scheduled call</button>
+            <button disabled={preparingKnowledge} onClick={() => void reviewCall(false)} type="button">{preparingKnowledge ? "Preparing knowledge…" : "Review call now"}</button>
+            <button disabled={!scheduledLocal || preparingKnowledge} onClick={() => void reviewCall(true)} type="button">{preparingKnowledge ? "Preparing knowledge…" : "Review scheduled call"}</button>
           </div>
         </div>
         {review ? (
           <div className="call-confirmation" role="group" aria-label="Confirm outbound call">
             <h2>Confirm this phone call</h2>
-            <p>When SMS follow-ups are enabled for this Australian mobile, the agent offers a short recap by text. The called number is saved automatically; after the call, one SMS is sent with the customer&apos;s permission. Requested searches are handled in the same follow-up.</p>
+            <p>{previewSms
+              ? "For this demo, the agent can prepare a customer-approved SMS preview after the call. Requested searches become sourced customer-facing answers, and no text is sent."
+              : "When SMS follow-ups are enabled for this Australian mobile, the agent offers a short recap by text. The called number is saved automatically; after the call, one SMS is sent with the customer’s permission. Requested searches are handled in the same follow-up."}</p>
             <p><strong>Destination:</strong> {review.destinationSummary}</p>
-            <p><strong>Purpose:</strong> {review.purpose || "No specific purpose"}</p>
+            <p><strong>Daily knowledge:</strong> {review.knowledgeSummary ?? "Off"}</p>
+            <p><strong>Additional instruction:</strong> {review.purpose || "None"}</p>
             <p><strong>When:</strong> {review.scheduledFor ? new Date(review.scheduledFor).toLocaleString() : "Now"}</p>
             <p className="fine-print">
               Confirm that you have permission to call this number. A scheduled call can be canceled
@@ -282,7 +435,7 @@ export function CallMonitor() {
             </div>
           </div>
         ) : null}
-        <div className="table-actions"><button onClick={refresh} type="button">Refresh table</button></div>
+        <div className="table-actions"><button onClick={refresh} type="button">Refresh calls and SMS</button></div>
         {dispatchMessage ? <p className="success" role="status">{dispatchMessage}</p> : null}
         {error ? <p className="error" role="alert">{error}</p> : null}
         {unavailableCount ? (
@@ -297,7 +450,7 @@ export function CallMonitor() {
         </div>
         {scheduledCalls.length ? (
           <div className="call-table-wrap"><table className="call-table">
-            <thead><tr><th>Scheduled for</th><th>Destination</th><th>Purpose</th><th>Status</th><th>Action</th></tr></thead>
+            <thead><tr><th>Scheduled for</th><th>Destination</th><th>Additional instruction</th><th>Status</th><th>Action</th></tr></thead>
             <tbody>{scheduledCalls.map((call) => (
               <tr key={call.id}>
                 <td>{new Date(call.scheduledFor).toLocaleString()}</td>
@@ -325,17 +478,19 @@ export function CallMonitor() {
             <p className="eyebrow">Operator review</p>
             <h2 id="phone-transcript-heading">All monitored calls</h2>
           </div>
-          <strong className="status-pill" aria-live="polite">{calls.length} calls</strong>
+          <strong className="status-pill" aria-live="polite">{calls.length} calls · {followups.length} SMS records</strong>
         </div>
         {calls.length ? (
           <div className="call-table-wrap">
             <table className="call-table call-history-table">
               <thead>
-                <tr><th>Started</th><th>Result</th><th>Summary</th><th>Conversation</th></tr>
+                <tr><th>Started</th><th>Result</th><th>Summary</th><th>Conversation</th><th>SMS follow-up</th></tr>
               </thead>
               <tbody>
-                {calls.map((call) => (
-                  <tr key={call.callId}>
+                {calls.map((call) => {
+                  const followup = followups.find((item) =>
+                    item.callId === call.callId || item.callReference === call.callId);
+                  return <tr key={call.callId}>
                     <td>{call.createdAt ? new Date(call.createdAt).toLocaleString() : "Pending"}</td>
                     <td>
                       <strong className="status-pill">
@@ -358,19 +513,21 @@ export function CallMonitor() {
                         </details>
                       ) : "Waiting for provider"}
                     </td>
-                  </tr>
-                ))}
+                    <td><SmsFollowupCell followup={followup} /></td>
+                  </tr>;
+                })}
               </tbody>
             </table>
           </div>
         ) : <p className="empty-transcript">No calls have been registered by this application.</p>}
         <p className="fine-print">
+          {followupsPreview ? "SMS entries marked Preview are prepared for the demo and are not sent. " : ""}
           CALL-E may withhold transcript text until a call finishes. Its public API does not publish
           stable machine-readable no-answer or voicemail values, so those cases remain incomplete
           unless the bounded provider summary explains more. This local view keeps transcript text
           in memory only, masks phone-like text, and never exposes the API key to the browser.
         </p>
       </section>
-    </main>
+    </div>
   );
 }

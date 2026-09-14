@@ -5,7 +5,7 @@ const steps = [
   ["Ask", "Call a normal phone number and speak naturally."],
   ["Search", "Retrieve current information during the conversation."],
   ["Remember", "Send short details by SMS when requested."],
-  ["Act", "Confirm before reminders or outbound calls are created."],
+  ["Review", "See the call result and SMS preview together."],
 ] as const;
 
 export default function Home() {
@@ -20,11 +20,11 @@ export default function Home() {
           Have a conversation, answer the questions that matter, and text the
           information your customer asked for after the call.
         </p>
-        <div className="workspace-actions"><Link className="workspace-primary" href="/calls">Open calls <span aria-hidden="true">→</span></Link><Link className="workspace-secondary" href="/followups">View SMS follow-ups</Link><span className="mode" data-mode={mode}>{mode} mode</span></div>
+        <div className="workspace-actions"><Link className="workspace-primary" href="/calls">Open calls <span aria-hidden="true">→</span></Link><Link className="workspace-secondary" href="/calls#phone-transcript-heading">View call &amp; SMS history</Link><span className="mode" data-mode={mode}>{mode} mode</span></div>
         <div className="notice" role="status">
           <strong>Choose your next step</strong>
           <span>
-            Use Calls to start a conversation, SMS follow-ups to track requested answers,
+            Use Calls to start a conversation and track requested SMS previews and answers,
             or Briefings to prepare information before a call. Live calls and messages
             require setup and the customer’s permission.
           </span>
@@ -54,8 +54,7 @@ export default function Home() {
         </div>
         <p>
           The assistant identifies itself as AI. It will require clear confirmation
-          before sending messages, saving reminders, contacting family or asking
-          CALL-E to place an outbound call.
+          before sending messages or asking CALL-E to place an outbound call.
         </p>
       </section>
     </main>

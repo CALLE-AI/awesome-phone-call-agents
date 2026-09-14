@@ -4,7 +4,7 @@ import { mkdir, open, readFile, rename, unlink, writeFile } from "node:fs/promis
 import { join } from "node:path";
 import { requireSecret } from "../config/server";
 import { searchLiveWeb } from "../tools/search-web-provider";
-import { localClock, renderBriefingTask, validateProfile, type DailyBriefing, type SeniorProfile } from "./model";
+import { localClock, renderBriefingTask, SHARED_BRIEFING_PROFILE, validateProfile, type DailyBriefing, type SeniorProfile } from "./model";
 import { prepareBriefing } from "./service";
 
 interface State { profiles: SeniorProfile[]; briefings: DailyBriefing[] }
@@ -80,6 +80,11 @@ export async function resolveBriefingTask(id: string, now = new Date()) {
   const profile = state.profiles.find((item) => item.id === briefing?.profileId);
   if (!briefing || !profile || briefing.profileFingerprint !== profileFingerprint(profile)) throw new Error("Briefing is missing or profile changed; prepare and review again");
   return renderBriefingTask(briefing, profile, now);
+}
+
+export async function prepareSharedBriefing(refresh = false, now = new Date()) {
+  await saveProfile(SHARED_BRIEFING_PROFILE);
+  return prepareProfile(SHARED_BRIEFING_PROFILE.id, refresh, now);
 }
 
 export async function prepareDueBriefings(now = new Date()) {

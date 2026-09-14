@@ -4,7 +4,6 @@ import { resolveBriefingTask } from "../briefings/store";
 import { assertCalleCallId, parseCalleCallSnapshot, type CalleCallSnapshot } from "./status";
 import { validateOutboundCallRequest, type OutboundCallRequest } from "./outbound";
 import { addPostCallSearchInstructions, assertFollowupDestination, CALLE_FOLLOWUP_SCHEMA } from "./followup-evidence";
-import { readTwilioSmsConfig } from "../tools/twilio-sms";
 
 const CALLE_API_ORIGIN = "https://api.heycall-e.com";
 
@@ -58,12 +57,16 @@ export async function createCalleCall(
 ): Promise<CalleCallSnapshot> {
   const validated = validateOutboundCallRequest(request);
   const briefingTask = validated.briefingId ? await resolveBriefingTask(validated.briefingId) : undefined;
-  const { calleFollowupsEnabled, createCalleFollowups } = await import("./followup-server");
-  const useFollowup = calleFollowupsEnabled() && readTwilioSmsConfig(process.env).recipients.includes(validated.destinationE164);
+  const { calleFollowupsEnabled, createCalleFollowups, calleFollowupsPreview, followupRecipients } = await import("./followup-server");
+  const useFollowup = calleFollowupsEnabled() && followupRecipients().includes(validated.destinationE164);
   const followups = useFollowup ? createCalleFollowups() : undefined;
-  const task = briefingTask ?? (validated.purpose
-    ? `Identify yourself as Senior Phone AI. ${validated.purpose}`
-    : "Identify yourself as Senior Phone AI and have a general conversation with the recipient.");
+  const task = briefingTask
+    ? validated.purpose
+      ? `${briefingTask}\nADDITIONAL_OPERATOR_INSTRUCTION=${JSON.stringify(validated.purpose)}`
+      : briefingTask
+    : validated.purpose
+      ? `Identify yourself as Senior Phone AI. ${validated.purpose}`
+      : "Identify yourself as Senior Phone AI and have a general conversation with the recipient.";
   const response = await fetcher(`${CALLE_API_ORIGIN}/v1/calls`, {
     method: "POST",
     headers: {
@@ -72,7 +75,7 @@ export async function createCalleCall(
       "Idempotency-Key": validated.idempotencyKey,
     },
     body: JSON.stringify({
-      task: useFollowup ? addPostCallSearchInstructions(task) : task,
+      task: useFollowup ? addPostCallSearchInstructions(task, calleFollowupsPreview()) : task,
       ...(useFollowup ? { result_schema: CALLE_FOLLOWUP_SCHEMA } : {}),
       recipients: [{ phones: [validated.destinationE164] }],
       metadata: { application: "senior-phone-ai" },

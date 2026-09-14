@@ -99,3 +99,31 @@ test("opted-in terminal call dispatches through Twilio once despite concurrent f
   await Promise.all([finalizer.sendOptedInFollowup(record, true, authorized), finalizer.sendOptedInFollowup(record, true, authorized)]);
   assert.equal(sends, 1);
 });
+
+
+test("local demo omits callbacks and authenticates read-only message status lookups", async () => {
+  const local = readTwilioSmsConfig({ ...env, SMS_STATUS_CALLBACK_URL: "" });
+  let reads = 0;
+  const adapter = new TwilioSmsAdapter(local, async (url, options) => {
+    if (options?.method === "POST") {
+      assert.equal(new URLSearchParams(String(options.body)).has("StatusCallback"), false);
+      return Response.json({ sid }, { status: 201 });
+    }
+    reads++;
+    assert.equal(options?.method, "GET");
+    assert.equal(options?.redirect, "error");
+    assert.equal(new Headers(options?.headers).get("Authorization"), `Basic ${Buffer.from(`${env.SMS_ACCOUNT_ID}:${env.SMS_AUTH_TOKEN}`).toString("base64")}`);
+    assert.equal(String(url), `https://api.twilio.com/2010-04-01/Accounts/${config.accountId}/Messages/${sid}.json`);
+    return Response.json({ sid, account_sid: config.accountId, status: "delivered", error_code: null });
+  });
+  assert.equal((await adapter.send(request)).status, "queued");
+  assert.equal((await adapter.readStatus(sid))?.status, "delivered");
+  assert.equal(await adapter.readStatus("../bad"), undefined);
+  assert.equal(reads, 1);
+  assert.equal((await createTwilioStatusHandler(() => local, () => new InMemorySmsStore())(callback("delivered"))).status, 404);
+  for (const data of [{ sid, account_sid: "wrong", status: "delivered" }, { sid: "wrong", account_sid: config.accountId, status: "delivered" }, { sid, account_sid: config.accountId, status: "unexpected" }]) {
+    assert.equal(await new TwilioSmsAdapter(local, async () => Response.json(data)).readStatus(sid), undefined);
+  }
+  assert.equal(await new TwilioSmsAdapter(local, async () => new Response(null, { status: 503 })).readStatus(sid), undefined);
+  assert.equal(await new TwilioSmsAdapter(local, async () => { throw new Error("private provider detail"); }).readStatus(sid), undefined);
+});

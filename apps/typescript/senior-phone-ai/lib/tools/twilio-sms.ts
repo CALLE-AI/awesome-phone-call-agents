@@ -4,6 +4,11 @@ import { assertStrictE164 } from "../safety/phone";
 import type { SmsAdapter, SmsRequest, SmsResult } from "./contracts";
 import { PreviewSmsAdapter } from "./preview-sms";
 
+export interface TwilioSmsReceipt {
+  status: "queued" | "sending" | "sent" | "delivered" | "undelivered" | "failed";
+  errorCode?: string;
+}
+
 export interface TwilioSmsConfig {
   readonly accountId: string;
   readonly authToken: string;
@@ -22,9 +27,11 @@ export function readTwilioSmsConfig(env: ServerEnvironment): TwilioSmsConfig {
     throw new Error("Valid server-only Twilio credentials are required");
   }
   assertStrictE164(from);
-  const url = new URL(statusUrl);
-  if (url.protocol !== "https:" || url.username || url.password || url.hash || url.search
+  if (statusUrl) {
+    const url = new URL(statusUrl);
+    if (url.protocol !== "https:" || url.username || url.password || url.hash || url.search
     || url.pathname !== "/api/twilio/sms/status") throw new Error("Invalid SMS callback URL");
+  }
   if (!recipients.length || recipients.some((number) => !/^\+614[0-9]{8}$/.test(number))) {
     throw new Error("Explicit Australian mobile test recipients are required");
   }
@@ -34,6 +41,22 @@ export function readTwilioSmsConfig(env: ServerEnvironment): TwilioSmsConfig {
 /** Use through SmsService or the consent-checked CALL-E workflow; persist a send claim before network dispatch. */
 export class TwilioSmsAdapter implements SmsAdapter {
   constructor(private readonly config: TwilioSmsConfig, private readonly fetcher: typeof fetch = fetch) {}
+
+  /** Read an existing message only. A failed lookup must never trigger another send. */
+  async readStatus(sid: string): Promise<TwilioSmsReceipt | undefined> {
+    if (!/^SM[0-9a-f]{32}$/i.test(sid)) return;
+    try {
+      const response = await this.fetcher(`https://api.twilio.com/2010-04-01/Accounts/${this.config.accountId}/Messages/${sid}.json`, {
+        method: "GET", redirect: "error", signal: AbortSignal.timeout(15_000),
+        headers: { Authorization: `Basic ${Buffer.from(`${this.config.accountId}:${this.config.authToken}`).toString("base64")}` },
+      });
+      if (!response.ok) return;
+      const data = await response.json();
+      if (!data || data.sid !== sid || data.account_sid !== this.config.accountId
+        || !["queued", "sending", "sent", "delivered", "undelivered", "failed"].includes(data.status)) return;
+      return { status: data.status, errorCode: /^\d{4,6}$/.test(String(data.error_code)) ? String(data.error_code) : undefined };
+    } catch { return; }
+  }
 
   async send(request: SmsRequest): Promise<SmsResult> {
     assertStrictE164(request.destinationE164);
@@ -48,7 +71,8 @@ export class TwilioSmsAdapter implements SmsAdapter {
           Authorization: `Basic ${Buffer.from(`${this.config.accountId}:${this.config.authToken}`).toString("base64")}`,
           "Content-Type": "application/x-www-form-urlencoded",
         },
-        body: new URLSearchParams({ To: request.destinationE164, From: this.config.from, Body: request.message, StatusCallback: this.config.statusUrl }),
+        body: new URLSearchParams({ To: request.destinationE164, From: this.config.from, Body: request.message,
+          ...(this.config.statusUrl ? { StatusCallback: this.config.statusUrl } : {}) }),
       });
       // A timeout or server failure can happen after acceptance. Never retry here.
       if (response.status >= 400 && response.status < 500 && response.status !== 408) return { status: "failed" };
@@ -56,7 +80,7 @@ export class TwilioSmsAdapter implements SmsAdapter {
       const data: unknown = await response.json();
       if (!data || typeof data !== "object" || !("sid" in data)
         || typeof data.sid !== "string" || !/^SM[0-9a-f]{32}$/i.test(data.sid)) return { status: "unknown" };
-      // Acceptance is not delivery. Only verified terminal callbacks update this later.
+      // Acceptance is not delivery. Authenticated lookups or signed callbacks confirm it.
       return { status: "queued", providerMessageId: data.sid };
     } catch {
       return { status: "unknown" };
@@ -71,6 +95,7 @@ export function createSmsAdapter(env: ServerEnvironment, fetcher: typeof fetch =
 
 /** Form webhook signature: configured public URL plus every sorted parameter. */
 export function verifyTwilioForm(rawBody: string, signature: string, config: TwilioSmsConfig): URLSearchParams {
+  if (!config.statusUrl) throw new Error("Callbacks are disabled");
   const params = new URLSearchParams(rawBody);
   const keys = [...params.keys()];
   if (new Set(keys).size !== keys.length) throw new Error("Duplicate webhook parameters");

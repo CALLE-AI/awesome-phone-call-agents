@@ -287,6 +287,19 @@ button.danger { background: #8b372a; }
 }
 .call-form button { justify-self: start; margin-top: 8px; }
 .call-form .controls { margin-top: 8px; }
+.knowledge-toggle {
+  background: #f2f5f1;
+  border: 1px solid #c6d2c8;
+  border-radius: 14px;
+  display: grid;
+  gap: 10px;
+  margin: 16px 0 4px;
+  padding: 18px;
+}
+.knowledge-toggle > label:first-child { align-items: center; display: flex; gap: 10px; margin: 0; }
+.knowledge-toggle input[type="checkbox"] { accent-color: #28523c; height: 20px; width: 20px; }
+.knowledge-toggle label:has(select) { display: grid; gap: 8px; }
+.knowledge-toggle small { color: #526156; line-height: 1.5; }
 .call-confirmation { background: #edf3ed; border-radius: 18px; margin-top: 28px; padding: 22px; }
 .call-confirmation h2 { font-size: 1.6rem; }
 .table-actions { margin-top: 28px; }
@@ -303,14 +316,30 @@ button.danger { background: #8b372a; }
 .call-table th { color: #526156; font-size: .82rem; text-transform: uppercase; }
 .call-table td:nth-child(1) { min-width: 180px; }
 .call-table details summary { cursor: pointer; font-weight: 800; }
-.call-history-table { min-width: 1200px; }
+.call-history-table { min-width: 1560px; }
 .call-history-table th:nth-child(2),
 .call-history-table td:nth-child(2) { min-width: 180px; }
 .call-history-table th:nth-child(3),
-.call-history-table td:nth-child(3) { min-width: 480px; width: 42%; }
+.call-history-table td:nth-child(3) { min-width: 380px; width: 28%; }
 .call-history-table th:nth-child(4),
-.call-history-table td:nth-child(4) { min-width: 440px; width: 38%; }
+.call-history-table td:nth-child(4) { min-width: 380px; width: 26%; }
+.call-history-table th:nth-child(5),
+.call-history-table td:nth-child(5) { min-width: 360px; width: 26%; }
 .operator-summary { font-size: 1.05rem; font-weight: 650; line-height: 1.65; }
+.sms-none { color: #607067; }
+.sms-followup-cell { display: grid; gap: 12px; line-height: 1.5; }
+.sms-followup-cell .status-pill { justify-self: start; }
+.sms-followup-cell small { color: #526156; display: block; }
+.sms-message {
+  background: #f2f5f1;
+  border-radius: 8px;
+  font: inherit;
+  line-height: 1.6;
+  margin: 10px 0 0;
+  overflow-wrap: anywhere;
+  padding: 14px;
+  white-space: pre-wrap;
+}
 .table-conversation { margin-top: 16px; max-height: 520px; overflow-y: auto; padding-right: 14px; }
 .table-conversation p {
   border-left: 3px solid #d6ded7;

@@ -16,7 +16,8 @@ SMS_ACCOUNT_ID=
 SMS_AUTH_TOKEN=
 SMS_FROM_NUMBER=
 SMS_TEST_RECIPIENTS=
-SMS_STATUS_CALLBACK_URL=https://your-public-host.example/api/twilio/sms/status
+# Optional: leave blank for a local demo with API delivery checks.
+SMS_STATUS_CALLBACK_URL=
 CALLE_FOLLOWUP_ENABLED=true
 CALLE_FOLLOWUP_STORAGE_KEY=
 ```
@@ -27,7 +28,7 @@ logs. The sender can be the SMS-capable Twilio trial number already tested by th
 operator; the recipient allowlist uses Australian `+614xxxxxxxx` mobiles. Replace
 the leading zero of a local `04...` mobile with `+61`, not `+610`.
 
-Only `/api/twilio/sms/status` needs public HTTPS exposure. Keep the operator UI
+No public access is required for the local demo. The server checks Twilio message status using authenticated GET requests. If you opt into callbacks, only `/api/twilio/sms/status` needs public HTTPS exposure. Keep the operator UI
 and APIs on loopback; never make a public proxy impersonate a local Origin/Host.
 No CALL-E inbound webhook or Supabase database is needed for this pilot.
 See [Twilio setup](twilio-sms.md) for account and sender requirements.
@@ -60,14 +61,12 @@ connecting an old call does not renew the customer's earlier permission.
    authorize a text. The first pilot supports allowlisted Australian mobiles;
    landlines cannot receive these SMS follow-ups.
 5. One durable job sends at most one SMS. A normal conversation needs no search
-   API request. When separately authorized, a search adds a verified answer and
-   source link to the recap if both fit the 480-character limit. Otherwise the
-   complete sourced answer takes priority. If search fails, an independently
-   approved recap is still sent with a short search-failure notice. Without recap
-   permission, a failed search sends nothing. No additional operator action is
-   needed after the call.
-6. Open `/followups` and refresh to see progress and the resulting message.
-   `queued` means accepted by Twilio; `sent` means a verified delivered callback.
+   API request. When a search is authorized, the customer message contains the
+   concise verified answer and source link. The provider summary and conversational
+   recap remain audit context and are never substituted for the requested answer.
+   If search fails, no answer message is prepared or sent.
+6. Open `/followups` to see SMS history: the exact attempted message, masked destination, send-attempt time, latest status-check time and numeric Twilio error code when available. The page refreshes every ten seconds.
+   `queued` means accepted by Twilio; `sent` means Twilio confirmed delivery through an authenticated API lookup or signed callback. A provider `sent` response means carrier acceptance, not confirmed delivery.
 
 Existing calls can be selected from the monitor on `/followups` and bound to their
 same allowed mobile. The provider result must already contain the new
@@ -122,3 +121,38 @@ No default test places a call or sends a message. Live CALL-E extraction, search
 quality and receipt on the test phone remain separate acceptance checks.
 
 Provider contract: [CALL-E calls and structured results](https://docs.heycall-e.com/api-reference/calls).
+
+## Local delivery history
+
+The existing server worker checks at most one pending message per tick, with a
+30-second minimum between checks of the same message, for up to 24 hours after
+registration. Checks resume after restart and only fetch the stored Message SID;
+they never create another SMS. A lookup failure retains the previous status and
+shows that the latest check was unavailable. Messages with uncertain creation and
+no saved SID require manual reconciliation in Twilio, never automatic resend.
+Signed callbacks and lookups cannot overwrite an already terminal local result.
+
+Disabling follow-ups stops delivery polling and new sends; existing history can
+still be read with the storage key in live mode. The existing 24-hour privacy
+retention remains: message text and recipient details are cleared on next access,
+while status tombstones remain for deduplication. Polling currently applies only
+to this local CALL-E workflow; the generic Supabase SMS service uses callbacks.
+
+## Demo SMS preview with real calls
+
+Set `SENIOR_PHONE_AI_MODE=live`, `CALLE_FOLLOWUP_ENABLED=true`,
+`CALLE_FOLLOWUP_PREVIEW=true`, and `SMS_ENABLED=false`, then restart the app.
+Keep the encrypted storage key and consented Australian test-recipient allowlist.
+Twilio credentials and a callback URL are not needed in this mode. CALL-E calls
+and requested OpenAI web searches remain live and can incur their normal charges.
+
+The call uses natural language to ask whether the customer wants an SMS prepared
+after the call. It does not repeatedly announce demo mechanics. The operator UI
+remains explicit that the message is a preview and is not sent.
+After the verified permission and completion checks, history records the exact
+message as **Preview — not sent**. No Twilio send or delivery lookup occurs.
+Preview registrations stay preview-only even if live sending is enabled later;
+preview-only consent cannot authorize live SMS. A displayed prior failed message
+can also be viewed as a preview without altering its failure history or retrying.
+The existing 24-hour content retention still applies. Set
+`CALLE_FOLLOWUP_ENABLED=false` to stop preparing new previews.

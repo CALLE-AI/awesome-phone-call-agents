@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 import { getRuntimeMode } from "@/lib/config/server";
 import { authorizeRealtimeSessionRequest, FixedWindowRateLimiter } from "@/lib/realtime/access";
-import { deleteProfile, prepareProfile, readBriefingState, resolveBriefingTask, saveProfile } from "@/lib/briefings/store";
+import { deleteProfile, prepareProfile, prepareSharedBriefing, readBriefingState, resolveBriefingTask, saveProfile } from "@/lib/briefings/store";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -16,6 +16,10 @@ export async function POST(request: Request) {
   try {
     const body = await request.json();
     if (body.action === "list") return NextResponse.json(await readBriefingState(), { headers });
+    if (body.action === "prepare-shared") {
+      if (!preparationLimiter.consume()) return NextResponse.json({ error: "Too many preparations; wait a minute" }, { status: 429, headers });
+      return NextResponse.json({ briefing: await prepareSharedBriefing(body.refresh === true) }, { headers });
+    }
     if (body.action === "save") return NextResponse.json({ profile: await saveProfile(body.profile) }, { headers });
     if (typeof body.id !== "string") throw new Error("Identifier required");
     if (body.action === "delete") { await deleteProfile(body.id); return NextResponse.json({ deleted: true }, { headers }); }

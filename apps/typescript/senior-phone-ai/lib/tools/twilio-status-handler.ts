@@ -9,7 +9,7 @@ export function createTwilioStatusHandler(
   return async (request: Request): Promise<Response> => {
     let config: TwilioSmsConfig | undefined;
     try { config = configuration(); } catch { return new Response(null, { status: 503 }); }
-    if (!config) return new Response(null, { status: 404 });
+    if (!config?.statusUrl) return new Response(null, { status: 404 });
     if (request.headers.get("content-type")?.split(";")[0] !== "application/x-www-form-urlencoded") return new Response(null, { status: 415 });
     // Bound the stream, including requests without Content-Length.
     const reader = request.body?.getReader();

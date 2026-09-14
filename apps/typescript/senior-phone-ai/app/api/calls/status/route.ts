@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 
 import { getCalleCallSnapshots } from "@/lib/calle/client";
-import { listRegisteredCallIds } from "@/lib/calle/registry";
+import { listRegisteredCallIds, readCallDisplayTimeOverrides } from "@/lib/calle/registry";
 import { getRuntimeMode, requireSecret } from "@/lib/config/server";
 import { authorizeRealtimeSessionRequest, FixedWindowRateLimiter } from "@/lib/realtime/access";
 
@@ -44,10 +44,17 @@ export async function POST(request: Request) {
   }
 
   try {
-    const snapshot = await getCalleCallSnapshots(callIds, requireSecret("CALLE_API_KEY"));
+    const [snapshot, displayTimes] = await Promise.all([
+      getCalleCallSnapshots(callIds, requireSecret("CALLE_API_KEY")),
+      readCallDisplayTimeOverrides(),
+    ]);
     return NextResponse.json({
       ...snapshot,
-      calls: snapshot.calls.map((call) => ({ ...call, callId: `${call.callId.slice(0, 14)}…` })),
+      calls: snapshot.calls.map((call) => ({
+        ...call,
+        createdAt: displayTimes[call.callId] ?? call.createdAt,
+        callId: `${call.callId.slice(0, 14)}…`,
+      })),
     }, { headers: noStoreHeaders });
   } catch {
     return NextResponse.json({ error: "Call status is unavailable" }, { status: 502, headers: noStoreHeaders });

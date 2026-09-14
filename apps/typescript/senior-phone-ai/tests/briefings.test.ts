@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import { healthPrompt, localClock, officialDomains, renderBriefingTask, researchQuery, validateProfile, type SeniorProfile } from "../lib/briefings/model";
+import { healthPrompt, localClock, officialDomains, renderBriefingTask, researchQuery, SHARED_BRIEFING_PROFILE, validateProfile, type SeniorProfile } from "../lib/briefings/model";
 import { prepareBriefing, type Search } from "../lib/briefings/service";
 
 const now = new Date("2026-09-10T21:00:00Z");
@@ -46,6 +46,15 @@ test("briefing retrieves fresh evidence for each topic and embeds it into the ph
   assert.throws(() => renderBriefingTask(result, { ...profile, consentToPersonalization: false }, now));
   assert.throws(() => renderBriefingTask(result, { ...profile, id: "another-senior" }, now));
   assert.throws(() => renderBriefingTask(result, profile, new Date("2026-09-11T21:00:00Z")));
+});
+
+test("the shared Australian briefing contains no recipient profile", async () => {
+  const result = await prepareBriefing(SHARED_BRIEFING_PROFILE, "shared-fingerprint", fake, now);
+  const task = renderBriefingTask(result, SHARED_BRIEFING_PROFILE, now);
+  assert.match(task, /older people in Australia/);
+  assert.match(task, /When asked about today's news or anything important/);
+  assert.ok(!task.includes(SHARED_BRIEFING_PROFILE.name));
+  assert.equal(result.healthPrompt, "");
 });
 
 test("failure and missing citations produce explicit gaps, never yesterday's answer", async () => {

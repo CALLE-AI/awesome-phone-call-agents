@@ -19,7 +19,10 @@ complete telephone-to-search-to-SMS experience still needs the bridge described 
    `SMS_TEST_RECIPIENTS` to comma-separated, explicitly consented Australian test
    mobiles in `+614xxxxxxxx` format. Replace the local mobile's leading `0` with
    `+61`. An allowlist entry does not replace consent or action authorization.
-5. Expose only `/api/twilio/sms/status` over public HTTPS. Set
+5. For the local CALL-E demo, leave `SMS_STATUS_CALLBACK_URL` blank; delivery
+   status is polled from Twilio without public access. For the generic Supabase
+   service or optional callback delivery tracking, expose only
+   `/api/twilio/sms/status` over public HTTPS. Set
    `SMS_STATUS_CALLBACK_URL` to that exact URL, without query or fragment. Do not
    expose the local call/briefing administration pages through the tunnel.
 6. For the generic Supabase SMS service, apply its schema and server credentials.
@@ -50,7 +53,8 @@ replies and pre-call texts are not implemented.
   Twilio API origin and times out after 15 seconds.
 - The service durably reserves an idempotency key before dispatch. The adapter
   never retries and does not assume provider-side message-creation idempotency.
-- API acceptance is `queued`. Verified `delivered` callbacks map to the existing
+- API acceptance is `queued`. Local CALL-E history also polls authenticated
+  message status, without resending. Verified `delivered` callbacks map to the existing
   `sent` state; `failed` and `undelivered` map to `failed`. Intermediate callbacks
   are ignored so late `sent` events cannot overwrite a terminal result.
 - Signatures include every form field and the configured public URL. Invalid

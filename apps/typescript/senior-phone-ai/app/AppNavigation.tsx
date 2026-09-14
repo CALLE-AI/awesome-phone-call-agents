@@ -5,10 +5,8 @@ import { usePathname } from "next/navigation";
 import styles from "./navigation.module.css";
 
 const links = [
-  ["/", "Overview"], ["/calls", "Calls"], ["/followups", "SMS follow-ups"],
-  ["/briefings", "Briefings"], ["/realtime", "Voice test"],
-  ["/dashboard", "Dashboard"], ["/seniors", "People"],
-  ["/reminders", "Reminders"], ["/settings", "Settings"],
+  ["/", "Overview"], ["/calls", "Calls"],
+  ["/briefings", "Daily knowledge"], ["/realtime", "Voice test"],
 ] as const;
 
 export function AppNavigation() {
@@ -23,10 +21,10 @@ export function AppNavigation() {
         <span>Senior Phone AI<small>Calls &amp; follow-ups</small></span>
       </Link>
       <nav className={styles.links} aria-label="Main navigation">
-        {links.map(([href, label], index) => {
+        {links.map(([href, label]) => {
           const active = pathname === href || (href !== "/" && pathname.startsWith(`${href}/`));
           return <Link key={href} href={href} aria-current={active ? "page" : undefined}
-            className={`${styles.link} ${active ? styles.active : ""} ${index === 5 ? styles.groupStart : ""}`}>{label}</Link>;
+            className={`${styles.link} ${active ? styles.active : ""}`}>{label}</Link>;
         })}
       </nav>
     </div>

@@ -21,6 +21,7 @@ interface RegistryRecord {
 interface RegistryFile { readonly version: 1; readonly calls: RegistryRecord[] }
 
 const registryPath = join(process.cwd(), "data", "calle-call-registry.json");
+const displayOverridesPath = join(process.cwd(), "data", "calle-call-display-overrides.json");
 const registryLockPath = `${registryPath}.lock`;
 let mutation = Promise.resolve();
 
@@ -102,4 +103,21 @@ export async function listRegisteredCallIds(environmentValue?: string): Promise<
   const registry = await readRegistry();
   const recorded = registry.calls.flatMap((call) => call.state === "accepted" && call.callId ? [assertCalleCallId(call.callId)] : []);
   return [...new Set([...recorded, ...configured])].slice(0, 20);
+}
+
+export async function readCallDisplayTimeOverrides(): Promise<Record<string, string>> {
+  try {
+    const input = JSON.parse(await readFile(displayOverridesPath, "utf8")) as unknown;
+    if (!input || typeof input !== "object" || Array.isArray(input)) throw new Error("invalid call display overrides");
+    const result: Record<string, string> = {};
+    for (const [callId, createdAt] of Object.entries(input)) {
+      assertCalleCallId(callId);
+      if (typeof createdAt !== "string" || !Number.isFinite(Date.parse(createdAt))) throw new Error("invalid call display time");
+      result[callId] = new Date(createdAt).toISOString();
+    }
+    return result;
+  } catch (error) {
+    if ((error as NodeJS.ErrnoException).code === "ENOENT") return {};
+    throw error;
+  }
 }
