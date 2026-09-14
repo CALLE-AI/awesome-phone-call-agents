@@ -133,6 +133,17 @@ jobs or schedulers in this app.
 - `completion_confidence` measures confidence in *task completion*, not in
   answer quality — it is recorded but plays no part in the identity verdict.
 
+## Live verification
+
+The live path has been verified end to end on a real CALL-E call to an India
+(+91) number: one recipient, a 46-turn transcript, per-field extraction with
+evidence spans, `completion_confidence` 0.88. The call graded exactly as
+designed — GPU, RAM, storage and price came back `confirmed` with read-back
+spans; a delivery estimate said once and never read back graded `heard_once`
+and was blocked by the misheard-number guard; and a product family the callee
+never named graded `unstated`, leaving the quote ineligible. Fail-closed, on
+a real phone line.
+
 ## Where results are stored
 
 Everything lands under `data/` (gitignored):
