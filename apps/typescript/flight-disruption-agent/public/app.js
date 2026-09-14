@@ -4,6 +4,7 @@ let snap = null;
 let selected = null; // { disruptionId, pnr }
 let selectedRequest = null; // request id
 const airlinePreviews = new Map();
+const callbackPreviews = new Map();
 const previews = new Map();
 const draft = {}; // form values by element id, kept across re-renders
 let pollTimer = null;
@@ -52,7 +53,7 @@ async function load() {
   clearTimeout(pollTimer);
   const running =
     snap.disruptions.some((d) => d.bookings.some((b) => b.entry && (b.entry.status === "in_progress" || b.entry.status === "submitted"))) ||
-    snap.requests.some((r) => r.status === "airline_call_in_progress");
+    snap.requests.some((r) => r.status === "airline_call_in_progress" || r.callback?.status === "in_progress");
   if (running) pollTimer = setTimeout(load, snap.live ? 5000 : 1500);
 }
 
@@ -418,6 +419,7 @@ function requestSteps(r) {
   } else if (r.status === "portal_rejected") steps.push(step("todo", "Call the airline service desk"));
   if (r.status === "needs_review") steps.push(step("todo", "A person resolves the request"));
   if (r.status === "resolved_by_human") steps.push(step("done", "Resolved by an agent"));
+  if (r.callbackVerdict) steps.push(step(r.callbackVerdict.kind === "delivered" ? "done" : "stop", r.callbackVerdict.kind === "delivered" ? "Passenger heard the result" : "Passenger needs written follow-up"));
   return steps;
 }
 
@@ -472,7 +474,62 @@ function renderRequestDetail() {
       <textarea id="${esc(ids.note)}">${esc(draft[ids.note] ?? "")}</textarea>
       <div class="row-inline"><button type="button" class="btn" data-req-resolve="${esc(id)}">Resolve</button></div></div>`);
   }
+  if (r.status === "completed" || r.status === "resolved_by_human") {
+    if (!r.callback || r.callback.status === "failed_to_submit") {
+      parts.push(renderCallbackBox(r));
+      ensureCallbackPreview(id);
+    } else {
+      parts.push(renderCallRecord("Result call to the passenger", r.callback));
+      if (r.callbackVerdict?.kind === "follow_up") parts.push(`<ul class="reasons">${r.callbackVerdict.reasons.map((x) => `<li>${esc(x)}</li>`).join("")}</ul>`);
+    }
+  }
   el.innerHTML = parts.join("");
+}
+
+function renderCallbackBox(r) {
+  const id = r.request.id;
+  const p = callbackPreviews.get(id);
+  const live = snap.live;
+  const last4Id = `req-cb-last4-${id}`;
+  const blocked = p?.blockedReason;
+  return `<div class="callbox ${live ? "live" : ""}"><h3>Optional: call the passenger with the result</h3>
+    ${r.callback?.status === "failed_to_submit" ? `<p class="note bad">Last attempt was not started: ${esc(r.callback.error)}</p>` : ""}
+    <dl class="kv"><dt>Destination</dt><dd class="mono">${p ? `${esc(p.destinationMasked)}${p.redirected ? ' <span class="note">(live calls always go to LIVE_DEMO_PHONE)</span>' : ""}` : "…"}</dd></dl>
+    ${blocked ? `<p class="note bad">${esc(blocked)}</p>` : ""}
+    ${p ? `<details><summary>What CALL-E will be told</summary><pre>${esc(p.task)}</pre></details>` : ""}
+    ${live
+      ? `<div class="row-inline"><label for="${esc(last4Id)}">Type the last 4 digits of the destination to confirm</label>
+          <input id="${esc(last4Id)}" inputmode="numeric" maxlength="4" autocomplete="off" value="${esc(draft[last4Id] ?? "")}">
+          <button type="button" class="btn live" data-req-callback="${esc(id)}" ${blocked ? "disabled" : ""}>Place real call</button></div>`
+      : `<div class="row-inline"><button type="button" class="btn" data-req-callback="${esc(id)}" ${blocked ? "disabled" : ""}>Simulate result call</button></div>`}
+  </div>`;
+}
+
+function renderCallRecord(title, c) {
+  const o = c.outcome;
+  return `<div class="outcome"><h3>${esc(title)}</h3>
+    <dl class="kv">
+      <dt>Status</dt><dd>${esc(c.status.replaceAll("_", " "))} <span class="muted">${esc(o?.providerStatus ?? "")}</span></dd>
+      <dt>Call id</dt><dd class="mono">${esc(c.callId ?? "none")}</dd>
+      <dt>Dialed</dt><dd class="mono">${esc(c.destinationMasked)}${c.redirected ? " (demo phone)" : ""}</dd>
+    </dl>
+    ${c.error ? `<p class="note bad">${esc(c.error)}</p>` : ""}
+    ${o?.summary ? `<p><span class="muted">Summary:</span> ${esc(o.summary)}</p>` : ""}
+    ${o?.transcript?.length ? `<details><summary>Transcript (${o.transcript.length} turns)</summary><div class="transcript" style="padding:10px 12px">${o.transcript.map((t) => `<div class="turn"><span class="spk">${esc(t.speaker)}</span><span>${esc(t.text)}</span></div>`).join("")}</div></details>` : ""}
+    <details><summary>What CALL-E was told</summary><pre>${esc(c.task)}</pre></details>
+  </div>`;
+}
+
+async function ensureCallbackPreview(id) {
+  if (callbackPreviews.has(id)) return;
+  callbackPreviews.set(id, null);
+  try {
+    callbackPreviews.set(id, await api("/api/requests/callback/preview", { id }));
+    if (selectedRequest === id) renderRequestDetail();
+  } catch (e) {
+    callbackPreviews.delete(id);
+    showError(e.message);
+  }
 }
 
 function renderAirlineCallBox(r) {
@@ -612,6 +669,12 @@ document.addEventListener("click", (e) => {
     act(() => api("/api/requests/airline/start", { id, confirmLast4: draft[`req-last4-${id}`] }));
     return;
   }
+  const reqCallback = e.target.closest("[data-req-callback]");
+  if (reqCallback) {
+    const id = reqCallback.dataset.reqCallback;
+    act(() => api("/api/requests/callback/start", { id, confirmLast4: draft[`req-cb-last4-${id}`] }));
+    return;
+  }
   const reqResolve = e.target.closest("[data-req-resolve]");
   if (reqResolve) {
     const id = reqResolve.dataset.reqResolve;
@@ -642,6 +705,7 @@ $("reset").addEventListener("click", () => {
     selectedRequest = null;
     previews.clear();
     airlinePreviews.clear();
+    callbackPreviews.clear();
   });
 });
 

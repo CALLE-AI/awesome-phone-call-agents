@@ -112,6 +112,15 @@ async function api(req: IncomingMessage, res: ServerResponse, path: string): Pro
     const confirm = typeof body.confirmLast4 === "string" ? body.confirmLast4 : undefined;
     return send(res, 201, await desk.callAirlineDesk(str(body, "id"), confirm));
   }
+  if (req.method === "POST" && path === "/api/requests/callback/preview") {
+    const body = await readJson(req);
+    return send(res, 200, desk.previewCallback(str(body, "id")));
+  }
+  if (req.method === "POST" && path === "/api/requests/callback/start") {
+    const body = await readJson(req);
+    const confirm = typeof body.confirmLast4 === "string" ? body.confirmLast4 : undefined;
+    return send(res, 201, await desk.callPassengerWithResult(str(body, "id"), confirm));
+  }
   if (req.method === "POST" && path === "/api/requests/resolve") {
     const body = await readJson(req);
     const newPnr = typeof body.newPnr === "string" ? body.newPnr.trim().toUpperCase() : "";
