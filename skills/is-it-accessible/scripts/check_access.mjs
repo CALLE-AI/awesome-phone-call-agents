@@ -37,12 +37,12 @@ function parsePhone(input) {
   const cleaned = String(input ?? "").trim().replace(/[\s\-().]/g, "");
   if (!cleaned.startsWith("+")) {
     throw new Error(
-      `"${input}" has no country code. Use international format, e.g. +15555550123. ` +
+      "The phone number has no country code. Use international format, e.g. +12025550123. " +
         "Country codes are never guessed, because guessing wrong means calling a stranger.",
     );
   }
   if (!E164.test(cleaned)) {
-    throw new Error(`"${input}" is not a valid international phone number.`);
+    throw new Error("The supplied phone number is not a valid international phone number.");
   }
   return cleaned;
 }
@@ -805,11 +805,15 @@ async function loadSdk() {
 }
 
 function makeClient(CalleClient) {
+  const baseUrl = "https://api.heycall-e.com";
+  if (process.env.CALLE_BASE_URL && process.env.CALLE_BASE_URL !== baseUrl) {
+    throw new Error("CALLE_BASE_URL must be the official HTTPS CALL-E origin.");
+  }
   const apiKey = process.env.CALLE_API_KEY;
   if (!apiKey) throw new Error("CALLE_API_KEY is required for --real and --call.");
   return new CalleClient({
     apiKey,
-    ...(process.env.CALLE_BASE_URL ? { baseUrl: process.env.CALLE_BASE_URL } : {}),
+    baseUrl,
   });
 }
 
@@ -899,6 +903,9 @@ async function main() {
     );
   } else {
     const venues = given;
+    if (new Set(venues.map((venue) => venue.phone)).size !== venues.length) {
+      throw new Error("Each live batch must contain unique destination phone numbers.");
+    }
     const { CalleClient, CalleAPIError, CalleTimeoutError } = await loadSdk();
     const client = makeClient(CalleClient);
 
@@ -922,9 +929,9 @@ async function main() {
     // prose, so it is composed rather than passed through.
     const locale = composeLocale(profile.language, profile.region);
 
-    // A stable key means a retry re-reads the original call instead of
-    // dialling a real business a second time. `--again` is the one way to
-    // ring the same venue twice in a day, and it has to be asked for.
+    // An identical enquiry reuses its key on the same UTC day. Changed needs,
+    // profile, destinations, day, or --again create a new intent; after an
+    // ambiguous submission, reconcile the original call before doing that.
     const idempotencyKey = checkKey(profile, venues, args.again ? randomUUID() : undefined);
 
     let call;
@@ -954,10 +961,9 @@ async function main() {
             "Run the identical check to read that call back, or pass --again to place a new one.",
         );
       }
-      // Any other refusal is CALL-E's, in CALL-E's words — the account's
-      // concurrency limit, for one — and the reader should know whose it is.
+      // Provider error bodies can echo credentials or private destinations.
       if (error instanceof CalleAPIError) {
-        throw new Error(`CALL-E would not accept the call: ${scrubNumbers(error.message)}`);
+        throw new Error("CALL-E did not accept the request; provider error details were suppressed. Reconcile before retrying if the outcome is uncertain.");
       }
       throw error;
     }
@@ -1012,6 +1018,6 @@ async function main() {
 try {
   process.exitCode = await main();
 } catch (error) {
-  console.error(error.message);
+  console.error(scrubNumbers(String(error.message).replaceAll(process.env.CALLE_API_KEY || "\u0000", "[credential redacted]")));
   process.exitCode = 1;
 }

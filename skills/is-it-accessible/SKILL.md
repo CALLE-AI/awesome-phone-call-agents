@@ -246,20 +246,22 @@ weaker than the quote rule below, and worth checking rather than trusting: a
 **One credit per venue.** A three-venue comparison spends three. The
 confirmation prompt states the count before anything is dialled.
 
-**Retries never dial twice.** Each check sends a stable `Idempotency-Key` that
+**Identical enquiries reuse their key.** Each check sends a stable `Idempotency-Key` that
 hashes the profile id, the needs asked, the venue numbers and the UTC day, so
 the identical check run again today re-reads the original call rather than
-ringing a real business again. Change the needs and CALL-E refuses the reused
-key outright; the script says so rather than "try again", because a retry is
-the one thing that cannot get past it.
+ringing a real business again, within the provider's deduplication window.
+Changing needs, profile, destination set, or UTC day creates a different key.
+After an ambiguous submission, reconcile the original call before changing
+the enquiry or intentionally requesting another call.
 
-**`--again` is the only way to ring the same venue twice in a day.** It mints
+**`--again` explicitly requests a new call for an otherwise identical enquiry.** It mints
 a fresh key. It exists for a venue whose first call went to voicemail or was
 never placed, not for asking a venue that has already answered — one call per
 venue per enquiry still stands.
 
 **Numbers are validated before anyone is called.** Every number in a batch is
-parsed up front. Discovering that venue three is malformed *after* ringing
+parsed up front, and duplicate destinations are rejected in live batches.
+Discovering that venue three is malformed *after* ringing
 venues one and two is the worst possible moment to find out.
 
 **Credentials stay in the environment.** `CALLE_API_KEY` is read from the
