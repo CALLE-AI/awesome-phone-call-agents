@@ -57,7 +57,7 @@ test("the airline task discloses the AI, caps the charge, and never shares payme
   const booking = findBooking(catalog, "P3X9GA");
   const option = voluntaryQuoteFor(catalog, booking).moves.find((m) => m.flightId === "NA729-2026-09-20");
   assert.ok(option);
-  const task = buildAirlineTask(catalog, { booking, option, rejectionCode: "REISSUE_NOT_PERMITTED", rejectionMessage: "" });
+  const task = buildAirlineTask(catalog, { booking, option });
   assert.match(task, /AI assistant calling the Nusantara Air travel agent service desk on behalf of TripKita/);
   assert.match(task, /Do not agree to any Nusantara Air charge above 350,000 rupiah/);
   assert.match(task, /Never give card numbers/);
@@ -98,7 +98,7 @@ test("a refused refund is escalated with the airline's own refund amount, never 
   const quote = voluntaryQuoteFor(catalog, booking);
   assert.equal(airlineRefundAmount(catalog, booking, quote), 1_962_000, "90% of the flex fare");
   assert.equal(quote.refund.amount, 1_962_000 - 50_000, "the passenger's refund also loses the TripKita fee");
-  const task = buildAirlineRefundTask(catalog, { booking, quote, rejectionCode: "REFUND_NOT_PERMITTED" });
+  const task = buildAirlineRefundTask(catalog, { booking, quote });
   assert.match(task, /approve the refund of 1,962,000 rupiah/);
   assert.match(task, /Do not accept a lower refund, a travel voucher, or credit/);
   assert.match(task, /Never give card numbers, bank account numbers/);

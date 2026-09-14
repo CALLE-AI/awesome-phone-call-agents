@@ -13,16 +13,14 @@ function spell(code: string): string {
 export interface ForcedChangeRequest {
   booking: Booking;
   option: MoveOption;
-  rejectionCode: string;
-  rejectionMessage: string;
 }
 
 /**
- * Workflow B step 5: the B2B portal refused a reissue the passenger already agreed
- * to pay for, so the agent phones the airline service desk and asks it to force the change.
+ * Workflow B step 3: the passenger agreed to a new flight and its cost on the CALL-E call,
+ * so the agent phones the airline service desk and asks it to reissue the ticket.
  */
 export function buildAirlineTask(catalog: Catalog, request: ForcedChangeRequest): string {
-  const { booking, option, rejectionCode } = request;
+  const { booking, option } = request;
   const airline = airlineOf(catalog, booking).rules;
   const from = findFlight(catalog, booking.flightId);
   const to = findFlight(catalog, option.flightId);
@@ -31,18 +29,17 @@ export function buildAirlineTask(catalog: Catalog, request: ForcedChangeRequest)
   return [
     `You are an AI assistant calling the ${airline.name} travel agent service desk on behalf of ${OTA_NAME}, an online travel agency. Say that you are an AI assistant calling for ${OTA_NAME} at the start of the call.`,
     ``,
-    `Goal: ask the desk to reissue one ticket to a new flight, because the B2B portal refused the change.`,
+    `Goal: ask the desk to reissue one ticket to a new flight. The passenger has already agreed to the change and its cost with ${OTA_NAME}.`,
     ``,
     `Facts you may share:`,
     `- Booking code: ${spell(booking.pnr)}. Ticket number: ${spell(booking.ticket.replace("-", ""))}.`,
     `- Passenger name: ${booking.passenger}.`,
     `- Current flight: ${from.code}, ${from.originCity} to ${from.destinationCity}, ${localDate(from.departure)} at ${localTime(from.departure)} Jakarta time.`,
     `- Requested flight: ${to.code} on ${localDate(to.departure)} at ${localTime(to.departure)} Jakarta time, same fare family (${booking.fareFamily}).`,
-    `- The portal returned error ${rejectionCode.replaceAll("_", " ").toLowerCase()}.`,
     `- ${OTA_NAME} expects ${airline.name} fees of ${spokenRupiah(airlineFees)} for this change, including any fare difference.`,
     ``,
     `Rules for this call:`,
-    `- Ask the desk to force the reissue to the requested flight. Do not ask for any other flight.`,
+    `- Ask the desk to reissue the ticket to the requested flight. Do not ask for any other flight.`,
     `- Do not agree to any ${airline.name} charge above ${spokenRupiah(airlineFees)}. If the desk asks for more, say ${OTA_NAME} will confirm with the passenger and call back, then end politely.`,
     `- If the desk reissues the ticket, ask for and read back the new booking code, the new ticket number, and a reference for this call.`,
     `- If the desk refuses, ask for the reason in one sentence and end politely.`,
@@ -149,7 +146,7 @@ export function decideAirline(outcome: CallOutcome): AirlineDecision {
   };
 }
 
-// ---------------------------------------------------------------- refunds the portal refused
+// ---------------------------------------------------------------- refunds
 
 /** What the airline itself should return: the fare minus the airline's own deduction, before OTA and distributor fees. */
 export function airlineRefundAmount(catalog: Catalog, booking: Booking, quote: Quote): number {
@@ -161,29 +158,27 @@ export function airlineRefundAmount(catalog: Catalog, booking: Booking, quote: Q
 export interface ForcedRefundRequest {
   booking: Booking;
   quote: Quote;
-  rejectionCode: string;
 }
 
 /**
- * The portal refused a refund the passenger already accepted, so the agent asks the airline
- * desk to approve it by hand. The agent may not accept less than the airline's own refund.
+ * The passenger accepted a refund on the CALL-E call, so the agent asks the airline desk to
+ * approve it. The agent may not accept less than the airline's own refund.
  */
 export function buildAirlineRefundTask(catalog: Catalog, request: ForcedRefundRequest): string {
-  const { booking, quote, rejectionCode } = request;
+  const { booking, quote } = request;
   const airline = airlineOf(catalog, booking).rules;
   const flight = findFlight(catalog, booking.flightId);
   const expected = airlineRefundAmount(catalog, booking, quote);
   return [
     `You are an AI assistant calling the ${airline.name} travel agent service desk on behalf of ${OTA_NAME}, an online travel agency. Say that you are an AI assistant calling for ${OTA_NAME} at the start of the call.`,
     ``,
-    `Goal: ask the desk to approve a refund for one ticket, because the B2B portal refused it.`,
+    `Goal: ask the desk to approve a refund for one ticket. The passenger has already accepted the refund amount with ${OTA_NAME}.`,
     ``,
     `Facts you may share:`,
     `- Booking code: ${spell(booking.pnr)}. Ticket number: ${spell(booking.ticket.replace("-", ""))}.`,
     `- Passenger name: ${booking.passenger}.`,
     `- Flight: ${flight.code}, ${flight.originCity} to ${flight.destinationCity}, ${localDate(flight.departure)} at ${localTime(flight.departure)} Jakarta time. The passenger will not travel.`,
     `- Fare paid: ${spokenRupiah(quote.refund.gross)}, ${booking.fareFamily} fare.`,
-    `- The portal returned error ${rejectionCode.replaceAll("_", " ").toLowerCase()}.`,
     `- Under the ${booking.fareFamily} fare rules, ${OTA_NAME} expects a refund from ${airline.name} of ${spokenRupiah(expected)}.`,
     ``,
     `Rules for this call:`,

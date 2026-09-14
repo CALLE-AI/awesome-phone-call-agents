@@ -328,7 +328,7 @@ function scriptedAirlineRefundDesk(booking: Booking, airlineRefund: number): Cal
   const amount = airlineRefund.toLocaleString("en-US");
   const opening: TranscriptTurn[] = [
     { speaker: "user", text: "Nusantara Air agency desk, how can I help?", offsetSeconds: 0 },
-    { speaker: "bot", text: `Hi, I'm an AI assistant calling for TripKita. The portal refused the refund for booking ${booking.pnr}. Can you approve a refund of ${amount} rupiah?`, offsetSeconds: 3 },
+    { speaker: "bot", text: `Hi, I'm an AI assistant calling for TripKita. The passenger on booking ${booking.pnr} has cancelled. Can you approve a refund of ${amount} rupiah?`, offsetSeconds: 3 },
   ];
   const base = { state: "completed" as const, providerStatus: "completed", result: null, failureCode: null, failureMessage: null };
   const answer = booking.simulatedAirlineDesk ?? "callback_later";
@@ -376,7 +376,7 @@ function scriptedAirlineRefundDesk(booking: Booking, airlineRefund: number): Cal
 function scriptedAirlineDesk(booking: Booking, option: MoveOption): CallOutcome {
   const opening: TranscriptTurn[] = [
     { speaker: "user", text: "Nusantara Air agency desk, how can I help?", offsetSeconds: 0 },
-    { speaker: "bot", text: `Hi, I'm an AI assistant calling for TripKita. The portal refused to reissue booking ${booking.pnr} to ${option.label}. Can you force the reissue?`, offsetSeconds: 3 },
+    { speaker: "bot", text: `Hi, I'm an AI assistant calling for TripKita. The passenger on booking ${booking.pnr} has agreed to move to ${option.label}. Can you reissue the ticket?`, offsetSeconds: 3 },
   ];
   const base = {
     state: "completed" as const,

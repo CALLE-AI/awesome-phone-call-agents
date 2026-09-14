@@ -827,7 +827,6 @@ export class Desk {
     }
     const airline = airlineOf(this.catalog, booking).rules;
     const destination = this.route(airline.supportPhone);
-    const rejectionCode = entry.portal.code;
 
     if (entry.action.kind === "refund") {
       const airlineRefund = airlineRefundAmount(this.catalog, booking, entry.quote);
@@ -837,7 +836,7 @@ export class Desk {
         airline,
         destination,
         purpose: "airline_forced_refund" as const,
-        task: buildAirlineRefundTask(this.catalog, { booking, quote: entry.quote, rejectionCode }),
+        task: buildAirlineRefundTask(this.catalog, { booking, quote: entry.quote }),
         resultSchema: buildAirlineRefundResultSchema(),
         simulation: { kind: "airline_refund_desk" as const, booking, airlineRefund },
         decide: (outcome: CallOutcome) => {
@@ -855,7 +854,7 @@ export class Desk {
       airline,
       destination,
       purpose: "airline_forced_reissue" as const,
-      task: buildAirlineTask(this.catalog, { booking, option, rejectionCode, rejectionMessage: entry.portal.message }),
+      task: buildAirlineTask(this.catalog, { booking, option }),
       resultSchema: buildAirlineResultSchema(),
       simulation: { kind: "airline_desk" as const, booking, option },
       decide: (outcome: CallOutcome) => {
