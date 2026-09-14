@@ -33,11 +33,17 @@ export interface Booking {
   ticket: string;
   /** Used only by the dry-run gateway to script a plausible call. */
   simulatedAnswer: SimulatedAnswer;
+  /** Dry run only: how the fake B2B portal answers a submission for this booking. */
+  simulatedGds?: "reject_reschedule" | "reject_refund";
+  /** Dry run only: what the airline service desk says when asked to force the change. */
+  simulatedAirlineDesk?: "reissued" | "refused" | "callback_later";
 }
 
 export interface AirlineRules {
   name: string;
   role: "airline";
+  /** E.164 service desk number agents call when the B2B portal refuses a change. */
+  supportPhone: string;
   involuntaryDelayMinutes: number;
   voluntary: Record<FareFamily, { rescheduleFee: number; refundPercent: number }>;
   involuntary: { rescheduleFee: number; refundPercent: number; waivesFareDifference: boolean };

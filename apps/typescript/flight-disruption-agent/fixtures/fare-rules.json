@@ -4,6 +4,7 @@
     "nusantara-air": {
       "name": "Nusantara Air",
       "role": "airline",
+      "supportPhone": "+15550100900",
       "involuntaryDelayMinutes": 120,
       "voluntary": {
         "flex": { "rescheduleFee": 0, "refundPercent": 90 },
