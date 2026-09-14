@@ -46,11 +46,22 @@ function buildTask(node: CallNode): string {
   return `${node.goal}${buildPolicyText(node.policy)}`;
 }
 
-/** Are all of a node's dependencies satisfied (done)? */
+/**
+ * Are all of a node's dependencies satisfied? A dependency is satisfied once it
+ * has settled (reached a terminal status), not only when it's "done". A
+ * follow-up call may be spawned precisely because its parent could NOT be
+ * completed — e.g. an emergency-contact call depends on an unreachable welfare
+ * call, which settles as needs_review. Only pending/blocked/running parents
+ * hold a dependent back.
+ */
 function depsSatisfied(node: CallNode, graph: CallGraph): boolean {
   if (node.dependsOn.length === 0) return true;
   const byId = new Map(graph.nodes.map((n) => [n.id, n]));
-  return node.dependsOn.every((id) => byId.get(id)?.status === "done");
+  const settled = new Set(["done", "needs_review", "needs_user", "failed"]);
+  return node.dependsOn.every((id) => {
+    const dep = byId.get(id);
+    return dep !== undefined && settled.has(dep.status);
+  });
 }
 
 /** Nodes eligible to run right now. */
@@ -170,30 +181,35 @@ export async function executeGraph(
   opts: ExecutorOptions
 ): Promise<CallGraph> {
   const limit = opts.maxConcurrency ?? 4;
+  // Nodes we've already run expand() on, so we never expand the same node twice
+  // across loop iterations.
+  const expandedIds = new Set<string>();
 
   while (true) {
     markBlocked(graph);
     const batch = runnableNodes(graph);
     if (batch.length === 0) break;
 
-    // Track which nodes were done before this batch so we only expand newly
-    // completed ones for chains.
-    const completedBefore = new Set(
-      graph.nodes.filter((n) => n.status === "done").map((n) => n.id)
-    );
-
     await runPool(batch, limit, (node) => runNode(node, opts));
 
-    // Expansion: derive follow-up nodes from freshly-completed nodes.
+    // Expansion: derive follow-up nodes from freshly-settled nodes.
     // Runs whenever the graph defines expand() — used by chains (each call
-    // reveals the next) and by fan-out graphs that escalate (e.g. a resident
-    // who needs help spawns a GP follow-up call). Fan-out graphs without an
-    // expand() behave exactly as before.
+    // reveals the next) and by fan-out graphs that escalate. We expand any node
+    // that has finished executing (reached a terminal status), not only "done"
+    // ones, so an unreachable resident (needs_review from no answer/voicemail)
+    // can still spawn a follow-up (e.g. a call to their emergency contact).
+    // The scenario's expand() decides what, if anything, each status warrants.
     if (graph.expand) {
-      const newlyDone = graph.nodes.filter(
-        (n) => n.status === "done" && !completedBefore.has(n.id)
+      const settled = graph.nodes.filter(
+        (n) =>
+          !expandedIds.has(n.id) &&
+          (n.status === "done" ||
+            n.status === "needs_review" ||
+            n.status === "needs_user" ||
+            n.status === "failed")
       );
-      for (const node of newlyDone) {
+      for (const node of settled) {
+        expandedIds.add(node.id);
         const spawned = graph.expand(node, graph);
         for (const child of spawned) {
           child.spawnedBy = node.id;

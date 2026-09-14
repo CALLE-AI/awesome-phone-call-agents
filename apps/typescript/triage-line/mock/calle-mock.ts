@@ -272,6 +272,32 @@ function gpOutcome(): CalleCallOutcome {
   };
 }
 
+/** Emergency-contact call spawned when a resident is unreachable. */
+function emergencyContactOutcome(): CalleCallOutcome {
+  return {
+    status: "completed",
+    taskCompleted: true,
+    completionConfidence: {
+      score: 0.9,
+      reason: "Emergency contact agreed to check in.",
+    },
+    structuredResult: {
+      contact_reached: true,
+      will_check_in: true,
+      eta: "within 30 minutes",
+      note: "Contact lives nearby and will go check on the resident in person.",
+    },
+    evidence: [
+      "Oh no, I'll head over right now to check on them.",
+      "I can be there in about half an hour.",
+    ],
+    transcript: turns(
+      ["agent", "We couldn't reach your relative for a welfare check after the outage. Could you check on them?"],
+      ["callee", "Of course, I live nearby. I'll go over within half an hour."]
+    ),
+  };
+}
+
 export interface MockTiming {
   /** Minimum simulated call duration (ms). */
   minDelayMs?: number;
@@ -298,9 +324,10 @@ export class MockCalleClient implements CalleClient {
     // varied order, like real telephony.
     const span = Math.max(0, this.maxDelayMs - this.minDelayMs);
     await delay(this.minDelayMs + Math.floor(Math.random() * (span + 1)));
-    // GP follow-up nodes are spawned dynamically (gp-<residentId>), so match by
+    // Follow-up nodes are spawned dynamically (gp-<id>, ec-<id>), so match by
     // prefix rather than an exact canned entry.
     if (req.nodeId?.startsWith("gp-")) return gpOutcome();
+    if (req.nodeId?.startsWith("ec-")) return emergencyContactOutcome();
     const factory = (req.nodeId && CANNED[req.nodeId]) || undefined;
     return factory ? factory(req) : defaultOutcome();
   }

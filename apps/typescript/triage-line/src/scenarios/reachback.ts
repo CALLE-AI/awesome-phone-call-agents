@@ -1,18 +1,24 @@
 /**
- * Scene 1 — Reachback (fan-out) with GP escalation.
+ * Scene 1 — Reachback (fan-out) with two-way escalation.
  *
  * Dial many residents with the same welfare-check goal, collect schema-validated
  * results, then triage/rank by urgency. Every resident call is independent (no
  * deps), so the executor runs them with bounded concurrency.
  *
- * Escalation: if a resident's verified result shows they need help
- * (urgency "high" or safe === false), expand() spawns a follow-up call to a GP
- * / clinic on their behalf. This links the fan-out welfare check to a
- * dependent follow-up call, driven entirely by what the welfare call learned.
+ * Escalation is driven entirely by what each welfare call learned:
  *
- * Phone numbers are configurable via env (REACHBACK_PHONES, GP_PHONE) so real
- * numbers can be used for live demos without editing source. When unset, the
- * built-in placeholders are used (only meaningful against the mock).
+ *   1. Needs help (urgency "high" or safe === false) -> spawn a follow-up call
+ *      to a GP / clinic to arrange a check-in.
+ *   2. Silence is the signal. If a resident is unreachable (no answer or
+ *      voicemail), we don't just log it — expand() spawns a call to their
+ *      emergency contact to ask someone to check on them in person. An
+ *      unanswered welfare call after a disaster is exactly the case that must
+ *      not be dropped.
+ *
+ * Phone numbers are configurable via env (REACHBACK_PHONES, GP_PHONE,
+ * EMERGENCY_CONTACT_PHONE) so real numbers can be used for live demos without
+ * editing source. When unset, the built-in placeholders are used (only
+ * meaningful against the mock).
  */
 
 import { makeNode, type CallGraph, type CallNode, type ResultSchema } from "../graph/types.js";
@@ -42,6 +48,17 @@ const GP_SCHEMA: ResultSchema = {
     note: { type: "string" },
   },
   required: ["request_logged"],
+};
+
+const EMERGENCY_CONTACT_SCHEMA: ResultSchema = {
+  type: "object",
+  properties: {
+    contact_reached: { type: "boolean" },
+    will_check_in: { type: "boolean" },
+    eta: { type: "string" },
+    note: { type: "string" },
+  },
+  required: ["contact_reached"],
 };
 
 interface Resident {
@@ -136,6 +153,15 @@ function needsHelp(node: CallNode): boolean {
   return r["urgency"] === "high" || r["safe"] === false;
 }
 
+/**
+ * Was the resident unreachable? Silence is the signal: a welfare call that
+ * didn't connect (no answer or voicemail) is exactly what we must escalate.
+ */
+function isUnreachable(node: CallNode): boolean {
+  const s = node.outcome?.status;
+  return s === "no_answer" || s === "voicemail";
+}
+
 export function buildReachbackGraph(): CallGraph {
   const residents = residentsToCall();
   const nodes: CallNode[] = residents.map((r) =>
@@ -151,6 +177,8 @@ export function buildReachbackGraph(): CallGraph {
   );
 
   const gpPhone = (process.env.GP_PHONE ?? "").trim() || "+14155550199";
+  const emergencyContactPhone =
+    (process.env.EMERGENCY_CONTACT_PHONE ?? "").trim() || "+14155550188";
   const nameById: Record<string, string> = Object.fromEntries(
     residents.map((r) => [r.id, r.name])
   );
@@ -159,37 +187,65 @@ export function buildReachbackGraph(): CallGraph {
     id: "reachback",
     mode: "fan_out",
     nodes,
-    // Escalation: a resident who needs help spawns a single GP follow-up call.
+    // Two-way escalation, driven by what each welfare call learned.
     expand(node, graph) {
-      // Only escalate resident welfare nodes, not GP nodes we already spawned.
-      if (node.id.startsWith("gp-")) return [];
-      if (!needsHelp(node)) return [];
-
-      const gpId = `gp-${node.id}`;
-      // Guard against double-spawning if the node is revisited.
-      if (graph.nodes.some((n) => n.id === gpId)) return [];
+      // Only escalate resident welfare nodes, not follow-ups we already spawned.
+      if (node.id.startsWith("gp-") || node.id.startsWith("ec-")) return [];
 
       const name = nameById[node.id] ?? node.id;
-      const needs = Array.isArray(node.result?.["needs"])
-        ? (node.result!["needs"] as string[]).join(", ")
-        : "urgent assistance";
 
-      return [
-        makeNode({
-          id: gpId,
-          phone: gpPhone,
-          region: node.region,
-          locale: node.locale,
-          goal:
-            `A welfare check found that ${name} needs help after the outage ` +
-            `(reported needs: ${needs || "urgent assistance"}). Call the GP / ` +
-            `clinic to request a follow-up: explain the situation, ask them to ` +
-            `arrange a check-in or callback, and get a reference number and ETA.`,
-          resultSchema: GP_SCHEMA,
-          dependsOn: [node.id],
-          spawnedBy: node.id,
-        }),
-      ];
+      // 1. Needs help -> call the GP / clinic.
+      if (needsHelp(node)) {
+        const gpId = `gp-${node.id}`;
+        if (graph.nodes.some((n) => n.id === gpId)) return [];
+        const needs = Array.isArray(node.result?.["needs"])
+          ? (node.result!["needs"] as string[]).join(", ")
+          : "urgent assistance";
+        return [
+          makeNode({
+            id: gpId,
+            phone: gpPhone,
+            region: node.region,
+            locale: node.locale,
+            goal:
+              `A welfare check found that ${name} needs help after the outage ` +
+              `(reported needs: ${needs || "urgent assistance"}). Call the GP / ` +
+              `clinic to request a follow-up: explain the situation, ask them to ` +
+              `arrange a check-in or callback, and get a reference number and ETA.`,
+            resultSchema: GP_SCHEMA,
+            dependsOn: [node.id],
+            spawnedBy: node.id,
+          }),
+        ];
+      }
+
+      // 2. Silence is the signal -> call the resident's emergency contact.
+      if (isUnreachable(node)) {
+        const ecId = `ec-${node.id}`;
+        if (graph.nodes.some((n) => n.id === ecId)) return [];
+        const why =
+          node.outcome?.status === "voicemail"
+            ? "the call went to voicemail"
+            : "there was no answer";
+        return [
+          makeNode({
+            id: ecId,
+            phone: emergencyContactPhone,
+            region: node.region,
+            locale: node.locale,
+            goal:
+              `We tried to reach ${name} for a welfare check after the outage ` +
+              `but ${why}. Call their emergency contact: explain we could not ` +
+              `reach ${name}, ask them to check on ${name} in person, and get a ` +
+              `commitment and an ETA for when they can do so.`,
+            resultSchema: EMERGENCY_CONTACT_SCHEMA,
+            dependsOn: [node.id],
+            spawnedBy: node.id,
+          }),
+        ];
+      }
+
+      return [];
     },
   };
 }

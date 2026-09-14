@@ -57,6 +57,11 @@ export function buildRunaroundGraph(): CallGraph {
     mode: "chain",
     nodes: [start],
     expand(node) {
+      // A chain only advances from a cleanly completed step. If a step could
+      // not be trusted (needs_review) or was halted by policy (needs_user,
+      // e.g. a fee was mentioned), the chain stops here for a human to handle.
+      if (node.status !== "done") return [];
+
       const r = node.result ?? {};
       const next = String(r["next_step"] ?? "");
 
