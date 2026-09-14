@@ -37,22 +37,50 @@ Mandatory fields — do not infer any of these from unrelated context:
      `no_answer` is terminal — flag NEEDS-ATTENTION, do not call again
    - `reschedule` → free the slot only (does **not** trigger backfill)
    - `cancelled` → free the slot **and** trigger backfill for that slot
+   - `wrong_person_or_unclear`, or a missing/malformed result (no
+     `outcome` field, an out-of-schema value, or the call never reaches
+     `completed`) → **stop on that appointment.** Do not treat it as
+     `no_answer` (no automatic retry) and do not treat it as `cancelled`
+     (no slot freed, no backfill call placed). Flag NEEDS-ATTENTION and
+     require a human to reconcile the real outcome before any
+     appointment/waitlist state changes on the strength of that call.
 2. For each slot freed by a cancellation, call the waitlist in order
-   (`accepted` / `declined` / `no_answer`) until someone accepts, then stop —
-   never call the rest of the waitlist once a slot is filled.
+   (`accepted` / `declined` / `no_answer` / `wrong_person_or_unclear`)
+   until someone accepts, then stop — never call the rest of the
+   waitlist once a slot is filled. The same stop-and-flag rule applies
+   here: a wrong-person or malformed offer-call result never advances
+   to the next waitlist entry on its own.
 3. Emit a run report: confirmed count, cancelled count, backfilled count,
-   still-needs-attention count.
+   still-needs-attention count (no-answer and wrong-person/malformed
+   cases both count here, and should be distinguishable in the report).
 
 See `references/runtime-prompt.md` for the exact `task` prompt templates
-and `references/examples.md` for full request/response payloads using
-each `result_schema`.
+and the full "Handling results that aren't a clean match" rule, and
+`references/examples.md` for full request/response payloads, including
+wrong-person and malformed-result examples.
+
+## Scope and limits
+
+- Appointment scheduling only — confirm, reschedule, cancel, backfill.
+  This skill must never be used to give medical advice, triage
+  symptoms, or handle an emergency; if a call surfaces anything outside
+  rescheduling an appointment, the agent ends the call and the run
+  flags it for a human, it does not attempt to help.
+- Once a call has been submitted to CALL-E, this skill has no reliable
+  way to cancel it in flight — the reference implementation doesn't
+  expose (or depend on) an in-flight cancel. Treat a submitted call as
+  something you can wait out, bounded by the client timeout
+  (`CALLE_TIMEOUT_SECONDS`), not something you can reliably abort.
+- See `references/safety.md` for the rest of the operating limits.
 
 ## Idempotency
 
 Each call attempt uses a unique idempotency key per (patient, attempt
-number, run date). CALL-E dedupes a reused key server-side forever, so a
-legitimate retry must mint a new key — reusing the original key silently
-drops the retry.
+number, run date). A reused key returns CALL-E's cached result instead
+of placing a second call — treat this as long-lived, but do not assume
+a specific retention window or expiry. A legitimate retry must always
+mint a new key regardless; reusing the original key silently drops the
+retry.
 
 ## Safety guardrails
 
@@ -66,6 +94,10 @@ See `references/safety.md` for the full list. Summary:
   real phones unattended.
 - Every call task explicitly forbids pressing phone/DTMF keys, learned after
   an early prompt taught the agent to press keys on itself mid-call.
+- Wrong-person, ambiguous, and missing/malformed call results stop the
+  run for that appointment/waitlist entry and require human
+  reconciliation — they are never auto-retried as `no_answer` or
+  auto-advanced as `cancelled`/`declined`.
 
 ## Reference implementation
 

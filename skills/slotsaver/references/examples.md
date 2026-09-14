@@ -26,7 +26,7 @@ Idempotency-Key: slotsaver-confirm-2026-09-14-a1-attempt1
     "properties": {
       "outcome": {
         "type": "string",
-        "enum": ["confirmed", "cancelled", "reschedule", "no_answer"]
+        "enum": ["confirmed", "cancelled", "reschedule", "no_answer", "wrong_person_or_unclear"]
       },
       "notes": { "type": "string" }
     },
@@ -68,7 +68,7 @@ Response:
     "type": "object",
     "required": ["outcome"],
     "properties": {
-      "outcome": { "type": "string", "enum": ["accepted", "declined", "no_answer"] },
+      "outcome": { "type": "string", "enum": ["accepted", "declined", "no_answer", "wrong_person_or_unclear"] },
       "notes": { "type": "string" }
     },
     "additionalProperties": false
@@ -76,7 +76,55 @@ Response:
 }
 ```
 
-## 4. One evening run, end to end (sample sequence)
+## 4. Wrong person, and a missing/malformed result — stop, don't guess
+
+Neither of these is a `no_answer`, and neither one is allowed to free a
+slot or advance the waitlist on its own — see
+`references/runtime-prompt.md`'s "Handling results that aren't a clean
+match" for the full rule. Both examples below must be flagged
+NEEDS-ATTENTION for a human to reconcile.
+
+**Wrong person answers** — the schema classifies this explicitly:
+
+```json
+{
+  "id": "call_02example",
+  "status": "completed",
+  "result": {
+    "outcome": "wrong_person_or_unclear",
+    "notes": "A different person answered and said Priya Sharma no longer has this number."
+  }
+}
+```
+
+**Missing/malformed result** — the call never produced a usable
+`outcome` at all (errored out, or the wait budget in
+`CALLE_TIMEOUT_SECONDS` was exhausted before `status` reached
+`completed`). This must be handled as its own case, distinct from
+`no_answer`:
+
+```json
+{
+  "id": "call_03example",
+  "status": "failed",
+  "result": null,
+  "failure_message": "recipient line dropped mid-call"
+}
+```
+
+or:
+
+```json
+{
+  "id": "call_04example",
+  "status": "completed",
+  "result": { "notes": "call ended early, no clear answer" }
+}
+```
+
+(no `outcome` key present, even though `status` says `completed`).
+
+## 5. One evening run, end to end (sample sequence)
 
 | Step | Action | Outcome | Effect |
 |------|--------|---------|--------|
@@ -86,7 +134,8 @@ Response:
 | 4 | Confirm call → Meera Iyer, 11:00 AM | `cancelled` | slot 11:00 AM freed → backfill |
 | 5 | Offer call → Arjun Das (waitlist #1) | `declined` | try next waitlist entry |
 | 6 | Offer call → Kavya Nair (waitlist #2) | `accepted` | slot 11:00 AM filled, stop backfilling |
-| 7 | Run report | — | 1 confirmed, 1 needs-attention, 1 cancelled, 1 backfilled |
+| 7 | Confirm call → Deepak Rao, 2:00 PM | `wrong_person_or_unclear` | do **not** retry-as-no_answer or treat as cancelled; flag NEEDS-ATTENTION and stop on this appointment |
+| 8 | Run report | — | 1 confirmed, 1 needs-attention (no-answer), 1 needs-attention (wrong person), 1 cancelled, 1 backfilled |
 
 ## Idempotency key pattern used above
 

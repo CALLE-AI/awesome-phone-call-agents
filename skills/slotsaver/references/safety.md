@@ -8,9 +8,13 @@
 - Every call task tells the agent to identify itself as the clinic's
   assistant at the start of the call — no impersonation of a human staff
   member.
-- Every call task caps itself under ~45 seconds and instructs the agent to
-  thank the person and end the call as soon as it has an answer — no
-  lingering on the line once the outcome is known.
+- Every call task asks the agent to keep the call under ~45 seconds once
+  it has an answer, and to thank the person and end the call rather than
+  linger. This is a prompt instruction, not a server- or client-enforced
+  cutoff — nothing outside the model following it forcibly ends a call
+  at 45 seconds. The only actually enforced limit is the CALL-E client
+  wait budget (`CALLE_TIMEOUT_SECONDS`, default 300s in the reference
+  implementation).
 - Every call task explicitly forbids pressing phone/DTMF keys and forbids
   waiting on hold. This was added after an early version of the task
   wording accidentally taught the agent to press keys on itself mid-call.
@@ -31,13 +35,52 @@
 
 ## Idempotency and retries
 
-- Each call attempt carries a fresh, unique idempotency key. Because
-  CALL-E dedupes a reused key server-side forever, a key must never be
-  reused across a legitimate retry, and a key must never be reused across
-  separate runs (e.g. a real run and a dry-run/test run of the same date).
+- Each call attempt carries a fresh, unique idempotency key. A reused key
+  returns CALL-E's cached result instead of placing a second call — treat
+  this as long-lived, but do not assume a specific retention window or
+  expiry either way. A key must never be reused across a legitimate
+  retry, and a key must never be reused across separate runs (e.g. a real
+  run and a dry-run/test run of the same date).
 - Exactly one retry is attempted after a `no_answer`. A second `no_answer`
   is a terminal state (flagged for human follow-up) — the skill never
   auto-retries more than once.
+
+## Ambiguous, wrong-person, and malformed results
+
+- `wrong_person_or_unclear` (the call reached someone but couldn't
+  confirm their identity, or the conversation was too ambiguous to
+  classify) and a missing/malformed `structured_result` (no `outcome`
+  field, a value outside the schema's enum, or the call never reaches
+  `completed`) are both treated as "we don't know what happened," never
+  as `no_answer` and never as `cancelled`/`declined`.
+- Neither case gets an automatic retry, and neither one is allowed to
+  free a slot, mark a cancellation, or advance the waitlist on its own.
+  Both are flagged NEEDS-ATTENTION and require a human to reconcile the
+  real outcome before any appointment/waitlist record changes on the
+  strength of that call.
+- A real appointment or waitlist state change is only finalized on a
+  `structured_result` that both parses against the schema and reflects a
+  confirmed recipient identity per `references/runtime-prompt.md`.
+- See `references/runtime-prompt.md` and `references/examples.md` for
+  the exact prompt wording and example payloads.
+
+## Cancelling a submitted call
+
+- Once a call has been submitted to CALL-E, this skill has no reliable
+  way to cancel it in flight — the reference implementation doesn't
+  expose, or depend on, an in-flight cancel endpoint. A submitted call
+  can only be waited out, bounded by the client wait budget
+  (`CALLE_TIMEOUT_SECONDS`); it should not be assumed to be abortable on
+  demand.
+
+## Scope
+
+- This skill is limited to appointment scheduling: confirming,
+  rescheduling, cancelling, and backfilling slots. It must never be used
+  to give medical advice, triage symptoms, or handle a medical
+  emergency. If a call surfaces anything outside rescheduling an
+  appointment, the agent ends the call and the run flags it for a
+  human — it does not attempt to help with it.
 
 ## Cancellation / rollback behavior for a recurring (scheduled) run
 
