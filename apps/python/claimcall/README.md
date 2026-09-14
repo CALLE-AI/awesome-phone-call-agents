@@ -181,11 +181,17 @@ to `.env` for `CALLE_API_KEY`; `.env` and `.env.local` are gitignored.
 Enforced in code (`claimcall/policy.py`, `claimcall/engine.py`), see `docs/safety.md`:
 
 - no-call default; explicit live mode; explicit per-call approval
-- exact destination displayed before the call, masked in logs/UI/storage
+- exact destination authorized before the call; phone numbers masked in CLI/dashboard display copies
 - no payment details, no passwords, no OTPs, no account credentials
 - no accepting fees, no accepting/rejecting compensation (offers stop at the human)
 - no unrelated itinerary changes, no repeated automatic redial, no scheduler
 - destination allowlist support for live verification on your own test number
+
+The local case store is private operator data: it can retain the original authorized
+destination, transcript, and result used for evidence checks. Display masking does not
+redact that private record or every kind of personal data. Keep the data directory
+private and do not commit or publish live records. Credential-bearing API requests
+refuse redirects; provider error bodies are not displayed.
 
 ## Cancellation / stop behaviour
 

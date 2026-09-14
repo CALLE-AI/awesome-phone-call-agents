@@ -16,6 +16,8 @@ from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from typing import Any, Dict, Optional
 from urllib.parse import urlparse
 
+from .display import mask_output_text
+
 TERMINAL = ("completed", "failed", "canceled")
 OFFICIAL_ORIGIN = "https://api.heycall-e.com"
 DEFAULT_BASE_URL = OFFICIAL_ORIGIN
@@ -26,9 +28,15 @@ class CalleError(RuntimeError):
     pass
 
 
+class NoRedirect(urllib.request.HTTPRedirectHandler):
+    """Never forward a credential-bearing request or its body to another URL."""
+    def redirect_request(self, req, fp, code, msg, headers, newurl):
+        return None
+
+
 def friendly_error(error: Exception) -> str:
     """Short operator-facing message for known CALL-E failures (used by the dashboard)."""
-    text = str(error)
+    text = mask_output_text(str(error))
     if "account_concurrency_exceeded" in text:
         return "Your calling line is busy with another call. Wait for it to finish, then retry once."
     if len(text) > 300:
@@ -41,12 +49,12 @@ def check_origin(base_url: str, allow_local_fake: bool) -> str:
     p = urlparse(base_url)
     origin = f"{p.scheme}://{p.netloc}"
     if p.path not in ("", "/") or p.query or p.fragment or p.username or p.password:
-        raise CalleError(f"CALLE_BASE_URL must be a bare origin, got {base_url!r}")
+        raise CalleError("CALLE_BASE_URL must be a bare origin without credentials, path, query, or fragment")
     if origin == OFFICIAL_ORIGIN:
         return origin
     if allow_local_fake and p.scheme == "http" and p.hostname in LOOPBACK_HOSTS:
         return origin
-    raise CalleError(f"refusing to send the API key to {origin!r}; live calls only go to {OFFICIAL_ORIGIN}")
+    raise CalleError(f"refusing the configured origin; live calls only go to {OFFICIAL_ORIGIN}")
 
 
 class CalleClient:
@@ -56,6 +64,7 @@ class CalleClient:
         self.api_key = api_key
         self.base_url = check_origin(base_url, allow_local_fake)
         self.timeout = timeout
+        self._opener = urllib.request.build_opener(NoRedirect())
 
     def _request(self, method: str, path: str, body: Optional[Dict[str, Any]] = None, headers: Optional[Dict[str, str]] = None) -> Dict[str, Any]:
         data = json.dumps(body).encode("utf-8") if body is not None else None
@@ -67,16 +76,16 @@ class CalleClient:
         for k, v in (headers or {}).items():
             req.add_header(k, v)
         try:
-            with urllib.request.urlopen(req, timeout=self.timeout) as resp:
+            with self._opener.open(req, timeout=self.timeout) as resp:
                 return json.loads(resp.read().decode("utf-8") or "{}")
         except urllib.error.HTTPError as e:
             detail = e.read().decode("utf-8", "replace")[:500]
             hint = ""
             if e.code == 429 and "account_concurrency_exceeded" in detail:
                 hint = " Another call is still active on your line; wait for it to finish, then retry once."
-            raise CalleError(f"CALL-E API {method} {path} failed: HTTP {e.code} {detail}.{hint}") from None
-        except urllib.error.URLError as e:
-            raise CalleError(f"CALL-E API unreachable at {self.base_url}: {e.reason}") from None
+            raise CalleError(f"CALL-E API request failed: HTTP {e.code}.{hint}") from None
+        except urllib.error.URLError:
+            raise CalleError("CALL-E API connection failed. Outcome may be unknown; check the provider before another call.") from None
 
     def create_call(self, request: Dict[str, Any], idempotency_key: str) -> Dict[str, Any]:
         return self._request("POST", "/v1/calls", request, {"Idempotency-Key": idempotency_key})

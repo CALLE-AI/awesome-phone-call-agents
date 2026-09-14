@@ -4,7 +4,7 @@ from __future__ import annotations
 import re
 from typing import Dict, List, Optional
 
-E164_PATTERN = re.compile(r"^\+[1-9]\d{7,14}$")
+E164_PATTERN = re.compile(r"\+[1-9][0-9]{7,14}")
 
 # Regions the app can dial. An unknown region is refused rather than guessed.
 REGIONS: Dict[str, str] = {
@@ -53,7 +53,7 @@ def region_for_number(hotline: str) -> Optional[str]:
 
 def destination_problems(hotline: str, region: str) -> List[str]:
     """Every reason a destination is not a valid, dialable, region-consistent E.164 number."""
-    if not isinstance(hotline, str) or not E164_PATTERN.match(hotline):
+    if not isinstance(hotline, str) or not E164_PATTERN.fullmatch(hotline):
         return ["Hotline must be a full E.164 number: '+', country code, subscriber number, 8 to 15 digits, no spaces."]
     if region not in REGIONS:
         return [f"Region {region!r} is not supported; refusing rather than guessing."]

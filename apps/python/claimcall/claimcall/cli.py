@@ -8,8 +8,9 @@ import sys
 
 from . import engine
 from .analysis import analyze_case
-from .calle_client import OFFICIAL_ORIGIN, CalleClient, CalleError, FakeCalleServer
+from .calle_client import OFFICIAL_ORIGIN, CalleClient, CalleError, FakeCalleServer, friendly_error
 from .call_plan import build_plan
+from .display import mask_output
 from .models import Store, mask_phone, new_case
 
 HERE = os.path.dirname(os.path.abspath(__file__))
@@ -60,7 +61,7 @@ def cmd_init_demo(args: argparse.Namespace) -> int:
 
 
 def cmd_show(args: argparse.Namespace) -> int:
-    case = load_case(args)
+    case = mask_output(load_case(args))
     print(f"SYNTHETIC DEMO — NOT A REAL BOOKING\n{case['passenger_name']} | {case['airline']} {case['flight_no']} "
           f"{case['origin']} -> {case['destination']} | booking {case['booking_ref']} | {case['flight_status']} | status {case['status']}")
     return 0
@@ -69,7 +70,7 @@ def cmd_show(args: argparse.Namespace) -> int:
 def cmd_analyze(args: argparse.Namespace) -> int:
     case = load_case(args)
     analysis = analyze_case(case)
-    print(json.dumps(analysis, indent=2))
+    print(json.dumps(mask_output(analysis), indent=2))
     return 0
 
 
@@ -78,11 +79,12 @@ def cmd_plan(args: argparse.Namespace) -> int:
     analysis = analyze_case(case)
     plan = build_plan(case, analysis["missing_information"])
     print("PREVIEW ONLY. Nothing will be sent.")
-    print(json.dumps(plan, indent=2))
+    print(json.dumps(mask_output(plan), indent=2))
     return 0
 
 
 def _print_outcome(case: dict, res: dict, mode: str) -> int:
+    case, res = mask_output(case), mask_output(res)
     if not res.get("placed"):
         print(f"NO CALL: {res.get('reason')}")
         return 2
@@ -103,7 +105,7 @@ def cmd_run(args: argparse.Namespace) -> int:
     store = Store(args.data)
     case = load_case(args)
     if args.mode == "preview":
-        res = engine.preview(case)
+        res = mask_output(engine.preview(case))
         print(f"PREVIEW ONLY. Would dial {res['masked_destination']} (region {res['region']}). Nothing was sent.")
         print(f"purpose: {res['plan']['purpose']}")
         for o in res["plan"]["objectives"]:
@@ -128,20 +130,20 @@ def cmd_run(args: argparse.Namespace) -> int:
         load_env_chain()
         override = os.environ.get("CALLE_BASE_URL")
         if override and override.rstrip("/") != OFFICIAL_ORIGIN:
-            print(f"REFUSED: CALLE_BASE_URL={override!r} is not the official origin {OFFICIAL_ORIGIN}; unset it", file=sys.stderr)
+            print(f"REFUSED: CALLE_BASE_URL is not the official origin {OFFICIAL_ORIGIN}; unset it", file=sys.stderr)
             return 3
         allowlist = os.environ.get("CLAIMCALL_ALLOWLIST", "")
         api_key_present = bool(os.environ.get("CALLE_API_KEY", ""))
         try:
             client = CalleClient(os.environ.get("CALLE_API_KEY", ""), OFFICIAL_ORIGIN)
         except CalleError as e:
-            print(f"REFUSED: {e}", file=sys.stderr)
+            print(f"REFUSED: {friendly_error(e)}", file=sys.stderr)
             return 3
     try:
         res = engine.run(case, args.mode, client=client, approved=args.approve,
                          allowlist=allowlist, api_key_present=api_key_present or args.mode == "fixture")
     except CalleError as e:
-        print(f"ERROR: {e}", file=sys.stderr)
+        print(f"ERROR: {friendly_error(e)}", file=sys.stderr)
         return 4
     finally:
         if fake:

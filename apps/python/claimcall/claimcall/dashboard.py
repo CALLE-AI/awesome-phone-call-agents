@@ -16,6 +16,7 @@ from . import engine
 from .analysis import analyze_case
 from .calle_client import LOOPBACK_HOSTS, OFFICIAL_ORIGIN, CalleClient, CalleError, FakeCalleServer, friendly_error
 from .call_plan import build_plan, build_task
+from .display import mask_output
 from .models import Store, mask_phone, new_case
 
 
@@ -43,13 +44,13 @@ def state_payload(case: Dict[str, Any], live_available: bool) -> Dict[str, Any]:
     out = dict(case)
     out["hotline_masked"] = mask_phone(case["airline_hotline"])
     out["airline_hotline"] = out["hotline_masked"]
-    return {
+    return mask_output({
         "case": out,
         "analysis": analysis,
         "plan": plan,
         "task": build_task(case, plan),
         "live_available": live_available,
-    }
+    })
 
 
 PAGE = """<!doctype html><html><head><meta charset="utf-8"><title>ClaimCall</title>
@@ -165,7 +166,7 @@ def serve(data_dir: str, host: str, port: int, fixtures_dir: str, allow_live: bo
             pass
 
         def _json(self, code: int, payload: Any) -> None:
-            body = json.dumps(payload).encode("utf-8")
+            body = json.dumps(mask_output(payload)).encode("utf-8")
             self.send_response(code)
             self.send_header("Content-Type", "application/json")
             self.send_header("Content-Length", str(len(body)))
