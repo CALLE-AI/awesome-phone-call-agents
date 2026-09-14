@@ -17,19 +17,20 @@ async function main() {
   const baseUrl = resolveCalleBaseUrl();
   const phone = process.env.CALLE_SMOKE_PHONE ?? "+15555550100";
 
-  console.log(`[smoke] mode=${mode} baseUrl=${baseUrl} phone=${phone}`);
+  const maskedPhone = /^\+[1-9][0-9]{7,14}$/.test(phone) ? `***${phone.slice(-4)}` : "[invalid phone]";
+  console.log(`[smoke] mode=${mode} baseUrl=${baseUrl} phone=${maskedPhone}`);
 
   if (mode === "live") {
     if (!process.env.CALLE_API_KEY || process.env.CALLE_API_KEY === "sim-local") {
       throw new Error("CALLE_LIVE=1 requires a real CALLE_API_KEY from dashboard.heycall-e.com/account/api-keys");
     }
-    if (phone.startsWith("+1555")) {
+    if (!process.env.CALLE_SMOKE_PHONE || !/^\+[1-9][0-9]{7,14}$/.test(phone) || phone.startsWith("+1555")) {
       throw new Error("CALLE_LIVE=1 requires CALLE_SMOKE_PHONE set to your own E.164 number");
     }
   }
 
   const client = createCalleClient();
-  const call = await client.calls.create({
+  await client.calls.create({
     task,
     recipients: [{ phones: [phone], region: "US", locale: "en-US" }],
     recipientResultSchema: {
@@ -41,12 +42,10 @@ async function main() {
     },
   });
 
-  console.log(`[smoke] created id=${(call as { id?: string }).id ?? "(see payload)"}`);
-  console.log(JSON.stringify(call, null, 2));
+  console.log("[smoke] Call submitted. Check the local simulator or CALL-E dashboard for details; private response omitted.");
 }
 
-main().catch((error) => {
-  console.error("[smoke] failed");
-  console.error(error);
+main().catch(() => {
+  console.error("[smoke] failed; private provider details omitted. Check the provider dashboard before retrying an ambiguous submission.");
   process.exitCode = 1;
 });
