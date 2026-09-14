@@ -31,17 +31,29 @@ Use this skill for:
 Do not use this skill to:
 
 - place the call before the order/service is actually complete
-- retry a call that already reached the customer (`completed`, `voicemail`) — only `no_answer`/`failed` outcomes are retry-eligible, and only up to a small fixed attempt cap
+- retry a call that already reached the customer (`completed`, `voicemail`) — only a *verified, terminal* `no_answer` is retry-eligible, once; never retry on `failed` or any ambiguous/unresolved outcome — hold those for reconciliation instead (see Core Workflow)
 - call about anything other than the specific completed order named in the task (no upsell, no collections, no marketing)
 - auto-apply a discount, refund, or other compensation based on the call result — that always stays a separate, explicitly human-approved action
 - store or forward the raw transcript to a human channel; only the structured result and a short generated summary should leave this workflow
+
+## Consent, Preview, and Cancellation Limits
+
+Before any real outreach call is armed — including the single automatic retry below — the workflow must have:
+
+- **Explicit, recipient-authorized scope.** The specific customer, the specific order, and the specific reason for the call must already be authorized — never a broadened or inferred scope (a different customer, a different order, an added marketing message). If the scope isn't already authorized, don't arm the call; surface it for a human decision first.
+- **A preview before dispatch.** The exact task text/script that will be spoken, tied to that specific order, must be shown before the call is placed — not after. A human (or an already-authorized automated policy) has to be able to see precisely what will be said before it is said.
+
+**Disabling future attempts.** The single retry described below is the *only* automatic re-attempt this skill ever makes — there is no broader auto-retry loop to separately disable. To stop even that one retry (for example, the recipient asked not to be called again), set the customer's do-not-call flag before the retry window elapses; the redial step must check that flag immediately before placing the call, not only at the first attempt.
+
+**Cancellation limits.** Once CALL-E has accepted a call (status `in_progress` or later), it generally **cannot be canceled locally** — there is no guaranteed local rollback of a call already placed with the provider. Only a call still in a pre-dispatch/preview state (not yet submitted to CALL-E) can be stopped for free. Treat "the call was placed" as effectively irreversible, and design the preview step to sit meaningfully before submission, not after.
 
 ## Core Workflow
 
 ```text
 order completed -> place_call (idempotent) -> webhook result -> outcome
    -> completed: run triage agents -> (optional) recommend notify
-   -> no_answer/failed: schedule one retry, then stop
+   -> verified terminal no_answer: schedule one retry, then stop
+   -> failed / ambiguous / unresolved: hold for reconciliation, never auto-retry
    -> voicemail/canceled: stop, no retry
 ```
 
@@ -64,7 +76,7 @@ order completed -> place_call (idempotent) -> webhook result -> outcome
    ```
 
 4. **Outcome classification.** Normalize the CALL-E webhook payload into `completed / no_answer / voicemail / failed / canceled / in_progress` before doing anything else with it. Never treat `no_answer` as a conversation that happened, and never treat `voicemail` as a completed feedback capture.
-5. **Retry.** Only `no_answer` and `failed` are retry-eligible, and only once, after a short fixed delay (for example 5 minutes). A second unreachable attempt stops the workflow — it does not loop.
+5. **Retry.** Only a *verified, terminal* `no_answer` is retry-eligible, and only once, after a short fixed delay (for example 5 minutes). `failed` and any ambiguous or unresolved outcome are never auto-retried — a `failed` status can mean a transient provider/network error rather than a confirmed customer non-contact, so it is held in a pending-reconciliation state for a human or a separate reconciliation job instead. A second unreachable attempt stops the workflow — it does not loop.
 6. **Triage on a completed call.** Fan the structured result out to a feedback-understanding step and, in parallel, an investigation step (does order/complaint history support this?) and a trend step (is this part of a rising pattern?). Reconcile both into one recommendation.
 7. **Notify, don't act.** If triage concludes the issue is urgent, produce a short recommendation message for a human channel (for example a Telegram/Slack alert to the business). The workflow's own authority ends at "recommend" — it must never place an order correction, refund, or compensation call by itself.
 

@@ -69,7 +69,7 @@ class FakeCalleClient:
 
 ## Handling the webhook result
 
-Normalize the payload into a terminal outcome before doing anything else with it — this is what keeps `no_answer` from ever being treated as a real conversation.
+Normalize the payload into a terminal outcome before doing anything else with it — this is what keeps `no_answer` from ever being treated as a real conversation, and what keeps an ambiguous `failed` from ever being treated as an equivalent-to-`no_answer` retry trigger.
 
 ```python
 _NO_ANSWER = {"no_answer", "no-answer", "unanswered", "missed"}
@@ -97,9 +97,19 @@ def handle_webhook(payload: dict) -> None:
     if outcome == "completed":
         result = payload.get("structured_result") or {}
         run_triage(result)  # feedback -> investigation + trend -> supervisor
-    elif outcome in ("no_answer", "failed"):
+    elif outcome == "no_answer":
+        # The ONE verified, terminal non-contact outcome that gets a
+        # single automatic redial.
         schedule_one_retry(payload, delay_minutes=5)
-    # voicemail / canceled: stop, no retry, no triage
+    elif outcome in ("voicemail", "canceled"):
+        pass  # certain terminal outcomes, but not "unreachable" — no retry
+    else:
+        # "failed" (can mean a transient provider/network error, not a
+        # confirmed customer non-contact) and anything classify_outcome
+        # didn't recognize: NEVER auto-retried — that would silently keep
+        # re-dialing on an ambiguous signal. Hold for a human or a
+        # separate reconciliation job instead.
+        hold_for_reconciliation(payload, outcome)
 ```
 
 ## Sample structured result -> recommendation

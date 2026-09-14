@@ -18,7 +18,7 @@
 
 ## Retry boundaries
 
-- Only `no_answer` and `failed` outcomes are retry-eligible. `voicemail`, `completed`, and `canceled` must never be retried.
+- Only a *verified, terminal* `no_answer` is retry-eligible. `voicemail`, `completed`, and `canceled` must never be retried, and neither must `failed` or any ambiguous/unresolved outcome — `failed` can mean a transient provider/network error rather than a confirmed customer non-contact; treating it the same as a verified `no_answer` would silently keep redialing on a signal that was never actually confirmed. Hold those for reconciliation instead.
 - Cap retries at one additional attempt after a short fixed delay. Do not create an unbounded or exponential retry loop for a phone call — a human should see "could not reach the customer" rather than the workflow silently redialing.
 
 ## Credential handling
