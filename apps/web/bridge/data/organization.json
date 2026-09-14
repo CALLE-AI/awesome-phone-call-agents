@@ -1,0 +1,97 @@
+{
+  "company": {
+    "id": "quickmove",
+    "name": "QuickMove Logistics"
+  },
+  "people": [
+    {
+      "id": "arjun",
+      "name": "Arjun",
+      "role": "Driver",
+      "type": "internal",
+      "phone": "+91******0878",
+      "responsibilities": [
+        "Delivery execution",
+        "Vehicle status",
+        "Shipment location"
+      ],
+      "canDecide": [
+        "Delivery status",
+        "Current location",
+        "Vehicle condition"
+      ],
+      "authority": {},
+      "connections": [
+        {
+          "personId": "amit",
+          "reason": "Warehouse and delivery coordination"
+        }
+      ]
+    },
+    {
+      "id": "amit",
+      "name": "Amit",
+      "role": "Warehouse Manager",
+      "type": "internal",
+      "phone": "+91******1432",
+      "responsibilities": [
+        "Warehouse dispatch",
+        "Replacement vehicles",
+        "Receiving capacity"
+      ],
+      "canDecide": [
+        "Vehicle availability",
+        "Dispatch capacity"
+      ],
+      "authority": {},
+      "connections": [
+        {
+          "personId": "arjun",
+          "reason": "Delivery coordination"
+        },
+        {
+          "personId": "priya",
+          "reason": "Expense escalation"
+        }
+      ]
+    },
+    {
+      "id": "priya",
+      "name": "Priya",
+      "role": "Operations Head",
+      "type": "internal",
+      "phone": "+91******9090",
+      "responsibilities": [
+        "Operational approvals",
+        "Exception resolution"
+      ],
+      "canDecide": [
+        "Additional operational spending"
+      ],
+      "authority": {
+        "extraCostLimit": 2000
+      },
+      "connections": [
+        {
+          "personId": "amit",
+          "reason": "Operational escalation"
+        }
+      ]
+    },
+    {
+      "id": "rahul",
+      "name": "Rahul",
+      "role": "Customer",
+      "type": "customer",
+      "phone": "+91******2211",
+      "responsibilities": [
+        "Receiving delivery"
+      ],
+      "canDecide": [
+        "Delivery time acceptance"
+      ],
+      "authority": {},
+      "connections": []
+    }
+  ]
+}
