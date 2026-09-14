@@ -194,7 +194,7 @@ This project is an awesome list for AI-agent phone-call workflows. Add resources
 - [ShohojSheba Voice](https://shohojsheba-call-e-preview.redwan-rahman.workers.dev/judge) - Consent-gated healthcare staffing dispatch that uses structured CALL-E results to advance after a verified decline, pauses on acceptance, and keeps final assignment human-controlled.
 
 - [WristCall AI](https://github.com/Baklolman69/WristCallAI) - Wear OS smartwatch assistant that searches Google via SerpApi, synthesizes call intent with Groq AI 120B, and dispatches autonomous phone calls via CALL-E with 3-bullet voice summaries.
-- [Churn-Rescue AI](https://github.com/NemesisDevX/Churn-Rescue-Agent) - Autonomous sub-500ms swarm dialing agent for enterprise revenue protection.
+- [Churn-Rescue AI](https://github.com/NemesisDevX/Churn-Rescue-Agent) - Simulated retention-conversation prototype with a proposed CALL-E integration; the browser currently stands in for telephony, so no working CALL-E dialer, verified latency, or enterprise revenue outcome is claimed.
 
 Runnable demo apps live under [`apps/`](apps/). They are not a CALL-E SDK and do not define a supported application API.
 
