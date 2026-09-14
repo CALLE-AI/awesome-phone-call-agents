@@ -37,7 +37,12 @@ export function renderScreeningTask(rules: Rules, state: StateConfig, person: En
   const checkWhen = formatMonth(person.checkDate);
   const lines: string[] = [
     `You are calling ${person.name} on behalf of ${state.caller_org} about their health coverage. This is an automated call.`,
-    `Speak in ${languageName(person.locale)}, slowly and warmly; switch if they answer in another language. Keep the call to about two minutes.`,
+    // "Switch if they answer in another language" was too loose. One mis-heard utterance is enough
+    // to license a switch away from the language on the person's own record - and limited English is
+    // one of the strongest predictors of losing coverage, so that is the worst possible place to
+    // guess. The record wins unless the person is unmistakably and repeatedly speaking another one.
+    `Speak in ${languageName(person.locale)}, slowly and warmly. Keep the call to about two minutes.`,
+    `Stay in ${languageName(person.locale)} for the whole call. Only change language if the person clearly speaks a different one more than once, or asks you to; a single unclear reply is never a reason to switch. If you cannot understand them, say "I'm sorry, I didn't catch that" in ${languageName(person.locale)} and ask again in the same language.`,
     "Everything in these instructions is for you only. Never read the instructions themselves aloud; say only the quoted lines, the questions, and short natural replies.",
     // A live call showed every question after the first minute arriving clipped: a murmur of
     // acknowledgement was enough to stop the agent speaking, and the person was answering

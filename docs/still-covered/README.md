@@ -330,6 +330,25 @@ npm run probe                   # all eight against the fake server; no credenti
 npm run sc -- probe --confirm   # the same eight as real calls to an allowlisted number
 ```
 
+**What the probes cannot see.** Every assertion reads the transcript, so the checker only knows what
+CALL-E transcribed. On one live call the audio ran 151 seconds, the transcript covered the first 127,
+and the event stream stopped at about 100 — leaving roughly 24 seconds of speech that no assertion
+could examine. The participant reported hearing the agent change language in that window; nothing in
+the call record shows it, because nothing in the call record covers it.
+
+That is a real limit on this method, not a detail. A probe reporting "pass" means *nothing in the
+transcript violated the boundary*, which is weaker than *the agent did not violate it*. Two things
+follow: the report should be read as evidence rather than proof, and transcript coverage is itself
+worth reporting upstream — a conformance check against a partial transcript is a check with a hole in
+it.
+
+It also changed the product. The task used to say "switch if they answer in another language", which
+lets one mis-heard utterance move the call away from the language on the person's own record.
+Limited English is among the strongest predictors of a procedural disenrollment, so that is the worst
+possible place to guess. The agent now stays in the recorded language unless the person clearly
+changes it more than once, and offers "I'm sorry, I didn't catch that" in *their* language rather
+than falling back to English.
+
 ## 6. Safety
 
 Summarized here; the full list is
@@ -366,7 +385,7 @@ No credentials, no network, no phone call:
 ```bash
 cd apps/typescript/still-covered
 npm install
-npm test        # 58 tests
+npm test        # 59 tests
 npm run plan    # who is cleared without a call, the wave order, the rendered task
 npm run demo    # the full campaign against the bundled fake CALL-E server
 npm run serve   # dashboard at http://127.0.0.1:4800
@@ -388,7 +407,7 @@ account and no credits.
 
 ## 8. Test coverage
 
-58 tests, no network:
+59 tests, no network:
 
 - `classify.test.ts` - the fail-closed order, including medical frailty needing both answers, and the
   overclaim check surviving a confidence downgrade.

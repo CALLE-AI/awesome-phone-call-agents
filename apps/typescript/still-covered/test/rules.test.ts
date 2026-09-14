@@ -143,3 +143,14 @@ test("the task forbids combining exemptions into one question, or inventing them
   assert.match(task, /you must then mark both unknown/, "a bundled yes-or-no cannot be attributed to either part");
   assert.match(task, /Never invent an exemption, a threshold or a reporting rule/);
 });
+
+test("the agent stays in the language on the person's record unless they clearly change it twice", () => {
+  const english = renderScreeningTask(rules, state, byId("e002"), "2026-09-14");
+  assert.match(english, /Stay in English for the whole call/);
+  assert.match(english, /a single unclear reply is never a reason to switch/);
+  assert.ok(!/switch if they answer in another language/i.test(english), "the old loose instruction is gone");
+
+  const spanish = renderScreeningTask(rules, state, byId("e001"), "2026-09-14");
+  assert.match(spanish, /Stay in Spanish for the whole call/);
+  assert.match(spanish, /didn't catch that" in Spanish/, "the fallback is offered in their language, not ours");
+});
