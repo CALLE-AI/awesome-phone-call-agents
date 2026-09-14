@@ -2,7 +2,16 @@ import { createServer, type IncomingMessage, type ServerResponse } from "node:ht
 import { readFile } from "node:fs/promises";
 import { extname, join, normalize } from "node:path";
 import { checkAccess, isLoopbackBind } from "./access.ts";
-import { APP_ROOT, demoClockFromEnv, gatewayFromEnv, liveAttestationError, loadEnvFile, webhookSecretFromEnv } from "./config.ts";
+import { CHANNEL_SIGNATURE_HEADER, ChannelMessageError, parseChannelMessage } from "./channel.ts";
+import {
+  APP_ROOT,
+  channelSecretFromEnv,
+  demoClockFromEnv,
+  gatewayFromEnv,
+  liveAttestationError,
+  loadEnvFile,
+  webhookSecretFromEnv,
+} from "./config.ts";
 import { loadCatalog } from "./data.ts";
 import { Desk, DeskError } from "./desk.ts";
 import { OpsEventError, parseOpsEvent, SIGNATURE_HEADER, verifySignature } from "./events.ts";
@@ -19,6 +28,7 @@ if (attestation) {
 }
 const catalog = loadCatalog();
 const webhook = webhookSecretFromEnv(gateway.live);
+const channelWebhook = channelSecretFromEnv(gateway.live);
 const demoClock = demoClockFromEnv();
 const desk = new Desk(catalog, gateway, {
   demoNow: demoClock.now,
@@ -34,6 +44,9 @@ const HOST = process.env.HOST ?? "127.0.0.1";
 const PORT = Number(process.env.PORT ?? 4310);
 const OPERATOR_TOKEN = process.env.OPERATOR_TOKEN?.trim() || null;
 const WEBHOOK_PATH = "/api/webhooks/airline-ops";
+const CHANNEL_WEBHOOK_PATH = "/api/webhooks/channel";
+/** Signed server-to-server endpoints; they authenticate by signature instead of the dashboard access check. */
+const SIGNED_PATHS = new Set([WEBHOOK_PATH, CHANNEL_WEBHOOK_PATH]);
 
 if (!isLoopbackBind(HOST) && !OPERATOR_TOKEN) {
   console.error(`Refusing to listen on ${HOST}: the dashboard can place calls. Keep HOST=127.0.0.1 or set OPERATOR_TOKEN.`);
@@ -114,6 +127,25 @@ async function api(req: IncomingMessage, res: ServerResponse, path: string): Pro
     const { record, duplicate } = desk.receiveOpsEvent(event);
     const status = duplicate ? 200 : record.status === "created" || record.status === "escalated" ? 201 : record.status === "conflict" ? 409 : 422;
     return send(res, status, { duplicate, ...record });
+  }
+
+  if (req.method === "POST" && path === CHANNEL_WEBHOOK_PATH) {
+    if (!channelWebhook.secret) throw new DeskError("Channel webhook is disabled: set CHANNEL_WEBHOOK_SECRET.", 503);
+    const raw = await readRaw(req);
+    const header = req.headers[CHANNEL_SIGNATURE_HEADER];
+    const check = verifySignature(channelWebhook.secret, raw, Array.isArray(header) ? header[0] : header, Date.now(), CHANNEL_SIGNATURE_HEADER);
+    if (!check.ok) throw new DeskError(check.reason, 401);
+    let message;
+    try {
+      message = parseChannelMessage(JSON.parse(raw));
+    } catch (error) {
+      if (error instanceof SyntaxError) throw new DeskError("Request body must be JSON.");
+      if (error instanceof ChannelMessageError) throw new DeskError(error.message, 422);
+      throw error;
+    }
+    const { record, duplicate } = desk.receiveChannelMessage(message);
+    // 200 either way: a refused message still carries the reply the channel shows the passenger.
+    return send(res, 200, { duplicate, ...record });
   }
 
   if (req.method === "GET" && path === "/api/state") {
@@ -211,8 +243,8 @@ async function staticFile(res: ServerResponse, path: string): Promise<void> {
 
 const server = createServer(async (req, res) => {
   const path = new URL(req.url ?? "/", "http://localhost").pathname;
-  // Every route except the signed webhook is the operator dashboard.
-  if (!(req.method === "POST" && path === WEBHOOK_PATH)) {
+  // Every route except the signed webhooks is the operator dashboard.
+  if (!(req.method === "POST" && SIGNED_PATHS.has(path))) {
     const access = checkAccess(
       { remoteAddress: req.socket.remoteAddress, host: req.headers.host, authorization: req.headers.authorization },
       OPERATOR_TOKEN,
@@ -242,6 +274,8 @@ server.listen(PORT, HOST, () => {
   console.log(`Flight disruption desk on http://${HOST}:${PORT}  [${live}]`);
   console.log(OPERATOR_TOKEN ? "Dashboard requires the operator token (HTTP Basic, any user name)." : "Dashboard accepts loopback connections only.");
   if (demoClock.label) console.log(`Demo clock: passenger request cutoffs use ${demoClock.label}. Set DEMO_NOW=real for the real time.`);
+  if (!channelWebhook.secret) console.log("Channel webhook disabled: set CHANNEL_WEBHOOK_SECRET to enable POST /api/webhooks/channel.");
+  else if (channelWebhook.demo) console.log("Channel webhook uses the dry-run demo secret. Set CHANNEL_WEBHOOK_SECRET before connecting a real channel.");
   if (!webhook.secret) console.log("Airline ops webhook disabled: set AIRLINE_WEBHOOK_SECRET to enable POST /api/webhooks/airline-ops.");
   else if (webhook.demo) console.log("Airline ops webhook uses the dry-run demo secret. Set AIRLINE_WEBHOOK_SECRET before exposing it anywhere.");
 });

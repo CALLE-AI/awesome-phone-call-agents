@@ -20,8 +20,14 @@ export function signPayload(secret: string, rawBody: string, timestampSeconds: n
 
 export type SignatureCheck = { ok: true } | { ok: false; reason: string };
 
-export function verifySignature(secret: string, rawBody: string, header: string | undefined, nowMs: number): SignatureCheck {
-  if (!header) return { ok: false, reason: `Missing ${SIGNATURE_HEADER} header.` };
+export function verifySignature(
+  secret: string,
+  rawBody: string,
+  header: string | undefined,
+  nowMs: number,
+  headerName = SIGNATURE_HEADER,
+): SignatureCheck {
+  if (!header) return { ok: false, reason: `Missing ${headerName} header.` };
   const parts = Object.fromEntries(
     header.split(",").map((p) => {
       const i = p.indexOf("=");

@@ -2,6 +2,7 @@ import { readFileSync, existsSync } from "node:fs";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 import { CliGateway, DryRunGateway, SdkGateway, type CallGateway } from "./calle.ts";
+import { DRY_RUN_CHANNEL_SECRET } from "./channel.ts";
 import { DRY_RUN_WEBHOOK_SECRET } from "./events.ts";
 
 export const APP_ROOT = join(dirname(fileURLToPath(import.meta.url)), "..");
@@ -35,12 +36,21 @@ export function gatewayFromEnv(env = process.env): CallGateway {
  * secret so the feed works out of the box; live modes refuse to start the webhook without one.
  */
 export function webhookSecretFromEnv(live: boolean, env = process.env): { secret: string | null; demo: boolean } {
-  const secret = env.AIRLINE_WEBHOOK_SECRET?.trim();
+  return sharedSecretFromEnv(env.AIRLINE_WEBHOOK_SECRET, DRY_RUN_WEBHOOK_SECRET, live);
+}
+
+/** Shared secret for the chat, web form, and phone line webhook, with the same dry-run fallback rules. */
+export function channelSecretFromEnv(live: boolean, env = process.env): { secret: string | null; demo: boolean } {
+  return sharedSecretFromEnv(env.CHANNEL_WEBHOOK_SECRET, DRY_RUN_CHANNEL_SECRET, live);
+}
+
+function sharedSecretFromEnv(value: string | undefined, demoSecret: string, live: boolean): { secret: string | null; demo: boolean } {
+  const secret = value?.trim();
   if (secret) {
-    if (secret === DRY_RUN_WEBHOOK_SECRET && live) return { secret: null, demo: false };
-    return { secret, demo: secret === DRY_RUN_WEBHOOK_SECRET };
+    if (secret === demoSecret && live) return { secret: null, demo: false };
+    return { secret, demo: secret === demoSecret };
   }
-  return live ? { secret: null, demo: false } : { secret: DRY_RUN_WEBHOOK_SECRET, demo: true };
+  return live ? { secret: null, demo: false } : { secret: demoSecret, demo: true };
 }
 
 /** The demo schedule is fixed on 20 September 2026, so request cutoffs run on a demo clock. */

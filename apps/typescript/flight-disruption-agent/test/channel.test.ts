@@ -56,6 +56,7 @@ test("the passenger confirms in the same conversation; the amount must match and
 
   const otherConversation = desk.receiveChannelMessage(confirm({ id: "msg-c0", conversation_id: "conv-evil" })).record;
   assert.equal(otherConversation.outcome, "refused");
+  assert.equal(otherConversation.requestId, null, "another conversation does not learn the request exists");
   const wrongAmount = desk.receiveChannelMessage(confirm({ id: "msg-c2", confirmed_amount: 0 })).record;
   assert.match(wrongAmount.reply, /does not match the quote/);
 

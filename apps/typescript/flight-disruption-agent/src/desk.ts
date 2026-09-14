@@ -739,26 +739,25 @@ export class Desk {
     } else {
       const entry = this.state.requests[message.requestId];
       const conversation = entry?.request.conversation;
-      record.requestId = entry ? message.requestId : null;
       if (!entry || !conversation || conversation.channel !== message.channel || conversation.id !== message.conversationId) {
+        // Do not echo the request id: another conversation must not learn that it exists.
         refuse("We could not find that request in this conversation. Start a new request with your booking code and last name.");
-      } else if (message.type === "request.declined") {
-        try {
-          record.reply = replyFor(this.catalog, this.declineRequest(message.requestId));
-        } catch {
-          refuse(replyFor(this.catalog, entry));
-        }
-      } else if (entry.status !== "quoted") {
-        refuse(replyFor(this.catalog, entry));
-      } else if (message.confirmedAmount !== entry.amount) {
-        refuse(`The amount does not match the quote. To go ahead, reply YES ${entry.amount ?? 0}.`);
       } else {
-        const done = this.confirmRequest(message.requestId, message.confirmedAmount, {
-          kind: "passenger",
-          channel: message.channel,
-          messageId: message.id,
-        });
-        record.reply = replyFor(this.catalog, done);
+        record.requestId = message.requestId;
+        if (entry.status !== "quoted") {
+          refuse(replyFor(this.catalog, entry));
+        } else if (message.type === "request.declined") {
+          record.reply = replyFor(this.catalog, this.declineRequest(message.requestId));
+        } else if (message.confirmedAmount !== entry.amount) {
+          refuse(`The amount does not match the quote. To go ahead, reply YES ${entry.amount ?? 0}.`);
+        } else {
+          const done = this.confirmRequest(message.requestId, message.confirmedAmount, {
+            kind: "passenger",
+            channel: message.channel,
+            messageId: message.id,
+          });
+          record.reply = replyFor(this.catalog, done);
+        }
       }
     }
     this.state.channelMessages[message.id] = record;
