@@ -3,7 +3,7 @@
 A concept for an AI phone agent that handles flight reschedule and refund requests for online travel agencies (OTAs) and airlines, replacing the repetitive parts of work that is commonly outsourced to business process outsourcing (BPO) contact centers.
 
 > [!NOTE]
-> A runnable implementation lives in [`apps/typescript/flight-disruption-agent`](../apps/typescript/flight-disruption-agent/), with a dry-run default and fictional data. It implements Workflow A as one outbound call per delayed passenger, and Workflow B as an operator-logged request that is quoted, confirmed, submitted to a fake portal, and escalated to the airline service desk by CALL-E when the portal refuses a reissue.
+> A runnable implementation lives in [`apps/typescript/flight-disruption-agent`](../apps/typescript/flight-disruption-agent/), with a dry-run default and fictional data. It implements Workflow A as one outbound call per passenger on a delayed or cancelled flight, with the disruption reported by an operator or pushed by the airline ops system through a signed webhook, and Workflow B as an operator-logged request that is quoted, confirmed, submitted to a fake portal, and escalated to the airline service desk by CALL-E when the portal refuses a reissue.
 
 ## Problem
 
@@ -52,7 +52,7 @@ The same team also handles failed bookings and general complaints.
 
 Replace one-way SMS notifications with outbound AI calls.
 
-1. A disruption event arrives from the airline or OTA system.
+1. A disruption event arrives from the airline or OTA system. In the implementation this is a signed webhook (`flight.delayed` or `flight.cancelled`, with an operational or force majeure cause); each event id is processed once, and an event that contradicts an existing disruption is held for a person.
 2. The agent calls each affected passenger who has consented to phone contact.
 3. The agent discloses that it is an AI, explains the change, and answers questions about the new schedule and available options.
 4. The agent records the passenger's choice, such as accepting the new flight, rescheduling, or requesting a refund, as a structured result.
