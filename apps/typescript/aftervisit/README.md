@@ -1,15 +1,15 @@
-# Aftervisit
+# AfterVisit
 
-Aftervisit is a clinical follow-up agent for a small practice. A doctor writes a
+AfterVisit is a clinical follow-up agent for a small practice. A doctor writes a
 free-text note after a consultation and presses *Save and start follow-up*.
-Aftervisit reads the note into a goal, up to five things to find out (each quoting
+AfterVisit reads the note into a goal, up to five things to find out (each quoting
 the note) and a schedule, then owns the follow-up as CALL-E calls: it dials on
 schedule in the patient's language, retries the calls nobody answers, reads every
 call, and routes anything uncertain or concerning to the doctor with the patient's
 own words. It never gives clinical advice and never diagnoses.
 
 **Contribution area: User-facing Apps.** This directory is a catalog and setup
-guide for the runnable [Aftervisit application](https://github.com/sharmilaraghu/Aftervisit).
+guide for the runnable [AfterVisit application](https://github.com/sharmilaraghu/Aftervisit).
 The application source and tests are maintained there under the MIT license. These
 instructions target revision
 [`1c80338`](https://github.com/sharmilaraghu/Aftervisit/tree/1c80338653542b765c98e5139b2f779b098ad343).
@@ -56,7 +56,7 @@ repository. The two were built independently.
    that needs a clinician becomes an escalation carrying the patient's own words; an
    urgent one pauses the follow-up until a doctor resolves it. Unanswered calls retry.
 6. The doctor's Follow-ups board shows how each patient is doing, and the doctor records
-   the decision. Aftervisit never makes a clinical decision.
+   the decision. AfterVisit never makes a clinical decision.
 
 ```mermaid
 flowchart LR
@@ -79,7 +79,7 @@ Use Node.js 20 or newer and pnpm.
 
 ```bash
 git clone https://github.com/sharmilaraghu/Aftervisit.git
-cd Aftervisit
+cd AfterVisit
 git checkout --detach 1c80338653542b765c98e5139b2f779b098ad343
 pnpm install --frozen-lockfile
 pnpm run verify   # vitest, typecheck, eslint
@@ -172,11 +172,11 @@ rings a typed number with nothing saved, behind `CARELOOP_TRY_PASSCODE`.
 - An urgent escalation pauses the follow-up until a clinician resolves it.
 - Instance-wide, unsetting `CALLE_API_KEY` or `CARELOOP_CALL_ALLOWLIST` refuses every dial,
   and disabling the cron stops unattended scheduler passes.
-- Aftervisit does not use a hang-up API. A call CALL-E has accepted cannot be recalled; the
+- AfterVisit does not use a hang-up API. A call CALL-E has accepted cannot be recalled; the
   patient can end it. No records are deleted by any of the above.
 
 ## License
 
-The upstream Aftervisit source is MIT licensed. CALL-E, OpenAI, Neon and Vercel retain their
+The upstream AfterVisit source is MIT licensed. CALL-E, OpenAI, Neon and Vercel retain their
 own terms. This guide contains no API keys, private phone numbers, call recordings, or
 transcripts.
