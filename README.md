@@ -124,6 +124,7 @@ This project is an awesome list for AI-agent phone-call workflows. Add resources
 - [`candidate-availability-call`](skills/candidate-availability-call/) - Recruiting coordination skill that confirms candidate interview availability by phone, returns evidence-backed time windows, and leaves scheduling commitments to a human.
 - [`call-reminder`](skills/call-reminder/) - Scheduler wrapper skill for recurring CALL-E phone-call reminders.
 - [`callparity-claimkill`](skills/callparity-claimkill/) - ClaimKill (CallParity) compiles the next CALL-E call as a leak-scored refute of a quoted claim; pytest runs on fixtures with zero live calls.
+- [`carecall-intake`](skills/carecall-intake/) - Consent-aware practical-support check-ins that capture only explicit beneficiary needs and route unsafe, unsupported, or uncertain outcomes to human review.
 - [`customer-onboarding-call`](skills/customer-onboarding-call/) - Welcome-call skill that turns a new signup into at most one conversation, a consent-gated structured result, and a CRM follow-up task, with evidence-backed dispositions, ordered outcome classification, per-attempt idempotency, and cancellable retries.
 - [`deployment-approval-call`](skills/deployment-approval-call/) - Spoken, code-verified human approval before an agent or pipeline does something irreversible.
 - [`emergency-dispatch-relay`](skills/emergency-dispatch-relay/) - Experimental, preview-first human-confirmed notification relay with an optional authorized exercise call and advisory unit-response output; not an autonomous emergency-dispatch system.
@@ -302,6 +303,7 @@ The default e2e tests use a local fake broker/OAuth/MCP server or dry-run paths,
 
 Externally hosted user-facing apps built on CALL-E. They live in their own repositories, so review their setup, credential handling, and call side effects before running them.
 
+- [Care Call AI](https://github.com/NeoSPU/care-call-ai) - Practical-support outreach app for charities with approved CALL-E rounds, no-call preflight, operator gates, and reviewed request/order handoff. [Demo video](https://youtu.be/Hc2bWjTnKFQ) · [Integration notes](docs/community-apps/care-call-ai.md).
 - [ProofMesh](https://github.com/fokrulanthro16-eng/proofmesh) - A consent-first CALL-E phone verification platform that turns supervised conversations into auditable, machine-readable facts with human approval, regional controls, and honest uncertainty handling. See the [integration notes](docs/community-apps/proofmesh.md).
 - [DischargePulse](https://github.com/Temake/DischargePulse) - Hospital discharge placement agent that calls skilled nursing facility admissions lines through CALL-E, verifies each care requirement from a runtime result schema, re-plans when a facility contradicts its directory record, and stops at a human approval gate, with replay and scripted no-call modes. See the [integration notes](docs/community-apps/dischargepulse.md).
 
