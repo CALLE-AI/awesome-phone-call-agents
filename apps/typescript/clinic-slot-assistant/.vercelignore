@@ -1,0 +1,10 @@
+.env*
+!.env.example
+.data
+.git
+.next
+.npm-cache
+node_modules
+*.log
+*.tsbuildinfo
+test-results

@@ -1,0 +1,71 @@
+{
+ "id": "train-human-005",
+ "label": "human",
+ "source": "sim-train",
+ "meta": {
+  "task": "check whether the store is open on Sunday",
+  "hard": false
+ },
+ "turns": [
+  {
+   "speaker": "user",
+   "text": "City Pharmacy, Maria speaking.",
+   "offset_seconds": 1.32
+  },
+  {
+   "speaker": "bot",
+   "text": "Hi, I'm an AI assistant calling on behalf of Alex Martin. Could you tell me your opening hours this Sunday?",
+   "offset_seconds": 2.66
+  },
+  {
+   "speaker": "user",
+   "text": "Sunday we're we're open ten to four.",
+   "offset_seconds": 10.66
+  },
+  {
+   "speaker": "bot",
+   "text": "Do you close earlier on holidays?",
+   "offset_seconds": 14.17
+  },
+  {
+   "speaker": "user",
+   "text": "Uh, five five to seven business days usually.",
+   "offset_seconds": 17.35
+  },
+  {
+   "speaker": "bot",
+   "text": "Do you close earlier on holidays?",
+   "offset_seconds": 21.66
+  },
+  {
+   "speaker": "user",
+   "text": "um, Uh, five to seven business days usually.",
+   "offset_seconds": 23.65
+  },
+  {
+   "speaker": "bot",
+   "text": "Thank you so much, that's all I needed.",
+   "offset_seconds": 27.67
+  },
+  {
+   "speaker": "user",
+   "text": "No, No, that's everything.",
+   "offset_seconds": 31.16
+  },
+  {
+   "speaker": "user",
+   "text": "right",
+   "offset_seconds": 33.22
+  },
+  {
+   "speaker": "bot",
+   "text": "Thank you so much, that's all I needed.",
+   "offset_seconds": 34.28
+  },
+  {
+   "speaker": "user",
+   "text": "Alright, take care.",
+   "offset_seconds": 37.34
+  }
+ ]
+}

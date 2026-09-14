@@ -1,0 +1,85 @@
+{
+  "id": "eval2-021",
+  "label": "human",
+  "difficulty": "typical",
+  "scenario": "County building-department clerk cannot book the inspection and says the inspector will call back; nothing confirmed.",
+  "task": "Schedule the final inspection for the homeowner's deck permit.",
+  "outcome": {
+    "task_completed_claimed": false,
+    "commitment_type": "booking",
+    "confirmation_artifact": null,
+    "expected_attestation": "unverified"
+  },
+  "turns": [
+    {
+      "speaker": "user",
+      "text": "Building department, this is Terry.",
+      "offset_seconds": 0.9
+    },
+    {
+      "speaker": "bot",
+      "text": "Hi Terry. I'm an AI assistant calling on behalf of a homeowner, Nadia Kowalski. She'd like to schedule the final inspection for her deck permit, number B P 26 dash 0 4 1 3 7.",
+      "offset_seconds": 3.44
+    },
+    {
+      "speaker": "user",
+      "text": "Okay, hang on. B P 26... what was the rest?",
+      "offset_seconds": 17.47
+    },
+    {
+      "speaker": "bot",
+      "text": "0 4 1 3 7.",
+      "offset_seconds": 21.91
+    },
+    {
+      "speaker": "user",
+      "text": "0 4 1 3 7. Okay...",
+      "offset_seconds": 23.93
+    },
+    {
+      "speaker": "user",
+      "text": "Yeah, I see it. So, finals for decks, those go through Mike, he's the inspector for that area, and he does his own schedule.",
+      "offset_seconds": 29.65
+    },
+    {
+      "speaker": "bot",
+      "text": "Is there a way to book a time with him today?",
+      "offset_seconds": 39.93
+    },
+    {
+      "speaker": "user",
+      "text": "Not from here, no. I can't see his calendar. I'll leave him a message and he'll call her back to set it up.",
+      "offset_seconds": 44.53
+    },
+    {
+      "speaker": "bot",
+      "text": "Okay. Do you know roughly when he'd call?",
+      "offset_seconds": 54.31
+    },
+    {
+      "speaker": "user",
+      "text": "Usually within a couple days. Could be sooner. Is the number on the permit still good?",
+      "offset_seconds": 57.62
+    },
+    {
+      "speaker": "bot",
+      "text": "Yes, the number ending in 3 3 0 8 is correct.",
+      "offset_seconds": 64.69
+    },
+    {
+      "speaker": "user",
+      "text": "Okay, I'll put the note in. He'll call her.",
+      "offset_seconds": 69.19
+    },
+    {
+      "speaker": "bot",
+      "text": "Thank you, Terry.",
+      "offset_seconds": 73.56
+    },
+    {
+      "speaker": "user",
+      "text": "Yep, bye.",
+      "offset_seconds": 74.45
+    }
+  ]
+}

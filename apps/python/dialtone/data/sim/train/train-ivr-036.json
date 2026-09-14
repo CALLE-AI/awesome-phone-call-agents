@@ -1,0 +1,36 @@
+{
+ "id": "train-ivr-036",
+ "label": "ivr",
+ "source": "sim-train",
+ "meta": {
+  "task": "cancel a subscription",
+  "hard": false
+ },
+ "turns": [
+  {
+   "speaker": "user",
+   "text": "Thank you for calling Summit Fitness. Your call is important to us. Please listen carefully, as our menu options have changed. For hours and directions, press 1. For appointments, press 2. For billing, press 3. To repeat these options, press 9.",
+   "offset_seconds": 0.25
+  },
+  {
+   "speaker": "bot",
+   "text": "I'd like to cancel the subscription for the account under Taylor Kim.",
+   "offset_seconds": 17.17
+  },
+  {
+   "speaker": "user",
+   "text": "Sorry, I didn't get that. Thank you for calling Summit Fitness. Your call is important to us. Please listen carefully, as our menu options have changed. For hours and directions, press 1. For appointments, press 2. For billing, press 3. To repeat these options, press 9.",
+   "offset_seconds": 22.28
+  },
+  {
+   "speaker": "bot",
+   "text": "[DTMF 3]",
+   "offset_seconds": 40.81
+  },
+  {
+   "speaker": "user",
+   "text": "Please enter your account number, followed by the pound key.",
+   "offset_seconds": 41.56
+  }
+ ]
+}
