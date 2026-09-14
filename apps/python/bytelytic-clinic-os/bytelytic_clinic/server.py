@@ -2,6 +2,7 @@
 FastAPI Server for Clinical Phone Operations
 """
 from __future__ import annotations
+import re
 from typing import Optional, Dict, Any
 from fastapi import FastAPI, HTTPException, Request, Header, Depends, Security
 from fastapi.security.api_key import APIKeyHeader
@@ -74,27 +75,46 @@ ALLOWED_RESULT_KEYS = {
 }
 
 
+PHONE_PATTERN = re.compile(
+    r"(?<!\d)(?:\+?1[\s.-]?)?(?:\(?\d{3}\)?[\s.-]?\d{3}[\s.-]?\d{4}|\+[1-9]\d{6,14})(?!\d)"
+)
+
+
+def scrub_phone_text(text: str) -> str:
+    """Masks any phone number found in arbitrary text for boundary safety."""
+    if not text:
+        return text
+    return PHONE_PATTERN.sub(lambda m: mask_phone(m.group(0)), text)
+
+
+def deep_mask_phones(obj: Any) -> Any:
+    """Recursively walks dictionaries, lists, and strings to mask any phone text."""
+    if isinstance(obj, str):
+        return scrub_phone_text(obj)
+    if isinstance(obj, dict):
+        return {k: deep_mask_phones(v) for k, v in obj.items()}
+    if isinstance(obj, list):
+        return [deep_mask_phones(item) for item in obj]
+    return obj
+
+
 def sanitize_call_result(res: Any) -> Dict[str, Any]:
     """
-    Sanitizes raw CALL-E execution results by enforcing an explicit key allowlist
-    and scrubbing unmasked phone numbers from textual evidence.
+    Sanitizes raw CALL-E execution results by enforcing an explicit key allowlist,
+    omitting raw unparsed provider objects, and deeply masking phone text across
+    all nested response boundaries (including structured_result and evidence).
     """
     if not isinstance(res, dict):
-        return {"status": "completed" if getattr(res, "status", None) == "completed" else str(res)}
+        status_val = getattr(res, "status", None)
+        return {"status": scrub_phone_text(str(status_val)) if status_val is not None else "completed"}
 
-    sanitized = {k: v for k, v in res.items() if k in ALLOWED_RESULT_KEYS}
+    sanitized = {k: res[k] for k in ALLOWED_RESULT_KEYS if k in res}
 
     if "recipient" in res and "recipient_masked" not in sanitized:
         sanitized["recipient_masked"] = mask_phone(str(res["recipient"]))
 
-    if "evidence" in sanitized and isinstance(sanitized["evidence"], list):
-        import re
-        sanitized["evidence"] = [
-            re.sub(r"\+?[1-9]\d{9,14}", lambda m: mask_phone(m.group(0)), str(item))
-            for item in sanitized["evidence"]
-        ]
-
-    return sanitized
+    # Deeply scrub phone text across all nested structures (evidence, structured_result, etc.)
+    return deep_mask_phones(sanitized)
 
 
 @app.get("/health")

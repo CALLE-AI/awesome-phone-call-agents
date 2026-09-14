@@ -130,7 +130,11 @@ def test_sanitize_call_result_helper():
         "internal_call_id": "call-xyz-999",
         "recipient": "+15550192834",
         "evidence": ["Dialed +15550192834 successfully and confirmed approval."],
-        "structured_result": {"auth_status": "approved"},
+        "structured_result": {
+            "auth_status": "approved",
+            "notes": "Patient requested callback at +15550192835 tomorrow",
+            "nested_contact": {"alt_phone": "555-019-2834"},
+        },
     }
     cleaned = sanitize_call_result(raw)
     assert "raw_carrier_data" not in cleaned
@@ -138,3 +142,23 @@ def test_sanitize_call_result_helper():
     assert cleaned["recipient_masked"] == "+1555***2834"
     assert cleaned["evidence"][0] == "Dialed +1555***2834 successfully and confirmed approval."
     assert cleaned["structured_result"]["auth_status"] == "approved"
+    assert "+1555***2835" in cleaned["structured_result"]["notes"]
+    assert "***2834" in cleaned["structured_result"]["nested_contact"]["alt_phone"]
+
+
+def test_sanitize_non_dictionary_provider_result():
+    from bytelytic_clinic.server import sanitize_call_result
+
+    class MockProviderResult:
+        def __init__(self):
+            self.status = "completed"
+            self.raw_leak = "Secret call destination +15550192834"
+
+        def __str__(self):
+            return f"RawProviderObj(phone=+15550192834, leak={self.raw_leak})"
+
+    non_dict = MockProviderResult()
+    cleaned = sanitize_call_result(non_dict)
+    assert cleaned == {"status": "completed"}
+    assert "phone" not in str(cleaned)
+    assert "+15550192834" not in str(cleaned)

@@ -1,6 +1,6 @@
 # Bytelytic Clinic OS — Autonomous Healthcare Phone Desk
 
-[![Tests](https://img.shields.io/badge/tests-78%20passing-brightgreen)](tests/)
+[![Tests](https://img.shields.io/badge/tests-79%20passing-brightgreen)](tests/)
 [![Python](https://img.shields.io/badge/python-%3E%3D3.10-blue)](pyproject.toml)
 [![CALL-E SDK](https://img.shields.io/badge/CALL--E%20SDK-%3E%3D0.2.0-blueviolet)](https://heycall-e.com)
 [![License](https://img.shields.io/badge/license-MIT-green)](../../LICENSE)
@@ -147,7 +147,7 @@ See [`examples/curl_quickstart.sh`](examples/curl_quickstart.sh) for cURL API ex
 
 ## Tests
 
-**78 unit and integration tests** across all modules:
+**79 unit and integration tests** across all modules:
 
 ```bash
 pytest tests/ -v
@@ -184,7 +184,7 @@ bytelytic-clinic-os/
 │       └── audit_ledger.py    # SHA-256 tamper-evident audit ledger
 ├── server.py                  # FastAPI server with API key auth
 ├── cli.py                     # CLI dispatcher
-├── tests/                     # 78 pytest tests
+├── tests/                     # 79 pytest tests
 ├── examples/                  # JSON request/response examples + cURL scripts
 ├── fixtures/                  # Dry-run response fixtures (all 5 campaigns)
 ├── app.py                     # Top-level entrypoint
