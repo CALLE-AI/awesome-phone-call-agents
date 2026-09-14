@@ -191,6 +191,7 @@ This project is an awesome list for AI-agent phone-call workflows. Add resources
 
 ### Apps
 
+- [GoodFaith](apps/typescript/goodfaith/) - Calls imaging clinics for self-pay Good Faith Estimate cash prices, enforces price comparability on the call, and returns a confidence-gated, transcript-evidenced landed-cost comparison that refuses to rank any price it cannot trace to a real quoted sentence; mock-first no-call default.
 
 - [SiteWitness](apps/typescript/sitewitness/) - Local site-history interview workspace that carries reviewed evidence gaps into individually approved CALL-E calls, with exact transcript quotations, human year review, and a no-call rehearsal mode.
 - [Rebuttal Dispute Call](apps/python/rebuttal-dispute-call/) - One disclosed CALL-E call to a disputing customer, cross-examined against its transcript before it becomes chargeback evidence, with six scripted no-call scenarios and a live path gated by per-run consent, an allowlist and local calling hours.
