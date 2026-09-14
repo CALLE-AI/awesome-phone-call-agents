@@ -255,6 +255,8 @@ This project is an awesome list for AI-agent phone-call workflows. Add resources
 -  [VendorPulse](https://github.com/Eman2123/VendorPlus) - Autonomous CALL-E-powered vendor check-in tool that calls suppliers about order status, scores delivery risk, and escalates high-risk vendors for human review.
 Runnable demo apps live under [`apps/`](apps/). They are not a CALL-E SDK and do not define a supported application API.
 
+- [Ringback](https://github.com/DrGitman/Ringback.git) - Callback-first front door for university admin offices: a reasoning agent reads the caller's question against their student record and curated institution documents, then either briefs one CALL-E call or routes the case to a named office without dialling. Third-party callers and requests needing a signature never reach a call. Mock transport with no calls by default.
+
 | App | Language | Purpose |
 | --- | --- | --- |
 | [`apps/typescript/readycheck`](apps/typescript/readycheck/) | TypeScript / Node | Requirement-based local-service inquiries with CALL-E, source-linked evidence review, focused follow-ups, explicit budget revisions and durable recovery; fictional no-call demo by default. |
