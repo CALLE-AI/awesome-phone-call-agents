@@ -6,8 +6,11 @@ from __future__ import annotations
 import pytest
 
 from reachable.models import (
+    IN_FLIGHT_ATTEMPTS,
+    AttemptState,
     ContactCheckState,
     ContactHealth,
+    Disposition,
     NoCallReason,
     PatternState,
     Workflow,
@@ -459,3 +462,34 @@ def test_full_numbers_never_appear_in_events_or_tasks(live, fake_state):
     text += " ".join(t["detail"] for t in live.store.tasks())
     for contact in live.dataset.contacts:
         assert contact.phone_e164 not in text
+
+
+def test_reading_back_a_non_terminal_call_leaves_the_attempt_in_flight(live, fake_client):
+    """Found on a live call: an early read-back must not retire guard 6.
+
+    The provider left that call queued for a minute. Reconciling in that window
+    used to move the attempt to TERMINAL_UNVERIFIED, which is not one of
+    IN_FLIGHT_ATTEMPTS -- so the attempt-level "never two calls for one case"
+    guard silently stopped applying while the telephone was still ringing. The
+    case state refused the second dial, but that is one defence where the design
+    calls for two.
+    """
+    live.scan_register()
+    fake_client.state.default_script = "timeout_then_complete"
+    outcome = live.place_call(IVY_CASE, confirmed=True, now=SCHOOL_DAY_IN_WINDOW)
+    assert outcome.placed
+    attempt_id = outcome.attempt_id
+
+    classification = live.reconcile(attempt_id)
+    assert classification.disposition is Disposition.OUTCOME_UNKNOWN
+
+    row = live.store.attempt(attempt_id)
+    assert AttemptState(row["state"]) in IN_FLIGHT_ATTEMPTS
+    # The reason is still recorded, so the office can see why it is waiting.
+    assert row["disposition"] == Disposition.OUTCOME_UNKNOWN.value
+    # And the guard still sees it.
+    assert live.store.in_flight_for(IVY_CASE) != []
+
+    # The next read finds it terminal and the attempt leaves the in-flight set.
+    live.reconcile(attempt_id)
+    assert AttemptState(live.store.attempt(attempt_id)["state"]) not in IN_FLIGHT_ATTEMPTS

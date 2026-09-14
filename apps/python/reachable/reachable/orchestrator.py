@@ -686,8 +686,15 @@ class Orchestrator:
 
         if classification.disposition is Disposition.OUTCOME_UNKNOWN:
             # Not ready is not a failure. Read again next cycle.
+            #
+            # The state is deliberately left alone. A queued call is still in
+            # flight, and moving it to TERMINAL_UNVERIFIED would drop it out of
+            # IN_FLIGHT_ATTEMPTS -- so guard 6, whose whole job is "never two
+            # calls for one case", would stop applying the moment anything read
+            # the call back early. The case state still refuses a second dial,
+            # but that is one defence where there should be two.
             self.store.update_attempt(
-                attempt_id, state=AttemptState.TERMINAL_UNVERIFIED.value,
+                attempt_id,
                 disposition=classification.disposition.value,
                 disposition_reason=classification.reason,
             )
