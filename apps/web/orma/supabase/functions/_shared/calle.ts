@@ -81,7 +81,18 @@ export function buildConfirmationCallRequest(
   return {
     task: `You are Orma. Say: Hello, this is Orma. Someone asked Orma to call this number with a confirmation code. Your code is ${digits}. Repeat: ${digits}. If you did not ask for this, hang up and Orma will not call again. Ask nothing, capture nothing, then end the call.`,
     recipients: [{ phones: [phoneE164] }],
-    result_schema: { type: "object", additionalProperties: false, properties: {} },
+    // CALL-E needs at least one property. Orma never reads this answer.
+    result_schema: {
+      type: "object",
+      additionalProperties: false,
+      properties: {
+        code_read: {
+          type: "string",
+          enum: ["yes", "no", "unknown"],
+          description: "Use yes only if the code was read aloud in full.",
+        },
+      },
+    },
     webhook_url: webhookUrl,
     metadata: { phone_confirmation_id: confirmationId },
   };
@@ -96,7 +107,14 @@ export async function dispatchPhoneConfirmation(
   const response = await deps.fetch(`${deps.calleApiBase.replace(/\/+$/, "")}/v1/calls`, {
     method: "POST", headers: { authorization: `Bearer ${deps.calleApiKey}`, "content-type": "application/json", "idempotency-key": `orma:confirm:${confirmationId}` }, body: requestBody,
   });
-  if (!response.ok) throw new Error(`CALL-E confirmation dispatch returned HTTP ${response.status}`);
+  if (!response.ok) {
+    // Keep CALL-E's reason for the log, with any number masked and the code removed.
+    const reason = (await response.text().catch(() => ""))
+      .replaceAll(code, "<code>")
+      .replace(/\+?\d{7,15}/g, "<number>")
+      .slice(0, 300);
+    throw new Error(`CALL-E confirmation dispatch returned HTTP ${response.status}: ${reason}`);
+  }
   const call = asCallTask(await response.json());
   return { mode: "live", requestBody: maskedConfirmationRequestBody(requestBody, code), callId: call.id };
 }
