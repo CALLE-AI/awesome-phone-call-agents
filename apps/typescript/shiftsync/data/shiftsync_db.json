@@ -1,0 +1,1115 @@
+{
+  "staff": [
+    {
+      "id": "emp_alex",
+      "name": "Alex Rivera",
+      "phone": "+15550192831",
+      "role": "Bartender",
+      "priority": 1,
+      "notes": "Senior mixologist, usually free Monday nights"
+    },
+    {
+      "id": "emp_david",
+      "name": "David Kim",
+      "phone": "+15550148291",
+      "role": "Bartender",
+      "priority": 2,
+      "notes": "Part-time bartender"
+    },
+    {
+      "id": "emp_james",
+      "name": "James Thornton",
+      "phone": "+15550183742",
+      "role": "Bartender",
+      "priority": 3,
+      "notes": "Available on-call for weekend and evening coverage"
+    },
+    {
+      "id": "emp_sarah",
+      "name": "Sarah Chen",
+      "phone": "+15550193721",
+      "role": "Cashier",
+      "priority": 1,
+      "notes": "Front counter lead"
+    },
+    {
+      "id": "emp_elena",
+      "name": "Elena Rostova",
+      "phone": "+15550129482",
+      "role": "Server",
+      "priority": 1,
+      "notes": "Floor lead"
+    },
+    {
+      "id": "emp_marcus",
+      "name": "Marcus Bell",
+      "phone": "+15550172940",
+      "role": "Cook",
+      "priority": 1,
+      "notes": "Line cook"
+    }
+  ],
+  "activeWorkflow": {
+    "requestId": "req_1789398739078",
+    "request": {
+      "id": "req_1789398739078",
+      "role": "Bartender",
+      "date": "Today",
+      "startTime": "6:00 PM",
+      "endTime": "11:00 PM",
+      "location": "The Copper Bistro — Main Branch",
+      "workersNeeded": 1,
+      "status": "searching",
+      "createdAt": "2026-09-14T15:12:19.082Z",
+      "businessName": "The Copper Bistro",
+      "scenario": "conditional"
+    },
+    "candidates": [
+      {
+        "id": "emp_alex",
+        "name": "Alex Rivera",
+        "phone": "+15550192831",
+        "role": "Bartender",
+        "priority": 1,
+        "notes": "Senior mixologist, usually free Monday nights"
+      },
+      {
+        "id": "emp_david",
+        "name": "David Kim",
+        "phone": "+15550148291",
+        "role": "Bartender",
+        "priority": 2,
+        "notes": "Part-time bartender"
+      },
+      {
+        "id": "emp_james",
+        "name": "James Thornton",
+        "phone": "+15550183742",
+        "role": "Bartender",
+        "priority": 3,
+        "notes": "Available on-call for weekend and evening coverage"
+      }
+    ],
+    "currentIndex": 0,
+    "attempts": [
+      {
+        "id": "att_1789398739342_emp_alex",
+        "requestId": "req_1789398739078",
+        "employeeId": "emp_alex",
+        "employeeName": "Alex Rivera",
+        "phone": "+15550192831",
+        "attemptNumber": 1,
+        "status": "completed",
+        "outcome": "conditional",
+        "startedAt": "2026-09-14T15:12:19.345Z",
+        "isSimulated": true,
+        "completedAt": "2026-09-14T15:12:22.905Z",
+        "summary": "Alex Rivera can cover but cannot arrive until 7:00 PM.",
+        "transcriptTurns": [
+          {
+            "speaker": "bot",
+            "text": "Hi Alex Rivera, this is ShiftSync calling from The Copper Bistro. We have an urgent open shift for a Bartender tonight from 6:00 PM to 11:00 PM. Can you cover?"
+          },
+          {
+            "speaker": "user",
+            "text": "I can come, but I can't make it until 7 PM."
+          },
+          {
+            "speaker": "bot",
+            "text": "Thank you, I've recorded that you can work starting at 7:00 PM. I will flag this for manager approval. Have a great day!"
+          }
+        ],
+        "structuredResult": {
+          "status": "conditional",
+          "employee_name": "Alex Rivera",
+          "shift_date": "Today",
+          "available_from": "7:00 PM",
+          "notes": "Alex Rivera can cover but cannot arrive until 7:00 PM.",
+          "manager_review_required": true
+        }
+      }
+    ],
+    "status": "conditional_review",
+    "timeline": [
+      {
+        "id": "tl_1789398739236_1",
+        "timestamp": "04:12 PM",
+        "title": "Coverage request created",
+        "description": "Need 1 Bartender for Today (6:00 PM – 11:00 PM) at The Copper Bistro — Main Branch.",
+        "type": "info"
+      },
+      {
+        "id": "tl_1789398739236_2",
+        "timestamp": "04:12 PM",
+        "title": "3 qualified staff identified",
+        "description": "Filtered eligible roster: Alex Rivera, David Kim, James Thornton.",
+        "type": "info"
+      },
+      {
+        "id": "tl_1789398739345_call",
+        "timestamp": "04:12 PM",
+        "title": "Calling Alex Rivera",
+        "description": "Dialing +15550192831 (Bartender, priority #1)...",
+        "type": "call"
+      },
+      {
+        "id": "tl_1789398742910_cond",
+        "timestamp": "04:12 PM",
+        "title": "⚠️ Conditional Availability from Alex Rivera",
+        "description": "Alex Rivera offered coverage available from 7:00 PM. Manager review required.",
+        "type": "warning"
+      }
+    ],
+    "mode": "simulation",
+    "confirmedEmployee": {
+      "id": "emp_alex",
+      "name": "Alex Rivera",
+      "phone": "+15550192831",
+      "role": "Bartender",
+      "priority": 1,
+      "notes": "Senior mixologist, usually free Monday nights"
+    },
+    "confirmedResult": {
+      "status": "conditional",
+      "employee_name": "Alex Rivera",
+      "shift_date": "Today",
+      "available_from": "7:00 PM",
+      "notes": "Alex Rivera can cover but cannot arrive until 7:00 PM.",
+      "manager_review_required": true
+    }
+  },
+  "history": [
+    {
+      "requestId": "req_1789398739078",
+      "request": {
+        "id": "req_1789398739078",
+        "role": "Bartender",
+        "date": "Today",
+        "startTime": "6:00 PM",
+        "endTime": "11:00 PM",
+        "location": "The Copper Bistro — Main Branch",
+        "workersNeeded": 1,
+        "status": "searching",
+        "createdAt": "2026-09-14T15:12:19.082Z",
+        "businessName": "The Copper Bistro",
+        "scenario": "conditional"
+      },
+      "candidates": [
+        {
+          "id": "emp_alex",
+          "name": "Alex Rivera",
+          "phone": "+15550192831",
+          "role": "Bartender",
+          "priority": 1,
+          "notes": "Senior mixologist, usually free Monday nights"
+        },
+        {
+          "id": "emp_david",
+          "name": "David Kim",
+          "phone": "+15550148291",
+          "role": "Bartender",
+          "priority": 2,
+          "notes": "Part-time bartender"
+        },
+        {
+          "id": "emp_james",
+          "name": "James Thornton",
+          "phone": "+15550183742",
+          "role": "Bartender",
+          "priority": 3,
+          "notes": "Available on-call for weekend and evening coverage"
+        }
+      ],
+      "currentIndex": 0,
+      "attempts": [
+        {
+          "id": "att_1789398739342_emp_alex",
+          "requestId": "req_1789398739078",
+          "employeeId": "emp_alex",
+          "employeeName": "Alex Rivera",
+          "phone": "+15550192831",
+          "attemptNumber": 1,
+          "status": "completed",
+          "outcome": "conditional",
+          "startedAt": "2026-09-14T15:12:19.345Z",
+          "isSimulated": true,
+          "completedAt": "2026-09-14T15:12:22.905Z",
+          "summary": "Alex Rivera can cover but cannot arrive until 7:00 PM.",
+          "transcriptTurns": [
+            {
+              "speaker": "bot",
+              "text": "Hi Alex Rivera, this is ShiftSync calling from The Copper Bistro. We have an urgent open shift for a Bartender tonight from 6:00 PM to 11:00 PM. Can you cover?"
+            },
+            {
+              "speaker": "user",
+              "text": "I can come, but I can't make it until 7 PM."
+            },
+            {
+              "speaker": "bot",
+              "text": "Thank you, I've recorded that you can work starting at 7:00 PM. I will flag this for manager approval. Have a great day!"
+            }
+          ],
+          "structuredResult": {
+            "status": "conditional",
+            "employee_name": "Alex Rivera",
+            "shift_date": "Today",
+            "available_from": "7:00 PM",
+            "notes": "Alex Rivera can cover but cannot arrive until 7:00 PM.",
+            "manager_review_required": true
+          }
+        }
+      ],
+      "status": "conditional_review",
+      "timeline": [
+        {
+          "id": "tl_1789398739236_1",
+          "timestamp": "04:12 PM",
+          "title": "Coverage request created",
+          "description": "Need 1 Bartender for Today (6:00 PM – 11:00 PM) at The Copper Bistro — Main Branch.",
+          "type": "info"
+        },
+        {
+          "id": "tl_1789398739236_2",
+          "timestamp": "04:12 PM",
+          "title": "3 qualified staff identified",
+          "description": "Filtered eligible roster: Alex Rivera, David Kim, James Thornton.",
+          "type": "info"
+        },
+        {
+          "id": "tl_1789398739345_call",
+          "timestamp": "04:12 PM",
+          "title": "Calling Alex Rivera",
+          "description": "Dialing +15550192831 (Bartender, priority #1)...",
+          "type": "call"
+        },
+        {
+          "id": "tl_1789398742910_cond",
+          "timestamp": "04:12 PM",
+          "title": "⚠️ Conditional Availability from Alex Rivera",
+          "description": "Alex Rivera offered coverage available from 7:00 PM. Manager review required.",
+          "type": "warning"
+        }
+      ],
+      "mode": "simulation",
+      "confirmedEmployee": {
+        "id": "emp_alex",
+        "name": "Alex Rivera",
+        "phone": "+15550192831",
+        "role": "Bartender",
+        "priority": 1,
+        "notes": "Senior mixologist, usually free Monday nights"
+      },
+      "confirmedResult": {
+        "status": "conditional",
+        "employee_name": "Alex Rivera",
+        "shift_date": "Today",
+        "available_from": "7:00 PM",
+        "notes": "Alex Rivera can cover but cannot arrive until 7:00 PM.",
+        "manager_review_required": true
+      }
+    },
+    {
+      "requestId": "req_1789396145590",
+      "request": {
+        "id": "req_1789396145590",
+        "role": "Bartender",
+        "date": "Today",
+        "startTime": "6:00 PM",
+        "endTime": "11:00 PM",
+        "location": "The Copper Bistro — Main Branch",
+        "workersNeeded": 1,
+        "status": "searching",
+        "createdAt": "2026-09-14T14:29:05.590Z",
+        "businessName": "The Copper Bistro",
+        "scenario": "conditional"
+      },
+      "candidates": [
+        {
+          "id": "emp_alex",
+          "name": "Alex Rivera",
+          "phone": "+15550192831",
+          "role": "Bartender",
+          "priority": 1,
+          "notes": "Senior mixologist, usually free Monday nights"
+        },
+        {
+          "id": "emp_david",
+          "name": "David Kim",
+          "phone": "+15550148291",
+          "role": "Bartender",
+          "priority": 2,
+          "notes": "Part-time bartender"
+        },
+        {
+          "id": "emp_james",
+          "name": "James Thornton",
+          "phone": "+15550183742",
+          "role": "Bartender",
+          "priority": 3,
+          "notes": "Available on-call for weekend and evening coverage"
+        }
+      ],
+      "currentIndex": 0,
+      "attempts": [
+        {
+          "id": "att_1789396145593_emp_alex",
+          "requestId": "req_1789396145590",
+          "employeeId": "emp_alex",
+          "employeeName": "Alex Rivera",
+          "phone": "+15550192831",
+          "attemptNumber": 1,
+          "status": "completed",
+          "outcome": "conditional",
+          "startedAt": "2026-09-14T14:29:05.593Z",
+          "isSimulated": true,
+          "completedAt": "2026-09-14T14:29:08.605Z",
+          "summary": "Alex Rivera can cover but cannot arrive until 7:00 PM.",
+          "transcriptTurns": [
+            {
+              "speaker": "bot",
+              "text": "Hi Alex Rivera, this is ShiftSync calling from The Copper Bistro. We have an urgent open shift for a Bartender tonight from 6:00 PM to 11:00 PM. Can you cover?"
+            },
+            {
+              "speaker": "user",
+              "text": "I can come, but I can't make it until 7 PM."
+            },
+            {
+              "speaker": "bot",
+              "text": "Thank you, I've recorded that you can work starting at 7:00 PM. I will flag this for manager approval. Have a great day!"
+            }
+          ],
+          "structuredResult": {
+            "status": "conditional",
+            "employee_name": "Alex Rivera",
+            "shift_date": "Today",
+            "available_from": "7:00 PM",
+            "notes": "Alex Rivera can cover but cannot arrive until 7:00 PM.",
+            "manager_review_required": true
+          }
+        }
+      ],
+      "status": "covered",
+      "timeline": [
+        {
+          "id": "tl_1789396145591_1",
+          "timestamp": "03:29 PM",
+          "title": "Coverage request created",
+          "description": "Need 1 Bartender for Today (6:00 PM – 11:00 PM) at The Copper Bistro — Main Branch.",
+          "type": "info"
+        },
+        {
+          "id": "tl_1789396145591_2",
+          "timestamp": "03:29 PM",
+          "title": "3 qualified staff identified",
+          "description": "Filtered eligible roster: Alex Rivera, David Kim, James Thornton.",
+          "type": "info"
+        },
+        {
+          "id": "tl_1789396145593_call",
+          "timestamp": "03:29 PM",
+          "title": "Calling Alex Rivera",
+          "description": "Dialing +15550192831 (Bartender, priority #1)...",
+          "type": "call"
+        },
+        {
+          "id": "tl_1789396148605_cond",
+          "timestamp": "03:29 PM",
+          "title": "⚠️ Conditional Availability from Alex Rivera",
+          "description": "Alex Rivera offered coverage available from 7:00 PM. Manager review required.",
+          "type": "warning"
+        },
+        {
+          "id": "tl_1789396164719_appr",
+          "timestamp": "03:29 PM",
+          "title": "Conditional Coverage Approved by Manager",
+          "description": "Manager accepted Alex Rivera's modified arrival time (7:00 PM).",
+          "type": "success"
+        }
+      ],
+      "mode": "simulation",
+      "confirmedEmployee": {
+        "id": "emp_alex",
+        "name": "Alex Rivera",
+        "phone": "+15550192831",
+        "role": "Bartender",
+        "priority": 1,
+        "notes": "Senior mixologist, usually free Monday nights"
+      },
+      "confirmedResult": {
+        "status": "conditional",
+        "employee_name": "Alex Rivera",
+        "shift_date": "Today",
+        "available_from": "7:00 PM",
+        "notes": "Alex Rivera can cover but cannot arrive until 7:00 PM.",
+        "manager_review_required": true
+      }
+    },
+    {
+      "requestId": "req_1789396011718",
+      "request": {
+        "id": "req_1789396011718",
+        "role": "Bartender",
+        "date": "Today",
+        "startTime": "6:00 PM",
+        "endTime": "11:00 PM",
+        "location": "The Copper Bistro — Main Branch",
+        "workersNeeded": 1,
+        "status": "searching",
+        "createdAt": "2026-09-14T14:26:51.718Z",
+        "businessName": "The Copper Bistro",
+        "scenario": "standard"
+      },
+      "candidates": [
+        {
+          "id": "emp_alex",
+          "name": "Alex Rivera",
+          "phone": "+15550192831",
+          "role": "Bartender",
+          "priority": 1,
+          "notes": "Senior mixologist, usually free Monday nights"
+        },
+        {
+          "id": "emp_david",
+          "name": "David Kim",
+          "phone": "+15550148291",
+          "role": "Bartender",
+          "priority": 2,
+          "notes": "Part-time bartender"
+        },
+        {
+          "id": "emp_james",
+          "name": "James Thornton",
+          "phone": "+15550183742",
+          "role": "Bartender",
+          "priority": 3,
+          "notes": "Available on-call for weekend and evening coverage"
+        }
+      ],
+      "currentIndex": 2,
+      "attempts": [
+        {
+          "id": "att_1789396011826_emp_alex",
+          "requestId": "req_1789396011718",
+          "employeeId": "emp_alex",
+          "employeeName": "Alex Rivera",
+          "phone": "+15550192831",
+          "attemptNumber": 1,
+          "status": "completed",
+          "outcome": "declined",
+          "startedAt": "2026-09-14T14:26:51.826Z",
+          "isSimulated": true,
+          "completedAt": "2026-09-14T14:26:54.841Z",
+          "summary": "Alex Rivera has family dinner commitments and cannot cover tonight.",
+          "transcriptTurns": [
+            {
+              "speaker": "bot",
+              "text": "Hi Alex Rivera, this is ShiftSync calling from The Copper Bistro. We have an urgent open shift for a Bartender tonight from 6:00 PM to 11:00 PM. Can you cover?"
+            },
+            {
+              "speaker": "user",
+              "text": "Hey, sorry but I have family in town tonight so I cannot make it."
+            },
+            {
+              "speaker": "bot",
+              "text": "No problem at all Alex Rivera, thank you for letting us know! Have a great evening."
+            }
+          ],
+          "structuredResult": {
+            "status": "declined",
+            "employee_name": "Alex Rivera",
+            "shift_date": "Today",
+            "available_from": null,
+            "notes": "Alex Rivera has family dinner commitments and cannot cover tonight.",
+            "manager_review_required": false
+          }
+        },
+        {
+          "id": "att_1789396014844_emp_david",
+          "requestId": "req_1789396011718",
+          "employeeId": "emp_david",
+          "employeeName": "David Kim",
+          "phone": "+15550148291",
+          "attemptNumber": 2,
+          "status": "failed",
+          "outcome": "no_answer",
+          "startedAt": "2026-09-14T14:26:54.844Z",
+          "isSimulated": true,
+          "completedAt": "2026-09-14T14:26:57.854Z",
+          "summary": "Line rang 5 times, diverted to voicemail without live answer.",
+          "transcriptTurns": [
+            {
+              "speaker": "bot",
+              "text": "Calling David Kim..."
+            }
+          ],
+          "structuredResult": {
+            "status": "no_answer",
+            "employee_name": "David Kim",
+            "shift_date": "Today",
+            "available_from": null,
+            "notes": "Line rang 5 times, diverted to voicemail without live answer.",
+            "manager_review_required": false
+          }
+        },
+        {
+          "id": "att_1789396017856_emp_james",
+          "requestId": "req_1789396011718",
+          "employeeId": "emp_james",
+          "employeeName": "James Thornton",
+          "phone": "+15550183742",
+          "attemptNumber": 3,
+          "status": "completed",
+          "outcome": "accepted",
+          "startedAt": "2026-09-14T14:26:57.856Z",
+          "isSimulated": true,
+          "completedAt": "2026-09-14T14:27:00.858Z",
+          "summary": "James Thornton confirmed availability and will arrive on time.",
+          "transcriptTurns": [
+            {
+              "speaker": "bot",
+              "text": "Hi James Thornton, this is ShiftSync calling from The Copper Bistro. We have an urgent open shift for a Bartender tonight from 6:00 PM to 11:00 PM. Can you cover?"
+            },
+            {
+              "speaker": "user",
+              "text": "Yes, I was just looking at my schedule. I can definitely take that shift!"
+            },
+            {
+              "speaker": "bot",
+              "text": "Great, I have noted that you can cover the Bartender shift tonight from 6:00 PM to 11:00 PM. Thank you, see you then!"
+            }
+          ],
+          "structuredResult": {
+            "status": "accepted",
+            "employee_name": "James Thornton",
+            "shift_date": "Today",
+            "available_from": "6:00 PM",
+            "notes": "James Thornton confirmed availability and will arrive on time.",
+            "manager_review_required": false
+          }
+        }
+      ],
+      "status": "covered",
+      "timeline": [
+        {
+          "id": "tl_1789396011819_1",
+          "timestamp": "03:26 PM",
+          "title": "Coverage request created",
+          "description": "Need 1 Bartender for Today (6:00 PM – 11:00 PM) at The Copper Bistro — Main Branch.",
+          "type": "info"
+        },
+        {
+          "id": "tl_1789396011819_2",
+          "timestamp": "03:26 PM",
+          "title": "3 qualified staff identified",
+          "description": "Filtered eligible roster: Alex Rivera, David Kim, James Thornton.",
+          "type": "info"
+        },
+        {
+          "id": "tl_1789396011826_call",
+          "timestamp": "03:26 PM",
+          "title": "Calling Alex Rivera",
+          "description": "Dialing +15550192831 (Bartender, priority #1)...",
+          "type": "call"
+        },
+        {
+          "id": "tl_1789396014841_dec",
+          "timestamp": "03:26 PM",
+          "title": "Alex Rivera Declined",
+          "description": "Alex Rivera cannot work this shift. Moving to next candidate.",
+          "type": "info"
+        },
+        {
+          "id": "tl_1789396014844_call",
+          "timestamp": "03:26 PM",
+          "title": "Calling David Kim",
+          "description": "Dialing +15550148291 (Bartender, priority #2)...",
+          "type": "call"
+        },
+        {
+          "id": "tl_1789396017854_unr",
+          "timestamp": "03:26 PM",
+          "title": "David Kim Unreached (no_answer)",
+          "description": "Could not connect. Moving to next candidate.",
+          "type": "info"
+        },
+        {
+          "id": "tl_1789396017856_call",
+          "timestamp": "03:26 PM",
+          "title": "Calling James Thornton",
+          "description": "Dialing +15550183742 (Bartender, priority #3)...",
+          "type": "call"
+        },
+        {
+          "id": "tl_1789396020858_acc",
+          "timestamp": "03:27 PM",
+          "title": "Coverage Confirmed by James Thornton",
+          "description": "James Thornton accepted the shift (6:00 PM – 11:00 PM). Workflow stopped.",
+          "type": "success"
+        }
+      ],
+      "mode": "simulation",
+      "confirmedEmployee": {
+        "id": "emp_james",
+        "name": "James Thornton",
+        "phone": "+15550183742",
+        "role": "Bartender",
+        "priority": 3,
+        "notes": "Available on-call for weekend and evening coverage"
+      },
+      "confirmedResult": {
+        "status": "accepted",
+        "employee_name": "James Thornton",
+        "shift_date": "Today",
+        "available_from": "6:00 PM",
+        "notes": "James Thornton confirmed availability and will arrive on time.",
+        "manager_review_required": false
+      }
+    },
+    {
+      "requestId": "req_1789394956929",
+      "request": {
+        "id": "req_1789394956929",
+        "role": "Bartender",
+        "date": "Today",
+        "startTime": "6:00 PM",
+        "endTime": "11:00 PM",
+        "location": "The Copper Bistro — Main Branch",
+        "workersNeeded": 1,
+        "status": "searching",
+        "createdAt": "2026-09-14T14:09:16.929Z",
+        "businessName": "The Copper Bistro"
+      },
+      "candidates": [
+        {
+          "id": "emp_alex",
+          "name": "Alex Rivera",
+          "phone": "+15550192831",
+          "role": "Bartender",
+          "priority": 1,
+          "notes": "Senior mixologist, usually free Monday nights"
+        },
+        {
+          "id": "emp_david",
+          "name": "David Kim",
+          "phone": "+15550148291",
+          "role": "Bartender",
+          "priority": 2,
+          "notes": "Part-time bartender"
+        },
+        {
+          "id": "emp_james",
+          "name": "James Thornton",
+          "phone": "+15550183742",
+          "role": "Bartender",
+          "priority": 3,
+          "notes": "Available on-call for weekend and evening coverage"
+        }
+      ],
+      "currentIndex": 2,
+      "attempts": [
+        {
+          "id": "att_1789394956956_emp_alex",
+          "requestId": "req_1789394956929",
+          "employeeId": "emp_alex",
+          "employeeName": "Alex Rivera",
+          "phone": "+15550192831",
+          "attemptNumber": 1,
+          "status": "completed",
+          "outcome": "declined",
+          "startedAt": "2026-09-14T14:09:16.956Z",
+          "isSimulated": true,
+          "completedAt": "2026-09-14T14:09:19.966Z",
+          "summary": "Alex has family dinner commitments and cannot cover tonight.",
+          "transcriptTurns": [
+            {
+              "speaker": "bot",
+              "text": "Hi Alex, this is ShiftSync calling from The Copper Bistro. We have an urgent open shift for a Bartender tonight from 6:00 PM to 11:00 PM. Can you cover?"
+            },
+            {
+              "speaker": "user",
+              "text": "Hey, sorry but I have family in town tonight so I cannot make it."
+            },
+            {
+              "speaker": "bot",
+              "text": "No problem at all Alex, thank you for letting us know! Have a great evening."
+            }
+          ],
+          "structuredResult": {
+            "status": "declined",
+            "employee_name": "Alex Rivera",
+            "shift_date": "Today",
+            "available_from": null,
+            "notes": "Alex has family dinner commitments and cannot cover tonight.",
+            "manager_review_required": false
+          }
+        },
+        {
+          "id": "att_1789394961236_emp_david",
+          "requestId": "req_1789394956929",
+          "employeeId": "emp_david",
+          "employeeName": "David Kim",
+          "phone": "+15550148291",
+          "attemptNumber": 2,
+          "status": "failed",
+          "outcome": "no_answer",
+          "startedAt": "2026-09-14T14:09:21.236Z",
+          "isSimulated": true,
+          "completedAt": "2026-09-14T14:09:24.253Z",
+          "summary": "Line rang 5 times, diverted to voicemail without live answer.",
+          "transcriptTurns": [
+            {
+              "speaker": "bot",
+              "text": "Calling David Kim..."
+            }
+          ],
+          "structuredResult": {
+            "status": "no_answer",
+            "employee_name": "David Kim",
+            "shift_date": "Today",
+            "available_from": null,
+            "notes": "Line rang 5 times, diverted to voicemail without live answer.",
+            "manager_review_required": false
+          }
+        },
+        {
+          "id": "att_1789394964259_emp_james",
+          "requestId": "req_1789394956929",
+          "employeeId": "emp_james",
+          "employeeName": "James Thornton",
+          "phone": "+15550183742",
+          "attemptNumber": 3,
+          "status": "completed",
+          "outcome": "accepted",
+          "startedAt": "2026-09-14T14:09:24.259Z",
+          "isSimulated": true,
+          "completedAt": "2026-09-14T14:09:29.279Z",
+          "summary": "James Thornton confirmed availability and will arrive on time.",
+          "transcriptTurns": [
+            {
+              "speaker": "bot",
+              "text": "Hi James Thornton, this is ShiftSync calling from The Copper Bistro. We have an urgent open shift for a Bartender tonight from 6:00 PM to 11:00 PM. Can you cover?"
+            },
+            {
+              "speaker": "user",
+              "text": "Yes, I was just looking at my schedule. I can definitely take that shift!"
+            },
+            {
+              "speaker": "bot",
+              "text": "Great, I have noted that you can cover the Bartender shift tonight from 6:00 PM to 11:00 PM. Thank you, see you then!"
+            }
+          ],
+          "structuredResult": {
+            "status": "accepted",
+            "employee_name": "James Thornton",
+            "shift_date": "Today",
+            "available_from": "6:00 PM",
+            "notes": "James Thornton confirmed availability and will arrive on time.",
+            "manager_review_required": false
+          }
+        }
+      ],
+      "status": "covered",
+      "timeline": [
+        {
+          "id": "tl_1789394956951_1",
+          "timestamp": "03:09 PM",
+          "title": "Coverage request created",
+          "description": "Need 1 Bartender for Today (6:00 PM – 11:00 PM) at The Copper Bistro — Main Branch.",
+          "type": "info"
+        },
+        {
+          "id": "tl_1789394956951_2",
+          "timestamp": "03:09 PM",
+          "title": "3 qualified staff identified",
+          "description": "Filtered eligible roster: Alex Rivera, David Kim, James Thornton.",
+          "type": "info"
+        },
+        {
+          "id": "tl_1789394956956_call",
+          "timestamp": "03:09 PM",
+          "title": "Calling Alex Rivera",
+          "description": "Dialing +15550192831 (Bartender, priority #1)...",
+          "type": "call"
+        },
+        {
+          "id": "tl_1789394959968_dec",
+          "timestamp": "03:09 PM",
+          "title": "Alex Rivera Declined",
+          "description": "Alex Rivera cannot work this shift. Moving to next candidate.",
+          "type": "info"
+        },
+        {
+          "id": "tl_1789394961236_call",
+          "timestamp": "03:09 PM",
+          "title": "Calling David Kim",
+          "description": "Dialing +15550148291 (Bartender, priority #2)...",
+          "type": "call"
+        },
+        {
+          "id": "tl_1789394964254_unr",
+          "timestamp": "03:09 PM",
+          "title": "David Kim Unreached (no_answer)",
+          "description": "Could not connect. Moving to next candidate.",
+          "type": "info"
+        },
+        {
+          "id": "tl_1789394964259_call",
+          "timestamp": "03:09 PM",
+          "title": "Calling James Thornton",
+          "description": "Dialing +15550183742 (Bartender, priority #3)...",
+          "type": "call"
+        },
+        {
+          "id": "tl_1789394969279_acc",
+          "timestamp": "03:09 PM",
+          "title": "Coverage Confirmed by James Thornton",
+          "description": "James Thornton accepted the shift (6:00 PM – 11:00 PM). Workflow stopped.",
+          "type": "success"
+        }
+      ],
+      "mode": "simulation",
+      "confirmedEmployee": {
+        "id": "emp_james",
+        "name": "James Thornton",
+        "phone": "+15550183742",
+        "role": "Bartender",
+        "priority": 3,
+        "notes": "Available on-call for weekend and evening coverage"
+      },
+      "confirmedResult": {
+        "status": "accepted",
+        "employee_name": "James Thornton",
+        "shift_date": "Today",
+        "available_from": "6:00 PM",
+        "notes": "James Thornton confirmed availability and will arrive on time.",
+        "manager_review_required": false
+      }
+    },
+    {
+      "requestId": "req_1789393216193",
+      "request": {
+        "id": "req_1789393216193",
+        "role": "Bartender",
+        "date": "Tonight",
+        "startTime": "6:00 PM",
+        "endTime": "11:00 PM",
+        "location": "Main Branch",
+        "workersNeeded": 1,
+        "status": "searching",
+        "createdAt": "2026-09-14T13:40:16.193Z",
+        "businessName": "The Copper Bistro"
+      },
+      "candidates": [
+        {
+          "id": "emp_alex",
+          "name": "Alex Rivera",
+          "phone": "+15550192831",
+          "role": "Bartender",
+          "priority": 1,
+          "notes": "Senior mixologist, usually free Monday nights"
+        },
+        {
+          "id": "emp_david",
+          "name": "David Kim",
+          "phone": "+15550148291",
+          "role": "Bartender",
+          "priority": 2,
+          "notes": "Part-time bartender"
+        },
+        {
+          "id": "emp_james",
+          "name": "James Thornton",
+          "phone": "+15550183742",
+          "role": "Bartender",
+          "priority": 3,
+          "notes": "Available on-call for weekend and evening coverage"
+        }
+      ],
+      "currentIndex": 2,
+      "attempts": [
+        {
+          "id": "att_1789393216343_emp_alex",
+          "requestId": "req_1789393216193",
+          "employeeId": "emp_alex",
+          "employeeName": "Alex Rivera",
+          "phone": "+15550192831",
+          "attemptNumber": 1,
+          "status": "completed",
+          "outcome": "declined",
+          "startedAt": "2026-09-14T13:40:16.343Z",
+          "isSimulated": true,
+          "completedAt": "2026-09-14T13:40:19.354Z",
+          "summary": "Alex has family dinner commitments and cannot cover tonight.",
+          "transcriptTurns": [
+            {
+              "speaker": "bot",
+              "text": "Hi Alex, this is ShiftSync calling from The Copper Bistro. We have an urgent open shift for a Bartender tonight from 6:00 PM to 11:00 PM. Can you cover?"
+            },
+            {
+              "speaker": "user",
+              "text": "Hey, sorry but I have family in town tonight so I cannot make it."
+            },
+            {
+              "speaker": "bot",
+              "text": "No problem at all Alex, thank you for letting us know! Have a great evening."
+            }
+          ],
+          "structuredResult": {
+            "status": "declined",
+            "employee_name": "Alex Rivera",
+            "shift_date": "Tonight",
+            "available_from": null,
+            "notes": "Alex has family dinner commitments and cannot cover tonight.",
+            "manager_review_required": false
+          }
+        },
+        {
+          "id": "att_1789393219377_emp_david",
+          "requestId": "req_1789393216193",
+          "employeeId": "emp_david",
+          "employeeName": "David Kim",
+          "phone": "+15550148291",
+          "attemptNumber": 2,
+          "status": "failed",
+          "outcome": "no_answer",
+          "startedAt": "2026-09-14T13:40:19.377Z",
+          "isSimulated": true,
+          "completedAt": "2026-09-14T13:40:22.403Z",
+          "summary": "Line rang 5 times, diverted to voicemail without live answer.",
+          "transcriptTurns": [
+            {
+              "speaker": "bot",
+              "text": "Calling David Kim..."
+            }
+          ],
+          "structuredResult": {
+            "status": "no_answer",
+            "employee_name": "David Kim",
+            "shift_date": "Tonight",
+            "available_from": null,
+            "notes": "Line rang 5 times, diverted to voicemail without live answer.",
+            "manager_review_required": false
+          }
+        },
+        {
+          "id": "att_1789393222420_emp_james",
+          "requestId": "req_1789393216193",
+          "employeeId": "emp_james",
+          "employeeName": "James Thornton",
+          "phone": "+15550183742",
+          "attemptNumber": 3,
+          "status": "completed",
+          "outcome": "accepted",
+          "startedAt": "2026-09-14T13:40:22.421Z",
+          "isSimulated": true,
+          "completedAt": "2026-09-14T13:40:25.429Z",
+          "summary": "James Thornton confirmed availability and will arrive on time.",
+          "transcriptTurns": [
+            {
+              "speaker": "bot",
+              "text": "Hi James Thornton, this is ShiftSync calling from The Copper Bistro. We have an urgent open shift for a Bartender tonight from 6:00 PM to 11:00 PM. Can you cover?"
+            },
+            {
+              "speaker": "user",
+              "text": "Yes, I was just looking at my schedule. I can definitely take that shift!"
+            },
+            {
+              "speaker": "bot",
+              "text": "Great, I have noted that you can cover the Bartender shift tonight from 6:00 PM to 11:00 PM. Thank you, see you then!"
+            }
+          ],
+          "structuredResult": {
+            "status": "accepted",
+            "employee_name": "James Thornton",
+            "shift_date": "Tonight",
+            "available_from": "6:00 PM",
+            "notes": "James Thornton confirmed availability and will arrive on time.",
+            "manager_review_required": false
+          }
+        }
+      ],
+      "status": "covered",
+      "timeline": [
+        {
+          "id": "tl_1789393216339_1",
+          "timestamp": "02:40 PM",
+          "title": "Coverage request created",
+          "description": "Need 1 Bartender for Tonight (6:00 PM – 11:00 PM) at Main Branch.",
+          "type": "info"
+        },
+        {
+          "id": "tl_1789393216339_2",
+          "timestamp": "02:40 PM",
+          "title": "3 qualified staff identified",
+          "description": "Filtered eligible roster: Alex Rivera, David Kim, James Thornton.",
+          "type": "info"
+        },
+        {
+          "id": "tl_1789393216343_call",
+          "timestamp": "02:40 PM",
+          "title": "Calling Alex Rivera",
+          "description": "Dialing +15550192831 (Bartender, priority #1)...",
+          "type": "call"
+        },
+        {
+          "id": "tl_1789393219356_dec",
+          "timestamp": "02:40 PM",
+          "title": "Alex Rivera Declined",
+          "description": "Alex Rivera cannot work this shift. Moving to next candidate.",
+          "type": "info"
+        },
+        {
+          "id": "tl_1789393219378_call",
+          "timestamp": "02:40 PM",
+          "title": "Calling David Kim",
+          "description": "Dialing +15550148291 (Bartender, priority #2)...",
+          "type": "call"
+        },
+        {
+          "id": "tl_1789393222404_unr",
+          "timestamp": "02:40 PM",
+          "title": "David Kim Unreached (no_answer)",
+          "description": "Could not connect. Moving to next candidate.",
+          "type": "info"
+        },
+        {
+          "id": "tl_1789393222421_call",
+          "timestamp": "02:40 PM",
+          "title": "Calling James Thornton",
+          "description": "Dialing +15550183742 (Bartender, priority #3)...",
+          "type": "call"
+        },
+        {
+          "id": "tl_1789393225429_acc",
+          "timestamp": "02:40 PM",
+          "title": "Coverage Confirmed by James Thornton",
+          "description": "James Thornton accepted the shift (6:00 PM – 11:00 PM). Workflow stopped.",
+          "type": "success"
+        }
+      ],
+      "mode": "simulation",
+      "confirmedEmployee": {
+        "id": "emp_james",
+        "name": "James Thornton",
+        "phone": "+15550183742",
+        "role": "Bartender",
+        "priority": 3,
+        "notes": "Available on-call for weekend and evening coverage"
+      },
+      "confirmedResult": {
+        "status": "accepted",
+        "employee_name": "James Thornton",
+        "shift_date": "Tonight",
+        "available_from": "6:00 PM",
+        "notes": "James Thornton confirmed availability and will arrive on time.",
+        "manager_review_required": false
+      }
+    }
+  ],
+  "metrics": {
+    "openShifts": 1,
+    "callsMade": 11,
+    "coverageFound": 4,
+    "estMinutesSaved": 132
+  }
+}
