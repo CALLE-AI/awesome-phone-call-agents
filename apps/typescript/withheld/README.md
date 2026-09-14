@@ -6,12 +6,14 @@ Every errand ends the same way: *"we'll call you back."* For most people that is
 mildly annoying. For someone who cannot answer a phone — Deaf, non-speaking, a
 speech disability, or simply no ability to hold a spoken conversation with a
 stranger at an unannounced moment — that sentence ends the errand. Not delays
-it. Ends it.
+it. Ends it. The words themselves are easy enough to receive in writing. The
+call they promise is the part that cannot be taken.
 
 Withheld is an errand engine built on CALL-E. It places the call, and when the
 other side offers to ring back, **it declines and asks for a time window
 instead** — then calls back itself, inside that window. The person never
 answers a phone, at any point, and the business never has a number to ring.
+The agent does the listening; the person gets a transcript.
 
 The number is not withheld by asking the model nicely. It is never put in the
 model's reach.
