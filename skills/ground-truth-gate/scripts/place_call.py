@@ -207,7 +207,7 @@ class _NoCredentialRedirect(urllib.request.HTTPRedirectHandler):
     def redirect_request(self, req, fp, code, msg, headers, newurl):  # noqa: D102
         if req.has_header("Authorization"):
             raise _CredentialRedirectRefused(
-                f"refused to follow {code} redirect to {newurl!r}: the request carries "
+                f"refused to follow {code} redirect: the request carries "
                 "credentials, and this skill never resends those cross-request"
             )
         return super().redirect_request(req, fp, code, msg, headers, newurl)
@@ -258,8 +258,8 @@ def request_json(
     except urllib.error.HTTPError as error:
         # The key must never reach a log line, and an error body can echo the
         # request back, so it is content-filtered, not just truncated.
-        raw = error.read().decode("utf-8", "replace")[:400]
-        detail = _sanitize_error_body(raw, api_key)
+        raw = error.read().decode("utf-8", "replace")
+        detail = _sanitize_error_body(raw, api_key)[:400]
         raise TransportError(f"HTTP {error.code} from {method} {url}: {detail}") from error
     except urllib.error.URLError as error:
         # A read timeout can fire after the POST is already on the wire, so it
