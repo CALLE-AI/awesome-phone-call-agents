@@ -4,10 +4,10 @@
  * verify-outing.mjs
  *
  * Standalone offline runner for the accessible-outing-verifier skill.
- * Implements the deterministic safety firewall and digital gap triage.
+ * Demonstrates one advisory fixture rule; no live integration is implemented.
  *
  * Usage:
- *   node scripts/verify-outing.mjs [--profile path/to/profile.json] [--real]
+ *   node scripts/verify-outing.mjs [--profile path/to/synthetic-profile.json]
  */
 
 import { readFileSync, existsSync } from 'fs';
@@ -20,14 +20,14 @@ const __dirname = dirname(__filename);
 // 1. Argument parsing
 const args = process.argv.slice(2);
 let profilePath = join(__dirname, '../assets/sample-outing-request.json');
-let isReal = false;
 
 for (let i = 0; i < args.length; i++) {
   if (args[i] === '--profile' && args[i + 1]) {
     profilePath = args[i + 1];
     i++;
   } else if (args[i] === '--real') {
-    isReal = true;
+    console.error('[ERROR] --real is unsupported: this helper is offline-only and cannot place a call.');
+    process.exit(2);
   }
 }
 
@@ -42,9 +42,9 @@ console.log('============================================================');
 console.log('       CALL-E SKILL: ACCESSIBLE OUTING VERIFIER');
 console.log('============================================================');
 console.log(`Target Venue: ${profile.venue_name}`);
-console.log(`Phone:        ${profile.phone ? profile.phone.replace(/(\+\d{1,3}-\d{3}-)\d{3}(-\d{4})/, '$1***$2') : 'N/A'}`);
+console.log(`Phone:        ${profile.phone ? '***' + String(profile.phone).replace(/\D/g, '').slice(-4) : 'N/A'}`);
 console.log(`Persona:      ${profile.persona}`);
-console.log(`Mode:         ${isReal ? 'LIVE CALL-E TELEPHONY' : 'OFFLINE DRY-RUN (Default)'}\n`);
+console.log('Mode:         OFFLINE DRY-RUN (Default)\n');
 
 // 2. Digital Gap Triage
 console.log('[Phase 1] Digital Gap Triage:');
@@ -54,7 +54,7 @@ const physicalGaps = [];
 for (const constraint of profile.constraints) {
   const found = digitalEvidence.find((d) => d.constraint_id === constraint.id);
   if (found && found.status === 'confirmed') {
-    console.log(`  [PASS] ${constraint.label} (Verified via ${found.source})`);
+    console.log(`  [FIXTURE] ${constraint.label} (Supplied source label: ${found.source})`);
   } else {
     console.log(`  [GAP]  ${constraint.label} (${constraint.category === 'daily_operational' ? 'CRITICAL OPERATIONAL GAP' : 'Missing'})`);
     physicalGaps.push(constraint);
@@ -62,15 +62,15 @@ for (const constraint of profile.constraints) {
 }
 
 if (physicalGaps.length === 0) {
-  console.log('\nAll constraints verified digitally. No phone call required.');
-  console.log('FINAL VERDICT: FEASIBLE (100% Digital Confidence)');
+  console.log('\nAll supplied fixture constraints are labeled confirmed. No phone call was made.');
+  console.log('FINAL VERDICT: ADVISORY ONLY — HUMAN VERIFICATION REQUIRED');
   process.exit(0);
 }
 
 // 3. Telephony actuation
 console.log(`\n[Phase 2] CALL-E Bounded Actuation (${physicalGaps.length} gaps to verify):`);
-console.log('  Task: Dial venue contact to verify operational accessibility.');
-console.log('  Human Consent Gate: Authorized.\n');
+console.log('  Task: Simulate an accessibility verification question; no call is placed.');
+console.log('  Human Consent Gate: Simulated only; no live authorization was obtained.\n');
 
 // In dry-run mode, simulate the Hero Demotion scenario
 const simulatedStaffResponse = {

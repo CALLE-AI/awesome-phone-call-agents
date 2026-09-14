@@ -1,6 +1,6 @@
 # Safety Reference: Accessible Outing Verifier
 
-This skill initiates phone calls to public venues to verify physical accessibility constraints on behalf of an outing planner. Getting this wrong can cause three kinds of harm: stranding a disabled person at a physical barrier, wasting the time of venue workers, or disclosing sensitive personal information. These rules protect all three parties.
+This skill ships an offline fixture runner and a proposed phone-verification pattern. It does not initiate calls or establish venue safety. A future integration must protect patrons, venue workers and private information using the following operator rules.
 
 ## 1. Explicit Consent to Dial
 
@@ -10,15 +10,14 @@ This skill initiates phone calls to public venues to verify physical accessibili
 
 ## 2. Dry Run Is the Default
 
-Every invocation defaults to offline dry-run against fixture data unless `--real` is explicitly provided.
+Every supported invocation is offline against fixture data. `--real` is refused; no live adapter or interactive authorization mechanism is implemented.
 - A dry run opens no network socket, consumes no telephony credits, and dials nobody.
-- Setting `AOV_FORCE_DRY_RUN=1` overrides `--real` across the entire process, guaranteeing a safe demonstration environment.
+- `AOV_FORCE_DRY_RUN` is not a supported setting and is not needed by this offline-only helper.
 
 | Flag / Environment | Mode | Outcome |
 |---|---|---|
 | *(default)* | Dry-Run | Simulates local verification using bundled fixtures. |
-| `--real` | Live Telephony | Calls target venue via CALL-E upon interactive confirmation. |
-| `AOV_FORCE_DRY_RUN=1` | Force Dry-Run | Refuses to place outbound calls regardless of command-line flags. |
+| `--real` | Unsupported | Exits without reading a profile or making a call. |
 
 ## 3. The Deterministic Demotion Firewall
 
@@ -31,12 +30,12 @@ When venue staff responds with uncertainty:
 
 Generic conversational AI bots frequently hallucinate confidence, converting these statements into a boolean `true` or a "90% confidence" score. For a power wheelchair user, a 90% guess can result in being stranded in a stairwell or facing physical injury.
 
-**The Rule:** Any `qualified_confirmation` is **strictly demoted to `UNKNOWN`**. If a non-negotiable constraint is `UNKNOWN`, the whole outing is classified as **`NOT FULLY VERIFIED (SAFETY DEMOTION)`**.
+**The Demonstrated Rule:** The fixed `qualified_confirmation` example is demoted to `UNKNOWN`. An unknown critical constraint should remain unverified. The helper does not parse arbitrary language, bind live evidence, or guarantee detection of uncertainty; a confirmed label is not proof that an outing is physically safe. Human verification and a backup plan remain necessary.
 
 ## 4. Phone Number Validation & Masking
 
 - Numbers must follow **E.164 format** (`+15555550199`). Country codes are never inferred.
-- Numbers are masked in all output logs and reports (e.g. `+1-555-***-0199`).
+- The offline helper masks its phone field. Other profile text is not automatically anonymized; use synthetic data only. A future integration must mask phone-bearing reports and logs.
 - Numbers must be validated before initiating any batch verification.
 
 ## 5. Privacy & Caller Protection

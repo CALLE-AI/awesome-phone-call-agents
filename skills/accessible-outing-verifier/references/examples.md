@@ -6,7 +6,7 @@ The examples below demonstrate the deterministic safety evaluation produced by `
 
 ## Example 1: The Hero Demotion (Qualified Staff Response)
 
-When staff provides an ambiguous or hedged response (*"I think it should be working..."*), the safety firewall intercepts the extraction and demotes the status to `UNKNOWN`.
+The fixed synthetic response is labeled `qualified_confirmation` and the helper demonstrates demoting that label to `UNKNOWN`; it is not interpreting a real conversation.
 
 ```bash
 node scripts/verify-outing.mjs --profile assets/sample-outing-request.json
@@ -17,17 +17,17 @@ node scripts/verify-outing.mjs --profile assets/sample-outing-request.json
        CALL-E SKILL: ACCESSIBLE OUTING VERIFIER
 ============================================================
 Target Venue: The Grand Theater
-Phone:        +1-555-***-0199
+Phone:        ***0199
 Persona:      Power Wheelchair User
 Mode:         OFFLINE DRY-RUN (Default)
 
 [Phase 1] Digital Gap Triage:
-  [PASS] Step-Free Main Entrance (Verified via OpenStreetMap Nominatim)
+  [FIXTURE] Step-Free Main Entrance (Supplied source label: OpenStreetMap Nominatim)
   [GAP]  Main Elevator Operating Today (CRITICAL OPERATIONAL GAP)
 
 [Phase 2] CALL-E Bounded Actuation (1 gaps to verify):
-  Task: Dial venue contact to verify operational accessibility.
-  Human Consent Gate: Authorized.
+  Task: Simulate an accessibility verification question; no call is placed.
+  Human Consent Gate: Simulated only; no live authorization was obtained.
 
 [Phase 3] Deterministic Safety Firewall:
   Raw Telephony Output: "qualified_confirmation"
@@ -46,9 +46,9 @@ Recommendation: Do not dispatch user without on-site backup plan.
 
 ---
 
-## Example 2: Hard Physical Barrier
+## Example 2: Proposed Hard-Barrier Interpretation
 
-When staff confirms a physical barrier that cannot accommodate the patron's requirements (e.g. 42 steps and no lift).
+This is an illustrative interpretation, not another scenario implemented by the runner. Any real staff statement would require human verification.
 
 ```text
 ============================================================
@@ -62,15 +62,15 @@ Status:       FAILED (Entrance/Lift Refuted)
 
 ---
 
-## Example 3: Full Confirmation
+## Example 3: Proposed Confirmation Interpretation
 
-When staff unequivocally confirms all critical operational requirements.
+This illustration is advisory, not an implemented runner scenario or proof of safe access. Verify critical conditions with the venue before acting.
 
 ```text
 ============================================================
 Target Venue: Metropolitan Symphony Hall
 Phone:        +1-555-***-0199
-Verdict:      FEASIBLE (100% OPERATIONAL CERTAINTY)
+Verdict:      ADVISORY CONFIRMATION — HUMAN VERIFICATION REQUIRED
 Finding:      Staff Quote: "Yes, both elevator banks A and B are active with no interruptions."
 Status:       PASSED
 ============================================================

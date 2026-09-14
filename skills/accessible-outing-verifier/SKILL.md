@@ -1,6 +1,6 @@
 ---
 name: accessible-outing-verifier
-description: Evaluates physical-world accessibility requirements for an outing by combining digital evidence with bounded CALL-E phone calls, strictly demoting qualified claims to protect patrons.
+description: Demonstrates advisory accessibility-planning checks with offline fixtures and a proposed bounded CALL-E workflow; use for exploring unknown or qualified venue claims without making calls.
 license: MIT
 ---
 
@@ -16,7 +16,7 @@ Where online data exists, it is often one flattened claim that hides daily opera
 - **The Elevator Paradox:** A theater website lists an elevator, but is it operating today? Did maintenance sign off on it this morning?
 - **The Qualified Guess:** Venue staff may say *"I think the ramp should be clear"* or *"The lift is usually fine"*. For a wheelchair user, a qualified guess can mean being stranded outside or facing physical danger.
 
-This skill bridges the digital gap: it checks digital claims first, pinpoints physical operational gaps, and places at most **one bounded CALL-E phone call** with an explicit schema. Crucially, it routes staff answers through a **deterministic safety demotion engine**—demoting any hedged or qualified answer to `UNKNOWN` to ensure human safety.
+The shipped helper reads supplied fixture labels and demonstrates how a `qualified_confirmation` can become `UNKNOWN`. It does not query a venue directory, interpret arbitrary speech, or place a call. The CALL-E schema and steps below are a proposed manual integration pattern, not an implemented live adapter. All findings are experimental and advisory; a person must verify critical conditions with the venue and plan a suitable backup before an outing.
 
 Consult `references/safety.md` for explicit consent rules, phone number validation, and privacy boundaries before initiating any phone call.
 
@@ -47,10 +47,10 @@ Do not use this skill to:
 
 Read `references/safety.md` for full requirements. Core rules:
 
-1. **Dry-Run by Default:** Without `--real`, every execution evaluates offline fixtures. No socket is opened, no credits are spent, and no phone is dialed.
-2. **Deterministic Demotion Firewall:** If venue staff answers with uncertainty (*"I think..."*, *"probably"*, *"should be"*), the skill strictly demotes the response from Confirmed to `UNKNOWN (STRICT SAFETY DEMOTION)`. It refuses to guess.
-3. **Explicit Consent Gate:** The agent halts after digital gap analysis and requests explicit user authorization before dialing.
-4. **Data Privacy & Masking:** Phone numbers are masked in all logs and outputs (e.g., `+1-555-***-0199`). No personal patron data or medical details are disclosed during the call.
+1. **Offline Only:** Every supported execution evaluates local fixtures. `--real` is unsupported and refused; no socket is opened, no credits are spent, and no phone is dialed.
+2. **Demonstrated Demotion Rule:** The fixed example maps `qualified_confirmation` to `UNKNOWN`. It does not detect every hedge, validate an extraction, or establish physical safety.
+3. **Proposed Consent Gate:** Any future live integration must request explicit authorization for the exact venue and question before dialing. Printed fixture authorization is not consent.
+4. **Data Privacy & Masking:** Use synthetic profiles only. The helper masks the phone field; venue names, persona text and other free text are not a general-purpose privacy filter. A future call must disclose no personal patron or medical details.
 5. **Fail-Closed Principle:** If a call fails, times out, or encounters a busy line, the verdict is `NEEDS_HUMAN_REVIEW` or `NOT FULLY VERIFIED`—never an assumed pass.
 
 ## Workflow
@@ -61,12 +61,12 @@ Define the venue and constraints in a profile JSON:
 
 ```json
 {
-  "venue": "The Grand Theater",
+  "venue_name": "The Grand Theater",
   "phone": "+15555550199",
   "persona": "Power Wheelchair User",
   "constraints": [
-    { "id": "c1", "type": "daily_operational", "label": "Main Elevator Operating Today", "critical": true },
-    { "id": "c2", "type": "static_facility", "label": "Step-Free Main Entrance", "critical": true }
+    { "id": "c1", "category": "daily_operational", "label": "Main Elevator Operating Today", "critical": true },
+    { "id": "c2", "category": "static_facility", "label": "Step-Free Main Entrance", "critical": true }
   ]
 }
 ```
@@ -81,11 +81,11 @@ node scripts/verify-outing.mjs --profile assets/sample-outing-request.json
 
 See `references/examples.md` for sample command output and scenario verdicts.
 
-### 3. Place Bounded CALL-E Verification Call
+### 3. Proposed Bounded CALL-E Verification Pattern
 
-When explicitly authorized, CALL-E dials the venue contact using the schema defined in `references/calle-task-schema.json`:
+No live runner is included. A future operator-controlled integration can use the schema in `references/calle-task-schema.json`, after confirming an authorized E.164 venue destination and reviewing the exact question. Stop on an unknown submission or result; do not automatically redial. Explain that a submitted call may continue after closing the host. This is information gathering, not emergency assistance, medical advice, or authorization to dispatch a person.
 
-The deterministic normalizer evaluates the spoken response:
+The proposed normalizer would evaluate extracted labels, subject to human verification; the shipped helper demonstrates only the qualified-confirmation fixture:
 - `confirmed` -> Constraint marked `PASSED`.
 - `qualified_confirmation` (*"I think it should be working..."*) -> Demoted to `UNKNOWN`. Outing verdict: `NOT FULLY VERIFIED`.
 - `refuted` (*"Elevator is undergoing repairs today"*) -> Constraint marked `FAILED`. Outing verdict: `NOT FEASIBLE`.
