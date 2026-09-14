@@ -583,6 +583,61 @@ def test_low_confidence_goes_to_manual_review():
     assert decision.route == "manual_review"
 
 
+def test_a_reached_person_is_reviewed_not_redialled_on_an_incomplete_task():
+    """The live defect: a real conversation was queued for a third call.
+
+    `lead-mz-live-5` answered five of seven fields at 0.9 confidence on a
+    `completed` call, and `task_completed: false` alone sent it to
+    `retry_later`. Reaching a consenting person is what makes a redial the
+    wrong action, so the gaps go to a human instead.
+    """
+    structured = qualified_result() | {
+        "right_person": "yes",
+        "continued_after_ai_disclosure": "yes",
+        "buying_intent": "comparing",
+        "budget_band_usd": "unknown",
+        "wants_human_callback": "unknown",
+    }
+    decision = routing.route_outcome(
+        first_lead(),
+        structured,
+        provider_status="completed",
+        task_completed=False,
+        completion_confidence=0.9,
+    )
+    assert decision.route == "manual_review"
+    assert decision.follow_up_allowed is True
+    assert decision.suppress_number is False
+
+
+def test_an_unreached_call_is_still_retried_on_an_incomplete_task():
+    """The retry path stays intact when nobody was reached."""
+    structured = qualified_result() | {
+        "right_person": "unknown",
+        "continued_after_ai_disclosure": "unknown",
+    }
+    decision = routing.route_outcome(
+        first_lead(),
+        structured,
+        provider_status="completed",
+        task_completed=False,
+    )
+    assert decision.route == "retry_later"
+
+
+def test_a_refusal_still_suppresses_over_an_incomplete_task():
+    """Opt-out keeps beating the incomplete-task branch, in both directions."""
+    structured = qualified_result() | {"continued_after_ai_disclosure": "no"}
+    decision = routing.route_outcome(
+        first_lead(),
+        structured,
+        provider_status="completed",
+        task_completed=False,
+    )
+    assert decision.route == "suppress_number"
+    assert decision.suppress_number is True
+
+
 def test_wrong_person_suppresses_the_number_even_on_a_partial_call():
     structured = qualified_result() | {"right_person": "no"}
     decision = routing.route_outcome(

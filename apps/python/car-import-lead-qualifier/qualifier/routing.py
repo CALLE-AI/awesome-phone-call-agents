@@ -137,6 +137,23 @@ def route_outcome(
         )
 
     if task_completed is False:
+        # A person who was reached and consented is not redialled just because
+        # the provider says the script did not finish. They already answered;
+        # another call re-asks what they have answered. A human reads the gaps
+        # and decides, the same way an unclear callback consent is handled
+        # below. Only a call that never reached that point is retried.
+        if right_person == "yes" and continued == "yes":
+            return Decision(
+                route=ROUTE_REVIEW,
+                priority="low",
+                reason=(
+                    "The call task was reported as not completed, but the person "
+                    "was reached and consented; a human decides before calling again."
+                ),
+                follow_up_allowed=True,
+                suppress_number=False,
+                payment_blocker=blocker,
+            )
         return Decision(
             route=ROUTE_RETRY,
             priority="low",

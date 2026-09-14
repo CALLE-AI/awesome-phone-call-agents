@@ -20,7 +20,7 @@ call beyond the one-line `evidence` field the schema already redacts.
 
 ## The runs
 
-Six executions across three leads, in two campaigns.
+Ten executions across six leads, in four campaigns.
 
 | Lead | Market | Outcome | Route | Confidence | Task completed |
 | --- | --- | --- | --- | --- | --- |
@@ -30,13 +30,23 @@ Six executions across three leads, in two campaigns.
 | `calle-inbound-hotline` | US test line | called, attempt 1 | `retry_later` | 0.66 `medium` | no |
 | `calle-inbound-hotline` | US test line | called, attempt 2 | `retry_later` | 0.62 `medium` | no |
 | `calle-inbound-hotline` | US test line | called, attempt 3 | `suppress_number` | 0.86 `high` | yes |
+| `lead-mz-test-0001` | MZ `+258800000002` | called | `nurture_sequence` | 0.92 `high` | yes |
+| `lead-mz-live-4` | MZ `+258800000003` | called, attempt 1 | `retry_later` | 0.58 `medium` | no |
+| `lead-mz-live-5` | MZ `+258800000004` | called, attempt 1 | `retry_later` | 0.72 `medium` | no |
+| `lead-mz-live-5` | MZ `+258800000004` | called, attempt 2 | `retry_later` → `manual_review` | 0.90 `high` | no |
 
 `lead-mz-live-2` and `lead-mz-live-3` are two inquiry records that resolved to the same
 line, which is why one number covers both rows.
 
-Between them the runs exercised five of the seven routes: `book_specialist_callback`,
-`close_lead`, `retry_later`, `suppress_number`, and the business-hours deferral that
-feeds `retry_later`.
+Between them the runs exercised five of the seven routes — `book_specialist_callback`,
+`close_lead`, `nurture_sequence`, `retry_later`, and `suppress_number` — plus the
+business-hours deferral that feeds `retry_later`. Only `payment_support` has never been
+reached by a live call.
+
+The last row carries two routes because the run exposed a defect in the routing itself.
+`retry_later` is what the code decided at the time; `manual_review` is what the corrected
+code decides when the same stored result is replayed. Both are recorded because the wrong
+one is the finding.
 
 ## Conversion path
 
@@ -145,15 +155,105 @@ lower bound and excludes its upper one.
 
 Neither is visible in a dry run. Both needed a real person answering in their own words.
 
+## The corrections, verified live
+
+`lead-mz-test-0001` is the first live run of the seven-question script, and it was aimed
+at the two defects above.
+
+**The split question collected what the compound one dropped.** `vehicle_type` came back
+`pickup`, not `unknown`, on a call where the person had just confirmed the inquiry
+vehicle — the exact sequence that used to lose the field. The fix holds in real speech,
+not only against the fake client.
+
+**The refusal path held.** The person declined to give a budget and the call moved on
+rather than pressing: `budget_band_usd` is `unknown` on an otherwise complete result, and
+the remaining questions were still answered. That is the "accept a refusal and move on"
+instruction working on someone who actually refused.
+
+The run answered every other field, chose Maputo, accepted a human callback, and routed
+to `nurture_sequence` at 0.92 `high` with `task_completed: true` — the first live call to
+reach that route.
+
+What it did not prove: the person continued after the AI disclosure, so this run says
+nothing about the opt-out path; `payment_blocker` came back `unknown`, so
+`payment_support` remains untouched; and 0.92 is nowhere near the sub-0.8 gate, so
+`manual_review` still has not fired live.
+
+## Mozambique delivery is intermittent, not broken
+
+Three MZ mobile attempts on 2026-09-04, on two different Mozambican networks, produced
+two dead calls and one real conversation.
+
+`lead-mz-live-4` and `lead-mz-live-5` both failed on attempt 1 with the signature already
+familiar from the hotline: `provider_status: failed`, `task_completed: false`, every
+structured field `unknown`, and an `evidence` line stating that no conversation occurred.
+The owner of one of the two lines confirmed the handset never rang — no missed call, no
+notification — which is what terminating before media looks like from the callee's side.
+
+The two numbers belong to different carriers, which is what made a single-network fault
+look unlikely and a route-level fault look probable. **Attempt 2 to the same Movitel
+number, eight minutes later, connected and held a full conversation at 0.90 `high`.**
+
+That result is worth recording precisely because it contradicts the conclusion the first
+two runs invited. A report was drafted claiming calls to Mozambique could not be placed
+at all; it was wrong, and the run that disproved it arrived before it was sent. The
+failures are intermittent, and earlier campaigns had already completed `+258` calls
+successfully. The honest statement is a rate, not an outage: one completed call in three
+MZ mobile attempts that day.
+
+The confidence tally also grew. Four dead calls have now returned a `medium`
+`completion_confidence` — 0.66 and 0.62 on the hotline, 0.58 and 0.72 on these two — and
+the one call with a real conversation returned 0.90. The score clearly carries signal
+when media exists, which makes the scores over silence harder to explain rather than
+easier.
+
+## A good call routed as a bad one
+
+`lead-mz-live-5` attempt 2 is the most valuable run in this file, and none of it is about
+the conversation.
+
+The person answered: right person `yes`, continued after the AI disclosure `yes`,
+`comparing` rather than ready, declined to give a budget, and asked for delivery to
+Beira. Five of seven fields, 0.90 `high`, `provider_status: completed`. By every signal
+that matters this was a successful qualification call.
+
+It routed to `retry_later`.
+
+The cause was a single gate in `routing.py`: `task_completed: false` returned a retry
+before any commercial branch was consulted. Opt-out signals were checked first — so a
+refusal would still have suppressed the number — but a *consenting* person who had
+already answered fell straight through to a redial. The lead was sitting at attempt 2 of
+3, which means the next campaign run would have called this person a third time to ask
+the seven questions they had just answered.
+
+The gate now distinguishes who was reached. With `right_person: yes` and
+`continued_after_ai_disclosure: yes`, an incomplete task routes to `manual_review`: a
+human reads the gaps and decides whether they are worth another call. Only a call that
+never reached a consenting person is still retried. This is the same principle the app
+already applied one branch below, where an unclear `wants_human_callback` goes to a human
+rather than to another dial.
+
+Three tests cover the three directions of that gate — a reached person is reviewed, an
+unreached call is still retried, and a refusal still suppresses over both. Replaying the
+stored result through the corrected code returns `manual_review`.
+
+The pattern is by now the familiar one: invisible in a dry run, invisible to the fifty-one
+tests that existed before it, visible the moment a real person answered. The difference
+is that the two earlier defects lost data, while this one would have called someone again.
+
 ## Still untested
 
-- No live call has produced `payment_support` or `nurture_sequence`, so the payment-blocker
-  branch — the one that motivated the whole route — has never routed on real speech.
-- `manual_review` has been reached once on a live lead, on the attempt-exhaustion path
-  recorded in the campaign state file. That run is not written up here because its result
-  file was not retained, and the sub-0.8 confidence gate has still never fired live.
+- No live call has produced `payment_support`, so the payment-blocker branch — the one
+  that motivated the whole route — has never routed on real speech. Every live lead so
+  far reported the blocker as `unknown` or `none`.
+- The sub-0.8 confidence gate has still never fired live. `manual_review` itself has now
+  been reached twice — once on the attempt-exhaustion path recorded in a campaign state
+  file, whose result file was not retained, and once on `lead-mz-live-5` under the
+  corrected incomplete-task branch. Neither came from low confidence.
 - The Angola, Tanzania, and Kenya markets were never dialled — only `+258` and the `+1`
   test line ever were. They have since been removed from `MARKETS` rather than shipped
   untested, so `destination_port` now lists ports for the only market served.
-- The corrections above changed the script after the last live run, so the seven-question
-  version has been tested only against the fake client.
+- No human has refused. The opt-out path was proved against an automated hotline agent
+  that could not verify the inquiry, not against a person saying no. The routing is the
+  same either way, but the recording that would settle it does not exist yet. This is the
+  most valuable gap left.
