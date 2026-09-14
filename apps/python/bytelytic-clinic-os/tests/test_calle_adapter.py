@@ -77,7 +77,7 @@ def test_calle_adapter_initializes_with_custom_config():
 
 
 def test_calle_adapter_enforces_live_recipient_gate():
-    cfg = ClinicConfig(dry_run=False, authorized_recipients=["+15550192834"])
+    cfg = ClinicConfig(dry_run=False, app_api_key="test_operator_secret_key", authorized_recipients=["+15550192834"])
     adapter = CalleAdapter(cfg)
     with pytest.raises(PermissionError):
         adapter.dispatch_confirmation_call(phone="+15559990000")

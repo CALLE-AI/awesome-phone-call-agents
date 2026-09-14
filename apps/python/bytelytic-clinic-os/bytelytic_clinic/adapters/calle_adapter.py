@@ -140,8 +140,10 @@ class CalleAdapter:
         member_id_masked: str,
         ivr_hints: str = "Press 1 for Provider Services, then press 2 for Prior Authorizations.",
     ) -> Dict[str, Any]:
+        valid_phone = self.policy.verify_call_permission(payor_phone)
+
         task = (
-            f"Call {payor_name} Prior Authorization line at {payor_phone}. "
+            f"Call {payor_name} Prior Authorization line at {valid_phone}. "
             f"IVR Navigation: {ivr_hints}. "
             f"Check status for CPT {cpt_code}, Member ID {member_id_masked}. "
             f"Request decision, auth number, reference number, and representative name."
@@ -176,7 +178,7 @@ class CalleAdapter:
         client = CalleClient(api_key=self.cfg.calle_api_key)
         return client.calls.create_and_wait(
             task=task,
-            recipients=[{"phones": [payor_phone], "region": "US", "locale": "en-US"}],
+            recipients=[{"phones": [valid_phone], "region": "US", "locale": "en-US"}],
             result_schema=PRIOR_AUTH_SCHEMA,
             timeout_seconds=300,
         )

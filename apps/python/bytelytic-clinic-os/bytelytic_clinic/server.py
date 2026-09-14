@@ -16,7 +16,7 @@ from .domain.models import AppointmentStatus
 
 app = FastAPI(
     title="Bytelytic Clinic OS — Autonomous Healthcare Phone Desk",
-    description="Production-grade CALL-E integration for outpatient healthcare practices.",
+    description="Bounded-prototype CALL-E integration demonstrating autonomous healthcare phone workflows.",
     version="1.2.0",
 )
 
@@ -101,13 +101,16 @@ def dispatch_noshow(req: NoShowRequest, _auth: str = Depends(verify_api_key)):
 
 @app.post("/calls/prior-auth")
 def dispatch_prior_auth(req: PriorAuthRequest, _auth: str = Depends(verify_api_key)):
-    res = calle_adapter.dispatch_prior_auth_call(
-        payor_phone=req.payor_phone,
-        payor_name=req.payor_name,
-        cpt_code=req.cpt_code,
-        member_id_masked=req.member_id_masked,
-    )
-    return {"success": True, "call_result": res}
+    try:
+        res = calle_adapter.dispatch_prior_auth_call(
+            payor_phone=req.payor_phone,
+            payor_name=req.payor_name,
+            cpt_code=req.cpt_code,
+            member_id_masked=req.member_id_masked,
+        )
+        return {"success": True, "payor": req.payor_name, "call_result": res}
+    except (ValueError, PermissionError) as e:
+        raise HTTPException(status_code=400, detail=str(e))
 
 
 @app.post("/calle/webhook")

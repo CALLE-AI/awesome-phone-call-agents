@@ -21,5 +21,12 @@ class ClinicConfig:
     primary_doctor: str = field(default_factory=lambda: os.environ.get("PRIMARY_DOCTOR", "Dr. Demo Specialist, MD"))
     timezone: str = field(default_factory=lambda: os.environ.get("TIMEZONE", "America/Chicago"))
 
+    def __post_init__(self):
+        if not self.dry_run and self.app_api_key == "bytelytic_demo_key_2026":
+            raise RuntimeError(
+                "APP_API_KEY must be set to a private operator secret when DRY_RUN=false. "
+                "The public demo key 'bytelytic_demo_key_2026' is not permitted in live mode."
+            )
+
 
 config = ClinicConfig()
