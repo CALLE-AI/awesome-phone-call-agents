@@ -1,22 +1,24 @@
-# Speakeasy
+# KindlyCall
 
-Speakeasy makes the English phone calls you would rather not — for people with
+**Your words. We make the call.**
+
+KindlyCall makes the English phone calls you would rather not, for people with
 limited English, phone anxiety, a disability, or no time during business hours.
-You speak or type a task in your own language; Speakeasy translates it to English,
+You speak or type a task in your own language; KindlyCall translates it to English,
 reads it back for you to confirm, and only then has CALL-E place the English call,
 navigate the menu, and talk to the receptionist. You watch the conversation happen
-live, then hear and read the outcome — and any confirmation number — back in your
+live, then hear and read the outcome, and any confirmation number, back in your
 own language, saved to your history.
 
 **Contribution area: User-facing Apps.** This directory is a catalog and setup
-guide for the runnable [Speakeasy application](https://github.com/yasaausman/Speakeasy).
+guide for the runnable [KindlyCall application](https://github.com/yasaausman/KindlyCall).
 The application source, tests, and CI are maintained there under the MIT license.
 The instructions below target revision
-[`c0ed346`](https://github.com/yasaausman/Speakeasy/tree/c0ed346ebe149a095538c1775e83b339da4eaa74).
+[`babfc61`](https://github.com/yasaausman/KindlyCall/tree/babfc61480c5034b847b078d6b62011de080886e).
 
-- [Full setup and architecture](https://github.com/yasaausman/Speakeasy/blob/c0ed346ebe149a095538c1775e83b339da4eaa74/README.md)
-- [Synthetic sample result (reserved fictional data)](https://github.com/yasaausman/Speakeasy/blob/c0ed346ebe149a095538c1775e83b339da4eaa74/docs/sample-run.json)
-- [Upstream integration feedback we reported](https://github.com/yasaausman/Speakeasy/blob/c0ed346ebe149a095538c1775e83b339da4eaa74/docs/CALLE-INTEGRATION-FEEDBACK.md)
+- [Full setup and architecture](https://github.com/yasaausman/KindlyCall/blob/babfc61480c5034b847b078d6b62011de080886e/README.md)
+- [Synthetic sample result (reserved fictional data)](https://github.com/yasaausman/KindlyCall/blob/babfc61480c5034b847b078d6b62011de080886e/docs/sample-run.json)
+- [Upstream integration feedback we reported](https://github.com/yasaausman/KindlyCall/blob/babfc61480c5034b847b078d6b62011de080886e/docs/CALLE-INTEGRATION-FEEDBACK.md)
 
 ## What it does
 
@@ -26,12 +28,11 @@ The instructions below target revision
   in English; the user's side is translated.
 - **Voice and text, both ways.** Speak or type in; spoken narration and saved
   text out, using native on-device iOS speech (no third-party voice keys).
-- **Finishes the task.** Books, confirms, and captures the reference number —
-  not just a price lookup.
+- **Finishes the task.** Books, confirms, and captures the reference number,   not just a price lookup.
 - **Multi-call comparison.** Call several places, rank the outcomes for the
   user's goal, and book the best one.
 - **Speculative two-call booking.** Because CALL-E is one-shot async (there is no
-  live "hold"), Speakeasy can call once to ask what times are available, let the
+  live "hold"), KindlyCall can call once to ask what times are available, let the
   user pick, then call back to book that exact slot.
 
 ## Supported host and CALL-E integration
@@ -48,19 +49,25 @@ three tools in order:
 3. `get_call_run` is polled for status, the live activity feed (streamed into the
    app as a transcript), and the terminal structured result.
 
+For real calls the backend has two transports. The recommended one is CALL-E's
+REST Developer API (`POST /v1/calls`, `GET /v1/calls/{id}`) with an API key
+(`CALLE_TRANSPORT=rest`). The MCP over OAuth path is the default for local
+development only: it reuses the same machine's `calle` CLI token cache
+(`calle auth login`), which is a private per-user credential store rather than a
+token-distribution API; the backend reads it locally and never copies, logs, or
+transmits it.
+
 The result is normalized, translated to the user's language, narrated, and saved.
-Auth uses the `calle` CLI token cache (`calle auth login`). Translation and
-multi-call ranking use Gemini when a key is present and fall back to offline
-behavior otherwise.
+Translation and multi-call ranking use Gemini when a key is present and fall back
+to offline behavior otherwise.
 
 ## Setup and usage
 
-Full instructions are in the upstream README. The core loop needs only Node —
-no Mac, no keys, and no real calls:
+Full instructions are in the upstream README. The core loop needs only Node, no Mac, no keys, and no real calls:
 
 ```bash
-git clone https://github.com/yasaausman/Speakeasy.git
-cd Speakeasy
+git clone https://github.com/yasaausman/KindlyCall.git
+cd KindlyCall
 npm install
 npm test            # deterministic end-to-end flow tests (fake transport, offline)
 npm run smoke:fake  # full plan -> run -> poll -> normalized result
@@ -77,14 +84,14 @@ started with `npm run dev`.
   against a fake-mode backend place **no** real calls.
 - **Real calls** are placed only in real mode, only after the in-app **confirm
   gate** (an explicit user "yes"), and only to the number the user provided.
-- **AI disclosure is non-optional** — every brief instructs the agent to identify
+- **AI disclosure is non-optional**, every brief instructs the agent to identify
   itself as an AI assistant calling on the user's behalf.
 - **Side-effect limitation (important).** The confirm gate is the only control
   point. Once `run_call` places a call it **cannot be cancelled or stopped from the
-  app** — CALL-E's MCP flow has no cancel operation, `get_call_run` is read-only,
+  app**, CALL-E's MCP flow has no cancel operation, `get_call_run` is read-only,
   and starting a new request only resets the app's view; it does **not** stop an
   in-progress call or change whether that call counts against your call quota.
-  Speakeasy does not create recurring jobs or schedules, so there is nothing to
+  KindlyCall does not create recurring jobs or schedules, so there is nothing to
   cancel later; each request is one confirmed call (or, for the two-call flow, one
   confirmed discovery call and one confirmed booking call).
 - **Credentials** stay local: the CALL-E token is managed by the `calle` CLI, and

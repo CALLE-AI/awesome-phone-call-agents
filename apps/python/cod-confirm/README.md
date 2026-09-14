@@ -148,28 +148,59 @@ pip install -r requirements.txt
 cp .env.example .env      # add your CALL-E API key
 
 python -m codconfirm.run              # dry run: full sweep, no calls, no credit
-python -m codconfirm.run --live --limit 1   # place one real call
 python -m codconfirm.run --reset      # restore the demo order book
 ```
+
+The dry run needs no API key and places no call:
 
 ```
 Dry run. No calls are placed. Pass --live to use call credit.
 
 4 of 5 pending order(s) justify a call.
-Order 1044  Shahriar Kabir  9800 BDT  risk 95%  net +165
+Order 1044  Shahriar Example  9800 BDT  risk 95%  net +165
   -> pending-confirmation: No answer, attempt 1.
-Order 1042  Tanvir Alam  6200 BDT  risk 25%  net +59
-  -> confirmed: Confirmed, address corrected. Said "yes I still want it".
+Order 1042  Tanvir Example  6200 BDT  risk 25%  net +59
+  -> confirmed: Confirmed, address corrected. Said "yes I still want it". Prefers delivery after 6pm.
+Order 1045  Farhana Example  4750 BDT  risk 28%  net +57
+  -> pending-confirmation: No answer, attempt 1.
+Order 1041  Rumana Example  3450 BDT  risk 8%  net +1
+  -> confirmed: Confirmed, address corrected. Said "yes I still want it". Prefers delivery after 6pm.
 
 Order book
   confirmed                2
   pending-confirmation     3
 
   1 order(s) left uncalled on purpose:
-    1043  Nusrat Jahan       net -0.5 per call
+    1043  Nusrat Example     net -0.5 per call
 ```
 
-Tests: `python -m pytest tests -q`
+### Placing a real call
+
+A live run only dials numbers named on `CALL_ALLOWLIST`, and the demo order
+book uses `+999` numbers, which cannot be dialled at all. So to hear the call
+yourself, point the run at a handset you control and put that handset on the
+allowlist:
+
+```bash
+export YOUR_NUMBER="+..."   # your own phone, in E.164 form
+CALL_ALLOWLIST="$YOUR_NUMBER" DEMO_PHONE="$YOUR_NUMBER" \
+  python -m codconfirm.run --live --limit 1
+```
+
+The call goes out through CALL-E and the transcript is kept on the order.
+Because it was redirected away from the order's own number, the answer is
+advisory: the order goes to `needs-human` instead of being confirmed, which
+is the redirect rule doing its job. Without `CALL_ALLOWLIST` a live run stops
+before the first ring and says why.
+
+### Tests
+
+```bash
+pip install pytest
+python -m pytest tests -q
+```
+
+71 tests, none of which need an API key or place a call.
 
 ## How it fits a real shop
 
@@ -187,14 +218,18 @@ codconfirm/
   orders.py      the order model and the store it reads and writes
   economics.py   which orders justify a call, and in what order
   schema.py      the call brief and the structured answer we ask for
+  phones.py      which numbers may be dialled, and cleaning what comes back
   agent.py       places the call through CALL-E
   decide.py      one call result -> one order status
   run.py         the sweep and the command line
 data/
   orders.seed.json   the demo order book
 tests/
-  test_decide.py     the decision table
-  test_economics.py  the call-budget model
+  test_decide.py       the decision table
+  test_economics.py    the call-budget model
+  test_phones.py       destination validation, masking and the allowlist
+  test_sweep.py        the sweep loop end to end, with the phone line replaced
+  test_call_safety.py  what a call may and may not be taken to mean
 ```
 
 ## Licence
