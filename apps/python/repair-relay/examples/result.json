@@ -1,0 +1,12 @@
+{
+  "synthetic": true,
+  "status": "completed",
+  "task_completed": true,
+  "recipients": [{
+    "structured_result": {"outcome": "available", "available_window_ids": ["saturday-pm"], "quote": "Saturday from one to three works for me.", "notes": "Coordinator must confirm separately."},
+    "attempts": [{"transcript_turns": [
+      {"speaker": "bot", "text": "Would Friday morning or Saturday from one to three work?"},
+      {"speaker": "user", "text": "Saturday from one to three works for me."}
+    ]}]
+  }]
+}

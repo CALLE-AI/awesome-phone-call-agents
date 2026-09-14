@@ -1,0 +1,21 @@
+{
+  "request_id": "screen-example-17",
+  "opportunity_id": "docs-17",
+  "title": "Improve the public API documentation",
+  "listing_url": "https://example.com/bounties/docs-17",
+  "organizer_name": "Example Project",
+  "organizer_phone_e164": "+15550101000",
+  "contact_basis": "The number is published in the official listing for bounty questions.",
+  "reported_reward": {
+    "amount": 100,
+    "currency": "USD"
+  },
+  "reported_ai_policy": "unknown",
+  "reported_eligibility": "unknown",
+  "reported_deadline": "unknown",
+  "reported_payout_method": "unknown",
+  "public_evidence": [
+    "The official listing says a reward may be available; the amount and rules need confirmation."
+  ],
+  "operator_intent": "I authorize one verification call before deciding whether to work on this listing."
+}
