@@ -2,7 +2,7 @@ import assert from "node:assert/strict";
 import { test } from "node:test";
 import { findBooking, loadCatalog } from "../src/data.ts";
 import { addMinutes } from "../src/format.ts";
-import { quoteFor } from "../src/rules.ts";
+import { quoteFor, voluntaryQuoteFor } from "../src/rules.ts";
 import type { Disruption } from "../src/types.ts";
 
 const catalog = loadCatalog();
@@ -60,4 +60,12 @@ test("only later flights on the same route with seats are offered", () => {
   );
   const noSeats = { ...catalog, flights: catalog.flights.map((f) => (f.id === "NA725-2026-09-20" ? { ...f, seatsAvailable: 0 } : f)) };
   assert.ok(!quoteFor(noSeats, findBooking(catalog, "K7Q2XA"), delay(240)).moves.some((m) => m.flightId === "NA725-2026-09-20"));
+});
+
+test("a passenger-requested change is always priced as voluntary, whatever the delay rules say", () => {
+  const booking = findBooking(catalog, "M3P8RD");
+  const quote = voluntaryQuoteFor(catalog, booking);
+  assert.equal(quote.changeCase, "voluntary");
+  assert.equal(quote.keep.newDeparture, "2026-09-20T08:10:00+07:00");
+  assert.deepEqual(quote, quoteFor(catalog, booking, { ...delay(90), newDeparture: "2026-09-20T08:10:00+07:00" }));
 });

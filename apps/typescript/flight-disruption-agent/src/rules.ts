@@ -42,10 +42,23 @@ function sum(lines: QuoteLine[]): number {
  * own rule, which is why the same delay costs different passengers different amounts.
  */
 export function quoteFor(catalog: Catalog, booking: Booking, disruption: Disruption): Quote {
+  const changeCase = changeCaseFor(catalog, booking, disruption.delayMinutes);
+  return priceOptions(catalog, booking, changeCase, disruption.newDeparture);
+}
+
+/**
+ * Prices a change the passenger asked for (Workflow B). Nothing happened to the
+ * flight, so standard voluntary rules apply and "keep" means the original departure.
+ */
+export function voluntaryQuoteFor(catalog: Catalog, booking: Booking): Quote {
+  const flight = findFlight(catalog, booking.flightId);
+  return priceOptions(catalog, booking, "voluntary", flight.departure);
+}
+
+function priceOptions(catalog: Catalog, booking: Booking, changeCase: ChangeCase, keepDeparture: string): Quote {
   const flight = findFlight(catalog, booking.flightId);
   const airline = airlineOf(catalog, booking);
   const middlemen = intermediariesOf(catalog, booking);
-  const changeCase = changeCaseFor(catalog, booking, disruption.delayMinutes);
   const involuntary = changeCase === "involuntary";
   const family = booking.fareFamily;
 
@@ -114,7 +127,7 @@ export function quoteFor(catalog: Catalog, booking: Booking, disruption: Disrupt
     pnr: booking.pnr,
     changeCase,
     thresholdMinutes: airline.rules.involuntaryDelayMinutes,
-    keep: { newDeparture: disruption.newDeparture, total: 0 },
+    keep: { newDeparture: keepDeparture, total: 0 },
     moves,
     refund: { gross: booking.farePaid, lines: refundLines, amount: refundAmount },
   };
