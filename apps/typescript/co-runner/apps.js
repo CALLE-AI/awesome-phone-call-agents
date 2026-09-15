@@ -53,6 +53,16 @@ function maskPhone(phone) {
     return phone.slice(0, 3) + '•'.repeat(Math.max(phone.length - 6, 3)) + phone.slice(-3);
 }
 
+// Same masking, but for free-form text (a typed task, or evidence text
+// returned by CALL-E) where a phone number could appear anywhere in the
+// string rather than in a dedicated field. HTML-escaping alone does NOT
+// hide this — it only stops the text from being parsed as markup, it does
+// nothing to the digits themselves.
+function maskPhoneNumbersInText(text) {
+    if (!text) return text;
+    return String(text).replace(/\+\d{6,15}/g, (match) => maskPhone(match));
+}
+
 window.addEventListener('DOMContentLoaded', () => {
     const mainMenuScreen = document.getElementById('mainMenuScreen');
     const newCallScreen = document.getElementById('newCallScreen');
@@ -70,22 +80,14 @@ window.addEventListener('DOMContentLoaded', () => {
     const targetPhoneInput = document.getElementById('targetPhone');
     const englishPrompt = document.getElementById('englishPrompt');
     const historyList = document.getElementById('historyList');
+    const phoneInfoBtn = document.getElementById('phoneInfoBtn');
 
-    // Only prefills the country code when the field is EMPTY. It never
-    // rewrites a number the user has already entered — a business's phone
-    // number must not silently change just because a different language
-    // was picked afterward. If the code doesn't match the new language's
-    // country, that's now the user's call to notice and fix, not something
-    // this app does invisibly for them.
-    function prefillPhonePrefix() {
-        const selectedLang = targetLanguageDropdown.value;
-        const config = LANGUAGE_TO_RECIPIENT[selectedLang];
-        if (config && targetPhoneInput.value.trim() === "") {
-            targetPhoneInput.value = config.code;
-        }
+    // Interactive popup alert explaining supported international country codes when clicking '!'
+    if (phoneInfoBtn) {
+        phoneInfoBtn.addEventListener('click', () => {
+            window.alert("ℹ️ International Support Info:\n\nThis field supports global E.164 numbers including codes such as:\n• +91 (India)\n• +49 (Germany)\n• +34 (Spain)\n• +33 (France)\n• +81 (Japanese)\n\nType any valid destination number manually.");
+        });
     }
-
-    targetLanguageDropdown.addEventListener('change', prefillPhonePrefix);
 
     // Credential-free preview: if config.js is missing or still has
     // placeholder values, the UI still loads and is fully browsable —
@@ -106,7 +108,7 @@ window.addEventListener('DOMContentLoaded', () => {
             mainMenuScreen.style.display = 'none';
             newCallScreen.style.display = 'block';
             statusLog.innerText = "";
-            prefillPhonePrefix();
+            targetPhoneInput.value = ""; // Keep phone field clean for manual entry
         });
     }
 
@@ -148,7 +150,7 @@ window.addEventListener('DOMContentLoaded', () => {
                     <div class="history-content" data-index="${index}" style="cursor: pointer; flex: 1;">
                         <b>ID:</b> ${escapeHtml(call.id)} | <b>Status:</b> ${escapeHtml(call.status || 'unknown')}<br>
                         <b>Lang:</b> ${escapeHtml(call.language)} | <b>Phone:</b> ${escapeHtml(maskPhone(call.phone))}<br>
-                        <b>Task:</b> ${escapeHtml(call.task)}<br>
+                        <b>Task:</b> ${escapeHtml(maskPhoneNumbersInText(call.task))}<br>
                         <span style="color: #888; font-size: 11px;">${escapeHtml(call.time)}</span>
                     </div>
                 </div>
@@ -160,9 +162,7 @@ window.addEventListener('DOMContentLoaded', () => {
                 const idx = parseInt(el.getAttribute('data-index'), 10);
                 const currentHistory = JSON.parse(localStorage.getItem('co_runner_calls') || '[]');
                 const call = currentHistory[idx];
-                // textContent, not innerHTML — the reply text comes from
-                // CALL-E's API and must never be interpreted as markup.
-                replyLogContent.textContent = call.reply || 'No reply captured for this call yet.';
+                replyLogContent.textContent = maskPhoneNumbersInText(call.reply) || 'No reply captured for this call yet.';
                 replyLogBox.style.display = 'block';
             });
         });
@@ -190,45 +190,38 @@ window.addEventListener('DOMContentLoaded', () => {
         reviewCallBtn.addEventListener('click', () => {
             mainMenuScreen.style.display = 'none';
             historyScreen.style.display = 'block';
-            replyLogBox.style.display = 'none'; // reset on every open
+            replyLogBox.style.display = 'none'; 
             renderHistory();
         });
     }
 
     if (submitCallBtn) {
-        // Polls GET /v1/calls/{id} until the call reaches a terminal state
-        // (completed/failed/canceled) so we report what actually happened,
-        // not just that the request was accepted.
         async function pollCallStatus(callId, onUpdate, { timeoutMs = 90000, intervalMs = 3000 } = {}) {
             const deadline = Date.now() + timeoutMs;
             while (Date.now() < deadline) {
                 await new Promise(r => setTimeout(r, intervalMs));
                 try {
-                    // Never attach the API key to anything but the approved
-                    // CALL-E host, even if CALLE_CONFIG.BASE_URL were ever
-                    // wrong, corrupted, or pointed elsewhere.
                     if (CALLE_CONFIG.BASE_URL !== APPROVED_CALLE_BASE_URL) {
                         onUpdate('blocked: BASE_URL is not the approved CALL-E host');
                         return null;
                     }
                     const res = await fetch(`${APPROVED_CALLE_BASE_URL}/v1/calls/${encodeURIComponent(callId)}`, {
                         headers: { 'Authorization': `Bearer ${CALLE_CONFIG.API_KEY}` },
-                        redirect: 'error' // never silently follow a redirect off the approved host
+                        redirect: 'error'
                     });
-                    if (!res.ok) continue; // transient error, keep polling
+                    if (!res.ok) continue; 
                     const call = await res.json();
                     if (call.status === 'completed' || call.status === 'failed' || call.status === 'canceled') {
                         return call;
                     }
                     onUpdate(call.status);
                 } catch (netErr) {
-                    // Network hiccup mid-poll — don't kill the whole flow, just retry.
+                    // Network hiccup mid-poll — retry
                 }
             }
-            return null; // timed out while still queued/in_progress
+            return null; 
         }
 
-        // Pulls a short, readable message out of whatever CALL-E's API returned.
         function extractErrorMessage(rawText) {
             try {
                 const parsed = JSON.parse(rawText);
@@ -249,12 +242,10 @@ window.addEventListener('DOMContentLoaded', () => {
                 return;
             }
 
-            // Basic E.164 check (+ country code, 7-15 digits total) — catches
-            // typos before they burn a call credit on a request that would
-            // just get rejected server-side anyway.
+            // Basic E.164 check (+ country code, 7-15 digits total)
             if (!/^\+[1-9]\d{6,14}$/.test(phoneValue)) {
                 statusLog.style.color = "red";
-                statusLog.innerText = "! Error: Enter a valid number in E.164 format, e.g. +919746175295.";
+                statusLog.innerText = "! Error: Enter a valid number in E.164 format, e.g. +15551234567.";
                 return;
             }
 
@@ -262,18 +253,6 @@ window.addEventListener('DOMContentLoaded', () => {
             if (!recipient) {
                 statusLog.style.color = "red";
                 statusLog.innerText = `! Error: ${selectedLanguage} isn't a CALL-E supported call language yet.`;
-                return;
-            }
-
-            // The language dropdown and the phone number are independent
-            // fields now (on purpose — see prefillPhonePrefix above). That
-            // means nothing else stops a mismatched combination, like a
-            // French number paired with Hindi selected. Catch that here
-            // instead of silently sending an inconsistent region/locale
-            // pair to CALL-E.
-            if (!phoneValue.startsWith(recipient.code)) {
-                statusLog.style.color = "red";
-                statusLog.innerText = `! Error: ${selectedLanguage} expects a number starting with ${recipient.code}, but this number doesn't. Fix the number or change the language.`;
                 return;
             }
 
@@ -285,11 +264,8 @@ window.addEventListener('DOMContentLoaded', () => {
                 return;
             }
 
-            // Explicit destination authorization: the user must see and
-            // confirm the exact number and language before a real call (and
-            // a real credit) goes out. Nothing dials automatically.
             const authorized = window.confirm(
-                `You're about to call ${phoneValue} in ${selectedLanguage}. This will use one CALL-E credit. Continue?`
+                `You're about to call ${maskPhone(phoneValue)} in ${selectedLanguage}. This will use one CALL-E credit. Continue?`
             );
             if (!authorized) return;
 
@@ -300,10 +276,6 @@ window.addEventListener('DOMContentLoaded', () => {
             let callRecord = null;
 
             try {
-                // The call itself is conducted in the recipient's language
-                // (that's the whole point). But we always want the evidence
-                // reported back to *us* in English, so we say so explicitly
-                // rather than relying on an undocumented default.
                 const taskWithReportingInstruction =
                     `${promptValue} After the call, report your findings and evidence in English, regardless of the language the conversation was conducted in.`;
 
@@ -314,7 +286,7 @@ window.addEventListener('DOMContentLoaded', () => {
                         'Content-Type': 'application/json',
                         'Idempotency-Key': `web_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`
                     },
-                    redirect: 'error', // never silently follow a redirect off the approved host
+                    redirect: 'error',
                     body: JSON.stringify({
                         task: taskWithReportingInstruction,
                         recipients: [
@@ -337,7 +309,7 @@ window.addEventListener('DOMContentLoaded', () => {
                     language: selectedLanguage,
                     task: promptValue,
                     time: new Date().toLocaleString(),
-                    status: call.status // updated below once we know the real outcome
+                    status: call.status 
                 };
 
                 statusLog.style.color = "#555";
@@ -351,14 +323,13 @@ window.addEventListener('DOMContentLoaded', () => {
                     callRecord.status = "still queued (check dashboard)";
                     callRecord.reply = "Call did not finish in time — no reply captured yet. Check the CALL-E dashboard for this call ID.";
                     statusLog.style.color = "orange";
-                    statusLog.innerText = `⏳ Still not resolved after 90s — check the CALL-E dashboard for ${call.id} (India may currently have regional restrictions in effect).`;
+                    statusLog.innerText = `⏳ Still not resolved after 90s — check the CALL-E dashboard for ${call.id}.`;
                 } else if (finalCall.status === 'completed') {
-                    // Real fields from CALL-E's API: task_completed (bool) and
-                    // evidence (array of short strings) — there is no "summary" field.
                     const taskDone = finalCall.task_completed === true;
-                    const evidenceText = Array.isArray(finalCall.evidence) && finalCall.evidence.length
+                    const rawEvidence = Array.isArray(finalCall.evidence) && finalCall.evidence.length
                         ? finalCall.evidence.join(' ')
                         : 'Call finished — no evidence details returned.';
+                    const evidenceText = maskPhoneNumbersInText(rawEvidence);
                     callRecord.status = taskDone ? "completed (task done)" : "completed (task unconfirmed)";
                     callRecord.reply = evidenceText;
                     statusLog.style.color = taskDone ? "green" : "orange";
@@ -371,7 +342,7 @@ window.addEventListener('DOMContentLoaded', () => {
                 }
             } catch (err) {
                 statusLog.style.color = "red";
-                statusLog.innerText = !err.message ? "! Error occurred." : `! Error: ${err.message}`;
+                statusLog.innerText = !err.message ? "! Error occurred." : `! Error: ${maskPhoneNumbersInText(err.message)}`;
             } finally {
                 if (callRecord) {
                     const history = JSON.parse(localStorage.getItem('co_runner_calls') || '[]');
