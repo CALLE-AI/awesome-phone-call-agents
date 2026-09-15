@@ -22,17 +22,18 @@ specs the caller supplies.
 - No emotion detection, stress scoring, deception scoring, or voice biometrics —
   and none are possible by construction, since CALL-E exposes no audio, only
   transcript text and integer turn offsets.
-- Grades attach to the **organisation** called, never the individual who answered.
-  `recipientId` is an organisation-level identifier; the output schema carries no
-  name, phone number, or speaker identifier, and `test/grade.test.ts` asserts this.
+- Hosts should attach grades to the **organisation** called, not the individual.
+  The schema has no dedicated profile fields, but caller-supplied IDs, values and
+  answer spans can still identify people. Supply organization-level IDs and redact
+  display/export copies; this grader does not anonymize or mutate private evidence.
 - A low grade means *the call did not establish this*, never *this person lied*.
 
 See [ethics.md](ethics.md) for the full boundary statement.
 
 ## Data minimisation
 
-Transcript spans are retained only as the minimum quote supporting one graded
-field — never the full transcript. The bundled fixtures are entirely synthetic:
+Output spans retain the selected answer text for one graded field; they are not
+automatically filtered for personal information. The bundled fixtures are entirely synthetic:
 invented businesses, invented order numbers, no real phone numbers anywhere in
 this skill.
 
@@ -42,7 +43,8 @@ Grades are an **ordering of trust, not a measurement of truth** (they are not ye
 validated against outcomes — see [limitations.md](limitations.md)). The consumer
 rule is part of the safety contract:
 
-- act automatically only on `verified`;
+- treat `verified` as advisory evidence subject to the host's own validation, not
+  proof of truth or independent authorization to act;
 - keep a human in the loop for `asserted`;
 - never auto-act on `assumed` or `unstated`.
 

@@ -1,8 +1,10 @@
 # Ethics boundary
 
-This skill grades **behaviour, not people.** The boundary is structural, not
-aspirational — it is enforced by what the code can and cannot see, and tested
-(`test/grade.test.ts` asserts the output schema carries no person-identifying field).
+This skill is intended to grade **transcript evidence, not people**. The schema
+omits dedicated person-profile fields, but that is not structural anonymization:
+caller-supplied IDs, values and exact answer spans may contain identifying data.
+The caller is responsible for appropriate use, input minimization and redaction
+of any display/export copies; the grader leaves evidence unchanged.
 
 ## No inference about the person
 
@@ -16,11 +18,9 @@ aspirational — it is enforced by what the code can and cannot see, and tested
 
 ## Grades attach to organisations
 
-- Grades are stored against the **organisation** called, never the individual who
-  answered. `recipientId` in the output contract is an organisation-level
-  identifier. No field in the output can identify the person — no name, no direct
-  phone line, no speaker identifier. (`concord` in this repository sets the
-  precedent for organisation-level records; this skill follows it.)
+- Hosts should store grades against the **organisation** called, not the individual
+  who answered. Supply an organisation-level `recipientId`; the pure grader does
+  not validate that meaning and does not remove personal data from free-text fields.
 
 ## What a low grade means
 
@@ -34,8 +34,9 @@ was never confirmed.
 
 ## Data minimisation
 
-- Transcript spans are retained only as the minimum quote supporting one field —
-  never the full transcript, never turns unrelated to a graded field.
+- Output spans contain the selected answer text for a graded field and may include
+  incidental personal information. Hosts must minimize retention and sanitize
+  copies before display/export; selection is not automatic privacy filtering.
 - The grader is a pure function over the turns it is handed. It stores nothing,
   transmits nothing, and calls no network in any code path (enforced in tests:
   the entire suite runs offline).

@@ -1,7 +1,0 @@
-{
-  "tool_name": "Bash",
-  "tool_input_preview": "{\"command\":\"say -v '?' 2>&1 | head -80; echo \\\"---\\\"; which edge-tts piper ffmpeg ffprobe afinfo afconvert 2>&1\",\"description\":\"List TTS voices and check for TTS tools\"}",
-  "error": "Exit code 1\nAlbert              en_US    # Hello! My name is Albert.\nAlice               it_IT    # Ciao! Mi chiamo Alice.\nSoumya              kn_IN    # Hello! My name is Soumya.\nAlva                sv_SE    # Hej! Jag heter Alva.\nAman                en_IN    # Hello! My name is Aman.\nAmélie              fr_CA    # Bonjour! Je m’appelle Amélie.\nAmira               ms_MY    # Helo! Nama saya Amira.\nAnna                de_DE    # Hallo! Ich heiße Anna.\nAru                 kk_KZ    # Hello! My nam...",
-  "timestamp": "2026-09-14T13:15:18.986Z",
-  "retry_count": 1
-}

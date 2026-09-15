@@ -105,7 +105,7 @@ describe('fail-closed properties', () => {
     expect(result.weakestGrade).toBe('assumed');
   });
 
-  it('output contains no fields identifying the person who answered', () => {
+  it('output omits dedicated person-profile fields, not identifying free text', () => {
     const fx = fixtures[0];
     const result = gradeCall({
       callId: fx.id,

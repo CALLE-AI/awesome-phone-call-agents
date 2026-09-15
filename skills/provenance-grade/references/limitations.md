@@ -16,8 +16,9 @@ corroborating specific (C), and B/C/D are weighted above it.
 The grader sees CALL-E's transcript, not the audio. If ASR drops "should be" or
 mangles "let me check", signals D and B silently miss. Fail-closed helps in one
 direction (a missed B can only *under*-grade), but a missed hedge *over*-grades to
-`asserted`. No mitigation beyond the fail-closed ceiling: an ASR miss can never
-produce `verified`, because verified needs two independent positive signals.
+`asserted` or even `verified` when other positive heuristics are present. Multiple
+signals do not guarantee independence or compensate for missing transcript words;
+the labels remain advisory and require host validation.
 
 ## 3. The lexicon is English-centric
 

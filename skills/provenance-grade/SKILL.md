@@ -1,6 +1,6 @@
 ---
 name: provenance-grade
-description: Attach a knowledge grade — verified / asserted / assumed — to every field a CALL-E phone agent extracts, computed from the transcript turns the API already returns. Tells a workflow whether the answer was looked up, stated from memory, or guessed.
+description: Attach an advisory knowledge grade — verified / asserted / assumed — to fields a CALL-E phone agent extracts, using heuristic signals in the transcript turns the API returns.
 ---
 
 # provenance-grade
@@ -40,13 +40,15 @@ Against the other skills here: `call-summarizer` summarises after the fact.
 
 | Grade | Meaning |
 |---|---|
-| `verified` | The speaker demonstrably consulted something: a lookup pause or explicit check language, **plus** an unrequested corroborating specific, **plus** read-back compliance where it was requested. |
+| `verified` | The heuristic detects a lookup pause or explicit check language, **plus** an unrequested corroborating specific, **plus** read-back compliance where requested. This label is not proof that a lookup occurred or that the answer is true. |
 | `asserted` | Answered directly and cleanly, but nothing established where the value came from. |
 | `assumed` | Hedged, deferred, misaligned with the question, or a bare round number. The call did not establish this value. |
 | `unstated` | The field never appeared in the transcript (voicemail, IVR, unanswered question). Never a grade — there is nothing to grade. |
 
-**Consumer rule:** a workflow may act on `verified`, may act on `asserted` with a
-human in the loop, and must never auto-act on `assumed` or `unstated`.
+**Consumer rule:** grades are advisory inputs to the host's own validation, not
+independent authorization to act. Keep a human in the loop for `asserted`, and
+never auto-act on `assumed` or `unstated`. The high-stakes prohibitions in
+[references/safety.md](references/safety.md) apply to every grade, including `verified`.
 
 **Fail-closed:** the default is `assumed`. `asserted` must be earned, `verified` must
 be earned twice. Absence of signal never upgrades a field. This is the same
@@ -170,9 +172,10 @@ This skill grades **behaviour, not people.**
 - No emotion detection, no stress or deception scoring, no voice biometrics. (Also
   impossible here by construction: CALL-E exposes no audio to grade — only transcript
   text and integer offsets.)
-- Grades are stored against the **organisation**, never the individual who answered.
-  No field in the output can identify the person. (`concord` in this repo sets the
-  precedent; this follows it.)
+- Hosts should associate grades with an **organisation**, not an individual.
+  This pure grader does not enforce identifier contents or anonymize input: values,
+  transcript spans and caller-supplied IDs may identify people. The caller must
+  minimize inputs and redact display/export copies before sharing them.
 - A low grade means *the call did not establish this*, never *this person lied*.
 - Transcript spans are retained only as the minimum quote supporting one field.
 
