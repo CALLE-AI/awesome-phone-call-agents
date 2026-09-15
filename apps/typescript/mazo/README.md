@@ -66,10 +66,10 @@ To maintain clear and honest boundaries, here is what this standalone CLI runner
 ### Implemented in this CLI Runner:
 - **Goal Compilation**: Generates structured CALL-E goals based on coach archetypes, client identity, and session modes (`kickoff` vs. `followup`).
 - **Safe Dry-Run Simulation**: Default zero-side-effect simulation with pre-baked demonstration fixtures.
-- **One-Shot Call Dispatch**: Outbound dispatch via CALL-E CLI (`calle call plan`) with fallback to direct CALL-E REST API (`POST /v1/calls`).
+- **Planning-Only CLI Path & Outbound REST Fallback**: The successful CLI path (`calle call plan`) is planning-only; `calle call plan` creates and validates the call task schema but does not place the advertised outbound call. Live outbound phone dialing requires provider execution or direct CALL-E REST API dispatch (`POST /v1/calls`) with an authorized API key.
 - **Strict Destination Authorization**: Requires an explicit authorized E.164 destination in live mode and enforces non-empty `ALLOWED_RECIPIENTS`.
-- **Pre-Call Operator Gate**: Interactive confirmation prompt (`y/N`) before initiating any live call.
-- **Privacy & PII Masking**: Automatically masks phone numbers, tokens, CLI plan responses, REST error bodies, and subprocess outputs.
+- **Pre-Call Operator Gate**: Interactive confirmation prompt (`y/N`) before initiating any live call plan.
+- **Privacy & PII Masking**: Automatically masks phone numbers, client usernames, session topics, goal prompts, structured plan secrets (including quoted JSON `confirmation_token` keys), REST error bodies, and subprocess outputs.
 
 ### Host-Scheduler & Platform Boundaries (Not Implemented in this CLI):
 - **Automated Recurring Scheduling**: This script is a one-shot dispatcher. Automated recurring routines (e.g., morning 8:30 AM kickoffs or evening verifications) must be managed by an external host scheduler (such as cron, an n8n workflow, or an agent platform).
@@ -104,7 +104,7 @@ Telephony agents interact with the physical world and require rigorous safeguard
 4. **Strict E.164 Phone Sanitization**:
    All phone inputs are validated against `^\+[1-9]\d{6,14}$`. Malformed numbers fail closed immediately.
 5. **Comprehensive PII & Sensitive Output Masking**:
-   Phone numbers are masked across all console logs, validation errors, CLI plan outputs, REST error payloads, and subprocess messages (`+15****99`). Bearer tokens and credentials are automatically redacted.
+   Phone numbers are masked across all console logs, validation errors, CLI plan outputs, REST error payloads, and subprocess messages (`+15****99`). Client usernames (`O***r`), session topics (`Fina***ine`), goal prompts (`[REDACTED_GOAL_PROMPT]`), Bearer tokens, and structured plan secrets (including quoted JSON `confirmation_token` keys) are automatically redacted.
 6. **Explicit Human Confirmation Gate**:
    Live calls require interactive user confirmation (`y/N`) before dialing out, preventing inadvertent dispatches.
 7. **Submitted-Call Cancellation Limits**:
@@ -146,16 +146,16 @@ Output:
             Powered by CALL-E Phone Engine            
 ======================================================
 
-👤 Client:   Omar
+👤 Client:   O***r
 🎯 Coach:    The Clarifier
 📞 Recipient: +15****99
-💡 Topic:    Finalizing Product Launch Timeline
+💡 Topic:    Fina***ine
 🔄 Call Type: Momentum Kickoff Call
 ⚡ Mode:     🟢 DRY-RUN (Safe Simulation)
 
 --- [DRY-RUN SIMULATION] ---
 • Validating coach persona and prompt constraints: PASS
-• Generated CALL-E Goal: "You are The Clarifier, an elite executive coach in Mazō calling Omar..."
+• Generated CALL-E Goal: "You are The Clarifier, an... [REDACTED_GOAL_PROMPT]"
 • Simulating call plan generation with CALL-E engine...
 • Simulated Call Plan ID: plan_mazo_kickoff_72819
 • Simulated Call Status: COMPLETED (Duration: 2m 15s)

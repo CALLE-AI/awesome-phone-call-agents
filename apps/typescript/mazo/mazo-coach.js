@@ -49,6 +49,29 @@ function maskPhone(phone) {
   return trimmed.slice(0, 3) + '****' + trimmed.slice(-2);
 }
 
+function maskUser(user) {
+  if (!user || typeof user !== 'string') return '***';
+  const trimmed = user.trim();
+  if (trimmed.length <= 2) return `${trimmed[0] || ''}***`;
+  return `${trimmed[0]}***${trimmed.slice(-1)}`;
+}
+
+function maskTopic(topic) {
+  if (!topic || typeof topic !== 'string') return '***';
+  const trimmed = topic.trim();
+  if (trimmed.length <= 6) return `${trimmed.slice(0, 1)}***`;
+  return `${trimmed.slice(0, 4)}***${trimmed.slice(-3)}`;
+}
+
+function maskGoal(goal) {
+  if (!goal || typeof goal !== 'string') return '***';
+  const sanitized = maskSensitiveOutput(goal);
+  if (sanitized.length > 35) {
+    return `${sanitized.slice(0, 25)}... [REDACTED_GOAL_PROMPT]`;
+  }
+  return '[REDACTED_GOAL_PROMPT]';
+}
+
 function maskSensitiveOutput(str, explicitTarget = targetPhone) {
   if (!str) return '';
   let sanitized = String(str);
@@ -58,9 +81,21 @@ function maskSensitiveOutput(str, explicitTarget = targetPhone) {
   // Mask any E.164 numbers (+ followed by 7-15 digits)
   sanitized = sanitized.replace(/\+[1-9]\d{6,14}/g, match => maskPhone(match));
   // Mask Bearer tokens
-  sanitized = sanitized.replace(/Bearer\s+[A-Za-z0-9_\-\.]+/gi, 'Bearer [REDACTED]');
-  // Mask generic API keys or secrets
-  sanitized = sanitized.replace(/(?:key|token|secret|password|auth|authorization)[=:\s]+['"]?[A-Za-z0-9_\-\.]{8,}['"]?/gi, '$1=[REDACTED]');
+  sanitized = sanitized.replace(/Bearer\s+[^\s"'\r\n,}]+/gi, 'Bearer [REDACTED]');
+  // Mask structured plan secrets, quoted JSON confirmation_token keys, API keys, and auth credentials
+  sanitized = sanitized.replace(
+    /(["']?[A-Za-z0-9_]*(?:key|token|secret|password|auth|authorization|credential)[A-Za-z0-9_]*["']?\s*[:=\s]\s*)(["']?)(?!Bearer\b)(?!\[REDACTED\])[^\s"'\r\n,}]+(\2)/gi,
+    '$1$2[REDACTED]$2'
+  );
+  // Mask user/topic/goal in structured plan / JSON output
+  sanitized = sanitized.replace(
+    /(["']?(?:user|client|topic|goal|task)["']?\s*[:=]\s*)(["'])(?:\\.|[^\\])*?(\2)/gi,
+    '$1$2[REDACTED]$2'
+  );
+  sanitized = sanitized.replace(
+    /(["']?(?:user|client|topic|goal|task)["']?\s*[:=]\s*)([^\s,"'{}]+)/gi,
+    '$1[REDACTED]'
+  );
   return sanitized;
 }
 
@@ -120,10 +155,10 @@ async function main() {
     }
   }
 
-  console.log(`👤 Client:   ${userName}`);
+  console.log(`👤 Client:   ${maskUser(userName)}`);
   console.log(`🎯 Coach:    ${coachRole}`);
   console.log(`📞 Recipient: ${maskPhone(targetPhone)}`);
-  console.log(`💡 Topic:    ${sessionTopic}`);
+  console.log(`💡 Topic:    ${maskTopic(sessionTopic)}`);
   console.log(`🔄 Call Type: ${sessionMode === 'followup' ? 'Follow-Up Verification Check-in' : 'Momentum Kickoff Call'}`);
   console.log(`⚡ Mode:     ${isLive ? '🔴 LIVE CALL' : '🟢 DRY-RUN (Safe Simulation)'}\n`);
 
@@ -137,7 +172,7 @@ async function main() {
   if (!isLive) {
     console.log('--- [DRY-RUN SIMULATION] ---');
     console.log('• Validating coach persona and prompt constraints: PASS');
-    console.log(`• Generated CALL-E Goal: "${callGoal.slice(0, 110)}..."`);
+    console.log(`• Generated CALL-E Goal: "${maskGoal(callGoal)}"`);
     console.log('• Simulating call plan generation with CALL-E engine...');
     console.log(`• Simulated Call Plan ID: plan_mazo_${sessionMode}_${Math.floor(10000 + Math.random() * 90000)}`);
     console.log('• Simulated Call Status: COMPLETED (Duration: 2m 15s)');
@@ -160,14 +195,16 @@ async function main() {
     }
   }
 
-  console.log('🚀 Dispatching live call via CALL-E...');
+  console.log('🚀 Initiating CALL-E live planning and integration pipeline...');
 
   const apiKey = process.env.CALLE_API_KEY || process.env.EXPO_PUBLIC_CALLE_API_KEY;
 
-  // Try CLI execution first
+  // Try CLI execution first (planning-only)
   execFile('calle', ['call', 'plan', '--to-phone', targetPhone, '--goal', callGoal], async (err, stdout, stderr) => {
     if (!err) {
-      console.log('✅ CALL-E call plan created via CLI:', maskSensitiveOutput(stdout.trim()));
+      console.log('📋 [PLANNING-ONLY] CALL-E call plan created via CLI (planning-only; call plan does not place the advertised outbound call):');
+      console.log(maskSensitiveOutput(stdout.trim()));
+      console.log('ℹ️ Notice: "calle call plan" compiles and validates the call task schema but does not place the outbound call. Actual outbound phone dialing requires provider execution or direct CALL-E REST API dispatch.');
       return;
     }
 
@@ -264,6 +301,9 @@ if (require.main === module) {
 module.exports = {
   isValidE164,
   maskPhone,
+  maskUser,
+  maskTopic,
+  maskGoal,
   maskSensitiveOutput,
   validateLiveAuthorization,
   buildCallGoal,

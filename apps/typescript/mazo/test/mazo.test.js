@@ -3,6 +3,9 @@ const assert = require('node:assert/strict');
 const {
   isValidE164,
   maskPhone,
+  maskUser,
+  maskTopic,
+  maskGoal,
   maskSensitiveOutput,
   validateLiveAuthorization,
   buildCallGoal,
@@ -121,6 +124,34 @@ test('Privacy, PII and sensitive output masking', async (t) => {
     assert.ok(!clean.includes('eyJhbGciOiJIUzI1Ni'));
     assert.ok(!clean.includes('iams_live_1234567890'));
     assert.ok(clean.includes('Bearer [REDACTED]'));
+  });
+
+  await t.test('11. user, topic, and prompt goal output masked', () => {
+    assert.equal(maskUser('Omar'), 'O***r');
+    assert.equal(maskUser('Sara'), 'S***a');
+    assert.equal(maskTopic('Finalizing Launch Plan'), 'Fina***lan');
+    const maskedGoal = maskGoal('You are The Clarifier, calling Omar for a momentum check-in session');
+    assert.ok(maskedGoal.includes('[REDACTED_GOAL_PROMPT]'));
+    assert.ok(!maskedGoal.includes('check-in session'));
+  });
+
+  await t.test('12. quoted JSON confirmation_token keys and structured plan secrets redacted', () => {
+    const jsonPlan = '{"plan_id":"plan_9901","confirmation_token":"c7a8b9f012345678","to_phone":"+15555550199","status":"planned"}';
+    const clean = maskSensitiveOutput(jsonPlan);
+    assert.ok(!clean.includes('c7a8b9f012345678'));
+    assert.ok(clean.includes('"confirmation_token":"[REDACTED]"') || clean.includes('"confirmation_token": "[REDACTED]"'));
+    assert.ok(clean.includes('+15****99'));
+  });
+
+  await t.test('13. user, topic, and goal in structured JSON outputs redacted', () => {
+    const structuredPlan = '{"user":"Omar Aloush","topic":"Q3 Launch Roadmap","goal":"Conduct executive triage call"}';
+    const clean = maskSensitiveOutput(structuredPlan);
+    assert.ok(!clean.includes('Omar Aloush'));
+    assert.ok(!clean.includes('Q3 Launch Roadmap'));
+    assert.ok(!clean.includes('Conduct executive triage call'));
+    assert.ok(clean.includes('"user":"[REDACTED]"') || clean.includes('"user": "[REDACTED]"'));
+    assert.ok(clean.includes('"topic":"[REDACTED]"') || clean.includes('"topic": "[REDACTED]"'));
+    assert.ok(clean.includes('"goal":"[REDACTED]"') || clean.includes('"goal": "[REDACTED]"'));
   });
 });
 
