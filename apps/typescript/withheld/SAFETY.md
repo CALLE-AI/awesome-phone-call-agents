@@ -44,7 +44,7 @@ has four independent enforcement points:
 | Errand load | A may_say list containing the person's own number is refused; no script is generated. |
 | Script generation | `buildScript` refuses to emit a script containing the number. `safeToDial` is false and the CLI will not proceed. |
 | Request construction | The result schema sent to CALL-E has no field for a phone number in either direction. There is nothing to fill in. |
-| After the call | Every leg re-scans the caller's turns for the number in any form — punctuated, regrouped, or read aloud as "oh double seven oh oh…". |
+| After the call | Every leg re-scans the caller's turns for the number in the forms the scanner handles: punctuated, regrouped, and read aloud as "oh double seven oh oh…". It is a pattern scan, not comprehension, and the schema above — not this scan — is the control. |
 
 A leg that discloses the number becomes `outcome_unknown` and stops the chain,
 **even if the errand was otherwise completed successfully.** A booking obtained
@@ -162,9 +162,17 @@ the person is probably free.
 
 ## 8. No duplicate calls
 
-Every leg carries `idempotencyKey: <errand_id>:leg-<n>`, stable across retries.
-A crash between submitting a call and recording it cannot put a second call
-through to the same person.
+Every leg carries `idempotencyKey: <errand_id>:leg-<n>`, stable across retries,
+and on the SDK path CALL-E collapses a repeat of the same key. Within that path,
+a crash between submitting a call and recording it does not put a second call
+through — the guarantee is the provider's, not this app's, and it is only as
+good as CALL-E's own deduplication.
+
+The MCP CLI path exposes no idempotency key at all. There, nothing prevents a
+duplicate, so the app does not pretend otherwise: a submission that may already
+be in flight is marked `retry_safe: false` and the leg stops for a human. Not
+re-dialling is the entire mitigation. Re-dialling a real person "to be safe" is
+not safe.
 
 A chain also stops after `maxLegs` (default 3) whatever happens. An errand that
 will not converge is an errand for a human, not a reason to keep dialing.
@@ -182,9 +190,13 @@ discarding the `ScheduledIntent` — there is no background job to kill, no
 subscription to end, and no state that keeps dialing if you walk away. A process
 that is not running cannot call anybody.
 
-An in-flight call can be stopped with Ctrl-C, and `run --real` waits three
-seconds after announcing the callee before dialing, specifically so that is
-possible.
+Before a call is placed, Ctrl-C stops it: `run --real` waits three seconds after
+announcing the callee before dialling, specifically so that is possible.
+
+After a call is placed, Ctrl-C ends this process and nothing more. It abandons
+the poll loop; it does not reach CALL-E and does not hang up a call already
+connected. The call runs to its own end on the provider's side. Treat the
+three-second pause, not Ctrl-C, as the cancellation point.
 
 ---
 
