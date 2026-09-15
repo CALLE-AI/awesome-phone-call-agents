@@ -29,7 +29,7 @@ Awesome Phone Call Agents is an early community hub for developers and workflow 
 | [`apps/typescript/headcount`](apps/typescript/headcount/) | TypeScript / Next.js | CDC CASPER-style disaster household needs assessment: the unreached count is the product, voicemail is not a reach, unsupported fields strike through, and fail-closed cards go to a human. Fixture replay by default. |
 | Agent Skills | Customer callbacks, appointment confirmation, lead qualification, order exception follow-up, service dispatch, incident escalation | `skills/` |
 | Workflow Plugins | Dify tools, n8n nodes, Zapier actions, HubSpot workflow actions, Feishu/Lark automation nodes | `plugins/` |
-| User-facing Apps | Call chat, call review console, call scheduler UI, customer callback app, business call workbench | [Vanguard](apps/typescript/vanguard) | TypeScript / Vike | Real-time telemetry, orchestration, and AI telephony engine for Call-E calls & token usage. |
+| User-facing Apps | Call chat, call review console, call scheduler UI, customer callback app, business call workbench | `apps/` |
 
 The community roadmap is a direction guide, not a fixed release plan. Small examples, platform notes, workflow sketches, templates, and focused demos are all useful.
 
@@ -387,6 +387,8 @@ Externally hosted user-facing apps built on CALL-E. They live in their own repos
 - [DischargePulse](https://github.com/Temake/DischargePulse) - Hospital discharge placement agent that calls skilled nursing facility admissions lines through CALL-E, verifies each care requirement from a runtime result schema, re-plans when a facility contradicts its directory record, and stops at a human approval gate, with replay and scripted no-call modes. See the [integration notes](docs/community-apps/dischargepulse.md).
 
 - [Off the Hook: The Memory Line](https://github.com/tivastreasures-ops/off-the-hook) - Operator-character message-taking line: CALL-E conducts an in-character disclosed-automation call (free tier) that can terminate on a physical rotary phone via SIP/ATA, with structured results rendered as a keepsake Message Slip; paid tier adds a custom ElevenLabs voice, Stripe billing, and email-keyed call balances. Live:[The Memory Line](https://off-the-hook.replit.app)
+
+- [Vanguard](apps/typescript/vangaurd/) - External TypeScript/Vike dashboard for CALL-E call orchestration, telemetry and token usage.
 
 ### Plugins
 
