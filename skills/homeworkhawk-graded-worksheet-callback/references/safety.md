@@ -67,9 +67,11 @@ A failed gate is logged as `blocked_ambiguous` with the reason and
 
 ## Cancellation behavior and limits
 
-- While the call is **pending** (created, not yet connected): it can
-  be cancelled at any moment via the CALL-E cancel endpoint or by
-  stopping the workflow (Ctrl-C) before `createAndWait` resolves.
+- Stop **before submission** to avoid placing the call. Once submitted,
+  stopping the local workflow (Ctrl-C) or timing out while waiting for
+  `createAndWait` does not confirm provider cancellation. The submitted
+  call may still connect or continue; this reference does not implement
+  provider-side cancellation.
 - Once the call is **live**: the operator cannot silently drop in —
   cancellation is in the parent's hands. The parent can hang up at any
   time; the agent ends politely and marks the call `ended_by_parent`.

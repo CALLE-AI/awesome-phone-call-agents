@@ -115,10 +115,10 @@ Full rules in [references/safety.md](references/safety.md). Summary:
   result to the app for a human to review first.
 - **Advisory framing.** The script reports what to review together —
   never "your child failed", never a grade, never a ranking.
-- **Cancellation limits.** A pending call can be cancelled any time
-  before it connects (`POST /calls/{id}:cancel` or Ctrl-C before the
-  SDK returns). Once the call is live, cancellation is in the parent's
-  hands: they hang up, and the agent ends politely. The skill never
+- **Cancellation limits.** Stop before submission to avoid placing the
+  call. After submission, Ctrl-C only stops the local workflow; it does
+  not confirm provider cancellation, and the call may still connect or
+  continue. The parent can hang up, and the agent ends politely. The skill never
   redials on its own — at most one call per worksheet, ever.
 - **No schedules, no duplicates.** No hidden recurring jobs; one call
   per worksheet idempotency key; a follow-up session is booked as a
