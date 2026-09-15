@@ -1,0 +1,403 @@
+.workflow-panel > .preview-card {
+  display: none;
+}
+
+@media (min-width: 1101px) {
+  .content {
+    display: grid;
+    grid-template-columns: 200px minmax(0, .8fr) minmax(0, 1.2fr);
+    gap: 16px;
+    align-items: start;
+    padding-top: 28px;
+  }
+
+  .content > .hero,
+  .content > .alert,
+  .content > .workflow-gallery,
+  .content > .lower-grid { grid-column: 1 / -1; }
+
+  .workspace-grid { display: contents; }
+  .roster-panel { grid-column: 1; }
+  .workflow-panel { grid-column: 2; }
+  .job-panel { grid-column: 3; margin-top: 0; }
+  .lower-grid { margin-top: 0; }
+
+  .hero { margin-bottom: 0; align-items: center; }
+  .hero h1 { font-size: clamp(30px, 3.7vw, 48px); max-width: 680px; }
+  .hero-copy { font-size: 13px; line-height: 1.45; margin-top: 10px; }
+  .hero-note { min-width: 205px; padding: 12px; }
+
+  .workflow-gallery { margin-bottom: 0; }
+  .workflow-gallery .panel-heading { padding: 14px 18px 10px; }
+  .workflow-gallery .section-copy { display: none; }
+  .workflow-cards { gap: 8px; padding: 10px 18px 12px; }
+  .workflow-card { min-height: 104px; padding: 11px; gap: 5px; }
+  .workflow-card strong { font-size: 13px; }
+  .workflow-card > span:not(.workflow-kind) { font-size: 10px; line-height: 1.3; }
+  .workflow-card small { font-size: 9px; }
+  .demo-rail { gap: 10px; margin: 0 18px 14px; padding: 9px 12px; }
+  .demo-rail span { font-size: 9px; }
+  .demo-rail .eyebrow { font-size: 8px; }
+  .demo-rail strong { font-size: 11px; }
+
+  .form-grid { gap: 9px; padding: 14px 18px 2px; }
+  .form-grid label { gap: 5px; font-size: 10px; }
+  .form-grid input,
+  .form-grid select { padding: 8px 9px; font-size: 11px; }
+  .workflow-panel > .button-row { padding: 12px 18px 14px; }
+  .primary-button,
+  .secondary-button,
+  .ghost-button { padding: 8px 11px; font-size: 11px; }
+  .preview-card { margin: 0 18px 16px; padding: 12px; }
+  .preview-card h3 { font-size: 12px; }
+  .task-copy { font-size: 10px; line-height: 1.4; margin: 9px 0; }
+  .preview-meta { gap: 5px; font-size: 9px; }
+  .preview-meta span { padding: 4px 5px; }
+  .preview-warning { margin-top: 8px; padding-top: 8px; font-size: 9px; }
+
+  .roster-panel .panel-heading { padding: 14px 14px 10px; }
+  .roster-panel .panel-heading h2 { font-size: 15px; }
+  .employee-list { padding: 5px; }
+  .employee-row { padding: 8px 7px; gap: 7px; }
+  .employee-row strong { font-size: 11px; }
+  .employee-row small { font-size: 9px; margin-top: 2px; }
+  .avatar { width: 27px; height: 27px; }
+  .roster-note { display: none; }
+
+  .job-panel .panel-heading { padding: 14px 16px 10px; }
+  .job-panel .section-copy { display: none; }
+  .job-detail { padding: 15px; }
+  .job-summary { padding-bottom: 10px; }
+  .job-summary h3 { font-size: 15px; }
+  .job-summary p { font-size: 10px; margin-top: 4px; }
+  .job-id { font-size: 9px; }
+  .approval-box,
+  .progress-box { gap: 10px; padding: 11px; margin-top: 11px; }
+  .approval-box p,
+  .progress-box p { font-size: 10px; margin-top: 4px; }
+  .result-grid { gap: 10px; margin-top: 12px; }
+  .result-main,
+  .evidence-panel { padding: 12px; }
+  .result-heading h3 { font-size: 13px; }
+  .result-fields { gap: 5px; margin: 10px 0; }
+  .result-fields div { padding: 7px; }
+  .result-fields span { font-size: 8px; }
+  .result-fields strong { font-size: 10px; margin-top: 3px; }
+  .evidence-quote { font-size: 11px; padding: 9px 0; }
+  .evidence-panel { max-height: 245px; overflow: auto; }
+  .evidence-panel h4 { font-size: 10px; margin-bottom: 8px; }
+  .evidence-heading { padding-top: 10px; margin-top: 10px !important; }
+  .transcript-turn { padding: 7px; margin-bottom: 5px; }
+  .transcript-turn p,
+  .evidence-item { font-size: 9px; }
+  .success-note,
+  .muted-note { font-size: 10px; margin-top: 8px; }
+  .footer { padding: 18px 20px; }
+  .panel-heading { padding-top: 14px; }
+  .call-trace { margin-top: 8px; padding: 9px; }
+  .trace-list { gap: 6px; margin-top: 7px; }
+  .trace-event { gap: 6px; }
+  .trace-event strong { font-size: 9px; }
+  .trace-event div > span { font-size: 8px; }
+  .trace-event small { font-size: 7px; }
+  .trace-flow { gap: 4px; margin: 8px 0 6px; }
+  .trace-flow span { padding: 4px 5px; font-size: 8px; }
+  .empty-trace-note { font-size: 8px; }
+}
+
+@media (min-width: 1101px) and (max-height: 1000px) {
+  .topbar { height: 62px; }
+  .content { padding-top: 10px; padding-bottom: 6px; gap: 8px; }
+  .hero h1 { font-size: clamp(26px, 3vw, 36px); }
+  .hero-copy { max-width: 540px; font-size: 10px; line-height: 1.3; margin-top: 5px; }
+  .hero-note { font-size: 9px; padding: 7px 9px; }
+  .hero-note-small { font-size: 9px; margin-top: 3px; }
+  .workflow-gallery .panel-heading { padding: 7px 14px 5px; }
+  .workflow-gallery .panel-heading h2 { font-size: 14px; }
+  .workflow-cards { padding: 5px 14px 6px; gap: 6px; }
+  .workflow-card { min-height: 68px; padding: 6px; gap: 2px; }
+  .workflow-card strong { font-size: 11px; }
+  .workflow-card > span:not(.workflow-kind) { font-size: 9px; }
+  .workflow-card small { font-size: 8px; }
+  .demo-rail { margin: 0 14px 6px; padding: 5px 8px; }
+  .demo-rail span { display: none; }
+  .demo-rail strong { font-size: 9px; }
+  .form-grid { padding-top: 9px; gap: 6px; }
+  .form-grid input,
+  .form-grid select { padding: 6px 8px; }
+  .workflow-panel > .button-row { padding-top: 8px; padding-bottom: 9px; }
+  .preview-card { margin-bottom: 9px; padding: 9px; }
+  .task-copy { margin: 5px 0; font-size: 9px; }
+  .preview-warning { display: none; }
+  .job-panel .panel-heading { padding: 8px 12px 7px; }
+  .job-detail { padding: 8px; }
+  .call-trace { margin-top: 6px; padding: 7px; }
+  .trace-head { gap: 6px; }
+  .trace-head strong { font-size: 10px; }
+  .trace-provider { padding: 4px 5px; font-size: 7px; }
+  .trace-list { gap: 4px; margin-top: 5px; }
+  .trace-event { grid-template-columns: 6px minmax(0, 1fr) auto; gap: 5px; }
+  .trace-dot { width: 6px; height: 6px; margin-top: 3px; }
+  .trace-event strong { font-size: 8px; }
+  .trace-event div > span { font-size: 7px; line-height: 1.25; }
+  .trace-event small { font-size: 6px; }
+  .trace-empty { margin-top: 8px !important; }
+  .trace-flow { gap: 3px; margin: 6px 0 4px; }
+  .trace-flow span { padding: 3px 4px; font-size: 7px; }
+  .trace-flow i { font-size: 8px; }
+  .empty-trace-note { font-size: 7px; }
+  .job-panel { display: flex; flex-direction: column; }
+  .job-panel > .empty-state { flex: 1; display: grid; place-content: center; padding: 20px; }
+  .job-summary { padding-bottom: 7px; }
+  .approval-box,
+  .progress-box { margin-top: 7px; padding: 8px; }
+  .approval-box p,
+  .progress-box p { display: none; }
+  .result-grid { margin-top: 7px; gap: 7px; }
+  .result-main,
+  .evidence-panel { padding: 8px; }
+  .evidence-panel { max-height: 190px; }
+  .result-fields { margin: 7px 0; }
+  .evidence-quote { margin-bottom: 7px; }
+  .lower-grid { display: none; }
+  .footer { display: block; padding: 4px 20px 6px; font-size: 7px; line-height: 1.25; }
+}
+
+@media (max-width: 1100px) {
+  .job-panel { margin-top: 18px; }
+}
+
+@media (max-width: 680px) {
+  .persona-chip { display: none; }
+}
+
+/* Recording layout: keep the whole demo on one viewport. The workflow and
+   evidence panels scroll internally (with the scrollbar hidden) when a call
+   adds preview, approval, trace, transcript, and result content. */
+@media (min-width: 1101px) {
+  html,
+  body,
+  #root {
+    height: 100%;
+    overflow: hidden;
+  }
+
+  .app-shell {
+    height: 100vh;
+    min-height: 0;
+    overflow: hidden;
+    display: flex;
+    flex-direction: column;
+  }
+
+  .topbar {
+    flex: 0 0 auto;
+  }
+
+  .content {
+    flex: 1 1 auto;
+    min-height: 0;
+    height: auto;
+    overflow: hidden;
+    display: grid;
+    grid-template-columns: 200px minmax(0, .8fr) minmax(0, 1.2fr);
+    grid-template-rows: auto auto minmax(0, 1fr);
+    align-content: stretch;
+  }
+
+  .content > .hero,
+  .content > .alert,
+  .content > .workflow-gallery {
+    grid-column: 1;
+    grid-column: 1 / -1;
+  }
+
+  .content > .workspace-grid {
+    display: contents;
+  }
+
+  .content > .workspace-grid > .panel,
+  .content > .job-panel {
+    min-height: 0;
+    height: 100%;
+    min-width: 0;
+    overflow-x: hidden;
+    overflow-y: hidden;
+    scrollbar-width: none;
+  }
+
+  .content > .workspace-grid > .panel::-webkit-scrollbar,
+  .content > .job-panel::-webkit-scrollbar {
+    display: none;
+  }
+
+  .content > .workspace-grid > .roster-panel,
+  .content > .roster-panel {
+    grid-column: 1;
+    grid-row: 3;
+  }
+
+  .content > .workspace-grid > .workflow-panel,
+  .content > .workflow-panel {
+    grid-column: 2;
+    grid-row: 3;
+  }
+
+  .content > .job-panel {
+    grid-column: 3;
+    grid-row: 3;
+    margin-top: 0;
+    display: flex;
+    flex-direction: column;
+  }
+
+  .content > .preview-stage {
+    grid-column: 3;
+    grid-row: 3;
+    z-index: 3;
+    min-height: 0;
+    height: 100%;
+    min-width: 0;
+    overflow: hidden;
+    display: flex;
+    flex-direction: column;
+  }
+
+  .content:has(> .preview-stage) > .job-panel {
+    visibility: hidden;
+    pointer-events: none;
+  }
+
+  .content > .preview-stage > .preview-card {
+    margin: 12px;
+  }
+
+  .content > .job-panel > .empty-state {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    padding: 20px;
+  }
+
+  .content > .job-panel > .empty-state .trace-empty {
+    width: min(100%, 520px);
+    margin: 16px 0 0;
+    padding: 11px 0 0;
+    border: 0;
+    border-top: 1px solid rgba(116, 184, 189, .2);
+    border-radius: 0;
+    background: transparent;
+  }
+
+  .content > .job-panel > .empty-state .trace-head {
+    align-items: center;
+  }
+
+  .content > .job-panel > .job-detail {
+    display: grid;
+    grid-template-columns: minmax(0, .42fr) minmax(0, .58fr);
+    grid-template-areas:
+      "summary summary"
+      "trace outcome";
+    align-content: start;
+    column-gap: 7px;
+    row-gap: 7px;
+    min-height: 0;
+    overflow: visible;
+    padding: 8px;
+  }
+
+  .content > .job-panel .job-summary {
+    grid-area: summary;
+    padding-bottom: 7px;
+  }
+
+  .content > .job-panel .call-trace {
+    grid-area: trace;
+    margin-top: 0;
+  }
+
+  .content > .job-panel .result-grid,
+  .content > .job-panel .approval-box,
+  .content > .job-panel .progress-box,
+  .content > .job-panel .failure-box {
+    grid-area: outcome;
+    margin-top: 0;
+  }
+
+  .content > .job-panel .result-grid {
+    grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+    gap: 7px;
+  }
+
+  .content > .job-panel .result-main,
+  .content > .job-panel .evidence-panel {
+    min-width: 0;
+    padding: 8px;
+  }
+
+  .content > .job-panel .evidence-panel {
+    max-height: none;
+    overflow: visible;
+  }
+
+  .content > .job-panel .result-fields {
+    grid-template-columns: 1fr 1fr;
+    gap: 4px;
+    margin: 6px 0;
+  }
+
+  .content > .job-panel .result-heading {
+    flex-direction: column;
+    gap: 4px;
+  }
+
+  .content > .job-panel .evidence-quote {
+    font-size: 9px;
+    line-height: 1.35;
+    margin: 5px 0;
+    padding: 6px 0;
+  }
+
+  .content > .job-panel .transcript-turn {
+    padding: 6px;
+    margin-bottom: 4px;
+  }
+
+  .content > .job-panel .transcript-turn p,
+  .content > .job-panel .evidence-item {
+    font-size: 8px;
+    line-height: 1.3;
+  }
+
+  .content > .job-panel .evidence-heading {
+    padding-top: 7px;
+    margin-top: 7px !important;
+  }
+
+  .content > .job-panel .result-main > .button-row {
+    flex-wrap: nowrap;
+    gap: 3px;
+  }
+
+  .content > .job-panel .result-main > .button-row button {
+    flex: 1 1 0;
+    min-width: 0;
+    padding: 5px 3px;
+    font-size: 7px;
+    line-height: 1.15;
+  }
+
+  .content > .lower-grid {
+    display: none;
+  }
+
+  .footer {
+    flex: 0 0 auto;
+    padding: 7px 20px 10px;
+    font-size: 8px;
+    line-height: 1.35;
+  }
+}

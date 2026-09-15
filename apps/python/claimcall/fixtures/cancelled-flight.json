@@ -1,0 +1,105 @@
+{
+  "synthetic": true,
+  "note": "SYNTHETIC DEMO — NOT A REAL BOOKING. Fixture mode only; no call is placed.",
+  "status": "completed",
+  "task_completed": true,
+  "completion_confidence": "high",
+  "summary": "Reached EuroSky Airways. Cancellation confirmed as an operational aircraft issue; rebooked on ES455 tomorrow 09:30, hotel approved, meal voucher available, written confirmation promised by email.",
+  "evidence": [
+    "Representative Daniel (Customer Care) said the cancellation was 'an operational aircraft issue'.",
+    "He confirmed rebooking on 'ES455 departing tomorrow at 09:30 with no additional fare'.",
+    "He approved 'one night of accommodation' and a meal voucher 'from the airport service desk'."
+  ],
+  "structured_result": {
+    "cancellation_reason": "Operational aircraft issue",
+    "replacement_itinerary": {
+      "available": "yes",
+      "details": "Replacement flight ES455 departing tomorrow at 09:30"
+    },
+    "hotel": {
+      "authorised": "yes",
+      "details": "One night of accommodation approved"
+    },
+    "meals": {
+      "available": "yes",
+      "details": "Meal voucher available from the airport service desk"
+    },
+    "written_confirmation": {
+      "promised": "yes",
+      "details": "Confirmation will be sent by email"
+    },
+    "representative_commitments": [
+      "Passenger will be rebooked without an additional fare",
+      "Hotel accommodation is approved",
+      "Written disruption confirmation will be sent"
+    ],
+    "unresolved_items": [],
+    "recommended_follow_up": "Monitor email for written confirmation and retain disruption-related receipts."
+  },
+  "recipients": [
+    {
+      "id": "rcp_1",
+      "phones": ["+12125550100"],
+      "locale": "en-US",
+      "region": "US",
+      "status": "completed",
+      "structured_result": null,
+      "summary": "Cancellation confirmed; rebooking, hotel, meals and written confirmation secured.",
+      "attempts": [
+        {
+          "id": "att_1",
+          "phone": "+12125550100",
+          "status": "completed",
+          "started_at": "2026-09-02T09:00:10Z",
+          "completed_at": "2026-09-02T09:06:40Z",
+          "summary": "Cancellation confirmed; rebooking, hotel, meals and written confirmation secured.",
+          "transcript_turns": [
+            {
+              "offset_seconds": 0,
+              "speaker": "agent",
+              "text": "Hello, I'm an AI assistant calling on behalf of Santee Cooper about cancelled flight ES421, booking ABC123."
+            },
+            {
+              "offset_seconds": 12,
+              "speaker": "recipient",
+              "text": "Thanks, I can see that booking. The cancellation was an operational aircraft issue."
+            },
+            {
+              "offset_seconds": 24,
+              "speaker": "agent",
+              "text": "What is the earliest replacement itinerary to Bengaluru?"
+            },
+            {
+              "offset_seconds": 36,
+              "speaker": "recipient",
+              "text": "I can rebook you on ES455 departing tomorrow at 09:30 with no additional fare."
+            },
+            {
+              "offset_seconds": 48,
+              "speaker": "agent",
+              "text": "Is hotel accommodation authorised for tonight, and are meals covered?"
+            },
+            {
+              "offset_seconds": 60,
+              "speaker": "recipient",
+              "text": "Yes, one night of accommodation is approved, and a meal voucher is available from the airport service desk."
+            },
+            {
+              "offset_seconds": 72,
+              "speaker": "agent",
+              "text": "Can you send written confirmation of the disruption and what you have committed to?"
+            },
+            {
+              "offset_seconds": 84,
+              "speaker": "recipient",
+              "text": "Of course, confirmation will be sent by email."
+            }
+          ],
+          "provider_call_id": null,
+          "failure_code": null,
+          "failure_message": null
+        }
+      ]
+    }
+  ]
+}

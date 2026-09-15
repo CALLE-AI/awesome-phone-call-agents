@@ -1,0 +1,18 @@
+{
+  "fixtureVersion": 1,
+  "sanitization": {
+    "manuallyReviewed": true,
+    "containsRawTranscript": false,
+    "containsRecordingUrl": false,
+    "containsRealPhoneNumber": false
+  },
+  "call": {
+    "id": "sanitized-regression",
+    "status": "completed"
+  },
+  "evaluation": {
+    "verdict": "fail",
+    "confidence": 0.93,
+    "summary": "A required behavior was omitted in this manually sanitized example."
+  }
+}

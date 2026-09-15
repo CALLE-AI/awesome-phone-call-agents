@@ -1,0 +1,60 @@
+{
+  "id": "eval-021",
+  "label": "ivr",
+  "difficulty": "typical",
+  "scenario": "Airline DTMF flight-status line reads a deterministic status; bot's spoken thanks gets 'sorry, I didn't get that'.",
+  "task": "Check whether Skyway Air flight 1472 on September 14 is on time.",
+  "outcome": {
+    "task_completed_claimed": true,
+    "commitment_type": "information",
+    "confirmation_artifact": "system read-back: flight 1472 on time, 6:40 PM, gate B31",
+    "expected_attestation": "system_asserted"
+  },
+  "turns": [
+    {
+      "speaker": "user",
+      "text": "welcome to Skyway Air. para español, oprima dos. for flight status, press 1. to make or change a reservation, press 2. for baggage services, press 3.",
+      "offset_seconds": 1.2
+    },
+    {
+      "speaker": "bot",
+      "text": "[DTMF 1]",
+      "offset_seconds": 14.88
+    },
+    {
+      "speaker": "user",
+      "text": "please enter your flight number using your telephone keypad.",
+      "offset_seconds": 16.01
+    },
+    {
+      "speaker": "bot",
+      "text": "[DTMF 1 4 7 2]",
+      "offset_seconds": 21.26
+    },
+    {
+      "speaker": "user",
+      "text": "please enter the date of travel as a two digit month, followed by a two digit day.",
+      "offset_seconds": 23.24
+    },
+    {
+      "speaker": "bot",
+      "text": "[DTMF 0 9 1 4]",
+      "offset_seconds": 32.0
+    },
+    {
+      "speaker": "user",
+      "text": "flight. fourteen seventy two. from Denver. to Portland. departing september fourteenth. is scheduled to depart. on time. at. six. forty. P M. from gate. B. thirty one. to hear this information again, press 1. for another flight, press 2.",
+      "offset_seconds": 34.0
+    },
+    {
+      "speaker": "bot",
+      "text": "thank you, that's all I needed.",
+      "offset_seconds": 57.07
+    },
+    {
+      "speaker": "user",
+      "text": "sorry. I didn't get that. to hear this information again, press 1. for another flight, press 2. to return to the main menu, press 9.",
+      "offset_seconds": 59.85
+    }
+  ]
+}

@@ -1,0 +1,18 @@
+{
+  "schema_version": "1.0",
+  "organization": "example-org",
+  "display_name": "Example Organization",
+  "numbers": ["+12025550199"],
+  "locale": "en-US",
+  "languages": ["en"],
+  "known_paths": [],
+  "hold_profile": {
+    "typical_seconds": null,
+    "max_observed_seconds": null,
+    "best_time_local": null
+  },
+  "operator_fallback": {"keypress": "0", "authorized": false},
+  "notes": [],
+  "last_verified": null,
+  "contributions": []
+}

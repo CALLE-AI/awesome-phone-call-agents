@@ -1,0 +1,594 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+    <meta name="theme-color" content="#0e1014" />
+    <title>RouteReady · the delivery route that calls ahead</title>
+    <meta name="description" content="RouteReady phones each customer through CALL-E shortly before the rider arrives, and re-orders the stops around what they say." />
+    <meta property="og:title" content="RouteReady · the delivery route that calls ahead" />
+    <meta property="og:description" content="Real phone calls through CALL-E, a few minutes before the rider arrives. Ready customers first, no wasted trips." />
+    <link rel="icon" href="/favicon.svg" type="image/svg+xml" />
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap" rel="stylesheet" />
+    <link rel="stylesheet" href="/splash.css" />
+    <style>
+      :root {
+        --lime: #d7f35a;
+        --ink: #0e1014;
+        --ink-2: #1b1f27;
+        --muted: #6b7280;
+        --line: #e3e6df;
+      }
+      * {
+        box-sizing: border-box;
+      }
+      html {
+        scroll-behavior: smooth;
+      }
+      body {
+        margin: 0;
+        min-height: 100vh;
+        overflow-x: hidden;
+        background: #f2f3ef;
+        color: var(--ink);
+        font-family: "Plus Jakarta Sans", "Segoe UI", system-ui, -apple-system, sans-serif;
+      }
+      a {
+        color: inherit;
+      }
+
+      /* ---------- background ---------- */
+      .glow {
+        position: fixed;
+        inset: -20%;
+        z-index: -1;
+        background:
+          radial-gradient(35% 30% at 18% 22%, rgb(215 243 90 / 0.55), transparent 70%),
+          radial-gradient(30% 28% at 82% 70%, rgb(215 243 90 / 0.28), transparent 70%),
+          radial-gradient(40% 40% at 60% 10%, rgb(220 208 255 / 0.35), transparent 70%);
+        animation: drift 18s ease-in-out infinite alternate;
+      }
+      .grid-bg {
+        position: fixed;
+        inset: 0;
+        z-index: -1;
+        background-image: radial-gradient(rgb(14 16 20 / 0.08) 1px, transparent 1px);
+        background-size: 22px 22px;
+        mask-image: linear-gradient(180deg, #000 0%, transparent 75%);
+      }
+
+      /* ---------- nav ---------- */
+      nav {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: 12px;
+        max-width: 1320px;
+        margin: 0 auto;
+        padding: 18px clamp(18px, 4vw, 48px);
+      }
+      .mark {
+        display: inline-block;
+        background: var(--ink);
+        color: var(--lime);
+        border-radius: 14px;
+        padding: 9px 12px;
+        font-weight: 800;
+        font-size: 14px;
+        line-height: 1.02;
+        letter-spacing: -0.02em;
+        text-decoration: none;
+      }
+      .nav-links {
+        display: flex;
+        align-items: center;
+        gap: 8px;
+      }
+      .pill {
+        display: inline-flex;
+        align-items: center;
+        gap: 8px;
+        border: 1px solid var(--line);
+        background: rgb(255 255 255 / 0.7);
+        backdrop-filter: blur(8px);
+        border-radius: 999px;
+        padding: 8px 13px;
+        font-size: 13px;
+        font-weight: 700;
+        text-decoration: none;
+        white-space: nowrap;
+      }
+      .pill .dot {
+        width: 8px;
+        height: 8px;
+        border-radius: 50%;
+        background: #22c55e;
+        box-shadow: 0 0 0 0 rgb(34 197 94 / 0.6);
+        animation: live-dot 2s infinite;
+      }
+
+      /* ---------- hero ---------- */
+      main {
+        max-width: 1320px;
+        margin: 0 auto;
+        padding: 8px clamp(18px, 4vw, 48px) 40px;
+        display: grid;
+        grid-template-columns: minmax(0, 1fr) auto;
+        align-items: center;
+        gap: clamp(28px, 4vw, 64px);
+      }
+      .intro {
+        max-width: 560px;
+      }
+      .eyebrow {
+        display: inline-flex;
+        align-items: center;
+        gap: 8px;
+        background: var(--ink);
+        color: #fff;
+        border-radius: 999px;
+        padding: 7px 13px 7px 8px;
+        font-size: 13px;
+        font-weight: 700;
+      }
+      .eyebrow b {
+        background: var(--lime);
+        color: var(--ink);
+        border-radius: 999px;
+        padding: 3px 8px;
+        font-size: 11px;
+        letter-spacing: 0.03em;
+      }
+      h1 {
+        font-size: clamp(38px, 5vw, 66px);
+        line-height: 1.02;
+        margin: 20px 0 16px;
+        font-weight: 800;
+        letter-spacing: -0.035em;
+      }
+      h1 .hl {
+        position: relative;
+        white-space: nowrap;
+      }
+      h1 .hl::after {
+        content: "";
+        position: absolute;
+        left: -4px;
+        right: -4px;
+        bottom: 0.08em;
+        height: 0.32em;
+        z-index: -1;
+        border-radius: 6px;
+        background: var(--lime);
+        transform-origin: left;
+        animation: underline 0.7s 0.55s cubic-bezier(0.6, 0, 0.2, 1) both;
+      }
+      .lead {
+        font-size: clamp(16px, 1.5vw, 19px);
+        line-height: 1.55;
+        color: #3a3f47;
+        margin: 0 0 26px;
+      }
+      .cta-row {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 10px;
+        margin-bottom: 14px;
+      }
+      .btn {
+        display: inline-flex;
+        align-items: center;
+        gap: 10px;
+        border: 0;
+        border-radius: 999px;
+        padding: 15px 22px;
+        font: inherit;
+        font-weight: 800;
+        font-size: 16px;
+        text-decoration: none;
+        cursor: pointer;
+        transition: transform 0.18s ease, box-shadow 0.18s ease, background 0.18s ease;
+      }
+      .btn:active {
+        transform: scale(0.97);
+      }
+      .btn.primary {
+        background: var(--ink);
+        color: var(--lime);
+        box-shadow: 0 14px 30px rgb(14 16 20 / 0.25);
+      }
+      .btn.primary:hover {
+        transform: translateY(-2px);
+        box-shadow: 0 18px 36px rgb(14 16 20 / 0.3);
+      }
+      .btn.primary .arrow {
+        transition: transform 0.2s ease;
+      }
+      .btn.primary:hover .arrow {
+        transform: translateX(4px);
+      }
+      .btn.secondary {
+        background: rgb(255 255 255 / 0.85);
+        color: var(--ink);
+        border: 1px solid var(--line);
+      }
+      .btn.secondary:hover {
+        background: #fff;
+        transform: translateY(-2px);
+      }
+      .btn.secondary .play {
+        display: grid;
+        place-items: center;
+        width: 22px;
+        height: 22px;
+        border-radius: 50%;
+        background: var(--lime);
+        font-size: 10px;
+      }
+      .note {
+        margin: 0;
+        font-size: 13px;
+        color: var(--muted);
+      }
+
+      /* ---------- steps and stats ---------- */
+      .steps {
+        display: grid;
+        grid-template-columns: repeat(3, minmax(0, 1fr));
+        gap: 10px;
+        margin: 30px 0 0;
+        padding: 0;
+        list-style: none;
+      }
+      .step {
+        background: rgb(255 255 255 / 0.8);
+        backdrop-filter: blur(8px);
+        border: 1px solid var(--line);
+        border-radius: 20px;
+        padding: 14px;
+        transition: transform 0.2s ease, box-shadow 0.2s ease;
+      }
+      .step:hover {
+        transform: translateY(-3px);
+        box-shadow: 0 12px 26px rgb(14 16 20 / 0.08);
+      }
+      .step .icon {
+        display: grid;
+        place-items: center;
+        width: 34px;
+        height: 34px;
+        border-radius: 11px;
+        background: var(--ink);
+        font-size: 17px;
+        margin-bottom: 10px;
+      }
+      .step b {
+        display: block;
+        font-size: 14px;
+        margin-bottom: 3px;
+      }
+      .step span {
+        font-size: 12.5px;
+        line-height: 1.4;
+        color: #4b5563;
+      }
+      .stats {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 8px 22px;
+        margin: 22px 0 0;
+        padding: 14px 16px;
+        border-radius: 18px;
+        background: var(--ink);
+        color: #fff;
+      }
+      .stat {
+        display: flex;
+        align-items: baseline;
+        gap: 7px;
+        font-size: 13px;
+        color: #a7adb8;
+      }
+      .stat strong {
+        color: var(--lime);
+        font-size: 20px;
+        font-weight: 800;
+        font-variant-numeric: tabular-nums;
+      }
+      .stats small {
+        width: 100%;
+        color: #6b7280;
+        font-size: 11px;
+      }
+
+      /* ---------- phones ---------- */
+      .phones {
+        position: relative;
+        display: flex;
+        gap: 26px;
+        align-items: flex-start;
+      }
+      .phone {
+        position: relative;
+        width: 360px;
+        height: clamp(580px, calc(100vh - 110px), 780px);
+        padding-top: 30px;
+        border: 11px solid var(--ink);
+        border-radius: 48px;
+        overflow: hidden;
+        background: #f2f3ef;
+        box-shadow:
+          0 40px 80px rgb(14 16 20 / 0.28),
+          inset 0 0 0 1px rgb(255 255 255 / 0.08);
+        animation: float 7s ease-in-out infinite;
+      }
+      .phone::before {
+        content: "";
+        position: absolute;
+        top: 6px;
+        left: 50%;
+        z-index: 2;
+        width: 84px;
+        height: 20px;
+        border-radius: 999px;
+        background: var(--ink);
+        transform: translateX(-50%);
+        pointer-events: none;
+      }
+      .phone::after {
+        content: "9:41";
+        position: absolute;
+        top: 7px;
+        left: 26px;
+        font-size: 12px;
+        font-weight: 800;
+        pointer-events: none;
+      }
+      .phone iframe {
+        width: 100%;
+        height: 100%;
+        border: 0;
+        display: block;
+      }
+      .phone.second {
+        margin-top: 70px;
+        animation-delay: -3.5s;
+      }
+      .phone-label {
+        position: absolute;
+        left: 50%;
+        bottom: -38px;
+        transform: translateX(-50%);
+        font-size: 12px;
+        font-weight: 700;
+        color: var(--muted);
+        white-space: nowrap;
+      }
+
+      footer {
+        max-width: 1320px;
+        margin: 0 auto;
+        padding: 26px clamp(18px, 4vw, 48px) 34px;
+        display: flex;
+        flex-wrap: wrap;
+        gap: 8px 18px;
+        font-size: 12.5px;
+        color: var(--muted);
+      }
+      footer span::before {
+        content: "✓ ";
+        color: #65a30d;
+        font-weight: 800;
+      }
+
+      /* ---------- entrance motion ---------- */
+      .rise {
+        animation: rise 0.8s var(--d, 0s) cubic-bezier(0.2, 0.7, 0.2, 1) both;
+      }
+      .phones.rise {
+        animation-name: rise-phones;
+        animation-duration: 1s;
+      }
+      .splash-on .rise,
+      .splash-on h1 .hl::after {
+        animation-play-state: paused;
+      }
+
+      @keyframes rise {
+        from {
+          opacity: 0;
+          transform: translateY(22px);
+        }
+        to {
+          opacity: 1;
+          transform: translateY(0);
+        }
+      }
+      @keyframes rise-phones {
+        from {
+          opacity: 0;
+          transform: translateY(60px) rotate(2deg);
+        }
+        to {
+          opacity: 1;
+          transform: none;
+        }
+      }
+      @keyframes underline {
+        from {
+          transform: scaleX(0);
+        }
+        to {
+          transform: scaleX(1);
+        }
+      }
+      @keyframes float {
+        50% {
+          transform: translateY(-10px);
+        }
+      }
+      @keyframes drift {
+        to {
+          transform: translate(3%, -2%) scale(1.05);
+        }
+      }
+      @keyframes live-dot {
+        70% {
+          box-shadow: 0 0 0 8px rgb(34 197 94 / 0);
+        }
+        100% {
+          box-shadow: 0 0 0 0 rgb(34 197 94 / 0);
+        }
+      }
+      @media (prefers-reduced-motion: reduce) {
+        *,
+        *::before,
+        *::after {
+          animation-duration: 0.01s !important;
+          animation-delay: 0s !important;
+          animation-iteration-count: 1 !important;
+          scroll-behavior: auto !important;
+        }
+      }
+
+      /* ---------- smaller screens ---------- */
+      @media (max-width: 1640px) {
+        .phone.second {
+          display: none;
+        }
+      }
+      @media (max-width: 1040px) {
+        main {
+          grid-template-columns: 1fr;
+        }
+        .intro {
+          max-width: 680px;
+        }
+        .phones {
+          justify-content: center;
+        }
+        .phone {
+          height: 720px;
+        }
+      }
+      @media (max-width: 640px) {
+        .nav-links .hide-sm {
+          display: none;
+        }
+        .steps {
+          grid-template-columns: 1fr;
+        }
+        .step {
+          display: grid;
+          grid-template-columns: 34px 1fr;
+          column-gap: 12px;
+          align-items: center;
+        }
+        .step .icon {
+          grid-row: span 2;
+          margin: 0;
+        }
+        .btn {
+          width: 100%;
+          justify-content: space-between;
+        }
+        .btn.secondary {
+          justify-content: center;
+        }
+        .phones {
+          display: none;
+        }
+      }
+    </style>
+  </head>
+  <body>
+    <script src="/splash.js"></script>
+    <div class="glow"></div>
+    <div class="grid-bg"></div>
+
+    <nav>
+      <a class="mark rise" href="/" style="--d: 0s">ROUTE<br />READY</a>
+      <div class="nav-links rise" style="--d: 0.05s">
+        <span class="pill hide-sm"><span class="dot"></span>Live on CALL-E</span>
+        <a class="pill" href="https://github.com/CALLE-AI/awesome-phone-call-agents/pull/474" target="_blank" rel="noopener">Source</a>
+      </div>
+    </nav>
+
+    <main>
+      <section class="intro">
+        <span class="eyebrow rise" style="--d: 0.08s"><b>NEW</b>Real phone calls, while the rider rides</span>
+        <h1 class="rise" style="--d: 0.14s">The delivery route that <span class="hl">calls ahead.</span></h1>
+        <p class="lead rise" style="--d: 0.22s">
+          RouteReady phones each customer through CALL-E a few minutes before the rider arrives, checks they are home with the cash ready,
+          and re-orders the stops around what they say. No calls while riding, no waiting at empty doors.
+        </p>
+        <div class="cta-row rise" style="--d: 0.3s">
+          <a class="btn primary" href="/route">Plan a route with real calls <span class="arrow">→</span></a>
+          <button class="btn secondary" id="watch" type="button"><span class="play">▶</span>Watch the demo day</button>
+        </div>
+        <p class="note rise" style="--d: 0.36s">Bring your CALL-E API key, pin your stops, drag the rider. Or watch a scripted day, no key needed.</p>
+
+        <ul class="steps">
+          <li class="step rise" style="--d: 0.44s">
+            <span class="icon">📍</span><b>Pin your stops</b><span>Customers, numbers and the rider's start on a map.</span>
+          </li>
+          <li class="step rise" style="--d: 0.52s">
+            <span class="icon">📞</span><b>CALL-E calls ahead</b><span>A real AI call when the rider is minutes away.</span>
+          </li>
+          <li class="step rise" style="--d: 0.6s">
+            <span class="icon">🔀</span><b>The route adapts</b><span>Ready customers first, "not today" off the route.</span>
+          </li>
+        </ul>
+
+        <div class="stats rise" style="--d: 0.68s">
+          <span class="stat"><strong>2 → 0</strong>failed door visits</span>
+          <span class="stat"><strong>16 min</strong>earlier finish</span>
+          <span class="stat"><strong>$0.35</strong>for 7 calls</span>
+          <small>On the eight-stop demo day, with and without calls.</small>
+        </div>
+      </section>
+
+      <section class="phones rise" style="--d: 0.25s" aria-label="RouteReady rider app, demo day">
+        <div class="phone">
+          <iframe src="/app?tab=route" title="RouteReady rider app, route" loading="eager"></iframe>
+          <span class="phone-label">Rider's route</span>
+        </div>
+        <div class="phone second">
+          <iframe src="/app?tab=calls" title="RouteReady rider app, calls" loading="lazy"></iframe>
+          <span class="phone-label">Calls as they happen</span>
+        </div>
+      </section>
+    </main>
+
+    <footer>
+      <span>One call at a time</span>
+      <span>Each customer at most once a day</span>
+      <span>Answers count only when the customer's own words back them</span>
+      <span>Phone numbers always masked</span>
+    </footer>
+
+    <script>
+      // "Watch the demo day" starts the scripted day in the phones; on small screens it opens the rider app.
+      document.getElementById("watch").addEventListener("click", async (event) => {
+        const button = event.currentTarget;
+        if (window.matchMedia("(max-width: 640px)").matches) {
+          location.href = "/app";
+          return;
+        }
+        button.disabled = true;
+        try {
+          await fetch("/api/run", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ mode: "simulate", pace: "normal" }) });
+          document.querySelector(".phones").scrollIntoView({ behavior: "smooth", block: "center" });
+          button.lastChild.textContent = "Demo day running";
+        } finally {
+          setTimeout(() => {
+            button.disabled = false;
+            button.lastChild.textContent = "Watch the demo day";
+          }, 4000);
+        }
+      });
+    </script>
+  </body>
+</html>

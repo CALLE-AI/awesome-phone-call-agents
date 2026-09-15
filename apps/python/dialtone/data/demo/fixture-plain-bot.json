@@ -1,0 +1,88 @@
+{
+ "id": "fixture-plain-bot",
+ "status": "completed",
+ "task": "GOAL: Book a table for two this Friday at 7 PM under the name Jordan Lee.",
+ "task_completed": true,
+ "completion_confidence": {
+  "score": 0.93,
+  "label": "high"
+ },
+ "structured_result": {
+  "counterpart_type": "unknown",
+  "handshake_acknowledged": "no",
+  "outcome": "confirmed",
+  "confirmation_code": "LT2208",
+  "human_review": "unknown",
+  "details": ""
+ },
+ "evidence": [],
+ "_fixture": true,
+ "recipients": [
+  {
+   "phones": [
+    "+14155550100"
+   ],
+   "attempts": [
+    {
+     "transcript_turns": [
+      {
+       "speaker": "user",
+       "text": "Hi, thanks for calling Luigi's Trattoria! This is Nova. How can I help you today?",
+       "offset_seconds": 0.9
+      },
+      {
+       "speaker": "bot",
+       "text": "Hi there! I'm an AI assistant calling on behalf of my client, Jordan Lee. I hope you're having a nice day. I was wondering if you might be able to help me with a reservation?",
+       "offset_seconds": 7.46
+      },
+      {
+       "speaker": "user",
+       "text": "Of course! I'd be happy to help with a reservation. What day and time were you thinking, and for how many people?",
+       "offset_seconds": 21.72
+      },
+      {
+       "speaker": "bot",
+       "text": "Thank you so much. Jordan would love a table for two people, ideally this Friday evening, around 7 PM if that's possible.",
+       "offset_seconds": 30.97
+      },
+      {
+       "speaker": "user",
+       "text": "Great choice! Friday at 7 PM is available for two. Can I get a name for the reservation?",
+       "offset_seconds": 40.52
+      },
+      {
+       "speaker": "bot",
+       "text": "Wonderful, thank you. The reservation would be under the name Jordan Lee. That's J O R D A N, Lee.",
+       "offset_seconds": 48.19
+      },
+      {
+       "speaker": "user",
+       "text": "Perfect, thank you Jordan. I've booked a table for two this Friday at 7 PM. Your confirmation code is L T two two zero eight.",
+       "offset_seconds": 57.1
+      },
+      {
+       "speaker": "bot",
+       "text": "That's great, thank you. Just to confirm, that's L T two two zero eight, for two people this Friday at 7 PM?",
+       "offset_seconds": 67.46
+      },
+      {
+       "speaker": "user",
+       "text": "That's correct! Is there anything else I can help you with today?",
+       "offset_seconds": 76.81
+      },
+      {
+       "speaker": "bot",
+       "text": "No, that's everything. Thank you so much for your help, have a lovely evening.",
+       "offset_seconds": 82.25
+      },
+      {
+       "speaker": "user",
+       "text": "You're welcome! Enjoy your dinner. Goodbye!",
+       "offset_seconds": 88.74
+      }
+     ]
+    }
+   ]
+  }
+ ]
+}

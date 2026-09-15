@@ -1,0 +1,35 @@
+{
+  "name": "critical-service-escalation",
+  "evidence": [
+    {
+      "source": "maintenance-system",
+      "type": "structured",
+      "freshness_hours": 72,
+      "claim": "technician assigned, intervention confirmed for 08:00",
+      "ambiguity": "low"
+    },
+    {
+      "source": "technician-message",
+      "type": "human",
+      "freshness_hours": 6,
+      "claim": "I may no longer be able to make it today",
+      "ambiguity": "high"
+    },
+    {
+      "source": "dispatch-follow-up",
+      "type": "absence",
+      "freshness_hours": 4,
+      "claim": "no reply to the reassignment check",
+      "ambiguity": "high"
+    }
+  ],
+  "deadline": "2026-09-11T08:00:00Z",
+  "decision_deadline_threshold_hours": 24,
+  "decision_options": {
+    "if_confirmed": "CONTINUE_DISPATCH",
+    "if_cancelled": "REASSIGN_TECHNICIAN"
+  },
+  "call_phone": "+12025550187",
+  "call_task_hint": "Call the assigned technician about the maintenance intervention scheduled for 08:00 on critical medical equipment. Their last message said they might no longer be able to make it. Ask them directly to confirm whether they are still able to attend the scheduled intervention today.",
+  "use_case": "critical_service_escalation"
+}

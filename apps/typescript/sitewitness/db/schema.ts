@@ -1,0 +1,127 @@
+import { integer, sqliteTable, text } from "drizzle-orm/sqlite-core";
+export const reviewActions = sqliteTable("review_actions", {
+  id: integer("id").primaryKey({ autoIncrement: true }),
+  statementId: text("statement_id").notNull(),
+  action: text("action").notNull(),
+  expectedRevision: integer("expected_revision").notNull(),
+  payload: text("payload", { mode: "json" }).notNull(),
+  reviewerRole: text("reviewer_role").notNull(),
+  createdAt: text("created_at").notNull(),
+});
+export const evidenceGapDispositions = sqliteTable(
+  "evidence_gap_dispositions",
+  {
+    id: integer("id").primaryKey({ autoIncrement: true }),
+    evidenceGapId: text("evidence_gap_id").notNull(),
+    disposition: text("disposition").notNull(),
+    rationale: text("rationale").notNull(),
+    reviewerRole: text("reviewer_role").notNull(),
+    createdAt: text("created_at").notNull(),
+  },
+);
+export const consentRecords = sqliteTable("consent_records", {
+  id: integer("id").primaryKey({ autoIncrement: true }),
+  respondentId: text("respondent_id").notNull(),
+  version: integer("version").notNull(),
+  automatedCallAllowed: integer("automated_call_allowed", {
+    mode: "boolean",
+  }).notNull(),
+  transcriptionAllowed: integer("transcription_allowed", {
+    mode: "boolean",
+  }).notNull(),
+  selectedChannel: text("selected_channel").notNull(),
+  createdAt: text("created_at").notNull(),
+  withdrawnAt: text("withdrawn_at"),
+});
+export const auditEvents = sqliteTable("audit_events", {
+  id: integer("id").primaryKey({ autoIncrement: true }),
+  eventType: text("event_type").notNull(),
+  entityId: text("entity_id").notNull(),
+  detail: text("detail", { mode: "json" }).notNull(),
+  actor: text("actor").notNull().default("System"),
+  createdAt: text("created_at").notNull(),
+});
+export const followUpTasks = sqliteTable("follow_up_tasks", {
+  id: integer("id").primaryKey({ autoIncrement: true }),
+  evidenceGapId: text("evidence_gap_id").notNull(),
+  channel: text("channel").notNull(),
+  summary: text("summary").notNull(),
+  status: text("status").notNull(),
+  assignee: text("assignee"),
+  dueAt: text("due_at"),
+  responseToken: text("response_token").unique(),
+  updatedAt: text("updated_at"),
+  attemptCount: integer("attempt_count").notNull().default(0),
+  cancelReason: text("cancel_reason"),
+  sentAt: text("sent_at"),
+  viewedAt: text("viewed_at"),
+  createdAt: text("created_at").notNull(),
+});
+export const secureFormResponses = sqliteTable("secure_form_responses", {
+  id: integer("id").primaryKey({ autoIncrement: true }),
+  taskId: integer("task_id").notNull().unique(),
+  respondentName: text("respondent_name").notNull(),
+  respondentRole: text("respondent_role").notNull(),
+  knowledgeStart: text("knowledge_start").notNull(),
+  knowledgeEnd: text("knowledge_end").notNull(),
+  answers: text("answers", { mode: "json" }).notNull(),
+  limitations: text("limitations").notNull(),
+  acknowledged: integer("acknowledged", { mode: "boolean" }).notNull(),
+  submittedAt: text("submitted_at").notNull(),
+});
+export const ingestedStatements = sqliteTable("ingested_statements", {
+  id: text("id").primaryKey(),
+  evidenceGapId: text("evidence_gap_id").notNull(),
+  origin: text("origin").notNull(),
+  fact: text("fact").notNull(),
+  source: text("source").notNull(),
+  certainty: text("certainty").notNull(),
+  evidence: text("evidence").notNull(),
+  limitations: text("limitations").notNull(),
+  createdAt: text("created_at").notNull(),
+});
+export const humanInterviewRecords = sqliteTable("human_interview_records", {
+  id: integer("id").primaryKey({ autoIncrement: true }),
+  taskId: integer("task_id").notNull().unique(),
+  interviewer: text("interviewer").notNull(),
+  method: text("method").notNull(),
+  interviewDate: text("interview_date").notNull(),
+  respondentName: text("respondent_name").notNull(),
+  respondentRole: text("respondent_role").notNull(),
+  knowledgeStart: text("knowledge_start").notNull(),
+  knowledgeEnd: text("knowledge_end").notNull(),
+  answers: text("answers", { mode: "json" }).notNull(),
+  limitations: text("limitations").notNull(),
+  declinedNotes: text("declined_notes").notNull(),
+  confirmed: integer("confirmed", { mode: "boolean" }).notNull(),
+  submittedAt: text("submitted_at").notNull(),
+});
+export const caseWorkflow = sqliteTable("case_workflow", {
+  evidenceGapId: text("evidence_gap_id").primaryKey(),
+  status: text("status").notNull(),
+  assignedRole: text("assigned_role").notNull(),
+  nextAction: text("next_action").notNull(),
+  updatedAt: text("updated_at").notNull(),
+});
+export const callRuns = sqliteTable("call_runs", {
+  id: integer("id").primaryKey({ autoIncrement: true }),
+  interviewId: text("interview_id").notNull(),
+  authorizationVersion: integer("authorization_version").notNull(),
+  providerMode: text("provider_mode").notNull(),
+  providerCallId: text("provider_call_id"),
+  goalId: text("goal_id"),
+  goalRunId: text("goal_run_id"),
+  telephoneRunId: text("telephone_run_id"),
+  runSpecId: text("run_spec_id"),
+  runSpecVersion: integer("run_spec_version"),
+  variablesFingerprint: text("variables_fingerprint"),
+  status: text("status").notNull(),
+  requestPayload: text("request_payload", { mode: "json" }).notNull(),
+  responsePayload: text("response_payload", { mode: "json" }),
+  goalResult: text("goal_result", { mode: "json" }),
+  goalError: text("goal_error", { mode: "json" }),
+  liveCallBudgetReservedAt: text("live_call_budget_reserved_at"),
+  previewConfirmedAt: text("preview_confirmed_at"),
+  launchedAt: text("launched_at"),
+  updatedAt: text("updated_at").notNull(),
+});

@@ -1,0 +1,530 @@
+{
+ "_note": "English for the lines CALL-E transcribed in Tamil. Only those lines are here: a call placed in Tamil still opens with an English announcement, and an English sentence needs no translation. The Tamil is copied from the transcript unchanged, so a build that finds it no longer matching stops instead of printing the English for a line that has moved. The English was written afterwards from that Tamil. It is not a second recording and nobody said it on the call.",
+ "_method": "S-4102, S-4104, S-4106 and S-4108 were translated turn by turn with a language model (Gemini 3.8 Flash) reading only the committed Tamil. S-3119 and S-3120 were translated by Claude Opus 5 reading only the committed Tamil, for the same instruction: stay literal, and keep the repetitions, false starts and grammar of the speaker rather than tidying them into written English.",
+ "_produced": "2026-09-09",
+ "calls": {
+  "S-4106": {
+   "locale": "ta-IN",
+   "turns": [
+    {
+     "ta": "இது பள்ளி வருகைப் பதிவு அலுவலகத்திலிருந்து வரும் தானியங்கி அழைப்பு.",
+     "en": "This is an automated call from the school attendance office."
+    },
+    {
+     "ta": "நீங்கள் ஒரு நபருடன் அல்ல, AI உதவியாளருடன் பேசுகிறீர்கள். எந்த நேரத்திலும் பணியாளர் ஒருவருடன் பேச வேண்டும் என்று கேட்டால்,",
+     "en": "You are speaking with an AI assistant, not a person. If at any time you ask to speak with a staff member,"
+    },
+    {
+     "ta": "நான் மீண்டும் அழைப்பை ஏற்பாடு செய்வேன்.",
+     "en": "I will arrange a callback."
+    },
+    {
+     "ta": "ஹலோ. ஓகே.",
+     "en": "Hello. Okay."
+    },
+    {
+     "ta": "லக்ஷ்மி வி இரண்டாயிரத்து இருபத்தாறு செப்டம்பர் பதினான்காம் தேதி வரவில்லை என பதிவு செய்யப்பட்டுள்ளார்;",
+     "en": "Lakshmi V has been marked absent on September fourteenth, twenty twenty-six;"
+    },
+    {
+     "ta": "நீங்கள் அவர் வராதது பற்றி அறிந்திருக்கிறீர்களா?",
+     "en": "Are you aware of her absence?"
+    },
+    {
+     "ta": "இல்லையே என்னச்சு சொல்றீங்க? எனக்கு கரெக்ட் டா தெரியலையே. காலைல ஸ்கூல் க்கு தான் கிளம்பி போனா அவ.",
+     "en": "No, what are you saying happened? I don't know for sure. In the morning she left for school only, she did."
+    },
+    {
+     "ta": "சரி.",
+     "en": "Okay."
+    },
+    {
+     "ta": "அது ஏன் என்று சொல்ல முடியுமா?",
+     "en": "Can you say why that is?"
+    },
+    {
+     "ta": "கரெக்டா தெரியல நான் செக் பண்ணனும். ஏன்னா அதை மோர்னிங் காலைல கிளம்பி தான் போனா ஸ்கூல் க்கு.",
+     "en": "Don't know for sure, I need to check. Because that morning in the morning she only left and went to school."
+    },
+    {
+     "ta": "நான் காத்திருக்கிறேன்.",
+     "en": "I am waiting."
+    },
+    {
+     "ta": "நான் காத்திருப்பேன்.",
+     "en": "I will wait."
+    },
+    {
+     "ta": "புரியல.",
+     "en": "Don't understand."
+    },
+    {
+     "ta": "எந்த காரணத்தால் வரவில்லை என்று தெரியுமா?",
+     "en": "Do you know for what reason she did not come?"
+    },
+    {
+     "ta": "உதாரணமாக உடல்நலம், குடும்ப காரணம், அல்லது வேறு ஏதாவது?",
+     "en": "For example health, family reason, or anything else?"
+    },
+    {
+     "ta": "இல்ல இல்ல அதான் இது.",
+     "en": "No no, that's what it is."
+    },
+    {
+     "ta": "சரி, நன்றி.",
+     "en": "Okay, thank you."
+    },
+    {
+     "ta": "அவர் எப்போது மீண்டும் பள்ளிக்கு வருவார்?",
+     "en": "When will she come back to school?"
+    },
+    {
+     "ta": "அதான் எனக்கு தெரியல. நான் செக் பண்ணனும். ஏன்னா அவன் மோர்னிங் ஸ்கூல் க்கு போனான்.",
+     "en": "That's what I don't know. I need to check. Because he went to school in the morning."
+    },
+    {
+     "ta": "சரி, புரிகிறது.",
+     "en": "Okay, understood."
+    },
+    {
+     "ta": "லக்ஷ்மி எப்போது திரும்ப வருவார்?",
+     "en": "When will Lakshmi come back?"
+    },
+    {
+     "ta": "அது செக் பண்ணா தான் தெரியும். ஏன்னா மோர்னிங் ஸ்கூல் க்கு போனது மட்டும் தான் எனக்கு தெரியும். பட் இப்ப நீங்க வரலன்னு சொல்றீங்க.",
+     "en": "That will only be known if I check. Because that she went to school in the morning is all I know. But now you are saying she didn't come."
+    },
+    {
+     "ta": "சரி,",
+     "en": "Okay,"
+    },
+    {
+     "ta": "நான் இதை மீண்டும் சரிபார்க்க சொல்லுகிறேன்; இன்று ஒரு பள்ளி பணியாளர் உங்களை பின்னர் அழைப்பார் நன்றி,",
+     "en": "I will tell them to check this again; a school staff member will call you later today thank you,"
+    },
+    {
+     "ta": "வணக்கம்.",
+     "en": "Goodbye."
+    }
+   ]
+  },
+  "S-4102": {
+   "locale": "ta-IN",
+   "turns": [
+    {
+     "ta": "இது பள்ளி வருகைப் பதிவு அலுவலகத்திலிருந்து வரும் தானியங்கி அழைப்பு.  நீங்கள் ஒரு நபருடன் அல்ல, ஒரு ஏஐ உதவியாளருடன் பேசுகிறீர்கள். எந்த நேரத்திலும் பணியாளர் ஒருவருடன் பேச வேண்டும் என்று நீங்கள் கேட்கலாம்;",
+     "en": "This is an automated call from the school attendance office. You are speaking with an AI assistant, not a person. At any time you can ask to speak with a staff member;"
+    },
+    {
+     "ta": "ஹலோ.",
+     "en": "Hello."
+    },
+    {
+     "ta": "மன்னிக்கவும், உங்கள் பேச்சு தெளிவாகக் கேட்கவில்லை. மீண்டும் சொல்ல முடியுமா?",
+     "en": "Sorry, your speech was not heard clearly. Can you say it again?"
+    },
+    {
+     "ta": "நீங்க என்ன கேட்க வந்தீங்க நீங்க யாரு?",
+     "en": "What did you come to ask, who are you?"
+    },
+    {
+     "ta": "நான் பள்ளி வருகைப் பதிவு அலுவலகத்தின் அழைப்பு உதவியாளர்.  அனிதா ஆர் வரவில்லை என்பதைத் தெரிந்திருக்கிறீர்களா?",
+     "en": "I am the call assistant of the school attendance office. Are you aware of Anitha R's absence?"
+    },
+    {
+     "ta": "ஆமா தெரியும் அவளுக்கு வந்து நேத்து நைட் ல இருந்து ஃபீவர் ஜாஸ்தியா இருந்துச்சு.",
+     "en": "Yes I know, she like had high fever since last night."
+    },
+    {
+     "ta": "சரி,  அவருக்குத் திரும்ப வருவது எப்போது என்று எதிர்பார்க்க வேண்டும்?",
+     "en": "Okay, when should we expect her to come back?"
+    },
+    {
+     "ta": "அதனால தான் அனுப்பல. காய்ச்சல் சரியாச்சுன்னா நான் அழைக்க வந்துருவோம்.",
+     "en": "That is why didn't send. If fever gets better I we will come to bring."
+    },
+    {
+     "ta": "நன்றி, வணக்கம்.",
+     "en": "Thank you, goodbye."
+    }
+   ]
+  },
+  "S-4104": {
+   "locale": "ta-IN",
+   "turns": [
+    {
+     "ta": "ஹலோ யார் பேசுறது? ஓகே.",
+     "en": "Hello, who is speaking? Okay."
+    },
+    {
+     "ta": "பள்ளி வருகைப் பதிவகத்திலிருந்து காவ்யா எம் குறித்து அழைக்கிறோம்;",
+     "en": "We are calling from the school attendance office about Kavya M;"
+    },
+    {
+     "ta": "இரண்டாயிரத்து இருபத்தாறு செப்டம்பர் பதினான்காம் தேதி அவர் வரவில்லை என்று பதிவு செய்யப்பட்டுள்ளது,",
+     "en": "She has been marked absent on September fourteenth, twenty twenty six,"
+    },
+    {
+     "ta": "இதைப் பற்றி உங்களுக்கு தெரியுமா?",
+     "en": "Are you aware of this?"
+    },
+    {
+     "ta": "ஆமா தெரியும் எங்களுக்கு வந்து ஒரு பேமிலி ஆனுவல் இருந்துச்சு. அதனால நாங்க இப்ப ஊர்ல இல்ல.",
+     "en": "Yes I know, we like had a family annual. That is why we are not in town now."
+    },
+    {
+     "ta": "சரி,",
+     "en": "Okay,"
+    },
+    {
+     "ta": "காரணம் குடும்ப ஆண்டு நிகழ்வு என்று புரிந்தது. காவ்யா எப்போது பள்ளிக்கு திரும்புவார்?",
+     "en": "Understood that the reason is family annual event. When will Kavya come back to school?"
+    },
+    {
+     "ta": "எப்போ வருவானு கரெக்ட் ஆ சொல்ல முடியாது. மே பி கப்புல் ஒப் டேஸ்.",
+     "en": "When she will come cannot say for sure. Maybe couple of days."
+    },
+    {
+     "ta": "சரி,",
+     "en": "Okay,"
+    },
+    {
+     "ta": "சில நாட்களில் வருவார் என்று புரிகிறது. பள்ளி அவரை எப்போது எதிர்பார்க்கலாம் என்பது குறித்து ஏதாவது மேலும் தெரிந்தால் சொல்லுங்கள்.",
+     "en": "Understood that she will come in a few days. If anything more is known regarding when the school can expect her, tell."
+    },
+    {
+     "ta": "நன்றி, வணக்கம்.",
+     "en": "Thank you, goodbye."
+    }
+   ]
+  },
+  "S-4108": {
+   "locale": "ta-IN",
+   "turns": [
+    {
+     "ta": "இது பள்ளி வருகைப் பதிவு அலுவலகத்திலிருந்து வரும் தானியங்கி அழைப்பு.",
+     "en": "This is an automated call from the school attendance office."
+    },
+    {
+     "ta": "நீங்கள் பேசுவது ஒரு ஏஐ உதவியாளருடன்; மனிதருடன் அல்ல. நீங்கள் எப்போது வேண்டுமானாலும் பணியாளர் ஒருவருடன் பேச விரும்பினால்,",
+     "en": "You are speaking with an AI assistant; not a human. If at any time you wish to speak with a staff member,"
+    },
+    {
+     "ta": "நான் திரும்ப அழைக்க ஏற்பாடு செய்வேன்.",
+     "en": "I will arrange a callback."
+    },
+    {
+     "ta": "சாரி யார் நீங்க?",
+     "en": "Sorry, who are you?"
+    },
+    {
+     "ta": "பள்ளி வருகைப் பதிவு அலுவலகத்தின் அழைப்பாளரின் உதவியாளன் நான்.",
+     "en": "I am the assistant to the caller of the school attendance office."
+    },
+    {
+     "ta": "சாரி நான். சாரி நான் ஒர்க் ல இருக்கேன் இப்ப பேச முடியாது. கொஞ்ச நேரம் கழிச்சு கூப்புறீங்களா?",
+     "en": "Sorry I. Sorry I am at work cannot talk right now. Could you call after some time?"
+    },
+    {
+     "ta": "சரி,",
+     "en": "Okay,"
+    },
+    {
+     "ta": "பிறகு அழைக்க ஏற்பாடு செய்கிறேன். நன்றி, வணக்கம்.",
+     "en": "I will arrange to call later. Thank you, goodbye."
+    }
+   ]
+  },
+  "S-3119": {
+   "locale": "ta-IN",
+   "turns": [
+    {
+     "ta": "இது பள்ளி வருகைப்பு பதிவு அலுவலகத்திலிருந்து வரும் தானியங்கி அழைப்பு.",
+     "en": "This is an automated call coming from the school attendance record office."
+    },
+    {
+     "ta": "நீங்கள் ஒருவருடன் அல்ல, AI உதவியாளருடன் பேசுகிறீர்கள். எந்த நேரத்திலும் பணியாளர் ஒருவருடன் பேச வேண்டும் என்று கேட்கலாம்;",
+     "en": "You are speaking not with a person but with an AI assistant. You may ask at any time to speak with a staff member;"
+    },
+    {
+     "ta": "ஓகே.",
+     "en": "Okay."
+    },
+    {
+     "ta": "நன்கு,",
+     "en": "Well,"
+    },
+    {
+     "ta": "நான் Oakridge High பள்ளியிலிருந்து அழைக்கிறேன். நீங்க எந்த மாணவரின் பெற்றோர் அல்லது பாதுகாவலரா?",
+     "en": "I am calling from Oakridge High school. Are you the parent or guardian of a pupil?"
+    },
+    {
+     "ta": "சொல்லுங்க. பாரன்.",
+     "en": "Tell me. Parent."
+    },
+    {
+     "ta": "பெஞ்ச் எஸ் மூன்று ஒன்று ஒன்று ஒன்பது க்குறிய மாதிரி,",
+     "en": "Like regarding Bench S three one one nine,"
+    },
+    {
+     "ta": "செப்டம்பர் பதினொன்றாம் தேதிக் காரணமில்லாமல் வரவிலலை. இது பற்றி உங்களுக்குத் தெரியுமா?",
+     "en": "did not come on the eleventh of September without a reason. Do you know about this?"
+    },
+    {
+     "ta": "ஆ ஆமா மேம் எனக்கு தெரியும் ஆக்ச்சுவலா அவனுக்கு மார்னிங்ல இருந்தே ஃபீவரா இருந்துச்சு அதனால",
+     "en": "Ah yes ma'am I know, actually he had a fever from the morning itself, so"
+    },
+    {
+     "ta": "சரீ, மாரணம் ஃபீவர்தான் காரணமா.",
+     "en": "Right, the [maaranam] is fever, that is the reason."
+    },
+    {
+     "ta": "கிளீனிக் கூட்டிட்டு போய்ட்டு வந்துருக்கோம். சோ இப்ப ரெஸ்ட் எடுத்துட்டு இருக்கோம்.",
+     "en": "We took him to the clinic and came back. So now we are resting."
+    },
+    {
+     "ta": "அவன் எந்த திகதி மீண்டும் பள்ளிக்கு வர இருக்கிறான்?",
+     "en": "On what date is he going to come back to school?"
+    },
+    {
+     "ta": "சரீ, ரெஸ்ட் எடுத்துட்டு இருக்கோம்தானா.",
+     "en": "Right, we are resting, is that so."
+    },
+    {
+     "ta": "அவன்கு எந்த திகதிக் மீண்டும் பள்ளிக் வர இருக்கிறான்?",
+     "en": "On what date is he to come back to school?"
+    },
+    {
+     "ta": "அப்புறம் நாளைக்கே கண்டிப்பாக அனுப்பிச்சுர்றேன் ஸ்கூலுக்கு.",
+     "en": "Then tomorrow I will definitely send him to school."
+    },
+    {
+     "ta": "சரீ,",
+     "en": "Right,"
+    },
+    {
+     "ta": "நாளைக்கே கண்டிப்பாக வர இருக்கிறான்தானா. உங்கள்கு மீண்டும் ஏதும் சொல்ல வேணும்னா?",
+     "en": "He is definitely going to come tomorrow, is that so. Do you need to say anything more?"
+    },
+    {
+     "ta": "நான் காத்திருக்கிறேன்.",
+     "en": "I am waiting."
+    },
+    {
+     "ta": "இல்ல மேம் சொல்றதுக்கு எதுவும் இல்ல. அதான் நாளைக்கு அனுப்பிச்சிருவேன் ஸ்கூலுக்கு.",
+     "en": "No ma'am there is nothing to say. That is it, tomorrow I will send him to school."
+    },
+    {
+     "ta": "நன்கு, வணக்கம்.",
+     "en": "Well, greetings."
+    }
+   ]
+  },
+  "S-3120": {
+   "locale": "ta-IN",
+   "turns": [
+    {
+     "ta": "இது பள்ளி வருகைப் பதிவுத் துறையிலிருந்து வரும் தானியங்கி அழைப்பு.",
+     "en": "This is an automated call coming from the school attendance record department."
+    },
+    {
+     "ta": "நீங்கள் மனிதரிடம் அல்ல, ஒரு ஏஐ உதவியாளரிடம் பேசுகிறீர்கள். எந்த நேரத்திலும் ஒரு பணியாளரிடம் பேச வேண்டும் என்று கேட்டால்,",
+     "en": "You are speaking not with a human but with an AI assistant. If at any time you ask to speak with a staff member,"
+    },
+    {
+     "ta": "ஹலோ. ஓகே.",
+     "en": "Hello. Okay."
+    },
+    {
+     "ta": "நன்கு.",
+     "en": "Well."
+    },
+    {
+     "ta": "நீங்கள் Oakridge High பள்ளி மாணவரின் பெற்றோரா அல்து பாதுகாவலரா?",
+     "en": "Are you the parent or guardian of a pupil at Oakridge High school?"
+    },
+    {
+     "ta": "ஆமா மேம் நான் பேரன்ட்ஸ் சொல்லுங்க.",
+     "en": "Yes ma'am I am the parents, tell me."
+    },
+    {
+     "ta": "சரீ.",
+     "en": "Right."
+    },
+    {
+     "ta": "Bench S-3120-ன் வருகையின்மை குறித்து; வருகையின்மைய்க்கான காரணத்தைச் சொல்ல முடியுமா?",
+     "en": "Regarding Bench S-3120's absence; can you tell the reason for the absence?"
+    },
+    {
+     "ta": "என்ன சொல்றீங்க எனக்கோ தெரியாது. அவன் காலைல ஸ்கூல் பேக் எடுத்து சைக்கிள்ல கெளம்பிட்டான்.",
+     "en": "I don't know what you are saying. He took his school bag in the morning and left on his bicycle."
+    },
+    {
+     "ta": "சரீ, அவசரம் இல்லை.",
+     "en": "Right, there is no hurry."
+    },
+    {
+     "ta": "அதுலாம் நன்கு. இன்து கேட்கிறேனா — அவன் எப்போதும் திரும்ப வரப்போறான்?",
+     "en": "All that is well. Shall I ask [indhu] — when is he going to come back?"
+    },
+    {
+     "ta": "கிளாஸ்ல இல்லையா? கொஞ்சம் செக் பண்றீங்களா?",
+     "en": "Is he not in class? Could you check a little?"
+    },
+    {
+     "ta": "ஆமாம்,",
+     "en": "Yes,"
+    },
+    {
+     "ta": "அவர் 202***11 அன்று வரவு இல்லை என்று குறிக்கப்பட்டார். காரணம் இன்னும் விளக்கப்படவில்லை.",
+     "en": "He was marked absent on 202***11. The reason has still not been explained."
+    },
+    {
+     "ta": "கொஞ்சம் செக் பண்றீங்களா? நான் கணேஷ் ஸ்கூலுக்கு வரேன்.",
+     "en": "Could you check a little? I [Ganesh] am coming to the school."
+    },
+    {
+     "ta": "நீங்கள்க்கு மனதரம் இல்லையா?",
+     "en": "Do you not have [manatharam]?"
+    },
+    {
+     "ta": "நான் இருக்கிறேன்.",
+     "en": "I am here."
+    },
+    {
+     "ta": "சாரி கொஞ்சம் கிளாஸ்ல பாக்குறீங்களா? எனக்கு கொஞ்சம் பதட்டமா இருக்கு. நான் உடனே ஸ்கூலுக்கு வரேன்.",
+     "en": "Sorry, could you look in the class a little? I am feeling rather panicked. I am coming to the school immediately."
+    },
+    {
+     "ta": "சரீ,",
+     "en": "Right,"
+    },
+    {
+     "ta": "உங்கள்க்கு மனதரம் இல்லையா? நான் இருக்கிறேன்.",
+     "en": "Do you not have [manatharam]? I am here."
+    },
+    {
+     "ta": "புரியல நீங்க என்ன சொல்றீங்கன்னு.",
+     "en": "I don't understand what you are saying."
+    },
+    {
+     "ta": "சரீ,",
+     "en": "Right,"
+    },
+    {
+     "ta": "நான் Oakridge High பள்ளி வருகைப் பதிவுத்துறையிலிருந்து அழைக்கிறேன். Bench S-3120-ன் வருகையின்மைய்க்கு,",
+     "en": "I am calling from Oakridge High school attendance record department. For Bench S-3120's absence,"
+    },
+    {
+     "ta": "இன்து காரணம் இன்தும் விலக்ப்படவில்லையா?",
+     "en": "Has [indhu] reason [indhum] not been [vilakappadavillai]?"
+    },
+    {
+     "ta": "அதெல்லம் எனக்குத் தெரியாது. ஆமா. காலைல ஸ்கூல் பேக் எடுத்து கெளம்பிட்டான். கிளாஸ் இல்லையா? நீங்க கொஞ்சம் பாத்து சொல்றீங்களா?",
+     "en": "I don't know any of that. Yes. In the morning he took his school bag and left. Is he not in class? Could you look and tell me?"
+    },
+    {
+     "ta": "சரீ,",
+     "en": "Right,"
+    },
+    {
+     "ta": "உங்கள்க்கு மனதரம் இல்லையா? நான் இருக்கிறேன்.",
+     "en": "Do you not have [manatharam]? I am here."
+    },
+    {
+     "ta": "அப்படின்னா அது என்ன மன தரம்?",
+     "en": "So then what is [mana tharam]?"
+    },
+    {
+     "ta": "சரீ,",
+     "en": "Right,"
+    },
+    {
+     "ta": "உங்கள்க்கு மனதரம் இல்லையா? நான் இருக்கிறேன்.",
+     "en": "Do you not have [manatharam]? I am here."
+    },
+    {
+     "ta": "புரியல நீங்க என்ன சொல்றீங்கனு எனக்கு புரியல அவன் கிளாஸ்ல இருக்கான்னா இல்லையா கொஞ்சம் பாத்து சொல்றீங்களா நான்",
+     "en": "I don't understand what you are saying, I don't understand, is he in class or not, could you look and tell me, I"
+    },
+    {
+     "ta": "சரீ,",
+     "en": "Right,"
+    },
+    {
+     "ta": "உங்கள்க்கு மனதரம் இல்லையா? நான் இருக்கிறேன்.",
+     "en": "Do you not have [manatharam]? I am here."
+    },
+    {
+     "ta": "ஸ்கூலுக்கு இப்ப கெளம்பி வரேன். எனக்கு புரியல மனதாரம்னா எனக்கு புரியல கொடியோர் செய்து இங்கிலிஷ் ஆர் லைக் யோர் வே ஆஃப் சைக்கிள்னு கேட்டேன்.",
+     "en": "I am leaving for the school now. I don't understand, if [manatharam] means, I don't understand, I asked [kodiyor] do it in English or like your way of bicycle."
+    },
+    {
+     "ta": "சரீ,",
+     "en": "Right,"
+    },
+    {
+     "ta": "உங்கள்க்கு மனதரம் இல்லையா? நான் இருக்கிறேன்.",
+     "en": "Do you not have [manatharam]? I am here."
+    },
+    {
+     "ta": "மனதரம், மனதிடம், ஆ மனதிடம் சொல்றீங்களா?",
+     "en": "[Manatharam], [manathidam], ah are you saying [manathidam]?"
+    },
+    {
+     "ta": "ஆமாம், மனதரம்தான்.",
+     "en": "Yes, it is [manatharam]."
+    },
+    {
+     "ta": "நான் இருக்கிறேன்.",
+     "en": "I am here."
+    },
+    {
+     "ta": "அது ஓகே ங்க. அவன் கிளாஸ் ல இருக்கானா இல்லையா? அத கொஞ்சம் பாத்து சொல்ல முடியுமா? இல்லன்னா இப்ப யாராவது ஹ்யூமன்ஸ் கிட்ட குடுங்க. அங்க இருக்க ஸ்டாஃப் யார்கிட்டயாச்சு.",
+     "en": "That is okay. Is he in class or not? Could you look and tell me that? Otherwise put me on to some human now. To whichever staff is there."
+    },
+    {
+     "ta": "சரீ,",
+     "en": "Right,"
+    },
+    {
+     "ta": "உங்கள்க்கு மனதரம் இல்லையா? நான் இருக்கிறேன்.",
+     "en": "Do you not have [manatharam]? I am here."
+    },
+    {
+     "ta": "நான் காத்திருக்கிறேன்.",
+     "en": "I am waiting."
+    },
+    {
+     "ta": "இல்ல மனதாரம் இல்ல.",
+     "en": "No, there is no [manathaaram]."
+    },
+    {
+     "ta": "சரீ,",
+     "en": "Right,"
+    },
+    {
+     "ta": "உங்கள்க்கு மனதரம் இல்லையா? நான் இருக்கிறேன்.",
+     "en": "Do you not have [manatharam]? I am here."
+    },
+    {
+     "ta": "இந்த.",
+     "en": "This."
+    },
+    {
+     "ta": "சரீ,",
+     "en": "Right,"
+    },
+    {
+     "ta": "உங்கள்க்கு மனதரம் இல்லையா? நான் இருக்கிறேன்.",
+     "en": "Do you not have [manatharam]? I am here."
+    },
+    {
+     "ta": "கால் கட்டணான்றீங்களா?",
+     "en": "Are you cutting the call?"
+    }
+   ]
+  }
+ },
+ "_brackets": "A word in square brackets is transliterated rather than translated, because it is not a word. The agent's Tamil in S-3120 is substantially malformed: `manatharam` is not Tamil, the caller asks what it means, and the agent answers that yes, it is `manatharam`. Glossing that line as \"can you hear me\", which is what it was probably generated from, would hide the defect this call is published for. The same convention marks `maaranam` for `kaaranam` (reason) in S-3119 and `indhu`, `indhum` and `vilakappadavillai` in S-3120."
+}

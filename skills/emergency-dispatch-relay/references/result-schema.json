@@ -1,0 +1,15 @@
+{
+  "unit_accepted": {
+    "type": "string",
+    "enum": ["yes", "no", "unknown"],
+    "description": "Can this unit respond to the relayed emergency assignment?"
+  },
+  "eta_minutes": {
+    "type": "string",
+    "description": "Estimated arrival in minutes exactly as the unit stated it, as digits (for example \"12\"). If the unit did not state a time or the answer was unclear, return the word \"unknown\"."
+  },
+  "notes": {
+    "type": "string",
+    "description": "One short sentence of anything else the unit said, in English."
+  }
+}

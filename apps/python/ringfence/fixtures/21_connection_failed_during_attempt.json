@@ -1,0 +1,40 @@
+{
+  "_evidence_source": "synthetic: models calltruth's connection_failed_during_attempt classification -- the provider reports a terminal failure with zero ring time (started_at == completed_at) and an attempt-level failure_code, so nothing was ever asked or answered. Distinct from no_answer_confirmed, which requires an attempt that actually rang; conflating the two would let a provider-side failure read as a recipient who chose not to pick up. Unit-tested directly in tests/test_resolve.py.",
+  "category": "escalation_case",
+  "case": {
+    "case_id": "case_f21",
+    "account_holder_name": "Dana Whitfield",
+    "on_file_phone": "+14155550121",
+    "claimed_transaction_amount": "4500.00",
+    "claimed_recipient": "Jordan Rivera",
+    "claimed_payment_method": "wire",
+    "request_supplied_callback_number": null
+  },
+  "call": {
+    "id": "call_f21",
+    "status": "failed",
+    "task": "Verify a flagged $4,500 wire transaction.",
+    "failure_code": "call_failed",
+    "failure_message": "calling task status=FAILED",
+    "task_completed": false,
+    "completion_confidence": {"score": 0.68, "label": "medium"},
+    "summary": "The call did not connect or complete; the recipient may be busy or unavailable."
+  },
+  "attempts": [
+    {
+      "id": "attempt_f21",
+      "phone": "+14155550121",
+      "status": "failed",
+      "started_at": "2026-01-05T10:00:00Z",
+      "completed_at": "2026-01-05T10:00:00Z",
+      "summary": "The call did not connect or complete; the recipient may be busy or unavailable.",
+      "transcript_turns": [],
+      "provider_call_id": "prov_f21",
+      "failure_code": "504",
+      "failure_message": null
+    }
+  ],
+  "events": [],
+  "signals": {},
+  "expected_disposition": "ESCALATE_TO_HUMAN"
+}

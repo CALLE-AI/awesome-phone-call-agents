@@ -1,0 +1,22 @@
+node_modules/
+dist/
+data/*.json
+.env
+.env.*
+!.env.example
+*.log
+.vite/
+graphify-out/
+
+.vercel
+
+# Local demo captures and inspection artifacts (never part of the app source)
+_intro-check-*.jpg
+_intro-verify-*.jpg
+_start-*.jpg
+_still-*.jpg
+_tail-*.jpg
+_video-check-contact.png
+_video-timeline-*.png
+e-mploye-demo-*.mp3
+e-mploye-demo-*.mp4

@@ -1,0 +1,284 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>RingFence -- Fraud Ops Dashboard</title>
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<style>
+  :root { color-scheme: light; }
+  * { box-sizing: border-box; }
+  body {
+    font-family: -apple-system, system-ui, "Segoe UI", sans-serif;
+    max-width: 900px; margin: 2rem auto; padding: 0 1rem;
+    background: #f6f8fa; color: #1f2328;
+  }
+  .banner {
+    background: #1a3a5c; color: #fff; padding: 1rem 1.25rem; border-radius: 10px;
+    margin-bottom: 1rem; display: flex; align-items: center; justify-content: space-between;
+  }
+  .banner h1 { font-size: 1.1rem; margin: 0; display: flex; align-items: center; gap: 0.5rem; }
+  .icon { width: 1.1em; height: 1.1em; vertical-align: -0.2em; flex-shrink: 0; }
+  .sim-tag {
+    background: #ffd54a; color: #1f2328; font-weight: 700; font-size: 0.7rem;
+    padding: 0.2rem 0.6rem; border-radius: 999px; letter-spacing: 0.05em;
+  }
+  .table-wrap { overflow-x: auto; -webkit-overflow-scrolling: touch; border-radius: 10px; }
+  table { width: 100%; min-width: 640px; border-collapse: collapse; background: #fff; }
+  @media (max-width: 480px) {
+    body { margin: 1rem auto; padding: 0 0.75rem; }
+  }
+  th, td { text-align: left; padding: 0.7rem 0.9rem; border-bottom: 1px solid #eaeef2; font-size: 0.9rem; }
+  th { background: #f0f3f6; font-size: 0.75rem; text-transform: uppercase; letter-spacing: 0.04em; color: #57606a; }
+  tr:last-child td { border-bottom: none; }
+  tr.clickable { cursor: pointer; }
+  tr.clickable:hover { background: #f6f8fa; }
+  .badge {
+    display: inline-block; padding: 0.2em 0.7em; border-radius: 999px; color: #fff;
+    font-weight: 700; font-size: 0.78rem;
+  }
+  .pending { color: #57606a; font-style: italic; }
+  .advisory { color: #9a6700; }
+  .empty { text-align: center; color: #57606a; padding: 2rem; }
+  #overlay {
+    display: none; position: fixed; inset: 0; background: rgba(31,35,40,0.35); z-index: 20;
+  }
+  #overlay.visible { display: block; }
+  #detail {
+    position: fixed; top: 0; right: 0; height: 100vh; width: min(560px, 100vw);
+    background: #fff; border-left: 1px solid #d0d7de; box-shadow: -8px 0 24px rgba(0,0,0,0.15);
+    padding: 1.5rem; overflow-y: auto; z-index: 21;
+    transform: translateX(100%); transition: transform 0.2s ease-out;
+  }
+  #detail.visible { transform: translateX(0); }
+  #detail h3 { margin-top: 0; padding-right: 2rem; }
+  #detail ul { padding-left: 1.2rem; }
+  .qa-item { margin-bottom: 0.6rem; }
+  .qa-q { font-weight: 600; }
+  .qa-a { color: #57606a; margin: 0.1rem 0 0; }
+  .close-btn {
+    position: absolute; top: 1.25rem; right: 1.25rem; cursor: pointer; color: #57606a;
+    background: #f0f3f6; border: none; border-radius: 50%; width: 2rem; height: 2rem;
+    font-size: 1rem; line-height: 1;
+  }
+  .copy-btn {
+    position: absolute; top: 1.25rem; right: 3.5rem; cursor: pointer; color: #57606a;
+    background: #f0f3f6; border: none; border-radius: 6px; padding: 0.35rem 0.7rem;
+    font-size: 0.78rem; font-weight: 600; display: flex; align-items: center; gap: 0.35em;
+  }
+  .copy-btn.copied { background: #d8f0dd; color: #1a7f37; }
+</style>
+</head>
+<body>
+
+<div class="banner">
+  <h1 id="banner-title"></h1>
+  <span class="sim-tag">SIMULATION</span>
+</div>
+
+<p class="advisory" style="margin:0.75rem 0 0;">
+  RingFence returns advisory recommendations from a verification call. Every
+  row below awaits an analyst; nothing here approves, holds, or releases a
+  transaction on its own.
+</p>
+
+<div class="table-wrap">
+  <table>
+    <thead>
+      <tr><th>Case</th><th>Account holder</th><th>Amount</th><th>Recipient</th><th>Recommendation</th></tr>
+    </thead>
+    <tbody id="rows"></tbody>
+  </table>
+</div>
+<div id="empty-state" class="empty" style="display:none;">No flagged transactions yet &mdash; submit one from the customer page.</div>
+
+<div id="overlay" onclick="hideDetail()"></div>
+<div id="detail"></div>
+
+<script>
+const DISPOSITION_COLORS = {
+  NO_VERIFICATION_REQUIRED: "#1a7f37",
+  ADVISE_ALLOW: "#1a7f37",
+  ESCALATE_TO_HUMAN: "#9a6700",
+  ADVISE_BLOCK: "#cf222e",
+};
+
+// Everything derived from a verification call is a recommendation for an
+// analyst, never a completed action on the transaction -- so the UI says
+// so on the row, in the drill-down, and in the copied transcript.
+const REVIEW_NOTICE =
+  "Advisory recommendation \u2014 requires analyst review before any action is taken on this transaction.";
+
+// Small, hand-built icon set (24x24 stroke icons, currentColor) -- no
+// icon-font or JS library dependency, no extra network request. Mirrors
+// demo/customer.html's set exactly.
+const ICONS = {
+  briefcase: `<svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="7" width="18" height="13" rx="2"/><path d="M8 7V5a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/><line x1="3" y1="12" x2="21" y2="12"/></svg>`,
+  clock: `<svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"/><polyline points="12 7 12 12 16 14"/></svg>`,
+  check: `<svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"/><polyline points="8 12.5 11 15.5 16 9"/></svg>`,
+  alertTriangle: `<svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3 L22 20 L2 20 Z"/><line x1="12" y1="9" x2="12" y2="14"/><circle cx="12" cy="17" r="0.5" fill="currentColor" stroke="none"/></svg>`,
+  helpCircle: `<svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"/><path d="M9.5 9.2a2.5 2.5 0 0 1 4.9.8c0 1.7-2.4 2-2.4 3.5"/><circle cx="12" cy="17" r="0.5" fill="currentColor" stroke="none"/></svg>`,
+  dot: `<svg class="icon" viewBox="0 0 24 24"><circle cx="12" cy="12" r="7" fill="currentColor"/></svg>`,
+  list: `<svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="5" y="3" width="14" height="18" rx="2"/><line x1="8" y1="8" x2="16" y2="8"/><line x1="8" y1="12" x2="16" y2="12"/><line x1="8" y1="16" x2="13" y2="16"/></svg>`,
+  copy: `<svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="9" y="9" width="12" height="12" rx="2"/><path d="M5 15V5a2 2 0 0 1 2-2h10"/></svg>`,
+};
+
+const CATEGORY_ICONS = {
+  scam_pattern: ICONS.alertTriangle,
+  clean_legitimate: ICONS.check,
+  escalation_case: ICONS.helpCircle,
+  no_verification_required: ICONS.check,
+};
+
+document.getElementById("banner-title").innerHTML = `${ICONS.briefcase} Fraud Operations Dashboard`;
+
+function categoryIcon(category) {
+  return CATEGORY_ICONS[category] || ICONS.list;
+}
+
+function statusCell(record) {
+  if (record.status !== "resolved") {
+    return `<span class="pending">${ICONS.clock} Verification call in progress&hellip;</span>`;
+  }
+  const color = DISPOSITION_COLORS[record.disposition] || "#57606a";
+  const badge = `<span class="badge" style="background:${color}">${record.disposition}</span>`;
+  return record.requires_human_review ? `${badge} <span class="pending">awaiting review</span>` : badge;
+}
+
+function renderQA(qa) {
+  if (!qa.length) return "<p><em>(no conversation occurred)</em></p>";
+  return "<ul>" + qa.map(item => `
+    <li class="qa-item">
+      <p class="qa-q">Q: ${item.question}</p>
+      <p class="qa-a">A: ${item.answer !== null ? item.answer : "<em>(no answer recorded)</em>"}</p>
+    </li>`).join("") + "</ul>";
+}
+
+const CLOSE_BTN = `<button class="close-btn" onclick="hideDetail()" aria-label="Close">&times;</button>`;
+const COPY_BTN = `<button id="copy-btn" class="copy-btn" onclick="copyCurrentTranscript()">${ICONS.copy} Copy</button>`;
+
+let selectedId = null;
+let currentDetailRecord = null;
+
+function showDetail(record) {
+  currentDetailRecord = record;
+  const detail = document.getElementById("detail");
+  if (record.status !== "resolved") {
+    detail.innerHTML = `${CLOSE_BTN}
+      <h3>${record.id}</h3><p class="pending">Verification call still in progress&hellip;</p>`;
+  } else if (!record.audit) {
+    const color = DISPOSITION_COLORS[record.disposition] || "#57606a";
+    detail.innerHTML = `${CLOSE_BTN}
+      <h3>${record.id} &mdash; <span class="badge" style="background:${color}">${record.disposition}</span></h3>
+      <p>No verification call was needed &mdash; ${(record.disposition_reasons || []).join(", ") || "below the bank's verification threshold"}.</p>`;
+  } else {
+    const a = record.audit;
+    const color = DISPOSITION_COLORS[a.disposition.disposition] || "#57606a";
+    detail.innerHTML = `
+      ${CLOSE_BTN}
+      ${COPY_BTN}
+      <h3>${record.id} &mdash; <span class="badge" style="background:${color}">${a.disposition.disposition}</span></h3>
+      <p><strong>Call outcome:</strong> ${a.call_outcome.outcome} (confidence: ${a.call_outcome.confidence})</p>
+      <p><strong>Verification Q&amp;A:</strong></p>
+      ${renderQA(a.verification_qa)}
+      <p><strong>Extracted signals:</strong></p>
+      <ul>${Object.entries(a.signals).map(([k, v]) => `<li>${k}: ${v}</li>`).join("") || "<li><em>none</em></li>"}</ul>
+      <p><strong>Reasons:</strong> ${a.disposition.reasons.join(", ") || "none"}</p>
+      <p class="advisory"><strong>${REVIEW_NOTICE}</strong></p>
+    `;
+  }
+  detail.classList.add("visible");
+  document.getElementById("overlay").classList.add("visible");
+}
+function hideDetail() {
+  document.getElementById("detail").classList.remove("visible");
+  document.getElementById("overlay").classList.remove("visible");
+  selectedId = null;
+  currentDetailRecord = null;
+}
+
+function transcriptText(record) {
+  const a = record.audit;
+  const lines = [
+    `Case: ${record.id}`,
+    `Recommendation: ${a.disposition.disposition} (${REVIEW_NOTICE})`,
+    `Call outcome: ${a.call_outcome.outcome} (confidence: ${a.call_outcome.confidence})`,
+    "",
+    "Verification Q&A:",
+  ];
+  if (!a.verification_qa.length) {
+    lines.push("(no conversation occurred)");
+  } else {
+    a.verification_qa.forEach(item => {
+      lines.push(`Q: ${item.question}`);
+      lines.push(`A: ${item.answer !== null ? item.answer : "(no answer recorded)"}`);
+    });
+  }
+  lines.push("", "Extracted signals:");
+  const signalEntries = Object.entries(a.signals);
+  if (!signalEntries.length) lines.push("(none)");
+  else signalEntries.forEach(([k, v]) => lines.push(`${k}: ${v}`));
+  lines.push("", `Reasons: ${a.disposition.reasons.join(", ") || "none"}`);
+  return lines.join("\n");
+}
+
+async function copyCurrentTranscript() {
+  if (!currentDetailRecord || !currentDetailRecord.audit) return;
+  const text = transcriptText(currentDetailRecord);
+  try {
+    await navigator.clipboard.writeText(text);
+  } catch (e) {
+    const ta = document.createElement("textarea");
+    ta.value = text;
+    ta.style.position = "fixed";
+    ta.style.opacity = "0";
+    document.body.appendChild(ta);
+    ta.select();
+    document.execCommand("copy");
+    document.body.removeChild(ta);
+  }
+  const btn = document.getElementById("copy-btn");
+  if (!btn) return;
+  btn.classList.add("copied");
+  btn.innerHTML = `${ICONS.check} Copied`;
+  setTimeout(() => {
+    btn.classList.remove("copied");
+    btn.innerHTML = `${ICONS.copy} Copy`;
+  }, 1500);
+}
+
+async function refresh() {
+  const res = await fetch("/api/demo/cases");
+  const data = await res.json();
+  const rows = document.getElementById("rows");
+  const emptyState = document.getElementById("empty-state");
+  if (!data.cases.length) {
+    rows.innerHTML = "";
+    emptyState.style.display = "block";
+  } else {
+    emptyState.style.display = "none";
+    rows.innerHTML = data.cases.map(r => `
+      <tr class="clickable" onclick='selectCase(${JSON.stringify(r.id)})'>
+        <td>${r.id}<br><small style="color:#57606a">${categoryIcon(r.category)} ${r.scenario_label || ""}</small></td>
+        <td>${r.account_holder_name}</td>
+        <td>$${r.claimed_transaction_amount}</td>
+        <td>${r.claimed_recipient}</td>
+        <td>${statusCell(r)}</td>
+      </tr>`).join("");
+  }
+  if (selectedId) {
+    const record = data.cases.find(r => r.id === selectedId);
+    if (record) showDetail(record);
+  }
+  setTimeout(refresh, 1000);
+}
+
+function selectCase(id) {
+  selectedId = id;
+  fetch(`/api/demo/cases/${id}`).then(r => r.json()).then(showDetail);
+}
+
+refresh();
+</script>
+
+</body>
+</html>
