@@ -1,0 +1,40 @@
+{
+  "workflow": "claim_status",
+  "max_hold_minutes": 25,
+  "practice": {
+    "name": "Lakeshore Family Medicine",
+    "npi": "1234567893"
+  },
+  "payer": {
+    "name": "Meridian Health Plan",
+    "phone": "+12125550142",
+    "region": "US",
+    "claims_per_call_cap": 3
+  },
+  "claims": [
+    {
+      "claim_number": "CLM-2026-004417",
+      "date_of_service": "2026-07-29",
+      "patient": {
+        "member_id": "W884213097",
+        "date_of_birth": "1984-03-11",
+        "patient_last_name": "Alvarez",
+        "ssn_last4": "9021",
+        "medical_record_number": "MRN-55219",
+        "address_line1": "418 Kestrel Lane",
+        "patient_phone": "+12125550177"
+      }
+    },
+    {
+      "claim_number": "CLM-2026-004612",
+      "date_of_service": "2026-08-04",
+      "patient": {
+        "member_id": "W884213097",
+        "date_of_birth": "1984-03-11",
+        "patient_last_name": "Alvarez",
+        "ssn_last4": "9021",
+        "medical_record_number": "MRN-55219"
+      }
+    }
+  ]
+}
