@@ -26,13 +26,26 @@ CALLE_API_KEY = (
     or os.getenv("CALL_E_API_KEY")
 )
 
+# Real-call destinations must be explicitly allowlisted.
+# Store comma-separated ASCII E.164 numbers in:
+# CLINICCALL_ALLOWED_DESTINATIONS=+254700000001,+254700000002
+_raw_allowed_destinations = os.getenv(
+    "CLINICCALL_ALLOWED_DESTINATIONS",
+    "",
+)
+ALLOWED_DESTINATIONS = {
+    value.strip()
+    for value in _raw_allowed_destinations.split(",")
+    if value.strip()
+}
+
 # Demo mode is SAFE by default.
 # Real outbound calls require explicitly setting:
 # CLINICCALL_DEMO_MODE=false
 DEMO_MODE = os.getenv(
     "CLINICCALL_DEMO_MODE",
     "true",
-).lower() == "true"
+).strip().lower() != "false"
 
 
 # ============================================================
@@ -173,7 +186,6 @@ def root():
     return {
         "message": "ClinicCall AI API is running",
         "status": "online",
-        "cale_configured": CALLE_API_KEY is not None,
         "demo_mode": DEMO_MODE,
     }
 
@@ -187,7 +199,6 @@ def health():
 
     return {
         "status": "healthy",
-        "cale_configured": CALLE_API_KEY is not None,
         "demo_mode": DEMO_MODE,
     }
 
@@ -554,6 +565,15 @@ def call_patient(
                 "Use a valid number such as "
                 "+254769710722."
             ),
+        )
+
+    # For real outbound calls, the destination must be explicitly
+    # allowlisted. This prevents an operator from turning an arbitrary
+    # patient number into an outbound provider destination.
+    if not DEMO_MODE and phone_number not in ALLOWED_DESTINATIONS:
+        raise HTTPException(
+            status_code=403,
+            detail="Destination is not authorized for outbound calling.",
         )
 
 
