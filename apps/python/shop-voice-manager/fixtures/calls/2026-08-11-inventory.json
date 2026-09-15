@@ -1,0 +1,179 @@
+{
+  "call_id": "call_inv_20260811",
+  "idempotency_key": "shopvoice-demo-lagos-corner-shop-inventory-2026-08-11",
+  "status": "completed",
+  "task_completed": true,
+  "completion_confidence": {
+    "score": 0.89,
+    "label": "high"
+  },
+  "evidence": [
+    "Owner reported Rice at about 10 bags.",
+    "Owner reported Indomie at about 13 cartons.",
+    "Owner reported Sugar at about 5 bags."
+  ],
+  "structured_result": {
+    "check_in_completed": true,
+    "products": [
+      {
+        "name": "Rice",
+        "quantity_estimate": 10,
+        "unit": "bags",
+        "running_low": false,
+        "supplier_mentioned": "Alhaji Musa Stores",
+        "last_purchase_price": 45000
+      },
+      {
+        "name": "Indomie",
+        "quantity_estimate": 13,
+        "unit": "cartons",
+        "running_low": false,
+        "supplier_mentioned": "Chidinma Distributors",
+        "last_purchase_price": 9000
+      },
+      {
+        "name": "Sugar",
+        "quantity_estimate": 5,
+        "unit": "bags",
+        "running_low": false
+      },
+      {
+        "name": "Cooking oil",
+        "quantity_estimate": 19,
+        "unit": "bottles",
+        "running_low": false
+      },
+      {
+        "name": "Milo",
+        "quantity_estimate": 9,
+        "unit": "tins",
+        "running_low": false
+      }
+    ],
+    "owner_notes": "Rain fall for morning, small customers."
+  },
+  "metadata": {
+    "shop_id": "demo-lagos-corner-shop",
+    "call_type": "inventory",
+    "call_date": "2026-08-11"
+  },
+  "recipients": [
+    {
+      "phones": [
+        "+2348000000000"
+      ],
+      "region": "NG",
+      "locale": "en",
+      "structured_result": {
+        "check_in_completed": true,
+        "products": [
+          {
+            "name": "Rice",
+            "quantity_estimate": 10,
+            "unit": "bags",
+            "running_low": false,
+            "supplier_mentioned": "Alhaji Musa Stores",
+            "last_purchase_price": 45000
+          },
+          {
+            "name": "Indomie",
+            "quantity_estimate": 13,
+            "unit": "cartons",
+            "running_low": false,
+            "supplier_mentioned": "Chidinma Distributors",
+            "last_purchase_price": 9000
+          },
+          {
+            "name": "Sugar",
+            "quantity_estimate": 5,
+            "unit": "bags",
+            "running_low": false
+          },
+          {
+            "name": "Cooking oil",
+            "quantity_estimate": 19,
+            "unit": "bottles",
+            "running_low": false
+          },
+          {
+            "name": "Milo",
+            "quantity_estimate": 9,
+            "unit": "tins",
+            "running_low": false
+          }
+        ],
+        "owner_notes": "Rain fall for morning, small customers."
+      },
+      "attempts": [
+        {
+          "attempt": 1,
+          "status": "completed",
+          "started_at": "2026-08-11T07:15:00+01:00",
+          "duration_seconds": 45,
+          "transcript_turns": [
+            {
+              "offset_seconds": 0,
+              "speaker": "bot",
+              "text": "Good morning o. How market?"
+            },
+            {
+              "offset_seconds": 3,
+              "speaker": "user",
+              "text": "We dey o."
+            },
+            {
+              "offset_seconds": 5,
+              "speaker": "bot",
+              "text": "I be AI assistant wey dey help you track your shop. This call fit dey recorded."
+            },
+            {
+              "offset_seconds": 11,
+              "speaker": "bot",
+              "text": "How many bags of rice you get now?"
+            },
+            {
+              "offset_seconds": 14,
+              "speaker": "user",
+              "text": "Rice na like 10 bag."
+            },
+            {
+              "offset_seconds": 18,
+              "speaker": "bot",
+              "text": "Indomie remain how many carton?"
+            },
+            {
+              "offset_seconds": 21,
+              "speaker": "user",
+              "text": "About 13."
+            },
+            {
+              "offset_seconds": 24,
+              "speaker": "bot",
+              "text": "Sugar na how many you still get?"
+            },
+            {
+              "offset_seconds": 27,
+              "speaker": "user",
+              "text": "Sugar remain 5 bag."
+            },
+            {
+              "offset_seconds": 31,
+              "speaker": "bot",
+              "text": "Which thing don finish or almost finish?"
+            },
+            {
+              "offset_seconds": 35,
+              "speaker": "user",
+              "text": "Na indomie and sugar dey worry me."
+            },
+            {
+              "offset_seconds": 39,
+              "speaker": "bot",
+              "text": "Thank you. I go note am."
+            }
+          ]
+        }
+      ]
+    }
+  ]
+}

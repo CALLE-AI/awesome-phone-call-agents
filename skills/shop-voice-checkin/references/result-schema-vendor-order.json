@@ -1,0 +1,45 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "result-schema-vendor-order.json",
+  "title": "Shop voice vendor order result",
+  "description": "Structured result of an outbound call placing a restock order with a saved vendor. No payment or bank details.",
+  "type": "object",
+  "required": ["vendor_order_completed", "available", "items"],
+  "additionalProperties": false,
+  "properties": {
+    "vendor_order_completed": {
+      "type": "boolean",
+      "description": "True when the vendor answered and the order was discussed."
+    },
+    "available": {
+      "type": "boolean",
+      "description": "True if the vendor can supply the items."
+    },
+    "items": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["name", "quantity"],
+        "additionalProperties": false,
+        "properties": {
+          "name": { "type": "string", "minLength": 1 },
+          "quantity": { "type": "number", "exclusiveMinimum": 0 },
+          "unit": { "type": "string" }
+        }
+      }
+    },
+    "quoted_amount": {
+      "type": "number",
+      "exclusiveMinimum": 0,
+      "description": "Only set if the vendor stated a price. Never estimated."
+    },
+    "eta_text": {
+      "type": "string",
+      "description": "Delivery estimate as the vendor stated it, e.g. 'around 4pm today'."
+    },
+    "vendor_notes": {
+      "type": "string",
+      "description": "Optional free-text; must not contain payment or bank details."
+    }
+  }
+}

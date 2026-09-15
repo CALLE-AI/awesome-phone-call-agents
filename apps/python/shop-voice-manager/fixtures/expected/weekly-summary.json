@@ -1,0 +1,33 @@
+{
+  "shop_id": "demo-lagos-corner-shop",
+  "currency": "NGN",
+  "week_start": "2026-08-10",
+  "week_end": "2026-08-16",
+  "days_with_data": 7,
+  "calls_ingested": 14,
+  "estimated_revenue": 425000,
+  "procurement_spend": 310000,
+  "estimated_gross": 115000,
+  "products_running_low": [
+    "Indomie",
+    "Sugar"
+  ],
+  "slow_moving_products": [
+    {
+      "name": "Cooking oil",
+      "quantity_estimate": 14,
+      "unit": "bottles",
+      "unit_cost": 3000,
+      "capital_estimate": 42000
+    },
+    {
+      "name": "Milo",
+      "quantity_estimate": 9,
+      "unit": "tins",
+      "unit_cost": 5000,
+      "capital_estimate": 45000
+    }
+  ],
+  "slow_moving_capital": 87000,
+  "narrative": "This week you sold about ₦425,000. You spent about ₦310,000 restocking. Products running low: Indomie, Sugar. Approximate capital in slow-moving stock: ₦87,000."
+}
