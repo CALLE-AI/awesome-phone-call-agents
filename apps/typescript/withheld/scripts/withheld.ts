@@ -12,6 +12,7 @@ import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { loadErrand } from '../src/core/errand';
 import { buildScript, formatWindow } from '../src/core/script';
+import { redactForDisplay } from '../src/core/budget';
 import { runChain } from '../src/core/chain';
 import { CalleProvider, FixtureProvider } from '../src/core/calle';
 import { CalleCliProvider } from '../src/core/calle-cli';
@@ -71,7 +72,10 @@ function readErrand(file: string) {
   return loaded.errand!;
 }
 
-function printLeg(result: LegResult): void {
+function printLeg(result: LegResult, personPhone: string): void {
+  // Answers and supporting turns are quoted out of the call, so everything
+  // transcript-derived goes through the same redaction the findings use.
+  const safe = (t: string) => redactForDisplay(t, personPhone);
   const ok = result.number_disclosed ? c.red : c.green;
   console.log(
     `\n  ${c.bold(`Leg ${result.leg}`)} ${c.dim(result.transcript_ref)}`,
@@ -100,8 +104,8 @@ function printLeg(result: LegResult): void {
           : c.dim('not answered');
         console.log(`      ${a.question_id}: ${note}`);
       } else {
-        console.log(`      ${a.question_id}: ${a.answer}`);
-        console.log(`        ${c.dim(`↳ "${a.supporting_turn}"`)}`);
+        console.log(`      ${a.question_id}: ${safe(a.answer)}`);
+        console.log(`        ${c.dim(`↳ "${safe(a.supporting_turn ?? '')}"`)}`);
       }
     }
   }
@@ -111,12 +115,16 @@ function printLeg(result: LegResult): void {
     console.log(
       `      ${c.green(formatWindow(result.agreed_window.start, result.agreed_window.end))}`,
     );
-    console.log(`        ${c.dim(`↳ "${result.agreed_window.supporting_turn}"`)}`);
+    console.log(
+      `        ${c.dim(`↳ "${safe(result.agreed_window.supporting_turn ?? '')}"`)}`,
+    );
   }
 
   if (result.disclosed_about_person.length) {
     console.log(`\n    ${c.dim('disclosed about the person')}`);
-    for (const d of result.disclosed_about_person) console.log(`      - ${d}`);
+    for (const d of result.disclosed_about_person) {
+      console.log(`      - ${safe(d)}`);
+    }
   }
 
   if (result.outside_may_say_findings.length) {
@@ -128,8 +136,8 @@ function printLeg(result: LegResult): void {
   }
 }
 
-function printChain(state: ChainState): void {
-  for (const leg of state.legs) printLeg(leg);
+function printChain(state: ChainState, personPhone: string): void {
+  for (const leg of state.legs) printLeg(leg, personPhone);
 
   if (state.next) {
     console.log(`\n  ${c.bold('Scheduled next leg')} ${c.dim('(intent only — this app runs no scheduler)')}`);
@@ -139,7 +147,9 @@ function printChain(state: ChainState): void {
         state.next.not_after,
       )}`,
     );
-    console.log(`    ${c.dim(`↳ "${state.next.supporting_turn}"`)}`);
+    console.log(
+      `    ${c.dim(`↳ "${redactForDisplay(state.next.supporting_turn ?? '', personPhone)}"`)}`,
+    );
   }
 
   if (state.halted_reason) {
@@ -262,14 +272,24 @@ async function main(): Promise<void> {
     );
   }
 
-  const state = await runChain({ errand, provider, now: new Date() });
-  printChain(state);
+  // `run --real` is happening now; a replay is anchored to when it was recorded.
+  const now =
+    (provider instanceof FixtureProvider ? provider.recordedAt() : null) ??
+    new Date();
+
+  const state = await runChain({ errand, provider, now });
+  printChain(state, errand.person.phone);
 
   const leaked = state.legs.some((l) => l.number_disclosed);
   process.exit(leaked ? 3 : 0);
 }
 
 main().catch((err) => {
-  console.error(`\n  ${c.red('error')} ${err instanceof Error ? err.message : err}\n`);
+  // A thrown error can carry a provider payload or a transcript fragment, so
+  // the crash path gets the same redaction as the success path. `personPhone`
+  // is unknown here, so this only strips phone-shaped text — which is why the
+  // printer above redacts against the actual number while it still can.
+  const raw = err instanceof Error ? err.message : String(err);
+  console.error(`\n  ${c.red('error')} ${redactForDisplay(raw, '')}\n`);
   process.exit(1);
 });
