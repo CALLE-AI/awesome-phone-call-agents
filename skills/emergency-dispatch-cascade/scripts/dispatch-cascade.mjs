@@ -77,7 +77,7 @@ function maskPhone(phone) {
 // E.164-shaped substring rather than relying on every call site to remember to.
 function maskPhonesInText(text) {
   if (typeof text !== "string") return text;
-  return text.replace(/\+\d{6,15}/g, (m) => maskPhone(m));
+  return text.replace(/\+[\d ()-]{6,24}\d/g, (m) => maskPhone(m));
 }
 
 // Live transcripts can carry real, unredacted speech (addresses, other numbers
@@ -115,7 +115,7 @@ function validateDestinations(job) {
   const seen = new Set();
   for (const { label, phone } of entries) {
     if (typeof phone !== "string" || !E164_RE.test(phone)) {
-      throw new Error(`${label}'s phone "${phone}" is not a valid E.164 number.`);
+      throw new Error(`${label}'s phone is not a valid E.164 number.`);
     }
     if (seen.has(phone)) {
       throw new Error(
@@ -183,7 +183,7 @@ function placeDryRunCall(outcome) {
 }
 
 function log(step) {
-  console.log(JSON.stringify(step));
+  console.log(JSON.stringify(step, (_key, value) => maskPhonesInText(value)));
 }
 
 // The confirmation gate for live mode: a heuristic "yes" and a COMPLETED call
@@ -295,11 +295,12 @@ async function main() {
     phase: "done",
     booked_technician: assigned.name,
     eta_minutes: assigned.eta_minutes,
-    customer_confirmed: confirmResult.status === "COMPLETED",
+    customer_call_completed: confirmResult.status === "COMPLETED",
+    customer_confirmed: args.live ? null : confirmResult.status === "COMPLETED",
   });
 }
 
 main().catch((err) => {
-  console.error(err.message ?? String(err));
+  console.error(maskPhonesInText(err.message ?? String(err)));
   process.exit(1);
 });

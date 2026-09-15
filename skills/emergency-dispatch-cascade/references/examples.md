@@ -57,6 +57,10 @@ If the operator does not confirm, the run ends with nobody booked and no custome
 call placed. Raw live transcripts are withheld from the script's own log output
 (see [`references/safety.md`](safety.md)).
 
+The final `customer_call_completed` field reports transport completion only.
+For a live call, `customer_confirmed` remains `null` until a person reviews the
+answer; a completed call does not prove that the customer agreed to be home.
+
 Under the hood, each phase is one `calle` CLI invocation shaped like this (the
 fixture number below is illustrative only — the script itself refuses to dial it
 live; substitute a real, authorized number to actually run this by hand):
