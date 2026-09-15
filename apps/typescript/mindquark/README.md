@@ -30,10 +30,11 @@ MindQuark handles the wellbeing side of one user-requested phone call:
 4. The UI polls `GET /api/call/status/:id` for live dialing progress and a
    post-call structured result (outcome, mood change, support summary). The modal
    is minimizable so text chat continues during dialing.
-5. If self-harm or crisis is detected during the call, the AI directs the user to
-   988 / local emergency services and ends the call. A dual-layer crisis interceptor
-   (client + server) short-circuits LLM inference entirely on high-risk text input —
-   verified hotlines are returned instead of generated replies.
+5. The phone task instructs the CALL-E model to direct a user reporting self-harm
+   or crisis to local crisis/emergency services and end the call. This is
+   prompt-based, best-effort behavior, not a deterministic crisis detector or
+   guaranteed intervention. Separately, text chat has a client/server interceptor
+   that bypasses model inference for the high-risk text inputs it recognizes.
 6. MindQuark does not diagnose, prescribe, replace therapy, or run recurring or
    scheduled call jobs. Every call is one explicit user action.
 
@@ -43,9 +44,9 @@ flowchart LR
   B --> C[Server validation: region, quota, concurrency]
   C --> D[CALL-E outbound check-in call]
   D --> E[Status polling + post-call summary]
-  E --> F{Crisis during call?}
-  F -->|Yes| G[988 / local emergency routing, call ends]
-  F -->|No| H[Structured result shown in UI]
+  E --> F{Model recognizes crisis?}
+  F -->|Yes| G[Prompt asks for local crisis guidance and call end]
+  F -->|No / missed| H[Advisory structured result shown in UI]
 ```
 
 ## Timing and failure behavior
@@ -97,5 +98,6 @@ breathwork, or mood features.
 
 - Outbound calling is consent-gated per call and rate-limited per IP.
 - Zero phone-number persistence; no secrets in the client bundle.
-- Crisis content bypasses the model entirely, in calls and in chat.
+- Text-chat interception bypasses inference only for recognized high-risk inputs;
+  spoken-call handling remains model/prompt-based and can miss or misinterpret crisis content.
 - The product is a supportive reflection tool, not a medical device or emergency service.
