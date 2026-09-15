@@ -77,6 +77,20 @@
             margin-top: 20px;
             opacity: 0.8;
         }
+        .info-badge {
+            display: inline-block;
+            background: #ffcc00;
+            color: #000;
+            width: 16px;
+            height: 16px;
+            font-size: 11px;
+            font-weight: bold;
+            text-align: center;
+            line-height: 16px;
+            border-radius: 50%;
+            cursor: pointer;
+            margin-left: 5px;
+        }
     </style>
 </head>
 <body>
@@ -112,8 +126,11 @@
                 <option value="Japanese">🇯🇵 Japanese (日本語)</option>
             </select>
 
-            <label style="display: block; text-align: left; font-size: 13px; font-weight: bold; margin-bottom: 5px;">Business Phone Number:</label>
-            <input type="text" id="targetPhone" style="width: 100%; padding: 10px; margin-bottom: 12px; border: 1px solid #ccc; border-radius: 6px; box-sizing: border-box;">
+            <label style="display: block; text-align: left; font-size: 13px; font-weight: bold; margin-bottom: 5px;">
+                Business Phone Number: 
+                <span class="info-badge" id="phoneInfoBtn" title="Supported international country codes include +91, +49, +34, +33, +81">!</span>
+            </label>
+            <input type="text" id="targetPhone" placeholder="e.g. +915551234567" style="width: 100%; padding: 10px; margin-bottom: 12px; border: 1px solid #ccc; border-radius: 6px; box-sizing: border-box;">
 
             <label style="display: block; text-align: left; font-size: 13px; font-weight: bold; margin-bottom: 5px;">Your Query Templates:</label>
             <div class="chip-container">
