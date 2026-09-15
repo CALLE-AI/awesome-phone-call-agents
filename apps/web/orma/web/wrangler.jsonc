@@ -1,0 +1,18 @@
+{
+  "$schema": "node_modules/wrangler/config-schema.json",
+  "name": "orma",
+  "main": ".svelte-kit/cloudflare/_worker.js",
+  "compatibility_date": "2026-09-10",
+  "compatibility_flags": ["nodejs_compat"],
+  // Account listing fails for this token, so the id is pinned here rather than
+  // discovered. Do NOT add CLOUDFLARE_API_TOKEN to .env: wrangler auto-loads a
+  // project .env and would prefer it over the OAuth login, breaking every deploy.
+  "account_id": "605bb8b43bddbbc2cbe22a191131c7e1",
+  // custom_domain makes Cloudflare create and own the DNS record for this name.
+  "routes": [{ "pattern": "orma.nryn.dev", "custom_domain": true }],
+  "observability": { "enabled": true },
+  "assets": {
+    "directory": ".svelte-kit/cloudflare",
+    "binding": "ASSETS"
+  }
+}
