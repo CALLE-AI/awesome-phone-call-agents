@@ -2,11 +2,14 @@
 
 **Where voice becomes action.**
 
-WAYXA is a transaction layer for autonomous phone agents that turns structured CALL-E conversation results into deterministic, auditable business actions.
+WAYXA is an author-reported video showcase of a transaction layer for CALL-E
+phone agents. This directory contains documentation only, not runnable application
+source. No public source or reproducible setup is supplied with this contribution;
+the described implementation and guarantees have not been independently verified.
 
 ## What it demonstrates
 
-The demo implements an end-to-end service booking workflow:
+The author describes the following service-booking flow in the video:
 
 1. CALL-E conducts the phone conversation.
 2. CALL-E returns structured customer intent.
@@ -23,11 +26,14 @@ The core design principle is:
 
 > **Conversation is probabilistic. Transaction state is deterministic.**
 
-CALL-E owns the conversation and intent extraction. WAYXA remains authoritative for pricing, availability, authorization, payment verification, booking, and transaction state.
+In the demonstrated design, CALL-E supplies conversation results and WAYXA is
+intended to control pricing, availability, authorization, payment verification,
+booking, and transaction state.
 
 ## Safety and side effects
 
-WAYXA intentionally separates conversational output from transactional authority.
+The author reports the following intended boundaries; this video-only reference
+does not independently establish that they hold in an executable deployment:
 
 - A CALL-E result cannot mark a payment as successful.
 - A browser redirect from Stripe is not treated as payment proof.
@@ -43,7 +49,10 @@ Video:
 
 https://youtu.be/6912In2LtKE
 
-The submitted demo shows a real CALL-E conversation progressing through customer intent, deterministic pricing and scheduling, Stripe Test Mode payment verification, and a confirmed appointment.
+The author describes the video as a real CALL-E conversation progressing through
+customer intent, pricing and scheduling, Stripe Test Mode payment verification,
+and a confirmed appointment. Watching the video is the no-call evaluation path;
+this repository provides no call or payment execution instructions.
 
 ## Technology
 
@@ -58,4 +67,6 @@ The submitted demo shows a real CALL-E conversation progressing through customer
 
 Built for **CALL-E: Your Code Is Calling**.
 
-WAYXA demonstrates how autonomous phone agents can safely move beyond conversation into verified real-world commitments.
+WAYXA illustrates a proposed separation between conversational intent and
+transaction approval. Treat it as an external hackathon case study, not a
+certified payment or booking system.
