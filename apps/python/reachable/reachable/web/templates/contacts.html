@@ -1,0 +1,57 @@
+{% extends "base.html" %}
+{% block title %}Contact health &middot; Reachable{% endblock %}
+{% block body %}
+
+<h1>Contact health</h1>
+<p class="muted">
+  Written by both workflows. A wrong number found during an absence call appears here
+  as soon as the call ends, not next term.
+</p>
+
+<h2>Reachability per pupil</h2>
+<div class="panel">
+  <table>
+    <tr><th>Pupil</th><th>Reachability</th><th>Flagged</th></tr>
+    {% for row in reachability %}
+    <tr class="{{ 'stop' if row.at_risk else '' }}">
+      <td>{{ row.first_name }} <span class="muted mono">{{ row.pupil_id }}</span></td>
+      <td>
+        {{ row.summary }}
+        {% if row.at_risk %}<span class="pill stop">no verified contact</span>{% endif %}
+      </td>
+      <td class="mono">{{ row.flagged or '' }}</td>
+    </tr>
+    {% endfor %}
+  </table>
+</div>
+
+<h2>Every contact</h2>
+<div class="panel">
+  <table>
+    <tr>
+      <th>Pupil</th><th>Order</th><th>Contact</th><th>Number</th>
+      <th>Status</th><th>Last checked</th><th>Found by</th>
+    </tr>
+    {% for row in contacts %}
+    <tr>
+      <td class="muted">{{ row.pupil_first_name }}</td>
+      <td class="mono">{{ row.contact_order }}</td>
+      <td>{{ row.contact_name }}</td>
+      {# Masked here as everywhere outside the single storage column. #}
+      <td class="mono">{{ row.masked }}</td>
+      <td>
+        <span class="pill {{ row.tone }}">{{ row.status_text }}</span>
+        {% if row.reason %}<div class="muted" style="font-size:12px">{{ row.reason }}</div>{% endif %}
+      </td>
+      <td class="mono muted">{{ row.last_checked[:10] if row.last_checked else '—' }}</td>
+      <td class="mono muted">{{ row.source or '—' }}</td>
+    </tr>
+    {% endfor %}
+  </table>
+</div>
+
+<form method="post" action="/export/contact-changes" class="inline">
+  <button class="secondary" type="submit">Download suggested changes (CSV)</button>
+</form>
+
+{% endblock %}

@@ -1,0 +1,23 @@
+# dependencies
+node_modules/
+
+# next.js
+.next/
+out/
+next-env.d.ts
+*.tsbuildinfo
+
+# secrets: never commit real keys or phone numbers
+.env
+.env.*
+!.env.example
+
+# misc
+.vercel/
+coverage/
+.DS_Store
+npm-debug.log*
+data/
+
+.vercel
+.env*
