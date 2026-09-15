@@ -1,0 +1,118 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <!-- Tree View -->
+    <record id="view_calle_call_tree" model="ir.ui.view">
+        <field name="name">calle.call.tree</field>
+        <field name="model">calle.call</field>
+        <field name="arch" type="xml">
+            <list string="CALL-E Calls" create="false" edit="false" delete="false" decoration-muted="status == 'draft'" decoration-info="status == 'pending'" decoration-success="status == 'completed'" decoration-danger="status == 'failed'" decoration-warning="status == 'skipped'">
+                <field name="date"/>
+                <field name="name"/>
+                <field name="masked_phone" string="Phone Number"/>
+                <field name="record_name"/>
+                <field name="task_completed"/>
+                <field name="status" widget="badge"
+                       decoration-muted="status == 'draft'"
+                       decoration-info="status == 'pending'"
+                       decoration-success="status == 'completed'"
+                       decoration-danger="status == 'failed'"
+                       decoration-warning="status == 'skipped'"/>
+                <field name="call_id"/>
+                <field name="server_action_id"/>
+            </list>
+        </field>
+    </record>
+
+    <!-- Form View -->
+    <record id="view_calle_call_form" model="ir.ui.view">
+        <field name="name">calle.call.form</field>
+        <field name="model">calle.call</field>
+        <field name="arch" type="xml">
+            <form string="CALL-E Call" create="false" edit="false" delete="false">
+                <header>
+                    <button name="action_trigger_call" string="Trigger Call" type="object" class="oe_highlight" invisible="status not in ('draft', 'failed')" confirm="Are you authorized to call this destination?"/>
+                    <field name="status" widget="statusbar" statusbar_visible="draft,pending,completed,failed,skipped"/>
+                </header>
+                <sheet>
+                    <div class="oe_title">
+                        <h1>
+                            <field name="name" readonly="1"/>
+                        </h1>
+                    </div>
+                    <group>
+                        <group string="Call Details">
+                            <field name="masked_phone" string="Phone Number" readonly="1"/>
+                            <field name="locale" readonly="1"/>
+                            <field name="date" readonly="1"/>
+                            <field name="task_completed" readonly="1"/>
+                            <field name="call_id" readonly="1"/>
+                        </group>
+                        <group string="Related Context">
+                            <field name="res_model" readonly="1"/>
+                            <field name="res_id" readonly="1"/>
+                            <field name="record_name" readonly="1"/>
+                            <field name="server_action_id" readonly="1"/>
+                        </group>
+                    </group>
+                    <notebook>
+                        <page string="Result" name="result">
+                            <field name="display_result" readonly="1" style="white-space: pre-wrap; font-size: 13px; line-height: 1.6;"/>
+                        </page>
+                        <page string="Structured Result" name="structured_result" invisible="not display_structured_result">
+                            <field name="display_structured_result" readonly="1" style="white-space: pre-wrap; font-size: 13px; line-height: 1.6;"/>
+                        </page>
+                        <page string="Evidence" name="evidence" invisible="not display_evidence">
+                            <field name="display_evidence" readonly="1" style="white-space: pre-wrap; font-size: 13px; line-height: 1.6;"/>
+                        </page>
+                        <page string="Task Prompt" name="task_prompt">
+                            <field name="task_description" readonly="1" style="white-space: pre-wrap;"/>
+                        </page>
+                    </notebook>
+                </sheet>
+                <chatter/>
+            </form>
+        </field>
+    </record>
+
+    <!-- Search View -->
+    <record id="view_calle_call_search" model="ir.ui.view">
+        <field name="name">calle.call.search</field>
+        <field name="model">calle.call</field>
+        <field name="arch" type="xml">
+            <search string="Search Calls">
+                <field name="name"/>
+                <field name="masked_phone" string="Phone Number"/>
+                <field name="call_id"/>
+                <field name="res_model"/>
+                <field name="status"/>
+                <filter string="Draft" name="draft" domain="[('status', '=', 'draft')]"/>
+                <filter string="Task Completed" name="task_completed" domain="[('task_completed', '=', True)]"/>
+                <filter string="Completed" name="completed" domain="[('status', '=', 'completed')]"/>
+                <filter string="Skipped" name="skipped" domain="[('status', '=', 'skipped')]"/>
+                <filter string="Failed" name="failed" domain="[('status', '=', 'failed')]"/>
+                <filter string="Calling" name="pending" domain="[('status', '=', 'pending')]"/>
+                <group>
+                    <filter string="Status" name="group_status" context="{'group_by': 'status'}"/>
+                    <filter string="Date" name="group_date" context="{'group_by': 'date:day'}"/>
+                    <filter string="Server Action" name="group_action" context="{'group_by': 'server_action_id'}"/>
+                </group>
+            </search>
+        </field>
+    </record>
+
+    <!-- Window Action -->
+    <record id="action_calle_call" model="ir.actions.act_window">
+        <field name="name">CALL-E Calls</field>
+        <field name="res_model">calle.call</field>
+        <field name="view_mode">list,form</field>
+        <field name="search_view_id" ref="view_calle_call_search"/>
+        <field name="help" type="html">
+            <p class="o_view_nocontent_smiling_face">
+                No CALL-E phone calls logged yet!
+            </p>
+            <p>
+                Calls triggered by Automation Rules or Server Actions will be recorded here.
+            </p>
+        </field>
+    </record>
+</odoo>
