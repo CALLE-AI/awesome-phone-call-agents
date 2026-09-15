@@ -387,7 +387,17 @@ def _print(obj: Any, pretty: bool) -> None:
     print(json.dumps(obj, indent=2 if pretty else None, ensure_ascii=False))
 
 
+def _mask_phone(phone: str) -> str:
+    """Mask a phone number for public output."""
+    digits = "".join(ch for ch in str(phone) if ch.isdigit())
+    if len(digits) >= 8:
+        return f"+{digits[:2]} {digits[2:4]} *** {digits[-4:]}"
+    return "***"
+
+
 def _envelope(call: dict[str, Any]) -> dict[str, Any]:
+    """Safe public envelope — structured_result + evidence only.
+    Raw attempts, transcripts, and full diagnostics are excluded."""
     return {
         "ok": True,
         "call_id": call.get("id"),
@@ -396,8 +406,17 @@ def _envelope(call: dict[str, Any]) -> dict[str, Any]:
         "completion_confidence": call.get("completion_confidence"),
         "structured_result": call.get("structured_result"),
         "evidence": call.get("evidence"),
-        "attempts": call.get("attempts") or [],
     }
+
+
+def _safe_spec(spec: dict[str, Any]) -> dict[str, Any]:
+    """Return a copy of the spec with sensitive fields masked for preview."""
+    safe = dict(spec)
+    if "recipient" in safe:
+        safe["recipient"] = {"phone": _mask_phone(safe["recipient"].get("phone", ""))}
+    if "webhook_url" in safe and safe["webhook_url"]:
+        safe["webhook_url"] = "***masked***"
+    return safe
 
 
 def _fail(code: int, message: str, pretty: bool) -> None:
@@ -411,6 +430,7 @@ def _fail(code: int, message: str, pretty: bool) -> None:
 
 def cmd_plan(args: argparse.Namespace) -> None:
     spec = build_spec(args)
+    spec = _safe_spec(spec)
     spec["dry_run"] = True
     spec["note"] = "No call placed. Review the task, then run `book --confirm` to dial."
     _print(spec, args.pretty)
@@ -423,7 +443,7 @@ def cmd_book(args: argparse.Namespace) -> None:
         out = {
             "dry_run": True,
             "note": "This would place a REAL phone call. Re-run with --confirm to dial.",
-            **spec,
+            **_safe_spec(spec),
         }
         _print(out, args.pretty)
         sys.stderr.write("Refusing to dial: pass --confirm to actually place the call.\n")
