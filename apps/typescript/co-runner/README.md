@@ -45,6 +45,7 @@ For international business travelers and cross-border entrepreneurs, language ba
 
 ## 📁 Repository Structure
 
+```text
 📁 apps/typescript/co-runner/
 ├── 📄 index.html           # Consolidated UI layer containing all semantic HTML and design layouts
 ├── 📄 apps.js              # Core calling engine orchestrating CALL-E REST APIs & polling loops
