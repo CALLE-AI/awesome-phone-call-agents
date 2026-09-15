@@ -203,6 +203,7 @@ This project is an awesome list for AI-agent phone-call workflows. Add resources
 - [`conversation-clarify`](skills/conversation-clarify/) - Detects a written reply that agrees without saying which option, or commits without saying when, then settles it with one bounded disclosed CALL-E phone call and writes the answer back into the thread bound to the recipient's own words, or refuses to answer at all.
 ### Apps
 
+- [GoodFaith](apps/typescript/goodfaith/) - Calls imaging clinics for self-pay Good Faith Estimate cash prices, enforces price comparability on the call, and returns a confidence-gated, transcript-evidenced landed-cost comparison that refuses to rank any price it cannot trace to a real quoted sentence; mock-first no-call default.
 
 - [Rove](https://github.com/siaohue1188/rove) - Logistics workforce operations control tower that detects the gap between digitally assigned and physically secured workers, uses CALL-E to verify standby-worker availability and arrival feasibility, and applies deterministic recovery or human-escalation rules. [Live Demo](https://rove-iota-seven.vercel.app/)
 - [AcreVoice](https://github.com/dj-DeepakJadhav/acrevoice-farmer-support) - Consent-first farmer-support workspace that turns a focused CALL-E callback into confirmed, reviewable evidence for an agricultural adviser; the local deterministic workflow is no-call by default.

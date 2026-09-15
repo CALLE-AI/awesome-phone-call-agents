@@ -1,0 +1,17 @@
+{
+  "claims": {
+    "winner_landed": 438,
+    "lowest_all_inclusive": 438,
+    "ranked_count": 1,
+    "non_comparable_count": 1,
+    "no_quote_count": 2
+  },
+  "actual": {
+    "winner_landed": 438,
+    "lowest_all_inclusive": 438,
+    "ranked_count": 1,
+    "non_comparable_count": 1,
+    "no_quote_count": 2
+  },
+  "ok": true
+}
