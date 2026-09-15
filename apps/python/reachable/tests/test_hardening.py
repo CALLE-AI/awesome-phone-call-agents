@@ -415,3 +415,14 @@ def test_an_error_with_no_message_still_names_its_type():
         pass
 
     assert client._describe(CalleConnectionError()) == "CalleConnectionError"
+
+
+def test_provider_diagnostics_mask_before_truncating():
+    from reachable.calls.calle_client import CalleClient
+
+    key = "synthetic-review-key-" + "z" * 92
+    client = CalleClient(Config(calle_api_key=key, live_calls=True))
+    described = client._describe(RuntimeError("x" * 280 + key))
+    assert "synthetic-review-key" not in described
+    assert "[redacted]" in described
+    assert "+447700900101" not in client._describe(RuntimeError("Call +447700900101"))

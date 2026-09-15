@@ -23,6 +23,7 @@ import threading
 from typing import Any, Mapping
 
 from ..config import Config, validate_calle_origin
+from ..phone import mask_display
 from ..sanitize import clean_text
 from .client import CallError, CallHandle, CallRequest, CallSubmissionUnknown
 
@@ -79,10 +80,11 @@ class CalleClient:
         a provider message may echo parts of the request, and this string is
         written to the event log and shown in the dashboard.
         """
-        detail = clean_text(str(exc), max_length=300)
+        detail = str(exc)
         key = self._config.calle_api_key
         if key and len(key) >= 8:
             detail = detail.replace(key, "[redacted]")
+        detail = clean_text(mask_display(detail), max_length=300)
         return f"{type(exc).__name__}: {detail}" if detail else type(exc).__name__
 
     def create(self, request: CallRequest) -> CallHandle:

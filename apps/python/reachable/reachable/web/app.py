@@ -540,7 +540,7 @@ def create_app(
             words = REFUSAL_TEXT.get(reason.lower(), reason.lower().replace("_", " "))
             if outcome.detail:
                 words = f"{words} ({outcome.detail})"
-            return JSONResponse({"placed": False, "reason": words})
+            return JSONResponse({"placed": False, "reason": mask_display(words)})
         return JSONResponse({"placed": True, "attempt_id": outcome.attempt_id})
 
     @app.get("/demo/attempt/{attempt_id}")
@@ -553,7 +553,7 @@ def create_app(
                                  "headline": "Call not found", "status_text": "",
                                  "turns": [], "facts": []})
 
-        turns = from_json(row["transcript"], []) or []
+        turns = mask_display(from_json(row["transcript"], []) or [])
         disposition = row["disposition"]
         case = orc.store.case(row["case_id"])
         state = case["state"] if case else ""
@@ -596,9 +596,9 @@ def create_app(
                 "headline": OUTCOME_TEXT.get(
                     str(result.get("outcome", "")), "Call finished"
                 ),
-                "status_text": row["disposition_reason"] or "",
+                "status_text": mask_display(row["disposition_reason"] or ""),
                 "turns": turns,
-                "facts": facts,
+                "facts": mask_display(facts),
             }
         )
 

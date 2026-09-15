@@ -345,3 +345,39 @@ def test_the_demo_reports_a_call_that_is_still_ringing(client, fake_client):
     state = http.get(f"/demo/attempt/{started['attempt_id']}").json()
     assert state["finished"] is False
     assert "Ringing" in state["status_text"]
+
+
+@pytest.mark.parametrize("pending", [False, True])
+def test_demo_json_masks_presentation_without_changing_evidence(client, monkeypatch, pending):
+    http, orc = client
+    started = http.post("/demo/call", json={"case_id": IVY_CASE, "confirm": "Ivy"}).json()
+    attempt_id = started["attempt_id"]
+    orc.reconcile(attempt_id)
+    number = "+447700900101"  # reserved fictional fixture
+    evidence = f"Please use {number}"
+    original = orc.store.attempt(attempt_id)
+    result = from_json(original["structured_result"], {})
+    result["reason_category"] = evidence
+    orc.store.update_attempt(
+        attempt_id, transcript=to_json([{"speaker": "user", "text": evidence}]),
+        structured_result=to_json(result), disposition_reason=evidence,
+        disposition="outcome_unknown" if pending else "confirmed",
+    )
+    before = dict(orc.store.attempt(attempt_id))
+    monkeypatch.setattr(orc, "reconcile", lambda _: None)
+    response = http.get(f"/demo/attempt/{attempt_id}")
+    assert response.status_code == 200
+    assert number not in response.text
+    assert "…101" in response.text
+    assert dict(orc.store.attempt(attempt_id)) == before
+
+
+def test_demo_refusal_detail_masks_phone(client, monkeypatch):
+    from reachable.orchestrator import CallOutcome
+
+    http, orc = client
+    number = "+447700900101"
+    monkeypatch.setattr(orc, "place_call", lambda *args, **kwargs: CallOutcome(False, detail=number))
+    response = http.post("/demo/call", json={"case_id": IVY_CASE, "confirm": "Ivy"})
+    assert number not in response.text
+    assert "…101" in response.text
