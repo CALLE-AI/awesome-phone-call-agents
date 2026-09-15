@@ -1,7 +1,7 @@
 import { readFile } from 'node:fs/promises';
 import { parseArgs } from 'node:util';
 import { pathToFileURL } from 'node:url';
-import { CalleClient, CalleError, DEFAULT_RUNTIME_DIR, buildCallRequest, createReservedCall, loadReservation, publicError, saveSnapshot } from './calle.mjs';
+import { CalleClient, CalleError, DEFAULT_RUNTIME_DIR, buildCallRequest, createReservedCall, loadReservation, maskForDisplay, publicError, saveSnapshot } from './calle.mjs';
 import { ingestCallResult, prepareReviewedScenario, saveReviewedScenario } from './ingest.mjs';
 
 const HELP = `Harvest Relay — local rehearsal and CALL-E integration
@@ -44,7 +44,7 @@ export async function main(args, { env = process.env, stdout = value => console.
     const flags = parsed.values;
     if (flags.help || command === 'help') { stdout(HELP); return 0; }
     if (parsed.positionals.length !== 1) throw new CalleError('invalid_arguments', 'Provide exactly one command. Run with --help for usage.');
-    const emit = value => stdout(JSON.stringify(value, null, 2).replace(/\+[1-9]\d{6,14}/g, phone => `${phone.slice(0, 2)}***${phone.slice(-4)}`));
+    const emit = value => stdout(JSON.stringify(maskForDisplay(value), null, 2));
     const client = new CalleClient({ apiKey: env.CALLE_API_KEY, fetchImpl });
 
     if (command === 'ingest') {

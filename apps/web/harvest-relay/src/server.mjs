@@ -2,7 +2,7 @@ import { createServer } from 'node:http';
 import { readFile, realpath, stat } from 'node:fs/promises';
 import { extname, resolve, sep } from 'node:path';
 import { fileURLToPath, pathToFileURL } from 'node:url';
-import { CalleClient, CalleError, buildCallRequest, publicError } from './calle.mjs';
+import { CalleClient, CalleError, buildCallRequest, maskForDisplay, publicError } from './calle.mjs';
 
 const DEFAULT_WEB = fileURLToPath(new URL('../web/', import.meta.url));
 const CONTENT_TYPES = {
@@ -46,7 +46,7 @@ export function createAppServer({ webDir = DEFAULT_WEB, env = process.env, fetch
         const input = request.method === 'GET' ? Object.fromEntries(url.searchParams) : await readJson(request);
         const scenario = JSON.parse(await readFile(resolve(root, 'scenario.json'), 'utf8'));
         const payload = buildCallRequest(scenario, { providerType: input.provider_type, providerId: input.provider_id, phone: input.phone, region: input.region, locale: input.locale });
-        return sendJson(response, 200, { mode: 'preview', dialed: false, request: payload });
+        return sendJson(response, 200, { mode: 'preview', dialed: false, request: maskForDisplay(payload) });
       }
       if (path === '/api/check' && ['GET', 'POST'].includes(request.method)) {
         const result = await client.check();

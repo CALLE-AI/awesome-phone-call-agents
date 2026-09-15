@@ -5,6 +5,10 @@ import { fileURLToPath } from 'node:url';
 
 export const CALLE_BASE_URL = 'https://api.heycall-e.com';
 export const DEFAULT_RUNTIME_DIR = fileURLToPath(new URL('../runtime/', import.meta.url));
+// Display-only copy; never use this masked representation for provider dispatch.
+export function maskForDisplay(value) {
+  return JSON.parse(JSON.stringify(value).replace(/\+[1-9]\d{6,14}/g, phone => `${phone.slice(0, 2)}***${phone.slice(-4)}`));
+}
 const PHONE = /^\+[1-9]\d{6,14}$/;
 const REGIONS = new Set('AU BD BR CA DE ES FI GB ID IN JP MX MY NL PH PK PL SG TH TR US VN'.split(' '));
 const API_CODES = new Set('invalid_request unauthorized forbidden rate_limit_exceeded insufficient_balance unsupported_region unsupported_language recipient_blocked policy_violation call_not_ready no_recipients invalid_recipient invalid_phone result_schema_invalid recipient_result_schema_invalid idempotency_conflict goal_not_published goal_not_executable goal_not_ready schema_override_not_allowed variables_invalid provider_unavailable internal_error not_found'.split(' '));

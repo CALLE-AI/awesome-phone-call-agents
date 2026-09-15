@@ -218,7 +218,7 @@ test('local health reveals configuration only, and preview never contacts CALL-E
   assert.equal(response.status, 200);
   const preview = await response.json();
   assert.equal(preview.dialed, false);
-  assert.deepEqual(preview.request.recipients[0].phones, [phone]);
+  assert.deepEqual(preview.request.recipients[0].phones, [`${phone.slice(0, 2)}***${phone.slice(-4)}`]);
   assert.equal(requests, 0);
 });
 
