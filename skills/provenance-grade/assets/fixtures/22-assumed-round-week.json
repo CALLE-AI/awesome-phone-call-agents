@@ -1,0 +1,23 @@
+{
+  "id": "22-assumed-round-week",
+  "category": "round-number-only",
+  "description": "'A week' — the roundest possible duration, unhedged and uncorroborated. Assumed.",
+  "turns": [
+    { "speaker": "bot", "text": "Hello, QuoteDesk assistant calling about the motor spares order.", "offset_seconds": 0 },
+    { "speaker": "user", "text": "Tell me.", "offset_seconds": 5 },
+    { "speaker": "bot", "text": "How long until the motor spares reach our workshop?", "offset_seconds": 9 },
+    { "speaker": "user", "text": "It takes a week.", "offset_seconds": 14 }
+  ],
+  "fields": [
+    {
+      "field": "eta_days",
+      "value": 7,
+      "expects": "duration",
+      "questionTurn": 2,
+      "answerTurns": [3],
+      "critical": true,
+      "expectedGrade": "assumed",
+      "expectSignals": ["G"]
+    }
+  ]
+}

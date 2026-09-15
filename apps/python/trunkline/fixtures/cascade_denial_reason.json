@@ -1,0 +1,167 @@
+{
+  "completion_confidence": {
+    "label": "high",
+    "score": 0.89
+  },
+  "evidence": [],
+  "object": "call_task",
+  "recipients": [
+    {
+      "attempts": [
+        {
+          "attempt": 1,
+          "transcript_turns": [
+            {
+              "offset_seconds": 0,
+              "speaker": "bot",
+              "text": "Dialing Cascade Mutual provider services."
+            },
+            {
+              "offset_seconds": 7,
+              "speaker": "user",
+              "text": "Thank you for calling Cascade Mutual provider services. For eligibility and benefits, press one. For claim status, press two. For authorizations, press three."
+            },
+            {
+              "offset_seconds": 12,
+              "speaker": "bot",
+              "text": "Selecting two for claim status."
+            },
+            {
+              "offset_seconds": 17,
+              "speaker": "user",
+              "text": "Please enter the ten digit national provider identifier, followed by the pound key."
+            },
+            {
+              "offset_seconds": 22,
+              "speaker": "bot",
+              "text": "Entering national provider identifier 1234567893."
+            },
+            {
+              "offset_seconds": 29,
+              "speaker": "user",
+              "text": "Please enter the last four digits of the tax identification number."
+            },
+            {
+              "offset_seconds": 35,
+              "speaker": "bot",
+              "text": "Entering 4419."
+            },
+            {
+              "offset_seconds": 41,
+              "speaker": "user",
+              "text": "Thank you. Your estimated wait time is eight minutes. Please continue to hold."
+            },
+            {
+              "offset_seconds": 553,
+              "speaker": "user",
+              "text": "Claims, this is Rosalind, thank you for holding."
+            },
+            {
+              "offset_seconds": 561,
+              "speaker": "bot",
+              "text": "This is an AI assistant calling for the billing office of Lakeshore Family Medicine. This call may be recorded for accuracy. Our national provider identifier is 1234567893."
+            },
+            {
+              "offset_seconds": 575,
+              "speaker": "user",
+              "text": "Thank you, member number and date of birth."
+            },
+            {
+              "offset_seconds": 584,
+              "speaker": "bot",
+              "text": "Member identification number H551908324, date of birth November 2, 1972, last name Okafor."
+            },
+            {
+              "offset_seconds": 600,
+              "speaker": "user",
+              "text": "Thank you, H 5 5 1 9 0 8 3 2 4, Okafor. Which claim?"
+            },
+            {
+              "offset_seconds": 611,
+              "speaker": "bot",
+              "text": "Claim number C L M dash 2026 dash 0 0 5 1 2 0, date of service August eleventh. I am calling about the denial on that claim."
+            },
+            {
+              "offset_seconds": 630,
+              "speaker": "user",
+              "text": "Right, that denied under C O sixteen with remark M 5 1, the procedure code submitted was incomplete for the service billed."
+            },
+            {
+              "offset_seconds": 652,
+              "speaker": "bot",
+              "text": "Thank you. Can that denial be appealed, and by when?"
+            },
+            {
+              "offset_seconds": 662,
+              "speaker": "user",
+              "text": "You can appeal within sixty days of the remittance date, that would be October twenty eighth, and reconsiderations go to the Medicare Advantage appeals unit at the post office box printed on the remittance."
+            },
+            {
+              "offset_seconds": 690,
+              "speaker": "bot",
+              "text": "Would a corrected claim be accepted instead of a formal appeal?"
+            },
+            {
+              "offset_seconds": 700,
+              "speaker": "user",
+              "text": "Yes, for a sixteen the corrected claim is the faster route and we will accept it, send it as a replacement with frequency code seven."
+            },
+            {
+              "offset_seconds": 725,
+              "speaker": "bot",
+              "text": "Understood, thank you. May I have a reference number for this call and your first name?"
+            },
+            {
+              "offset_seconds": 736,
+              "speaker": "user",
+              "text": "Reference number is C A S dash R E F dash 5 1 9 0 7 7 2 3, and this is Rosalind."
+            }
+          ]
+        }
+      ],
+      "phones": [
+        "+13125550188"
+      ],
+      "region": "US",
+      "structured_result": {
+        "call_outcome": "answered",
+        "claims": [
+          {
+            "appeal_deadline": "2026-10-28",
+            "appeal_method": "Medicare Advantage appeals unit at the post office box printed on the remittance advice.",
+            "appealable": "yes",
+            "carc_code": "CO-16",
+            "claim_number": "CLM-2026-005120",
+            "corrected_claim_accepted": "yes",
+            "denial_reason_text": "The procedure code submitted was incomplete for the service billed.",
+            "evidence_quote": "that denied under C O sixteen with remark M 5 1, the procedure code submitted was incomplete for the service billed",
+            "rarc_code": "M51"
+          }
+        ],
+        "reference_number": "CAS-REF-51907723",
+        "representative_name": "Rosalind"
+      }
+    }
+  ],
+  "status": "completed",
+  "structured_result": {
+    "call_outcome": "answered",
+    "claims": [
+      {
+        "appeal_deadline": "2026-10-28",
+        "appeal_method": "Medicare Advantage appeals unit at the post office box printed on the remittance advice.",
+        "appealable": "yes",
+        "carc_code": "CO-16",
+        "claim_number": "CLM-2026-005120",
+        "corrected_claim_accepted": "yes",
+        "denial_reason_text": "The procedure code submitted was incomplete for the service billed.",
+        "evidence_quote": "that denied under C O sixteen with remark M 5 1, the procedure code submitted was incomplete for the service billed",
+        "rarc_code": "M51"
+      }
+    ],
+    "reference_number": "CAS-REF-51907723",
+    "representative_name": "Rosalind"
+  },
+  "summary": "Denial confirmed as CO-16 with remark M51; a corrected claim is accepted instead of an appeal, appeal deadline 2026-10-28.",
+  "task_completed": true
+}
