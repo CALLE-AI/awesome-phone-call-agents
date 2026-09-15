@@ -1,6 +1,6 @@
 ---
 name: auditlane
-description: Gates dangerous agent actions (DROP TABLE, rm -rf, terraform destroy, force-push, curl-pipe-to-shell, and 19 other patterns) behind a real, live phone call to a human before they're allowed to execute, as a Claude Code PreToolUse hook the agent cannot skip; also audits PR text for undocumented claims of verbal human approval by calling the named person to check, failing closed on every error path.
+description: Explore an experimental phone-verification workflow for risky agent actions and undocumented approval claims; use no-call rehearsals and advisory evidence alongside independent human authorization.
 license: MIT
 ---
 
@@ -21,18 +21,19 @@ CI pipelines. A common mitigation is "the agent should ask a human before
 doing anything dangerous." That's an honor system. A careless, confused,
 or compromised agent just doesn't ask, and nothing stops it.
 
-This skill's actual contribution isn't the phone call — it's *where the
-gate lives*. Instead of trusting the agent to voluntarily request
-verification, it installs as a **Claude Code `PreToolUse` hook**, which
-means every `Bash` command the agent tries to run passes through it
-*before execution*, unconditionally. The agent has no code path that
-skips it. If the command matches a dangerous pattern, execution is
-blocked until a real, live phone call to a configured human is
-explicitly confirmed.
+This reference explores placing a supplementary check at a host's
+pre-execution hook. The linked implementation targets Claude Code's
+`PreToolUse` hook for configured `Bash` tools; read the
+[host and safety notes](references/safety.md) before installation.
+It is an experimental pattern matcher, not an unskippable security boundary:
+nonmatching commands and other execution paths can bypass this check, and
+dress-rehearsal fixtures can produce an `allow` response without a real call.
+Keep independent human authorization and host permissions in place for real
+destructive actions. A phone interpretation alone must not authorize them.
 
 ## What it actually does
 
-**1. `telephony-gate` — automatic, can't-be-skipped command gating**
+**1. `telephony-gate` — experimental command-pattern hook**
 `auditlane/danger_patterns.py` pattern-matches the command against 22
 categories across databases, filesystem, remote-code-execution
 (`curl | bash`), infrastructure (terraform/kubectl/docker/cloud CLIs),
@@ -40,9 +41,10 @@ git, system control, and package publishing. A match calls the
 configured authorizer with a free-recall-first interview ("what did you
 discuss/approve regarding X?" *before* reading back the specific claim —
 this is the same reason real witness interviews lead with open recall,
-not a leading yes/no) and only allows the command through on an explicit
-verbal confirmation. Everything else passes through untouched, with zero
-added latency.
+not a leading yes/no). The hook uses heuristic confirmation results to propose
+an allow/deny decision; rehearsal uses fictional responses. Nonmatching commands
+pass through without a verification call. Neither behavior establishes that a
+command is safe or that all risky execution paths were covered.
 
 **2. `audit_pr` — the same engine, applied to PR text after the fact**
 Scans a PR's title/body for claims of undocumented verbal authorization
@@ -54,10 +56,10 @@ approval, the chain continues — that person gets called too, up to a
 configurable hop limit — before a verdict is reached.
 
 Both share one verification core (`auditlane/calle_client.py`,
-`auditlane/verifier.py`) and one decision policy: any denial or confident
-contradiction blocks; every hop confirmed with confident entailment
-verifies; anything else — unreachable, no phone on file, ambiguous,
-internal error — fails closed to a human, never to a guess.
+`auditlane/verifier.py`). Its intended policy blocks detected denials, reports
+detected uncertainty for human review, and labels matching confirmations
+`verified`. These are advisory heuristic labels, not proof of authorization;
+they can miss ambiguity or misread a statement.
 
 ## Compatibility notes
 
@@ -65,17 +67,11 @@ Pure Python 3.11+, no framework dependency. Requires `calle-ai` (PyPI)
 only for live calls; the default dress-rehearsal mode requires nothing
 beyond `requests` and `pytest`.
 
-**On portability, explicitly:** most skills in this directory are
-written as agent-agnostic instruction patterns — any capable AI system
-could follow them. `telephony-gate` is deliberately different, and it's
-worth saying why rather than leaving it implicit. Its entire value is
-that the gate is a *real interception point an agent cannot skip* — the
-"can't be skipped" part is not a documentation convention, it's a
-wire-level guarantee, and that guarantee only exists because it's built
-against Claude Code's actual `PreToolUse` stdin/stdout JSON contract. A
-fully generic, "any agent could theoretically implement this" version
-would just be the honor-system problem this was built to solve, again,
-under a different name.
+The generic workflow is portable, but host interception is not automatic:
+each host needs its own reviewed adapter and independent permission boundary.
+The supplied Claude Code adapter covers configured `Bash` hook invocations,
+not all tools or all ways to execute a command. See the
+[host-specific reference](references/safety.md#host-integration-boundary).
 
 What *is* genuinely portable: the verification core underneath
 (`auditlane/danger_patterns.py`, `auditlane/calle_client.py`,
@@ -95,23 +91,16 @@ honor-system caveat), but it's real and working now, not aspirational.
 and read a PR's title/body — the included GitHub Actions workflow is
 one example, not the only one.
 
-**Why Claude Code specifically, not a hypothetical universal target:**
-something that provably works against one real, currently-widely-used
-agent's actual execution path — 129 tests, fired live against a real
-`Bash` tool call during development, two real crash bugs found and
-fixed by adversarial testing before anyone else ever saw it — is a
-stronger claim than something written to theoretically work everywhere
-but verified nowhere. Claude Code is also not an arbitrary pick for this
-specific use case: a tool that gates dangerous *agent* actions is
-naturally aimed at the agent people are actually giving real execution
-access to right now. Narrow-and-proven over broad-and-theoretical is the
-deliberate choice here, not a limitation to apologize for.
+The author reports 129 offline tests, development checks against a real `Bash`
+hook invocation, and two crash fixes. These reports have not been independently
+reproduced as part of this documentation contribution and do not establish an
+all-path enforcement guarantee.
 
 ## Setup / install
 
 ```bash
 pip install -r requirements.txt
-cp phonebook.example.json phonebook.json   # replace with your real org directory
+cp phonebook.example.json phonebook.json   # keep fictional entries for rehearsal
 python demo/dress_rehearsal.py             # confirm it runs, zero API key needed
 ```
 
@@ -136,8 +125,12 @@ cd scripts
 python run_verification.py --dry-run --title "..." --body "..."
 ```
 
-Prints the exact phone number, region, and prompt CALL-E would receive —
-zero API calls, zero cost.
+Use the unmodified external CLI preview only with fictional phonebook entries:
+it may print the private request payload. For a real recipient, first prepare a
+display-only preview with the phone masked (for example, `+1 *** *** 0142`)
+and remove phone/secret text from the displayed prompt. Retain the exact
+destination only in private dispatch state; do not copy it to logs or summaries.
+Preview itself must not place a call.
 
 **To go live:** `pip install calle-ai`, set `CALLE_API_KEY`, set
 `AUDITLANE_DRESS_REHEARSAL=false`. See
@@ -152,26 +145,26 @@ being audited or the command being gated, so a fabricated claim — or an
 agent that's been prompt-injected into naming a fake authorizer — can't
 point the verification call at a number it controls.
 
-The gate fails closed on every error path, not just the obvious ones —
-verified with a dedicated stress-test suite, not just claimed:
+The author reports tests for these intended deny paths on matching commands;
+they are examples of covered behavior, not exhaustive security guarantees:
+
 - No `AUDITLANE_HOOK_AUTHORIZER` configured → deny
 - Authorizer has no phone on file → deny
 - Authorizer unreachable → deny
 - CALL-E itself errors (balance, network, auth) → deny
 - Malformed, missing, or unexpected-shaped hook input (not even valid
   JSON, wrong types, wrong structure) → deny, never a crash
-- Any unforeseen internal error → deny, via a top-level catch-all that
-  guarantees valid JSON output no matter what breaks upstream
+- Caught internal errors → intended deny via a top-level exception handler
 
-That last set of guarantees exists because two real crash bugs were
-found by stress-testing malformed input during development (a
-list-shaped payload, a non-string command field) — both fixed, both now
-permanently regression-tested in `tests/test_hook_robustness.py` so they
-can't silently come back.
+The author reports regression tests for two malformed-input bugs in
+`tests/test_hook_robustness.py`. Finite tests cannot establish that every
+unexpected input, command encoding, or future regression is handled.
 
 A local call-budget guard (`AUDITLANE_MAX_LIVE_CALLS`, default 3) caps
-live calls placed per session independent of CALL-E's own balance, so a
-retry loop or a misconfiguration can't silently run up real charges.
+live calls placed per session independent of CALL-E's own balance. This local
+budget is not permanent deduplication or crash-proof enforcement. Stop after
+an ambiguous call submission; do not redial or continue a conflicting approval
+chain until a human has reconciled the existing provider outcome.
 
 Full detail, plus concrete before/after examples of the gate actually
 blocking a real command, in
@@ -186,29 +179,27 @@ Run from within a clone of AuditLane (see the top of this file):
 python -m pytest tests/ -v
 ```
 
-129 tests, all offline, no network access or API key required:
+The author reports 129 offline tests requiring no network or API key:
+
 - Core verification pipeline: claim extraction, entailment scoring,
   multi-hop chains, fail-closed decision policy
 - `test_danger_patterns.py` — 85 cases: 49 real dangerous commands
   (all correctly flagged) and 31 safe/near-miss commands specifically
   chosen to catch false positives (`git branch -d` vs `-D`,
   `UPDATE ... WHERE` vs unscoped, `npm run publish` vs `npm publish`)
-- `test_hook_robustness.py` — 18 cases proving the hook cannot crash on
-  malformed, missing, oversized, or wrong-typed input
+- `test_hook_robustness.py` — 18 cases exercising selected malformed,
+  missing, oversized, or wrong-typed inputs
 
 ## Cancellation / rollback
 
-Stateless per invocation — there is no recurring job to cancel. For
-`audit_pr`: removing the CI step (or the GitHub Actions workflow file)
-stops all behavior immediately; a `blocked`/`needs_human_review` verdict
-is only a commit status / PR comment, carries no merge authority of its
-own, and can always be overridden by a human with normal repository
-permissions. For `telephony-gate`: deleting the hook entry from your
-project's `.claude/settings.json` (or setting
-`AUDITLANE_DRESS_REHEARSAL=true` to force every match into the free,
-offline mock path) disables it immediately — no state to unwind, no
-in-flight job to cancel, since a gated command simply hasn't run yet
-when you do either.
+There is no provider-side recurring job created by this reference. Removing a
+CI step or hook entry prevents future invocations; enabling dress rehearsal
+changes subsequent invocations only. None of these actions recalls an accepted
+outbound call or necessarily stops an already-running process. Check the
+provider's actual cancellation capability and result; otherwise report that the
+call may continue. A command already executed needs its own recovery procedure.
+`audit_pr` statuses are advisory and carry no merge authority of their own.
+Do not switch to rehearsal to authorize a real destructive action.
 
 ## No secrets or personal data
 

@@ -6,6 +6,11 @@ All examples below use AuditLane's own fictional fixture data
 and run in the free, offline dress-rehearsal mode — no API key, no
 network access, no real phone call, reproducible exactly as shown.
 
+These are author-reported illustrative responses, not permission to execute the
+destructive commands shown. Test only the hook decision with an inert harness;
+do not run these commands against a real system. An `allow` or `VERIFIED` fixture
+response is advisory and proves neither a real phone confirmation nor safety.
+
 ## 1. `telephony-gate` blocking a dangerous command
 
 Registered as a `PreToolUse` hook (see
@@ -17,8 +22,8 @@ this fires automatically — nothing to invoke by hand.
 DROP TABLE v1_accounts;
 ```
 
-**With `AUDITLANE_HOOK_AUTHORIZER=sarah`, the hook calls her, she denies it,
-and the hook's stdout response is:**
+**With `AUDITLANE_HOOK_AUTHORIZER=sarah`, the rehearsal simulates her denial
+and the hook's illustrated stdout response is:**
 ```json
 {
   "hookSpecificOutput": {
@@ -50,7 +55,8 @@ terraform destroy -auto-approve
 }
 ```
 
-The command proceeds exactly as if no hook were installed. Everyday
+The hook emits `allow` in this fictional rehearsal; an independent host approval
+boundary must still prevent real destructive execution. Everyday
 commands (`ls`, `npm install`, `git status`, ...) never trigger a call at
 all — they don't match anything in
 [`danger_patterns.py`](https://github.com/soujasK/AuditLane/blob/main/auditlane/danger_patterns.py)
@@ -97,14 +103,14 @@ python scripts/run_verification.py \
   --pr-ref "acme-corp/auth-service#340"
 ```
 
-The architect's answer names a second person ("the security lead had
-already signed off") — AuditLane calls that person too before deciding:
+The fictional architect response names a second person ("the security lead had
+already signed off") — this rehearsal simulates that hop before deciding:
 
 ```
 ### AuditLane verdict: `VERIFIED`
 
-Every hop in the claimed chain was independently confirmed. Safe to
-merge.
+Every fixture hop matched the heuristic. Advisory result only; a person must
+independently decide whether to merge.
 
 **Hop 0 — The architect**
 - Their statement: "Yes, I verbally cleared this breaking schema change
@@ -132,6 +138,8 @@ python scripts/run_verification.py --dry-run \
   --body "As confirmed with @sarah_dba during standup, this is safe to drop the legacy table."
 ```
 
-Prints the exact recipient (phone, region, locale) and the exact prompt
-CALL-E would receive — zero API calls, zero cost, nothing placed. Use
-this to sanity-check any claim before actually spending a live call.
+Run this unmodified external preview only with fictional phonebook entries; it
+may print the private payload. A real-recipient preview must instead show a
+display-only masked phone (for example, `+1 *** *** 0142`) and a prompt stripped
+of phone/secret text, while preserving the exact destination privately for any
+separately approved dispatch. No preview should place a call.

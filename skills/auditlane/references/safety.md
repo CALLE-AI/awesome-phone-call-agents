@@ -4,12 +4,25 @@ AuditLane places real phone calls to real people, and its `telephony-gate`
 hook can block real commands from executing. Read this before enabling
 either in live mode.
 
+## Host integration boundary
+
+The linked adapter uses Claude Code's `PreToolUse` stdin/stdout JSON contract
+and the configured `Bash` matcher in `.claude/settings.json`. It does not cover
+other tools, direct execution outside that hook, or every dangerous command
+spelling. The pattern detector and textual entailment checks are experimental
+heuristics. Treat this as a supplementary check, not sole authority for real
+destructive actions or proof of a person's authorization. Rehearsal fixtures can
+produce `allow` without a phone call; never use that response to authorize a real
+destructive command. Host permissions and independent human approval remain
+necessary.
+
 ## Dress rehearsal is the default, on purpose
 
 `AUDITLANE_DRESS_REHEARSAL` defaults to `true`. Going live requires
 **both** setting it to `false` **and** providing a real `CALLE_API_KEY` —
-two explicit, deliberate actions. There is no code path that places a
-real call by accident.
+two explicit configuration actions. Before each live run, the operator must
+approve the bounded questions and attest that each intended recipient has
+authorized the call. Configuration alone is not proof of per-run intent.
 
 ## What a live call actually does
 
@@ -39,16 +52,23 @@ prompt-injected agent) could point the "verification" call at a number
 they control and have it self-confirm. The phonebook must come from your
 own org directory, kept out of version control.
 
-## `telephony-gate` fails closed on every path, verified not claimed
+Validate private destinations as E.164. Use only fictional entries with the
+external CLI's unmodified dry-run output, which may expose the request payload.
+Before displaying any real preview or summary, mask phone numbers and remove
+credentials from display-only copies, including free-text prompts and results.
+Keep the exact recipient only in private dispatch state. Do not give credentials
+to an arbitrary or insecure provider origin.
 
-This isn't a design intent taken on faith — it's covered by a dedicated
-stress-test suite
+## Intended deny paths and finite test coverage
+
+The author reports a dedicated stress-test suite
 ([`tests/test_hook_robustness.py`](https://github.com/soujasK/AuditLane/blob/main/tests/test_hook_robustness.py),
 18 cases) that found and fixed two real crash bugs during development
 (a list-shaped hook payload, a non-string command field — both now
-permanently regression-tested so they can't silently return).
+covered by regression tests). This is reported coverage, not an exhaustive
+guarantee for unexpected inputs or future versions.
 
-Every one of these denies, none of them allow-by-default:
+For matching commands, the intended outcomes include:
 
 | Condition | Result |
 |---|---|
@@ -57,7 +77,7 @@ Every one of these denies, none of them allow-by-default:
 | Authorizer unreachable | deny |
 | CALL-E itself errors (balance, network, auth) | deny |
 | Hook input isn't valid JSON, or isn't the expected shape | deny, never a crash |
-| Any unforeseen internal error | deny, via a top-level catch-all |
+| Caught internal error | intended deny via a top-level exception handler |
 
 The pattern detector
 ([`auditlane/danger_patterns.py`](https://github.com/soujasK/AuditLane/blob/main/auditlane/danger_patterns.py))
@@ -72,11 +92,11 @@ near-misses chosen specifically to probe for false positives.
 
 A local call-budget guard (`AUDITLANE_MAX_LIVE_CALLS`, default **3**)
 caps live calls placed per session, tracked on disk independent of
-CALL-E's own account balance — a retry loop, a misconfigured automation,
-or a `telephony-gate` false-positive storm can't silently run up real
-charges or turn into repeated unwanted calls to the same person. Raise
-the limit explicitly, or delete the ledger file, when you actually mean
-to place more.
+CALL-E's own account balance. This is a local safeguard, not permanent dedupe or
+crash-proof enforcement. Preserve the existing intent/provider ID after a timeout
+or ambiguous submission, stop automatic redial and conflicting follow-on calls,
+and reconcile before authorizing further calls. Do not delete the ledger to bypass
+an unknown outcome; a higher budget is not evidence that a prior call failed.
 
 ## No secrets or personal data
 
@@ -85,33 +105,36 @@ to place more.
   is fictional demo data — no real names, no real statements from real
   people.
 - `.env.example` documents required variables but ships no real values.
-- `.gitignore` excludes `.env`, `phonebook.json`, and the local
-  call-budget/ledger files so real credentials and a real org directory
-  are never committed by accident.
+- `.gitignore` excludes `.env`, `phonebook.json`, and local call-budget/ledger
+  files. Review tracked files and history as well; ignore rules do not remove
+  content already committed.
 
-## Fail-closed is the whole safety model
+## Advisory results and human review
 
-Every uncertain outcome for `audit_pr` — unreachable person, no phone on
-file, a hedge, an ambiguous statement, a chain of claims too long to
-fully resolve — routes to `NEEDS_HUMAN_REVIEW`, never to a silent pass.
-The only way to get a `VERIFIED` result is for every hop in the chain to
-be both a clear "yes" from the person and a confident textual match to
-the claim. See
+Detected uncertainty is intended to route to `NEEDS_HUMAN_REVIEW`. A
+`VERIFIED` result means the heuristic accepted the supplied responses; it may
+miss a hedge, contradiction, wrong subject, or fabricated rehearsal response.
+It is not proof of identity, authority, or safe execution. Keep destructive
+execution and merge decisions under independent human authorization. See
 [`auditlane/verifier.py`](https://github.com/soujasK/AuditLane/blob/main/auditlane/verifier.py)
 for the exact decision logic.
 
 ## Cancellation / rollback
 
-Both capabilities are stateless per invocation — neither has a recurring
-job to cancel.
+Neither capability requires provider-side recurrence. The host may still have a
+running invocation or an accepted outbound call.
 
 - **`audit_pr`**: removing the CI step (or the GitHub Actions workflow
-  file) stops all behavior immediately. A `BLOCKED`/`NEEDS_HUMAN_REVIEW`
+  file) prevents future invocations. A `BLOCKED`/`NEEDS_HUMAN_REVIEW`
   status is only a commit status / PR comment — it carries no merge
   authority of its own and can always be overridden by a human with
   normal repository permissions.
 - **`telephony-gate`**: deleting the hook entry from your project's
   `.claude/settings.json`, or setting `AUDITLANE_DRESS_REHEARSAL=true`
-  to force every match into the free offline mock path, disables it
-  immediately. A gated command simply hasn't run yet when you do either
-  — there's nothing in flight to roll back.
+  selects the offline mock path for later invocations; it does not stop an
+  already-running call or command and must not bypass real action approval.
+
+Stopping a host process or removing its configuration may leave an accepted call
+in flight. Use provider cancellation only if supported, and report its confirmed
+result rather than claiming success. Otherwise state that the call may continue.
+Recovery from an already-executed command is outside this hook's scope.
