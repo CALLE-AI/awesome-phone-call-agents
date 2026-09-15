@@ -325,7 +325,6 @@ Runnable demo apps live under [`apps/`](apps/). They are not a CALL-E SDK and do
 | [`apps/python/callflow-campaign-runner`](apps/python/callflow-campaign-runner/) | Python | CSV-driven outbound campaign runner that triages structured results into auto-closed, retry, and needs-human queues. |
 | [`apps/python/mobilize`](apps/python/mobilize/) | Python | Parallel wave dispatch to a consented pool under a deadline: stops calling the moment enough people confirm, and scores how firm each "yes" actually is instead of trusting every stated agreement. Ships a 300-trial zero-cost evaluation harness with a measured accuracy result, a crash-safe ledger, and an MCP server. |
 | [`apps/python/batch-runner`](apps/python/batch-runner/) | Python | JSONL batch runner using CALL-E CLI auth state, FastMCP, Rich output, and MCP tool-call metadata. |
-| [`apps/python/discharge-guardian`](https://github.com/CALLE-AI/awesome-phone-call-agents/blob/main/apps/python/discharge-guardian) | Python | Post-discharge patient follow-up automation with CALL-E: calls high-risk patients within 48 hours of discharge, detects care gaps, triggers escalation, and surfaces results to a live clinical dashboard; runs fully offline in mock mode by default. |
 | [`apps/python/broker-login-client`](apps/python/broker-login-client/) | Python | CALL-E brokered login client with local token cache and MCP HTTP calls. |
 | [`apps/typescript/broker-login-client`](apps/typescript/broker-login-client/) | TypeScript | CALL-E brokered login client using `@call-e/core`. |
 | [`apps/typescript/broker-login-client-standalone`](apps/typescript/broker-login-client-standalone/) | TypeScript | CALL-E brokered login client without a shared package dependency. |
@@ -370,6 +369,8 @@ The default e2e tests use a local fake broker/OAuth/MCP server or dry-run paths,
 
 
 ### Community apps
+
+- [Discharge Guardian](docs/community-apps/discharge-guardian.md) - Author-proposed CALL-E post-discharge follow-up design with advisory care-team review; documentation only, with source currently unavailable and no included runnable or verified offline pipeline.
 
 - [Exception Broker](https://exception-broker-production.up.railway.app) - Execution-control app for CALL-E-acquired operational decisions, with exact review, controlled ALLOW/BLOCK/WAIT dispositions, and a deterministic no-call demo. See the [integration notes](docs/community-apps/exception-broker.md) and [demo video](https://youtu.be/Smw7aXyI0fI).
 
