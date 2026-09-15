@@ -1,0 +1,201 @@
+{
+  "note": "Canned CALL-E call result in the same shape client.calls.waitForResult returns. Used by --dry-run (the default). D1 is a clean verified match; D2 quotes cheapest but never read the ETA back; D3 quotes an even cheaper machine with the WRONG GPU (the demo case); D4 went to voicemail and extracted nothing.",
+  "id": "call_fixture_0001",
+  "object": "call_task",
+  "status": "completed",
+  "task": "(fixture) stock check on Predator Helios 16 AI",
+  "taskCompleted": true,
+  "completionConfidence": { "score": 0.92, "label": "high" },
+  "evidence": [],
+  "metadata": { "rfqId": "RFQ-FIXTURE" },
+  "failureCode": null,
+  "failureMessage": null,
+  "createdAt": "2026-09-14T10:00:00Z",
+  "completedAt": "2026-09-14T10:09:00Z",
+  "structuredResult": null,
+  "summary": null,
+  "recipients": [
+    {
+      "id": "rcp_d1",
+      "phones": ["+91MASKED00001"],
+      "locale": "en-IN",
+      "region": "IN",
+      "status": "completed",
+      "summary": null,
+      "structuredResult": {
+        "part_number": "NH.QRZSI.002",
+        "part_number_quote": "N H dot Q R Z S I dot zero zero two",
+        "family": "Acer Predator Helios 16 AI",
+        "family_quote": "yes the Predator Helios 16 AI",
+        "family_confidence": "confirmed",
+        "gpu": "RTX 5080",
+        "gpu_quote": "that unit carries the RTX 5080, confirmed",
+        "gpu_confidence": "confirmed",
+        "ram_gb": 32,
+        "ram_quote": "thirty-two GB RAM, yes",
+        "ram_confidence": "confirmed",
+        "storage_gb": 2048,
+        "storage_quote": "two TB SSD",
+        "storage_confidence": "confirmed",
+        "unit_price": 289500,
+        "price_quote": "two eight nine five zero zero rupees, I repeat, two lakh eighty-nine thousand five hundred",
+        "price_confidence": "confirmed",
+        "quantity_available": 15,
+        "eta_days": 5,
+        "eta_quote": "five working days, confirmed five",
+        "eta_confidence": "confirmed",
+        "answered_by": "human",
+        "quote_summary": "Verified Helios 16 AI RTX 5080/32/2TB at 289500 INR, 15 in stock, 5 days"
+      },
+      "attempts": [
+        {
+          "id": "att_d1_1",
+          "phone": "+91MASKED00001",
+          "status": "completed",
+          "startedAt": "2026-09-14T10:00:10Z",
+          "completedAt": "2026-09-14T10:03:05Z",
+          "summary": null,
+          "providerCallId": null,
+          "failureCode": null,
+          "failureMessage": null,
+          "transcriptTurns": [
+            { "offset_seconds": 0, "speaker": "bot", "text": "This is an automated call from QuoteDesk purchasing, calling with an AI assistant to check stock on one item." },
+            { "offset_seconds": 21, "speaker": "user", "text": "yes the Predator Helios 16 AI, that unit carries the RTX 5080, confirmed" },
+            { "offset_seconds": 48, "speaker": "user", "text": "thirty-two GB RAM, yes. two TB SSD. part number N H dot Q R Z S I dot zero zero two" },
+            { "offset_seconds": 92, "speaker": "user", "text": "two eight nine five zero zero rupees, I repeat, two lakh eighty-nine thousand five hundred. fifteen units. five working days, confirmed five" }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "rcp_d2",
+      "phones": ["+91MASKED00002"],
+      "locale": "en-IN",
+      "region": "IN",
+      "status": "completed",
+      "summary": null,
+      "structuredResult": {
+        "part_number": "NH.QRZSI.002",
+        "part_number_quote": "N H Q R Z S I zero zero two",
+        "family": "Predator Helios 16 AI",
+        "family_quote": "Helios 16 AI, we have it",
+        "family_confidence": "confirmed",
+        "gpu": "RTX 5080",
+        "gpu_quote": "5080 machine, yes, the 5080",
+        "gpu_confidence": "confirmed",
+        "ram_gb": 32,
+        "ram_quote": "32 gigs",
+        "ram_confidence": "confirmed",
+        "storage_gb": 2048,
+        "storage_quote": "2 terabyte",
+        "storage_confidence": "confirmed",
+        "unit_price": 286000,
+        "price_quote": "two eight six zero zero zero, confirmed digit by digit",
+        "price_confidence": "confirmed",
+        "quantity_available": 8,
+        "eta_days": 10,
+        "eta_quote": "maybe ten days or so",
+        "eta_confidence": "heard_once",
+        "answered_by": "human",
+        "quote_summary": "Helios 16 AI 5080/32/2TB at 286000 INR, 8 units, ETA said once as about ten days"
+      },
+      "attempts": [
+        {
+          "id": "att_d2_1",
+          "phone": "+91MASKED00002",
+          "status": "completed",
+          "startedAt": "2026-09-14T10:00:12Z",
+          "completedAt": "2026-09-14T10:04:20Z",
+          "summary": null,
+          "providerCallId": null,
+          "failureCode": null,
+          "failureMessage": null,
+          "transcriptTurns": [
+            { "offset_seconds": 0, "speaker": "bot", "text": "This is an automated call from QuoteDesk purchasing, calling with an AI assistant to check stock on one item." },
+            { "offset_seconds": 25, "speaker": "user", "text": "Helios 16 AI, we have it. 5080 machine, yes, the 5080. 32 gigs, 2 terabyte" },
+            { "offset_seconds": 70, "speaker": "user", "text": "two eight six zero zero zero, confirmed digit by digit. eight units in godown" },
+            { "offset_seconds": 96, "speaker": "user", "text": "maybe ten days or so" }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "rcp_d3",
+      "phones": ["+91MASKED00003"],
+      "locale": "en-IN",
+      "region": "IN",
+      "status": "completed",
+      "summary": null,
+      "structuredResult": {
+        "part_number": "NH.QSDSI.001",
+        "part_number_quote": "N H dot Q S D S I dot zero zero one",
+        "family": "Predator Helios 16 AI",
+        "family_quote": "Helios 16 AI, same model sir",
+        "family_confidence": "confirmed",
+        "gpu": "RTX 5070",
+        "gpu_quote": "this one is the RTX 5070 version, confirming, five zero seven zero",
+        "gpu_confidence": "confirmed",
+        "ram_gb": 32,
+        "ram_quote": "32 GB",
+        "ram_confidence": "confirmed",
+        "storage_gb": 1024,
+        "storage_quote": "one TB storage",
+        "storage_confidence": "confirmed",
+        "unit_price": 231000,
+        "price_quote": "two three one zero zero zero rupees exact",
+        "price_confidence": "confirmed",
+        "quantity_available": 20,
+        "eta_days": 3,
+        "eta_quote": "three days, confirmed three days",
+        "eta_confidence": "confirmed",
+        "answered_by": "human",
+        "quote_summary": "Cheapest offer but it is the RTX 5070 1TB variant, not the requested 5080 2TB"
+      },
+      "attempts": [
+        {
+          "id": "att_d3_1",
+          "phone": "+91MASKED00003",
+          "status": "completed",
+          "startedAt": "2026-09-14T10:00:15Z",
+          "completedAt": "2026-09-14T10:05:41Z",
+          "summary": null,
+          "providerCallId": null,
+          "failureCode": null,
+          "failureMessage": null,
+          "transcriptTurns": [
+            { "offset_seconds": 0, "speaker": "bot", "text": "This is an automated call from QuoteDesk purchasing, calling with an AI assistant to check stock on one item." },
+            { "offset_seconds": 30, "speaker": "user", "text": "Helios 16 AI, same model sir, best price in market" },
+            { "offset_seconds": 55, "speaker": "user", "text": "this one is the RTX 5070 version, confirming, five zero seven zero. 32 GB, one TB storage" },
+            { "offset_seconds": 88, "speaker": "user", "text": "two three one zero zero zero rupees exact. twenty units ready. three days, confirmed three days" }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "rcp_d4",
+      "phones": ["+91MASKED00004"],
+      "locale": "en-IN",
+      "region": "IN",
+      "status": "completed",
+      "summary": null,
+      "structuredResult": null,
+      "attempts": [
+        {
+          "id": "att_d4_1",
+          "phone": "+91MASKED00004",
+          "status": "completed",
+          "startedAt": "2026-09-14T10:00:18Z",
+          "completedAt": "2026-09-14T10:01:02Z",
+          "summary": null,
+          "providerCallId": null,
+          "failureCode": null,
+          "failureMessage": null,
+          "transcriptTurns": [
+            { "offset_seconds": 0, "speaker": "bot", "text": "This is an automated call from QuoteDesk purchasing, calling with an AI assistant to check stock on one item." },
+            { "offset_seconds": 8, "speaker": "unknown", "text": "The person you are calling is not available. Please leave a message after the tone." }
+          ]
+        }
+      ]
+    }
+  ]
+}
