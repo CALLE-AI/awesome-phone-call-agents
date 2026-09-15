@@ -1,0 +1,18 @@
+{
+  "status": "completed",
+  "task_completed": true,
+  "recipient_masked": "+1555***2834",
+  "completion_confidence": {
+    "score": 0.91,
+    "label": "high"
+  },
+  "evidence": [
+    "Patient requested rebooking for next Tuesday afternoon."
+  ],
+  "structured_result": {
+    "wants_rebook": "yes",
+    "preferred_time": "Next Tuesday at 2:00 PM",
+    "reason_for_no_show": "Transportation delay"
+  },
+  "dry_run": true
+}
