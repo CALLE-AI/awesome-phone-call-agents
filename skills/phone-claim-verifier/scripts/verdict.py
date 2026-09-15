@@ -13,12 +13,12 @@
 `--extraction` is what you (the agent) read from the transcript: the answer plus a quote you
 copied verbatim from a recipient turn (or evidence_span:null if there is no such quote).
 
-Prints the attestation. Appends a row to `corrections.csv` only for an evidence-backed MISMATCH.
+Prints a masked attestation preview. --private-payload emits the exact private attestation.
+Appends an unchanged private row to `corrections.csv` only for an evidence-backed MISMATCH.
 """
 
 from __future__ import annotations
 
-import argparse
 import csv
 import json
 import sys
@@ -26,6 +26,7 @@ from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 from _pcv import CORRECTION_FIELDS, corrections_row, evaluate, load_pack
+from _display import DisplayArgumentParser, for_display, mask_text
 
 
 def _turns(obj: object) -> list[dict]:
@@ -42,13 +43,14 @@ def _turns(obj: object) -> list[dict]:
 
 
 def main() -> None:
-    ap = argparse.ArgumentParser()
+    ap = DisplayArgumentParser()
     ap.add_argument("--record", required=True)
     ap.add_argument("--pack", required=True, type=Path)
     ap.add_argument("--claim", required=True)
     ap.add_argument("--transcript", required=True, type=Path)
     ap.add_argument("--extraction", required=True)
     ap.add_argument("--corrections", type=Path, default=Path("corrections.csv"))
+    ap.add_argument("--private-payload", action="store_true", help="emit exact private evidence; never show or share this output")
     args = ap.parse_args()
 
     record = json.loads(args.record)
@@ -57,7 +59,7 @@ def main() -> None:
     extraction = json.loads(args.extraction)
 
     att = evaluate(record, pack, args.claim, extraction, transcript)
-    print(json.dumps(att, indent=2))
+    print(json.dumps(att if args.private_payload else for_display(att), indent=2))
 
     row = corrections_row(att)
     if row:
@@ -67,8 +69,12 @@ def main() -> None:
             if new:
                 w.writeheader()
             w.writerow(row)
-        print(f"\n-> appended a correction to {args.corrections}", file=sys.stderr)
+        print(mask_text(f"\n-> appended a private correction to {args.corrections}"), file=sys.stderr)
 
 
 if __name__ == "__main__":
-    main()
+    try:
+        main()
+    except (OSError, ValueError, KeyError, TypeError) as error:
+        print(mask_text(f"Verdict failed: {error}"), file=sys.stderr)
+        sys.exit(1)

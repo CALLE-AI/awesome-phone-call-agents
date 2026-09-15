@@ -60,10 +60,11 @@ CALL-E CLI parameters and command flags are documented in [`cli-reference.md`](h
    python3 scripts/plan.py records.csv --pack path/to/pack.json
    ```
 
-   This prints, per record, a JSON object with `dial` (the only number that may be called
-   for that record), `goal` (the natural-language instruction for the call, including the
-   automated-call disclosure and the questions), `result_schema`, and an `idempotency_key`.
-   It never places a call.
+   This prints a phone-masked preview of `dial`, `goal`, `result_schema`, and
+   `idempotency_key`. The preview is not executable. After approval, run the same command
+   with `--private-payload` for private machine input to the executor: it preserves the
+   exact number from the record and the full goal. Never show that private output to the
+   user or paste it into logs. Neither mode places a call.
 
 2. For each plan, run the CALL-E one-off call workflow:
 
@@ -71,11 +72,15 @@ CALL-E CLI parameters and command flags are documented in [`cli-reference.md`](h
    auth status  ->  call plan  ->  (show the plan to the user)  ->  call run  ->  call status
    ```
 
-   - Plan exactly one call, to `plan.dial`. Do not substitute any other number.
+   - Use the private payload for execution, not the masked preview. Plan exactly one call,
+     to `plan.dial`. Do not substitute any other number.
    - Inspect the returned plan. Run it only if it targets `plan.dial` and carries the
      `goal` text.
    - Preserve any returned `plan_id` and `confirm_token` exactly.
    - Poll call status until the call reaches a terminal state and a transcript is available.
+   - If submission or status times out or acceptance is unknown, stop this batch. Do not
+     redial, advance to the next record, or report no contact. Reconcile the existing
+     intent with the provider and obtain a new explicit operator decision before resuming.
 
 3. Read the transcript. For each claim in the pack, decide:
    - `answer`: `yes`, `no`, or `unknown`
@@ -93,11 +98,13 @@ CALL-E CLI parameters and command flags are documented in [`cli-reference.md`](h
      --extraction '{"answer":"...","evidence_span":"...","source_role":"...","conflicting":false}'
    ```
 
-   It prints the attestation (verdict, quote, provenance, expiry) and appends a row to
+   It prints a masked attestation (verdict, quote, provenance, expiry) and appends a private row to
    `corrections.csv` only for an evidence-backed `MISMATCH`. An `UNCLEAR` never becomes a
-   correction. Verdict meanings: `references/verdict-taxonomy.md`.
+   correction. Exact quote matching and the private corrections file remain unchanged;
+   `--private-payload` is available only for a private machine consumer. Verdict meanings:
+   `references/verdict-taxonomy.md`.
 
-5. Report per record: the verdict for each claim, the quote behind any `MATCH`/`MISMATCH`,
+5. Report per record: the verdict for each claim, a phone-masked display of the quote behind any `MATCH`/`MISMATCH`,
    and the path to `corrections.csv`. Do not present an `UNCLEAR` as a failure - it is the
    skill declining to guess.
 

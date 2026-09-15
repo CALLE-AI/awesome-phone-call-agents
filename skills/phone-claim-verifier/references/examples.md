@@ -14,20 +14,21 @@ For `provider_101` this prints (abridged):
 ```json
 {
   "record_id": "provider_101",
-  "dial": "+12025550110",
+  "dial": "[phone ending 0110]",
   "goal": "You are an automated verification call on behalf of Northline Health. State at the start that this is an automated call ... 1. Does this office currently accept patients covered by the Northline Health plan? 2. Is this office currently accepting new patients? 3. Is this office still located at the address on file, 1420 Oak St, Suite 300? ...",
   "result_schema": { "type": "object", "required": ["accepts_plan", "accepting_new_patients", "address_current"], "properties": { "accepts_plan": { "type": "string", "enum": ["yes", "no", "unknown"] } } },
   "idempotency_key": "pcv:provider_101:healthcare@1"
 }
 ```
 
-The `dial` value is `+12025550110` because that is the number on the record - nothing else
-can become the dial target.
+This default display is not executable. For private executor input, add `--private-payload`;
+its `dial` is the exact number on the record. Never show that private output in a summary.
 
 ## 2. Place the call
 
 Using CALL-E: `auth status -> call plan (goal = the goal above, phone = +12025550110) ->`
-show the plan to the user `-> call run -> call status` until terminal. You get a transcript.
+show a phone-masked plan to the user `-> call run -> call status` until terminal. You get a transcript.
+Stop the batch on any unknown acceptance or timeout; do not assume no contact or advance.
 
 Say the front desk answered:
 

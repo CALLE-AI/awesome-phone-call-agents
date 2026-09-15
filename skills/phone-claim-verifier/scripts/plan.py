@@ -5,13 +5,12 @@
     python3 scripts/plan.py --record '{"record_id":"p1","name":"Northline Family Clinic",
         "phone":"+12025550110","claims":{"accepts_plan":true}}' --pack examples/healthcare.json
 
-For each record it prints a JSON object: the E.164 number to dial (from the record only), the
-natural-language `goal` to hand to CALL-E's plan_call, and the `result_schema`. It never dials.
+By default it prints a masked JSON preview. Use --private-payload only for private machine
+input to the executor; that output preserves the exact dial/goal/schema. It never dials.
 """
 
 from __future__ import annotations
 
-import argparse
 import csv
 import json
 import re
@@ -20,6 +19,7 @@ from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 from _pcv import build_goal, build_result_schema, load_pack
+from _display import DisplayArgumentParser, for_display, mask_text
 
 E164 = re.compile(r"^\+[1-9]\d{7,14}$")
 _CORE = {"record_id", "name", "phone", "address", "region", "locale"}
@@ -66,10 +66,11 @@ def plan_one(record: dict, pack: dict) -> dict:
 
 
 def main() -> None:
-    ap = argparse.ArgumentParser()
+    ap = DisplayArgumentParser()
     ap.add_argument("csv", nargs="?", type=Path)
     ap.add_argument("--record", help="a single record as a JSON object")
     ap.add_argument("--pack", required=True, type=Path)
+    ap.add_argument("--private-payload", action="store_true", help="emit exact private machine input; never show or share this output")
     args = ap.parse_args()
 
     pack = load_pack(args.pack)
@@ -82,8 +83,13 @@ def main() -> None:
         ap.error("give a CSV path or --record")
 
     for rec in records:
-        print(json.dumps(plan_one(rec, pack), indent=2))
+        plan = plan_one(rec, pack)
+        print(json.dumps(plan if args.private_payload and "error" not in plan else for_display(plan), indent=2))
 
 
 if __name__ == "__main__":
-    main()
+    try:
+        main()
+    except (OSError, ValueError, KeyError, TypeError) as error:
+        print(mask_text(f"Plan failed: {error}"), file=sys.stderr)
+        sys.exit(1)
