@@ -31,7 +31,7 @@ README_SUBTITLE = "A community hub for reusable phone-call Agent Skills, runnabl
 CLI_REFERENCE_SENTENCE = "CALL-E CLI parameters and command flags are documented in [`cli-reference.md`](https://github.com/CALLE-AI/call-e-integrations/blob/main/packages/cli/docs/cli-reference.md)."
 TEXT_SUFFIXES = {".md", ".mjs", ".py", ".ts", ".json", ".toml", ".yaml", ".yml"}
 SKIP_TEXT_FILES = {"uv.lock"}
-SKIP_TEXT_DIRS = {".venv", "node_modules", ".pytest_cache", "__pycache__", ".mypy_cache", ".ruff_cache"}
+SKIP_TEXT_DIRS = {".venv", "node_modules", ".next", ".pytest_cache", "__pycache__", ".mypy_cache", ".ruff_cache"}
 EMAIL_ADDRESS_RE = re.compile(
     r"(?<![A-Za-z0-9.!#$%&'*+/=?^_`{|}~-])"
     r"[A-Za-z0-9.!#$%&'*+/=?^_`{|}~-]+@"
@@ -639,6 +639,8 @@ def validate_apps() -> None:
                 fail(f"App depends on source-repository internals in {path.relative_to(ROOT)}: {snippet}")
 
     for package_json in apps_dir.rglob("package.json"):
+        if set(package_json.relative_to(ROOT).parts) & SKIP_TEXT_DIRS:
+            continue
         payload = json.loads(read(package_json))
         dependencies = {}
         dependencies.update(payload.get("dependencies", {}))

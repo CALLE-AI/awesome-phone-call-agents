@@ -1,0 +1,67 @@
+{
+  "language": "en",
+  "validated": true,
+  "check": [
+    "hold on",
+    "let me check",
+    "one second",
+    "one sec",
+    "just a second",
+    "give me a second",
+    "let me pull that up",
+    "let me see",
+    "let me look",
+    "checking now",
+    "i'll check",
+    "i will check"
+  ],
+  "hedge": [
+    "should be",
+    "i think",
+    "usually",
+    "normally",
+    "typically",
+    "probably",
+    "around",
+    "roughly",
+    "about",
+    "more or less",
+    "i'd say",
+    "i guess",
+    "maybe",
+    "most likely",
+    "if i remember"
+  ],
+  "deferral": [
+    "i'll have to confirm",
+    "i will have to confirm",
+    "let me get back to you",
+    "i'll get back to you",
+    "i will get back to you",
+    "my colleague handles",
+    "have to ask",
+    "need to check with",
+    "not the right person",
+    "call you back with that"
+  ],
+  "correction": [
+    "actually",
+    "no wait",
+    "no, wait",
+    "sorry, i mean",
+    "i mean",
+    "make that",
+    "correction",
+    "scratch that"
+  ],
+  "readback_request": [
+    "just to confirm",
+    "to confirm",
+    "did you say",
+    "so that is",
+    "so that's",
+    "did i get that right",
+    "can you confirm",
+    "let me repeat that back"
+  ]
+}

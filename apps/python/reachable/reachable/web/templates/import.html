@@ -1,0 +1,83 @@
+{% extends "base.html" %}
+{% block title %}Import &middot; Reachable{% endblock %}
+{% block body %}
+
+<h1>Import</h1>
+<p class="muted">
+  Five CSV files exported from the school's own system. There is no live link to it, and
+  Reachable never writes back.
+</p>
+
+<div class="panel">
+  <p class="mono">{{ data_dir }}</p>
+  <form method="post" action="/import" class="inline">
+    <button type="submit">Re-import CSVs</button>
+  </form>
+  <form method="post" action="/scan" class="inline" style="margin-left:8px">
+    <button class="secondary" type="submit">Scan register for patterns</button>
+  </form>
+  <form method="post" action="/contact-check" class="inline" style="margin-left:8px">
+    <button class="secondary" type="submit">Start contact check</button>
+  </form>
+</div>
+
+{% if report %}
+<h2>Validation report</h2>
+<div class="panel">
+  {% if report.fatal %}
+    <p class="stop"><strong>Import failed.</strong> {{ report.fatal }}</p>
+    <p class="muted" style="font-size:13px">
+      Nothing was half-imported. A register date the calendar does not cover is fatal
+      rather than a row rejection, because the session chain and the statutory deadline
+      both depend on knowing whether that date was a school day.
+    </p>
+  {% else %}
+    <p>{{ report.summary() }}</p>
+    <table>
+      <tr><th>File</th><th>Accepted</th></tr>
+      {% for name, count in report.accepted.items() %}
+      <tr><td class="mono">{{ name }}</td><td class="mono">{{ count }}</td></tr>
+      {% endfor %}
+    </table>
+  {% endif %}
+</div>
+
+{% if report.rejected %}
+<h2>Rejected rows</h2>
+<div class="panel">
+  <table>
+    <tr><th>File</th><th>Row</th><th>Reason</th><th>Detail</th></tr>
+    {% for p in report.rejected %}
+    <tr>
+      <td class="mono">{{ p.file }}</td>
+      <td class="mono">{{ p.row_number }}</td>
+      <td class="stop">{{ p.reason }}</td>
+      <td class="mono muted">{{ p.detail }}</td>
+    </tr>
+    {% endfor %}
+  </table>
+  <p class="muted" style="font-size:13px; margin-bottom:0">
+    Row numbers match what you see in a spreadsheet. Numbers are shown masked. A number
+    that fails validation is rejected, never repaired.
+  </p>
+</div>
+{% endif %}
+{% endif %}
+
+<h2>Exports</h2>
+<div class="panel">
+  <form method="post" action="/export/contact-changes" class="inline">
+    <button class="secondary" type="submit">Suggested contact changes</button>
+  </form>
+  <form method="post" action="/export/register-reasons" class="inline" style="margin-left:8px">
+    <button class="secondary" type="submit">Suggested register reasons</button>
+  </form>
+  <form method="post" action="/export/contact-health" class="inline" style="margin-left:8px">
+    <button class="secondary" type="submit">Contact-health report</button>
+  </form>
+  <p class="muted" style="font-size:13px; margin-bottom:0">
+    Suggestions for the office to review. Every cell is sanitised and every number masked.
+  </p>
+</div>
+
+{% endblock %}
