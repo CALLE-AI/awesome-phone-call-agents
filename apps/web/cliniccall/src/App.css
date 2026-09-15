@@ -1613,7 +1613,7 @@ select:focus-visible {
     right: 0;
     bottom: 0;
     top: auto;
-    width: 205px;
+    width: 170px;
     height: 100vh;
     z-index: 1000;
     flex-direction: column;
@@ -1625,8 +1625,8 @@ select:focus-visible {
   }
 
   .app .main {
-    width: 100%;
-    margin-left: 0;
+    width: calc(100% - 170px);
+    margin-left: 170px;
     padding: 17px 14px 30px;
   }
 
