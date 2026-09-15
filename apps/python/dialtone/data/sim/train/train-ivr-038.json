@@ -1,0 +1,56 @@
+{
+ "id": "train-ivr-038",
+ "label": "ivr",
+ "source": "sim-train",
+ "meta": {
+  "task": "check whether the store is open on Sunday",
+  "hard": false
+ },
+ "turns": [
+  {
+   "speaker": "user",
+   "text": "Thank you for calling Maple Vet Clinic. Your call is important to us. Please listen carefully, as our menu options have changed. For hours and directions, press 1. For appointments, press 2. For billing, press 3. To repeat these options, press 9.",
+   "offset_seconds": 0.68
+  },
+  {
+   "speaker": "bot",
+   "text": "[DTMF 2]",
+   "offset_seconds": 17.61
+  },
+  {
+   "speaker": "user",
+   "text": "Our hours are Monday through Friday, 9 AM to 6 PM. To return to the main menu, press star.",
+   "offset_seconds": 18.41
+  },
+  {
+   "speaker": "bot",
+   "text": "[DTMF 2]",
+   "offset_seconds": 26.53
+  },
+  {
+   "speaker": "user",
+   "text": "Sorry, I didn't get that. Thank you for calling Maple Vet Clinic. Your call is important to us. Please listen carefully, as our menu options have changed. For hours and directions, press 1. For appointments, press 2. For billing, press 3. To repeat these options, press 9.",
+   "offset_seconds": 27.35
+  },
+  {
+   "speaker": "bot",
+   "text": "[DTMF 1]",
+   "offset_seconds": 46.02
+  },
+  {
+   "speaker": "user",
+   "text": "Our hours are Monday through Friday, 9 AM to 6 PM. To return to the main menu, press star.",
+   "offset_seconds": 46.76
+  },
+  {
+   "speaker": "bot",
+   "text": "Could you tell me your opening hours this Sunday?",
+   "offset_seconds": 55.19
+  },
+  {
+   "speaker": "user",
+   "text": "Our hours are Monday through Friday, 9 AM to 6 PM. To return to the main menu, press star.",
+   "offset_seconds": 59.16
+  }
+ ]
+}

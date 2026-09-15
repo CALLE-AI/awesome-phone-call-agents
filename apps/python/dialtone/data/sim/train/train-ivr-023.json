@@ -1,0 +1,46 @@
+{
+ "id": "train-ivr-023",
+ "label": "ivr",
+ "source": "sim-train",
+ "meta": {
+  "task": "cancel a subscription",
+  "hard": false
+ },
+ "turns": [
+  {
+   "speaker": "user",
+   "text": "Thank you for calling Luigi's Trattoria. Your call is important to us. Please listen carefully, as our menu options have changed. For hours and directions, press 1. For appointments, press 2. For billing, press 3. To repeat these options, press 9.",
+   "offset_seconds": 0.79
+  },
+  {
+   "speaker": "bot",
+   "text": "[DTMF 1]",
+   "offset_seconds": 17.15
+  },
+  {
+   "speaker": "user",
+   "text": "Please enter your account number, followed by the pound key.",
+   "offset_seconds": 17.84
+  },
+  {
+   "speaker": "bot",
+   "text": "I'd like to cancel the subscription for the account under Jordan Lee.",
+   "offset_seconds": 22.72
+  },
+  {
+   "speaker": "user",
+   "text": "Sorry, I didn't get that. Thank you for calling Luigi's Trattoria. Your call is important to us. Please listen carefully, as our menu options have changed. For hours and directions, press 1. For appointments, press 2. For billing, press 3. To repeat these options, press 9.",
+   "offset_seconds": 27.88
+  },
+  {
+   "speaker": "bot",
+   "text": "[DTMF 1]",
+   "offset_seconds": 46.26
+  },
+  {
+   "speaker": "user",
+   "text": "Sorry, I didn't get that. Thank you for calling Luigi's Trattoria. Your call is important to us. Please listen carefully, as our menu options have changed. For hours and directions, press 1. For appointments, press 2. For billing, press 3. To repeat these options, press 9.",
+   "offset_seconds": 47.11
+  }
+ ]
+}

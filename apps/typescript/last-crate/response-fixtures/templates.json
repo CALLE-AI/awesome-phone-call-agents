@@ -1,0 +1,383 @@
+{
+  "version": 1,
+  "provenance": "synthetic-template",
+  "description": "Synthetic CALL-E-shaped response templates captured from the development fixture adapter. These are not recorded real calls.",
+  "templates": {
+    "happy-donor": {
+      "id": "fixture_donor",
+      "status": "completed",
+      "taskCompleted": true,
+      "completionConfidence": {
+        "score": 0.98,
+        "label": "high"
+      },
+      "structuredResult": {
+        "answer": "confirmed",
+        "quantity": "{{quantity}}",
+        "ready": "{{ready}}",
+        "cutoff": "{{cutoff}}",
+        "breadOnly": "yes",
+        "release": "yes",
+        "evidence": "Yes, we have {{quantity}} plain loaves in our packaging. They are ready at {{ready}}. Please collect by {{cutoff}}. I will set them aside for your approved partner until then."
+      },
+      "summary": "Yes, we have {{quantity}} plain loaves in our packaging. They are ready at {{ready}}. Please collect by {{cutoff}}. I will set them aside for your approved partner until then.",
+      "evidence": [
+        "Yes, we have {{quantity}} plain loaves in our packaging. They are ready at {{ready}}. Please collect by {{cutoff}}. I will set them aside for your approved partner until then."
+      ],
+      "recipients": [
+        {
+          "attempts": [
+            {
+              "transcriptTurns": [
+                {
+                  "offset_seconds": 0,
+                  "speaker": "bot",
+                  "text": "Hello, I am Last Crate, an AI assistant. This is a fictional rehearsal of a surplus-bread pickup."
+                },
+                {
+                  "offset_seconds": 8,
+                  "speaker": "user",
+                  "text": "Yes, we have {{quantity}} plain loaves in our packaging. They are ready at {{ready}}. Please collect by {{cutoff}}. I will set them aside for your approved partner until then."
+                }
+              ]
+            }
+          ]
+        }
+      ]
+    },
+    "happy-partner": {
+      "id": "fixture_partner",
+      "status": "completed",
+      "taskCompleted": true,
+      "completionConfidence": {
+        "score": 0.98,
+        "label": "high"
+      },
+      "structuredResult": {
+        "answer": "accepted",
+        "quantity": "{{quantity}}",
+        "arrival": "{{arrival}}",
+        "ownTransport": "yes",
+        "evidence": "Yes, we will collect all {{quantity}} loaves from {{donor}} at {{arrival}}. We have our own transport. Please confirm the pickup."
+      },
+      "summary": "Yes, we will collect all {{quantity}} loaves from {{donor}} at {{arrival}}. We have our own transport. Please confirm the pickup.",
+      "evidence": [
+        "Yes, we will collect all {{quantity}} loaves from {{donor}} at {{arrival}}. We have our own transport. Please confirm the pickup."
+      ],
+      "recipients": [
+        {
+          "attempts": [
+            {
+              "transcriptTurns": [
+                {
+                  "offset_seconds": 0,
+                  "speaker": "bot",
+                  "text": "Hello, I am Last Crate, an AI assistant. This is a fictional rehearsal of a surplus-bread pickup."
+                },
+                {
+                  "offset_seconds": 8,
+                  "speaker": "user",
+                  "text": "Yes, we will collect all {{quantity}} loaves from {{donor}} at {{arrival}}. We have our own transport. Please confirm the pickup."
+                }
+              ]
+            }
+          ]
+        }
+      ]
+    },
+    "unclear-donor": {
+      "id": "fixture_donor",
+      "status": "completed",
+      "taskCompleted": true,
+      "completionConfidence": {
+        "score": 0.98,
+        "label": "high"
+      },
+      "structuredResult": {
+        "answer": "unknown",
+        "quantity": 0,
+        "ready": "{{ready}}",
+        "cutoff": "{{cutoff}}",
+        "breadOnly": "yes",
+        "release": "yes",
+        "evidence": "There might be some bread left. I cannot promise a quantity or a collection time."
+      },
+      "summary": "There might be some bread left. I cannot promise a quantity or a collection time.",
+      "evidence": [
+        "There might be some bread left. I cannot promise a quantity or a collection time."
+      ],
+      "recipients": [
+        {
+          "attempts": [
+            {
+              "transcriptTurns": [
+                {
+                  "offset_seconds": 0,
+                  "speaker": "bot",
+                  "text": "Hello, I am Last Crate, an AI assistant. This is a fictional rehearsal of a surplus-bread pickup."
+                },
+                {
+                  "offset_seconds": 8,
+                  "speaker": "user",
+                  "text": "There might be some bread left. I cannot promise a quantity or a collection time."
+                }
+              ]
+            }
+          ]
+        }
+      ]
+    },
+    "unclear-partner": {
+      "id": "fixture_partner",
+      "status": "completed",
+      "taskCompleted": true,
+      "completionConfidence": {
+        "score": 0.98,
+        "label": "high"
+      },
+      "structuredResult": {
+        "answer": "accepted",
+        "quantity": "{{quantity}}",
+        "arrival": "{{arrival}}",
+        "ownTransport": "yes",
+        "evidence": "Yes, we will collect all {{quantity}} loaves from {{donor}} at {{arrival}}. We have our own transport. Please confirm the pickup."
+      },
+      "summary": "Yes, we will collect all {{quantity}} loaves from {{donor}} at {{arrival}}. We have our own transport. Please confirm the pickup.",
+      "evidence": [
+        "Yes, we will collect all {{quantity}} loaves from {{donor}} at {{arrival}}. We have our own transport. Please confirm the pickup."
+      ],
+      "recipients": [
+        {
+          "attempts": [
+            {
+              "transcriptTurns": [
+                {
+                  "offset_seconds": 0,
+                  "speaker": "bot",
+                  "text": "Hello, I am Last Crate, an AI assistant. This is a fictional rehearsal of a surplus-bread pickup."
+                },
+                {
+                  "offset_seconds": 8,
+                  "speaker": "user",
+                  "text": "Yes, we will collect all {{quantity}} loaves from {{donor}} at {{arrival}}. We have our own transport. Please confirm the pickup."
+                }
+              ]
+            }
+          ]
+        }
+      ]
+    },
+    "no-answer-donor": {
+      "id": "fixture_no_answer",
+      "status": "failed",
+      "structuredResult": null,
+      "recipients": [],
+      "failureCode": "fixture_no_answer",
+      "summary": "Scripted rehearsal: no answer."
+    },
+    "no-answer-partner": {
+      "id": "fixture_partner",
+      "status": "completed",
+      "taskCompleted": true,
+      "completionConfidence": {
+        "score": 0.98,
+        "label": "high"
+      },
+      "structuredResult": {
+        "answer": "accepted",
+        "quantity": "{{quantity}}",
+        "arrival": "{{arrival}}",
+        "ownTransport": "yes",
+        "evidence": "Yes, we will collect all {{quantity}} loaves from {{donor}} at {{arrival}}. We have our own transport. Please confirm the pickup."
+      },
+      "summary": "Yes, we will collect all {{quantity}} loaves from {{donor}} at {{arrival}}. We have our own transport. Please confirm the pickup.",
+      "evidence": [
+        "Yes, we will collect all {{quantity}} loaves from {{donor}} at {{arrival}}. We have our own transport. Please confirm the pickup."
+      ],
+      "recipients": [
+        {
+          "attempts": [
+            {
+              "transcriptTurns": [
+                {
+                  "offset_seconds": 0,
+                  "speaker": "bot",
+                  "text": "Hello, I am Last Crate, an AI assistant. This is a fictional rehearsal of a surplus-bread pickup."
+                },
+                {
+                  "offset_seconds": 8,
+                  "speaker": "user",
+                  "text": "Yes, we will collect all {{quantity}} loaves from {{donor}} at {{arrival}}. We have our own transport. Please confirm the pickup."
+                }
+              ]
+            }
+          ]
+        }
+      ]
+    },
+    "declined-donor": {
+      "id": "fixture_donor",
+      "status": "completed",
+      "taskCompleted": true,
+      "completionConfidence": {
+        "score": 0.98,
+        "label": "high"
+      },
+      "structuredResult": {
+        "answer": "confirmed",
+        "quantity": "{{quantity}}",
+        "ready": "{{ready}}",
+        "cutoff": "{{cutoff}}",
+        "breadOnly": "yes",
+        "release": "yes",
+        "evidence": "Yes, we have {{quantity}} plain loaves in our packaging. They are ready at {{ready}}. Please collect by {{cutoff}}. I will set them aside for your approved partner until then."
+      },
+      "summary": "Yes, we have {{quantity}} plain loaves in our packaging. They are ready at {{ready}}. Please collect by {{cutoff}}. I will set them aside for your approved partner until then.",
+      "evidence": [
+        "Yes, we have {{quantity}} plain loaves in our packaging. They are ready at {{ready}}. Please collect by {{cutoff}}. I will set them aside for your approved partner until then."
+      ],
+      "recipients": [
+        {
+          "attempts": [
+            {
+              "transcriptTurns": [
+                {
+                  "offset_seconds": 0,
+                  "speaker": "bot",
+                  "text": "Hello, I am Last Crate, an AI assistant. This is a fictional rehearsal of a surplus-bread pickup."
+                },
+                {
+                  "offset_seconds": 8,
+                  "speaker": "user",
+                  "text": "Yes, we have {{quantity}} plain loaves in our packaging. They are ready at {{ready}}. Please collect by {{cutoff}}. I will set them aside for your approved partner until then."
+                }
+              ]
+            }
+          ]
+        }
+      ]
+    },
+    "declined-partner": {
+      "id": "fixture_partner",
+      "status": "completed",
+      "taskCompleted": true,
+      "completionConfidence": {
+        "score": 0.98,
+        "label": "high"
+      },
+      "structuredResult": {
+        "answer": "declined",
+        "quantity": "{{quantity}}",
+        "arrival": "{{arrival}}",
+        "ownTransport": "yes",
+        "evidence": "Sorry, our driver is unavailable. We cannot collect this evening."
+      },
+      "summary": "Sorry, our driver is unavailable. We cannot collect this evening.",
+      "evidence": [
+        "Sorry, our driver is unavailable. We cannot collect this evening."
+      ],
+      "recipients": [
+        {
+          "attempts": [
+            {
+              "transcriptTurns": [
+                {
+                  "offset_seconds": 0,
+                  "speaker": "bot",
+                  "text": "Hello, I am Last Crate, an AI assistant. This is a fictional rehearsal of a surplus-bread pickup."
+                },
+                {
+                  "offset_seconds": 8,
+                  "speaker": "user",
+                  "text": "Sorry, our driver is unavailable. We cannot collect this evening."
+                }
+              ]
+            }
+          ]
+        }
+      ]
+    },
+    "window-donor": {
+      "id": "fixture_donor",
+      "status": "completed",
+      "taskCompleted": true,
+      "completionConfidence": {
+        "score": 0.98,
+        "label": "high"
+      },
+      "structuredResult": {
+        "answer": "confirmed",
+        "quantity": "{{quantity}}",
+        "ready": "{{ready}}",
+        "cutoff": "{{cutoff}}",
+        "breadOnly": "yes",
+        "release": "yes",
+        "evidence": "Yes, we have {{quantity}} plain loaves in our packaging. They are ready at {{ready}}. Please collect by {{cutoff}}. I will set them aside for your approved partner until then."
+      },
+      "summary": "Yes, we have {{quantity}} plain loaves in our packaging. They are ready at {{ready}}. Please collect by {{cutoff}}. I will set them aside for your approved partner until then.",
+      "evidence": [
+        "Yes, we have {{quantity}} plain loaves in our packaging. They are ready at {{ready}}. Please collect by {{cutoff}}. I will set them aside for your approved partner until then."
+      ],
+      "recipients": [
+        {
+          "attempts": [
+            {
+              "transcriptTurns": [
+                {
+                  "offset_seconds": 0,
+                  "speaker": "bot",
+                  "text": "Hello, I am Last Crate, an AI assistant. This is a fictional rehearsal of a surplus-bread pickup."
+                },
+                {
+                  "offset_seconds": 8,
+                  "speaker": "user",
+                  "text": "Yes, we have {{quantity}} plain loaves in our packaging. They are ready at {{ready}}. Please collect by {{cutoff}}. I will set them aside for your approved partner until then."
+                }
+              ]
+            }
+          ]
+        }
+      ]
+    },
+    "window-partner": {
+      "id": "fixture_partner",
+      "status": "completed",
+      "taskCompleted": true,
+      "completionConfidence": {
+        "score": 0.98,
+        "label": "high"
+      },
+      "structuredResult": {
+        "answer": "accepted",
+        "quantity": "{{quantity}}",
+        "arrival": "{{lateArrival}}",
+        "ownTransport": "yes",
+        "evidence": "Yes, we will collect all {{quantity}} loaves from {{donor}} at {{lateArrival}}. We have our own transport. Please confirm the pickup."
+      },
+      "summary": "Yes, we will collect all {{quantity}} loaves from {{donor}} at {{lateArrival}}. We have our own transport. Please confirm the pickup.",
+      "evidence": [
+        "Yes, we will collect all {{quantity}} loaves from {{donor}} at {{lateArrival}}. We have our own transport. Please confirm the pickup."
+      ],
+      "recipients": [
+        {
+          "attempts": [
+            {
+              "transcriptTurns": [
+                {
+                  "offset_seconds": 0,
+                  "speaker": "bot",
+                  "text": "Hello, I am Last Crate, an AI assistant. This is a fictional rehearsal of a surplus-bread pickup."
+                },
+                {
+                  "offset_seconds": 8,
+                  "speaker": "user",
+                  "text": "Yes, we will collect all {{quantity}} loaves from {{donor}} at {{lateArrival}}. We have our own transport. Please confirm the pickup."
+                }
+              ]
+            }
+          ]
+        }
+      ]
+    }
+  }
+}

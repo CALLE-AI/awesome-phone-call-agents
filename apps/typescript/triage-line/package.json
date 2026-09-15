@@ -1,0 +1,35 @@
+{
+  "name": "triage-line",
+  "version": "0.1.0",
+  "description": "Autonomous phone-task orchestrator built on CALL-E. Fan-out and chain call topologies with verification, policy, and language auto-retry.",
+  "type": "module",
+  "engines": {
+    "node": ">=18"
+  },
+  "scripts": {
+    "reachback": "tsx src/index.ts reachback",
+    "runaround": "tsx src/index.ts runaround",
+    "server": "tsx src/server.ts",
+    "start": "tsx src/server.ts",
+    "typecheck": "tsc --noEmit",
+    "build": "tsc"
+  },
+  "keywords": [
+    "call-e",
+    "telephony",
+    "orchestration",
+    "agent"
+  ],
+  "license": "MIT",
+  "devDependencies": {
+    "@types/express": "^5.0.6",
+    "@types/node": "^22.7.0",
+    "typescript": "^5.6.0"
+  },
+  "dependencies": {
+    "@call-e/calle": "^0.7.0",
+    "dotenv": "^17.4.2",
+    "express": "^5.2.1",
+    "tsx": "^4.19.0"
+  }
+}
