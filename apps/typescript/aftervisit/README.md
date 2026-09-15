@@ -76,7 +76,7 @@ Use Node.js 20 or newer and pnpm.
 
 ```bash
 git clone https://github.com/sharmilaraghu/Aftervisit.git
-cd AfterVisit
+cd Aftervisit
 git checkout --detach cc4ef0c79011bb292c18d1a8d04862743e43d094
 pnpm install --frozen-lockfile
 pnpm run verify   # vitest, typecheck, eslint
