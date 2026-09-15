@@ -17,86 +17,187 @@ Follow this sequence:
 2. Review relevant longitudinal patient history.
 3. Determine the patient's current risk level and priority.
 4. Produce a structured care decision.
-5. Run a deterministic safety gate before any automated call.
-6. If the call is authorized, initiate the CALL-E call using the patient's authorized phone number.
-7. Track the call lifecycle.
-8. Convert the call result into structured health information.
-9. Store the result as a patient event.
-10. Reassess the patient's condition and determine the next action.
+5. Run the deterministic safety gate.
+6. Generate a no-call preview.
+7. Stop for operator approval before any live call.
+8. If explicitly approved, validate the authorized destination and initiate the CALL-E call.
+9. Track the call lifecycle.
+10. Convert a verified terminal call result into structured health information.
+11. Store the verified result as a patient event when appropriate.
+12. Reassess the patient's condition and determine the next action.
 
 The phone call is an action within the care workflow, not the end of the workflow.
 
-## Safety Gate
+For detailed safety rules and examples, see:
+
+- `references/safety.md`
+- `references/examples.md`
+
+## No-Call Preview
+
+The default workflow is preview-only.
+
+Before any live call, produce a preview containing:
+
+- patient identifier or masked patient identifier
+- reason for the proposed call
+- care decision
+- risk level
+- priority
+- deterministic safety-gate result
+- destination authorization status
+- proposed next action
+
+The preview must not initiate a phone call.
+
+A preview should use masked destinations and identifiers in logs and displayed output.
+
+Example:
+
+```text
+CALL PREVIEW
+Patient: CT-102
+Reason: increased follow-up due to worsening trajectory
+Risk: high
+Priority: high
+Safety gate: PASS
+Destination: +91••••••5837
+Destination authorization: VALID
+Live call: NOT STARTED
+Operator approval: REQUIRED
+
+Operator-Approved Live Run
+
+A live CALL-E call requires explicit operator approval.
+
+The workflow is:
+
+Care decision
+    ↓
+Deterministic safety gate
+    ↓
+No-call preview
+    ↓
+Explicit operator approval
+    ↓
+Authorized destination validation
+    ↓
+CALL-E live call
+
+A model recommendation is not operator approval.
+
+The system must not initiate a live call merely because a language model recommends calling.
+
+If operator approval is absent, the workflow stops without placing a call.
+
+Safety Gate
 
 Never allow a language model alone to authorize an automated healthcare call.
 
-Before initiating a call, verify all required conditions:
+Before initiating a live call, verify all required conditions:
 
-- An authorized patient phone number exists.
-- The care decision explicitly permits a routine follow-up call.
-- The patient's risk level satisfies the application's automated-call threshold.
-- The patient's priority satisfies the application's automated-call threshold.
-- The call reason is traceable to a structured care decision.
-- The call is associated with the correct patient record.
-- The same call has not already been initiated.
+An authorized patient phone number exists.
+The destination is valid and approved for the current run.
+The care decision explicitly permits a routine follow-up call.
+The patient's risk level satisfies the application's automated-call threshold.
+The patient's priority satisfies the application's automated-call threshold.
+The call reason is traceable to a structured care decision.
+The call is associated with the correct patient record.
+The same call has not already been initiated.
+Explicit operator approval has been obtained for the live run.
 
 If any required condition fails, do not initiate the call.
 
 Do not bypass or weaken the safety gate because a model recommends calling.
 
-## Call Initiation
+Detailed safety guidance is in references/safety.md.
+
+Destination Validation
+
+Live calls must use an authorized destination.
+
+The destination must:
+
+be explicitly authorized for the current demonstration or run
+be valid E.164 format
+come from a trusted application field rather than arbitrary model-generated text
+not be replaced by a destination supplied in free-form model output
+
+Do not expose full phone numbers in logs, screenshots, examples, or public documentation.
+
+Use masked or clearly fake values in community examples.
+
+Call Initiation
 
 Phone numbers should be stored and supplied in E.164 format.
 
 CALL-E API credentials must remain server-side and must never be exposed to:
 
-- browser code
-- frontend applications
-- client-side environment variables
-- logs
-- screenshots
-- public repositories
-- documentation
+browser code
+frontend applications
+client-side environment variables
+logs
+screenshots
+public repositories
+documentation
 
-Only initiate a call after the deterministic safety gate has passed.
+Only initiate a live call after the deterministic safety gate and explicit operator approval have passed.
 
 The system should record:
 
-- patient identifier
-- call reason
-- care decision identifier
-- risk level
-- priority
-- call timestamp
-- CALL-E call identifier
-- call status
+patient identifier
+call reason
+care decision identifier
+risk level
+priority
+call timestamp
+CALL-E call identifier
+call status
 
-## Patient Conversation
+Displayed logs and summaries should mask sensitive identifiers and destinations.
+
+Patient Conversation
 
 The follow-up call should be concise and focused on collecting information relevant to the existing care decision.
 
 The caller should:
 
-1. Identify the healthcare service appropriately.
-2. Confirm that the patient is available to talk.
-3. Explain the reason for the follow-up.
-4. Ask whether relevant symptoms have improved, remained stable, or worsened.
-5. Ask about medication adherence when applicable.
-6. Identify urgent concerns.
-7. Record the patient's responses.
-8. Avoid making unsupported medical diagnoses.
+Identify the healthcare service appropriately.
+Confirm that the patient is available to talk.
+Explain the reason for the follow-up.
+Ask whether relevant symptoms have improved, remained stable, or worsened.
+Ask about medication adherence when applicable.
+Identify urgent concerns.
+Record the patient's responses.
+Avoid making unsupported medical diagnoses.
 
 The caller should not claim to be a doctor or replace professional medical judgment.
 
 The conversation should collect patient-reported information rather than attempting to independently diagnose the patient.
 
-## Structured Outcome
+Call Outcome Handling
 
-Convert the completed call into structured information.
+Only process a call after a trustworthy terminal result has been received.
+
+If the provider reports an unknown, ambiguous, unavailable, or otherwise unreconciled outcome:
+
+Stop the automated workflow.
+Do not assume that the patient answered.
+Do not assume that the patient failed to answer.
+Do not fabricate symptoms or health status.
+Do not create a successful patient event from an unverified outcome.
+Do not automatically retry.
+Reconcile the provider call status.
+Continue only after a verified terminal result is available.
+
+An unknown outcome is a stop condition, not a successful or failed clinical outcome.
+
+Structured Outcome
+
+Convert a verified completed call into structured information.
 
 A result may contain fields such as:
 
-```json
 {
   "patient_reached": "yes",
   "health_status": "stable",
@@ -107,143 +208,267 @@ A result may contain fields such as:
   "next_action": "continue_followup"
 }
 
-Possible patient_reached values include:
+Only information actually obtained from the call should be represented as a patient-reported outcome.
 
-yes
-no
-voicemail
-wrong_number
+Do not invent missing fields or infer a clinical condition that was not established by the conversation.
 
-Possible health_status values include:
+Patient Event and Reassessment
 
-improved
-stable
-worsened
-unknown
+When a verified completed call produces a valid patient-reported outcome:
 
-The exact schema may vary by implementation.
-
-Do not infer a successful health assessment when the patient was not reached.
-
-Post-Call Processing
-
-A completed call is not the end of the workflow.
-
-After receiving the structured CALL-E result:
-
-Store the call result.
-Create exactly one patient event for the call outcome.
-Associate the event with the call record.
+Record the structured outcome.
+Associate it with the corresponding call record.
+Create the appropriate patient event.
 Reassess the patient's longitudinal state.
-Determine whether follow-up should be maintained, increased, escalated, or otherwise adjusted.
-Surface cases requiring human attention to the healthcare worker.
+Determine the next care action.
 
-Call-result processing must be idempotent.
+Processing should be idempotent so that the same completed call cannot create duplicate patient events.
 
-If the same CALL-E result is received or processed more than once, the system must not create duplicate patient events or duplicate care actions.
+Failed, cancelled, or unreconciled calls must not be represented as successful patient-reported clinical outcomes.
 
-Human Oversight
+Cancellation Limits
 
-Automated routine follow-up should not be presented as replacing healthcare workers.
+Preview cancellation is always possible because no external call has been initiated.
 
-The purpose of this workflow is to reduce repetitive follow-up work while preserving human oversight for patients who require additional attention.
+Before live initiation, the operator can cancel by withholding approval.
 
-Urgent or clinically concerning situations should follow the application's escalation policy rather than being treated as ordinary automated follow-up calls.
+After a live call has been accepted by the external calling provider, cancellation is provider-dependent and is not guaranteed.
 
-A system may automate routine communication while keeping clinically significant escalation under human control.
+Do not claim that an accepted call can always be cancelled.
 
-Privacy
+If cancellation is requested, report the actual provider state honestly. A call that has already been accepted for execution or connected may be unavailable for cancellation or may still complete.
 
-Do not place real patient information in source code, examples, tests, screenshots, or documentation.
+Demo and Community Use
 
-Never publish:
+This skill is intended as a reusable community/demo workflow.
 
-real patient names
-real patient phone numbers
-medical records
+Examples must use masked or clearly fake identifiers and destinations.
+
+Do not include:
+
 API keys
-authentication tokens
-private database identifiers
+credentials
+private patient information
+real phone numbers
+production secrets
+private infrastructure details
 
-Use synthetic or masked patient data in examples.
+The workflow is designed to demonstrate safe agentic calling patterns and is not a substitute for clinical judgment or production healthcare governance.
+
+
+### 2. `skills/vaidya-care-call/references/safety.md`
+
+```markdown
+# Vaidya Care Call Safety
+
+## Core Principle
+
+A language model must never be the sole authority for initiating a healthcare phone call.
+
+The workflow must separate:
+
+1. model recommendation
+2. deterministic safety validation
+3. no-call preview
+4. explicit operator approval
+5. live CALL-E execution
+
+## No-Call Preview
+
+Preview mode must not contact the patient.
+
+The preview should show:
+
+- proposed call reason
+- care decision
+- risk level
+- priority
+- safety-gate result
+- destination authorization status
+- masked destination
+- operator approval requirement
 
 Example:
 
-Patient: Example Patient
-Phone: +91XXXXXXXXXX
-Failure Handling
+```text
+Safety gate: PASS
+Destination: +91••••••5837
+Live call: NOT STARTED
+Operator approval: REQUIRED
+Operator Approval
 
-If CALL-E cannot initiate the call:
+A live call requires explicit operator approval after the preview has been generated.
 
-Record the failure.
-Do not report that the patient was contacted.
-Surface the failure to the appropriate healthcare workflow.
-Retry only according to an explicit retry policy.
+The following is not sufficient:
 
-If the patient cannot be reached:
+model recommendation
+automatic care decision
+a valid phone number alone
+a passing risk threshold alone
 
-Record the actual outcome.
-Do not interpret the failed contact as a successful health assessment.
-Follow the application's retry or human-review policy.
+If operator approval is missing, do not initiate CALL-E.
 
-If the call result is incomplete or ambiguous:
+Authorized Destinations
 
-Preserve the uncertainty.
-Do not invent missing clinical information.
-Allow the healthcare workflow to determine whether human review is required.
-Idempotency
+Only an explicitly authorized destination may be used.
 
-Call initiation and result processing should be protected against duplicate execution.
+Destinations must:
 
-A repeated callback, webhook, or processing attempt must not:
+be valid E.164 numbers
+belong to an approved demonstration or run
+come from trusted application state
+not be taken from arbitrary model output
 
-create duplicate patient events
-create duplicate care decisions
-initiate duplicate calls
-overwrite a valid result with an older result
+Public examples must use masked or fake numbers.
 
-Use a stable call identifier or equivalent idempotency mechanism when available.
+Deterministic Safety
 
-Auditability
+The deterministic safety gate must remain authoritative.
 
-A healthcare communication workflow should make it possible to determine why a call was made.
+A model must not be able to:
 
-Record sufficient metadata to trace the action, including:
+bypass the gate
+change the gate
+grant itself permission
+select an unauthorized destination
+convert a blocked decision into an approved call
+Masking
 
-patient identifier
-care decision identifier
-call reason
-risk level
-priority
-CALL-E call identifier
-call status
-timestamps
-structured call outcome
+Never expose complete phone numbers in:
 
-Avoid storing unnecessary sensitive information.
+logs
+screenshots
+README files
+examples
+public repositories
 
-Core Principle
+Use masking such as:
 
-The upstream healthcare agent may identify that a follow-up action is appropriate.
++91••••••5837
 
-A deterministic safety layer decides whether an automated call is permitted.
+Use fake identifiers for examples:
 
-CALL-E performs the communication action.
+patient: CT-DEMO-102
+call_id: call_demo_••••
+Unknown Outcomes
 
-The call result becomes new information in the patient's longitudinal care timeline.
+An unknown or ambiguous provider result is a hard stop.
 
-The healthcare workflow then reassesses the patient and determines what should happen next.
+Do not infer:
 
-The goal is not simply to make a phone call.
+patient reached
+patient not reached
+health improved
+health worsened
+symptoms
+medication adherence
 
-The goal is to close the loop between patient information, care decisions, communication, and reassessment.
+Do not create a patient event from an unverified result.
+
+Do not automatically retry.
+
+First reconcile the provider's call status. Continue only after a trustworthy terminal state is available.
+
+Cancellation
+
+Preview cancellation is always possible because no call has been placed.
+
+Before initiation, cancellation means withholding operator approval.
+
+After provider acceptance, cancellation depends on the provider's actual state.
+
+A connected or accepted call may not be cancellable.
+
+The system must report the real provider state rather than claiming cancellation succeeded when it cannot be verified.
+
+Community Safety
+
+This skill is a reusable demonstration workflow.
+
+Do not include real patient data, production credentials, private phone numbers, or secrets.
+
+The skill does not replace professional medical judgment.
 
 
-### Then do this
+### 3. `skills/vaidya-care-call/references/examples.md`
 
-1. **Paste** it into `SKILL.md`.
-2. Scroll to the bottom.
-3. Commit message:
+```markdown
+# Vaidya Care Call Examples
+
+All examples use fake or masked data.
+
+## Preview-Only Example
 
 ```text
-Add Vaidya care call skill
+Patient: CT-DEMO-102
+Reason: worsening trajectory requires increased follow-up
+Risk: high
+Priority: high
+Safety gate: PASS
+Destination: +91••••••5837
+Destination authorization: VALID
+
+CALL PREVIEW
+Live call: NOT STARTED
+Operator approval: REQUIRED
+
+No phone call occurs in this mode.
+
+Approved Live Run
+Patient: CT-DEMO-102
+Safety gate: PASS
+Destination: +91••••••5837
+Destination authorization: VALID
+Operator approval: APPROVED
+
+CALL-E
+Status: initiated
+Call ID: call_demo_••••
+
+The live run occurs only after explicit operator approval.
+
+Blocked Safety Gate
+Patient: CT-DEMO-104
+Risk: moderate
+Priority: normal
+Safety gate: BLOCKED
+Reason: automated-call threshold not satisfied
+
+Live call: NOT STARTED
+
+The workflow stops.
+
+Unknown Outcome
+Call ID: call_demo_••••
+Provider status: UNKNOWN
+
+Action:
+STOP
+DO NOT RETRY
+DO NOT CREATE PATIENT EVENT
+RECONCILE PROVIDER STATUS
+
+No patient-reported outcome is created until the call reaches a verified terminal state.
+
+Verified Call Result
+{
+  "patient_reached": "yes",
+  "health_status": "stable",
+  "symptoms": [],
+  "medication_adherence": "partial",
+  "urgent": false,
+  "notes": "Patient reported no new concerns.",
+  "next_action": "continue_followup"
+}
+
+Only information actually obtained during the call should be recorded.
+
+Cancellation
+Before live initiation
+Operator approval: NOT GIVEN
+Action: CANCEL
+CALL-E call: NOT STARTED
+After provider acceptance
+Call ID: call_demo_••••
+Provider status: accepted
+Cancellation: provider-dependent
