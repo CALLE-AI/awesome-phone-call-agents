@@ -1,5 +1,5 @@
 // Where credentials may travel. The CALL-E key is sent only to CALL-E's official HTTPS API, or to a
-// loopback test server the operator enables explicitly, and credentialed requests never follow
+// loopback test server with an explicit dummy key, and credentialed requests never follow
 // redirects, so a 30x can't forward the key or a request body to another host.
 
 export const APPROVED_CALLE_ORIGINS: readonly string[] = ["https://api.heycall-e.com"];
@@ -12,7 +12,7 @@ export function isLoopbackUrl(url: URL): boolean {
 
 /**
  * The base URL the CALL-E SDK may use; undefined keeps the SDK's official default. Throws for any other
- * origin, for loopback without CALLE_LOCAL_TEST_TRANSPORT=true, and for URLs carrying credentials, a
+ * origin, for loopback without CALLE_LOCAL_TEST_TRANSPORT=true and CALLE_API_KEY=local-test-only, and for URLs carrying credentials, a
  * query, or a fragment.
  */
 export function calleBaseUrl(env: Record<string, string | undefined> = process.env): string | undefined {
@@ -30,8 +30,8 @@ export function calleBaseUrl(env: Record<string, string | undefined> = process.e
   const base = `${url.origin}${url.pathname.replace(/\/+$/, "")}`;
   if (url.protocol === "https:" && APPROVED_CALLE_ORIGINS.includes(url.origin)) return base;
   const web = url.protocol === "http:" || url.protocol === "https:";
-  if (web && isLoopbackUrl(url) && env.CALLE_LOCAL_TEST_TRANSPORT === "true") return base;
-  throw new Error(`CALLE_BASE_URL must be ${APPROVED_CALLE_ORIGINS.join(" or ")}, or a loopback URL with CALLE_LOCAL_TEST_TRANSPORT=true.`);
+  if (web && isLoopbackUrl(url) && env.CALLE_LOCAL_TEST_TRANSPORT === "true" && env.CALLE_API_KEY === "local-test-only") return base;
+  throw new Error(`CALLE_BASE_URL must be ${APPROVED_CALLE_ORIGINS.join(" or ")}, or a loopback URL with CALLE_LOCAL_TEST_TRANSPORT=true and CALLE_API_KEY=local-test-only.`);
 }
 
 /** The SDK's fetch: a redirect fails the request instead of being followed. */

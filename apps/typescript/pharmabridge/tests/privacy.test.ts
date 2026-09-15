@@ -56,7 +56,9 @@ describe("CALL-E credential transport", () => {
 
   it("allows a loopback test transport only when explicitly enabled", () => {
     expect(() => calleBaseUrl({ CALLE_BASE_URL: "http://127.0.0.1:8787" })).toThrow();
-    expect(calleBaseUrl({ CALLE_BASE_URL: "http://127.0.0.1:8787", CALLE_LOCAL_TEST_TRANSPORT: "true" })).toBe("http://127.0.0.1:8787");
+    expect(calleBaseUrl({ CALLE_BASE_URL: "http://127.0.0.1:8787", CALLE_LOCAL_TEST_TRANSPORT: "true", CALLE_API_KEY: "local-test-only" })).toBe("http://127.0.0.1:8787");
+    expect(() => calleBaseUrl({ CALLE_BASE_URL: "http://127.0.0.1:8787", CALLE_LOCAL_TEST_TRANSPORT: "true", CALLE_API_KEY: "synthetic-non-test-key" })).toThrow();
+    expect(() => calleBaseUrl({ CALLE_BASE_URL: "http://127.0.0.1:8787", CALLE_LOCAL_TEST_TRANSPORT: "true" })).toThrow();
     expect(() => calleBaseUrl({ CALLE_BASE_URL: "http://10.0.0.5:8787", CALLE_LOCAL_TEST_TRANSPORT: "true" })).toThrow();
   });
 

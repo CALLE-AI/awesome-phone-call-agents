@@ -134,7 +134,7 @@ reuses the same idempotency key, so CALL-E returns the original call instead of 
 - **Fail-closed live gate** (above) with timing-safe operator-code checks and scoped, expiring
   per-call access tokens for polling.
 - **Credentials stay on approved transports.** The CALL-E key is sent only to
-  `https://api.heycall-e.com` (or a loopback test server with `CALLE_LOCAL_TEST_TRANSPORT=true`), and
+  `https://api.heycall-e.com` (or a loopback test server with `CALLE_LOCAL_TEST_TRANSPORT=true` and the dummy `CALLE_API_KEY=local-test-only`), and
   the SDK refuses redirects. The agent skill sends operator codes and call tokens only to a loopback
   server or an https origin listed in `PHARMABRIDGE_APPROVED_ORIGINS`, also without redirects.
 - **Phone numbers masked everywhere.** API responses, the ledger, error messages, the smoke script,
@@ -204,7 +204,7 @@ npm run dev                  # http://localhost:3000
 | Variable | Purpose |
 | --- | --- |
 | `CALLE_API_KEY` | CALL-E key (live calls only) |
-| `CALLE_BASE_URL` | Optional. Only `https://api.heycall-e.com`, or a loopback URL together with `CALLE_LOCAL_TEST_TRANSPORT=true` |
+| `CALLE_BASE_URL` | Optional. Only `https://api.heycall-e.com`, or a loopback URL together with `CALLE_LOCAL_TEST_TRANSPORT=true` and the dummy `CALLE_API_KEY=local-test-only`; real keys are never allowed for local test transport |
 | `PHARMABRIDGE_LIVE_CALLS` | `true` to allow live routing |
 | `PHARMABRIDGE_OPERATOR_CODE` | Code the operator types before every live mission and to open call records |
 | `PHARMABRIDGE_ACCESS_TOKEN_SECRET` | 32+ random characters; signs call tokens and discovered numbers |
