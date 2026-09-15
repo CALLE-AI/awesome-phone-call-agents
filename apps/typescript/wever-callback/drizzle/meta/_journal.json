@@ -1,0 +1,34 @@
+{
+  "version": "7",
+  "dialect": "sqlite",
+  "entries": [
+    {
+      "idx": 0,
+      "version": "6",
+      "when": 1788819672711,
+      "tag": "0000_hot_the_liberteens",
+      "breakpoints": true
+    },
+    {
+      "idx": 1,
+      "version": "6",
+      "when": 1788819808365,
+      "tag": "0001_hesitant_molten_man",
+      "breakpoints": true
+    },
+    {
+      "idx": 2,
+      "version": "6",
+      "when": 1789087166628,
+      "tag": "0002_plain_golden_guardian",
+      "breakpoints": true
+    },
+    {
+      "idx": 3,
+      "version": "6",
+      "when": 1789151774159,
+      "tag": "0003_long_iron_fist",
+      "breakpoints": true
+    }
+  ]
+}

@@ -1,0 +1,80 @@
+{
+  "id": "eval2-018",
+  "label": "human",
+  "difficulty": "typical",
+  "scenario": "Plumber on the phone asks clarifying questions and gives a ballpark verbal quote with caveats.",
+  "task": "Get a quote to replace a bathroom sink faucet and shutoff valves.",
+  "outcome": {
+    "task_completed_claimed": true,
+    "commitment_type": "information",
+    "confirmation_artifact": null,
+    "expected_attestation": "human_attested"
+  },
+  "turns": [
+    {
+      "speaker": "user",
+      "text": "Yeah, Benchmark Plumbing, this is Luis.",
+      "offset_seconds": 2.1
+    },
+    {
+      "speaker": "bot",
+      "text": "Hi Luis. I'm an AI assistant calling on behalf of a homeowner, Clara Voss. She's looking for a quote to replace a bathroom sink faucet and the shutoff valves under the sink.",
+      "offset_seconds": 5.32
+    },
+    {
+      "speaker": "user",
+      "text": "Okay. Is she buying the faucet or you want us to supply it?",
+      "offset_seconds": 17.66
+    },
+    {
+      "speaker": "bot",
+      "text": "She's already bought the faucet. It's a standard single-hole model.",
+      "offset_seconds": 23.5
+    },
+    {
+      "speaker": "user",
+      "text": "Okay, good. And the valves, are they, like, the old multi-turn ones? Compression or soldered, do you know?",
+      "offset_seconds": 28.0
+    },
+    {
+      "speaker": "bot",
+      "text": "She's not sure. The house was built in 1978, if that helps.",
+      "offset_seconds": 36.08
+    },
+    {
+      "speaker": "user",
+      "text": "Yeah, seventy-eight, probably copper, could be sweated on. So, uh, ballpark... install the faucet, that's a hundred forty. Two new quarter-turn valves, figure another hundred sixty for both, parts included. So around three hundred, maybe a little more if the valves are soldered and I gotta cut them out.",
+      "offset_seconds": 42.34
+    },
+    {
+      "speaker": "bot",
+      "text": "So roughly 300 dollars total, possibly more if the valves are soldered. Is there a trip charge on top of that?",
+      "offset_seconds": 62.1
+    },
+    {
+      "speaker": "user",
+      "text": "Nope, no trip charge if we do the job. If she just wants me to come look, it's fifty-nine.",
+      "offset_seconds": 69.34
+    },
+    {
+      "speaker": "bot",
+      "text": "Got it. And how soon could you schedule it?",
+      "offset_seconds": 77.83
+    },
+    {
+      "speaker": "user",
+      "text": "I got, uh, next Thursday or Friday open right now. She can call back or text this number to book.",
+      "offset_seconds": 82.3
+    },
+    {
+      "speaker": "bot",
+      "text": "Perfect. I'll pass that along. Thanks, Luis.",
+      "offset_seconds": 90.38
+    },
+    {
+      "speaker": "user",
+      "text": "Yep, no problem. Take care.",
+      "offset_seconds": 92.83
+    }
+  ]
+}

@@ -1,0 +1,13 @@
+services:
+  - type: web
+    name: changelock
+    runtime: docker
+    plan: free
+    healthCheckPath: /
+    envVars:
+      - key: NODE_ENV
+        value: production
+      - key: CHANGELOCK_MODE
+        value: replay
+      - key: CHANGELOCK_DB_PATH
+        value: /data/changelock.db

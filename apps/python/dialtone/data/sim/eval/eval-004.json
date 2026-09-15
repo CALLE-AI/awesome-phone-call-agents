@@ -1,0 +1,85 @@
+{
+  "id": "eval-004",
+  "label": "human",
+  "difficulty": "typical",
+  "scenario": "Owner of a small pizzeria answers casually, checks a paper book, overlaps during name spelling.",
+  "task": "Book a table for four this Friday at 7:30 PM under Dana Whitfield.",
+  "outcome": {
+    "task_completed_claimed": true,
+    "commitment_type": "booking",
+    "confirmation_artifact": null,
+    "expected_attestation": "human_attested"
+  },
+  "turns": [
+    {
+      "speaker": "user",
+      "text": "Tony's, hello?",
+      "offset_seconds": 0.9
+    },
+    {
+      "speaker": "bot",
+      "text": "hi, this is an AI assistant calling on behalf of Dana Whitfield. I'd like to book a table for four this Friday at seven thirty, if you have room.",
+      "offset_seconds": 2.72
+    },
+    {
+      "speaker": "user",
+      "text": "friday seven thirty, uh, hang on let me grab the book.",
+      "offset_seconds": 13.02
+    },
+    {
+      "speaker": "user",
+      "text": "okay yeah, four people you said?",
+      "offset_seconds": 20.29
+    },
+    {
+      "speaker": "bot",
+      "text": "yes, four people.",
+      "offset_seconds": 23.51
+    },
+    {
+      "speaker": "user",
+      "text": "yeah I can do seven thirty. what's the name?",
+      "offset_seconds": 24.74
+    },
+    {
+      "speaker": "bot",
+      "text": "Dana Whitfield. W H I T F I E L D.",
+      "offset_seconds": 28.65
+    },
+    {
+      "speaker": "user",
+      "text": "Whitfield, got it.",
+      "offset_seconds": 32.04
+    },
+    {
+      "speaker": "bot",
+      "text": "and could you note that one guest uses a wheelchair, so a table that's easy to get to would be great?",
+      "offset_seconds": 33.92
+    },
+    {
+      "speaker": "user",
+      "text": "yeah no problem, we'll put you by the front, there's no steps there.",
+      "offset_seconds": 41.46
+    },
+    {
+      "speaker": "bot",
+      "text": "wonderful. so just to confirm, a table for four this Friday at seven thirty under Whitfield?",
+      "offset_seconds": 47.13
+    },
+    {
+      "speaker": "user",
+      "text": "yep you're all set, friday seven thirty, four people.",
+      "offset_seconds": 52.85
+    },
+    {
+      "speaker": "bot",
+      "text": "thank you so much, have a good evening.",
+      "offset_seconds": 57.08
+    },
+    {
+      "speaker": "user",
+      "text": "you too, bye bye.",
+      "offset_seconds": 59.94
+    }
+  ]
+}
