@@ -13,6 +13,9 @@ input:
 
 output:
   strategy_status: invalid
+  evidence:
+    - { fact: quantity, value: 2000, source_call: call_112, target: "Supplier A",
+        confidence: high, status: validated }
   constraint_results:
     - { constraint: quantity, required: 5000, observed: 2000, status: violated }
   replan:

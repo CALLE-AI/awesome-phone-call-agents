@@ -39,9 +39,9 @@
       "type": "object",
       "required": ["call_id", "target"],
       "properties": {
-        "call_id": {"type": "string"},
+        "call_id": {"type": ["string", "null"]},
         "target": {"type": "string"},
-        "status": {"enum": ["completed", "no_answer", "busy", "voicemail", "failed"]},
+        "status": {"enum": ["completed", "no_answer", "busy", "voicemail", "failed", "rejected"]},
         "facts": {"type": "object"}
       }
     },
