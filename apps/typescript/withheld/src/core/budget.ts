@@ -242,6 +242,35 @@ export function scanForNumbers({
   return findings;
 }
 
+/**
+ * Make transcript-derived text safe to print.
+ *
+ * Answers and the turns that support them are quoted straight out of the call,
+ * so anything the callee said can end up on a terminal or in a log. A report
+ * that quotes the leak is not a report.
+ *
+ * This redacts the whole string rather than splicing digits out of it. The
+ * scanner works on normalised digit runs and on spoken forms like "oh double
+ * seven", neither of which maps back to an exact span of the original text, so
+ * a surgical edit would be guesswork. Over-redacting a reference number costs a
+ * reader one lookup; under-redacting prints the number this app exists to
+ * withhold.
+ */
+export function redactForDisplay(text: string, personPhone: string): string {
+  if (containsNumber(text, personPhone)) {
+    return `[redacted — contains the person's number ${maskSecret(
+      onlyDigits(personPhone),
+    )}]`;
+  }
+  const shaped = findPhoneShaped(text);
+  if (shaped.length) {
+    return `[redacted — contains phone-shaped digits ${shaped
+      .map((s) => maskSecret(s))
+      .join(', ')}]`;
+  }
+  return text;
+}
+
 function normalize(s: string): string {
   return s.toLowerCase().replace(/[^a-z0-9\s]/g, ' ').replace(/\s+/g, ' ').trim();
 }
