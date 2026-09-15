@@ -1,0 +1,19 @@
+{
+  "status": "completed",
+  "task_completed": true,
+  "completion_confidence": {
+    "score": 0.98,
+    "label": "high"
+  },
+  "evidence": [
+    "Representative confirmed CPT 99213 approved under auth #AUTH-882194."
+  ],
+  "structured_result": {
+    "auth_status": "approved",
+    "authorization_number": "AUTH-882194",
+    "representative_name": "Sarah M. (Ext 401)",
+    "reference_number": "REF-99201-BCBS",
+    "denial_reason": null
+  },
+  "dry_run": true
+}

@@ -1,0 +1,74 @@
+[
+  {
+    "id": "FS-01",
+    "exception": "OH-01",
+    "title": "Readback yes, one letter wrong (live 2026-09-05)",
+    "observation": {
+      "field": "off_hire_reference",
+      "intended": "07198FECTIST",
+      "extracted": "07198SECTIST",
+      "readbackConfirmed": true,
+      "evidenceKind": "synthesized_support",
+      "evidenceText": "zero seven one nine eight F as in Frank… yes",
+      "secondChannelMatch": false
+    },
+    "expect": { "provenance": "mismatch", "writable": false }
+  },
+  {
+    "id": "FS-02",
+    "exception": "OH-01",
+    "title": "Contradictory time, summary picked one",
+    "observation": {
+      "field": "collection_window",
+      "intended": null,
+      "extracted": "Sunday 5:00 PM",
+      "readbackConfirmed": false,
+      "evidenceKind": "synthesized_support",
+      "evidenceText": "Sunday morning … 5:00 PM",
+      "secondChannelMatch": false
+    },
+    "expect": { "provenance": "spoken_only", "writable": false }
+  },
+  {
+    "id": "FS-03",
+    "title": "Clean spoken value, no second channel",
+    "observation": {
+      "field": "ticket_number",
+      "intended": "TK-44019",
+      "extracted": "TK-44019",
+      "readbackConfirmed": true,
+      "evidenceKind": "verbatim_span",
+      "evidenceText": "That's TK-44019.",
+      "secondChannelMatch": false
+    },
+    "expect": { "provenance": "conversational_confirmed", "writable": false }
+  },
+  {
+    "id": "FS-04",
+    "title": "No identifier extracted",
+    "observation": {
+      "field": "pickup_number",
+      "intended": null,
+      "extracted": null,
+      "readbackConfirmed": false,
+      "evidenceKind": "none",
+      "evidenceText": null,
+      "secondChannelMatch": false
+    },
+    "expect": { "provenance": "unknown", "writable": false }
+  },
+  {
+    "id": "FS-05",
+    "title": "Zero vs letter O after readback",
+    "observation": {
+      "field": "purchase_order",
+      "intended": "PO-1040",
+      "extracted": "PO-1O40",
+      "readbackConfirmed": true,
+      "evidenceKind": "synthesized_support",
+      "evidenceText": "P O one O four zero … yes",
+      "secondChannelMatch": false
+    },
+    "expect": { "provenance": "mismatch", "writable": false }
+  }
+]
