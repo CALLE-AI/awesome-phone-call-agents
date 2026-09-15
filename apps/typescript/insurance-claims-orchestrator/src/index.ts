@@ -51,7 +51,24 @@ async function main(): Promise<void> {
   const result = await chain.execute(phone, caller, !live);
 
   console.log("\n=== Result ===");
-  console.log(JSON.stringify(result, null, 2));
+  // Mask structured_result data in output — only show outcome status
+  const displayResult = {
+    completed: result.completed,
+    steps: Object.fromEntries(
+      Object.entries(result.steps).map(([id, step]) => [
+        id,
+        {
+          callId: step.callId,
+          outcome: step.outcome,
+          attempts: step.attempts,
+          // structured_result intentionally omitted from console output
+        },
+      ])
+    ),
+    humanReviewRequired: result.humanReviewRequired,
+    humanReviewReason: result.humanReviewReason,
+  };
+  console.log(JSON.stringify(displayResult, null, 2));
 
   if (result.humanReviewRequired) {
     console.log("\n⚠️  HUMAN REVIEW REQUIRED:", result.humanReviewReason);

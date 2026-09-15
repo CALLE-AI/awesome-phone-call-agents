@@ -31,8 +31,10 @@ export async function calleApiCaller(
   });
 
   if (!createRes.ok) {
+    const errorText = await createRes.text();
+    // Mask provider error to avoid exposing sensitive details
     throw new Error(
-      `CALL-E create failed: ${createRes.status} ${await createRes.text()}`
+      `CALL-E create failed: ${createRes.status}`
     );
   }
 
@@ -55,9 +57,11 @@ export async function calleApiCaller(
     };
 
     if (TERMINAL_STATUSES.has(data.status)) {
+      const outcome = mapStatusToOutcome(data.status, data.structured_result);
+      // Do NOT log structured_result — only report outcome status
       return {
         callId,
-        outcome: mapStatusToOutcome(data.status, data.structured_result),
+        outcome,
         structured_result: data.structured_result ?? null,
       };
     }

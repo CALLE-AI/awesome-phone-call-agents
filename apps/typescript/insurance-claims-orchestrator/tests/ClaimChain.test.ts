@@ -78,6 +78,19 @@ describe("ClaimChain — dependency blocking", () => {
     const result = await chain.execute("+15550001234", caller, false);
     assert.equal(result.completed, false);
     assert.equal(result.humanReviewRequired, true);
+    assert.ok(result.humanReviewReason?.includes("refused"));
+  });
+
+  it("blocks coverage_verify when loss_report returns unclear", async () => {
+    const chain = new ClaimChain()
+      .addStep({ id: "loss_report", maxRetries: 1, resultSchema: {}, taskText: () => "loss task" })
+      .addStep({ id: "coverage_verify", dependsOn: "loss_report", maxRetries: 1, resultSchema: {}, taskText: () => "coverage task" });
+
+    const caller = makeCaller([{ outcome: "unclear", result: null }]);
+    const result = await chain.execute("+15550001234", caller, false);
+    assert.equal(result.completed, false);
+    assert.equal(result.humanReviewRequired, true);
+    assert.ok(result.humanReviewReason?.includes("unclear"));
   });
 });
 

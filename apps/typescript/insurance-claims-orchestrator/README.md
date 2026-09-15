@@ -7,9 +7,9 @@ Two-call consent-first insurance claims intake orchestrator using CALL-E.
 This app orchestrates a two-call CALL-E workflow for insurance claims intake:
 
 - **Call 1 — Loss Report:** Contacts the policyholder to collect structured incident details (description, date, damage estimate, policy number).
-- **Call 2 — Coverage Verification:** Using Call 1 results, confirms policy status and coverage applicability.
+- **Call 2 — Provisional Intake Notification:** Notifies the claimant their claim was received. An adjuster MAY follow up within 2-3 business days. This is NOT guaranteed coverage verification or adjuster assignment. Cancellation or non-follow-up is possible.
 
-Call 2 runs only when Call 1 reaches a completed outcome with valid policy confirmation. Both calls use explicit AI disclosure and fail-closed result schemas. Dry-run is the default.
+Call 2 runs only when Call 1 reaches a completed outcome. Both calls use explicit AI disclosure and fail-closed result schemas. Dry-run is the default.
 
 The core reusable piece is `src/ClaimChain.ts` — a domain-agnostic orchestrator class that enforces dependency ordering, exit gates, and context passing between call steps.
 
@@ -36,7 +36,6 @@ apps/typescript/insurance-claims-orchestrator/
 │   └── types.ts                  <- Shared TypeScript interfaces
 ├── scripts/
 │   ├── dry-run.ts                <- Full two-call simulation, no API key needed
-│   ├── validate-schema.ts        <- Validates fixture JSON against schema
 │   └── fixtures/                 <- Fictional example results (NANP reserved numbers)
 ├── tests/
 │   ├── ClaimChain.test.ts        <- Unit tests for orchestrator logic
@@ -51,7 +50,6 @@ apps/typescript/insurance-claims-orchestrator/
 | Command | Description |
 |---|---|
 | `npm run dry-run` | Simulate full workflow with fixture data, no calls placed |
-| `npm run validate-schema` | Validate fixture JSON against schema.json |
 | `npm test` | Run unit tests |
 | `npm run check` | TypeScript type check |
 
@@ -81,7 +79,9 @@ See `skills/insurance-claims-orchestrator/references/two-call-pattern.md` for fu
 - Dry-run is the default — `--live` flag required for real calls
 - AI disclosure mandatory at the start of both calls
 - Phone numbers masked in all logs
-- Ambiguous outcomes route to human review, never auto-retried
+- Ambiguous outcomes (refused, unclear) route to human review, never auto-retried
+- Structured results never logged to console (outcome status only)
+- Idempotency keys included in task context for provider-side deduplication
 - No SSN, payment, or medical data ever collected
 
 See `skills/insurance-claims-orchestrator/references/safety.md` for the full contract.

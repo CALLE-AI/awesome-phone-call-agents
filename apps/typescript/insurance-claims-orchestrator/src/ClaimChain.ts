@@ -65,12 +65,37 @@ export class ClaimChain {
     for (const step of this.steps) {
       if (step.dependsOn) {
         const dep = stepResults[step.dependsOn];
-        if (!dep || dep.outcome !== "completed") {
+        if (!dep) {
           return {
             completed: false,
             steps: stepResults,
             humanReviewRequired: true,
-            humanReviewReason: `Step "${step.dependsOn}" did not complete — blocked "${step.id}"`,
+            humanReviewReason: `Required step "${step.dependsOn}" not executed — blocked "${step.id}"`,
+          };
+        }
+        // Explicitly check for completed outcome; refuse on "refused" or "unclear"
+        if (dep.outcome === "refused") {
+          return {
+            completed: false,
+            steps: stepResults,
+            humanReviewRequired: true,
+            humanReviewReason: `Step "${step.dependsOn}" was refused — cannot proceed to "${step.id}"`,
+          };
+        }
+        if (dep.outcome === "unclear") {
+          return {
+            completed: false,
+            steps: stepResults,
+            humanReviewRequired: true,
+            humanReviewReason: `Step "${step.dependsOn}" had unclear outcome — cannot proceed to "${step.id}"`,
+          };
+        }
+        if (dep.outcome !== "completed") {
+          return {
+            completed: false,
+            steps: stepResults,
+            humanReviewRequired: true,
+            humanReviewReason: `Step "${step.dependsOn}" outcome was "${dep.outcome}" — blocked "${step.id}"`,
           };
         }
       }
