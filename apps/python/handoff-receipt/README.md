@@ -19,19 +19,17 @@ export CALLE_API_KEY=...
 python handoff_receipt.py --request request.json --live --confirm I_AUTHORIZE_UP_TO_TWO_CALLS --state private-state.json
 ```
 
-The app places at most two calls: sender first, then receiver only if sender evidence supports a completed handoff. It never dials a number discovered during a call, never auto-redials after an ambiguous creation result, and stores the returned call ID before polling.
+The app places at most two calls: sender first, then receiver only after the sender has been reached, explicitly confirms a completed handoff, and supplies a valid case/reference. It never dials a number discovered during a call, never auto-redials after an ambiguous creation result, and stores the returned call ID before polling.
 
-Structured results are treated as claims. Material evidence must be grounded by exact recipient transcript quotes. Conservative reconciliation returns explicit outcomes such as `ACKNOWLEDGED_MATCH`, `HANDOFF_NOT_ACKNOWLEDGED`, `OWNERSHIP_CONTRADICTION`, `REFERENCE_MISMATCH`, `SENDER_DENIES_HANDOFF`, or `UNKNOWN`.
+Authenticated CALL-E requests reject redirects instead of forwarding authorization or idempotency credentials to another location. E.164 destinations are validated as full-string ASCII numbers.
 
-## Safety and claim limits
+Structured results are treated as claims. Material evidence must be grounded by exact recipient transcript quotes. Reconciliation is advisory evidence processing, not an authoritative determination of fault, ownership, entitlement, or real-world completion. It returns explicit outcomes such as `ACKNOWLEDGED_MATCH`, `HANDOFF_NOT_ACKNOWLEDGED`, `OWNERSHIP_CONTRADICTION`, `REFERENCE_MISMATCH`, `SENDER_DENIES_HANDOFF`, or `UNKNOWN`.
 
-Before a receiver call is allowed, sender evidence must positively show all of the following: the sender was reached, it explicitly claims the handoff is complete, and the supplied case/reference passes validation. `UNKNOWN` is never itself permission for the next side effect.
+Human-facing preview/result/error copies redact phone-like content embedded in subject, organization-name, or task/error text. The actual authorized destination remains bound separately to the validated request and is masked when displayed.
 
-Destination phone numbers must be full-string ASCII E.164 values. Authenticated CALL-E requests reject redirects rather than forwarding bearer credentials or idempotency material to another location.
+## Cancellation and recovery limits
 
-Human-facing output masks phone-like values found in names, subjects, tasks, and error text. Reconciliation is advisory evidence, not an authoritative statement about real-world case ownership.
-
-Stopping this local process does not prove that a call already accepted by the remote provider has been canceled. The app makes no guaranteed remote-cancellation claim.
+A call accepted by the remote provider is already an external side effect. Stopping this local process does not prove that the remote call was canceled. This demo does not implement or claim guaranteed cancellation after remote acceptance. If creation or polling becomes ambiguous, use the saved call ID to reconcile the existing operation and do not redial automatically.
 
 ## Live proof ceiling
 
