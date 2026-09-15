@@ -1,0 +1,25 @@
+[project]
+name = "trunkline"
+version = "0.1.0"
+description = "Call a health plan's provider-services line about a claim with CALL-E, wait on hold, and return an evidence-bound structured answer, with patient identifiers held outside the ledger."
+readme = "README.md"
+requires-python = ">=3.9"
+license = { text = "MIT" }
+dependencies = []
+
+[project.optional-dependencies]
+dev = ["pytest>=7.0"]
+
+[project.scripts]
+trunkline = "trunkline.cli:main"
+
+[build-system]
+requires = ["setuptools>=68"]
+build-backend = "setuptools.build_meta"
+
+[tool.setuptools.packages.find]
+include = ["trunkline*"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+addopts = "-q"

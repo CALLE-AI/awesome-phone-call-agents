@@ -1,0 +1,36 @@
+{
+  "currency": "IDR",
+  "parties": {
+    "nusantara-air": {
+      "name": "Nusantara Air",
+      "role": "airline",
+      "supportPhone": "+15550100900",
+      "involuntaryDelayMinutes": 120,
+      "voluntary": {
+        "flex": { "rescheduleFee": 0, "refundPercent": 90 },
+        "saver": { "rescheduleFee": 350000, "refundPercent": 50 },
+        "basic": { "rescheduleFee": 500000, "refundPercent": 0 }
+      },
+      "involuntary": { "rescheduleFee": 0, "refundPercent": 100, "waivesFareDifference": true },
+      "forceMajeure": { "rescheduleFee": 0, "refundPercent": 100, "waivesFareDifference": false }
+    },
+    "dist-lintas": {
+      "name": "Lintas Consolidator",
+      "role": "distributor",
+      "voluntary": { "rescheduleAdminFee": 50000, "refundAdminFee": 75000 },
+      "involuntary": { "rescheduleAdminFee": 0, "refundAdminFee": 25000 }
+    },
+    "dist-samudra": {
+      "name": "Samudra Travel Wholesale",
+      "role": "distributor",
+      "voluntary": { "rescheduleAdminFee": 35000, "refundAdminFee": 50000 },
+      "involuntary": { "rescheduleAdminFee": 35000, "refundAdminFee": 50000 }
+    },
+    "tripkita": {
+      "name": "TripKita",
+      "role": "ota",
+      "voluntary": { "rescheduleAdminFee": 30000, "refundAdminFee": 50000 },
+      "involuntary": { "rescheduleAdminFee": 0, "refundAdminFee": 0 }
+    }
+  }
+}
