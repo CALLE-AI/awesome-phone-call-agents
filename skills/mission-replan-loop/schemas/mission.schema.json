@@ -1,0 +1,52 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "mission-replan-loop input",
+  "type": "object",
+  "required": ["mission", "constraints", "strategy", "call_result"],
+  "properties": {
+    "mission": {
+      "type": "object",
+      "required": ["objective"],
+      "properties": {
+        "id": {"type": "string"},
+        "objective": {"type": "string"},
+        "deadline": {"type": "string"}
+      }
+    },
+    "constraints": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["key", "operator", "value"],
+        "properties": {
+          "key": {"type": "string"},
+          "operator": {"enum": ["eq", "neq", "lte", "gte", "lt", "gt", "in"]},
+          "value": {},
+          "mandatory": {"type": "boolean", "default": true}
+        }
+      }
+    },
+    "strategy": {
+      "type": "object",
+      "required": ["id", "target"],
+      "properties": {
+        "id": {"type": "string"},
+        "type": {"type": "string"},
+        "target": {"type": "string"}
+      }
+    },
+    "call_result": {
+      "type": "object",
+      "required": ["call_id", "target"],
+      "properties": {
+        "call_id": {"type": ["string", "null"]},
+        "target": {"type": "string"},
+        "status": {"enum": ["completed", "no_answer", "busy", "voicemail", "failed", "rejected"]},
+        "facts": {"type": "object"}
+      }
+    },
+    "excluded_targets": {"type": "array", "items": {"type": "string"}},
+    "available_targets": {"type": "array", "items": {"type": "string"}},
+    "policy": {"type": "object"}
+  }
+}

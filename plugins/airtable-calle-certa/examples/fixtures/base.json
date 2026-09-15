@@ -1,0 +1,323 @@
+{
+  "schema": [
+    {
+      "name": "Request ID",
+      "type": "singleLineText"
+    },
+    {
+      "name": "Applicant reference",
+      "type": "singleLineText"
+    },
+    {
+      "name": "Applicant name",
+      "type": "singleLineText"
+    },
+    {
+      "name": "Employer",
+      "type": "singleLineText"
+    },
+    {
+      "name": "Sourced number",
+      "type": "singleLineText"
+    },
+    {
+      "name": "Number source",
+      "type": "singleLineText"
+    },
+    {
+      "name": "Number on application",
+      "type": "singleLineText"
+    },
+    {
+      "name": "Consent receipt ID",
+      "type": "singleLineText"
+    },
+    {
+      "name": "Consent disclosure version",
+      "type": "singleLineText"
+    },
+    {
+      "name": "Consent signed at",
+      "type": "singleLineText"
+    },
+    {
+      "name": "Consent token",
+      "type": "singleLineText"
+    },
+    {
+      "name": "Cancelled",
+      "type": "checkbox",
+      "options": {}
+    },
+    {
+      "name": "Status",
+      "type": "singleLineText"
+    },
+    {
+      "name": "Reason",
+      "type": "multilineText"
+    },
+    {
+      "name": "Call ID",
+      "type": "singleLineText"
+    },
+    {
+      "name": "Reached employer",
+      "type": "singleSelect",
+      "description": "Use yes only if a person at the employer spoke about employment records. Use no if only an automated menu, a voicemail, or a wrong department was reached.",
+      "options": {
+        "choices": [
+          {
+            "id": "sel0",
+            "name": "Yes"
+          },
+          {
+            "id": "sel1",
+            "name": "No"
+          },
+          {
+            "id": "selUnknown",
+            "name": "Unknown"
+          }
+        ]
+      }
+    },
+    {
+      "name": "Employment confirmed",
+      "type": "singleSelect",
+      "description": "Use yes only when the employer states the person currently works there.",
+      "options": {
+        "choices": [
+          {
+            "id": "sel0",
+            "name": "Yes"
+          },
+          {
+            "id": "sel1",
+            "name": "No"
+          },
+          {
+            "id": "selUnknown",
+            "name": "Unknown"
+          }
+        ]
+      }
+    },
+    {
+      "name": "Title matches",
+      "type": "singleSelect",
+      "description": "Use yes when the stated job title matches the application. Use no when the employer names a different title. Use unknown if they would not say.",
+      "options": {
+        "choices": [
+          {
+            "id": "sel0",
+            "name": "Yes"
+          },
+          {
+            "id": "sel1",
+            "name": "No"
+          },
+          {
+            "id": "selUnknown",
+            "name": "Unknown"
+          }
+        ]
+      }
+    },
+    {
+      "name": "Declined to answer",
+      "type": "singleSelect",
+      "description": "Use yes when the employer refuses to confirm anything or asks for a written request.",
+      "options": {
+        "choices": [
+          {
+            "id": "sel0",
+            "name": "Yes"
+          },
+          {
+            "id": "sel1",
+            "name": "No"
+          },
+          {
+            "id": "selUnknown",
+            "name": "Unknown"
+          }
+        ]
+      }
+    }
+  ],
+  "records": [
+    {
+      "id": "recA1",
+      "fields": {
+        "Request ID": "VR-1041",
+        "Applicant reference": "APP-1041",
+        "Applicant name": "Dana Okafor",
+        "Employer": "Cascade Freight Systems",
+        "Sourced number": "+15550100471",
+        "Number source": "official_site",
+        "Number on application": "+15550109001",
+        "Cancelled": false,
+        "Consent receipt ID": "CR-1041",
+        "Consent disclosure version": "voe-disclosure-2026-01",
+        "Consent signed at": "2026-09-09T08:41:00Z",
+        "Consent token": "fab045414b94e35cb0f0ca0fc59238efea06a44d491cec704a28a80fd424dda9"
+      }
+    },
+    {
+      "id": "recA2",
+      "fields": {
+        "Request ID": "VR-1042",
+        "Applicant reference": "APP-1042",
+        "Applicant name": "Ilse Brandt",
+        "Employer": "Northwind Components Ltd",
+        "Sourced number": "+15550102038",
+        "Number source": "business_registry",
+        "Number on application": "+15550109002",
+        "Cancelled": false,
+        "Consent receipt ID": "CR-1042",
+        "Consent disclosure version": "voe-disclosure-2026-01",
+        "Consent signed at": "2026-09-09T08:41:00Z",
+        "Consent token": "4cecc40ffd96db62fb2f6384bc06fd213c59bf9ad96ee0838461c698813de873"
+      }
+    },
+    {
+      "id": "recA3",
+      "fields": {
+        "Request ID": "VR-1043",
+        "Applicant reference": "APP-1043",
+        "Applicant name": "Tomas Reyes",
+        "Employer": "Apex Holdings",
+        "Sourced number": "+15550109917",
+        "Number source": "directory",
+        "Number on application": "+15550109003",
+        "Cancelled": false,
+        "Consent receipt ID": "CR-1043",
+        "Consent disclosure version": "voe-disclosure-2026-01",
+        "Consent signed at": "2026-09-09T08:41:00Z",
+        "Consent token": "3ebbe05775f7d8c061f37d5fb667b1b5dfa1da10313b51650e82eb2714e306c8"
+      }
+    },
+    {
+      "id": "recA4",
+      "fields": {
+        "Request ID": "VR-1044",
+        "Applicant reference": "APP-1044",
+        "Applicant name": "Priya Nair",
+        "Employer": "Sterling Corp",
+        "Sourced number": "",
+        "Number source": "",
+        "Number on application": "+15550109004",
+        "Cancelled": false,
+        "Consent receipt ID": "CR-1044",
+        "Consent disclosure version": "voe-disclosure-2026-01",
+        "Consent signed at": "2026-09-09T08:41:00Z",
+        "Consent token": ""
+      }
+    },
+    {
+      "id": "recB1",
+      "fields": {
+        "Request ID": "VR-1050",
+        "Applicant reference": "APP-1050",
+        "Applicant name": "Sam Vollmer",
+        "Employer": "Harbour Metals",
+        "Sourced number": "+15550103311",
+        "Number source": "official_site",
+        "Number on application": "+15550109005",
+        "Cancelled": false,
+        "Consent receipt ID": "CR-1050",
+        "Consent disclosure version": "voe-disclosure-2026-01",
+        "Consent signed at": "2026-09-09T08:41:00Z",
+        "Consent token": "7a31f17277878878de2baa29618c0796b2c951788a3ad8a61922f8c3e8ee2c7b"
+      }
+    },
+    {
+      "id": "recB2",
+      "fields": {
+        "Request ID": "VR-1051",
+        "Applicant reference": "APP-1051",
+        "Applicant name": "Ada Yildiz",
+        "Employer": "Kestrel Logistics",
+        "Sourced number": "+15550103312",
+        "Number source": "official_site",
+        "Number on application": "+15550109006",
+        "Cancelled": false,
+        "Consent receipt ID": "CR-1051",
+        "Consent disclosure version": "voe-disclosure-2026-01",
+        "Consent signed at": "2026-09-09T08:41:00Z",
+        "Consent token": "f0b03f385458d77bc8fc38a89efd247adccc9cfe83aa18fa5f0fa9f80079f12a"
+      }
+    }
+  ],
+  "view_records": [
+    {
+      "id": "recA1",
+      "fields": {
+        "Request ID": "VR-1041",
+        "Applicant reference": "APP-1041",
+        "Applicant name": "Dana Okafor",
+        "Employer": "Cascade Freight Systems",
+        "Sourced number": "+15550100471",
+        "Number source": "official_site",
+        "Number on application": "+15550109001",
+        "Cancelled": false,
+        "Consent receipt ID": "CR-1041",
+        "Consent disclosure version": "voe-disclosure-2026-01",
+        "Consent signed at": "2026-09-09T08:41:00Z",
+        "Consent token": "fab045414b94e35cb0f0ca0fc59238efea06a44d491cec704a28a80fd424dda9"
+      }
+    },
+    {
+      "id": "recA2",
+      "fields": {
+        "Request ID": "VR-1042",
+        "Applicant reference": "APP-1042",
+        "Applicant name": "Ilse Brandt",
+        "Employer": "Northwind Components Ltd",
+        "Sourced number": "+15550102038",
+        "Number source": "business_registry",
+        "Number on application": "+15550109002",
+        "Cancelled": false,
+        "Consent receipt ID": "CR-1042",
+        "Consent disclosure version": "voe-disclosure-2026-01",
+        "Consent signed at": "2026-09-09T08:41:00Z",
+        "Consent token": "4cecc40ffd96db62fb2f6384bc06fd213c59bf9ad96ee0838461c698813de873"
+      }
+    },
+    {
+      "id": "recA3",
+      "fields": {
+        "Request ID": "VR-1043",
+        "Applicant reference": "APP-1043",
+        "Applicant name": "Tomas Reyes",
+        "Employer": "Apex Holdings",
+        "Sourced number": "+15550109917",
+        "Number source": "directory",
+        "Number on application": "+15550109003",
+        "Cancelled": false,
+        "Consent receipt ID": "CR-1043",
+        "Consent disclosure version": "voe-disclosure-2026-01",
+        "Consent signed at": "2026-09-09T08:41:00Z",
+        "Consent token": "3ebbe05775f7d8c061f37d5fb667b1b5dfa1da10313b51650e82eb2714e306c8"
+      }
+    },
+    {
+      "id": "recA4",
+      "fields": {
+        "Request ID": "VR-1044",
+        "Applicant reference": "APP-1044",
+        "Applicant name": "Priya Nair",
+        "Employer": "Sterling Corp",
+        "Sourced number": "",
+        "Number source": "",
+        "Number on application": "+15550109004",
+        "Cancelled": false,
+        "Consent receipt ID": "CR-1044",
+        "Consent disclosure version": "voe-disclosure-2026-01",
+        "Consent signed at": "2026-09-09T08:41:00Z",
+        "Consent token": ""
+      }
+    }
+  ]
+}

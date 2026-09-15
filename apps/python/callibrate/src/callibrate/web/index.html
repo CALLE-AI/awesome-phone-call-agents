@@ -1,0 +1,116 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="description" content="Callibrate phones the authoritative source with CALL-E, reads the transcript by rule, and corrects the record only when the evidence is there.">
+  <title>Callibrate — call the source, calibrate the record</title>
+  <link rel="stylesheet" href="/assets/app.css">
+</head>
+<body>
+<div id="toast-region" class="toast-region" aria-live="polite"></div>
+
+<template id="mark-template">
+  <span class="mark" aria-hidden="true">
+    <svg viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="2.1" stroke-linecap="round">
+      <path d="M4 14V10"/><path d="M9 18V6"/><path d="M14 16v-8"/><path d="M19.5 13.5 21 12"/>
+      <circle cx="19" cy="12" r="0.2" fill="#fff"/>
+    </svg>
+  </span>
+</template>
+
+<!-- ------------------------------------------------------------- sign in -->
+<main id="login-view" class="login-shell">
+  <section class="login-story">
+    <a class="wordmark" href="/">
+      <span class="mark" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="2.1" stroke-linecap="round"><path d="M4 14V10"/><path d="M9 18V6"/><path d="M14 16v-8"/><path d="M20 15V9"/></svg></span>
+      Callibrate <small>call the source</small>
+    </a>
+    <div>
+      <p class="label">Record verification over the phone</p>
+      <h1>Your database says it is open. <em>Only the phone knows.</em></h1>
+      <p>Every operational record drifts away from the world it describes. Callibrate uses CALL-E to phone the authoritative source, reads what was actually said, and corrects the record only when the evidence is in the transcript. Everything else goes to a person.</p>
+    </div>
+    <div class="drift">
+      <div><b>Published</b> <span>Wednesday 09:00&ndash;12:00</span></div>
+      <div><b>Reality</b> <span class="miss">moved to 10:00&ndash;13:00 in June</span></div>
+      <div><b>Noticed</b> <span>when somebody took two buses to find out</span></div>
+    </div>
+  </section>
+  <section class="login-panel">
+    <form id="login-form" class="login-form">
+      <p class="label">Curator console</p>
+      <h2>Sign in</h2>
+      <p class="muted">The queue, the calls, and the decisions software is not allowed to make.</p>
+      <label><span>Username</span><input name="username" autocomplete="username" required></label>
+      <label><span>Password</span><input name="password" type="password" autocomplete="current-password" required></label>
+      <p id="login-error" class="form-error" role="alert"></p>
+      <button class="button primary wide" type="submit">Open the console</button>
+      <p class="login-aside"><a id="public-link" href="/find">Looking for a service? Check it before you travel &rarr;</a></p>
+    </form>
+  </section>
+</main>
+
+<!-- ------------------------------------------------------------- console -->
+<div id="app-view" class="app-shell" hidden>
+  <header class="commandbar">
+    <a class="wordmark" href="#queue">
+      <span class="mark" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="2.1" stroke-linecap="round"><path d="M4 14V10"/><path d="M9 18V6"/><path d="M14 16v-8"/><path d="M20 15V9"/></svg></span>
+      Callibrate
+    </a>
+    <nav class="tabs" aria-label="Console sections">
+      <button class="tab active" data-view="queue">Verification queue <b id="tab-queue-count" class="count" hidden>0</b></button>
+      <button class="tab" data-view="decisions">Decisions <b id="tab-decisions-count" class="count warn" hidden>0</b></button>
+      <button class="tab" data-view="directory">Directory</button>
+      <button class="tab" data-view="ledger">Evidence ledger</button>
+    </nav>
+    <span id="caller-chip" class="chip">caller</span>
+    <span id="ledger-chip" class="chip good"><span class="dot"></span> ledger intact</span>
+    <div id="avatar" class="avatar">--</div>
+    <button id="logout" class="mini" type="button">exit</button>
+  </header>
+  <main id="content" class="workspace" aria-live="polite"></main>
+</div>
+
+<!-- ------------------------------------------------------ public directory -->
+<div id="public-view" class="public-shell" hidden>
+  <header class="public-head">
+    <a class="wordmark" href="/find">
+      <span class="mark" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="2.1" stroke-linecap="round"><path d="M4 14V10"/><path d="M9 18V6"/><path d="M14 16v-8"/><path d="M20 15V9"/></svg></span>
+      Callibrate <small>community directory</small>
+    </a>
+    <a class="console" href="/">Curator console &rarr;</a>
+  </header>
+  <section class="public-hero">
+    <h1>Find help, and check it is still true before you go.</h1>
+    <p>Opening hours change and nobody tells the directory. If a listing looks old, ask us to phone the provider now and tell you what they said.</p>
+  </section>
+  <form id="search-form" class="search-row">
+    <input id="search-need" placeholder="What do you need? e.g. food, shelter, legal advice" value="food" required>
+    <input id="search-postal" class="postal" placeholder="Postcode" value="02038">
+    <button class="button primary" type="submit">Search</button>
+  </form>
+  <div id="results" class="results"></div>
+</div>
+
+<!-- --------------------------------------------------------------- dialogs -->
+<dialog id="form-dialog">
+  <form id="form-dialog-form" class="dialog-card">
+    <div class="dialog-head">
+      <div><p id="form-dialog-kicker" class="label">Action</p><h2 id="form-dialog-title">Confirm</h2></div>
+      <button id="form-dialog-close" class="icon-button" type="button" aria-label="Close">&times;</button>
+    </div>
+    <p id="form-dialog-copy" class="muted"></p>
+    <div id="form-dialog-fields"></div>
+    <p id="form-dialog-error" class="form-error" role="alert"></p>
+    <div class="dialog-actions">
+      <button id="form-dialog-cancel" class="button ghost" type="button">Cancel</button>
+      <button id="form-dialog-submit" class="button primary" type="submit">Continue</button>
+    </div>
+  </form>
+</dialog>
+
+<script src="/assets/app.js" defer></script>
+<script src="/assets/demo.js" defer></script>
+</body>
+</html>

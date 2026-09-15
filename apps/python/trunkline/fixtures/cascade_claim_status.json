@@ -1,0 +1,195 @@
+{
+  "completion_confidence": {
+    "label": "high",
+    "score": 0.91
+  },
+  "evidence": [],
+  "object": "call_task",
+  "recipients": [
+    {
+      "attempts": [
+        {
+          "attempt": 1,
+          "transcript_turns": [
+            {
+              "offset_seconds": 0,
+              "speaker": "bot",
+              "text": "Dialing Cascade Mutual provider services."
+            },
+            {
+              "offset_seconds": 7,
+              "speaker": "user",
+              "text": "Thank you for calling Cascade Mutual provider services. For eligibility and benefits, press one. For claim status, press two. For authorizations, press three."
+            },
+            {
+              "offset_seconds": 12,
+              "speaker": "bot",
+              "text": "Selecting two for claim status."
+            },
+            {
+              "offset_seconds": 17,
+              "speaker": "user",
+              "text": "Please enter the ten digit national provider identifier, followed by the pound key."
+            },
+            {
+              "offset_seconds": 22,
+              "speaker": "bot",
+              "text": "Entering national provider identifier 1234567893."
+            },
+            {
+              "offset_seconds": 29,
+              "speaker": "user",
+              "text": "Please enter the last four digits of the tax identification number."
+            },
+            {
+              "offset_seconds": 35,
+              "speaker": "bot",
+              "text": "Entering 4419."
+            },
+            {
+              "offset_seconds": 41,
+              "speaker": "user",
+              "text": "Thank you. All of our representatives are assisting other providers. Your estimated wait time is twelve minutes. Please hold."
+            },
+            {
+              "offset_seconds": 745,
+              "speaker": "user",
+              "text": "Thanks for holding, claims department, this is Tasha."
+            },
+            {
+              "offset_seconds": 754,
+              "speaker": "bot",
+              "text": "This is an AI assistant calling for the billing office of Lakeshore Family Medicine. This call may be recorded for accuracy. Our national provider identifier is 1234567893, and I have two claims to check."
+            },
+            {
+              "offset_seconds": 770,
+              "speaker": "user",
+              "text": "That is fine. Member number and date of birth for the first one."
+            },
+            {
+              "offset_seconds": 780,
+              "speaker": "bot",
+              "text": "Member identification number T203877651, date of birth June 24, 1995, last name Sorensen."
+            },
+            {
+              "offset_seconds": 795,
+              "speaker": "user",
+              "text": "Got it, T 2 0 3 8 7 7 6 5 1, Sorensen. Which claim number?"
+            },
+            {
+              "offset_seconds": 806,
+              "speaker": "bot",
+              "text": "Claim number C L M dash 2026 dash 0 0 5 2 0 4, date of service August twenty seventh."
+            },
+            {
+              "offset_seconds": 820,
+              "speaker": "user",
+              "text": "Let me pull that up. Okay, that claim finalized and paid on September fourth, four hundred eighty eight dollars and twenty cents, the allowed amount was five hundred sixty dollars even."
+            },
+            {
+              "offset_seconds": 845,
+              "speaker": "bot",
+              "text": "Thank you. Is there a check or E F T trace number for that payment?"
+            },
+            {
+              "offset_seconds": 854,
+              "speaker": "user",
+              "text": "Yes, the E F T trace is 7 7 3 0 2 4 5 1, and the member owes seventy one dollars and eighty cents in coinsurance."
+            },
+            {
+              "offset_seconds": 872,
+              "speaker": "bot",
+              "text": "Thank you. My second claim is for a different member."
+            },
+            {
+              "offset_seconds": 880,
+              "speaker": "user",
+              "text": "Go ahead."
+            },
+            {
+              "offset_seconds": 885,
+              "speaker": "bot",
+              "text": "Member identification number H551908324, date of birth November 2, 1972, last name Okafor. Claim number C L M dash 2026 dash 0 0 5 1 2 0, date of service August eleventh."
+            },
+            {
+              "offset_seconds": 905,
+              "speaker": "user",
+              "text": "Okay, that one denied, nothing paid on it, the denial is on the remittance dated August twenty ninth."
+            },
+            {
+              "offset_seconds": 925,
+              "speaker": "bot",
+              "text": "Thank you. May I have a reference number for this call and your first name?"
+            },
+            {
+              "offset_seconds": 936,
+              "speaker": "user",
+              "text": "Reference number is C A S dash R E F dash 4 0 2 1 8 8 6 6, and this is Tasha."
+            }
+          ]
+        }
+      ],
+      "phones": [
+        "+13125550188"
+      ],
+      "region": "US",
+      "structured_result": {
+        "call_outcome": "answered",
+        "claims": [
+          {
+            "allowed_amount": "560.00",
+            "check_number": "EFT-77302451",
+            "claim_number": "CLM-2026-005204",
+            "claim_status": "paid",
+            "evidence_quote": "that claim finalized and paid on September fourth, four hundred eighty eight dollars and twenty cents, the allowed amount was five hundred sixty dollars even",
+            "paid_amount": "488.20",
+            "paid_date": "2026-09-04",
+            "patient_responsibility": "71.80"
+          },
+          {
+            "allowed_amount": "unknown",
+            "check_number": "unknown",
+            "claim_number": "CLM-2026-005120",
+            "claim_status": "denied",
+            "evidence_quote": "that one denied, nothing paid on it, the denial is on the remittance dated August twenty ninth",
+            "paid_amount": "0.00",
+            "paid_date": "unknown",
+            "patient_responsibility": "unknown"
+          }
+        ],
+        "reference_number": "CAS-REF-40218866",
+        "representative_name": "Tasha"
+      }
+    }
+  ],
+  "status": "completed",
+  "structured_result": {
+    "call_outcome": "answered",
+    "claims": [
+      {
+        "allowed_amount": "560.00",
+        "check_number": "EFT-77302451",
+        "claim_number": "CLM-2026-005204",
+        "claim_status": "paid",
+        "evidence_quote": "that claim finalized and paid on September fourth, four hundred eighty eight dollars and twenty cents, the allowed amount was five hundred sixty dollars even",
+        "paid_amount": "488.20",
+        "paid_date": "2026-09-04",
+        "patient_responsibility": "71.80"
+      },
+      {
+        "allowed_amount": "unknown",
+        "check_number": "unknown",
+        "claim_number": "CLM-2026-005120",
+        "claim_status": "denied",
+        "evidence_quote": "that one denied, nothing paid on it, the denial is on the remittance dated August twenty ninth",
+        "paid_amount": "0.00",
+        "paid_date": "unknown",
+        "patient_responsibility": "unknown"
+      }
+    ],
+    "reference_number": "CAS-REF-40218866",
+    "representative_name": "Tasha"
+  },
+  "summary": "Two Cascade Mutual claims settled on one call after a twelve minute hold: one paid with an EFT trace, one denied.",
+  "task_completed": true
+}
