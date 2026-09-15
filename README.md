@@ -419,7 +419,7 @@ Runnable demo apps live under [`apps/`](apps/). They are not a CALL-E SDK and do
 | [`apps/python/positive-contact`](apps/python/positive-contact/) | Python | PSPS Medical Baseline live-contact confirmation with a safe support loop: disclosed CALL-E calls, transcript-evidenced acknowledgement, retry and alternate-contact ladder, operator-approved identity-free supplier availability calls, field-visit work orders and denominator-honest reporting. Fixture mode by default. |
 
 The default e2e tests use a local fake broker/OAuth/MCP server or dry-run paths, so they do not require real CALL-E credentials or browser login. Live verification is opt-in in each app README.
-- [callhook](apps/go/callhook/) - Event-driven CALL-E calling platform: webhook in, structured outcome back, with goal-driven campaigns that early-stop, 19 doc-verified platform integrations, an MCP server, and a war-room UI in one zero-dependency Go binary. Dry-run by default. [Demo](https://callhook.onrender.com) · [Video](https://youtu.be/66siB3kIYMk)
+- [callhook](apps/go/callhook/) - Event-driven CALL-E calling platform: webhook in, structured outcome back, with goal-driven campaigns that early-stop, 18 doc-verified platform integrations plus a generic HTTP webhook, an MCP server, and a war-room UI in one zero-dependency Go binary. Dry-run by default. [Demo](https://callhook.onrender.com) · [Video](https://youtu.be/66siB3kIYMk)
 
 
 ### Community apps
