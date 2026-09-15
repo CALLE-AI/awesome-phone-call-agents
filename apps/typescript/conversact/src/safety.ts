@@ -16,6 +16,17 @@ export function maskPhone(phone: string): string {
   return `${phone.slice(0, 2)}••••••••${phone.slice(-2)}`;
 }
 
+/** Terminal text only; private evidence and commerce decisions stay unchanged. */
+export function redactDisplay(text: string, secrets: readonly string[] = []): string {
+  let output = text;
+  for (const secret of secrets) if (secret) output = output.split(secret).join("[credential redacted]");
+  output = output.replace(/\bBearer\s+[^\s"'<>]+/gi, "Bearer [credential redacted]");
+  return output.replace(/(?<!\w)(?:\+\d{1,3}[\s().-]*)?(?:\(?\d{2,4}\)?[\s.-]*){2,4}\d{2,4}(?!\w)/g, (match) => {
+    const digits = match.replace(/\D/g, "");
+    return digits.length >= 7 && digits.length <= 15 ? "[phone masked]" : match;
+  });
+}
+
 export function providerIdempotencyKey(sessionId: string): string {
   if (!/^cv_[A-Za-z0-9_-]{3,64}$/.test(sessionId)) {
     throw new SafetyError("session id must start with cv_ and contain only letters, digits, underscores, or hyphens.");

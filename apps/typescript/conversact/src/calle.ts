@@ -2,6 +2,7 @@ import type { CallPlan, CallSnapshot, JsonSchema, PurchaseIntent } from "./types
 import { providerIdempotencyKey } from "./safety.js";
 
 export const DEFAULT_BASE_URL = "https://api.heycall-e.com";
+export const LOOPBACK_FAKE_API_KEY = "conversact-fake-key";
 const LOOPBACK_HOSTS = new Set(["localhost", "127.0.0.1", "::1"]);
 const TRUSTED_HOSTS = new Set(["api.heycall-e.com"]);
 
@@ -18,7 +19,7 @@ export interface CallePort {
   waitForResult(callId: string): Promise<CallSnapshot>;
 }
 
-export function assertTrustedBaseUrl(baseUrl: string): URL {
+export function assertTrustedBaseUrl(baseUrl: string, apiKey: string): URL {
   let url: URL;
   try {
     url = new URL(baseUrl);
@@ -26,6 +27,9 @@ export function assertTrustedBaseUrl(baseUrl: string): URL {
     throw new CalleCallError("unsafe_base_url", "CALLE_BASE_URL is not a URL. CALLE_API_KEY was not sent.");
   }
   const host = url.hostname.toLowerCase().replace(/^\[/, "").replace(/\]$/, "");
+  if (LOOPBACK_HOSTS.has(host) && apiKey !== LOOPBACK_FAKE_API_KEY) {
+    throw new CalleCallError("unsafe_base_url", "Loopback fake servers require the literal conversact-fake-key; real credentials were not sent.");
+  }
   if (url.protocol === "http:" && !LOOPBACK_HOSTS.has(host)) {
     throw new CalleCallError("unsafe_base_url", "CALLE_API_KEY may use plain HTTP only with a loopback fake server.");
   }
@@ -101,7 +105,7 @@ export function buildCallPlan(options: {
 
 /** The official SDK remains lazy so preview and fixture runs require no credentials or install. */
 export async function createSdkPort(apiKey: string, baseUrl = DEFAULT_BASE_URL): Promise<CallePort> {
-  assertTrustedBaseUrl(baseUrl);
+  assertTrustedBaseUrl(baseUrl, apiKey);
   const sdk = (await import("@call-e/calle")) as unknown as {
     CalleClient: new (options: { apiKey: string; baseUrl: string }) => {
       calls: {

@@ -4,10 +4,14 @@ import { buildCallPlan, createSdkPort, callFromFixture } from "./calle.js";
 import { DemoCommerce } from "./commerce.js";
 import { ConversactOrchestrator } from "./orchestrator.js";
 import { DemoPayment } from "./payment.js";
-import { assertE164, assertUsableConsent, maskPhone } from "./safety.js";
+import { assertE164, assertUsableConsent, maskPhone, redactDisplay } from "./safety.js";
 import type { CallConsent, Product, PurchaseIntent, WorkflowOutcome } from "./types.js";
 
 const FIXTURES = new Set(["confirmed-order", "ambiguous-result", "declined-result", "incomplete-result", "unavailable-product", "insufficient-stock"]);
+
+function writeDisplay(text: string, stream: { write(text: string): unknown } = process.stdout): void {
+  stream.write(redactDisplay(text, [process.env.CALLE_API_KEY ?? ""]));
+}
 
 function usage(): string {
   return `Conversact — Conversational Commerce Reference
@@ -49,29 +53,29 @@ function consent(sessionId: string, recipientPhone: string): CallConsent {
 }
 
 function printOutcome(outcome: WorkflowOutcome, noSideEffects: boolean): void {
-  process.stdout.write("Conversact — Conversational Commerce Reference\n\n");
-  process.stdout.write(`Session: ${outcome.sessionId}\nState: ${outcome.state}\n`);
-  if (outcome.reason !== undefined) process.stdout.write(`Reason: ${outcome.reason}\n`);
+  writeDisplay("Conversact — Conversational Commerce Reference\n\n");
+  writeDisplay(`Session: ${outcome.sessionId}\nState: ${outcome.state}\n`);
+  if (outcome.reason !== undefined) writeDisplay(`Reason: ${outcome.reason}\n`);
   if (outcome.intent !== undefined) {
-    process.stdout.write(`CALL-E outcome: ${outcome.intent.outcome}\n`);
-    for (const item of outcome.intent.items) process.stdout.write(`  ${item.quantity} × ${item.product_id}\n`);
+    writeDisplay(`CALL-E outcome: ${outcome.intent.outcome}\n`);
+    for (const item of outcome.intent.items) writeDisplay(`  ${item.quantity} × ${item.product_id}\n`);
   }
   if (outcome.quote !== undefined) {
-    process.stdout.write(`Authoritative total: $${(outcome.quote.totalMinor / 100).toFixed(2)}\n`);
-    process.stdout.write("Prices and availability were loaded by the commerce adapter.\n");
+    writeDisplay(`Authoritative total: $${(outcome.quote.totalMinor / 100).toFixed(2)}\n`);
+    writeDisplay("Prices and availability were loaded by the commerce adapter.\n");
   }
-  if (outcome.payment !== undefined) process.stdout.write(`Payment: synthetic handoff ready (${outcome.payment.reference})\n`);
-  if (noSideEffects) process.stdout.write("\nNo real phone call or payment was made.\n");
+  if (outcome.payment !== undefined) writeDisplay(`Payment: synthetic handoff ready (${outcome.payment.reference})\n`);
+  if (noSideEffects) writeDisplay("\nNo real phone call or payment was made.\n");
 }
 
 async function preview(): Promise<void> {
   const sessionId = "cv_preview_001";
   const phone = "+14155550100";
   const plan = buildCallPlan({ sessionId, recipientPhone: phone, catalog: readCatalog() });
-  process.stdout.write("Conversact — Preview (no call)\n\n");
-  process.stdout.write(`Session: ${sessionId}\nRecipient: ${maskPhone(phone)}\nIdempotency: ${plan.idempotencyKey}\n`);
-  process.stdout.write("Side effects: no network request, telephone call, or payment.\n\n");
-  process.stdout.write(`Task:\n${plan.task}\n\nResult schema:\n${JSON.stringify(plan.resultSchema, null, 2)}\n`);
+  writeDisplay("Conversact — Preview (no call)\n\n");
+  writeDisplay(`Session: ${sessionId}\nRecipient: ${maskPhone(phone)}\nIdempotency: ${plan.idempotencyKey}\n`);
+  writeDisplay("Side effects: no network request, telephone call, or payment.\n\n");
+  writeDisplay(`Task:\n${plan.task}\n\nResult schema:\n${JSON.stringify(plan.resultSchema, null, 2)}\n`);
 }
 
 async function simulate(): Promise<void> {
@@ -102,7 +106,7 @@ async function live(): Promise<void> {
   if (apiKey === undefined || apiKey.length === 0) throw new Error("CALLE_API_KEY is required for live mode and is never read from CLI arguments.");
   const plan = buildCallPlan({ sessionId, recipientPhone: phone, catalog: readCatalog() });
   const workflow = new ConversactOrchestrator(new DemoCommerce(readCatalog()), new DemoPayment());
-  process.stderr.write(`[conversact] session=${sessionId} call=submitting recipient=${maskPhone(phone)}\n`);
+  writeDisplay(`[conversact] session=${sessionId} call=submitting recipient=${maskPhone(phone)}\n`, process.stderr);
   const outcome = await workflow.startLive(authorization, plan, await createSdkPort(apiKey, process.env.CALLE_BASE_URL));
   printOutcome(outcome, false);
 }
@@ -110,7 +114,7 @@ async function live(): Promise<void> {
 async function main(): Promise<void> {
   const command = process.argv[2] ?? "help";
   if (command === "help" || command === "--help") {
-    process.stdout.write(`${usage()}\n`);
+    writeDisplay(`${usage()}\n`);
     return;
   }
   if (command === "preview") return preview();
@@ -120,6 +124,6 @@ async function main(): Promise<void> {
 }
 
 main().catch((error: unknown) => {
-  process.stderr.write(`${error instanceof Error ? error.message : String(error)}\n`);
+  writeDisplay(`${error instanceof Error ? error.message : String(error)}\n`, process.stderr);
   process.exitCode = 1;
 });
