@@ -1,0 +1,62 @@
+{
+  "schemaVersion": 1,
+  "mode": "SYNTHETIC_REPLAY_FIXTURE",
+  "fixtureRevision": "workshop-v1",
+  "fixtureSourceCommit": "c6111870f92aefdc5995bca6054e036c74dca4eb",
+  "caseReference": "DEMO-REPAIR-0042",
+  "context": {
+    "customerExpectedReturn": "2026-09-11",
+    "observation": {
+      "observedAt": "2026-09-08T10:00:00.000Z",
+      "timeZone": "Europe/Paris"
+    }
+  },
+  "networkEvidence": {
+    "serviceRequests": 0,
+    "phoneCalls": 0,
+    "serverContracts": "UNOBSERVED"
+  },
+  "scenarios": [
+    {
+      "id": "AMBIGUOUS",
+      "state": "COMPLETED",
+      "transcript": [
+        "Agent: This is a fictional repair follow-up for DEMO-REPAIR-0042. I am an automated demo assistant.",
+        "Supplier: Part arrival is estimated for 2026-09-11.",
+        "Supplier: Repair completion is not confirmed.",
+        "Supplier: Device return is not confirmed.",
+        "Supplier: Next supplier update is estimated for 2026-09-10."
+      ]
+    },
+    {
+      "id": "NOMINAL",
+      "state": "COMPLETED",
+      "transcript": [
+        "Agent: This is a fictional repair follow-up for DEMO-REPAIR-0042. I am an automated demo assistant.",
+        "Supplier: Part arrival is confirmed for 2026-09-08.",
+        "Supplier: The repair is complete.",
+        "Supplier: Repair completion is confirmed for 2026-09-08.",
+        "Supplier: Device return is confirmed for 2026-09-11."
+      ]
+    },
+    {
+      "id": "CONFLICTING",
+      "state": "COMPLETED",
+      "transcript": [
+        "Agent: This is a fictional repair follow-up for DEMO-REPAIR-0042. I am an automated demo assistant.",
+        "Supplier: Part arrival is confirmed for 2026-09-08.",
+        "Supplier: Device return is confirmed for 2026-09-11.",
+        "Supplier: Device return is confirmed for 2026-09-14.",
+        "Agent: The return dates conflict. No date will be treated as settled."
+      ]
+    },
+    {
+      "id": "FAILED",
+      "state": "FAILED",
+      "transcript": [
+        "Simulation: The supplier could not be reached.",
+        "Simulation: No information was obtained. No retry is scheduled."
+      ]
+    }
+  ]
+}

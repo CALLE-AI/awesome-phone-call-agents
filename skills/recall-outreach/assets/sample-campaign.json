@@ -1,0 +1,69 @@
+{
+  "_comment": "Fictional campaign. Phone numbers are from the NANP +1500555xxxx test range and belong to nobody. Never put real customer data in a skill fixture.",
+  "campaign_id": "RC-2026-001",
+  "org_name": "Harborline Appliances",
+  "product_label": "Harborline 1.7L cordless kettle, model HL-220",
+  "product_identifier": "HL-220, lots 2451 to 2489",
+  "reference": "HL-220-NOTICE-01",
+  "timezone": "Asia/Singapore",
+  "calling_window": { "start": "09:00", "end": "19:00" },
+  "escalation_contact": {
+    "name": "Priya Menon, customer safety desk",
+    "phone_e164": "+15005550199",
+    "_comment": "A human. The assistant never dials this number."
+  },
+  "approved_by": "Compliance lead",
+  "approved_notice": "Harborline Appliances has issued a safety notice for the Harborline 1.7 litre cordless kettle, model HL-220, from production lots 2451 to 2489. Please stop using the kettle and unplug it. Do not attempt to open or repair it. Harborline will arrange to collect the kettle or send you a prepaid return label, and you will receive a full refund once it is returned.",
+  "voicemail_text": "This is an automated call from Harborline Appliances about an important product notice for something you purchased. Please call us back on the number on our website, or we will try you again. Thank you.",
+  "allowed_next_steps": ["pickup_request", "mail_return", "callback"],
+  "approved_answers": [
+    {
+      "question": "Do I get a refund?",
+      "answer": "Yes. Harborline will issue a full refund of the purchase price once the kettle is returned."
+    },
+    {
+      "question": "How long does the return take?",
+      "answer": "A collection is usually arranged within five working days, and a refund is issued within ten working days of the kettle arriving."
+    },
+    {
+      "question": "Do I need the original receipt or box?",
+      "answer": "No. Neither the receipt nor the original packaging is needed for this return."
+    },
+    {
+      "question": "Can I keep using it in the meantime?",
+      "answer": "Harborline asks that you stop using the kettle and unplug it until it has been collected."
+    }
+  ],
+  "recipients": [
+    {
+      "customer_ref": "CUST-1001",
+      "phone_e164": "+15005550101",
+      "item_identifier": "HL220-2481",
+      "consent_basis": "purchase_record",
+      "consent_source": "Order 44821 dated 2026-03-11"
+    },
+    {
+      "customer_ref": "CUST-1002",
+      "phone_e164": "+15005550102",
+      "item_identifier": "HL220-2482",
+      "consent_basis": "warranty_registration",
+      "consent_source": "Warranty registration 9912"
+    },
+    {
+      "customer_ref": "CUST-1003",
+      "phone_e164": "+15005550103",
+      "item_identifier": "HL220-2483",
+      "consent_basis": "purchase_record",
+      "consent_source": "Order 44877 dated 2026-03-14"
+    }
+  ],
+  "idempotency_key": "recall-outreach:RC-2026-001:wave1:outreach:v1",
+  "metadata_sent_to_calle": {
+    "_comment": "Correlation only. No customer name, phone, or item identifier belongs here.",
+    "campaign_id": "RC-2026-001",
+    "call_task_id": "RC-2026-001:wave1:outreach",
+    "wave_no": 1,
+    "kind": "outreach",
+    "script_version": 1
+  }
+}

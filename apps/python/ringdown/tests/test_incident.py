@@ -297,3 +297,18 @@ def test_a_missing_runbook_url_stays_empty_and_a_plain_one_passes():
     assert parse_incident(raw_incident()).runbook_url == ""
     url = "https://runbooks.example.com/checkout"
     assert parse_incident(raw_incident(runbook_url=url)).runbook_url == url
+
+
+@pytest.mark.parametrize("severity", ["sev1", "sev2", "sev3", "p1", "p2", "p3", "p4", "p5"])
+def test_both_severity_scales_are_accepted(severity):
+    assert parse_incident(raw_incident(severity=severity)).severity == severity
+
+
+def test_a_pagerduty_priority_is_lowercased_on_the_way_in():
+    assert parse_incident(raw_incident(severity="P2")).severity == "p2"
+
+
+@pytest.mark.parametrize("severity", ["sev9", "p9", "critical", "p0", ""])
+def test_a_severity_outside_both_scales_is_refused(severity):
+    with pytest.raises(IncidentError):
+        parse_incident(raw_incident(severity=severity))

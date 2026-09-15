@@ -1,0 +1,51 @@
+[build-system]
+requires = ["setuptools>=61.0"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "calle-double"
+description = "An offline test double for the CALL-E server SDK, verified against real API responses"
+readme = "README.md"
+requires-python = ">=3.10"
+license = { text = "MIT" }
+authors = [{ name = "Kesav2k04", email = "kesavk659@gmail.com" }]
+keywords = ["calle", "testing", "test-double", "mock-transport", "telephony"]
+classifiers = [
+    "Development Status :: 4 - Beta",
+    "Intended Audience :: Developers",
+    "License :: OSI Approved :: MIT License",
+    "Programming Language :: Python :: 3",
+    "Topic :: Software Development :: Testing :: Mocking",
+]
+# Read from `calle_double.__version__` so the number exists once. A version written here
+# and again in the package is a version that will disagree with itself, and this package's
+# whole job is to be indistinguishable from something else, which makes "which one is
+# this" the question a user asks first.
+dynamic = ["version"]
+dependencies = ["httpx>=0.27.0"]
+
+[project.optional-dependencies]
+# Only needed to run the double as a separate process over real HTTP. The in-process
+# transport, which is what the test suite and the offline demo use, needs neither.
+server = ["uvicorn>=0.30.0", "starlette>=0.38.0"]
+
+[project.urls]
+Homepage = "https://github.com/Kesav2k04/awesome-phone-call-agents"
+Source = "https://github.com/Kesav2k04/awesome-phone-call-agents/tree/feat/firstbell/apps/python/firstbell/calle_double"
+
+[project.scripts]
+calle-double = "calle_double.server:main"
+
+# The package is the directory this file sits in. `packages.find` with `where = ["."]`
+# would look inside `calle_double/` for a `calle_double/` and find nothing, which is what
+# the first draft of this file did: it declared a distribution that built an empty wheel.
+# Mapping the name to `.` says outright that the project root and the package are the same
+# directory, which is unusual and is the actual layout.
+[tool.setuptools]
+packages = ["calle_double"]
+
+[tool.setuptools.package-dir]
+calle_double = "."
+
+[tool.setuptools.dynamic]
+version = { attr = "calle_double.__version__" }

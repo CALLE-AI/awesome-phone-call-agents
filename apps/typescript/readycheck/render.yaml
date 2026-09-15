@@ -1,0 +1,36 @@
+services:
+  - type: web
+    name: readycheck
+    runtime: node
+    plan: 0.5c-512mb
+    region: ohio
+    numInstances: 1
+    repo: https://github.com/ankitlade12/readycheck
+    branch: main
+    buildCommand: npm ci --include=dev && npm run build
+    startCommand: 'APP_ORIGIN="${APP_ORIGIN:-$RENDER_EXTERNAL_URL}" npm start'
+    healthCheckPath: /api/health
+    autoDeployTrigger: checksPass
+    disk:
+      name: readycheck-data
+      mountPath: /var/data
+      sizeGB: 1
+    envVars:
+      - key: NODE_VERSION
+        value: '24'
+      - key: NODE_ENV
+        value: production
+      - key: BIND_HOST
+        value: 0.0.0.0
+      - key: PORT
+        value: '10000'
+      - key: DATABASE_PATH
+        value: /var/data/readycheck.sqlite
+      - key: LIVE_CALLS_ENABLED
+        value: 'false'
+      - key: CALLE_API_KEY
+        value: ''
+      - key: TEST_RECIPIENTS_JSON
+        value: '[]'
+      - key: LIVE_USER_IDS
+        value: ''

@@ -1,0 +1,44 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <record id="res_config_settings_view_form_calle" model="ir.ui.view">
+        <field name="name">res.config.settings.view.form.inherit.calle</field>
+        <field name="model">res.config.settings</field>
+        <field name="priority" eval="100"/>
+        <field name="inherit_id" ref="base.res_config_settings_view_form"/>
+        <field name="arch" type="xml">
+            <xpath expr="//form" position="inside">
+                <app data-string="CALL-E" string="CALL-E Integration" name="call_e">
+                    <block title="CALL-E Configuration" id="calle_settings_block">
+                        <setting id="calle_api_key_setting" string="API Credentials" help="Configure API credentials for CALL-E AI Voice Agent service">
+                            <div class="content-group">
+                                <div class="row mt16">
+                                    <label for="calle_api_key" class="col-lg-3 o_light_label"/>
+                                    <field name="calle_api_key" password="true"/>
+                                </div>
+                            </div>
+                        </setting>
+                        <setting id="calle_options_setting" string="Call Settings" help="Timeout and language options for CALL-E calls">
+                            <div class="content-group">
+                                <div class="row mt16">
+                                    <label for="calle_pending_timeout_minutes" class="col-lg-4 o_light_label"/>
+                                    <field name="calle_pending_timeout_minutes"/>
+                                </div>
+                                <div class="row mt8">
+                                    <label for="calle_default_locale" class="col-lg-4 o_light_label"/>
+                                    <field name="calle_default_locale"/>
+                                </div>
+                            </div>
+                        </setting>
+                    </block>
+                </app>
+            </xpath>
+        </field>
+    </record>
+
+    <record id="action_calle_config_settings" model="ir.actions.act_window">
+        <field name="name">Settings</field>
+        <field name="res_model">res.config.settings</field>
+        <field name="view_mode">form</field>
+        <field name="context">{'module' : 'call_e'}</field>
+    </record>
+</odoo>

@@ -1,0 +1,9 @@
+# Dependency and asset notices
+
+The static app has no third-party application runtime imports. Its build includes Vite's module-preload helper, whose MIT notice is shipped as `THIRD_PARTY_NOTICES.txt`. System fonts are used locally. The UI-02 brand mark and favicon share one SVG implementation of the project owner's supplied visual reference: a rounded green C with a pale green central disc. The reference image is not bundled in the public app. No stock photos, generated illustrations, music or third-party recordings are bundled.
+
+The pinned dependency inventory covers 163 package entries across the public build/test toolchain and private integration tooling: 139 installed packages and 24 optional entries observed from the lockfile. Their declared licenses are MIT (119), Apache-2.0 (15), BSD-2-Clause (6), BSD-3-Clause (2), ISC (7), MPL-2.0 (12), BlueOak-1.0.0 (1) and 0BSD (1). These are package metadata, not an independent legal review. The [machine-readable inventory](../submission/callops-license-inventory-20260908.json) records each version, path, group and lockfile hash. The static archive does not redistribute node_modules or the provider packages.
+
+`@call-e/core` 0.2.3 and `@call-e/cli` 0.3.7 both declare MIT; they are separate private tooling and absent from the browser build. Browser test recordings contain only the fictional local app. No supplier/customer recording has been captured for this candidate.
+
+CallOps source code is provided under the [MIT License](../../LICENSE). Dependencies retain their original licenses and notices. The September 8 inventory is preserved as a historical snapshot: the current package lockfiles differ in project license metadata and serialization, while every third-party package entry is unchanged. SOURCE_EXPORT.json records this metadata-only preparation and the current file hashes.
