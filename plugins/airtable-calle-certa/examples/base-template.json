@@ -1,0 +1,159 @@
+{
+  "$comment": "Structure for the Airtable base Certa reads. Airtable has no public base-import format, so create the table by hand or with the metadata API and match these names and types. Field names are configurable via certa.airtable.FieldMap if an existing base already uses others.",
+  "table": "Verification Requests",
+  "views": {
+    "Ready to verify": "Filter to rows with a consent token and a sourced number. `preview` reports how many rows the filter is hiding, because a run that silently called only what was visible would be a hazard."
+  },
+  "control_fields": [
+    {
+      "name": "Request ID",
+      "type": "singleLineText"
+    },
+    {
+      "name": "Applicant reference",
+      "type": "singleLineText"
+    },
+    {
+      "name": "Applicant name",
+      "type": "singleLineText"
+    },
+    {
+      "name": "Employer",
+      "type": "singleLineText"
+    },
+    {
+      "name": "Sourced number",
+      "type": "singleLineText"
+    },
+    {
+      "name": "Number source",
+      "type": "singleLineText"
+    },
+    {
+      "name": "Number on application",
+      "type": "singleLineText"
+    },
+    {
+      "name": "Consent receipt ID",
+      "type": "singleLineText"
+    },
+    {
+      "name": "Consent disclosure version",
+      "type": "singleLineText"
+    },
+    {
+      "name": "Consent signed at",
+      "type": "singleLineText"
+    },
+    {
+      "name": "Consent token",
+      "type": "singleLineText"
+    },
+    {
+      "name": "Cancelled",
+      "type": "checkbox",
+      "options": {}
+    },
+    {
+      "name": "Status",
+      "type": "singleLineText"
+    },
+    {
+      "name": "Reason",
+      "type": "multilineText"
+    },
+    {
+      "name": "Call ID",
+      "type": "singleLineText"
+    }
+  ],
+  "answer_fields": [
+    {
+      "name": "Reached employer",
+      "type": "singleSelect",
+      "description": "Use yes only if a person at the employer spoke about employment records. Use no if only an automated menu, a voicemail, or a wrong department was reached.",
+      "options": {
+        "choices": [
+          {
+            "id": "sel0",
+            "name": "Yes"
+          },
+          {
+            "id": "sel1",
+            "name": "No"
+          },
+          {
+            "name": "Unknown"
+          }
+        ]
+      }
+    },
+    {
+      "name": "Employment confirmed",
+      "type": "singleSelect",
+      "description": "Use yes only when the employer states the person currently works there.",
+      "options": {
+        "choices": [
+          {
+            "id": "sel0",
+            "name": "Yes"
+          },
+          {
+            "id": "sel1",
+            "name": "No"
+          },
+          {
+            "name": "Unknown"
+          }
+        ]
+      }
+    },
+    {
+      "name": "Title matches",
+      "type": "singleSelect",
+      "description": "Use yes when the stated job title matches the application. Use no when the employer names a different title. Use unknown if they would not say.",
+      "options": {
+        "choices": [
+          {
+            "id": "sel0",
+            "name": "Yes"
+          },
+          {
+            "id": "sel1",
+            "name": "No"
+          },
+          {
+            "name": "Unknown"
+          }
+        ]
+      }
+    },
+    {
+      "name": "Declined to answer",
+      "type": "singleSelect",
+      "description": "Use yes when the employer refuses to confirm anything or asks for a written request.",
+      "options": {
+        "choices": [
+          {
+            "id": "sel0",
+            "name": "Yes"
+          },
+          {
+            "id": "sel1",
+            "name": "No"
+          },
+          {
+            "name": "Unknown"
+          }
+        ]
+      }
+    }
+  ],
+  "notes": [
+    "Answer fields are anything Certa does not own. Adding a single select here adds a field to CALL-E's recipient_result_schema; its choices become the enum and its description becomes the instruction the extraction model reads.",
+    "One answer field must map to `reached_employer`. Nothing is reported as verified without it, because CALL-E can return task_completed true when setup fails before dialing (CALL-E issue #341).",
+    "`Number source` must be one of official_site, business_registry, directory, known_employer_record. There is deliberately no value for the number written on the application.",
+    "`Number on application` is stored for the record and comparison only. No code path converts it into a dialable number.",
+    "Every answer single select must include an Unknown choice. CALL-E answers `unknown` when it cannot establish a fact, and a column that cannot store that value turns a successful call into a failed write."
+  ]
+}
