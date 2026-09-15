@@ -1,0 +1,28 @@
+{
+  "description": "Dispatch an insurance prior authorization IVR navigation call",
+  "endpoint": "POST /calls/prior-auth",
+  "headers": {
+    "X-API-Key": "bytelytic_demo_key_2026"
+  },
+  "body": {
+    "payor_phone": "1-800-676-2583",
+    "payor_name": "Blue Cross Blue Shield",
+    "cpt_code": "99213",
+    "member_id_masked": "MBR-***-8492"
+  },
+  "example_response": {
+    "success": true,
+    "call_result": {
+      "status": "completed",
+      "task_completed": true,
+      "structured_result": {
+        "auth_status": "approved",
+        "authorization_number": "AUTH-882194",
+        "representative_name": "Sarah M. (Ext 401)",
+        "reference_number": "REF-99201-BCBS",
+        "denial_reason": null
+      },
+      "dry_run": true
+    }
+  }
+}

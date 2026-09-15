@@ -1,0 +1,40 @@
+{
+  "manifest_version": 3,
+  "name": "Conversation Clarify",
+  "version": "0.1.0",
+  "description": "Spots an email reply that looks like an answer but isn't, and settles it with one short phone call.",
+  "permissions": [
+    "storage"
+  ],
+  "host_permissions": [
+    "http://127.0.0.1:8000/*",
+    "http://localhost:8000/*"
+  ],
+  "optional_host_permissions": [
+    "http://*/*",
+    "https://*/*"
+  ],
+  "background": {
+    "service_worker": "src/background.js"
+  },
+  "content_scripts": [
+    {
+      "matches": [
+        "https://mail.google.com/*"
+      ],
+      "js": [
+        "src/extract.js",
+        "src/content.js"
+      ],
+      "css": [
+        "src/panel.css"
+      ],
+      "run_at": "document_idle"
+    }
+  ],
+  "options_page": "src/options.html",
+  "action": {
+    "default_title": "Conversation Clarify",
+    "default_popup": "src/options.html"
+  }
+}
