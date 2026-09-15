@@ -33,7 +33,7 @@ def phone(value):
     value = re.sub(r"[\s()-]", "", value)
     if value.startswith("+610"):
         value = "+61" + value[4:]
-    if not re.fullmatch(r"\+[1-9]\d{7,14}", value):
+    if not re.fullmatch(r"\+[1-9][0-9]{7,14}", value):
         raise ValueError("Provide an E.164 phone number including country code.")
     return value
 
@@ -57,6 +57,12 @@ def extract_command(call):
     return {"action": "turn_off_light", "target": "demo_light", "source_call_id": call.get("id"),
             "confirmation_quote": result["confirmation_quote"], "execution_status": "not_dispatched"}
 
+class NoRedirects(urllib.request.HTTPRedirectHandler):
+    def redirect_request(self, req, fp, code, msg, headers, newurl):
+        # Never forward the bearer credential away from the fixed provider URL.
+        raise urllib.error.HTTPError(req.full_url, code, "Provider redirect refused", {}, None)
+
+
 def api(path, payload=None, idem=None):
     key = os.environ.get("CALLE_API_KEY", "")
     if not key:
@@ -66,7 +72,7 @@ def api(path, payload=None, idem=None):
         headers["Idempotency-Key"] = idem
     request = urllib.request.Request("https://api.heycall-e.com/v1/" + path,
         data=json.dumps(payload).encode() if payload is not None else None, headers=headers)
-    with urllib.request.urlopen(request, timeout=45) as response:
+    with urllib.request.build_opener(NoRedirects()).open(request, timeout=45) as response:
         return json.load(response)
 
 def write_state(path, data):
