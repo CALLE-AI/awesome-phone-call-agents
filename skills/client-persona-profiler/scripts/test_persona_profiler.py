@@ -365,7 +365,7 @@ class TestCallerToken(unittest.TestCase):
         self.assertNotEqual(caller_token("abc"), caller_token("xyz"))
 
     def test_phone_number_not_in_token(self):
-        token = caller_token("+1-555-000-0001")
+        token = caller_token("+14155550100")
         self.assertNotIn("555", token)
         self.assertNotIn("+1", token)
 
@@ -540,7 +540,7 @@ class TestAnalyseIntegration(unittest.TestCase):
         import re
         phone_re = re.compile(r"\b\+?1?[\s\-.]?\(?\d{3}\)?[\s\-.]?\d{3}[\s\-.]?\d{4}\b")
         # Inject a phone-like caller_id; ensure it doesn't leak.
-        card = run_analyse(ANALYTICAL_TRANSCRIPT, "+1-555-000-0001")
+        card = run_analyse(ANALYTICAL_TRANSCRIPT, "+14155550100")
         card_text = json.dumps(card)
         self.assertIsNone(phone_re.search(card_text), "Raw phone in output")
 
@@ -705,7 +705,7 @@ class TestValidation(unittest.TestCase):
 
     def test_pii_phone_in_output_fails(self):
         card = good_card()
-        card["call_driver"] = "caller asked about account +1-555-000-0001"
+        card["call_driver"] = "caller asked about account +14155550100"
         errors = validate(card)
         self.assertTrue(any("PII" in e for e in errors))
 

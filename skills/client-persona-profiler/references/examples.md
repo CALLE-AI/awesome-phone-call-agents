@@ -17,9 +17,11 @@
 
 ### Command
 
+Save the transcript above as `analytical-caller.json`, then run:
+
 ```bash
 python3 scripts/profile_caller.py \
-  --transcript references/example-transcript.json \
+  --transcript analytical-caller.json \
   --profile-dir /tmp/profiles/ \
   --caller-id "test-analytical-caller" \
   --dry-run \
