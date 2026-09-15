@@ -2,6 +2,9 @@
 
 *Note: All phone numbers used in examples must use `<E164_PHONE>` or a controlled internal test number. Do not commit real numbers.*
 
+This is a fictional, no-call walkthrough. The dialogue and extracted values below
+are illustrative; no provider response or durable host receipt is supplied.
+
 ## Example: Verifying a Local Gig
 
 **1. Input & Bounding**
@@ -27,4 +30,4 @@
 
 **4. Downstream State (PKA)**
 The structured extraction is passed downstream to the host application's reconciliation layer (e.g., PKA). 
-If the evidence is sufficient, the state resolves to `KNOWN`. If the contact contradicted the pay, it would resolve to `CONFLICTING`. This governed state is output as a durable verification receipt.
+An integrating host may label a supported claim `KNOWN` or a contradictory one `CONFLICTING`; these are advisory evidence labels, not proof of an employer's identity or offer validity. Persisting a masked verification receipt is the host's responsibility. Missing or ambiguous provider state remains `UNKNOWN` and stops further calls pending human reconciliation.
