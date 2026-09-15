@@ -7,6 +7,7 @@ import {
   refusesCall,
   scanAgainstBudget,
   scanForNumbers,
+  redactForDisplay,
   scanForProhibited,
 } from './budget';
 
@@ -131,5 +132,54 @@ describe('the disclosure budget', () => {
   it('masks its findings rather than quoting them', () => {
     const findings = scanAgainstBudget('the HIV result', [], 'caller_speech');
     expect(findings[0]?.masked).not.toBe('HIV');
+  });
+});
+
+/**
+ * The printer quotes answers and supporting turns straight out of the call, so
+ * a leak the report is supposed to flag could otherwise be printed by the
+ * report itself. A privacy report that quotes the leak is not a report.
+ */
+describe('redactForDisplay', () => {
+  const phone = '+447700900123';
+
+  it('leaves ordinary transcript text alone', () => {
+    expect(redactForDisplay('Thursday at ten works', phone)).toBe(
+      'Thursday at ten works',
+    );
+    expect(redactForDisplay('', phone)).toBe('');
+  });
+
+  it("masks the person's number and never prints it back", () => {
+    const out = redactForDisplay('ring them on 07700 900123', phone);
+    expect(out).toMatch(/redacted/);
+    expect(out).not.toContain('900123');
+    expect(out).not.toContain('07700');
+  });
+
+  it('masks it when spoken as words, which is how it would actually be said', () => {
+    const out = redactForDisplay(
+      'oh double seven double oh nine oh oh one two three',
+      phone,
+    );
+    expect(out).toMatch(/the person's number/);
+    expect(out).not.toContain('one two three');
+  });
+
+  it('masks any other phone-shaped run, not just the one it knows', () => {
+    const out = redactForDisplay('try the ward on 020 7946 0321', phone);
+    expect(out).toMatch(/phone-shaped/);
+    expect(out).not.toContain('0321');
+  });
+
+  it('still redacts when no number is supplied, as on the crash path', () => {
+    // The top-level error handler has no errand in scope, so it must fall back
+    // to shape alone rather than printing the payload raw.
+    expect(redactForDisplay('CALL-E returned HTTP 500', '')).toBe(
+      'CALL-E returned HTTP 500',
+    );
+    expect(redactForDisplay('failed for 07700 900123', '')).toMatch(
+      /phone-shaped/,
+    );
   });
 });
