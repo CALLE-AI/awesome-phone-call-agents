@@ -57,6 +57,19 @@ function withinAcceptable(
   });
 }
 
+/**
+ * Has the agreed window started?
+ *
+ * An unparseable `not_before` is treated as *not* open. The chain would rather
+ * hand a human an intent it could have placed than place one it should not
+ * have: only the second mistake rings a real telephone.
+ */
+export function windowIsOpen(notBefore: string, now: Date): boolean {
+  const start = Date.parse(notBefore);
+  if (!Number.isFinite(start)) return false;
+  return start <= now.getTime();
+}
+
 export interface RunChainOptions {
   errand: ErrandFile;
   provider: CallProvider;
@@ -146,6 +159,21 @@ export async function runChain(opts: RunChainOptions): Promise<ChainState> {
 
     state.scheduled.push(intent);
     state.next = intent;
+
+    // A window agreed for later is a window to be honoured. Falling through to
+    // the next iteration would dial the callee again within milliseconds of
+    // them saying "call back at four" — the rudest possible reading of the
+    // agreement, and exactly what this file's header promises not to do. The
+    // intent is the output; placing it is the host scheduler's job.
+    //
+    // Fixture replay is exempt because it places no calls and replays recorded
+    // time rather than waiting in it. The exemption is named here rather than
+    // implied, and it is the only one.
+    if (provider.placesRealCalls && !windowIsOpen(intent.not_before, now)) {
+      state.halted_reason =
+        'The callee agreed a window that has not opened yet. The intent for the next leg is returned unplaced; this app runs no scheduler and will not dial ahead of an agreed time.';
+      return state;
+    }
 
     if (leg === maxLegs) {
       state.halted_reason =
