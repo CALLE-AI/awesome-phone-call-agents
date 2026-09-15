@@ -1,0 +1,8 @@
+id,numbers,answered,consent_record,reason_category,expected_return,parent_confirmed_aware,spoke_with,transcript
+S-2001,+15550000101,true,CR-2001,illness,tomorrow,yes,guardian,
+S-2002,+15550000102,true,CR-2002,illness,today,yes,child,
+S-2003,+15550000103,true,CR-2003,unknown,unknown,unknown,unknown,
+S-2004,+15550000104,true,CR-2004,,,,,"Agent: Good morning, I am calling from the attendance office about Ravi. Parent: Oh yes, he is at home with me today, he had a temperature overnight so I kept him back. He should be in tomorrow."
+S-2005,+15550000105,true,,transport,today,yes,guardian,
+S-2006,+15550000106,false,CR-2006,unknown,unknown,,voicemail,
+S-2007,+15550000107,,CR-2007,illness,tomorrow,yes,guardian,

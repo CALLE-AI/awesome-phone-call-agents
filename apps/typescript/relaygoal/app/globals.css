@@ -1,0 +1,403 @@
+@import "tailwindcss";
+
+@custom-variant dark (&:where(.dark, .dark *));
+
+/* Obsidian & Ember — dark-first, warm. Default theme is a warm near-black studio;
+   a stored `light` preference (A11yControls) swaps to a warm-bone light theme.
+   Trust states are colorblind-safe and deliberately non-green: verified = blue,
+   caution = amber, unreachable = red — always paired with an icon + text label. */
+:root {
+  --radius: 0.7rem;
+
+  --font-display: "Fraunces", Georgia, "Times New Roman", serif;
+  --font-hero: "Fraunces", Georgia, serif;
+  --font-body: "Geist", ui-sans-serif, system-ui, sans-serif;
+  --font-mono: "Geist Mono", ui-monospace, "SFMono-Regular", monospace;
+
+  --background: oklch(0.165 0.008 45);
+  --foreground: oklch(0.91 0.013 75);
+  --surface: oklch(0.205 0.009 48);
+  --surface-foreground: oklch(0.91 0.013 75);
+  --card: oklch(0.205 0.009 48);
+  --card-foreground: oklch(0.91 0.013 75);
+  --popover: oklch(0.205 0.009 48);
+  --popover-foreground: oklch(0.91 0.013 75);
+  --primary: oklch(0.685 0.155 43);
+  --primary-foreground: oklch(0.17 0.03 40);
+  --secondary: oklch(0.245 0.011 48);
+  --secondary-foreground: oklch(0.91 0.013 75);
+  --muted: oklch(0.225 0.009 48);
+  --muted-foreground: oklch(0.71 0.017 70);
+  --accent: oklch(0.275 0.014 46);
+  --accent-foreground: oklch(0.93 0.013 75);
+  --border: oklch(0.31 0.012 50);
+  --input: oklch(0.34 0.014 50);
+  --ring: oklch(0.685 0.155 43);
+
+  --verified: oklch(0.52 0.115 248);
+  --verified-foreground: oklch(0.97 0.02 250);
+  --caution: oklch(0.78 0.13 75);
+  --caution-foreground: oklch(0.24 0.05 70);
+  --destructive: oklch(0.62 0.19 30);
+  --destructive-foreground: oklch(0.97 0.02 30);
+
+  /* Brand / cinematic surfaces (always dark, both themes) */
+  --hero-bg: oklch(0.135 0.008 42);
+  --hero-bg-2: oklch(0.10 0.006 44);
+  --hero-fg: oklch(0.93 0.013 75);
+  --hero-dim: oklch(0.70 0.017 70);
+  --signal: oklch(0.685 0.155 43);
+  --ivory: oklch(0.93 0.013 75);
+
+  /* Proof receipt masthead band (dark, sits on the bone document) */
+  --receipt-head: oklch(0.275 0.032 55);
+  --receipt-head-foreground: oklch(0.94 0.02 78);
+  --ledger: oklch(0.24 0.011 48);
+  --brand-accent: oklch(0.72 0.14 55);
+}
+
+/* Warm-bone light theme (accessibility light toggle). Hero/call surfaces stay dark. */
+.light {
+  --background: oklch(0.95 0.012 82);
+  --foreground: oklch(0.22 0.012 55);
+  --surface: oklch(0.975 0.008 82);
+  --surface-foreground: oklch(0.22 0.012 55);
+  --card: oklch(0.99 0.006 82);
+  --card-foreground: oklch(0.22 0.012 55);
+  --popover: oklch(0.99 0.006 82);
+  --popover-foreground: oklch(0.22 0.012 55);
+  --primary: oklch(0.55 0.155 40);
+  --primary-foreground: oklch(0.98 0.01 82);
+  --secondary: oklch(0.92 0.014 80);
+  --secondary-foreground: oklch(0.28 0.02 55);
+  --muted: oklch(0.93 0.012 80);
+  --muted-foreground: oklch(0.45 0.015 58);
+  --accent: oklch(0.90 0.02 78);
+  --accent-foreground: oklch(0.26 0.02 55);
+  --border: oklch(0.86 0.014 78);
+  --input: oklch(0.84 0.016 78);
+  --ring: oklch(0.55 0.155 40);
+
+  --verified: oklch(0.46 0.12 248);
+  --verified-foreground: oklch(0.98 0.02 250);
+  --caution: oklch(0.72 0.13 74);
+  --caution-foreground: oklch(0.24 0.05 70);
+  --destructive: oklch(0.53 0.19 30);
+  --destructive-foreground: oklch(0.98 0.02 30);
+
+  --receipt-head: oklch(0.275 0.032 55);
+  --receipt-head-foreground: oklch(0.94 0.02 78);
+  --ledger: oklch(0.94 0.014 82);
+  --brand-accent: oklch(0.6 0.15 52);
+}
+
+/* The proof is a warm-bone document island, in BOTH themes, so it always reads as a
+   legible printed receipt regardless of the dark app around it. */
+.receipt {
+  --card: oklch(0.955 0.014 82);
+  --card-foreground: oklch(0.22 0.012 55);
+  --foreground: oklch(0.22 0.012 55);
+  --muted-foreground: oklch(0.46 0.015 58);
+  --border: oklch(0.85 0.014 80);
+  --secondary: oklch(0.91 0.016 82);
+  --accent: oklch(0.90 0.02 78);
+  --ledger: oklch(0.93 0.015 82);
+  --primary: oklch(0.5 0.15 40);
+  --verified: oklch(0.43 0.11 248);
+  --caution: oklch(0.66 0.13 70);
+  --caution-foreground: oklch(0.26 0.05 68);
+  --destructive: oklch(0.5 0.19 30);
+}
+
+/* High-contrast: pure black/white ground, stronger borders. Stacks with .light. */
+.hc {
+  --background: oklch(0.06 0 0);
+  --foreground: oklch(1 0 0);
+  --surface: oklch(0.06 0 0);
+  --card: oklch(0.06 0 0);
+  --card-foreground: oklch(1 0 0);
+  --muted-foreground: oklch(0.86 0 0);
+  --border: oklch(0.78 0 0);
+  --primary: oklch(0.78 0.16 45);
+  --ring: oklch(0.78 0.16 45);
+  --receipt-head: oklch(0.06 0 0);
+  --receipt-head-foreground: oklch(1 0 0);
+}
+.hc.light {
+  --background: oklch(1 0 0);
+  --foreground: oklch(0.12 0 0);
+  --surface: oklch(1 0 0);
+  --card: oklch(1 0 0);
+  --card-foreground: oklch(0.12 0 0);
+  --muted-foreground: oklch(0.26 0 0);
+  --border: oklch(0.28 0 0);
+  --primary: oklch(0.44 0.16 40);
+  --ring: oklch(0.44 0.16 40);
+}
+.hc .receipt, .hc.light .receipt {
+  --card: var(--card);
+  --card-foreground: var(--foreground);
+  --foreground: var(--foreground);
+  --muted-foreground: var(--muted-foreground);
+  --border: var(--border);
+}
+
+@theme inline {
+  --color-background: var(--background);
+  --color-foreground: var(--foreground);
+  --color-surface: var(--surface);
+  --color-surface-foreground: var(--surface-foreground);
+  --color-card: var(--card);
+  --color-card-foreground: var(--card-foreground);
+  --color-popover: var(--popover);
+  --color-popover-foreground: var(--popover-foreground);
+  --color-primary: var(--primary);
+  --color-primary-foreground: var(--primary-foreground);
+  --color-secondary: var(--secondary);
+  --color-secondary-foreground: var(--secondary-foreground);
+  --color-muted: var(--muted);
+  --color-muted-foreground: var(--muted-foreground);
+  --color-accent: var(--accent);
+  --color-accent-foreground: var(--accent-foreground);
+  --color-border: var(--border);
+  --color-input: var(--input);
+  --color-ring: var(--ring);
+  --color-receipt-head: var(--receipt-head);
+  --color-receipt-head-foreground: var(--receipt-head-foreground);
+  --color-ledger: var(--ledger);
+  --color-brand-accent: var(--brand-accent);
+  --color-verified: var(--verified);
+  --color-verified-foreground: var(--verified-foreground);
+  --color-caution: var(--caution);
+  --color-caution-foreground: var(--caution-foreground);
+  --color-destructive: var(--destructive);
+  --color-destructive-foreground: var(--destructive-foreground);
+
+  --font-sans: var(--font-body);
+  --font-display: var(--font-display);
+  --font-mono: var(--font-mono);
+
+  --radius-sm: calc(var(--radius) - 4px);
+  --radius-md: calc(var(--radius) - 2px);
+  --radius-lg: var(--radius);
+  --radius-xl: calc(var(--radius) + 4px);
+}
+
+html { font-size: 106.25%; }
+html[data-textsize="large"] { font-size: 118.75%; }
+html[data-textsize="xlarge"] { font-size: 131.25%; }
+
+@layer base {
+  * { border-color: var(--border); }
+  body {
+    background-color: var(--background);
+    color: var(--foreground);
+    font-family: var(--font-body);
+    line-height: 1.6;
+    -webkit-font-smoothing: antialiased;
+  }
+  h1, h2, h3 {
+    font-family: var(--font-display);
+    line-height: 1.1;
+    letter-spacing: -0.005em;
+    font-weight: 600;
+  }
+  :focus-visible {
+    outline: 3px solid var(--ring);
+    outline-offset: 2px;
+    border-radius: 2px;
+  }
+  .skip-link {
+    position: absolute;
+    left: 0.5rem;
+    top: -3rem;
+    z-index: 50;
+    background: var(--primary);
+    color: var(--primary-foreground);
+    padding: 0.5rem 0.875rem;
+    border-radius: var(--radius);
+    transition: top 0.15s ease;
+  }
+  .skip-link:focus { top: 0.5rem; }
+}
+
+/* Numerals: Geist has clean tabular lining figures — use them for numeric values. */
+.font-mono { font-variant-numeric: tabular-nums; }
+.num-clean {
+  font-family: "Geist", var(--font-body);
+  font-variant-numeric: tabular-nums lining-nums;
+  letter-spacing: -0.01em;
+}
+
+.brand-mark {
+  background: linear-gradient(150deg, var(--primary), var(--brand-accent));
+  color: var(--primary-foreground);
+}
+
+/* Cinematic hero — dark studio field. */
+.hero {
+  position: relative;
+  overflow: hidden;
+  background:
+    radial-gradient(120% 90% at 78% 28%, oklch(0.3 0.09 48 / 0.4), transparent 60%),
+    linear-gradient(160deg, var(--hero-bg), var(--hero-bg-2));
+  color: var(--hero-fg);
+}
+.hero::after {
+  content: "";
+  position: absolute;
+  left: 0; right: 0; bottom: 0;
+  height: 96px;
+  background: linear-gradient(to bottom, transparent, var(--background));
+  pointer-events: none;
+}
+.hero-eyebrow {
+  font-family: var(--font-mono);
+  font-size: 0.72rem;
+  letter-spacing: 0.26em;
+  text-transform: uppercase;
+  color: var(--signal);
+}
+.hero-title {
+  font-family: var(--font-hero);
+  font-weight: 600;
+  letter-spacing: -0.015em;
+  line-height: 0.98;
+  text-wrap: balance;
+}
+.hero-title em { font-style: italic; color: var(--signal); }
+.hero-sub { color: var(--hero-dim); }
+
+/* Relay scene poster + swap slot for a studio render. */
+.relay-scene { filter: drop-shadow(0 24px 60px oklch(0 0 0 / 0.55)); }
+.relay-plinth { fill: var(--ivory); }
+.relay-rule { stroke: oklch(0.72 0.02 60); stroke-width: 2; }
+.signal-path {
+  fill: none; stroke: var(--signal); stroke-width: 5; stroke-linecap: round;
+  filter: drop-shadow(0 0 8px oklch(0.685 0.155 43 / 0.8));
+}
+.signal-comet {
+  fill: none; stroke: oklch(0.9 0.09 55); stroke-width: 6; stroke-linecap: round;
+  stroke-dasharray: 26 320;
+  filter: drop-shadow(0 0 10px oklch(0.8 0.14 48 / 0.95));
+  animation: signal-travel 3.2s cubic-bezier(0.5, 0, 0.5, 1) infinite;
+}
+@keyframes signal-travel { from { stroke-dashoffset: 346; } to { stroke-dashoffset: 0; } }
+
+.hero-render {
+  position: absolute; inset: 0;
+  background-image: var(--hero-render, none);
+  background-size: cover; background-position: right center;
+  opacity: var(--hero-render-opacity, 0);
+}
+
+/* Live-call surface — the "on the call" moment, dark and cinematic. */
+.call-live {
+  position: relative;
+  overflow: hidden;
+  background:
+    radial-gradient(130% 80% at 50% -10%, oklch(0.32 0.1 48 / 0.4), transparent 62%),
+    linear-gradient(165deg, var(--hero-bg), var(--hero-bg-2));
+  color: var(--hero-fg);
+  border: 1px solid oklch(1 0 0 / 0.09);
+  border-radius: var(--radius-xl);
+}
+.call-live-eyebrow {
+  font-family: var(--font-mono);
+  font-size: 0.72rem;
+  letter-spacing: 0.22em;
+  text-transform: uppercase;
+  color: var(--signal);
+}
+
+/* Receipt material — the bone document. */
+.receipt {
+  position: relative;
+  background: var(--card);
+  color: var(--card-foreground);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-xl);
+  box-shadow: 0 1px 2px oklch(0 0 0 / 0.3), 0 22px 48px -18px oklch(0 0 0 / 0.6);
+}
+.receipt-perf {
+  height: 12px;
+  background-image: radial-gradient(circle at 8px 12px, var(--background) 6px, transparent 6.5px);
+  background-size: 16px 12px;
+  background-repeat: repeat-x;
+  background-position: -8px 0;
+}
+.stamp { border: 1.5px solid currentColor; border-radius: 6px; }
+
+/* Audio waveform. */
+.waveform { display: flex; align-items: center; gap: 3px; height: 34px; }
+.waveform > span { width: 3px; border-radius: 2px; background: var(--primary); animation: wave 1.1s ease-in-out infinite; }
+.waveform-xl { height: 84px; gap: 4px; justify-content: center; }
+.waveform-xl > span { width: 4px; background: var(--signal); box-shadow: 0 0 10px oklch(0.685 0.155 43 / 0.5); }
+@keyframes wave { 0%, 100% { height: 20%; } 50% { height: 100%; } }
+
+/* Full-screen mobile "on-call" takeover. The call owns the display like a real call;
+   captions are large and high-contrast. Padded to the safe area so it paints under a notch. */
+.call-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 60;
+  display: none; /* shown only on small screens; see the max-width query below */
+  flex-direction: column;
+  padding:
+    max(1.4rem, env(safe-area-inset-top)) max(1.4rem, env(safe-area-inset-right))
+    max(1.4rem, env(safe-area-inset-bottom)) max(1.4rem, env(safe-area-inset-left));
+  overflow-y: auto;
+  background:
+    radial-gradient(120% 60% at 50% -5%, oklch(0.32 0.1 48 / 0.35), transparent 60%),
+    linear-gradient(170deg, var(--hero-bg), var(--hero-bg-2));
+  color: var(--hero-fg);
+}
+.call-emitter {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 84px;
+  height: 84px;
+  border-radius: 999px;
+  color: var(--signal);
+  background: radial-gradient(circle, oklch(0.685 0.155 43 / 0.24), oklch(0.685 0.155 43 / 0.05));
+  border: 1px solid oklch(0.685 0.155 43 / 0.4);
+}
+.call-emitter > span {
+  position: absolute;
+  inset: 0;
+  border-radius: 999px;
+  border: 1px solid var(--signal);
+  opacity: 0;
+  animation: emit 2.4s ease-out infinite;
+}
+.call-emitter > span:nth-child(2) { animation-delay: 0.8s; }
+.call-emitter > span:nth-child(3) { animation-delay: 1.6s; }
+@keyframes emit { 0% { transform: scale(1); opacity: 0.55; } 100% { transform: scale(2.15); opacity: 0; } }
+/* The full-screen call takeover is a small-screen affordance; desktop keeps the inline timeline. */
+@media (max-width: 1023px) { .call-overlay { display: flex; } }
+
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after {
+    animation-duration: 0.001ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.001ms !important;
+    scroll-behavior: auto !important;
+  }
+  .signal-comet { animation: none; opacity: 0; }
+  .waveform > span { animation: none !important; height: 55% !important; }
+}
+html[data-motion="reduced"] *, html[data-motion="reduced"] *::before, html[data-motion="reduced"] *::after {
+  animation-duration: 0.001ms !important;
+  transition-duration: 0.001ms !important;
+  scroll-behavior: auto !important;
+}
+html[data-motion="reduced"] .signal-comet { animation: none; opacity: 0; }
+html[data-motion="reduced"] .waveform > span { animation: none !important; height: 55% !important; }
+
+@keyframes evidence-pulse {
+  0% { background-color: color-mix(in oklch, var(--caution) 45%, transparent); }
+  100% { background-color: color-mix(in oklch, var(--caution) 0%, transparent); }
+}
+.evidence-flash { animation: evidence-pulse 1.6s ease-out 1; }

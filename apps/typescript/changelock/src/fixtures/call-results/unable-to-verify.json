@@ -1,0 +1,17 @@
+{
+  "status": "completed",
+  "taskCompleted": true,
+  "recipientStatus": "completed",
+  "confidenceScore": 0.81,
+  "failureCode": null,
+  "structuredResult": {
+    "organization_identity": "confirmed",
+    "change_request_status": "unable_to_verify",
+    "safe_case_code_confirmed": "yes",
+    "sensitive_data_disclosed": "no",
+    "recipient_opt_out": "no"
+  },
+  "evidence": [
+    "Recipient identified the vendor organization but could not confirm whether the request was initiated."
+  ]
+}
