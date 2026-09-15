@@ -67,9 +67,10 @@ app.post('/api/calls/trigger', async (req, res) => {
 
     const data = await response.json();
     if (!response.ok) {
+      console.error('[CALL-E Engine] Provider response error:', data.error || data);
       return res.status(400).json({
         success: false,
-        message: data.error ? data.error.message : 'CALL-E API Error'
+        message: 'Unable to initiate call task at provider. Please verify phone number and try again.'
       });
     }
 
