@@ -1,0 +1,10 @@
+calle-ai==0.7.0
+python-dotenv
+google-api-python-client
+google-auth
+google-auth-httplib2
+google-auth-oauthlib
+streamlit==1.63.0
+pandas
+tzdata
+pytest
