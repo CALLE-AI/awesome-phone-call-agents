@@ -1,0 +1,13 @@
+{
+  "job": {
+    "description": "water heater leaking in the garage, steady drip, floor and walls still dry",
+    "address": "142 Birchwood Ave, Unit 3",
+    "customer_name": "Jordan Lee",
+    "customer_phone": "+15550100"
+  },
+  "technicians": [
+    { "name": "Priya", "phone": "+15550101" },
+    { "name": "Marcus", "phone": "+15550102" },
+    { "name": "Dana", "phone": "+15550103" }
+  ]
+}
