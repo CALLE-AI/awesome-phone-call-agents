@@ -71,10 +71,13 @@ The skill does not verify consent; this is the operator's responsibility.
 
 ## Medical, Legal, Financial, and Emergency Content
 
-If the `call_driver` extracted from the transcript contains medical, legal,
-financial, or emergency subject matter, the skill sets `REQUIRES_HUMAN_REVIEW`
-in `flags`. The persona card must be reviewed by a qualified human before any
-action is taken on the recommended playbook.
+The skill scans the transcript for a narrow list of sensitive subject-matter
+keywords (medical, legal, financial-advice, and emergency terms). When any
+match, it sets `REQUIRES_HUMAN_REVIEW` in `flags` and lists the matched
+topics in `sensitive_topics`. The scan is a coarse heuristic: it can miss
+sensitive content that avoids the keywords and can flag benign calls that
+happen to use them. The persona card must be reviewed by a qualified human
+before any action is taken on the recommended playbook.
 
 ---
 

@@ -12,8 +12,7 @@ Usage (dry-run, no LLM, no writes):
         --dry-run \
         --out /tmp/persona_card.json
 
-No external packages required for heuristic mode.
-Set OPENAI_API_KEY (or CALLE_LLM_ENDPOINT) for LLM-assisted scoring.
+No external packages required. Heuristic mode only; no LLM call is made.
 """
 
 from __future__ import annotations
@@ -36,7 +35,8 @@ SCHEMA_VERSION = "1.0"
 MIN_TURNS_DEFAULT = 4
 
 # DISC linguistic markers — keyword weights per dimension.
-# Source: adapted from DISC validation research (Bonnstetter et al., 2009).
+# Source: adapted from DISC behavioural theory (Marston, 1928).
+# Advisory heuristic only; see references/research-papers.md for validity caveats.
 DISC_MARKERS: dict[str, list[str]] = {
     "D": [
         "immediately", "decision", "result", "bottom line", "direct",
@@ -68,6 +68,26 @@ ARCHETYPE_LABELS: dict[str, str] = {
 }
 
 SENTIMENT_LABELS = ("very_negative", "negative", "neutral", "positive", "very_positive")
+
+# Sensitive subject matter that requires a human review before any playbook
+# action (see references/safety.md). Narrow, advice-oriented keyword lists to
+# avoid flagging ordinary billing or booking calls.
+SENSITIVE_TOPIC_KEYWORDS: dict[str, tuple[str, ...]] = {
+    "medical": (
+        "doctor", "hospital", "medication", "prescription", "diagnosis",
+        "surgery", "clinic", "symptom", "pharmacy",
+    ),
+    "legal": (
+        "lawyer", "attorney", "court", "lawsuit", "legal advice",
+    ),
+    "financial": (
+        "investment advice", "loan", "mortgage", "retirement", "portfolio",
+        "pension", "tax advice",
+    ),
+    "emergency": (
+        "emergency", "ambulance", "fire department", "evacuation",
+    ),
+}
 
 CHURN_RISK_MAP = [
     (80, "low"),
@@ -192,6 +212,16 @@ def sentiment_trend(trajectory: list[str]) -> str:
     return "stable"
 
 
+def detect_sensitive_topics(text: str) -> list[str]:
+    """Return sensitive subject-matter topics found in the transcript."""
+    low = text.lower()
+    return [
+        topic
+        for topic, keywords in SENSITIVE_TOPIC_KEYWORDS.items()
+        if any(kw in low for kw in keywords)
+    ]
+
+
 # ---------------------------------------------------------------------------
 # RFMAP loyalty scoring
 # ---------------------------------------------------------------------------
@@ -207,7 +237,8 @@ def compute_rfmap(
     Frequency (F): more interactions → higher score.
     Activation Periods (AP): spread of activity over time.
 
-    Extended from RFMAP model (ResearchGate, 2024).
+    RFMAP-style extension of the classic RFM (Recency-Frequency-Monetary)
+    model. Weights are a skill design choice, not empirically derived.
     """
     recency_score = max(0.0, 1.0 - last_seen_days_ago / 90)
     frequency_score = min(1.0, interaction_count / 10)
@@ -336,6 +367,7 @@ def analyse(
     playbook = select_playbook(arch_key, playbooks)
 
     # Flags.
+    sensitive_topics = detect_sensitive_topics(full_text)
     flags: list[str] = []
     if arch_confidence == "undetermined":
         flags.append("UNDETERMINED_ARCHETYPE")
@@ -343,6 +375,8 @@ def analyse(
         flags.append("LOW_TURN_COUNT")
     if risk == "high":
         flags.append("CHURN_RISK_ELEVATED")
+    if sensitive_topics:
+        flags.append("REQUIRES_HUMAN_REVIEW")
 
     # Build the record for this interaction.
     interaction_record: dict = {
@@ -357,6 +391,7 @@ def analyse(
 
     persona_card: dict = {
         "caller_token": token,
+        "analysis_timestamp": datetime.now(timezone.utc).isoformat(),
         "interaction_count": interaction_count,
         "first_seen_days_ago": first_seen_days_ago,
         "last_seen_days_ago": last_seen_days_ago,
@@ -368,7 +403,8 @@ def analyse(
         "rfmap_loyalty_score": rfmap,
         "loyalty_tier": tier,
         "churn_risk": risk,
-        "call_driver": "unknown",  # Populated by LLM path when available.
+        "call_driver": "unknown",  # Heuristic mode does not extract call drivers.
+        "sensitive_topics": sensitive_topics,
         "recommended_playbook": playbook,
         "flags": flags,
         "analysis_mode": "heuristic",

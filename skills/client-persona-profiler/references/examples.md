@@ -32,12 +32,12 @@ python3 scripts/profile_caller.py \
 {
   "caller_token": "sha256:...",
   "persona_archetype": "Analytical",
-  "disc_scores": { "D": 0.12, "I": 0.08, "S": 0.18, "C": 0.62 },
+  "disc_scores": { "D": 0.0, "I": 0.0769, "S": 0.0, "C": 0.9231 },
   "archetype_confidence": "high",
   "sentiment_trajectory": ["neutral", "neutral", "neutral"],
   "sentiment_trend": "stable",
-  "rfmap_loyalty_score": 0,
-  "loyalty_tier": "low_value",
+  "rfmap_loyalty_score": 48,
+  "loyalty_tier": "at_risk",
   "churn_risk": "high",
   "recommended_playbook": {
     "archetype": "Analytical",
@@ -45,14 +45,14 @@ python3 scripts/profile_caller.py \
     "avoid": "Emotional appeals, vague generalisations, premature commitments.",
     "close_with": "Offer written confirmation."
   },
-  "flags": ["UNDETERMINED_ARCHETYPE"],
+  "flags": ["CHURN_RISK_ELEVATED"],
   "schema_version": "1.0"
 }
 ```
 
-> **Note**: On a first interaction, `rfmap_loyalty_score` is low and
-> `UNDETERMINED_ARCHETYPE` may be set if the margin is narrow. More interactions
-> refine the profile.
+> **Note**: This is the first interaction for this caller, so the RFMAP
+> score is low (`CHURN_RISK_ELEVATED`). Churn risk on a single interaction
+> is expected and softens as history accumulates — see Example 3.
 
 ---
 
@@ -75,7 +75,9 @@ A caller who is enthusiastic, story-driven, and people-oriented:
 ```json
 {
   "persona_archetype": "Influential",
-  "disc_scores": { "D": 0.10, "I": 0.62, "S": 0.14, "C": 0.14 },
+  "archetype_confidence": "high",
+  "disc_scores": { "D": 0.0, "I": 1.0, "S": 0.0, "C": 0.0 },
+  "flags": ["LOW_TURN_COUNT", "CHURN_RISK_ELEVATED"],
   "recommended_playbook": {
     "archetype": "Influential",
     "open_with": "Start with energy and warmth.",
@@ -84,20 +86,24 @@ A caller who is enthusiastic, story-driven, and people-oriented:
 }
 ```
 
+> **Note**: Only 3 turns are available (below `--min-turns 4`), so
+> `LOW_TURN_COUNT` is set — act on the archetype with caution.
+
 ---
 
-## Example 3: Returning Caller (4th interaction, high loyalty)
+## Example 3: Returning Caller (5th interaction, high loyalty)
 
-After 4 interactions with a caller (loaded from profile store):
+After 4 prior interactions with a caller (loaded from the profile store),
+the 5th call returns:
 
 ```json
 {
-  "interaction_count": 4,
+  "interaction_count": 5,
   "first_seen_days_ago": 42,
   "last_seen_days_ago": 3,
-  "rfmap_loyalty_score": 74,
+  "rfmap_loyalty_score": 65,
   "loyalty_tier": "high_value",
-  "churn_risk": "low"
+  "churn_risk": "medium"
 }
 ```
 

@@ -1,6 +1,6 @@
 ---
 name: client-persona-profiler
-description: Post-call persona detection skill. Analyses a CALL-E transcript to classify the caller's behavioural archetype (DISC model), compute an RFMAP loyalty score across accumulated call history, persist a privacy-preserving profile, and return a structured persona card with a personalised next-call strategy playbook. Backed by peer-reviewed DISC, persona-DB, and customer-loyalty research.
+description: Post-call persona detection skill. Analyses a CALL-E transcript to classify the caller's behavioural archetype (heuristic DISC keyword scoring), compute an RFMAP-style loyalty score across accumulated call history, persist a privacy-preserving hashed profile, and return a structured persona card with a personalised next-call strategy playbook. Runs in heuristic mode only, with sensitive-topic human-review flags.
 license: MIT
 ---
 
@@ -9,9 +9,10 @@ license: MIT
 > **Detect who your caller is — and how to keep them.**
 
 Unlock lasting customer relationships by understanding the *person* behind every
-call, not just the transaction. This skill silently profiles caller behaviour
-across interactions, builds a long-term loyalty picture, and hands the agent a
-concrete, archetype-specific playbook for the next call.
+call, not just the transaction. This skill profiles caller behaviour across
+interactions (from transcripts obtained with caller consent), builds a
+long-term loyalty picture, and hands the agent a concrete, archetype-specific
+playbook for the next call.
 
 ---
 
@@ -26,14 +27,16 @@ and more likely to convert a one-time caller into a long-term champion.
 
 ## Scientific Foundation
 
+The classification is a **heuristic**, not a validated psychometric instrument:
+DISC keyword markers are a design choice and the archetype labels are advisory
+only (see [`references/safety.md`](references/safety.md)).
+
 | Research | Relevance |
 |---|---|
-| Marston (1928) + Bonnstetter et al. (2009) — DISC | Four-quadrant behavioural archetype classification |
-| Salemi et al. *Persona-DB* arXiv:2402.11060 (2024) | Persona profile storage and retrieval without fine-tuning |
-| RFMAP Model (ResearchGate, 2024) | Recency-Frequency-Monetary-Activation loyalty scoring |
-| *Big Five from Call-Centre Transcripts* (MDPI, 2023) | Validates transcript-based personality inference in call-centre settings |
-| Salemi et al. *LLM Call Driver* arXiv (2024) | Automated intent extraction from transcripts |
-| arXiv:2411.12539 (Nov 2024) — CSAT from transcripts | Sentiment trajectory as loyalty proxy |
+| Marston, *Emotions of Normal People* (1928) — DISC | Four-quadrant behavioural model the keyword library is adapted from; DISC's predictive validity is contested in independent academic literature |
+| Persona-DB, arXiv:2402.11060 (COLING 2025) | Persona profile storage and retrieval without fine-tuning; conceptual basis for the per-caller profile store |
+| Classic RFM (Recency-Frequency-Monetary) model | Basis of the RFMAP-style loyalty score; weights are a skill design choice |
+| arXiv:2411.12539 (Nov 2024) — CSAT from transcripts | Transcript sentiment as a satisfaction/loyalty proxy |
 
 Full citations: [`references/research-papers.md`](references/research-papers.md)
 
@@ -41,25 +44,14 @@ Full citations: [`references/research-papers.md`](references/research-papers.md)
 
 ## Quick Start
 
-### Heuristic mode (no LLM required)
+### Heuristic mode (no external dependencies, no model call)
 
 ```bash
 python3 scripts/profile_caller.py \
   --transcript path/to/transcript.json \
   --profile-dir /var/call-profiles/ \
-  --caller-id "+1-555-000-0001" \
+  --caller-id "+14155550100" \
   --dry-run \
-  --out /tmp/persona_card.json
-```
-
-### With LLM-assisted scoring (optional)
-
-```bash
-export OPENAI_API_KEY="sk-..."
-python3 scripts/profile_caller.py \
-  --transcript path/to/transcript.json \
-  --profile-dir /var/call-profiles/ \
-  --caller-id "+1-555-000-0001" \
   --out /tmp/persona_card.json
 ```
 
@@ -104,24 +96,25 @@ Supported turn keys: `role` / `speaker`, and `text` / `content` / `message`.
 {
   "caller_token":        "sha256:3f9c8e2a1b7d...",
   "analysis_timestamp":  "2026-09-15T09:00:00Z",
-  "interaction_count":   4,
+  "interaction_count":   5,
   "first_seen_days_ago": 42,
   "last_seen_days_ago":  3,
 
   "persona_archetype":   "Analytical",
   "archetype_confidence":"high",
   "disc_scores": {
-    "D": 0.08, "I": 0.10, "S": 0.18, "C": 0.64
+    "D": 0.0, "I": 0.0769, "S": 0.0, "C": 0.9231
   },
 
-  "sentiment_trajectory": ["neutral", "neutral", "positive"],
-  "sentiment_trend":       "improving",
+  "sentiment_trajectory": ["neutral", "neutral", "neutral"],
+  "sentiment_trend":       "stable",
 
-  "rfmap_loyalty_score":  74,
+  "rfmap_loyalty_score":  65,
   "loyalty_tier":         "high_value",
-  "churn_risk":           "low",
+  "churn_risk":           "medium",
 
-  "call_driver":          "policy documentation request",
+  "call_driver":          "unknown",
+  "sensitive_topics":     [],
   "recommended_playbook": {
     "archetype":    "Analytical",
     "open_with":    "Lead with facts, data, and specifics. Reference documented policies.",
@@ -132,12 +125,15 @@ Supported turn keys: `role` / `speaker`, and `text` / `content` / `message`.
   },
 
   "flags":           [],
-  "profile_version": 4,
+  "profile_version": 5,
   "analysis_mode":   "heuristic",
   "dry_run":         false,
   "schema_version":  "1.0"
 }
 ```
+
+`call_driver` is always `"unknown"` in heuristic mode (no intent extraction is
+performed); it is kept in the schema for future extensions.
 
 ---
 
@@ -168,10 +164,10 @@ Supported turn keys: `role` / `speaker`, and `text` / `content` / `message`.
 
 | Flag | Meaning |
 |---|---|
-| `LOW_TURN_COUNT` | Fewer than `--min-turns` callee turns; archetype is unreliable |
+| `LOW_TURN_COUNT` | Fewer than `--min-turns` turns; archetype is unreliable |
 | `UNDETERMINED_ARCHETYPE` | Top two DISC dimensions are within the margin; archetype is `Undetermined` |
 | `CHURN_RISK_ELEVATED` | RFMAP score is below 55 |
-| `REQUIRES_HUMAN_REVIEW` | Call driver is medical, legal, financial, or emergency |
+| `REQUIRES_HUMAN_REVIEW` | Sensitive subject matter (medical, legal, financial, or emergency keywords) detected in the transcript; the matched topics are listed in `sensitive_topics` |
 
 ---
 
@@ -222,7 +218,7 @@ skills/client-persona-profiler/
 ├── scripts/
 │   ├── profile_caller.py                 ← Main analysis runner
 │   ├── validate_profile.py               ← Output schema validator
-│   └── test_persona_profiler.py          ← Test suite (165+ assertions)
+│   └── test_persona_profiler.py          ← Test suite (84 tests)
 └── references/
     ├── disc-playbooks.json               ← Archetype strategy playbooks
     ├── example-transcript.json           ← Sample transcript

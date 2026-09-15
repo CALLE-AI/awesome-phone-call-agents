@@ -94,6 +94,13 @@ SHORT_TRANSCRIPT = [
     {"role": "callee", "text": "Hi."},
 ]
 
+MEDICAL_TRANSCRIPT = [
+    {"role": "agent",  "text": "Hello, calling about your recent visit."},
+    {"role": "callee", "text": "Yes, I want to discuss my medication and the prescription renewal."},
+    {"role": "agent",  "text": "Of course. Let me connect you to the right person."},
+    {"role": "callee", "text": "Thank you. My doctor said someone would follow up on the diagnosis."},
+]
+
 EMPTY_TRANSCRIPT: list = []
 
 
@@ -609,6 +616,21 @@ class TestAnalyseIntegration(unittest.TestCase):
     def test_analysis_mode_heuristic(self):
         card = run_analyse(ANALYTICAL_TRANSCRIPT)
         self.assertEqual(card["analysis_mode"], "heuristic")
+
+    def test_analysis_timestamp_present(self):
+        card = run_analyse(ANALYTICAL_TRANSCRIPT)
+        self.assertIn("analysis_timestamp", card)
+        self.assertTrue(card["analysis_timestamp"].strip())
+
+    def test_medical_transcript_sets_human_review_flag(self):
+        card = run_analyse(MEDICAL_TRANSCRIPT)
+        self.assertIn("REQUIRES_HUMAN_REVIEW", card["flags"])
+        self.assertIn("medical", card["sensitive_topics"])
+
+    def test_benign_transcript_no_human_review_flag(self):
+        card = run_analyse(ANALYTICAL_TRANSCRIPT)
+        self.assertNotIn("REQUIRES_HUMAN_REVIEW", card["flags"])
+        self.assertEqual(card["sensitive_topics"], [])
 
 
 # ===========================================================================
