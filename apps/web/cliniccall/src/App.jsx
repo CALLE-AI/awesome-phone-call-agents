@@ -527,7 +527,11 @@ function App() {
                 {patients.map((patient) => (
                   <div className="patient-card" key={patient.id}>
                     <div className="patient-avatar big">{patient.name ? patient.name.slice(0, 2).toUpperCase() : "PT"}</div>
-                    <div><h3>{patient.name || `Patient #${patient.id}`}</h3><p>{patient.phone_number || "Phone protected"}</p></div>
+                    <div><h3>{patient.name || `Patient #${patient.id}`}</h3><p>
+  {patient.phone_number
+    ? `${patient.phone_number.slice(0, 4)}•••••${patient.phone_number.slice(-4)}`
+    : "Phone protected"}
+</p></div>
                     <span>ID #{patient.id}</span>
                   </div>
                 ))}
