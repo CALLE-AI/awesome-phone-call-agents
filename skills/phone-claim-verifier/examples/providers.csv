@@ -1,0 +1,4 @@
+record_id,name,phone,address,region,accepts_plan,accepting_new_patients
+provider_101,Northline Family Clinic,+12025550110,"1420 Oak St, Suite 300",US,true,true
+provider_102,Harbor Point Medical,+12025550120,88 Marina Way,US,true,false
+provider_103,Cedar Grove Practice,+12025550130,17 Cedar Grove Rd,US,true,true

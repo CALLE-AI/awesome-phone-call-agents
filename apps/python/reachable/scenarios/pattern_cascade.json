@@ -1,0 +1,19 @@
+{
+  "name": "Pattern follow-up with a cascade",
+  "description": "Ivy has two consecutive unexplained sessions. Contact 1's number now belongs to a stranger, so it is flagged in contact health and the cascade moves to contact 2, who gives a reason and mentions that the bus fare has been difficult. Contact 3 is never dialled, because the cascade stops at the first confirmed conversation.",
+  "clock": "2026-09-11T10:30:00+01:00",
+  "steps": [
+    { "action": "import" },
+    { "action": "scan" },
+    { "action": "call", "case": "PF-P-1041-2026-09-11", "script": "wrong_person" },
+    { "action": "call", "case": "PF-P-1041-2026-09-11", "script": "pattern_support" },
+    { "action": "approve_reason", "case": "PF-P-1041-2026-09-11" }
+  ],
+  "expect": {
+    "cases": { "PF-P-1041-2026-09-11": "PF_SUPPORT_REQUESTED" },
+    "contact_health": { "C-2089": "wrong_person" },
+    "tasks": ["support"],
+    "never_called": ["C-2088"],
+    "calls_placed": 2
+  }
+}

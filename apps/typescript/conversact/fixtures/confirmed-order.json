@@ -1,0 +1,6 @@
+{
+  "outcome": "order_requested",
+  "items": [{ "product_id": "coffee-small", "quantity": 2 }, { "product_id": "sandwich-cheese", "quantity": 1 }],
+  "delivery_method": "standard",
+  "customer_confirmed": "yes"
+}
