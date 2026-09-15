@@ -1,0 +1,163 @@
+{
+  "completion_confidence": {
+    "label": "high",
+    "score": 0.91
+  },
+  "evidence": [],
+  "object": "call_task",
+  "recipients": [
+    {
+      "attempts": [
+        {
+          "attempt": 1,
+          "transcript_turns": [
+            {
+              "offset_seconds": 0,
+              "speaker": "bot",
+              "text": "Dialing Meridian Health Plan provider services."
+            },
+            {
+              "offset_seconds": 6,
+              "speaker": "user",
+              "text": "Thank you for calling Meridian Health Plan provider services. For claim status, press one. For eligibility and benefits, press two. For authorizations, press three."
+            },
+            {
+              "offset_seconds": 11,
+              "speaker": "bot",
+              "text": "Selecting one for claim status."
+            },
+            {
+              "offset_seconds": 15,
+              "speaker": "user",
+              "text": "Please enter the ten digit national provider identifier, followed by the pound key."
+            },
+            {
+              "offset_seconds": 20,
+              "speaker": "bot",
+              "text": "Entering national provider identifier 1234567893."
+            },
+            {
+              "offset_seconds": 27,
+              "speaker": "user",
+              "text": "Thank you. All of our representatives are currently assisting other providers. Your estimated wait time is twenty minutes. Please hold and your call will be answered in the order it was received."
+            },
+            {
+              "offset_seconds": 1090,
+              "speaker": "user",
+              "text": "Eligibility and benefits, this is Tanya."
+            },
+            {
+              "offset_seconds": 1098,
+              "speaker": "bot",
+              "text": "This is an AI assistant calling for the billing office of Lakeshore Family Medicine. This call may be recorded for accuracy. Our national provider identifier is 1234567893."
+            },
+            {
+              "offset_seconds": 1112,
+              "speaker": "user",
+              "text": "Thank you. Member identification number and date of birth."
+            },
+            {
+              "offset_seconds": 1120,
+              "speaker": "bot",
+              "text": "Member identification number W884213097, date of birth March 11, 1984."
+            },
+            {
+              "offset_seconds": 1134,
+              "speaker": "user",
+              "text": "Thank you, I have the member. What date of service?"
+            },
+            {
+              "offset_seconds": 1142,
+              "speaker": "bot",
+              "text": "September third, twenty twenty six, office visit."
+            },
+            {
+              "offset_seconds": 1154,
+              "speaker": "user",
+              "text": "Okay, coverage is active as of that date of service, the plan is Meridian Choice P P O, group number is four four one nine zero two, the individual deductible is one thousand five hundred and she has met six hundred and forty of it."
+            },
+            {
+              "offset_seconds": 1186,
+              "speaker": "bot",
+              "text": "Thank you. What is the copay and coinsurance for an office visit, and the out of pocket maximum?"
+            },
+            {
+              "offset_seconds": 1198,
+              "speaker": "user",
+              "text": "Specialist copay is forty dollars, coinsurance after deductible is twenty percent, out of pocket maximum is six thousand and she has met eleven hundred and eighty."
+            },
+            {
+              "offset_seconds": 1220,
+              "speaker": "bot",
+              "text": "Does this plan require prior authorization for an office visit?"
+            },
+            {
+              "offset_seconds": 1228,
+              "speaker": "user",
+              "text": "No, office visits do not need authorization on this plan."
+            },
+            {
+              "offset_seconds": 1238,
+              "speaker": "bot",
+              "text": "Thank you. May I have a reference number and your first name?"
+            },
+            {
+              "offset_seconds": 1248,
+              "speaker": "user",
+              "text": "Reference M H P dash R E F dash 5 5 0 2 3 3 1 9, and this is Tanya."
+            }
+          ]
+        }
+      ],
+      "phones": [
+        "+12125550142"
+      ],
+      "region": "US",
+      "structured_result": {
+        "call_outcome": "answered",
+        "claims": [
+          {
+            "claim_number": "CLM-2026-004901",
+            "coinsurance": "20%",
+            "copay": "40.00",
+            "coverage_active": "active",
+            "deductible_met": "640.00",
+            "deductible_total": "1500.00",
+            "evidence_quote": "coverage is active as of that date of service, the plan is Meridian Choice P P O, group number is four four one nine zero two, the individual deductible is one thousand five hundred and she has met six hundred and forty of it",
+            "group_number": "441902",
+            "out_of_pocket_max": "6000.00",
+            "out_of_pocket_met": "1180.00",
+            "plan_name": "Meridian Choice PPO",
+            "prior_auth_required": "no"
+          }
+        ],
+        "reference_number": "MHP-REF-55023319",
+        "representative_name": "Tanya"
+      }
+    }
+  ],
+  "status": "completed",
+  "structured_result": {
+    "call_outcome": "answered",
+    "claims": [
+      {
+        "claim_number": "CLM-2026-004901",
+        "coinsurance": "20%",
+        "copay": "40.00",
+        "coverage_active": "active",
+        "deductible_met": "640.00",
+        "deductible_total": "1500.00",
+        "evidence_quote": "coverage is active as of that date of service, the plan is Meridian Choice P P O, group number is four four one nine zero two, the individual deductible is one thousand five hundred and she has met six hundred and forty of it",
+        "group_number": "441902",
+        "out_of_pocket_max": "6000.00",
+        "out_of_pocket_met": "1180.00",
+        "plan_name": "Meridian Choice PPO",
+        "prior_auth_required": "no"
+      }
+    ],
+    "reference_number": "MHP-REF-55023319",
+    "representative_name": "Tanya"
+  },
+  "summary": "Coverage active on the date of service; deductible and cost sharing confirmed.",
+  "task_completed": true
+}
