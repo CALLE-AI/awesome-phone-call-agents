@@ -1,0 +1,53 @@
+# Production deployment — Postgres-backed AfterHold API.
+#
+# SQLite is great for dev (one file, zero setup) but doesn't survive horizontal scaling
+# or a server crash mid-poll. This Compose file replaces the SQLite file with Postgres
+# so the worker can be safely replicated.
+#
+# Usage:
+#   docker compose -f docker-compose.yml up -d
+#   docker compose -f docker-compose.yml logs -f api
+#
+# Then point your iOS client at http://localhost:8787 (or the public host).
+
+version: "3.9"
+
+services:
+  postgres:
+    image: postgres:16-alpine
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: afterhold
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-afterhold}
+      POSTGRES_DB: afterhold
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U afterhold"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+  api:
+    build: .
+    restart: unless-stopped
+    depends_on:
+      postgres:
+        condition: service_healthy
+    environment:
+      PORT: 8787
+      HOST: 0.0.0.0
+      APP_ORIGIN: ${APP_ORIGIN:-http://localhost:8081}
+      DATABASE_URL: postgres://afterhold:${POSTGRES_PASSWORD:-afterhold}@postgres:5432/afterhold
+      JWT_SECRET: ${JWT_SECRET:?JWT_SECRET is required}
+      CALLE_MOCK: ${CALLE_MOCK:-0}
+      CALLE_ENABLED: ${CALLE_ENABLED:-1}
+      CALLE_API_KEY: ${CALLE_API_KEY:-}
+      CALLE_BASE_URL: ${CALLE_BASE_URL:-https://api.heycall-e.com}
+      RATE_LIMIT_PER_HOUR: ${RATE_LIMIT_PER_HOUR:-5}
+      LOG_LEVEL: ${LOG_LEVEL:-info}
+    ports:
+      - "8787:8787"
+
+volumes:
+  pgdata:
