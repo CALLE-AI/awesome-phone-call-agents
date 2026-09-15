@@ -1,0 +1,75 @@
+{
+  "id": "eval-007",
+  "label": "human",
+  "difficulty": "typical",
+  "scenario": "Hotel front-desk clerk finds a double charge, refunds it while on the call and reads out a refund reference.",
+  "task": "Get the duplicate room charge refunded for guest Olivia Brandt.",
+  "outcome": {
+    "task_completed_claimed": true,
+    "commitment_type": "refund",
+    "confirmation_artifact": "refund reference R-20931",
+    "expected_attestation": "human_attested"
+  },
+  "turns": [
+    {
+      "speaker": "user",
+      "text": "Harborview Inn, front desk, Sam speaking.",
+      "offset_seconds": 1.0
+    },
+    {
+      "speaker": "bot",
+      "text": "hi Sam, I'm an AI assistant calling for a guest, Olivia Brandt. she stayed August thirtieth to September first and was charged twice for the room.",
+      "offset_seconds": 4.36
+    },
+    {
+      "speaker": "user",
+      "text": "oh no, okay, let me pull that up. Brandt with a D?",
+      "offset_seconds": 13.73
+    },
+    {
+      "speaker": "bot",
+      "text": "yes, B R A N D T.",
+      "offset_seconds": 19.27
+    },
+    {
+      "speaker": "user",
+      "text": "okay... yeah I see two charges of two eighteen forty on the thirty first. that's on us, the card reader double posted.",
+      "offset_seconds": 25.78
+    },
+    {
+      "speaker": "bot",
+      "text": "could you refund the duplicate charge?",
+      "offset_seconds": 34.87
+    },
+    {
+      "speaker": "user",
+      "text": "yep, I'm doing that right now.",
+      "offset_seconds": 37.14
+    },
+    {
+      "speaker": "user",
+      "text": "okay, done. I refunded two eighteen forty back to the card ending in eight three oh one. the reference is R dash two oh nine three one.",
+      "offset_seconds": 45.86
+    },
+    {
+      "speaker": "bot",
+      "text": "thank you. that's R-20931?",
+      "offset_seconds": 57.03
+    },
+    {
+      "speaker": "user",
+      "text": "yep. it usually takes three to five business days to show up.",
+      "offset_seconds": 60.09
+    },
+    {
+      "speaker": "bot",
+      "text": "great, I'll let her know. thanks for sorting that out so quickly.",
+      "offset_seconds": 65.59
+    },
+    {
+      "speaker": "user",
+      "text": "of course, sorry about that. tell her we hope to see her again.",
+      "offset_seconds": 70.13
+    }
+  ]
+}

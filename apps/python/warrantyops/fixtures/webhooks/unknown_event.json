@@ -1,0 +1,6 @@
+{
+  "event": "call.teleported",
+  "call_id": "call_synthetic_webhook_unknown_0004",
+  "timestamp": "2026-09-01T12:09:09Z",
+  "note": "Not a documented terminal event; ignored. Synthetic scenario."
+}

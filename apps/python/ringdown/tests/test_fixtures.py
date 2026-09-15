@@ -7,7 +7,10 @@ import pytest
 
 from ringdown.calle import CalleError, _call_run
 from ringdown.calls import run_from, snapshot_from
+from ringdown.dispositions import classify, ground
 from ringdown.extract import extract, normalise, recipient_turns
+from ringdown.incident import Policy
+from tests.data import ALICE
 
 FIXTURES = Path(__file__).resolve().parent / "fixtures"
 DOCUMENTED = sorted(FIXTURES.glob("*.json"))
@@ -87,6 +90,17 @@ def test_a_call_the_carrier_never_saw_is_reported_as_a_recipient_who_hung_up():
     assert attempt["started_at"] == attempt["completed_at"]
     assert "Hangup by: user" in payload["failure_message"]
     assert (snapshot.failure_code, snapshot.turns) == ("call_failed", ())
+    assert snapshot.duration_seconds == 0
+
+
+def test_a_call_that_never_reached_the_network_is_recorded_as_what_was_seen():
+    snapshot = snapshot_from(payload_of("rest-call-declined-without-dialling.json"))
+    extraction = extract(snapshot.turns)
+
+    judged = classify(snapshot, extraction, ground(extraction, snapshot.turns), ALICE, Policy())
+
+    assert judged.verdict == "not_acknowledged"
+    assert judged.reason == "zero_duration"
 
 
 def test_the_provider_reported_an_acknowledgement_the_transcript_does_not_carry():

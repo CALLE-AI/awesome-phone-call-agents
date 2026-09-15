@@ -1,0 +1,294 @@
+:root {
+  font-family:Inter,"Segoe UI",Arial,sans-serif;
+  color:#24332f;
+  background:#f5f6f2;
+  font-synthesis:none;
+  text-rendering:optimizeLegibility;
+  -webkit-font-smoothing:antialiased;
+  --muted:#65716a;
+  --line:#dde2d9;
+  --green:#234c3e;
+  --cream:#f5f6f2;
+}
+
+* {
+  box-sizing:border-box;
+}
+
+body {
+  margin:0;
+}
+
+button,input,textarea {
+  font:inherit;
+}
+
+button,a,input,textarea,summary {
+  -webkit-tap-highlight-color:transparent;
+}
+
+button,a,summary {
+  touch-action:manipulation;
+}
+
+button {
+  cursor:pointer;
+}
+
+button:disabled {
+  cursor:default;
+  opacity:.42;
+}
+
+button:focus-visible,a:focus-visible,input:focus-visible,textarea:focus-visible,summary:focus-visible {
+  outline:3px solid #ad632c;
+  outline-offset:4px;
+}
+
+a {
+  color:var(--green);
+}
+
+h1,h2,h3,p {
+  margin:0;
+}
+
+h1 {
+  font-size:clamp(2rem,3.6vw,2.85rem);
+  line-height:1.12;
+  letter-spacing:-1.8px;
+  font-weight:620;
+}
+
+h2 {
+  font-size:1.3rem;
+  line-height:1.35;
+  font-weight:620;
+  letter-spacing:-.45px;
+}
+
+h3 {
+  font-size:.95rem;
+  font-weight:650;
+}
+
+p {
+  line-height:1.6;
+}
+
+button {
+  border:0;
+}
+
+.eyebrow {
+  display:block;
+  font-size:.66rem;
+  letter-spacing:1.6px;
+  font-weight:750;
+  color:var(--muted);
+}
+
+.caption {
+  font-size:.75rem;
+  line-height:1.55;
+  color:var(--muted);
+}
+
+.muted {
+  color:var(--muted);
+  font-size:.9rem;
+}
+
+.pill {
+  display:inline-flex;
+  align-items:center;
+  gap:6px;
+  border-radius:5px;
+  padding:6px 9px;
+  font-size:.67rem;
+  line-height:1.2;
+  font-weight:650;
+  white-space:nowrap;
+}
+
+.neutral {
+  background:#f0f2ed;
+  color:#59665e;
+}
+
+.success {
+  background:#e4eee4;
+  color:#345b37;
+}
+
+.simulation {
+  background:#e9eee4;
+  color:#435c30;
+}
+
+.primary,.secondary {
+  display:inline-flex;
+  align-items:center;
+  justify-content:center;
+  gap:20px;
+  border-radius:7px;
+  padding:13px 18px;
+  font-size:.82rem;
+  font-weight:650;
+  line-height:1.5;
+  min-height:44px;
+}
+
+.primary {
+  background:var(--green);
+  color:white;
+}
+
+.primary:hover:not(:disabled) {
+  background:#163a2d;
+}
+
+.secondary {
+  background:white;
+  color:var(--green);
+  border:1px solid var(--line);
+}
+
+.compact {
+  padding:8px 12px;
+  font-size:.73rem;
+  min-height:36px;
+}
+
+.text-button {
+  color:var(--green);
+  background:transparent;
+  font-size:.78rem;
+  font-weight:600;
+  text-align:left;
+  min-height:44px;
+  padding:8px 0;
+}
+
+.text-button:hover {
+  text-decoration:underline;
+}
+
+.full {
+  width:100%;
+  justify-content:center;
+  text-align:center;
+}
+
+.panel {
+  background:#fff;
+  border:1px solid var(--line);
+  border-radius:11px;
+  padding:27px;
+}
+
+.section-top {
+  display:flex;
+  align-items:center;
+  justify-content:space-between;
+  gap:16px;
+  margin-bottom:16px;
+}
+
+.panel h3 {
+  margin-top:25px;
+  margin-bottom:15px;
+}
+
+.panel p.muted {
+  margin-top:5px;
+}
+
+.plain-list {
+  padding-left:20px;
+  margin:16px 0;
+  color:#56635b;
+  font-size:.82rem;
+  line-height:1.65;
+}
+
+.plain-list li+li {
+  margin-top:9px;
+}
+
+.details {
+  border-top:1px solid var(--line);
+  margin-top:22px;
+  padding-top:15px;
+  font-size:.8rem;
+  line-height:1.65;
+}
+
+.details summary {
+  cursor:pointer;
+  color:var(--green);
+  font-weight:600;
+  padding:6px 0;
+}
+
+.details p {
+  margin-top:12px;
+}
+
+.details[open] summary {
+  margin-bottom:8px;
+}
+
+.sr-only {
+  position:absolute;
+  width:1px;
+  height:1px;
+  margin:-1px;
+  padding:0;
+  overflow:hidden;
+  clip:rect(0,0,0,0);
+  white-space:nowrap;
+  border:0;
+}
+
+.skip-link {
+  position:fixed;
+  top:-100px;
+  left:16px;
+  background:#fff;
+  z-index:10;
+  padding:12px;
+}
+
+.skip-link:focus {
+  top:10px;
+}
+
+main:focus {
+  outline:none;
+}
+
+.notice {
+  border:1px solid #c8d6c4;
+  border-radius:7px;
+  background:#eaf1e6;
+  padding:13px 17px;
+  margin:10px 0;
+  font-size:.85rem;
+}
+
+.notice[hidden] {
+  display:none;
+}
+
+.recovery {
+  margin:50px 0;
+}
+
+.recovery p {
+  margin:20px 0;
+}
+
+.recovery button {
+  margin:5px;
+}

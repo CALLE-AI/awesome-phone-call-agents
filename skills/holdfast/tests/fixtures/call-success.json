@@ -1,0 +1,17 @@
+{
+  "ok": true,
+  "tool_name": "get_call_run",
+  "structuredContent": {
+    "run_id": "FIXTURE-SUCCESS-1",
+    "status": "COMPLETED",
+    "result": {
+      "summary": "The call reached the Example Pharmacy automated refill line, not a human. The line confirmed prescription RX-778812 is ready for pickup. No human conversation occurred.",
+      "structured_result": {
+        "refill_status": "ready",
+        "pickup_by": "2026-09-18",
+        "ready_today": true
+      },
+      "transcript": "[00:00:02] USER: Thank you for calling Example Pharmacy. For prescription status, press 1. To speak to a pharmacist, press 0.\n[00:00:08] BOT: pressed 1\n[00:00:15] USER: Please enter or say your prescription number.\n[00:00:20] BOT: RX-778812.\n[00:00:28] USER: Your prescription is ready for pickup today. It will be held until September 18. Thank you for calling.\n[00:00:34] BOT: Ending the call now. Have a nice day."
+    }
+  }
+}

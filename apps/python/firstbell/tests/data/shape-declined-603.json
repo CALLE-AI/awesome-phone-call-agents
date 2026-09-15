@@ -1,0 +1,46 @@
+{
+  "_provenance": "Authored, not recorded. Emitted by tools/make_shape_fixtures.py from calle_double, whose likeness to the production API is measured by tools/double_conformance.py and gated by test_the_double_emits_every_field_the_real_api_returns. The spoken turns were written for this fixture and are not a transcript of any call. No real-call artifact is committed to this repository. The recordings and transcripts of the calls that were placed are on the linked evidence page; their receipt files are in neither place, and the counts those receipts produced are in evidence/recorded-calls.json.",
+  "id": "call_2",
+  "object": "call_task",
+  "created_at": "2026-09-04T09:15:00Z",
+  "status": "failed",
+  "task": "Ask why the student was absent and when they will return.",
+  "task_completed": false,
+  "completion_confidence": null,
+  "evidence": [],
+  "structured_result": null,
+  "recipients": [
+    {
+      "id": "rcp_1",
+      "phones": [
+        "+915550000003"
+      ],
+      "locale": "ta-IN",
+      "region": "IN",
+      "status": "failed",
+      "structured_result": null,
+      "summary": "All 1 number(s) failed.",
+      "attempts": [
+        {
+          "id": "att_4",
+          "phone": "+915550000003",
+          "status": "failed",
+          "started_at": "2026-09-04T09:15:30Z",
+          "completed_at": "2026-09-04T09:15:30Z",
+          "summary": null,
+          "transcript_turns": [],
+          "provider_call_id": "prov_5",
+          "failure_code": "603",
+          "failure_message": "calling task status=DECLINED (code 603)"
+        }
+      ]
+    }
+  ],
+  "metadata": {
+    "work_item": "S-2003"
+  },
+  "summary": "No recipient was reached.",
+  "completed_at": "2026-09-04T09:15:30Z",
+  "failure_code": "call_failed",
+  "failure_message": "The call task did not reach any recipient."
+}

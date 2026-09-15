@@ -1,0 +1,118 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Conversation Clarify — standalone demo</title>
+<link rel="stylesheet" href="../src/panel.css">
+<style>
+  body { font: 14px/1.6 system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+         margin: 0; padding: 32px; background: #f6f8fa; color: #202124; }
+  .wrap { max-width: 760px; margin: 0 auto; }
+  h1 { font-size: 20px; margin: 0 0 4px; }
+  p.lede { color: #5f6368; margin: 0 0 24px; }
+  .mail { background: #fff; border: 1px solid #dadce0; border-radius: 12px; padding: 24px; }
+  h2.hP { font-size: 20px; font-weight: 400; margin: 0 0 18px; }
+  div.adn.ads { border-top: 1px solid #f1f3f4; padding: 16px 0; }
+  div.adn.ads:first-of-type { border-top: none; }
+  span.gD { font-weight: 600; }
+  span.g3 { color: #5f6368; font-size: 12px; margin-left: 8px; }
+  div.a3s { margin-top: 8px; white-space: pre-wrap; }
+  .gmail_quote { color: #9aa0a6; border-left: 2px solid #dadce0; padding-left: 10px; margin-top: 10px; }
+  .note { background: #e8f0fe; border-radius: 8px; padding: 12px 16px; margin-bottom: 20px; font-size: 13px; }
+  code { background: #f1f3f4; padding: 1px 5px; border-radius: 4px; font-size: 12px; }
+  @media (prefers-color-scheme: dark) {
+    body { background: #17181a; color: #e8eaed; }
+    .mail { background: #202124; border-color: #3c4043; }
+    div.adn.ads { border-top-color: #3c4043; }
+    .note { background: #1f3a5f; }
+    code { background: #292a2d; }
+  }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <h1>Conversation Clarify — standalone demo</h1>
+  <p class="lede">The real panel, running against a real server, with no browser extension installed.</p>
+
+  <div class="note">
+    This page mirrors Gmail's markup so the same reader and the same panel code run unchanged.
+    The <code>chrome.*</code> APIs the extension uses are shimmed below to call the server
+    directly. The server decides whether anything is dialled — it starts in fixture mode and
+    the panel shows which mode it is in.
+  </div>
+
+  <!-- The signed-in account, in the shape Gmail exposes it. -->
+  <a aria-label="Google Account: Charles Miller (charles@example.test)" href="#" style="display:none">account</a>
+
+  <div class="mail">
+    <h2 class="hP">Kickoff — Monday or Tuesday?</h2>
+
+    <div class="adn ads">
+      <span class="gD" email="charles@example.test" name="Charles Miller">Charles Miller</span>
+      <span class="g3" title="Thu, 11 Sep 2026, 09:14">11 Sep</span>
+      <div class="a3s">Hi Alex — does Monday or Tuesday work for the kickoff? Stephen can only join on Tuesday.</div>
+    </div>
+
+    <div class="adn ads">
+      <span class="gD" email="alex@example.test" name="Alex Doe">Alex Doe</span>
+      <span class="g3" title="Thu, 11 Sep 2026, 16:02">11 Sep</span>
+      <div class="a3s">Yeah, I'll be there.
+
+--
+Alex Doe
+Operations, Example Ltd
++1 555 010 0142
+        <div class="gmail_quote">On Thu, 11 Sep 2026, Charles Miller wrote:<br>&gt; does Monday or Tuesday work for the kickoff</div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script>
+  // Minimal stand-ins for the extension APIs, so content.js runs unmodified.
+  const SERVER = localStorage.getItem('cr-server') || 'http://127.0.0.1:8000';
+  const TOKEN = localStorage.getItem('cr-token') || 'local-dev-token';
+
+  async function api(path, options) {
+    const response = await fetch(SERVER.replace(/\/+$/, '') + path, {
+      ...options,
+      headers: { 'Content-Type': 'application/json', Authorization: 'Bearer ' + TOKEN,
+                 ...((options || {}).headers || {}) },
+    });
+    let body = null;
+    try { body = await response.json(); } catch (e) { body = null; }
+    if (!response.ok) {
+      return { ok: false, error: (body && (body.detail || body.message)) || ('HTTP ' + response.status) };
+    }
+    return { ok: true, data: body };
+  }
+
+  const ROUTES = {
+    health: () => api('/health'),
+    analyze: (m) => api('/v1/analyze', { method: 'POST',
+      body: JSON.stringify({ ...m.thread, rules_only: Boolean(m.rulesOnly) }) }),
+    propose: (m) => api('/v1/proposals', { method: 'POST', body: JSON.stringify(m) }),
+    place: (m) => api('/v1/proposals/' + encodeURIComponent(m.proposalId) + '/call',
+                      { method: 'POST', body: JSON.stringify({ confirm: m.confirm }) }),
+    result: (m) => api('/v1/proposals/' + encodeURIComponent(m.proposalId)),
+  };
+
+  window.chrome = {
+    runtime: {
+      sendMessage: (message, callback) => {
+        const route = ROUTES[message.type];
+        if (!route) return callback({ ok: false, error: 'Unknown request: ' + message.type });
+        route(message).then(callback).catch((error) => callback({
+          ok: false,
+          error: 'Could not reach the server at ' + SERVER + '. Start it and reload.',
+        }));
+      },
+    },
+    storage: { sync: { get: async (d) => d, set: async () => {} } },
+  };
+</script>
+<script src="../src/extract.js"></script>
+<script src="../src/content.js"></script>
+</body>
+</html>

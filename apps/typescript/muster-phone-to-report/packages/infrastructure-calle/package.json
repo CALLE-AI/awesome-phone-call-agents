@@ -1,0 +1,21 @@
+{
+  "name": "@muster/infrastructure-calle",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "sideEffects": false,
+  "types": "./dist/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js"
+    }
+  },
+  "scripts": {
+    "build": "tsc -b"
+  },
+  "dependencies": {
+    "@call-e/calle": "0.6.0",
+    "@muster/application": "0.0.0"
+  }
+}

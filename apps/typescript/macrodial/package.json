@@ -1,0 +1,12 @@
+{
+  "name": "macrodial-governed-outreach-preview",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "description": "No-call MacroDial playbook and structured-result review app",
+  "engines": { "node": ">=24" },
+  "scripts": {
+    "start": "node src/server.ts",
+    "test": "node --test test/*.test.ts"
+  }
+}

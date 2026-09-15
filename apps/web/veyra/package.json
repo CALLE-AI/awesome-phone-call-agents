@@ -1,0 +1,14 @@
+{
+  "name": "veyra",
+  "version": "0.1.0",
+  "private": true,
+  "packageManager": "pnpm@11.23.0",
+  "scripts": {
+    "web:install": "pnpm --dir web install",
+    "engine:install": "python3 -m venv engine/.venv && engine/.venv/bin/python -m pip install -r engine/requirements.txt",
+    "setup": "pnpm run web:install && pnpm run engine:install",
+    "run:web": "pnpm --dir web dev",
+    "run:engine": "cd engine && .venv/bin/python -m uvicorn main:app --reload --port 8008",
+    "postinstall": "pnpm run setup"
+  }
+}

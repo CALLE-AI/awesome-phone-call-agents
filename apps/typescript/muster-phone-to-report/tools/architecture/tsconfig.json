@@ -1,0 +1,10 @@
+{
+  "extends": "../../tsconfig.base.json",
+  "compilerOptions": {
+    "rootDir": ".",
+    "outDir": "../../.build/tools/architecture",
+    "tsBuildInfoFile": "../../.build/tools/architecture/.tsbuildinfo",
+    "types": ["node", "vitest"]
+  },
+  "include": ["*.ts"]
+}
