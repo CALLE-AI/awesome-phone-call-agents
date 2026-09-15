@@ -42,7 +42,7 @@ expect_raises("unapproved https origin refused",
               lambda: calle_rest._require_approved_origin("https://evil.example.com"))
 
 # --- create_call fails closed before any network on a bad destination / origin ---
-SCHEMA = {"answer": "string", "outcome": "string"}
+SCHEMA = {"type": "object", "properties": {"outcome": {"type": "string"}}}
 expect_raises("create refuses a non-E.164 destination", lambda: calle_rest.create_call(
     api_key="k", to_phone_e164="5550123", task="t", result_schema=SCHEMA,
     idempotency_key="i", region="US", locale="en-US"))
@@ -96,6 +96,27 @@ check("parse_terminal normalises user -> callee",
 DERIVED = {"status": "voicemail", "recipients": [{"attempts": [{"transcript_turns": []}]}]}
 raw2, _ = calle_rest.parse_terminal(DERIVED)
 check("parse_terminal derives voicemail from status", raw2["outcome"] == "voicemail")
+
+# MF3: an answered provider result that OMITS disclosed_ai must not be assumed
+# disclosed. parse_terminal must leave disclosed_ai unset, and the classifier
+# must then fail the answer closed to needs_human.
+from dispatch import classify  # noqa: E402
+UNDISCLOSED = {
+    "status": "completed", "task_completed": True,
+    "recipients": [{
+        "structured_result": {"answer": "Yes.", "outcome": "answered"},
+        "attempts": [{"transcript_turns": [
+            {"speaker": "bot", "text": "Ready?"},
+            {"speaker": "user", "text": "Yes."},
+        ]}],
+    }],
+}
+raw3, transcript3 = calle_rest.parse_terminal(UNDISCLOSED)
+check("parse_terminal does not default disclosed_ai to true",
+      "disclosed_ai" not in raw3)
+classified = classify(raw3, transcript3)
+check("undisclosed REST result fails closed to needs_human",
+      classified["outcome"] == "needs_human" and classified["answer"] == "")
 
 print()
 if failures:

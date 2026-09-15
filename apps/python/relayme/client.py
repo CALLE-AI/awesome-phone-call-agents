@@ -32,8 +32,9 @@ from pathlib import Path
 sys.path.insert(0, str(Path(__file__).parent))
 from dispatch import (  # noqa: E402
     ReservationStore, DispatchError, classify, enforce_followup_budget, is_e164,
+    VALID_OUTCOMES,
 )
-from thread import build_thread, thread_to_dicts, render_plaintext  # noqa: E402
+from thread import build_thread, thread_to_dicts, render_plaintext, redact  # noqa: E402
 
 DEFAULT_STORE = Path(__file__).parent / ".reservations.json"
 
@@ -84,6 +85,11 @@ def validate_task(task: dict) -> list[str]:
 
 
 def print_preview(task: dict, goal: str) -> None:
+    # The preview may be shown on a shared screen. The question and the goal
+    # embed free text (the question, the caller_context) that can contain the
+    # user's own phone/email, so display copies are redacted the same way the
+    # thread is. The number is masked. The goal sent to CALL-E is unredacted;
+    # only what is *printed* here is reduced.
     print("=" * 68)
     print("RelayMe call preview  (no call is placed in this step)")
     print("=" * 68)
@@ -92,9 +98,9 @@ def print_preview(task: dict, goal: str) -> None:
     print(f"  Number:       {mask_phone(task['to_phone_e164'])}")
     print(f"  Idempotency:  relayme:{task['task_id']}")
     print("\n  Question the agent will ask:")
-    print(f'    "{task["question"]}"')
-    print("\n  Full CALL-E goal:")
-    for line in goal.splitlines():
+    print(f'    "{redact(task.get("question", "").strip())}"')
+    print("\n  Full CALL-E goal (display copy, sensitive spans hidden):")
+    for line in redact(goal).splitlines():
         print(f"    {line}")
     print("=" * 68)
 
@@ -184,10 +190,25 @@ def run_live_rest(task: dict, goal: str) -> tuple[dict, list[dict]]:
     import calle_rest
     key = _load_api_key()
     region, locale = _locale_for(task)
+    # Actual JSON Schema, not a map of type-name strings. This is the shape the
+    # classifier consumes (dispatch.classify). Note: per the repo API notes the
+    # live API has rejected result_schema on POST /v1/calls; the REST path is
+    # gated as experimental below and does not depend on provider-side
+    # structured results returning.
     result_schema = {
-        "answer": "string", "outcome": "string",
-        "transcript_summary": "string", "follow_up_needed": "boolean",
-        "disclosed_ai": "boolean",
+        "type": "object",
+        "additionalProperties": False,
+        "properties": {
+            "answer": {"type": "string"},
+            "outcome": {
+                "type": "string",
+                "enum": sorted(VALID_OUTCOMES),
+            },
+            "transcript_summary": {"type": "string"},
+            "follow_up_needed": {"type": "boolean"},
+            "disclosed_ai": {"type": "boolean"},
+        },
+        "required": ["outcome", "disclosed_ai"],
     }
     created = calle_rest.create_call(
         api_key=key,
@@ -213,12 +234,30 @@ def main() -> int:
     ap.add_argument("--task", required=True, help="path to task JSON")
     ap.add_argument("--mock", action="store_true", help="no-call replay (default if no execute flag)")
     ap.add_argument("--execute", action="store_true", help="place a real call via the calle CLI (OAuth)")
-    ap.add_argument("--execute-rest", action="store_true", help="place a real call via the REST API (api_key)")
+    ap.add_argument("--execute-rest", action="store_true",
+                    help="[EXPERIMENTAL, UNFINISHED] place a real call via the REST API "
+                         "(api_key). The live API has rejected result_schema on "
+                         "POST /v1/calls, so provider-side structured results are not "
+                         "guaranteed; use --execute (the CLI path) for a supported live call. "
+                         "Requires --i-understand-rest-is-experimental.")
+    ap.add_argument("--i-understand-rest-is-experimental", action="store_true",
+                    help="acknowledge the REST path is unfinished; required with --execute-rest")
     ap.add_argument("--fixture", default=None, help="fixture path for mock mode")
     ap.add_argument("--thread", action="store_true", help="print the user-facing text thread")
     ap.add_argument("--emit-thread-json", default=None, help="write web-view thread JSON to this path")
     ap.add_argument("--store", default=str(DEFAULT_STORE), help="reservation store path")
     args = ap.parse_args()
+
+    # MF3: the REST path is experimental and unfinished (the live API has
+    # rejected result_schema on POST /v1/calls, so provider-side structured
+    # results are not guaranteed). Refuse to run it without an explicit
+    # acknowledgment so no one mistakes it for a supported live path.
+    if args.execute_rest and not args.i_understand_rest_is_experimental:
+        print("The --execute-rest path is EXPERIMENTAL and UNFINISHED: the live CALL-E API")
+        print("has rejected result_schema on POST /v1/calls, so provider-side structured")
+        print("results are not guaranteed to return. Use --execute (the supported CLI path),")
+        print("or pass --i-understand-rest-is-experimental to proceed anyway.")
+        return 2
 
     task = json.loads(Path(args.task).read_text())
 
@@ -266,7 +305,7 @@ def main() -> int:
             print("\n[mock] Replaying fixture transcript (no live call):\n")
             for turn in transcript:
                 who = "Agent " if turn["speaker"] == "agent" else "Callee"
-                print(f"    {who}: {turn['text']}")
+                print(f"    {who}: {redact((turn.get('text') or '').strip())}")
             raw = fixture.get("structured_result", {})
         elif args.execute_rest:
             print("\n[live] Placing a real call via the CALL-E REST API...")
@@ -284,8 +323,15 @@ def main() -> int:
         except Exception:
             pass
 
-    print("\nStructured result:")
-    print(json.dumps(result, indent=2))
+    # The structured result carries free-text (answer, transcript_summary) that
+    # may echo what was said on the call. What we *print* is a redacted display
+    # copy; the unredacted result still drives the thread builder (which redacts
+    # again on its own copy) below.
+    display_result = dict(result)
+    display_result["answer"] = redact(result.get("answer", ""))
+    display_result["transcript_summary"] = redact(result.get("transcript_summary", ""))
+    print("\nStructured result (display copy, sensitive spans hidden):")
+    print(json.dumps(display_result, indent=2))
 
     thread = build_thread(task, result, transcript)
 
@@ -296,7 +342,7 @@ def main() -> int:
     if args.emit_thread_json:
         payload = {
             "outcome": result["outcome"],
-            "outcome_text": result["transcript_summary"] or result["outcome"],
+            "outcome_text": redact(result["transcript_summary"]) or result["outcome"],
             "messages": thread_to_dicts(thread),
         }
         Path(args.emit_thread_json).write_text(json.dumps(payload, indent=2))
@@ -304,7 +350,7 @@ def main() -> int:
 
     print(f"\nOutcome: {result['outcome']}")
     if result["outcome"] in {"answered", "partial"} and result["answer"]:
-        print(f"Answer for the user:\n  {result['answer']}")
+        print(f"Answer for the user:\n  {redact(result['answer'])}")
     else:
         print("No confirmed answer surfaced. Routed for a human where needed.")
     return 0

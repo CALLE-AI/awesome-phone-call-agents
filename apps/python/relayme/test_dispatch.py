@@ -70,6 +70,9 @@ check("leading zero country code rejected", not is_e164("+0123456789"))
 check("too short rejected", not is_e164("+1234567"))
 check("too long rejected", not is_e164("+1234567890123456"))
 check("empty rejected", not is_e164(""))
+check("trailing newline rejected (fullmatch, not match)", not is_e164("+15550000123\n"))
+check("embedded newline rejected", not is_e164("+15550000123\nx"))
+check("leading whitespace rejected", not is_e164(" +15550000123"))
 check("non-ascii digits rejected", not is_e164("+\uff11\uff15\uff15\uff10\uff10\uff10\uff10\uff10"))
 
 # corrupt journal fails closed

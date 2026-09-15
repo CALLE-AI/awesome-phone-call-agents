@@ -55,21 +55,28 @@ python3 apps/python/relayme/client.py --task <authorized-task.json> --execute
 Drives `calle call plan` -> `calle call run` -> `calle call status`, reading the
 result from the CLI's `structuredContent` envelope.
 
-**REST API path** (uses a Bearer `api_key` from `CALLE_API_KEY` or a local `.env`):
+**REST API path** — EXPERIMENTAL / UNFINISHED (uses a Bearer `api_key` from
+`CALLE_API_KEY` or a local `.env`):
 
 ```
-python3 apps/python/relayme/client.py --task <authorized-task.json> --execute-rest
+python3 apps/python/relayme/client.py --task <authorized-task.json> \
+  --execute-rest --i-understand-rest-is-experimental
 ```
 
-Drives `GET /v1/goals` preflight -> `POST /v1/calls` (documented `recipients[]`
-schema with `region`/`locale`) -> `GET /v1/calls/{id}` poll, then maps the
-`recipients[].attempts[].transcript_turns` result through the same classifier and
-thread builder as every other path. The destination `region`/`locale` are derived
-from the task's `region`/`language` (or an explicit `locale`); the recipient must
-be in a supported region. Credentials are only ever sent to an approved HTTPS
-origin, and redirects are refused so a 3xx cannot forward the Bearer key
-off-origin. Provider error bodies are never surfaced; only a safe status summary
-is shown.
+This path is not finished and is not the supported way to place a live call.
+The live CALL-E API has rejected `result_schema` / `recipient_result_schema` on
+`POST /v1/calls`, so provider-side structured results are not guaranteed to
+return; use the OAuth / CLI path above for a supported live call. The client
+refuses to run `--execute-rest` unless `--i-understand-rest-is-experimental` is
+also passed. When it does run it drives `GET /v1/goals` preflight ->
+`POST /v1/calls` (documented `recipients[]` schema with `region`/`locale`) ->
+`GET /v1/calls/{id}` poll, then maps the `recipients[].attempts[].transcript_turns`
+result through the same classifier and thread builder as every other path. It
+never assumes the call disclosed it was AI: a result without an explicit
+`disclosed_ai == true` fails closed to `needs_human`. Credentials are only ever
+sent to an approved HTTPS origin, and redirects are refused so a 3xx cannot
+forward the Bearer key off-origin. Provider error bodies and redirect
+destinations are never surfaced; only a safe status summary is shown.
 
 ## Side effects and cancellation
 

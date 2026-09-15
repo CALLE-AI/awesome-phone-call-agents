@@ -4,7 +4,9 @@ import sys
 from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).parent))
-from client import validate_task, mask_phone, build_goal, _locale_for  # noqa: E402
+from client import validate_task, mask_phone, build_goal, _locale_for, print_preview  # noqa: E402
+import io  # noqa: E402
+from contextlib import redirect_stdout  # noqa: E402
 
 failures = []
 
@@ -44,6 +46,20 @@ check("English/US derives en-US", _locale_for(good) == ("US", "en-US"))
 check("explicit locale is trusted", _locale_for({**good, "locale": "es-419", "region": "MX"}) == ("MX", "es-419"))
 check("Spanish/US derives es-US", _locale_for({**good, "language": "Spanish"}) == ("US", "es-US"))
 check("unknown language falls back to en", _locale_for({**good, "language": "Klingon"}) == ("US", "en-US"))
+
+# --- MF2: the preview (shown on a shared screen) masks embedded phone/email ---
+leaky = {
+    **good,
+    "question": "Call me back at +15551234567 or me@example.com about my order",
+    "caller_context": "reach me at +15551234567",
+}
+buf = io.StringIO()
+with redirect_stdout(buf):
+    print_preview(leaky, build_goal(leaky))
+preview_out = buf.getvalue()
+check("preview hides an embedded phone number", "+15551234567" not in preview_out)
+check("preview hides an embedded email", "me@example.com" not in preview_out)
+check("preview still shows redaction markers", "[number hidden]" in preview_out)
 
 print()
 if failures:

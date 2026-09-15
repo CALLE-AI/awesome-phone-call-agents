@@ -68,8 +68,10 @@ class _NoRedirect(urllib.request.HTTPRedirectHandler):
     """Refuse every redirect so a 3xx cannot leak the Bearer token off-origin."""
 
     def redirect_request(self, req, fp, code, msg, headers, newurl):  # noqa: D401
+        # The destination is deliberately not included: it is attacker-controlled
+        # and must not be echoed into an error message or a log.
         raise RestError(
-            f"refusing to follow a {code} redirect to {_origin(newurl)}; "
+            f"refusing to follow a {code} redirect; "
             "credentials must not leave the approved origin"
         )
 
@@ -204,7 +206,12 @@ def parse_terminal(call: dict) -> tuple[dict, list[dict]]:
                 "text": turn.get("text", ""),
             })
     raw = dict(structured)
-    raw.setdefault("disclosed_ai", True)
+    # Do NOT assume the call disclosed it was AI. The provider result may omit
+    # disclosed_ai entirely (and per the API notes, provider-side structured
+    # results are not even guaranteed to come back). Defaulting it true would let
+    # an undisclosed call be reported as a clean success. Leave it unset so the
+    # classifier's fail-closed rule routes an answer-bearing result without an
+    # explicit disclosed_ai == True to needs_human.
     if "outcome" not in raw:
         # Derive a coarse outcome from status when the schema didn't set one.
         status = (call.get("status") or "").lower()

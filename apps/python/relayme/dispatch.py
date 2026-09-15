@@ -28,14 +28,19 @@ from pathlib import Path
 # Full ASCII E.164: a leading '+', a nonzero country-code digit, then up to 14
 # more ASCII digits (8-15 digits total). Rejects spaces, punctuation, and
 # non-ASCII digit lookalikes, which a live transport must never receive.
-_E164_RE = re.compile(r"^\+[1-9][0-9]{7,14}$")
+_E164_RE = re.compile(r"\+[1-9][0-9]{7,14}")
 
 
 def is_e164(phone: str) -> bool:
-    """True only for a full, ASCII-only E.164 number (+ then 8-15 digits)."""
+    """True only for a full, ASCII-only E.164 number (+ then 8-15 digits).
+
+    Uses fullmatch, not match: `match` anchored with `$` still accepts a
+    trailing newline (`+15550000123\n`), which a live transport must never
+    receive. fullmatch requires the entire string to be the number.
+    """
     if not phone or not phone.isascii():
         return False
-    return bool(_E164_RE.match(phone))
+    return bool(_E164_RE.fullmatch(phone))
 
 VALID_OUTCOMES = {
     "answered", "partial", "refused", "voicemail",
