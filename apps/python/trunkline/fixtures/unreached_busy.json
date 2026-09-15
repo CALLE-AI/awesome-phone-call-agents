@@ -1,0 +1,35 @@
+{
+  "completion_confidence": {
+    "label": "low",
+    "score": 0.0
+  },
+  "evidence": [],
+  "failure_code": "no_answer",
+  "failure_message": "The destination did not answer after the configured attempts.",
+  "object": "call_task",
+  "recipients": [
+    {
+      "attempts": [
+        {
+          "attempt": 1,
+          "transcript_turns": [
+            {
+              "offset_seconds": 0,
+              "speaker": "bot",
+              "text": "Dialing Meridian Health Plan provider services."
+            }
+          ]
+        }
+      ],
+      "phones": [
+        "+12125550142"
+      ],
+      "region": "US",
+      "structured_result": null
+    }
+  ],
+  "status": "failed",
+  "structured_result": null,
+  "summary": "The line did not connect.",
+  "task_completed": false
+}
