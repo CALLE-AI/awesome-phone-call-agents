@@ -1,8 +1,9 @@
 import { describe, expect, it } from 'vitest';
 import path from 'node:path';
 import { readFileSync } from 'node:fs';
-import { runChain } from './chain';
+import { runChain, windowIsOpen } from './chain';
 import { FixtureProvider, foldStatus, normalizeTurns } from './calle';
+import type { CallOutcome, CallProvider, CallRequest } from './calle';
 import { loadErrand } from './errand';
 import type { ErrandFile } from './types';
 
@@ -220,5 +221,94 @@ describe('normalizeTurns', () => {
     expect(normalizeTurns([{ speaker: 'user', text: '   ' }, null, 'x'])).toEqual(
       [],
     );
+  });
+});
+
+/**
+ * A chain that agrees "call me back at four" and then dials at 15:00:00.001 has
+ * not honoured anything. These lock the boundary between proposing a call and
+ * placing one, which is the whole reason this app runs no scheduler.
+ */
+describe('a real provider never dials ahead of an agreed window', () => {
+  /** Replays fixtures but reports itself as placing real calls, which is the only bit that matters here. */
+  class RealishProvider implements CallProvider {
+    readonly name = 'realish';
+    readonly placesRealCalls = true;
+    calls = 0;
+    private readonly inner: FixtureProvider;
+
+    constructor(dir: string, sequence: string[]) {
+      this.inner = new FixtureProvider(dir, sequence);
+    }
+
+    async placeCall(request: CallRequest): Promise<CallOutcome> {
+      this.calls += 1;
+      return this.inner.placeCall(request);
+    }
+  }
+
+  function realChain(sequence: string[], now: Date) {
+    const provider = new RealishProvider(FIXTURES, sequence);
+    return { provider, run: runChain({ errand: errand(), provider, now }) };
+  }
+
+  it('stops after one leg and hands back the intent unplaced', async () => {
+    const { provider, run } = realChain(
+      ['window-agreed', 'errand-complete'],
+      NOW,
+    );
+    const state = await run;
+
+    expect(provider.calls).toBe(1);
+    expect(state.legs).toHaveLength(1);
+    expect(state.next).not.toBeNull();
+    expect(state.halted_reason).toMatch(/has not opened yet/);
+  });
+
+  it('still records the intent and the turn that justifies it', async () => {
+    const { run } = realChain(['window-agreed', 'errand-complete'], NOW);
+    const state = await run;
+
+    expect(state.scheduled).toHaveLength(1);
+    expect(state.scheduled[0].leg).toBe(2);
+    expect(state.next?.not_before).toBe(state.scheduled[0].not_before);
+    expect(state.next?.supporting_turn).toBeTruthy();
+  });
+
+  it('halts for a stated reason, not by silently running out of legs', async () => {
+    const { run } = realChain(['window-agreed', 'errand-complete'], NOW);
+    const state = await run;
+
+    expect(state.halted_reason).toContain('runs no scheduler');
+  });
+
+  it('fixture replay is exempt, because it places no calls', async () => {
+    const state = await chain(['window-agreed', 'errand-complete']);
+    expect(state.legs).toHaveLength(2);
+    expect(state.halted_reason).toBeNull();
+  });
+});
+
+/**
+ * The gate itself. The chain fixture always names a window relative to `now`,
+ * so the open case is unreachable through it; testing the predicate directly is
+ * the honest way to cover the branch that lets a call proceed.
+ */
+describe('windowIsOpen', () => {
+  const now = new Date('2026-09-15T10:00:00Z');
+
+  it('is closed before the agreed start', () => {
+    expect(windowIsOpen('2026-09-15T10:00:00.001Z', now)).toBe(false);
+    expect(windowIsOpen('2026-09-16T09:00:00Z', now)).toBe(false);
+  });
+
+  it('is open once the agreed start has passed', () => {
+    expect(windowIsOpen('2026-09-15T10:00:00Z', now)).toBe(true);
+    expect(windowIsOpen('2026-09-15T09:59:59Z', now)).toBe(true);
+  });
+
+  it('treats an unparseable time as closed rather than guessing', () => {
+    expect(windowIsOpen('tomorrow-ish', now)).toBe(false);
+    expect(windowIsOpen('', now)).toBe(false);
   });
 });
