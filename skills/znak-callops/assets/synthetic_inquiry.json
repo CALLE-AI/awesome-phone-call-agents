@@ -1,0 +1,62 @@
+{
+  "task_id": "synthetic-bike-inquiry-001",
+  "source_mode": "synthetic",
+  "call_status": "completed",
+  "fixture_notice": "Invented dialogue for an offline demonstration. No real call occurred.",
+  "transcript": [
+    {
+      "id": "t1",
+      "speaker": "agent",
+      "text": "This is an information-only inquiry. Is a bicycle tune-up available Tuesday afternoon, and what is the price? Please do not book anything."
+    },
+    {
+      "id": "t2",
+      "speaker": "provider",
+      "text": "We have availability on Tuesday afternoon."
+    },
+    {
+      "id": "t3",
+      "speaker": "provider",
+      "text": "The tune-up costs 80 EUR, excluding replacement parts."
+    },
+    {
+      "id": "t4",
+      "speaker": "provider",
+      "text": "The tune-up costs 95 EUR, excluding replacement parts."
+    },
+    {
+      "id": "t5",
+      "speaker": "agent",
+      "text": "Thank you. The user will decide; I am not making a reservation."
+    }
+  ],
+  "candidates": [
+    {
+      "field": "availability",
+      "quote": "We have availability on Tuesday afternoon.",
+      "evidence": {
+        "turn_id": "t2",
+        "start": 0,
+        "end": 42
+      }
+    },
+    {
+      "field": "quoted_price",
+      "quote": "The tune-up costs 80 EUR, excluding replacement parts.",
+      "evidence": {
+        "turn_id": "t3",
+        "start": 0,
+        "end": 54
+      }
+    },
+    {
+      "field": "quoted_price",
+      "quote": "The tune-up costs 95 EUR, excluding replacement parts.",
+      "evidence": {
+        "turn_id": "t4",
+        "start": 0,
+        "end": 54
+      }
+    }
+  ]
+}

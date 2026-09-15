@@ -1,0 +1,10 @@
+node_modules/
+dist/
+.dockbrief/
+*.state.json
+*.state.json.*
+.env
+.env.*
+!.env.example
+coverage/
+*.lock.tmp

@@ -1,0 +1,51 @@
+{
+ "id": "train-human-053",
+ "label": "human",
+ "source": "sim-train",
+ "meta": {
+  "task": "ask for a quote for a brake replacement",
+  "hard": true
+ },
+ "turns": [
+  {
+   "speaker": "user",
+   "text": "Thank you for calling Summit Fitness, this is Dev, how can I help you?",
+   "offset_seconds": 1.2
+  },
+  {
+   "speaker": "bot",
+   "text": "Hi, I'm an AI assistant calling on behalf of Taylor Kim. Could you give me a rough quote for replacing the front brake pads on a 2018 sedan?",
+   "offset_seconds": 7.15
+  },
+  {
+   "speaker": "user",
+   "text": "Oh, uh, Sundays we close at five I think.",
+   "offset_seconds": 18.59
+  },
+  {
+   "speaker": "bot",
+   "text": "Does that include labour?",
+   "offset_seconds": 23.17
+  },
+  {
+   "speaker": "user",
+   "text": "Yeah.",
+   "offset_seconds": 27.82
+  },
+  {
+   "speaker": "user",
+   "text": "right",
+   "offset_seconds": 28.74
+  },
+  {
+   "speaker": "bot",
+   "text": "How soon could you do it?",
+   "offset_seconds": 30.22
+  },
+  {
+   "speaker": "user",
+   "text": "Okay, bye.",
+   "offset_seconds": 32.96
+  }
+ ]
+}

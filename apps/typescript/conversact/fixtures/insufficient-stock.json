@@ -1,0 +1,6 @@
+{
+  "outcome": "order_requested",
+  "items": [{ "product_id": "snack-pack", "quantity": 10 }],
+  "delivery_method": "pickup",
+  "customer_confirmed": "yes"
+}

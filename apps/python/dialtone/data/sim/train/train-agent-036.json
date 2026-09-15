@@ -1,0 +1,66 @@
+{
+ "id": "train-agent-036",
+ "label": "agent",
+ "source": "sim-train",
+ "meta": {
+  "task": "ask for a quote for a brake replacement",
+  "hard": true
+ },
+ "turns": [
+  {
+   "speaker": "user",
+   "text": "Hello and thanks for calling Maple Vet Clinic. I'm Nova, the virtual assistant for Maple Vet Clinic, and I can help with bookings, hours, and more. What can I do for you?",
+   "offset_seconds": 1.12
+  },
+  {
+   "speaker": "bot",
+   "text": "Hi, I'm an AI assistant calling on behalf of Taylor Kim. Could you give me a rough quote for replacing the front brake pads on a 2018 sedan?",
+   "offset_seconds": 13.78
+  },
+  {
+   "speaker": "user",
+   "text": "Of course! Maple Maple Vet Clinic is open on Sunday from 10 AM to 4 PM. Is there anything else I can help you with?",
+   "offset_seconds": 24.77
+  },
+  {
+   "speaker": "bot",
+   "text": "How soon could you do it?",
+   "offset_seconds": 35.04
+  },
+  {
+   "speaker": "user",
+   "text": "so, Absolutely, that's confirmed. Is there anything else I can help you with today?",
+   "offset_seconds": 38.1
+  },
+  {
+   "speaker": "bot",
+   "text": "Does that include labour?",
+   "offset_seconds": 44.38
+  },
+  {
+   "speaker": "user",
+   "text": "I understand. Someone from our team will follow up to confirm the details.",
+   "offset_seconds": 47.02
+  },
+  {
+   "speaker": "bot",
+   "text": "Thank you, that's everything.",
+   "offset_seconds": 52.89
+  },
+  {
+   "speaker": "user",
+   "text": "Certainly. yeah, um, You're all set. Thank you for calling, and have a wonderful day!",
+   "offset_seconds": 55.32
+  },
+  {
+   "speaker": "bot",
+   "text": "Thank you, that's everything.",
+   "offset_seconds": 61.78
+  },
+  {
+   "speaker": "user",
+   "text": "You're welcome! Have a wonderful day. Goodbye!",
+   "offset_seconds": 64.23
+  }
+ ]
+}

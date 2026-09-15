@@ -1,0 +1,19 @@
+# Local credentials
+.env
+.env.*
+!.env.example
+
+# Dependencies and build output
+node_modules/
+.next/
+out/
+coverage/
+next-env.d.ts
+*.tsbuildinfo
+
+# Local application data
+data/
+logs/
+*.log
+.vercel/
+.DS_Store
