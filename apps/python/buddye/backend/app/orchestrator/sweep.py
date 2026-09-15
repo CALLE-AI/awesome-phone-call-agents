@@ -4,8 +4,8 @@ Everything here is the part of the sweep that is *not* the driver loop — creat
 objects the contract needs, the second call the ladder is allowed to place, and the summary the API
 and the trace both render. `runner.py` imports this; this imports nothing from `runner.py`.
 
-The one idea worth stating out loud is `unaccounted()`. ShiftFill's run ended when somebody said
-yes, and the candidates it never got to were simply not interesting. A BuddyE sweep ends when the
+The one idea worth stating out loud is `unaccounted()`. A hiring cascade ends when somebody says
+yes, and the candidates it never reaches are simply not interesting. A BuddyE sweep ends when the
 list is finished, and the people it did **not** reach are the output: Gerald never opted in, an
 allowlist can stop a dial, a budget can run out mid-roster. Those are not gaps to be tidied away —
 `unaccounted()` names every one of them with the reason, and the summary carries it next to the

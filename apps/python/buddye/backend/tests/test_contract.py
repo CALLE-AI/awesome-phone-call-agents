@@ -276,7 +276,7 @@ def test_the_task_identifies_itself_as_a_machine_and_names_the_captain() -> None
 
 
 def test_the_register_is_warm_and_paced_for_someone_who_may_be_frightened() -> None:
-    """A long rigid script produced fragmented speech and dead air on a live ShiftFill call; the same
+    """A long rigid script produced fragmented speech and dead air on an earlier live call; the same
     pacing rules apply here, and the person on this line may also have been asleep."""
     task = compile_contract(HEAT, ROSA).task
     assert "How to speak. This matters as much as what you say:" in task
@@ -351,7 +351,7 @@ def test_only_the_help_that_exists_may_be_offered_and_it_is_stated_word_for_word
     desc = c.result_schema["properties"]["help_accepted"]["description"]
     assert all(k in desc for k in c.offer_keys)
     assert "items" not in c.result_schema["properties"]["help_accepted"]["description"]
-    # a thing never said out loud is unknown, never yes — the ShiftFill terms rule, restated for help
+    # a thing never said out loud is unknown, never yes — the same rule, restated for offers of help
     assert "Help you never said out loud was never offered" in c.task
     assert "Never \"yes\" for something you only intended to say" in c.result_schema["properties"]["help_offers_stated"]["description"]
 

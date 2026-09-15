@@ -1,19 +1,19 @@
 """The sweep driver. State lives in the DB; this coroutine only pushes it forward.
 
-Ported from ShiftFill's runner, which is the part of this system with real miles on it: DB as the
+It is built on a design with real miles on it: DB as the
 source of truth, an idempotency key written before any dial, the SSE event bus, polling with a
 webhook shortcut, the allowlist/budget guard, `obs.timed` around every provider leg, and a redacted
-audit trail. All of that is kept. The **shape of the work** is not, and three differences are the
-whole product:
+audit trail. What separates it from a hiring cascade is the **shape of the work**, and three
+differences are the whole product:
 
-1. **A sweep fans out. It does not stop at the first success.** ShiftFill walked candidates until
-   one accepted and then stopped, and the people it never got to did not matter. Here the triage
+1. **A sweep fans out. It does not stop at the first success.** A hiring cascade walks candidates
+   until one accepts and then stops, and the people it never reaches do not matter. Here the triage
    order is worked to the end, because the point is that nobody is missed. There is no early exit
    in `_loop()` — only the budget running out or the provider failing in a way that is the same for
    every neighbour.
 
-2. **NO_ANSWER and FAILED go *into* `decide()`, not around it.** ShiftFill's `_evaluate` returned
-   early on those statuses; that early return is gone. An unanswered call to Walter during a
+2. **NO_ANSWER and FAILED go *into* `decide()`, not around it.** A cascade returns early on those
+   statuses; there is no such early return here. An unanswered call to Walter during a
    blackout is `CheckOutcome.UNREACHABLE`, it carries his risk assessment, and it escalates. Silence
    is the finding this product exists to surface, so it takes the same path as speech: it gets an
    outcome, a reason, an escalation, and a row on the board.
@@ -440,7 +440,7 @@ class Runner:
         if leg.status == "SKIPPED":
             return True
 
-        # The line ShiftFill did not have. Whatever the provider said — a completed conversation, a
+        # Whatever the provider said — a completed conversation, a
         # phone that rang out, a call that never connected — it goes to the outcome layer with this
         # neighbour's risk attached, and comes back as a finding.
         # `placed` is false only after a definite refusal: CALL-E answered the create request with a 4xx
@@ -600,9 +600,7 @@ class Runner:
         req = CallRequest(
             phone=phone, region=region_for(phone), locale=contract.locale, task=contract.task,
             result_schema=contract.result_schema, idempotency_key=key,
-            # `employee_id` is ShiftFill's spelling, still on CallRequest in app/calls/provider.py.
-            # It carries the neighbour id; the mock provider reads either name.
-            employee_id=neighbour.id,
+            neighbour_id=neighbour.id,
             metadata={
                 "hazard_id": self.hazard_id, "hazard_kind": hazard.kind, "sweep_id": self.sweep_id,
                 "neighbour_id": neighbour.id, "neighbour_name": neighbour.name, "callee": callee,
@@ -635,7 +633,7 @@ class Runner:
                 leg_log["provider_call_id"] = outcome.provider_call_id
                 leg_log["status"] = outcome.status
         except CandidateRejectedByProvider as exc:
-            # ShiftFill skipped to the next candidate here. BuddyE cannot: "the number we hold for
+            # A cascade would skip to the next candidate here. BuddyE cannot: "the number we hold for
             # her is unroutable" is a fact about a person nobody has spoken to today, so it is a
             # FAILED call that goes to decide() and comes back UNREACHABLE.
             self._mark_failed(call_id, exc.code, exc.message)
@@ -714,8 +712,7 @@ class Runner:
     ) -> Leg:
         """Persist what came back, reconcile if it is worth reconciling, and hand it on.
 
-        Note what is *not* here: ShiftFill's `if outcome.status in {"NO_ANSWER", "FAILED"}: return`.
-        Every status flows on. What is still gated is the reconcile step — a call that never
+        Note what is *not* here: an early return on NO_ANSWER or FAILED. Every status flows on. What is still gated is the reconcile step — a call that never
         connected has no transcript, and asking a language model to recover fifteen required fields
         from an empty conversation is a spend that can only invent things.
         """

@@ -60,11 +60,8 @@ PHONE_RE = re.compile(rf"^{re.escape(FICTIONAL_PREFIX)}\d{{2}}$")
 def demo_db(tmp_path, monkeypatch):  # noqa: ANN001, ANN201
     """A database with BuddyE's tables in it.
 
-    Deliberately not conftest's `db` fixture: `app.db.init_db` still creates ShiftFill's
-    "one active run per position" index over a `workflowrun` table that no longer exists, so it
-    raises before any BuddyE row can be written. This builds the schema straight from the models
-    instead. Switch back to `db` once `db.py` is ported — the BuddyE equivalent of that index is one
-    active sweep per hazard.
+    Built straight from the models rather than through conftest's `db` fixture, so the seed tests do
+    not depend on `init_db`'s extra SQL (the one-active-sweep-per-hazard index).
     """
     from sqlmodel import SQLModel
 
@@ -160,7 +157,7 @@ def test_every_seeded_number_is_unroutable(demo_db, monkeypatch) -> None:  # noq
 
 
 def test_demo_phone_env_injects_a_real_number_and_flags_the_row(demo_db, monkeypatch) -> None:  # noqa: ANN001
-    """Mirrors ShiftFill exactly: a real number arrives only from DEMO_PHONE_*, only onto the named
+    """A real number arrives only from DEMO_PHONE_*, only onto the named
     row, and the row is flagged so every downstream gate can see it."""
     from app import config
     from app.db import session_scope
@@ -247,7 +244,7 @@ async def test_mock_refuses_to_dial_the_opted_out_neighbour() -> None:
     provider = MockCallProvider(delay_s=0)
     req = CallRequest(
         phone="+155501008", task="check in", result_schema={"type": "object", "properties": {}},
-        idempotency_key="k1", employee_id="nbr_gerald", metadata={"neighbour_name": "Gerald Pryce"},
+        idempotency_key="k1", neighbour_id="nbr_gerald", metadata={"neighbour_name": "Gerald Pryce"},
     )
 
     async def sink(_event: Any) -> None:  # pragma: no cover - never reached
@@ -264,7 +261,7 @@ async def test_mock_refuses_a_call_whose_metadata_says_no_consent() -> None:
     provider = MockCallProvider(delay_s=0)
     req = CallRequest(
         phone="+155501099", task="check in", result_schema={"type": "object", "properties": {}},
-        idempotency_key="k2", employee_id="nbr_x",
+        idempotency_key="k2", neighbour_id="nbr_x",
         metadata={"neighbour_name": "Someone Not On The List", "check_in_consent": False},
     )
     with pytest.raises(ConsentViolation):
@@ -677,7 +674,7 @@ async def test_mock_replays_the_right_scene_for_the_right_hazard() -> None:
     contract = compile_contract(hazard, NeighbourView.from_row(Row(_neighbour("Walter Brzezinski"))))
     req = CallRequest(
         phone="+155501001", task=contract.task, result_schema=contract.result_schema,
-        idempotency_key="swp1:nbr1:1", employee_id="nbr1",
+        idempotency_key="swp1:nbr1:1", neighbour_id="nbr1",
         metadata={"neighbour_name": "Walter Brzezinski", "hazard_kind": "power_outage", "callee": "neighbour"},
     )
     outcome = await provider.place(req, sink)
@@ -699,7 +696,7 @@ async def test_mock_emits_a_no_answer_outcome_rather_than_an_error() -> None:
 
     req = CallRequest(
         phone="+155501002", task="check in", result_schema={"type": "object", "properties": {}, "required": []},
-        idempotency_key="swp1:nbr2:1", employee_id="nbr2",
+        idempotency_key="swp1:nbr2:1", neighbour_id="nbr2",
         metadata={"neighbour_name": "Hazel Nakamura", "hazard_kind": "heat"},
     )
     outcome = await provider.place(req, sink)
@@ -717,7 +714,7 @@ async def test_mock_serves_the_emergency_contact_a_contact_scene() -> None:
     provider = MockCallProvider(delay_s=0)
     req = CallRequest(
         phone="+155501052", task="tell them", result_schema={"type": "object", "properties": {}, "required": []},
-        idempotency_key="esc1:nbr3:1", employee_id="nbr3",
+        idempotency_key="esc1:nbr3:1", neighbour_id="nbr3",
         metadata={"neighbour_name": "Hazel Nakamura", "callee": "emergency_contact", "contact_name": "Dennis Nakamura"},
     )
     outcome = await provider.place(req, lambda _e: _noop())

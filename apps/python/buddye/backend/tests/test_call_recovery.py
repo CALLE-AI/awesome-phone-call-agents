@@ -69,7 +69,7 @@ def _provider(script: list[Any]) -> tuple[CalleSdkProvider, FakeCalls]:
 def _resume_request() -> CallRequest:
     return CallRequest(
         phone="+15555550100", region="US", locale="en-US", task="t", result_schema={},
-        idempotency_key="k", employee_id="nbr_test", existing_provider_call_id="call_live",
+        idempotency_key="k", neighbour_id="nbr_test", existing_provider_call_id="call_live",
     )
 
 

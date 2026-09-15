@@ -13,8 +13,8 @@ Four rules are load-bearing and are enforced here rather than left to the caller
 * **The call is paced for an emergency.** The brief gets to the point in two sentences, establishes
   safety first, and is written to be over in well under two minutes when the person is fine — and to
   expand, slow down and stay on the line the moment they are not. The shortness is not a saving: the
-  voice engine re-reads the whole brief on every turn (a long one is where the dead air in the live
-  ShiftFill call came from) and a sweep is a queue, so a minute spent on somebody who is fine is a
+  voice engine re-reads the whole brief on every turn (a long one is where the dead air in an earlier
+  live call came from) and a sweep is a queue, so a minute spent on somebody who is fine is a
   minute the next neighbour waits. `test_the_task_stays_inside_the_length_budget_on_the_worst_case`
   pins the budget, and what it is really pinning is the latency of every single turn.
 * **Silence is a finding.** Every required field is answerable when nobody picked up: the tri-states
@@ -447,7 +447,7 @@ def compile_contract(hazard: HazardView, neighbour: NeighbourView) -> CallContra
 
     # This brief is written for HASTE, and its shortness is a safety property rather than a saving.
     # Two reasons: the voice engine re-reads the whole brief on every turn, which is where the dead
-    # air and the fragmented speech in the live ShiftFill call came from; and a sweep is a queue, so
+    # air and the fragmented speech in an earlier live call came from; and a sweep is a queue, so
     # every minute spent on a neighbour who is fine is a minute the next one waits. The expansion —
     # confused, frightened, crying, hard of hearing, something wrong — is stated in the same breath
     # as the default so the model reads "be quick" and "unless" as one instruction, not as a rule

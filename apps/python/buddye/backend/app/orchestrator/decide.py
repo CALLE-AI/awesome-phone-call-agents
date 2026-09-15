@@ -1,11 +1,10 @@
 """What one check-in call established. Deterministic, pure, no model, no I/O.
 
-Ported from ShiftFill's `decide()`, which held one rule above all others: every branch is written
-down in this table, and an unknown is never resolved in the direction that lets the machine stop
-worrying. BuddyE keeps that and inverts the input that matters.
+One rule above all others: every branch is written down in this table, and an unknown is never
+resolved in the direction that lets the machine stop worrying.
 
-**An unanswered call is an input to this function, not an early return.** In ShiftFill a NO_ANSWER
-never reached `decide()` — the runner moved to the next candidate and the silence cost nothing. Here
+**An unanswered call is an input to this function, not an early return.** In a hiring cascade a
+NO_ANSWER never reaches `decide()`: the runner moves on and the silence costs nothing. Here
 nobody picking up is frequently the most important thing the system learns all evening: an
 unanswered call to a neighbour whose oxygen concentrator is plugged into a wall socket during a
 blackout is `UNREACHABLE`, and `UNREACHABLE` at the critical band is the top line on the captain's
@@ -35,16 +34,15 @@ Three orderings in that table are load-bearing and were chosen against the obvio
 
 * **The alarm checks run before the reached-them gate.** A daughter picking up her mother's phone to
   say "she's on the floor and I can't lift her" arrives as `reached_intended_person = "no"` with
-  `is_safe_now = "no"`. Gating on "did we speak to the person themselves" first — which is what
-  ShiftFill did, because there an answer about someone we did not speak to is worthless — would turn
+  `is_safe_now = "no"`. Gating on "did we speak to the person themselves" first — which is what a
+  hiring cascade does, because there an answer about someone else is worthless — would turn
   the most urgent call in the product into a shrug.
 * **`sounded_distressed == "yes"` is URGENT, not a note on a NEEDS_HELP.** Someone confused, slurred,
   or unable to follow the conversation cannot self-report, so their own "I'm fine" carries no
   evidentiary weight at all; and confusion is itself a symptom of heat illness and hypoxia. Guarded
   on "yes" only — "unknown" is what a voicemail returns, and must not make every voicemail urgent.
-* **Safety asserted alongside an alarm resolves pessimistically.** ShiftFill parked that exact
-  contradiction (accepted the shift in words, recorded as unable to work it) in HOLD_FOR_REVIEW.
-  There is no hold here — five outcomes, all of them actionable — so the contradiction resolves to
+* **Safety asserted alongside an alarm resolves pessimistically.** A review queue could park
+  this contradiction. There is no hold here — five outcomes, all of them actionable — so the contradiction resolves to
   URGENT and the reason says out loud that they told us they were fine, because "I'm alright" from
   someone whose cooler died two days ago is the single most common way this product could fail.
 
@@ -343,8 +341,7 @@ def decide(
         clock = f" and triage put them about {hours:g}h from harm" if hours is not None else ""
         alarms.append(f"critical band{clock}: " + "; ".join(s for _, s in bad_checks))
     if alarms:
-        # ShiftFill's contradiction rule, ported. There it bought a human review; here there is no
-        # hold, so it resolves against the reassurance and says so.
+        # The contradiction rule: there is no hold, so it resolves against the reassurance and says so.
         head = ("they told us they were safe, but " if core["is_safe_now"] == "yes" else "")
         return finish(CheckOutcome.URGENT, head + "; ".join(alarms), findings=list(alarms))
 

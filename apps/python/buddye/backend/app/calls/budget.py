@@ -5,13 +5,14 @@ the number must be in DIALABLE_NUMBERS and the real-call count must be under CAL
 """
 from __future__ import annotations
 
-from sqlalchemy import func
 from sqlmodel import Session, select
 
 from app.calls.guards import is_strict_e164
 from app.calls.provider import CallBudgetExhausted, NumberNotAllowlisted
 from app.config import Settings
-from app.models import SpentCall
+from app.models import CheckCall, SpentCall
+
+IN_FLIGHT_OR_UNKNOWN = ("PENDING", "DIALING", "UNKNOWN")
 
 
 def record_spent_call(session: Session, *, provider: str, provider_call_id: str | None) -> None:
@@ -29,15 +30,29 @@ def record_spent_call(session: Session, *, provider: str, provider_call_id: str 
 
 
 def count_real_calls(session: Session) -> int:
-    """Calls the provider actually accepted, which is what the free tier bills.
+    """Real calls that count against `CALL_BUDGET_MAX`: accepted, in flight, or of unknown outcome.
 
-    Counted from the SpentCall ledger rather than from CheckCall: a record with no
-    `provider_call_id` never reached CALL-E (the request was rejected before a call task existed —
-    bad schema, auth, blocked recipient), so no phone rang and no credit was spent, and counting
-    those would silently shrink the budget on a bad deploy. Just as importantly, the ledger is not
-    demo data, so wiping the demo does not hand the free tier back.
+    Three sources, because counting only accepted calls lets the cap be overshot:
+
+    * `SpentCall`, the ledger of calls CALL-E accepted (keyed by provider call id). It is not demo data,
+      so wiping the demo does not hand the free tier back.
+    * real-provider `CheckCall` rows still `PENDING`/`DIALING` whose provider id is not in the ledger
+      yet. The row is written before the dial and the id only arrives after the create request returns,
+      so without this, calls started at the same moment would all see room under the cap.
+    * `UNKNOWN` rows with no ledger entry: an ambiguous create may have been billed.
+
+    A row that ended `FAILED` with no provider id is a definite refusal (no call task) and is not counted.
+    The check and the row insert happen with no `await` between them, which makes reserve-then-record
+    atomic within this single server process.
     """
-    return int(session.exec(select(func.count()).select_from(SpentCall)).one())
+    spent = set(session.exec(select(SpentCall.provider_call_id)).all())
+    reserved = session.exec(
+        select(CheckCall.provider_call_id).where(
+            CheckCall.provider != "mock",
+            CheckCall.status.in_(IN_FLIGHT_OR_UNKNOWN),  # type: ignore[attr-defined]
+        )
+    ).all()
+    return len(spent) + sum(1 for pcid in reserved if not pcid or pcid not in spent)
 
 
 class CallBudget:

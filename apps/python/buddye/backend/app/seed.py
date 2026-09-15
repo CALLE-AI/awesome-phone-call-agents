@@ -1,7 +1,7 @@
 """The demo world: one block captain's roster in Maryvale, and the two hazards that reorder it.
 
-Ported from ShiftFill's seed, which had one job — make the demo look like a real Tuesday rather
-than like test data — and keeps its two rules exactly:
+Its job is to make the demo look like a real evening rather than like test data, and it keeps two
+rules exactly:
 
 * every phone number is a fictional, unroutable +1 555-01xx number, and
 * a neighbour gets a **real** number only if `DEMO_PHONE_A/B/C` is set in the environment at seed
@@ -466,7 +466,7 @@ ASSETS: list[dict[str, Any]] = [
 def wipe(session: Session) -> None:
     """Clear the demo data.
 
-    `SpentCall` is deliberately absent, exactly as in ShiftFill: it is the ledger of real calls
+    `SpentCall` is deliberately absent: it is the ledger of real calls
     already billed against the free tier, and a demo reset that handed twenty calls back would be a
     reset that lets the next demo place them again for real.
     """

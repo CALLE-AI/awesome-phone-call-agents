@@ -1,7 +1,7 @@
 """Scripted check-in calls, keyed by neighbour. Zero network, zero phones, zero cost.
 
-Ported from ShiftFill's mock provider, which existed so the whole workflow could be exercised
-without dialling anybody. Here it carries more weight, because the calls ARE the product: what these
+It exists so the whole workflow can be exercised without dialling anybody, and it carries real
+weight, because the calls ARE the product: what these
 fixtures return is what the captain's board says, so they have to sound like fourteen real people
 having fourteen real conversations rather than one template with the names changed.
 
@@ -288,8 +288,8 @@ FIXTURES: dict[str, Fixture] = {
         },
     },
     # -- the silence -----------------------------------------------------------------------------
-    # 82, bedbound, insulin in the refrigerator, critical band, and nobody picks up. In ShiftFill
-    # this was a shrug and a move to the next candidate. Here it is the top line on the board: her
+    # 82, bedbound, insulin in the refrigerator, critical band, and nobody picks up. A hiring
+    # cascade would shrug and move on. Here it is the top line on the board: her
     # escalation opens on the silence, her son has the key, and if he cannot be reached a handoff
     # packet gets prepared for a human to release.
     "Hazel Nakamura": {
@@ -947,9 +947,8 @@ def hazard_kind_of(req: CallRequest) -> str:
 class MockCallProvider:
     """A CallProvider that replays the fixtures above. Never touches the network.
 
-    Fixture lookup reads, in order: `metadata["neighbour_name"]`, `metadata["employee_name"]` (the
-    ShiftFill spelling, kept so a half-ported runner still works), `metadata["name"]`, and finally
-    the injected `name_lookup` against `req.neighbour_id` or `req.employee_id`. If none of those
+    Fixture lookup reads, in order: `metadata["neighbour_name"]`, `metadata["name"]`, and finally the
+    injected `name_lookup` against `req.neighbour_id`. If none of those
     produce a name every call falls through to `DEFAULT_FIXTURE` and the demo becomes one generic
     conversation fourteen times — so if that is what you are seeing, this is the line to check.
     """
@@ -970,9 +969,9 @@ class MockCallProvider:
         callee = _first(meta, "callee") or "neighbour"
         if callee != "neighbour":
             return _first(meta, "contact_name", "callee_name", "neighbour_name", "name"), callee
-        name = _first(meta, "neighbour_name", "employee_name", "name")
+        name = _first(meta, "neighbour_name", "name")
         if not name and self._name_lookup is not None:
-            ident = getattr(req, "neighbour_id", "") or getattr(req, "employee_id", "")
+            ident = req.neighbour_id
             name = str(self._name_lookup(ident) or "")
         return name, "neighbour"
 

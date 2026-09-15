@@ -101,8 +101,6 @@ async def preflight(settings: Settings, *, budget_used: int) -> dict[str, Any]:
         "allowlist_count": len(settings.dialable_numbers),
         "budget": {"max": settings.CALL_BUDGET_MAX, "used": budget_used, "remaining": max(0, settings.CALL_BUDGET_MAX - budget_used), "enforced": True},
         "webhook_configured": bool(settings.PUBLIC_BASE_URL),
-        "split_coverage_enabled": settings.ENABLE_SPLIT_COVERAGE,
-        "require_manager_approval": settings.REQUIRE_MANAGER_APPROVAL,
         "reconciler": reconciler_name(settings),
     }
 

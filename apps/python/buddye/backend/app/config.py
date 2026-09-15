@@ -1,13 +1,6 @@
 """Runtime settings. Every default fails closed: mock provider, empty allowlist, tiny budget.
 
-Ported from ShiftFill with the CALL-E, budget and TokenRouter blocks intact — they are the part that
-has been live-tested — and the shift domain replaced by the block captain's.
-
-Two settings look like dead weight and are not. `ENABLE_SPLIT_COVERAGE` and
-`REQUIRE_MANAGER_APPROVAL` mean nothing in BuddyE, but `app/calls/preflight.py` reads both when it
-builds the `/api/calle/status` snapshot, and `refresh_loop` swallows exceptions — so deleting them
-would not raise anywhere visible, it would just leave the status panel permanently empty. They stay,
-inert and documented, until preflight is ported.
+The CALL-E, budget and inference blocks are the live-tested part; the rest describes the block.
 """
 from __future__ import annotations
 
@@ -99,9 +92,6 @@ class Settings(BaseSettings):
     #: arrival.
     MOVEMENT_TICK_S: float = 2.0
 
-    # --- inert, read by app/calls/preflight.py; see the module docstring ---
-    ENABLE_SPLIT_COVERAGE: bool = False
-    REQUIRE_MANAGER_APPROVAL: bool = False
 
     @field_validator("RECONCILER")
     @classmethod

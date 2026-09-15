@@ -18,8 +18,8 @@ Two limits are enforced here rather than trusted to the model:
   definite answer. CALL-E heard the audio; the reconciler is reading a text transcript of it.
 * **Quotes must be grounded.** A quote it returns has to be traceable to something a human turn
   actually contains. The match is fuzzy on purpose — a transcript is punctuated by a machine and
-  people repeat themselves — but a sentence nobody said is discarded. This matters more here than it
-  did in ShiftFill: `alarming_quote` is copied verbatim into a HandoffPacket and read out to a
+  people repeat themselves — but a sentence nobody said is discarded. This matters because
+  `alarming_quote` is copied verbatim into a HandoffPacket and read out to a
   responder, so an invented sentence would be words put into a frightened person's mouth.
 """
 from __future__ import annotations
@@ -95,8 +95,8 @@ def failing_fields_for(schema: dict[str, Any], result: dict[str, Any] | None, va
             bad.add(path)
         elif spec.get("type") == "string" and not spec.get("enum") and not str(value or "").strip():
             # A required string left blank is schema-valid, so it raises no validation error and
-            # would otherwise never reach the understanding layer. In ShiftFill that hid a missing
-            # acceptance quote. Here it is `alarming_quote`: CALL-E leaving it empty is the common,
+            # would otherwise never reach the understanding layer. Here that field is
+            # `alarming_quote`: CALL-E leaving it empty is the common,
             # correct case (most people are fine), but it is also what an extractor does when it
             # heard something bad and could not pin the sentence. Ask a second reader — and see the
             # SYSTEM prompt, which is explicit that "" is usually the right answer, precisely
@@ -167,8 +167,8 @@ def merge_reconciled(
 
     Refuses three things: a quote the person cannot be shown to have said, any attempt to replace a
     definite provider answer with a contradicting one, and — when `offer_keys` is supplied — help
-    identifiers that were never available on this call. The last one is the welfare analogue of
-    ShiftFill's "a term nobody stated cannot be acknowledged": "declined the cooling centre" and "the
+    identifiers that were never available on this call. The last one is the rule that an offer
+    nobody stated cannot be declined: "declined the cooling centre" and "the
     cooling centre was never mentioned" are different facts, and only one of them is about the person.
     """
     if patch is None:

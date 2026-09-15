@@ -327,11 +327,10 @@ signing a form, and approving a message.
  "cli": {"found": true, "authenticated": true, "expires_at": "…", "server_url": "…"},
  "mcp": {"reachable": true, "tools": ["plan_call", "run_call", "get_call_run"], "server_url": "…"},
  "allowlist_count": 0, "budget": {"max": 4, "used": 0, "remaining": 4, "enforced": true},
- "webhook_configured": false, "reconciler": "none | glm | anthropic",
- "split_coverage_enabled": false, "require_manager_approval": false, "checked_at": 1757000000.0}
+ "webhook_configured": false, "reconciler": "none | glm | anthropic", "checked_at": 1757000000.0}
 ```
 
-Booleans only; no key is ever returned. `live` is false for the mock provider; `ready` means the selected provider has what it needs. The last two flags are inert carry-over from the ported settings and mean nothing in BuddyE.
+Booleans only; no key is ever returned. `live` is false for the mock provider; `ready` means the selected provider has what it needs.
 
 ### The trace (`/api/sweeps/{id}/trace`)
 

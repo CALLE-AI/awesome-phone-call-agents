@@ -175,7 +175,7 @@ async def test_it_cannot_invent_a_symptom_nobody_described() -> None:
 
 
 async def test_nobody_answering_reaches_the_layer_as_a_finding_not_a_skip() -> None:
-    """An unanswered call is where a ShiftFill-shaped system moves on and this one leans in. The
+    """An unanswered call is where a hiring cascade moves on and this one leans in. The
     empty transcript is sent, it is labelled as such, and every field the model cannot establish
     stays unknown — which is what the escalation ladder is fed."""
     r = make([reply('{"is_safe_now": {"value": "unknown", "evidence": ""}, "checks.too_hot": {"value": "unknown", "evidence": ""}}')])
@@ -369,7 +369,7 @@ def test_selection_prefers_tokenrouter_and_reports_its_name() -> None:
 
 
 async def test_a_timeout_does_not_trigger_the_no_json_retry() -> None:
-    """A live ShiftFill run spent 105 s because a timeout was treated as "this gateway lacks
+    """An earlier live run spent 105 s because a timeout was treated as "this gateway lacks
     response_format" and retried without it. Retrying doubles the wall clock on a call that was
     already too slow, and here there are forty neighbours waiting behind it."""
     import httpx

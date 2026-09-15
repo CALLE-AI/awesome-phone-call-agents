@@ -7,7 +7,7 @@ what CALL-E returned (its raw call object, its own developer events, `task_compl
 `completion_confidence`, `evidence`), what we did with it (local validation, reconcile telemetry, the
 deterministic outcome), and what that opened.
 
-Two things are here that ShiftFill's trace had no need of, and they are the ones to read first:
+Two things here are the ones to read first:
 
 * **`unaccounted`** — everyone on the roster this sweep has no outcome for, with the reason. A sweep
   is not judged by how many calls it made; it is judged by whether anybody was quietly dropped.

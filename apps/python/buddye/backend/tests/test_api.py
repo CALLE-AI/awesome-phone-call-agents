@@ -2,8 +2,8 @@
 
 Every test runs inside `app.router.lifespan_context`, so the app is exercised with the real startup
 path — preflight validation, `init_db`, seeding, sweep resumption — rather than against handlers
-called in isolation. That is deliberate: the ShiftFill port broke first at startup, not in a handler,
-and a suite that never boots the app would not have noticed.
+called in isolation. That is deliberate: startup is where regressions
+surface first, and a suite that never boots the app would not notice.
 """
 from __future__ import annotations
 

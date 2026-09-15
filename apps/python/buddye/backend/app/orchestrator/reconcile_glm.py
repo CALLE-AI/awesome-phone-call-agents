@@ -255,9 +255,8 @@ class GlmReconciler:
         transcript: list[dict[str, Any]],
         summary: str | None,
         help_offered: list[dict[str, Any]] | None = None,
-        # `disclosures` is what the ported ShiftFill runner called this argument and `help_offers` is
-        # what CallContract calls the field. A keyword mismatch between two modules ported in
-        # parallel would raise a TypeError at the call site, outside the fail-open try below, and
+        # `disclosures` and `help_offers` are accepted aliases for this argument. A keyword mismatch
+        # between two modules would raise a TypeError at the call site, outside the fail-open try below, and
         # take the sweep down with it — which is the one thing this layer is not allowed to do.
         # `help_offered` is canonical; the aliases exist so a wiring mistake cannot cost a call.
         disclosures: list[dict[str, Any]] | None = None,

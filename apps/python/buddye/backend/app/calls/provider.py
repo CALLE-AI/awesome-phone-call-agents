@@ -21,7 +21,7 @@ class CallRequest(BaseModel):
     result_schema: dict[str, Any]
     metadata: dict[str, Any] = Field(default_factory=dict)
     idempotency_key: str
-    employee_id: str  # used by the mock provider to pick a fixture
+    neighbour_id: str  # who the call is about; the mock provider picks its fixture by it
     webhook_url: str | None = None
     existing_provider_call_id: str | None = None  # set on startup resume
 

@@ -214,7 +214,7 @@ def _sdk(calls: _FakeCalls, *, deadline_s: float = 5.0) -> CalleSdkProvider:
 
 
 def _request() -> CallRequest:
-    return CallRequest(phone="+15550100", task="t", result_schema={}, idempotency_key="k", employee_id="nbr_test")
+    return CallRequest(phone="+15550100", task="t", result_schema={}, idempotency_key="k", neighbour_id="nbr_test")
 
 
 async def _sink(ev: Any) -> None:
@@ -421,3 +421,52 @@ async def test_a_case_call_with_an_unknown_outcome_opens_nothing(seeded: str) ->
         assert s.exec(select(Incident).where(Incident.neighbour_id == rosa.id)).all() == []
         [row] = s.exec(select(CheckCall).where(CheckCall.neighbour_id == rosa.id)).all()
         assert row.status == "UNKNOWN"
+
+
+# --- the budget cap cannot be overshot ------------------------------------------------------------
+async def test_calls_in_flight_and_of_unknown_outcome_use_up_the_budget(seeded: str) -> None:
+    from app.calls.budget import count_real_calls
+    from app.calls.provider import CallBudgetExhausted
+
+    order = _call_order(seeded)
+    first, second = neighbour_named(order[0]), neighbour_named(order[1])
+    settings = settings_with(CALL_PROVIDER="calle_sdk", DIALABLE_NUMBERS=f"{first.phone},{second.phone}", CALL_BUDGET_MAX=2)
+    sweep_id = make_sweep(seeded, provider="calle_sdk")
+    with session_scope() as s:
+        for nbr, status in ((first, "DIALING"), (second, "UNKNOWN")):  # neither has a provider id yet
+            s.add(CheckCall(sweep_id=sweep_id, hazard_id=seeded, neighbour_id=nbr.id, callee="neighbour", attempt=1,
+                            idempotency_key=f"{sweep_id}:{nbr.id}:neighbour:1", provider="calle_sdk",
+                            status=status, task="t", result_schema={}))
+        s.add(CheckCall(sweep_id=sweep_id, hazard_id=seeded, neighbour_id=first.id, callee="neighbour", attempt=2,
+                        idempotency_key=f"{sweep_id}:{first.id}:neighbour:2", provider="calle_sdk",
+                        status="FAILED", task="t", result_schema={}))  # a definite refusal: not counted
+    with session_scope() as s:
+        assert count_real_calls(s) == 2
+        with pytest.raises(CallBudgetExhausted):
+            CallBudget(settings).reserve(s, phone=first.phone, provider="calle_sdk")
+
+
+async def test_calls_started_at_the_same_moment_cannot_overshoot_the_budget(seeded: str) -> None:
+    import asyncio
+
+    from app.api.cases import launch_call
+
+    class _SlowCreate(MockCallProvider):
+        """Like the real SDK: the provider call id only exists after the create request returns."""
+
+        name = "calle_sdk"
+
+        async def place(self, req: CallRequest, on_event: Any) -> CallOutcome:
+            await asyncio.sleep(0.05)
+            return await super().place(req, on_event)
+
+    order = _call_order(seeded)
+    people = [neighbour_named(name) for name in order[:3]]
+    settings = settings_with(CALL_PROVIDER="calle_sdk", DIALABLE_NUMBERS=",".join(p.phone for p in people), CALL_BUDGET_MAX=1)
+    provider = _SlowCreate(delay_s=0)
+    results = await asyncio.gather(*(launch_call(seeded, p.id, settings=settings, provider=provider,
+                                                 reconciler=NullReconciler()) for p in people))
+
+    assert len(provider.placed) == 1
+    assert sorted(r["status"] for r in results) == ["completed", "refused", "refused"]
+    assert all(r["budget_exhausted"] for r in results if r["status"] == "refused")

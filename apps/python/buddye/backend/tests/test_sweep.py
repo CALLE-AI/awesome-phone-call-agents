@@ -100,7 +100,7 @@ async def test_full_sweep_reaches_every_neighbour(seeded: str) -> None:
 
 
 async def test_sweep_does_not_stop_at_the_first_finding(seeded: str) -> None:
-    """ShiftFill stopped when somebody said yes. A heat warning does not become safe because the
+    """A hiring cascade stops when somebody says yes. A heat warning does not become safe because the
     first person answered, so the roster is worked to the end whatever the calls turn up."""
     sweep_id = await run_sweep(seeded)
     outcomes = outcomes_by_name(sweep_id)
@@ -192,7 +192,7 @@ async def test_a_low_band_no_answer_stops_at_the_block_captain(seeded: str) -> N
 
 
 async def test_a_recipient_the_provider_rejects_is_unreachable_not_a_skip(seeded: str) -> None:
-    """ShiftFill moved to the next candidate. Here "the number we hold for her does not work" is a
+    """A cascade would move on. Here "the number we hold for her does not work" is a
     fact about a person nobody has spoken to today, and it has to reach the board as one."""
     provider = _RejectsOne("Trinidad Bustos", delay_s=0)
     sweep_id = await run_sweep(seeded, provider=provider)
@@ -296,7 +296,7 @@ async def test_a_handoff_packet_cannot_be_released_without_a_named_human(seeded:
 
 
 # ------------------------------------------------------------------------------------------------
-# The guards ShiftFill proved, kept
+# The dialling guards
 # ------------------------------------------------------------------------------------------------
 async def test_numbers_not_on_the_allowlist_are_never_dialled(seeded: str) -> None:
     provider = _RealNamedProvider(delay_s=0)

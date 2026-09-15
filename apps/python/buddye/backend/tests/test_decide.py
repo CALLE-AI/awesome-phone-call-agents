@@ -40,7 +40,7 @@ def risk(band: RiskBand, hours: float | None = None) -> dict:
 # ---------------------------------------------------------------------------------- silence
 @pytest.mark.parametrize("status", ["NO_ANSWER", "FAILED", "INVALID_RESULT", "PENDING", "DIALING", ""])
 def test_any_status_but_completed_is_unreachable(status: str) -> None:
-    """The inversion. In ShiftFill these never reached decide(); here they must, and they must not
+    """The inversion. In a hiring cascade these never reach decide(); here they must, and they must not
     raise, must not be SAFE, and must carry an outcome the board can show."""
     d = decide(status=status, result=None, risk=risk(RiskBand.ROUTINE), hard_fields=HEAT_HARD)
     assert d.outcome is CheckOutcome.UNREACHABLE
@@ -114,7 +114,7 @@ def test_life_support_stopped_is_urgent_at_any_band() -> None:
 
 
 def test_i_am_fine_does_not_survive_a_dead_cooler() -> None:
-    """ShiftFill's contradiction rule, ported. There it bought a human review; there is no hold here,
+    """The contradiction rule: there is no hold here,
     so it resolves pessimistically and the reason says out loud that they claimed to be safe."""
     d = decide(status="COMPLETED",
                result=result(is_safe_now="yes", checks={"too_hot": "yes"},
