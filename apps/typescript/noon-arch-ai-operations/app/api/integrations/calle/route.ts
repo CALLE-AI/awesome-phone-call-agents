@@ -14,7 +14,7 @@ export async function POST(request: Request) {
     const body = await request.json() as { action?: string; apiKey?: string; confirmed?: boolean };
     if (body.action === "connect") {
       const apiKey = String(body.apiKey || "").trim();
-      if (!validApiKey(apiKey)) return NextResponse.json({ error: "مفتاح CALL‑E لا يطابق الصيغة المتوقعة. انسخه كاملاً من لوحة CALL‑E." }, { status: 400 });
+      if (!validApiKey(apiKey)) return NextResponse.json({ error: "Enter the full CALL-E API key from the dashboard." }, { status: 400 });
       const test = await testCalleApiKey(apiKey);
       await saveCalleConnection(ownerId, apiKey);
       return NextResponse.json({ ...test, source: "saved" });
@@ -31,17 +31,17 @@ export async function POST(request: Request) {
       }
     }
     if (body.action === "disconnect") {
-      if (body.confirmed !== true) return NextResponse.json({ error: "يلزم تأكيد حذف مفتاح CALL‑E المحفوظ." }, { status: 400 });
+      if (body.confirmed !== true) return NextResponse.json({ error: "Confirm before deleting the saved CALL-E key." }, { status: 400 });
       await deleteCalleConnection(ownerId);
       return NextResponse.json({ disconnected: true, fallbackConfigured: Boolean(String(process.env.CALLE_API_KEY || "").trim()) });
     }
-    return NextResponse.json({ error: "إجراء CALL‑E غير معروف." }, { status: 400 });
+    return NextResponse.json({ error: "Unknown CALL-E action." }, { status: 400 });
   } catch (error) {
     if (error instanceof CalleApiError) return NextResponse.json({ error: error.message, code: error.code }, { status: error.status });
     const message = error instanceof Error ? error.message : "";
-    if (message === "AUTH_REQUIRED") return NextResponse.json({ error: "يلزم تسجيل الدخول." }, { status: 401 });
-    if (message === "ENCRYPTION_NOT_CONFIGURED") return NextResponse.json({ error: "تخزين الأسرار غير مجهز على الخادم بعد." }, { status: 503 });
-    if (message === "CALLE_NOT_CONNECTED") return NextResponse.json({ error: "اربط CALL‑E من الإعدادات أولاً؛ لم يُستخدم أي رصيد." }, { status: 409 });
-    return NextResponse.json({ error: "تعذر تنفيذ إعداد CALL‑E." }, { status: 500 });
+    if (message === "AUTH_REQUIRED") return NextResponse.json({ error: "Operator authentication is required." }, { status: 401 });
+    if (message === "ENCRYPTION_NOT_CONFIGURED") return NextResponse.json({ error: "Server-side credential encryption is not configured." }, { status: 503 });
+    if (message === "CALLE_NOT_CONNECTED") return NextResponse.json({ error: "Connect CALL-E first; no credit was used." }, { status: 409 });
+    return NextResponse.json({ error: "CALL-E setup could not be completed." }, { status: 500 });
   }
 }

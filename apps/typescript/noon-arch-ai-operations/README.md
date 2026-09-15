@@ -1,6 +1,6 @@
 # Noon Arch AI Operations
 
-A configurable Arabic-first operations assistant that prepares, confirms, and places real phone calls through CALL-E. The current workflows cover approval/payment follow-up, meeting scheduling, employee-document expiry reminders, and supplier quotation collection with confidential price negotiation.
+A configurable English-default operations assistant with an optional Arabic locale that prepares, confirms, and places real phone calls through CALL-E. The current workflows cover approval/payment follow-up, meeting scheduling, employee-document expiry reminders, and supplier quotation collection with confidential price negotiation.
 
 The hosted application is private by default. Importing data, refreshing a connector, or writing a result back never places a call. A CALL-E credit can only be spent after one recipient is selected and a new one-time confirmation is approved.
 
@@ -26,6 +26,7 @@ For local development, keep `CALLE_LIVE_CALLS_ENABLED=false`. Live calls are opt
 - Automatic draft refresh when a configured service is selected; completed tasks are always excluded.
 - Every non-empty standard and Custom Field is retained as task context, while a small mapping chooses the primary name/date/phone fields.
 - Optional ClickUp result write-back. Normal services add a confirmed task comment; meeting scheduling can automatically update the agreed start/end time and status, then add the call summary.
+- Saving a recipient phone number to a ClickUp task requires a separate, unchecked-by-default confirmation in the final call review and an enabled write-back binding. Call approval alone never grants phone-field write access.
 - Manual operation without any external application.
 
 The first-time setup guide separates required calling setup from optional data connectors. It shows saved configuration, CALL-E and ClickUp health, service mappings, and the manual-confirmation safety gate. Connector checks are read-only and never place a call.
@@ -82,7 +83,12 @@ Set these server-only values in `.env.local`:
 - `CALLE_BILLING_DASHBOARD_URL` if the account uses a different official billing URL
 - `CALLE_LIVE_CALLS_ENABLED=false` while developing
 - `INTEGRATION_ENCRYPTION_KEY` with at least 24 random characters
-- `SINGLE_TENANT_MODE=true` for a private one-company deployment
+- `AI_OPS_TRUSTED_INGRESS_SECRET` (at least 32 random characters) and `AI_OPS_OWNER_USER_ID` for a trusted ingress-protected one-company deployment
+- `CALLE_API_BASE_URL` only when an approved CALL-E provider origin is needed; add its exact HTTPS origin to server-only `CALLE_APPROVED_API_ORIGINS`
+
+Operator API routes fail closed with HTTP 401 if these auth values or verified ingress headers are missing. A public caller can spoof identity headers, so do not trust them by themselves. Put the app behind an authenticated ingress that strips incoming `oai-authenticated-user-*` and `x-ai-ops-trusted-ingress-secret` headers, verifies the real user's session, and injects the verified user ID/email plus the server-held secret only on backend requests. Restrict direct access to the backend. The single configured owner ID is intentional because call records, contacts, and workflows are shared within one company. `/demo` stays accessible without this setup and performs no external action. This is not a multi-tenant auth design.
+
+CALL-E bearer requests accept the official API origin by default or an exact additional server-approved HTTPS origin; redirects are refused. Do not add arbitrary client-controlled origins to the allowlist.
 
 Never put a ClickUp personal token in `.env.local`; each company connects from the application UI.
 
@@ -109,6 +115,7 @@ The regression tests verify manual CALL-E confirmation, duplicate protection, ho
 - Expiry automation is a saved preference only; no scheduler is shipped or silently created.
 - Disconnecting a connector stops future reads and write-backs. Existing call records remain an audit trail.
 - ClickUp write-back is separately configurable and is never performed by the no-call demo.
+- Phone-field synchronization also requires separate per-call operator consent and a write-back-enabled ClickUp binding.
 - Credentials are entered only in server-rendered/private setup surfaces, encrypted before storage, and never returned by an API response.
 
 ## Optional live verification

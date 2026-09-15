@@ -10,6 +10,11 @@ async function render(pathname = "/") {
   return worker.fetch(new Request(`http://localhost${pathname}`, { headers: { accept: "text/html" } }), { ASSETS: { fetch: async () => new Response("Not found", { status: 404 }) } }, { waitUntil() {}, passThroughOnException() {} });
 }
 
+function transpileUrl(source) {
+  const output = ts.transpileModule(source, { compilerOptions: { module: ts.ModuleKind.ESNext, target: ts.ScriptTarget.ES2022 } }).outputText;
+  return "data:text/javascript;base64," + Buffer.from(output).toString("base64");
+}
+
 test("credential-free demo is explicit, functional, and has no external requests", async () => {
   const response = await render("/demo");
   assert.equal(response.status, 200);
@@ -28,12 +33,14 @@ test("renders all four manually confirmed calling services", async () => {
   const response = await render();
   assert.equal(response.status, 200);
   const html = await response.text();
-  assert.match(html, /متابعة الموافقة والدفع/);
-  assert.match(html, /تنسيق الاجتماعات/);
-  assert.match(html, /تذكير انتهاء الوثائق/);
-  assert.match(html, /جمع ومقارنة عروض الأسعار/);
-  assert.match(html, /اتصال واحد فقط لكل تأكيد/);
-  assert.match(html, /لن يعيد التطبيق الاتصال أو ينفذ متابعة تلقائية/);
+  assert.match(html, /Approval &amp; payment follow-up/);
+  assert.match(html, /Meeting scheduling/);
+  assert.match(html, /Document expiry reminders/);
+  assert.match(html, /Quotation collection &amp; comparison/);
+  assert.match(html, /One call per confirmation/);
+  assert.match(html, /never redials or follows up automatically/);
+  assert.match(html, /Switch to Arabic/);
+  assert.match(html, /<html lang="en" dir="ltr"/);
 });
 
 test("server enforces manual confirmation and duplicate protection", async () => {
@@ -44,6 +51,88 @@ test("server enforces manual confirmation and duplicate protection", async () =>
   assert.match(source, /manual_confirmation/);
   assert.match(source, /Idempotency-Key/);
   assert.doesNotMatch(source, /setInterval|setTimeout|cron|scheduleCall/);
+});
+
+test("operator routes require trusted identity rather than spoofed headers", async () => {
+  for (const path of ["calls", "contacts", "workflow", "integrations"]) {
+    const route = await readFile(new URL(`../app/api/${path}/route.ts`, import.meta.url), "utf8");
+    assert.match(route, /getIntegrationOwnerId\(\)|operatorAuthResponse\(\)/, `${path} must authenticate`);
+  }
+  const owner = await readFile(new URL("../lib/integrations/owner.ts", import.meta.url), "utf8");
+  assert.doesNotMatch(owner, /SINGLE_TENANT_MODE/);
+  const source = await readFile(new URL("../lib/integrations/trusted-owner.ts", import.meta.url), "utf8");
+  const { trustedOwnerId } = await import(transpileUrl(source));
+  const secret = "a-private-ingress-secret-of-at-least-32-chars";
+  const config = { ingressSecret: secret, ownerUserId: "verified-operator" };
+  assert.equal(trustedOwnerId(new Headers(), config), null);
+  assert.equal(trustedOwnerId(new Headers({ "oai-authenticated-user-id": "verified-operator" }), config), null);
+  assert.equal(trustedOwnerId(new Headers({ "oai-authenticated-user-id": "impostor", "x-ai-ops-trusted-ingress-secret": secret }), config), null);
+  assert.equal(trustedOwnerId(new Headers({ "oai-authenticated-user-id": "verified-operator", "x-ai-ops-trusted-ingress-secret": secret }), config), "single-tenant-owner");
+});
+
+test("phone-bearing history and provider errors are masked and phone sync requires separate consent", async () => {
+  const redactorSource = await readFile(new URL("../lib/integrations/redact.ts", import.meta.url), "utf8");
+  const { maskPhoneText, maskPhoneValue } = await import(transpileUrl(redactorSource));
+  const international = ["+966", "55", "123", "4567"].join("");
+  const local = ["055", "123", "4567"].join("");
+  assert.equal(maskPhoneText(`Call +966 55 123 4567 and ${local}`), "Call [phone ending 4567] and [phone ending 4567]");
+  assert.equal(maskPhoneText(`Call ${international.slice(1)}`), "Call [phone ending 4567]");
+  assert.deepEqual(maskPhoneValue({ phone: international, transcript: `Dial ${local}` }), { phone: "[phone ending 4567]", transcript: "Dial [phone ending 4567]" });
+  const [calls, page] = await Promise.all([
+    readFile(new URL("../app/api/calls/route.ts", import.meta.url), "utf8"),
+    readFile(new URL("../app/page.tsx", import.meta.url), "utf8"),
+  ]);
+  assert.match(calls, /maskPhoneValue\(parseJson\(row\.transcript_json/);
+  assert.match(calls, /maskPhoneValue\(parseJson\(row\.evidence_json/);
+  assert.match(calls, /maskPhoneValue\(parseJson\(row\.result_json/);
+  assert.match(calls, /body\.syncPhoneToClickUp === true/);
+  assert.match(calls, /binding\?\.writeback_enabled/);
+  assert.match(page, /syncPhoneToClickUp: phoneWritebackConsent/);
+  assert.match(page, /checked=\{phoneWritebackConsent\}/);
+});
+
+test("meeting write-back requires the exact provider-selected slot ID", async () => {
+  const source = await readFile(new URL("../lib/integrations/call-writeback.ts", import.meta.url), "utf8");
+  assert.match(source, /source\.find\(\(item\) => item\.provider === "clickup" && item\.slotId === selectedSlotId\)/);
+  assert.doesNotMatch(source, /source\.length === 1 \? source\[0\]/);
+  assert.match(source, /MEETING_RESULT_SLOT_INVALID/);
+});
+
+test("CALL-E bearer tokens stay on approved HTTPS origins and redirects are refused", async () => {
+  const [client, redactor] = await Promise.all([
+    readFile(new URL("../lib/integrations/calle.ts", import.meta.url), "utf8"),
+    readFile(new URL("../lib/integrations/redact.ts", import.meta.url), "utf8"),
+  ]);
+  const output = ts.transpileModule(client, { compilerOptions: { module: ts.ModuleKind.ESNext, target: ts.ScriptTarget.ES2022 } }).outputText.replace('from "./redact"', `from "${transpileUrl(redactor)}"`);
+  const calle = await import("data:text/javascript;base64," + Buffer.from(output).toString("base64"));
+  const previousBase = process.env.CALLE_API_BASE_URL;
+  const previousOrigins = process.env.CALLE_APPROVED_API_ORIGINS;
+  const originalFetch = globalThis.fetch;
+  try {
+    delete process.env.CALLE_API_BASE_URL;
+    delete process.env.CALLE_APPROVED_API_ORIGINS;
+    assert.equal(calle.calleApiBaseUrl(), "https://api.heycall-e.com");
+    for (const base of ["http://api.heycall-e.com", "https://api.heycall-e.com.evil.invalid", "https://api.heycall-e.com/prefix", "https://api.heycall-e.com/?token=leak"]) {
+      process.env.CALLE_API_BASE_URL = base;
+      assert.throws(() => calle.calleApiBaseUrl(), /CALLE_API_BASE_URL_INVALID/);
+    }
+    process.env.CALLE_API_BASE_URL = "https://api.heycall-e.com";
+    let request;
+    globalThis.fetch = async (target, options) => {
+      request = { target, options };
+      return new Response("{}", { status: 200 });
+    };
+    await calle.calleFetch("/v1/calls", { headers: { Authorization: "Bearer fictional-test-token" }, redirect: "follow" });
+    assert.equal(request.target, "https://api.heycall-e.com/v1/calls");
+    assert.equal(request.options.redirect, "error");
+    assert.throws(() => calle.calleFetch("//another-origin/v1/calls"), /CALLE_PATH_INVALID/);
+  } finally {
+    globalThis.fetch = originalFetch;
+    if (previousBase === undefined) delete process.env.CALLE_API_BASE_URL;
+    else process.env.CALLE_API_BASE_URL = previousBase;
+    if (previousOrigins === undefined) delete process.env.CALLE_APPROVED_API_ORIGINS;
+    else process.env.CALLE_APPROVED_API_ORIGINS = previousOrigins;
+  }
 });
 
 test("CALL-E credentials are configurable, encrypted, and tested without a phone call", async () => {
@@ -70,10 +159,13 @@ test("CALL-E credentials are configurable, encrypted, and tested without a phone
   assert.doesNotMatch(calls, /process\.env\.CALLE_API_KEY/);
   assert.match(integrationsRoute, /liveCallsEnabled: process\.env\.CALLE_LIVE_CALLS_ENABLED === "true"/);
   assert.match(page, /liveCallsEnabled \? "الاتصال المباشر مفعل" : "الاتصال المباشر متوقف"/);
-  const output = ts.transpileModule(calleClient, { compilerOptions: { module: ts.ModuleKind.ESNext, target: ts.ScriptTarget.ES2022 } }).outputText;
+  const redactor = await readFile(new URL("../lib/integrations/redact.ts", import.meta.url), "utf8");
+  const redactorOutput = ts.transpileModule(redactor, { compilerOptions: { module: ts.ModuleKind.ESNext, target: ts.ScriptTarget.ES2022 } }).outputText;
+  const redactorUrl = "data:text/javascript;base64," + Buffer.from(redactorOutput).toString("base64");
+  const output = ts.transpileModule(calleClient, { compilerOptions: { module: ts.ModuleKind.ESNext, target: ts.ScriptTarget.ES2022 } }).outputText.replace('from "./redact"', `from "${redactorUrl}"`);
   const calle = await import("data:text/javascript;base64," + Buffer.from(output).toString("base64"));
   assert.equal(calle.calleErrorDetails(401, {}).code, "invalid_api_key");
-  assert.match(calle.calleErrorDetails(401, {}).message, /لم يُستخدم أي رصيد/);
+  assert.match(calle.calleErrorDetails(401, {}).message, /no credit/);
 });
 
 test("provider balance is never inferred from the local call count", async () => {
@@ -117,7 +209,7 @@ test("contact directory exposes duplicate feedback and supports explicit editing
   assert.match(contactsRoute, /export async function PUT/);
   assert.match(contactsRoute, /UPDATE contacts SET name = \?, company = \?, phone = \? WHERE id = \?/);
   assert.match(contactsRoute, /WHERE phone = \? AND id <> \?/);
-  assert.match(contactsRoute, /يمكنك تعديل جهة الاتصال الموجودة/);
+  assert.match(contactsRoute, /Edit the existing contact instead/);
   assert.match(page, /فتحنا جهة الاتصال الحالية مع بياناتك الجديدة/);
   assert.match(page, /حفظ التعديلات/);
   assert.match(page, /className="edit-contact"/);

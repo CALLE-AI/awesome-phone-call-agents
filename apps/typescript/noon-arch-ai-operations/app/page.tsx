@@ -31,10 +31,10 @@ const serviceConfig: Record<ServiceKey, { title: string; short: string; subjectL
   supplier_quotation: { title: "جمع ومقارنة عروض الأسعار", short: "الموردون", subjectLabel: "طلب التسعير", itemsLabel: "المواد والكميات", goal: "السعر · الضريبة · التوفر · التسليم · الضمان", recipientLabel: "اسم ممثل المورد", affiliationLabel: "شركة المورد (اختياري)", affiliationPlaceholder: "مثال: مؤسسة التوريد" },
 };
 const defaultWorkflows: Record<ServiceKey, Workflow> = {
-  approval_payment_follow_up: { subject: "DEMO-104 — مشروع تجريبي", items: [{ name: "اعتماد مخططات التكييف", quantity: 1 }, { name: "سداد دفعة المرحلة الحالية", quantity: 1 }], settings: { enabled: true, automaticCalling: false, daysBefore: 0 } },
-  meeting_scheduling: { subject: "تنسيق اجتماع", items: [{ name: "موعد الاجتماع", quantity: 1, date: "", startTime: "", endTime: "" }], settings: { enabled: true, automaticCalling: false, daysBefore: 0 } },
-  employee_document_expiry: { subject: "تذكير بانتهاء وثائق الموظف", items: [{ name: "رخصة الهيئة السعودية للمهندسين", quantity: 1, date: "2026-10-15" }], settings: { enabled: false, automaticCalling: false, daysBefore: 30 } },
-  supplier_quotation: { subject: "طلب تسعير — التسليم إلى المدينة المنورة", items: [{ name: "كاشف دخان", quantity: 20, unit: "قطعة" }, { name: "رأس رشاش", quantity: 15, unit: "قطعة" }], settings: { enabled: true, automaticCalling: false, daysBefore: 0 } },
+  approval_payment_follow_up: { subject: "DEMO-104 — fictional project", items: [{ name: "Approve HVAC drawings", quantity: 1 }, { name: "Pay current phase invoice", quantity: 1 }], settings: { enabled: true, automaticCalling: false, daysBefore: 0 } },
+  meeting_scheduling: { subject: "Schedule a meeting", items: [{ name: "Meeting request", quantity: 1, date: "", startTime: "", endTime: "" }], settings: { enabled: true, automaticCalling: false, daysBefore: 0 } },
+  employee_document_expiry: { subject: "Employee document expiry reminder", items: [{ name: "Professional engineering license", quantity: 1, date: "2026-10-15" }], settings: { enabled: false, automaticCalling: false, daysBefore: 30 } },
+  supplier_quotation: { subject: "Quotation request — delivery to the project site", items: [{ name: "Smoke detector", quantity: 20, unit: "unit" }, { name: "Sprinkler head", quantity: 15, unit: "unit" }], settings: { enabled: true, automaticCalling: false, daysBefore: 0 } },
 };
 const statusLabels: Record<string, string> = { completed: "مكتملة", queued: "قيد الانتظار", running: "جارية", failed: "فشلت", rejected: "مرفوضة", created: "تم إنشاؤها" };
 const resultLabels: Record<string, string> = { approval_status: "حالة الموافقة", payment_status: "حالة الدفع", expected_payment_date: "موعد الدفع المتوقع", blocker: "العائق", follow_up_needed: "تحتاج متابعة", follow_up_date: "موعد المتابعة", availability_status: "نتيجة المواعيد", selected_available_time: "الوقت المختار", preferred_times: "الأيام والأوقات المفضلة", unavailable_time_requested: "وقت غير متاح طُلب", document_status: "حالة الوثيقة", renewal_started: "بدأ التجديد", expected_completion_date: "موعد الإكمال", initial_quote_sar: "السعر الأولي (ر.س)", final_quote_sar: "السعر النهائي (ر.س)", discount_offered: "تم تقديم خصم", discount_percent: "نسبة الخصم", vat_included: "شامل الضريبة", stock_status: "حالة المخزون", delivery_days: "مدة التسليم بالأيام", warranty: "الضمان", price_premium_reason: "سبب السعر الأعلى", quote_valid_until: "صلاحية العرض", notes: "ملاحظات" };
@@ -172,6 +172,7 @@ export default function Home() {
   const [serviceKey, setServiceKey] = useState<ServiceKey>("approval_payment_follow_up");
   const [workflows, setWorkflows] = useState<Record<ServiceKey, Workflow>>(defaultWorkflows);
   const [disclosure, setDisclosure] = useState(false);
+  const [phoneWritebackConsent, setPhoneWritebackConsent] = useState(false);
   const [callState, setCallState] = useState<"idle" | "sending" | "sent" | "error">("idle");
   const [message, setMessage] = useState("");
   const [confirmationId, setConfirmationId] = useState("");
@@ -329,7 +330,7 @@ export default function Home() {
   async function placeCall() {
     if (!canCall) return; setCallState("sending"); setMessage("");
     const callItems = serviceKey === "meeting_scheduling" ? offeredMeetingItems(workflow.items) : workflow.items;
-    const response = await fetch("/api/calls", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ recipient: chosen[0], deliveryCity: workflow.subject, items: callItems, serviceKey, confirmed: true, confirmationId }) });
+    const response = await fetch("/api/calls", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ recipient: chosen[0], deliveryCity: workflow.subject, items: callItems, serviceKey, confirmed: true, confirmationId, syncPhoneToClickUp: phoneWritebackConsent }) });
     const data = await response.json().catch(() => ({})) as { error?: string; phoneSync?: { updated: number; unchanged: number; unavailable: number; failed: number } | null };
     if (response.ok) {
       setCallState("sent");
@@ -346,7 +347,7 @@ export default function Home() {
     else { setCallState("error"); setMessage(localizeMessage(data.error || t("تعذر بدء المكالمة."))); }
   }
 
-  function openConfirmation() { setConfirmationId(crypto.randomUUID()); setDisclosure(false); setCallState("idle"); setMessage(""); setShowConfirm(true); }
+  function openConfirmation() { setConfirmationId(crypto.randomUUID()); setDisclosure(false); setPhoneWritebackConsent(false); setCallState("idle"); setMessage(""); setShowConfirm(true); }
   function selectContactForCall(contact: Contact) { setSelected([contact.id]); setShowAdd(false); setEditingContact(null); setMessage(t("تم اختيار جهة الاتصال. راجع الطلب قبل تأكيد أي مكالمة.")); setActiveView("call"); void loadClickUpService(serviceKey); }
   async function applyImportedItems(key: ServiceKey, items: Item[], subject?: string) {
     const current = workflows[key];
@@ -525,7 +526,7 @@ export default function Home() {
     </aside>
 
     <section className="workspace">
-      <header className="topbar"><div><p className="eyebrow">{t(appSettings.assistantName)}</p><h1>{t(viewTitles[activeView])}</h1></div><div className="topbar-actions"><button type="button" className="language-toggle" onClick={() => { toggleLanguage(); setMessage(""); }} aria-label={t("لغة الواجهة")} title={t("غيّر لغة الواجهة فقط؛ لغة المكالمة مستقلة في الإعدادات.")}><span aria-hidden="true">文</span>{language === "ar" ? "English" : "العربية"}</button><div className={`simulation ${liveCallsEnabled ? "" : "disabled"}`}><span /> {t(liveCallsEnabled ? "الاتصال المباشر مفعل" : "الاتصال المباشر متوقف")}</div></div></header>
+      <header className="topbar"><div><p className="eyebrow">{t(appSettings.assistantName)}</p><h1>{t(viewTitles[activeView])}</h1></div><div className="topbar-actions"><button type="button" className="language-toggle" onClick={() => { toggleLanguage(); setMessage(""); }} aria-label={t("لغة الواجهة")} title={t("غيّر لغة الواجهة فقط؛ لغة المكالمة مستقلة في الإعدادات.")}><span aria-hidden="true">EN/AR</span>{language === "ar" ? "English" : "Switch to Arabic"}</button><div className={`simulation ${liveCallsEnabled ? "" : "disabled"}`}><span /> {t(liveCallsEnabled ? "الاتصال المباشر مفعل" : "الاتصال المباشر متوقف")}</div></div></header>
       <CalleUsageCard usage={usage} mobile/>
 
       {activeView === "call" && <>
@@ -572,7 +573,19 @@ export default function Home() {
       {activeView === "settings" && <IntegrationsPanel appSettings={appSettings} onSettingsSaved={setAppSettings} onApplyItems={applyImportedItems} onSetupStatusChange={(ready) => setSetupNeedsAttention(!ready)}/>}
     </section>
 
-    {showConfirm && <div className="modal-backdrop"><section className="confirm-modal" role="dialog" aria-modal="true" aria-labelledby="confirm-title"><button className="modal-close" aria-label={t("إغلاق")} onClick={() => setShowConfirm(false)}>×</button><span className="confirm-icon">☎</span><p className="eyebrow">{t("التأكيد النهائي")}</p><h2 id="confirm-title">{t("راجع المكالمة قبل إرسالها")}</h2><div className="confirm-summary"><span>{t("المستلم")}</span><strong>{chosen[0]?.name}</strong><span>{t("الرقم")}</span><strong dir="ltr">{chosen[0]?.phone}</strong><span>{t("الخدمة")}</span><strong>{t(config.title)}</strong><span>{t(config.subjectLabel)}</span><strong>{t(workflow.subject)}</strong></div><WorkflowSummary serviceKey={serviceKey} workflow={workflow}/>{selectedClickUpTask && <div className={`phone-sync-note ${selectedClickUpTask.item.source?.contactPhoneFieldKey ? "available" : "unavailable"}`}>{t(selectedClickUpTask.item.source?.contactPhoneFieldKey ? "بعد قبول CALL‑E للمكالمة، سيُحفظ هذا الرقم في حقل الهاتف بمهمة ClickUp إذا كان جديداً أو معدلاً." : "لا يوجد حقل Phone صالح في هذه المهمة؛ ستُرسل المكالمة، لكن لن يُحفظ الرقم في ClickUp حتى تضيف حقل Phone إلى المصدر.")}</div>}<label className="disclosure"><input type="checkbox" checked={disclosure} onChange={(e) => setDisclosure(e.target.checked)}/><span>{t("أؤكد أنني مخوّل بالاتصال بهذا الرقم وأن البيانات أعلاه صحيحة.")}</span></label>{message && <div className={`call-message ${callState}`}>{message}</div>}<div className="modal-actions"><button onClick={() => setShowConfirm(false)}>{t("رجوع للتعديل")}</button><button className="call-button" disabled={!canCall || callState === "sending" || callState === "sent"} onClick={placeCall}>{t(callState === "sending" ? "جارٍ الإرسال…" : "تأكيد واستخدام مكالمة واحدة")}</button></div>{callState === "sent" && <button className="history-link" onClick={() => { setShowConfirm(false); switchView("history"); }}>{t("عرض سجل المكالمات")}</button>}<small className="final-note">{t("لن تتكرر هذه المكالمة تلقائياً. أي مكالمة جديدة تحتاج إلى تأكيد جديد.")}</small></section></div>}
+    {showConfirm && <div className="modal-backdrop"><section className="confirm-modal" role="dialog" aria-modal="true" aria-labelledby="confirm-title">
+      <button className="modal-close" aria-label={t("إغلاق")} onClick={() => setShowConfirm(false)}>×</button>
+      <span className="confirm-icon">☎</span><p className="eyebrow">{t("التأكيد النهائي")}</p><h2 id="confirm-title">{t("راجع المكالمة قبل إرسالها")}</h2>
+      <div className="confirm-summary"><span>{t("المستلم")}</span><strong>{chosen[0]?.name}</strong><span>{t("الرقم")}</span><strong dir="ltr">{chosen[0]?.phone}</strong><span>{t("الخدمة")}</span><strong>{t(config.title)}</strong><span>{t(config.subjectLabel)}</span><strong>{t(workflow.subject)}</strong></div>
+      <WorkflowSummary serviceKey={serviceKey} workflow={workflow}/>
+      {selectedClickUpTask && <div className={`phone-sync-note ${selectedClickUpTask.item.source?.contactPhoneFieldKey ? "available" : "unavailable"}`}>{t(selectedClickUpTask.item.source?.contactPhoneFieldKey ? "يمكن حفظ الرقم في حقل Phone للمهمة بعد قبول المكالمة، فقط إذا وافقت بشكل منفصل وفُعّلت كتابة النتيجة لهذا الربط." : "لا يوجد حقل Phone صالح في هذه المهمة؛ لن يُحفظ الرقم في ClickUp.")}</div>}
+      {selectedClickUpTask?.item.source?.contactPhoneFieldKey && <label className="disclosure"><input type="checkbox" checked={phoneWritebackConsent} onChange={(e) => setPhoneWritebackConsent(e.target.checked)}/><span>{t("أوافق بشكل منفصل على حفظ رقم هذا المستلم في حقل Phone للمهمة المحددة بعد قبول المكالمة، إذا كان ربط ClickUp يسمح بالكتابة.")}</span></label>}
+      <label className="disclosure"><input type="checkbox" checked={disclosure} onChange={(e) => setDisclosure(e.target.checked)}/><span>{t("أؤكد أنني مخوّل بالاتصال بهذا الرقم وأن البيانات أعلاه صحيحة.")}</span></label>
+      {message && <div className={`call-message ${callState}`}>{message}</div>}
+      <div className="modal-actions"><button onClick={() => setShowConfirm(false)}>{t("رجوع للتعديل")}</button><button className="call-button" disabled={!canCall || callState === "sending" || callState === "sent"} onClick={placeCall}>{t(callState === "sending" ? "جارٍ الإرسال…" : "تأكيد واستخدام مكالمة واحدة")}</button></div>
+      {callState === "sent" && <button className="history-link" onClick={() => { setShowConfirm(false); switchView("history"); }}>{t("عرض سجل المكالمات")}</button>}
+      <small className="final-note">{t("لن تتكرر هذه المكالمة تلقائياً. أي مكالمة جديدة تحتاج إلى تأكيد جديد.")}</small>
+    </section></div>}
   </main>;
 }
 
@@ -628,7 +641,7 @@ function TaskRecipientEditor({ serviceKey, recipient, phoneFieldAvailable, saved
       <label><span>{t(recipientConfig.affiliationLabel)}</span><input value={recipient.company} autoComplete="organization" placeholder={t(recipientConfig.affiliationPlaceholder)} onChange={(event) => onChange({ company: event.target.value })}/></label>
       <label className="phone-field"><span>{t("رقم الهاتف الدولي")}</span><input type="tel" value={recipient.phone} autoComplete="tel" inputMode="tel" dir="ltr" placeholder="+9665XXXXXXXX" onChange={(event) => onChange({ phone: event.target.value })}/><small>{t("صيغة E.164: علامة + ثم رمز الدولة والرقم.")}</small></label>
     </div>
-    <div className={`clickup-phone-write ${phoneFieldAvailable ? "available" : "unavailable"}`}>{t(phoneFieldAvailable ? "سيُحدّث حقل الهاتف في مهمة ClickUp بعد قبول المكالمة إذا غيّرت الرقم أو أضفته." : "لم يجد التطبيق حقل Phone في المهمة. يمكن الاتصال، لكن أضف حقل Phone للمصدر حتى يعمل الحفظ إلى ClickUp.")}</div>
+    <div className={`clickup-phone-write ${phoneFieldAvailable ? "available" : "unavailable"}`}>{t(phoneFieldAvailable ? "يمكنك الموافقة بشكل منفصل في المراجعة النهائية على حفظ الرقم في حقل Phone للمهمة، إذا فُعّلت كتابة النتيجة لهذا الربط." : "لم يجد التطبيق حقل Phone في المهمة. يمكن الاتصال، لكن لن يُحفظ الرقم في ClickUp.")}</div>
     <button className="save-contact-button" onClick={onSave} disabled={saved || saving || !recipient.name.trim() || !validPhone(recipient.phone)}>{t(saved ? "✓ محفوظ كجهة اتصال" : saving ? "جارٍ الحفظ…" : "حفظ كجهة اتصال")}</button>
   </div>;
 }

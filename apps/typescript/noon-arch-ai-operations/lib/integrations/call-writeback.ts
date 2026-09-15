@@ -2,6 +2,7 @@ import { getD1 } from "../../db/d1";
 import { analyzeProposedMeetingSlot, createTaskComment, getListTasks, getSourceTasks, updateMeetingTask, type ClickUpTask } from "./clickup";
 import type { IntegrationSourceType, WorkflowFieldMapping } from "./contracts";
 import { getBinding, getClickUpAuth } from "./store";
+import { maskPhoneText, maskPhoneValue } from "./redact";
 
 type CallRow = {
   id: number;
@@ -46,16 +47,16 @@ function resultComment(record: CallRow, result: Record<string, unknown>) {
   const resultLines = Object.entries(result)
     .filter(([key]) => key !== "selected_slot_id")
     .slice(0, 20)
-    .map(([key, value]) => "- " + key + ": " + String(value))
+    .map(([key, value]) => "- " + key + ": " + String(maskPhoneValue(value, key)))
     .join("\n");
   return [
-    "📞 نتيجة مكالمة CALL‑E",
-    "المستلم: " + record.recipient_name,
-    "الملخص: " + (record.summary || "لم يتوفر ملخص"),
-    resultLines ? "\nالبيانات المستخرجة:\n" + resultLines : "",
-    record.calle_call_id ? "\nمعرّف المكالمة: " + record.calle_call_id : "",
-    "\nتمت الكتابة من مساعد العمليات؛ لم تُنشأ مكالمة جديدة.",
-  ].filter(Boolean).join("\n");
+    "CALL-E call result",
+    "Recipient: " + record.recipient_name,
+    "Summary: " + (record.summary || "No summary available"),
+    resultLines ? "\nExtracted fields:\n" + resultLines : "",
+    record.calle_call_id ? "\nCall ID: " + record.calle_call_id : "",
+    "\nWritten by the operations assistant; no new call was placed.",
+  ].filter(Boolean).map((line) => maskPhoneText(line)).join("\n");
 }
 
 export async function performCallWriteback(ownerId: string, recordId: number) {
@@ -82,8 +83,7 @@ export async function performCallWriteback(ownerId: string, recordId: number) {
 
     if (record.workflow === "meeting_scheduling" && result.availability_status === "selected") {
       const selectedSlotId = typeof result.selected_slot_id === "string" ? result.selected_slot_id : "";
-      const selected = source.find((item) => item.provider === "clickup" && item.slotId === selectedSlotId)
-        || (source.length === 1 ? source[0] : undefined);
+      const selected = selectedSlotId ? source.find((item) => item.provider === "clickup" && item.slotId === selectedSlotId) : undefined;
       const startMilliseconds = Date.parse(selected?.startAt || "");
       const endMilliseconds = Date.parse(selected?.endAt || "");
       if (!selected?.taskId || !Number.isFinite(startMilliseconds) || !Number.isFinite(endMilliseconds) || endMilliseconds <= startMilliseconds) {

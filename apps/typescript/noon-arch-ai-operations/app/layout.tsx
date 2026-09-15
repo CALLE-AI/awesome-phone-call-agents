@@ -16,7 +16,7 @@ const geistMono = Geist_Mono({
 
 export const metadata: Metadata = {
   title: "Noon Arch AI Assistant",
-  description: "Noon Arch AI Operations Assistant | مساعد نون آرتش لإدارة عمليات الاتصال الذكية",
+  description: "Noon Arch AI Operations Assistant for approval-gated phone workflows",
   icons: {
     icon: "/favicon.svg",
     shortcut: "/favicon.svg",
@@ -29,7 +29,7 @@ export default function RootLayout({
   children: React.ReactNode;
 }>) {
   return (
-    <html lang="ar" dir="rtl" suppressHydrationWarning>
+    <html lang="en" dir="ltr" suppressHydrationWarning>
       <body
         className={`${geistSans.variable} ${geistMono.variable} antialiased`}
       >

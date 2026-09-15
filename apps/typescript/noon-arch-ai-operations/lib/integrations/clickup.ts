@@ -102,7 +102,7 @@ export async function getSpaces(auth: ClickUpAuth, workspaceId: string) {
   return payload.spaces ?? [];
 }
 
-export async function getSpaceSources(auth: ClickUpAuth, spaceId: string, spaceName = "القسم") {
+export async function getSpaceSources(auth: ClickUpAuth, spaceId: string, spaceName = "Space") {
   const [folderPayload, folderlessPayload] = await Promise.all([
     clickUpRequest<{ folders?: Array<{ id: string; name: string; parent_folder?: { id?: string } | string | null }> }>(auth, `/space/${encodeURIComponent(spaceId)}/folder?archived=false`),
     clickUpRequest<{ lists?: Array<{ id: string; name: string }> }>(auth, `/space/${encodeURIComponent(spaceId)}/list?archived=false`),
@@ -113,24 +113,24 @@ export async function getSpaceSources(auth: ClickUpAuth, spaceId: string, spaceN
     return (payload.lists ?? []).map<ClickUpSource>((list) => ({ id: list.id, name: list.name, path: `${folder.name} / ${list.name}`, type: "list", folderId: folder.id }));
   }));
   const sources: ClickUpSource[] = [
-    { id: spaceId, name: spaceName, path: `كل القسم: ${spaceName}`, type: "space" },
-    ...folders.map((folder) => ({ id: folder.id, name: folder.name, path: `كل المجلد: ${folder.name}`, type: "folder" as const })),
+    { id: spaceId, name: spaceName, path: `Entire space: ${spaceName}`, type: "space" },
+    ...folders.map((folder) => ({ id: folder.id, name: folder.name, path: `Entire folder: ${folder.name}`, type: "folder" as const })),
     ...(folderlessPayload.lists ?? []).map((list) => ({ id: list.id, name: list.name, path: list.name, type: "list" as const, folderId: null })),
     ...folderLists.flat(),
   ];
   const order: Record<IntegrationSourceType, number> = { space: 0, folder: 1, list: 2 };
-  return sources.sort((a, b) => order[a.type] - order[b.type] || a.path.localeCompare(b.path, "ar"));
+  return sources.sort((a, b) => order[a.type] - order[b.type] || a.path.localeCompare(b.path, "en"));
 }
 
 const builtInFields: SourceField[] = [
-  { key: "name", label: "اسم المهمة", type: "text" },
-  { key: "description", label: "وصف المهمة", type: "text" },
-  { key: "status", label: "حالة المهمة", type: "status" },
-  { key: "start_date", label: "تاريخ/وقت البدء", type: "date" },
-  { key: "due_date", label: "تاريخ/وقت الاستحقاق", type: "date" },
-  { key: "assignee", label: "المسند إليه", type: "users" },
-  { key: "folder_name", label: "اسم المجلد / الموظف", type: "text" },
-  { key: "list_name", label: "اسم القائمة", type: "text" },
+  { key: "name", label: "Task name", type: "text" },
+  { key: "description", label: "Task description", type: "text" },
+  { key: "status", label: "Task status", type: "status" },
+  { key: "start_date", label: "Start date/time", type: "date" },
+  { key: "due_date", label: "Due date/time", type: "date" },
+  { key: "assignee", label: "Assignee", type: "users" },
+  { key: "folder_name", label: "Folder / employee name", type: "text" },
+  { key: "list_name", label: "List name", type: "text" },
 ];
 
 export async function getSourceFields(auth: ClickUpAuth, sourceType: IntegrationSourceType, sourceId: string): Promise<SourceField[]> {
@@ -141,7 +141,7 @@ export async function getSourceFields(auth: ClickUpAuth, sourceType: Integration
       : `/space/${encodeURIComponent(sourceId)}/field`;
   const payload = await clickUpRequest<{ fields?: Array<{ id: string; name: string; type: string }> }>(auth, path);
   const typeMap: Record<string, SourceField["type"]> = { date: "date", number: "number", currency: "number", phone: "phone", users: "users", checkbox: "text" };
-  return [...builtInFields, ...(payload.fields ?? []).map((field) => ({ key: `custom:${field.id}`, label: `${field.name} · حقل مخصص`, type: typeMap[field.type] ?? "text" }))];
+  return [...builtInFields, ...(payload.fields ?? []).map((field) => ({ key: `custom:${field.id}`, label: `${field.name} · Custom field`, type: typeMap[field.type] ?? "text" }))];
 }
 
 export async function getListFields(auth: ClickUpAuth, listId: string) {
@@ -304,7 +304,7 @@ function compactObject(value: Record<string, unknown>): string {
 export function displayClickUpValue(value: unknown): string {
   if (value === null || value === undefined) return "";
   if (typeof value === "string" || typeof value === "number" || typeof value === "boolean") return String(value).trim();
-  if (Array.isArray(value)) return value.map((entry) => typeof entry === "object" && entry !== null ? compactObject(entry as Record<string, unknown>) : displayClickUpValue(entry)).filter(Boolean).join("، ");
+  if (Array.isArray(value)) return value.map((entry) => typeof entry === "object" && entry !== null ? compactObject(entry as Record<string, unknown>) : displayClickUpValue(entry)).filter(Boolean).join(", ");
   if (typeof value === "object") return compactObject(value as Record<string, unknown>);
   return "";
 }
@@ -318,7 +318,7 @@ function readCustomField(field: ClickUpCustomField): unknown {
   if (field.type === "labels" && Array.isArray(field.value)) return field.value.map((id) => {
     const option = customOption(field, String(id));
     return option?.label || option?.name || id;
-  }).join("، ");
+  }).join(", ");
   return field.value;
 }
 
@@ -330,7 +330,7 @@ export function readTaskField(task: ClickUpTask, key?: string): unknown {
   }
   if (key === "description") return task.description || task.text_content;
   if (key === "status") return typeof task.status === "string" ? task.status : task.status?.status;
-  if (key === "assignee") return task.assignees?.map((assignee) => assignee.username || assignee.email).filter(Boolean).join("، ");
+  if (key === "assignee") return task.assignees?.map((assignee) => assignee.username || assignee.email).filter(Boolean).join(", ");
   if (key === "folder_name") return task.folder?.name;
   if (key === "list_name") return task.list?.name;
   return task[key as keyof ClickUpTask];
@@ -584,7 +584,7 @@ export function meetingRequestContext(task: ClickUpTask, attendeeField: string, 
   return {
     requestStatus,
     attendeeIds: meetingAttendeeIdentities(task, attendeeField),
-    attendeeNames: displayClickUpValue(readTaskField(task, attendeeField)).split("،").map((name) => name.trim()).filter(Boolean),
+    attendeeNames: displayClickUpValue(readTaskField(task, attendeeField)).split(/[،,]/).map((name) => name.trim()).filter(Boolean),
   };
 }
 
@@ -615,11 +615,11 @@ export function analyzeProposedMeetingSlot(
       }];
     });
   const reason = interval.end <= now
-    ? "انتهى هذا الوقت"
+    ? "This time has passed"
     : !request.attendeeIds.length
-      ? "لم يُحدد أي حاضر في الحقل المختار"
+      ? "No attendee is selected in the mapped field"
       : conflicts.length
-        ? "لدى أحد الحاضرين اجتماع آخر في هذا الوقت"
+        ? "An attendee has another meeting at this time"
         : undefined;
   return {
     taskId: requestTask.id,
@@ -663,7 +663,7 @@ function contextType(fieldType?: string): SourceField["type"] {
 function contextDate(value: unknown, timezone: string) {
   const milliseconds = Number(value);
   if (!Number.isFinite(milliseconds) || milliseconds <= 0) return displayClickUpValue(value);
-  return new Intl.DateTimeFormat("ar-SA-u-ca-gregory", { timeZone: timezone, dateStyle: "medium", timeStyle: "short" }).format(new Date(milliseconds));
+  return new Intl.DateTimeFormat("en-GB-u-ca-gregory", { timeZone: timezone, dateStyle: "medium", timeStyle: "short" }).format(new Date(milliseconds));
 }
 
 export function collectTaskContext(task: ClickUpTask, timezone: string): WorkflowContextField[] {
@@ -672,19 +672,19 @@ export function collectTaskContext(task: ClickUpTask, timezone: string): Workflo
     const formatted = type === "date" ? contextDate(value, timezone) : displayClickUpValue(value);
     if (formatted) result.push({ key, label, value: formatted.slice(0, 1200), type });
   };
-  add("name", "اسم المهمة", task.name);
-  add("status", "الحالة", readTaskField(task, "status"), "status");
-  add("description", "الوصف", task.description || task.text_content);
-  add("priority", "الأولوية", typeof task.priority === "string" ? task.priority : task.priority?.priority);
-  add("start_date", "وقت البدء", task.start_date, "date");
-  add("due_date", "وقت الاستحقاق / الانتهاء", task.due_date, "date");
-  add("assignees", "المسند إليهم", task.assignees?.map((assignee) => assignee.username || assignee.email).filter(Boolean));
-  add("tags", "الوسوم", task.tags?.map((tag) => tag.name).filter(Boolean));
-  add("folder_name", "المجلد / الموظف", task.folder?.name);
-  add("list_name", "القائمة", task.list?.name);
+  add("name", "Task name", task.name);
+  add("status", "Status", readTaskField(task, "status"), "status");
+  add("description", "Description", task.description || task.text_content);
+  add("priority", "Priority", typeof task.priority === "string" ? task.priority : task.priority?.priority);
+  add("start_date", "Start time", task.start_date, "date");
+  add("due_date", "Due / expiry time", task.due_date, "date");
+  add("assignees", "Assignees", task.assignees?.map((assignee) => assignee.username || assignee.email).filter(Boolean));
+  add("tags", "Tags", task.tags?.map((tag) => tag.name).filter(Boolean));
+  add("folder_name", "Folder / employee", task.folder?.name);
+  add("list_name", "List", task.list?.name);
   for (const field of task.custom_fields ?? []) {
     const value = readCustomField(field);
-    add(`custom:${field.id}`, field.name || "حقل ClickUp مخصص", value, contextType(field.type));
+    add(`custom:${field.id}`, field.name || "ClickUp custom field", value, contextType(field.type));
   }
   return result;
 }

@@ -1,5 +1,6 @@
 import { headers } from "next/headers";
 import { redirect } from "next/navigation";
+import { trustedOwnerId } from "../lib/integrations/trusted-owner";
 
 export type ChatGPTUser = {
   userId: string;
@@ -20,6 +21,10 @@ const CALLBACK_PATH = "/callback";
 
 export async function getChatGPTUser(): Promise<ChatGPTUser | null> {
   const requestHeaders = await headers();
+  if (!trustedOwnerId(requestHeaders, {
+    ingressSecret: process.env.AI_OPS_TRUSTED_INGRESS_SECRET,
+    ownerUserId: process.env.AI_OPS_OWNER_USER_ID,
+  })) return null;
   const userId = requestHeaders.get(USER_ID_HEADER);
   const email = requestHeaders.get(USER_EMAIL_HEADER);
   if (!userId || !email) return null;

@@ -24,6 +24,7 @@ import {
 } from "../../../../lib/integrations/clickup";
 import type { ImportedWorkflowItem, IntegrationSourceType, WorkflowFieldMapping } from "../../../../lib/integrations/contracts";
 import { getIntegrationOwnerId } from "../../../../lib/integrations/owner";
+import { maskPhoneText } from "../../../../lib/integrations/redact";
 import { getBinding, getClickUpAuth, markBindingSynced, saveBinding } from "../../../../lib/integrations/store";
 
 const serviceKeys = ["approval_payment_follow_up", "meeting_scheduling", "employee_document_expiry", "supplier_quotation"] as const;
@@ -43,13 +44,14 @@ function parseJson<T>(value: string, fallback: T): T {
 }
 
 function clickUpError(error: unknown) {
-  if (error instanceof ClickUpApiError) return NextResponse.json({ error: `تعذر قراءة ClickUp: ${error.message}`, code: error.code, retryAfter: error.retryAfter }, { status: error.status === 429 ? 429 : 502 });
+  if (error instanceof ClickUpApiError) return NextResponse.json({ error: `Could not read ClickUp: ${maskPhoneText(error.message)}`, code: error.code, retryAfter: error.retryAfter }, { status: error.status === 429 ? 429 : 502 });
   const message = error instanceof Error ? error.message : "";
-  if (message === "CLICKUP_NOT_CONNECTED") return NextResponse.json({ error: "اربط ClickUp أولاً." }, { status: 409 });
-  if (message === "ENCRYPTION_NOT_CONFIGURED") return NextResponse.json({ error: "تخزين الأسرار غير مجهز على الخادم." }, { status: 503 });
-  if (message === "BINDING_NOT_FOUND") return NextResponse.json({ error: "لم يتم إعداد مصدر ClickUp لهذه الخدمة بعد." }, { status: 404 });
-  if (message === "WORKSPACE_REQUIRED") return NextResponse.json({ error: "أعد حفظ الربط مرة واحدة لاختيار مساحة العمل؛ بعدها سيعمل التحميل التلقائي." }, { status: 409 });
-  return NextResponse.json({ error: "تعذر إكمال طلب ClickUp." }, { status: 500 });
+  if (message === "AUTH_REQUIRED") return NextResponse.json({ error: "Operator authentication is required." }, { status: 401 });
+  if (message === "CLICKUP_NOT_CONNECTED") return NextResponse.json({ error: "Connect ClickUp first." }, { status: 409 });
+  if (message === "ENCRYPTION_NOT_CONFIGURED") return NextResponse.json({ error: "Server-side credential encryption is not configured." }, { status: 503 });
+  if (message === "BINDING_NOT_FOUND") return NextResponse.json({ error: "No ClickUp source is configured for this service yet." }, { status: 404 });
+  if (message === "WORKSPACE_REQUIRED") return NextResponse.json({ error: "Save this binding again with a Workspace selection before automatic loading." }, { status: 409 });
+  return NextResponse.json({ error: "The ClickUp request could not be completed." }, { status: 500 });
 }
 
 export async function GET(request: Request) {
@@ -61,37 +63,37 @@ export async function GET(request: Request) {
     if (resource === "workspaces") return NextResponse.json({ workspaces: await getAuthorizedWorkspaces(auth) });
     if (resource === "spaces") {
       const workspaceId = url.searchParams.get("workspaceId");
-      if (!validNumericId(workspaceId)) return NextResponse.json({ error: "معرّف مساحة العمل غير صالح." }, { status: 400 });
+      if (!validNumericId(workspaceId)) return NextResponse.json({ error: "Invalid Workspace ID." }, { status: 400 });
       return NextResponse.json({ spaces: await getSpaces(auth, workspaceId!) });
     }
     if (resource === "sources" || resource === "lists") {
       const spaceId = url.searchParams.get("spaceId");
-      const spaceName = url.searchParams.get("spaceName") || "القسم";
-      if (!validNumericId(spaceId)) return NextResponse.json({ error: "معرّف القسم غير صالح." }, { status: 400 });
+      const spaceName = url.searchParams.get("spaceName") || "Space";
+      if (!validNumericId(spaceId)) return NextResponse.json({ error: "Invalid Space ID." }, { status: 400 });
       const sources = await getSpaceSources(auth, spaceId!, spaceName);
       return NextResponse.json(resource === "lists" ? { lists: sources.filter((source) => source.type === "list") } : { sources });
     }
     if (resource === "fields") {
       const sourceId = url.searchParams.get("sourceId") || url.searchParams.get("listId");
       const sourceType = url.searchParams.get("sourceType") || "list";
-      if (!validNumericId(sourceId) || !validSourceType(sourceType)) return NextResponse.json({ error: "مصدر ClickUp غير صالح." }, { status: 400 });
+      if (!validNumericId(sourceId) || !validSourceType(sourceType)) return NextResponse.json({ error: "Invalid ClickUp source." }, { status: 400 });
       return NextResponse.json({ fields: await getSourceFields(auth, sourceType, sourceId!) });
     }
     if (resource === "statuses") {
       const sourceId = url.searchParams.get("sourceId") || "";
       const sourceType = url.searchParams.get("sourceType") || "list";
       const workspaceId = url.searchParams.get("workspaceId") || undefined;
-      if (!validNumericId(sourceId) || !validSourceType(sourceType)) return NextResponse.json({ error: "مصدر ClickUp غير صالح." }, { status: 400 });
-      if (sourceType !== "list" && !validNumericId(workspaceId)) return NextResponse.json({ error: "اختر مساحة العمل لقراءة حالات هذا المصدر." }, { status: 400 });
+      if (!validNumericId(sourceId) || !validSourceType(sourceType)) return NextResponse.json({ error: "Invalid ClickUp source." }, { status: 400 });
+      if (sourceType !== "list" && !validNumericId(workspaceId)) return NextResponse.json({ error: "Choose a Workspace to read these statuses." }, { status: 400 });
       return NextResponse.json({ statuses: await getSourceStatuses(auth, sourceType, sourceId, workspaceId) });
     }
     if (resource === "binding") {
       const serviceKey = url.searchParams.get("serviceKey") || "";
-      if (!serviceKeys.includes(serviceKey as ServiceKey)) return NextResponse.json({ error: "الخدمة غير صالحة." }, { status: 400 });
+      if (!serviceKeys.includes(serviceKey as ServiceKey)) return NextResponse.json({ error: "Invalid service." }, { status: 400 });
       const row = await getBinding(ownerId, serviceKey);
       return NextResponse.json({ binding: row ? publicBinding(row) : null });
     }
-    return NextResponse.json({ error: "مورد ClickUp غير معروف." }, { status: 400 });
+    return NextResponse.json({ error: "Unknown ClickUp resource." }, { status: 400 });
   } catch (error) {
     return clickUpError(error);
   }
@@ -278,7 +280,7 @@ export async function POST(request: Request) {
       writebackEnabled?: boolean;
       force?: boolean;
     };
-    if (!body.serviceKey || !serviceKeys.includes(body.serviceKey)) return NextResponse.json({ error: "الخدمة غير صالحة." }, { status: 400 });
+    if (!body.serviceKey || !serviceKeys.includes(body.serviceKey)) return NextResponse.json({ error: "Invalid service." }, { status: 400 });
     if (body.action === "mark_synced") {
       await markBindingSynced(ownerId, body.serviceKey);
       return NextResponse.json({ synced: true });
@@ -295,8 +297,8 @@ export async function POST(request: Request) {
     }
 
     const sourceType = validSourceType(body.sourceType) ? body.sourceType : "list";
-    if (!validNumericId(body.sourceId) || !body.sourceName?.trim() || !body.mapping?.itemName) return NextResponse.json({ error: "اختر مصدراً وحدد حقل اسم البند." }, { status: 400 });
-    if (sourceType !== "list" && !validNumericId(body.workspaceId)) return NextResponse.json({ error: "اختر مساحة العمل للمجلد أو القسم." }, { status: 400 });
+    if (!validNumericId(body.sourceId) || !body.sourceName?.trim() || !body.mapping?.itemName) return NextResponse.json({ error: "Choose a source and map its item-name field." }, { status: 400 });
+    if (sourceType !== "list" && !validNumericId(body.workspaceId)) return NextResponse.json({ error: "Choose a Workspace for a Folder or Space source." }, { status: 400 });
     const mapping = body.serviceKey === "meeting_scheduling" ? { ...body.mapping, ...meetingAvailabilityRules(body.mapping) } : body.mapping;
     if (body.action === "save_binding") {
       const binding = await saveBinding(ownerId, {
@@ -316,7 +318,7 @@ export async function POST(request: Request) {
       const preview = await previewSource(ownerId, { serviceKey: body.serviceKey, sourceId: body.sourceId!, sourceName: body.sourceName.trim(), sourceType, workspaceId: body.workspaceId, mapping });
       return NextResponse.json(preview);
     }
-    return NextResponse.json({ error: "إجراء ClickUp غير معروف." }, { status: 400 });
+    return NextResponse.json({ error: "Unknown ClickUp action." }, { status: 400 });
   } catch (error) {
     return clickUpError(error);
   }

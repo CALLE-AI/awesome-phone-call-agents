@@ -3,15 +3,15 @@ import type { IntegrationProviderDefinition } from "./contracts";
 const providers: IntegrationProviderDefinition[] = [
   {
     key: "manual",
-    name: "الإدخال اليدوي",
-    description: "استخدم التطبيق كاملاً دون ربط أي نظام خارجي.",
+    name: "Manual entry",
+    description: "Use the app without connecting an external service.",
     authModes: ["none"],
     capabilities: ["preview_records", "import_records"],
   },
   {
     key: "clickup",
     name: "ClickUp",
-    description: "اكتشف القوائم والحقول، عاين المهام، واستورد ما تختاره فقط.",
+    description: "Discover lists and fields, preview tasks, and import only the selected records.",
     authModes: ["personal_token", "oauth"],
     capabilities: [
       "discover_workspaces",

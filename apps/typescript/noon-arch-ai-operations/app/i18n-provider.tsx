@@ -13,6 +13,11 @@ const english: Record<string, string> = {
   "مكالمة جديدة": "New call",
   "الطلبات": "Services",
   "جهات الاتصال": "Contacts",
+  "يمكن حفظ الرقم في حقل Phone للمهمة بعد قبول المكالمة، فقط إذا وافقت بشكل منفصل وفُعّلت كتابة النتيجة لهذا الربط.": "The task's Phone field can be updated after CALL-E accepts the call only with separate consent and write-back enabled for this binding.",
+  "لا يوجد حقل Phone صالح في هذه المهمة؛ لن يُحفظ الرقم في ClickUp.": "This task has no valid Phone field; the number will not be saved to ClickUp.",
+  "أوافق بشكل منفصل على حفظ رقم هذا المستلم في حقل Phone للمهمة المحددة بعد قبول المكالمة، إذا كان ربط ClickUp يسمح بالكتابة.": "I separately consent to save this recipient's number to the selected task's Phone field after the call is accepted, if this ClickUp binding allows writes.",
+  "يمكنك الموافقة بشكل منفصل في المراجعة النهائية على حفظ الرقم في حقل Phone للمهمة، إذا فُعّلت كتابة النتيجة لهذا الربط.": "You can separately consent at final review to save this number to the task's Phone field if write-back is enabled for this binding.",
+  "لم يجد التطبيق حقل Phone في المهمة. يمكن الاتصال، لكن لن يُحفظ الرقم في ClickUp.": "No Phone field was found on this task. You can call, but the number will not be saved to ClickUp.",
   "سجل المكالمات": "Call history",
   "الإعدادات والتكاملات": "Settings & integrations",
   "متابعة الموافقة والدفع": "Approval & payment follow-up",
@@ -616,7 +621,7 @@ type I18nContextValue = {
 const I18nContext = createContext<I18nContextValue | null>(null);
 
 export function I18nProvider({ children }: { children: ReactNode }) {
-  const [language, setLanguageState] = useState<UiLanguage>("ar");
+  const [language, setLanguageState] = useState<UiLanguage>("en");
 
   const setLanguage = useCallback((next: UiLanguage) => {
     setLanguageState(next);

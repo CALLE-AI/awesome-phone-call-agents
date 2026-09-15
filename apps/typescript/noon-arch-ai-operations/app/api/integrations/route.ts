@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { getAuthorizedWorkspaces, ClickUpApiError } from "../../../lib/integrations/clickup";
 import { getIntegrationOwnerId } from "../../../lib/integrations/owner";
+import { maskPhoneText } from "../../../lib/integrations/redact";
 import { listIntegrationProviders } from "../../../lib/integrations/registry";
 import { deleteClickUpConnection, getClickUpAuth, getConnection, listBindings, markConnectionTested, saveClickUpConnection } from "../../../lib/integrations/store";
 
@@ -42,7 +43,7 @@ export async function GET() {
     });
   } catch (error) {
     const unauthorized = error instanceof Error && error.message === "AUTH_REQUIRED";
-    return NextResponse.json({ error: unauthorized ? "يلزم تسجيل الدخول." : "تعذر تحميل موصلات البيانات." }, { status: unauthorized ? 401 : 500 });
+    return NextResponse.json({ error: unauthorized ? "Operator authentication is required." : "The connectors could not be loaded." }, { status: unauthorized ? 401 : 500 });
   }
 }
 export async function POST(request: Request) {
@@ -51,7 +52,7 @@ export async function POST(request: Request) {
     const body = await request.json() as { action?: string; token?: string; confirmed?: boolean };
     if (body.action === "connect") {
       const token = String(body.token || "").trim();
-      if (!/^pk_[A-Za-z0-9_-]{8,}$/.test(token)) return NextResponse.json({ error: "رمز ClickUp لا يطابق صيغة المفتاح الشخصي pk_." }, { status: 400 });
+      if (!/^pk_[A-Za-z0-9_-]{8,}$/.test(token)) return NextResponse.json({ error: "Enter a valid ClickUp personal token beginning with pk_." }, { status: 400 });
       const workspaces = await getAuthorizedWorkspaces({ mode: "personal_token", token });
       await saveClickUpConnection(ownerId, token, workspaces.length);
       return NextResponse.json({ connected: true, workspaces });
@@ -68,16 +69,17 @@ export async function POST(request: Request) {
       }
     }
     if (body.action === "disconnect") {
-      if (body.confirmed !== true) return NextResponse.json({ error: "يلزم تأكيد فصل ClickUp." }, { status: 400 });
+      if (body.confirmed !== true) return NextResponse.json({ error: "Confirm before disconnecting ClickUp." }, { status: 400 });
       await deleteClickUpConnection(ownerId);
       return NextResponse.json({ disconnected: true });
     }
-    return NextResponse.json({ error: "إجراء الموصل غير معروف." }, { status: 400 });
+    return NextResponse.json({ error: "Unknown connector action." }, { status: 400 });
   } catch (error) {
-    if (error instanceof ClickUpApiError) return NextResponse.json({ error: `رفض ClickUp الاتصال: ${error.message}`, code: error.code }, { status: error.status === 401 ? 401 : 502 });
+    if (error instanceof ClickUpApiError) return NextResponse.json({ error: `ClickUp rejected the request: ${maskPhoneText(error.message)}`, code: error.code }, { status: error.status === 401 ? 401 : 502 });
     const message = error instanceof Error ? error.message : "";
-    if (message === "ENCRYPTION_NOT_CONFIGURED") return NextResponse.json({ error: "تخزين الأسرار غير مجهز على الخادم بعد." }, { status: 503 });
-    if (message === "CLICKUP_NOT_CONNECTED") return NextResponse.json({ error: "اربط ClickUp أولاً." }, { status: 409 });
-    return NextResponse.json({ error: "تعذر تنفيذ إعداد ClickUp." }, { status: 500 });
+    if (message === "AUTH_REQUIRED") return NextResponse.json({ error: "Operator authentication is required." }, { status: 401 });
+    if (message === "ENCRYPTION_NOT_CONFIGURED") return NextResponse.json({ error: "Server-side credential encryption is not configured." }, { status: 503 });
+    if (message === "CLICKUP_NOT_CONNECTED") return NextResponse.json({ error: "Connect ClickUp first." }, { status: 409 });
+    return NextResponse.json({ error: "ClickUp setup could not be completed." }, { status: 500 });
   }
 }

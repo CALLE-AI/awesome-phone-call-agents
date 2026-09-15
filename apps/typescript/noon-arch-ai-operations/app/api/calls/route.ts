@@ -2,7 +2,8 @@ import { NextResponse } from "next/server";
 import { getD1 } from "../../../db/d1";
 import { loadAppSettings } from "../../../lib/app-settings";
 import { performCallWriteback } from "../../../lib/integrations/call-writeback";
-import { calleApiBaseUrl, calleBalanceCapability, calleErrorDetails } from "../../../lib/integrations/calle";
+import { calleFetch, calleBalanceCapability, calleErrorDetails } from "../../../lib/integrations/calle";
+import { maskPhoneText, maskPhoneValue } from "../../../lib/integrations/redact";
 import { analyzeMeetingAvailability, analyzeProposedMeetingSlot, generateMeetingAvailabilitySlots, getListTasks, getSourceTasks, meetingAvailabilityRules, setTaskPhone, type ClickUpTask, type MeetingSlotAnalysis } from "../../../lib/integrations/clickup";
 import type { ImportedWorkflowItem, IntegrationSourceType, WorkflowFieldMapping } from "../../../lib/integrations/contracts";
 import { getIntegrationOwnerId } from "../../../lib/integrations/owner";
@@ -13,6 +14,7 @@ type CallRequest = {
   deliveryCity?: string;
   items?: ImportedWorkflowItem[];
   confirmed?: boolean;
+  syncPhoneToClickUp?: boolean;
   confirmationId?: string;
   serviceKey?: "approval_payment_follow_up" | "meeting_scheduling" | "employee_document_expiry" | "supplier_quotation";
 };
@@ -232,8 +234,10 @@ async function syncRecipientPhoneToClickUp(ownerId: string, serviceKey: string, 
 }
 
 export async function GET() {
+  let ownerId: string;
+  try { ownerId = await getIntegrationOwnerId(); }
+  catch { return NextResponse.json({ error: "Operator authentication is required." }, { status: 401 }); }
   const db = getD1();
-  const ownerId = await getIntegrationOwnerId();
   const [bindings, usageRow] = await Promise.all([
     listBindings(ownerId),
     db.prepare("SELECT COUNT(*) AS count FROM call_records WHERE calle_call_id IS NOT NULL").first<{ count: number | string }>(),
@@ -247,7 +251,7 @@ export async function GET() {
   for (const row of initial.results) {
     if (!row.calle_call_id || row.summary || row.completed_at || !calleApiKey) continue;
     try {
-      const response = await fetch(`${calleApiBaseUrl()}/v1/calls/${encodeURIComponent(row.calle_call_id)}`, { headers: { Authorization: `Bearer ${calleApiKey}` } });
+      const response = await calleFetch(`/v1/calls/${encodeURIComponent(row.calle_call_id)}`, { headers: { Authorization: `Bearer ${calleApiKey}` } });
       if (!response.ok) continue;
       const call = await response.json() as CalleCall;
       const recipient = Array.isArray(call.recipients) ? call.recipients[0] : undefined;
@@ -256,7 +260,7 @@ export async function GET() {
       const result = recipient?.structured_result || call.structured_result || {};
       const confidence = typeof call.completion_confidence?.score === "number" ? Math.round(call.completion_confidence.score * 100) : null;
       await db.prepare("UPDATE call_records SET status=?, summary=?, result_json=?, evidence_json=?, transcript_json=?, confidence_percent=?, completed_at=? WHERE id=?")
-        .bind(call.status || row.status, call.summary || null, JSON.stringify(result), JSON.stringify(call.evidence || []), JSON.stringify(transcript), confidence, call.status === "completed" ? new Date().toISOString() : null, row.id).run();
+        .bind(maskPhoneText(call.status || row.status), maskPhoneText(call.summary || "") || null, JSON.stringify(maskPhoneValue(result)), JSON.stringify(maskPhoneValue(call.evidence || [])), JSON.stringify(maskPhoneValue(transcript)), confidence, call.status === "completed" ? new Date().toISOString() : null, row.id).run();
       if (row.workflow === "meeting_scheduling" && call.status === "completed" && meetingBinding?.writeback_enabled && meetingMapping?.automaticMeetingUpdate !== false) {
         await performCallWriteback(ownerId, row.id).catch(() => undefined);
       }
@@ -264,12 +268,12 @@ export async function GET() {
   }
   const latest = await db.prepare("SELECT * FROM call_records ORDER BY id DESC LIMIT 25").all<StoredCall>();
   const records = latest.results.map((row) => ({
-    id: row.id, callId: row.calle_call_id, recipientName: row.recipient_name, phoneLastFour: row.phone_last_four,
-    workflow: row.workflow, status: row.status, summary: row.summary,
-    result: row.result_json ? JSON.parse(row.result_json) : null,
-    evidence: row.evidence_json ? JSON.parse(row.evidence_json) : [],
-    transcript: row.transcript_json ? JSON.parse(row.transcript_json) : [],
-    sourceContext: row.source_context_json ? JSON.parse(row.source_context_json) : [],
+    id: row.id, callId: row.calle_call_id ? maskPhoneText(row.calle_call_id) : null, recipientName: maskPhoneText(row.recipient_name), phoneLastFour: row.phone_last_four,
+    workflow: row.workflow, status: maskPhoneText(row.status), summary: row.summary ? maskPhoneText(row.summary) : null,
+    result: row.result_json ? maskPhoneValue(parseJson(row.result_json, null)) : null,
+    evidence: row.evidence_json ? maskPhoneValue(parseJson(row.evidence_json, [])) : [],
+    transcript: row.transcript_json ? maskPhoneValue(parseJson(row.transcript_json, [])) : [],
+    sourceContext: row.source_context_json ? maskPhoneValue(parseJson(row.source_context_json, [])) : [],
     canWriteback: writebackServices.has(row.workflow),
     automaticWriteback: row.workflow === "meeting_scheduling" && automaticMeetingWriteback,
     writebackStatus: row.writeback_status,
@@ -287,24 +291,26 @@ export async function GET() {
 }
 
 export async function POST(request: Request) {
+  let ownerId: string;
+  try { ownerId = await getIntegrationOwnerId(); }
+  catch { return NextResponse.json({ error: "Operator authentication is required." }, { status: 401 }); }
   const body = await request.json() as CallRequest;
   body.items = body.items?.filter((item) => item.availability?.status !== "unavailable");
   const phone = body.recipient?.phone?.replace(/\s/g, "") || "";
-  if (body.confirmed !== true) return NextResponse.json({ error: "يلزم التأكيد الصريح قبل الاتصال." }, { status: 400 });
-  if (!/^\+[1-9]\d{7,14}$/.test(phone)) return NextResponse.json({ error: "رقم الهاتف غير صالح. استخدم صيغة E.164 مثل +9665XXXXXXXX." }, { status: 400 });
-  if (!body.items?.length) return NextResponse.json({ error: "أضف صنفاً واحداً على الأقل." }, { status: 400 });
-  if (!body.confirmationId || !/^[0-9a-f-]{36}$/i.test(body.confirmationId)) return NextResponse.json({ error: "رمز تأكيد المكالمة غير صالح." }, { status: 400 });
+  if (body.confirmed !== true) return NextResponse.json({ error: "Explicit call confirmation is required." }, { status: 400 });
+  if (!/^\+[1-9]\d{7,14}$/.test(phone)) return NextResponse.json({ error: "Use a valid E.164 phone number, such as +9665XXXXXXXX." }, { status: 400 });
+  if (!body.items?.length) return NextResponse.json({ error: "Add at least one request item." }, { status: 400 });
+  if (!body.confirmationId || !/^[0-9a-f-]{36}$/i.test(body.confirmationId)) return NextResponse.json({ error: "The call confirmation ID is invalid." }, { status: 400 });
   const serviceKey = body.serviceKey || "approval_payment_follow_up";
-  if (!["approval_payment_follow_up", "meeting_scheduling", "employee_document_expiry", "supplier_quotation"].includes(serviceKey)) return NextResponse.json({ error: "الخدمة المحددة غير صالحة." }, { status: 400 });
-  if (body.items.some((item) => !item.name?.trim() || Number(item.quantity) < 1)) return NextResponse.json({ error: "أكمل جميع بيانات الطلب قبل الاتصال." }, { status: 400 });
+  if (!["approval_payment_follow_up", "meeting_scheduling", "employee_document_expiry", "supplier_quotation"].includes(serviceKey)) return NextResponse.json({ error: "The selected service is invalid." }, { status: 400 });
+  if (body.items.some((item) => !item.name?.trim() || Number(item.quantity) < 1)) return NextResponse.json({ error: "Complete the request before calling." }, { status: 400 });
   let collectingMeetingPreferences = false;
   if (serviceKey === "meeting_scheduling") {
     if (body.items.every(meetingTimeIsComplete)) collectingMeetingPreferences = false;
     else if (body.items.every(meetingTimeIsEmpty)) collectingMeetingPreferences = true;
-    else return NextResponse.json({ error: "أكمل كل أوقات الاجتماع، أو اترك حقول الوقت كلها فارغة لجمع تفضيلات العميل فقط." }, { status: 400 });
+    else return NextResponse.json({ error: "Complete every meeting time or leave all time fields empty to collect preferences." }, { status: 400 });
   }
-  if (serviceKey === "employee_document_expiry" && body.items.some((item) => !/^\d{4}-\d{2}-\d{2}$/.test(item.date || ""))) return NextResponse.json({ error: "حدد تاريخ انتهاء صحيحاً لكل وثيقة." }, { status: 400 });
-  const ownerId = await getIntegrationOwnerId();
+  if (serviceKey === "employee_document_expiry" && body.items.some((item) => !/^\d{4}-\d{2}-\d{2}$/.test(item.date || ""))) return NextResponse.json({ error: "Choose a valid expiry date for each document." }, { status: 400 });
   const appSettings = await loadAppSettings(ownerId);
   let meetingAvailability = { slots: [] as PreparedMeetingSlot[], suggestionLimit: 0, truncated: false };
   if (serviceKey === "meeting_scheduling") {
@@ -312,15 +318,15 @@ export async function POST(request: Request) {
       if (collectingMeetingPreferences) meetingAvailability = await prepareMeetingAvailabilityCatalog(ownerId, body.items, appSettings.timezone);
       else body.items = await revalidateMeetingItems(ownerId, body.items, appSettings.timezone);
     } catch {
-      return NextResponse.json({ error: "تغيّر جدول أحد الحاضرين أو حالة الطلب. أعد تحميل بيانات ClickUp قبل الاتصال؛ لم يُستخدم أي رصيد." }, { status: 409 });
+      return NextResponse.json({ error: "The attendee schedule or request status changed. Refresh ClickUp data before calling; no credit was used." }, { status: 409 });
     }
   }
-  if (process.env.CALLE_LIVE_CALLS_ENABLED !== "true") return NextResponse.json({ error: "وضع المكالمات الحقيقية غير مفعل بعد. لم يُستخدم أي رصيد." }, { status: 503 });
+  if (process.env.CALLE_LIVE_CALLS_ENABLED !== "true") return NextResponse.json({ error: "Live calls are disabled. No credit was used." }, { status: 503 });
   let calleApiKey: string;
   try {
     calleApiKey = (await getCalleApiKey(ownerId)).apiKey;
   } catch {
-    return NextResponse.json({ error: "اربط CALL‑E من الإعدادات أولاً؛ لم يُستخدم أي رصيد." }, { status: 503 });
+    return NextResponse.json({ error: "Connect CALL-E in settings first; no credit was used." }, { status: 503 });
   }
 
   // Reserve this explicit confirmation before contacting CALL-E. The unique
@@ -353,10 +359,10 @@ export async function POST(request: Request) {
   let recordId: number;
   try {
     const reservation = await db.prepare("INSERT INTO call_records (calle_call_id, contact_id, recipient_name, phone_last_four, workflow, status, confirmation_id, initiated_by, automatic_follow_up, source_context_json, created_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)")
-      .bind(null, body.recipient?.id || null, body.recipient?.name || "غير معروف", phone.slice(-4), serviceKey, "submitting", body.confirmationId, "manual_confirmation", 0, sourceContext.length ? JSON.stringify(sourceContext) : null, createdAt).run();
+      .bind(null, body.recipient?.id || null, body.recipient?.name || "Unknown", phone.slice(-4), serviceKey, "submitting", body.confirmationId, "manual_confirmation", 0, sourceContext.length ? JSON.stringify(sourceContext) : null, createdAt).run();
     recordId = Number(reservation.meta.last_row_id);
   } catch {
-    return NextResponse.json({ error: "تم إرسال هذا الطلب مسبقاً. لم تُنشأ مكالمة أخرى ولم يُستخدم رصيد إضافي." }, { status: 409 });
+    return NextResponse.json({ error: "This confirmation was already used. No duplicate call or additional credit was spent." }, { status: 409 });
   }
 
   const itemText = body.items.map((item, index) => {
@@ -405,7 +411,7 @@ export async function POST(request: Request) {
   };
   let upstream: Response;
   try {
-    upstream = await fetch(`${calleApiBaseUrl()}/v1/calls`, {
+    upstream = await calleFetch("/v1/calls", {
       method: "POST",
       headers: {
         Authorization: `Bearer ${calleApiKey}`,
@@ -429,7 +435,7 @@ export async function POST(request: Request) {
     });
   } catch {
     await db.prepare("UPDATE call_records SET status=? WHERE id=?").bind("submission_failed", recordId).run();
-    return NextResponse.json({ error: "تعذر إرسال الطلب إلى CALL‑E. لم يُجدول التطبيق إعادة محاولة تلقائية." }, { status: 502 });
+    return NextResponse.json({ error: "The request could not be sent to CALL-E. The app will not retry automatically." }, { status: 502 });
   }
   const result = await upstream.json().catch(() => ({})) as Record<string, unknown>;
   const callId = result.id || result.call_id || null;
@@ -441,10 +447,16 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: details.message, code: details.code }, { status: upstream.status });
   }
   let phoneSync: PhoneSyncResult | null = null;
-  try {
-    phoneSync = await syncRecipientPhoneToClickUp(ownerId, serviceKey, sourceContext.map((source) => source.taskId), phone);
-  } catch {
-    phoneSync = sourceContext.length ? { updated: 0, unchanged: 0, unavailable: 0, failed: new Set(sourceContext.map((source) => source.taskId)).size } : null;
+  if (body.syncPhoneToClickUp === true) {
+    try {
+      const binding = await getBinding(ownerId, serviceKey);
+      if (binding?.writeback_enabled) {
+        const selectedTaskIds = itemSourceContext.map((source) => source.taskId);
+        phoneSync = await syncRecipientPhoneToClickUp(ownerId, serviceKey, selectedTaskIds, phone);
+      }
+    } catch {
+      phoneSync = itemSourceContext.length ? { updated: 0, unchanged: 0, unavailable: 0, failed: new Set(itemSourceContext.map((source) => source.taskId)).size } : null;
+    }
   }
-  return NextResponse.json({ callId, status, phoneSync });
+  return NextResponse.json({ callId: typeof callId === "string" ? maskPhoneText(callId) : callId, status: maskPhoneText(String(status)), phoneSync });
 }
