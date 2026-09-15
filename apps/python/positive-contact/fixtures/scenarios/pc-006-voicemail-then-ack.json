@@ -1,0 +1,181 @@
+{
+  "scenario": "voicemail-then-ack",
+  "contact_id": "pc-006",
+  "note": "Scripted CALL-E responses for the voicemail-then-ack path.",
+  "steps": [
+    {
+      "ladder_step": 1,
+      "submit": "accepted",
+      "response": {
+        "id": "call_fx_pc-006_1",
+        "object": "call_task",
+        "status": "completed",
+        "task": "This is an automated safety notification from Northbay Power about a possible Public Safety Power Shutoff. This call may be recorded. Confirm the customer heard the notice.",
+        "recipients": [
+          {
+            "id": "rcp_1",
+            "phones": [
+              "+14155550106"
+            ],
+            "locale": "en-US",
+            "region": "US",
+            "status": "completed",
+            "structured_result": {
+              "contact_type": "voicemail",
+              "acknowledged": "unknown",
+              "spoke_with": "unknown",
+              "needs_assistance": "unknown",
+              "callback_window": "",
+              "preferred_language": "",
+              "notify_alternate_contact": "unknown",
+              "notes_for_human": ""
+            },
+            "summary": "Answering machine. Notice left, nobody confirmed hearing it.",
+            "attempts": [
+              {
+                "id": "att_1",
+                "phone": "+14155550106",
+                "status": "completed",
+                "started_at": "2026-09-11T15:00:05Z",
+                "completed_at": "2026-09-11T15:01:12Z",
+                "summary": "Answering machine. Notice left, nobody confirmed hearing it.",
+                "transcript_turns": [
+                  {
+                    "offset_seconds": 0,
+                    "speaker": "bot",
+                    "text": "This is an automated safety notification from Northbay Power about a possible Public Safety Power Shutoff. This call may be recorded. Am I speaking with Dolores or someone in the household?"
+                  },
+                  {
+                    "offset_seconds": 7,
+                    "speaker": "user",
+                    "text": "You have reached the voicemail of this number. Please leave a message after the tone."
+                  },
+                  {
+                    "offset_seconds": 14,
+                    "speaker": "bot",
+                    "text": "This is an automated safety notification from Northbay Power. Power in your area may be turned off starting Friday September 11 at 6:00 PM PDT to reduce wildfire risk. Please call us back or visit a Community Resource Center. Thank you."
+                  }
+                ],
+                "provider_call_id": "provider_call_fx_pc-006_1",
+                "failure_code": null,
+                "failure_message": null
+              }
+            ]
+          }
+        ],
+        "structured_result": null,
+        "summary": "Answering machine. Notice left, nobody confirmed hearing it.",
+        "task_completed": false,
+        "completion_confidence": {
+          "score": 0.88,
+          "label": "high"
+        },
+        "evidence": [
+          "Answering machine. Notice left, nobody confirmed hearing it."
+        ],
+        "metadata": {},
+        "failure_code": null,
+        "failure_message": null,
+        "created_at": "2026-09-11T15:00:00Z",
+        "completed_at": "2026-09-11T15:01:12Z"
+      }
+    },
+    {
+      "ladder_step": 2,
+      "submit": "accepted",
+      "response": {
+        "id": "call_fx_pc-006_2",
+        "object": "call_task",
+        "status": "completed",
+        "task": "This is an automated safety notification from Northbay Power about a possible Public Safety Power Shutoff. This call may be recorded. Confirm the customer heard the notice.",
+        "recipients": [
+          {
+            "id": "rcp_2",
+            "phones": [
+              "+14155550106"
+            ],
+            "locale": "en-US",
+            "region": "US",
+            "status": "completed",
+            "structured_result": {
+              "contact_type": "live_person",
+              "acknowledged": "yes",
+              "spoke_with": "customer",
+              "needs_assistance": "none",
+              "callback_window": "",
+              "preferred_language": "",
+              "notify_alternate_contact": "unknown",
+              "notes_for_human": ""
+            },
+            "summary": "Reached on the second attempt; the customer confirmed hearing the notice.",
+            "attempts": [
+              {
+                "id": "att_2",
+                "phone": "+14155550106",
+                "status": "completed",
+                "started_at": "2026-09-11T15:00:05Z",
+                "completed_at": "2026-09-11T15:01:12Z",
+                "summary": "Reached on the second attempt; the customer confirmed hearing the notice.",
+                "transcript_turns": [
+                  {
+                    "offset_seconds": 0,
+                    "speaker": "bot",
+                    "text": "This is an automated safety notification from Northbay Power about a possible Public Safety Power Shutoff. This call may be recorded. Am I speaking with Dolores or someone in the household?"
+                  },
+                  {
+                    "offset_seconds": 7,
+                    "speaker": "user",
+                    "text": "This is Dolores speaking."
+                  },
+                  {
+                    "offset_seconds": 14,
+                    "speaker": "bot",
+                    "text": "Power at 950 block of Maple Dr may be turned off starting Friday September 11 at 6:00 PM PDT to reduce wildfire risk, and could stay off until Saturday September 12 at 8:00 PM PDT. Because this account is enrolled in the Medical Baseline program, we are calling to make sure you have received this notice. Can you confirm that you heard it?"
+                  },
+                  {
+                    "offset_seconds": 21,
+                    "speaker": "user",
+                    "text": "Yes, I heard you. When do you think it will come back on?"
+                  },
+                  {
+                    "offset_seconds": 28,
+                    "speaker": "bot",
+                    "text": "Do you need information about the Community Resource Center at the Glen Ellen Community Hall, or would you like a callback from our customer support team?"
+                  },
+                  {
+                    "offset_seconds": 35,
+                    "speaker": "user",
+                    "text": "Okay, thank you."
+                  },
+                  {
+                    "offset_seconds": 42,
+                    "speaker": "bot",
+                    "text": "We will never ask for payment or account information on this call. Thank you."
+                  }
+                ],
+                "provider_call_id": "provider_call_fx_pc-006_2",
+                "failure_code": null,
+                "failure_message": null
+              }
+            ]
+          }
+        ],
+        "structured_result": null,
+        "summary": "Reached on the second attempt; the customer confirmed hearing the notice.",
+        "task_completed": true,
+        "completion_confidence": {
+          "score": 0.93,
+          "label": "high"
+        },
+        "evidence": [
+          "Reached on the second attempt; the customer confirmed hearing the notice."
+        ],
+        "metadata": {},
+        "failure_code": null,
+        "failure_message": null,
+        "created_at": "2026-09-11T15:00:00Z",
+        "completed_at": "2026-09-11T15:01:12Z"
+      }
+    }
+  ]
+}

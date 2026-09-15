@@ -1,0 +1,12 @@
+{
+  "right_person_reached": "no",
+  "item_recognized": "unknown",
+  "item_status": "unknown",
+  "notice_understood": "unknown",
+  "selected_next_step": "unknown",
+  "preferred_time": "",
+  "questions": "",
+  "human_follow_up_required": "unknown",
+  "contact_outcome": "not_reached",
+  "certainty": "unknown"
+}

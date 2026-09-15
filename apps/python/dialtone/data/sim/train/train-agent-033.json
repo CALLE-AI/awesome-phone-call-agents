@@ -1,0 +1,66 @@
+{
+ "id": "train-agent-033",
+ "label": "agent",
+ "source": "sim-train",
+ "meta": {
+  "task": "request a refund for a double charge",
+  "hard": true
+ },
+ "turns": [
+  {
+   "speaker": "user",
+   "text": "Hello and thanks for calling City Pharmacy. This is Max at City Pharmacy, and I can help with bookings, hours, and more. What can I do for you?",
+   "offset_seconds": 0.83
+  },
+  {
+   "speaker": "bot",
+   "text": "Hi, I'm an AI assistant calling on behalf of Taylor Kim. Taylor Kim was charged twice for the same order last week, and I'm calling to request a refund for the duplicate.",
+   "offset_seconds": 12.0
+  },
+  {
+   "speaker": "user",
+   "text": "I'm sorry about the double charge. I've submitted a refund request for the duplicate payment. It should be processed within five to seven business days.",
+   "offset_seconds": 24.62
+  },
+  {
+   "speaker": "bot",
+   "text": "Can you confirm the refund has been issued?",
+   "offset_seconds": 35.01
+  },
+  {
+   "speaker": "user",
+   "text": "Great question! Let me check that for you. Yes, that's correct.",
+   "offset_seconds": 38.85
+  },
+  {
+   "speaker": "bot",
+   "text": "How long will the refund take?",
+   "offset_seconds": 43.9
+  },
+  {
+   "speaker": "user",
+   "text": "I understand. Someone from our team will follow up to confirm the details.",
+   "offset_seconds": 47.2
+  },
+  {
+   "speaker": "bot",
+   "text": "Thank you, that's everything.",
+   "offset_seconds": 53.3
+  },
+  {
+   "speaker": "user",
+   "text": "Of course. One moment please. Yes, that works.",
+   "offset_seconds": 55.88
+  },
+  {
+   "speaker": "bot",
+   "text": "Thank you, that's everything.",
+   "offset_seconds": 59.61
+  },
+  {
+   "speaker": "user",
+   "text": "You're welcome! Have a wonderful day. Goodbye!",
+   "offset_seconds": 62.27
+  }
+ ]
+}

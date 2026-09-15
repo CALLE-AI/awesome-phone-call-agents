@@ -1,0 +1,7 @@
+{
+  "stem": "line-synth-02-constraints-asks-for-id-details-20260910",
+  "kind": "synthetic",
+  "scenario_id": "02-schedule-with-constraints",
+  "target_id": "local-clinic-id-hungry",
+  "note": "SYNTHETIC - in-process text simulation; no phone call, no CALL-E, no platform identifiers. Names are fictional."
+}

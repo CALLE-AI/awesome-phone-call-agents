@@ -1,0 +1,60 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 480 1008" role="img" aria-labelledby="absence-path-title absence-path-desc" font-family="'neue-haas-grotesk-text', 'ui-fallback', Arial, Helvetica, sans-serif">
+<title id="absence-path-title">The path of one unexplained school absence through firstbell</title>
+<desc id="absence-path-desc">A row from a school's nightly absence export meets a gate on consent and then on voice reachability: a family with no recorded consent is never dialled and no call is owed, and a family the telephone cannot reach is not dialled either but goes to a person to be reached another way. A row that passes both gets a short spoken instruction in the family's own language, with the disclosure that the caller is automated spoken first: the reason for the absence, the expected return, and a check that the person answering knew the student was absent, and nothing else. CALL-E then places the call under a cap on families rather than on requests, one idempotency key for each row, polled until the call reaches a terminal status. The answer comes back as exactly one of three endings. Resolved: a schema-valid answer came back, and nobody looks again. Undetermined: the call happened and no usable answer came back, so a person owns it. Failed: nobody was reached on any number, so a person owns it too. A safeguarding escalation is a second axis that can attach to resolved or to undetermined, because only an explicit yes closes a record; it sends the case to the top of a person's queue. A failed call carries no answer to read, so it cannot escalate.</desc>
+<defs>
+<marker id="ar" markerWidth="12" markerHeight="9" refX="12" refY="4.5" orient="auto" markerUnits="userSpaceOnUse"><polygon points="0 0, 12 4.5, 0 9" fill="#6B6864"/></marker>
+<marker id="ar-mark" markerWidth="12" markerHeight="9" refX="12" refY="4.5" orient="auto" markerUnits="userSpaceOnUse"><polygon points="0 0, 12 4.5, 0 9" fill="#795616"/></marker>
+</defs>
+<rect x="0" y="0" width="480" height="1008" fill="#F8F7F4"/>
+<g id="flow">
+<path d="M48 92 V124" fill="none" stroke="#6B6864" stroke-width="2" marker-end="url(#ar)"/>
+<path d="M248 164 H358 A8 8 0 0 1 366 172 V196" fill="none" stroke="#6B6864" stroke-width="2" marker-end="url(#ar)"/>
+<path d="M48 204 V320" fill="none" stroke="#6B6864" stroke-width="2" marker-end="url(#ar)"/>
+<path d="M48 412 V444" fill="none" stroke="#6B6864" stroke-width="2" marker-end="url(#ar)"/>
+<path d="M48 536 V776 A8 8 0 0 0 56 784 H76" fill="none" stroke="#6B6864" stroke-width="2" marker-end="url(#ar)"/>
+<path d="M48 600 H76" fill="none" stroke="#6B6864" stroke-width="2" marker-end="url(#ar)"/>
+<path d="M48 692 H76" fill="none" stroke="#6B6864" stroke-width="2" marker-end="url(#ar)"/>
+<path d="M416 600 H440 A8 8 0 0 1 448 608 V872" fill="none" stroke="#795616" stroke-width="2" marker-end="url(#ar-mark)"/>
+<path d="M416 692 H424 A8 8 0 0 1 432 700 V872" fill="none" stroke="#795616" stroke-width="2" marker-end="url(#ar-mark)"/>
+</g>
+<text x="60" y="268" fill="#524F4B" font-size="16" font-family="'azeret-mono', 'mono-fallback', Consolas, ui-monospace, monospace" letter-spacing="0.06em">BOTH YES</text>
+<text x="352" y="152" fill="#524F4B" font-size="16" font-family="'azeret-mono', 'mono-fallback', Consolas, ui-monospace, monospace" text-anchor="end" letter-spacing="0.06em">EITHER NO</text>
+<rect x="20" y="16" width="440" height="76" rx="8" fill="#FFFFFF" stroke="#C0BDB7" stroke-width="1"/>
+<text x="36" y="60" fill="#201E1A" font-size="20" font-family="'neue-haas-grotesk-display', 'ui-display-fallback', Arial, Helvetica, sans-serif" font-weight="500">One absence row</text>
+<text x="216" y="48" fill="#524F4B" font-size="16">A nightly export, or a file.</text>
+<text x="216" y="72" fill="#524F4B" font-size="16">Stale or reused: refused.</text>
+<rect x="20" y="124" width="228" height="80" rx="8" fill="#FFFFFF" stroke="#201E1A" stroke-width="2"/>
+<text x="36" y="164" fill="#201E1A" font-size="20" font-family="'neue-haas-grotesk-display', 'ui-display-fallback', Arial, Helvetica, sans-serif" font-weight="500">Consent, then voice</text>
+<text x="36" y="188" fill="#524F4B" font-size="16">In that order.</text>
+<rect x="272" y="196" width="188" height="92" rx="8" fill="#F8F7F4" stroke="#6B6864" stroke-width="1" stroke-dasharray="6 4"/>
+<text x="288" y="228" fill="#201E1A" font-size="20" font-family="'neue-haas-grotesk-display', 'ui-display-fallback', Arial, Helvetica, sans-serif" font-weight="500">Not dialled</text>
+<text x="288" y="252" fill="#524F4B" font-size="16">No consent, no call.</text>
+<text x="288" y="276" fill="#524F4B" font-size="16">No voice, a person.</text>
+<rect x="20" y="320" width="440" height="92" rx="8" fill="#FFFFFF" stroke="#C0BDB7" stroke-width="1"/>
+<text x="36" y="372" fill="#201E1A" font-size="20" font-family="'neue-haas-grotesk-display', 'ui-display-fallback', Arial, Helvetica, sans-serif" font-weight="500">The instruction</text>
+<text x="216" y="348" fill="#524F4B" font-size="16">In the family's own language.</text>
+<text x="216" y="372" fill="#524F4B" font-size="16">The disclosure comes first.</text>
+<text x="216" y="396" fill="#524F4B" font-size="16">Two questions and a check.</text>
+<rect x="20" y="444" width="440" height="92" rx="8" fill="#FFFFFF" stroke="#C0BDB7" stroke-width="1"/>
+<text x="36" y="496" fill="#201E1A" font-size="20" font-family="'neue-haas-grotesk-display', 'ui-display-fallback', Arial, Helvetica, sans-serif" font-weight="500">CALL-E places it</text>
+<text x="216" y="472" fill="#524F4B" font-size="16">A cap on families, not requests.</text>
+<text x="216" y="496" fill="#524F4B" font-size="16">One key for each row.</text>
+<text x="216" y="520" fill="#524F4B" font-size="16">Polled to the end.</text>
+<rect x="76" y="564" width="340" height="72" rx="8" fill="#414A39"/>
+<text x="92" y="596" fill="#F8F7F4" font-size="24" font-family="'neue-haas-grotesk-display', 'ui-display-fallback', Arial, Helvetica, sans-serif" font-weight="500">resolved</text>
+<text x="92" y="620" fill="#F8F7F4" font-size="16">A schema-valid answer came back.</text>
+<text x="400" y="596" fill="#F8F7F4" font-size="16" font-family="'azeret-mono', 'mono-fallback', Consolas, ui-monospace, monospace" text-anchor="end" letter-spacing="0.08em">NOBODY</text>
+<rect x="76" y="656" width="340" height="72" rx="8" fill="#795616"/>
+<text x="92" y="688" fill="#F8F7F4" font-size="24" font-family="'neue-haas-grotesk-display', 'ui-display-fallback', Arial, Helvetica, sans-serif" font-weight="500">undetermined</text>
+<text x="92" y="712" fill="#F8F7F4" font-size="16">The call happened. No usable answer.</text>
+<text x="400" y="688" fill="#F8F7F4" font-size="16" font-family="'azeret-mono', 'mono-fallback', Consolas, ui-monospace, monospace" text-anchor="end" letter-spacing="0.08em">A PERSON</text>
+<rect x="76" y="748" width="340" height="72" rx="8" fill="#605D59"/>
+<text x="92" y="780" fill="#F8F7F4" font-size="24" font-family="'neue-haas-grotesk-display', 'ui-display-fallback', Arial, Helvetica, sans-serif" font-weight="500">failed</text>
+<text x="92" y="804" fill="#F8F7F4" font-size="16">Nobody was reached on any number.</text>
+<text x="400" y="780" fill="#F8F7F4" font-size="16" font-family="'azeret-mono', 'mono-fallback', Consolas, ui-monospace, monospace" text-anchor="end" letter-spacing="0.08em">A PERSON</text>
+<rect x="20" y="872" width="440" height="120" rx="8" fill="#FFFFFF" stroke="#795616" stroke-width="2"/>
+<text x="36" y="900" fill="#524F4B" font-size="16" font-family="'azeret-mono', 'mono-fallback', Consolas, ui-monospace, monospace" letter-spacing="0.08em">SAFEGUARDING, DEFAULT 30 MINUTES</text>
+<text x="36" y="928" fill="#201E1A" font-size="20" font-family="'neue-haas-grotesk-display', 'ui-display-fallback', Arial, Helvetica, sans-serif" font-weight="500">Only an explicit yes closes it.</text>
+<text x="36" y="952" fill="#524F4B" font-size="16">Anything else goes to the top of a person's queue.</text>
+<text x="36" y="976" fill="#524F4B" font-size="16">A failed call has no answer, so it cannot escalate.</text>
+</svg>

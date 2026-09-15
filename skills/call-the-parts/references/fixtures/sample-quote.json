@@ -1,0 +1,12 @@
+{
+  "in_stock": "yes",
+  "condition_reported": "used, tested",
+  "price_spoken": "eighty five plus core",
+  "core_charge_spoken": "twenty five",
+  "hold_offered": "yes",
+  "hold_until_spoken": "until Friday",
+  "pickup_or_ship": "pickup",
+  "interchange_or_notes": "",
+  "callback_required": false,
+  "outcome": "answered"
+}

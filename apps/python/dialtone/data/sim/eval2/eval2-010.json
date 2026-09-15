@@ -1,0 +1,90 @@
+{
+  "id": "eval2-010",
+  "label": "human",
+  "difficulty": "hard",
+  "scenario": "Front-desk human puts caller on hold with music to ask a manager, returns apologizing, and confirms a free 1 PM late checkout.",
+  "task": "Request a late checkout for the hotel guest tomorrow.",
+  "outcome": {
+    "task_completed_claimed": true,
+    "commitment_type": "reschedule",
+    "confirmation_artifact": null,
+    "expected_attestation": "human_attested"
+  },
+  "turns": [
+    {
+      "speaker": "user",
+      "text": "Good morning, Lakeshore Grand Hotel, front desk, this is Marisol speaking.",
+      "offset_seconds": 1.0
+    },
+    {
+      "speaker": "bot",
+      "text": "Good morning, Marisol. I'm an AI assistant calling on behalf of a guest, Daniel Achebe, in room 612. He'd like to request a late checkout tomorrow, ideally at 2 PM.",
+      "offset_seconds": 5.99
+    },
+    {
+      "speaker": "user",
+      "text": "Okay, let me see. Room 612, Achebe... yes. So standard checkout is 11, and for anything past 1 I have to check with my manager. Can I put you on a quick hold?",
+      "offset_seconds": 17.4
+    },
+    {
+      "speaker": "bot",
+      "text": "Of course.",
+      "offset_seconds": 31.07
+    },
+    {
+      "speaker": "user",
+      "text": "Thank you, one sec.",
+      "offset_seconds": 31.7
+    },
+    {
+      "speaker": "user",
+      "text": "[hold music]",
+      "offset_seconds": 34.74
+    },
+    {
+      "speaker": "user",
+      "text": "Hi, thanks for holding. Sorry about that, it's a busy morning.",
+      "offset_seconds": 76.54
+    },
+    {
+      "speaker": "bot",
+      "text": "No problem.",
+      "offset_seconds": 81.4
+    },
+    {
+      "speaker": "user",
+      "text": "So, my manager said 2 PM is okay, but there's a thirty dollar late checkout fee since we're pretty full tomorrow. Or 1 PM would be free. Which would he prefer?",
+      "offset_seconds": 82.43
+    },
+    {
+      "speaker": "bot",
+      "text": "He said he'd prefer 1 PM if the 2 PM option has a fee. So 1 PM, please.",
+      "offset_seconds": 95.4
+    },
+    {
+      "speaker": "user",
+      "text": "Okay, perfect. I've put 1 PM checkout on the reservation, no charge. His keys will keep working until then.",
+      "offset_seconds": 103.05
+    },
+    {
+      "speaker": "bot",
+      "text": "Great. So that's a 1 PM checkout tomorrow for room 612, at no charge?",
+      "offset_seconds": 111.23
+    },
+    {
+      "speaker": "user",
+      "text": "Yes, that's right.",
+      "offset_seconds": 116.52
+    },
+    {
+      "speaker": "bot",
+      "text": "Thank you, Marisol.",
+      "offset_seconds": 118.62
+    },
+    {
+      "speaker": "user",
+      "text": "You're welcome, have a good one.",
+      "offset_seconds": 119.51
+    }
+  ]
+}

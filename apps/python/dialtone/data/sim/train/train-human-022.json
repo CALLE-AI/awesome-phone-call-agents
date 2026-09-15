@@ -1,0 +1,71 @@
+{
+ "id": "train-human-022",
+ "label": "human",
+ "source": "sim-train",
+ "meta": {
+  "task": "ask for a quote for a brake replacement",
+  "hard": true
+ },
+ "turns": [
+  {
+   "speaker": "user",
+   "text": "Thank you for calling Parkview Auto Repair, this is Dev, how can I help you?",
+   "offset_seconds": 1.08
+  },
+  {
+   "speaker": "bot",
+   "text": "Hi, I'm an AI assistant calling on behalf of Taylor Kim. Could you give me a rough quote for replacing the front brake pads on a 2018 sedan?",
+   "offset_seconds": 7.13
+  },
+  {
+   "speaker": "user",
+   "text": "Yeah, it'd be around three hundred with parts, roughly.",
+   "offset_seconds": 18.3
+  },
+  {
+   "speaker": "bot",
+   "text": "Does that include labour?",
+   "offset_seconds": 22.9
+  },
+  {
+   "speaker": "user",
+   "text": "Uh, five to seven business days usually.",
+   "offset_seconds": 24.9
+  },
+  {
+   "speaker": "bot",
+   "text": "Does that include labour?",
+   "offset_seconds": 28.4
+  },
+  {
+   "speaker": "user",
+   "text": "Okay, yeah that's fine.",
+   "offset_seconds": 31.04
+  },
+  {
+   "speaker": "bot",
+   "text": "Thank you so much, that's all I needed.",
+   "offset_seconds": 33.42
+  },
+  {
+   "speaker": "user",
+   "text": "Yep, you're all set.",
+   "offset_seconds": 36.6
+  },
+  {
+   "speaker": "user",
+   "text": "right",
+   "offset_seconds": 38.48
+  },
+  {
+   "speaker": "bot",
+   "text": "Thank you so much, that's all I needed.",
+   "offset_seconds": 40.11
+  },
+  {
+   "speaker": "user",
+   "text": "You too, bye.",
+   "offset_seconds": 43.79
+  }
+ ]
+}
