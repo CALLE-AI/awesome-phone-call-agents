@@ -96,6 +96,21 @@ export class FixtureProvider implements CallProvider {
     return JSON.parse(readFileSync(file, 'utf8')) as FixtureFile;
   }
 
+  /**
+   * The moment the first recorded call was placed.
+   *
+   * A replay that reads the wall clock is not a replay: the same fixtures would
+   * resolve "tomorrow between ten and twelve" to a different date every day, and
+   * eventually drift outside the hours the errand accepts. Anchoring to the
+   * recording keeps the demo reproducible for good.
+   */
+  recordedAt(): Date | null {
+    const first = this.queue[0];
+    if (!first) return null;
+    const parsed = Date.parse(this.load(first).now);
+    return Number.isFinite(parsed) ? new Date(parsed) : null;
+  }
+
   async placeCall(_request: CallRequest): Promise<CallOutcome> {
     const name = this.queue[this.cursor] ?? this.queue[this.queue.length - 1];
     if (!name) throw new Error('FixtureProvider was given no fixtures to replay.');
@@ -158,7 +173,7 @@ export class CalleProvider implements CallProvider {
       );
     }
     this.apiKey = opts.apiKey;
-    this.baseUrl = approvedBaseUrl(opts.baseUrl ?? LIVE_API_URL);
+    this.baseUrl = approvedBaseUrl(opts.baseUrl ?? LIVE_API_URL, opts.apiKey);
     this.timeoutMs = opts.timeoutMs ?? 10 * 60_000;
   }
 
@@ -208,10 +223,27 @@ export class CalleProvider implements CallProvider {
 }
 
 /**
- * Refuse to send an API key anywhere except CALL-E's own origin or a loopback
- * simulator. A misconfigured base URL is otherwise a silent credential leak.
+ * Is this key obviously not a real credential?
+ *
+ * Loopback simulators are useful, but "send the key anywhere on localhost" is
+ * not a boundary: any process on the machine can bind a port, and a plaintext
+ * HTTP hop hands over a live credential to whatever answers. So loopback is
+ * allowed only for a key that announces itself as fake. The test must be
+ * conservative — anything it is unsure about is treated as real, because the
+ * cost of guessing wrong is a working API key sent in the clear.
  */
-export function approvedBaseUrl(value: string): string {
+export function isObviouslyFakeKey(apiKey: string): boolean {
+  return /^(test|fake|dummy|sim|local)[-_]/i.test(apiKey.trim());
+}
+
+/**
+ * Refuse to send an API key anywhere except CALL-E's own origin over HTTPS, or
+ * a loopback simulator holding a key that is explicitly fake.
+ *
+ * A misconfigured base URL is otherwise a silent credential leak, and the
+ * silent part is what makes it dangerous: nothing fails, the key is just gone.
+ */
+export function approvedBaseUrl(value: string, apiKey = ''): string {
   let url: URL;
   try {
     url = new URL(value);
@@ -220,7 +252,9 @@ export function approvedBaseUrl(value: string): string {
   }
 
   const loopback = ['localhost', '127.0.0.1', '[::1]'].includes(url.hostname);
-  const official = url.origin === LIVE_API_URL;
+  // Compared by host, not origin: `http://api.heycall-e.com` is the *live* host
+  // over plaintext, and must be refused as such rather than as an unknown one.
+  const official = url.hostname === new URL(LIVE_API_URL).hostname;
 
   if (url.username || url.password || url.search || url.hash) {
     throw new Error(
@@ -230,6 +264,17 @@ export function approvedBaseUrl(value: string): string {
   if (!official && !loopback) {
     throw new Error(
       `Refusing an unapproved CALL-E origin: ${url.origin}. Use ${LIVE_API_URL} or a loopback simulator.`,
+    );
+  }
+  if (official && url.protocol !== 'https:') {
+    throw new Error(
+      'Refusing to send a CALL-E credential over plaintext to the live API.',
+    );
+  }
+  if (loopback && !isObviouslyFakeKey(apiKey)) {
+    throw new Error(
+      'Refusing to send a real-looking CALL-E key to a loopback simulator. ' +
+        'Prefix the key with `test-`, `fake-`, `dummy-`, `sim-` or `local-` to confirm it is not a live credential.',
     );
   }
   return url.origin;
