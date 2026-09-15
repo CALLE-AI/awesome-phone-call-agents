@@ -1,0 +1,10 @@
+[
+  {"case_id": "PB-SIM-01-OK",    "phone": "+886900000001", "scenario": "outage_welfare_check", "language": "en", "equipment_type": "ventilator",          "battery_hours_hint": 2,    "district": "TPE-001", "disclosure_allowlist": ["caller_identity", "nearest_shelter", "emergency_hotline"]},
+  {"case_id": "PB-SIM-02-DECL",  "phone": "+886900000002", "scenario": "outage_welfare_check", "language": "en", "equipment_type": "oxygen_concentrator", "battery_hours_hint": 5,    "district": "TPE-001", "disclosure_allowlist": ["caller_identity"]},
+  {"case_id": "PB-SIM-03-NOANS", "phone": "+886900000003", "scenario": "outage_welfare_check", "language": "en", "equipment_type": "ventilator",          "battery_hours_hint": null, "district": "TPE-002", "disclosure_allowlist": ["caller_identity", "outage_status"]},
+  {"case_id": "PB-SIM-04-THIN",  "phone": "+886900000004", "scenario": "resource_needs_survey", "language": "en", "equipment_type": "dialysis",           "battery_hours_hint": 8,    "district": "TPE-003", "disclosure_allowlist": ["caller_identity", "estimated_restore_time"]},
+  {"case_id": "PB-SIM-05-VM",    "phone": "+886900000005", "scenario": "outage_welfare_check", "language": "en", "equipment_type": "suction_machine",     "battery_hours_hint": 4,    "district": "TPE-002", "disclosure_allowlist": ["caller_identity"]},
+  {"case_id": "PB-SIM-06-WRONG", "phone": "+886900000006", "scenario": "evacuation_notice_confirm", "language": "en", "equipment_type": "power_wheelchair", "battery_hours_hint": 12, "district": "TPE-004", "disclosure_allowlist": ["caller_identity", "nearest_shelter"]},
+  {"case_id": "PB-SIM-07-OK",    "phone": "+886900000007", "scenario": "outage_welfare_check", "language": "en", "equipment_type": "unknown",             "battery_hours_hint": null, "district": "TPE-005", "disclosure_allowlist": ["caller_identity", "emergency_hotline"]},
+  {"case_id": "PB-SIM-08-OK",    "phone": "+886900000008", "scenario": "resource_needs_survey", "language": "en", "equipment_type": "power_wheelchair",   "battery_hours_hint": 24,   "district": "TPE-004", "disclosure_allowlist": ["caller_identity"]}
+]
