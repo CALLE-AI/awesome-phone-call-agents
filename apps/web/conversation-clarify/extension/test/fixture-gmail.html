@@ -1,0 +1,80 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Conversation Clarify — offline extractor test</title>
+<style>
+  body { font: 14px/1.5 system-ui, sans-serif; margin: 0; padding: 24px; background: #f6f8fa; color: #111; }
+  h1 { font-size: 16px; margin: 0 0 4px; }
+  p.note { color: #57606a; margin: 0 0 20px; }
+  .layout { display: grid; grid-template-columns: 1fr 1fr; gap: 20px; align-items: start; }
+  .card { background: #fff; border: 1px solid #d0d7de; border-radius: 8px; padding: 16px; }
+  h2.hP { font-size: 18px; margin: 0 0 14px; font-weight: 500; }
+  div.adn.ads { border-top: 1px solid #eaeef2; padding: 12px 0; }
+  span.gD { font-weight: 600; }
+  span.g3 { color: #57606a; font-size: 12px; margin-left: 8px; }
+  div.a3s { margin-top: 6px; white-space: pre-wrap; }
+  .gmail_quote { color: #9aa0a6; border-left: 2px solid #dadce0; padding-left: 8px; margin-top: 8px; }
+  pre { background: #0d1117; color: #c9d1d9; padding: 12px; border-radius: 6px; overflow: auto;
+        font-size: 12px; max-height: 60vh; }
+  button { font: inherit; padding: 6px 12px; border-radius: 6px; border: 1px solid #d0d7de;
+           background: #f6f8fa; cursor: pointer; }
+  .ok { color: #1a7f37; font-weight: 600; }
+  .bad { color: #cf222e; font-weight: 600; }
+</style>
+</head>
+<body>
+
+<h1>Offline extractor test</h1>
+<p class="note">
+  Mirrors Gmail's markup (<code>h2.hP</code>, <code>div.adn.ads</code>, <code>span.gD[email]</code>,
+  <code>div.a3s</code>, <code>.gmail_quote</code>) so the reader can be verified without a Gmail
+  account and without a network. Nothing here places a call.
+</p>
+
+<!-- The signed-in account, exactly as Gmail exposes it. -->
+<a aria-label="Google Account: Charles Miller (charles@example.test)" href="#">account</a>
+
+<div class="layout">
+  <div class="card">
+    <h2 class="hP">Kickoff — Monday or Tuesday?</h2>
+
+    <div class="adn ads">
+      <span class="gD" email="charles@example.test" name="Charles Miller">Charles Miller</span>
+      <span class="g3" title="Thu, 11 Sep 2026, 09:14">11 Sep</span>
+      <div class="a3s">Hi Alex — does Monday or Tuesday work for the kickoff? Stephen can only join on Tuesday.</div>
+    </div>
+
+    <div class="adn ads">
+      <span class="gD" email="alex@example.test" name="Alex Doe">Alex Doe</span>
+      <span class="g3" title="Thu, 11 Sep 2026, 16:02">11 Sep</span>
+      <div class="a3s">Yeah, I'll be there.
+
+--
+Alex Doe
+Operations, Example Ltd
++1 555 010 0142
+        <div class="gmail_quote">On Thu, 11 Sep 2026, Charles Miller wrote:<br>&gt; does Monday or Tuesday work</div>
+      </div>
+    </div>
+  </div>
+
+  <div class="card">
+    <button id="run">Run extractor</button>
+    <span id="verdict"></span>
+    <pre id="out">Press the button.</pre>
+  </div>
+</div>
+
+<script src="../src/extract.js"></script>
+<script>
+  document.getElementById('run').addEventListener('click', () => {
+    const result = window.ConversationClarifyExtract.readThread(document);
+    const verdict = document.getElementById('verdict');
+    verdict.textContent = result.ok ? ' extracted' : ' refused';
+    verdict.className = result.ok ? 'ok' : 'bad';
+    document.getElementById('out').textContent = JSON.stringify(result, null, 2);
+  });
+</script>
+</body>
+</html>
