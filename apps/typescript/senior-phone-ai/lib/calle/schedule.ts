@@ -137,6 +137,9 @@ export async function cancelScheduledCall(id: string, secret: string): Promise<S
 
 async function claimDueCall(now: Date): Promise<{ record?: ScheduledCallRecord; expired: boolean } | undefined> {
   return mutate(async (schedule) => {
+    // UI refreshes also run this scheduler. Do not let a later poll bypass an
+    // ambiguous dispatch; the operator must reconcile its existing intent first.
+    if (schedule.calls.some((call) => call.status === "unknown")) return undefined;
     const due = schedule.calls
       .filter((call) => call.status === "pending" && scheduledCallDispatchDecision(call.scheduledFor, now) !== "not_due")
       .sort((left, right) => left.scheduledFor.localeCompare(right.scheduledFor))[0];
@@ -198,6 +201,7 @@ export async function runDueScheduledCalls(secret: string, now = new Date()): Pr
           requestId: claimed.record.id,
           source: "registry",
         });
+        return { processed: processed + 1, expired };
       } else {
         await writeCallLog({
           destinationE164: request.destinationE164,
@@ -230,6 +234,7 @@ export async function runDueScheduledCalls(secret: string, now = new Date()): Pr
         requestId: claimed.record.id,
         source: "provider",
       });
+      if (!rejected) return { processed: processed + 1, expired };
     }
     processed += 1;
   }

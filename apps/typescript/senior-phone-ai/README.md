@@ -145,6 +145,14 @@ Choose **End session**, close the page or stop the server to close a local Realt
 
 Closing `/calls` stops status polling but does not cancel a call accepted by CALL-E. Remove the ignored `data/calle-call-registry.json` file to clear the local call registry after any in-flight outcome has been reconciled.
 
+An unknown scheduled-call outcome pauses the current pass and later automatic
+polls. Reconcile that exact intent with CALL-E before resuming; do not create a
+fresh call to work around it. This local demo has no reconciliation UI. After
+provider verification, stop the server and review the matching `unknown` entry
+in the ignored `data/calle-call-schedule.json` with the operator: set `status` to
+`accepted` with the verified `callId`, or remove only that reconciled entry before explicitly resuming
+the remaining schedules. Never clear unknown records merely to unblock dispatch.
+
 Future provider actions must document their own cancellation limits. In particular, closing the browser or stopping this server must never be described as canceling a call already accepted by a provider. The host scheduler will own recurrence and must support disabling future runs.
 
 ## Project boundaries
