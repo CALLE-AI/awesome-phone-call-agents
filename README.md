@@ -119,6 +119,7 @@ Avoid: `- [call-reminder](skills/call-reminder/) - A great tool for calling peop
 This project is an awesome list for AI-agent phone-call workflows. Add resources only when they directly help agents package, schedule, execute, or safely operate phone-call tasks.
 
 ### Skills
+- [scam-mirror](skills/scam-mirror/) - Dispatches two short-lived CALL-E flies (published official line + suspect line) and returns a trust verdict with evidence hashes, grounded in real Drosophila connectome neuron personas.
 
 - [`lesson-language-phone-practice`](skills/lesson-language-phone-practice/) - Consent-gated, lesson-derived phone rehearsal with a one-minute maximum, transcript-bound formative evidence, and no automatic redial.
 - [`accesscall`](skills/accesscall/) - Phone-based accessibility intake for VPAT 2.4/Section 508 audits. Run `npm install` in `skills/accesscall/` before using `scripts/format-to-vpat.js`, or it fails with `Cannot find module 'jszip'`.
