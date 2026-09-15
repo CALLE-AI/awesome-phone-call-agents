@@ -1,0 +1,13 @@
+{
+  "question": "Does this branch have the Bosch HBL8453UC in stock for pickup today?",
+  "asked_scope": ["hbl8453uc", "in-stock", "this-branch"],
+  "evidence_scope": ["hbl8453uc", "in-stock"],
+  "evidence_age_days": 427,
+  "cost_if_wrong": "expensive",
+  "user_requested": true,
+  "authority_name": "Northgate Appliance, Bellevue branch",
+  "authority_phone": "+14155550100",
+  "region": "US",
+  "provisional_answer": "Probably in stock, but the listing is chain-wide, not branch-level.",
+  "evidence_quote": "In stock at Northgate Appliance."
+}

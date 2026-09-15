@@ -1,0 +1,81 @@
+{
+ "id": "train-human-042",
+ "label": "human",
+ "source": "sim-train",
+ "meta": {
+  "task": "ask for a quote for a brake replacement",
+  "hard": false
+ },
+ "turns": [
+  {
+   "speaker": "user",
+   "text": "Hi, who's calling?",
+   "offset_seconds": 0.8
+  },
+  {
+   "speaker": "bot",
+   "text": "Hi, I'm an AI assistant calling on behalf of Casey Brown. Could you give me a rough quote for replacing the front brake pads on a 2018 sedan?",
+   "offset_seconds": 5.45
+  },
+  {
+   "speaker": "user",
+   "text": "Sunday we're um, open ten to four.",
+   "offset_seconds": 15.81
+  },
+  {
+   "speaker": "user",
+   "text": "yeah",
+   "offset_seconds": 18.98
+  },
+  {
+   "speaker": "bot",
+   "text": "Does that include labour?",
+   "offset_seconds": 20.22
+  },
+  {
+   "speaker": "user",
+   "text": "Yep, you're all set.",
+   "offset_seconds": 22.54
+  },
+  {
+   "speaker": "user",
+   "text": "right",
+   "offset_seconds": 24.56
+  },
+  {
+   "speaker": "bot",
+   "text": "How soon could you do it?",
+   "offset_seconds": 25.89
+  },
+  {
+   "speaker": "user",
+   "text": "Sure.",
+   "offset_seconds": 30.33
+  },
+  {
+   "speaker": "bot",
+   "text": "Thank you so much, that's all I needed.",
+   "offset_seconds": 31.74
+  },
+  {
+   "speaker": "user",
+   "text": "Uh, let me see, five to seven business days usually.",
+   "offset_seconds": 34.97
+  },
+  {
+   "speaker": "user",
+   "text": "yeah",
+   "offset_seconds": 39.08
+  },
+  {
+   "speaker": "bot",
+   "text": "Thank you so much, that's all I needed.",
+   "offset_seconds": 40.14
+  },
+  {
+   "speaker": "user",
+   "text": "No problem, bye now.",
+   "offset_seconds": 44.37
+  }
+ ]
+}

@@ -1,0 +1,56 @@
+{
+ "id": "train-agent-005",
+ "label": "agent",
+ "source": "sim-train",
+ "meta": {
+  "task": "reschedule an appointment from Tuesday to Thursday morning",
+  "hard": false
+ },
+ "turns": [
+  {
+   "speaker": "user",
+   "text": "Hi there, I'm Nova, the virtual assistant for Maple Vet Clinic. How may I assist you today?",
+   "offset_seconds": 0.5
+  },
+  {
+   "speaker": "bot",
+   "text": "Hi, I'm an AI assistant calling on behalf of Alex Martin. I'm calling to move Alex Martin's appointment from Tuesday to Thursday morning.",
+   "offset_seconds": 7.6
+  },
+  {
+   "speaker": "user",
+   "text": "Absolutely, I'd be happy to help. I've moved Alex Martin's appointment from Tuesday to Thursday at 10 AM. Is there anything else?",
+   "offset_seconds": 17.33
+  },
+  {
+   "speaker": "bot",
+   "text": "Is 10 AM on Thursday possible?",
+   "offset_seconds": 26.66
+  },
+  {
+   "speaker": "user",
+   "text": "I understand. Someone from our team will follow up to confirm the details.",
+   "offset_seconds": 30.31
+  },
+  {
+   "speaker": "bot",
+   "text": "Can you confirm the new time?",
+   "offset_seconds": 36.34
+  },
+  {
+   "speaker": "user",
+   "text": "Great question! Let me check that for you. Yes, that's correct.",
+   "offset_seconds": 40.0
+  },
+  {
+   "speaker": "bot",
+   "text": "Thank you, that's everything.",
+   "offset_seconds": 45.49
+  },
+  {
+   "speaker": "user",
+   "text": "You're welcome! Have a wonderful day. Goodbye!",
+   "offset_seconds": 48.09
+  }
+ ]
+}

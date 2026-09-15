@@ -1,0 +1,287 @@
+{
+  "_comment": "Generated from src/core/needs.ts by scripts/sync-skill.ts. Do not edit by hand — run `pnpm sync:skill`.",
+  "categories": {
+    "mobility": "Mobility",
+    "vision": "Vision",
+    "hearing": "Hearing (d/Deaf and hard of hearing)",
+    "sensory": "Sensory and neurodivergent",
+    "cognitive": "Cognitive and communication",
+    "support": "Care and support"
+  },
+  "needs": [
+    {
+      "id": "step-free-entry",
+      "category": "mobility",
+      "label": "Step-free entrance",
+      "rationale": "Even one step can make it impossible to get inside.",
+      "question": "How many steps are there at the main entrance? If there are any, is there a ramp or step-free door somewhere else?",
+      "evidenceHint": "A count of steps (zero counts). If there are steps, whether an alternative step-free entrance exists and where it is.",
+      "schemaDescription": "Whether a person using a wheelchair can get in without going up or down any step. Answer 'yes' only when the number of steps at the main entrance is zero. Any steps at the main entrance is 'partial' at best, even when a ramp or an alternative step-free door exists — a ramp whose gradient and location nobody confirmed is not proof of step-free entry. 'partial' also covers step-free entry that exists only via a side or back door.",
+      "googleField": "wheelchairAccessibleEntrance"
+    },
+    {
+      "id": "ramp-gradient",
+      "category": "mobility",
+      "label": "Usable ramp",
+      "rationale": "A ramp needs to be gentle enough to use safely and independently.",
+      "question": "If there is a ramp, roughly how long is it and how steep does it feel — could someone push themselves up it unaided?",
+      "evidenceHint": "Rough length or steepness, or a staff judgement of whether people self-propel up it unaided.",
+      "schemaDescription": "Whether the ramp is usable unaided. 'partial' if staff say most people need a push."
+    },
+    {
+      "id": "door-width",
+      "category": "mobility",
+      "label": "Wide enough doorway",
+      "rationale": "A standard wheelchair needs about 32 inches of clear space.",
+      "question": "Roughly how wide is the entrance doorway? Would a wheelchair about 70 centimetres wide fit through?",
+      "evidenceHint": "A width in centimetres or inches, or a clear yes/no about a 70cm chair fitting.",
+      "schemaDescription": "Whether the doorway admits a standard wheelchair of about 70cm width."
+    },
+    {
+      "id": "accessible-parking",
+      "category": "mobility",
+      "label": "Accessible parking",
+      "rationale": "Accessible parking only helps if there is a step-free route to the door.",
+      "question": "Is there designated accessible parking, and how far is it from the step-free entrance?",
+      "evidenceHint": "Whether designated bays exist, and the distance or walking time to the accessible entrance.",
+      "schemaDescription": "Whether designated accessible parking exists near an accessible entrance.",
+      "googleField": "wheelchairAccessibleParking"
+    },
+    {
+      "id": "lift-access",
+      "category": "mobility",
+      "label": "Lift to all public floors",
+      "rationale": "A ground-floor entrance is not enough if key facilities are upstairs.",
+      "question": "Are all the areas customers use on one floor? If not, is there a lift to the other floors, and is it working today?",
+      "evidenceHint": "Which floors customers use, whether a lift reaches them, and whether it is currently in service.",
+      "schemaDescription": "Whether every public area is reachable without stairs. 'partial' if some areas are not."
+    },
+    {
+      "id": "accessible-toilet",
+      "category": "mobility",
+      "label": "Accessible toilet",
+      "rationale": "Without an accessible toilet, you may have to cut your visit short.",
+      "question": "Is there an accessible toilet? Is it on the same floor as the main seating area, and is it kept unlocked?",
+      "evidenceHint": "Whether one exists, which floor it is on, and whether a key must be requested.",
+      "schemaDescription": "Whether an accessible toilet is available and reachable without stairs. 'partial' if it exists but is on another floor or kept locked.",
+      "googleField": "wheelchairAccessibleRestroom"
+    },
+    {
+      "id": "accessible-toilet-placement",
+      "category": "mobility",
+      "label": "Accessible toilet a companion can enter",
+      "rationale": "Some people need a partner or carer to come into the toilet with them.",
+      "question": "If there is an accessible toilet, is it its own separate room, or is it a cubicle inside the men's or the ladies'?",
+      "evidenceHint": "Which of the two it is — a separate room off a corridor, or a cubicle inside a gendered block — or that there is no accessible toilet to describe.",
+      "schemaDescription": "Whether the accessible toilet is a separate room a companion of any gender can enter. 'no' if it is a cubicle inside a gendered toilet block."
+    },
+    {
+      "id": "step-free-to-table",
+      "category": "mobility",
+      "label": "Step-free inside",
+      "rationale": "Steps inside the venue and raised seating areas are often missing from online listings.",
+      "question": "Once inside, are there any steps or raised areas between the door and the seating? Is there space for a wheelchair at a table?",
+      "evidenceHint": "Whether internal steps exist, and whether a wheelchair user can be seated at a normal table.",
+      "schemaDescription": "Whether the route from the entrance to a seat is free of steps and a wheelchair fits at a table.",
+      "googleField": "wheelchairAccessibleSeating"
+    },
+    {
+      "id": "accessible-room",
+      "category": "mobility",
+      "label": "Accessible room (hotels)",
+      "rationale": "An accessible lobby does not tell you whether the bedroom and bathroom will work for a wheelchair user.",
+      "question": "Is there a room adapted for a wheelchair user? Can someone in a wheelchair get into that room easily — a wide enough door and space to turn — and into its bathroom without a step or a raised threshold?",
+      "evidenceHint": "Whether an adapted room exists; whether its doorway is wide enough and there is space to turn inside; and whether the way into the room and into its bathroom is free of steps and raised thresholds.",
+      "schemaDescription": "Whether a room adapted for a wheelchair user is available with nothing to climb on the way in. Answer 'yes' only when they confirm both that such a room exists and that someone in a wheelchair can get into it and into its bathroom without a step or a raised threshold. A step or a raised threshold anywhere on the way in is 'partial' at best, even when staff call the room accessible. 'unknown' when they say only that the room is accessible and describe nothing about the way in."
+    },
+    {
+      "id": "shower-chair",
+      "category": "mobility",
+      "label": "Shower chair (hotels)",
+      "rationale": "A shower chair can make the difference between being able to wash safely and not at all.",
+      "question": "If you have a room adapted for a wheelchair user, is there a shower chair in its bathroom, or is one brought up only if a guest asks?",
+      "evidenceHint": "Whether a shower chair exists at all, and whether it is already in the adapted room or has to be requested — or that there is no adapted room to describe.",
+      "schemaDescription": "Whether a shower chair is available in an adapted room. Answer 'yes' only when they confirm a shower chair is kept in the room. 'partial' when one exists but has to be requested, or when staff cannot confirm one is in the room. 'no' when there is none."
+    },
+    {
+      "id": "guide-dog",
+      "category": "vision",
+      "label": "Guide dog welcome",
+      "rationale": "It is worth checking because assistance dogs are still sometimes refused.",
+      "question": "Are guide dogs and assistance dogs welcome inside, including in the seating area?",
+      "evidenceHint": "A clear yes or no about assistance dogs indoors, and any area they are excluded from.",
+      "schemaDescription": "Whether assistance dogs are admitted to all customer areas."
+    },
+    {
+      "id": "assistance-dog-overnight",
+      "category": "vision",
+      "label": "Assistance dog overnight (hotels)",
+      "rationale": "A hotel may welcome assistance dogs in public areas but have different rules or fees for overnight stays.",
+      "question": "Can an assistance dog stay in the room overnight? Is there any extra charge or cleaning fee for that, and is there somewhere nearby the dog can be taken to relieve itself?",
+      "evidenceHint": "Whether the dog may stay in the room, any charge, deposit or cleaning fee and how much it is, and where the nearest place to take the dog is.",
+      "schemaDescription": "Whether an assistance dog can stay in the room overnight without an extra charge. Answer 'yes' only when they confirm the dog may stay and that no fee, deposit or cleaning charge applies. 'partial' when the dog may stay but a charge applies, when nobody can say whether one applies, or when there is nowhere nearby to take the dog. 'no' when the dog may not stay in the room."
+    },
+    {
+      "id": "accessible-menu",
+      "category": "vision",
+      "label": "Braille or large-print menu",
+      "rationale": "A braille or large-print menu lets you read the options without relying on a companion.",
+      "question": "Do you have a menu in braille or large print, or can staff read the menu aloud if someone asks?",
+      "evidenceHint": "Which formats exist, or a commitment that staff will read the menu aloud.",
+      "schemaDescription": "Whether menu content is available in a non-visual or large-print form. 'partial' if only staff reading aloud is offered."
+    },
+    {
+      "id": "lighting-level",
+      "category": "vision",
+      "label": "Well-lit interior",
+      "rationale": "Dim lighting can make it difficult or impossible to move around and read.",
+      "question": "How bright is the lighting inside — is it dim mood lighting, or bright enough to read a menu comfortably?",
+      "evidenceHint": "A description of the lighting level, and whether it changes at certain times of day.",
+      "schemaDescription": "Whether lighting is bright enough to read by. 'partial' if it varies by time of day."
+    },
+    {
+      "id": "sighted-guide",
+      "category": "vision",
+      "label": "Staff will guide to a table",
+      "rationale": "A little guidance can make an unfamiliar layout much easier to navigate.",
+      "question": "If someone arrives who cannot see well, can a member of staff guide them to a table and describe the layout?",
+      "evidenceHint": "A clear commitment from staff to guide and describe, not just a general willingness to help.",
+      "schemaDescription": "Whether staff will act as a sighted guide on request."
+    },
+    {
+      "id": "braille-room-numbers",
+      "category": "vision",
+      "label": "Braille room numbers (hotels)",
+      "rationale": "Tactile room numbers and lift buttons help guests find their way independently.",
+      "question": "Are the room numbers and the lift buttons marked in braille or in raised numbers, or is the room number only printed on the door?",
+      "evidenceHint": "Whether the room numbers are braille or raised, whether the lift buttons are, or a clear statement that both are printed only.",
+      "schemaDescription": "Whether room numbers and lift buttons can be read by touch. Answer 'yes' only when both the room numbers and the lift buttons are braille or raised. 'partial' when one is and the other is not, or when the only tactile marking is on a floor the guest is not staying on."
+    },
+    {
+      "id": "hearing-loop",
+      "category": "hearing",
+      "label": "Hearing loop",
+      "rationale": "A working hearing loop can make speech much clearer for hearing aid users.",
+      "question": "Do you have a hearing loop or induction loop system, and is it switched on?",
+      "evidenceHint": "Whether a loop is installed, where it covers, and whether staff know it is working.",
+      "schemaDescription": "Whether a working hearing loop is available. 'partial' if installed but staff are unsure it works."
+    },
+    {
+      "id": "staff-write",
+      "category": "hearing",
+      "label": "Staff will write or type",
+      "rationale": "Writing or typing can make communication much easier when speech is hard to hear.",
+      "question": "If a customer cannot hear you, are staff willing to write things down or type on a phone to communicate?",
+      "evidenceHint": "A clear commitment to write or type, not just 'we'd speak louder'.",
+      "schemaDescription": "Whether staff will communicate in writing on request."
+    },
+    {
+      "id": "noise-level",
+      "category": "hearing",
+      "label": "Manageable background noise",
+      "rationale": "Background noise can make conversation difficult for hearing aid users.",
+      "question": "How loud does it usually get inside? Is there music playing, and is there a quieter area or a quieter time of day?",
+      "evidenceHint": "A description of typical noise, whether music plays, and any quieter area or time.",
+      "schemaDescription": "Whether background noise stays low enough for conversation. 'partial' if only at certain times or in certain areas."
+    },
+    {
+      "id": "visual-alarm",
+      "category": "hearing",
+      "label": "Visual fire alarm",
+      "rationale": "People who cannot hear an alarm need a visual warning in an emergency.",
+      "question": "Does the fire alarm have flashing lights as well as a sound, so someone who cannot hear it would know?",
+      "evidenceHint": "Whether a visual alarm exists, and if not, whether staff have a procedure to alert people.",
+      "schemaDescription": "Whether the fire alarm has a visual signal. 'partial' if staff instead have a manual alerting procedure."
+    },
+    {
+      "id": "deaf-alert",
+      "category": "hearing",
+      "label": "Deaf alert kit (hotels)",
+      "rationale": "Guests need a reliable way to be alerted while they are asleep.",
+      "question": "If there was a fire in the night, how would a guest who cannot hear the alarm be woken? Do you have a vibrating pad that goes under the pillow, or a flashing beacon for the room?",
+      "evidenceHint": "Whether a vibrating pad or a room beacon exists, whether one is on site now or has to be ordered in, and what staff would do instead if there is none.",
+      "schemaDescription": "Whether a guest who cannot hear the fire alarm would be woken by equipment in their room. Answer 'yes' only when they name a vibrating pad or a flashing beacon that can be fitted in the room. 'partial' when the only answer is that staff would come and knock, or when a kit has to be ordered in and nobody can confirm one is on site. 'no' when there is nothing."
+    },
+    {
+      "id": "quiet-hours",
+      "category": "sensory",
+      "label": "Quiet hours",
+      "rationale": "A calm, predictable time can make a visit much easier.",
+      "question": "Do you have a quiet time or low-sensory hour, or a time of day that is reliably calm?",
+      "evidenceHint": "Specific days or times, or a clear statement that no such time exists.",
+      "schemaDescription": "Whether a reliably quiet period exists. 'partial' if it is informal rather than scheduled."
+    },
+    {
+      "id": "dimmable-lighting",
+      "category": "sensory",
+      "label": "No flickering or harsh lighting",
+      "rationale": "Flickering or harsh lights can trigger migraines or sensory overload.",
+      "question": "Is the lighting fluorescent or flickering anywhere, and can it be dimmed or turned down on request?",
+      "evidenceHint": "The lighting type, and whether staff can adjust it.",
+      "schemaDescription": "Whether lighting is free of flicker or can be adjusted on request."
+    },
+    {
+      "id": "music-volume",
+      "category": "sensory",
+      "label": "Music can be turned down",
+      "rationale": "Turning the music down can make the space easier to use.",
+      "question": "Is music always playing, and would staff be willing to turn it down if a customer asks?",
+      "evidenceHint": "Whether music always plays and whether staff will lower it on request.",
+      "schemaDescription": "Whether music volume can be reduced on request. 'partial' if only sometimes possible."
+    },
+    {
+      "id": "extra-time",
+      "category": "cognitive",
+      "label": "Staff patience with extra time",
+      "rationale": "Extra time helps people order and understand information without feeling rushed.",
+      "question": "If a customer needs longer to order or to understand something, are staff able to take extra time without rushing them?",
+      "evidenceHint": "A clear commitment to allow extra time, ideally with an example.",
+      "schemaDescription": "Whether staff will take extra time with a customer who needs it."
+    },
+    {
+      "id": "picture-menu",
+      "category": "cognitive",
+      "label": "Picture or simple-language menu",
+      "rationale": "Pictures and plain language can make a menu easier to understand.",
+      "question": "Is there a menu with pictures, or one written in simple plain language?",
+      "evidenceHint": "Which formats exist, or a clear no.",
+      "schemaDescription": "Whether a picture or plain-language menu exists."
+    },
+    {
+      "id": "advance-notice",
+      "category": "cognitive",
+      "label": "Advance notice welcomed",
+      "rationale": "Being able to explain your needs in advance can make the visit less stressful.",
+      "question": "If someone calls or messages ahead to explain what they need, can you note it against a booking?",
+      "evidenceHint": "Whether requirements can be recorded against a booking, and how to send them.",
+      "schemaDescription": "Whether access requirements can be recorded in advance against a booking."
+    },
+    {
+      "id": "companion-free",
+      "category": "support",
+      "label": "Companion or carer admitted free",
+      "rationale": "Some people cannot attend without a carer or companion.",
+      "question": "If someone needs a carer or companion with them, does that person need to pay, or do they come in free?",
+      "evidenceHint": "Whether a companion pays, and what proof if any is required.",
+      "schemaDescription": "Whether a carer or companion is admitted without charge."
+    },
+    {
+      "id": "changing-places",
+      "category": "support",
+      "label": "Changing Places facility",
+      "rationale": "A Changing Places toilet includes a hoist and adult-sized bench that a standard accessible toilet does not.",
+      "question": "Do you have a Changing Places facility, with a height-adjustable adult changing bench and a hoist? This is different from a standard accessible toilet.",
+      "evidenceHint": "Whether a bench and hoist are present. A standard accessible toilet does not count.",
+      "schemaDescription": "Whether a Changing Places facility with an adult bench and hoist exists."
+    },
+    {
+      "id": "seating-near-entrance",
+      "category": "support",
+      "label": "Seating near the entrance",
+      "rationale": "Nearby seating matters when standing in a queue is difficult.",
+      "question": "Is there seating close to the entrance where someone could sit while waiting, rather than standing in a queue?",
+      "evidenceHint": "Whether seating exists near the door and whether it is usually free.",
+      "schemaDescription": "Whether seating is available near the entrance for someone who cannot stand in a queue."
+    }
+  ]
+}

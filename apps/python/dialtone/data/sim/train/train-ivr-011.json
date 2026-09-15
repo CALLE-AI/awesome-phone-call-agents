@@ -1,0 +1,56 @@
+{
+ "id": "train-ivr-011",
+ "label": "ivr",
+ "source": "sim-train",
+ "meta": {
+  "task": "request a refund for a double charge",
+  "hard": false
+ },
+ "turns": [
+  {
+   "speaker": "user",
+   "text": "Thank you for calling Harbor Hotel. Your call is important to us. Please listen carefully, as our menu options have changed. For hours and directions, press 1. For appointments, press 2. For billing, press 3. To repeat these options, press 9.",
+   "offset_seconds": 0.49
+  },
+  {
+   "speaker": "bot",
+   "text": "Casey Brown was charged twice for the same order last week, and I'm calling to request a refund for the duplicate.",
+   "offset_seconds": 17.24
+  },
+  {
+   "speaker": "user",
+   "text": "Sorry, I didn't get that. Thank you for calling Harbor Hotel. Your call is important to us. Please listen carefully, as our menu options have changed. For hours and directions, press 1. For appointments, press 2. For billing, press 3. To repeat these options, press 9.",
+   "offset_seconds": 25.71
+  },
+  {
+   "speaker": "bot",
+   "text": "[DTMF 1]",
+   "offset_seconds": 43.89
+  },
+  {
+   "speaker": "user",
+   "text": "Please enter your account number, followed by the pound key.",
+   "offset_seconds": 44.68
+  },
+  {
+   "speaker": "bot",
+   "text": "Casey Brown was charged twice for the same order last week, and I'm calling to request a refund for the duplicate.",
+   "offset_seconds": 49.89
+  },
+  {
+   "speaker": "user",
+   "text": "Our hours are Monday through Friday, 9 AM to 6 PM. To return to the main menu, press star.",
+   "offset_seconds": 58.29
+  },
+  {
+   "speaker": "bot",
+   "text": "Casey Brown was charged twice for the same order last week, and I'm calling to request a refund for the duplicate.",
+   "offset_seconds": 66.71
+  },
+  {
+   "speaker": "user",
+   "text": "Sorry, I didn't get that. Thank you for calling Harbor Hotel. Your call is important to us. Please listen carefully, as our menu options have changed. For hours and directions, press 1. For appointments, press 2. For billing, press 3. To repeat these options, press 9.",
+   "offset_seconds": 75.27
+  }
+ ]
+}

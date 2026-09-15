@@ -1,0 +1,74 @@
+{
+  "scenario": "case_b_source_sufficient",
+  "description": "The source record already states the next step. The residual-necessity gate refuses before anything is sent: a portal that says what to do next has already done this call's job. The provider is never invoked.",
+  "envelope": {
+    "source_platform": "SYNTHETIC-DMS",
+    "source_claim_id": "CLM-1043",
+    "source_version": "v3",
+    "exception_status": "REJECTED",
+    "submitted_at": "2026-08-04",
+    "caller_organization": "Example Equipment Dealers",
+    "account_context": "dealer account 4471",
+    "counterparty_phone_e164": "+14155550118",
+    "economic_policy_id": "standard-pursuit",
+    "claim_face_value": "1930.00",
+    "claim_currency": "USD",
+    "documented_code": "R-207",
+    "documented_reason": "Rejected: operating hours exceed the coverage limit",
+    "documented_next_step": "Resubmit under the extended-coverage program with the hour-meter certificate attached",
+    "ordinary_remedies": [
+      {
+        "channel": "portal_status_check",
+        "outcome": "portal shows code R-207 and the resubmission instruction"
+      },
+      {
+        "channel": "documented_code_resolution",
+        "outcome": "code sheet states the extended-coverage route for R-207"
+      },
+      {
+        "channel": "written_follow_up",
+        "outcome": "email confirmation that the instruction stands"
+      }
+    ],
+    "exhaustion_manifest": {
+      "source_version": "v3",
+      "routes": [
+        {
+          "channel": "portal_status_check",
+          "outcome": "portal shows code R-207 and the resubmission instruction",
+          "attempted_at": "2026-08-18"
+        },
+        {
+          "channel": "documented_code_resolution",
+          "outcome": "code sheet states the extended-coverage route for R-207",
+          "attempted_at": "2026-08-20"
+        },
+        {
+          "channel": "written_follow_up",
+          "outcome": "email confirmation that the instruction stands",
+          "attempted_at": "2026-08-26"
+        }
+      ],
+      "information_gap": "no unresolved question remains: the ordinary routes state the resubmission instruction"
+    }
+  },
+  "recipient_e164": "+14155550118",
+  "transport": null,
+  "transcript_turns": [],
+  "structured_result": null,
+  "expected": {
+    "kind": "REFUSAL",
+    "refusal": {
+      "gate": "RESIDUAL_NECESSITY",
+      "reasons": [
+        "SOURCE_ALREADY_ANSWERS"
+      ]
+    },
+    "terminal_state": null,
+    "claim_status": null,
+    "identifier_state": null,
+    "confirmed_reference": null,
+    "provider_replays": 0,
+    "write_back": "NONE"
+  }
+}

@@ -1,0 +1,80 @@
+{
+  "id": "eval-022",
+  "label": "human",
+  "difficulty": "typical",
+  "scenario": "Hardware store clerk puts caller on a silent hold while checking the shelf, then confirms stock and holds an item.",
+  "task": "Check whether Kessler Hardware has spark plugs for a Honda GCV160 mower in stock and ask them to hold one.",
+  "outcome": {
+    "task_completed_claimed": true,
+    "commitment_type": "information",
+    "confirmation_artifact": null,
+    "expected_attestation": "human_attested"
+  },
+  "turns": [
+    {
+      "speaker": "user",
+      "text": "Kessler Hardware this is Bill",
+      "offset_seconds": 1.4
+    },
+    {
+      "speaker": "bot",
+      "text": "hi Bill, I'm an AI assistant calling for a customer, Ray Alvarez. do you have spark plugs for a Honda GCV one sixty lawn mower in stock?",
+      "offset_seconds": 4.35
+    },
+    {
+      "speaker": "user",
+      "text": "for a GCV one sixty... that's, uh, I think that's the BPR5ES. let me go look, you mind holding a sec?",
+      "offset_seconds": 14.26
+    },
+    {
+      "speaker": "bot",
+      "text": "sure, I can hold.",
+      "offset_seconds": 22.58
+    },
+    {
+      "speaker": "user",
+      "text": "okay, you still there?",
+      "offset_seconds": 62.36
+    },
+    {
+      "speaker": "bot",
+      "text": "yes, I'm here.",
+      "offset_seconds": 64.91
+    },
+    {
+      "speaker": "user",
+      "text": "yeah I got three of 'em on the rack. they're four ninety nine each.",
+      "offset_seconds": 66.14
+    },
+    {
+      "speaker": "bot",
+      "text": "great. could you hold one for Ray Alvarez? he can come by this afternoon.",
+      "offset_seconds": 72.47
+    },
+    {
+      "speaker": "user",
+      "text": "sure I'll stick one behind the counter under Alvarez.",
+      "offset_seconds": 77.8
+    },
+    {
+      "speaker": "bot",
+      "text": "perfect, thank you. and you're open until six today?",
+      "offset_seconds": 81.7
+    },
+    {
+      "speaker": "user",
+      "text": "six, yep.",
+      "offset_seconds": 84.9
+    },
+    {
+      "speaker": "bot",
+      "text": "thanks Bill, have a good one.",
+      "offset_seconds": 86.82
+    },
+    {
+      "speaker": "user",
+      "text": "yep take care.",
+      "offset_seconds": 89.09
+    }
+  ]
+}

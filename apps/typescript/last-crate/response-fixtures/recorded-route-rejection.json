@@ -1,0 +1,44 @@
+{
+  "version": 1,
+  "id": "99e49ac4-bede-471c-8017-7189fd89d2ed",
+  "provenance": "live-recording",
+  "state": "review",
+  "createdAt": "2026-09-12T07:32:49.795Z",
+  "clockMinute": null,
+  "privacy": "Known inputs and email addresses redacted. Stored privately; free-form speech still needs review before public sharing.",
+  "input": {
+    "mode": "fixture",
+    "quantity": 48,
+    "region": "LK",
+    "date": "2026-09-12",
+    "ready": "17:30",
+    "scenario": "happy",
+    "address": "Recorded collection address",
+    "cutoff": "18:30",
+    "partners": [
+      {
+        "name": "Recorded partner 1",
+        "capacity": 60,
+        "phone": "+12025550101",
+        "travelMinutes": 12,
+        "approved": true
+      },
+      {
+        "name": "Recorded partner 2",
+        "capacity": 30,
+        "phone": "+12025550101",
+        "travelMinutes": 8,
+        "approved": true
+      }
+    ],
+    "phone": "+12025550101",
+    "offset": "+05:30",
+    "donor": "Recorded bakery"
+  },
+  "calls": [],
+  "error": {
+    "code": "call_not_ready",
+    "message": "Call task creation was rejected: The recipient number is recognized as Sri Lanka (LK), but calls in English to Sri Lanka are not currently supported. Which supported region/language combination should be used instead if you want to continue?"
+  },
+  "sha256": "96436c42aaa2e551f1aa48fbea1b86acd38b8c31bf9dbe1c41551cb8a8dae9dc"
+}

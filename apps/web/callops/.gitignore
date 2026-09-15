@@ -1,0 +1,37 @@
+# Local environment and secrets
+.env
+.env.*
+!.env.example
+
+# CALL-E authentication caches if a custom cache root points into the project
+.calle-mcp/
+.calle/
+**/token.json
+**/pending_login.json
+
+# Credentials and private keys
+*.key
+*.pem
+*.p12
+*.pfx
+credentials.json
+
+# Node.js transient files
+node_modules/
+npm-debug.log*
+dist/
+coverage/
+.vite/
+output/playwright/
+output/local-demo/
+.playwright-cli/
+
+# Local demo exports and atomic-write residue
+exports/
+*.tmp
+
+# Local editor and operating-system files
+.vscode/
+.idea/
+.DS_Store
+Thumbs.db
