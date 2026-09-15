@@ -1,6 +1,7 @@
 import {freshBreastWorkspace} from './src/breast/demo.mjs';
 import {clinicianFollowupScript} from './src/breast/clinician-script.mjs';
 import {sampleCase,previewCall,inspectCall,modelWorkflow} from './workflow.mjs';
+import {displayJSON} from './src/display.mjs';
 const args=process.argv.slice(2);
 function value(flag,fallback){const i=args.indexOf(flag);if(i<0)return fallback;if(!args[i+1]||args[i+1].startsWith('--'))throw Error('Missing value for '+flag);return args[i+1];}
 const values=new Set(['--case','--inspect-call']);const flags=new Set(['--demo','--preview','--models','--allow-model-upload','--fictional-roleplay']);
@@ -18,8 +19,8 @@ else if(args.length===0){
   if(models&&!args.includes('--allow-model-upload'))throw Error('--models requires --allow-model-upload: context and transcript will be sent to DeepSeek.');
   sampleCase(id);
   const parsed=callId?await inspectCall(callId,process.env):null;
-  if(models)console.log(JSON.stringify(await modelWorkflow(sampleCase(id),process.env,{parsed}),null,2));
-  else console.log(JSON.stringify({mode:'Read-only CALL-E inspection',status:parsed.status,transcript:parsed.transcript,proposed_result:parsed.provider_structured_result,warning:'Unverified provider extraction. No classification or workflow action performed.'},null,2));
+  if(models)console.log(displayJSON(await modelWorkflow(sampleCase(id),process.env,{parsed})));
+  else console.log(displayJSON({mode:'Read-only CALL-E inspection',status:parsed.status,transcript:parsed.transcript,proposed_result:parsed.provider_structured_result,warning:'Unverified provider extraction. No classification or workflow action performed.'}));
  }else{
   console.log('Demo Simulation — fictional records, scripted verification and template drafts; no network or calls.');
   if(args.includes('--case'))sampleCase(id);
