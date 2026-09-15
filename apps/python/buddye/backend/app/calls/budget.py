@@ -8,6 +8,7 @@ from __future__ import annotations
 from sqlalchemy import func
 from sqlmodel import Session, select
 
+from app.calls.guards import is_strict_e164
 from app.calls.provider import CallBudgetExhausted, NumberNotAllowlisted
 from app.config import Settings
 from app.models import SpentCall
@@ -16,8 +17,10 @@ from app.models import SpentCall
 def record_spent_call(session: Session, *, provider: str, provider_call_id: str | None) -> None:
     """Write the ledger row the moment the provider accepts a call, before we know how it went.
 
-    Idempotent on provider_call_id, so a retry or a duplicate webhook cannot double-spend, and a
-    call with no provider_call_id never reached CALL-E and is not billed.
+    Idempotent on provider_call_id, so a retry or a duplicate webhook cannot double-spend. Without a
+    provider_call_id there is nothing to key the row on. That is not proof no call was made: an
+    ambiguous create (timeout, 5xx, no id in the answer) is recorded as UNKNOWN on its CheckCall row
+    and stops the sweep, because a credit may have been spent that this ledger cannot see.
     """
     if provider == "mock" or not provider_call_id:
         return
@@ -42,12 +45,19 @@ class CallBudget:
         self.settings = settings
 
     def reserve(self, session: Session, *, phone: str, provider: str) -> None:
-        """Raise before any dial if the number is not allowlisted or the budget is spent.
-        Mock calls are never counted and never gated."""
+        """Raise before any dial unless the number is an authorised ASCII E.164 recipient and the
+        budget has room. Mock calls are never counted and never gated.
+
+        The recipient checks depend on no setting. There used to be a `CALL_BUDGET_ENFORCE` switch
+        that turned the allowlist off and nothing else, which made "authorised recipients only" an
+        option; it is gone, so no budget knob can widen who may be rung.
+        """
         if provider == "mock":
             return
         s = self.settings
-        if s.CALL_BUDGET_ENFORCE and phone not in s.dialable_numbers:
+        if not is_strict_e164(phone):
+            raise NumberNotAllowlisted(f"{_mask(str(phone))} is not an ASCII E.164 number (+ then digits, no formatting)")
+        if phone not in s.dialable_numbers:
             raise NumberNotAllowlisted(f"{_mask(phone)} is not in DIALABLE_NUMBERS")
         used = count_real_calls(session)
         if used >= s.CALL_BUDGET_MAX:

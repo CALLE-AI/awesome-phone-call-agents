@@ -1,6 +1,6 @@
 # BuddyE backend API
 
-Base URL in dev: `http://localhost:8000`. All responses are JSON. CORS is open to ports 5173 and 5174 on localhost by default (`CORS_ORIGINS`).
+Base URL in dev: `http://localhost:8000`. **Local-only:** every endpoint except `POST /api/calle/webhook/{token}` returns `403` unless the request comes from a loopback peer with a loopback `Host`, carries no forwarding header (`X-Forwarded-For`, `Forwarded`, `CF-Connecting-IP`, …), and has no non-loopback `Origin` (`app/api/local_only.py`). All responses are JSON. CORS is open to ports 5173 and 5174 on localhost by default (`CORS_ORIGINS`).
 
 Two conventions hold everywhere:
 
@@ -372,8 +372,9 @@ Each message: `id: <event id>`, `event: <type>`, `data: <json>` where data is
 | `sweep.triaged` | `{hazard{kind,headline,severity}, queued, roster, order[{neighbour_id, name, score, band, time_to_harm_h, may_call, skip_reason, reasons[]}]}` | **The whole roster scored against this hazard**, worst first, including the people who will not be dialled. |
 | `neighbour.skipped` | `{neighbour_id, name, band, reason, dialled: false}` | On the roster, not in the call order — no consent. Emitted at triage time so nobody vanishes silently. |
 | `sweep.advanced` | `{next_index, remaining}` | Moving to the next neighbour. |
-| `sweep.unaccounted` | `{count, people[{neighbour_id, name, kind, reason}]}` | Emitted whenever the sweep reaches a terminal state. **Read this one.** |
+| `sweep.unaccounted` | `{count, people[{neighbour_id, name, kind, reason}]}` | Emitted whenever the sweep reaches a terminal state. `kind` ∈ `no_consent | outcome_unknown | not_dialled | still_running`. **Read this one.** |
 | `sweep.provider_error` | `{call_id, code, message, details, fatal: true}` | CALL-E rejected something that applies to everybody (`result_schema_invalid`, `unauthorized`, `insufficient_balance`). The sweep ends before another dial. |
+| `sweep.halted_outcome_unknown` | `{call_id, neighbour_id, name, reason, note}` | A call's outcome could not be established: an ambiguous create (timeout, 5xx, no call id), a poll deadline, or a restart that found a dial with no provider id. The sweep ends `FAILED` (terminal, never resumed) with no escalation and no further dial; the person is `outcome_unknown` in `sweep.unaccounted`. |
 | `demo.reset` | `{headline, kind, neighbours, sweeps_cancelled[]}` | The board was wiped and re-seeded. |
 
 ### One call
@@ -386,6 +387,7 @@ Each message: `id: <event id>`, `event: <type>`, `data: <json>` where data is
 | `provider.<type>` | `{call_id, neighbour_id, callee, message, status, provider_call_id, details}` | Provider lifecycle, forwarded verbatim. Mock emits `provider.call.queued`, `.dialing`, `.in_progress`, `.transcript_turn` (details `{speaker, text, offset_seconds}`), `.completed`, `.no_answer`. The SDK provider emits `provider.call.created`, `provider.call.status.<status>`, `provider.call.resumed`, `provider.call.events_unavailable`, and CALL-E's own developer events under their own type. The MCP provider emits `provider.mcp.plan_call` / `provider.mcp.run_call`. |
 | `call.completed` | `{call_id, neighbour_id, name, callee, status, structured_result, validation_errors[], summary, duration_s, transcript[], failure_code, failure_message, task_completed, completion_confidence, evidence[]}` | **The structured result.** `status` ∈ `COMPLETED | NO_ANSWER | FAILED | INVALID_RESULT`. A `NO_ANSWER` is a completed *event* with a `null` result — not an error, and not the absence of an event. |
 | `call.failed` | `{call_id, neighbour_id, name, callee, code, message, details}` | The provider rejected this recipient (`invalid_phone`, `recipient_blocked`, …). This becomes a `FAILED` leg, goes to `decide()`, and comes back `UNREACHABLE`. |
+| `call.outcome_unknown` | `{call_id, neighbour_id, name, callee, status: "UNKNOWN", provider_call_id, failure_code, failure_message, note}` | We cannot tell whether the phone rang. Not a finding and not a skip: it never reaches `decide()`, the roster stops, and this person is not dialled again from this database until a human has checked the call in CALL-E. A definite `4xx` refusal is not this: it stays a `FAILED` leg reported as "no call was placed". |
 | `reconcile.started` | `{call_id, fields[], reconciler}` | An LLM pass over the transcript, on the failing fields only. |
 | `reconcile.finished` | `{call_id, patched_fields[], structured_result, validation_errors[], meta}` | Merged result. It may resolve unknowns; it may not overturn a definite answer. |
 | `reconcile.skipped` | `{call_id, fields[], reason}` | Unknown fields, no reconciler configured — the unknowns stay and are escalated as findings. |

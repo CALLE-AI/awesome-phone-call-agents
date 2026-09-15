@@ -293,7 +293,9 @@ def decide(
     # — our wording refused, nobody's phone rang — and the old code filed it as UNREACHABLE, which
     # put "nobody answered" against a man who was never dialled and opened a P1 deployment on the
     # strength of it. Same principle as SKIPPED: silence is a finding, but only once we have
-    # actually rung. `placed` is false when no provider_call_id was ever issued.
+    # actually rung. `placed` is false only when CALL-E definitely refused the create (a 4xx, no call
+    # task). An ambiguous create or poll deadline is UNKNOWN and never reaches decide(): the caller
+    # stops the roster on it first, because a missing provider id is not proof that no phone rang.
     if state != COMPLETED and not placed:
         return finish(
             CheckOutcome.UNREACHABLE,

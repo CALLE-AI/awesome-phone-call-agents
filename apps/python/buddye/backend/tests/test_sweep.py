@@ -300,7 +300,7 @@ async def test_a_handoff_packet_cannot_be_released_without_a_named_human(seeded:
 # ------------------------------------------------------------------------------------------------
 async def test_numbers_not_on_the_allowlist_are_never_dialled(seeded: str) -> None:
     provider = _RealNamedProvider(delay_s=0)
-    settings = settings_with(CALL_PROVIDER="calle_sdk", DIALABLE_NUMBERS="", CALL_BUDGET_ENFORCE=True)
+    settings = settings_with(CALL_PROVIDER="calle_sdk", DIALABLE_NUMBERS="")
     sweep_id = await run_sweep(seeded, provider=provider, settings=settings)
 
     assert provider.placed == []

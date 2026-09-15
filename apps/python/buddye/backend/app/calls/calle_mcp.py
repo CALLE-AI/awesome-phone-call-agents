@@ -95,7 +95,9 @@ class CalleMcpProvider:
             run_env = await asyncio.to_thread(self._run, build_run_argv(bin_, str(plan["plan_id"]), str(plan.get("confirm_token", ""))))
             run_id = str(run_env.get("run_id") or structured(run_env, "run_result").get("run_id") or "")
             if not run_env.get("ok") or not run_id:
-                return CallOutcome(provider_call_id=None, status="FAILED", structured_result=None, failure_code="run_call_failed", failure_message=str(run_env.get("message") or "run_call failed"), raw=run_env)
+                # plan_call dials nobody, so a failed plan above is a definite no-call. run_call is the
+                # dial: without a run id we cannot tell whether it started, so this is UNKNOWN.
+                return CallOutcome(provider_call_id=None, status="UNKNOWN", structured_result=None, failure_code="run_call_outcome_unknown", failure_message=str(run_env.get("message") or "run_call returned no run id; a call may have started"), raw=run_env)
             await on_event(ProviderEvent(type="mcp.run_call", message="run_call accepted", provider_call_id=run_id, details={"run_id": run_id}))
         # poll get_call_run
         deadline = asyncio.get_event_loop().time() + self.settings.CALLE_CALL_TIMEOUT_S
@@ -111,5 +113,5 @@ class CalleMcpProvider:
             if status in TERMINAL:
                 return outcome_from_status(run_id, status_obj)
             if asyncio.get_event_loop().time() > deadline:
-                return CallOutcome(provider_call_id=run_id, status="FAILED", structured_result=None, failure_code="timeout", failure_message="poll timeout; run_id retained", raw=status_obj)
+                return CallOutcome(provider_call_id=run_id, status="UNKNOWN", structured_result=None, failure_code="poll_deadline", failure_message="poll deadline passed before a terminal status; run_id retained", raw=status_obj)
             await asyncio.sleep(max(5.0, self.settings.CALLE_POLL_INTERVAL_S))

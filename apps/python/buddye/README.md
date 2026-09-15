@@ -260,7 +260,7 @@ npm run dev          # proxies /api to 127.0.0.1:8000
 Tests — mock provider only, no network, no phones:
 
 ```bash
-cd backend && .venv/bin/python -m pytest -q     # 439 passed
+cd backend && .venv/bin/python -m pytest -q     # 497 passed
 ```
 
 The suite reads `.env` like the app does, so a local `.env` carrying `DEMO_PHONE_*` or a
@@ -282,16 +282,32 @@ handoff packet both require a name supplied in the request, by the human making 
 moment they make it. `INCIDENT_SYNC_S` and `MOVEMENT_TICK_S` are cadence knobs; a missed pass of
 either costs seconds and nothing else.
 
+### Local-only
+
+BuddyE is a local operator tool, not a hosted service. The console has no login, and its API starts
+real calls, releases handoffs, authorises dispatches and returns named neighbours' health records and
+transcripts. So the backend enforces local use itself (`app/api/local_only.py`). Every endpoint except
+the CALL-E webhook answers `403` unless all of these hold: the peer is a loopback address, the `Host`
+is `localhost` or a loopback IP, no forwarding header is present (`X-Forwarded-For`, `Forwarded`,
+`CF-Connecting-IP`, …), and any browser `Origin` is a loopback origin. No setting turns this off.
+
+Keep uvicorn on `127.0.0.1` as shown. The Vite dev proxy and `demo.sh` already reach the backend over
+loopback, so the documented workflow is unchanged. **Do not put the console or the API behind a
+tunnel, reverse proxy or port-forward.** If you do, every request through it is refused anyway, except
+the webhook.
+
 ### Going live
 
 Real calls are opt-in, capped, and allowlisted, and the free tier is small. Before switching a provider on:
 
 1. Get consent from the people you are going to call, and note it.
-2. In `.env`: `CALL_PROVIDER=calle_sdk`, `CALLE_API_KEY=…`, `DEMO_PHONE_A=+1…` (becomes Rosa), `DEMO_PHONE_B=+1…` (Walter), `DEMO_PHONE_C=+1…` (Ernesto), `DIALABLE_NUMBERS=` those same numbers, `CALL_BUDGET_MAX=` the number of calls you are willing to spend.
-3. Optionally run a tunnel and set `PUBLIC_BASE_URL` plus a fixed `CALLE_WEBHOOK_SECRET`; without it, polling alone completes the call.
+2. In `.env`: `CALL_PROVIDER=calle_sdk`, `CALLE_API_KEY=…`, `DEMO_PHONE_A=+1…` (becomes Rosa), `DEMO_PHONE_B=+1…` (Walter), `DEMO_PHONE_C=+1…` (Ernesto), `DIALABLE_NUMBERS=` those same numbers in strict ASCII E.164 (`+15550100` style: a `+`, digits, nothing else), `CALL_BUDGET_MAX=` the number of calls you are willing to spend. Leave `CALLE_BASE_URL` unset. The API key is only ever sent to `https://api.heycall-e.com`, and any other value stops startup.
+3. Polling completes every call, so no tunnel is needed. If you want the webhook shortcut anyway, expose **only** `POST /api/calle/webhook/{token}`: set `PUBLIC_BASE_URL` to the tunnel origin and a fixed `CALLE_WEBHOOK_SECRET`. The local-only guard refuses everything else that arrives through the tunnel.
 4. `POST /api/demo/reset` so the seed picks up the demo numbers, then start the sweep.
 
-Every other seeded neighbour keeps an unroutable number, and any number outside `DIALABLE_NUMBERS` is refused before the dial (`call.skipped`). Emergency contacts are never given a real number whatever the environment says — the ladder can place a second call on its own, and a demo must not spend the tier on somebody who never agreed to be rung.
+Every other seeded neighbour keeps an unroutable number. Any recipient that is not strict ASCII E.164 *and* listed in `DIALABLE_NUMBERS` is refused before the dial (`call.skipped`), with no switch to turn that off. Emergency contacts are never given a real number whatever the environment says: the ladder can place a second call on its own, and a demo must not spend the tier on somebody who never agreed to be rung.
+
+**When a call's outcome is unknown, the sweep stops.** Suppose the create request times out, fails with a 5xx, or comes back without a call id, or the poll deadline passes on a call that exists. CALL-E may then have created the call, and the phone may have rung. BuddyE does not record that as `UNREACHABLE` (it is not a finding) or as "no call was placed" (it is not a reassurance). The call row is marked `UNKNOWN`, `sweep.halted_outcome_unknown` is published, and the sweep ends `FAILED`, which is terminal, so a restart will not resume it. Nobody is escalated off the back of it and nobody else is dialled. The person is listed in `sweep.unaccounted` as `outcome_unknown` and will not be rung again, by a later sweep or from the case page, in this database. Check the call in the CALL-E dashboard. A credit may have been spent that the local ledger could not record. A definite `4xx` refusal from CALL-E is different: no call task exists, and it is still reported as "no call was placed". (`calle_mcp` sends no API key from this process, since the CLI uses its own login; a `call run` with no run id and its poll deadline are `UNKNOWN` in the same way.)
 
 ## CALL-E integration
 
@@ -310,7 +326,9 @@ Webhooks are unsigned in current CALL-E, so `POST /api/calle/webhook/{token}` us
 ## Safety summary
 
 - **Default is no-call.** `CALL_PROVIDER=mock`; the whole test suite is mock.
-- **Allowlist and budget in code.** A real provider refuses any number outside `DIALABLE_NUMBERS`, and the sweep ends `BUDGET_EXHAUSTED` once `CALL_BUDGET_MAX` accepted calls exist in the ledger. The ledger (`SpentCall`) survives a demo reset, so the button cannot hand the free tier back.
+- **Local-only API.** Every endpoint except the CALL-E webhook refuses non-loopback peers, non-loopback `Host` headers, forwarded (tunnelled or proxied) requests and cross-site `Origin`s. See [Local-only](#local-only).
+- **Unknown is not a finding, and not a reassurance.** An ambiguous create or a poll deadline is recorded `UNKNOWN`, and the sweep stops `FAILED` before any escalation or further dial. See [Going live](#going-live).
+- **Allowlist and budget in code.** A real provider refuses any number that is not strict ASCII E.164 *and* in `DIALABLE_NUMBERS`, with no switch that turns this off. It sends the API key only to `https://api.heycall-e.com`. and the sweep ends `BUDGET_EXHAUSTED` once `CALL_BUDGET_MAX` accepted calls exist in the ledger. The ledger (`SpentCall`) survives a demo reset, so the button cannot hand the free tier back.
 - **Consent is checked at the row.** `risk.call_order` drops anyone who never opted in, and the runner checks again at the moment of dialling, next to the allowlist. A guard that exists only one layer up is one an off-by-one gets past, and the thing on the other side of it is somebody's phone ringing after they said no.
 - **Idempotency before the dial.** The key is written to the database before the provider is called, and reused on retry or restart.
 - **The agent never negotiates and never summons.** It offers only help that exists, in the exact words supplied, with no time and no promise attached.

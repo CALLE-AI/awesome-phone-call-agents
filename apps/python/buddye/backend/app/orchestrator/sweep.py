@@ -168,11 +168,39 @@ def contact_contract(
 # ------------------------------------------------------------------------------------------------
 # Reading a sweep back
 # ------------------------------------------------------------------------------------------------
-def unaccounted(sweep: Sweep, roster: list[Neighbour]) -> list[dict[str, str]]:
+#: Why somebody with an UNKNOWN call is not rung again, by a sweep or from the case page.
+OUTCOME_UNKNOWN_REASON = (
+    "a call to them was attempted and its outcome is unknown (CALL-E may have created it and their phone "
+    "may have rung); check the call in the CALL-E dashboard before calling them again"
+)
+
+
+def unknown_call_for(session: Session, *, neighbour_id: str, callee: str) -> CheckCall | None:
+    """The call to this person whose outcome we could not establish, if there is one.
+
+    Any hazard, any sweep: a second hazard over the same roster would otherwise ring them again with a
+    fresh idempotency key while the first call may still be live.
+    """
+    return session.exec(select(CheckCall).where(
+        CheckCall.neighbour_id == neighbour_id, CheckCall.callee == callee, CheckCall.status == "UNKNOWN",
+    )).first()
+
+
+def outcome_unknown_neighbours(session: Session, sweep_id: str) -> set[str]:
+    rows = session.exec(select(CheckCall.neighbour_id).where(
+        CheckCall.sweep_id == sweep_id, CheckCall.status == "UNKNOWN")).all()
+    return {str(r) for r in rows}
+
+
+def unaccounted(sweep: Sweep, roster: list[Neighbour],
+                outcome_unknown: set[str] | frozenset[str] = frozenset()) -> list[dict[str, str]]:
     """Everyone on the roster this sweep has no outcome for, and why.
 
-    Three reasons exist, and the difference between them matters to whoever picks the list up:
+    Four reasons exist, and the difference between them matters to whoever picks the list up:
       * no consent — they opted out; nobody should knock either.
+      * outcome unknown — we tried to call them and cannot tell whether their phone rang or what was
+        said. Not a finding and not a skip: the sweep stopped on it (`outcome_unknown` is the set of
+        neighbour ids with an UNKNOWN call; see `outcome_unknown_neighbours`).
       * not dialled — the sweep never got to them (budget, allowlist, or it is still running).
       * still running — the sweep is mid-roster and they are next.
     """
@@ -188,6 +216,9 @@ def unaccounted(sweep: Sweep, roster: list[Neighbour]) -> list[dict[str, str]]:
         if not nbr.check_in_consent:
             reason = assessment.get("skip_reason") or "not opted in to automated check-in calls"
             kind = "no_consent"
+        elif nbr.id in outcome_unknown:
+            reason = OUTCOME_UNKNOWN_REASON
+            kind = "outcome_unknown"
         elif nbr.id not in order:
             reason = "not in this sweep's call order"
             kind = "not_dialled"
@@ -215,7 +246,7 @@ def sweep_summary(session: Session, sweep: Sweep) -> dict[str, Any]:
     packets = list(session.exec(
         select(HandoffPacket).where(HandoffPacket.escalation_id.in_([e.id for e in escalations] or [""]))  # type: ignore[attr-defined]
     ).all())
-    missing = unaccounted(sweep, roster)
+    missing = unaccounted(sweep, roster, outcome_unknown_neighbours(session, sweep.id))
     return {
         "sweep_id": sweep.id,
         "hazard_id": sweep.hazard_id,

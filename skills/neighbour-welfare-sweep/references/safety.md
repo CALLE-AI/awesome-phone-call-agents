@@ -58,7 +58,9 @@ Conditions, medications, power dependency, and addresses are sensitive health in
 
 ## Allowlist, budget, idempotency
 
-- A real provider may only dial numbers in an explicit allowlist. Anything else is refused **before** the dial, with a visible "skipped" event that is never confused with "did not answer" — their phone never rang.
+- Run the operator console local-only. It starts calls and returns health records, so the API refuses anything that is not a loopback, untunnelled request. The provider's webhook receiver is the only exemption, and it re-fetches the call before trusting it.
+- Send the provider API key only to the provider's official HTTPS origin, and refuse any other base URL before a client holding the key exists.
+- A real provider may only dial strict ASCII E.164 numbers (`+` and digits, no normalisation) in an explicit allowlist, and no budget or enforcement switch may turn that off. Anything else is refused **before** the dial, with a visible "skipped" event that is never confused with "did not answer" — their phone never rang.
 - A hard cap on real calls is checked against the database before every dial. Reaching it ends the sweep with a stated reason and the remaining people named in the unaccounted list.
 - Count the budget from a ledger of calls the provider actually accepted, and keep that ledger **outside** the demo data. A reset that wipes the demo must not hand a metered free tier back.
 - The default provider is a mock. Tests and CI never reach a real one.
@@ -70,6 +72,7 @@ Conditions, medications, power dependency, and addresses are sensitive health in
 
 - An unanswered call gets an outcome, a reason, an escalation and a row. Never retry silence away, never let it exit the loop early, and never leave a person with no outcome and no entry in the unaccounted list.
 - Distinguish, in the data and in the interface, between *not dialled* (no consent, not allowlisted, budget spent) and *did not answer*. Conflating them tells a coordinator someone was checked when nobody checked them.
+- **An ambiguous call is neither silence nor a skip.** A create request that timed out, failed with a 5xx, or came back without an id, or a poll that passed its deadline, may have rung someone. Record it as unknown, stop the roster before escalating or dialling anyone else, name the person as outcome-unknown in the unaccounted list, and do not ring them again until a human has checked the provider. A missing provider id is not proof that no phone rang. Only a definite 4xx refusal is.
 - Compute the unaccounted list **after** the sweep reaches its terminal state. Computed a moment early, it tells a coordinator whose budget just ran out that eleven people are "next in the queue" when nobody is going to ring them.
 
 ## Human control

@@ -69,7 +69,11 @@ def client(db):  # noqa: ANN001, ANN201
     from app.main import app
 
     async def _mk():  # noqa: ANN202
-        return AsyncClient(transport=ASGITransport(app=app), base_url="http://test")
+        # A loopback peer and a loopback Host, which is what the documented local-only server sees.
+        # The API refuses anything else (app/api/local_only.py), so the default "http://test" base URL
+        # and the transport's non-loopback default peer would be turned away with a 403.
+        return AsyncClient(transport=ASGITransport(app=app, client=("127.0.0.1", 50000)),
+                           base_url="http://127.0.0.1:8000")
 
     return _mk
 

@@ -116,6 +116,7 @@ function phaseOf(status: string): CallPhase {
     case 'NO_ANSWER':
       return 'no_answer'
     case 'FAILED':
+    case 'UNKNOWN': // not "over and fine": the outcome could not be established, so never 'completed'
       return 'failed'
     case 'PENDING':
       return 'queued'

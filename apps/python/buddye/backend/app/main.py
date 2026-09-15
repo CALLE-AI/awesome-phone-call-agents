@@ -24,6 +24,7 @@ from app.api import (
     trace,
     webhooks,
 )
+from app.api.local_only import LocalOnlyMiddleware
 from app.calls.budget import count_real_calls
 from app.calls.preflight import refresh_loop, validate_startup
 from app.config import get_settings
@@ -158,6 +159,10 @@ async def lifespan(app: FastAPI):  # noqa: ANN201
 
 app = FastAPI(title="BuddyE", version="0.1.0", lifespan=lifespan)
 app.add_middleware(CORSMiddleware, allow_origins=get_settings().cors_origins, allow_methods=["*"], allow_headers=["*"])
+# Added last, so it is the outermost layer: every request except a CALL-E webhook delivery is refused
+# unless it comes from this machine, untunnelled. BuddyE is a local operator tool with no login, and
+# these endpoints start real calls and return private records. See app/api/local_only.py.
+app.add_middleware(LocalOnlyMiddleware)
 for r in (
     hazards.router,
     hazards.sweeps_router,

@@ -15,6 +15,7 @@ import subprocess
 import time
 from typing import Any
 
+from app.calls.guards import UnapprovedBaseUrl, approved_calle_base_url, is_strict_e164
 from app.config import Settings
 from app.orchestrator.reconcile import reconciler_name
 
@@ -98,7 +99,7 @@ async def preflight(settings: Settings, *, budget_used: int) -> dict[str, Any]:
         "cli": cli,
         "mcp": mcp,
         "allowlist_count": len(settings.dialable_numbers),
-        "budget": {"max": settings.CALL_BUDGET_MAX, "used": budget_used, "remaining": max(0, settings.CALL_BUDGET_MAX - budget_used), "enforced": settings.CALL_BUDGET_ENFORCE},
+        "budget": {"max": settings.CALL_BUDGET_MAX, "used": budget_used, "remaining": max(0, settings.CALL_BUDGET_MAX - budget_used), "enforced": True},
         "webhook_configured": bool(settings.PUBLIC_BASE_URL),
         "split_coverage_enabled": settings.ENABLE_SPLIT_COVERAGE,
         "require_manager_approval": settings.REQUIRE_MANAGER_APPROVAL,
@@ -137,8 +138,16 @@ def validate_startup(settings: Settings) -> list[str]:
         problems.append("CALL_PROVIDER=calle_sdk requires CALLE_API_KEY")
     if settings.CALL_PROVIDER == "calle_mcp" and not shutil.which(settings.CALLE_CLI_BIN):
         problems.append(f"CALL_PROVIDER=calle_mcp requires the `{settings.CALLE_CLI_BIN}` CLI on PATH")
-    if settings.is_real_provider and settings.CALL_BUDGET_ENFORCE and not settings.dialable_numbers:
+    if settings.is_real_provider and not settings.dialable_numbers:
         problems.append("a real CALL_PROVIDER with an empty DIALABLE_NUMBERS would skip every candidate; set the allowlist or use CALL_PROVIDER=mock")
+    malformed = [n for n in settings.dialable_numbers if not is_strict_e164(n)]
+    if malformed:
+        problems.append(f"DIALABLE_NUMBERS has {len(malformed)} entry(ies) that are not ASCII E.164 (+ then digits, no spaces or punctuation)")
+    if settings.CALL_PROVIDER == "calle_sdk":
+        try:
+            approved_calle_base_url(settings.CALLE_BASE_URL)
+        except UnapprovedBaseUrl as exc:
+            problems.append(str(exc))
     if settings.is_real_provider and settings.CALL_BUDGET_MAX <= 0:
         problems.append("CALL_BUDGET_MAX must be > 0 for a real provider")
     return problems

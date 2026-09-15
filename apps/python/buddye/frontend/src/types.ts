@@ -44,7 +44,8 @@ export type EscalationStatus =
 
 export type Callee = 'neighbour' | 'emergency_contact'
 
-export type CallStatus = 'PENDING' | 'DIALING' | 'COMPLETED' | 'NO_ANSWER' | 'FAILED' | 'INVALID_RESULT'
+/** UNKNOWN: we cannot tell whether the phone rang (an ambiguous create or a poll deadline). The sweep stops on it. */
+export type CallStatus = 'PENDING' | 'DIALING' | 'COMPLETED' | 'NO_ANSWER' | 'FAILED' | 'INVALID_RESULT' | 'UNKNOWN'
 
 // ---------------------------------------------------------------------------
 // Hazard

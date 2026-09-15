@@ -17,6 +17,7 @@ from pathlib import Path
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
 from app.calls.budget import count_real_calls  # noqa: E402
+from app.calls.guards import UnapprovedBaseUrl, approved_calle_base_url, is_strict_e164  # noqa: E402
 from app.calls.contract import CandidateView, assert_calle_schema_subset, compile_contract  # noqa: E402
 from app.config import get_settings  # noqa: E402
 from app.db import init_db, session_scope  # noqa: E402
@@ -43,7 +44,10 @@ def main() -> int:
     # --- provider and credentials -------------------------------------------------
     line(OK if s.CALL_PROVIDER == "calle_sdk" else BAD, "provider", f"CALL_PROVIDER={s.CALL_PROVIDER} (want calle_sdk)")
     line(OK if s.CALLE_API_KEY else BAD, "CALL-E API key", f"present, {len(s.CALLE_API_KEY)} chars" if s.CALLE_API_KEY else "missing")
-    line(OK, "CALL-E base URL", s.CALLE_BASE_URL)
+    try:
+        line(OK, "CALL-E base URL", approved_calle_base_url(s.CALLE_BASE_URL))
+    except UnapprovedBaseUrl as exc:
+        line(BAD, "CALL-E base URL", str(exc))
     try:
         import calle  # noqa: F401
 
@@ -55,8 +59,8 @@ def main() -> int:
     allow = s.dialable_numbers
     line(OK if allow else BAD, "dial allowlist", f"{len(allow)} number(s): {', '.join(mask_phone(n) for n in allow) or 'EMPTY'}")
     for n in allow:
-        if not n.startswith("+"):
-            line(BAD, "allowlist format", f"{mask_phone(n)} is not E.164 (must start with +country code)")
+        if not is_strict_e164(n):
+            line(BAD, "allowlist format", f"{mask_phone(n)} is not ASCII E.164 (+ then digits, no formatting)")
 
     init_db()
     with session_scope() as sess:
@@ -69,10 +73,8 @@ def main() -> int:
         line(
             OK if used < s.CALL_BUDGET_MAX else BAD,
             "call budget",
-            f"{used}/{s.CALL_BUDGET_MAX} accepted calls used, {max(0, s.CALL_BUDGET_MAX - used)} left"
-            + ("" if s.CALL_BUDGET_ENFORCE else "  (ENFORCE IS OFF)"),
+            f"{used}/{s.CALL_BUDGET_MAX} accepted calls used, {max(0, s.CALL_BUDGET_MAX - used)} left",
         )
-        line(OK if s.CALL_BUDGET_ENFORCE else BAD, "budget enforcement", str(s.CALL_BUDGET_ENFORCE))
         line(
             OK if dialable else BAD,
             "roster reachable",

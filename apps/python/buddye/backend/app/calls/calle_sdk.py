@@ -11,6 +11,7 @@ import asyncio
 from datetime import datetime
 from typing import Any
 
+from app.calls.guards import approved_calle_base_url
 from app.calls.provider import (
     CANDIDATE_SKIP_CODES,
     RUN_FATAL_CODES,
@@ -95,16 +96,38 @@ def classify_api_error(exc: Exception) -> ProviderFatalError | CandidateRejected
     return None
 
 
+def is_ambiguous_create_error(exc: BaseException) -> bool:
+    """Whether a failed `calls.create` might still have created a call task.
+
+    Only an HTTP answer that says no settles it: a 4xx (other than 408) means CALL-E refused the
+    request and no task exists. A timeout, a dropped connection, a 5xx or 408, or anything that is not
+    an HTTP answer at all could have happened after CALL-E accepted the request, and then a phone may
+    be ringing that we hold no id for. The missing id is not evidence that nothing rang.
+    """
+    status = getattr(exc, "status_code", None)
+    if isinstance(status, int):
+        return status >= 500 or status == 408
+    return True
+
+
+def unknown_outcome(provider_call_id: str | None, code: str, message: str, *, raw: dict[str, Any] | None = None) -> CallOutcome:
+    return CallOutcome(provider_call_id=provider_call_id, status="UNKNOWN", structured_result=None,
+                       failure_code=code, failure_message=message, raw=raw or {})
+
+
 class CalleSdkProvider:
     name = "calle_sdk"
 
     def __init__(self, settings: Settings, client: Any | None = None) -> None:
         if client is None:
-            from calle import CalleClient  # imported lazily so tests never need the key
-
+            # The origin is checked before the key is read: a client built with a credential and an
+            # unapproved base URL would send the bearer token there on its first request.
+            base_url = approved_calle_base_url(settings.CALLE_BASE_URL)
             if not settings.CALLE_API_KEY:
                 raise RuntimeError("CALL_PROVIDER=calle_sdk requires CALLE_API_KEY")
-            client = CalleClient(api_key=settings.CALLE_API_KEY, base_url=settings.CALLE_BASE_URL)
+            from calle import CalleClient  # imported lazily so tests never need the key
+
+            client = CalleClient(api_key=settings.CALLE_API_KEY, base_url=base_url)
         self.client = client
         self.settings = settings
         self.poll_count = 0
@@ -154,12 +177,24 @@ class CalleSdkProvider:
                 classified = classify_api_error(exc)
                 if classified is not None:
                     raise classified from exc
+                raw = {"error": {"code": _error_code(exc), "message": str(exc), "details": obs.redact(self.last_error_details)}}
+                if is_ambiguous_create_error(exc):
+                    return unknown_outcome(
+                        None, "create_outcome_unknown",
+                        f"CALL-E did not answer the create request definitively ({type(exc).__name__}); a call task may exist",
+                        raw=raw,
+                    )
+                # A definite refusal: the API answered 4xx, so no call task was created.
                 return CallOutcome(
                     provider_call_id=None, status="FAILED", structured_result=None,
-                    failure_code=_error_code(exc), failure_message=str(exc),
-                    raw={"error": {"code": _error_code(exc), "message": str(exc), "details": obs.redact(self.last_error_details)}},
+                    failure_code=_error_code(exc), failure_message=str(exc), raw=raw,
                 )
-            call_id = str(created["id"])
+            call_id = str(created.get("id") or "").strip()
+            if not call_id:
+                # Accepted, but with nothing to track it by. The call may be ringing right now.
+                return unknown_outcome(None, "create_returned_no_id",
+                                       "CALL-E answered the create request without a call id; a call task may exist",
+                                       raw={"created": obs.redact(created)})
             await on_event(
                 ProviderEvent(type="call.created", message="CALL-E accepted the call task", status=created.get("status"), provider_call_id=call_id, details={"id": call_id})
             )
@@ -195,9 +230,10 @@ class CalleSdkProvider:
                     await on_event(ProviderEvent(type="call.poll_retry", provider_call_id=call_id,
                                                  message=f"status check failed ({type(exc).__name__}); retrying"))
                     if asyncio.get_event_loop().time() > deadline:
-                        return CallOutcome(provider_call_id=call_id, status="FAILED", structured_result=None,
-                                           failure_code="timeout", failure_message=f"poll timeout after {type(exc).__name__}",
-                                           raw=None)
+                        # The call exists and we lost sight of it. Whether it rang, connected or is still
+                        # going is exactly what we do not know, so it is UNKNOWN and not FAILED.
+                        return unknown_outcome(call_id, "poll_deadline",
+                                               f"poll deadline passed while status checks were failing ({type(exc).__name__})")
                     await asyncio.sleep(s.CALLE_POLL_INTERVAL_S)
                     continue
                 if call.get("status") != last_status:
@@ -220,7 +256,9 @@ class CalleSdkProvider:
                 if call.get("status") in TERMINAL:
                     return outcome_from_call(call)
                 if asyncio.get_event_loop().time() > deadline:
-                    return CallOutcome(provider_call_id=call_id, status="FAILED", structured_result=None, failure_code="timeout", failure_message="poll timeout", raw=call)
+                    return unknown_outcome(call_id, "poll_deadline",
+                                           f"poll deadline passed with CALL-E still reporting {call.get('status')!r}",
+                                           raw=obs.redact(call))
                 try:
                     await asyncio.wait_for(asyncio.shield(webhook_fut), timeout=s.CALLE_POLL_INTERVAL_S)
                 except asyncio.TimeoutError:

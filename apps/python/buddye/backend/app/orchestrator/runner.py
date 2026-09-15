@@ -71,13 +71,16 @@ from app.orchestrator.decide import decide
 from app.orchestrator.reconcile import Reconciler, failing_fields_for, get_reconciler, merge_reconciled
 from app.orchestrator.sweep import (
     CONTACT_CALL_OUTCOMES,
+    OUTCOME_UNKNOWN_REASON,
     band_at_least,
     calls_for_neighbour,
     contact_contract,
     hazard_view,
     load_roster,
     neighbour_view,
+    outcome_unknown_neighbours,
     unaccounted,
+    unknown_call_for,
 )
 
 log = logging.getLogger("buddye.runner")
@@ -105,6 +108,9 @@ class Leg:
     `decide()`, because it does not describe the neighbour at all: it means an operator gate (the
     allowlist) stopped us dialling, and inventing `UNREACHABLE` from it would put "did not answer"
     against the name of someone whose phone never rang.
+
+    `UNKNOWN` never reaches `decide()` either, for the opposite reason: a phone may well have rung.
+    It carries `unknown=True`, and the caller stops — no outcome, no escalation, no next dial.
     """
 
     status: str
@@ -115,6 +121,7 @@ class Leg:
     reason: str = ""
     fatal: bool = False   # the provider failed in a way that is the same for everyone: stop
     budget: bool = False  # the call budget is spent: stop
+    unknown: bool = False  # we cannot tell whether a phone rang or how the call went: stop
 
 
 class Runner:
@@ -311,6 +318,37 @@ class Runner:
         self._emit_unaccounted()
         self._settle_hazard()
 
+    def _halt_unknown(self, neighbour: Neighbour, leg: Leg) -> None:
+        """Stop the roster on a call whose outcome cannot be established.
+
+        A create request that timed out or failed with a 5xx, an answer with no call id, a poll that ran
+        past its deadline, a restart that finds a dial with no provider id: in each of these CALL-E may
+        have created the call and a phone may be ringing. None of them is evidence that nobody answered
+        (so no UNREACHABLE and no ladder), and none of them is evidence that nothing was placed.
+
+        So the sweep stops, in FAILED, which is terminal: a restart does not resume it and ring the
+        next person. Nobody is escalated off the back of it, and this person is named in
+        `sweep.unaccounted` as outcome-unknown rather than "not reached". A human looks at the call in
+        CALL-E, and only then decides whether anyone gets rung again.
+        """
+        note = ("the outcome of this call is unknown: CALL-E may have created it and a phone may have rung. "
+                "No outcome was recorded, nothing was escalated, and this sweep will call nobody else. "
+                "Check the call in the CALL-E dashboard before calling anyone again. A credit may have been "
+                "spent that the local budget ledger could not record.")
+        with session_scope() as s:
+            sweep = s.get(Sweep, self.sweep_id)
+            if sweep is not None:
+                sweep.error = f"outcome unknown for a call to {neighbour.name}: {leg.reason}"
+                sweep.updated_at = utcnow()
+                s.add(sweep)
+        self.emit(
+            "sweep.halted_outcome_unknown",
+            {"call_id": leg.call_id, "neighbour_id": neighbour.id, "name": neighbour.name,
+             "reason": leg.reason, "note": note},
+            neighbour_id=neighbour.id,
+        )
+        self._finish(SweepState.FAILED)
+
     def _emit_unaccounted(self) -> None:
         """The last thing on the stream: who is still nobody's job.
 
@@ -326,7 +364,7 @@ class Runner:
             sweep = s.get(Sweep, self.sweep_id)
             if sweep is None:
                 return
-            missing = unaccounted(sweep, load_roster(s))
+            missing = unaccounted(sweep, load_roster(s), outcome_unknown_neighbours(s, self.sweep_id))
         self.emit("sweep.unaccounted", {"count": len(missing), "people": missing})
 
     def _settle_hazard(self) -> None:
@@ -382,6 +420,12 @@ class Runner:
             hazard=hazard, neighbour=nbr, contract=contract, callee="neighbour",
             phone=nbr.phone, to_name=nbr.name, risk=risk,
         )
+        if leg.unknown:
+            # Before the budget, the fatal branch and decide(): nothing below may treat this person
+            # as reached, unreached or never dialled, and nobody else may be rung until a human has
+            # looked at what happened to this call.
+            self._halt_unknown(nbr, leg)
+            return False
         if leg.budget:
             self._finish(SweepState.BUDGET_EXHAUSTED)
             return False
@@ -399,8 +443,10 @@ class Runner:
         # The line ShiftFill did not have. Whatever the provider said — a completed conversation, a
         # phone that rang out, a call that never connected — it goes to the outcome layer with this
         # neighbour's risk attached, and comes back as a finding.
-        # provider_call_id is issued only once CALL-E has actually created the call task, so its
-        # absence is the clean signal that no phone ever rang. Same test the budget ledger uses.
+        # `placed` is false only after a definite refusal: CALL-E answered the create request with a 4xx
+        # and created no call task. A missing provider_call_id on its own is not proof that no phone
+        # rang. An ambiguous create (timeout, 5xx, an answer with no id) or a poll deadline comes back
+        # UNKNOWN, and the roster already stopped on it above.
         placed = True
         if leg.status != "COMPLETED" and leg.call_id:
             with session_scope() as s:
@@ -436,7 +482,7 @@ class Runner:
         )
         await self._pace()
         if d.escalates:
-            await self._escalate(hazard, nbr, leg.call_id, d)
+            return await self._escalate(hazard, nbr, leg.call_id, d)
         return True
 
     # -------------------------------------------------------------------- call
@@ -465,6 +511,16 @@ class Runner:
 
         with session_scope() as s:
             existing = s.exec(select(CheckCall).where(CheckCall.idempotency_key == key)).first()
+            if existing is None and unknown_call_for(s, neighbour_id=neighbour.id, callee=callee) is not None:
+                # An earlier call to this person has an unknown outcome and may still be live. A new
+                # key would be a new call, so nobody rings them again until a human has checked.
+                self.emit(
+                    "call.skipped",
+                    {"neighbour_id": neighbour.id, "name": to_name, "callee": callee, "dialled": False,
+                     "reason": OUTCOME_UNKNOWN_REASON},
+                    neighbour_id=neighbour.id,
+                )
+                return Leg(status="SKIPPED", reason=OUTCOME_UNKNOWN_REASON)
             if existing is None:
                 try:
                     self.budget.reserve(s, phone=phone, provider=self.provider.name)
@@ -496,7 +552,16 @@ class Runner:
                 call_id, existing_pcid = call.id, None
             else:
                 call_id, existing_pcid = existing.id, existing.provider_call_id
-                if existing.status not in {"PENDING", "DIALING"}:
+                if existing.status in {"PENDING", "DIALING"} and not existing_pcid and self.provider.name != "mock":
+                    # A dial was started and no provider id was ever written back: the process died
+                    # between our row and CALL-E's answer, or the answer never came. Sending the create
+                    # again would be a second call if the first one landed, so this is UNKNOWN, not a retry.
+                    stored = CallOutcome(
+                        provider_call_id=None, status="UNKNOWN", structured_result=None,
+                        failure_code="resume_without_provider_id",
+                        failure_message="a dial was in flight with no provider call id recorded; it may have been placed",
+                    )
+                elif existing.status not in {"PENDING", "DIALING"}:
                     # Already finished before a restart: re-evaluate from what is on the row rather
                     # than dialling again.
                     stored = CallOutcome(
@@ -587,6 +652,16 @@ class Runner:
                 "call_id": call_id, "code": exc.code, "message": exc.message,
                 "details": getattr(exc, "details", None), "fatal": True})
             return Leg(status="FAILED", call_id=call_id, fatal=True, reason=f"{exc.code}: {exc.message}")
+        except Exception as exc:  # noqa: BLE001
+            if self.provider.name == "mock":
+                raise  # the mock's consent tripwire and genuine test failures must stay loud
+            # Something escaped the provider mid-dial: a CLI timeout, a bug, a connection error the SDK
+            # did not wrap. The create may already have landed, so this is an unknown outcome.
+            log.exception("provider raised mid-dial for call %s", call_id)
+            outcome = CallOutcome(
+                provider_call_id=None, status="UNKNOWN", structured_result=None,
+                failure_code=type(exc).__name__, failure_message="the provider raised before reporting an outcome",
+            )
 
         return await self._evaluate(call_id, neighbour, to_name, callee, contract, outcome)
 
@@ -599,6 +674,40 @@ class Runner:
                 call.completed_at = utcnow()
                 s.add(call)
 
+    def _record_unknown(self, call_id: str, neighbour: Neighbour, to_name: str, callee: str,
+                        outcome: CallOutcome, *, resumed: bool = False) -> Leg:
+        """Persist a call whose outcome cannot be established, and return a leg that stops the caller.
+
+        No validation, no reconcile, no decide(): there is nothing to read and nothing may be inferred.
+        The row keeps whatever provider id is known, so a human can find the call in CALL-E.
+        """
+        reason = f"{outcome.failure_code or 'unknown'}: {outcome.failure_message or 'outcome could not be established'}"
+        with session_scope() as s:
+            call = s.get(CheckCall, call_id)
+            assert call is not None
+            call.status = "UNKNOWN"
+            call.provider_call_id = outcome.provider_call_id or call.provider_call_id
+            record_spent_call(s, provider=call.provider, provider_call_id=call.provider_call_id)
+            call.summary = reason
+            call.provider_raw = obs.redact(outcome.raw) or None
+            call.poll_count = int(getattr(self.provider, "poll_count", 0) or 0)
+            s.add(call)
+            provider_call_id = call.provider_call_id
+            sweep = s.get(Sweep, self.sweep_id)
+            if sweep is not None and not resumed:
+                sweep.calls_made += 1  # it may well have been made
+                sweep.updated_at = utcnow()
+                s.add(sweep)
+        self.emit(
+            "call.outcome_unknown",
+            {"call_id": call_id, "neighbour_id": neighbour.id, "name": to_name, "callee": callee,
+             "status": "UNKNOWN", "provider_call_id": provider_call_id,
+             "failure_code": outcome.failure_code, "failure_message": outcome.failure_message,
+             "note": OUTCOME_UNKNOWN_REASON},
+            neighbour_id=neighbour.id,
+        )
+        return Leg(status="UNKNOWN", call_id=call_id, reason=reason, unknown=True)
+
     async def _evaluate(
         self, call_id: str, neighbour: Neighbour, to_name: str, callee: str,
         contract: CallContract, outcome: CallOutcome, *, resumed: bool = False,
@@ -610,6 +719,9 @@ class Runner:
         connected has no transcript, and asking a language model to recover fifteen required fields
         from an empty conversation is a spend that can only invent things.
         """
+        if outcome.status == "UNKNOWN":
+            return self._record_unknown(call_id, neighbour, to_name, callee, outcome, resumed=resumed)
+
         result = outcome.structured_result
         validation_errors = contract.validate_result(result) if outcome.status in {"COMPLETED", "INVALID_RESULT"} else []
         status = "INVALID_RESULT" if (outcome.status == "COMPLETED" and validation_errors) else outcome.status
@@ -696,8 +808,11 @@ class Runner:
                    confidence=outcome.completion_confidence)
 
     # --------------------------------------------------------------- escalate
-    async def _escalate(self, hazard: Hazard, neighbour: Neighbour, call_id: str | None, d: Any) -> None:
+    async def _escalate(self, hazard: Hazard, neighbour: Neighbour, call_id: str | None, d: Any) -> bool:
         """Climb the ladder for one neighbour. Every rung is `app.orchestrator.escalate`'s to write.
+
+        Returns False only when the sweep must stop: the emergency-contact call came back with an
+        unknown outcome, and the roster has already been halted.
 
         The ladder is EMERGENCY_CONTACT (BuddyE may call) -> BLOCK_CAPTAIN (BuddyE notifies) ->
         RESPONDER (BuddyE prepares a packet and stops). There is no fourth branch, and the third one
@@ -725,7 +840,7 @@ class Runner:
                      "note": "already escalated in this sweep; not opening a second ladder"},
                     neighbour_id=neighbour.id,
                 )
-                return
+                return True
 
         with session_scope() as s:
             esc = ladder.open_escalation(
@@ -748,6 +863,8 @@ class Runner:
         if level is EscalationLevel.EMERGENCY_CONTACT:
             if outcome.value in CONTACT_CALL_OUTCOMES and self.settings.CALL_EMERGENCY_CONTACTS:
                 reached_contact = await self._call_contact(hazard, neighbour, esc_id, d)
+                if reached_contact is None:
+                    return False  # the contact call's outcome is unknown; the roster has been stopped
                 if reached_contact:
                     self.emit(
                         "escalation.rung",
@@ -755,7 +872,7 @@ class Runner:
                          "result": "reached", "note": f"{neighbour.contact_name} is going to look in on them"},
                         neighbour_id=neighbour.id,
                     )
-                    return  # a human with a key is on their way; the ladder stops climbing
+                    return True  # a human with a key is on their way; the ladder stops climbing
             else:
                 with session_scope() as s:
                     esc = s.get(Escalation, esc_id)
@@ -789,7 +906,7 @@ class Runner:
 
         # ---- rung 3: prepare a responder handoff, and stop ---------------------------------------
         if outcome not in {CheckOutcome.UNREACHABLE, CheckOutcome.URGENT}:
-            return
+            return True
         if not band_at_least(d.band, self.settings.HANDOFF_MIN_BAND):
             self.emit(
                 "handoff.not_prepared",
@@ -797,7 +914,7 @@ class Runner:
                  "reason": f"triage band {d.band.value} is below HANDOFF_MIN_BAND={self.settings.HANDOFF_MIN_BAND}"},
                 neighbour_id=neighbour.id,
             )
-            return
+            return True
 
         with session_scope() as s:
             esc = s.get(Escalation, esc_id)
@@ -823,9 +940,11 @@ class Runner:
             neighbour_id=neighbour.id,
         )
         await self._pace()
+        return True
 
-    async def _call_contact(self, hazard: Hazard, neighbour: Neighbour, esc_id: str, d: Any) -> bool:
-        """Ring the person this neighbour nominated. Returns True only if we actually spoke to them."""
+    async def _call_contact(self, hazard: Hazard, neighbour: Neighbour, esc_id: str, d: Any) -> bool | None:
+        """Ring the person this neighbour nominated. Returns True only if we actually spoke to them,
+        and None when that call's outcome is unknown, in which case the sweep has been halted."""
         base = compile_contract(hazard_view(hazard, self.settings), neighbour_view(neighbour))
         contract = contact_contract(
             base, hazard=hazard_view(hazard, self.settings), neighbour=neighbour_view(neighbour),
@@ -838,6 +957,14 @@ class Runner:
             risk=None, extra_metadata={"contact_name": neighbour.contact_name,
                                        "contact_relation": neighbour.contact_relation},
         )
+        if leg.unknown:
+            with session_scope() as s:
+                esc = s.get(Escalation, esc_id)
+                if esc is not None:
+                    ladder.record_attempt(s, esc, action="called", call_id=leg.call_id, reached=False,
+                                          result="outcome unknown", note=leg.reason)
+            self._halt_unknown(neighbour, leg)
+            return None
         if leg.budget or leg.fatal or leg.status == "SKIPPED":
             with session_scope() as s:
                 esc = s.get(Escalation, esc_id)

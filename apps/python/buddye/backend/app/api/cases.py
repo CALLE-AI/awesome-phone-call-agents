@@ -73,7 +73,7 @@ from app.orchestrator import escalate as ladder
 from app.orchestrator import incidents as incident_layer
 from app.orchestrator.decide import decide
 from app.orchestrator.runner import Runner
-from app.orchestrator.sweep import hazard_view, neighbour_view
+from app.orchestrator.sweep import OUTCOME_UNKNOWN_REASON, hazard_view, neighbour_view, unknown_call_for
 
 log = logging.getLogger("buddye.cases")
 
@@ -165,6 +165,9 @@ def _callable_now(session: Session, nbr: Neighbour, settings: Settings) -> dict[
     """
     if not nbr.check_in_consent:
         return {"allowed": False, "reason": "no consent on file for automated check-in calls",
+                "provider": settings.CALL_PROVIDER, "budget_remaining": None}
+    if unknown_call_for(session, neighbour_id=nbr.id, callee="neighbour") is not None:
+        return {"allowed": False, "reason": OUTCOME_UNKNOWN_REASON,
                 "provider": settings.CALL_PROVIDER, "budget_remaining": None}
     budget = CallBudget(settings)
     try:
@@ -471,7 +474,17 @@ async def launch_call(hazard_id: str, neighbour_id: str, *, settings: Settings,
         return {"status": "refused", "reason": leg.reason, "sweep_id": sweep_id,
                 "neighbour_id": nbr.id, "attempt": attempt, "call_id": None,
                 "budget_exhausted": bool(leg.budget)}
+    if leg.unknown:
+        # We cannot tell whether their phone rang. No outcome, no escalation, no incident: the runner
+        # already put the row at UNKNOWN and `call.outcome_unknown` on the stream, and the call button
+        # stays refused for this person until somebody has checked the call in CALL-E.
+        return {"status": "outcome_unknown", "reason": leg.reason, "sweep_id": sweep_id,
+                "neighbour_id": nbr.id, "attempt": attempt, "call_id": leg.call_id,
+                "note": OUTCOME_UNKNOWN_REASON}
 
+    # `placed` is false only after a definite refusal (CALL-E answered 4xx and created nothing). An
+    # ambiguous create or poll deadline is UNKNOWN and returned above, so a missing provider id alone
+    # is never read as "nobody was rung".
     placed = True
     if leg.status != "COMPLETED" and leg.call_id:
         with session_scope() as s:

@@ -6,7 +6,11 @@ from typing import Any, Literal, Protocol
 
 from pydantic import BaseModel, Field
 
-OutcomeStatus = Literal["COMPLETED", "NO_ANSWER", "FAILED", "INVALID_RESULT"]
+# UNKNOWN: we cannot tell whether a phone rang or how the call went — the create request timed out,
+# failed with a 5xx, or came back without an id, or the poll deadline passed on a call that exists.
+# It is never mapped onto UNREACHABLE (that would be a finding we do not have) nor onto "no call was
+# placed" (that would be a reassurance we do not have). The runner stops the roster on it.
+OutcomeStatus = Literal["COMPLETED", "NO_ANSWER", "FAILED", "INVALID_RESULT", "UNKNOWN"]
 
 
 class CallRequest(BaseModel):

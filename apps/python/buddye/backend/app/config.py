@@ -48,8 +48,9 @@ class Settings(BaseSettings):
     CALL_PROVIDER: str = "mock"  # mock | calle_sdk | calle_mcp
     MOCK_DELAY_S: float = 1.2  # simulated dial/talk time per mock event
     CALL_BUDGET_MAX: int = 4  # hard cap on real calls per database
-    CALL_BUDGET_ENFORCE: bool = True
-    DIALABLE_NUMBERS: str = ""  # comma-separated E.164 allowlist for real providers
+    # Comma-separated strict ASCII E.164 allowlist for real providers. Always enforced: there is no
+    # switch that turns it off, and a malformed entry stops startup (app/calls/preflight.py).
+    DIALABLE_NUMBERS: str = ""
     # Injected into the seeded roster by app.seed (see its DEMO_NAMES map, which looks these up by
     # name via getattr — rename one of these and real numbers silently stop reaching the roster).
     DEMO_PHONE_A: str = ""  # Rosa Delgado
