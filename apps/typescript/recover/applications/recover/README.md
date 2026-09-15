@@ -81,8 +81,8 @@ npm install
 ### 2. Environment Variables
 Create `.env.local`:
 ```env
+# Server-side secret key; operators authenticate via the in-app desk boundary (sessionStorage)
 RECOVER_API_KEY=your_recover_secret
-NEXT_PUBLIC_RECOVER_API_KEY=your_recover_secret
 CALLE_API_KEY=your_calle_api_key
 APP_BASE_URL=https://your-domain.ngrok-free.app
 CALLE_WEBHOOK_SECRET=your_calle_webhook_secret

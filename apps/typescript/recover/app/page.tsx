@@ -277,9 +277,25 @@ function fmtMoney(cents: number): string {
 
 const EMPTY_FORM = { name: "", phone: "+12763229632", email: "", planName: "", amountDollars: "", region: "US", locale: "en-US" };
 
-// Attach configured API key header from environment if provided
-const CONFIGURED_KEY = typeof process !== "undefined" ? process.env.NEXT_PUBLIC_RECOVER_API_KEY?.trim() : "";
-const AUTH_HEADERS: Record<string, string> = CONFIGURED_KEY ? { "x-recover-key": CONFIGURED_KEY } : {};
+// Operator Authentication Boundary (stored in per-tab sessionStorage; never inlined into public build)
+const OPERATOR_TOKEN_STORAGE_KEY = "recover_operator_token";
+
+function getStoredOperatorToken(): string {
+  if (typeof window === "undefined") return "";
+  return sessionStorage.getItem(OPERATOR_TOKEN_STORAGE_KEY)?.trim() ?? "";
+}
+
+function setStoredOperatorToken(token: string) {
+  if (typeof window !== "undefined") {
+    sessionStorage.setItem(OPERATOR_TOKEN_STORAGE_KEY, token.trim());
+  }
+}
+
+function clearStoredOperatorToken() {
+  if (typeof window !== "undefined") {
+    sessionStorage.removeItem(OPERATOR_TOKEN_STORAGE_KEY);
+  }
+}
 
 // ─── Main Dashboard ───────────────────────────────────────
 
@@ -295,30 +311,59 @@ export default function Dashboard() {
   const [formSubmitting, setFormSubmitting] = useState(false);
   const [callFilter, setCallFilter] = useState<"all" | "pending" | "completed" | "scheduled">("all");
   const [activeIntelligenceCall, setActiveIntelligenceCall] = useState<CallLogRow | null>(null);
+  const [operatorToken, setOperatorToken] = useState<string>("");
+  const [operatorInput, setOperatorInput] = useState<string>("");
+  const [showAuthGate, setShowAuthGate] = useState<boolean>(false);
 
-  const refresh = useCallback(async () => {
+  useEffect(() => {
+    const stored = getStoredOperatorToken();
+    if (stored) {
+      setOperatorToken(stored);
+      setOperatorInput(stored);
+    }
+  }, []);
+
+  const getAuthHeaders = useCallback((tokenOverride?: string): Record<string, string> => {
+    const token = tokenOverride !== undefined ? tokenOverride : operatorToken;
+    if (!token) return {};
+    return { "x-recover-key": token, Authorization: `Bearer ${token}` };
+  }, [operatorToken]);
+
+  const refresh = useCallback(async (tokenOverride?: string) => {
+    const headers = getAuthHeaders(tokenOverride);
     try {
       const [subsRes, callsRes, metricsRes] = await Promise.all([
-        fetch("/api/subscribers", { headers: AUTH_HEADERS }),
-        fetch("/api/calls", { headers: AUTH_HEADERS }),
-        fetch("/api/admin/metrics", { headers: AUTH_HEADERS }),
+        fetch("/api/subscribers", { headers }),
+        fetch("/api/calls", { headers }),
+        fetch("/api/admin/metrics", { headers }),
       ]);
+      if (subsRes.status === 401 || callsRes.status === 401 || metricsRes.status === 401) {
+        setShowAuthGate(true);
+        setError("Operator authentication required: Please enter RECOVER_API_KEY.");
+        return;
+      }
       if (subsRes.ok) setSubscribers(await subsRes.json());
       if (callsRes.ok) setCalls(await callsRes.json());
       if (metricsRes.ok) setMetrics(await metricsRes.json());
     } catch {}
-  }, []);
+  }, [getAuthHeaders]);
 
   useEffect(() => {
     let ignore = false;
     async function init() {
+      const headers = getAuthHeaders();
       try {
         const [subsRes, callsRes, metricsRes] = await Promise.all([
-          fetch("/api/subscribers", { headers: AUTH_HEADERS }),
-          fetch("/api/calls", { headers: AUTH_HEADERS }),
-          fetch("/api/admin/metrics", { headers: AUTH_HEADERS }),
+          fetch("/api/subscribers", { headers }),
+          fetch("/api/calls", { headers }),
+          fetch("/api/admin/metrics", { headers }),
         ]);
         if (!ignore) {
+          if (subsRes.status === 401 || callsRes.status === 401 || metricsRes.status === 401) {
+            setShowAuthGate(true);
+            setError("Operator authentication required: Please enter RECOVER_API_KEY.");
+            return;
+          }
           if (subsRes.ok) setSubscribers(await subsRes.json());
           if (callsRes.ok) setCalls(await callsRes.json());
           if (metricsRes.ok) setMetrics(await metricsRes.json());
@@ -326,9 +371,9 @@ export default function Dashboard() {
       } catch {}
     }
     init();
-    const interval = setInterval(refresh, 3000);
+    const interval = setInterval(() => refresh(), 3000);
     return () => { ignore = true; clearInterval(interval); };
-  }, [refresh]);
+  }, [refresh, getAuthHeaders]);
 
   function updateForm<K extends keyof typeof EMPTY_FORM>(key: K, value: string) {
     setForm((f) => {
@@ -358,7 +403,7 @@ export default function Dashboard() {
     try {
       const res = await fetch("/api/subscribers", {
         method: "POST",
-        headers: { "Content-Type": "application/json", ...AUTH_HEADERS },
+        headers: { "Content-Type": "application/json", ...getAuthHeaders() },
         body: JSON.stringify({ name: form.name, phone: form.phone, email: form.email, planName: form.planName, amountCents, region: form.region, locale: form.locale }),
       });
       let data: { error?: string } = {};
@@ -375,9 +420,14 @@ export default function Dashboard() {
     setBusyId(subscriberId); setError(null);
     try {
       const res = await fetch("/api/stripe/simulate-failure", {
-        method: "POST", headers: { "Content-Type": "application/json", ...AUTH_HEADERS },
+        method: "POST", headers: { "Content-Type": "application/json", ...getAuthHeaders() },
         body: JSON.stringify({ subscriberId }),
       });
+      if (res.status === 401) {
+        setShowAuthGate(true);
+        setError("Operator authentication required. Please enter your RECOVER_API_KEY.");
+        return;
+      }
       let data: { error?: string } = {};
       try { data = await res.json(); } catch {}
       if (!res.ok) setError(data.error ?? `HTTP ${res.status}`);
@@ -389,9 +439,14 @@ export default function Dashboard() {
     setBusyId(callLogId); setError(null);
     try {
       const res = await fetch("/api/calle/place-call", {
-        method: "POST", headers: { "Content-Type": "application/json", ...AUTH_HEADERS },
+        method: "POST", headers: { "Content-Type": "application/json", ...getAuthHeaders() },
         body: JSON.stringify({ callLogId }),
       });
+      if (res.status === 401) {
+        setShowAuthGate(true);
+        setError("Operator authentication required. Please enter your RECOVER_API_KEY.");
+        return;
+      }
       let data: { error?: string } = {};
       try { data = await res.json(); } catch {}
       if (!res.ok) setError(data.error ?? `HTTP ${res.status}`);
@@ -401,14 +456,14 @@ export default function Dashboard() {
 
   async function cancelCall(callLogId: string) {
     setBusyId(callLogId);
-    try { await fetch("/api/calle/cancel-call", { method: "POST", headers: { "Content-Type": "application/json", ...AUTH_HEADERS }, body: JSON.stringify({ callLogId }) }); }
+    try { await fetch("/api/calle/cancel-call", { method: "POST", headers: { "Content-Type": "application/json", ...getAuthHeaders() }, body: JSON.stringify({ callLogId }) }); }
     finally { setBusyId(null); refresh(); }
   }
 
   async function pauseFollowups(subscriberId: string) {
     setBusyId(subscriberId);
     try {
-      await fetch("/api/calle/pause-followups", { method: "POST", headers: { "Content-Type": "application/json", ...AUTH_HEADERS }, body: JSON.stringify({ subscriberId }) });
+      await fetch("/api/calle/pause-followups", { method: "POST", headers: { "Content-Type": "application/json", ...getAuthHeaders() }, body: JSON.stringify({ subscriberId }) });
       notify("Automated follow-up chain stopped for this subscriber.");
     } finally { setBusyId(null); refresh(); }
   }
@@ -416,7 +471,7 @@ export default function Dashboard() {
   async function loadDemoData() {
     setBusyId("demo-load"); setError(null);
     try {
-      const res = await fetch("/api/admin/demo-data", { method: "POST", headers: AUTH_HEADERS });
+      const res = await fetch("/api/admin/demo-data", { method: "POST", headers: getAuthHeaders() });
       if (res.ok) notify("Judge demo dataset loaded — real transcripts, recoveries, and follow-up chains ready.");
     } finally { setBusyId(null); refresh(); }
   }
@@ -424,7 +479,7 @@ export default function Dashboard() {
   async function resetDatabase() {
     if (!confirm("Reset all data to an empty database?")) return;
     setBusyId("demo-reset");
-    try { await fetch("/api/admin/demo-data", { method: "DELETE", headers: AUTH_HEADERS }); notify("Database reset."); }
+    try { await fetch("/api/admin/demo-data", { method: "DELETE", headers: getAuthHeaders() }); notify("Database reset."); }
     finally { setBusyId(null); refresh(); }
   }
 
@@ -486,6 +541,30 @@ export default function Dashboard() {
                   <span style={{ width: 6, height: 6, borderRadius: "50%", background: "var(--warning)", display: "inline-block" }} />
                   {pendingCount} awaiting review
                 </span>
+              )}
+              {operatorToken ? (
+                <button
+                  id="btn-operator-lock"
+                  onClick={() => {
+                    clearStoredOperatorToken();
+                    setOperatorToken("");
+                    notify("Operator desk locked.");
+                  }}
+                  className="btn btn-ghost btn-sm"
+                  style={{ color: "var(--success)", borderColor: "var(--success-border)", display: "flex", alignItems: "center", gap: 5 }}
+                  title="Operator session active in sessionStorage. Click to lock desk."
+                >
+                  <IconShield size={13} color="var(--success)" /> Operator Active
+                </button>
+              ) : (
+                <button
+                  id="btn-operator-auth"
+                  onClick={() => setShowAuthGate(true)}
+                  className="btn btn-secondary btn-sm"
+                  style={{ color: "var(--warning)", borderColor: "var(--warning-border)", display: "flex", alignItems: "center", gap: 5 }}
+                >
+                  <IconShield size={13} color="var(--warning)" /> Authenticate Operator
+                </button>
               )}
               <button
                 id="btn-load-demo"
@@ -981,6 +1060,101 @@ export default function Dashboard() {
           <span>Auto-refreshes every 3s · CALL-E Voice API</span>
         </footer>
       </div>
+
+      {/* ── Operator Authentication Modal ───────────────── */}
+      {showAuthGate && (
+        <div
+          className="modal-backdrop"
+          style={{
+            position: "fixed", inset: 0, zIndex: 60,
+            background: "rgba(0,0,0,0.75)",
+            backdropFilter: "blur(8px)", WebkitBackdropFilter: "blur(8px)",
+            display: "flex", alignItems: "center", justifyContent: "center",
+            padding: 16,
+          }}
+          onClick={(e) => { if (e.target === e.currentTarget) setShowAuthGate(false); }}
+        >
+          <div
+            className="modal-panel"
+            style={{
+              width: "100%", maxWidth: 480,
+              background: "var(--surface)", border: "1px solid var(--border-strong)",
+              borderRadius: 16, overflow: "hidden",
+              boxShadow: "0 25px 80px rgba(0,0,0,0.6)",
+              padding: 24,
+            }}
+          >
+            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 16 }}>
+              <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+                <div style={{ padding: 8, borderRadius: 8, background: "rgba(99,102,241,0.15)", border: "1px solid rgba(99,102,241,0.3)" }}>
+                  <IconShield size={20} color="var(--accent-2)" />
+                </div>
+                <div>
+                  <h2 style={{ fontSize: 17, fontWeight: 800 }}>Operator Authentication</h2>
+                  <p style={{ fontSize: 12, color: "var(--ink-2)" }}>Private &amp; Live Operations Boundary</p>
+                </div>
+              </div>
+              <button className="btn btn-ghost btn-xs" onClick={() => setShowAuthGate(false)}>✕</button>
+            </div>
+
+            <p style={{ fontSize: 13, color: "var(--ink-2)", lineHeight: 1.6, marginBottom: 20 }}>
+              Live customer dialing and financial recovery interventions require an authorized operator.
+              Enter your <code style={{ color: "var(--accent-2)", background: "rgba(99,102,241,0.1)", padding: "2px 6px", borderRadius: 4 }}>RECOVER_API_KEY</code>.
+              Your key is kept strictly in your browser&apos;s <code style={{ color: "var(--ink)" }}>sessionStorage</code> and is cleared when this tab closes.
+            </p>
+
+            <form onSubmit={(e) => {
+              e.preventDefault();
+              const trimmed = operatorInput.trim();
+              if (!trimmed) {
+                setError("Please enter the operator secret key.");
+                return;
+              }
+              setStoredOperatorToken(trimmed);
+              setOperatorToken(trimmed);
+              setShowAuthGate(false);
+              notify("Operator authenticated. Desk unlocked.");
+              refresh(trimmed);
+            }}>
+              <div style={{ marginBottom: 20 }}>
+                <label style={{ display: "block", fontSize: 12, fontWeight: 600, marginBottom: 8, color: "var(--ink)" }}>
+                  Operator Secret Key (RECOVER_API_KEY)
+                </label>
+                <input
+                  type="password"
+                  value={operatorInput}
+                  onChange={(e) => setOperatorInput(e.target.value)}
+                  placeholder="Enter RECOVER_API_KEY..."
+                  autoFocus
+                  style={{
+                    width: "100%", padding: "10px 14px", borderRadius: 8,
+                    background: "var(--surface-2)", border: "1px solid var(--border)",
+                    color: "var(--ink)", fontFamily: "var(--font-mono)", fontSize: 13,
+                    outline: "none",
+                  }}
+                />
+              </div>
+
+              <div style={{ display: "flex", justifyContent: "flex-end", gap: 10 }}>
+                <button
+                  type="button"
+                  className="btn btn-ghost"
+                  onClick={() => setShowAuthGate(false)}
+                >
+                  Cancel
+                </button>
+                <button
+                  type="submit"
+                  className="btn btn-primary"
+                  style={{ display: "flex", alignItems: "center", gap: 6 }}
+                >
+                  <IconShield size={14} /> Unlock Operator Desk
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
 
       {/* ── Intelligence Modal ───────────────────────────── */}
       {activeIntelligenceCall?.intelligence && (

@@ -3,7 +3,7 @@ import { randomUUID } from "crypto";
 import { callLogsTable, subscribersTable, webhookEventsTable } from "@/lib/db";
 import type { PaymentRecoveryDecision } from "@/lib/calle";
 import { MAX_CALL_ATTEMPTS, followUpDelayMinutes, fetchVerifiedCalleCall } from "@/lib/calle";
-import { deepSanitizeText } from "@/lib/masking";
+import { deepSanitizeText, maskPhone } from "@/lib/masking";
 import { validateWebhookAuth } from "@/lib/auth";
 
 /**
@@ -81,7 +81,7 @@ export async function POST(req: NextRequest) {
     verifiedCall.recipients?.[0]?.phones?.[0] ?? null;
 
   if (recipientPhone && subscriber.phone && recipientPhone.trim() !== subscriber.phone.trim()) {
-    console.error(`[Webhook Security] Destination mismatch: verified ${recipientPhone} does not match stored ${subscriber.phone}`);
+    console.error(`[Webhook Security] Destination mismatch: verified ${maskPhone(recipientPhone)} does not match stored ${maskPhone(subscriber.phone)}`);
     callLogsTable.completeByCalleCallId(callId, {
       status: "failed",
       decision: "unknown",
