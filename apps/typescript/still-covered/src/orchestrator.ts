@@ -70,6 +70,8 @@ export interface RunOptions {
   callTimeoutMs?: number;
   /** Delay before the redial. Collapsed to zero in drills. */
   retryDelayMs?: number;
+  /** resume --include-unresolved: re-place submissions whose outcome was unknown, after a human checked. */
+  includeUnresolved?: boolean;
   createRetries?: number;
   createRetryBaseMs?: number;
   log?: (line: string) => void;
@@ -192,7 +194,7 @@ async function mapLimit<T, R>(items: T[], limit: number, fn: (item: T) => Promis
   return results;
 }
 
-type Resolved = Required<Pick<RunOptions, "policy" | "pollIntervalMs" | "callTimeoutMs" | "retryDelayMs" | "createRetries" | "createRetryBaseMs" | "log">> & RunOptions;
+type Resolved = Required<Pick<RunOptions, "policy" | "pollIntervalMs" | "callTimeoutMs" | "retryDelayMs" | "createRetries" | "createRetryBaseMs" | "includeUnresolved" | "log">> & RunOptions;
 
 export class Orchestrator {
   private readonly o: Resolved;
@@ -206,6 +208,7 @@ export class Orchestrator {
       pollIntervalMs: 3000,
       callTimeoutMs: 15 * 60 * 1000,
       retryDelayMs: 0,
+      includeUnresolved: false,
       createRetries: 4,
       createRetryBaseMs: 1000,
       log: () => undefined,
@@ -315,6 +318,27 @@ export class Orchestrator {
       this.o.log(`Re-placing ${failed.reduce((n, f) => n + f.personIds.length, 0)} call task(s) CALL-E did not accept earlier.`);
       retryIds.push(...(await this.runWaves(failed.map((f) => ({ ...f.wave, personIds: f.personIds })))));
     }
+
+    // Unresolved submissions are named, never swept up. The operator reconciles them against CALL-E
+    // and then asks for them explicitly, because the alternative is this command deciding on its own
+    // to re-send a request that may already have rung somebody's telephone.
+    const unresolved = [...projection.unresolvedSubmissions];
+    if (unresolved.length > 0 && !this.o.includeUnresolved) {
+      this.o.log(`${unresolved.length} submission(s) failed earlier without saying whether the call went out. Not re-placing them.`);
+      for (const u of unresolved) {
+        const name = this.personById.get(u.personId)?.name ?? u.personId;
+        this.o.log(`  ${name}: look up ${u.idempotencyKey} in CALL-E. If no call exists, re-run resume with --include-unresolved.`);
+      }
+    } else if (unresolved.length > 0) {
+      this.o.log(`Re-placing ${unresolved.length} unresolved submission(s) at your request, with their original idempotency keys.`);
+      const byWave = new Map<number, { wave: Wave; personIds: string[] }>();
+      for (const u of unresolved) {
+        const row = byWave.get(u.wave.index) ?? { wave: u.wave, personIds: [] };
+        row.personIds.push(u.personId);
+        byWave.set(u.wave.index, row);
+      }
+      retryIds.push(...(await this.runWaves([...byWave.values()].map((r) => ({ ...r.wave, personIds: r.personIds })))));
+    }
     await this.runRetryPass(retryIds);
     this.createWorkItems(null);
     return this.finish();
@@ -412,7 +436,15 @@ export class Orchestrator {
     const ambiguous = submissionAmbiguous(err);
     const outcome: Outcome = ambiguous ? "dial_unknown" : "not_attempted";
     const key = screeningIdempotencyKey(this.o.campaign.id, person.id, wave.attempt);
-    this.o.ledger.append({ type: "wave.failed", at: this.now(), wave: { ...wave, personIds: [person.id] }, personIds: [person.id], error: message });
+    // A refusal goes into failedWaves, which `resume` re-places automatically - correct, because
+    // nothing was dialled. An ambiguous failure must NOT go there: resume would then re-submit a
+    // call that may already be ringing, which is the automatic redial this outcome exists to stop.
+    // It is recorded separately, where resume can see it and deliberately leave it alone.
+    if (ambiguous) {
+      this.o.ledger.append({ type: "call.unresolved", at: this.now(), wave: { ...wave, personIds: [person.id] }, personId: person.id, idempotencyKey: key, error: message });
+    } else {
+      this.o.ledger.append({ type: "wave.failed", at: this.now(), wave: { ...wave, personIds: [person.id] }, personIds: [person.id], error: message });
+    }
     this.o.log(
       ambiguous
         ? `The request to CALL-E for ${person.name} failed without saying whether the call went out: ${message}. Marked dial unknown; reconcile idempotency key ${key} in CALL-E before redialling.`

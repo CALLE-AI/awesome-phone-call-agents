@@ -61,6 +61,8 @@ Options
   --state <id>            State configuration in states/ (default from SC_STATE, else example-state)
   --rules <json>          Rules file (default: rules/federal-2027.json)
   --campaign-id <id>      Stable campaign id (used by resume, follow-up, report, serve)
+  --include-unresolved    resume only: also re-place submissions whose outcome was unknown.
+                          Reconcile them in CALL-E first; resume names them and their keys.
   --title <text>          Campaign title
   --as-of <YYYY-MM-DD>    Date used for deadline arithmetic (default: today in SC_TIMEZONE)
   --due-within <days>     Only people whose coverage check is within this many days
@@ -214,6 +216,8 @@ interface RunSettings {
   parallel: number;
   fast: boolean;
   confirm: boolean;
+  /** resume only: re-place submissions whose outcome was unknown, after a person checked CALL-E. */
+  includeUnresolved: boolean;
 }
 
 async function executeRun(deps: RunDeps, campaign: Campaign, registryPath: string, settings: RunSettings): Promise<{ campaignId: string; reportPath: string }> {
@@ -294,6 +298,7 @@ function orchestratorFromLedger(deps: RunDeps, ledger: Ledger, settings: RunSett
     waveSize: settings.waveSize,
     parallelWaves: settings.parallel,
     pollIntervalMs: deps.config.mode === "dry-run" ? 500 : 3000,
+    includeUnresolved: settings.includeUnresolved,
     log: deps.log,
   });
 }
@@ -307,6 +312,7 @@ async function main(): Promise<void> {
       state: { type: "string" },
       rules: { type: "string" },
       "campaign-id": { type: "string" },
+    "include-unresolved": { type: "boolean" },
       title: { type: "string" },
       "as-of": { type: "string" },
       "due-within": { type: "string" },
@@ -344,6 +350,7 @@ async function main(): Promise<void> {
   const settings: RunSettings = {
     waveSize: values["wave-size"] ? Number.parseInt(values["wave-size"], 10) : config.waveSize,
     parallel: values.parallel ? Number.parseInt(values.parallel, 10) : 1,
+    includeUnresolved: values["include-unresolved"] === true,
     fast: values.fast,
     confirm: values.confirm,
   };

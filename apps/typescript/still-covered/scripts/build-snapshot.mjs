@@ -36,9 +36,21 @@ const BANNER = `
 page = page.replace("<body>", `<body>${BANNER}`);
 
 // Replace the three network calls with the baked state.
+// JSON inside a <script> element is HTML, not JavaScript, until the parser finds </script>. A
+// caller org, operator note or person name containing that string would close the tag early and the
+// rest would be parsed as markup. Escaping the three HTML-significant characters (and the two line
+// separators that are legal in JSON but not in a JS string literal) keeps the value inert.
+const embed = (value) =>
+  JSON.stringify(value)
+    .split("<").join("\\u003c")
+    .split(">").join("\\u003e")
+    .split("&").join("\\u0026")
+    .split("\u2028").join("\\u2028")
+    .split("\u2029").join("\\u2029");
+
 const boot = `
 (function () {
-  window.__SNAPSHOT__ = ${JSON.stringify(state)};
+  window.__SNAPSHOT__ = ${embed(state)};
 })();
 `;
 page = page.replace("<script>\n(function () {", `<script>${boot}</script>\n<script>\n(function () {`);

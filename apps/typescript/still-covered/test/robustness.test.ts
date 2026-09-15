@@ -95,15 +95,14 @@ test("an invalid request is not retried", async () => {
   }
 });
 
-test("resume re-places refused tasks with the same keys and reaches the same end state", async () => {
-  const h = await harness({ createFailures: { count: 3, status: 503, code: "provider_unavailable" } }, { createRetries: 0 });
+test("resume re-places tasks CALL-E refused, with the same keys, and reaches the same end state", async () => {
+  // A 422 is a refusal: nothing was dialled, so re-placing is safe and automatic.
+  const h = await harness({ createFailures: { count: 3, status: 422, code: "invalid_request" } }, { createRetries: 0 });
   try {
     const first = await h.make().run();
-    assert.equal(first.dialUnknown, 3, "a 503 leaves it unknown whether these three were dialled");
+    assert.equal(first.notAttempted, 3);
     const refused = new Ledger(h.ledgerPath).projection.failedWaves.flatMap((f) => f.personIds);
     assert.equal(refused.length, 3);
-    // Resume is the reconciliation: the same idempotency key either settles the call CALL-E already
-    // has or creates the one it never got, so the unknown resolves without anybody being dialled twice.
     const resumed = await h.make().resume();
     assert.deepEqual(resumed.outcomes, NORMAL);
     assert.equal(new Ledger(h.ledgerPath).projection.failedWaves.length, 0);
@@ -112,6 +111,36 @@ test("resume re-places refused tasks with the same keys and reaches the same end
       assert.ok(keys.includes(`sc:robust:${id}:attempt1`), `${id} was re-placed with its original key`);
     }
     assert.equal(new Set(keys).size, keys.length);
+  } finally {
+    await h.cleanup();
+  }
+});
+
+test("resume refuses to re-place an unresolved submission on its own, and does it on request", async () => {
+  // A 503 is not a refusal. Re-placing it automatically is the redial this outcome exists to stop,
+  // so resume names it and stops; the operator checks CALL-E and then asks for it explicitly.
+  const h = await harness({ createFailures: { count: 3, status: 503, code: "provider_unavailable" } }, { createRetries: 0 });
+  try {
+    const first = await h.make().run();
+    assert.equal(first.dialUnknown, 3);
+
+    const unresolved = new Ledger(h.ledgerPath).projection.unresolvedSubmissions;
+    assert.equal(unresolved.length, 3, "recorded separately from failedWaves");
+    assert.equal(new Ledger(h.ledgerPath).projection.failedWaves.length, 0, "and never in failedWaves, which resume sweeps up");
+
+    const placedBefore = h.fake.requests().length;
+    const quiet = await h.make().resume();
+    assert.equal(h.fake.requests().length, placedBefore, "a plain resume places nothing for them");
+    assert.equal(quiet.outcomes.dial_unknown, 3, "they are still unknown, not quietly resolved");
+
+    // The operator has now checked CALL-E and found no call, so they ask for it.
+    const asked = await h.make({ includeUnresolved: true }).resume();
+    assert.deepEqual(asked.outcomes, NORMAL);
+    const keys = h.fake.requests().map((r) => r.idempotencyKey);
+    for (const u of unresolved) {
+      assert.ok(keys.includes(u.idempotencyKey), `${u.personId} was re-placed with its original key`);
+    }
+    assert.equal(new Set(keys).size, keys.length, "the same key is never sent twice");
   } finally {
     await h.cleanup();
   }

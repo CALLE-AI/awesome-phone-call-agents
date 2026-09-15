@@ -27,6 +27,7 @@ export type LedgerEntry =
   | { type: "person.cleared"; at: string; personId: string; kind: "exempt" | "meets"; codes: ExemptionCode[]; reason: string }
   | { type: "wave.planned"; at: string; wave: Wave }
   | { type: "wave.failed"; at: string; wave: Wave; personIds: string[]; error: string }
+  | { type: "call.unresolved"; at: string; wave: Wave; personId: string; idempotencyKey: string; error: string }
   | { type: "call.pending"; at: string; callId: string; personIds: string[]; reason: string }
   | { type: "call.created"; at: string; call: CallRecord; taskPreview: string }
   | { type: "call.event"; at: string; callId: string; level: string; message: string; eventId: string }
@@ -52,6 +53,14 @@ export interface Projection {
   waves: Wave[];
   /** Waves whose call tasks CALL-E never accepted; `resume` re-places them with the same idempotency keys. */
   failedWaves: { wave: Wave; personIds: string[]; error: string }[];
+  /**
+   * Submissions that failed without saying whether a call went out.
+   *
+   * Deliberately separate from `failedWaves`: resume re-places those automatically, which is right
+   * when nothing was dialled and wrong here, because the call may already be ringing. These are
+   * listed for a person to reconcile against CALL-E and are re-placed only on an explicit request.
+   */
+  unresolvedSubmissions: { wave: Wave; personId: string; idempotencyKey: string; error: string }[];
   calls: Map<string, CallRecord>;
   timeline: { at: string; message: string; level: string }[];
   work: Map<string, WorkItem>;
@@ -73,6 +82,7 @@ export function emptyProjection(): Projection {
     states: new Map(),
     waves: [],
     failedWaves: [],
+    unresolvedSubmissions: [],
     calls: new Map(),
     timeline: [],
     work: new Map(),
@@ -228,6 +238,14 @@ export function apply(projection: Projection, entry: LedgerEntry): void {
       projection.timeline.push({ at: entry.at, level: "info", message: `Worklist item ${entry.itemId} reviewed by ${entry.by}` });
       break;
     }
+    case "call.unresolved":
+      projection.unresolvedSubmissions.push({ wave: entry.wave, personId: entry.personId, idempotencyKey: entry.idempotencyKey, error: entry.error });
+      projection.timeline.push({
+        at: entry.at,
+        level: "warning",
+        message: `Submission for ${entry.personId} failed without saying whether the call went out (${entry.error}); reconcile ${entry.idempotencyKey} in CALL-E`,
+      });
+      break;
     case "note":
       projection.timeline.push({ at: entry.at, level: entry.level, message: entry.message });
       break;
