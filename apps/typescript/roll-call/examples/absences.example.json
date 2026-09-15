@@ -1,0 +1,72 @@
+{
+  "school": {
+    "schoolName": "Riverside Primary School",
+    "officePhone": "+15550100000",
+    "safeguardingContact": "Ms. Alvarez (Designated Safeguarding Lead)",
+    "callingWindow": { "start": "08:00", "end": "11:30" },
+    "timeZone": "America/New_York",
+    "maxGuardiansPerStudent": 2,
+    "doNotCall": ["+15550100199"]
+  },
+  "absences": [
+    {
+      "studentId": "S-1041",
+      "firstName": "Amara",
+      "classLabel": "5B",
+      "date": "2026-09-14",
+      "guardians": [
+        { "name": "Ms. Okafor", "phone": "+15550100101", "locale": "en-US", "region": "US", "automatedCallsConsent": true }
+      ]
+    },
+    {
+      "studentId": "S-2077",
+      "firstName": "Ben",
+      "classLabel": "3A",
+      "date": "2026-09-14",
+      "guardians": [
+        { "name": "Mr. Lindqvist", "phone": "+15550100102", "locale": "en-US", "region": "US", "automatedCallsConsent": true },
+        { "name": "Ms. Lindqvist", "phone": "+15550100112", "locale": "en-US", "region": "US", "automatedCallsConsent": true }
+      ]
+    },
+    {
+      "studentId": "S-3150",
+      "firstName": "Chloe",
+      "classLabel": "4C",
+      "date": "2026-09-14",
+      "guardians": [
+        { "name": "Mr. Weber", "phone": "+15550100103", "locale": "en-US", "region": "US", "automatedCallsConsent": true },
+        { "name": "Frau Weber", "phone": "+15550100104", "locale": "de-DE", "region": "US", "automatedCallsConsent": true }
+      ]
+    },
+    {
+      "studentId": "S-4212",
+      "firstName": "Dev",
+      "classLabel": "6A",
+      "date": "2026-09-14",
+      "guardians": [
+        { "name": "Mr. Patel", "phone": "+15550100105", "locale": "en-US", "region": "US", "automatedCallsConsent": true }
+      ]
+    },
+    {
+      "studentId": "S-5390",
+      "firstName": "Elif",
+      "classLabel": "2B",
+      "date": "2026-09-14",
+      "guardians": [
+        { "name": "Ms. Kaya", "phone": "+15550100106", "locale": "tr-TR", "region": "US", "automatedCallsConsent": true },
+        { "name": "Mr. Kaya", "phone": "+15550100116", "locale": "tr-TR", "region": "US", "automatedCallsConsent": true },
+        { "name": "Grandmother Kaya", "phone": "+15550100126", "locale": "tr-TR", "region": "US", "automatedCallsConsent": true }
+      ]
+    },
+    {
+      "studentId": "S-6001",
+      "firstName": "Femi",
+      "classLabel": "1A",
+      "date": "2026-09-14",
+      "guardians": [
+        { "name": "Mr. Adeyemi", "phone": "+15550100199", "locale": "en-US", "region": "US", "automatedCallsConsent": true },
+        { "name": "Ms. Adeyemi", "phone": "+15550100107", "locale": "en-US", "region": "US", "automatedCallsConsent": false }
+      ]
+    }
+  ]
+}
