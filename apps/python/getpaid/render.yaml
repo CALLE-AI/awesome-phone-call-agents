@@ -1,0 +1,12 @@
+services:
+  - type: web
+    name: getpaid
+    env: python
+    plan: free
+    buildCommand: pip install -r requirements.txt
+    startCommand: uvicorn main:app --host 0.0.0.0 --port $PORT
+    envVars:
+      - key: CALLE_MODE
+        value: fixture
+      - key: AUTO_SEED_ON_EMPTY
+        value: "true"
