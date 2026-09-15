@@ -255,7 +255,7 @@ This project is an awesome list for AI-agent phone-call workflows. Add resources
 -  [VendorPulse](https://github.com/Eman2123/VendorPlus) - Autonomous CALL-E-powered vendor check-in tool that calls suppliers about order status, scores delivery risk, and escalates high-risk vendors for human review.
 Runnable demo apps live under [`apps/`](apps/). They are not a CALL-E SDK and do not define a supported application API.
 
-- [FixFast](https://github.com/DheerajBishnoi/FixFast-Powered_by_Call-E) - Autonomous emergency contractor dispatch agent that negotiates arrival ETA and callout fees via sequential CALL-E phone calls, with strict budget/time caps, verbatim audio grounding, and an atomic stop that prevents double-booking.
+- [FixFast](https://github.com/DheerajBishnoi/FixFast-Powered_by_Call-E) - Experimental contractor-dispatch simulator and CALL-E workflow comparing ETA and callout fees; quote grounding is heuristic, and the live path may advance after an ambiguous provider error, so use simulation for evaluation and manually reconcile uncertain calls before further dispatch.
 
 | App | Language | Purpose |
 | --- | --- | --- |
