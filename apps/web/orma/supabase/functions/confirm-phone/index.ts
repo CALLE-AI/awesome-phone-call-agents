@@ -86,7 +86,9 @@ export function createConfirmPhoneHandler(deps = depsFromEnv()): (request: Reque
       // The message never carries the code or an unmasked number.
       console.error("confirm-phone dispatch failed", error instanceof Error ? error.message : "unknown error");
       await deps.fetch(url(deps.apiUrl, "phone_confirmations", new URLSearchParams({ id: `eq.${confirmation.id}` }).toString()), { method: "PATCH", headers: headers(deps.serviceRoleKey), body: JSON.stringify({ state: "failed" }) });
-      return publicResponse({ id: confirmation.id, state: "failed", expires_at: row.expires_at, error: "The confirmation call could not be placed. Try again in a few minutes." }, 502);
+      // The request may have reached CALL-E before this failed, so the copy
+      // claims neither outcome and does not invite another attempt.
+      return publicResponse({ id: confirmation.id, state: "failed", expires_at: row.expires_at, error: "Orma could not confirm whether the confirmation call was placed. This attempt is recorded for manual review." }, 502);
     }
   };
 }

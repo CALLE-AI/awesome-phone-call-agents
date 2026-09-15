@@ -426,7 +426,7 @@ if (typeof testFn === "function" && !import.meta.main) {
       const env: Record<string, string> = {
         ORMA_API_URL: "https://orma-api.nryn.dev",
         SUPABASE_SERVICE_ROLE_KEY: "service-key",
-        CALLE_API_BASE: "https://api.call-e.test",
+        CALLE_API_BASE: "https://api.heycall-e.com",
         CALLE_API_KEY: "calle-key",
         ORMA_WEBHOOK_SECRET: "webhook-secret",
         ORMA_DRY_RUN: "false",
@@ -477,7 +477,7 @@ if (typeof testFn === "function" && !import.meta.main) {
       const env: Record<string, string> = {
         ORMA_API_URL: "https://orma-api.nryn.dev",
         SUPABASE_SERVICE_ROLE_KEY: "service-key",
-        CALLE_API_BASE: "https://api.call-e.test",
+        CALLE_API_BASE: "https://api.heycall-e.com",
         CALLE_API_KEY: "calle-key",
         ORMA_WEBHOOK_SECRET: "webhook-secret",
         TELEGRAM_BOT_TOKEN: "fixture-bot-token",
@@ -561,7 +561,7 @@ if (typeof testFn === "function" && !import.meta.main) {
         const request = new Request(String(input), init);
         requests.push(request);
         const url = new URL(request.url);
-        if (url.host === "api.call-e.test") {
+        if (url.host === "api.heycall-e.com") {
           return url.pathname.endsWith("/v1/calls/call-stuck")
             ? new Response(null, { status: 503 })
             : Response.json(callTask("call-healthy"));
@@ -620,7 +620,7 @@ if (typeof testFn === "function" && !import.meta.main) {
       const env: Record<string, string> = {
         ORMA_API_URL: "https://orma-api.nryn.dev",
         SUPABASE_SERVICE_ROLE_KEY: "service-key",
-        CALLE_API_BASE: "https://api.call-e.test",
+        CALLE_API_BASE: "https://api.heycall-e.com",
         CALLE_API_KEY: "calle-key",
         ORMA_WEBHOOK_SECRET: "webhook-secret",
         TELEGRAM_BOT_TOKEN: "fixture-bot-token",
@@ -850,7 +850,7 @@ if (typeof testFn === "function" && !import.meta.main) {
     const calleDeps = {
       apiUrl: "https://orma-api.nryn.dev",
       serviceRoleKey: "service-key",
-      calleApiBase: "https://api.call-e.test",
+      calleApiBase: "https://api.heycall-e.com",
       calleApiKey: "calle-key",
       webhookUrl: "https://orma-api.nryn.dev/functions/v1/calle-webhook/secret",
       fetch: (async () => new Response(null, { status: 500 })) as typeof fetch,

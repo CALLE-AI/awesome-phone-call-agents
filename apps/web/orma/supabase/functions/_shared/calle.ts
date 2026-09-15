@@ -7,6 +7,7 @@
  */
 
 import { assembleBriefing, renderCallTask, storeBriefing } from "./briefing.ts";
+import { approvedCalleApiBase, calleFetch } from "./calle-origin.ts";
 import {
   dryRunFixture,
   dryRunFixtureName,
@@ -104,8 +105,8 @@ export async function dispatchPhoneConfirmation(
 ): Promise<ConfirmationDispatch> {
   const requestBody = JSON.stringify(buildConfirmationCallRequest(confirmationId, phoneE164, code, deps.webhookUrl));
   if (isDryRun(false, deps.getEnv)) return { mode: "dry_run", requestBody: maskedConfirmationRequestBody(requestBody, code), callId: null };
-  const response = await deps.fetch(`${deps.calleApiBase.replace(/\/+$/, "")}/v1/calls`, {
-    method: "POST", headers: { authorization: `Bearer ${deps.calleApiKey}`, "content-type": "application/json", "idempotency-key": `orma:confirm:${confirmationId}` }, body: requestBody,
+  const response = await calleFetch(deps, "/v1/calls", {
+    method: "POST", headers: { "content-type": "application/json", "idempotency-key": `orma:confirm:${confirmationId}` }, body: requestBody,
   });
   if (!response.ok) {
     // Keep CALL-E's reason for the log, with any number masked and the code removed.
@@ -197,7 +198,7 @@ export function depsFromEnv(
   return {
     apiUrl,
     serviceRoleKey: requireNamedEnv("SUPABASE_SERVICE_ROLE_KEY", getEnv),
-    calleApiBase: requireNamedEnv("CALLE_API_BASE", getEnv),
+    calleApiBase: approvedCalleApiBase(requireNamedEnv("CALLE_API_BASE", getEnv)),
     calleApiKey: requireNamedEnv("CALLE_API_KEY", getEnv),
     webhookUrl: `${apiUrl.replace(/\/+$/, "")}/functions/v1/calle-webhook/${webhookSecret}`,
     telegramBotToken: requireNamedEnv("TELEGRAM_BOT_TOKEN", getEnv),
@@ -252,10 +253,12 @@ function failure(code: string, message: string): Record<string, string> {
 
 /**
  * The field set every dispatcher failure writes beside its code. `spec.md`
- * section 3 maps a failed run to `not_answered`, and that disposition is never
- * billed, so this is the only pair a failed dispatch may store. This module ends
- * a run in three places, and one definition is what keeps a fourth from
- * inventing its own.
+ * section 3 maps a failed run to `not_answered` with `billable = false`, so this
+ * is the only pair the schema accepts for a failed run. The pair is that shape,
+ * not proof that no call was placed or charged. When CALL-E received the request
+ * and returned no call id, the code is `dispatch_outcome_unknown` and the reason
+ * says the run needs manual review. This module ends a run in three places, and
+ * one definition is what keeps a fourth from inventing its own.
  */
 function failedDispatchFields(
   code: string,
@@ -346,11 +349,17 @@ export type DispatchOutcome = {
 /** The tag the write that fails a stranded run stores. */
 const RECOVERY_WRITER = "dispatch_recovery";
 
+/** The code for a run whose POST reached CALL-E and returned no call id. */
+const OUTCOME_UNKNOWN = "dispatch_outcome_unknown";
+const MANUAL_REVIEW = "whether CALL-E placed a call is unknown and needs manual review";
+
 /**
  * The call CALL-E accepted before the run could store it. A failed write after
  * the POST would otherwise lose the only id a reconciler can match the call on.
+ * `requested` turns true as the POST goes out. From then on, a missing id no
+ * longer shows that no call exists.
  */
-type PlacedCall = { callId: string | null };
+type PlacedCall = { callId: string | null; requested: boolean };
 
 /**
  * Dispatches one claimed run. A missing or revoked consent is terminally
@@ -370,7 +379,7 @@ export async function dispatchClaimedRun(
   deps: CalleDeps,
 ): Promise<DispatchOutcome> {
   if (run.state !== "claimed") throw new Error("only claimed runs may dispatch");
-  const placed: PlacedCall = { callId: null };
+  const placed: PlacedCall = { callId: null, requested: false };
   try {
     await recordCallEvent(run.id, "claimed", { state: run.state }, deps);
     return await dispatchOne(run, deps, placed);
@@ -455,10 +464,10 @@ async function dispatchOne(
     return { mode: "dry_run", requestBody: rehearsed.requestBody };
   }
 
-  const response = await deps.fetch(`${deps.calleApiBase.replace(/\/+$/, "")}/v1/calls`, {
+  placed.requested = true;
+  const response = await calleFetch(deps, "/v1/calls", {
     method: "POST",
     headers: {
-      authorization: `Bearer ${deps.calleApiKey}`,
       "content-type": "application/json",
       "idempotency-key": run.idempotency_key,
     },
@@ -479,15 +488,21 @@ async function dispatchOne(
     throw new Error("CALL-E idempotency conflict");
   }
   if (!response.ok) {
-    const reason = `CALL-E dispatch returned HTTP ${response.status}`;
+    // A 5xx can arrive after CALL-E created the call, so it proves nothing
+    // either way. A 4xx is CALL-E refusing the request.
+    const unknown = response.status >= 500;
+    const code = unknown ? OUTCOME_UNKNOWN : "dispatch_failed";
+    const reason = unknown
+      ? `CALL-E dispatch returned HTTP ${response.status}, so ${MANUAL_REVIEW}`
+      : `CALL-E dispatch returned HTTP ${response.status}`;
     await updateRun(deps, run.id, {
-      ...failedDispatchFields("dispatch_failed", reason),
+      ...failedDispatchFields(code, reason),
       completed_at: deps.now().toISOString(),
     });
     await recordCallEvent(
       run.id,
       "finalised",
-      finalisedFailureDetail("dispatch_failed", reason, "failed"),
+      finalisedFailureDetail(code, reason, "failed"),
       deps,
     );
     throw new Error("CALL-E dispatch failed");
@@ -562,15 +577,20 @@ async function recoverStrandedRun(
       });
       return;
     }
+    // Once the POST went out, a missing id is not evidence that no call exists.
+    const code = placed.requested ? OUTCOME_UNKNOWN : "dispatch_failed";
+    const recorded = placed.requested
+      ? `${reason}. CALL-E received the request and no call id came back, so ${MANUAL_REVIEW}`
+      : reason;
     await updateRun(deps, run.id, {
-      ...failedDispatchFields("dispatch_failed", reason),
+      ...failedDispatchFields(code, recorded),
       terminal_writer: RECOVERY_WRITER,
       completed_at: now.toISOString(),
     });
     await recordCallEvent(
       run.id,
       "finalised",
-      finalisedFailureDetail("dispatch_failed", reason, "failed"),
+      finalisedFailureDetail(code, recorded, "failed"),
       deps,
     );
   } catch (error) {
@@ -579,7 +599,9 @@ async function recoverStrandedRun(
       error instanceof Error ? error.message : "unknown error",
       placed.callId
         ? `accepted call ${placed.callId} needs manual reconciliation`
-        : "no call was placed",
+        : placed.requested
+          ? `the request reached CALL-E with no call id, so ${MANUAL_REVIEW}`
+          : "the run failed before any request reached CALL-E",
     );
   }
 }
@@ -593,7 +615,7 @@ if (typeof testFn === "function") {
   // Live dispatch is the explicit opt-in, so every live test says so.
   const baseDeps = (fetchImpl: typeof fetch): CalleDeps => ({
     apiUrl: "https://orma-api.nryn.dev", serviceRoleKey: "service-key",
-    calleApiBase: "https://api.call-e.test", calleApiKey: "calle-key",
+    calleApiBase: "https://api.heycall-e.com", calleApiKey: "calle-key",
     webhookUrl: "https://orma-api.nryn.dev/functions/v1/calle-webhook/secret",
     fetch: fetchImpl, now: () => new Date("2026-09-12T00:00:00.000Z"),
     // Only the dry-run switch is live for these tests. Every other name reads
@@ -745,9 +767,11 @@ if (typeof testFn === "function") {
       () => undefined,
     );
     const rejected = await onlyFinalised(requests);
+    // A 503 can follow a created call, so the row claims neither outcome.
     if (
-      rejected.state !== "failed" || rejected.outcome !== "dispatch_failed" ||
-      rejected.failure_reason !== "CALL-E dispatch returned HTTP 503"
+      rejected.state !== "failed" || rejected.outcome !== "dispatch_outcome_unknown" ||
+      rejected.failure_reason !==
+        "CALL-E dispatch returned HTTP 503, so whether CALL-E placed a call is unknown and needs manual review"
     ) {
       throw new Error(`the rejected dispatch must name the status, saw ${JSON.stringify(rejected)}`);
     }
@@ -804,7 +828,7 @@ if (typeof testFn === "function") {
       ORMA_API_URL: "https://orma-api.nryn.dev/",
       ORMA_WEBHOOK_SECRET: "webhook-secret",
       SUPABASE_SERVICE_ROLE_KEY: "service-key",
-      CALLE_API_BASE: "https://api.call-e.test",
+      CALLE_API_BASE: "https://api.heycall-e.com",
       CALLE_API_KEY: "calle-key",
       TELEGRAM_BOT_TOKEN: "fixture-bot-token",
     };
@@ -1021,6 +1045,90 @@ if (typeof testFn === "function") {
     const terminal = patches.find((patch) => typeof patch.state === "string");
     if (terminal?.state !== "failed" || terminal.terminal_writer !== "dry_run") {
       throw new Error(`the failed rehearsal landed the wrong terminal shape, saw ${JSON.stringify(terminal)}`);
+    }
+  });
+
+  testFn("a 4xx dispatch is CALL-E refusing, and says only the status", async () => {
+    const requests: Request[] = [];
+    const fetchStub: typeof fetch = async (input, init) => {
+      const request = new Request(input, init);
+      requests.push(request.clone());
+      if (request.url.endsWith("/v1/calls")) return new Response(null, { status: 422 });
+      if (request.url.includes("/call_runs") && request.method === "GET") return Response.json([{ state: "failed", calle_call_id: null }]);
+      return stubFetch([])(request);
+    };
+    await dispatchClaimedRun(run, baseDeps(fetchStub)).then(() => { throw new Error("a 422 was reported as a dispatch"); }, () => undefined);
+    const refused = await onlyFinalised(requests);
+    if (refused.outcome !== "dispatch_failed" || refused.failure_reason !== "CALL-E dispatch returned HTTP 422") {
+      throw new Error(`a 422 must name only its status, saw ${JSON.stringify(refused)}`);
+    }
+  });
+
+  testFn("a POST that returns no readable call id is held for manual review", async () => {
+    const patches: Array<Record<string, unknown>> = [];
+    const requests: Request[] = [];
+    const logged: string[] = [];
+    const fetchStub: typeof fetch = async (input, init) => {
+      const request = new Request(input, init);
+      requests.push(request.clone());
+      if (request.url.endsWith("/v1/calls")) return new Response("not json", { status: 200 });
+      if (request.method === "PATCH") {
+        patches.push(JSON.parse(await request.text()) as Record<string, unknown>);
+        return new Response(null, { status: 204 });
+      }
+      if (request.url.includes("/call_runs")) return Response.json([{ state: "claimed", calle_call_id: null }]);
+      return stubFetch([])(request);
+    };
+    const original = console.error;
+    console.error = (...args: unknown[]) => { logged.push(args.join(" ")); };
+    try {
+      await dispatchClaimedRun(run, baseDeps(fetchStub)).then(() => { throw new Error("an unreadable response was reported as a dispatch"); }, () => undefined);
+    } finally {
+      console.error = original;
+    }
+    const recovered = patches.at(-1) as { calle_failure?: Record<string, string> } | undefined;
+    if (recovered?.calle_failure?.failure_code !== "dispatch_outcome_unknown") {
+      throw new Error(`a POST with no id must be held as unknown, saw ${JSON.stringify(recovered)}`);
+    }
+    const detail = await onlyFinalised(requests);
+    if (!String(detail.failure_reason).includes("unknown and needs manual review")) {
+      throw new Error(`the timeline row must ask for manual review, saw ${JSON.stringify(detail)}`);
+    }
+    if (logged.some((line) => line.includes("no call was placed"))) throw new Error("an uncertain dispatch claimed no call was placed");
+  });
+
+  testFn("the CALL-E key only goes to an approved HTTPS origin, never through a redirect", async () => {
+    const values: Record<string, string> = {
+      ORMA_API_URL: "https://orma-api.nryn.dev", ORMA_WEBHOOK_SECRET: "s", SUPABASE_SERVICE_ROLE_KEY: "k",
+      CALLE_API_KEY: "calle-key", TELEGRAM_BOT_TOKEN: "t",
+    };
+    for (const base of [
+      "http://api.heycall-e.com", "https://api.heycall-e.com.evil.example", "https://evil.example",
+      "https://user:pass@api.heycall-e.com", "https://api.heycall-e.com/proxy", "https://api.heycall-e.com:8443", "not a url",
+    ]) {
+      let refused = false;
+      try { depsFromEnv((key) => key === "CALLE_API_BASE" ? base : values[key]); } catch { refused = true; }
+      if (!refused) throw new Error(`CALLE_API_BASE ${base} was accepted`);
+    }
+    if (depsFromEnv((key) => key === "CALLE_API_BASE" ? "https://api.heycall-e.com/" : values[key]).calleApiBase !== "https://api.heycall-e.com") {
+      throw new Error("the approved origin with a trailing slash was refused");
+    }
+    // Injected deps are checked at the request too, so no caller can skip the list.
+    const seen: Request[] = [];
+    const capture: typeof fetch = async (input, init) => { seen.push(new Request(input, init)); return new Response(null, { status: 204 }); };
+    let refusedInjected = false;
+    try {
+      await dispatchPhoneConfirmation("c-1", "+919999999991", "123456", { ...baseDeps(capture), calleApiBase: "https://evil.example" });
+    } catch { refusedInjected = true; }
+    if (!refusedInjected || seen.length !== 0) throw new Error("an injected unapproved base received a request");
+    await dispatchClaimedRun(run, baseDeps(async (input, init) => {
+      const request = new Request(input, init);
+      if (request.url.endsWith("/v1/calls")) seen.push(request);
+      return stubFetch([])(request);
+    }));
+    const posted = seen.find((request) => request.url === "https://api.heycall-e.com/v1/calls");
+    if (!posted || posted.redirect !== "error" || posted.headers.get("authorization") !== "Bearer calle-key") {
+      throw new Error(`the credentialed POST must refuse redirects, saw ${posted?.redirect}`);
     }
   });
 

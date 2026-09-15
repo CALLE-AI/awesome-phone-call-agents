@@ -402,6 +402,20 @@ export type SummaryLine = {
   offset: string
 }
 
+/**
+ * The displayed copy of text that may carry a phone number. A run of seven or
+ * more digits, spaces, dots, dashes or brackets keeps only its last two digits.
+ * The stored rows are untouched, so the evidence stays with its owner.
+ */
+export function maskPhoneText(text: string): string {
+  return text.replace(/\+?\d[\d\s().-]{5,}\d/g, (run) => {
+    const total = run.replace(/\D/g, "").length
+    if (total < 7) return run
+    let seen = 0
+    return run.replace(/\d/g, (digit) => (++seen > total - 2 ? digit : "X"))
+  })
+}
+
 export type LastCallSummary = {
   lines: SummaryLine[]
   mentionCount: number
@@ -454,7 +468,7 @@ export function lastCallSummary(
     lines.push({
       kind: "committed",
       label: "Committed",
-      text: `${text}${due}`,
+      text: maskPhoneText(`${text}${due}`),
       offsetSeconds: row.evidence_offset_seconds,
       offset: formatOffset(row.evidence_offset_seconds),
     })
@@ -475,7 +489,7 @@ export function lastCallSummary(
       lines.push({
         kind: "retired",
         label: "Retired",
-        text: item.text,
+        text: maskPhoneText(item.text),
         offsetSeconds: row.offset_seconds,
         offset: formatOffset(row.offset_seconds),
       })
@@ -483,7 +497,7 @@ export function lastCallSummary(
       lines.push({
         kind: "captured",
         label: "Captured",
-        text: item.text,
+        text: maskPhoneText(item.text),
         offsetSeconds: row.offset_seconds,
         offset: formatOffset(row.offset_seconds),
       })

@@ -3,7 +3,7 @@
  * Counts come from lastCallSummary and clocks from the profile zone,
  * both in $lib/today/model, so History and Today agree by construction.
  */
-import { formatOffset } from "$lib/today/model"
+import { formatOffset, maskPhoneText } from "$lib/today/model"
 
 export type TurnView = {
 	offsetSeconds: number | null
@@ -31,7 +31,8 @@ export function parseTurns(turns: unknown): TurnView[] {
 	const parsed = turns.map((turn, order) => {
 		const record = turn !== null && typeof turn === "object" ? (turn as Record<string, unknown>) : {}
 		const offsetSeconds = turnOffset(record.offset_seconds)
-		const text = typeof record.text === "string" ? record.text : ""
+		// The stored transcript keeps every word. The displayed copy masks numbers.
+		const text = typeof record.text === "string" ? maskPhoneText(record.text) : ""
 		return { order, offsetSeconds, offset: formatOffset(offsetSeconds), who: speakerLabel(record.speaker), text }
 	})
 	parsed.sort(

@@ -19,6 +19,7 @@ import {
   lastCallHeadline,
   lastCallSummary,
   liveSteps,
+  maskPhoneText,
   mentionCounts,
   nextSlotInstant,
   openItemsView,
@@ -264,6 +265,19 @@ eq(callBlock(null, liveConsent, null, slotRows)?.reason, "phone", "a missing pro
 eq(callBlock(phoneOk, liveConsent, { slot_id: null }, slotRows)?.reason, "slot", "a run with no slot blocks")
 eq(callBlock(phoneOk, liveConsent, { slot_id: "slot-gone" }, slotRows)?.reason, "slot", "a run whose slot is gone blocks")
 if (!/Settings/.test(callBlock(phoneOk, [], null, slotRows)?.detail ?? "")) fail("a blocked call must point to Settings")
+
+// 8d. Displayed copies mask phone numbers. Stored rows keep them.
+eq(maskPhoneText("Call +91 99999 99991 back"), "Call +XX XXXXX XXX91 back", "a spaced number keeps only its last two digits")
+eq(maskPhoneText("ring 5555550100 today"), "ring XXXXXXXX00 today", "a bare number is masked")
+eq(maskPhoneText("Dentist at 10:30 on 2026"), "Dentist at 10:30 on 2026", "times and years stay readable")
+const phoneItem = { id: "item-phone", text: "Call +15555550100 back", source: "call", created_at: "2026-09-14T01:00:00.000Z", retired_at: null }
+const phoneSummary = lastCallSummary(
+  { id: "run-phone", scheduled_for: "2026-09-14T00:45:00.000Z" },
+  [{ call_run_id: "run-phone", item_id: "item-phone", offset_seconds: 12, items: phoneItem }] as unknown as RunMentionRow[],
+  [], null, "Asia/Kolkata", new Date("2026-09-14T02:00:00.000Z"),
+)
+eq(phoneSummary.lines[0]?.text, "Call +XXXXXXXXX00 back", "a captured line masks the number it shows")
+eq(phoneItem.text, "Call +15555550100 back", "masking leaves the stored row untouched")
 
 // 9. Navigation marks exactly one current page.
 eq(isCurrentNav("/app", "/app"), true, "Today is current on /app")

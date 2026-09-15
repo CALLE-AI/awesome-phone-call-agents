@@ -474,7 +474,7 @@ if (typeof testFn === "function") {
     calle_call_id: "call_finalise_1",
   };
   const API = "https://orma-api.nryn.dev";
-  const CALLE = "https://api.call-e.test";
+  const CALLE = "https://api.heycall-e.com";
   const CALLE_HOST = new URL(CALLE).host;
 
   /** Every stub throws on a path it does not expect, so no request passes

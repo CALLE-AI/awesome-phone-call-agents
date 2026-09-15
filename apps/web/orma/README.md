@@ -320,7 +320,7 @@ Users can manage or stop calls from `https://orma.nryn.dev/app/settings`:
 
 ### Operator cancellation
 
-An operator can halt all platform calls and recurring jobs directly:
+An operator can stop Orma from dispatching any further calls and halt its recurring jobs directly. These steps stop future dispatches only. They do not cancel a call CALL-E has already accepted, which can still ring and still be charged:
 
 1. Unschedule the cron jobs in SQL:
 

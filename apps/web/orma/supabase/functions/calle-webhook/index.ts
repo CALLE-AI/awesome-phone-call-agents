@@ -6,6 +6,7 @@
  * item, result, or billing state is ever taken from the webhook body.
  */
 
+import { approvedCalleApiBase, calleFetch } from "../_shared/calle-origin.ts";
 import { terminalStateFor } from "../_shared/poll.ts";
 import { recordCallEvent } from "../_shared/events.ts";
 
@@ -148,7 +149,7 @@ export function depsFromEnv(
     apiUrl: requireNamedEnv("ORMA_API_URL", getEnv),
     serviceRoleKey: requireNamedEnv("SUPABASE_SERVICE_ROLE_KEY", getEnv),
     webhookSecret: requireNamedEnv("ORMA_WEBHOOK_SECRET", getEnv),
-    calleApiBase: requireNamedEnv("CALLE_API_BASE", getEnv),
+    calleApiBase: approvedCalleApiBase(requireNamedEnv("CALLE_API_BASE", getEnv)),
     calleApiKey: requireNamedEnv("CALLE_API_KEY", getEnv),
     fetch: fetchImpl,
   };
@@ -192,10 +193,7 @@ async function setEventState(deps: WebhookDeps, eventId: string, type: string): 
 }
 
 async function fetchAuthoritativeCall(deps: WebhookDeps, callId: string): Promise<AuthoritativeCall | null> {
-  const response = await deps.fetch(
-    `${deps.calleApiBase.replace(/\/+$/, "")}/v1/calls/${encodeURIComponent(callId)}`,
-    { headers: { authorization: `Bearer ${deps.calleApiKey}` } },
-  );
+  const response = await calleFetch(deps, `/v1/calls/${encodeURIComponent(callId)}`);
   if (!response.ok) throw new Error(`CALL-E re-fetch returned HTTP ${response.status}`);
   return parseAuthoritativeCall(await response.json(), callId);
 }
@@ -379,7 +377,7 @@ if (typeof testFn === "function" && !import.meta.main) {
   });
   const baseDeps = (fetchImpl: typeof fetch): WebhookDeps => ({
     apiUrl: "https://orma-api.nryn.dev", serviceRoleKey: "service-key",
-    webhookSecret: "path-secret", calleApiBase: "https://api.call-e.test",
+    webhookSecret: "path-secret", calleApiBase: "https://api.heycall-e.com",
     calleApiKey: "calle-key", fetch: fetchImpl,
   });
   const request = (body: unknown = event(), eventId = "evt_terminal") => new Request(

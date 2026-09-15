@@ -427,12 +427,16 @@ export function exactRequestBody(requestBody: string): string {
 }
 
 /**
- * Keeps the leading seven characters of a number and masks the rest, so an
- * operator can still read the shape of a dialled number and never its digits.
+ * Keeps a leading `+` and the last two digits and masks every other character.
+ * The recorded copy is readable by the run's owner, so it shows the shape of
+ * the dialled number and nothing a reader could dial. The profile keeps the
+ * full number as the private record.
  */
 function maskPhoneNumber(phone: string): string {
-  if (phone.length <= 7) return "X".repeat(phone.length);
-  return `${phone.slice(0, 7)}${"X".repeat(phone.length - 7)}`;
+  const lead = phone.startsWith("+") ? "+" : "";
+  const rest = phone.slice(lead.length);
+  if (rest.length <= 2) return `${lead}${"X".repeat(rest.length)}`;
+  return `${lead}${"X".repeat(rest.length - 2)}${rest.slice(-2)}`;
 }
 
 /**
@@ -706,12 +710,12 @@ if (typeof testFn === "function") {
     if (parsed.webhook_url !== "https://orma-api.nryn.dev/functions/v1/calle-webhook/<redacted>") {
       throw new Error(`the recorded webhook url is not the redacted route, saw ${parsed.webhook_url}`);
     }
-    if (parsed.recipients[0].phones[0] !== "+919999XXXXXX") {
+    if (parsed.recipients[0].phones[0] !== "+XXXXXXXXXX91") {
       throw new Error(`the recorded number is not masked, saw ${parsed.recipients[0].phones[0]}`);
     }
     if (parsed.recipients[0].status !== "queued") throw new Error("the mask dropped a field beside the number");
     const restored = masked
-      .replace("+919999XXXXXX", "+919999999991")
+      .replace("+XXXXXXXXXX91", "+919999999991")
       .replace("/<redacted>", "/deployment-secret");
     if (restored !== live) throw new Error("the mask changed bytes outside the number and the secret");
   });

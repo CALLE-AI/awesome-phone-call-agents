@@ -19,6 +19,7 @@
  */
 
 import type { CalleDeps } from "./calle.ts";
+import { calleFetch } from "./calle-origin.ts";
 import { recordCallEvent } from "./events.ts";
 import { RESULT_VALIDATION_FAILED, type CallTaskFixture } from "./fixtures.ts";
 
@@ -93,10 +94,7 @@ export async function fetchCall(
   deps: CalleDeps,
 ): Promise<CallTaskFixture> {
   if (!callId) throw new Error("poll requires a CALL-E call id");
-  const response = await deps.fetch(
-    `${deps.calleApiBase.replace(/\/+$/, "")}/v1/calls/${encodeURIComponent(callId)}`,
-    { headers: { authorization: `Bearer ${deps.calleApiKey}` } },
-  );
+  const response = await calleFetch(deps, `/v1/calls/${encodeURIComponent(callId)}`);
   if (!response.ok) throw new Error(`CALL-E re-fetch returned HTTP ${response.status}`);
   const value: unknown = await response.json();
   if (typeof value !== "object" || value === null) {
@@ -285,7 +283,7 @@ if (typeof testFn === "function") {
   ): CalleDeps => ({
     apiUrl: "https://orma-api.test",
     serviceRoleKey: "service-key",
-    calleApiBase: "https://api.call-e.test",
+    calleApiBase: "https://api.heycall-e.com",
     calleApiKey: "calle-key",
     webhookUrl: "https://orma-api.test/functions/v1/calle-webhook/secret",
     fetch: fetchImpl,
@@ -308,7 +306,7 @@ if (typeof testFn === "function") {
       const url = new URL(request.url);
       const body = init?.body ? JSON.parse(init.body as string) as Record<string, unknown> : null;
       seen.push({ method: request.method, url: request.url, body });
-      if (url.host === "api.call-e.test") {
+      if (url.host === "api.heycall-e.com") {
         if (options.callThrows) throw new Error("network down");
         if (options.callStatus && options.callStatus >= 400) {
           return new Response(null, { status: options.callStatus });
@@ -424,7 +422,7 @@ if (typeof testFn === "function") {
   testFn("a run the webhook already terminalised is a no-op", async () => {
     const { seen, events, fetchImpl } = driver({ run: { id: RUN, state: "completed" } });
     await pollRun({ id: RUN, state: "completed", poll_after: null }, depsFor(fetchImpl));
-    if (seen.some((entry) => entry.url.includes("api.call-e.test"))) {
+    if (seen.some((entry) => entry.url.includes("api.heycall-e.com"))) {
       throw new Error("a terminal run must not be re-fetched");
     }
     if (seen.some((entry) => entry.method === "PATCH")) {
@@ -480,7 +478,7 @@ if (typeof testFn === "function") {
     if (body.calle_failure?.failure_code !== "poll_timeout") {
       throw new Error("giving up must name the reason on the run");
     }
-    if (!seen.some((entry) => entry.url.includes("api.call-e.test"))) {
+    if (!seen.some((entry) => entry.url.includes("api.heycall-e.com"))) {
       throw new Error("a run past its window must still ask CALL-E before giving up");
     }
     if (events[0]?.detail.failure_reason !== "poll_timeout") {
@@ -545,7 +543,7 @@ if (typeof testFn === "function") {
     if (body?.state !== "failed" || body.calle_failure?.failure_code !== "poll_timeout") {
       throw new Error("a run with no dispatched_at must still give up once its window has passed");
     }
-    if (!seen.some((entry) => entry.url.includes("api.call-e.test"))) {
+    if (!seen.some((entry) => entry.url.includes("api.heycall-e.com"))) {
       throw new Error("a run past its window must still ask CALL-E before giving up");
     }
     if (events[0]?.detail.failure_reason !== "poll_timeout") {
@@ -562,7 +560,7 @@ if (typeof testFn === "function") {
     if ((patch?.body as { terminal_writer?: string } | null)?.terminal_writer !== "poll") {
       throw new Error("the missing-call-id write must name the poll as the writer");
     }
-    if (seen.some((entry) => entry.url.includes("api.call-e.test"))) {
+    if (seen.some((entry) => entry.url.includes("api.heycall-e.com"))) {
       throw new Error("a run without a provider id cannot be polled");
     }
     if (events[0]?.detail.failure_reason !== "run has no CALL-E call id to poll") {
