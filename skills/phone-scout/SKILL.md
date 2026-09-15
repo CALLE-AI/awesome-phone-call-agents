@@ -301,7 +301,7 @@ ranker would score against whatever constraints were supplied.
 ## Call execution (serial by default)
 
 > **Default: shared line = 1 concurrent call.** CALL-E's shared line allows only ONE
-> active outbound call at a time (shared across API/MCP/Dashboard). Firing N parallel
+> active call at a time (author-observed on free-tier accounts; dedicated numbers
 > calls makes N-1 fail with *"account concurrency limit of 1"*. **Serialize all calls
 > by default** — one `call-one` at a time.
 
@@ -424,7 +424,7 @@ needed to run in a different city, country, or currency:
 | Variable | Default | Purpose |
 |---|---|---|
 | `CALLE_API_KEY` | — | Required for all live calls |
-| `GOOGLE_PLACES_API_KEY` | — | Optional — enables Google Places for discovery (90%+ phone coverage). Falls back to OSM Overpass (free). |
+| `GOOGLE_PLACES_API_KEY` | — | Optional — enables Google Places for discovery (author-reported ~90% phone coverage). Falls back to OSM Overpass (free). |
 | `PHONE_SCOUT_CURRENCY` | `R` | Currency symbol prefix for budget prompts (e.g. `$`, `€`, `£`) |
 | `PHONE_SCOUT_TZ` | `Africa/Johannesburg` | IANA timezone for log timestamps (e.g. `America/New_York`) |
 | `PHONE_SCOUT_DEFAULT_LOCATION` | `Johannesburg` | Fallback city when none detected in objective |

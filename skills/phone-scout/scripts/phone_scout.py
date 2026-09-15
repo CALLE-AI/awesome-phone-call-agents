@@ -52,6 +52,33 @@ _KIND_KEYWORDS = ("barber", "salon", "hair", "haircut", "dentist", "doctor",
                   "clinic", "hotel", "vet", "garage", "pharmacy", "cafe",
                   "gym", "spa", "restaurant", "steakhouse")
 
+
+# ---------------------------------------------------------------------------
+# Safety helpers
+# ---------------------------------------------------------------------------
+
+def _validate_e164(phone: str) -> bool:
+    """Check that a phone number is valid E.164 format."""
+    digits = "".join(ch for ch in phone if ch.isdigit() or ch == "+")
+    return bool(digits) and digits.startswith("+") and len(digits) >= 8
+
+
+def _mask_phone(phone: str) -> str:
+    """Mask a phone number for public output: +27 87 *** 6508"""
+    digits = "".join(ch for ch in phone if ch.isdigit())
+    if len(digits) >= 8:
+        return f"+{digits[:2]} {digits[2:4]} *** {digits[-4:]}"
+    return "***"
+
+
+def _mask_result(result: dict[str, Any]) -> dict[str, Any]:
+    """Return a copy of a result dict with sensitive fields masked."""
+    masked = dict(result)
+    for key in ("phone", "caller_phone"):
+        if key in masked and masked[key]:
+            masked[key] = _mask_phone(str(masked[key]))
+    return masked
+
 # ---------------------------------------------------------------------------
 # Timezone
 # ---------------------------------------------------------------------------
@@ -214,11 +241,31 @@ def _collect_transcript(call: dict) -> str | None:
     return "\n".join(parts) if parts else None
 
 
+def _research_error(restaurant: dict, code: str, message: str) -> dict[str, Any]:
+    """Build a standard recovered-error result."""
+    return {
+        "business_id": restaurant.get("id", "?"),
+        "business_name": restaurant.get("name", "?"),
+        "error": code,
+        "recoverable": True,
+        "user_action": message,
+        "contacted": False,
+        "mode": "live",
+    }
+
+
 def run_live_research_call(restaurant: dict, research_plan: dict) -> dict[str, Any]:
     """Contact a business via CALL-E and return structured results."""
     required_fields = research_plan.get("required_fields", [])
     constraints = research_plan.get("constraints", {})
     context = research_plan.get("context", "")  # free-text context injected by --context
+
+    # Safety: never dial an invalid/missing number
+    if not _validate_e164(restaurant.get("phone", "")):
+        return _research_error(
+            restaurant, "invalid_phone",
+            f"Invalid or missing E.164 phone number: {restaurant.get('phone', '')!r}",
+        )
 
     # Build a rich natural-language task that CALL-E validation will accept.
     questions = [FIELD_QUESTIONS[f] for f in required_fields if f in FIELD_QUESTIONS]
@@ -717,7 +764,33 @@ def cmd_search(args: argparse.Namespace) -> int:
             print(json.dumps(out, ensure_ascii=False, default=str))
         return 0
 
+    if not args.plan_only and not args.confirm:
+        sys.stderr.write("This would place REAL phone calls. Re-run with --confirm to dial.\n")
+        # Still run discovery so the user can see candidates before confirming
+        candidates = discover_candidates(
+            plan.get("constraints", {}),
+            max_results=MAX_CALLS,
+            objective=plan.get("objective", ""),
+        )
+        out = {
+            "dry_run": True,
+            "research_id": plan["research_id"],
+            "objective": plan["objective"],
+            "required_fields": plan["required_fields"],
+            "candidates": candidates,
+            "note": "CONFIRMATION REQUIRED — review these candidates, then re-run with --confirm to place live research calls.",
+        }
+        if args.pretty:
+            print(json.dumps(out, indent=2, ensure_ascii=False, default=str))
+        else:
+            print(json.dumps(out, ensure_ascii=False, default=str))
+        sys.stderr.write("Refusing to dial: pass --confirm to place live calls.\n")
+        return 1
+
     result = run_research(plan)
+    # Mask sensitive fields in output (phones, transcripts)
+    if "results" in result:
+        result["results"] = [_mask_result(r) for r in result["results"]]
 
     if args.pretty:
         print(json.dumps(result, indent=2, ensure_ascii=False, default=str))
@@ -750,8 +823,25 @@ def cmd_call_one(args: argparse.Namespace) -> int:
         "phone": args.phone or "",
     }
 
+    if not args.confirm:
+        sys.stderr.write("This would place a REAL phone call. Re-run with --confirm to dial.\n")
+        plan_out = dict(plan)
+        plan_out["dry_run"] = True
+        plan_out["note"] = "CONFIRMATION REQUIRED — review, then re-run with --confirm to place a live call."
+        if args.pretty:
+            print(json.dumps(plan_out, indent=2, ensure_ascii=False, default=str))
+        else:
+            print(json.dumps(plan_out, ensure_ascii=False, default=str))
+        sys.stderr.write("Refusing to dial: pass --confirm to place a live call.\n")
+        return 1
+
+    if not _validate_e164(candidate["phone"]):
+        sys.stderr.write(f"error: invalid or missing E.164 phone number: {candidate['phone']}\n")
+        return 2
+
     result = run_live_research_call(candidate, plan)
     result["mode"] = "live"
+    result = _mask_result(result)
     if args.pretty:
         print(json.dumps(result, indent=2, ensure_ascii=False, default=str))
     else:
@@ -824,6 +914,7 @@ def build_parser() -> argparse.ArgumentParser:
     sp.add_argument("--max-calls", type=int, default=MAX_CALLS, help=f"Max businesses to contact (default: {MAX_CALLS})")
     sp.add_argument("--constraints", help='JSON constraints dict, e.g. {"vegetarian":true,"max_price_per_person":400}')
     sp.add_argument("--plan-only", action="store_true", help="Stop after discovery — print candidates, don't call")
+    sp.add_argument("--confirm", action="store_true", help="REQUIRED to place live calls. Without this, the command is a dry run.")
     sp.add_argument("--pretty", action="store_true", help="Pretty-print full JSON result")
     sp.set_defaults(func=cmd_search)
 
@@ -834,6 +925,7 @@ def build_parser() -> argparse.ArgumentParser:
     sp.add_argument("--research-questions", required=True, nargs="*", help="Questions to research (from planner required_fields)")
     sp.add_argument("--context", help="Rich natural-language context for the call")
     sp.add_argument("--constraints", help='JSON constraints dict for the call')
+    sp.add_argument("--confirm", action="store_true", help="REQUIRED to place a live call. Without this, it's a dry run.")
     sp.add_argument("--pretty", action="store_true", help="Pretty-print full JSON result")
     sp.set_defaults(func=cmd_call_one)
 

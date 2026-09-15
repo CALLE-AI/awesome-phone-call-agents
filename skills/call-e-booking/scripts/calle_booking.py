@@ -375,33 +375,63 @@ def build_spec(args: argparse.Namespace) -> dict[str, Any]:
     }
 
 
+def _validate_base_url(base_url: str | None) -> str:
+    """Return the approved base URL or exit if it's not the official origin."""
+    url = (base_url or DEFAULT_BASE_URL).rstrip("/")
+    if url != "https://api.heycall-e.com":
+        sys.stderr.write(
+            f"error: --base-url must be exactly https://api.heycall-e.com, got {url}\n"
+        )
+        sys.exit(2)
+    return url
+
+
 def _get_client(args: argparse.Namespace, calle):
     api_key = args.api_key or os.environ.get("CALLE_API_KEY")
     if not api_key:
         sys.stderr.write("No API key: set CALLE_API_KEY or pass --api-key.\n")
         sys.exit(2)
-    return calle.CalleClient(api_key=api_key, base_url=(args.base_url or DEFAULT_BASE_URL))
+    return calle.CalleClient(api_key=api_key, base_url=_validate_base_url(args.base_url))
 
 
 def _print(obj: Any, pretty: bool) -> None:
     print(json.dumps(obj, indent=2 if pretty else None, ensure_ascii=False))
 
 
+def _mask_phone(phone: str) -> str:
+    """Mask a phone number for public output."""
+    digits = "".join(ch for ch in str(phone) if ch.isdigit())
+    if len(digits) >= 8:
+        return f"+{digits[:2]} {digits[2:4]} *** {digits[-4:]}"
+    return "***"
+
+
 def _envelope(call: dict[str, Any]) -> dict[str, Any]:
+    """Public-safe envelope — status only. No task, result, evidence, or raw diagnostics."""
     return {
         "ok": True,
         "call_id": call.get("id"),
         "status": call.get("status"),
         "task_completed": call.get("task_completed"),
         "completion_confidence": call.get("completion_confidence"),
-        "structured_result": call.get("structured_result"),
-        "evidence": call.get("evidence"),
-        "attempts": call.get("attempts") or [],
     }
 
 
+def _safe_spec(spec: dict[str, Any]) -> dict[str, Any]:
+    """Return a copy of the spec with sensitive fields masked for preview.
+    Task text and recipient phone are redacted; only the phone's masked form is shown."""
+    safe = dict(spec)
+    if "task" in safe:
+        safe["task"] = "[task redacted — run with --confirm to execute]"
+    if "recipient" in safe:
+        safe["recipient"] = {"phone": _mask_phone(safe["recipient"].get("phone", ""))}
+    if "webhook_url" in safe and safe["webhook_url"]:
+        safe["webhook_url"] = "***masked***"
+    return safe
+
+
 def _fail(code: int, message: str, pretty: bool) -> None:
-    _print({"ok": False, "error": message}, pretty)
+    _print({"ok": False, "error": "call failed — see CALL-E dashboard for details"}, pretty)
     sys.exit(code)
 
 
@@ -411,6 +441,7 @@ def _fail(code: int, message: str, pretty: bool) -> None:
 
 def cmd_plan(args: argparse.Namespace) -> None:
     spec = build_spec(args)
+    spec = _safe_spec(spec)
     spec["dry_run"] = True
     spec["note"] = "No call placed. Review the task, then run `book --confirm` to dial."
     _print(spec, args.pretty)
@@ -423,11 +454,15 @@ def cmd_book(args: argparse.Namespace) -> None:
         out = {
             "dry_run": True,
             "note": "This would place a REAL phone call. Re-run with --confirm to dial.",
-            **spec,
+            **_safe_spec(spec),
         }
         _print(out, args.pretty)
         sys.stderr.write("Refusing to dial: pass --confirm to actually place the call.\n")
         sys.exit(1)
+
+    # Validate --base-url BEFORE importing the SDK / placing a call,
+    # so credentials never reach a non-approved origin.
+    _validate_base_url(getattr(args, "base_url", None))
 
     calle = _import_calle()
     client = _get_client(args, calle)
