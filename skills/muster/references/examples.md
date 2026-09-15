@@ -3,7 +3,7 @@
 ## Mock audit (no calls, no credits)
 
 ```bash
-python scripts/run_audit.py sample_data/us_insurer_network.json --mode mock
+python skills/muster/scripts/run_audit.py sample_data/us_insurer_network.json --mode mock
 ```
 
 Runs the full pipeline against a sample insurer directory using deterministic simulated calls. Use it for development and demos.
@@ -11,7 +11,7 @@ Runs the full pipeline against a sample insurer directory using deterministic si
 ## Live audit (real CALL-E calls)
 
 ```bash
-python scripts/run_audit.py sample_data/us_insurer_network.json --mode live --confirm-live
+python skills/muster/scripts/run_audit.py sample_data/us_insurer_network.json --mode live --confirm-live
 ```
 
 Places a real CALL-E call to each listing, asks one benign verification question, and classifies each entry as PRESENT, GHOST, UNREACHABLE, or UNCERTAIN with a confidence score.

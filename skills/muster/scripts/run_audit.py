@@ -3,8 +3,8 @@
 Portable standalone audit runner script for the Muster Agent Skill.
 Compatible with the awesome-phone-call-agents repository structure.
 Usage:
-  python scripts/run_audit.py sample_data/us_insurer_network.json --mode mock
-  python scripts/run_audit.py sample_data/us_insurer_network.json --sector US_INSURER --mode live
+  python skills/muster/scripts/run_audit.py sample_data/us_insurer_network.json --mode mock
+  python skills/muster/scripts/run_audit.py sample_data/us_insurer_network.json --sector US_INSURER --mode live
 """
 
 import sys

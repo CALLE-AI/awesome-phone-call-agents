@@ -97,13 +97,13 @@ Muster produces experimental, advisory classifications intended for human review
 ### 1. Zero-Cost Rehearsal (Mock Mode)
 Run a deterministic audit simulating realistic reception dialogues without spending CALL-E credits:
 ```bash
-python scripts/run_audit.py sample_data/us_insurer_network.json --mode mock
+python skills/muster/scripts/run_audit.py sample_data/us_insurer_network.json --mode mock
 ```
 
 ### 2. Live Phone Verification (CALL-E Runtime)
 Run real phone verification calls through authenticated CALL-E CLI:
 ```bash
-python scripts/run_audit.py sample_data/us_insurer_network.json \
+python skills/muster/scripts/run_audit.py sample_data/us_insurer_network.json \
   --mode live \
   --concurrency 2 \
   --goal "Hello, I am calling to verify directory network status. Are you currently in-network and accepting new patients?"
