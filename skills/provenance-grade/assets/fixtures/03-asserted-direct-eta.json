@@ -1,0 +1,22 @@
+{
+  "id": "03-asserted-direct-eta",
+  "category": "clean-asserted",
+  "description": "Direct, immediate, specific answer. No hedging, no lookup, no corroboration. Earns asserted, not verified.",
+  "turns": [
+    { "speaker": "bot", "text": "Hello, this is the QuoteDesk assistant about your delivery schedule.", "offset_seconds": 0 },
+    { "speaker": "user", "text": "Yes?", "offset_seconds": 5 },
+    { "speaker": "bot", "text": "How many days will delivery to Pune take from your side?", "offset_seconds": 9 },
+    { "speaker": "user", "text": "Four business days.", "offset_seconds": 14 }
+  ],
+  "fields": [
+    {
+      "field": "eta_days",
+      "value": 4,
+      "expects": "duration",
+      "questionTurn": 2,
+      "answerTurns": [3],
+      "critical": true,
+      "expectedGrade": "asserted"
+    }
+  ]
+}
