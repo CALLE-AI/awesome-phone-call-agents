@@ -1,0 +1,47 @@
+[project]
+name = "warranty-claimcall"
+version = "0.1.0"
+description = "Compile invoice and warranty evidence into one consented, safety-gated CALL-E warranty call, then reconcile the result against call evidence."
+readme = "README.md"
+requires-python = ">=3.11"
+license = { text = "MIT" }
+authors = [{ name = "Tech Phantom" }]
+keywords = ["call-e", "phone-agent", "warranty", "consumer-rights", "consent"]
+
+# The provider-neutral engine. Same code the demo UI in the same monorepo runs, so the
+# safety gate and idempotency rules here are not a simplified copy of them.
+#
+# These resolve from the public claimcall repository. Both are ordinary
+# distributions with their own pyproject.toml, so the subdirectory references
+# below are installable on their own.
+#
+# Working inside the claimcall monorepo instead? Install from local paths:
+#   pip install -e ../../../../../packages/contracts_py \
+#                -e ../../../../../packages/claimcall_core \
+#                -e .
+dependencies = [
+    "pydantic>=2.7",
+    "python-dateutil>=2.9",
+    "claimpilot-contracts @ git+https://github.com/Subramanyarao11/claimcall.git#subdirectory=packages/contracts_py",
+    "claimcall-core @ git+https://github.com/Subramanyarao11/claimcall.git#subdirectory=packages/claimcall_core",
+]
+
+[project.optional-dependencies]
+# Only needed to place a real call. Everything else runs without it.
+live = ["httpx>=0.27"]
+dev = ["pytest>=8.2"]
+
+[project.scripts]
+claimcall = "claimcall.cli:main"
+
+[build-system]
+requires = ["setuptools>=68"]
+build-backend = "setuptools.build_meta"
+
+[tool.setuptools.packages.find]
+include = ["claimcall*"]
+
+# The fixtures are the no-call path. A wheel without them is a tool whose
+# documented quickstart does not run.
+[tool.setuptools.package-data]
+claimcall = ["fixtures/*.json"]

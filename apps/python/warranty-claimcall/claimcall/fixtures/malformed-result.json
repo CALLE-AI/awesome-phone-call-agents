@@ -1,0 +1,21 @@
+{
+  "call_id": "fixture_malformed_result",
+  "status": "completed",
+  "task_completed": true,
+  "note": "The provider returned a result that does not satisfy the schema. It must not be salvaged into a partial success.",
+  "result": {
+    "outcome": "claim_definitely_registered_probably",
+    "recipient_verified": "maybe",
+    "claim_reference": 44810,
+    "coverage_status": "covered!",
+    "documents_requested": "invoice",
+    "appointment_options": {},
+    "fee": { "amount": 500, "currency": "INR", "accepted": true },
+    "needs_human": "no",
+    "uncertainty_reasons": null
+  },
+  "evidence": [],
+  "transcript": [
+    { "speaker": "representative", "at_seconds": 30, "text": "Yes I have registered that for you." }
+  ]
+}
