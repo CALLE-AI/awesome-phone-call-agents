@@ -103,6 +103,17 @@
       .replace(/"/g, "&quot;");
   }
 
+  function maskText(text) {
+    if (!text) return "";
+    return String(text)
+      .replace(/\+[1-9][0-9]{7,14}/g, m => {
+        if (m.length <= 5) return m[0] + "*".repeat(m.length - 1);
+        return m.slice(0, 2) + "*".repeat(m.length - 6) + m.slice(-4);
+      })
+      .replace(/Bearer\s+[A-Za-z0-9_\-\.]{8,}/gi, "Bearer [REDACTED_TOKEN]")
+      .replace(/(?:calle|api|secret|token)[_-]?(?:key)?[\"'\s:=]+[A-Za-z0-9_\-\.]{8,}/gi, "$1[REDACTED_KEY]");
+  }
+
   function fmtTime(iso) {
     if (!iso) return "—";
     const d = new Date(iso);
@@ -534,27 +545,27 @@
       ${(entry.proposed_action || entry.description) ? `
         <div class="ticket-slip">
           <span class="ticket-slip__label">Proposed Action & Incident Details</span>
-          <p class="ticket-slip__text">${entry.proposed_action ? `<strong>Action:</strong> ${escapeHtml(entry.proposed_action)}` : ""}${entry.description ? `<br><strong>Details:</strong> ${escapeHtml(entry.description)}` : ""}${entry.source ? `<br><strong>Source:</strong> ${escapeHtml(entry.source)}` : ""}</p>
+          <p class="ticket-slip__text">${entry.proposed_action ? `<strong>Action:</strong> ${escapeHtml(maskText(entry.proposed_action))}` : ""}${entry.description ? `<br><strong>Details:</strong> ${escapeHtml(maskText(entry.description))}` : ""}${entry.source ? `<br><strong>Source:</strong> ${escapeHtml(maskText(entry.source))}` : ""}</p>
         </div>` : ""}
       ${entry.task_text ? `
         <div class="ticket-slip">
           <span class="ticket-slip__label">CALL-E Task Prompt</span>
-          <p class="ticket-slip__text">${escapeHtml(entry.task_text)}</p>
+          <p class="ticket-slip__text">${escapeHtml(maskText(entry.task_text))}</p>
         </div>` : ""}
       ${entry.reason ? `
         <div class="ticket-slip">
           <span class="ticket-slip__label">Recipient's Reason</span>
-          <p class="ticket-slip__text">${escapeHtml(entry.reason)}</p>
+          <p class="ticket-slip__text">${escapeHtml(maskText(entry.reason))}</p>
         </div>` : ""}
       ${entry.transcript_evidence ? `
         <div class="ticket-slip">
           <span class="ticket-slip__label">Transcript Evidence</span>
-          <p class="ticket-slip__text ${entry.dry_run ? "ticket-slip__text--muted" : ""}">${escapeHtml(entry.transcript_evidence)}</p>
+          <p class="ticket-slip__text ${entry.dry_run ? "ticket-slip__text--muted" : ""}">${escapeHtml(maskText(entry.transcript_evidence))}</p>
         </div>` : ""}
       ${entry.post_action_reason ? `
         <div class="ticket-slip">
           <span class="ticket-slip__label">Post-Action Reason</span>
-          <p class="ticket-slip__text">${escapeHtml(entry.post_action_reason)}</p>
+          <p class="ticket-slip__text">${escapeHtml(maskText(entry.post_action_reason))}</p>
         </div>` : ""}
       ${!entry.call_id && entry.action_state === "AUTO-CLEARED" ? `
         <div class="ticket-slip">
@@ -632,7 +643,7 @@
       div.className = "feed-entry";
       div.dataset.event = act.event || "";
       const time = fmtTime(act.timestamp);
-      div.innerHTML = `<span class="feed-entry__time">${time}</span> <span class="feed-entry__id">${escapeHtml(act.incident_id || "")}</span> <span class="feed-entry__event">${escapeHtml(act.event || "")}: ${escapeHtml(act.detail || "")}</span>`;
+      div.innerHTML = `<span class="feed-entry__time">${time}</span> <span class="feed-entry__id">${escapeHtml(act.incident_id || "")}</span> <span class="feed-entry__event">${escapeHtml(act.event || "")}: ${escapeHtml(maskText(act.detail || ""))}</span>`;
       frag.appendChild(div);
     }
     el.activityFeed.appendChild(frag);

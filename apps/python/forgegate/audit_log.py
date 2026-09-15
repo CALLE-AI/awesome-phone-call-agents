@@ -1,8 +1,8 @@
 """Flat JSONL audit trail: incident, task text, call id, transcript-backed
 decision, final action state, timestamps.
 
-Deliberately not SQLite — this is a hackathon MVP and a flat append-only
-file is enough to demo and enough to grep during the recording.
+Thread-safe via reentrant lock (threading.RLock), avoiding reset deadlocks.
+Preserves ambiguous incident intent and masks credentials / phones at storage boundary.
 """
 from __future__ import annotations
 
@@ -13,11 +13,13 @@ from datetime import datetime, timezone
 from pathlib import Path
 from typing import List, Optional
 
+import safety
+
 LOG_DIR = Path(os.environ.get("FORGEGATE_LOG_DIR", Path(__file__).parent / "data"))
 LOG_PATH = LOG_DIR / "audit_log.jsonl"
 ACTIVITY_PATH = LOG_DIR / "activity_feed.jsonl"
 
-_lock = threading.Lock()
+_lock = threading.RLock()
 
 
 def _ensure_log_dir() -> None:
@@ -26,46 +28,69 @@ def _ensure_log_dir() -> None:
 
 def append_entry(entry: dict) -> dict:
     _ensure_log_dir()
-    entry = dict(entry)
-    entry.setdefault("timestamp", datetime.now(timezone.utc).isoformat())
+    sanitized = dict(entry)
+    sanitized.setdefault("timestamp", datetime.now(timezone.utc).isoformat())
+
+    # Mask any free text fields before writing
+    for field in ("task_text", "reason", "transcript_evidence", "error", "description"):
+        if field in sanitized and isinstance(sanitized[field], str):
+            sanitized[field] = safety.mask_text(sanitized[field])
+
     with _lock:
         with LOG_PATH.open("a", encoding="utf-8") as f:
-            f.write(json.dumps(entry) + "\n")
-    return entry
+            f.write(json.dumps(sanitized) + "\n")
+    return sanitized
 
 
 def read_all() -> List[dict]:
-    if not LOG_PATH.exists():
-        return []
-    entries = []
-    with LOG_PATH.open("r", encoding="utf-8") as f:
-        for line in f:
-            line = line.strip()
-            if line:
-                entries.append(json.loads(line))
-    return entries
+    with _lock:
+        if not LOG_PATH.exists():
+            return []
+        entries = []
+        with LOG_PATH.open("r", encoding="utf-8") as f:
+            for line in f:
+                line = line.strip()
+                if line:
+                    entries.append(json.loads(line))
+        return entries
 
 
 def read_for_incident(incident_id: str) -> List[dict]:
     return [e for e in read_all() if e.get("incident_id") == incident_id]
 
 
+def get_latest_for_incident(incident_id: str) -> Optional[dict]:
+    entries = read_for_incident(incident_id)
+    return entries[-1] if entries else None
+
+
 def has_existing_call(incident_id: str) -> Optional[dict]:
-    """Returns the prior entry with a call_id for this incident, if any.
-    The app layer uses this to enforce idempotency: a retry or double-POST
-    of the same incident_id must not place a second call."""
+    """Returns prior entry with a call_id or active dispatch for this incident, if any.
+    Used to enforce idempotency and prevent duplicate calls."""
     for entry in read_for_incident(incident_id):
-        if entry.get("call_id"):
+        if entry.get("call_id") or entry.get("disposition") in ("DISPATCH_FAILED", "UNCLEAR", "NO_ANSWER"):
             return entry
     return None
 
 
+def has_unreconciled_incident(incident_id: str) -> Optional[dict]:
+    """Detects whether an incident has a prior recorded state (call, auto-cleared,
+    or ambiguous/held) that prevents redispatch without explicit operator reconciliation."""
+    entries = read_for_incident(incident_id)
+    if not entries:
+        return None
+    latest = entries[-1]
+    # If the latest entry already resolved via a post-action, or is recorded, return it
+    return latest
+
+
 def clear_all() -> None:
-    """Removes the audit log file so the exchange can be cleanly reset."""
+    """Removes the audit log and activity feed files so the exchange can be cleanly reset.
+    Thread-safe and deadlock-free under reentrant lock."""
     with _lock:
         if LOG_PATH.exists():
             LOG_PATH.unlink()
-    clear_activity()
+        clear_activity()
 
 
 def append_activity(event: str, incident_id: str, detail: str) -> dict:
@@ -74,7 +99,7 @@ def append_activity(event: str, incident_id: str, detail: str) -> dict:
         "timestamp": datetime.now(timezone.utc).isoformat(),
         "event": event,
         "incident_id": incident_id,
-        "detail": detail,
+        "detail": safety.mask_text(detail),
     }
     with _lock:
         ACTIVITY_PATH.parent.mkdir(parents=True, exist_ok=True)
@@ -84,15 +109,16 @@ def append_activity(event: str, incident_id: str, detail: str) -> dict:
 
 
 def read_activity(limit: int = 100) -> List[dict]:
-    if not ACTIVITY_PATH.exists():
-        return []
-    entries = []
-    with ACTIVITY_PATH.open("r", encoding="utf-8") as f:
-        for line in f:
-            line = line.strip()
-            if line:
-                entries.append(json.loads(line))
-    return entries[-limit:]
+    with _lock:
+        if not ACTIVITY_PATH.exists():
+            return []
+        entries = []
+        with ACTIVITY_PATH.open("r", encoding="utf-8") as f:
+            for line in f:
+                line = line.strip()
+                if line:
+                    entries.append(json.loads(line))
+        return entries[-limit:]
 
 
 def clear_activity() -> None:

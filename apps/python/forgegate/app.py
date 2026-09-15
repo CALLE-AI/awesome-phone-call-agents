@@ -6,8 +6,12 @@ POST /incident                 score an incident; if it crosses the risk
                                 the proposed action on the human decision.
                                 Fail-closed: anything but a clean APPROVE
                                 holds the action.
+POST /incident/create          create incident from UI/operator form.
+POST /incident/{id}/action     reconcile held incident with operator decision.
 GET  /incidents/{incident_id}  audit trail for one incident.
 GET  /incidents                full audit trail.
+GET  /incidents/{id}/status    live status polling endpoint for UI.
+GET  /activity-feed            terminal activity stream.
 GET  /scenarios                the demo scenario payloads (for the dashboard's patch keys).
 GET  /health                   liveness + current dry_run setting + risk threshold.
 GET  /                          the Manual Exchange dashboard (static/index.html).
@@ -27,6 +31,7 @@ from pydantic import BaseModel, Field
 import audit_log
 import calle_client
 import risk_engine
+import safety
 import task_composer
 
 logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(message)s")
@@ -74,6 +79,7 @@ def health():
         "status": "ok",
         "dry_run": calle_client.DRY_RUN,
         "risk_threshold": risk_engine.DEFAULT_THRESHOLD,
+        "approved_origins": sorted(calle_client.APPROVED_ORIGINS),
     }
 
 
@@ -98,10 +104,10 @@ def create_incident(payload: CreateIncidentPayload):
     incident_payload = IncidentPayload(
         incident_id=incident_id,
         source=payload.source,
-        description=payload.description,
+        description=safety.mask_text(payload.description),
         signals=payload.signals,
         risk_score=risk_score,
-        proposed_action=payload.proposed_action
+        proposed_action=safety.mask_text(payload.proposed_action),
     )
 
     result = post_incident(incident_payload)
@@ -123,8 +129,8 @@ def post_incident(payload: IncidentPayload):
             {
                 "incident_id": incident_id,
                 "source": incident.get("source"),
-                "description": incident.get("description", ""),
-                "proposed_action": incident.get("proposed_action", ""),
+                "description": safety.mask_text(incident.get("description", "")),
+                "proposed_action": safety.mask_text(incident.get("proposed_action", "")),
                 "risk_score": assessment.score,
                 "threshold": assessment.threshold,
                 "call_id": None,
@@ -147,20 +153,21 @@ def post_incident(payload: IncidentPayload):
             "call_placed": False,
         }
 
-    existing = audit_log.has_existing_call(incident_id)
+    existing = audit_log.has_unreconciled_incident(incident_id)
     if existing:
         logger.info(
-            "incident %s already has a call on record (%s); refusing to dispatch a duplicate",
+            "incident %s has prior state on record (%s); refusing redispatch until reconciliation",
             incident_id,
-            existing.get("call_id"),
+            existing.get("action_state"),
         )
         return {
             "incident_id": incident_id,
-            "risk_score": assessment.score,
+            "risk_score": existing.get("risk_score", assessment.score),
             "action_state": existing.get("action_state"),
             "call_id": existing.get("call_id"),
+            "disposition": existing.get("disposition"),
             "call_placed": False,
-            "note": "idempotent: reused existing call result, no duplicate call placed",
+            "note": "idempotent: preserved prior incident intent, refusing redispatch until reconciliation",
         }
 
     task_text = task_composer.compose_task(incident, assessment.score)
@@ -169,25 +176,26 @@ def post_incident(payload: IncidentPayload):
     try:
         result = calle_client.place_call(task_text, incident_id)
     except calle_client.CalleDispatchError as exc:
-        audit_log.append_activity("dispatch_failed", incident_id, str(exc))
-        logger.error("call dispatch failed for %s: %s", incident_id, exc)
+        masked_exc = safety.mask_text(str(exc))
+        audit_log.append_activity("dispatch_failed", incident_id, masked_exc)
+        logger.error("call dispatch failed for %s: %s", incident_id, masked_exc)
         audit_log.append_entry(
             {
                 "incident_id": incident_id,
                 "source": incident.get("source"),
-                "description": incident.get("description", ""),
-                "proposed_action": incident.get("proposed_action", ""),
+                "description": safety.mask_text(incident.get("description", "")),
+                "proposed_action": safety.mask_text(incident.get("proposed_action", "")),
                 "risk_score": assessment.score,
                 "threshold": assessment.threshold,
                 "call_id": None,
                 "disposition": "DISPATCH_FAILED",
                 "action_state": "HELD",
                 "idempotency_key": key,
-                "task_text": task_text,
-                "error": str(exc),
+                "task_text": safety.mask_text(task_text),
+                "error": masked_exc,
             }
         )
-        raise HTTPException(status_code=502, detail=str(exc)) from exc
+        raise HTTPException(status_code=502, detail=masked_exc) from exc
 
     action_state = calle_client.resolve_action_state(result.disposition)
 
@@ -195,21 +203,21 @@ def post_incident(payload: IncidentPayload):
     audit_log.append_activity("disposition_received", incident_id, f"{result.disposition}: {result.reason}")
     audit_log.append_activity("action_resolved", incident_id, action_state)
 
-    entry = audit_log.append_entry(
+    audit_log.append_entry(
         {
             "incident_id": incident_id,
             "source": incident.get("source"),
-            "description": incident.get("description", ""),
-            "proposed_action": incident.get("proposed_action", ""),
+            "description": safety.mask_text(incident.get("description", "")),
+            "proposed_action": safety.mask_text(incident.get("proposed_action", "")),
             "risk_score": assessment.score,
             "threshold": assessment.threshold,
             "call_id": result.call_id,
             "disposition": result.disposition,
-            "reason": result.reason,
-            "transcript_evidence": result.transcript_evidence,
+            "reason": safety.mask_text(result.reason),
+            "transcript_evidence": safety.mask_text(result.transcript_evidence),
             "action_state": action_state,
             "idempotency_key": key,
-            "task_text": task_text,
+            "task_text": safety.mask_text(task_text),
             "dry_run": result.dry_run,
         }
     )
@@ -219,86 +227,106 @@ def post_incident(payload: IncidentPayload):
         incident_id,
         result.call_id,
         result.disposition,
-        entry["action_state"],
+        action_state,
     )
-
     return {
         "incident_id": incident_id,
         "risk_score": assessment.score,
-        "call_placed": True,
+        "action_state": action_state,
         "call_id": result.call_id,
         "disposition": result.disposition,
-        "reason": result.reason,
-        "action_state": entry["action_state"],
+        "reason": safety.mask_text(result.reason),
+        "transcript_evidence": safety.mask_text(result.transcript_evidence),
+        "call_placed": True,
     }
 
 
 @app.post("/incident/{incident_id}/action")
 def post_incident_action(incident_id: str, payload: PostActionPayload):
-    if payload.action not in ("discard", "escalate"):
-        raise HTTPException(status_code=400, detail="action must be discard or escalate")
-    
-    entries = audit_log.read_for_incident(incident_id)
-    if not entries:
-        raise HTTPException(status_code=404, detail="Incident not found")
-    
-    original_entry = entries[-1]
-    
-    action_map = {"discard": "DISCARDED", "escalate": "ESCALATED"}
-    action_state = action_map[payload.action]
-    
-    updated_entry = dict(original_entry)
-    updated_entry.update({
-        "action_state": action_state,
-        "post_action": payload.action,
-        "post_action_reason": payload.reason,
-    })
-    updated_entry.pop("timestamp", None)
-    
-    audit_log.append_entry(updated_entry)
-    audit_log.append_activity("post_action", incident_id, f"{payload.action.upper()}: {payload.reason or 'No reason provided'}")
-    
-    return {"action_state": action_state}
+    """Allows operator to explicitly reconcile a HELD incident (e.g. escalate or discard)."""
+    action = payload.action.strip().lower()
+    if action not in ("discard", "escalate"):
+        raise HTTPException(status_code=400, detail="Action must be either 'discard' or 'escalate'")
+
+    existing_entries = audit_log.read_for_incident(incident_id)
+    if not existing_entries:
+        raise HTTPException(status_code=404, detail=f"Incident {incident_id} not found")
+
+    last_entry = existing_entries[-1]
+    new_action_state = "DISCARDED" if action == "discard" else "ESCALATED"
+    reason = safety.mask_text(payload.reason)
+
+    updated_entry = audit_log.append_entry(
+        {
+            "incident_id": incident_id,
+            "source": last_entry.get("source"),
+            "description": last_entry.get("description", ""),
+            "proposed_action": last_entry.get("proposed_action", ""),
+            "risk_score": last_entry.get("risk_score"),
+            "threshold": last_entry.get("threshold"),
+            "call_id": last_entry.get("call_id"),
+            "disposition": last_entry.get("disposition"),
+            "reason": last_entry.get("reason", ""),
+            "transcript_evidence": last_entry.get("transcript_evidence", ""),
+            "action_state": new_action_state,
+            "post_action": action,
+            "post_action_reason": reason,
+            "idempotency_key": last_entry.get("idempotency_key"),
+            "task_text": last_entry.get("task_text", ""),
+            "dry_run": last_entry.get("dry_run", True),
+        }
+    )
+
+    audit_log.append_activity("post_action", incident_id, f"{action}: {reason}")
+    logger.info("incident %s reconciled via post-action: %s -> %s", incident_id, action, new_action_state)
+
+    return {
+        "incident_id": incident_id,
+        "action_state": new_action_state,
+        "post_action": action,
+        "entry": updated_entry,
+    }
 
 
 @app.get("/incidents/{incident_id}/status")
 def get_incident_status(incident_id: str):
+    """Polled by dashboard during active calls to track phase and final disposition."""
+    phase = calle_client.get_call_phase(incident_id)
     entries = audit_log.read_for_incident(incident_id)
-    entry = entries[-1] if entries else None
+    latest_entry = entries[-1] if entries else None
     return {
         "incident_id": incident_id,
-        "call_phase": calle_client.get_call_phase(incident_id),
-        "entry": entry
+        "call_phase": phase,
+        "entry": latest_entry,
     }
+
+
+@app.get("/activity-feed")
+def get_activity_feed(limit: int = 100):
+    return {"activities": audit_log.read_activity(limit=limit)}
 
 
 @app.get("/incidents/{incident_id}")
 def get_incident(incident_id: str):
     entries = audit_log.read_for_incident(incident_id)
     if not entries:
-        raise HTTPException(status_code=404, detail="no audit entries for this incident_id")
-    return {"incident_id": incident_id, "entries": entries}
+        raise HTTPException(status_code=404, detail=f"incident {incident_id} not found")
+    return {"incident_id": incident_id, "entries": entries, "history": entries}
 
 
 @app.get("/incidents")
 def list_incidents():
-    return {"entries": audit_log.read_all()}
-
-
-@app.get("/activity-feed")
-def get_activity_feed(limit: int = 100):
-    return {"activities": audit_log.read_activity(limit)}
+    all_entries = audit_log.read_all()
+    return {"entries": all_entries, "incidents": all_entries}
 
 
 @app.post("/reset")
-def reset():
+def reset_exchange():
     audit_log.clear_all()
     calle_client.clear_call_phases()
-    audit_log.clear_activity()
-    return {"status": "ok", "message": "exchange audit log cleared"}
+    logger.info("exchange reset: cleared audit log, activity feed, and active call phases")
+    return {"status": "ok", "message": "All exchange logs, activity feed, and active calls cleared"}
 
 
-# Registered last so it never shadows the API routes above: Starlette matches
-# routes in registration order, and this mount is a catch-all for "/".
 if STATIC_DIR.exists():
-    app.mount("/", StaticFiles(directory=str(STATIC_DIR), html=True), name="dashboard")
+    app.mount("/", StaticFiles(directory=str(STATIC_DIR), html=True), name="static")

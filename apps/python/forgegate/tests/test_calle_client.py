@@ -1,9 +1,8 @@
+import pytest
 import calle_client
 
 
 def test_dry_run_is_the_default():
-    # Tests must never place a real call. This asserts the safe default
-    # holds unless CALLE_DRY_RUN=false is explicitly set in the environment.
     assert calle_client.DRY_RUN is True
 
 
@@ -47,3 +46,51 @@ def test_disposition_from_result_falls_back_to_unclear():
     assert calle_client._disposition_from_result("COMPLETED", True, {}) == "UNCLEAR"
     assert calle_client._disposition_from_result("COMPLETED", False, {"disposition": "APPROVE"}) == "UNCLEAR"
     assert calle_client._disposition_from_result("COMPLETED", True, {"disposition": "MAYBE"}) == "UNCLEAR"
+
+
+def test_validate_origin_approved_https():
+    # Approved HTTPS origin passes
+    assert calle_client.validate_origin("https://api.heycall-e.com") == "https://api.heycall-e.com"
+    assert calle_client.validate_origin("https://api.heycall-e.com/v1") == "https://api.heycall-e.com/v1"
+
+    # Plain HTTP must be refused
+    with pytest.raises(calle_client.CalleDispatchError, match="Refusing to send credentials"):
+        calle_client.validate_origin("http://api.heycall-e.com")
+
+    # Unapproved host must be refused
+    with pytest.raises(calle_client.CalleDispatchError, match="unapproved origin"):
+        calle_client.validate_origin("https://attacker.example.com")
+
+
+def test_place_call_dry_run_validates_ascii_phone():
+    # Valid ASCII E.164 passes in dry-run
+    res = calle_client.place_call("task", "inc_01", recipient_phone="+12025550123")
+    assert res.task_completed is True
+
+    # Non-ASCII or invalid format fails even in dry-run
+    with pytest.raises(calle_client.CalleDispatchError):
+        calle_client.place_call("task", "inc_01", recipient_phone="not_a_phone")
+
+
+def test_poll_timeout_resolves_to_unclear_and_preserves_intent(monkeypatch):
+    monkeypatch.setattr(calle_client, "POLL_TIMEOUT_SECONDS", 0.05)
+    monkeypatch.setattr(calle_client, "POLL_INTERVAL_SECONDS", 0.01)
+
+    class DummyResponse:
+        is_redirect = False
+        status_code = 200
+
+        def raise_for_status(self):
+            pass
+
+        def json(self):
+            return {"status": "in-progress", "task_completed": False}
+
+    monkeypatch.setattr(calle_client.requests, "get", lambda *args, **kwargs: DummyResponse())
+
+    res = calle_client._poll_rest("call_timeout_test")
+    # Must NOT claim timeout proves NO_ANSWER
+    assert res.disposition == "UNCLEAR"
+    assert res.task_completed is False
+    assert "timeout" in res.reason.lower()
+    assert calle_client.resolve_action_state(res.disposition) == "HELD"
