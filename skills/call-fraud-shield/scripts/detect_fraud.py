@@ -3,17 +3,16 @@
 call-fraud-shield · detect_fraud.py
 
 Analyses a CALL-E transcript for vishing, spam, social engineering,
-deepfake voice, and scam-script patterns. Returns a structured risk card
+and scam-script patterns. Returns a structured risk card
 with XAI-explained evidence spans and a recommended action.
 
-Usage (dry-run, heuristic mode, no LLM):
+Usage (dry-run, heuristic mode):
     python3 detect_fraud.py \
         --transcript references/example-transcript.json \
         --dry-run \
         --out /tmp/risk_card.json
 
-No external packages required for heuristic mode.
-Set OPENAI_API_KEY (or CALLE_LLM_ENDPOINT) for LLM-assisted trajectory scoring.
+No external packages required. Heuristic mode only; no LLM call is made.
 """
 
 from __future__ import annotations
@@ -28,13 +27,14 @@ from pathlib import Path
 from typing import Any
 
 SCHEMA_VERSION = "1.0"
+MIN_TURNS_FOR_LEVEL = 3  # Below this turn count the skill abstains (risk_level UNKNOWN).
 
 # ---------------------------------------------------------------------------
 # Threat taxonomy
 # ---------------------------------------------------------------------------
 
 THREAT_CATEGORIES = frozenset(
-    ["SPAM", "VISHING", "SOCIAL_ENGINEERING", "DEEPFAKE_VOICE", "SCAM_SCRIPT"]
+    ["SPAM", "VISHING", "SOCIAL_ENGINEERING", "SCAM_SCRIPT"]
 )
 
 RECOMMENDED_ACTIONS = ["PROCEED", "FLAG_FOR_REVIEW", "CAUTION_ADVISE_USER", "TERMINATE_AND_ALERT"]
@@ -326,6 +326,13 @@ def analyse(
     rl = risk_level(overall_score, threshold)
     action = recommended_action(rl)
 
+    # Abstention: with fewer than MIN_TURNS_FOR_LEVEL turns the trajectory
+    # evidence is too thin for a confident level. Keep the signals visible
+    # but refuse to label the call (see references/safety.md).
+    if len(turns) < MIN_TURNS_FOR_LEVEL:
+        rl = "UNKNOWN"
+        action = "FLAG_FOR_REVIEW"
+
     xai = build_xai_explanation(trigger_signals, matched_archetypes, trajectory, rl)
 
     trajectory_assessment = (
@@ -360,7 +367,6 @@ def analyse(
         "trigger_signals": trigger_signals,
         "trajectory_assessment": trajectory_assessment,
         "harm_projection": harm_projection,
-        "deepfake_voice_probability": 0.0,  # Set by audio-feature path when available.
         "recommended_action": action,
         "xai_explanation": xai,
         "false_positive_disclaimer": (

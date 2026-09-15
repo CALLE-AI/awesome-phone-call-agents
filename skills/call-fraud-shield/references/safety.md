@@ -35,10 +35,10 @@ The operator must verify independently before acting on a high-risk flag.
 
 ## False Negatives
 
-The heuristic path (`analysis_mode: "heuristic"`) is less accurate than the
-LLM path. Sophisticated social engineering calls may evade keyword detection.
-The risk card should be treated as one signal among several, not as a
-definitive fraud verdict.
+The analysis is heuristic only (`analysis_mode: "heuristic"`); no LLM or
+audio model is invoked. Sophisticated social engineering calls may evade
+keyword detection. The risk card should be treated as one signal among
+several, not as a definitive fraud verdict.
 
 ---
 
@@ -50,13 +50,10 @@ probabilistic risk signal for operational decision support.
 
 ---
 
-## Deepfake Voice Probability
+## Audio Analysis Is Out of Scope
 
-`deepfake_voice_probability` is only populated when MFCC audio features are
-provided via `--audio-features`. A high score indicates acoustic deviation
-from natural-speech baselines; it is not a proof of AI synthesis. A qualified
-audio forensics analyst must verify before any accusation of voice spoofing
-is made.
+The skill analyses transcript text only. It never ingests audio and makes no
+claim about whether a voice is synthetic or cloned.
 
 ---
 

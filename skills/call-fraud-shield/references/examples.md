@@ -1,6 +1,6 @@
 # Examples — call-fraud-shield
 
-## Example 1: Vishing (Bank Impersonation) — HIGH RISK
+## Example 1: Vishing (Bank Impersonation) — CRITICAL RISK
 
 ### Input Transcript
 
@@ -32,23 +32,23 @@ python3 scripts/detect_fraud.py \
 
 ```json
 {
-  "overall_risk_score": 0.87,
-  "risk_level": "HIGH",
-  "threat_categories": ["VISHING", "SOCIAL_ENGINEERING"],
+  "overall_risk_score": 1.0,
+  "risk_level": "CRITICAL",
+  "threat_categories": ["VISHING", "SOCIAL_ENGINEERING", "SCAM_SCRIPT"],
   "trigger_signals": [
-    {
-      "type": "urgency_language",
-      "evidence": "within the next 10 minutes",
-      "weight": 0.35
-    },
     {
       "type": "credential_request",
       "evidence": "one-time password",
-      "weight": 0.52
+      "weight": 0.55
+    },
+    {
+      "type": "authority_impersonation",
+      "evidence": "Your account has been compromised",
+      "weight": 0.40
     }
   ],
   "recommended_action": "TERMINATE_AND_ALERT",
-  "xai_explanation": "Risk level is HIGH. Signal 'credential_request' detected...",
+  "xai_explanation": "Risk level is CRITICAL. Signal 'credential_request' detected...",
   "false_positive_disclaimer": "This is a probabilistic risk signal..."
 }
 ```
@@ -83,7 +83,7 @@ python3 scripts/detect_fraud.py \
 
 ---
 
-## Example 3: Spam / Unsolicited Marketing
+## Example 3: Spam / Unsolicited Marketing — CRITICAL RISK
 
 ### Input Transcript
 
@@ -101,15 +101,16 @@ python3 scripts/detect_fraud.py \
 
 ```json
 {
-  "risk_level": "MEDIUM",
-  "threat_categories": ["SPAM", "SCAM_SCRIPT"],
-  "recommended_action": "FLAG_FOR_REVIEW"
+  "overall_risk_score": 1.0,
+  "risk_level": "CRITICAL",
+  "threat_categories": ["SPAM", "SOCIAL_ENGINEERING", "SCAM_SCRIPT"],
+  "recommended_action": "TERMINATE_AND_ALERT"
 }
 ```
 
 ---
 
-## Example 4: IRS / Tax Authority Scam
+## Example 4: IRS / Tax Authority Scam — CRITICAL RISK
 
 A caller claiming to be from the IRS and threatening arrest:
 
@@ -127,8 +128,9 @@ A caller claiming to be from the IRS and threatening arrest:
 
 ```json
 {
-  "risk_level": "HIGH",
-  "threat_categories": ["VISHING", "SOCIAL_ENGINEERING"],
+  "overall_risk_score": 1.0,
+  "risk_level": "CRITICAL",
+  "threat_categories": ["VISHING", "SOCIAL_ENGINEERING", "SCAM_SCRIPT"],
   "recommended_action": "TERMINATE_AND_ALERT"
 }
 ```

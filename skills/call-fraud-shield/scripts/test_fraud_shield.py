@@ -180,7 +180,6 @@ def good_card() -> dict:
         ],
         "trajectory_assessment": "Escalating.",
         "harm_projection": "Credential extraction likely.",
-        "deepfake_voice_probability": 0.0,
         "recommended_action": "TERMINATE_AND_ALERT",
         "xai_explanation": "Vishing pattern detected.",
         "false_positive_disclaimer": "Verify independently.",
@@ -510,6 +509,30 @@ class TestAnalyseIntegration(unittest.TestCase):
         card = run_analyse(SINGLE_TURN_TRANSCRIPT)
         self.assertIn("INSUFFICIENT_TURNS_LOW_CONFIDENCE", card["flags"])
 
+    def test_short_transcript_abstains_to_unknown(self):
+        """Fewer than 3 turns: the skill must abstain rather than guess."""
+        card = run_analyse(SINGLE_TURN_TRANSCRIPT)
+        self.assertEqual(card["risk_level"], "UNKNOWN")
+
+    def test_short_transcript_action_is_flag_for_review(self):
+        card = run_analyse(SINGLE_TURN_TRANSCRIPT)
+        self.assertEqual(card["recommended_action"], "FLAG_FOR_REVIEW")
+
+    def test_empty_transcript_abstains_to_unknown(self):
+        card = run_analyse(EMPTY_TRANSCRIPT)
+        self.assertEqual(card["risk_level"], "UNKNOWN")
+        self.assertEqual(card["recommended_action"], "FLAG_FOR_REVIEW")
+
+    def test_three_turn_transcript_does_not_abstain(self):
+        card = run_analyse(UTILITY_TRANSCRIPT)  # exactly 3 turns
+        self.assertNotEqual(card["risk_level"], "UNKNOWN")
+
+    def test_abstention_still_reports_signals(self):
+        """Abstention overrides the risk level, not the signal evidence."""
+        card = run_analyse(SPAM_ROBOCALL_TRANSCRIPT)  # 1 turn with spam signals
+        self.assertEqual(card["risk_level"], "UNKNOWN")
+        self.assertIn("SPAM", card["threat_categories"])
+
     def test_custom_threshold_changes_level(self):
         # With a very high threshold (0.99), even vishing may not be HIGH.
         card_strict = run_analyse(VISHING_BANK_TRANSCRIPT, threshold=0.99)
@@ -534,7 +557,7 @@ class TestAnalyseIntegration(unittest.TestCase):
         required = [
             "call_id", "analysis_timestamp", "overall_risk_score", "risk_level",
             "threat_categories", "trigger_signals", "trajectory_assessment",
-            "harm_projection", "deepfake_voice_probability", "recommended_action",
+            "harm_projection", "recommended_action",
             "xai_explanation", "false_positive_disclaimer", "flags", "schema_version",
         ]
         for field in required:
@@ -572,15 +595,13 @@ class TestAnalyseIntegration(unittest.TestCase):
             self.assertIn("weight", sig, f"Signal missing weight: {sig}")
             self.assertGreater(sig["weight"], 0, "Signal weight should be positive")
 
-    def test_deepfake_probability_is_float_0_to_1(self):
+    def test_output_has_no_deepfake_field(self):
+        """Audio analysis is not implemented; the field must not exist."""
         card = run_analyse(VISHING_BANK_TRANSCRIPT)
-        prob = card["deepfake_voice_probability"]
-        self.assertIsInstance(prob, float)
-        self.assertGreaterEqual(prob, 0.0)
-        self.assertLessEqual(prob, 1.0)
+        self.assertNotIn("deepfake_voice_probability", card)
 
     def test_threat_categories_are_valid_enums(self):
-        valid = {"SPAM", "VISHING", "SOCIAL_ENGINEERING", "DEEPFAKE_VOICE", "SCAM_SCRIPT"}
+        valid = {"SPAM", "VISHING", "SOCIAL_ENGINEERING", "SCAM_SCRIPT"}
         card = run_analyse(MULTI_THREAT_TRANSCRIPT)
         for cat in card["threat_categories"]:
             self.assertIn(cat, valid, f"Invalid threat category: {cat}")
@@ -656,12 +677,19 @@ class TestValidation(unittest.TestCase):
             [],
             ["SPAM"],
             ["VISHING", "SOCIAL_ENGINEERING"],
-            ["SPAM", "VISHING", "SOCIAL_ENGINEERING", "DEEPFAKE_VOICE", "SCAM_SCRIPT"],
+            ["SPAM", "VISHING", "SOCIAL_ENGINEERING", "SCAM_SCRIPT"],
         ):
             card = good_card()
             card["threat_categories"] = cats
             errors = validate(card)
             self.assertEqual(errors, [], f"Categories {cats} should be valid")
+
+    def test_deepfake_category_rejected(self):
+        """Audio analysis is out of scope; DEEPFAKE_VOICE is not a valid category."""
+        card = good_card()
+        card["threat_categories"] = ["DEEPFAKE_VOICE"]
+        errors = validate(card)
+        self.assertTrue(any("categories" in e.lower() for e in errors))
 
     def test_signal_missing_evidence_fails(self):
         card = good_card()
@@ -695,7 +723,7 @@ class TestValidation(unittest.TestCase):
 
     def test_pii_phone_in_output_fails(self):
         card = good_card()
-        card["xai_explanation"] = "Caller from +1-555-000-0001 showed vishing signals"
+        card["xai_explanation"] = "Caller from +14155550100 showed vishing signals"
         errors = validate(card)
         self.assertTrue(any("PII" in e for e in errors))
 
