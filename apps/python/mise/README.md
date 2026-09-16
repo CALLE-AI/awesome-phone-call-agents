@@ -114,9 +114,11 @@ python3 demo.py --db contractor.db   # recovery board, called and defended
 python3 server.py --db contractor.db # dashboard at http://127.0.0.1:8080
 ```
 
-Frontend: Next.js 16 (TypeScript, Tailwind CSS v4, GSAP, Three.js canvas).
-Recovery board, evidence trail, calls history, and a Security Lab where four
-adversarial scenarios are all blocked.
+**Or open the live demo** —
+[`https://mise-1-uzy5.onrender.com/demo/incident`](https://mise-1-uzy5.onrender.com/demo/incident):
+recovery board, evidence trail, calls history, and a Security Lab where four
+adversarial scenarios are all blocked. Frontend: Next.js 16 (TypeScript,
+Tailwind CSS v4, GSAP, Three.js canvas).
 
 ## Side effects & safety
 
