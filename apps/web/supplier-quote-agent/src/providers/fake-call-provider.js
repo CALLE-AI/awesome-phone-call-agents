@@ -12,11 +12,25 @@ function loadCannedResponses(responsesPath = DEFAULT_RESPONSES_PATH) {
 // `wait` are injectable so tests can control both the timestamps on each status
 // transition and how the sequence is paced (default: resolves instantly).
 class FakeCallProvider extends CallProvider {
-  constructor({ clock = () => new Date().toISOString(), wait = () => Promise.resolve(), outcomes } = {}) {
+  // cancelIsAuthoritative defaults to true (the base class's own default — a fake abort
+  // genuinely ends the sequence) but is overridable so a test can simulate a provider
+  // like CallEProvider's "cancel only stops local waiting" behaviour deterministically,
+  // with no network and no real credentials anywhere near it.
+  constructor({
+    clock = () => new Date().toISOString(),
+    wait = () => Promise.resolve(),
+    outcomes,
+    cancelIsAuthoritative = true
+  } = {}) {
     super();
     this.clock = clock;
     this.wait = wait;
     this.outcomes = outcomes || loadCannedResponses();
+    this._cancelIsAuthoritative = cancelIsAuthoritative;
+  }
+
+  get cancelIsAuthoritative() {
+    return this._cancelIsAuthoritative;
   }
 
   async placeCall(_task, { onStatusChange, signal, scenario = 'default' } = {}) {

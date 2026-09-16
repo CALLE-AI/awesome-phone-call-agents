@@ -18,6 +18,28 @@ describe('invoke choicepoint', () => {
     expect(result.result.createdBy).toBe('owner');
   });
 
+  test('create_task ignores caller-supplied status/approval fields — a task is never born approved', async () => {
+    const result = await invoke('create_task', {
+      name: 'Smuggled approval',
+      sku: 'SMUGGLE-001',
+      quantity: 1,
+      status: 'approved',
+      approvedAt: '2020-01-01T00:00:00.000Z',
+      approvedBy: 'owner',
+      rejectedAt: '2020-01-01T00:00:00.000Z',
+      rejectedBy: 'owner',
+      rejectReason: 'nope'
+    }, 'agent');
+
+    expect(result.success).toBe(true);
+    expect(result.result.status).toBe('pending');
+    expect(result.result.approvedAt).toBeUndefined();
+    expect(result.result.approvedBy).toBeUndefined();
+    expect(result.result.rejectedAt).toBeUndefined();
+    expect(result.result.rejectedBy).toBeUndefined();
+    expect(result.result.rejectReason).toBeUndefined();
+  });
+
   test('should log activity when creating a task', async () => {
     const initialCount = activityLog.getAll().length;
 

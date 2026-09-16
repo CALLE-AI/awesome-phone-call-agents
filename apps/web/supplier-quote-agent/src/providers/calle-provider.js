@@ -18,6 +18,30 @@ const DEFAULT_REQUEST_TIMEOUT_MS = 30000;
 
 const TERMINAL_STATUSES = new Set(['completed', 'failed', 'canceled']);
 
+// Strict E.164: a leading +, a non-zero first digit, up to 15 digits total, nothing else —
+// what CALL-E's API actually requires (a punctuated number like "+1-555-0100" 400s there;
+// see docs/real-call.md). Checked separately from the ASCII guard below so a homoglyph or
+// RTL-override digit fails on "not ASCII" rather than a confusing "not E.164".
+const E164_PATTERN = /^\+[1-9]\d{1,14}$/;
+
+// Refuses to dial a destination that isn't a clean, explicit phone number — guards the
+// one field this module hands to a paid external API against injection, corruption, or a
+// unicode homoglyph, regardless of how it reached the task.
+function normalizeAndValidatePhone(rawPhone) {
+  if (typeof rawPhone !== 'string' || rawPhone.length === 0) {
+    throw new Error('Supplier phone must be a non-empty string; refusing to dial.');
+  }
+  // eslint-disable-next-line no-control-regex
+  if (!/^[\x00-\x7F]*$/.test(rawPhone)) {
+    throw new Error(`Supplier phone "${rawPhone}" contains non-ASCII characters; refusing to dial.`);
+  }
+  const normalized = rawPhone.replace(/[\s().-]/g, '');
+  if (!E164_PATTERN.test(normalized)) {
+    throw new Error(`Supplier phone "${rawPhone}" is not a valid E.164 number; refusing to dial.`);
+  }
+  return normalized;
+}
+
 // CALL-E extracts this from the call transcript/evidence and validates it strictly
 // (additionalProperties: false) before returning it — see "Structured results" at
 // docs.heycall-e.com/calls. Field names match this app's own outcome shape so
@@ -64,7 +88,7 @@ function buildCallRequest(task, scenario) {
       `${task.sku} (qty ${task.quantity}), thank them, and end the call.`,
     // Explicit recipient rather than leaving CALL-E to infer the number out of the
     // task text — the docs allow either, and inference is the avoidable risk here.
-    recipients: [{ phones: [supplier.phone] }],
+    recipients: [{ phones: [normalizeAndValidatePhone(supplier.phone)] }],
     result_schema: RESULT_SCHEMA,
     metadata: { task_id: task.id, supplier_name: supplier.name, scenario: scenario || undefined }
   };
@@ -147,12 +171,28 @@ class CallEProvider extends CallProvider {
     requestTimeoutMs = DEFAULT_REQUEST_TIMEOUT_MS
   } = {}) {
     super();
+    // Pinned to https:// so the real API key (read from CALLE_API_KEY, never from a
+    // request) can never be sent to a plaintext or otherwise-unpinned origin — baseUrl
+    // itself is only ever operator-configured (env), never a per-call argument.
+    if (!/^https:\/\//i.test(baseUrl)) {
+      throw new Error(
+        `CALLE_BASE_URL must be an https:// origin (got "${baseUrl}"); refusing to send ` +
+        'credentials to an unpinned or insecure origin.'
+      );
+    }
     this.apiKey = apiKey;
     this.baseUrl = baseUrl;
     this.fetchImpl = fetchImpl;
     this.pollIntervalMs = pollIntervalMs;
     this.pollTimeoutMs = pollTimeoutMs;
     this.requestTimeoutMs = requestTimeoutMs;
+  }
+
+  // The Calls API "does not expose an operation for clients to cancel a call after it
+  // has been created" (docs.heycall-e.com/calls) — aborting here only stops this process
+  // waiting, never the phone call itself.
+  get cancelIsAuthoritative() {
+    return false;
   }
 
   // The caller's signal (cancel_call) and a per-request timeout, as one signal.

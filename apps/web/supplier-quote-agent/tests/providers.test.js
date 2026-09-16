@@ -121,7 +121,8 @@ describe('CallEProvider (fixtures only — never dials)', () => {
     expect(calls[0].url).toBe('https://api.heycall-e.com/v1/calls');
     expect(calls[0].opts.method).toBe('POST');
     expect(calls[0].opts.headers.Authorization).toBe('Bearer test-key');
-    expect(JSON.parse(calls[0].opts.body).recipients).toEqual([{ phones: ['+1-555-0100'] }]);
+    // Sent E.164-normalized (no dashes) — the actual format CALL-E's API requires.
+    expect(JSON.parse(calls[0].opts.body).recipients).toEqual([{ phones: ['+15550100'] }]);
     expect(calls[1].url).toBe('https://api.heycall-e.com/v1/calls/call_success_1');
     expect(calls[1].opts.headers.Authorization).toBe('Bearer test-key');
     expect(outcome).toEqual({
@@ -235,6 +236,62 @@ describe('CallEProvider (fixtures only — never dials)', () => {
     };
     const provider = new CallEProvider({ apiKey: undefined, fetchImpl });
     await expect(provider.placeCall(task, {})).rejects.toThrow(/CALLE_API_KEY/);
+  });
+
+  test('refuses to construct against a non-https base URL, before any credential is ever sent', () => {
+    expect(() => new CallEProvider({ apiKey: 'test-key', baseUrl: 'http://api.heycall-e.com' })).toThrow(
+      /https/i
+    );
+  });
+
+  test('reports cancellation as non-authoritative — the Calls API has no client cancel operation', () => {
+    const provider = new CallEProvider({ apiKey: 'test-key' });
+    expect(provider.cancelIsAuthoritative).toBe(false);
+  });
+
+  test('normalizes a punctuated phone to strict E.164 before dialing', async () => {
+    const calls = [];
+    const fetchImpl = async (url, opts) => {
+      calls.push({ url, opts });
+      if (opts.method === 'POST') {
+        return { ok: true, json: async () => ({ id: 'call_1', status: 'queued' }) };
+      }
+      return { ok: true, json: async () => fixtures.success };
+    };
+    const provider = new CallEProvider({ apiKey: 'test-key', fetchImpl, pollIntervalMs: 0 });
+    const punctuated = { ...task, suppliers: [{ name: 'Acme', phone: '+1 (555) 010-0' }] };
+
+    await provider.placeCall(punctuated, {});
+
+    expect(JSON.parse(calls[0].opts.body).recipients).toEqual([{ phones: ['+15550100'] }]);
+  });
+
+  test('refuses to dial a non-ASCII phone number', async () => {
+    const fetchImpl = async () => {
+      throw new Error('fetchImpl should never be called for an invalid phone');
+    };
+    const provider = new CallEProvider({ apiKey: 'test-key', fetchImpl });
+    const badTask = { ...task, suppliers: [{ name: 'Acme', phone: '+1５５５0100' }] };
+    await expect(provider.placeCall(badTask, {})).rejects.toThrow(/non-ASCII/i);
+  });
+
+  test('refuses to dial a malformed phone number', async () => {
+    const fetchImpl = async () => {
+      throw new Error('fetchImpl should never be called for an invalid phone');
+    };
+    const provider = new CallEProvider({ apiKey: 'test-key', fetchImpl });
+    const badTask = { ...task, suppliers: [{ name: 'Acme', phone: 'not-a-phone-number' }] };
+    await expect(provider.placeCall(badTask, {})).rejects.toThrow(/not a valid E\.164/i);
+  });
+});
+
+describe('FakeCallProvider.cancelIsAuthoritative', () => {
+  test('defaults to true — a fake abort genuinely ends the sequence', () => {
+    expect(new FakeCallProvider().cancelIsAuthoritative).toBe(true);
+  });
+
+  test('is overridable for tests that need to simulate a real-provider-style cancel', () => {
+    expect(new FakeCallProvider({ cancelIsAuthoritative: false }).cancelIsAuthoritative).toBe(false);
   });
 });
 

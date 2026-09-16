@@ -32,11 +32,12 @@ dialing and the note-taking; the human does the deciding.**
 | **Default mode** | `FakeCallProvider`. No network, no timers, no credentials, no calls. |
 | **How a real call becomes possible** | Only with `CALL_PROVIDER=calle` **and** `CALLE_API_KEY` set in the environment. Both. Missing either one, the provider refuses to dial. |
 | **What the agent can do** | Plan a call, dial an already-approved task, cancel a call in flight, re-plan a finished one, read state. |
-| **What the agent can never do** | Approve or reject a task. Not through a tool, not through `update_task`, not by calling `invoke()` directly. |
-| **Cancellation** | `cancel_call` aborts a call that is currently ringing or connected. See [Cancelling and rolling back](#cancelling-and-rolling-back). |
+| **What the agent can never do** | Approve or reject a task, or mint one already approved — not through a tool, not through `create_task`/`update_task`, not by calling `invoke()` directly. Changing the plan or the supplier on an approved task returns it to `planned`; the old approval never carries over to new content. |
+| **Cancellation** | `cancel_call` aborts a call that is currently ringing or connected. Against the real provider this can only stop local waiting, not the phone call — see [Cancelling and rolling back](#cancelling-and-rolling-back). |
 | **Recurring jobs** | None. There is no scheduler, no cron, no retry daemon. Every call is placed by an explicit `place_call` against a task a human approved. |
-| **Phone numbers** | Every number in this repository is in the NANP block reserved for fiction (`+1-555-0100` … `+1-555-0199`). No real contact information. |
-| **Secrets** | None committed. Credentials are read from environment variables at construction time and never written to disk or logs. |
+| **Phone numbers** | Every number in this repository is in the NANP block reserved for fiction (`+1-555-0100` … `+1-555-0199`). No real contact information. Every user-facing API response masks phone numbers, including a known number if it reappears in unrelated free text such as a call summary (`src/mask.js`); the real provider validates a destination is a clean, ASCII E.164 number before dialing (`src/providers/calle-provider.js`). |
+| **Network exposure** | The server binds to `127.0.0.1` only and refuses any request whose remote address isn't loopback (`src/local-only.js`). `actor` still isn't verified — this is a local demo app — but `POST /api/invoke` refuses a request that omits it (`src/server.js`) rather than silently treating a missing actor as `"owner"`, so nothing gets the most privileged identity for free. |
+| **Secrets** | None committed. Credentials are read from environment variables at construction time, never from a request, and never written to disk or logs. `CALLE_BASE_URL` must be `https://`; the provider refuses to construct otherwise. |
 
 ## Stack
 
@@ -264,8 +265,8 @@ has the exact narration, timings and seeded state.
 |---|---|---|
 | `plan_call` | Attach a plan brief (goal, script points, success criteria, fallback) and set status `planned` | Approve, or dial |
 | `place_call` | Dial a task that is **already** `approved`; record `{outcome, summary, next_action}` | Approve; act on an unapproved task; auto-retry |
-| `cancel_call` | Abort a call that is currently in flight; task becomes `cancelled` | Approve, reject, retry; silently succeed when nothing is dialing |
-| `retry_with_plan` | Replace the plan on a finished/failed/cancelled/rejected task and reset it to `planned` | Set `approved` — re-approval is required |
+| `cancel_call` | Abort a call currently in flight; task becomes `cancelled` (fake provider) or `cancel_requested` (real provider — see [Cancelling and rolling back](#cancelling-and-rolling-back)) | Approve, reject, retry; silently succeed when nothing is dialing |
+| `retry_with_plan` | Replace the plan on a finished/failed/cancelled/cancel_requested/rejected task and reset it to `planned` | Set `approved` — re-approval is required |
 | `get_task`, `list_tasks` | Read tasks, statuses, plans, outcomes | Change anything |
 | `get_quote_status`, `list_pending_quotes` | Read quotes | Predict pricing or recommend vendors |
 | `request_human_approval` | Gather the top quotes and transcripts for a person to look at | Approve anything itself |
@@ -288,6 +289,10 @@ only inside `src/invoke.js` and refuse any actor but `owner`.
 | `GET /api/activity-log` | Every invocation with its actor, args and result |
 | `GET /api/tools` | The agent-facing tool registry |
 
+Every route is behind the local-only check above, and every response above masks phone
+numbers (`src/mask.js`) — a task's real number is operational data this app needs to
+dial with, never something a response body needs to echo back in full.
+
 ## Credentials and real calls
 
 Four environment variables, none of which has a value in this repository:
@@ -301,9 +306,12 @@ Four environment variables, none of which has a value in this repository:
 
 `CALL_PROVIDER`, `CALLE_API_KEY` and `CALLE_BASE_URL` are read as constructor defaults in
 `src/providers/calle-provider.js`, evaluated at construction rather than at import, so
-merely importing the module has no effect. `CallEProvider` calls `POST /v1/calls` and
-polls `GET /v1/calls/:id` until the call reaches one of `completed`/`failed`/`canceled` —
-a real call is not synchronous.
+merely importing the module has no effect. **None of the three is ever settable from a
+request** — `place_call`'s `args` cannot choose the provider or reconfigure its
+credentials or base URL, only the process environment can, so nothing an agent or an
+HTTP caller sends can redirect the real API key anywhere but the pinned `https://`
+origin. `CallEProvider` calls `POST /v1/calls` and polls `GET /v1/calls/:id` until the
+call reaches one of `completed`/`failed`/`canceled` — a real call is not synchronous.
 
 **Running a real call places a real phone call and is billed to the CALL-E account behind
 the key.** It is a manual, deliberate act, and `npm start` can never do it: the default
@@ -342,15 +350,21 @@ a task a human has approved.
 
 For a call that is already in flight:
 
-- **`cancel_call`** aborts it. The provider races its own pacing against the abort
-  signal, so a call stuck ringing is genuinely interrupted rather than cancelled at the
-  next checkpoint. The task lands on `cancelled` and the cancellation is written to the
-  activity log with the stage it was interrupted at.
-  **With the real provider this cancels the *task*, not the phone call.** CALL-E's Calls
-  API "does not expose an operation for clients to cancel a call after it has been
-  created", so a call already dialing rings and bills to completion whatever the
-  dashboard says. `cancel_call` stops this process waiting for it and nothing more —
-  the honest boundary of the abstraction, stated here rather than discovered live.
+- **`cancel_call`** aborts it. Each provider states whether that abort is authoritative
+  (`provider.cancelIsAuthoritative`) and the task's resulting status says so honestly:
+  - **Fake provider:** the abort genuinely ends the deterministic sequence. The task
+    lands on `cancelled`, and the cancellation is written to the activity log with the
+    stage it was interrupted at.
+  - **Real provider:** CALL-E's Calls API "does not expose an operation for clients to
+    cancel a call after it has been created", so a call already dialing rings and bills
+    to completion regardless of what the dashboard says. `cancel_call` stops this
+    process *waiting* for it and nothing more — the task lands on `cancel_requested`,
+    never `cancelled`, because this app cannot actually confirm the phone call stopped.
+    The outcome is left unresolved for the owner to reconcile against CALL-E directly
+    (`docs.heycall-e.com/calls`) rather than guessed at.
+  A `cancel_requested` task is still retryable through `retry_with_plan` — that is the
+  owner's own informed call to make (accepting the small chance of a duplicate dial),
+  not something this app decides for them.
 - **In the dashboard**, that is the **Cancel Call** button on the in-flight strip.
 - **After the fact**, `retry_with_plan` clears the outcome, call record and approval
   metadata and returns the task to `planned` — which means it needs a human approval

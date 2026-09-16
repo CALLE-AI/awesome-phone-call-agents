@@ -40,9 +40,15 @@ async function invoke(tool, args, actor) {
   let result;
   try {
     switch (tool) {
-      case 'create_task':
-        result = store.createTask(args);
+      case 'create_task': {
+        // A new task always starts pending. status/approvedAt/approvedBy/rejected* are
+        // never caller-supplied here — approve_task is the only place status can become
+        // "approved", so a task cannot be born pre-approved through this path.
+        // eslint-disable-next-line no-unused-vars
+        const { status, approvedAt, approvedBy, rejectedAt, rejectedBy, rejectReason, ...safeArgs } = args || {};
+        result = store.createTask(safeArgs);
         break;
+      }
       case 'update_task': {
         const nextStatus = args && args.updates && args.updates.status;
         if (nextStatus === 'approved' || nextStatus === 'rejected') {
@@ -51,7 +57,28 @@ async function invoke(tool, args, actor) {
             '(owner-only, never a registered tool) instead.'
           );
         }
-        result = store.updateTask(args.id, args.updates);
+        // approve_task/reject_task are the only place these fields are ever written —
+        // stripped here the same way create_task strips them, so a caller can't stamp
+        // fabricated approval/rejection metadata onto a task through the generic path,
+        // even one that never touches `status` itself. `id` is stripped too — a task's
+        // own identity is never a field this path may rewrite; doing so would silently
+        // orphan the original id from every future lookup.
+        // eslint-disable-next-line no-unused-vars
+        const { id: _id, approvedAt, approvedBy, rejectedAt, rejectedBy, rejectReason, ...updates } =
+          { ...(args && args.updates) };
+        const task = store.getTask(args.id);
+        // Changing what an approval actually covers — the plan or who gets called —
+        // invalidates that approval rather than silently carrying it over; place_call
+        // only dials a task the owner approved with this exact content.
+        const changesApprovedContent = task.status === 'approved' &&
+          (Object.prototype.hasOwnProperty.call(updates, 'plan') ||
+            Object.prototype.hasOwnProperty.call(updates, 'suppliers'));
+        if (changesApprovedContent) {
+          delete task.approvedAt;
+          delete task.approvedBy;
+          updates.status = 'planned';
+        }
+        result = store.updateTask(args.id, updates);
         break;
       }
       case 'approve_task':
@@ -126,7 +153,7 @@ async function invoke(tool, args, actor) {
 // Hands a task to the configured CallProvider (fake by default — see src/providers/index.js).
 // Only acts on a task already approved — approval itself lives entirely outside this
 // function, in approveTask() below, and never here.
-async function placeCall({ id, provider: providerName, scenario, providerOptions } = {}) {
+async function placeCall({ id, scenario, providerOptions } = {}) {
   const task = store.getTask(id);
   if (task.status !== 'approved') {
     throw new Error(
@@ -135,12 +162,16 @@ async function placeCall({ id, provider: providerName, scenario, providerOptions
     );
   }
 
-  // providerOptions is a test-only hook (e.g. a `wait` that never resolves on its own,
-  // so a concurrent cancel_call has something real to interrupt) — it is deliberately
-  // absent from tools.js's public inputSchema for this tool.
-  const provider = getProvider(providerName, providerOptions);
+  // Which provider dials is an operator decision (CALL_PROVIDER at process start), never
+  // a per-call one — no field in args can select or reconfigure it. providerOptions is a
+  // same-process test hook (e.g. a `wait` that never resolves on its own, so a concurrent
+  // cancel_call has something real to interrupt) and is honoured only for the fake
+  // provider; the real provider is always built from environment alone, with zero
+  // per-call overrides, so no request body can touch its credentials or destination.
+  const providerName = process.env.CALL_PROVIDER || 'fake';
+  const provider = getProvider(providerName, providerName === 'fake' ? providerOptions : undefined);
   const controller = new AbortController();
-  inFlightControllers.set(id, controller);
+  inFlightControllers.set(id, { controller, provider });
 
   const onStatusChange = (status, at) => {
     store.updateTask(id, { call: { status, updatedAt: at } });
@@ -154,11 +185,22 @@ async function placeCall({ id, provider: providerName, scenario, providerOptions
       outcome
     });
   } catch (error) {
-    const cancelled = error.name === 'AbortError';
-    store.updateTask(id, {
-      status: cancelled ? 'cancelled' : 'failed',
-      call: { status: cancelled ? 'cancelled' : 'failed', updatedAt: new Date().toISOString() }
-    });
+    const aborted = error.name === 'AbortError';
+    if (aborted && !provider.cancelIsAuthoritative) {
+      // The provider has no client cancel operation: aborting only stopped this process
+      // waiting, so the phone call may still be ringing, connecting, or already billed
+      // to an outcome we never fetched. "cancelled" would be a claim about the provider
+      // side we can't back up — leave it unresolved for reconciliation instead.
+      store.updateTask(id, {
+        status: 'cancel_requested',
+        call: { status: 'cancel_requested', updatedAt: new Date().toISOString() }
+      });
+    } else {
+      store.updateTask(id, {
+        status: aborted ? 'cancelled' : 'failed',
+        call: { status: aborted ? 'cancelled' : 'failed', updatedAt: new Date().toISOString() }
+      });
+    }
     throw error;
   } finally {
     inFlightControllers.delete(id);
@@ -169,13 +211,23 @@ async function placeCall({ id, provider: providerName, scenario, providerOptions
 // AbortController placeCall() registered for this task. Agent-callable — cancelling
 // never approves, rejects, or retries anything, it only ends the dial.
 function cancelCall({ id } = {}) {
-  const controller = inFlightControllers.get(id);
-  if (!controller) {
+  const inFlight = inFlightControllers.get(id);
+  if (!inFlight) {
     throw new Error(`Task ${id} has no in-flight call to cancel — nothing is currently dialing.`);
   }
+  const { controller, provider } = inFlight;
   const task = store.getTask(id);
   const stage = (task.call && task.call.status) || 'dialing';
   controller.abort();
+  if (!provider.cancelIsAuthoritative) {
+    return {
+      id,
+      cancelledAtStage: stage,
+      message: `Requested cancellation for task ${id} while it was "${stage}" — the real ` +
+        'provider has no client cancel operation, so the call may still be ringing or ' +
+        'already connected. The outcome is unknown until reconciled against the provider directly.'
+    };
+  }
   return {
     id,
     cancelledAtStage: stage,
@@ -189,7 +241,10 @@ function cancelCall({ id } = {}) {
 // place_call will dial it again.
 function retryWithPlan({ id, goal, script_points, success_criteria, fallback } = {}) {
   const task = store.getTask(id);
-  const retryableStatuses = ['completed', 'failed', 'rejected', 'cancelled'];
+  // cancel_requested is retryable too — against the real provider a cancelled wait
+  // leaves the provider-side outcome unknown, with no automatic reconciliation, so
+  // retrying here is the owner's own informed call, not this app's.
+  const retryableStatuses = ['completed', 'failed', 'rejected', 'cancelled', 'cancel_requested'];
   if (!retryableStatuses.includes(task.status)) {
     throw new Error(
       `Task ${id} cannot be retried from status "${task.status}" — retry_with_plan only applies ` +

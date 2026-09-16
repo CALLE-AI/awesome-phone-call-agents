@@ -14,8 +14,8 @@ Taken from the hackathon rules page, not assumed.
 | Required field | Status | Notes |
 |---|---|---|
 | A pull request to [`CALLE-AI/awesome-phone-call-agents`](https://github.com/CALLE-AI/awesome-phone-call-agents) following that repo's contribution conventions | **owner** | Body pre-written in [`pr-body.md`](pr-body.md), including the branch name, PR title and commit message that pass their `scripts/check_branch_name.py`. |
-| The pull request URL, on the Devpost form | **owner** | Available only once the PR is open. |
-| A ~3-minute demo video, public, on YouTube or Vimeo | **owner** | Script, shot list and timings in [`video-script.md`](video-script.md); see §5. |
+| The pull request URL, on the Devpost form | **done** | <https://github.com/CALLE-AI/awesome-phone-call-agents/pull/524> |
+| A ~3-minute demo video, public, on YouTube or Vimeo | **done** — <https://youtu.be/3MOBu8sBQvE> (2:39) | Script, shot list and timings in [`video-script.md`](video-script.md); see §5. |
 | CALL-E account email address | **owner** | The email on the owner's CALL-E account. |
 
 | Optional field | Status | Notes |
@@ -35,7 +35,7 @@ The rules page names four criteria. The write-up below is arranged to hit them i
 |---|---|
 | **Real World Impact** | Procurement teams genuinely do phone three vendors for the same three numbers. The entry automates the calling and refuses to automate the buying. |
 | **Quality of the Idea** | Most call agents put "ask a human first" in a prompt. This one makes approval structurally unreachable from the tool surface — and proves it with tests that try to break in four different ways. |
-| **Technical Implementation** | One `invoke()` chokepoint shared by UI and agent; three independent enforcement layers; a provider adapter that makes the real integration unit-testable with zero network. 65 tests, and one real billed call placed end to end (docs/real-call.md). |
+| **Technical Implementation** | One `invoke()` chokepoint shared by UI and agent; four independent enforcement layers; a provider adapter that makes the real integration unit-testable with zero network. 103 tests, and one real billed call placed end to end (docs/real-call.md). |
 | **Product Experience & Demo** | The demo shows an agent *being refused* three different ways before a person clicks Approve — the refusal is the product. |
 
 ## 3. Text to paste
@@ -116,6 +116,16 @@ free-form `updates` object, so an agent could simply write `{status: "approved"}
 around the whole design. Closing it meant accepting that the generic write path needed a
 specific exception — and testing for that exception by name.
 
+The most instructive one came last. Our "real" CALL-E integration had passed its unit
+tests against fixtures for days, and was completely non-functional: it POSTed an invented
+request body to CALL-E's MCP host, which rejects a static API key because it wants OAuth.
+Fixtures had only ever confirmed that our code agreed with itself. Rewriting it against
+the documented Calls API — `POST /v1/calls`, then polling until terminal — and then
+actually dialing turned up two more things no fixture could have: a real call takes
+minutes, not milliseconds, so the poll loop is load-bearing; and `cancel_call` cannot hang
+up a real call at all, because the Calls API exposes no client cancellation. The README
+says so now rather than implying a Cancel button does more than it does.
+
 ### Accomplishments that we're proud of
 
 The refusals are the demo. Watching an agent get told *no* three different ways, then
@@ -136,9 +146,9 @@ between a demo and something a procurement team could actually be handed.
 ### What's next
 
 Persistence (state is in memory today), a real session-backed identity instead of an
-`actor` string in the request body, an approval queue for teams where the approver is not
-the person who set up the request, and validating the `CallEProvider` stub against the
-live service.
+`actor` string in the request body, and an approval queue for teams where the approver is
+not the person who set up the request. Validating `CallEProvider` against the live service
+was on this list until we did it — see "Challenges", and `docs/real-call.md`.
 
 ### Built with
 
@@ -149,7 +159,8 @@ From `package.json`, not from memory:
 
 ### Try it out
 
-- Repository / pull request: **owner supplies once the PR is open**
+- Pull request: <https://github.com/CALLE-AI/awesome-phone-call-agents/pull/524>
+- Demo video: <https://youtu.be/3MOBu8sBQvE>
 - No hosted demo: `npm install && npm start` → <http://localhost:3000>, no credentials
   needed, no calls placed
 
@@ -183,9 +194,9 @@ Record with `CALL_PROVIDER` unset so the fake provider is in use and no call is 
 ## 6. Before the owner submits
 
 - [ ] Fill in the CALL-E account email
-- [ ] Decide the `LICENSE` copyright holder — it currently reads `Copyright (c) 2026` with
+- [x] Decide the `LICENSE` copyright holder — it currently reads `Copyright (c) 2026` with
       no name (see [`submission-checklist.md`](submission-checklist.md))
-- [ ] Decide `package.json`'s `"author"` field, currently `"Claude Code"`
-- [ ] Record and publish the video following [`video-script.md`](video-script.md), then paste the URL
-- [ ] Open the PR (see [`pr-body.md`](pr-body.md)) and paste its URL
+- [x] Decide `package.json`'s `"author"` field, currently `"Claude Code"`
+- [x] Record and publish the video following [`video-script.md`](video-script.md), then paste the URL — <https://youtu.be/3MOBu8sBQvE>, public, 2:39
+- [x] Open the PR (see [`pr-body.md`](pr-body.md)) and paste its URL — <https://github.com/CALLE-AI/awesome-phone-call-agents/pull/524>
 - [ ] Consider the feedback survey — a separate prize category

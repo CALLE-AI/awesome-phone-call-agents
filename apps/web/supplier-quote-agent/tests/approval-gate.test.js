@@ -135,6 +135,122 @@ describe('the approval gate — no registered tool can approve or reject', () =>
     expect(rename.result.name).toBe('Renamed');
   });
 
+  test('changing the plan on an approved task requires renewed approval', async () => {
+    const created = await invoke(
+      'create_task',
+      { name: 'Bait and switch (plan)', sku: 'SWAP-1', quantity: 1 },
+      'owner'
+    );
+    const id = created.result.id;
+    await invoke('plan_call', { id, goal: 'Original goal' }, 'agent');
+    await invoke('approve_task', { id }, 'owner');
+    expect(store.getTask(id).status).toBe('approved');
+
+    const swapped = await invoke(
+      'update_task',
+      { id, updates: { plan: { goal: 'A completely different goal' } } },
+      'agent'
+    );
+    expect(swapped.success).toBe(true);
+    expect(swapped.result.status).toBe('planned');
+    expect(swapped.result.approvedAt).toBeUndefined();
+    expect(swapped.result.approvedBy).toBeUndefined();
+
+    // The swapped plan cannot dial on the strength of the old approval.
+    const blocked = await invoke('place_call', { id }, 'agent');
+    expect(blocked.success).toBe(false);
+    expect(blocked.error).toMatch(/must be approved/i);
+  });
+
+  test('changing the supplier list on an approved task requires renewed approval', async () => {
+    const created = await invoke(
+      'create_task',
+      {
+        name: 'Bait and switch (recipient)',
+        sku: 'SWAP-2',
+        quantity: 1,
+        suppliers: [{ name: 'Acme Corp', phone: '+1-555-0100' }]
+      },
+      'owner'
+    );
+    const id = created.result.id;
+    await invoke('plan_call', { id, goal: 'Get a quote' }, 'agent');
+    await invoke('approve_task', { id }, 'owner');
+    expect(store.getTask(id).status).toBe('approved');
+
+    const swapped = await invoke(
+      'update_task',
+      { id, updates: { suppliers: [{ name: 'Attacker Inc', phone: '+1-555-0199' }] } },
+      'agent'
+    );
+    expect(swapped.success).toBe(true);
+    expect(swapped.result.status).toBe('planned');
+    expect(swapped.result.approvedAt).toBeUndefined();
+
+    const blocked = await invoke('place_call', { id }, 'agent');
+    expect(blocked.success).toBe(false);
+    expect(blocked.error).toMatch(/must be approved/i);
+  });
+
+  test('update_task cannot overwrite a task\'s own id, orphaning it from future lookups', async () => {
+    const created = await invoke('create_task', { name: 'Identity check', sku: 'ID-1', quantity: 1 }, 'owner');
+    const id = created.result.id;
+
+    const result = await invoke('update_task', { id, updates: { id: 'task_hijacked', name: 'still allowed' } }, 'agent');
+
+    expect(result.success).toBe(true);
+    expect(result.result.id).toBe(id);
+    expect(result.result.name).toBe('still allowed');
+    // The original id still resolves — nothing was orphaned.
+    expect(store.getTask(id).id).toBe(id);
+  });
+
+  test('update_task cannot stamp fabricated approval/rejection metadata on any task', async () => {
+    const created = await invoke('create_task', { name: 'Metadata forgery', sku: 'FORGE-1', quantity: 1 }, 'owner');
+    const id = created.result.id;
+
+    const result = await invoke(
+      'update_task',
+      {
+        id,
+        updates: {
+          name: 'still allowed',
+          approvedAt: '2020-01-01T00:00:00.000Z',
+          approvedBy: 'owner',
+          rejectedAt: '2020-01-01T00:00:00.000Z',
+          rejectedBy: 'owner',
+          rejectReason: 'forged'
+        }
+      },
+      'agent'
+    );
+
+    expect(result.success).toBe(true);
+    expect(result.result.name).toBe('still allowed');
+    expect(result.result.approvedAt).toBeUndefined();
+    expect(result.result.approvedBy).toBeUndefined();
+    expect(result.result.rejectedAt).toBeUndefined();
+    expect(result.result.rejectedBy).toBeUndefined();
+    expect(result.result.rejectReason).toBeUndefined();
+    expect(result.result.status).toBe('pending');
+  });
+
+  test('update_task on a task not currently approved leaves plan/suppliers changes alone', async () => {
+    const created = await invoke('create_task', { name: 'Not yet approved', sku: 'PLAN-1', quantity: 1 }, 'owner');
+    const id = created.result.id;
+    await invoke('plan_call', { id, goal: 'First draft' }, 'agent');
+    expect(store.getTask(id).status).toBe('planned');
+
+    const edited = await invoke(
+      'update_task',
+      { id, updates: { plan: { goal: 'Revised before approval' } } },
+      'agent'
+    );
+    expect(edited.success).toBe(true);
+    expect(edited.result.status).toBe('planned');
+    expect(edited.result.plan.goal).toBe('Revised before approval');
+  });
+
   test('reject_task refuses while a call is in flight', async () => {
     const created = await invoke('create_task', { name: 'Mid-call reject', sku: 'MID-1', quantity: 1 }, 'owner');
     const id = created.result.id;
@@ -216,6 +332,63 @@ describe('cancel_call', () => {
     // Both actors show up, interleaved, for the same task.
     expect(entries.map((e) => e.actor)).toEqual(expect.arrayContaining(['agent', 'owner']));
   });
+
+  test('against a provider with no real cancel operation, stopping local waiting is never reported as "cancelled"', async () => {
+    const created = await invoke(
+      'create_task',
+      { name: 'Cancel me (no real cancel)', sku: 'CANCEL-2', quantity: 1 },
+      'owner'
+    );
+    const id = created.result.id;
+    await invoke('plan_call', { id, goal: 'Get a quote' }, 'agent');
+    await invoke('approve_task', { id }, 'owner');
+
+    // Simulates a provider like CallEProvider, whose network API offers no client
+    // cancel operation — a fake with no network, so this stays deterministic.
+    const placePromise = invoke(
+      'place_call',
+      { id, providerOptions: { wait: () => new Promise(() => {}), cancelIsAuthoritative: false } },
+      'agent'
+    );
+    await flushMicrotasks();
+
+    const cancelled = await invoke('cancel_call', { id }, 'owner');
+    expect(cancelled.success).toBe(true);
+    expect(cancelled.result.message).not.toMatch(/^cancelled/i);
+    expect(cancelled.result.message).toMatch(/unknown/i);
+
+    await placePromise;
+
+    const task = store.getTask(id);
+    expect(task.status).toBe('cancel_requested');
+    expect(task.call.status).toBe('cancel_requested');
+  });
+});
+
+describe('place_call ignores caller-supplied provider selection/config', () => {
+  beforeEach(() => {
+    activityLog.clear();
+  });
+
+  test('a "provider" arg cannot select the real provider — the env-unconfigured default still dials the fake one', async () => {
+    const created = await invoke('create_task', { name: 'No provider override', sku: 'PROV-1', quantity: 1 }, 'owner');
+    const id = created.result.id;
+    await invoke('plan_call', { id, goal: 'Get a quote' }, 'agent');
+    await invoke('approve_task', { id }, 'owner');
+
+    // CALLE_API_KEY/CALL_PROVIDER are unset in the test process — if `provider: 'calle'`
+    // reached provider selection this would throw ("CALLE_API_KEY is not set..."); it
+    // succeeding on the deterministic fake path proves the arg was never read.
+    const result = await invoke('place_call', { id, provider: 'calle' }, 'agent');
+    expect(result.success).toBe(true);
+    expect(result.result.status).toBe('completed');
+  });
+
+  // What happens when CALL_PROVIDER=calle and providerOptions carries a baseUrl/apiKey —
+  // proving those never reach the real provider — needs to intercept provider selection
+  // itself rather than let a real CallEProvider dial out; see
+  // tests/invoke-provider-security.test.js for that (a live invoke() call here would
+  // otherwise open a real socket to prove a negative, which this suite never does).
 });
 
 describe('retry_with_plan', () => {
