@@ -6,24 +6,32 @@ import { RankedStation, Station, StationCheckState } from "./types";
  * the driver's requirements is plain arithmetic so the outcome is
  * inspectable and reproducible.
  *
+ * IMPORTANT: everything scored here is a *call-reported* snapshot — what a
+ * CALL-E-conducted phone conversation extracted — not independently
+ * verified station truth. See headlineFor() and the README for the
+ * language this maps to in the UI.
+ *
  * Rule of thumb enforced by the point values below:
- *   verified operational + connector available + no queue  >  unknown/advertised-only
- *   an unavailable-but-verified station never outranks a verified-available one
+ *   reported operational + connector available + no queue  >  unknown/advertised-only
+ *   a reported-unavailable station never outranks a reported-available one
  */
 export function scoreStation(check: StationCheckState): number {
   const r = check.structuredResult;
 
   if (check.status !== "completed" || !r) {
-    // Not verified: never treated as confirmed, always ranked below any
-    // verified result, but ranked by how much we DO know when comparing
-    // two unverified stations.
+    // Not a completed call-reported result: never treated as confirmed,
+    // always ranked below any completed one. An uncertain outcome (we
+    // genuinely don't know if the call happened) ranks lowest of all,
+    // below a definite failure, since we have even less information about
+    // it than a call we know didn't go through.
+    if (check.outcomeUncertain) return -15;
     return check.status === "failed" ? -10 : -5;
   }
 
   let score = 0;
 
   if (r.operational === "yes") score += 40;
-  else if (r.operational === "no") score -= 100; // out of service must not outrank an available one
+  else if (r.operational === "no") score -= 100; // reported out of service must not outrank a reported-available one
   // "unknown" contributes 0 — neither confirmed working nor confirmed down
 
   if (r.requested_connector_available === "yes") score += 30;
@@ -54,25 +62,34 @@ export function scoreStation(check: StationCheckState): number {
   return score;
 }
 
+/**
+ * Every string here describes what was *reported on the call*, not an
+ * independently verified fact about the station — "Reported available now"
+ * rather than "Available now", "Could not confirm via call" rather than
+ * "Could not verify". This matters because the underlying data is itself
+ * an AI's extraction from a phone conversation with whoever answered, not
+ * a direct read of the charger's own state.
+ */
 export function headlineFor(check: StationCheckState): string {
   const r = check.structuredResult;
   if (check.status === "queued" || check.status === "in_progress") return "Checking…";
-  if (check.status === "failed") return "Could not verify";
+  if (check.outcomeUncertain) return "Uncertain — could not confirm call outcome";
+  if (check.status === "failed") return "Could not confirm via call";
   if (check.status === "canceled") return "Check canceled";
-  if (!r) return "Could not verify";
+  if (!r) return "Could not confirm via call";
 
-  if (r.operational === "no") return "Out of service";
-  if (r.requested_connector_available === "no") return "Connector not available";
+  if (r.operational === "no") return "Reported out of service";
+  if (r.requested_connector_available === "no") return "Reported connector unavailable";
   if (r.requested_connector_available === "unknown" || r.operational === "unknown")
-    return "Partially verified";
+    return "Partially confirmed by call";
   if (r.queue_present === "yes") {
     const wait =
       r.estimated_wait_minutes !== null && r.estimated_wait_minutes >= 0
         ? `${r.estimated_wait_minutes} min wait`
         : "vehicle waiting";
-    return `Available soon — ${wait}`;
+    return `Reported available soon — ${wait}`;
   }
-  return "Available now";
+  return "Reported available now";
 }
 
 export function rankStations(
@@ -85,7 +102,7 @@ export function rankStations(
       station,
       check,
       score: scoreStation(check),
-      verified: check?.status === "completed" && !!check.structuredResult,
+      reported: check?.status === "completed" && !!check.structuredResult && !check.outcomeUncertain,
       headline: headlineFor(check),
     };
   });

@@ -1,35 +1,35 @@
 # ChargeCheck
 
-**Don't trust the map. Call the station.**
+Verifies EV charging station availability by phone, using CALL-E to ask the
+station directly and returning a structured, ranked result.
 
-A map can tell you a charging station exists. It can't tell you whether the
-charger is actually working right now, whether someone is using it, whether
-there's a queue, whether it takes the connector you need, or what it
-actually costs. ChargeCheck closes that gap by using **CALL-E** to call the
-station directly and ask, then turns the conversation into structured,
-ranked, "verified right now" data.
+A map can tell a driver that a charging station exists. It cannot tell them
+whether the charger is working right now, whether someone is using it,
+whether there is a queue, whether it supports the connector they need, or
+what it currently costs. That information usually exists only with the
+person or system that answers the phone for that station.
 
-The phone call is the missing API.
+## What the results mean
 
-## Why a phone call
+Every result this app produces is **call-reported**: what a CALL-E-placed
+conversation extracted from whoever answered. It is not independently
+verified station truth — nobody is physically checking the charger, and the
+answer is only as good as the person on the line.
 
-Charging-station apps and maps report what an operator advertised, not what
-is true at this minute. The only source that knows the current state — is
-this specific charger on, free, and reachable — is the person or system that
-picks up the phone at the station. ChargeCheck never treats advertised
-information as verified; it is either confirmed by a call or shown as
-unverified.
+The app's language reflects this throughout. Results read "reported
+available now" and "call-reported", never "verified". An answer the call
+could not establish stays `unknown` rather than being resolved into a guess,
+and a call whose outcome is genuinely ambiguous is labelled uncertain rather
+than reported as a failure.
 
 ## How CALL-E is used
 
-For each selected station, ChargeCheck creates one CALL-E call task with a
-schema that extracts exactly the fields a driver needs, and runs all
-selected stations' calls concurrently:
+One call task per station, dispatched concurrently:
 
 ```ts
 const call = await client.calls.create(
   {
-    task: buildTask(station, connector), // natural-language call script
+    task: buildTask(station, connector),
     recipients: [{ phones: [station.phone] }],
     recipientResultSchema: buildRecipientResultSchema(connector),
     metadata: { workflow: "chargecheck", station_id: station.id },
@@ -38,183 +38,209 @@ const call = await client.calls.create(
 );
 ```
 
-The app then polls `client.calls.get(callId)` to show the real CALL-E call
-lifecycle live in the UI: `queued → in_progress → completed / failed`. Once
-terminal, the per-recipient `structuredResult` (operational status, chargers
-available, requested connector available, queue, price, payment
-requirements, accessibility, notes, and an `answered_by` classification) is
-read and passed to a small, fully deterministic ranking function — no LLM is
-used for ranking, only for the call itself.
+The app polls `client.calls.get(callId)` and surfaces the CALL-E call
+lifecycle directly in the UI (`queued → in_progress → completed / failed`).
+On a terminal status, the per-recipient `structuredResult` — operational
+status, chargers available, requested connector available, queue, wait,
+price, payment requirements, accessibility, notes, and an `answered_by`
+classification — is passed to a deterministic ranking function. No model is
+involved in ranking; CALL-E's role ends at producing a schema-valid result.
 
-This mirrors the documented CALL-E Calls API contract exactly (see
-[Architecture notes](#architecture-notes)) — nothing here is invented.
-
-## Running it
+## Setup
 
 ```bash
 npm install
 npm run dev
 ```
 
-Open `http://localhost:3000`. No environment variables or setup are needed
-to get started.
+Open `http://localhost:3000`. No environment variables are required.
 
-**Demo mode is on by default.** With demo mode on, ChargeCheck never dials
-anyone — a `MockCallProvider` simulates the same `queued → in_progress →
-completed` lifecycle with realistic, mixed outcomes (one station reports an
-outage, one reports a queue, two report clean availability) so the full
-product experience — including the "COULD NOT VERIFY" / "CALL VERIFIED"
-states — can be exercised with zero calls placed.
+### No-call default
 
-To place a real CALL-E call:
+Demo mode is enabled by default and places no calls. A `MockCallProvider`
+simulates the same `queued → in_progress → completed` lifecycle across a
+fictional station set with mixed outcomes — one reported outage, one
+reported queue, two reported available — so the full workflow, including the
+"could not confirm" states, runs without dialling anyone. The UI displays a
+`DEMO / SIMULATION` badge whenever this provider is active and a
+`LIVE CALL-E` badge otherwise; simulated results are never presented as
+real.
 
-1. Get a free API key from the [CALL-E dashboard](https://dashboard.heycall-e.com/login).
-2. In the app, switch **Station set → US live test** (or add your own
-   stations to `src/lib/stations.ts` with real numbers you own or are
-   authorized to call).
-3. Uncheck **Demo mode**.
-4. Paste your key into the **Your CALL-E API key** field that appears, and
-   click **Check availability**.
+### Placing a live call
 
-There is no shared or server-side API key anywhere in this app. Your key is
-sent only with your own request, used to place that one call, and never
-stored, logged, or reused — each person who tries live calling uses (and
-pays for) their own CALL-E account.
+1. Obtain an API key from the [CALL-E dashboard](https://dashboard.heycall-e.com/login).
+2. Select the **US live test** station set. Only stations in this set are
+   eligible for live calling — see [Live-call authorization](#live-call-authorization).
+3. Disable **Demo mode**.
+4. Enter the API key, confirm the operator attestation, and start the check.
+
+The key is supplied per request by whoever is using the app. There is no
+server-side or shared credential anywhere in this project: the key is used
+for the requests it arrives with and is never stored, logged, or reused.
+
+## Live-call authorization
+
+Three checks gate live calling in `src/app/api/check/start/route.ts`. All
+are enforced server-side and cannot be bypassed by modifying the request
+payload.
+
+**Station allowlist.** Each `Station` carries a `liveCallAuthorized` flag.
+Only reviewed entries in `LIVE_US_STATIONS` set it. The fictional
+`DEMO_STATIONS` set never does, so selecting a demo station with demo mode
+disabled is refused with a 403 regardless of API key or attestation.
+
+**E.164 validation.** Each authorized station's number is checked against
+E.164 before a call is attempted (`src/lib/liveCallGuard.ts`). This is a
+format check only; it does not establish that a number is reachable or
+correctly attributed.
+
+**Operator attestation.** Live requests must carry
+`operatorAttestation: true`, surfaced in the UI as an explicit checkbox
+confirming the operator is authorized to have CALL-E place a disclosed AI
+call to the selected numbers. This is a recorded confirmation, not an
+authorization system — it does not verify the operator's identity, and it
+does not make an arbitrary number safe to call.
+
+### Destinations in the live set
+
+`LIVE_US_STATIONS` contains published, 24/7 customer support lines operated
+by US charging networks. These lines exist to answer questions of exactly
+this kind from any driver, which is what makes them an appropriate
+destination for a disclosed AI call. A personal number, or an on-site line
+at a business that does not publish itself as a support channel, is not, and
+should not be called without that business's prior agreement.
+
+Because these are centralized support desks rather than phones at the
+charger, each call task states the specific station address and leads with
+the requested connector type, so the request is not generalized away during
+the conversation. Every task opens with an explicit AI disclosure.
+
+Verify these numbers and addresses before use; support lines and station
+listings change.
+
+## Phone-number handling
+
+Numbers are masked before reaching the client. `GET /api/stations` returns
+all but the final four digits replaced, and the UI does not render station
+phone numbers at all.
+
+Free text is redacted separately. `src/lib/redact.ts` passes provider and
+SDK error messages, CALL-E `evidence` strings, and the free-text fields of
+structured results (`notes`, `price_per_kwh`, `payment_requirements`,
+`accessibility`) through phone-number redaction before either API route
+responds. This runs uniformly rather than only on the station list, so a
+number cannot surface through an error string or through something a call
+recipient happened to say.
+
+## Side effects and cancellation
+
+Live mode places real outbound phone calls to the selected destinations —
+one call per selected station, dispatched concurrently. Demo mode places
+none.
+
+There is no recurring or scheduled workflow: a check runs once when
+started and does not repeat. The CALL-E Calls API exposes no
+cancel-in-flight operation, so an already-dispatched call cannot be recalled
+by this app; a per-station idempotency key derived from
+`stationId + connector + date` prevents a retried request from placing a
+duplicate call for the same station on the same day.
 
 ## Configuring stations
 
-Stations for the MVP demo live in `src/lib/stations.ts` as a small static
-array (`name`, `phone`, `location`, `address`, `connectors`,
-`advertisedHours`). This is intentionally not wired to a live station
-directory yet — see [Limitations](#limitations). To try your own stations,
-edit that file or extend `GET /api/stations` to read from your own source;
-the rest of the app (orchestration, polling, ranking, UI) is unchanged.
+`src/lib/stations.ts` holds two static arrays: `DEMO_STATIONS` (fictional,
+demo mode only) and `LIVE_US_STATIONS` (reviewed, `liveCallAuthorized`).
 
-## Architecture notes
+To add a live-callable destination, add an entry to `LIVE_US_STATIONS` with
+a valid E.164 number you own or are authorized to call, and set
+`liveCallAuthorized: true`. Adding a station elsewhere, or omitting the
+flag, will not make it live-callable — by design.
 
-- `src/lib/callProvider.ts` — the `CallProvider` abstraction. `CalleCallProvider`
-  is the real integration (`@call-e/calle`, `client.calls.create` /
-  `client.calls.get`), built fresh from whichever API key is passed into
-  each call — never a server-side credential. `MockCallProvider` is a
-  clearly labeled simulation used only in demo mode; the UI always shows a
-  `DEMO / SIMULATION` badge when it's active, and a `LIVE CALL-E` badge
-  otherwise. Both providers are stateless per call — a mock call's elapsed
-  time is derived from a timestamp encoded in its call id, and the real
-  provider always re-fetches status from CALL-E — so nothing is ever
-  presented as real, and nothing depends on server memory surviving between
-  requests (important for both Next.js dev recompiles and serverless
-  deployments).
-- `src/lib/callTask.ts` — builds the call `task` text (including the exact
-  station address, since a live network support line is a call center, not
-  a phone sitting at the charger, and leading with the requested connector
-  type so it survives the model's own paraphrasing rather than getting
-  buried in a longer checklist) and the `recipientResultSchema` using only
-  the JSON Schema features CALL-E documents as supported (`type`,
-  `properties`, `required`, `enum`, nested `object`,
-  `additionalProperties: false`); every enum includes an `unknown`/`-1`
-  fallback so an unclear answer is preserved as unclear rather than
-  resolved into a guess.
-- `src/lib/stations.ts` — `DEMO_STATIONS` (fictional Lahore–Islamabad route,
-  always safe to "call" in demo mode) and `LIVE_US_STATIONS` (real 24/7
-  published network support lines — Electrify America, EVgo, ChargePoint,
-  Blink Charging — for the recorded live-call segment; see
-  [Live US demo segment](#live-us-demo-segment)).
-- `src/lib/ranking.ts` — deterministic scoring. A verified "out of service"
-  or "connector unavailable" can never outrank a verified "available now",
-  and any unverified/failed check is always ranked below any verified one.
-- `src/app/api/check/start/route.ts` — dispatches one CALL-E call per
-  selected station **concurrently** (`Promise.allSettled`) and returns the
-  started calls directly to the client. A per-station idempotency key is
-  derived from `stationId + connector + date` so a retried request doesn't
-  place a duplicate call. If a station's call never starts (bad API key,
-  CALL-E account issue, network failure), it's returned already marked
-  `failed` with the real error — it's never given a `queued` status, so it
-  can never render as stuck on "Calling…".
-- `src/app/api/check/status/route.ts` — **stateless** poll: the client sends
-  back the checks array it currently holds (plus its API key, for live
-  checks), the route re-queries only the ones still in flight, and returns
-  the merged array. There is no server-side session store, deliberately —
-  an earlier version kept in-memory session state and broke in Next.js dev
-  (each API route can be compiled as an independent module on first
-  request, so `/status` got its own empty memory and never found what
-  `/start` had created) and would have broken the same way on a serverless
-  deployment. Both routes return clean JSON on any unexpected failure
-  rather than an HTML error page, so the client's error handling always has
-  something to read. If you want a version that survives full page reloads
-  mid-check, persist the checks array (e.g. in `sessionStorage`) rather than
-  reintroducing server memory.
-- `src/app/page.tsx` — the client also enforces a 2-minute poll timeout per
-  check (real calls typically resolve in 20-90s): anything still in flight
-  past that is marked failed with a clear "Timed out" message and the UI
-  moves on to the results screen, instead of polling forever with no
-  feedback.
+## Architecture
 
-## Live US demo segment
+| Path | Responsibility |
+| --- | --- |
+| `src/lib/callProvider.ts` | `CallProvider` abstraction. `CalleCallProvider` wraps `@call-e/calle`, constructed per request from the supplied key. `MockCallProvider` is the no-call simulation. Defines `KnownCallError` for failures the app can fully explain. |
+| `src/lib/liveCallGuard.ts` | E.164 validation and the live-call station allowlist. |
+| `src/lib/redact.ts` | Phone-number redaction applied to all outbound free text. |
+| `src/lib/callTask.ts` | Call task text and `recipientResultSchema`. |
+| `src/lib/ranking.ts` | Deterministic scoring and result headlines. |
+| `src/app/api/check/start/route.ts` | Authorization checks, then concurrent dispatch. |
+| `src/app/api/check/status/route.ts` | Stateless status polling. |
+| `src/app/page.tsx` | UI, attestation control, client-side poll timeout. |
 
-For the part of the demo video where a real CALL-E call needs to happen and
-be understood by an English-speaking recipient, use the **US live test**
-station set in the app (dropdown on the form). It points at real, published,
-24/7 customer support lines run by US charging networks — Electrify America,
-EVgo, ChargePoint, and Blink Charging — rather than a private individual's
-number or a station's own unlisted line. These lines exist specifically to
-answer "is this charger working right now" questions from any driver, which
-is why they're an appropriate target for a disclosed AI call; a personal
-cell number or an on-site line at a business that doesn't publish itself as
-a support line is not, and shouldn't be called without that business's
-explicit agreement first. The call task always states the specific station
-address and leads with the requested connector type so the agent asks the
-support rep about the right location and the right connector, and opens
-with an explicit AI disclosure, per CALL-E's own permission and disclosure
-guidance. Confirm the numbers and addresses in `src/lib/stations.ts` are
-still current before recording — support lines and station listings do
-change.
+### Result schema
 
-## Deploying to Vercel (optional)
+`buildRecipientResultSchema` uses only the JSON Schema features CALL-E
+documents as supported: `type`, `properties`, `required`, `enum`, nested
+`object`, and `additionalProperties: false`. Every enum includes an
+`unknown` member and every numeric field a `-1` sentinel, so an answer the
+call did not establish is preserved as unestablished rather than omitted or
+inferred.
 
-Deployment is not required for the hackathon submission — the PR into
-`awesome-phone-call-agents` is what's judged. This is only if you also want
-a shareable live URL.
+### Ranking
 
-1. Push this code to GitHub. If it's already living at `apps/web/chargecheck`
-   inside your fork of `awesome-phone-call-agents`, you don't need a
-   separate repo — Vercel can deploy a subfolder of a monorepo.
-2. On [vercel.com](https://vercel.com), sign in with GitHub, **Add New →
-   Project**, and import that repo.
-3. In the import screen, set **Root Directory** to `apps/web/chargecheck`
-   (skip this if you're deploying a standalone copy of just this folder).
-4. Deploy. Framework preset (Next.js) is auto-detected. **No environment
-   variables are required** — there is no server-side CALL-E key to
-   configure, because every visitor supplies their own.
+Scoring is plain arithmetic over the call-reported result, so outcomes are
+reproducible and inspectable. A reported "out of service" or "connector
+unavailable" cannot outrank a reported "available now". Any check without a
+completed result ranks below every completed one, and a check flagged
+`outcomeUncertain` ranks lowest of all — it carries less information than a
+call known to have failed. CALL-E's completion confidence acts only as a
+tiebreaker, never as a primary factor.
 
-Once deployed, demo mode works for anyone who visits the URL with no
-restriction or setup. If a visitor wants to place a real call, they paste
-their own CALL-E API key into the field that appears when they turn off
-demo mode — it's used for their request only, so your CALL-E account is
-never touched by anyone else using the deployed site.
+### Uncertain outcomes
+
+A failure to create or poll a call is not automatically a confirmed
+non-event. `KnownCallError` marks failures the app can fully explain, such
+as a missing API key. Anything else — a network failure, an unexpected SDK
+error, or a call that never reaches a terminal status within the client's
+two-minute poll timeout — is flagged `outcomeUncertain`, because whether
+CALL-E received and processed the call is genuinely unknown. The UI
+distinguishes these from definite failures, and ranking treats them as
+carrying less information rather than more.
+
+### State
+
+Neither API route keeps server-side session state. The client holds the
+checks array returned by `/start` and sends it back on each `/status` poll;
+the route re-queries only the entries still in flight and returns the merged
+result. Both routes return JSON on unexpected failure rather than an HTML
+error page, so client-side error handling always has a parseable response.
+
+This means an in-flight check does not survive a full page reload. An
+application needing that should persist the checks array client-side rather
+than reintroducing server memory, which is unreliable across serverless
+invocations.
+
+## Deployment
+
+The app runs anywhere Next.js does and requires no environment variables,
+since credentials are supplied per request. On a public deployment, demo
+mode is fully usable by any visitor with no setup, and live calling remains
+gated by the authorization checks above.
 
 ## Limitations
 
-- Station data is a small static set (demo + two real US support lines),
-  not a live directory integration.
-- Status is polled from the client rather than pushed via webhook; a
-  production version should use CALL-E's terminal webhooks (deduplicated
-  via the `CALL-E-Event-Id` header) instead, and persist the checks array
-  server-side keyed by an authenticated session rather than trusting the
-  client to send it back.
-- The Calls API has no cancel-in-flight operation; a longer-running version
-  of this app should dispatch in waves rather than truly unbounded
-  concurrency once station lists grow large.
-- `answered_by` (human / IVR / voicemail / unknown) is asked for in the
-  result schema, but CALL-E's own confidence in that classification is not
-  independently re-verified against the transcript in this MVP.
+- Station data is a small static set, not a live directory integration.
+- Status is polled from the client rather than delivered by webhook. A
+  production deployment should use CALL-E's terminal webhooks, deduplicated
+  via the `CALL-E-Event-Id` header, and persist state server-side against an
+  authenticated session rather than trusting the client to return it.
+- The Calls API exposes no cancel-in-flight operation. A deployment
+  handling larger station lists should dispatch in waves rather than
+  unbounded concurrency.
+- `answered_by` (human / IVR / voicemail / unknown) is requested in the
+  result schema but is not independently re-checked against the transcript.
+- The operator attestation records a confirmation; it does not verify
+  operator identity or authorization.
 
-## Future extensions
+## Future work
 
-- Live station directory integration (e.g. an open charging-station API) in
-  place of the static demo list.
-- Terminal webhook receiver instead of polling, with event-id
-  deduplication.
-- Persisted call history so a "verified 2 minutes ago" station doesn't need
-  to be re-called on every visit within some freshness window.
-- Wave-based dispatch and a "verify only the top N by distance" mode for
-  longer routes.
+- Live station directory integration, with the same `liveCallAuthorized`
+  and E.164 gating applied to any discovered station before it becomes
+  eligible for a live call.
+- Terminal webhook ingestion with event-id deduplication, replacing client
+  polling.
+- A freshness window over stored results, so a station reported on recently
+  is not re-called by every subsequent request.
+- Wave-based dispatch and distance-bounded station selection for longer
+  routes.

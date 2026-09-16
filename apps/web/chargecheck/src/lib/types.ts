@@ -16,6 +16,15 @@ export interface Station {
   /** Advertised only. Never treated as verified truth. */
   advertisedHours?: string;
   advertisedNotes?: string;
+  /**
+   * True only for stations reviewed and included specifically for live
+   * calling (published 24/7 network support lines — see
+   * src/lib/stations.ts). The fictional DEMO_STATIONS set is never
+   * authorized for live calls, even if an operator selects it with demo
+   * mode off — this is enforced server-side in
+   * src/app/api/check/start/route.ts regardless of what the client sends.
+   */
+  liveCallAuthorized?: boolean;
 }
 
 export interface CheckRequest {
@@ -32,6 +41,16 @@ export interface CheckRequest {
    * credentials of its own: each visitor pays for their own live calls.
    */
   apiKey?: string;
+  /**
+   * Required (must be exactly `true`) whenever demoMode is false. This is
+   * the operator's explicit attestation that they are authorized to have
+   * CALL-E place a disclosed AI call to the selected number(s). It is not
+   * proof of authorization — CALL-E's own permission and disclosure
+   * guidance still applies — but it is the minimum bar the
+   * awesome-phone-call-agents community/demo policy asks for: a deliberate,
+   * recorded confirmation rather than a call placed by default.
+   */
+  operatorAttestation?: boolean;
 }
 
 /**
@@ -72,14 +91,33 @@ export interface StationCheckState {
   evidence: string[];
   /** null whenever CALL-E could not produce a schema-valid result from the evidence. */
   structuredResult: StationCallResult | null;
-  verifiedAt: string | null;
+  /**
+   * When this check reached a terminal state via a CALL-E-reported outcome
+   * (or our own explicit, known rejection — bad key, unauthorized station,
+   * invalid number). Named `reportedAt`, not `verifiedAt`: nothing here is
+   * independently verified station truth, only what was reported back from
+   * an AI-conducted phone call or our own validation.
+   */
+  reportedAt: string | null;
   error?: string;
+  /**
+   * True when `status: "failed"` reflects a genuinely ambiguous outcome —
+   * e.g. a network error while creating or polling the call, where we
+   * cannot tell whether CALL-E actually placed/continued the call or not —
+   * rather than a definite, known rejection (bad key, unauthorized station,
+   * invalid E.164 number). An uncertain outcome should be reconciled, not
+   * silently treated as a confirmed non-event; see
+   * docs/production-workflows.md and the ambiguous-outcomes reference in
+   * the upstream repo for why this distinction matters.
+   */
+  outcomeUncertain?: boolean;
 }
 
 export interface RankedStation {
   station: Station;
   check: StationCheckState;
   score: number;
-  verified: boolean;
+  /** Call-reported, not independently verified — see StationCheckState.reportedAt. */
+  reported: boolean;
   headline: string;
 }

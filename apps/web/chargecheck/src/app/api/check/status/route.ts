@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { StationCheckState } from "@/lib/types";
-import { getCallProvider } from "@/lib/callProvider";
+import { getCallProvider, KnownCallError } from "@/lib/callProvider";
+import { redactCheckState } from "@/lib/redact";
 
 const TERMINAL = new Set(["completed", "failed", "canceled"]);
 
@@ -30,21 +31,30 @@ export async function POST(req: NextRequest) {
             completionConfidence: snapshot.completionConfidence,
             evidence: snapshot.evidence,
             structuredResult: snapshot.structuredResult,
-            verifiedAt: TERMINAL.has(snapshot.status) ? new Date().toISOString() : null,
+            reportedAt: TERMINAL.has(snapshot.status) ? new Date().toISOString() : null,
             error: snapshot.error,
           };
           return merged;
         } catch (err: any) {
-          // A per-station failure (bad key, no access, station not found,
-          // network hiccup, etc.) ends that station's check rather than
-          // leaving it stuck — this is the failsafe that stops the UI from
-          // showing "Calling…" forever.
-          return { ...check, status: "failed" as const, error: String(err?.message ?? err) };
+          // A per-station failure ends that station's check rather than
+          // leaving it in flight indefinitely. As in /start, a
+          // KnownCallError is a definite outcome; anything else — a
+          // dropped connection, an unexpected provider error — is
+          // ambiguous, since a failure to read status does not establish
+          // that the underlying call failed. That ambiguity is preserved
+          // rather than collapsed into a reported failure.
+          const known = err instanceof KnownCallError;
+          return {
+            ...check,
+            status: "failed" as const,
+            error: String(err?.message ?? err),
+            outcomeUncertain: !known,
+          };
         }
       }),
     );
 
-    return NextResponse.json({ checks: updated });
+    return NextResponse.json({ checks: updated.map(redactCheckState) });
   } catch (err: any) {
     // Malformed request body or another unexpected failure — still return
     // clean JSON so the client's error handling (not a silent hang) kicks

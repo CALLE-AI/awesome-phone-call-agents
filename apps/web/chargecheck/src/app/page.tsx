@@ -18,6 +18,7 @@ export default function Home() {
   const [connector, setConnector] = useState<ConnectorType>("CCS2");
   const [demoMode, setDemoMode] = useState(true);
   const [apiKey, setApiKey] = useState("");
+  const [operatorAttestation, setOperatorAttestation] = useState(false);
   const [phase, setPhase] = useState<Phase>("form");
   const [checks, setChecks] = useState<Record<string, StationCheckState>>({});
   const [error, setError] = useState<string | null>(null);
@@ -50,7 +51,15 @@ export default function Home() {
       startRes = await fetch("/api/check/start", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ from, to, connector, stationIds, demoMode, apiKey }),
+        body: JSON.stringify({
+          from,
+          to,
+          connector,
+          stationIds,
+          demoMode,
+          apiKey,
+          operatorAttestation,
+        }),
       });
     } catch (err: any) {
       setError(`Could not reach the server: ${String(err?.message ?? err)}`);
@@ -69,9 +78,8 @@ export default function Home() {
     checksListRef.current = started;
     setChecks(Object.fromEntries(started.map((c) => [c.stationId, c])));
 
-    // Failsafe: if every station already came back failed (e.g. a bad API
-    // key rejected before any call was placed), there's nothing to poll —
-    // go straight to results instead of sitting on the checking screen.
+    // If every check is already terminal (for example, a rejected API key
+    // before any call was placed), there is nothing to poll.
     if (started.every((c) => ["completed", "failed", "canceled"].includes(c.status))) {
       setPhase("results");
       return;
@@ -112,17 +120,20 @@ export default function Home() {
         if (pollRef.current) clearInterval(pollRef.current);
         setPhase("results");
       } else if (elapsed > POLL_TIMEOUT_MS) {
-        // A real call sitting in queued/in_progress for over 2 minutes is
-        // unusual (most resolve in 20-90s) but not impossible — rather than
-        // polling forever with no feedback, stop and show what we have,
-        // marking anything still in flight so it's visible instead of
-        // silently stuck. This is the failsafe for a call that never
-        // reaches a terminal status at all.
+        // Calls typically reach a terminal status within 20-90s. Past the
+        // timeout, polling stops rather than continuing indefinitely.
+        // Whether CALL-E finished processing is unknown at this point, so
+        // remaining checks are marked uncertain rather than failed.
         if (pollRef.current) clearInterval(pollRef.current);
         checksListRef.current = latest.map((c) =>
           ["completed", "failed", "canceled"].includes(c.status)
             ? c
-            : { ...c, status: "failed" as const, error: c.error ?? "Timed out waiting for a final result from CALL-E." },
+            : {
+                ...c,
+                status: "failed" as const,
+                error: c.error ?? "Timed out waiting for a final result from CALL-E.",
+                outcomeUncertain: true,
+              },
         );
         setChecks(Object.fromEntries(checksListRef.current.map((c) => [c.stationId, c])));
         setPhase("results");
@@ -142,14 +153,15 @@ export default function Home() {
   const selectedStations = stations.filter((s) => selected.has(s.id));
   const ranked =
     phase === "results" ? rankStations(selectedStations, checks) : [];
+  const canCheck = selected.size > 0 && (demoMode || operatorAttestation);
 
   return (
     <main className="wrap">
       <div className="brand">ChargeCheck</div>
       <h1>Don&apos;t trust the map. Call the station.</h1>
       <p className="tagline">
-        Google can tell you where the charger is. ChargeCheck calls to find out whether you can
-        actually use it.
+        Google can tell you where the charger is. ChargeCheck calls to ask — and reports back
+        what the call found, not an independently verified fact.
       </p>
 
       {phase === "form" && (
@@ -208,9 +220,7 @@ export default function Home() {
                 <label key={s.id} className="station-row" style={{ cursor: "pointer" }}>
                   <div className="station-meta">
                     <span className="station-name">{s.name}</span>
-                    <span className="station-sub">
-                      {s.location} · {s.phone} · {s.connectors.join(", ")}
-                    </span>
+                    <span className="station-sub">{s.location} · {s.connectors.join(", ")}</span>
                   </div>
                   <input
                     type="checkbox"
@@ -237,13 +247,27 @@ export default function Home() {
                   onChange={(e) => setApiKey(e.target.value)}
                   placeholder="Get one free at dashboard.heycall-e.com"
                 />
+                <label className="toggle" style={{ marginTop: 10 }}>
+                  <input
+                    type="checkbox"
+                    checked={operatorAttestation}
+                    onChange={(e) => setOperatorAttestation(e.target.checked)}
+                  />
+                  I confirm I am authorized to have CALL-E place a disclosed AI call to the
+                  selected number(s).
+                </label>
+                <p className="small-muted" style={{ marginTop: 8 }}>
+                  Only the pre-reviewed, published network support lines in the US live test set
+                  can be dialed live — the fictional demo set is refused for live calls regardless
+                  of this setting.
+                </p>
               </div>
             )}
           </div>
 
           {error && <div className="card" style={{ color: "var(--danger)" }}>{error}</div>}
 
-          <button className="primary" disabled={selected.size === 0} onClick={handleCheck}>
+          <button className="primary" disabled={!canCheck} onClick={handleCheck}>
             CHECK AVAILABILITY
           </button>
         </>
@@ -285,18 +309,23 @@ export default function Home() {
 
       {phase === "results" && (
         <>
-          <div className="small-muted" style={{ marginBottom: 12 }}>
-            VERIFIED CHARGING OPTIONS{"  "}
+          <div className="small-muted" style={{ marginBottom: 4 }}>
+            CALL-REPORTED CHARGING OPTIONS{"  "}
             <span className={`badge ${demoMode ? "badge-demo" : "badge-live"}`}>
               {demoMode ? "DEMO / SIMULATION" : "LIVE CALL-E"}
             </span>
           </div>
+          <p className="small-muted" style={{ marginBottom: 12, maxWidth: 560 }}>
+            Results below reflect what was reported on an AI-placed phone call, not
+            independently verified station truth. This is an experimental snapshot.
+          </p>
           {ranked.map((r, i) => (
             <div key={r.station.id} className={`card result-card ${i === 0 ? "top" : ""}`}>
               <div>
                 {i === 0 &&
-                  r.verified &&
-                  (r.headline === "Available now" || r.headline.startsWith("Available soon")) && (
+                  r.reported &&
+                  (r.headline === "Reported available now" ||
+                    r.headline.startsWith("Reported available soon")) && (
                     <div className="recommended">Recommended</div>
                   )}
                 <div className="headline">{r.station.name}</div>
@@ -316,13 +345,15 @@ export default function Home() {
                   </div>
                 )}
                 <div style={{ marginTop: 6 }}>
-                  {r.verified ? (
+                  {r.reported ? (
                     <span className="tag verified-tag">
-                      CALL VERIFIED{" "}
-                      {r.check.verifiedAt ? `· ${new Date(r.check.verifiedAt).toLocaleTimeString()}` : ""}
+                      CALL-REPORTED{" "}
+                      {r.check.reportedAt ? `· ${new Date(r.check.reportedAt).toLocaleTimeString()}` : ""}
                     </span>
+                  ) : r.check.outcomeUncertain ? (
+                    <span className="tag unverified-tag">UNCERTAIN OUTCOME</span>
                   ) : (
-                    <span className="tag unverified-tag">COULD NOT VERIFY</span>
+                    <span className="tag unverified-tag">COULD NOT CONFIRM</span>
                   )}
                 </div>
                 {r.check.error && (
@@ -357,9 +388,9 @@ function statusLabel(status: string): string {
     case "in_progress":
       return "Connected — asking about availability…";
     case "completed":
-      return "Verified";
+      return "Call finished";
     case "failed":
-      return "No answer / unavailable";
+      return "Could not complete the call";
     case "canceled":
       return "Canceled";
     default:

@@ -1,6 +1,15 @@
 import { Station, ConnectorType, CallLifecycleStatus, StationCallResult } from "./types";
 import { buildTask, buildRecipientResultSchema } from "./callTask";
 
+/**
+ * Thrown for errors we can fully explain (missing/empty API key). The
+ * caller can treat these as a definite, known outcome. Anything else that
+ * escapes a provider call (network failure, an unexpected SDK exception)
+ * is NOT wrapped in this and should be treated as an ambiguous/uncertain
+ * outcome instead — see StationCheckState.outcomeUncertain.
+ */
+export class KnownCallError extends Error {}
+
 export interface StartedCall {
   callId: string;
   provider: "calle" | "mock";
@@ -43,7 +52,7 @@ export class CalleCallProvider implements CallProvider {
 
   private async getClient(apiKey?: string) {
     if (!apiKey || !apiKey.trim()) {
-      throw new Error(
+      throw new KnownCallError(
         "Enter your own CALL-E API key to place a live call (get one free at dashboard.heycall-e.com), or use demo mode.",
       );
     }

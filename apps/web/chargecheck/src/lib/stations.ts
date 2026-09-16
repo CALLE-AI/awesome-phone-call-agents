@@ -1,11 +1,10 @@
 import { Station } from "./types";
 
-// Demo dataset for the hackathon MVP. Numbers use the NANP-reserved
-// fictional block (area-code-555-01XX, 0100-0199) — the same convention
-// awesome-phone-call-agents reviewers check for — so they are recognizably
-// non-dialable even though the narrative is a Lahore-Islamabad route. This
-// set only ever runs through MockCallProvider (demo mode); it is never
-// passed to a real CALL-E call.
+// Fictional demo dataset. Numbers use the NANP-reserved fictional block
+// (area-code-555-01XX, 0100-0199), so they are recognizably non-dialable.
+// This set is never eligible for a live call: it carries no
+// `liveCallAuthorized` flag, so validateLiveStations() refuses it even if a
+// client requests it with demo mode disabled.
 export const DEMO_STATIONS: Station[] = [
   {
     id: "stn-a",
@@ -51,30 +50,26 @@ export function getStationById(id: string): Station | undefined {
 }
 
 // ---------------------------------------------------------------------
-// LIVE US DEMO SET — for the recorded, real-CALL-E segment of the demo.
+// LIVE STATION SET — the only entries eligible for a real CALL-E call.
 //
-// These are NOT random private numbers. All are 24/7 published customer
-// support lines run by the charging networks themselves, meant to be called
-// by any driver asking exactly this question ("is this specific charger
-// working right now?"). That makes them an appropriate, consent-compatible
-// target for a disclosed AI call — unlike a station's own front desk or an
-// individual's cell number, which you should not cold-call without their
-// prior agreement.
+// These are not private numbers. All are 24/7 published customer support
+// lines operated by the charging networks themselves, intended to field
+// exactly this question ("is this specific charger working right now?")
+// from any driver. That is what makes them an appropriate destination for
+// a disclosed AI call — unlike a station's own front desk or an
+// individual's number, which should not be called without prior
+// agreement.
 //
-// INVARIANT: `address` must always be a real, specific street address —
-// never instructional/placeholder text like "ask about a station during
-// the call". buildTask() inserts this field verbatim into the actual
-// sentence spoken to CALL-E ("Call X (ADDRESS) to check..."), so a
-// placeholder here doesn't prompt the caller to improvise — it gets read
-// out as the literal address, produces a nonsense call, and CALL-E
-// correctly reports no verifiable result. If you add a "just call the
-// generic support line" entry, it needs a real paired address, not a note
-// to the human reading this file.
+// INVARIANT: `address` must always be a real, specific street address,
+// never instructional or placeholder text. buildTask() inserts this field
+// verbatim into the sentence spoken on the call ("Call X (ADDRESS) to
+// check..."), so placeholder text here is read out literally rather than
+// prompting the caller to improvise, producing a nonsensical call and no
+// usable result. A "generic support line" entry still needs a real paired
+// address.
 //
-// Verify these numbers and addresses are still current before recording
-// (support lines and specific stations do change) and keep the live
-// segment to one or two calls given the free-call allowance on a new
-// account.
+// Verify these numbers and addresses before use; support lines and station
+// listings change.
 export const LIVE_US_STATIONS: Station[] = [
   {
     id: "us-ea-la-broadway",
@@ -85,6 +80,7 @@ export const LIVE_US_STATIONS: Station[] = [
     connectors: ["CCS2", "CHAdeMO"],
     advertisedHours: "24/7",
     advertisedNotes: "Central support line, not an on-site phone — the call task states the exact address.",
+    liveCallAuthorized: true,
   },
   {
     id: "us-ea-bakersfield",
@@ -95,6 +91,7 @@ export const LIVE_US_STATIONS: Station[] = [
     connectors: ["CCS2", "CHAdeMO"],
     advertisedHours: "24/7",
     advertisedNotes: "Central support line, not an on-site phone — the call task states the exact address.",
+    liveCallAuthorized: true,
   },
   {
     id: "us-evgo-la-3rd",
@@ -105,6 +102,7 @@ export const LIVE_US_STATIONS: Station[] = [
     connectors: ["CCS2", "CHAdeMO"],
     advertisedHours: "24/7",
     advertisedNotes: "Central support line, not an on-site phone — the call task states the exact address.",
+    liveCallAuthorized: true,
   },
   {
     id: "us-chargepoint-la-beverly",
@@ -115,6 +113,7 @@ export const LIVE_US_STATIONS: Station[] = [
     connectors: ["Type2"],
     advertisedHours: "24/7",
     advertisedNotes: "Central support line, not an on-site phone — the call task states the exact address.",
+    liveCallAuthorized: true,
   },
   {
     id: "us-blink-la-flower",
@@ -125,5 +124,6 @@ export const LIVE_US_STATIONS: Station[] = [
     connectors: ["CCS1", "Type2"],
     advertisedHours: "24/7",
     advertisedNotes: "Central support line, not an on-site phone — the call task states the exact address.",
+    liveCallAuthorized: true,
   },
 ];
