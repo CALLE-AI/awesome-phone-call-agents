@@ -1,0 +1,23 @@
+{
+  "id": "07-assumed-deferral-warranty",
+  "category": "deferral",
+  "description": "A value is stated but immediately deferred. Deferral is a hard downgrade to assumed.",
+  "turns": [
+    { "speaker": "bot", "text": "Hi, this is the QuoteDesk assistant about the pump motor order.", "offset_seconds": 0 },
+    { "speaker": "user", "text": "Tell me.", "offset_seconds": 5 },
+    { "speaker": "bot", "text": "Can you confirm the warranty period on the pump motor?", "offset_seconds": 9 },
+    { "speaker": "user", "text": "It is twelve months, but let me get back to you to be sure.", "offset_seconds": 14 }
+  ],
+  "fields": [
+    {
+      "field": "warranty_months",
+      "value": 12,
+      "expects": "duration",
+      "questionTurn": 2,
+      "answerTurns": [3],
+      "critical": false,
+      "expectedGrade": "assumed",
+      "expectSignals": ["E"]
+    }
+  ]
+}
