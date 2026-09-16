@@ -1,0 +1,5 @@
+node_modules
+data/runs
+data/*.private.csv
+.env
+*.log
