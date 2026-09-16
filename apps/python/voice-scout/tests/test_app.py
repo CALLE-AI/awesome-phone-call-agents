@@ -17,19 +17,30 @@ class VoiceScoutTests(unittest.TestCase):
         self.assertTrue(result["idempotency_key"].startswith("voice-scout:"))
         self.assertNotIn("0000000000", json.dumps(result))
 
-    def test_live_requires_credentials(self):
+    def test_live_requires_explicit_authorization(self):
         lead = {"id": "x", "business_name": "Test", "industry": "Test", "phone": "+15550000000"}
-        with tempfile.TemporaryDirectory():
-            old_key = app.os.environ.pop("CALLE_API_KEY", None)
-            old_goal = app.os.environ.pop("CALLE_GOAL_ID", None)
-            try:
-                with self.assertRaises(RuntimeError):
-                    app.run_live(lead)
-            finally:
-                if old_key is not None:
-                    app.os.environ["CALLE_API_KEY"] = old_key
-                if old_goal is not None:
-                    app.os.environ["CALLE_GOAL_ID"] = old_goal
+        with self.assertRaises(RuntimeError):
+            app.run_live(lead)
+
+    def test_nested_provider_output_is_sanitized(self):
+        result = app.sanitize_result({
+            "transcript": "Call +15551234567 and then +441234567890.",
+            "recipient_phone": "+15551234567",
+            "api_key": "secret-value",
+            "nested": {"destination": "+15557654321"},
+        })
+        encoded = json.dumps(result)
+        self.assertNotIn("+15551234567", encoded)
+        self.assertNotIn("+441234567890", encoded)
+        self.assertNotIn("+15557654321", encoded)
+        self.assertNotIn("secret-value", encoded)
+        self.assertIn("[REDACTED]", encoded)
+
+    def test_unicode_digits_are_not_valid_e164(self):
+        path = Path(tempfile.mkdtemp()) / "lead.json"
+        path.write_text(json.dumps({"id": "x", "business_name": "Test", "industry": "Test", "phone": "+١٥٥٥٠٠٠٠٠٠٠"}))
+        with self.assertRaises(ValueError):
+            app.load_lead(path)
 
 
 if __name__ == "__main__":
