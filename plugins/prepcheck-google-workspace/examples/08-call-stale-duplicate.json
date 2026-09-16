@@ -1,5 +1,5 @@
 {
-  "_comment": "First call at the 72-hour checkpoint. The patient has stopped the iron tablets but has not collected the prep kit, and says they will. PrepCheck records this as PARTIAL and schedules a callback 48 hours later. No call is placed by posting this file.",
+  "_comment": "A duplicate of an earlier result, replayed. The row is no longer IN_CALL, so PrepCheck refuses to apply it a second time and holds the patient for review. Without this check a replayed webhook would advance the follow-up counter and schedule another call to a real person.",
   "status": "completed",
   "task_completed": true,
   "completion_confidence": {
@@ -23,9 +23,9 @@
         ],
         "outstanding_plan": "will collect it tomorrow afternoon",
         "wants_reschedule": "no",
+        "asked_to_stop": false,
         "flag_for_staff": false,
-        "identity_verified": true,
-        "asked_to_stop": false
+        "identity_verified": true
       }
     }
   ]

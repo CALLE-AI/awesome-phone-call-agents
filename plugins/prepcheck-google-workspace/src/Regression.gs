@@ -72,10 +72,14 @@ function diffReadiness_(previousSnapshot, completedNow, outstandingNow) {
     net = 'unchanged';
   }
 
+  // Item labels come from the clinic's own PrepSteps sheet, but the arrays
+  // arrive from the provider, so treat them as free text on the way out.
   const parts = [];
-  if (resolved.length) parts.push('resolved: ' + resolved.join(', '));
-  if (regressed.length) parts.push('REGRESSED: ' + regressed.join(', '));
-  if (stillOutstanding.length) parts.push('still outstanding: ' + stillOutstanding.join(', '));
+  if (resolved.length) parts.push('resolved: ' + maskFreeText_(resolved.join(', '), 120));
+  if (regressed.length) parts.push('REGRESSED: ' + maskFreeText_(regressed.join(', '), 120));
+  if (stillOutstanding.length) {
+    parts.push('still outstanding: ' + maskFreeText_(stillOutstanding.join(', '), 120));
+  }
   parts.push('net: ' + net);
 
   return {
@@ -130,15 +134,21 @@ function recordReadiness_(r, result) {
  */
 function notifyRegression_(r, diff) {
   notifyStaff_(r,
-    'Preparation regressed — previously confirmed step is not complete',
+    'For review — a previously confirmed step is reported as not complete',
     [
-      'A step recorded as complete on an earlier call is now reported as not done.',
+      'On an earlier call this step was recorded as done. On the latest call ' +
+      'the patient reported it as not done.',
       '',
-      'Regressed: ' + diff.regressed.join(', '),
-      diff.resolved.length ? 'Resolved since last call: ' + diff.resolved.join(', ') : '',
-      'Net readiness: ' + diff.net,
+      'Reported as not done: ' + maskFreeText_(diff.regressed.join(', '), 160),
+      diff.resolved.length
+        ? 'Reported as done since the last call: ' +
+          maskFreeText_(diff.resolved.join(', '), 160)
+        : '',
+      'Net change: ' + diff.net,
       '',
-      'Verify the record before the procedure goes ahead.'
+      'Which of the two reports is correct is not something this system can ' +
+      'establish. No further calls will be placed for this patient until ' +
+      'someone has checked the record.'
     ].filter(Boolean).join('\n'));
 }
 

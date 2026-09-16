@@ -28,7 +28,14 @@ function prepResultSchema_() {
         type: 'string',
         description: 'For any step not yet done: what the patient says they ' +
           'have actually arranged to complete it — a booked appointment, a ' +
-          'specific day, or nothing concrete. Empty if all steps are done.'
+          'specific day, or nothing concrete. Logistics only; do not record ' +
+          'anything the patient said about their health, symptoms or ' +
+          'medication. Empty if all steps are done.'
+      },
+      asked_to_stop: {
+        type: 'boolean',
+        description: 'True if the patient asked not to be called again, ' +
+          'by any wording. Once true, no further call is placed.'
       },
       flag_for_staff: {
         type: 'boolean',
@@ -42,9 +49,36 @@ function prepResultSchema_() {
 }
 
 /**
+ * A copy of the outbound payload that is safe to write to a sheet a clinic
+ * will share, screenshot, or paste into a support ticket. The webhook secret
+ * and the patient's full number never appear in the log.
+ */
+function redactPayload_(payload) {
+  const copy = JSON.parse(JSON.stringify(payload));
+  if (copy.webhook_url) {
+    copy.webhook_url = String(copy.webhook_url).split('?')[0] + '?token=[redacted]';
+  }
+  (copy.recipients || []).forEach(r => {
+    r.phones = (r.phones || []).map(maskPhone_);
+  });
+  return copy;
+}
+
+/**
  * Places one outbound call. Returns { call_id }.
  */
 function createCall_(patient, checkpoint, prepItems, attemptTag) {
+  // Dispatch entry point. Nothing unvalidated gets past here, in either mode
+  // — a dry run that would have dialled a malformed number is still a bug.
+  if (!isE164_(patient.phone_e164)) {
+    throw new Error('Refusing to dispatch: phone number is not ASCII E.164 ' +
+      '(expected +<country><number>, got "' + maskFreeText_(patient.phone_e164, 24) + '").');
+  }
+  if (!prepItems || !prepItems.length) {
+    throw new Error('Refusing to dispatch: no preparation steps for ' +
+      maskFreeText_(patient.procedure, 40) + ' at checkpoint ' + checkpoint + '.');
+  }
+
   const payload = {
     task: buildTask_(patient, checkpoint, prepItems),
     recipients: [{
@@ -63,7 +97,7 @@ function createCall_(patient, checkpoint, prepItems, attemptTag) {
   };
 
   if (!LIVE_CALLS_ENABLED) {
-    logEvent_(patient.row_id, '', checkpoint, 'DRY_RUN', payload);
+    logEvent_(patient.row_id, '', checkpoint, 'DRY_RUN', redactPayload_(payload));
     return { call_id: 'dry_' + Utilities.getUuid().slice(0, 8), dryRun: true };
   }
 
@@ -83,8 +117,9 @@ function createCall_(patient, checkpoint, prepItems, attemptTag) {
   const code = res.getResponseCode();
   const body = res.getContentText();
   if (code < 200 || code >= 300) {
-    logEvent_(patient.row_id, '', checkpoint, 'CREATE_FAILED', code + ' ' + body);
-    throw new Error('CALL-E create failed: ' + code + ' ' + body);
+    const safe = maskFreeText_(body, 300);
+    logEvent_(patient.row_id, '', checkpoint, 'CREATE_FAILED', code + ' ' + safe);
+    throw new Error('CALL-E create failed: ' + code + ' ' + safe);
   }
 
   const json = JSON.parse(body);
@@ -136,7 +171,8 @@ function buildTask_(patient, checkpoint, prepItems) {
     'obtaining something is not the same as having done it. If an answer is',
     'ambiguous, ask once to clarify before recording it.',
     'For any step not yet done, ask what they have arranged to complete it:',
-    'a booked appointment, a specific day, or nothing yet. Record that.',
+    'a booked appointment, a specific day, or nothing yet. Record that as',
+    'logistics only — never record what they say about their health.',
     '',
     checklist,
     '',
@@ -158,7 +194,8 @@ function buildTask_(patient, checkpoint, prepItems) {
     '  acknowledge briefly, say a clinician will call them back, set',
     '  flag_for_staff true, and end the call. Do not ask follow-up questions',
     '  about the symptom.',
-    '- If the patient asks to stop being called, agree, and end.',
+    '- If the patient asks to stop being called, in any wording: agree, set',
+    '  asked_to_stop true, and end. Do not offer to call back.',
     '- Never claim to be a nurse, doctor, or human.'
   ].join('\n');
 }

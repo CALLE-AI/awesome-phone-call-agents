@@ -33,11 +33,11 @@ function sweep() {
       try {
         placeCheckpointCall_(r);
       } catch (err) {
-        logEvent_(r.row_id, '', r.checkpoint, 'SWEEP_ERROR', String(err));
-        updateRow_(r._row, {
-          state: STATE.STAFF_REVIEW,
-          staff_note: 'Call could not be placed: ' + err
-        });
+        const safe = maskFreeText_(String(err), 200);
+        logEvent_(r.row_id, '', r.checkpoint, 'SWEEP_ERROR', safe);
+        // A dispatch that failed must not be retried on the next sweep until
+        // a person has looked at why.
+        hold_(r, 'Call could not be placed: ' + safe);
       }
     });
   } finally {
@@ -45,18 +45,35 @@ function sweep() {
   }
 }
 
-/** A row is due when it is waiting on a call and its timestamp has passed. */
+/**
+ * A row is due when it is waiting on a call and its timestamp has passed.
+ * STAFF_REVIEW, IN_CALL, CONFIRMED and NOT_PREPARED are not callable states,
+ * which is what makes hold_() a genuine stop rather than a label.
+ */
 function isDue_(r, now) {
   const callable = [STATE.PENDING, STATE.PARTIAL, STATE.NO_ANSWER];
   if (callable.indexOf(r.state) < 0) return false;
   if (!r.next_call_at) return false;
   if (!r.checkpoint || r.checkpoint === 'DONE') return false;
-  if (!r.phone_e164) return false;
-  return new Date(r.next_call_at) <= now;
+  if (!isE164_(r.phone_e164)) return false;
+  const due = new Date(r.next_call_at);
+  if (isNaN(due.getTime())) return false;
+  return due <= now;
 }
 
 /** Places the call for this row's current checkpoint. */
 function placeCheckpointCall_(r) {
+  // Second validation point. createCall_ checks too, but refusing here keeps
+  // a malformed row out of the IN_CALL state entirely.
+  if (!isE164_(r.phone_e164)) {
+    return hold_(r, 'Phone number is not valid E.164, so no call was placed. ' +
+      'Correct the number and reset the patient.');
+  }
+  if (!r.procedure_at || isNaN(new Date(r.procedure_at).getTime())) {
+    return hold_(r, 'Procedure date is missing or unreadable, so no call was ' +
+      'placed.');
+  }
+
   const items = prepItemsFor_(r.procedure, r.checkpoint);
   if (!items.length) {
     // Nothing to verify at this checkpoint — advance rather than call.
@@ -102,5 +119,8 @@ function scheduleNewRows() {
 function callRowNow(rowId) {
   const r = findByRowId_(rowId);
   if (!r) throw new Error('No such row_id: ' + rowId);
+  if (r.state === STATE.IN_CALL) {
+    throw new Error('A call is already in flight for ' + rowId + '.');
+  }
   placeCheckpointCall_(r);
 }

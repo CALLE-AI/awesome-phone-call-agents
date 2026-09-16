@@ -1,0 +1,28 @@
+{
+  "_comment": "The patient asked not to be called again. asked_to_stop ends the workflow for this patient immediately — no callback, no retry, no further checkpoint. The opt-out is handled in code rather than left to whoever reads the sheet next.",
+  "status": "completed",
+  "task_completed": true,
+  "completion_confidence": {
+    "score": 0.9,
+    "label": "high"
+  },
+  "metadata": {
+    "row_id": "P001",
+    "checkpoint": "T72",
+    "source": "prepcheck"
+  },
+  "recipients": [
+    {
+      "structured_result": {
+        "prep_status": "unclear",
+        "items_completed": [],
+        "items_outstanding": [],
+        "outstanding_plan": "",
+        "wants_reschedule": "unknown",
+        "asked_to_stop": true,
+        "flag_for_staff": false,
+        "identity_verified": true
+      }
+    }
+  ]
+}

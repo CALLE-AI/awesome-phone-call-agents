@@ -42,7 +42,15 @@ const MAX_NO_ANSWER_ATTEMPTS = 2;
 const PARTIAL_CALLBACK_HOURS = 48;
 const NO_ANSWER_RETRY_HOURS = 5;  // different time of day, not a redial
 
-/** Kill switch. Set to true to place real calls. */
+/**
+ * Kill switch. Set to true to place real calls.
+ *
+ * Note what this does and does not do. Setting it to false stops PrepCheck
+ * dispatching anything further — no new calls, no notification email. It
+ * cannot recall a call CALL-E has already accepted: once the provider has the
+ * task, the conversation is out of this system's hands. Treat the kill switch
+ * as "place nothing more", not as "cancel what is in flight".
+ */
 const LIVE_CALLS_ENABLED = false;
 
 function props_() {
@@ -65,8 +73,44 @@ function getWebhookSecret_() {
   return props_().getProperty('WEBHOOK_SECRET') || '';
 }
 
+/**
+ * Staff notification address. There is deliberately no fallback to the
+ * effective user: an unconfigured install must not quietly email whoever
+ * happened to run the script.
+ */
 function getStaffEmail_() {
-  return props_().getProperty('STAFF_EMAIL') || Session.getEffectiveUser().getEmail();
+  return props_().getProperty('STAFF_EMAIL') || '';
+}
+
+/**
+ * ASCII E.164 only. Anything else never reaches a dispatch call.
+ * Rejects Unicode digits, spaces, dashes, brackets and leading zeros.
+ */
+function isE164_(value) {
+  const s = String(value == null ? '' : value);
+  return /^\+[1-9][0-9]{7,14}$/.test(s);
+}
+
+/** Masks a phone number for logs and previews: +1202*****43 */
+function maskPhone_(value) {
+  const s = String(value == null ? '' : value);
+  if (s.length < 7) return '***';
+  return s.slice(0, 5) + '*'.repeat(Math.max(0, s.length - 7)) + s.slice(-2);
+}
+
+/**
+ * Anything a caller said, or a provider returned, is untrusted free text.
+ * It never lands in a log verbatim: it is truncated and stripped of
+ * characters that could break out of a cell or a log line.
+ */
+function maskFreeText_(value, max) {
+  const limit = max || 120;
+  const s = String(value == null ? '' : value)
+    .replace(/[\r\n\t]+/g, ' ')
+    .replace(/[<>]/g, '')
+    .trim();
+  if (!s) return '';
+  return s.length > limit ? s.slice(0, limit) + '…' : s;
 }
 
 /**

@@ -201,36 +201,78 @@
       { key: 'settled',   title: 'Ready for the procedure' }
     ];
 
-    var html = '<div class="wrap">';
-    html += '<header><p class="clinic">' + esc(q.clinic) + '</p>' +
-            '<p class="strap">Procedure preparation &middot; ' +
-            q.patients.length + (q.patients.length === 1 ? ' patient' : ' patients') +
-            '</p></header>';
+    var wrap = el('div', 'wrap');
+
+    var head = el('header');
+    head.appendChild(text(el('p', 'clinic'), q.clinic));
+    head.appendChild(text(el('p', 'strap'),
+      'Procedure preparation \u00b7 ' + q.patients.length +
+      (q.patients.length === 1 ? ' patient' : ' patients')));
+    wrap.appendChild(head);
 
     groups.forEach(function (g) {
       var rows = q.patients.filter(function (p) { return p.bucket === g.key; });
       if (!rows.length) return;
-      html += '<div class="group"><h2>' + esc(g.title) + ' (' + rows.length + ')</h2></div>';
-      html += rows.map(row).join('');
+      var grp = el('div', 'group');
+      grp.appendChild(text(el('h2'), g.title + ' (' + rows.length + ')'));
+      wrap.appendChild(grp);
+      rows.forEach(function (p) { wrap.appendChild(row(p)); });
     });
 
-    html += '<footer>Calls placed by CALL-E' +
-            (q.liveCalls ? '' : ' &middot; calling switched off') + '</footer>';
-    html += '</div>';
-    document.getElementById('root').className = '';
-    document.getElementById('root').innerHTML = html;
+    wrap.appendChild(text(el('footer'),
+      'Calls placed by CALL-E' + (q.liveCalls ? '' : ' \u00b7 calling switched off')));
+
+    mount(wrap);
   }
 
+  /** Replaces the panel contents with a node, never with a string. */
+  function mount(node) {
+    var root = document.getElementById('root');
+    root.className = '';
+    root.textContent = '';
+    root.appendChild(node);
+  }
+
+  /**
+   * Patient rows are built as DOM nodes with textContent, never as an HTML
+   * string carrying patient data. The row id travels in a data attribute and
+   * is read back by a delegated listener, so nothing a patient's name
+   * contains can become markup or script.
+   */
   function row(p) {
-    return '<button class="patient ' + p.tone + '" onclick="open_(\'' + esc(p.rowId) + '\')">' +
-             '<span class="top">' +
-               '<span class="name">' + esc(p.name) + '</span>' +
-               '<span class="word ' + p.tone + '">' + esc(p.word) + '</span>' +
-             '</span>' +
-             '<div class="line">' + esc(p.procedure) +
-               (p.when ? ' &middot; ' + esc(p.when) : '') + '</div>' +
-             (p.holdup ? '<div class="holdup">' + esc(p.holdup) + '</div>' : '') +
-           '</button>';
+    var btn = el('button', 'patient ' + toneClass(p.tone));
+    btn.type = 'button';
+    btn.dataset.action = 'open';
+    btn.dataset.rowId = String(p.rowId);
+
+    var top = el('span', 'top');
+    top.appendChild(text(el('span', 'name'), p.name));
+    top.appendChild(text(el('span', 'word ' + toneClass(p.tone)), p.word));
+    btn.appendChild(top);
+
+    var line = p.procedure + (p.when ? ' \u00b7 ' + p.when : '');
+    btn.appendChild(text(el('div', 'line'), line));
+
+    if (p.holdup) btn.appendChild(text(el('div', 'holdup'), p.holdup));
+    return btn;
+  }
+
+  /* ---------- DOM helpers: structure from code, content from textContent ---------- */
+
+  function el(tag, cls) {
+    var n = document.createElement(tag);
+    if (cls) n.className = cls;
+    return n;
+  }
+
+  function text(node, value) {
+    node.textContent = value == null ? '' : String(value);
+    return node;
+  }
+
+  /** Tones are a closed set; never let a server string become a class name. */
+  function toneClass(tone) {
+    return ['alarm', 'warn', 'ready', 'ok', 'idle'].indexOf(tone) >= 0 ? tone : 'ok';
   }
 
   /* ---------- card ---------- */
@@ -239,42 +281,60 @@
     if (!c) return fail('That patient is no longer in the sheet.');
     view = { name: 'card', rowId: c.rowId };
 
-    var html = '<div class="wrap">';
-    html += '<button class="back" onclick="loadList()">&larr; All patients</button>';
-    html += '<div class="card-head"><h1>' + esc(c.name) + '</h1>' +
-            '<p class="when">' + esc(c.procedure) +
-            (c.procedureAt ? ' &middot; ' + esc(c.procedureAt) : '') + '</p></div>';
+    var wrap = el('div', 'wrap');
 
-    html += '<div class="verdict">' +
-              '<p class="headline ' + c.tone + '">' + esc(headline(c)) + '</p>' +
-              '<p class="because">' + esc(because(c)) + '</p>' +
-            '</div>';
+    var back = el('button', 'back');
+    back.type = 'button';
+    back.dataset.action = 'list';
+    back.textContent = '\u2190 All patients';
+    wrap.appendChild(back);
 
-    html += '<div class="rail">' + c.stages.map(stage).join('') + '</div>';
+    var head = el('div', 'card-head');
+    head.appendChild(text(el('h1'), c.name));
+    head.appendChild(text(el('p', 'when'),
+      c.procedure + (c.procedureAt ? ' \u00b7 ' + c.procedureAt : '')));
+    wrap.appendChild(head);
 
-    html += '<div class="facts">';
-    if (c.nextCallAt) html += fact('Next call', c.nextCallAt);
+    var verdict = el('div', 'verdict');
+    verdict.appendChild(text(el('p', 'headline ' + toneClass(c.tone)), headline(c)));
+    verdict.appendChild(text(el('p', 'because'), because(c)));
+    wrap.appendChild(verdict);
+
+    var rail = el('div', 'rail');
+    c.stages.forEach(function (s) { rail.appendChild(stage(s)); });
+    wrap.appendChild(rail);
+
+    var facts = el('div', 'facts');
+    if (c.nextCallAt) facts.appendChild(fact('Next call', c.nextCallAt));
     if (c.partialCycles) {
-      html += fact('Follow-up calls used', c.partialCycles + ' of ' + c.maxPartialCycles);
+      facts.appendChild(fact('Follow-up calls used',
+        c.partialCycles + ' of ' + c.maxPartialCycles));
     }
-    if (c.noAnswerAttempts) html += fact('Unanswered calls', String(c.noAnswerAttempts));
-    html += '</div>';
+    if (c.noAnswerAttempts) {
+      facts.appendChild(fact('Unanswered calls', String(c.noAnswerAttempts)));
+    }
+    wrap.appendChild(facts);
 
-    if (c.staffNote) html += '<div class="note">' + esc(c.staffNote) + '</div>';
+    if (c.staffNote) wrap.appendChild(text(el('div', 'note'), c.staffNote));
 
-    html += '<div class="actions">';
-    html +=   '<button class="act primary" onclick="act(\'callPatient\', this)">Call ' +
-              esc(first(c.name)) + ' now</button>';
-    html +=   '<button class="act" onclick="act(\'resetPatient\', this)">' +
-              'Start this patient over</button>';
-    html += '</div>';
+    var actions = el('div', 'actions');
+    var callBtn = el('button', 'act primary');
+    callBtn.type = 'button';
+    callBtn.dataset.action = 'callPatient';
+    callBtn.textContent = 'Call ' + first(c.name) + ' now';
+    actions.appendChild(callBtn);
 
-    html += '<footer>Calls placed by CALL-E' +
-            (c.liveCalls ? '' : ' &middot; calling switched off') + '</footer>';
-    html += '</div>';
+    var resetBtn = el('button', 'act');
+    resetBtn.type = 'button';
+    resetBtn.dataset.action = 'resetPatient';
+    resetBtn.textContent = 'Start this patient over';
+    actions.appendChild(resetBtn);
+    wrap.appendChild(actions);
 
-    document.getElementById('root').className = '';
-    document.getElementById('root').innerHTML = html;
+    wrap.appendChild(text(el('footer'),
+      'Calls placed by CALL-E' + (c.liveCalls ? '' : ' \u00b7 calling switched off')));
+
+    mount(wrap);
   }
 
   function headline(c) {
@@ -310,46 +370,85 @@
   }
 
   function stage(s) {
-    return '<div class="stage ' + s.position + '">' +
-             '<div class="spine"><span class="dot"></span><span class="thread"></span></div>' +
-             '<div class="stage-body">' +
-               '<div class="stage-when">' + esc(before(s.hoursBefore)) + '</div>' +
-               '<ul class="steps">' + s.items.map(step).join('') + '</ul>' +
-             '</div>' +
-           '</div>';
+    var wrap = el('div', 'stage ' + positionClass(s.position));
+
+    var spine = el('div', 'spine');
+    spine.appendChild(el('span', 'dot'));
+    spine.appendChild(el('span', 'thread'));
+    wrap.appendChild(spine);
+
+    var body = el('div', 'stage-body');
+    body.appendChild(text(el('div', 'stage-when'), before(s.hoursBefore)));
+
+    var list = el('ul', 'steps');
+    s.items.forEach(function (it) { list.appendChild(step(it)); });
+    body.appendChild(list);
+
+    wrap.appendChild(body);
+    return wrap;
+  }
+
+  function positionClass(p) {
+    return ['past', 'now', 'ahead'].indexOf(p) >= 0 ? p : 'ahead';
+  }
+
+  function statusClass(st) {
+    return ['done', 'outstanding', 'unknown'].indexOf(st) >= 0 ? st : 'unknown';
   }
 
   function before(hours) {
-    if (hours % 24 === 0) {
-      var d = hours / 24;
+    var h = Number(hours);
+    if (!isFinite(h)) return '';
+    if (h % 24 === 0) {
+      var d = h / 24;
       return d === 1 ? 'The day before' : d + ' days before';
     }
-    return hours + ' hours before';
+    return h + ' hours before';
   }
 
   function step(it) {
-    var mark = it.status === 'done' ? '&#10003;'
-             : it.status === 'outstanding' ? '&#10007;' : '&middot;';
-    return '<li class="is-' + it.status + '">' +
-             '<span class="tick ' + it.status + '">' + mark + '</span>' +
-             '<span class="step-label">' + esc(it.label) + '</span>' +
-           '</li>';
+    var st = statusClass(it.status);
+    var li = el('li', 'is-' + st);
+    var mark = st === 'done' ? '\u2713' : (st === 'outstanding' ? '\u2717' : '\u00b7');
+    li.appendChild(text(el('span', 'tick ' + st), mark));
+    li.appendChild(text(el('span', 'step-label'), it.label));
+    return li;
   }
 
   function fact(k, v) {
-    return '<div class="fact"><span>' + esc(k) + '</span><b>' + esc(v) + '</b></div>';
+    var row = el('div', 'fact');
+    row.appendChild(text(el('span'), k));
+    row.appendChild(text(el('b'), v));
+    return row;
   }
 
   /* ---------- plumbing ---------- */
 
+  /**
+   * One delegated listener for the whole panel. Buttons carry a data-action
+   * and, where relevant, a data-row-id; nothing is wired through markup.
+   */
+  document.addEventListener('click', function (ev) {
+    var btn = ev.target.closest ? ev.target.closest('button[data-action]') : null;
+    if (!btn) return;
+    var action = btn.dataset.action;
+
+    if (action === 'list') return loadList();
+    if (action === 'open') return open_(btn.dataset.rowId);
+    if (action === 'callPatient' || action === 'resetPatient') {
+      return act(action, btn);
+    }
+  });
+
   function open_(rowId) {
-    busy('Opening…');
+    if (!rowId) return;
+    busy('Opening\u2026');
     google.script.run.withSuccessHandler(renderCard)
-      .withFailureHandler(failWith).focusRow(rowId);
+      .withFailureHandler(failWith).focusRow(String(rowId));
   }
 
   function loadList() {
-    busy('Loading…');
+    busy('Loading\u2026');
     google.script.run.withSuccessHandler(renderList)
       .withFailureHandler(failWith).getQueue();
   }
@@ -357,7 +456,7 @@
   function act(fn, btn) {
     var all = document.querySelectorAll('button');
     for (var i = 0; i < all.length; i++) all[i].disabled = true;
-    btn.textContent = 'Working…';
+    btn.textContent = 'Working\u2026';
     google.script.run.withSuccessHandler(renderCard)
       .withFailureHandler(failWith)[fn](view.rowId);
   }
@@ -372,27 +471,23 @@
     }
   }
 
-  function busy(text) {
+  function busy(t) {
     var root = document.getElementById('root');
     root.className = 'msg';
-    root.textContent = text;
+    root.textContent = t;
   }
 
-  function fail(text) {
+  function fail(t) {
     var root = document.getElementById('root');
     root.className = 'msg';
-    root.textContent = text;
+    root.textContent = t;
   }
 
-  function failWith(e) { fail(e && e.message ? e.message : 'Something went wrong.'); }
+  function failWith(e) {
+    fail(e && e.message ? String(e.message) : 'Something went wrong.');
+  }
 
   function first(n) { return String(n || '').split(' ')[0]; }
-
-  function esc(s) {
-    return String(s === undefined || s === null ? '' : s)
-      .replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
-      .replace(/'/g, '&#39;');
-  }
 
   loadList();
   window.addEventListener('focus', refresh);
