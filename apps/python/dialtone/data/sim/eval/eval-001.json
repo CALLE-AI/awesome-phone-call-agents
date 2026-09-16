@@ -1,0 +1,75 @@
+{
+  "id": "eval-001",
+  "label": "agent",
+  "difficulty": "typical",
+  "scenario": "Restaurant AI reservation assistant books a party, reads out a confirmation code and sends SMS confirmation.",
+  "task": "Book a table for six this Saturday around 8 PM for Leah Morgan at Saffron Table.",
+  "outcome": {
+    "task_completed_claimed": true,
+    "commitment_type": "booking",
+    "confirmation_artifact": "confirmation code ST482; SMS confirmation sent to 555-0126",
+    "expected_attestation": "agent_asserted"
+  },
+  "turns": [
+    {
+      "speaker": "user",
+      "text": "thank you for calling Saffron Table. this is the Saffron Table reservation assistant. are you looking to make a new reservation, or change an existing one?",
+      "offset_seconds": 1.0
+    },
+    {
+      "speaker": "bot",
+      "text": "hi, I'm an AI assistant calling on behalf of Leah Morgan. I'd like to make a new reservation for six people this Saturday at eight PM.",
+      "offset_seconds": 10.81
+    },
+    {
+      "speaker": "user",
+      "text": "sure, I can help with that. let me check availability for a party of six this Saturday, September nineteenth, at eight PM.",
+      "offset_seconds": 20.83
+    },
+    {
+      "speaker": "user",
+      "text": "I don't have eight PM for six, but I do have seven fifteen or eight forty five. would either of those work?",
+      "offset_seconds": 30.22
+    },
+    {
+      "speaker": "bot",
+      "text": "eight forty five works.",
+      "offset_seconds": 38.78
+    },
+    {
+      "speaker": "user",
+      "text": "perfect. can I get a name and a mobile number for the reservation?",
+      "offset_seconds": 41.09
+    },
+    {
+      "speaker": "bot",
+      "text": "Leah Morgan, and the number is 555-0126.",
+      "offset_seconds": 46.75
+    },
+    {
+      "speaker": "user",
+      "text": "thank you, Leah. I've reserved a table for six on Saturday, September nineteenth, at eight forty five PM. your confirmation code is S T 4 8 2. I've also sent a text confirmation to 555-0126. please note we hold tables for fifteen minutes.",
+      "offset_seconds": 52.21
+    },
+    {
+      "speaker": "bot",
+      "text": "thanks. could you repeat the confirmation code?",
+      "offset_seconds": 69.88
+    },
+    {
+      "speaker": "user",
+      "text": "of course. it's S as in Sam, T as in Tom, four, eight, two.",
+      "offset_seconds": 73.76
+    },
+    {
+      "speaker": "bot",
+      "text": "got it, S T 4 8 2. thank you.",
+      "offset_seconds": 79.11
+    },
+    {
+      "speaker": "user",
+      "text": "you're welcome. we look forward to seeing you Saturday.",
+      "offset_seconds": 83.01
+    }
+  ]
+}

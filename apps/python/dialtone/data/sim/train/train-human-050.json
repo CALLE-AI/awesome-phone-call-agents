@@ -1,0 +1,46 @@
+{
+ "id": "train-human-050",
+ "label": "human",
+ "source": "sim-train",
+ "meta": {
+  "task": "book a table for two on Friday at 7 PM",
+  "hard": true
+ },
+ "turns": [
+  {
+   "speaker": "user",
+   "text": "Bloom Florists, Leah speaking.",
+   "offset_seconds": 1.28
+  },
+  {
+   "speaker": "bot",
+   "text": "Hi, I'm an AI assistant calling on behalf of Alex Martin. I'd like to book a table for two people this Friday at 7 PM, under the name Alex Martin.",
+   "offset_seconds": 3.15
+  },
+  {
+   "speaker": "user",
+   "text": "Friday at seven,",
+   "offset_seconds": 14.77
+  },
+  {
+   "speaker": "bot",
+   "text": "Is Friday at 7 available?",
+   "offset_seconds": 16.87
+  },
+  {
+   "speaker": "user",
+   "text": "Yep, you're all",
+   "offset_seconds": 18.75
+  },
+  {
+   "speaker": "bot",
+   "text": "Is Friday at 7 available?",
+   "offset_seconds": 21.28
+  },
+  {
+   "speaker": "user",
+   "text": "No problem, bye now.",
+   "offset_seconds": 24.28
+  }
+ ]
+}

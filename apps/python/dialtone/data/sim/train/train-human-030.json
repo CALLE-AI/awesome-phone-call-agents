@@ -1,0 +1,56 @@
+{
+ "id": "train-human-030",
+ "label": "human",
+ "source": "sim-train",
+ "meta": {
+  "task": "ask for a quote for a brake replacement",
+  "hard": false
+ },
+ "turns": [
+  {
+   "speaker": "user",
+   "text": "Hello?",
+   "offset_seconds": 1.82
+  },
+  {
+   "speaker": "bot",
+   "text": "Hi, I'm an AI assistant calling on behalf of Jordan Lee. Could you give me a rough quote for replacing the front brake pads on a 2018 sedan?",
+   "offset_seconds": 3.21
+  },
+  {
+   "speaker": "user",
+   "text": "uh, Sunday we're open ten to four.",
+   "offset_seconds": 14.55
+  },
+  {
+   "speaker": "bot",
+   "text": "How soon could you do it?",
+   "offset_seconds": 18.78
+  },
+  {
+   "speaker": "user",
+   "text": "Okay, yeah hmm, that's fine.",
+   "offset_seconds": 20.9
+  },
+  {
+   "speaker": "bot",
+   "text": "How soon could you do it?",
+   "offset_seconds": 23.78
+  },
+  {
+   "speaker": "user",
+   "text": "Okay, yeah yeah that's fine.",
+   "offset_seconds": 26.66
+  },
+  {
+   "speaker": "bot",
+   "text": "Thank you so much, that's all I needed.",
+   "offset_seconds": 29.52
+  },
+  {
+   "speaker": "user",
+   "text": "Okay, bye.",
+   "offset_seconds": 32.97
+  }
+ ]
+}
