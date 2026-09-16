@@ -1,0 +1,59 @@
+[
+  {
+    "id": "c1",
+    "claim": "Maintained 98% CSAT",
+    "topic": "98% CSAT",
+    "need": "Was 98% Devan's own score or the team's?",
+    "source": "resume",
+    "whyItMatters": "The role weights numbers that are yours rather than your queue's, and one satisfaction figure reads identically whether it describes this person or the six people around them.",
+    "question": "You mentioned 98% CSAT. Was that your own score or the team's?",
+    "probes": [
+      "What was your own figure, if it differed from the queue's?",
+      "Across how many surveyed cases?",
+      "Over what period was it measured?"
+    ],
+    "extract": [
+      "whose number it is",
+      "their own figure",
+      "sample size"
+    ]
+  },
+  {
+    "id": "c2",
+    "claim": "Resolved critical production incidents for enterprise customers",
+    "topic": "Production incidents",
+    "need": "What did Devan diagnose personally, and what did others?",
+    "source": "resume",
+    "whyItMatters": "The role is hands-on diagnosis rather than case routing, so what this person read and concluded themselves is exactly what the written claim leaves open.",
+    "question": "You wrote that you resolved critical production incidents. On the most recent one, what did you personally diagnose before anyone else was involved?",
+    "probes": [
+      "Which logs or consoles did you open yourself, and what did they tell you?",
+      "What turned out to be the root cause, and who found it?",
+      "At what point did you hand it to a service team, and what did you give them?"
+    ],
+    "extract": [
+      "what they diagnosed personally",
+      "which tools and logs they used",
+      "the root cause and who identified it"
+    ]
+  },
+  {
+    "id": "c3",
+    "claim": "Handled Sev-1 incidents",
+    "topic": "Sev-1 incidents",
+    "need": "Did Devan run the bridge, or answer questions on it?",
+    "source": "resume",
+    "whyItMatters": "The role asks for a clear account of your own incident role, and \"handled\" covers everything from driving the bridge to answering one question on it.",
+    "question": "You wrote that you handled Sev-1 incidents. On the last one, what was your role on the bridge?",
+    "probes": [
+      "Were you the person driving the call, or one of the responders on it?",
+      "Who owned the updates going out to the customer during it?",
+      "How many Sev-1 bridges have you been on in the last year?"
+    ],
+    "extract": [
+      "role on the bridge",
+      "who ran the call",
+      "who owned customer updates"
+    ]
+  }
+]

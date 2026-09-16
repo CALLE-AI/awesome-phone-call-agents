@@ -1,0 +1,350 @@
+{
+  "id": "call_fixture_rolloffscope_001",
+  "status": "completed",
+  "task_completed": true,
+  "completion_confidence": {
+    "score": 0.93,
+    "label": "high"
+  },
+  "structured_result": {
+    "recipients_contacted": 4,
+    "quotes_received": 3
+  },
+  "recipients": [
+    {
+      "status": "completed",
+      "structured_result": {
+        "outcome": "quoted",
+        "scope_match": "yes",
+        "base_rental_amount": 475,
+        "currency": "USD",
+        "delivery_fee_amount": 0,
+        "delivery_fee_status": "included",
+        "pickup_fee_amount": 0,
+        "pickup_fee_status": "included",
+        "rental_days_included": 7,
+        "included_tonnage": 2,
+        "overage_per_ton_amount": 80,
+        "overage_status": "quoted",
+        "fuel_fee_amount": 25,
+        "fuel_fee_status": "additional",
+        "environmental_fee_amount": 15,
+        "environmental_fee_status": "additional",
+        "permit_requirement": "not_required",
+        "permit_responsibility": "not_applicable",
+        "permit_fee_amount": 0,
+        "permit_fee_status": "none",
+        "prohibited_materials_status": "provided",
+        "prohibited_materials": [
+          "hazardous waste",
+          "batteries",
+          "tires"
+        ],
+        "tax_amount": 60,
+        "tax_status": "additional",
+        "availability": "available",
+        "earliest_delivery": "2026-09-15",
+        "quote_valid_until": "2026-09-12",
+        "assumptions": [
+          "Load contains only the stated non-hazardous household cleanout waste",
+          "Container stays on the stated private driveway"
+        ],
+        "contradictions": [],
+        "evidence": [
+          {
+            "fields": [
+              "outcome",
+              "scope_match",
+              "availability",
+              "earliest_delivery",
+              "quote_valid_until"
+            ],
+            "statement": "The representative confirmed the requested scope, availability on September 15, and validity through September 12."
+          },
+          {
+            "fields": [
+              "base_rental_amount",
+              "currency",
+              "rental_days_included",
+              "included_tonnage",
+              "overage_per_ton_amount",
+              "overage_status"
+            ],
+            "statement": "The USD 475 base covers seven days and two tons; additional weight is USD 80 per ton."
+          },
+          {
+            "fields": [
+              "delivery_fee_amount",
+              "delivery_fee_status",
+              "pickup_fee_amount",
+              "pickup_fee_status"
+            ],
+            "statement": "Delivery and pickup are included with no separate charge."
+          },
+          {
+            "fields": [
+              "fuel_fee_amount",
+              "fuel_fee_status",
+              "environmental_fee_amount",
+              "environmental_fee_status"
+            ],
+            "statement": "A USD 25 fuel charge and USD 15 environmental charge are mandatory additions."
+          },
+          {
+            "fields": [
+              "permit_requirement",
+              "permit_responsibility",
+              "permit_fee_amount",
+              "permit_fee_status"
+            ],
+            "statement": "No permit is required for the stated private-driveway placement, so no permit fee applies."
+          },
+          {
+            "fields": [
+              "prohibited_materials_status",
+              "prohibited_materials"
+            ],
+            "statement": "Hazardous waste, batteries, and tires are prohibited."
+          },
+          {
+            "fields": [
+              "tax_amount",
+              "tax_status"
+            ],
+            "statement": "USD 60 tax is added to the quote."
+          },
+          {
+            "fields": [
+              "assumptions"
+            ],
+            "statement": "The quote assumes the stated waste type and private-driveway placement."
+          }
+        ],
+        "notes": "Fictional complete fixture."
+      }
+    },
+    {
+      "status": "completed",
+      "structured_result": {
+        "outcome": "quoted",
+        "scope_match": "yes",
+        "base_rental_amount": 350,
+        "currency": "USD",
+        "delivery_fee_amount": 0,
+        "delivery_fee_status": "included",
+        "pickup_fee_amount": 0,
+        "pickup_fee_status": "included",
+        "rental_days_included": 7,
+        "included_tonnage": 1,
+        "fuel_fee_amount": 30,
+        "fuel_fee_status": "additional",
+        "environmental_fee_amount": 20,
+        "environmental_fee_status": "additional",
+        "permit_requirement": "not_required",
+        "permit_responsibility": "not_applicable",
+        "permit_fee_amount": 0,
+        "permit_fee_status": "none",
+        "prohibited_materials_status": "provided",
+        "prohibited_materials": [
+          "hazardous waste",
+          "batteries"
+        ],
+        "availability": "available",
+        "earliest_delivery": "2026-09-15",
+        "quote_valid_until": "2026-09-11",
+        "assumptions": [
+          "Load contains only the stated waste type"
+        ],
+        "contradictions": [],
+        "evidence": [
+          {
+            "fields": [
+              "outcome",
+              "scope_match",
+              "availability",
+              "earliest_delivery",
+              "quote_valid_until"
+            ],
+            "statement": "The representative offered the requested container for September 15 and held the quote through September 11."
+          },
+          {
+            "fields": [
+              "base_rental_amount",
+              "currency",
+              "rental_days_included",
+              "included_tonnage"
+            ],
+            "statement": "The USD 350 base covers seven days and one ton."
+          },
+          {
+            "fields": [
+              "delivery_fee_amount",
+              "delivery_fee_status",
+              "pickup_fee_amount",
+              "pickup_fee_status"
+            ],
+            "statement": "Delivery and pickup are included."
+          },
+          {
+            "fields": [
+              "fuel_fee_amount",
+              "fuel_fee_status",
+              "environmental_fee_amount",
+              "environmental_fee_status"
+            ],
+            "statement": "Fuel is USD 30 additional and the environmental charge is USD 20 additional."
+          },
+          {
+            "fields": [
+              "permit_requirement",
+              "permit_responsibility",
+              "permit_fee_amount",
+              "permit_fee_status"
+            ],
+            "statement": "No permit or permit fee is required for the stated placement."
+          },
+          {
+            "fields": [
+              "prohibited_materials_status",
+              "prohibited_materials"
+            ],
+            "statement": "Hazardous waste and batteries are prohibited."
+          },
+          {
+            "fields": [
+              "assumptions"
+            ],
+            "statement": "The price assumes the stated household cleanout waste."
+          }
+        ],
+        "notes": "Overage and tax were not provided."
+      }
+    },
+    {
+      "status": "completed",
+      "structured_result": {
+        "outcome": "quoted",
+        "scope_match": "yes",
+        "base_rental_amount": 400,
+        "currency": "USD",
+        "delivery_fee_amount": 0,
+        "delivery_fee_status": "included",
+        "pickup_fee_amount": 0,
+        "pickup_fee_status": "included",
+        "rental_days_included": 7,
+        "included_tonnage": 2.5,
+        "overage_per_ton_amount": 70,
+        "overage_status": "quoted",
+        "fuel_fee_amount": 0,
+        "fuel_fee_status": "included",
+        "environmental_fee_amount": 35,
+        "environmental_fee_status": "additional",
+        "permit_requirement": "not_required",
+        "permit_responsibility": "not_applicable",
+        "permit_fee_amount": 0,
+        "permit_fee_status": "none",
+        "prohibited_materials_status": "provided",
+        "prohibited_materials": [
+          "hazardous waste"
+        ],
+        "tax_amount": 0,
+        "tax_status": "included",
+        "availability": "available",
+        "earliest_delivery": "2026-09-16",
+        "quote_valid_until": "2026-09-12",
+        "assumptions": [
+          "Load contains only the stated waste type"
+        ],
+        "contradictions": [
+          "The representative first said every mandatory fee was included, then said a USD 35 environmental fee was additional."
+        ],
+        "evidence": [
+          {
+            "fields": [
+              "outcome",
+              "scope_match",
+              "availability",
+              "earliest_delivery",
+              "quote_valid_until"
+            ],
+            "statement": "The requested scope was available September 16 and the bid was valid through September 12."
+          },
+          {
+            "fields": [
+              "base_rental_amount",
+              "currency",
+              "rental_days_included",
+              "included_tonnage",
+              "overage_per_ton_amount",
+              "overage_status"
+            ],
+            "statement": "The USD 400 base covers seven days and 2.5 tons; overage is USD 70 per ton."
+          },
+          {
+            "fields": [
+              "delivery_fee_amount",
+              "delivery_fee_status",
+              "pickup_fee_amount",
+              "pickup_fee_status",
+              "fuel_fee_amount",
+              "fuel_fee_status"
+            ],
+            "statement": "Delivery, pickup, and fuel were described as included."
+          },
+          {
+            "fields": [
+              "environmental_fee_amount",
+              "environmental_fee_status"
+            ],
+            "statement": "The representative later said a USD 35 environmental fee was additional."
+          },
+          {
+            "fields": [
+              "permit_requirement",
+              "permit_responsibility",
+              "permit_fee_amount",
+              "permit_fee_status"
+            ],
+            "statement": "No permit or permit fee is required."
+          },
+          {
+            "fields": [
+              "prohibited_materials_status",
+              "prohibited_materials"
+            ],
+            "statement": "Hazardous waste is prohibited."
+          },
+          {
+            "fields": [
+              "tax_amount",
+              "tax_status"
+            ],
+            "statement": "Tax was described as included with no separate amount."
+          },
+          {
+            "fields": [
+              "assumptions"
+            ],
+            "statement": "The quote assumes the stated waste type."
+          }
+        ],
+        "notes": "The conflicting mandatory-fee answers were preserved."
+      }
+    },
+    {
+      "status": "voicemail",
+      "structured_result": {
+        "outcome": "voicemail",
+        "evidence": [
+          {
+            "fields": [
+              "outcome"
+            ],
+            "statement": "The call reached voicemail and no person provided a quote."
+          }
+        ],
+        "notes": "No quote facts were obtained."
+      }
+    }
+  ]
+}

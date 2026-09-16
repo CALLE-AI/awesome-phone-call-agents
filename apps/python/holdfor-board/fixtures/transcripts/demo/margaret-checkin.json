@@ -1,0 +1,62 @@
+{
+  "state": "terminal_verified",
+  "turns": [
+    {
+      "index": 0,
+      "speaker": "agent",
+      "text": "Hello,  is that Margaret? This is an automated call from Fieldgate Surgery.  I'm a computer, not a person, so I'll keep this short.  You saw someone here on Sunday, and the practice asked me to check how you've been getting on since.  I won't ask you for your date of birth, your address,  your bank details or anything like that. I don't need them,  and nobody from the practice will ever ask you for them over the phone.  If anyone does, it isn't us. If you would rather not talk to a machine,  just put the phone down. We won't ring you again.  Is now a good time? If it isn't, just say so and I'll leave you be."
+    },
+    {
+      "index": 1,
+      "speaker": "other",
+      "text": "this call will be recorded. yes, margaret speaking."
+    },
+    {
+      "index": 2,
+      "speaker": "agent",
+      "text": "Since Sunday,  are you feeling better, about the same, or worse?"
+    },
+    {
+      "index": 3,
+      "speaker": "other",
+      "text": "a little better. thank you."
+    },
+    {
+      "index": 4,
+      "speaker": "agent",
+      "text": "Okay.  Is there anything worrying you?"
+    },
+    {
+      "index": 5,
+      "speaker": "other",
+      "text": "i can get up the stairs the way i could a fortnight ago."
+    },
+    {
+      "index": 6,
+      "speaker": "agent",
+      "text": "Understood.  Would you like the surgery to see you again?"
+    },
+    {
+      "index": 7,
+      "speaker": "other",
+      "text": "yes please. i would like to see someone."
+    },
+    {
+      "index": 8,
+      "speaker": "agent",
+      "text": "Are mornings or afternoons easier for you?"
+    },
+    {
+      "index": 9,
+      "speaker": "other",
+      "text": "afternoon are easier for me."
+    },
+    {
+      "index": 10,
+      "speaker": "agent",
+      "text": "Thank you, Margaret.  Someone at the practice will read this today, and if you need another appointment they'll sort that out for you,  so you won't have to ring in and wait on hold.  Take care."
+    }
+  ],
+  "structured": null,
+  "outcome": "COMPLETED"
+}

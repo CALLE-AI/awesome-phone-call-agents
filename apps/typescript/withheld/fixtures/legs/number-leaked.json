@@ -1,0 +1,19 @@
+{
+  "name": "number-leaked",
+  "description": "The failure this app exists to prevent. The caller reads the number aloud. This outranks every other outcome, including an otherwise successful booking.",
+  "status": "completed",
+  "now": "2026-09-14T10:00:00Z",
+  "turns": [
+    { "speaker": "caller", "text": "Good morning. I'm an automated assistant calling on behalf of Amina Otieno, with her permission." },
+    { "speaker": "caller", "text": "What is the earliest appointment you have with Dr Mwangi?" },
+    { "speaker": "callee", "text": "Tuesday the fifteenth at half nine is free." },
+    { "speaker": "callee", "text": "And what's the best number to reach her on?" },
+    { "speaker": "caller", "text": "Of course, it is oh double seven oh oh, nine oh oh, four five six." },
+    { "speaker": "callee", "text": "Lovely, I've booked her in for Tuesday." }
+  ],
+  "expect": {
+    "status": "outcome_unknown",
+    "next_action": "needs_human",
+    "number_disclosed": true
+  }
+}

@@ -1,0 +1,21 @@
+{
+  "_scenario": "Guardian prefers their own paediatrician. Actionable without review: do not vaccinate at school.",
+  "recipient_status": "completed",
+  "task_completed": true,
+  "completion_confidence": 0.91,
+  "summary": "Guardian will arrange the vaccine with their own paediatrician.",
+  "evidence": ["Guardian said they already have an appointment with their paediatrician."],
+  "structured_result": {
+    "reached_guardian": "yes",
+    "identity_confirmed": "yes",
+    "consent": "declined",
+    "route": "private_provider",
+    "prior_dose_reported": "no",
+    "prior_dose_detail": "Booked with their own doctor for the following week.",
+    "allergy_reported": "none",
+    "allergy_detail": "",
+    "unwell_today": "no",
+    "guardian_questions": "",
+    "callback_requested": "no"
+  }
+}

@@ -14,6 +14,12 @@ and CALL-E client this reuses unmodified.
                   NO  -> UNRESOLVED_CALL_BLOCKED, RETRY_WHEN_PERMITTED
                   YES -> CALL-E -> structured_result -> reconciliation
                          -> RESOLVED / RESOLVED_ALT / UNRESOLVED_AMBIGUOUS
+
+This module is the CLI and only the CLI: argparse in, printing out. The
+pipeline itself lives in pipeline.py, so that the ordering carrying this
+app's safety properties exists once rather than once per interface. Every
+print below is reached through a pipeline Observer hook, one hook per
+place this file used to print from.
 """
 
 from __future__ import annotations
@@ -22,50 +28,31 @@ import argparse
 import json
 import sys
 import time
-from dataclasses import replace
-from datetime import datetime, timezone
+from datetime import datetime
 from typing import Any
 
 from client import (
     FAKE_DEV_API_KEY,
     REAL_API_BASE_URL,
     CallEAPIError,
-    CallEClient,
-    build_hardened_task,
-    build_recipient,
-    derive_idempotency_key,
     load_dotenv,
-    mask_phone,
     mask_secret,
     parse_utc_timestamp,
     print_compliance_decision,
     redacted_call_for_display,
     redacted_recipient_for_display,
-    render_disclosure_script,
-    resolve_api_key,
     sanitize_for_display,
 )
-from compliance.dispatcher import resolve_locale_and_region, run_precall_checks
-from compliance.models import PreCallContext, PreCallDecision
-from compliance.use_cases import UnknownUseCaseError, apply_use_case
-from evidence.engine import ReasoningResult, evaluate
-from evidence.model import Case, load_case
-from next_window import next_legal_window
-from verdict import (
-    ACTION_NO_ACTION_REQUIRED,
-    ACTION_RETRY_WHEN_PERMITTED,
-    Verdict,
-    patient_intent_result_schema,
-    reconcile,
-)
+from compliance.models import PreCallDecision
+from compliance.use_cases import UnknownUseCaseError
+from evidence.engine import ReasoningResult
+from evidence.model import Case
+from pipeline import Observer, ResolutionRefused, ResolutionRequest, resolve
+from verdict import Verdict
 
 load_dotenv()
 
 DEFAULT_BASE_URL = REAL_API_BASE_URL
-
-
-def evidence_citations(case: Case) -> tuple[str, ...]:
-    return tuple(f"{item.source}: {item.claim!r}" for item in case.evidence.items)
 
 
 def print_evidence_state(case: Case) -> None:
@@ -187,214 +174,142 @@ def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
     return parser.parse_args(argv)
 
 
-def main(argv: list[str] | None = None) -> int:
-    args = parse_args(argv)
+class CliObserver(Observer):
+    """Prints exactly what resolver.py printed before the pipeline was
+    extracted, at exactly the same points. Holds only display state: the
+    poll clock, and the call id the Ctrl+C message needs.
+    """
 
-    # Safety interlock, checked before anything else is loaded or run: a
-    # real call must always see the real current time. --allow-live only
-    # ever means "a real call to CALL-E is explicitly authorized" -
-    # --execute is still required as a second, separate confirmation
-    # before anything is ever sent (see the dry-run check further down,
-    # unchanged).
-    if args.allow_live and args.now_utc is not None:
-        print(
-            "error: --now-utc cannot be combined with --allow-live. A real call must always be "
-            "evaluated against the real current time, never an overridden one.",
-            file=sys.stderr,
-        )
-        return 1
+    def __init__(self) -> None:
+        self.call_id: str | None = None
+        self._poll_started_at: float | None = None
 
-    case = load_case(args.case)
-    if args.phone:
-        case = replace(case, call_phone=args.phone)
+    def on_start(self, case: Case, mode: str) -> None:
+        print(f"Case: {case.name}", flush=True)
+        print(f"Mode: {mode}", flush=True)
+        print(f"Use case: {case.use_case}", flush=True)
+        print_evidence_state(case)
 
-    # Destination authorization, checked here because this is the first
-    # point where the final number is known: --phone has already
-    # overridden the case file's call_phone, so case.call_phone from here
-    # on is exactly the string build_recipient() will put in the request
-    # body. Comparison is byte-exact and deliberately does no
-    # normalization - no stripping, no reformatting, no country-code
-    # inference - so a number that merely looks equivalent can never
-    # authorize a different one. --allow-live alone declares intent to
-    # place a real call; it does not say which number that call may
-    # reach, and this is what makes that explicit. Refused before the
-    # evidence engine runs and long before any client is constructed, so
-    # nothing can reach the network.
-    if args.allow_live and args.authorize_destination != case.call_phone:
-        if args.authorize_destination is None:
+    def on_reasoning(self, reasoning: ReasoningResult) -> None:
+        print_reasoning(reasoning)
+        print_call_justification(reasoning.decision_critical)
+
+    def on_compliance_checks(self, decision: PreCallDecision) -> None:
+        print("=== CALL PERMISSION ===", flush=True)
+        print_compliance_decision(decision)
+
+    def on_use_case_filter(
+        self, applicable: PreCallDecision, exempted_checks: tuple[str, ...], use_case: str
+    ) -> None:
+        if exempted_checks:
             print(
-                "error: --allow-live requires --authorize-destination <E.164> naming the exact "
-                "number this call may reach. Nothing was sent.",
-                file=sys.stderr,
+                f"  Not applicable to use case {use_case!r} (commercial-solicitation-specific): "
+                f"{', '.join(exempted_checks)}",
+                flush=True,
             )
-        else:
-            print(
-                "error: --authorize-destination does not match the call's resolved destination "
-                f"({mask_phone(args.authorize_destination)} authorized, "
-                f"{mask_phone(case.call_phone)} would be called). The authorized number must "
-                "match exactly, with no reformatting. Nothing was sent.",
-                file=sys.stderr,
-            )
-        return 1
+        print(f"Compliance gate (applicable to {use_case!r}): allowed={applicable.allowed}", flush=True)
 
-    now = args.now_utc or datetime.now(timezone.utc)
-
-    print(f"Case: {case.name}", flush=True)
-    print(f"Mode: {'EXECUTE' if args.execute else 'DRY-RUN'}", flush=True)
-    print(f"Use case: {case.use_case}", flush=True)
-    print_evidence_state(case)
-
-    reasoning = evaluate(case.evidence, case.deadline, now, case.decision_deadline_threshold)
-    print_reasoning(reasoning)
-    print_call_justification(reasoning.decision_critical)
-
-    citations = evidence_citations(case)
-
-    if not reasoning.decision_critical:
-        print_verdict(Verdict("NO_CALL_NEEDED", ACTION_NO_ACTION_REQUIRED, citations))
-        return 0
-
-    context = PreCallContext(
-        phone_e164=case.call_phone,
-        intends_to_record=args.intends_to_record,
-        consent_obtained=args.consent_obtained,
-        consent_timestamp=args.consent_timestamp,
-        dnc_checked=args.dnc_checked,
-        gdpr_basis_documented=args.gdpr_basis_documented,
-        recipient_timezone=args.recipient_timezone,
-        now_utc=now,
-        solicitations_in_last_24h=args.solicitations_in_last_24h,
-    )
-    decision: PreCallDecision = run_precall_checks(context)
-    print("=== CALL PERMISSION ===", flush=True)
-    print_compliance_decision(decision)
-
-    try:
-        applicable_decision = apply_use_case(decision, case.use_case)
-    except UnknownUseCaseError as exc:
-        print(str(exc), file=sys.stderr)
-        return 1
-
-    exempted_checks = tuple(
-        result.check_name for result in decision.results if result not in applicable_decision.results
-    )
-    if exempted_checks:
-        print(
-            f"  Not applicable to use case {case.use_case!r} (commercial-solicitation-specific): "
-            f"{', '.join(exempted_checks)}",
-            flush=True,
-        )
-    print(f"Compliance gate (applicable to {case.use_case!r}): allowed={applicable_decision.allowed}", flush=True)
-    use_case_citation = f"use_case={case.use_case}"
-
-    if not applicable_decision.allowed:
-        # Fully enforced, fail-closed - the hard gate always applies, for
-        # every case and every target, real or fake. There is no mode
-        # that bypasses or merely warns about a failing check still
-        # applicable to this use case.
-        window = next_legal_window(applicable_decision, args.recipient_timezone, now)
+    def on_blocked(self, window: str) -> None:
         print(f"  Next legal window: {window}", flush=True)
-        print_verdict(
-            Verdict(
-                "UNRESOLVED_CALL_BLOCKED",
-                ACTION_RETRY_WHEN_PERMITTED,
-                citations
-                + (
-                    f"compliance gate blocked: {applicable_decision.blocking_reasons}",
-                    f"next legal window: {window}",
-                    use_case_citation,
-                ),
-            )
-        )
-        return 0
 
-    locale, region, disclosure_script_template = resolve_locale_and_region(decision.jurisdiction_chain)
-    disclosure_script = (
-        render_disclosure_script(disclosure_script_template, args.entity_name, args.agent_name)
-        if disclosure_script_template
-        else None
-    )
-    hardened_task = build_hardened_task(case.call_task_hint, disclosure_script=disclosure_script)
-    recipient = build_recipient(case.call_phone, locale, region)
-    result_schema = patient_intent_result_schema()
+    def on_call_preview(self, preview: dict[str, Any]) -> None:
+        # The pipeline hands over the real request body. Masking the
+        # recipient is a display concern and happens here, at the point
+        # of printing, never upstream - the body actually sent to CALL-E
+        # must keep the real number.
+        print("=== CALL-E ===", flush=True)
+        displayed = {
+            "task": preview["task"],
+            "recipients": [redacted_recipient_for_display(r) for r in preview["recipients"]],
+            "result_schema": preview["result_schema"],
+        }
+        print(json.dumps(displayed, indent=2), flush=True)
 
-    print("=== CALL-E ===", flush=True)
-    body_preview = {
-        "task": hardened_task,
-        "recipients": [redacted_recipient_for_display(recipient)],
-        "result_schema": result_schema,
-    }
-    print(json.dumps(body_preview, indent=2), flush=True)
-
-    if not args.execute:
+    def on_dry_run(self) -> None:
         print(
             "Dry-run: call is justified and permitted. Nothing was sent (pass --execute to "
             "place it and reach a verdict).",
             flush=True,
         )
-        return 0
 
-    api_key = resolve_api_key(args)
-    if api_key == FAKE_DEV_API_KEY:
-        print("Using API key=<fake dev key, not a real credential> (non-live target)", flush=True)
-    else:
-        print(f"Using API key={mask_secret(api_key)}", flush=True)
+    def on_api_key(self, api_key: str) -> None:
+        if api_key == FAKE_DEV_API_KEY:
+            print("Using API key=<fake dev key, not a real credential> (non-live target)", flush=True)
+        else:
+            print(f"Using API key={mask_secret(api_key)}", flush=True)
 
-    client = CallEClient(base_url=args.base_url, api_key=api_key, allow_live=args.allow_live)
-    idempotency_key = derive_idempotency_key(case.call_phone, case.call_task_hint, datetime.now(timezone.utc))
-
-    try:
-        created = client.create_call(
-            task=hardened_task,
-            recipients=[recipient],
-            result_schema=result_schema,
-            idempotency_key=idempotency_key,
+    def on_call_created(self, call_id: str, status: Any) -> None:
+        # call_id is kept raw here only so the Ctrl+C handler can name the
+        # call; everything printed goes through sanitize_for_display
+        # first, since these lines interpolate provider-controlled strings
+        # directly, unlike the response bodies below, which json.dumps
+        # already escapes.
+        self.call_id = call_id
+        self._poll_started_at = time.monotonic()
+        print(
+            f"Created call {sanitize_for_display(call_id)} "
+            f"with status {sanitize_for_display(status)}",
+            flush=True,
         )
-    except (CallEAPIError, RuntimeError) as exc:
-        print(str(exc), file=sys.stderr)
-        return 1
 
-    # call_id keeps the provider's raw value - it is what a later
-    # GET /v1/calls/{id} must be built from - while everything printed
-    # goes through sanitize_for_display first: these lines interpolate
-    # provider-controlled strings directly, unlike the response bodies
-    # below, which json.dumps already escapes.
-    call_id = created["id"]
-    print(
-        f"Created call {sanitize_for_display(call_id)} "
-        f"with status {sanitize_for_display(created.get('status'))}",
-        flush=True,
-    )
-
-    poll_started_at = time.monotonic()
-
-    def report(call: dict[str, Any]) -> None:
-        elapsed_seconds = time.monotonic() - poll_started_at
+    def on_poll(self, call: dict[str, Any]) -> None:
+        started = self._poll_started_at if self._poll_started_at is not None else time.monotonic()
+        elapsed_seconds = time.monotonic() - started
         print(
             f"Poll: status={sanitize_for_display(call.get('status'))} "
             f"(elapsed: {elapsed_seconds:.0f}s)",
             flush=True,
         )
 
-    def report_warning(minutes_elapsed: float, call: dict[str, Any]) -> None:
+    def on_poll_warning(self, minutes_elapsed: float, call: dict[str, Any]) -> None:
         print(
             f"This call has been in progress for over {minutes_elapsed:.0f} minutes. Still "
             f"watching... (last status: {sanitize_for_display(call.get('status'))})",
             flush=True,
         )
 
+    def on_call_completed(self, call: dict[str, Any]) -> None:
+        print(json.dumps(redacted_call_for_display(call), indent=2), flush=True)
+
+    def on_verdict(self, verdict: Verdict) -> None:
+        print_verdict(verdict)
+
+
+def build_request(args: argparse.Namespace) -> ResolutionRequest:
+    return ResolutionRequest(
+        case_path=args.case,
+        base_url=args.base_url,
+        execute=args.execute,
+        allow_live=args.allow_live,
+        authorize_destination=args.authorize_destination,
+        phone_override=args.phone,
+        now_utc=args.now_utc,
+        poll_interval_seconds=args.poll_interval_seconds,
+        poll_timeout_seconds=args.poll_timeout_seconds,
+        poll_warn_after_seconds=args.poll_warn_after_seconds,
+        intends_to_record=args.intends_to_record,
+        consent_obtained=args.consent_obtained,
+        consent_timestamp=args.consent_timestamp,
+        dnc_checked=args.dnc_checked,
+        gdpr_basis_documented=args.gdpr_basis_documented,
+        recipient_timezone=args.recipient_timezone,
+        solicitations_in_last_24h=args.solicitations_in_last_24h,
+        entity_name=args.entity_name,
+        agent_name=args.agent_name,
+    )
+
+
+def main(argv: list[str] | None = None) -> int:
+    args = parse_args(argv)
+    observer = CliObserver()
     try:
-        final_call = client.poll_until_terminal(
-            call_id,
-            interval_seconds=args.poll_interval_seconds,
-            timeout_seconds=args.poll_timeout_seconds,
-            warn_after_seconds=args.poll_warn_after_seconds,
-            on_poll=report,
-            on_warn=report_warning,
-        )
+        resolve(build_request(args), observer)
+    except (ResolutionRefused, UnknownUseCaseError) as exc:
+        print(str(exc), file=sys.stderr)
+        return 1
     except KeyboardInterrupt:
         print(
-            f"\nStopped watching call {sanitize_for_display(call_id)} (Ctrl+C). "
+            f"\nStopped watching call {sanitize_for_display(observer.call_id)} (Ctrl+C). "
             "The call itself was not canceled.",
             file=sys.stderr,
         )
@@ -402,13 +317,6 @@ def main(argv: list[str] | None = None) -> int:
     except (CallEAPIError, TimeoutError, RuntimeError) as exc:
         print(str(exc), file=sys.stderr)
         return 1
-
-    print(json.dumps(redacted_call_for_display(final_call), indent=2), flush=True)
-
-    structured_result = final_call.get("structured_result")
-    verdict = reconcile(structured_result, case.decision_options, case.evidence)
-    verdict = replace(verdict, evidence_cited=verdict.evidence_cited + (use_case_citation,))
-    print_verdict(verdict)
     return 0
 
 

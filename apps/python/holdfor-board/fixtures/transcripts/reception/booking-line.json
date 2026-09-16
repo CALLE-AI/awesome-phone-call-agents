@@ -1,0 +1,62 @@
+{
+  "state": "terminal_verified",
+  "outcome": "COMPLETED",
+  "turns": [
+    {
+      "index": 0,
+      "speaker": "agent",
+      "text": "Good morning. I am calling from Fieldgate Surgery on behalf of a patient, Margaret Ellery, date of birth the seventeenth of March 1941. She would like to be seen again."
+    },
+    {
+      "index": 1,
+      "speaker": "other",
+      "text": "Right, bear with me. What is it regarding?"
+    },
+    {
+      "index": 2,
+      "speaker": "agent",
+      "text": "She asked me to pass on her own words: I can't get up the stairs the way I could a fortnight ago."
+    },
+    {
+      "index": 3,
+      "speaker": "other",
+      "text": "Was that the nurse she saw, or the doctor?"
+    },
+    {
+      "index": 4,
+      "speaker": "agent",
+      "text": "I'm only able to pass on what she said. The practice has the rest on file."
+    },
+    {
+      "index": 5,
+      "speaker": "other",
+      "text": "I could do Thursday at ten past nine, face to face. Would that suit her?"
+    },
+    {
+      "index": 6,
+      "speaker": "agent",
+      "text": "Thursday at ten past nine, face to face. Yes, she will take that. Thank you."
+    },
+    {
+      "index": 7,
+      "speaker": "other",
+      "text": "That's down for her. Anything else?"
+    },
+    {
+      "index": 8,
+      "speaker": "agent",
+      "text": "No, thank you. Goodbye."
+    }
+  ],
+  "structured": {
+    "offers": [
+      {
+        "turn": 5,
+        "time": "09:10",
+        "accepted": true
+      }
+    ],
+    "reception_outcome": "slot_offered",
+    "reception_outcome_turn": 7
+  }
+}

@@ -38,7 +38,8 @@ from client import (
 )
 from compliance.jurisdictions import fr, us_federal
 from fake_server import INSUFFICIENT_BALANCE_PHONE, RATE_LIMITED_ONCE_PHONE, FakeCalleServer
-from verdict import patient_intent_result_schema
+from pipeline import ResolutionRequest
+from verdict import subject_intent_result_schema
 
 TEST_API_KEY = "iams_live_fake_test_key_do_not_use"
 
@@ -59,7 +60,7 @@ def test_live_base_url_is_blocked_without_allow_live() -> None:
 
 def test_create_and_poll_reaches_completed_with_structured_result() -> None:
     """Proves the REST transport itself (CallEClient) works end to end
-    against the fake server, using the same patient_intent_result_schema
+    against the fake server, using the same subject_intent_result_schema
     Reality Resolver actually sends.
     """
     with FakeCalleServer() as server:
@@ -69,7 +70,7 @@ def test_create_and_poll_reaches_completed_with_structured_result() -> None:
         created = client.create_call(
             task="Call the recipient to confirm their appointment.",
             recipients=[recipient],
-            result_schema=patient_intent_result_schema(),
+            result_schema=subject_intent_result_schema(),
             idempotency_key="test-happy-path-1",
         )
         assert created["status"] == "queued"
@@ -79,7 +80,7 @@ def test_create_and_poll_reaches_completed_with_structured_result() -> None:
 
         assert final_call["status"] == "completed"
         assert final_call["structured_result"] == {
-            "patient_intent": "confirmed",
+            "subject_intent": "confirmed",
             "answered_by": "human",
             "confidence_note": "Fake server: deterministic canned result, not extracted from real call evidence.",
             "manipulation_attempt_detected": False,
@@ -583,7 +584,7 @@ def _hostile_call() -> dict:
         "task_completed": True,
         "completion_confidence": {"score": 0.86, "label": "high" + poison},
         "structured_result": {
-            "patient_intent": "unknown",
+            "subject_intent": "unknown",
             "confidence_note": "note" + poison + long_text,
             "manipulation_attempt_note": "note2" + poison + long_text,
             "manipulation_attempt_detected": False,
@@ -680,7 +681,7 @@ def test_display_copy_stays_valid_json_and_keeps_structure() -> None:
     assert display["completion_confidence"]["score"] == 0.86
     assert display["task_completed"] is True
     assert display["structured_result"]["manipulation_attempt_detected"] is False
-    assert display["structured_result"]["patient_intent"] == "unknown"
+    assert display["structured_result"]["subject_intent"] == "unknown"
     assert len(display["evidence"]) == 2
     assert display["recipients"][0]["attempts"][0]["transcript_turns"][0]["offset_seconds"] == 0
 
@@ -712,7 +713,7 @@ def test_reconcile_sees_the_raw_result_not_the_display_copy() -> None:
         (Evidence("calendar", EvidenceType.STRUCTURED, timedelta(hours=1), "confirmed", Ambiguity.LOW),)
     )
     raw = {
-        "patient_intent": "confirmed",
+        "subject_intent": "confirmed",
         "answered_by": "human",
         "confidence_note": "note" + ESC + "[2J" + "A" * 100000,
     }
@@ -812,7 +813,7 @@ def test_verdict_evidence_line_is_bounded_at_display_time() -> None:
         (Evidence("calendar", EvidenceType.STRUCTURED, timedelta(hours=1), "ok", Ambiguity.LOW),)
     )
     verdict = reconcile(
-        {"patient_intent": "X" * 100000 + ESC, "answered_by": "human"},
+        {"subject_intent": "X" * 100000 + ESC, "answered_by": "human"},
         {"if_confirmed": "KEEP_SLOT", "if_cancelled": "RELEASE_SLOT"},
         matrix,
     )
@@ -830,3 +831,99 @@ def test_verdict_evidence_line_is_bounded_at_display_time() -> None:
     assert ESC not in printed
     for line in printed.splitlines():
         assert len(line) <= MAX_DISPLAY_CHARS + 10  # + the "    - " prefix
+
+
+# --- per-request CALL-E credential -----------------------------------
+#
+# resolve_api_key() has exactly one caller, pipeline.resolve(), which
+# hands it a ResolutionRequest - so these use the real object rather than
+# a stand-in, and test the integration as it actually runs.
+#
+# SENTINEL_KEY is deliberately shaped like a credential so that a leak
+# would be visible in any output; it is not one.
+
+SENTINEL_KEY = "iams_live_per_request_sentinel_not_a_real_credential"
+
+
+def _live_request(**overrides: Any) -> ResolutionRequest:
+    fields: dict[str, Any] = {
+        "case_path": "not-read-by-this-function",
+        "base_url": REAL_API_BASE_URL,
+        "execute": True,
+        "allow_live": True,
+    }
+    fields.update(overrides)
+    return ResolutionRequest(**fields)
+
+
+def test_a_per_request_key_is_used_on_the_live_path(monkeypatch: pytest.MonkeyPatch) -> None:
+    """And it wins over the environment, so one process can serve several
+    resolutions with different credentials without touching os.environ.
+    """
+    monkeypatch.setenv("CALLE_API_KEY", "environment-key-should-not-win")
+
+    assert client_module.resolve_api_key(_live_request(api_key=SENTINEL_KEY)) == SENTINEL_KEY
+
+
+def test_no_per_request_key_falls_back_to_the_environment(monkeypatch: pytest.MonkeyPatch) -> None:
+    """The CLI's behaviour, unchanged: it has no such flag, so api_key is
+    always None there.
+    """
+    monkeypatch.setenv("CALLE_API_KEY", "environment-key")
+
+    assert client_module.resolve_api_key(_live_request()) == "environment-key"
+    assert client_module.resolve_api_key(_live_request(api_key=None)) == "environment-key"
+
+
+def test_an_empty_per_request_key_falls_back_to_the_environment(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """An empty string is not a credential."""
+    monkeypatch.setenv("CALLE_API_KEY", "environment-key")
+
+    assert client_module.resolve_api_key(_live_request(api_key="")) == "environment-key"
+
+
+def test_neither_a_per_request_key_nor_an_environment_key_still_raises(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.delenv("CALLE_API_KEY", raising=False)
+
+    with pytest.raises(RuntimeError, match="CALLE_API_KEY is not set"):
+        client_module.resolve_api_key(_live_request())
+
+
+def test_a_per_request_key_never_reaches_a_non_live_target(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """The guarantee that predates this field and must survive it: the
+    fake server can never receive a real credential - not from the
+    environment, and now not from a request either.
+    """
+    monkeypatch.setenv("CALLE_API_KEY", "environment-key")
+
+    for request in (
+        _live_request(api_key=SENTINEL_KEY, base_url="http://127.0.0.1:9999"),
+        _live_request(api_key=SENTINEL_KEY, execute=False),
+        _live_request(api_key=SENTINEL_KEY, allow_live=False),
+    ):
+        resolved = client_module.resolve_api_key(request)
+        assert resolved == client_module.FAKE_DEV_API_KEY
+        assert resolved != SENTINEL_KEY
+
+
+def test_a_request_never_renders_its_key(monkeypatch: pytest.MonkeyPatch) -> None:
+    """repr() on a frozen dataclass prints every field by default. This
+    one is declared repr=False, so a log line or an exception that
+    rendered the request cannot carry the credential.
+    """
+    request = _live_request(api_key=SENTINEL_KEY)
+
+    for rendered in (repr(request), str(request), f"{request}"):
+        assert SENTINEL_KEY not in rendered
+        # The field itself is absent, not merely its value: no "api_key="
+        # pair is rendered at all.
+        assert "api_key=" not in rendered
+        assert "authorize_destination=None, phone_override=None" in rendered
+    # The attribute is still there for resolve_api_key to read.
+    assert request.api_key == SENTINEL_KEY

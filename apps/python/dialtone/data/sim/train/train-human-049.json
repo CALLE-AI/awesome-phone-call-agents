@@ -1,0 +1,71 @@
+{
+ "id": "train-human-049",
+ "label": "human",
+ "source": "sim-train",
+ "meta": {
+  "task": "book a table for two on Friday at 7 PM",
+  "hard": false
+ },
+ "turns": [
+  {
+   "speaker": "user",
+   "text": "Luigi's Trattoria, Maria speaking.",
+   "offset_seconds": 1.44
+  },
+  {
+   "speaker": "bot",
+   "text": "Hi, I'm an AI assistant calling on behalf of Jordan Lee. I'd like to book a table for two people this Friday at 7 PM, under the name Jordan Lee.",
+   "offset_seconds": 4.66
+  },
+  {
+   "speaker": "user",
+   "text": "Friday at seven, let me look. Yeah we have that.",
+   "offset_seconds": 15.67
+  },
+  {
+   "speaker": "bot",
+   "text": "Is Friday at 7 available?",
+   "offset_seconds": 20.31
+  },
+  {
+   "speaker": "user",
+   "text": "so, Yeah.",
+   "offset_seconds": 22.87
+  },
+  {
+   "speaker": "user",
+   "text": "mm-hmm",
+   "offset_seconds": 23.92
+  },
+  {
+   "speaker": "bot",
+   "text": "Is Friday at 7 available?",
+   "offset_seconds": 25.15
+  },
+  {
+   "speaker": "user",
+   "text": "No, that's everything.",
+   "offset_seconds": 27.29
+  },
+  {
+   "speaker": "bot",
+   "text": "Thank you so much, that's all I needed.",
+   "offset_seconds": 29.33
+  },
+  {
+   "speaker": "user",
+   "text": "No, that's uh, everything.",
+   "offset_seconds": 33.13
+  },
+  {
+   "speaker": "bot",
+   "text": "Thank you so much, that's all I needed.",
+   "offset_seconds": 35.68
+  },
+  {
+   "speaker": "user",
+   "text": "Alright, take care.",
+   "offset_seconds": 39.0
+  }
+ ]
+}

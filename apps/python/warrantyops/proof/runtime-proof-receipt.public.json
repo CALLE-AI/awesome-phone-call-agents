@@ -1,0 +1,43 @@
+{
+  "schema": "warrantyops-runtime-receipt-public/1",
+  "derived_from": "verified sanitized runtime receipt (recovery of the single recorded CALL-E proof call)",
+  "call_id": "call_dMU…A-3Q",
+  "calls_created": 0,
+  "claim_status": "UNKNOWN",
+  "contract_version": "warranty-claim-exception/v1",
+  "evidence": [
+    {
+      "field": "stated_reason",
+      "quote": "requires an installation photograph"
+    },
+    {
+      "field": "required_correction",
+      "quote": "requires an installation photograph"
+    },
+    {
+      "field": "required_documents",
+      "quote": "installation photograph"
+    },
+    {
+      "display": "BR-4821",
+      "field": "confirmed_reference",
+      "method": "DIRECT_COUNTERPARTY_QUOTE",
+      "quote": "Br Hyphen, 4821."
+    }
+  ],
+  "ledger_state": "COMPLETED",
+  "limitation": "Recorded CALL-E runtime proof using a consenting role-player. This is not evidence of deployment at a warranty desk.",
+  "missing_requirement": [
+    "installation photograph"
+  ],
+  "reference": {
+    "display": "BR-4821",
+    "label": "reference",
+    "method": "DIRECT_COUNTERPARTY_QUOTE",
+    "normalized": "BR4821"
+  },
+  "source_version": "runtime-proof-v1",
+  "terminal_state": "INFORMATION_OBTAINED",
+  "transport_state": "completed",
+  "write_back": "WRITE_BACK_WITHHELD_PENDING_HUMAN_REVIEW"
+}
