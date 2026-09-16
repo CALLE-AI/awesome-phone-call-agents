@@ -1,0 +1,843 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Certa</title>
+<style>
+/* ══════════════════════════════════════════════════════════════════════════
+   Warm-white editorial. Display is set light and tight; body is set regular
+   and slightly open. The opposite tracking directions are the whole voice.
+   Colour appears only where it carries state — never as chrome.
+   ══════════════════════════════════════════════════════════════════════════ */
+:root {
+  --canvas:  #fdfcfc;
+  --surface: #f5f3f1;
+  --raised:  #ffffff;
+  --hover:   #efece9;
+  --line:    #e7e3df;
+  --hair:    #f0edea;
+  --ink:     #0d0c0b;
+  --muted:   #6b6560;
+  --faint:   #9c948d;
+
+  --ok:   #12694a;  --ok-bg:   #eef7f2;  --ok-line:   #cfe7dc;
+  --attn: #9a5b06;  --attn-bg: #fdf5e9;  --attn-line: #f0dcbc;
+  --stop: #a32b21;  --stop-bg: #fdf1f0;  --stop-line: #f2d3d0;
+  --idle: #6b6560;  --idle-bg: #f5f3f1;  --idle-line: #e7e3df;
+
+  --btn:     #0d0c0b;  --btn-fg: #fdfcfc;  --btn-hov: #2a2724;
+  --ring:    rgba(13,12,11,.14);
+
+  --display: -apple-system, BlinkMacSystemFont, "SF Pro Display",
+             "Segoe UI Variable Display", "Segoe UI", system-ui, sans-serif;
+  --text:    -apple-system, BlinkMacSystemFont, "SF Pro Text",
+             "Segoe UI Variable Text", "Segoe UI", system-ui, sans-serif;
+  --mono:    "SF Mono", ui-monospace, "Cascadia Mono", Menlo, monospace;
+
+  --r-card: 20px;
+  --r-soft: 14px;
+  --r-pill: 9999px;
+
+  --t-fast: 140ms cubic-bezier(.22,1,.36,1);
+  --t-mid:  260ms cubic-bezier(.22,1,.36,1);
+  color-scheme: light;
+}
+@media (prefers-color-scheme: dark) {
+  html:not([data-theme="light"]) {
+    --canvas:  #0c0b0a;
+    --surface: #161513;
+    --raised:  #1b1a17;
+    --hover:   #221f1c;
+    --line:    #2b2825;
+    --hair:    #201d1a;
+    --ink:     #faf9f8;
+    --muted:   #a8a099;
+    --faint:   #79726b;
+
+    --ok:   #6ee7a8;  --ok-bg:   #0f2019;  --ok-line:   #1e3d2e;
+    --attn: #f3c165;  --attn-bg: #241c0e;  --attn-line: #453520;
+    --stop: #f08b83;  --stop-bg: #241413;  --stop-line: #452522;
+    --idle: #a8a099;  --idle-bg: #1b1a17;  --idle-line: #2b2825;
+
+    --btn: #faf9f8;   --btn-fg: #0c0b0a;   --btn-hov: #ffffff;
+    --ring: rgba(250,249,248,.18);
+    color-scheme: dark;
+  }
+}
+html[data-theme="dark"] {
+  --canvas:#0c0b0a; --surface:#161513; --raised:#1b1a17; --hover:#221f1c;
+  --line:#2b2825; --hair:#201d1a; --ink:#faf9f8; --muted:#a8a099; --faint:#79726b;
+  --ok:#6ee7a8; --ok-bg:#0f2019; --ok-line:#1e3d2e;
+  --attn:#f3c165; --attn-bg:#241c0e; --attn-line:#453520;
+  --stop:#f08b83; --stop-bg:#241413; --stop-line:#452522;
+  --idle:#a8a099; --idle-bg:#1b1a17; --idle-line:#2b2825;
+  --btn:#faf9f8; --btn-fg:#0c0b0a; --btn-hov:#ffffff; --ring:rgba(250,249,248,.18);
+  color-scheme: dark;
+}
+
+*, *::before, *::after { box-sizing: border-box; }
+html, body { background: var(--canvas); }
+body {
+  margin: 0; color: var(--ink);
+  font: 400 15px/1.65 var(--text);
+  letter-spacing: 0.01em;               /* body opens slightly */
+  -webkit-font-smoothing: antialiased;
+}
+h1, h2, .display, .figure {
+  font-family: var(--display);
+  font-weight: 300;                      /* whisper weight */
+  letter-spacing: -0.022em;              /* display tightens */
+}
+.page { max-width: 1120px; margin: 0 auto; padding: 0 28px 140px; }
+code { font: 400 .88em var(--mono); letter-spacing: 0; }
+
+/* ── header ───────────────────────────────────────────────────────────── */
+.top { display: flex; align-items: center; gap: 14px; padding: 30px 0 26px; }
+.mark { display: flex; align-items: center; gap: 11px; margin-right: auto; }
+.mark svg { width: 24px; height: 24px; display: block; flex: none; }
+.mark b { font: 300 21px/1 var(--display); letter-spacing: -0.028em; }
+.mark span { color: var(--faint); font-size: 14px; letter-spacing: 0.01em; }
+
+.chip {
+  display: inline-flex; align-items: center; gap: 8px;
+  font-size: 13px; font-weight: 500; letter-spacing: 0.01em;
+  padding: 7px 15px 7px 12px; border-radius: var(--r-pill);
+  border: 1px solid var(--line); background: var(--raised); color: var(--muted);
+  white-space: nowrap;
+}
+.chip i { width: 6px; height: 6px; border-radius: 50%; background: currentColor; }
+.chip[data-live="true"] { color: var(--stop); border-color: var(--stop-line); background: var(--stop-bg); }
+.chip[data-live="true"] i { animation: breathe 2.6s ease-in-out infinite; }
+@keyframes breathe { 0%,100%{opacity:1} 50%{opacity:.3} }
+
+/* ── controls ─────────────────────────────────────────────────────────── */
+button {
+  font: 500 14px/1 var(--text); letter-spacing: 0.01em;
+  padding: 12px 22px; border-radius: var(--r-pill);
+  border: 1px solid var(--line); background: var(--raised); color: var(--ink);
+  cursor: pointer; white-space: nowrap;
+  transition: background var(--t-fast), border-color var(--t-fast),
+              transform var(--t-fast), box-shadow var(--t-fast), opacity var(--t-fast);
+}
+button:hover { background: var(--hover); border-color: var(--faint); }
+button:active { transform: scale(.98); }
+button.primary { background: var(--btn); color: var(--btn-fg); border-color: var(--btn); }
+button.primary:hover { background: var(--btn-hov); border-color: var(--btn-hov); }
+button.quiet { background: none; border-color: transparent; color: var(--muted); }
+button.quiet:hover { background: var(--surface); color: var(--ink); }
+button.sm { padding: 8px 14px; font-size: 13px; }
+button[disabled] { opacity: .35; cursor: not-allowed; transform: none; }
+:focus-visible { outline: none; box-shadow: 0 0 0 4px var(--ring); border-radius: var(--r-pill); }
+
+/* ── figures ──────────────────────────────────────────────────────────── */
+.figures {
+  display: grid; grid-template-columns: 1.7fr repeat(4, 1fr);
+  border: 1px solid var(--line); border-radius: var(--r-card);
+  background: var(--raised); overflow: hidden; margin-bottom: 64px;
+}
+.fig { padding: 26px 26px 28px; border-left: 1px solid var(--hair); min-width: 0; }
+.fig:first-child { border-left: 0; }
+.fig dt { font-size: 13px; color: var(--faint); margin: 0 0 14px; letter-spacing: 0.01em; }
+.fig dd {
+  margin: 0; font: 300 40px/1 var(--display); letter-spacing: -0.03em;
+  font-variant-numeric: tabular-nums;
+}
+.fig dd.words { font-size: 20px; letter-spacing: -0.018em; line-height: 1.3; }
+.fig dd small { font: 400 14px/1 var(--text); color: var(--faint); letter-spacing: 0.01em; margin-left: 4px; }
+.fig[data-flag="true"] dd { color: var(--attn); }
+
+/* ── sections ─────────────────────────────────────────────────────────── */
+section { margin-bottom: 64px; }
+.shead { display: flex; align-items: baseline; gap: 12px; margin-bottom: 20px; }
+.shead h2 { font-size: 20px; margin: 0; }
+.shead em {
+  font-style: normal; font-size: 13px; color: var(--faint);
+  border: 1px solid var(--line); border-radius: var(--r-pill);
+  padding: 3px 11px; letter-spacing: 0.01em;
+}
+
+/* ── records ──────────────────────────────────────────────────────────── */
+.list { display: flex; flex-direction: column; gap: 12px; }
+.rec {
+  background: var(--raised); border: 1px solid var(--line);
+  border-radius: var(--r-card); padding: 24px 26px;
+  transition: border-color var(--t-fast), transform var(--t-fast);
+  animation: enter var(--t-mid) both;
+}
+.rec:hover { border-color: var(--faint); }
+@keyframes enter { from{opacity:0; transform:translateY(8px)} to{opacity:1; transform:none} }
+.rec-top { display: flex; align-items: flex-start; gap: 20px; }
+.rec-id { font: 400 13px/1.7 var(--mono); color: var(--faint); flex: none; width: 78px; letter-spacing: 0; }
+.rec-main { flex: 1; min-width: 0; }
+.rec-org { font: 400 17px/1.4 var(--display); font-weight: 400; letter-spacing: -0.016em; }
+.rec-meta {
+  display: flex; align-items: center; gap: 10px; flex-wrap: wrap;
+  margin-top: 6px; font-size: 14px; color: var(--muted); letter-spacing: 0.01em;
+}
+.rec-meta .tel { font: 400 14px/1.4 var(--mono); letter-spacing: 0; font-variant-numeric: tabular-nums; }
+.rec-meta .dot { color: var(--line); }
+.rec-meta .src { color: var(--faint); }
+.rec-note { color: var(--muted); font-size: 14.5px; margin: 11px 0 0; max-width: 70ch; }
+.rec-quote {
+  margin: 12px 0 0; padding: 14px 18px; border-radius: var(--r-soft);
+  background: var(--surface); color: var(--muted); font-size: 14px; line-height: 1.65;
+}
+
+.tag {
+  display: inline-flex; align-items: center; gap: 8px; flex: none;
+  font-size: 13px; font-weight: 500; letter-spacing: 0.01em;
+  padding: 6px 14px 6px 11px; border-radius: var(--r-pill);
+  border: 1px solid var(--idle-line); background: var(--idle-bg); color: var(--idle);
+  text-transform: capitalize;
+}
+.tag::before { content: ""; width: 6px; height: 6px; border-radius: 50%; background: currentColor; flex: none; }
+.tag[data-s="ok"]   { color: var(--ok);   background: var(--ok-bg);   border-color: var(--ok-line); }
+.tag[data-s="attn"] { color: var(--attn); background: var(--attn-bg); border-color: var(--attn-line); }
+.tag[data-s="stop"] { color: var(--stop); background: var(--stop-bg); border-color: var(--stop-line); }
+.tag .cf { font: 400 12.5px/1 var(--mono); letter-spacing: 0; opacity: .7; }
+
+/* ── disclosure ───────────────────────────────────────────────────────── */
+details { margin-top: 16px; }
+summary {
+  display: inline-flex; align-items: center; gap: 9px; cursor: pointer;
+  font-size: 13.5px; color: var(--faint); list-style: none; letter-spacing: 0.01em;
+  padding: 7px 14px 7px 12px; margin-left: -12px; border-radius: var(--r-pill);
+  transition: color var(--t-fast), background var(--t-fast);
+}
+summary::-webkit-details-marker { display: none; }
+summary:hover { color: var(--ink); background: var(--surface); }
+summary .car { transition: transform var(--t-fast); font-size: 9px; opacity: .7; }
+details[open] summary .car { transform: rotate(90deg); }
+.script {
+  margin: 12px 0 0; padding: 22px 24px; border-radius: var(--r-soft);
+  background: var(--surface); color: var(--muted);
+  font: 400 13.5px/1.8 var(--mono); letter-spacing: 0;
+  white-space: pre-wrap; overflow-x: auto;
+  animation: unfold var(--t-mid) both;
+}
+@keyframes unfold { from{opacity:0; transform:translateY(-6px)} to{opacity:1; transform:none} }
+
+/* ── connect ──────────────────────────────────────────────────────────── */
+.connect {
+  border: 1px solid var(--line); border-radius: var(--r-card);
+  background: var(--raised); overflow: hidden; margin-bottom: 64px;
+  animation: enter var(--t-mid) both;
+}
+.connect-head { padding: 34px 34px 0; }
+.connect-head h2 { font-size: 30px; margin: 0 0 10px; }
+.connect-head p { margin: 0; color: var(--muted); font-size: 15px; max-width: 62ch; }
+.steps { display: flex; gap: 10px; padding: 28px 34px 0; }
+.step {
+  flex: 1; display: flex; align-items: center; gap: 11px;
+  padding: 13px 17px; border-radius: var(--r-pill);
+  border: 1px solid var(--line); background: var(--surface);
+  font-size: 14px; color: var(--faint); letter-spacing: 0.01em;
+  transition: color var(--t-fast), border-color var(--t-fast), background var(--t-fast);
+}
+.step .n {
+  width: 21px; height: 21px; border-radius: 50%; flex: none;
+  display: grid; place-items: center; font-size: 11.5px; font-weight: 500;
+  border: 1px solid currentColor; letter-spacing: 0;
+}
+.step[data-state="active"] { color: var(--ink); border-color: var(--faint); background: var(--raised); }
+.step[data-state="done"] { color: var(--ok); border-color: var(--ok-line); background: var(--ok-bg); }
+.step[data-state="done"] .n { border-color: transparent; background: currentColor; color: var(--raised); }
+.connect-body { padding: 32px 34px; }
+.fields { display: grid; gap: 28px 30px; grid-template-columns: repeat(2, minmax(0, 1fr)); }
+label { display: block; font-size: 14px; font-weight: 500; margin-bottom: 10px; letter-spacing: 0.01em; }
+label em { font-style: normal; font-weight: 400; color: var(--ok); font-size: 13px; margin-left: 8px; }
+input {
+  width: 100%; font: 400 14.5px/1.4 var(--text); letter-spacing: 0.01em;
+  padding: 13px 17px; border: 1px solid var(--line); border-radius: var(--r-soft);
+  background: var(--surface); color: var(--ink);
+  transition: border-color var(--t-fast), background var(--t-fast), box-shadow var(--t-fast);
+}
+input[type="password"], input#f-base { font-family: var(--mono); font-size: 13.5px; letter-spacing: 0; }
+input::placeholder { color: var(--faint); }
+input:hover { border-color: var(--faint); }
+input:focus { outline: none; border-color: var(--faint); background: var(--raised); box-shadow: 0 0 0 4px var(--ring); }
+.hint { font-size: 13px; color: var(--faint); margin: 10px 0 0; line-height: 1.55; }
+.hint a { color: var(--muted); text-underline-offset: 3px; }
+.hint a:hover { color: var(--ink); }
+.makebase {
+  margin-top: 28px; padding: 22px 24px; border-radius: var(--r-soft);
+  background: var(--surface); border: 1px solid var(--line);
+}
+.makebase h3 { font-size: 16px; margin: 0 0 6px; }
+.makebase > p { margin: 0 0 18px; color: var(--muted); font-size: 14px; max-width: 60ch; }
+.makebase .inline { display: flex; gap: 12px; align-items: flex-start; flex-wrap: wrap; }
+.makebase .inline > div { flex: 1 1 260px; }
+.makebase .inline button { flex: none; margin-top: 30px; }
+.connect-foot {
+  display: flex; align-items: center; gap: 14px; flex-wrap: wrap;
+  padding: 24px 34px; border-top: 1px solid var(--hair); background: var(--surface);
+}
+.privacy { font-size: 13.5px; color: var(--faint); margin-right: auto; max-width: 50ch; line-height: 1.55; }
+
+/* ── notice ───────────────────────────────────────────────────────────── */
+.notice {
+  display: flex; align-items: center; gap: 22px; flex-wrap: wrap;
+  border: 1px solid var(--line); border-radius: var(--r-card);
+  background: var(--surface); padding: 22px 26px; margin-bottom: 40px;
+  animation: enter var(--t-mid) both;
+}
+.notice p { margin: 0; flex: 1 1 360px; font-size: 15px; color: var(--muted); }
+.notice b { color: var(--ink); font-weight: 500; }
+
+/* ── action bar ───────────────────────────────────────────────────────── */
+.bar {
+  display: flex; align-items: center; gap: 12px; flex-wrap: wrap;
+  padding: 22px 26px; border-radius: var(--r-card);
+  border: 1px solid var(--line); background: var(--raised); margin-bottom: 48px;
+}
+select {
+  font: 400 14px/1 var(--text); letter-spacing: 0.01em; color: var(--ink);
+  padding: 11px 16px; border-radius: var(--r-pill);
+  border: 1px solid var(--line); background: var(--raised); cursor: pointer;
+  transition: border-color var(--t-fast);
+}
+select:hover { border-color: var(--faint); }
+.act { display: flex; gap: 8px; margin-top: 14px; }
+.act button { padding: 8px 15px; font-size: 13px; }
+.bar .say { font-size: 14px; color: var(--muted); margin-left: auto; text-align: right; letter-spacing: 0.01em; }
+.bar .say.warn { color: var(--stop); }
+
+.skel {
+  border-radius: var(--r-card); background: var(--surface); height: 106px;
+  border: 1px solid var(--hair); position: relative; overflow: hidden;
+}
+.skel::after {
+  content: ""; position: absolute; inset: 0;
+  background: linear-gradient(90deg, transparent, var(--hover), transparent);
+  animation: sweep 1.6s ease-in-out infinite;
+}
+@keyframes sweep { from{transform:translateX(-100%)} to{transform:translateX(100%)} }
+
+footer {
+  display: flex; gap: 20px; flex-wrap: wrap; justify-content: space-between;
+  padding-top: 26px; border-top: 1px solid var(--hair);
+  font-size: 13px; color: var(--faint);
+}
+footer .m { font-family: var(--mono); font-size: 12.5px; letter-spacing: 0; }
+footer .bad { color: var(--stop); }
+
+@media (max-width: 900px) {
+  .figures { grid-template-columns: 1fr 1fr; }
+  .fig { border-top: 1px solid var(--hair); }
+  .steps { flex-direction: column; }
+  .fields { grid-template-columns: 1fr; }
+  .rec-top { flex-wrap: wrap; gap: 14px; }
+  .rec-id { width: auto; }
+}
+/* Phones. The console is a desktop tool, but an operator checking a run from
+   a phone should not meet a three-line tagline wedged against a status chip. */
+.checkup { border: 1px solid var(--hair); border-radius: 20px; padding: 22px 24px; margin: 0 0 26px; background: var(--raised); }
+.checkup[data-ok="true"] { opacity: .82; }
+.checkup-head { display: flex; align-items: baseline; justify-content: space-between; gap: 14px; }
+.checkup h2 { font: 300 19px/1.25 var(--display); letter-spacing: -.018em; margin: 0; }
+.checkup-sub { margin: 6px 0 0; color: var(--muted); font-size: 13.5px; max-width: 62ch; }
+.checkup-list { list-style: none; margin: 16px 0 0; padding: 0; display: grid; gap: 10px; }
+.checkup-list li { display: grid; grid-template-columns: 18px 1fr; gap: 10px; align-items: start; padding: 10px 12px; border-radius: 12px; background: var(--surface); }
+.checkup-list li[data-s="problem"] { background: var(--stop-bg); }
+.checkup-list .mark { font: 600 13px/1.5 var(--mono); color: var(--ok); }
+.checkup-list li[data-s="problem"] .mark { color: var(--stop); }
+.checkup-list .col { font: 500 13.5px/1.5 var(--text); }
+.checkup-list .det { color: var(--muted); font-size: 13px; margin-top: 2px; }
+.checkup-list .fix { font-size: 13px; margin-top: 6px; padding-left: 10px; border-left: 2px solid var(--stop-line); }
+@media (max-width: 620px) {
+  .top { gap: 10px; padding: 22px 0 18px; }
+  .top a span { display: none; }          /* tagline: the logo already says it */
+  .rec-top { flex-direction: column; align-items: flex-start; gap: 8px; }
+  .rec-top .tag { align-self: flex-start; }
+  .bar { flex-wrap: wrap; gap: 12px; }
+}
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after { animation: none !important; transition: none !important; }
+}
+[hidden] { display: none !important; }
+</style>
+</head>
+<body>
+<div class="page">
+
+  <header class="top">
+    <a class="mark" href="/" style="text-decoration:none;color:inherit">
+      <svg viewBox="0 0 24 24" aria-hidden="true">
+        <path d="M18.6 6.6A8.6 8.6 0 1 0 18.6 17.4" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round"/>
+        <circle cx="19" cy="12" r="2.3" fill="currentColor"/>
+      </svg>
+      <b>Certa</b><span>Verification of employment</span>
+    </a>
+    <span class="chip" id="mode" data-live="false"><i></i><span id="mode-text">Loading</span></span>
+    <button class="quiet sm" id="theme">Auto</button>
+  </header>
+
+  <dl class="figures">
+    <div class="fig"><dt>View</dt><dd class="words" id="m-view">—</dd></div>
+    <div class="fig"><dt>Will call</dt><dd id="m-call">—</dd></div>
+    <div class="fig"><dt>Skipped</dt><dd id="m-skip">—</dd></div>
+    <div class="fig" id="fig-hidden"><dt>Hidden by filter</dt><dd id="m-hidden">—</dd></div>
+    <div class="fig"><dt>Estimated</dt><dd id="m-cost">—</dd></div>
+  </dl>
+
+  <!-- Table checkup. Configuration problems are the common failure, and the
+       expensive version is discovering one after a call has been paid for. -->
+  <section class="checkup" id="checkup" hidden>
+    <div class="checkup-head">
+      <h2 id="checkup-title">This table cannot run yet</h2>
+      <button class="quiet sm" id="checkup-toggle">Show all columns</button>
+    </div>
+    <p class="checkup-sub" id="checkup-sub"></p>
+    <ol class="checkup-list" id="checkup-list"></ol>
+  </section>
+
+  <div class="notice" id="notice" hidden>
+    <p id="notice-text"></p>
+    <button class="primary" id="notice-cta">Connect</button>
+  </div>
+
+  <section class="connect" id="connect" hidden>
+    <div class="connect-head">
+      <h2>Connect your verification queue</h2>
+      <p>Two connections and you are working from your own Airtable base. Everything stays on this machine.</p>
+      <p class="hint">Both are written to <code>.env</code> beside Certa, created readable only by you (<code>0600</code>), and sent to Airtable and CALL-E only. The <code>?token=</code> in this page's address is a different thing again — a throwaway key generated each time Certa starts, so nothing else on your machine can drive the console. Lose it and you just restart Certa; a new one is printed.</p>
+    </div>
+    <div class="steps">
+      <div class="step" id="step-1"><span class="n">1</span> Airtable base</div>
+      <div class="step" id="step-2"><span class="n">2</span> CALL-E account</div>
+      <div class="step" id="step-3"><span class="n">3</span> Your organisation</div>
+    </div>
+    <div class="connect-body">
+      <div class="fields">
+        <div>
+          <label for="f-token">Airtable token <em id="s-token"></em></label>
+          <input id="f-token" type="password" autocomplete="off" placeholder="pat…">
+          <p class="hint">Scope <code>schema.bases:read</code> plus record read and write. <a href="https://airtable.com/create/tokens" target="_blank" rel="noopener">Create a token →</a></p>
+        </div>
+        <div>
+          <label for="f-base">Airtable base</label>
+          <input id="f-base" autocomplete="off" placeholder="app…">
+          <p class="hint">The <code>app…</code> segment of your base URL.</p>
+        </div>
+        <div>
+          <label for="f-key">CALL-E API key <em id="s-key"></em></label>
+          <input id="f-key" type="password" autocomplete="off" placeholder="iams_live_…">
+          <p class="hint">Only needed to place calls. <a href="https://dashboard.heycall-e.com/account/api-keys" target="_blank" rel="noopener">Open dashboard →</a></p>
+        </div>
+        <div>
+          <label for="f-req">Your organisation</label>
+          <input id="f-req" autocomplete="off" placeholder="Meridian Lending">
+          <p class="hint">Spoken aloud on every call. An unnamed caller asking about an employee is pretexting.</p>
+        </div>
+      </div>
+      <div class="makebase" id="makebase" hidden>
+        <h3>No base yet?</h3>
+        <p>Certa can build it for you — nineteen columns with the right types and the extraction instructions already written in. Your token needs the <code>schema.bases:write</code> scope.</p>
+        <div class="inline">
+          <div>
+            <label for="f-ws">Airtable workspace</label>
+            <input id="f-ws" autocomplete="off" placeholder="wsp…">
+            <p class="hint">The <code>wsp…</code> segment of your Airtable address bar.</p>
+          </div>
+          <button id="mkbase">Create the base</button>
+        </div>
+        <p class="hint" id="mkbase-msg" style="margin-top:14px"></p>
+      </div>
+    </div>
+    <div class="connect-foot">
+      <p class="privacy">Saved to a local file only you can read. Never written to your base, never logged, and never shown again — only the last four characters.</p>
+      <button class="quiet" id="disconnect">Disconnect</button>
+      <button id="close-connect">Cancel</button>
+      <button class="primary" id="save">Save and connect</button>
+      <span class="say" id="setup-msg"></span>
+    </div>
+  </section>
+
+  <section id="s-plan">
+    <div class="shead"><h2>Will be called</h2><em id="c-plan">—</em></div>
+    <div class="list" id="planned"><div class="skel"></div><div class="skel"></div></div>
+  </section>
+
+  <section id="s-skip" hidden>
+    <div class="shead"><h2>Will not be called</h2><em id="c-skip">—</em></div>
+    <div class="list" id="skipped"></div>
+  </section>
+
+  <div class="bar">
+    <button class="primary" id="run">Run</button>
+    <button id="refresh">Preview again</button>
+    <select id="viewpick" title="Which Airtable view to run"></select>
+    <button class="quiet" id="open-connect">Connections</button>
+    <span class="say" id="hint"></span>
+  </div>
+
+  <section id="s-res" hidden>
+    <div class="shead"><h2>Results</h2><em id="c-res">—</em></div>
+    <div class="list" id="results"></div>
+  </section>
+
+  <footer>
+    <span class="m" id="chain">audit —</span>
+    <span id="perm"></span>
+  </footer>
+</div>
+
+<script>
+const TOKEN = new URLSearchParams(location.search).get("token") || "";
+const $ = (id) => document.getElementById(id);
+const esc = (s) => String(s ?? "").replace(/[&<>"]/g, c => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[c]));
+let VIEW = "", MODE = "fixtures", CONFIG = {}, polling = null;
+
+const TONE = {
+  verified: "ok",
+  needs_review: "attn", partial: "attn",
+  employer_unreachable: "stop", not_verified: "stop", skipped: "stop",
+  declined: "idle", pending: "idle",
+};
+const ORDER = ["needs_review","partial","verified","declined","not_verified","employer_unreachable","pending","skipped"];
+
+const api = async (path, opts) => {
+  const r = await fetch(path + (path.includes("?") ? "&" : "?") + "token=" + encodeURIComponent(TOKEN), opts);
+  const j = await r.json().catch(() => ({ error: "bad response" }));
+  if (!r.ok) throw new Error(j.error || r.statusText);
+  return j;
+};
+
+function say(msg, bad) {
+  const el = $("hint");
+  el.textContent = msg || "";
+  el.classList.toggle("warn", !!bad);
+}
+
+const THEMES = ["Auto", "Light", "Dark"];
+function applyTheme(next) {
+  const root = document.documentElement;
+  if (next === "Auto") root.removeAttribute("data-theme");
+  else root.setAttribute("data-theme", next.toLowerCase());
+  $("theme").textContent = next;
+  try { localStorage.setItem("certa-theme", next); } catch (e) { /* private window */ }
+}
+$("theme").addEventListener("click", () =>
+  applyTheme(THEMES[(THEMES.indexOf($("theme").textContent.trim()) + 1) % THEMES.length]));
+(() => {
+  let saved = "Auto";
+  try { saved = localStorage.getItem("certa-theme") || "Auto"; } catch (e) { /* ignore */ }
+  applyTheme(THEMES.includes(saved) ? saved : "Auto");
+})();
+
+function planRow(x) {
+  return `
+  <article class="rec">
+    <div class="rec-top">
+      <div class="rec-id">${esc(x.request_id)}</div>
+      <div class="rec-main">
+        <div class="rec-org">${esc(x.employer)}</div>
+        <div class="rec-meta">
+          <span class="tel">${esc(x.masked_number)}</span>
+          <span class="dot">·</span>
+          <span class="src">sourced from ${esc(x.source.replace(/_/g, " "))}</span>
+        </div>
+        <details>
+          <summary><span class="car">▶</span> What will be said on this call</summary>
+          <pre class="script">${esc(x.task)}</pre>
+        </details>
+      </div>
+      <span class="tag">Ready</span>
+    </div>
+  </article>`;
+}
+
+function skipRow(x) {
+  return `
+  <article class="rec">
+    <div class="rec-top">
+      <div class="rec-id">${esc(x.request_id)}</div>
+      <div class="rec-main">
+        <div class="rec-org">${esc(x.employer)}</div>
+        <p class="rec-note">${esc(x.reason)}</p>
+        ${x.grantable ? `<div class="act"><button data-grant="${esc(x.record_id)}">Record consent</button></div>` : ""}
+      </div>
+      <span class="tag" data-s="stop">Not called</span>
+    </div>
+  </article>`;
+}
+
+function renderPlan(p) {
+  VIEW = p.view;
+  $("m-view").textContent = p.view;
+  $("m-call").textContent = p.call_count;
+  $("m-skip").textContent = p.skipped.length;
+  $("m-hidden").textContent = p.hidden;
+  $("fig-hidden").dataset.flag = String(p.hidden > 0);
+  $("m-cost").innerHTML = "$" + p.estimated_cost_usd.toFixed(2) + " <small>est.</small>";
+  $("c-plan").textContent = p.call_count;
+  $("c-skip").textContent = p.skipped.length;
+
+  $("planned").innerHTML = p.planned.map(planRow).join("")
+    || `<p class="rec-note">Nothing in this view is ready to call.</p>`;
+  $("s-skip").hidden = p.skipped.length === 0;
+  $("skipped").innerHTML = p.skipped.map(skipRow).join("");
+
+  $("run").disabled = p.call_count === 0;
+  say(p.call_count ? `${p.call_count} real call${p.call_count > 1 ? "s" : ""} · cannot be undone` : "");
+}
+
+function renderRun(s) {
+  $("s-res").hidden = false;
+  const rows = [...s.rows].sort((a, b) => ORDER.indexOf(a.disposition) - ORDER.indexOf(b.disposition));
+  $("c-res").textContent = rows.length;
+  $("results").innerHTML = rows.map(r => `
+    <article class="rec">
+      <div class="rec-top">
+        <div class="rec-id">${esc(r.request_id)}</div>
+        <div class="rec-main">
+          <p class="rec-note" style="margin-top:2px">${esc(r.reason)}</p>
+          ${(r.evidence || []).map(e => `<p class="rec-quote">${esc(e)}</p>`).join("")}
+        </div>
+        <span class="tag" data-s="${TONE[r.disposition] || "idle"}">
+          ${esc(r.disposition.replace(/_/g, " "))}
+          ${r.confidence != null ? `<span class="cf">${r.confidence.toFixed(2)}</span>` : ""}
+        </span>
+      </div>
+    </article>`).join("");
+
+  if (s.error) say(s.error, true);
+  if (s.finished && !s.running) {
+    const parts = Object.entries(s.counts).map(([k, v]) => `${v} ${k.replace(/_/g, " ")}`);
+    if (!s.error) say(parts.length ? `${parts.join(" · ")} in ${s.elapsed}s` : "");
+    $("run").disabled = false; $("refresh").disabled = false;
+    clearInterval(polling); polling = null;
+    loadAudit();
+  }
+}
+
+function renderSteps() {
+  const c = CONFIG;
+  $("step-1").dataset.state = c.can_read_table ? "done" : "active";
+  $("step-2").dataset.state = c.calle_api_key ? "done" : (c.can_read_table ? "active" : "");
+  $("step-3").dataset.state = c.requester_name ? "done" : (c.calle_api_key ? "active" : "");
+}
+
+function renderConfig(c) {
+  CONFIG = c; VIEW = c.view; MODE = c.mode;
+  const liveLabel = c.transport === "mcp" ? "Live \u00b7 MCP" : "Live";
+  $("mode-text").textContent =
+    { fixtures: "Sample data", preview: "Preview only", live: liveLabel }[MODE] || MODE;
+  $("mode").dataset.live = String(MODE === "live");
+
+  $("s-token").textContent = c.airtable_token || "";
+  $("s-key").textContent = c.calle_api_key || "";
+  $("f-base").value = c.airtable_base_id || "";
+  $("f-req").value = c.requester_name || "";
+  const baseLooksRight = (c.airtable_base_id || "").startsWith("app");
+  $("makebase").hidden = !(c.airtable_token && !baseLooksRight);
+  const pick = $("viewpick");
+  const views = c.views || [];
+  pick.innerHTML = views.length
+    ? views.map(v => `<option${v.name === c.view ? " selected" : ""}>${esc(v.name)}</option>`).join("")
+    : `<option selected>${esc(c.view || "All rows")}</option>`;
+  if (views.length && !views.some(v => v.name === c.view)) {
+    /* The configured view no longer exists. Fall back to a real one rather
+       than failing every request with a 422. */
+    VIEW = views[0].name;
+    pick.value = VIEW;
+  }
+  $("perm").textContent = c.permission_warning || "";
+  $("perm").className = c.permission_warning ? "bad" : "";
+  renderSteps();
+
+  const n = $("notice"), t = $("notice-text"), cta = $("notice-cta");
+  if (MODE === "fixtures" && !c.forced_fixtures) {
+    n.hidden = false;
+    t.innerHTML = "<b>You are looking at sample data.</b> Every part of this is real except the phone calls. Connect your Airtable base to run your own verification queue.";
+    cta.textContent = "Connect";
+  } else if (MODE === "preview") {
+    n.hidden = false;
+    t.innerHTML = "<b>Preview only.</b> Reading your real table, but there is no CALL-E key yet, so nothing can be dialled.";
+    cta.textContent = "Add key";
+  } else if (c.transport === "mcp") {
+    n.hidden = false;
+    t.innerHTML = "<b>Calling over MCP.</b> CALL-E's REST host does not resolve, " +
+      "so calls go through the MCP surface instead. It dials for real, but cannot " +
+      "return typed answers \u2014 so every result lands in <em>needs review</em> " +
+      "with its transcript, rather than being marked verified.";
+    cta.textContent = "Connections";
+  } else { n.hidden = true; }
+}
+
+const toggleConnect = (show) => {
+  $("connect").hidden = !show;
+  if (show) {
+    $("connect").scrollIntoView({ behavior: "smooth", block: "start" });
+    setTimeout(() => (CONFIG.can_read_table ? $("f-key") : $("f-token")).focus(), 300);
+  }
+};
+$("open-connect").addEventListener("click", () => toggleConnect($("connect").hidden));
+$("notice-cta").addEventListener("click", () => toggleConnect(true));
+$("close-connect").addEventListener("click", () => toggleConnect(false));
+
+$("save").addEventListener("click", async () => {
+  const body = {};
+  for (const [id, key] of [["f-token","airtable_token"],["f-key","calle_api_key"],["f-base","airtable_base_id"],["f-req","requester_name"]]) {
+    const v = $(id).value.trim(); if (v) body[key] = v;
+  }
+  $("save").disabled = true;
+  $("setup-msg").textContent = "Connecting…";
+  try {
+    const c = await api("/api/setup", {
+      method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(body),
+    });
+    $("f-token").value = ""; $("f-key").value = "";
+    renderConfig(c);
+    $("setup-msg").textContent = "Connected";
+    setTimeout(() => { toggleConnect(false); $("setup-msg").textContent = ""; }, 800);
+    await loadPlan();
+  } catch (e) {
+    $("setup-msg").textContent = "";
+    say(e.message, true);
+  } finally { $("save").disabled = false; }
+});
+
+$("disconnect").addEventListener("click", async () => {
+  if (!confirm("Forget the stored Airtable and CALL-E credentials on this machine?\n\nCerta will fall back to sample data.")) return;
+  $("disconnect").disabled = true;
+  try {
+    renderConfig(await api("/api/disconnect", {
+      method: "POST", headers: { "Content-Type": "application/json" }, body: "{}",
+    }));
+    $("f-base").value = ""; $("f-req").value = ""; $("f-ws").value = "";
+    $("setup-msg").textContent = "Disconnected";
+    await loadPlan();
+  } catch (e) { say(e.message, true); }
+  finally { $("disconnect").disabled = false; }
+});
+
+$("mkbase").addEventListener("click", async () => {
+  const ws = $("f-ws").value.trim();
+  if (!ws) { $("mkbase-msg").textContent = "Paste your workspace id first."; return; }
+  $("mkbase").disabled = true;
+  $("mkbase-msg").textContent = "Creating the base…";
+  try {
+    const c = await api("/api/create-base", {
+      method: "POST", headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ workspace_id: ws }),
+    });
+    renderConfig(c);
+    $("mkbase-msg").textContent =
+      "Created " + c.created_base_id + " — now add a view called “Ready to verify”.";
+    await loadPlan();
+  } catch (e) {
+    $("mkbase-msg").textContent = e.message;
+  } finally { $("mkbase").disabled = false; }
+});
+
+async function loadPlan() {
+  try { renderPlan(await api("/api/plan?view=" + encodeURIComponent(VIEW))); }
+  catch (e) { say(e.message, true); $("planned").innerHTML = ""; }
+}
+
+/* Table checkup -------------------------------------------------------- */
+let CHECKUP_ALL = false;
+async function loadCheckup() {
+  let c;
+  try { c = await api("/api/checkup"); } catch (e) { return; }
+  const box = $("checkup");
+  if (!c.connected) { box.hidden = true; return; }
+  const problems = (c.findings || []).filter((f) => f.state === "problem");
+  const ok = problems.length === 0;
+  box.hidden = false;
+  box.dataset.ok = String(ok);
+  $("checkup-title").textContent = ok
+    ? "This table is ready"
+    : problems.length === 1 ? "One column needs a change" : `${problems.length} columns need a change`;
+  $("checkup-sub").textContent = ok
+    ? "Every column Certa reads or writes is present and can hold the answers CALL-E gives."
+    : "Fix these before running. Each one would otherwise fail after a call has been placed and paid for.";
+  $("checkup-toggle").textContent = CHECKUP_ALL ? "Show only problems" : "Show all columns";
+  $("checkup-toggle").hidden = ok && !CHECKUP_ALL ? false : false;
+  const rows = CHECKUP_ALL ? c.findings : (ok ? [] : problems);
+  $("checkup-list").innerHTML = rows.map((f) => `
+    <li data-s="${f.state}">
+      <span class="mark">${f.state === "problem" ? "\u2715" : "\u2713"}</span>
+      <div>
+        <div class="col">${esc(f.column)}</div>
+        <div class="det">${esc(f.detail)}</div>
+        ${f.fix ? `<div class="fix">${esc(f.fix)}</div>` : ""}
+      </div>
+    </li>`).join("");
+}
+$("checkup-toggle").addEventListener("click", () => { CHECKUP_ALL = !CHECKUP_ALL; loadCheckup(); });
+
+async function loadAudit() {
+  try {
+    const a = await api("/api/audit");
+    const el = $("chain");
+    el.className = a.ok ? "m" : "m bad";
+    el.textContent = a.ok
+      ? `audit · chain intact · ${a.records} records · head ${a.head}`
+      : `audit · CHAIN BROKEN at seq ${a.broken_at} · ${a.reason}`;
+  } catch (e) { /* panel remains usable */ }
+}
+
+/* Consent is recorded, not created: the operator attests that the applicant
+   named this employer and agreed to it being contacted. */
+document.addEventListener("click", async (ev) => {
+  const btn = ev.target.closest("[data-grant]");
+  if (!btn) return;
+  if (!confirm(
+    "Record that the applicant consented to this employer being called?\n\n" +
+    "You are attesting that they named this employer and agreed to the contact. " +
+    "This goes into the audit record under your organisation."
+  )) return;
+  btn.disabled = true; btn.textContent = "Recording\u2026";
+  try {
+    await api("/api/consent/grant", {
+      method: "POST", headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ record_id: btn.dataset.grant }),
+    });
+    await loadPlan(); await loadAudit();
+  } catch (e) {
+    say(e.message, true);
+    btn.disabled = false; btn.textContent = "Record consent";
+  }
+});
+
+$("viewpick").addEventListener("change", () => { VIEW = $("viewpick").value; loadPlan(); });
+
+$("refresh").addEventListener("click", loadPlan);
+
+$("run").addEventListener("click", async () => {
+  const n = $("m-call").textContent;
+  if (!confirm(`Place ${n} real phone call${n === "1" ? "" : "s"} to real employers.\n\nThis cannot be undone.`)) return;
+  $("run").disabled = true; $("refresh").disabled = true;
+  say("Dialling…");
+  try {
+    await api("/api/run", {
+      method: "POST", headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ view: VIEW, confirm: true }),
+    });
+    polling = setInterval(async () => {
+      try { renderRun(await api("/api/status")); }
+      catch (e) { say(e.message, true); clearInterval(polling); polling = null; }
+    }, 1000);
+  } catch (e) {
+    say(e.message, true);
+    $("run").disabled = false; $("refresh").disabled = false;
+  }
+});
+
+(async () => {
+  try {
+    renderConfig(await api("/api/config"));
+    await loadPlan();
+    await loadCheckup();
+    await loadAudit();
+  } catch (e) {
+    say(e.message + " — open the URL printed when Certa started; it carries the access token.", true);
+    $("planned").innerHTML = "";
+  }
+})();
+</script>
+</body>
+</html>

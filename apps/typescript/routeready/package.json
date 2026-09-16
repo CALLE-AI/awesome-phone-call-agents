@@ -1,0 +1,30 @@
+{
+  "name": "routeready",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Call-ahead delivery route re-sequencing: CALL-E phones the next customers on a rider's route and the stops are re-ordered around their answers.",
+  "type": "module",
+  "license": "MIT",
+  "engines": {
+    "node": ">=20.12"
+  },
+  "scripts": {
+    "start": "tsx src/server/app.ts",
+    "smoke": "tsx scripts/smoke-call.ts",
+    "smoke:live": "tsx scripts/smoke-call.ts --live",
+    "build:travel": "tsx scripts/build-travel.ts",
+    "sim": "tsx scripts/sim.ts",
+    "export:schema": "tsx scripts/export-schema.ts",
+    "check": "tsc -p tsconfig.json",
+    "test": "vitest run"
+  },
+  "dependencies": {
+    "@call-e/calle": "0.7.0"
+  },
+  "devDependencies": {
+    "@types/node": "^22.20.2",
+    "tsx": "^4.23.13",
+    "typescript": "^7.0.2",
+    "vitest": "^5.0.0"
+  }
+}

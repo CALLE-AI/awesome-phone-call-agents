@@ -1,0 +1,13 @@
+{
+  "name": "firstbell-page-gates",
+  "private": true,
+  "type": "module",
+  "description": "Browser gates for the evidence page. Drives the Chrome already on the machine, so nothing is downloaded.",
+  "scripts": {
+    "gates": "node run.mjs"
+  },
+  "comment": "puppeteer-core is pinned exactly, not ranged. Every other dependency in this repository is pinned, and this was the one caret left. A gate whose own tooling can change under it between two runs cannot be the thing that decides whether a claim still holds: the run that passes and the run that fails would differ by a package nobody chose. 23.11.1 is the version every published gate report was measured on.",
+  "devDependencies": {
+    "puppeteer-core": "23.11.1"
+  }
+}
