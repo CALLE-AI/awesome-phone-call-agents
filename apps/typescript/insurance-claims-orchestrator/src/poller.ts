@@ -1,6 +1,10 @@
 // src/poller.ts
 // Calls CALL-E REST API, polls to terminal status, returns structured result.
 // Only used in --live mode. Dry-run never reaches this file.
+//
+// IMPORTANT (real-world side effect): once CALL-E accepts a call, the outbound
+// call may continue on the provider even if this process exits locally. Exiting
+// this CLI does NOT cancel an in-flight accepted call.
 
 import type { CallOutcome } from "./ClaimChain.js";
 
@@ -8,6 +12,18 @@ const TERMINAL_STATUSES = new Set(["completed", "failed", "cancelled"]);
 const MAX_POLL = 60;
 const POLL_INTERVAL_MS = 10_000;
 const CALLE_BASE_URL = "https://api.heycall-e.com/v1";
+
+// The set of self-reported outcomes we treat as a confirmed, successful intake.
+// The AI reports its own outcome in the structured result; provider transport
+// status alone is NOT sufficient to declare success.
+const CONFIRMED_OUTCOMES = new Set<CallOutcome>(["completed"]);
+const KNOWN_OUTCOMES = new Set<CallOutcome>([
+  "completed",
+  "voicemail",
+  "no_answer",
+  "refused",
+  "unclear",
+]);
 
 export async function calleApiCaller(
   phone: string,
@@ -31,11 +47,8 @@ export async function calleApiCaller(
   });
 
   if (!createRes.ok) {
-    const errorText = await createRes.text();
-    // Mask provider error to avoid exposing sensitive details
-    throw new Error(
-      `CALL-E create failed: ${createRes.status}`
-    );
+    // Mask provider error to avoid exposing sensitive details in logs.
+    throw new Error(`CALL-E create failed: ${createRes.status}`);
   }
 
   const { id: callId } = (await createRes.json()) as { id: string };
@@ -53,12 +66,11 @@ export async function calleApiCaller(
 
     const data = (await statusRes.json()) as {
       status: string;
-      structured_result?: object;
+      structured_result?: { outcome?: string } & Record<string, unknown>;
     };
 
     if (TERMINAL_STATUSES.has(data.status)) {
-      const outcome = mapStatusToOutcome(data.status, data.structured_result);
-      // Do NOT log structured_result — only report outcome status
+      const outcome = deriveOutcome(data.status, data.structured_result);
       return {
         callId,
         outcome,
@@ -67,16 +79,48 @@ export async function calleApiCaller(
     }
   }
 
-  throw new Error(
-    `Call ${callId} did not reach terminal status within ${MAX_POLL} polling attempts`
-  );
+  // Timed out waiting for a terminal status. This is ambiguous — the call may
+  // still be in progress or accepted on the provider. Do NOT treat as a clean
+  // no-answer that would trigger an automatic redial. Surface as unclear so the
+  // orchestrator routes to human review.
+  return { callId, outcome: "unclear", structured_result: null };
 }
 
-function mapStatusToOutcome(status: string, result: object | undefined): CallOutcome {
-  if (status === "completed" && result) return "completed";
-  if (status === "completed" && !result) return "unclear";
-  if (status === "failed") return "no_answer";
+// Derive the workflow outcome from BOTH the provider transport status and the
+// AI-reported outcome inside the structured result.
+//
+// Rules:
+// - A confirmed intake requires the provider to report "completed" AND the AI's
+//   own self-reported `outcome` to be a confirmed outcome ("completed").
+// - If the AI reported a specific known outcome (refused/unclear/voicemail/
+//   no_answer), preserve it verbatim — never overwrite a refusal with success.
+// - Ambiguous provider failures ("failed"/"cancelled") map to "unclear", which
+//   is NOT retryable, rather than "no_answer", which is.
+function deriveOutcome(
+  providerStatus: string,
+  result: ({ outcome?: string } & Record<string, unknown>) | undefined
+): CallOutcome {
+  const reported = normalizeReportedOutcome(result?.outcome);
+
+  // If the AI self-reported a known outcome, that is the source of truth.
+  if (reported) {
+    // Success requires provider completion too; otherwise it's ambiguous.
+    if (CONFIRMED_OUTCOMES.has(reported)) {
+      return providerStatus === "completed" && result ? "completed" : "unclear";
+    }
+    return reported;
+  }
+
+  // No usable self-reported outcome. Fall back conservatively.
+  // Provider "completed" without a parsable result is ambiguous, not success.
+  // Provider "failed"/"cancelled" is ambiguous — do NOT map to retryable no_answer.
   return "unclear";
+}
+
+function normalizeReportedOutcome(value: unknown): CallOutcome | null {
+  if (typeof value !== "string") return null;
+  const v = value.trim().toLowerCase() as CallOutcome;
+  return KNOWN_OUTCOMES.has(v) ? v : null;
 }
 
 function sleep(ms: number): Promise<void> {

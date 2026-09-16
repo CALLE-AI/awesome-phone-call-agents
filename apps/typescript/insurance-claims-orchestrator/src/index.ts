@@ -35,7 +35,15 @@ async function main(): Promise<void> {
   const masked = phone.slice(0, 4) + "*".repeat(Math.max(0, phone.length - 4));
   console.log("\n=== Insurance Claims Orchestrator ===");
   console.log(`Mode:  ${live ? "LIVE (calls will be placed)" : "DRY-RUN (no calls placed)"}`);
-  console.log(`Phone: ${masked}\n`);
+  console.log(`Phone: ${masked}`);
+  if (live) {
+    console.log(
+      "NOTE: Once CALL-E accepts a call it may continue on the provider even if\n" +
+        "      you stop this process. Exiting does NOT cancel an in-flight call —\n" +
+        "      use the CALL-E dashboard/API to cancel or manage accepted calls."
+    );
+  }
+  console.log("");
 
   const chain = new ClaimChain()
     .addStep(buildLossReportStep())
@@ -75,7 +83,10 @@ async function main(): Promise<void> {
     process.exit(2);
   }
 
-  console.log("\n✅ Both calls completed. Routing to adjuster assignment queue.");
+  console.log(
+    "\n✅ Both calls completed (simulated). No downstream claim/adjuster system is\n" +
+      "   integrated in this demo — nothing was submitted or queued."
+  );
 }
 
 main().catch((e: Error) => {

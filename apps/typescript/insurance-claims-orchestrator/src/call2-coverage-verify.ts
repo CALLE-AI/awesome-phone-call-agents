@@ -1,19 +1,14 @@
 // src/call2-coverage-verify.ts
-// CALL-E task builder for Call 2: Provisional Intake Notification.
-// Notifies the claimant their claim is received and an adjuster will follow up.
-// This is NOT guaranteed follow-up and NOT coverage verification.
-// Does NOT collect policy or coverage data — CALL-E safety policy prohibits that.
+// CALL-E task builder for Call 2: Provisional (Simulated) Intake Notification.
+//
+// This app has NO real adjuster/claims-management integration. Call 2 delivers a
+// SIMULATED, provisional acknowledgement only. It does NOT guarantee follow-up,
+// does NOT verify coverage, and does NOT submit a claim to any downstream system.
+// It does NOT collect policy or coverage data — CALL-E safety policy prohibits that.
 // Depends on loss_report step result via ChainContext.
 
-import { createHash } from "node:crypto";
 import type { CallStep, ChainContext } from "./ClaimChain.js";
 import type { LossReportResult } from "./types.js";
-
-// Generate stable idempotency key from phone + execution context
-function generateIdempotencyKey(phone: string, stepId: string): string {
-  const input = `${phone}:${stepId}:coverage_verify`;
-  return createHash("sha256").update(input).digest("hex");
-}
 
 // Schema captures call outcome and any claimant questions — nothing sensitive.
 const adjusterNotifySchema = {
@@ -60,21 +55,16 @@ export function buildCoverageVerifyStep(): CallStep {
       const incidentSummary =
         lossResult?.incident_description || "a recently reported incident";
 
-      // Idempotency key: stable hash of phone + step id for deduplication
-      // Passed in task context for provider-side deduplication
-      const idempotencyKey = generateIdempotencyKey(ctx.phone, "coverage_verify");
-      const taskNote = `[IDEMPOTENCY_KEY: ${idempotencyKey}]\n\n`;
-
-      return taskNote + `You are calling on behalf of an insurance company to provide a provisional intake notification to a claimant.
+      return `You are calling on behalf of an insurance company to provide a provisional intake notification to a claimant.
 
 IMPORTANT DISCLAIMER:
-This is a notification call only. It does NOT guarantee coverage verification, adjuster assignment, or claim approval. The claimant may need to take additional steps. Cancellation or non-follow-up is possible.
+This is a SIMULATED, provisional notification only — there is no live adjuster or claims-management system behind it. It does NOT guarantee coverage verification, adjuster assignment, or claim approval. The claimant may need to take additional steps. Cancellation or non-follow-up is possible.
 
 DISCLOSURE (say this first, exactly):
 "Hello, this is an automated assistant calling on behalf of your insurance provider. This call may be recorded for quality and compliance purposes."
 
 Your purpose is to deliver the following update:
-"We are calling to let you know that your claim regarding ${incidentSummary} has been received. A claims adjuster will attempt to contact you within 2 to 3 business days to discuss next steps. Please note that this is a provisional notification and circumstances may change."
+"We are calling with a provisional update: the information you shared about ${incidentSummary} has been recorded. If your claim proceeds, an adjuster may attempt to contact you within 2 to 3 business days. This is a provisional notification only, and it is not a confirmation that a claim has been opened or that coverage applies."
 
 Then ask:
 "Do you have any questions I can pass along to your adjuster?"

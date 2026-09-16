@@ -7,7 +7,7 @@ Two-call consent-first insurance claims intake orchestrator using CALL-E.
 This app orchestrates a two-call CALL-E workflow for insurance claims intake:
 
 - **Call 1 — Loss Report:** Contacts the policyholder to collect structured incident details (description, date, damage estimate, policy number).
-- **Call 2 — Provisional Intake Notification:** Notifies the claimant their claim was received. An adjuster MAY follow up within 2-3 business days. This is NOT guaranteed coverage verification or adjuster assignment. Cancellation or non-follow-up is possible.
+- **Call 2 — Provisional (Simulated) Intake Notification:** Delivers a simulated, provisional acknowledgement to the claimant. This app has NO real adjuster or claims-management integration — Call 2 does NOT open a claim, verify coverage, assign an adjuster, or guarantee any follow-up. An adjuster MAY contact the claimant only if a real downstream process (not included here) picks up the intake.
 
 Call 2 runs only when Call 1 reaches a completed outcome. Both calls use explicit AI disclosure and fail-closed result schemas. Dry-run is the default.
 
@@ -79,9 +79,18 @@ See `skills/insurance-claims-orchestrator/references/two-call-pattern.md` for fu
 - Dry-run is the default — `--live` flag required for real calls
 - AI disclosure mandatory at the start of both calls
 - Phone numbers masked in all logs
-- Ambiguous outcomes (refused, unclear) route to human review, never auto-retried
+- Ambiguous outcomes (refused, unclear, provider failure, poll timeout) route to human review, never auto-retried
+- Call 2 requires a confirmed Call 1 intake outcome before it runs
 - Structured results never logged to console (outcome status only)
-- Idempotency keys included in task context for provider-side deduplication
 - No SSN, payment, or medical data ever collected
+
+### Live-mode side effects
+
+- `--live` places real outbound phone calls via CALL-E and incurs real cost.
+- Once CALL-E accepts a call, that call may continue on the provider even if you
+  stop this CLI locally. **Exiting this process does not cancel an accepted, in-flight call.**
+  To cancel or manage an in-flight call, use the CALL-E dashboard/API directly.
+- This app does not implement provider-side idempotency/deduplication. Re-running
+  `--live` against the same number can place another real call.
 
 See `skills/insurance-claims-orchestrator/references/safety.md` for the full contract.

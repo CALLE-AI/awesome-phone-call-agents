@@ -1,14 +1,7 @@
 // src/call1-loss-report.ts
 // CALL-E task builder for Call 1: Loss Report.
 
-import { createHash } from "node:crypto";
 import type { CallStep, ChainContext } from "./ClaimChain.js";
-
-// Generate stable idempotency key from phone + execution context
-function generateIdempotencyKey(phone: string, stepId: string): string {
-  const input = `${phone}:${stepId}:loss_report`;
-  return createHash("sha256").update(input).digest("hex");
-}
 
 // CALL-E only supports: type string/number/boolean/object/array, enum.
 // Nullable fields use type "string" with empty string as the null sentinel.
@@ -126,11 +119,8 @@ export function buildLossReportStep(): CallStep {
     retryOnOutcome: ["no_answer"],
     maxRetries: 2,
     resultSchema: lossReportSchema,
-    taskText: (ctx: ChainContext): string => {
-      const idempotencyKey = generateIdempotencyKey(ctx.phone, "loss_report");
-      const taskNote = `[IDEMPOTENCY_KEY: ${idempotencyKey}]\n\n`;
-
-      return taskNote + `You are calling on behalf of an insurance company to record a new claim.
+    taskText: (_ctx: ChainContext): string => {
+      return `You are calling on behalf of an insurance company to record a new claim.
 
 DISCLOSURE (say this first, exactly):
 "Hello, this is an automated assistant calling on behalf of your insurance provider.

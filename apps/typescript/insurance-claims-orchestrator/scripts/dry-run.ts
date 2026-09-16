@@ -48,7 +48,7 @@ async function runDryRun(): Promise<void> {
   console.log(JSON.stringify(result, null, 2));
   console.log(
     result.completed
-      ? "\n✅ SUCCESS — Route to adjuster queue."
+      ? "\n✅ SUCCESS — both calls completed (simulated; nothing submitted downstream)."
       : "\n⚠️  Human review required: " + result.humanReviewReason
   );
 }
