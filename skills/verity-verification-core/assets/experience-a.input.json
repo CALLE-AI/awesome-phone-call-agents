@@ -1,0 +1,12 @@
+{
+  "label": "A - clean confirm",
+  "intent": "confirm",
+  "business_tz": "America/New_York",
+  "intended_value": {
+    "appointment_date": "2026-09-08",
+    "appointment_time": "09:00",
+    "timezone": "America/New_York",
+    "service_type": "haircut"
+  },
+  "expect": { "decision": "ALLOW", "reason_code": "allow_clean" }
+}

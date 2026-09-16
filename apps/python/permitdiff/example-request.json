@@ -1,0 +1,19 @@
+{
+  "snapshot": {
+    "jurisdiction": "Example City Building Department",
+    "permit_id": "BLD-2026-1042",
+    "public_project_reference": "Commercial tenant improvement, 100 Example Ave",
+    "portal_status": "reviewing",
+    "portal_updated_at_utc": "2026-08-14T09:00:00Z",
+    "portal_missing_items_summary": "No missing items shown",
+    "portal_next_step": "Plan review in progress"
+  },
+  "office": {
+    "phone": "+14155550123",
+    "region": "US",
+    "locale": "en-US"
+  },
+  "caller_authorized_for_permit": true,
+  "stale_after_hours": 72,
+  "explicit_discrepancy": ""
+}

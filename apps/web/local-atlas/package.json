@@ -1,0 +1,17 @@
+{
+  "name": "local-atlas",
+  "version": "1.0.0",
+  "description": "Map-first local guide that turns a phone call into a dated, reusable verified fact.",
+  "license": "MIT",
+  "private": true,
+  "scripts": {
+    "start": "node server.js"
+  },
+  "engines": {
+    "node": ">=18"
+  },
+  "dependencies": {
+    "@call-e/calle": "^0.6.0",
+    "express": "^4.19.2"
+  }
+}

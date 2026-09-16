@@ -1,0 +1,7 @@
+[
+  { "vendor": "Sharp Cuts", "phoneE164": "+14155550101", "answered": true, "price": 25, "available": "yes", "availableDetail": "walk-in now, 15 min wait", "etaMinutes": 15, "notes": "" },
+  { "vendor": "The Barber Room", "phoneE164": "+14155550102", "answered": true, "price": 20, "available": "yes", "availableDetail": "today, 40 min wait", "etaMinutes": 40, "notes": "" },
+  { "vendor": "Classic Cuts", "phoneE164": "+14155550103", "answered": true, "price": 30, "available": "no", "availableDetail": "fully booked today, open Thursday", "etaMinutes": null, "notes": "" },
+  { "vendor": "Fade Factory", "phoneE164": "+14155550104", "answered": false, "price": null, "available": "unknown", "availableDetail": "", "etaMinutes": null, "notes": "no answer" },
+  { "vendor": "Style Studio", "phoneE164": "+14155550105", "answered": true, "price": 22, "available": "yes", "availableDetail": "today, 20 min wait", "etaMinutes": 20, "notes": "" }
+]

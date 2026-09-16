@@ -1,0 +1,412 @@
+TAP version 13
+# Subtest: exact paused report has an enabled concrete next step, not Keep going
+ok 1 - exact paused report has an enabled concrete next step, not Keep going
+  ---
+  duration_ms: 2.071053
+  type: 'test'
+  ...
+# Subtest: derived display neither changes source data nor assumes capabilities
+ok 2 - derived display neither changes source data nor assumes capabilities
+  ---
+  duration_ms: 0.392019
+  type: 'test'
+  ...
+# Subtest: already_contacted never appears in the actionable chooser
+ok 3 - already_contacted never appears in the actionable chooser
+  ---
+  duration_ms: 0.184698
+  type: 'test'
+  ...
+# Subtest: not_approved never appears in the actionable chooser
+ok 4 - not_approved never appears in the actionable chooser
+  ---
+  duration_ms: 0.089835
+  type: 'test'
+  ...
+# Subtest: inactive never appears in the actionable chooser
+ok 5 - inactive never appears in the actionable chooser
+  ---
+  duration_ms: 0.82522
+  type: 'test'
+  ...
+# Subtest: mock_only never appears in the actionable chooser
+ok 6 - mock_only never appears in the actionable chooser
+  ---
+  duration_ms: 0.087341
+  type: 'test'
+  ...
+# Subtest: duplicate_number never appears in the actionable chooser
+ok 7 - duplicate_number never appears in the actionable chooser
+  ---
+  duration_ms: 0.122874
+  type: 'test'
+  ...
+# Subtest: queued prioritizes the working indicator over new calls
+ok 8 - queued prioritizes the working indicator over new calls
+  ---
+  duration_ms: 0.114331
+  type: 'test'
+  ...
+# Subtest: running prioritizes the working indicator over new calls
+ok 9 - running prioritizes the working indicator over new calls
+  ---
+  duration_ms: 0.285009
+  type: 'test'
+  ...
+# Subtest: starting prioritizes the working indicator over new calls
+ok 10 - starting prioritizes the working indicator over new calls
+  ---
+  duration_ms: 0.269555
+  type: 'test'
+  ...
+# Subtest: matching contacts still need server permission
+ok 11 - matching contacts still need server permission
+  ---
+  duration_ms: 0.192689
+  type: 'test'
+  ...
+# Subtest: uncertain provider call blocks new inquiries even with stale eligibility flags
+ok 12 - uncertain provider call blocks new inquiries even with stale eligibility flags
+  ---
+  duration_ms: 0.100561
+  type: 'test'
+  ...
+# Subtest: stopped inquiry stays stopped, with explicit continuation available
+ok 13 - stopped inquiry stays stopped, with explicit continuation available
+  ---
+  duration_ms: 0.1327
+  type: 'test'
+  ...
+# Subtest: no_contacts points to a permitted recovery action
+ok 14 - no_contacts points to a permitted recovery action
+  ---
+  duration_ms: 0.247793
+  type: 'test'
+  ...
+# Subtest: call_limit points to a permitted recovery action
+ok 15 - call_limit points to a permitted recovery action
+  ---
+  duration_ms: 0.069895
+  type: 'test'
+  ...
+# Subtest: mode_changed points to a permitted recovery action
+ok 16 - mode_changed points to a permitted recovery action
+  ---
+  duration_ms: 0.092129
+  type: 'test'
+  ...
+# Subtest: other_run_busy points to a permitted recovery action
+ok 17 - other_run_busy points to a permitted recovery action
+  ---
+  duration_ms: 0.048743
+  type: 'test'
+  ...
+# Subtest: review_required points to a permitted recovery action
+ok 18 - review_required points to a permitted recovery action
+  ---
+  duration_ms: 0.052259
+  type: 'test'
+  ...
+# Subtest: scope mismatch and legacy plans cannot be approved or re-inquired from this UI
+ok 19 - scope mismatch and legacy plans cannot be approved or re-inquired from this UI
+  ---
+  duration_ms: 0.123496
+  type: 'test'
+  ...
+# Subtest: one complete plan leads to review, never implicit approval
+ok 20 - one complete plan leads to review, never implicit approval
+  ---
+  duration_ms: 0.101162
+  type: 'test'
+  ...
+# Subtest: complete alternatives without a selection lead to comparison
+ok 21 - complete alternatives without a selection lead to comparison
+  ---
+  duration_ms: 0.080651
+  type: 'test'
+  ...
+# Subtest: existing approved actions never expose inquiry or approval controls
+ok 22 - existing approved actions never expose inquiry or approval controls
+  ---
+  duration_ms: 0.136064
+  type: 'test'
+  ...
+# Subtest: one failed callback cannot pretend all helpers are ready
+ok 23 - one failed callback cannot pretend all helpers are ready
+  ---
+  duration_ms: 0.096525
+  type: 'test'
+  ...
+# Subtest: only a finished active rescue offers safe closure
+ok 24 - only a finished active rescue offers safe closure
+  ---
+  duration_ms: 0.082685
+  type: 'test'
+  ...
+# Subtest: completed rescue is read-only with a share action
+ok 25 - completed rescue is read-only with a share action
+  ---
+  duration_ms: 0.078058
+  type: 'test'
+  ...
+# Subtest: observation label requires a nonempty, observation-only definition
+ok 26 - observation label requires a nonempty, observation-only definition
+  ---
+  duration_ms: 0.093761
+  type: 'test'
+  ...
+# Subtest: missing legacy fields produce a review action without throwing
+ok 27 - missing legacy fields produce a review action without throwing
+  ---
+  duration_ms: 0.058979
+  type: 'test'
+  ...
+# Subtest: a stopped complete plan does not loop into a comparison that cannot enable approval
+ok 28 - a stopped complete plan does not loop into a comparison that cannot enable approval
+  ---
+  duration_ms: 0.083666
+  type: 'test'
+  ...
+# Subtest: stale permissions cannot bypass call_limit
+ok 29 - stale permissions cannot bypass call_limit
+  ---
+  duration_ms: 0.134012
+  type: 'test'
+  ...
+# Subtest: stale permissions cannot bypass mode_changed
+ok 30 - stale permissions cannot bypass mode_changed
+  ---
+  duration_ms: 0.161292
+  type: 'test'
+  ...
+# Subtest: stale permissions cannot bypass other_run_busy
+ok 31 - stale permissions cannot bypass other_run_busy
+  ---
+  duration_ms: 0.068663
+  type: 'test'
+  ...
+# Subtest: stale permissions cannot bypass review_required
+ok 32 - stale permissions cannot bypass review_required
+  ---
+  duration_ms: 0.047491
+  type: 'test'
+  ...
+# Subtest: failed cannot expose stale contact permissions
+ok 33 - failed cannot expose stale contact permissions
+  ---
+  duration_ms: 0.072219
+  type: 'test'
+  ...
+# Subtest: completed cannot expose stale contact permissions
+ok 34 - completed cannot expose stale contact permissions
+  ---
+  duration_ms: 0.043075
+  type: 'test'
+  ...
+# Subtest: pending supervisor confirmation has a direct action before adding new contacts
+ok 35 - pending supervisor confirmation has a direct action before adding new contacts
+  ---
+  duration_ms: 0.244527
+  type: 'test'
+  ...
+# Subtest: non-supervisor condition uses a truthful generic label
+ok 36 - non-supervisor condition uses a truthful generic label
+  ---
+  duration_ms: 0.096304
+  type: 'test'
+  ...
+# Subtest: a complete selected plan prioritizes approval over unused conditional alternatives
+ok 37 - a complete selected plan prioritizes approval over unused conditional alternatives
+  ---
+  duration_ms: 0.08697
+  type: 'test'
+  ...
+# Subtest: a stopped conditional run permits only a new explicit recheck
+ok 38 - a stopped conditional run permits only a new explicit recheck
+  ---
+  duration_ms: 0.067481
+  type: 'test'
+  ...
+# Subtest: stale followup permissions cannot bypass {"status":"running"}
+ok 39 - stale followup permissions cannot bypass {"status":"running"}
+  ---
+  duration_ms: 0.837279
+  type: 'test'
+  ...
+# Subtest: stale followup permissions cannot bypass {"status":"failed"}
+ok 40 - stale followup permissions cannot bypass {"status":"failed"}
+  ---
+  duration_ms: 0.076134
+  type: 'test'
+  ...
+# Subtest: stale followup permissions cannot bypass {"status":"interrupted"}
+ok 41 - stale followup permissions cannot bypass {"status":"interrupted"}
+  ---
+  duration_ms: 0.051608
+  type: 'test'
+  ...
+# Subtest: stale followup permissions cannot bypass {"status":"completed"}
+ok 42 - stale followup permissions cannot bypass {"status":"completed"}
+  ---
+  duration_ms: 0.575184
+  type: 'test'
+  ...
+# Subtest: stale followup permissions cannot bypass {"activity":{"uncertain":true}}
+ok 43 - stale followup permissions cannot bypass {"activity":{"uncertain":true}}
+  ---
+  duration_ms: 0.151347
+  type: 'test'
+  ...
+# Subtest: stale followup permissions cannot bypass {"scope_warning":"changed goal"}
+ok 44 - stale followup permissions cannot bypass {"scope_warning":"changed goal"}
+  ---
+  duration_ms: 0.060171
+  type: 'test'
+  ...
+# Subtest: stale followup permissions cannot bypass {"legacy":true}
+ok 45 - stale followup permissions cannot bypass {"legacy":true}
+  ---
+  duration_ms: 0.044577
+  type: 'test'
+  ...
+# Subtest: stale followup permissions cannot bypass {"continue_blocked_code":"call_limit"}
+ok 46 - stale followup permissions cannot bypass {"continue_blocked_code":"call_limit"}
+  ---
+  duration_ms: 0.042254
+  type: 'test'
+  ...
+# Subtest: stale followup permissions cannot bypass {"continue_blocked_code":"mode_changed"}
+ok 47 - stale followup permissions cannot bypass {"continue_blocked_code":"mode_changed"}
+  ---
+  duration_ms: 0.04018
+  type: 'test'
+  ...
+# Subtest: stale followup permissions cannot bypass {"continue_blocked_code":"other_run_busy"}
+ok 48 - stale followup permissions cannot bypass {"continue_blocked_code":"other_run_busy"}
+  ---
+  duration_ms: 0.091227
+  type: 'test'
+  ...
+# Subtest: stale followup permissions cannot bypass {"actions":[{"status":"confirmed"}]}
+ok 49 - stale followup permissions cannot bypass {"actions":[{"status":"confirmed"}]}
+  ---
+  duration_ms: 0.052289
+  type: 'test'
+  ...
+# Subtest: missing callback price surfaces one recovery action, not instructions to read a log
+ok 50 - missing callback price surfaces one recovery action, not instructions to read a log
+  ---
+  duration_ms: 0.1529
+  type: 'test'
+  ...
+# Subtest: stale retry hint is not used in {"status":"running"}
+ok 51 - stale retry hint is not used in {"status":"running"}
+  ---
+  duration_ms: 0.081352
+  type: 'test'
+  ...
+# Subtest: stale retry hint is not used in {"status":"starting"}
+ok 52 - stale retry hint is not used in {"status":"starting"}
+  ---
+  duration_ms: 0.043425
+  type: 'test'
+  ...
+# Subtest: stale retry hint is not used in {"status":"completed"}
+ok 53 - stale retry hint is not used in {"status":"completed"}
+  ---
+  duration_ms: 0.039129
+  type: 'test'
+  ...
+# Subtest: stale retry hint is not used in {"status":"interrupted"}
+ok 54 - stale retry hint is not used in {"status":"interrupted"}
+  ---
+  duration_ms: 0.037407
+  type: 'test'
+  ...
+# Subtest: stale retry hint is not used in {"activity":{"uncertain":true}}
+ok 55 - stale retry hint is not used in {"activity":{"uncertain":true}}
+  ---
+  duration_ms: 0.035493
+  type: 'test'
+  ...
+# Subtest: stale retry hint is not used in {"scope_warning":"changed"}
+ok 56 - stale retry hint is not used in {"scope_warning":"changed"}
+  ---
+  duration_ms: 0.034802
+  type: 'test'
+  ...
+# Subtest: stale retry hint is not used in {"legacy":true}
+ok 57 - stale retry hint is not used in {"legacy":true}
+  ---
+  duration_ms: 0.035614
+  type: 'test'
+  ...
+# Subtest: stale retry hint is not used in {"engine_version":2}
+ok 58 - stale retry hint is not used in {"engine_version":2}
+  ---
+  duration_ms: 0.036355
+  type: 'test'
+  ...
+# Subtest: confirmed helpers have inline progress controls, not a second primary explanation button
+ok 59 - confirmed helpers have inline progress controls, not a second primary explanation button
+  ---
+  duration_ms: 1.158352
+  type: 'test'
+  ...
+# Subtest: an unresolved saved operation exposes recovery rather than a redial
+ok 60 - an unresolved saved operation exposes recovery rather than a redial
+  ---
+  duration_ms: 0.172279
+  type: 'test'
+  ...
+# Subtest: stale provider recovery is not actionable for {"mode":"mock"}
+ok 61 - stale provider recovery is not actionable for {"mode":"mock"}
+  ---
+  duration_ms: 0.090957
+  type: 'test'
+  ...
+# Subtest: stale provider recovery is not actionable for {"status":"completed"}
+ok 62 - stale provider recovery is not actionable for {"status":"completed"}
+  ---
+  duration_ms: 0.047572
+  type: 'test'
+  ...
+# Subtest: stale provider recovery is not actionable for {"status":"running"}
+ok 63 - stale provider recovery is not actionable for {"status":"running"}
+  ---
+  duration_ms: 0.037306
+  type: 'test'
+  ...
+# Subtest: stale provider recovery is not actionable for {"status":"active"}
+ok 64 - stale provider recovery is not actionable for {"status":"active"}
+  ---
+  duration_ms: 0.040501
+  type: 'test'
+  ...
+# Subtest: stale provider recovery is not actionable for {"scope_warning":"Changed goal"}
+ok 65 - stale provider recovery is not actionable for {"scope_warning":"Changed goal"}
+  ---
+  duration_ms: 0.036004
+  type: 'test'
+  ...
+# Subtest: stale provider recovery is not actionable for {"legacy":true}
+ok 66 - stale provider recovery is not actionable for {"legacy":true}
+  ---
+  duration_ms: 0.034191
+  type: 'test'
+  ...
+# Subtest: stale provider recovery is not actionable for {"engine_version":2}
+ok 67 - stale provider recovery is not actionable for {"engine_version":2}
+  ---
+  duration_ms: 0.033901
+  type: 'test'
+  ...
+1..67
+# tests 67
+# suites 0
+# pass 67
+# fail 0
+# cancelled 0
+# skipped 0
+# todo 0
+# duration_ms 87.122588

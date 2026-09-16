@@ -1,0 +1,17 @@
+[project]
+name = "calle-callback-coordinator-app"
+version = "0.1.0"
+description = "Consent-first callback triage and routing with the CALL-E Python SDK."
+requires-python = ">=3.11"
+dependencies = [
+  "calle-ai==0.6.0",
+  "tzdata>=2024.1",
+]
+
+[dependency-groups]
+dev = [
+  "pytest>=9.0.0",
+]
+
+[tool.pytest.ini_options]
+testpaths = ["test_coordinator.py", "test_client.py"]

@@ -1,0 +1,43 @@
+name: Initialize issue triage
+
+on:
+  issues:
+    types: [opened, reopened]
+
+permissions:
+  issues: write
+
+jobs:
+  initialize:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Add initial triage metadata
+        uses: actions/github-script@f28e40c7f34bde8b3046d885e986cb6290c5673b # v7
+        with:
+          script: |
+            const issue = context.payload.issue;
+            if (issue.pull_request) return;
+
+            const names = issue.labels.map((label) =>
+              typeof label === "string" ? label : label.name
+            );
+            const add = [];
+
+            if (!names.some((name) => name.startsWith("status:"))) {
+              add.push("status:needs-triage");
+            }
+
+            if (
+              (issue.body ?? "").includes("<!-- triage-discord-feedback:") &&
+              !names.includes("source:discord")
+            ) {
+              add.push("source:discord");
+            }
+
+            if (add.length > 0) {
+              await github.rest.issues.addLabels({
+                ...context.repo,
+                issue_number: issue.number,
+                labels: add,
+              });
+            }

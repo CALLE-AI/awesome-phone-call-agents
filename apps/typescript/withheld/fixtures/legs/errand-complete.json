@@ -1,0 +1,21 @@
+{
+  "name": "errand-complete",
+  "description": "No callback was ever offered and every question is backed by a callee turn. The errand is done in one leg.",
+  "status": "completed",
+  "now": "2026-09-14T10:00:00Z",
+  "turns": [
+    { "speaker": "caller", "text": "Good morning. I'm an automated assistant calling on behalf of Amina Otieno, with her permission." },
+    { "speaker": "caller", "text": "What is the earliest appointment you have with Dr Mwangi?" },
+    { "speaker": "callee", "text": "Tuesday the fifteenth at half past nine." },
+    { "speaker": "caller", "text": "Can you arrange a sign language interpreter for the appointment?" },
+    { "speaker": "callee", "text": "Yes, we book those through the county service, that's arranged." },
+    { "speaker": "caller", "text": "Do you need the referral letter before the appointment?" },
+    { "speaker": "callee", "text": "No, bring it on the day, that's fine." },
+    { "speaker": "caller", "text": "Thank you very much. Goodbye." }
+  ],
+  "expect": {
+    "status": "errand_complete",
+    "next_action": "errand_complete",
+    "number_disclosed": false
+  }
+}

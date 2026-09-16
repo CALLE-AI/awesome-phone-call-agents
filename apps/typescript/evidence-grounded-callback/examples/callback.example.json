@@ -1,0 +1,40 @@
+{
+  "business_name": "Harbor & Pine Home Services",
+  "recipient": {
+    "phone": "+12025550147",
+    "region": "US",
+    "locale": "en-US"
+  },
+  "objective": "Follow up on the requested callback and identify the next helpful step.",
+  "consent": {
+    "affirmed": true,
+    "method": "web_form",
+    "recorded_at": "2026-08-07T12:00:00.000Z"
+  },
+  "facts": [
+    {
+      "kind": "business_name",
+      "value": "Harbor & Pine Home Services",
+      "source_url": "https://example.com/",
+      "source_quote": "Harbor & Pine Home Services",
+      "source_sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+      "approved": true
+    },
+    {
+      "kind": "hours",
+      "value": "Monday through Friday, 8 AM to 6 PM",
+      "source_url": "https://example.com/contact",
+      "source_quote": "Open Monday through Friday from 8 AM to 6 PM.",
+      "source_sha256": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+      "approved": true
+    },
+    {
+      "kind": "availability_claim",
+      "value": "Same-day appointments may be available",
+      "source_url": "https://example.com/services",
+      "source_quote": "Same-day appointments may be available when capacity allows.",
+      "source_sha256": "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
+      "approved": false
+    }
+  ]
+}

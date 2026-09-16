@@ -1,0 +1,67 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Disruption Desk</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,700;12..96,800&family=Public+Sans:wght@400;500;600;700&family=JetBrains+Mono:wght@400;600;700&display=swap">
+  <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+  <header class="top">
+    <div class="brand">
+      <img class="mark" src="calle-icon.svg" alt="CALL-E">
+      <strong>Disruption Desk</strong>
+      <span>Calls placed by CALL-E for TripKita, a fictional travel agency</span>
+    </div>
+    <div class="top-right">
+      <span id="clock" class="chip" hidden></span>
+      <span id="mode" class="pill">…</span>
+      <button id="reset" class="btn ghost" type="button">Reset demo</button>
+    </div>
+  </header>
+
+  <main>
+    <section class="board-wrap" aria-labelledby="board-title">
+      <div class="section-head">
+        <h1 id="board-title">Departures · Jakarta (CGK)</h1>
+        <p class="muted">Report a delay or cancellation on a flight with passengers, or let the airline push it through the webhook. The desk prices every option across the airline, distributor, and OTA chain before any call.</p>
+      </div>
+      <div class="board-scroll">
+        <table class="board">
+          <thead><tr><th>Flight</th><th>To</th><th>Sched</th><th>Status</th><th>Pax</th><th>Seats</th><th><span class="sr">Action</span></th></tr></thead>
+          <tbody id="board"></tbody>
+        </table>
+      </div>
+    </section>
+
+    <section id="feed" class="feed" aria-live="polite" hidden></section>
+
+    <div id="error" class="error" role="alert" hidden></div>
+
+    <section id="desk" class="desk" hidden>
+      <div class="list" id="events"></div>
+      <aside class="detail" id="detail" aria-live="polite"></aside>
+    </section>
+    <section class="requests-wrap" aria-labelledby="requests-title">
+      <div class="section-head">
+        <h2 id="requests-title">Passenger requests · CALL-E handles the change</h2>
+        <p class="muted">Passenger → CALL-E → airline desk. A request arrives through chat, the web form, or the phone line. The desk checks eligibility and prices every option at voluntary rates. CALL-E calls the passenger to agree the change and its cost, then calls the airline service desk to make exactly that change.</p>
+      </div>
+      <div class="desk">
+        <div class="list">
+          <form id="request-form" class="event request-form"></form>
+          <div id="request-list"></div>
+        </div>
+        <aside class="detail" id="request-detail" aria-live="polite"></aside>
+      </div>
+    </section>
+  </main>
+
+  <div id="call-modal" hidden></div>
+  <div id="toast" class="toast" role="status" aria-live="polite" hidden></div>
+  <script src="app.js"></script>
+</body>
+</html>

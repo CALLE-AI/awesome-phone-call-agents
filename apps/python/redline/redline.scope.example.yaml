@@ -1,0 +1,45 @@
+# REDLINE scope file -- the written authorisation for placing real calls.
+#
+# Copy this to `redline.scope.yaml` and fill it in. The package-local
+# `.gitignore` excludes that file, live mode refuses it if Git could track it,
+# and the supplied pre-commit hook rejects a force-added copy by filename.
+#
+# Nothing in REDLINE will place a call without it. That is not paperwork for
+# its own sake: `redline run --live` makes a stranger's phone ring and spends
+# credits, and the question of who agreed to that has a right answer that
+# should be written down before the fact rather than reconstructed after it.
+#
+# Every number below is standards-reserved fiction and rings nothing. The
+# ranges, written without their country codes so this file does not itself
+# carry something a phone-number scanner reads as dialable:
+#   NANP documentation block 555-0100..0199 (ATIS-0300115), country code 1
+#   Ofcom drama range 7700 900000..900999 (OFW 002), country code 44
+#   ARCEP fiction range 09 99 98 xx xx, country code 33
+
+# Who authorised this, and in what capacity. An authorisation nobody signed is
+# not an authorisation.
+authorised_by: "Dana Okafor, Head of Support Operations"
+
+# How to reach whoever can call this off. This is what somebody needs when a
+# phone rings that should not have rung.
+contact: "dana.okafor@example.com"
+
+# When the authorisation runs out, YYYY-MM-DD. There is deliberately no way to
+# write "no expiry": permission granted once in March is not permission in
+# November.
+expires: 2026-12-31
+
+# The exact numbers, and who owns the phone each one rings. Matching is exact
+# -- no prefixes, no ranges, no wildcards. A prefix is how one line quietly
+# authorises a million phones.
+targets:
+  - number: "+14155550142"
+    owner: "Test handset, support office, second floor"
+    note: "Kept in the drawer. Nobody's personal line."
+
+  - number: "+447700900123"
+    owner: "UK test SIM, held by the support team"
+
+  - number: "+33999981234"
+    owner: "FR test line, forwarded to voicemail"
+    note: "Use for the false-completion family."

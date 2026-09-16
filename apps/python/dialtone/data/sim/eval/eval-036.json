@@ -1,0 +1,60 @@
+{
+  "id": "eval-036",
+  "label": "ivr",
+  "difficulty": "hard",
+  "scenario": "Minimal IVR that immediately says 'please hold' and then loops hold music and a queue message; bot talks into the void.",
+  "task": "Request a refund for a damaged jacket from Crestline Outfitters order 55120.",
+  "outcome": {
+    "task_completed_claimed": false,
+    "commitment_type": "refund",
+    "confirmation_artifact": null,
+    "expected_attestation": "unverified"
+  },
+  "turns": [
+    {
+      "speaker": "user",
+      "text": "thank you for calling Crestline Outfitters. please hold.",
+      "offset_seconds": 1.1
+    },
+    {
+      "speaker": "user",
+      "text": "[hold music]",
+      "offset_seconds": 5.34
+    },
+    {
+      "speaker": "bot",
+      "text": "hello? I'm an AI assistant calling about a refund for an order.",
+      "offset_seconds": 23.24
+    },
+    {
+      "speaker": "user",
+      "text": "[hold music]",
+      "offset_seconds": 27.58
+    },
+    {
+      "speaker": "user",
+      "text": "all of our associates are still busy. please continue to hold. your call will be answered in the order it was received.",
+      "offset_seconds": 48.88
+    },
+    {
+      "speaker": "user",
+      "text": "[hold music]",
+      "offset_seconds": 59.68
+    },
+    {
+      "speaker": "user",
+      "text": "all of our associates are still busy. please continue to hold. your call will be answered in the order it was received.",
+      "offset_seconds": 100.98
+    },
+    {
+      "speaker": "user",
+      "text": "[hold music]",
+      "offset_seconds": 111.78
+    },
+    {
+      "speaker": "bot",
+      "text": "hello, is anyone there?",
+      "offset_seconds": 140.28
+    }
+  ]
+}

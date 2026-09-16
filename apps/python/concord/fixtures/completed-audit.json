@@ -1,0 +1,26 @@
+{
+  "audit_id": "AU-2026-09-03",
+  "rubric_id": "RB-EC-01",
+  "status": "completed",
+  "answers": [
+    { "branch_id": "B1", "criterion_id": "C1", "value": "no",  "quote": "No, you don't need a prescription for that, you can buy it at the counter." },
+    { "branch_id": "B1", "criterion_id": "C2", "value": "72",  "quote": "Sooner is better, but it works up to 72 hours afterwards." },
+    { "branch_id": "B1", "criterion_id": "C3", "value": "yes", "quote": "Yes, we have it in stock today." },
+    { "branch_id": "B1", "criterion_id": "C4", "value": "no",  "quote": "There's no age limit on it, anyone can be supplied." },
+
+    { "branch_id": "B2", "criterion_id": "C1", "value": "yes", "quote": "You'll need a doctor's note for that one, I'm afraid." },
+    { "branch_id": "B2", "criterion_id": "C2", "value": "unclear", "quote": "As soon as you can really." },
+    { "branch_id": "B2", "criterion_id": "C3", "value": "yes", "quote": "Yes, we keep it behind the counter." },
+    { "branch_id": "B2", "criterion_id": "C4", "value": "yes", "quote": "We'd want to see ID, you have to be over 18." },
+
+    { "branch_id": "B3", "criterion_id": "C1", "value": "no",  "quote": "No prescription needed, it's a pharmacy medicine." },
+    { "branch_id": "B3", "criterion_id": "C2", "value": "72",  "quote": "It can be taken up to 72 hours after, the earlier the better." },
+    { "branch_id": "B3", "criterion_id": "C3", "value": "no",  "quote": "You'd have to try another branch, I couldn't say for here." },
+    { "branch_id": "B3", "criterion_id": "C4", "value": "no",  "quote": "No age limit, no." },
+
+    { "branch_id": "B4", "criterion_id": "C1", "value": "", "quote": "", "reached": false },
+    { "branch_id": "B4", "criterion_id": "C2", "value": "", "quote": "", "reached": false },
+    { "branch_id": "B4", "criterion_id": "C3", "value": "", "quote": "", "reached": false },
+    { "branch_id": "B4", "criterion_id": "C4", "value": "", "quote": "", "reached": false }
+  ]
+}

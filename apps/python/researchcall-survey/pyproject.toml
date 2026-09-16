@@ -1,0 +1,11 @@
+[project]
+name = "calle-standardized-survey-runner-app"
+version = "0.1.0"
+description = "Standardized telephone survey with locked ethics rules and an honest denominator."
+requires-python = ">=3.11"
+dependencies = []
+
+[dependency-groups]
+dev = [
+  "pytest>=9.0.0",
+]

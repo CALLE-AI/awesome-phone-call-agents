@@ -1,0 +1,36 @@
+{
+  "call_id": "call_mock_decline",
+  "status": "completed",
+  "task_completed": true,
+  "completion_confidence": {
+    "score": 0.9,
+    "label": "high"
+  },
+  "description": "Recipient cancels. No alternative time.",
+  "transcript_turns": [
+    {
+      "offset_seconds": 0,
+      "speaker": "bot",
+      "text": "Hi Amelia, calling from KAY2 Studios to confirm Thursday 10:00. Can you attend?"
+    },
+    {
+      "offset_seconds": 5,
+      "speaker": "user",
+      "text": "No, I need to cancel."
+    },
+    {
+      "offset_seconds": 8,
+      "speaker": "bot",
+      "text": "Understood. I will mark this as declined so a human can cancel the booking. Thank you."
+    }
+  ],
+  "expected_structured_result": {
+    "can_attend": "no",
+    "confirmed_time": "",
+    "requested_time": "",
+    "disposition": "declined"
+  },
+  "evidence": [
+    "No, I need to cancel."
+  ]
+}

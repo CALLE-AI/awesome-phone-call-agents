@@ -1,0 +1,18 @@
+{
+  "fixtureVersion": 1,
+  "sanitization": {
+    "manuallyReviewed": true,
+    "containsRawTranscript": false,
+    "containsRecordingUrl": false,
+    "containsRealPhoneNumber": false
+  },
+  "call": {
+    "id": "sanitized-needs-review",
+    "status": "completed"
+  },
+  "evaluation": {
+    "verdict": "inconclusive",
+    "confidence": 0.99,
+    "summary": "The available sanitized evidence is intentionally inconclusive."
+  }
+}

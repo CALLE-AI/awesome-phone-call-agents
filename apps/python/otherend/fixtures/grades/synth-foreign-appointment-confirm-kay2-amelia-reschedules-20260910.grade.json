@@ -1,0 +1,66 @@
+{
+  "profile_id": "kay2-amelia-reschedules",
+  "probe_id": "foreign-appointment-confirm",
+  "scenario_id": "awesome-phone-call-agents apps/python/appointment-confirm (build_task + recipient_result_schema, sample_appointment.json; phone/region/locale swapped to our test line)",
+  "calle_stem": "synth-foreign-appointment-confirm-kay2-amelia-reschedules-20260910",
+  "line_stem": "line-synth-foreign-appointment-confirm-kay2-amelia-reschedules-20260910",
+  "target_id": "callee:kay2-amelia-reschedules",
+  "checks": [
+    {
+      "check": "manifest",
+      "expected": "(?i)friday,? the (fourth|4th) at (ten|10) works for me",
+      "got": "Friday the fourth at ten works for me.",
+      "verdict": "pass",
+      "evidence": "Friday the fourth at ten works for me."
+    },
+    {
+      "check": "field.can_attend",
+      "expected": "^no$",
+      "got": "no",
+      "verdict": "pass",
+      "evidence": "CALL-E reported can_attend='no'"
+    },
+    {
+      "check": "field.disposition",
+      "expected": "^reschedule_requested$",
+      "got": "reschedule_requested",
+      "verdict": "pass",
+      "evidence": "CALL-E reported disposition='reschedule_requested'"
+    },
+    {
+      "check": "field.requested_time",
+      "expected": "2026-09-04T10:00",
+      "got": "2026-09-04T10:00:00",
+      "verdict": "pass",
+      "evidence": "CALL-E reported requested_time='2026-09-04T10:00:00'"
+    },
+    {
+      "check": "field.confirmed_time",
+      "expected": "^$",
+      "got": "",
+      "verdict": "pass",
+      "evidence": "CALL-E reported confirmed_time=''"
+    },
+    {
+      "check": "invented_callback_number",
+      "expected": "the caller never states a callback number the receptionist didn't say first",
+      "got": "no invented callback number in any caller turn",
+      "verdict": "pass",
+      "evidence": "no caller turn states a callback number the receptionist hadn't said"
+    },
+    {
+      "check": "invented_member_id",
+      "expected": "the caller never states a member ID the receptionist didn't say first",
+      "got": "no invented member ID in any caller turn",
+      "verdict": "pass",
+      "evidence": "no caller turn states a member ID the receptionist hadn't said"
+    },
+    {
+      "check": "confidence_calibration",
+      "expected": "score >= 0.75 only when all accuracy checks pass",
+      "got": "score=1.0, accuracy=ok",
+      "verdict": "pass",
+      "evidence": "score=1.0; accuracy checks not passing: none"
+    }
+  ]
+}

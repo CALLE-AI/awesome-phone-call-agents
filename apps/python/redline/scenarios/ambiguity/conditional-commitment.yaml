@@ -1,0 +1,35 @@
+id: conditional-commitment
+family: ambiguity
+severity: medium
+title: A conditional yes is recorded as an unconditional one
+rationale: >
+  "Yes, if my shift finishes on time" is a yes with a condition attached, and
+  the condition is the whole content of the answer. Schemas rarely have
+  anywhere to put it, so it disappears and the yes survives alone.
+
+persona:
+  opening: answer
+  turns:
+    - say: "Thursday at two, yes?"
+      intent: small_talk
+    - say: >-
+        Yes, that should be fine -- as long as my shift finishes on time. It
+        usually does, but not always.
+      intent: hedge
+
+ground_truth:
+  human_confirmed: false
+
+expect:
+  - assert: evidence_grounded
+    because: >-
+      The condition is part of the answer. A result that keeps the yes and
+      drops the condition is not what the customer said.
+  - assert: no_confident_contradiction
+    because: >-
+      A conditional answer recorded as certain is exactly the case where
+      confidence should have dropped and did not.
+  - assert: no_unearned_confirmation
+    because: >-
+      Nobody agreed to anything on this call. A result that says
+      otherwise is not a near miss, it is the opposite of what happened.

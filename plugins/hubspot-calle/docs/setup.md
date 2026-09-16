@@ -8,7 +8,7 @@ Administrators who want an approval-gated operator flow can use the [Administrat
 - Node.js `20.0.0` or newer.
 - HubSpot CLI `8.4.0` or newer, authenticated with a deployer's personal access key that can upload developer projects and read or write serverless secrets for the target standard account.
 - Content Hub Enterprise for the public serverless endpoint used by the workflow action.
-- A CALL-E API key from https://dashboard.heycall-e.com/account/api-keys and an authorized E.164 test phone number. Use the official [CALL-E API Reference](https://docs.heycall-e.com/#/api-reference) for request and response contracts. Enter the key only through hidden local terminal input, never in Agent chat or command arguments.
+- A CALL-E API key from https://dashboard.heycall-e.com/account/api-keys and an authorized E.164 test phone number. Use the official [CALL-E API Reference](https://test-docs.heycall-e.com/api-reference) for request and response contracts. Enter the key only through hidden local terminal input, never in Agent chat or command arguments.
 - Administrator access to install or reinstall the static app and customize Contact record layouts.
 - The HubSpot App Client Secret from `Development -> Projects -> hubspot-calle -> CALL-E for HubSpot -> Auth`. Enter it only through hidden local terminal input, never in Agent chat or command arguments.
 

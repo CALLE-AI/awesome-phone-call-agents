@@ -1,0 +1,21 @@
+{
+  "schema_version": "2.0",
+  "request_id": "northstar-site-go",
+  "freelancer_name": "Northstar Studio",
+  "contact": {
+    "name": "Jordan Lee",
+    "organization": "Example Works",
+    "phone_e164": "+12025550123"
+  },
+  "authorization": {
+    "authorization_type": "explicit_request",
+    "authorized_by": "Jordan Lee",
+    "authorized_at": "2026-09-01T03:00:00Z",
+    "purpose": "Verify the project brief for human review.",
+    "source": "contact_written_consent"
+  },
+  "project_summary": "Design and build a five-page marketing website for a fictional product launch.",
+  "known_context": ["The contact requested a proposal after written discovery."],
+  "language": "English",
+  "region": "US"
+}

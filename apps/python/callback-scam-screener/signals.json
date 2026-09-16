@@ -1,0 +1,108 @@
+{
+  "context_fields": [
+    {"name": "company_name_stated", "type": ["string", "null"]},
+    {"name": "department_stated", "type": ["string", "null"]},
+    {"name": "callback_number_offered", "type": ["string", "null"]},
+    {"name": "call_summary", "type": "string"}
+  ],
+  "categories": {
+    "critical": {
+      "weight": "force_scam",
+      "signals": [
+        {
+          "id": "C1",
+          "name": "Requests remote-access software install",
+          "examples": ["download AnyDesk", "install TeamViewer", "UltraViewer", "LogMeIn", "take control of your screen"],
+          "result_field": "requested_remote_access_software",
+          "field_type": "boolean"
+        },
+        {
+          "id": "C2",
+          "name": "Requests gift card / crypto / wire payment",
+          "examples": ["buy a gift card", "send Bitcoin", "wire transfer the funds"],
+          "result_field": "requested_payment_method",
+          "field_type": "enum",
+          "present_values": ["gift_card", "crypto", "wire", "other"]
+        },
+        {
+          "id": "C3",
+          "name": "Requests OTP / MFA code / card PIN or CVV",
+          "examples": ["read me the code we texted you", "what's the 3-digit number on the back"],
+          "result_field": "requested_otp_or_card_details",
+          "field_type": "boolean"
+        }
+      ]
+    },
+    "high": {
+      "weight": 3,
+      "signals": [
+        {
+          "id": "H1",
+          "name": "Discourages independent verification",
+          "examples": ["don't call the number on your card", "you must resolve this with me right now"],
+          "result_field": "discouraged_independent_verification",
+          "field_type": "boolean"
+        },
+        {
+          "id": "H2",
+          "name": "Urgency/threat escalation when questioned",
+          "examples": ["your account will be suspended today", "final notice", "legal action will be taken"],
+          "result_field": "used_urgency_or_threat_language",
+          "field_type": "boolean"
+        },
+        {
+          "id": "H3",
+          "name": "Refuses or hedges on company name/department",
+          "examples": [],
+          "result_field": "refused_to_state_company_name",
+          "field_type": "boolean"
+        },
+        {
+          "id": "H4",
+          "name": "Cannot provide callback number matching published support line",
+          "examples": [],
+          "result_field": null,
+          "note": "Evaluated during prechecks by comparing callback_number_offered / the dialed number against the claimed company's official support number, not self-reported by the call agent."
+        }
+      ]
+    },
+    "medium": {
+      "weight": 1,
+      "signals": [
+        {
+          "id": "M1",
+          "name": "No hold music/IVR/call routing",
+          "examples": [],
+          "result_field": "had_hold_music_or_ivr",
+          "field_type": "boolean_negated"
+        },
+        {
+          "id": "M2",
+          "name": "Inconsistent details vs claimed company practices",
+          "examples": [],
+          "result_field": "inconsistent_with_claimed_company",
+          "field_type": "boolean",
+          "note": "Best-effort self-assessment by the call agent, lower confidence than the other signals."
+        },
+        {
+          "id": "M3",
+          "name": "Heavy fixed-script reliance, poor handling of off-script questions",
+          "examples": [],
+          "result_field": "relied_on_fixed_script",
+          "field_type": "boolean"
+        },
+        {
+          "id": "M4",
+          "name": "Generic rehearsed phrasing inconsistent with claimed company's tone",
+          "examples": [],
+          "result_field": "generic_rehearsed_phrasing",
+          "field_type": "boolean"
+        }
+      ]
+    }
+  },
+  "thresholds": {
+    "likely_scam_min_score": 6,
+    "inconclusive_min_score": 3
+  }
+}

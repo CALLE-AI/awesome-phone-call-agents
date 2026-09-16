@@ -1,0 +1,26 @@
+{
+  "name": "linecanary",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "description": "Synthetic monitoring and CI regression testing for business phone lines and deployed voice agents, powered by CALL-E.",
+  "scripts": {
+    "check": "tsc --noEmit",
+    "test": "node --import tsx --test test/*.test.ts",
+    "demo": "tsx demo/run-local.ts",
+    "cli": "tsx src/cli.ts",
+    "start": "sh deploy/start.sh"
+  },
+  "engines": {
+    "node": ">=22"
+  },
+  "dependencies": {
+    "@anthropic-ai/sdk": "^0.115.0",
+    "@call-e/calle": "0.2.2"
+  },
+  "devDependencies": {
+    "@types/node": "^22.15.0",
+    "tsx": "^4.20.0",
+    "typescript": "^5.8.0"
+  }
+}

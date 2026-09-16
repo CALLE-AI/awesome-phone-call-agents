@@ -11,6 +11,13 @@ const RETRYABLE_CALL_E_CODES = new Set([
   "provider_unavailable",
   "internal_error",
 ]);
+const CALL_E_CALL_STATUSES = new Set([
+  "queued",
+  "in_progress",
+  "completed",
+  "failed",
+  "canceled",
+]);
 const HUBSPOT_SIGNATURE_MAX_AGE_MS = 300_000;
 const HUBSPOT_V3_URI_DECODE_MAP = new Map([
   ["%3A", ":"],
@@ -257,6 +264,28 @@ function ambiguousCallEError(stage) {
   return error;
 }
 
+function documentedCallTaskError() {
+  const error = new Error(
+    "CALL-E create call returned a successful response that was not a documented CallTask response. Retry the same intent.",
+  );
+  error.providerCode = "invalid_response";
+  error.providerStatus = 0;
+  error.retrySameIntent = true;
+  return error;
+}
+
+function validateCreatedCallTask(responseBody) {
+  if (
+    !responseBody
+    || responseBody.object !== "call_task"
+    || !/^call_[A-Za-z0-9_-]+$/.test(String(responseBody.id || ""))
+    || !CALL_E_CALL_STATUSES.has(String(responseBody.status || ""))
+  ) {
+    throw documentedCallTaskError();
+  }
+  return responseBody;
+}
+
 function readCallEProviderCode(responseBody, status) {
   const nestedError = responseBody && typeof responseBody.error === "object"
     ? responseBody.error
@@ -348,6 +377,7 @@ async function createCallECall({
     response = await fetch(`${callEBaseUrl}/v1/calls`, {
       method: "POST",
       headers: {
+        accept: "application/json",
         authorization: `Bearer ${apiKey}`,
         "content-type": "application/json",
         "idempotency-key": idempotencyKey,
@@ -374,7 +404,7 @@ async function createCallECall({
   if (!response.ok) {
     throw callEProviderError(response, responseBody, normalizedPhone);
   }
-  return responseBody;
+  return validateCreatedCallTask(responseBody);
 }
 
 function cardResponse(statusCode, body) {

@@ -17,6 +17,11 @@ export interface FakeScript {
   confidence?: { score: number; label: string } | null;
   failureCode?: string | null;
   apiError?: { status: number; code: string };
+  /**
+   * One answer per create attempt, in order, so a first attempt that leaves the
+   * call unknown can be followed by an answer of another class.
+   */
+  createErrors?: { status: number; code: string }[];
   /** The call is created and the answer to the create is lost, so the caller cannot tell. */
   lostCreateResponse?: boolean;
   /** Reading the call back fails, so the result of a created call cannot be read. */
@@ -124,6 +129,8 @@ export async function startFakeCalle(scripts: FakeScript[]): Promise<FakeCalle> 
   const created: CreatedCall[] = [];
   const calls = new Map<string, StoredCall>();
   const idempotency = new Map<string, { id: string; bodyKey: string }>();
+  /** Create attempts per script, so `createErrors` can answer them one at a time. */
+  const createAttempts = new Map<string, number>();
   let counter = 0;
 
   const server: Server = createServer((request, response) => {
@@ -167,6 +174,14 @@ export async function startFakeCalle(scripts: FakeScript[]): Promise<FakeCalle> 
             response.end(snapshot(calls.get(seen.id)!, false));
             return;
           }
+        }
+        const attempts = (createAttempts.get(script.phone) ?? 0) + 1;
+        createAttempts.set(script.phone, attempts);
+        const sequenced = script.createErrors?.[attempts - 1];
+        if (sequenced !== undefined) {
+          response.statusCode = sequenced.status;
+          response.end(envelope(sequenced.code, `Fake server answered create attempt ${attempts} with an error.`));
+          return;
         }
         if (script.apiError !== undefined) {
           response.statusCode = script.apiError.status;

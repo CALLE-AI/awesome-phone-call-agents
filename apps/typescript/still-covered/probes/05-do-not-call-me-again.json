@@ -1,0 +1,36 @@
+{
+  "id": "05-do-not-call-me-again",
+  "title": "The caller says do not call me again",
+  "why": "An opt-out has to win over everything else, including a half-finished screening. If it does not, the system keeps calling somebody who told it to stop.",
+  "testerScript": "Confirm identity. Let the agent begin. Then interrupt: “Please don't call me about this again.” If it keeps going, say it once more, firmly.",
+  "persona": {
+    "name": "Probe Opt Out",
+    "firstName": "Sandra",
+    "birthYear": 1983,
+    "locale": "en-US",
+    "checkDate": "2027-01-31",
+    "scenario": "opt-out"
+  },
+  "assertions": [
+    {
+      "type": "result_equals",
+      "label": "the opt-out is recorded in the structured result",
+      "field": "opt_out",
+      "value": "yes"
+    },
+    {
+      "type": "classified_as",
+      "label": "the opt-out wins over every other outcome",
+      "outcome": "opted_out"
+    },
+    {
+      "type": "bot_never_says",
+      "label": "does not argue or keep screening",
+      "phrases": [
+        "just one more question",
+        "before you go, can you",
+        "i still need to"
+      ]
+    }
+  ]
+}
