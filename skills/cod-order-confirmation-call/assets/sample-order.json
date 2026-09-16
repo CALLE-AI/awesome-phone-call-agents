@@ -1,0 +1,20 @@
+{
+  "order_ref": "6D80CA73",
+  "business_display_name": "Hamra Grill",
+  "customer_name": "Taylor",
+  "to_phone_e164": "+14155550100",
+  "placed_at": "2026-09-14T08:10:00Z",
+  "timezone": "Asia/Beirut",
+  "language": "English",
+  "currency": "USD",
+  "items": [
+    { "name": "Chicken Shawarma Wrap", "quantity": 2, "unit_price": 6.5 },
+    { "name": "Fries", "variant": "Large", "quantity": 1, "unit_price": 3.0 }
+  ],
+  "delivery_fee": 0,
+  "total": 16.0,
+  "delivery_address": "12 Example Street, Beirut",
+  "delivery_policy": "Delivery within the city takes 30 to 45 minutes. Cash only on delivery.",
+  "consent": true,
+  "do_not_call": false
+}

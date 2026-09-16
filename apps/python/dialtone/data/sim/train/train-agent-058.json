@@ -1,0 +1,46 @@
+{
+ "id": "train-agent-058",
+ "label": "agent",
+ "source": "sim-train",
+ "meta": {
+  "task": "reschedule an appointment from Tuesday to Thursday morning",
+  "hard": true
+ },
+ "turns": [
+  {
+   "speaker": "user",
+   "text": "Thank you for calling Summit Fitness! This is Nova at Summit Fitness. How can I help you today?",
+   "offset_seconds": 0.88
+  },
+  {
+   "speaker": "bot",
+   "text": "Hi, I'm an AI assistant calling on behalf of Jordan Lee. I'm calling to move Jordan Lee's appointment from Tuesday to Thursday morning.",
+   "offset_seconds": 8.35
+  },
+  {
+   "speaker": "user",
+   "text": "Absolutely, I'd be happy to help. I've moved Jordan Lee's appointment from Tuesday to Thursday at 10 AM. Is there anything else?",
+   "offset_seconds": 18.24
+  },
+  {
+   "speaker": "bot",
+   "text": "Can you confirm the new time?",
+   "offset_seconds": 27.18
+  },
+  {
+   "speaker": "user",
+   "text": "I understand. understand. Someone from our team will follow up to confirm the details.",
+   "offset_seconds": 30.69
+  },
+  {
+   "speaker": "bot",
+   "text": "Can you confirm the new time?",
+   "offset_seconds": 37.27
+  },
+  {
+   "speaker": "user",
+   "text": "You're welcome! Have a wonderful day. Goodbye!",
+   "offset_seconds": 40.91
+  }
+ ]
+}

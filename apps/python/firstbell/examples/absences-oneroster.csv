@@ -1,0 +1,5 @@
+sourcedId,givenName,familyName,phone,sms,consent,locale,region,absence_date,voice
+S-2201,Marcus,Ellery,+15550100201,+15550100901,yes,en-US,US,2026-09-05,
+S-2202,Lucia,Moreno,+15550100202,,yes,es-US,US,2026-09-05,
+S-2203,Priya,Raghunathan,,+15550100903,yes,en-US,US,2026-09-05,
+S-2204,Dana,Whitfield,+15550100204,,yes,en-US,US,2026-09-05,no

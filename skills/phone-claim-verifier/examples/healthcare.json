@@ -1,0 +1,24 @@
+{
+  "pack_id": "healthcare",
+  "version": 1,
+  "display_name": "Health-plan provider directory",
+  "expires_after_days": 90,
+  "call_preamble": "You are an automated verification call on behalf of Northline Health. State at the start that this is an automated call, that it will take under a minute, and that no patient or personal information is being requested. Speak to whoever answers. Ask only the questions listed and do not offer medical advice or make appointments.",
+  "claims": [
+    {
+      "claim_id": "accepts_plan",
+      "question": "Does this office currently accept patients covered by the Northline Health plan?",
+      "answer_guidance": "yes only if the responder explicitly confirms Northline Health specifically is accepted. 'We take most major plans' is NOT a confirmation of Northline Health - use unknown. no only on an explicit statement that Northline Health is not accepted or was dropped."
+    },
+    {
+      "claim_id": "accepting_new_patients",
+      "question": "Is this office currently accepting new patients?",
+      "answer_guidance": "yes only on an explicit 'yes, we are accepting new patients'. no on an explicit 'no / not right now / waitlist only'. Anything hedged is unknown."
+    },
+    {
+      "claim_id": "address_current",
+      "question": "Is this office still located at the address on file, {address}?",
+      "answer_guidance": "yes if the responder confirms that address. no if they give a different address or say they moved. unknown if they cannot say."
+    }
+  ]
+}

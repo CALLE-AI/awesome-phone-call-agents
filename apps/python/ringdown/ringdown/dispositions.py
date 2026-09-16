@@ -15,6 +15,8 @@ class Grounded:
     disposition: bool
     owner: bool
     eta: bool
+    callback: bool = False
+    hedge: bool = False
 
 
 @dataclass(frozen=True)
@@ -35,6 +37,8 @@ def ground(extraction: Extraction, turns: Sequence[Turn]) -> Grounded:
         disposition=ground_span(extraction.disposition_span, turns),
         owner=ground_span(extraction.owner_span, turns),
         eta=ground_span(extraction.eta_span, turns),
+        callback=ground_span(extraction.callback_span, turns),
+        hedge=ground_span(extraction.hedge_span, turns),
     )
 
 
@@ -46,6 +50,10 @@ def confident(snapshot: CallSnapshot, policy: Policy) -> bool:
     )
 
 
+def owner_matches(extraction: Extraction, contact: Contact) -> bool:
+    return extraction.owner_confirmed == normalise(first_name(contact))
+
+
 def classify(
     snapshot: CallSnapshot,
     extraction: Extraction,
@@ -53,6 +61,8 @@ def classify(
     contact: Contact,
     policy: Policy,
 ) -> Assessment:
+    if snapshot.duration_seconds == 0 and not snapshot.turns:
+        return Assessment("not_acknowledged", "zero_duration")
     if snapshot.status != "completed":
         return Assessment("not_acknowledged", snapshot.failure_code or snapshot.status)
     if not confident(snapshot, policy):
@@ -63,6 +73,10 @@ def classify(
         return Assessment("not_acknowledged", "task_not_completed")
     if extraction.disposition in ("unreachable", "wrong_person"):
         return Assessment("not_acknowledged", extraction.disposition)
+    if extraction.callback_minutes is not None and grounded.callback:
+        return Assessment("not_acknowledged", "callback_requested")
+    if extraction.hedge_span and grounded.hedge:
+        return Assessment("not_acknowledged", "hedged_acknowledgement")
     if extraction.eta_minutes is None:
         return Assessment("not_acknowledged", "no_eta")
     if not 1 <= extraction.eta_minutes <= policy.max_eta_minutes:
@@ -73,7 +87,7 @@ def classify(
         return Assessment("not_acknowledged", "unclear")
     if not grounded.disposition:
         return Assessment("not_acknowledged", "ungrounded_disposition")
-    if extraction.owner_confirmed != first_name(contact):
+    if not owner_matches(extraction, contact):
         return Assessment("not_acknowledged", "owner_not_confirmed")
     if not grounded.owner:
         return Assessment("not_acknowledged", "ungrounded_owner")

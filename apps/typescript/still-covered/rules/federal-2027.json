@@ -1,0 +1,112 @@
+{
+  "id": "federal-2027",
+  "title": "Medicaid community engagement requirement, federal floor from January 1, 2027",
+  "source": "P.L. 119-21 section 71119 and the CMS interim final rule CMS-2454-IFC (June 2026), as summarized by KFF, SHVS and CHCS. States may add details; check your state's rules before any live use.",
+  "age_range": [19, 64],
+  "requirement": {
+    "hours_per_month": 80,
+    "income_per_month_usd": 580,
+    "plain_language": "Starting in January 2027, most adults aged 19 to 64 on Medicaid need to show 80 hours a month of work, school, volunteering, or a job training program, or earn about 580 dollars a month, to keep their coverage. Some people are exempt.",
+    "awareness_question": "Before this call, had you heard about the new Medicaid rule about work hours that starts in January?",
+    "hours_question": "In a typical month, about how many hours do you work, go to school, volunteer, or take part in a job training program? A rough number is fine.",
+    "income_question": "Do you earn more or less than about 580 dollars a month before taxes?",
+    "checklist_meets": [
+      "Report your hours or income to the state before your coverage check date.",
+      "Keep recent pay stubs, a school schedule, or a volunteer letter in case the state asks."
+    ],
+    "checklist_at_risk": [
+      "A free navigator can help you find volunteering or job training that counts toward the 80 hours.",
+      "Tell the state if anything changes, such as a new job, a pregnancy, or caring for someone."
+    ]
+  },
+  "exemptions": [
+    {
+      "code": "caregiver_child",
+      "order": 1,
+      "label": "Parent or caregiver of a child 13 or younger",
+      "question": "Do you take care of a child who is 13 or younger?",
+      "checklist": [
+        "Tell the state the name and age of the child you care for.",
+        "Keep a school or birth record in case the state asks."
+      ]
+    },
+    {
+      "code": "pregnant_postpartum",
+      "order": 2,
+      "label": "Pregnant or gave birth in the last year",
+      "question": "Are you pregnant right now, or have you had a baby in the last year?",
+      "checklist": [
+        "Tell the state you are pregnant or recently gave birth.",
+        "Keep a note from your clinic with your due date or delivery date in case the state asks."
+      ]
+    },
+    {
+      "code": "caregiver_disabled",
+      "order": 3,
+      "label": "Caregiver of a person with a disability",
+      "question": "Do you take care of someone with a disability, like a parent or another family member?",
+      "checklist": [
+        "Tell the state who you care for.",
+        "Keep a doctor's letter or proof of their disability benefits in case the state asks."
+      ]
+    },
+    {
+      "code": "medically_frail",
+      "order": 4,
+      "label": "Medically frail: a condition that limits daily activities",
+      "question": "Do you have a health condition, a disability, or a mental health or substance use condition?",
+      "follow_up": "Does it make it hard for you to work or to do everyday things, like getting dressed, shopping, or getting around?",
+      "checklist": [
+        "Ask your doctor or clinic to confirm that your condition limits your daily activities.",
+        "Tell the state you are asking for the medically frail exemption."
+      ]
+    },
+    {
+      "code": "snap_tanf",
+      "order": 5,
+      "label": "Gets SNAP or TANF and meets their work rules",
+      "question": "Do you get SNAP food benefits or TANF cash assistance?",
+      "checklist": [
+        "Give the state your SNAP or TANF case number; the state can usually confirm this itself."
+      ]
+    },
+    {
+      "code": "veteran_disability",
+      "order": 6,
+      "label": "Veteran with a total disability rating",
+      "question": "Are you a veteran with a total disability rating from the VA?",
+      "checklist": [
+        "Keep your VA disability rating letter."
+      ]
+    },
+    {
+      "code": "sud_treatment",
+      "order": 7,
+      "label": "In a drug or alcohol treatment program",
+      "question": "Are you in a drug or alcohol treatment program right now?",
+      "checklist": [
+        "Ask your treatment program for a letter confirming you are enrolled."
+      ]
+    },
+    {
+      "code": "former_foster_youth",
+      "order": 8,
+      "label": "Former foster youth under 26",
+      "question": "Were you in foster care when you turned 18?",
+      "ask_if_age_under": 26,
+      "checklist": [
+        "Tell the state you were in foster care at 18; the state can usually confirm this itself."
+      ]
+    },
+    {
+      "code": "tribal",
+      "order": 9,
+      "label": "American Indian or Alaska Native",
+      "question": null,
+      "note": "Taken from state records only. Never asked on a call.",
+      "checklist": [
+        "No action needed if the state's records already show this."
+      ]
+    }
+  ]
+}

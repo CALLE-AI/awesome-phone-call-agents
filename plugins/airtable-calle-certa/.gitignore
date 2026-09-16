@@ -1,0 +1,11 @@
+# Credentials written by the panel's Setup screen. Never commit these.
+.env
+.env.local
+
+# Local audit log and run state.
+audit.jsonl
+*.jsonl.bak
+
+__pycache__/
+*.pyc
+.venv/

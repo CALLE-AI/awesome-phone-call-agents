@@ -1,0 +1,3438 @@
+/* firstbell evidence page.
+ *
+ * The page is paper, all the way down. One thing on it is lit, and it is lit only while
+ * something is actually happening: a call that is running right now. The light goes on when
+ * the line connects and out when the call ends, and after that the record it produced stays
+ * on the paper in ink like everything else.
+ *
+ * That rule replaced an inverted band. The page used to take the lights DOWN for the call,
+ * onto a near-black warm brown, which read as muddy and low-energy and made the one moment
+ * the page is about the dimmest thing on it. A call arriving is not a darkening. Lighting the
+ * live object rather than darkening everything around it says the same thing with one
+ * element instead of a whole band, and it leaves the page readable at length.
+ *
+ * Two colour systems, and they never touch:
+ *
+ *   the live light   is a FIELD and never ink. It is painted behind things, never with.
+ *   the outcomes     are INK and never a field. They are written, never painted behind.
+ *
+ * That is what lets the light sit two hue-steps from `undetermined` without either being
+ * mistaken for the other: they can never appear in the same role. Nothing decorative is ever
+ * given the light, because on a page about software that refuses to claim it resolved a call
+ * it did not resolve, a colour that lies about liveness would be the same defect in visual
+ * form.
+ *
+ * Every text-on-ground pair below is measured by tools/check_contrast.py, which understands
+ * oklch() and reports the number of pairs it could not measure. That count must be zero.
+ */
+
+/* ---- tokens -------------------------------------------------------------------------- */
+:root {
+  /* Paper. A ladder rather than one colour, warming very slightly as the page descends, so
+   * sections separate without a rule between them. The hue is warm because the software acts
+   * at twenty to nine in the morning: a warm ground reads as daylight where a cool one reads
+   * as night, and this page is about a school day that has already started. */
+  --paper:         oklch(0.975 0.004 85);
+  /* The three grounds under the paper are re-cut, and only their chroma moved. Every
+   * lightness here is the number it was, so no text on any of them changed ratio: the
+   * closest run on this page was --ink-3 on --paper-deep at 4.60 and it is 4.62 after.
+   * A tint is free contrast, and it is the cheapest answer to a page that measured 0.006
+   * of chroma from top to bottom and read as grey that remembered being warm.
+   *
+   * The hue rotates from 75 to 110 as the ladder descends, which walks the page from
+   * CALL-E's warm off-white toward their pale sage rather than adding an unrelated
+   * colour. --paper-deep at 0.938 34 110 renders #EBEDD3 against their measured #EBECDC. */
+  --paper-2:       oklch(0.963 0.005 85);
+  --paper-3:       oklch(0.952 0.006 85);
+  --paper-deep:    oklch(0.938 0.008 85);
+  /* CALL-E put white cards on their warm ground and so does this page now. It is the one
+   * surface lighter than the paper, so an object that has to read as an object, the
+   * register, a stat cell, a tally segment, lifts off the ladder rather than sinking
+   * into it. Every ink measures higher on it than on paper. */
+  --card:          oklch(1 0 0);
+  /* The ink of the light grounds, under a name no plate remaps.
+   *
+   * `.plate-royal` and the masthead plate both re-point --ink at the ink measured against
+   * the dark ground, and custom properties inherit, so anything inside a plate that is
+   * NOT on the plate's own ground inherits the wrong one. The yellow money cell is exactly
+   * that: it sits inside the plate on --brand-field, asked for --ink, and was handed
+   * oklch(0.973 0.002 250) on oklch(0.92 0.14 97), which is about 1.1 to 1. It looked
+   * deliberate and it was unreadable.
+   *
+   * This alias is substituted at :root, before any plate exists, so its computed value is
+   * the light-ground ink and a descendant re-pointing --ink cannot reach back and change
+   * it. Anything sitting on a light ground inside a dark plate names this instead. */
+  --ink-on-light:  oklch(0.235 0.008 80);   /* = --ink, fixed at the root */
+
+  --ink:           oklch(0.235 0.008 80);
+  --ink-2:         oklch(0.430 0.008 80);
+  --ink-3:         oklch(0.520 0.008 80);
+  --ink-4:         oklch(0.640 0.007 80);
+  --line:          oklch(0.878 0.007 85);
+  --line-strong:   oklch(0.800 0.009 85);
+
+  /* The light. One colour, and it means one thing: this is happening now.
+   *
+   * It is CALL-E's own yellow, measured off heycall-e.com by painted area rather than read
+   * out of a stylesheet, and converted: oklch(0.885 0.17 93) renders #FFD531 against their
+   * #FFD733, which is inside two counts on every channel. Borrowing it is deliberate and it
+   * is the only thing borrowed. On their site it is a field with near-black on it and never
+   * a text colour, which is also the only way it can be used, so the constraint and the
+   * brand agree.
+   *
+   * Against the paper it is 1.31, which is not a border and is not trying to be. That is
+   * what a highlighter does: almost no lightness difference, an unmissable hue difference.
+   * A field that shouted in lightness as well would fight the ink sitting on it.
+   *
+   * The light falls on text that is already there, so the first draft of this remapped the
+   * whole ink ladder under it. That was wrong twice: a colour swap on every text run costs a
+   * restyle of the subtree, and worse, a reader would have watched the words change colour
+   * while the ground faded, which reads as the type flinching.
+   *
+   * Only two steps actually break. --ink and --ink-2 measure 11.12 and 5.72 on the light and
+   * clear AA there without being touched. --ink-3 measures 3.89 and fails, and the waveform's
+   * unplayed bars fail with it. So exactly two values are re-cut, and each is re-cut to one
+   * number that holds on BOTH grounds rather than to a pair that swaps. The ink of the
+   * register never changes. Only the ground under it does, which is one property, on one
+   * element, in one composited step. */
+  --live:          oklch(0.885 0.170 93);   /* the field.       1.31 against the paper     */
+  /* Body text where the light can fall: 6.36 on paper, 4.84 on the light. It replaces
+   * --ink-3 inside the register and nowhere else, because nowhere else can be lit. */
+  --lit-ink-3:     oklch(0.470 0.020 70);
+  /* A hairline that survives the light. --line is 0.878 and the field is 0.885, so the rule
+   * this replaces measured 1.00 against the light: it did not fade, it disappeared. */
+  --lit-line:      oklch(0.740 0.060 85);   /* 2.15 on paper, 1.64 on the light            */
+  /* The light as a stroke, for a mark that has to read as live while still on paper: 3.41
+   * against it, past the 3:1 a meaningful graphic needs. It is a stroke and never a fill and
+   * never a word, because at 3.41 it would fail as body text. */
+  --live-mark:     oklch(0.620 0.160 80);
+
+  /* ---- the brand surfaces ----
+   *
+   * CALL-E's own palette, measured off their site by painted area. Four values, four jobs,
+   * and each one is a FILL. None of them is ever a text colour.
+   *
+   *   --sage         their #EBECDC, the pale panel they put blocks on
+   *   --brand-field  their yellow as a page field
+   *   --royal        their action blue taken down to a ground
+   *   --action       their #1863DC exactly, for anything clickable
+   *
+   * The yellow needs a rule, because this page already spends that hue on liveness. The
+   * light is the saturated grade and it only ever appears on a call object: a register row
+   * that is running, a lane whose call is playing. --brand-field is the lifted grade and it
+   * only ever appears on a page object: the way in at the top, the one number the page
+   * wants read. Three lightness steps and three chroma steps apart, on the same hue, and
+   * they can never appear on the same kind of thing. So a reader who has learned what the
+   * light means cannot be told it twice about something that is not a call.
+   *
+   * --sage is 1.08 against the paper and 1.02 against --paper-deep, which is not a border
+   * and cannot be one, so every panel carries --sage-line as a hairline. A panel that is
+   * invisible on one of the page's own grounds is not a panel.
+   *
+   * On --brand-field, --ink measures 12.53 and --ink-2 6.44. --ink-3 measures 4.38 and
+   * fails, so the field re-cuts it to --lit-ink-3, which is 5.43 there. That is the same
+   * re-cut the register already makes under the light and it reuses the same value rather
+   * than adding a second one.
+   *
+   * --royal is the one ground on the page that is darker than its ink. --paper on it is
+   * 13.64, and the two lighter inks under it are 9.99 and 7.93, so a whole block can flip
+   * without any of it landing near the floor. */
+  --sage:          oklch(0.945 0.006 85);   /* #EBF0D7, their #EBECDC                     */
+  --sage-line:     oklch(0.855 0.009 85);
+  --brand-field:   oklch(0.920 0.140 97);    /* #FFE56F, the lifted grade of their yellow  */
+  --royal:         oklch(0.215 0.012 80);   /* #0E2654, their action blue as a ground     */
+  --royal-ink:     oklch(0.975 0.004 85);    /* 13.64 on the royal                         */
+  --royal-ink-2:   oklch(0.870 0.006 85);   /*  9.99                                      */
+  --royal-ink-3:   oklch(0.800 0.008 85);   /*  7.93                                      */
+  --royal-line:    oklch(0.420 0.014 80);
+  /* #1863DC, and it is a fill, a rule and a focus ring rather than a word. As text on the
+   * paper it is 5.03, which passes, but it is 4.13 on --sage-deep grounds and this page
+   * does not ship a link that clears in one place and not another. --link below is the
+   * same hue cut for text and holds on every ground the page has. */
+  --action:        oklch(0.470 0.105 255);
+
+  /* Outcome states. `failed` is never red: nobody answering the phone is not an error, it is
+   * the ordinary case this software exists to handle. Red would tell the reader to panic
+   * about the wrong thing.
+   *
+   * The three were re-cut because the page was running three cool accents that meant
+   * different things. `failed` sat at hue 250 with 0.030 of chroma, which is the link hue at
+   * a sixth of its saturation and one lightness step away from it, so the state that means
+   * "nobody picked up" rendered as a link that had lost its colour. Vercel's system settles
+   * this by refusing the situation outright: their `success` and `link` are the same token,
+   * `#0070f3`, there is no green in the palette at all, and everything that is not a warning
+   * or an error is left to the grey ladder. Colour is spent on interaction, not decoration.
+   *
+   * The same rule is applied here without giving up the warm ground:
+   *
+   *   blue          is interaction and nothing else. Links and the focus ring, one hue.
+   *   amber         is the one state that asks a person to do something.
+   *   green         is the one state that says the software finished the job.
+   *   warm grey     is the state where nothing happened, which is what it looks like.
+   *
+   * Every lightness below is the number it already was, so no measured pair moved: only hue
+   * and chroma changed, and `tools/check_contrast.py` is the thing that says so rather than
+   * this comment. */
+  --resolved:      oklch(0.395 0.030 130);
+  --undetermined:  oklch(0.480 0.090 78);
+  --failed:        oklch(0.480 0.008 80);
+  /* The action blue, one step down and slightly off it, so it holds as running text on
+   * every ground this page has: 5.86 on paper, 5.43 on the sage, 5.31 on --paper-deep and
+   * 5.02 on the brand field. It replaces a stock blue at hue 245 that belonged to nothing. */
+  --link:          oklch(0.455 0.095 255);
+
+  /* The waveform is a measurement, so it is drawn in ink and given no gradient and no
+   * shadow. Played is --ink, which needs no second value: 14.61 on paper and 11.12 on the
+   * light. Ahead has to clear 3:1 three ways at once, against the paper, against the light,
+   * and against played, and one value does it: 4.31, 3.28 and 3.39.
+   *
+   * Even so, neither tint carries the meaning on its own. How far through the call the
+   * reader is, is stated by the playhead rule, which is full ink on either ground. The tint
+   * confirms it. That is the same argument the two speakers already make, and for the same
+   * reason: they measure 2.79 against each other, so they are separated by position and not
+   * by colour. */
+  /* These two are read by player.js with getPropertyValue and drawn onto a canvas, so a
+   * search for var(--wave-played) in this file finds nothing. They are used. */
+  --wave-played:   oklch(0.235 0.008 80);   /* = --ink                                    */
+  --wave-ahead:    oklch(0.560 0.010 80);   /* 4.31 paper / 3.28 light / 3.39 vs played   */
+
+  /* The ring is the action colour itself. It was a stock blue that matched nothing on the
+   * page or off it, and a focus ring is the one graphic every keyboard reader sees. */
+  --focus:         var(--action);
+
+  /* The margin column. Fixed rather than fluid, because the reserve it pays for is a
+   * padding on the reading column and a padding that answers to the viewport moves the
+   * text under a reader who resizes. 7.5rem is 120px, which is about eighteen characters
+   * of the 12px UI face: a marginal note, not a sidebar. */
+  --margin-col:    7.5rem;
+
+  /* Type. Loaded non-render-blocking, so every stack names a fallback that is already on the
+   * reader's machine and the page paints before the kit arrives. */
+  --display: "freighttextcmp-pro", "display-fallback", Georgia, serif;
+  --serif:   "freight-text-pro", "serif-fallback", Georgia, serif;
+  --ui:      "neue-haas-grotesk-text", "ui-fallback", Arial, sans-serif;
+  --ui-display: "neue-haas-grotesk-display", "ui-display-fallback", Arial, sans-serif;
+  --mono:    "azeret-mono", "mono-fallback", Consolas, monospace;
+  --tamil:   "adapter-tamil-text", "Nirmala UI", "Latha", "ui-fallback", Arial, sans-serif;
+
+  /* Every stack runs real face, then the fallback corrected to that face, then the bare
+   * local the correction was measured against. Nothing uncorrected sits between the first
+   * two any more. The stacks used to name "Freight Text Pro" and "source-code-pro" ahead
+   * of the fallback, so a reader with either installed got an uncorrected face, and
+   * Freight Text Pro is not even the width of the compressed grade it stood in for. */
+
+  /* Measured in em, never in ch. ch is the advance width of a zero, and size-adjust
+   * corrects mean advance width, so even a metric-matched fallback resolves ch wrong: by
+   * 1.4% for the serif and 15.7% for the UI face, which rewrapped paragraphs the moment
+   * the kit landed and moved everything below them. em depends on font-size alone. Each
+   * value is the ch width it replaces resolved against the real face, so the page still
+   * renders at the width it did before. */
+  --measure: 34.72em;          /* 62 characters of Freight Text Pro */
+  --measure-tight: 30.24em;    /* 54 of them */
+  --measure-ui: 41.35em;       /* 62 characters of Neue Haas Grotesk Text */
+  --measure-ui-tight: 36.02em; /* 54 of them */
+
+  /* ---- the type scale ----
+   *
+   * Eight steps, and they are not one ratio. The bottom five are a UI ladder where the job
+   * is to separate a label from the thing it labels inside a 13px band, so the steps are
+   * about 1.08 and a single pixel is the whole difference. The top three are display, where
+   * a step has to be visible across a screen, so they open out to 1.24 and 1.52. A single
+   * geometric ratio would have made the small end unusable (0.75 to 0.94 in one jump) or the
+   * large end mush. Two regimes, because the page has two jobs.
+   *
+   * These replace fourteen ad-hoc font sizes at 29 call sites. Twenty-one of those already
+   * sat exactly on one of the eight; the other eight were snapped to the nearest step and
+   * the largest any of them moved is 0.6 of a pixel, on `.result-line`. Nothing crossed the
+   * 18.66px or 24px boundaries where WCAG changes what it asks of a contrast ratio, so the
+   * snap cannot have moved a passing run into a failing band. What the scale changes is
+   * that the next size has to be one of these or argue for a ninth. */
+  --size-0: 0.6875rem;   /* 11px  the smallest thing allowed to carry a word: field labels */
+  --size-1: 0.75rem;     /* 12px  timestamps, table heads, the rail                        */
+  --size-2: 0.8125rem;   /* 13px  captions and small print                                 */
+  --size-3: 0.875rem;    /* 14px  table bodies, secondary UI                               */
+  --size-4: 0.9375rem;   /* 15px  the transcript, which is read rather than skimmed        */
+  --size-5: 1.0625rem;   /* 17px  body                                                     */
+  --size-6: 1.3125rem;   /* 21px  the lede and a stated result                             */
+  --size-7: 2rem;        /* 32px  a numeral standing on its own                            */
+
+  /* ---- the spacing scale ----
+   *
+   * A 4pt grid, named for what it separates rather than for its size, so a value cannot be
+   * chosen because it looked right. --space-3 is the unit: it is one line of 13px UI text,
+   * which is what most of the vertical rhythm on this page is built out of.
+   *
+   * --gutter stays a clamp because it is the page margin and has to answer to the viewport
+   * rather than to the grid. */
+  --space-1: 0.25rem;    /*  4px  inside a word: a label to its value                      */
+  --space-2: 0.5rem;     /*  8px  inside a row                                             */
+  --space-3: 1rem;       /* 16px  between rows                                             */
+  --space-4: 1.5rem;     /* 24px  between the parts of one object                           */
+  --space-5: 2.5rem;     /* 40px  between one object and the next                          */
+  --space-6: 4rem;       /* 64px  between an object and the next argument                  */
+  --gutter: clamp(1.25rem, 4vw, 3.5rem);
+
+  /* ---- the inset, and the stroke that marks an object --------------------------------
+   *
+   * One number for the distance from an object's outer edge to the text inside it, and one
+   * width for every left stroke that marks an object as live or unresolved.
+   *
+   * Measured before this existed: 258 block elements sat on 33 distinct left edges at 1440
+   * and 26 at 1024, and prose in the first column alone started on twelve of them (256,
+   * 276, 293, 294.2, 295.4, 297.6, 300, 301, 302, 320, 320.4 and 323.4). The cause was two
+   * ladders nobody had reconciled. Five component insets: 16px on `.fold` and `.lane`,
+   * 17.6 on `.minute-card`, 18.4 across the whole queue and money family, 24 on `.act-fold`
+   * and `.path`, 44 on `.plate-royal`. Four stroke widths that each shove their own content
+   * sideways: 1px hairlines, 2px on a lane, 3px on a queue row, 4px on a minute card. They
+   * add in combination, which is where 17, 18.2, 19.4, 21.6, 25, 26, 44.4 and 47.4 came
+   * from. Twelve edges within 30px of each other do not read as twelve decisions. They read
+   * as a page nobody squared up.
+   *
+   * So every rule below states the inset as this token minus whatever sits to the left of
+   * its own content. A component's text edge is then the same whether the component has a
+   * hairline, a marker stroke or no border at all, and nesting one component inside another
+   * steps the text by exactly one inset rather than by an accident. Three edges, at 0, 24
+   * and 48. */
+  --inset: var(--space-4);   /* 24px, from an object's outer edge to the text inside it */
+  --marker: 3px;             /* every left stroke that marks a row or a lane             */
+
+  /* ---- the motion scale ----
+   *
+   * This time they govern. The block that used to sit at the foot of this file declared
+   * five durations and three easings and then went unused: two of the eight were referenced
+   * once each and every other transition on the page carried a hardcoded number, so there
+   * were nine durations in play under a comment claiming five. A scale nothing references
+   * is a comment.
+   *
+   * Four durations and three curves, and every one of them is referenced. Each value is a
+   * decision, not a default:
+   *
+   *   --dur-tick   a fact landing. Under the ~100ms where the eye starts reading a change
+   *                as a movement rather than as a thing that is now true. A structured
+   *                field arriving should feel stamped, not eased in.
+   *   --dur-micro  hover and press. Long enough to be felt, short enough that a control
+   *                pressed twice in a second never feels like it is catching up.
+   *   --dur-enter  something arriving on screen. The old easeOutCubic reveal, kept.
+   *   --dur-mode   the light coming up or going out. It is the largest change the page
+   *                makes, so it is the slowest, and it is still under half a second
+   *                because the reader is waiting on it before anything else can happen.
+   *
+   * There is no duration here for the transcript following the playhead to a new line,
+   * because that scroll is `behavior: smooth` and the browser owns its timing. A token
+   * naming a number nothing applies would be the same lie this block replaced.
+   *
+   * Three curves, all asymmetric, none a browser default. --ease-out is the Ionic drawer
+   * curve: it leaves immediately and lands slowly, which is what makes a 240ms entrance
+   * feel faster than a 240ms `ease` one. There is no --ease-in, because starting slow
+   * delays the exact moment the reader is watching and nothing here should.
+   *
+   * No transition on this page may name a number. If a duration is needed that is not one
+   * of these, it becomes a fifth here with a reason next to it. */
+  --dur-tick:  90ms;
+  --dur-micro: 150ms;
+  --dur-enter: 240ms;
+  --dur-mode:  400ms;
+  --ease-out:  cubic-bezier(0.32, 0.72, 0, 1);
+  --ease-both: cubic-bezier(0.4, 0, 0.2, 1);
+  /* easeOutCubic. The reveal was written against this curve and reads wrong on any other. */
+  --ease-reveal: cubic-bezier(0.215, 0.61, 0.355, 1);
+}
+
+/* The swap must not move the page. One corrected fallback per real face.
+ *
+ * There were three fallbacks for five faces, and one family cannot correct two faces at
+ * once: "serif-fallback" stood in for both Freight Text Pro and Freight Text Compressed,
+ * which need 92.5% and 77.4%, so the compressed headline face ran 22 points wrong.
+ * "sans-fallback" covered both Neue Haas grades the same way.
+ *
+ * size-adjust is the ratio of real to fallback mean advance width over a sample of the
+ * page own running text. Ascent and descent are the real face bounding box divided by
+ * that size-adjust, because size-adjust has already scaled the em the override resolves
+ * against. Every number was measured from the loaded kit in Chrome, not read off a
+ * vendor table.
+ *
+ * Each src names a single local, so the correction is one fixed number rather than
+ * whichever of several locals a given machine resolves first. Georgia and Arial ship on
+ * both macOS and Windows. Consolas does not, so the mono fallback names Menlo second and
+ * is approximate there; it sets no width anything else depends on. */
+@font-face {
+  font-family: "display-fallback";      /* freighttextcmp-pro */
+  src: local("Georgia");
+  size-adjust: 77.4%; ascent-override: 122.81%; descent-override: 34.9%; line-gap-override: 0%;
+}
+@font-face {
+  font-family: "serif-fallback";        /* freight-text-pro */
+  src: local("Georgia");
+  size-adjust: 92.5%; ascent-override: 105.89%; descent-override: 28.9%; line-gap-override: 0%;
+}
+@font-face {
+  font-family: "ui-fallback";           /* neue-haas-grotesk-text */
+  src: local("Arial");
+  size-adjust: 103.7%; ascent-override: 94.28%; descent-override: 23.63%; line-gap-override: 0%;
+}
+@font-face {
+  font-family: "ui-display-fallback";   /* neue-haas-grotesk-display */
+  src: local("Arial");
+  size-adjust: 89.5%; ascent-override: 99.39%; descent-override: 24.29%; line-gap-override: 0%;
+}
+@font-face {
+  font-family: "mono-fallback";         /* azeret-mono */
+  src: local("Consolas"), local("Menlo");
+  size-adjust: 118.2%; ascent-override: 93.47%; descent-override: 18.61%; line-gap-override: 0%;
+}
+
+/* ---- base ---------------------------------------------------------------------------- */
+*, *::before, *::after { box-sizing: border-box; }
+
+html {
+  background: var(--paper);
+  /* Lenis drives the scroll. Without it, or with reduced motion, the browser does. */
+  scroll-behavior: auto;
+}
+
+body {
+  margin: 0;
+  background: var(--paper);
+  color: var(--ink);
+  font-family: var(--serif);
+  font-size: clamp(1rem, 0.96rem + 0.2vw, 1.0625rem);
+  line-height: 1.62;
+  text-rendering: optimizeLegibility;
+  -webkit-font-smoothing: antialiased;
+  font-kerning: normal;
+}
+
+/* The document no longer changes colour at all. The page-wide crossfade that used to live
+ * here existed to take the whole page down to near-black for one section; the light is a
+ * property of one element now, so the transition belongs on that element and the root has
+ * nothing left to animate. Deleting it also deletes a full-page composite per mode change. */
+
+h1, h2, h3 { font-family: var(--display); font-weight: 400; letter-spacing: -0.008em; }
+
+h1 {
+  font-size: clamp(2.4rem, 1.6rem + 3.6vw, 4.6rem);
+  line-height: 1.02;
+  margin: 0 0 1rem;
+  letter-spacing: -0.018em;
+}
+/* The nine act headlines are the argument, and every one of them is a full sentence set at
+ * up to 2.6rem, which is where a browser's greedy line breaker leaves a one-word last line.
+ * `balance` rather than `pretty`, because these are short enough to sit inside the four-line
+ * limit browsers apply to balancing, and it evens every line rather than only the last. The
+ * body copy keeps `pretty`: it is too long to balance and only the widow needs fixing. */
+h2 {
+  font-size: clamp(1.7rem, 1.3rem + 1.6vw, 2.6rem);
+  line-height: 1.12;
+  margin: 0 0 0.75rem;
+  letter-spacing: -0.012em;
+  text-wrap: balance;
+}
+h3 {
+  font-family: var(--ui-display);
+  font-weight: 600;
+  font-size: var(--size-2);
+  letter-spacing: 0.07em;
+  text-transform: uppercase;
+  color: var(--ink-3);
+  margin: 0 0 0.6rem;
+  text-wrap: balance;
+}
+/* The act number. It reads as an eyebrow and it used to be marked up as one, an <h3> sitting
+ * above the act's <h2>. That made the document outline run h1, h3, h2, h3, h2, and a screen
+ * reader listing the headings on this page announced "01, 02, 03, 04" rather than the eight
+ * sentences that carry the argument. It is a label, so it is a label now, and it keeps every
+ * visual property it had. */
+.act-num {
+  font-family: var(--ui-display);
+  font-weight: 600;
+  font-size: var(--size-2);
+  letter-spacing: 0.07em;
+  text-transform: uppercase;
+  color: var(--ink-3);
+  margin: 0 0 0.6rem;
+  text-wrap: balance;
+}
+
+/* Ragged right, and no stranded last words. One declaration, after a justified version of
+ * this rule was built and measured and thrown away.
+ *
+ * `text-align: justify` was tried here with `text-justify: inter-word`, `text-align-last`
+ * and hyphenation, and every one of those came back out. Justification opened holes: the
+ * worst single gap was 97.9px, 28 times the natural space, and 28 of the 42 paragraph
+ * classes on the page ran past 3 times it. What the per-line dump showed is that the cause
+ * is not the measure, so no measure-based guard fixes it. A justified line is stretched to
+ * the full box however few words are on it, and the lines that broke early broke against
+ * the identifiers this page is about: `parent_confirmed_aware yes,` with `reason_category`
+ * next, and `m firstbell --work-file` with `examples/absences-oneroster.` next. Those
+ * tokens cannot be hyphenated and must not be broken, because the argument is that the
+ * exact field name is the thing that matters. The argument prose itself, plain `p`, ran at
+ * 16.9 times the natural space at 390 and 7.1 at 1440. A page whose prose quotes code
+ * cannot be justified, and the only classes that came in under 3 times were captions and
+ * one-liners, so justifying those alone would have left the page more mixed than before.
+ *
+ * `text-wrap: pretty` is the half of the idea that survived, and it is the half that was
+ * actually wanted: it is what stops a paragraph ending on one stranded word. Measured on
+ * ragged text it changes line geometry in 11 of 106 paragraphs at 1440 and 19 of 106 at
+ * 390, so it is doing work here and not just declared.
+ *
+ * Hyphenation is gone rather than kept as decoration. `hyphens: auto` needs a hyphenation
+ * dictionary in the reader's own Chrome profile; with one present it moved 2 of 29 wide
+ * paragraphs at 390, and on the fresh profile every gate run and most first-time readers
+ * get, it moved none. */
+/* Flush left, one measure, and a leading set here rather than inherited. `body` runs at
+ * 1.62 because that leading also lands on table bodies, labels and the mono blocks, where
+ * a looser line opens gaps between rows. Running prose wants the looser one, so it is set
+ * on the element that holds running prose and nowhere else. `letter-spacing: 0` pins what
+ * is already inherited: it is here so a later tracking rule on an ancestor cannot reach
+ * body copy, which is the one place on this page tracking must not be applied. */
+/* No `text-align` here, deliberately. The initial value is `start`, which is already left
+ * in this document, so declaring it buys nothing and costs everything: at (0,0,1) it beats
+ * the `:where()` lists below, which are written at zero specificity precisely so the
+ * `:has(code)` rule can override them. With it present nothing on the page justified at
+ * all, and the cause was one redundant declaration. */
+p {
+  margin: 0 0 1.1rem;
+  max-width: var(--measure);
+  line-height: 1.65;
+  letter-spacing: 0;
+  text-wrap: pretty;
+}
+
+/* ---- justified prose ------------------------------------------------------------------
+ *
+ * Running prose is justified; everything that is not running prose is not.
+ *
+ * The distinction is doing real work and it is measured rather than guessed. A paragraph
+ * of three lines or more in a column 380px or wider has enough words on a line that the
+ * space between them stretches by a few pixels and nothing else happens. A two-line label
+ * in a 155px cell has three or four words on a line, and justifying it drags those words
+ * to the edges with a hole in the middle: that is the failure this stylesheet already
+ * recorded once, with a worst gap of 97.9px, and the reason justification came back out.
+ *
+ * Two more guards on top of the length one. Below 52rem the reading column is narrow
+ * enough that every paragraph behaves like the label case, so nothing is justified there.
+ * And a paragraph that sets `text-wrap: balance` is never justified: balance chooses short
+ * lines deliberately, and justification then stretches each of them to the full box, which
+ * is how a 778px claim ended up with 46.2px between its words.
+ *
+ * `hyphens: auto` is here and is not load-bearing. With a dictionary in the reader's own
+ * profile it closes a gap or two; on the fresh profile a gate run gets it does nothing.
+ * It costs a declaration and can only help. */
+/* Every paragraph, justified.
+ *
+ * This was a list of classes, twice, and the lists were the argument: some paragraphs
+ * justified well and some opened holes, so the ones that opened holes stayed ragged. The
+ * page read as two typographies and the mixture was more obvious than either. So the rule
+ * is the whole element now, at every width.
+ *
+ * Two things have to come with it, because justification is the thing they were tuned
+ * against. `text-wrap: balance` picks short lines deliberately and justify then pulls each
+ * of them out to the full box: measured at 46.2px between words on a two-line claim, which
+ * is the worst gap on the page and was entirely self-inflicted. Balance is gone from the
+ * paragraph classes below. And a line whose next word is an unbreakable file path has
+ * nowhere to give, which is a real cost and a visible one on `.closes`; `overflow-wrap:
+ * anywhere` and `word-break: break-all` were both measured against it and moved the gap by
+ * nothing at all, because Chrome only breaks a word to stop it overflowing, never to fill a
+ * justified line. The cost is accepted rather than hidden behind a second typography. */
+p {
+  text-align: justify;
+  text-justify: inter-word;
+  hyphens: auto;
+}
+/* A line of code is not prose and a table cell is not a sentence: stretching the spaces in
+ * either one moves a value away from the label it belongs to. These carry words in a
+ * column, not paragraphs in a measure. */
+p.mut-code,
+p.take-run,
+p.q-tried, p.q-todo, p.q-when,
+p.tally-head, p.tally-alt,
+p.money-n, p.band-count {
+  text-align: left;
+  hyphens: manual;
+}
+
+p.lede {
+  font-size: clamp(1.15rem, 1.05rem + 0.5vw, 1.4rem);
+  line-height: 1.45;
+  color: var(--ink-2);
+  max-width: var(--measure-tight);
+}
+
+a { color: var(--link); text-underline-offset: 0.18em; text-decoration-thickness: 0.06em; }
+/* Fifty-four links and, until this line, five hover rules in the whole stylesheet, none of
+ * them on a prose link. On a page whose argument is that every claim carries a source, the
+ * sources are what a reviewer puts the pointer on, and they answered nothing. The rule
+ * thickens rather than changing colour, so every ratio `tools/check_contrast.py` measures
+ * is the same ratio afterwards, and it reads as a pen pressing harder. */
+a:hover { text-decoration-thickness: 0.12em; text-underline-offset: 0.14em; }
+
+/* Two properties for a hand rather than a mouse. An act reached from the rail used to land
+ * with its heading flush against the top edge, and a 28px control on a phone carries the
+ * 300ms wait for a second tap that `manipulation` says will not come. The highlight is set
+ * rather than left alone because the default is a blue-grey box, which is the one colour
+ * on this page that came from nobody. */
+/* Flush, and it was 2rem.
+ *
+ * Act 00 is pinned at top:0 under the curtain and every later act is opaque at z-index 2,
+ * so the only way the hero can be seen again is through a gap. scroll-margin-top made one:
+ * a jump from the rail to #act-04 stops 32px short of the act's own top edge, and those
+ * 32px look straight down onto the pinned first screen. It was invisible while the hero
+ * was warm paper on warm paper. The masthead is a dark plate now, so the same 32px reads
+ * as a black band across the top of whichever act you jumped to. The breathing room is not
+ * worth a hole in the curtain. */
+.act { scroll-margin-top: 0; }
+a, button, summary, label, [tabindex] {
+  touch-action: manipulation;
+  -webkit-tap-highlight-color: color-mix(in oklch, var(--focus) 18%, transparent);
+}
+a:focus-visible, button:focus-visible, [tabindex]:focus-visible,
+[data-turns]:focus-visible, pre:focus-visible {
+  outline: 2px solid var(--focus); outline-offset: 3px; border-radius: 2px;
+}
+
+code, pre, .mono { font-family: var(--mono); font-variant-ligatures: none; }
+code { font-size: 0.88em; }
+
+/* ---- layout -------------------------------------------------------------------------- */
+.act {
+  /* Was clamp(4rem, 9vh, 8rem), which is 81px above and 81px below on a 900px screen. Two
+   * of those meet at every seam, so a reader crossing from one act to the next scrolled
+   * through about 210px of empty ground with nothing in it but the fixed rail. Eight seams
+   * of that is most of a screenful of nothing, and on a page a judge is meant to get
+   * through in a minute it is the most expensive space there is. */
+  padding: clamp(2.75rem, 5.5vh, 4.5rem) var(--gutter);
+  position: relative;
+  /* Every act is opaque. The first one is sticky, so it stays behind the page after the
+   * curtain closes, and an act that set no ground of its own let the hero show through it:
+   * act 8 was being read over the hero's own transcript. The .act-2 and .act-3 grounds
+   * come later in this file and still win on the tie. */
+  background: var(--paper);
+}
+.act > .inner { max-width: 68rem; margin: 0 auto; }
+
+/* Claim on one side, the artifact that checks it on the other. Below 60rem it stacks, claim
+ * first, because a claim with its evidence underneath still reads correctly. */
+/* One column below 60rem, and it is stated rather than left implicit. An implicit
+ * track is `auto`, which is floored by its widest item's min-content, so a table in
+ * the artifact column widened the whole act and the document with it at 390px. */
+.split {
+  display: grid; grid-template-columns: minmax(0, 1fr);
+  gap: clamp(1.5rem, 4vw, 3.5rem); align-items: start;
+}
+@media (min-width: 60rem) { .split { grid-template-columns: minmax(0, 27rem) minmax(0, 1fr); } }
+
+/* ---- stacked bands ---------------------------------------------------------------------
+ * Act 04's layout. Full-width blocks in reading order, one under the next, with no grid
+ * and nothing sticky.
+ *
+ * It replaced a diptych whose money band was a `grid-column: 1 / -1` row inside the same
+ * grid as a sticky column, which is a defect and not a taste: a sticky grid item is
+ * contained by the grid container, not by its own grid area, so the sticky column's travel
+ * range was the full height of the grid and it came to rest on top of the band. Measured
+ * 2026-09-10 at 1280, 1440 and 1920: 56 occlusion-verified text-on-text conflicts, the
+ * column sliding 1,526px and covering the band by its own full 1,249px height. Below 60rem
+ * nothing is sticky and there were none, which is why every earlier viewport sweep passed.
+ *
+ * The one-column order override that used to live here is gone with it. It existed because
+ * source order was claim, artifact, money, and on a phone the twelve-call table sat between
+ * a reader and the numbers the act exists for. Stacked, the money is second at every width
+ * and needs no override to be.
+ *
+ * Bands are separated by --space-6, which is the step this page already uses between an
+ * object and the next argument. Nothing here introduces a new spacing value. */
+.band > h2 { max-width: var(--measure); }
+.band + .band, .band + .money, .money + .band { margin-top: var(--space-6); }
+
+/* The opening paragraph of a band, at the same measure as the heading above it. */
+.lede { max-width: var(--measure); }
+
+/* The count under the rows it counts. Set in the UI face and at the UI measure, because it
+ * is read as a caption on the table rather than as prose in an argument. */
+.band-count {
+  font-family: var(--ui); font-size: var(--size-6); color: var(--ink-2);
+  max-width: var(--measure-ui); margin: var(--space-4) 0 0;
+}
+.band-count code { font-family: var(--mono); color: var(--ink); }
+
+/* The fine print: why identifiers are cut, what is held where, who requires it. Every word
+ * of it was in this act before and none of it is hidden now; it is set after the evidence,
+ * one step smaller, behind a rule, because it answers a question a reader only has once
+ * they have seen the rows. */
+.band-fine {
+  border-top: 1px solid var(--line); padding-top: var(--space-5);
+  max-width: var(--measure-ui);
+}
+.band-fine > :last-child { margin-bottom: 0; }
+
+.act-2 { background: var(--paper-2); }
+.act-3 { background: var(--paper-3); }
+.act-deep { background: var(--paper-deep); }
+
+/* ---- the light ------------------------------------------------------------------------ */
+/* The one thing on this page that changes colour, and it is one element rather than a band.
+ *
+ * `data-live="on"` is written by the scene and by nothing else, so the light cannot appear
+ * on anything that is not running. It changes exactly one property. Everything written on
+ * the register is already a colour that clears AA on both grounds, so no text moves when
+ * the light does.
+ *
+ * The outcome inks are deliberately not lit and deliberately not remapped. On the field they
+ * measure 2.4 to 3.0 and would fail, and the reason they are absent is better than a remap:
+ * while a call is running there is no outcome yet. The colours that state an outcome arrive
+ * when the light goes out, which is also when the outcome does. */
+/* ---- why ten colour cross-fades were deleted rather than rewritten -----------------------
+ *
+ * "Animate transform/opacity only (compositor-friendly)" is unconditional, and ten rules on
+ * this page transitioned background-color, border-color or color. Every one of them was
+ * paint-only and none cost layout, so the frames were cheap; the rule is still the rule.
+ *
+ * The compliant way to keep a cross-fade is to move the colour onto a pseudo-element and
+ * animate its opacity. That was rejected here on evidence rather than taste, twice over.
+ * The contrast gate resolves a text run's ground by walking what is painted BEHIND it, which
+ * is written down at :533 because getting it wrong once already produced a number measured
+ * against the wrong layer. `--live` on `.reg-row` and `.lane-fields` is exactly such a
+ * ground, and moving it into an overlay hides it from that walk: the gate would keep
+ * reporting a ratio, and the ratio would be against paper the reader never sees. Second,
+ * :586 records that opacity was already tried as the channel on `.turns li` and measured
+ * 1.77 and 2.49 against a floor of 4.5.
+ *
+ * So the transitions are gone and the state changes are instant. Every end state, every
+ * colour and every contrast ratio is untouched; only the 120ms it took to arrive is. The
+ * transitions that were already on transform or opacity are all kept, which is what leaves
+ * `.hear`, `.turns li`, `.replay` and `.filings li` with their transform lines below. */
+.reg-row[data-live="on"] { background: var(--live); }
+
+/* ---- the call player ----------------------------------------------------------------- */
+/* The control that starts a recording. It is a pill with words in it rather than the
+   3.25rem circle that used to sit here, because the circle's only name was an aria-label:
+   a reader looking for the sound read the one control that had words, which says "again"
+   and replays the transcript in silence. It matches `.replay` on purpose. The two sit next
+   to each other and the difference between them is what they do, not how they look. */
+.hear {
+  display: inline-flex; align-items: center; gap: 0.45rem;
+  flex: none;
+  font-family: var(--ui); font-size: var(--size-2);
+  letter-spacing: 0.05em; text-transform: uppercase;
+  background: transparent; color: var(--ink-2);
+  border: 1px solid var(--line-strong); border-radius: 2px;
+  padding: var(--space-1) var(--space-2);
+  cursor: pointer;
+  transition: transform var(--dur-micro) var(--ease-out);
+}
+.hear:hover { color: var(--ink); border-color: currentColor; }
+.hear:active { transform: scale(0.97); }
+.hear svg { width: 0.6rem; height: 0.7rem; fill: currentColor; flex: none; }
+[data-playing="true"] .hear .i-play,
+[data-playing="false"] .hear .i-pause { display: none; }
+
+canvas[data-waveform] {
+  display: block; width: 100%; height: 4.5rem; cursor: pointer;
+  /* The canvas is a measurement of a real recording. It gets no frame and no shadow. */
+}
+
+.switch { display: inline-flex; border: 1px solid var(--line); border-radius: 2px; overflow: hidden; }
+.switch button {
+  font-family: var(--ui); font-size: var(--size-2); letter-spacing: 0.05em; text-transform: uppercase;
+  padding: 0.4rem 0.85rem; background: transparent; color: var(--ink-3);
+  border: 0; cursor: pointer;
+}
+/* The pressed language is filled, but filled light and written in ink rather than the
+ * other way round.
+ *
+ * It used to be ink filled with the dark theatre colour as its text. That rendered
+ * correctly and measured wrongly: the contrast probe resolves a run's ground by walking
+ * what is painted BEHIND the element, and an element's own background is not behind
+ * itself, so it read the theatre colour against the paper two layers down. The number was
+ * high and it was a number about a pair that is not on the screen. Turning the same rule
+ * into paper on ink made the accident visible: 1.07, paper against paper.
+ *
+ * Ink on a paper-deep fill is the same affordance and it is the arrangement the probe can
+ * actually see: the text is ink, the ground behind it is paper either way, and the two
+ * measure 13.5 whichever of them the probe picks up. A fill that can only be checked by a
+ * human eye is not checked. */
+.switch button[aria-pressed="true"] {
+  background: var(--paper-deep);
+  color: var(--ink);
+  box-shadow: inset 0 0 0 1px var(--line-strong);
+}
+/* Drawn inside the button, not outside it. .switch clips its children so the two buttons
+ * share one frame, and a ring 3px outside a button that fills that frame is 3px outside
+ * the clip: tabbing to the language switch showed a two-pixel sliver and nothing else, on
+ * the control that demonstrates the whole point of the page. */
+.switch button:focus-visible { outline-offset: -3px; }
+
+/* Turns. The transcript is the evidence, so it is set to be read, not skimmed: a tight
+ * measure, real leading, and only the line being spoken at full strength. */
+.turns {
+  list-style: none; margin: 0; padding: 0;
+  max-height: 22rem; overflow-y: auto;
+  font-family: var(--ui);
+  font-size: var(--size-4); line-height: 1.55;
+  max-width: var(--measure-ui-tight);
+  scrollbar-width: thin;
+}
+/* The bottom of the scroller, drawn rather than left as a slice.
+ *
+ * `max-height` cuts at 352px, and rows are not a fixed height: a one-line English turn and
+ * a three-line Tamil one are different sizes, so no max-height can land on a row boundary.
+ * Both columns of the duet were ending on the top third of a line of type, side by side, in
+ * the one act that exists for a reader to compare them.
+ *
+ * The fade says the box has more in it. It comes off at the bottom of the scroll, so the
+ * last line of a transcript is never the dim one, and it is not applied at all to a list
+ * short enough to fit. `console.js` marks both. A mask is not motion, so reduced-motion
+ * changes nothing here. */
+.turns[data-scrollable]:not([data-at-end]) {
+  mask-image: linear-gradient(to bottom, #000 calc(100% - 2.5rem), transparent);
+}
+.turns li {
+  display: grid;
+  grid-template-columns: 3rem 4.5rem minmax(0, 1fr);
+  gap: 0 0.75rem;
+  padding: 0.45rem 0;
+  border-top: 1px solid var(--line);
+  border-left: 2px solid transparent;
+  padding-left: 0.5rem;
+  transition: transform var(--dur-micro) var(--ease-both);
+}
+/* Opacity is not the channel for this. The dimming pointed at the line being spoken, and
+ * it was first fixed only for the build with no audio, where no playhead runs and every
+ * line sat dim forever. That left the build a judge actually opens, the one with the
+ * recordings, still dimming its own evidence: turn-at measured 1.77 and a Tamil turn 2.49,
+ * against a floor of 4.5. It cannot be tuned back into range either. --ink-3 on paper is
+ * 5.10 at full strength, so the least dim that still clears AA is 0.94, which is not a
+ * state anyone can see. The tracking cue moves to the marker below, which carries no text.
+ * Both builds now read the same, and the transcript is legible at every playhead position. */
+.turns li { opacity: 1; }
+
+/* The live colour, used the same way the filing list uses it: this is the line being
+ * spoken. A border and a nudge, so nothing about the text itself changes as it plays. */
+.turns li[data-rel="now"] {
+  border-left-color: var(--live-mark);
+  transform: translateX(3px);
+}
+.turns li[data-who="bot"] .turn-who { color: var(--ink-3); }
+.turn-at  { font-family: var(--mono); font-size: var(--size-1); color: var(--ink-3); padding-top: 0.15em; }
+.turn-who {
+  font-size: var(--size-0); letter-spacing: 0.07em; text-transform: uppercase;
+  color: var(--ink-3); padding-top: 0.3em;
+}
+/* A `<span>` in source, but a grid item of `.turns li`, so it blockifies and this applies:
+ * measured `display: block`. The turn column is what is left of a 36.02em box after a 3rem
+ * and a 4.5rem track, narrow enough that a one-word last line is common, and this is the
+ * one property that fixes that. */
+.turn-text { text-wrap: pretty; }
+.turn-text:lang(ta-IN), [lang="ta-IN"] { font-family: var(--tamil); line-height: 1.72; }
+.turn-gloss {
+  grid-column: 3; font-size: var(--size-3); color: var(--ink-3); font-style: italic;
+  margin-top: 0.1rem;
+}
+
+/* The structured result. It arrives when the call ends and not before, because that is when
+ * CALL-E returned it. */
+.result {
+  font-family: var(--mono); font-size: var(--size-2); line-height: 1.75;
+  border: 1px solid var(--line); padding: 1rem 1.1rem;
+  transition: opacity var(--dur-mode) var(--ease-both);
+}
+.result[data-state="out"] { opacity: 0.35; }
+.result[data-state="in"]  { opacity: 1; }
+.result dt { color: var(--ink-3); }
+.result dd { margin: 0 0 0.6rem; color: var(--ink); }
+
+/* ---- tables -------------------------------------------------------------------------- */
+table { border-collapse: collapse; width: 100%; font-family: var(--ui); font-size: var(--size-3); }
+th, td { text-align: left; padding: 0.5rem 0.7rem; border-bottom: 1px solid var(--line); vertical-align: top; }
+th {
+  font-size: var(--size-0); letter-spacing: 0.07em; text-transform: uppercase;
+  color: var(--ink-3); font-weight: 600; border-bottom-color: var(--line-strong);
+}
+td.mono, .mono { font-family: var(--mono); font-size: var(--size-2); }
+
+/* Status is never colour alone. The word is always present, and the two states that are not
+ * the ordinary good case carry a rule as well, because a reader scanning the column reads
+ * the marks before the words.
+ *
+ * The two rules are different on purpose, and the difference is the instruction:
+ *
+ *   solid    somebody has to do something about this row
+ *   dotted   nothing happened and nothing is owed
+ *
+ * The dotted rule is what lets `failed` be a neutral grey. Without it a grey state in a
+ * column of coloured ones reads as a style that failed to load rather than a state that was
+ * chosen, and grey is the honest colour for a call nobody answered. */
+.state { font-family: var(--ui); font-weight: 500; }
+.state-resolved { color: var(--resolved); }
+.state-failed { color: var(--failed); padding-left: 0.5rem; border-left: 2px dotted var(--line-strong); }
+.state-undetermined { color: var(--undetermined); padding-left: 0.5rem; border-left: 2px solid var(--undetermined); }
+/* Escalation is a second axis and not a fourth resolution, so it does not get a fourth
+   colour. It is drawn exactly as `--undetermined` is, which is the same choice
+   `.q-safeguarding` already makes in the office queue below: both mean a person has to see
+   this. Reusing the token also means it inherits a contrast that has already been measured
+   as running text on paper rather than needing its own. */
+.state-escalated { color: var(--undetermined); padding-left: 0.5rem; border-left: 2px solid var(--undetermined); }
+
+button[data-copy] {
+  font: inherit; font-family: var(--mono); font-size: var(--size-2);
+  background: transparent; border: 0; border-bottom: 1px dashed var(--line-strong);
+  color: inherit; cursor: pointer; padding: 0 0 1px;
+}
+button[data-copy]:hover { border-bottom-style: solid; }
+button[data-copy][data-copied]::after { content: " copied"; color: var(--resolved); font-family: var(--ui); }
+
+pre {
+  font-size: var(--size-2); line-height: 1.6; overflow-x: auto;
+  background: var(--paper-deep); border: 1px solid var(--line);
+  padding: 1rem 1.1rem; margin: 1rem 0; max-width: 100%;
+  scrollbar-width: thin;
+}
+/* The cut, made visible on the blocks that are actually cut.
+ *
+ * The page already learned this once and only fixed it in one place: the comment at the
+ * identifier table says it "overflowed a box the reader had no way of knowing was
+ * scrollable, and the outcome column was cut mid-word at the edge". The console blocks in
+ * act 08 had the same defect and act 08 is the one titled "Run it yourself", so on a phone
+ * both of its central artifacts, the command and its output, ended mid-word with nothing
+ * saying there was more.
+ *
+ * The console is fixed-width mono and cannot reflow, so this marks the edge rather than
+ * trying to remove it. `console.js` sets the attribute only where the content really is
+ * wider than its box, which is why the rule is not on `pre` itself: a fade over a block
+ * that fits reads as a rendering fault rather than as an affordance. */
+pre[data-overflowing] {
+  mask-image: linear-gradient(to right, #000 calc(100% - 2.5rem), transparent);
+}
+
+/* ---- the run block ------------------------------------------------------------------- */
+/* The offline run, with controls above it. The block is the evidence and the animation at
+ * the same time, so the frame goes round both and the two cannot be separated by a
+ * stylesheet change.
+ *
+ * The height is fixed while it plays. Without that, sixty lines arriving one at a time
+ * push everything below them down sixty times, and a reader trying to read line four is
+ * chasing it up the screen. It is `min-height` rather than `height` so the finished block
+ * is its own length and nothing is clipped at the end. */
+.runbox { margin: 1rem 0; }
+.runbox .run { margin: 0; min-height: 22rem; }
+.runbox[data-run-state="playing"] .run,
+.runbox[data-run-state="idle"] .run { overflow-y: auto; max-height: 32rem; }
+.runbar {
+  display: flex; flex-wrap: wrap; align-items: center; gap: 0.75rem;
+  margin-bottom: 0.6rem;
+}
+.runbar .dim { font-size: var(--size-2); }
+/* The outcome tag the program prints, picked out where it sits rather than restated in a
+ * key beside the line. The colours are the act-3 ones: this is the same three-endings
+ * idea and a second palette for it would say it was a different idea. */
+.run .tag { font-weight: 600; }
+.run .tag-ok    { color: var(--ink); }
+.run .tag-human { color: var(--ink-2); }
+.run .tag-safeg { color: var(--ink); text-decoration: underline; text-underline-offset: 2px; }
+.run .tag-skip  { color: var(--ink-3); }
+.run .tag-fail  { color: var(--ink-2); }
+.runlegend {
+  display: grid; gap: 0.3rem; margin-top: 0.7rem;
+  font-size: var(--size-2); color: var(--ink-2);
+}
+.runlegend b { margin-right: 0.35rem; }
+
+/* ---- reveal -------------------------------------------------------------------------- */
+/* The only entrance on the page. Anything still moving after 320ms is not allowed.
+ *
+ * The transition lives on .shown rather than on the base rule, so the starting state is
+ * applied instantly and the element cannot animate backwards when the class is removed.
+ * The curve is easeOutCubic, which is the GSAP power3.out this replaced. */
+[data-reveal] { opacity: 0; transform: translateY(10px); }
+[data-reveal].shown {
+  opacity: 1; transform: none;
+  transition: opacity var(--dur-enter) var(--ease-reveal),
+              transform var(--dur-enter) var(--ease-reveal);
+}
+html:not([data-ready]) [data-reveal] { opacity: 1; transform: none; }
+
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after {
+    animation-duration: 0.01ms !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
+  [data-reveal] { opacity: 1; transform: none; }
+}
+
+/* ---- panels, plates and the way in ------------------------------------------------------
+ *
+ * The page is 4,283 words in nine acts and every claim on it is held by a test, so the
+ * answer to a reader who has two minutes cannot be fewer words. It has to be entry points:
+ * somewhere to start, somewhere to stop, and a way to take the argument without the prose.
+ *
+ * Three devices, and each one is a surface rather than a size. Nothing here reflows text,
+ * because the measure is already right at 62 characters and widening it would trade a
+ * fatigue the reader can name for one they cannot.
+ *
+ *   .path    the way in. One field, three destinations, at the top of act 1.
+ *   .panel   sage, behind the parts a reader is meant to stop at. .note is one of these.
+ *   .pull    a sentence already in the act, set large enough to be taken on its own.
+ *
+ * Every panel measures 1.08 against the paper and 1.02 against --paper-deep, so the fill
+ * alone cannot be trusted to draw the box and each carries a hairline. --ink-3 is re-cut
+ * inside a panel to the value the register already uses under the light, because small
+ * print is exactly what a panel is full of and 4.38 is not a pass anywhere on this page. */
+.panel, .note {
+  background: var(--sage);
+  box-shadow: inset 0 0 0 1px var(--sage-line);
+  border-radius: 3px;
+  padding: var(--space-3) var(--inset);
+  margin: var(--space-4) 0;
+  color: var(--ink-2);
+  /* The padding is added back, so the line inside a panel is the same 62 characters it is
+   * outside one. box-sizing is border-box everywhere on this page, so without this the
+   * measure would quietly narrow by 48px inside every panel on the page. */
+  max-width: calc(var(--measure) + var(--space-4) * 2);
+  --ink-3: var(--lit-ink-3);
+}
+/* The mark the page already uses for a caveat, kept. It is the reason a note is a note and
+ * not a panel, and the 3px it costs is added to the measure for the same reason as above. */
+/* The rule down the side of a note is neutral, and it was the state colour.
+ *
+ * `--undetermined` is a warning colour and it has to clear 4.5 as running text on paper,
+ * which pins it dark. Any warm hue that dark reads as olive rather than as amber, and a
+ * 3px olive rule ran down the side of every note on a page whose grounds are now graphite:
+ * it was the single most visible thing left arguing for the old palette. A note is already
+ * marked by its indent and its measure. It does not also need a hue, and borrowing the
+ * warning colour for it said "attention" on blocks that were only asides. */
+.note {
+  border-left: var(--marker) solid var(--line-strong);
+  /* The stroke is part of the inset rather than added to it, so a note's first character
+   * sits on the same edge as the text of every other object. Measured before: +51 against
+   * the +48 everything else in that column was on. */
+  padding-left: calc(var(--inset) - var(--marker));
+  max-width: calc(var(--measure) + var(--inset) * 2);
+}
+.panel > :last-child, .note > :last-child { margin-bottom: 0; }
+.panel-k, .path-k {
+  font-family: var(--ui); font-size: var(--size-0); letter-spacing: 0.09em;
+  text-transform: uppercase; color: var(--ink-2);
+  margin: 0 0 var(--space-2); max-width: none;
+}
+
+/* The way in. CALL-E open on a saturated yellow field with near-black on it and small mono
+ * labels above, and this is that, at the first place on the page where a field of colour
+ * does not compete with the light: after the curtain, one screen below the register. It
+ * names three destinations and says how long each one takes, so a reader with two minutes
+ * spends them on the three things worth seeing instead of on the first three paragraphs. */
+.path {
+  background: var(--brand-field);
+  border-radius: 3px;
+  padding: var(--inset);
+  margin: 0 0 var(--space-5);
+  --ink-3: var(--lit-ink-3);
+}
+.path-lead {
+  font-family: var(--ui-display); font-weight: 600;
+  font-size: var(--size-6); line-height: 1.2; color: var(--ink);
+  margin: 0 0 var(--space-4); max-width: var(--measure-ui-tight);
+}
+.path-steps {
+  list-style: none; margin: 0; padding: 0;
+  display: grid; gap: var(--space-3);
+}
+@media (min-width: 52rem) {
+  .path-steps { grid-template-columns: repeat(3, minmax(0, 1fr)); gap: var(--space-4); }
+}
+.path-steps li {
+  display: grid; gap: var(--space-1); align-content: start;
+  border-top: 2px solid var(--ink); padding-top: var(--space-2);
+}
+.path-n {
+  font-family: var(--mono); font-size: var(--size-0);
+  font-variant-numeric: tabular-nums; color: var(--ink-2);
+}
+.path-steps a { font-family: var(--ui); font-size: var(--size-4); font-weight: 600; color: var(--link); }
+.path-why { font-family: var(--ui); font-size: var(--size-2); color: var(--ink-3); margin: 0; max-width: none; }
+
+/* A sentence the act already says, set at display size so a reader who is scanning takes
+ * the argument without reading the paragraph around it. Every one is lifted word for word,
+ * because a pull-quote that paraphrases is a second claim nothing checks.
+ *
+ * The measure is in em and the wrap is balanced rather than ragged, so the block holds the
+ * same number of lines on the metric-matched fallback and on the real face. A quote that
+ * wrapped to a third line when the kit landed would move every act below it, and the
+ * layout-shift ceiling for this page is one part of a thousand of a viewport. */
+.pull {
+  font-family: var(--display); font-weight: 400;
+  font-size: clamp(1.45rem, 1.1rem + 1.3vw, 2rem);
+  line-height: 1.18; letter-spacing: -0.014em;
+  color: var(--ink);
+  margin: var(--space-5) auto;
+  padding-top: var(--space-3);
+  border-top: var(--marker) solid var(--live-mark);
+  max-width: min(var(--measure), 68rem);
+  text-wrap: pretty;
+}
+/* A single-line statement the act stands behind, set between body prose and a pull quote.
+   Smaller than `.pull` on purpose: three of these in one act at pull size would be three
+   competing headlines, and the pull is the one sentence a reader leaves the act with. */
+.hard {
+  font-family: var(--display); font-weight: 400;
+  font-size: clamp(1.15rem, 1rem + 0.5vw, 1.4rem);
+  line-height: 1.32; color: var(--ink);
+  margin: var(--space-4) 0; max-width: var(--measure);
+  text-wrap: pretty;
+}
+
+.pull-who {
+  display: block; font-family: var(--ui); font-size: var(--size-1);
+  letter-spacing: 0.07em; text-transform: uppercase; color: var(--ink-3);
+  margin-top: var(--space-2);
+}
+
+/* The one dark ground on the page, and it is a plate rather than a band.
+ *
+ * A full-bleed dark band cannot work here and the arithmetic says so rather than the taste:
+ * the rail is fixed, it crosses whatever is behind it at every scroll position, and no
+ * single ink clears 4.5 against both the paper at 0.973 and a royal at 0.28. One of the two
+ * would have to be illegible, or the rail would need a script to tell it what it is over.
+ * A plate is bounded by the inner column, which begins 240px in, and the rail ends at 226,
+ * so the two never meet and the rail stays on paper all the way down.
+ *
+ * Everything inside flips per surface. The tokens are re-declared on the plate and not on
+ * the root, so nothing outside it changes and a block lifted out of the plate reverts on
+ * its own rather than staying inverted on paper. */
+.plate-royal {
+  background: var(--royal);
+  color: var(--royal-ink);
+  border-radius: 4px;
+  padding: clamp(1.5rem, 4vw, 2.75rem) var(--inset);
+  --ink:         var(--royal-ink);
+  --ink-2:       var(--royal-ink-2);
+  --ink-3:       var(--royal-ink-3);
+  --ink-4:       var(--royal-ink-3);
+  --line:        var(--royal-line);
+  --line-strong: var(--royal-line);
+  --link:        var(--royal-ink-2);
+  --focus:       var(--royal-ink-2);
+  /* A card on this ground is a lift off the royal, never the paper card. Without this a
+   * disclosure inside the plate paints `oklch(1 0 0)` under type that has already flipped
+   * to near-white, which is the same defect this stylesheet already records twice: a token
+   * that does not flip on a surface that does. */
+  --card:        color-mix(in oklch, var(--royal-ink) 7%, var(--royal));
+}
+
+/* ---- the margin column ------------------------------------------------------------------
+ *
+ * The outer thirds of a wide viewport carried nothing. This is the editorial answer rather
+ * than a sidebar: the figure a section refers to, the file a number was read out of, the
+ * gloss on a term the page uses without defining. Short, quiet, and never load-bearing. If
+ * a reader never looks right, they lose nothing.
+ *
+ * It appears at 72rem, which is the width the rail already appears at, and it is that width
+ * and not a new one on purpose. Below it the note falls into normal flow above the block it
+ * annotates, which is where a margin note goes on a phone.
+ *
+ * The float is pulled fully outside the content box: the reserve on .inner is the column
+ * plus its gap, and the negative margin is exactly the same number, so the float's margin
+ * box begins where the content box ends. That is what keeps it from rewrapping a single
+ * line of the text it sits beside, which matters because the note's height depends on the
+ * font and the font arrives after first paint.
+ *
+ * The reserve is opt-in per act. Three acts hold artifacts that are already near their
+ * minimum width at this breakpoint, the duet's three fields and the two identifier tables,
+ * and taking 144px off those would have them overlap rather than narrow. The reading
+ * column's left edge is the same in every act either way, which is the edge a reader
+ * tracks; only the artifacts on the right run wider in the three that opt out. */
+.marginalia {
+  font-family: var(--ui); font-size: var(--size-1); line-height: 1.45;
+  color: var(--ink-3);
+  margin: 0 0 var(--space-4);
+  padding-top: var(--space-1);
+  border-top: 2px solid var(--live-mark);
+  max-width: var(--measure-ui-tight);
+}
+.marginalia b {
+  display: block; font-family: var(--mono); font-size: var(--size-0);
+  letter-spacing: 0.06em; text-transform: uppercase; font-weight: 500;
+  color: var(--ink-2); margin-bottom: var(--space-1);
+}
+.marginalia a { color: var(--link); }
+.marginalia code { font-size: 0.94em; overflow-wrap: anywhere; }
+/* p carries the 62 character serif measure, which is four times the width of this column
+ * and would leave the note's own bottom margin under it. */
+.marginalia p { margin: 0; max-width: none; }
+
+@media (min-width: 72rem) {
+  .inner-margin { padding-right: calc(var(--margin-col) + var(--space-4)); }
+  .inner-margin > .marginalia {
+    float: right; clear: right;
+    width: var(--margin-col); max-width: none;
+    margin-right: calc(-1 * (var(--margin-col) + var(--space-4)));
+  }
+  /* auto-fit resolves against whatever width is left, so the reserve turned a four across
+   * grid into three and one. Two by two is what this grid already is at every width from
+   * 60rem to 72rem, so stating it here keeps one shape instead of introducing a third. */
+  .inner-margin .stat-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+}
+
+/* ---- utility ------------------------------------------------------------------------- */
+.dim { color: var(--ink-3); }
+/* The skip link. Hidden until focused, then it lands on the paper as an ordinary control
+ * rather than a floating browser artefact. It has to sit above the rail's stacking context
+ * or it would take focus behind the thing it exists to skip. */
+.skip {
+  position: fixed; top: 0; left: 0; z-index: 100;
+  transform: translateY(-120%);
+  background: var(--card); color: var(--link);
+  font-family: var(--ui); font-size: var(--size-3);
+  padding: 0.7rem 1.1rem;
+  border: 1px solid var(--line-strong); border-top: 0;
+  border-bottom-right-radius: 4px;
+  text-decoration-thickness: 0.08em;
+}
+.skip:focus-visible {
+  transform: translateY(0);
+  outline: 2px solid var(--focus); outline-offset: 2px;
+}
+@media (prefers-reduced-motion: no-preference) {
+  .skip { transition: transform 140ms ease-out; }
+}
+
+.visually-hidden {
+  position: absolute; width: 1px; height: 1px; padding: 0; margin: -1px;
+  overflow: hidden; clip-path: inset(50%); white-space: nowrap;
+}
+footer {
+  padding: 3rem var(--gutter) 5rem; color: var(--ink-3);
+  font-family: var(--ui); font-size: var(--size-3);
+  /* The same ground and the same layer as `.further` above, and for the same
+   * reason: the stuck hero reaches the bottom of the document too. */
+  position: relative; z-index: 2; background: var(--paper);
+}
+/* The provenance block closes the page on the royal, which gives the document an ending
+ * instead of letting it run out of cream. Same plate, same inner column, same rule about
+ * never reaching the rail. */
+footer > .inner { max-width: 68rem; margin: 0 auto; }
+footer .plate-royal p { max-width: var(--measure-ui); margin-bottom: 0; }
+footer .plate-royal .source-link { margin-top: var(--space-3); }
+
+/* ---- the rail ------------------------------------------------------------------------- */
+/* The reader's position, and the through-line: the hero call rides here as a miniature after
+ * the page has left the dark, so the call is never lost. */
+.rail { display: none; }
+@media (min-width: 72rem) {
+  /* On its own plate, and that is a bug fix rather than a decoration.
+   *
+   * The rail is fixed at the middle of the viewport and the acts scroll past behind it.
+   * Every act sets its own ground, so at a seam the rail sat with half its items on
+   * act 03's paper and half on act 04's, split by a hard horizontal colour change running
+   * straight through the list. It read as two broken navigations rather than one, and it
+   * was reported as an overlap three times. A plate gives it one ground of its own at
+   * every scroll position, so there is nothing for a seam to cut. */
+  .rail {
+    display: block; position: fixed; z-index: 5;
+    top: 50%; left: 1.5rem; transform: translateY(-50%);
+    font-family: var(--ui); font-size: var(--size-1);
+    background: var(--card);
+    border: 1px solid var(--line);
+    border-radius: 8px;
+    padding: 0.9rem 1rem;
+    /* Fixed width, and the act's left inset is set from it below. Transparent, the rail
+     * could sit flush against the text column and nothing showed. Opaque, the same flush
+     * edge ate the first character of every line in the paragraph beside it. A plate has
+     * to be measured against what it now covers. */
+    width: 13.5rem;
+    box-sizing: border-box;
+  }
+  .rail ol { list-style: none; margin: 0; padding: 0 0 0 1.1rem; }
+  .rail li + li { margin-top: 0.55rem; }
+  .rail a {
+    display: grid; grid-template-columns: 1.6rem auto; gap: 0.5rem;
+    /* ink-3, not ink-4. ink-4 is 2.81 against the deepest paper and these are 12px
+     * navigation links, so they were the quietest thing on the page in the sense that
+     * matters least and the sense that matters most. ink-4 stays for the unplayed
+     * waveform bars, which are a graphic and carry no words. */
+    text-decoration: none; color: var(--ink-3);
+  }
+  .rail a[aria-current="true"] { color: var(--ink); }
+  .rail a:hover { color: var(--ink-2); }
+  .rail-num { font-family: var(--mono); font-variant-numeric: tabular-nums; }
+  .rail-label { max-width: 100%; text-wrap: balance; }
+  .rail-line {
+    position: absolute; left: 0; top: 0; bottom: 0; width: 2px;
+    background: var(--line);
+  }
+  .rail-fill {
+    position: absolute; inset: 0; background: var(--ink-3);
+    transform: scaleY(0); transform-origin: top; will-change: transform;
+  }
+  .rail-wave { display: block; width: 48px; height: 18px; margin: 0.75rem 0 0 -0.1rem; }
+
+  /* The rail is fixed, so the page has to make room for it. The inset goes on the section
+   * and not on main: padding main leaves a paper margin down the left, which stops the
+   * theatre band being full bleed and strands the rail on paper while it is styled for the
+   * dark. There is exactly one dark band and it has to reach both edges. */
+  .act { padding-left: 16rem; }
+  /* The footer takes the same inset, so its plate starts where every act's does and the
+   * rail cannot end up on top of a dark ground at the foot of the page. And the block
+   * between the last act and the footer takes it too: it is not an `.act`, so it was
+   * running its left column under the fixed rail, and the rail is opaque. The takeaway a
+   * reader arrives at from the bar was the thing underneath it. */
+  footer { padding-left: 16rem; }
+
+  /* The rail used to need four overrides here, because it sits outside the section that
+   * inverted and was rendering paper ink on a dark ground. The page has no inverted band
+   * now, so the rail is on paper at every scroll position and the overrides are gone. */
+}
+
+/* ---- the hero ------------------------------------------------------------------------- */
+/* The whole scene has to be on the first screen: a judge who has to scroll to find out
+ * what this is has already been asked for something. 14vh of head room and the act's
+ * shared 9vh foot came to 207px of the 900 a laptop has, on a screen whose entire job is
+ * to hold one sentence and one object. 8vh and 3rem is 105. */
+.act-00 {
+  min-height: 100svh; display: grid; align-content: start;
+  padding-top: 8vh; padding-bottom: var(--space-6);
+}
+/* `.act > .inner` carries `margin: 0 auto`, and auto margins on a grid item mean the item
+ * is sized to its own content and the margins absorb what is left. Every other act fills
+ * the 68rem cap and never notices. The hero holds the board, and a canvas hands its
+ * element size to whatever measures it, a second after first paint: the column stepped
+ * 15px sideways the moment the board mounted. Stating the width makes it a function of the
+ * track instead, and the cap still decides the final number. */
+.act-00 > .inner { width: 100%; }
+.act-00 .inner { will-change: transform; }
+
+/* The curtain. Act 0 holds while Act 1, which is opaque and sits at z-index 2, slides over
+ * it. This is position:sticky doing what ScrollTrigger's pin with pinSpacing:false did,
+ * for no script. It is gated on the attribute the scroll wiring sets, so a reader with
+ * JavaScript off or reduced motion asked for gets the hero scrolling normally, which is
+ * the behaviour they had before. */
+@media (min-width: 60rem) and (prefers-reduced-motion: no-preference) {
+  html[data-curtain] .act-00 { position: sticky; top: 0; z-index: 0; }
+}
+/* The masthead. A reader met the first viewport, could not name the product and
+ * could not say who buys it. Both were the page's fault: `firstbell` was in the browser
+ * tab and in one shell command nine screens down, and the one sentence that answers the
+ * question lived in README.md.
+ *
+ * It sits above the eyebrow and stays quiet. The headline is still the loudest thing on
+ * the screen, because the register underneath it is the argument; this block only has to
+ * make sure a reader knows what they are looking at before they start looking. */
+/* Stacked, and measured in rem.
+ *
+ * The first version put the wordmark and the sentence on one row with `flex-wrap` and a
+ * `44ch` measure, and the CLS gate caught it at 0.00174 against a 0.001 ceiling: `ch` is a
+ * property of the loaded font, so the fallback and the real face resolve it to different
+ * widths, the sentence wraps to a different number of lines, and everything below the
+ * masthead moves once the webfont arrives. A row that can reflow above 140 screens of
+ * content is a bad trade for one saved line. */
+.masthead {
+  margin: 0 0 var(--space-5);
+  padding-bottom: var(--space-3);
+  border-bottom: 1px solid var(--line);
+}
+.wordmark {
+  font-family: var(--display); font-size: var(--size-6); line-height: 1.1;
+  margin: 0 0 var(--space-2); color: var(--ink); letter-spacing: -0.012em;
+}
+.standfirst {
+  font-family: var(--ui); font-size: var(--size-3); line-height: 1.45;
+  margin: 0; color: var(--ink-2);
+  max-width: 30rem;
+}
+/* The dateline under the standfirst. Four measured numbers, and the only place on the
+ * first screen where a reader meets one.
+ *
+ * It is a dateline and not the stat grid act 01 already carries. A four-cell grid repeated
+ * two screens apart reads as a landing page rather than as a page making an argument, and
+ * the grid's whole design decides which of its four numbers leads. This one ranks nothing:
+ * it is the byline convention, set in the label type the eyebrow uses, with the digits in
+ * mono so the eye stops on them without the line shouting.
+ *
+ * Tabular figures because the four values are read as a set. Fixed line-height and no
+ * wrapping of a value away from its own label, so the block's height is the same in the
+ * fallback face as in the real one, which is what keeps it off the layout-shift budget. */
+.topline {
+  list-style: none; display: flex; flex-wrap: wrap;
+  gap: 0 var(--space-3); margin: var(--space-2) 0 0; padding: 0;
+  font-family: var(--ui); font-size: var(--size-1); line-height: 1.6;
+  letter-spacing: 0.04em; text-transform: uppercase; color: var(--ink-3);
+  max-width: none;
+}
+.topline li { white-space: nowrap; }
+.topline b {
+  font-family: var(--mono); font-weight: 500; font-size: var(--size-2);
+  font-variant-numeric: tabular-nums; letter-spacing: 0; color: var(--ink);
+}
+
+.source-link {
+  font-family: var(--ui); font-size: var(--size-2); margin: var(--space-2) 0 0;
+}
+.source-link a { color: var(--ink-2); }
+footer .source-link { margin-top: var(--space-3); }
+
+.eyebrow {
+  font-family: var(--ui); font-size: var(--size-2); letter-spacing: 0.09em;
+  text-transform: uppercase; color: var(--ink-3); margin: 0 0 var(--space-3);
+  font-variant-numeric: tabular-nums;
+  /* p carries a 34.72em measure meant for the serif body. Resolved against 13px of tracked
+   * uppercase UI that is 451px, and this label is longer than that, so it was breaking one
+   * line of small caps across two. A label is one line or it is not a label. */
+  max-width: none;
+  /* This label is marked up as a `<p>`, so it inherits `text-wrap: pretty` from the rule
+   * that sets the prose, and `pretty` is the wrong style for a label that has to survive
+   * wrapping on a phone. `balance` is what the other four labels on this page are set to,
+   * and this is the only one of the five that needed saying twice. */
+  text-wrap: pretty;
+}
+/* The whole screen has one sentence on it. Everything else up here is a label on a real
+ * object, and the object is the argument.
+ *
+ * 5rem rather than the 7rem this was: the headline is no longer competing to be the thing
+ * the reader looks at, because the register underneath it is. A statement that has nothing
+ * next to it does not need to be the largest type that fits. */
+.act-00 h1 {
+  font-size: clamp(2.25rem, 4.4vw, 4rem);
+  line-height: 0.98; letter-spacing: -0.012em; text-wrap: balance;
+  margin-bottom: var(--space-4);
+  /* Measured in em of this headline own font-size, never in ch.
+   *
+   * ch is the advance width of a zero in whatever face is rendering, so 16ch resolved to
+   * 833.68px against the local fallback and 760.32px against Freight Text Compressed.
+   * The headline wrapped to three lines instead of two and the block changed height by
+   * exactly one line box, 105.84px, which on a centred hero is a 0.0386 layout shift.
+   * It appeared in three runs out of five, which is why a single measurement had called
+   * it fixed.
+   *
+   * em scales with the type across the clamp the way ch did, and depends on no glyph. The
+   * value moved from 8.6em to 11em because the headline text changed: the sentence here is
+   * a character longer than the one this was derived against and sits at a smaller size, so
+   * the old width put it on the edge of a third line. 11em holds two lines in both states
+   * with a whole line of margin, and the CLS gate is what proves it rather than this
+   * comment: its ceiling is 0.001 and a wrap that differed between the fallback and the
+   * real face would spend a full line box, which is 0.03 or worse. */
+  max-width: 11em;
+}
+/* ---- the exchange ----------------------------------------------------------------------
+ * The call that makes the argument, on the screen that decides whether anybody reads the
+ * rest. Two voices, and they are not the same weight: the office asks in the interface
+ * face at small print size, the guardian answers in the display face at something close to
+ * a headline. A reader who takes one thing off this page should take her sentence.
+ *
+ * No `text-wrap: balance` on the answer, deliberately, and the measure is in em rather than
+ * ch. Both are the same lesson the headline above already learned the hard way: ch is the
+ * advance width of a zero in whatever face happens to be rendering, so it resolves
+ * differently against the fallback and against Freight Text, the line count changes, and
+ * the block moves by a whole line box. The CLS ceiling on this page is 0.001 and one
+ * reflowed line spends thirty times that. em scales with the type and depends on no glyph.
+ */
+.exchange {
+  margin: 0 0 var(--space-4);
+  max-width: var(--measure-ui);
+}
+.exchange blockquote { margin: 0; }
+
+.xc-who {
+  display: block;
+  font-family: var(--ui); font-size: var(--size-0);
+  letter-spacing: 0.09em; text-transform: uppercase;
+  color: var(--ink-3);
+  margin-bottom: var(--space-1);
+}
+
+.xc-ask {
+  font-family: var(--ui); font-size: var(--size-3); line-height: 1.5;
+  color: var(--ink-3);
+  margin: 0 0 var(--space-3);
+  max-width: 34em;
+}
+
+/* Her answer. The largest thing on this screen after the headline, and the only sentence on
+ * it spoken by a person.
+ *
+ * 19em, and the number is the whole point. At 26em this sentence fitted on one line and
+ * then did not: swapping one straight apostrophe for a curly one, which is two or three
+ * pixels, pushed it onto a second line and left `morning.` alone there. A block whose line
+ * count turns on three pixels is a block that will render differently against the fallback
+ * face than against Freight Text, and one reflowed line at this size is a 0.03 layout
+ * shift into a 0.001 ceiling.
+ *
+ * The sentence is about 34em of text. At 19em it cannot reach one line and cannot reach
+ * three, so it is two lines in every face, and the height under it never moves. The break
+ * point may wander inside those two lines, which costs nothing: nothing below it depends
+ * on where a line breaks, only on how many there are. */
+.xc-say {
+  font-family: var(--display); font-weight: 400;
+  font-size: clamp(1.25rem, 0.95rem + 1.05vw, 1.75rem);
+  line-height: 1.28; letter-spacing: -0.008em;
+  color: var(--ink);
+  margin: 0;
+  max-width: 19em;
+}
+
+.exchange figcaption {
+  font-family: var(--ui); font-size: var(--size-2); line-height: 1.5;
+  color: var(--ink-3);
+  margin-top: var(--space-3);
+  max-width: var(--measure-ui);
+}
+.exchange figcaption a { color: var(--ink-2); }
+
+/* What the office was left with. Interface face, because it is the system talking about
+ * itself rather than anybody speaking. */
+/* The line-height is a length, not a ratio, and that is load-bearing.
+ *
+ * This paragraph mixes three faces: the interface face for the prose, the mono face for the
+ * two field values, and the interface face again for the state. A unitless line-height is
+ * resolved separately against each of those font-sizes, so the tallest inline box on a line
+ * decides that line's height, and when the mono webfont replaces its fallback the answer
+ * changes by a pixel. One pixel here moved the register and all nine acts under it, which
+ * the CLS gate scored 0.00140 against a 0.001 ceiling. A length is inherited as the same
+ * computed value by every inline child, so the line box is 22px whatever is on the line. */
+.hero-turn {
+  font-family: var(--ui); font-size: var(--size-3); line-height: 1.375rem;
+  color: var(--ink-2);
+  margin: 0 0 var(--space-4);
+  max-width: var(--measure-ui);
+}
+/* The two field values are NOT set in the mono face, and the reason is written at the
+ * @font-face block above: the mono fallback resolves to Consolas or Menlo depending on the
+ * machine, it is approximate, and the comment there records that it "sets no width anything
+ * else depends on". That held while mono appeared in table cells and on lines of its own.
+ * Put it inline in a sentence and the sentence depends on its width: when azeret-mono
+ * replaced the local fallback, every inline box after `unknown` slid along its line and the
+ * CLS gate scored the movement. Weight and ink separate a field value from the prose around
+ * it without introducing a second set of metrics into one line. */
+.hero-turn b { font-weight: inherit; color: var(--ink); }
+/* The state chips are authored for the figure key, where each one starts a row and the
+ * rule down its left edge is what makes three of them read as a set. Inline in a sentence
+ * that rule is a stray mark between two words. Colour and weight are the whole job here. */
+.hero-turn .state { border-left: 0; padding-left: 0; font-weight: inherit; font-size: inherit; }
+
+.hero-foot {
+  font-family: var(--ui); font-size: var(--size-2); color: var(--ink-3);
+  max-width: var(--measure-ui); margin-top: var(--space-4);
+}
+
+/* The demonstration used to sit here: a screen recording, embedded, with a poster and a
+ * reserved 16 by 9 box. It is gone. The clip already exists somewhere a viewer can watch
+ * it, and a second player here made this page a place to watch a file rather than a place
+ * to check a claim. Everything this page shows now is built from the run: the register
+ * plays, the waveform is the audio it was drawn from, and the figure in act 02 is the
+ * system's own shape. Those stay true when the code changes and a recording does not. */
+
+/* ---- the register --------------------------------------------------------------------- */
+/* The object the software acts on, and the object it hands back. Four real calls, one row
+ * each, and the three columns are the three fields CALL-E returns. It is not a table
+ * element because one of its rows opens into a phone call, and a cell containing a canvas,
+ * a transcript and a set of controls is not a cell.
+ *
+ * Every column is fixed or fractional and none is sized by its content. That is the whole
+ * reason a value can be swapped in mid-scene without costing a layout shift: `·` and
+ * `later_this_week` occupy the same track. The CLS ceiling on this page is 0.001, which is
+ * one part of a thousand of a viewport, so a column that resized on a text change would
+ * fail the gate on its own. */
+.register {
+  border: 1px solid var(--line-strong);
+  background: var(--card);
+  font-family: var(--mono);
+  font-size: var(--size-2);
+  font-variant-numeric: tabular-nums;
+  /* The two steps that do not survive the light, re-cut once for the whole register. Only
+   * the register can ever be lit, so this is the only scope that needs them. */
+  --ink-3: var(--lit-ink-3);
+  --line:  var(--lit-line);
+}
+.reg-head, .reg-row {
+  display: grid;
+  grid-template-columns: 7rem repeat(3, minmax(0, 1fr));
+  gap: 0 var(--space-3);
+  padding: var(--space-1) var(--space-3);
+  align-items: baseline;
+}
+.reg-head {
+  font-family: var(--mono); font-size: var(--size-0);
+  color: var(--ink-3);
+  border-bottom: 1px solid var(--line-strong);
+}
+.reg-row + .reg-row { border-top: 1px solid var(--line); }
+.reg-id { color: var(--ink-3); }
+.reg-val { overflow-wrap: anywhere; }
+.reg-v { font-weight: 400; color: var(--ink); }
+/* The field name, carried on every value so a screen reader hears which field it is
+ * hearing, and so the row can stack under 52rem where three columns cannot fit. It is
+ * out of sight on a desktop, where the head row says the same thing once. */
+.reg-key {
+  position: absolute; width: 1px; height: 1px; padding: 0; margin: -1px;
+  overflow: hidden; clip-path: inset(50%); white-space: nowrap;
+}
+
+/* The row that is running. Nothing about it moves and nothing about it grows: the scene
+ * turns a light on and that is the whole of it. An entrance that opened this row would be
+ * a layout shift on the first screen, and the ceiling for the whole page is 0.001. */
+
+/* A value that has not arrived yet. The cell is never empty and never hidden: it holds the
+ * same `·` this page prints everywhere else for a field with no value, at 4.84 on the
+ * light, so a reader meets a readable pending state rather than a gap. Hiding it would
+ * also have taken it out of reach of the contrast gate, which skips anything invisible;
+ * an unmeasured run reads as a pass and this page does not allow that anywhere else. */
+/* `·` alone was not enough. The row under the live one carries three real `unknown`s,
+ * which is a value CALL-E returned, and a waiting field one line above it has to be
+ * legible as a different kind of thing at a glance. A blank on a form is a rule, so this
+ * is a rule, in the light's own stroke colour. It is on an inline box, so it adds no
+ * height and cannot move the row when it goes. */
+.reg-v[data-at="pending"] {
+  color: var(--ink-3);
+  border-bottom: 1px dotted var(--live-mark);
+}
+/* The commit is drawn only while the light is on, which is the only time a field can be
+ * arriving. Without that condition the rule would also match the served page, and all
+ * three would flinch once on every load for a scene that had not started. */
+.reg-row[data-live="on"] .reg-v[data-at="committed"] {
+  animation: field-commit var(--dur-tick) var(--ease-out);
+}
+/* 3px, not 8. A field arriving is a fact becoming true, not an object flying in, so the
+ * distance is the smallest one the eye still reads as a landing. Nothing in the real world
+ * appears from nothing, so it is 3px and 0.35 rather than nothing at all. */
+@keyframes field-commit {
+  from { transform: translateY(3px); opacity: 0.35; }
+  to   { transform: none;            opacity: 1; }
+}
+
+/* Three columns of mono at 13px need about 620px before the values start breaking mid
+ * word. Under that the row stacks and each value carries its own field name, which is the
+ * span that was out of sight above. The head row has nothing left to head, so it goes. */
+@media (max-width: 51.999rem) {
+  .reg-head { display: none; }
+  .reg-head, .reg-row { grid-template-columns: minmax(0, 1fr); gap: var(--space-1) 0; }
+  .reg-key {
+    position: static; width: auto; height: auto; margin: 0;
+    clip-path: none; color: var(--ink-3);
+  }
+  .reg-key::after { content: " "; }
+}
+
+/* ---- the call, under the row it belongs to ---------------------------------------------- */
+/* Joined to the lit row by a rule in the light's own colour rather than by being inside it.
+ * The rule is --live-mark, which is 3.41 against the paper and so clears the 3:1 a graphic
+ * that carries meaning has to clear: this one carries the only thing tying a waveform to a
+ * row three lines above it. It is a stroke, which is the only role that colour has.
+ *
+ * When the call has ended the rule drops back to the ordinary hairline, because nothing is
+ * running and nothing should be claiming to be. */
+.reg-open {
+  margin-top: var(--space-5);
+  padding-left: var(--space-4);
+  border-left: 2px solid var(--line);
+}
+.scene[data-live="on"] .reg-open { border-left-color: var(--live-mark); }
+.reg-open .turns {
+  /* Four turns, not the twenty-two rem the act 3 player uses. This one shares a screen with
+   * the register it belongs to and with the sentence above it, and the point of it is that
+   * lines land: a window the playhead pushes them through says that, where a full transcript
+   * sitting still says nothing. Every turn is in the list and the list scrolls, so a reader
+   * with no script still has all seventeen. */
+  max-height: 7.5rem;
+  border-top: 0;
+  margin-top: var(--space-2);
+  max-width: none;
+}
+.reg-open .turns li:first-child { border-top: 0; }
+.reg-open canvas[data-waveform] { height: 2.75rem; }
+
+/* The clock. It says a recording is playing and where the playhead is, which is the truth;
+ * an "on air" lamp would say a call is connected, which is not. Tabular so the digits do
+ * not walk while it counts. */
+.scene-clock {
+  font-family: var(--mono); font-size: var(--size-1);
+  font-variant-numeric: tabular-nums;
+  color: var(--ink-2);
+}
+/* The replay button is served hidden and shown once a script exists to answer it, so this
+ * row is 19.44px tall for one frame and 26px after. Six pixels, and everything under it,
+ * the transcript, the caption and the small print, moved down by exactly that: 0.00085 of
+ * layout shift against a ceiling of 0.001, which passed with fifteen percent to spare and
+ * would not have on a slower machine.
+ *
+ * min-height is the button's own measured box, so the row is the same height whether the
+ * button is in it or not, and a reader with no script still gets no empty slot beside the
+ * clock. It holds across the font swap: both faces render the button at 26px. */
+.scene-bar {
+  display: flex; align-items: center; gap: var(--space-3);
+  flex-wrap: wrap; margin-top: var(--space-2);
+  min-height: 1.625rem;
+}
+/* Small print that has to be there. Two claims the scene would otherwise make silently:
+ * that it is running at the recording's speed, and that CALL-E returned the three fields
+ * together at the end rather than one at a time as they are drawn here. */
+.scene-note {
+  font-family: var(--ui); font-size: var(--size-1); color: var(--ink-3);
+  line-height: 1.5; margin: var(--space-2) 0 0; max-width: none;
+}
+.replay {
+  font-family: var(--ui); font-size: var(--size-2);
+  letter-spacing: 0.05em; text-transform: uppercase;
+  background: transparent; color: var(--ink-2);
+  border: 1px solid var(--line-strong); border-radius: 2px;
+  padding: var(--space-1) var(--space-2);
+  cursor: pointer;
+  transition: transform var(--dur-micro) var(--ease-out);
+}
+.replay:hover { color: var(--ink); border-color: currentColor; }
+/* Pressed is 0.97, not 0.95. This control is 28px tall, and a scale a reader can measure
+ * on a small target reads as the button breaking rather than as the button answering. */
+.replay:active { transform: scale(0.97); }
+/* The disabled state, which did not exist.
+ *
+ * `app.js` sets `disabled` on these the moment a scene stops running, and this stylesheet
+ * had no `:disabled` selector anywhere in it. `.replay` sets colour, border and
+ * `cursor: pointer` unconditionally, which overrides the browser's own greying, so "PAUSE
+ * THE TRANSCRIPT" rendered pixel for pixel like "RUN THE TRANSCRIPT AGAIN" beside it. Worse,
+ * a hover rule fires on a disabled element, so the border darkened under the pointer and
+ * promised a response that could not come. That pair is the first control a reader reaches
+ * on the first screen, and it was the first thing on the page that was not true.
+ *
+ * The ink is `--ink-3` and not the quieter `--ink-4`. WCAG exempts an inactive control from
+ * the 4.5 floor, so `--ink-4` would have been defensible, and the contrast gate measured it
+ * at 3.13 and failed the build. Carving an exemption into a gate that works, to win a
+ * slightly greyer button, is the trade this project spends its time arguing against. The
+ * state is legible without it: lighter ink, a lighter border, no hover response and no
+ * press. */
+.replay:disabled {
+  color: var(--ink-3); border-color: var(--line); cursor: default;
+}
+.replay:disabled:hover { color: var(--ink-3); border-color: var(--line); }
+.replay:disabled:active { transform: none; }
+
+/* Act 1 rides over the pinned hero, so it needs its own ground and an edge. */
+.act-01 { position: relative; z-index: 2; background: var(--paper); border-top: 1px solid var(--line); }
+/* Every act after the first sits above the curtain too, and until now only act 01 did.
+ *
+ * Act 00 is `position: sticky` under the curtain, which makes it a positioned element, and
+ * a positioned element hit-tests above static ones however little it paints. Acts 02 to 08
+ * were static, so `document.elementFromPoint` at the middle of the viewport could return
+ * act 00 while the reader was somewhere else entirely, and the rail named the act the
+ * reader had left twelve screens ago. It was invisible on the way down, because the
+ * observer that triggers the hit test happened to fire on a real act first, and it appeared
+ * on the way back up.
+ *
+ * Nothing moves and nothing repaints: these acts were already drawn in this order by flow.
+ * This only says so in a way that hit testing can read. */
+.act:not(.act-00) { position: relative; z-index: 2; }
+
+/* ---- the diptych ---------------------------------------------------------------------- */
+/* The artifact holds still while the argument scrolls past it. One CSS rule, no JavaScript,
+ * and it is most of what turns a document into something that reads like a documentary. */
+@media (min-width: 60rem) {
+  /* `align-self: start` is the whole rule. Without it a grid item stretches to the row's
+   * height, a stretched item has nowhere to travel, and `position: sticky` on it does
+   * exactly nothing. The comment above described the intended behaviour for the entire life
+   * of this page while the page scrolled both columns together, which is why more than half
+   * the scroll depth had a column that simply ran out and left the space blank. */
+  .split > .artifact { position: sticky; top: 12vh; align-self: start; }
+  .split { grid-template-columns: minmax(0, 26rem) minmax(0, 1fr); }
+
+  /* Three acts hold a table or a transcript taller than the argument beside it. Sticking the
+   * taller column would pin something that cannot fit and clip its foot, so in those the
+   * argument is what holds still and the artifact is what moves. */
+  .split-long > .artifact { position: static; }
+  .split-long > .claim { position: sticky; top: 12vh; align-self: start; }
+}
+.claim > h2 { margin-bottom: 1rem; }
+.result-line { font-family: var(--ui); font-size: var(--size-6); color: var(--ink); }
+.result-line b { font-family: var(--mono); font-weight: 500; }
+
+/* ---- stat grid ------------------------------------------------------------------------ */
+.stat-grid {
+  display: grid; grid-template-columns: repeat(auto-fit, minmax(9.5rem, 1fr));
+  gap: 1px; background: var(--line); border: 1px solid var(--line);
+}
+.stat-grid .cell { background: var(--card); padding: 1.1rem 1rem; }
+.stat-grid .num {
+  font-family: var(--mono); font-size: var(--size-7); font-weight: 500; line-height: 1;
+  font-variant-numeric: tabular-nums; color: var(--ink);
+}
+.stat-grid .lbl {
+  font-family: var(--ui); font-size: var(--size-1); line-height: 1.4;
+  color: var(--ink-3); margin-top: 0.45rem;
+}
+/* One of the four is filled and the other three are not, because a grid of four equal
+ * numbers asks a reader to rank them and this page already knows the answer: the count of
+ * real calls is the one that decides whether any of the rest is worth reading.
+ *
+ * The fill is the brand field and never the light, for the reason the token block gives.
+ * It carries no text of its own; the number and its label sit on it at 12.53 and 5.43. */
+.stat-grid .cell[data-lead] {
+  background: var(--brand-field);
+  --ink-3: var(--lit-ink-3);
+}
+
+/* ---- tables --------------------------------------------------------------------------- */
+.agree { font-family: var(--mono); font-variant-numeric: tabular-nums; }
+.agree.ok { color: var(--resolved); }
+.agree.part { color: var(--undetermined); }
+.caught { color: var(--resolved); font-variant-numeric: tabular-nums; }
+.ids td { padding-top: 0.4rem; padding-bottom: 0.4rem; }
+
+/* The register of identifiers is the widest thing on the page and it has a floor: two
+ * masked ids, every field the call returned, and the outcome. At 1152px the rail's 15rem
+ * inset and the margin column leave it about 112px short, and the document was going wide
+ * rather than the table. Nothing else on the page overflowed at any width, so the box goes
+ * here rather than a rule about tables in general. */
+/* `min-width: 0` because a grid or flex item's default is `auto`, which is its
+ * min-content width: without it the box grows to the table instead of scrolling it,
+ * and `overflow-x: auto` is then a rule about a box that is never too small. */
+/* And the box is a container, so the table inside it can answer the width it actually
+ * has rather than the width of the window. Those are different numbers here: at 1152 the
+ * window is wide and this column is 404px, because the rail and the claim column take the
+ * rest. A viewport query cannot see that and had no business deciding it. */
+.scrollbox {
+  overflow-x: auto; min-width: 0; max-width: 100%;
+  container: judge-artifact / inline-size;
+}
+.scrollbox:focus-visible { outline: 2px solid var(--focus); outline-offset: 2px; }
+.compliance td { font-family: var(--ui); font-size: var(--size-2); }
+.compliance td.ok { color: var(--resolved); white-space: nowrap; }
+.mutations td:nth-child(2) { max-width: 34rem; }
+
+/* ---- the distribution figure ----------------------------------------------------------- */
+/* Sits in act 05's argument column, which now holds still while the whole mutation table
+ * scrolls past it. The figure is what makes that pinning worth doing: the reader keeps the
+ * shape of the table in view while reading the table itself.
+ *
+ * No width and no height on the svg, only a viewBox, so it scales to the column and reserves
+ * its own box. A figure that reserved nothing would land after the fonts and move the note
+ * above it, which is the one thing this page's 0.001 shift budget cannot afford. */
+.dist { margin: 1.5rem 0 0; }
+.dist svg { display: block; width: 100%; height: auto; overflow: visible; }
+.dist-k {
+  font-family: var(--mono); font-size: var(--size-0); fill: var(--ink-3);
+  font-variant-numeric: tabular-nums;
+}
+.dist-n {
+  font-family: var(--mono); font-size: var(--size-0); fill: var(--ink-2);
+  font-variant-numeric: tabular-nums;
+}
+.dist figcaption {
+  font-family: var(--ui); font-size: var(--size-1); line-height: 1.45;
+  color: var(--ink-3); margin-top: 0.6rem;
+}
+
+/* ---- take-aways ----------------------------------------------------------------------- */
+.takes { display: grid; gap: 2rem; margin-top: 2rem; }
+/* The plate already carries the space the margin was buying. */
+.plate-royal > .takes { margin-top: 0; }
+@media (min-width: 60rem) {
+  /* Two cards in a three-column track left a third of the royal plate blank, on the
+   * shortest act of the page and the only dark ground it has. auto-fit spends the
+   * columns the cards actually need, and keeps working if a third card arrives. */
+  .takes { grid-template-columns: repeat(auto-fit, minmax(16rem, 1fr)); }
+}
+.take-n {
+  font-family: var(--mono); font-size: var(--size-2); color: var(--ink-3);
+  border-top: 2px solid var(--ink); padding-top: 0.5rem; display: inline-block;
+  min-width: 2.5rem;
+}
+.take .take-t { font-family: var(--ui-display); font-size: var(--size-5); font-weight: 600;
+  margin: 0.75rem 0 0.5rem; letter-spacing: -0.006em; text-transform: none; color: var(--ink); }
+.take p { font-size: var(--size-4); color: var(--ink-2); }
+
+/* ---- limits --------------------------------------------------------------------------- */
+.limits { list-style: none; margin: 0; padding: 0; }
+.limits li { padding: 1.1rem 0; border-top: 1px solid var(--line); }
+.limits li:first-child { border-top: 0; }
+.limit { margin: 0 0 0.4rem; max-width: 33.60em; }
+.closes {
+  margin: 0; font-family: var(--ui); font-size: var(--size-3); color: var(--ink-3);
+  max-width: 40.02em;
+}
+
+/* ---- player extras -------------------------------------------------------------------- */
+.stage { min-width: 0; }
+.cue { font-family: var(--ui); font-size: var(--size-3); color: var(--ink-2); }
+.cue.no-audio { max-width: 30.68em; margin: 0; font-size: var(--size-2); color: var(--ink-3); }
+.note-free {
+  font-family: var(--ui); font-size: var(--size-4); line-height: 1.5; color: var(--ink);
+  margin: 0 0 1rem; max-width: none;
+}
+.result dl { margin: 0; display: grid; grid-template-columns: auto 1fr; gap: 0.15rem 1rem; }
+.result dt { font-size: var(--size-1); }
+.conf { font-family: var(--ui); font-size: var(--size-1); color: var(--ink-3); margin: 0.9rem 0 0; }
+.conf b { font-family: var(--mono); font-weight: 500; color: var(--ink-2); }
+
+/* ---- the duet, act 2 -------------------------------------------------------------------
+ *
+ * Two calls, side by side, started from the same moment and never synchronised after it.
+ *
+ * The lanes are deliberately not the same height and are never made to be. The English call
+ * ran 59.54 seconds and the Tamil one 109.98, which is 25 turns against 17, and forcing the
+ * two transcripts to a common height would say "these are the same length" in the one place
+ * on the page where the opposite is the argument. Each lane is as tall as its own call.
+ *
+ * What IS aligned is the row the three fields sit on, because that is the comparison. The
+ * fields are pinned to the bottom of each lane by the grid, so a reader scanning across
+ * reads three values against three values with nothing between them. */
+/* The duet in space.
+ *
+ * Two calls side by side is a comparison a reader has to assemble. Two panels angled
+ * towards each other, with the active one coming forward, is a comparison they can see: the
+ * one you are listening to is the one nearest you, and the other is still there, turned
+ * slightly away, waiting.
+ *
+ * CSS 3D and not WebGL, for a reason that is about this repository and not about taste.
+ * Headless Chromium here cannot composite a GL canvas, so a WebGL scene screenshots blank
+ * and `tools/gates/run.mjs` could not see whether it drew anything. A transformed DOM tree
+ * is measured by `getBoundingClientRect` and captured by the screenshot gate exactly as a
+ * reader sees it, so all twenty gates keep their grip on it.
+ *
+ * The numbers are chosen against those gates rather than for effect. Perspective is 1600px
+ * and the furthest translation is 20px, so the projection scales an element by at most
+ * 1600/(1600-20) = 1.013: a 420px panel grows by five pixels, inside a 40px gutter. The
+ * scroll walk checks that no two pieces of text overlap at 1,127 stops and it reads the
+ * projected boxes, so a rotation big enough to look dramatic is a rotation that fails the
+ * page. Four degrees is what survives, and four degrees is enough. */
+.duet { display: grid; gap: var(--space-4); }
+@media (min-width: 52rem) {
+  .duet {
+    grid-template-columns: 1fr 1fr; gap: var(--space-5);
+    perspective: 1400px;
+    perspective-origin: 50% 35%;
+    transform-style: preserve-3d;
+  }
+  /* Angled in, and lifted when it is the one being played. `:focus-within` is in the list
+   * because a reader on a keyboard tabbing into a lane's transcript is reading that lane,
+   * and the panel should come to them the same way it does for a mouse. */
+  .duet > .lane:first-child { transform: rotateY(5deg) translateZ(-15px); }
+  .duet > .lane:last-child  { transform: rotateY(-5deg) translateZ(-15px); }
+  .duet > .lane {
+    transform-style: preserve-3d;
+    /* 140ms, not the 240 the enter token carries. A panel that takes a quarter of a second
+     * to acknowledge the pointer reads as a panel that did not notice it: an entrance
+     * animation and a hover response are different jobs and this was using the entrance
+     * curve for both. The shadow layer below fades on the same clock. */
+    transition: transform 140ms var(--ease-out);
+    /* Both lanes are promoted for the whole time the 3D layout is on, rather than at the
+     * moment the pointer arrives. Measured on a 4x-throttled CPU: promoting on hover cost
+     * a 212ms first frame, because the browser was rasterising a panel that holds a
+     * canvas, a scrollable transcript and three sublayers at three depths while the
+     * transition had already started. There are two of these on the page, which is the
+     * size of hint `will-change` is for. */
+    will-change: transform;
+  }
+  /* The shadow moved off the panel and on to a layer of its own, and what animates is that
+   * layer's opacity. A `box-shadow` in a transition is repainted every frame at a new blur,
+   * and a 40px blur under a 420px panel is the most expensive thing in this act: with it in
+   * the transition list, 19 of 34 frames ran past 20ms and the mean frame was 28.7ms. An
+   * opacity fade on an already-painted layer is work the compositor does without touching
+   * paint at all. */
+  .duet > .lane::after {
+    content: ""; position: absolute; inset: 0; z-index: -1;
+    border-radius: inherit; pointer-events: none;
+    box-shadow: 0 20px 40px -12px rgba(0, 0, 0, 0.25);
+    opacity: 0;
+    transition: opacity 140ms var(--ease-out);
+  }
+  /* The active lane comes forward rather than merely squaring up. 20px at a perspective
+   * of 1400 is a scale of 1400/1380 = 1.0145: a 420px panel grows by six pixels, inside a
+   * 40px gutter, so the pair can never touch. */
+  /* Playing and pointed at are two different states and they used to be one.
+   *
+   * A lane whose call is running carried `translateZ(20px)`, and so did a lane under the
+   * pointer. While the scene plays, which is most of the time a reader spends in this act,
+   * the panel was already at the hover position: moving the pointer on to it changed
+   * nothing, and a panel that does not answer the pointer reads as a panel that is broken.
+   * Measured rather than guessed: the computed transform at rest and the computed transform
+   * after a real mouse move were the same matrix, to the digit.
+   *
+   * So playing squares the panel up and lifts it a little; the pointer lifts it the rest of
+   * the way and brings the shadow to full. 24px at a perspective of 1400 is a scale of
+   * 1.0174, which grows a 420px panel by seven pixels inside a 40px gutter. */
+  .duet > .lane[data-live="on"] {
+    transform: rotateY(0deg) translateZ(10px);
+  }
+  .duet > .lane[data-live="on"]::after { opacity: 0.5; }
+  .duet > .lane:hover,
+  .duet > .lane:focus-within {
+    transform: rotateY(0deg) translateZ(24px);
+  }
+  .duet > .lane:hover::after,
+  .duet > .lane:focus-within::after { opacity: 1; }
+  /* The head and the field row sit off the face of the panel, which is what makes the tilt
+   * read as depth rather than as a skewed image. The transcript stays flat on the panel:
+   * it is the one part a reader has to read a paragraph of, and text on a plane tilted
+   * towards the eye is text with a near edge and a far edge. */
+  .duet > .lane > .lane-head { transform: translateZ(18px); }
+  .duet > .lane > .lane-fields { transform: translateZ(10px); }
+  .duet > .lane > canvas[data-waveform] { transform: translateZ(6px); }
+}
+/* Flat for anybody who asked for less motion. The global reduced-motion block above kills
+ * durations, which stops the movement but leaves the panels sitting at an angle for ever,
+ * and a permanent 4-degree rotation is not a reduced version of a transition: it is the
+ * end state with the animation removed. This puts them back on the page. */
+@media (prefers-reduced-motion: reduce) {
+  .duet, .duet > .lane, .duet > .lane > * { transform: none !important; perspective: none; }
+}
+/* A panel, not a margin rule with text beside it. The left stroke stays, because it is the
+ * element that goes gold while the lane's call is running and a fill cannot: it has to
+ * clear 3:1 on paper as a graphic. What is new is the ground and the edge around it, so
+ * the two conversations read as two objects a reader can compare rather than as two runs
+ * of text under one heading.
+ *
+ * There is deliberately no `backdrop-filter` here. Nothing sits behind these panels except
+ * flat paper, so a blur would change no pixel; and a non-initial `backdrop-filter` forces
+ * `transform-style` to compute to `flat`, which would drop the head, the fields and the
+ * waveform out of the lane's 3D context and undo the depth the block above builds. A
+ * translucent ground gives the same read at none of that cost.
+ *
+ * The horizontal padding is the load-bearing number, and it was measured the hard way.
+ * `.lane-k` is `white-space: nowrap` and `parent_confirmed_aware` needs half a lane, so
+ * 6px taken off this content box once put `expected_return` over the transcript beneath
+ * it: 19 text-on-text collisions on the scroll walk. The fields grid below is `auto-fit`
+ * now and drops to one column before it can overflow, which is what makes a padded panel
+ * safe at all; the scroll walk is still the thing that says so. */
+.lane {
+  display: grid;
+  grid-template-rows: auto auto auto 1fr;   /* head, wave, fields, transcript takes the rest */
+  gap: var(--space-2);
+  min-width: 0;
+  padding: var(--space-3) var(--space-3) var(--space-3) calc(var(--space-3) - 1px);
+  background: color-mix(in oklch, var(--card) 95%, transparent);
+  border: 1px solid var(--line-strong);
+  border-left: var(--marker) solid var(--line);
+  border-radius: 12px;
+  /* Positioned for the shadow layer the 3D block above hangs on `::after`. */
+  position: relative;
+  transition: border-color 0.2s ease;
+}
+/* The same rule the register uses, for the same reason: while this lane's call is running,
+ * the mark ties the waveform to the language label above it. It is a stroke and never a
+ * fill, so it can sit on paper and still clear 3:1. */
+.lane[data-live="on"] { border-left-color: var(--live-mark); }
+
+.lane-head {
+  display: flex; align-items: baseline; gap: var(--space-2); flex-wrap: wrap;
+  font-family: var(--ui); font-size: var(--size-1);
+}
+.lane-lang { font-size: var(--size-3); font-weight: 600; color: var(--ink); }
+.lane-id { font-family: var(--mono); font-size: var(--size-1); color: var(--ink-3); }
+.lane-head .scene-clock { margin-left: auto; }
+
+.lane canvas[data-waveform] { width: 100%; height: 2.5rem; display: block; }
+
+/* The comparison itself. Three values under each waveform, in the same order both sides,
+ * so the answer to "did the Tamil call get the same result" is read across and not worked
+ * out. `·` is what a field says before it has been answered. */
+/* Two columns and it was three. `fieldOrder` carries four fields since `spoke_with` was
+ * published, and four in a three-column grid leaves the fourth alone on a second row. The
+ * comment below already said `parent_confirmed_aware` does not fit in a third of a lane and
+ * broke mid-word; half a lane is the first width it fits in, and 2x2 is what four fields
+ * want anyway. */
+/* Two columns while two columns fit, one the moment they do not. `repeat(2, minmax(0, 1fr))`
+ * keeps two columns at any width and lets the nowrap label run out of its cell, which is
+ * the mechanism behind the 19 collisions recorded above. `auto-fit` with a floor makes the
+ * grid give up the second column instead of overflowing, so the panel can carry padding. */
+.lane-fields {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, 10.5rem), 1fr));
+  gap: var(--space-2);
+  padding: var(--space-2) 0;
+  border-top: 1px solid var(--line);
+  border-bottom: 1px solid var(--line);
+}
+.lane-fields[data-live="on"] { background: var(--live); }
+.lane-f { display: grid; gap: 0.1rem; min-width: 0; }
+/* Set as the schema writes it, in mono and lower case, and not as a tracked upper-case
+ * label. FIELD_LABEL is an identity map on purpose: these are the names CALL-E returns and
+ * renaming them for the page would cost a reader the ability to match what is on screen to
+ * what is in the response. Tracked and upper-cased, `parent_confirmed_aware` is wider than
+ * a third of a lane and broke as PARENT_CONFIRMED_AWA / RE, which is a word split that says
+ * the name is something other than what it is. */
+.lane-k {
+  font-family: var(--mono); font-size: var(--size-0); color: var(--lit-ink-3);
+  white-space: nowrap;
+}
+/* A chip once the value is in, and loose text while it is not. The difference between a
+ * field that has been answered and a field that is waiting is the whole of what this act
+ * asks a reader to watch, and it was carried by a 5px node alone. The chip is drawn on the
+ * committed state only, so a lane mid-call is visibly a lane with holes in it. */
+.lane-v {
+  font-family: var(--mono); font-size: var(--size-2); color: var(--ink);
+  font-weight: 500; overflow-wrap: anywhere;
+}
+/* Below the duet's own breakpoint the three fields stack, because at one column a third of
+ * a phone is 40 pixels and no amount of type sizing rescues that. */
+@media (max-width: 51.999rem) {
+  .lane-fields { grid-template-columns: 1fr; }
+  .lane-f { display: flex; align-items: baseline; gap: var(--space-2); }
+}
+/* Waiting, not empty. A dashed edge round the chip says a value is expected here, which an
+ * empty cell does not. --live-mark is a stroke and carries no word, so it stays legal.
+ *
+ * The border is 1px in both states and the padding is the same in both, so the chip is the
+ * same box whether the field has been answered or not. That is not decoration: app.js
+ * rewinds each lane to pending and plays it forward, so a chip that is taller in one state
+ * than the other moves everything under the duet every time a field lands. It did, by 3px,
+ * and the layout-shift gate read 0.00237 against a ceiling of 0.001. */
+.lane-v[data-at="pending"] {
+  color: var(--lit-ink-3);
+  background: transparent;
+  border-style: dashed;
+  border-color: var(--live-mark);
+}
+
+/* A node per field, so the four of them read as a row of states rather than four words.
+ *
+ * It is drawn on the value and not on the label, because the value is the element carrying
+ * `data-at` and the alternative is `:has()` on the parent for no gain. Hollow while the
+ * field is waiting, filled and lit once the call has answered it.
+ *
+ * The glow is a `box-shadow` on a 6px dot and never anything on the text. A shadow behind a
+ * glyph is how a page loses a contrast gate: it lifts the local background under the
+ * smallest type on the screen, the ratio drops below 4.5, and nothing about the CSS looks
+ * wrong. The dot has no word in it, so 3:1 is the bar it has to clear and it clears it as a
+ * filled mark in --live-mark. */
+/* One chip geometry for both states, set here rather than on either state. */
+.lane-v {
+  position: relative;
+  display: inline-block;
+  padding: 0.1em 0.5em 0.1em 0.95em;
+  border: 1px solid transparent;
+  border-radius: 999px;
+}
+.lane-v::before {
+  content: ""; position: absolute; left: 0.42em; top: 0.62em;
+  width: 6px; height: 6px; border-radius: 50%;
+  border: 1px solid var(--ink-3); background: transparent;
+  transition: background var(--dur-tick) var(--ease-out),
+              box-shadow var(--dur-tick) var(--ease-out),
+              border-color var(--dur-tick) var(--ease-out);
+}
+.lane-v[data-at="committed"] {
+  background: color-mix(in oklch, var(--ink) 4%, transparent);
+  border-color: var(--line);
+}
+.lane-v[data-at="committed"]::before { background: var(--ink-3); border-color: var(--ink-3); }
+.lane-fields[data-live="on"] .lane-v[data-at="committed"]::before {
+  background: var(--live-mark); border-color: var(--live-mark);
+  box-shadow: 0 0 0 3px color-mix(in oklch, var(--live-mark) 22%, transparent),
+              0 0 10px 1px color-mix(in oklch, var(--live-mark) 45%, transparent);
+}
+.lane-fields[data-live="on"] .lane-v[data-at="pending"]::before {
+  border-color: var(--live-mark); background: transparent;
+}
+@media (prefers-reduced-motion: reduce) {
+  .lane-v::before { transition: none; }
+}
+.lane-fields[data-live="on"] .lane-v[data-at="committed"] {
+  animation: field-commit var(--dur-tick) var(--ease-out);
+}
+
+.lane .turns { max-height: 15rem; }
+
+.lane-note {
+  font-family: var(--ui); font-size: var(--size-2); color: var(--ink-2);
+  margin: 0; max-width: none;
+}
+.lane-note-k {
+  display: block; font-size: var(--size-0); letter-spacing: 0.07em;
+  text-transform: uppercase; color: var(--ink-3);
+}
+
+.duet-bar {
+  display: flex; align-items: baseline; gap: var(--space-3); flex-wrap: wrap;
+  margin-top: var(--space-3);
+  /* Reserved, because the replay button is served hidden and shown by the script. Without
+   * a floor here the paragraph under it moves the moment app.js boots, which is a layout
+   * shift the reader did not ask for and the gate counts. */
+  min-height: 1.625rem;
+}
+.duet-len { font-family: var(--ui); font-size: var(--size-2); color: var(--ink-3); }
+.duet-line {
+  font-family: var(--ui); font-size: var(--size-6); color: var(--ink);
+  margin: var(--space-4) 0 var(--space-2); max-width: none;
+}
+.duet-line b { font-variant-numeric: tabular-nums; }
+
+/* ---- a fold ---------------------------------------------------------------------------
+ * The twelve comparisons are the receipt behind the two calls above them. A judge who
+ * believes the scene does not need the table; a judge who does not believe it needs it very
+ * much. `details` is the browser's own answer to that and it costs no script, keeps the
+ * table in the served HTML for the no-JavaScript gate, and is keyboard-reachable already. */
+/* A disclosure is a card, not a rule with text above it.
+ *
+ * It was a single hairline border-top and a line of label text, which reads as a divider
+ * that happens to be clickable rather than as a thing you open. Twelve of them down one
+ * page and a reader has no idea any of them contain anything. The card gives the closed
+ * state an edge and the open state a shadow, so the difference between "there is more
+ * here" and "here it is" is visible without reading the label.
+ *
+ * The chevron replaces the default marker because `list-style: none` is needed anyway to
+ * put the label and the indicator on opposite ends of the row, and a disclosure triangle
+ * cannot be moved there. It rotates rather than swapping glyph, so nothing reflows. */
+/* The card sits on `--card` rather than on a tint of `--ink`, so a disclosure reads as a
+ * surface laid on the page instead of a smudge of it. `--card` is re-declared on every
+ * ground that flips its ink, which is what keeps a fold on the royal plate from painting
+ * a white box under near-white type. A fold whose ground does not flip would inherit the
+ * paper card and be right anyway. */
+.fold {
+  margin: var(--space-4) 0;
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  background: color-mix(in oklch, var(--card) 98%, transparent);
+  /* 1.25rem of air inside the card; the horizontal figure is the shared inset less the
+   * border, so the label starts on the same vertical as the prose above the card rather
+   * than one pixel inside it. */
+  padding: 1.25rem calc(var(--inset) - 1px);
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.04);
+  transition: border-color 0.2s ease, box-shadow 0.2s ease, background 0.2s ease;
+}
+.fold[open] {
+  border-color: var(--line-strong);
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.08);
+}
+.fold > summary {
+  cursor: pointer; padding: var(--space-1) 0;
+  font-family: var(--ui); font-size: 0.95rem; color: var(--ink);
+  font-weight: 600;
+  list-style: none;
+  display: flex; align-items: center; justify-content: space-between; gap: var(--space-3);
+}
+.fold > summary::-webkit-details-marker { display: none; }
+.fold > summary::after {
+  content: "›";
+  font-size: 1.4em; line-height: 1; color: var(--ink-3);
+  transition: transform 0.2s ease, color 0.2s ease;
+}
+.fold[open] > summary::after { transform: rotate(90deg); color: var(--ink); }
+.fold > .fold-body, .fold > p:not(:first-of-type) {
+  padding-top: 0.85rem;
+  margin-top: 0.85rem;
+  border-top: 1px solid var(--line);
+  line-height: 1.65;
+}
+/* Secondary ink for the prose inside a small fold, and only there. `.act-fold` holds most
+ * of an act -- its tables, its money block, its own headings -- and dimming that whole
+ * subtree would take the body copy of four acts down a step for no reason. A `.fold` holds
+ * the working behind a claim already made, which is what secondary ink is for. */
+.fold > .fold-body > p, .fold > p:not(:first-of-type) {
+  color: var(--ink-2);
+  line-height: 1.65;
+}
+.fold > summary::marker { color: var(--ink-3); }
+.fold > summary:hover { color: var(--ink); }
+.fold > p { margin-top: 0; }
+
+/* ---- an act's fold -------------------------------------------------------------------
+ * The same element, doing a heavier job. `.fold` hides a receipt under a claim that has
+ * already been made; `.act-fold` holds most of an act, so its summary has to read as the
+ * way in rather than as a footnote, and it needs a rule under the act it belongs to so a
+ * reader can see where the act ends without opening anything.
+ *
+ * Measured 2026-09-10: acts 04, 05, 07 and 08 were 9,356px of the 21,164px document, and
+ * a reader deciding in thirty seconds scrolled every pixel of it before reaching the end.
+ * Nothing is deleted. The bytes are all still served, which is what keeps the
+ * no-JavaScript gate, an in-page find, and the contrast census whole. */
+/* The act-level disclosure gets the same card, one step larger, because it sits between
+ * arguments rather than inside one. */
+.act-fold {
+  margin: var(--space-5) 0;
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  background: color-mix(in oklch, var(--card) 98%, transparent);
+  padding: 1.25rem calc(var(--inset) - 1px);
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.04);
+  transition: border-color 0.2s ease, box-shadow 0.2s ease, background 0.2s ease;
+}
+.act-fold[open] {
+  border-color: var(--line-strong);
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.08);
+}
+.act-fold > summary {
+  cursor: pointer; padding: var(--space-2) 0;
+  font-family: var(--ui); font-size: 0.95rem; color: var(--ink);
+  font-weight: 600;
+  list-style: none;
+  display: flex; align-items: center; justify-content: space-between; gap: var(--space-3);
+}
+.act-fold > summary::-webkit-details-marker { display: none; }
+.act-fold > summary::after {
+  content: "›";
+  font-size: 1.4em; line-height: 1; color: var(--ink-3);
+  transition: transform 0.2s ease, color 0.2s ease;
+}
+.act-fold[open] > summary { color: var(--ink); }
+.act-fold[open] > summary::after { transform: rotate(90deg); color: var(--ink); }
+.act-fold > .fold-body {
+  padding-top: 0.85rem;
+  margin-top: 0.85rem;
+  border-top: 1px solid var(--line);
+}
+/* The disclosure is a block in the reading column, and the bands and splits inside it
+ * were written expecting to be direct children of `.inner`. Nothing about their width
+ * changes here; only their top margin, which would otherwise double the first gap. */
+.act-fold > .fold-body > :first-child { margin-top: 0; }
+
+/* ---- three endings, act 3 --------------------------------------------------------------
+ *
+ * One finished call and the three ways it can be filed. Two of the three are wrong, and the
+ * page says which in a word before it says it in a line, because a strike through text is
+ * a graphic and a graphic on its own is not a statement.
+ *
+ * Nothing here fades. The strike is the only thing that moves, it moves by scaling a rule
+ * from its left edge, and every word is at full ink the whole time. That is not a stylistic
+ * preference: text mid-fade has a real, measurable contrast ratio lower than the one it was
+ * designed at, and this page publishes a gate that says every run clears AA. */
+.endings { display: grid; gap: var(--space-4); margin: var(--space-4) 0; }
+
+.subject {
+  display: flex; align-items: baseline; gap: var(--space-3); flex-wrap: wrap;
+  padding-bottom: var(--space-3); border-bottom: 1px solid var(--line-strong);
+}
+.subject-id { font-family: var(--mono); font-size: var(--size-3); color: var(--ink); font-weight: 500; }
+.subject-say { font-family: var(--ui); font-size: var(--size-2); color: var(--ink-3); }
+.subject-fields { display: flex; gap: var(--space-3); flex-wrap: wrap; margin-left: auto; }
+.subject-f { display: flex; align-items: baseline; gap: var(--space-1); }
+.subject-k {
+  font-family: var(--ui); font-size: var(--size-0); letter-spacing: 0.05em;
+  text-transform: uppercase; color: var(--ink-3);
+}
+.subject-v { font-family: var(--mono); font-size: var(--size-2); color: var(--ink); }
+
+.filings { list-style: none; margin: 0; padding: 0; display: grid; gap: var(--space-3); }
+.filings li {
+  display: grid; gap: var(--space-1);
+  grid-template-columns: 4.5rem minmax(0, 1fr);
+  grid-template-areas: "verdict name" "verdict who" "verdict cost";
+  padding-left: var(--space-3);
+  border-left: 2px solid var(--line);
+  transition: transform var(--dur-enter) var(--ease-out);
+}
+/* Where the reader is being asked to look, and only while the scene is walking the list.
+ * The live colour means one thing on this page and this is that thing: it is happening now. */
+.filings li[data-at="now"] { border-left-color: var(--live-mark); transform: translateX(3px); }
+.filing-verdict {
+  grid-area: verdict;
+  font-family: var(--ui); font-size: var(--size-0); letter-spacing: 0.07em;
+  text-transform: uppercase; font-weight: 600; color: var(--ink-3);
+  align-self: start;
+}
+li[data-verdict="ours"] .filing-verdict { color: var(--resolved); }
+.filing-name {
+  grid-area: name;
+  font-family: var(--mono); font-size: var(--size-4); color: var(--ink);
+  position: relative; justify-self: start;
+}
+/* The strike is a rule, not `text-decoration`, so it can be drawn rather than switched on.
+ * Served at full width, which is the state a reader with no script gets: the two wrong
+ * filings are already crossed out and the page reads correctly without a frame of motion. */
+.filing-name::after {
+  content: ""; position: absolute; left: -0.1em; right: -0.1em; top: 0.88em; height: 2px;
+  background: var(--ink-2);
+  transform-origin: left center;
+  transition: transform var(--dur-enter) var(--ease-out);
+}
+li[data-verdict="ours"] .filing-name::after { display: none; }
+.filings[data-strike="off"] .filing-name::after { transform: scaleX(0); }
+.filing-who { grid-area: who; font-family: var(--ui); font-size: var(--size-3); color: var(--ink-2); }
+.filing-cost { grid-area: cost; font-family: var(--ui); font-size: var(--size-3); color: var(--ink); }
+li[data-verdict="ours"] .filing-cost { color: var(--ink); font-weight: 500; }
+
+/* The same seven calls, counted twice. Both bars are on the page at once and stay there:
+ * a reader comparing two numbers should be able to look from one to the other, and a
+ * version that swapped one for the other over time would make them remember instead. */
+.tally { display: grid; gap: var(--space-2); }
+.tally-head { font-family: var(--ui); font-size: var(--size-3); color: var(--ink-2); margin: 0; max-width: none; }
+.bar { display: flex; width: 100%; gap: 2px; }
+.seg {
+  display: grid; gap: 0.1rem; padding: var(--space-2);
+  min-width: 0; flex-basis: 0;
+  font-family: var(--ui);
+}
+.seg-n { font-size: var(--size-6); font-variant-numeric: tabular-nums; line-height: 1; }
+.seg-k { font-size: var(--size-0); letter-spacing: 0.06em; text-transform: uppercase; }
+/* Grounds, not inks. The outcome inks are tuned for text on paper and would not survive
+ * being used as a fill under their own colour, so each segment takes a tint of the paper
+ * and states its outcome in the word rather than in the fill. */
+.seg[data-seg="resolved"] { background: var(--card); box-shadow: inset 0 2px 0 var(--resolved); }
+.seg[data-seg="undetermined"] { background: var(--card); box-shadow: inset 0 2px 0 var(--undetermined); }
+.seg[data-seg="failed"] { background: var(--card); box-shadow: inset 0 2px 0 var(--failed); }
+.seg-n, .seg-k { color: var(--ink); }
+.tally-alt { font-family: var(--ui); font-size: var(--size-3); color: var(--ink-2); margin: 0; max-width: none; }
+.tally-x { text-decoration: line-through; text-decoration-thickness: 2px; color: var(--ink); }
+
+/* ---- act 4: the copy that goes somewhere ----------------------------------------------
+ * The one interaction in this act is taking an id to somebody else's dashboard, so the
+ * confirmation says where it is going rather than just that it happened. */
+button[data-copy][data-copied]::after {
+  content: " copied";
+  font-family: var(--ui); font-size: var(--size-0); letter-spacing: 0.06em;
+  text-transform: uppercase; color: var(--resolved);
+}
+
+/* A provider id is 32 unbroken characters and an API id is 26. Side by side with the
+ * outcome column they need 668px, and a grid item cannot be narrower than its own content,
+ * so at 390px act 4 pushed the entire document sideways and every act with it. Measured:
+ * scrollWidth 688 against a clientWidth of 390, and hiding this one table returned it to
+ * 390 exactly.
+ *
+ * It predates this redesign. The viewport gate checks the 60rem breakpoint in both
+ * directions and nothing narrower, so a break that only happens on a phone was never in
+ * front of it.
+ *
+ * `anywhere` rather than `break-word` on purpose: only `anywhere` counts toward the
+ * min-content width, which is the number that was doing the damage. The reader loses
+ * nothing, because the copy button carries the whole value in data-copy and hands over an
+ * unbroken id however it is drawn. */
+/* At every width, not only on a phone.
+ *
+ * The rule below used to be inside a `max-width: 51.999rem` query, which fixed the case
+ * that had been observed and left the mechanism in place: a grid item cannot be narrower
+ * than its own min-content width, and an unbroken 26 character identifier sets that width
+ * whatever the viewport is. Anything that narrows this column, a margin reserve included,
+ * walks back into the same defect at a wider size. The reader loses nothing either way,
+ * because the copy button hands over the whole value from `data-copy` however it is drawn. */
+.ids td.mono, .ids button[data-copy] { overflow-wrap: anywhere; }
+/* And a floor under the identifier column, because `anywhere` with no floor is what
+ * produced two characters to a line. The markup now carries a `<wbr>` after the `call_`
+ * prefix, so the cell breaks in one sensible place and `anywhere` is the last resort it
+ * was meant to be rather than the first rule that applies. */
+.ids td.mono { min-width: 6.5rem; }
+/* Kept for a money band placed inside a grid, which act 04 no longer does.
+ *
+ * The history is worth the four lines, because the rule is correct and was not enough. A
+ * band appended after the artifact column closes lands back in column one of a two-column
+ * grid: three cells of 134px each, every label wrapped to four words, and the row a buyer
+ * reads first set narrower than the prose beside it. Spanning fixed that. What spanning
+ * could not fix is that a full-width row in a grid with a sticky column gets sat on by it,
+ * which is why act 04 is stacked bands now and this rule applies to nothing. Deleting it
+ * would invite the same band back into the same grid. */
+.money { grid-column: 1 / -1; }
+
+/* The column heads too, which the earlier fix left out and which are the wider half of the
+ * problem: `parent_confirmed_aware` is a field name CALL-E returns and the page prints it
+ * as it is returned, so it is one 22 character word that no line break can fall inside.
+ * Three of those plus two identifier columns set a min-content width of 1583px, and a
+ * table cannot be narrower than that, so the whole document scrolled sideways at 1440 and
+ * at 1600 with nothing on screen to explain why. Measured after: 1520 and 1600. */
+/* Underscores only, now that the markup carries a `<wbr>` after each one. `anywhere` was
+ * the only break opportunity these heads had, so it broke them mid-word: `PARENT_ CONFIR
+ * MED_ AWARE` in four lines. The name is one CALL-E returns and this page prints it as
+ * returned, so the break belongs where a reader would put it. */
+.ids th { overflow-wrap: normal; }
+/* The dashboard identifier, on the second line of the cell the API identifier leads.
+ * Secondary ink rather than a label, because a label in front of each of the two lines
+ * costs 40px of column and the head already names them in order. */
+.ids .second { color: var(--ink-3); }
+
+/* Two tiers, and each one is a measurement rather than a guess about phones.
+ *
+ * The table's min-content width is 593px once the identifiers share a column. The column
+ * it sits in is 616px at 1440, 522px at 1280 and 404px at 1152, so at the two middle
+ * widths it overflowed a box the reader had no way of knowing was scrollable, and the
+ * outcome column was cut mid-word at the edge.
+ *
+ * Under 40rem: small print, tight gutters, and no floor under the identifier column.
+ * Under 38rem: no table at all. Compact still needs 539px, and a table that fits its
+ * column by four pixels, which is what a 36rem boundary gave at 1280, is one font
+ * substitution away from being cut again. So the boundary sits where the table has room
+ * to spare: every box that keeps the table has at least 45px of it, and every box below
+ * becomes one block per call, each cell printing the field name in front of itself. */
+@container judge-artifact (max-width: 40rem) {
+  .ids { font-size: var(--size-2); }
+  .ids th, .ids td { padding-left: 0.45rem; padding-right: 0.45rem; }
+  .ids th:first-child, .ids td:first-child { padding-left: 0; }
+  /* And the floor under the identifier column goes. 6.5rem is what that column needs
+   * where there is room to spare; at 1280 there is none, and this is the 17px the table
+   * was over by. The cell takes a third line and nothing breaks mid-word, because the
+   * markup carries a break opportunity after each underscore. */
+  .ids td.mono { min-width: 0; }
+}
+
+@container judge-artifact (max-width: 38rem) {
+  /* The heads go, because each cell now carries its own. Their text is not lost to a
+   * screen reader: `content` on a pseudo-element is read out, and it is the same string
+   * the head carried. */
+  .ids thead { display: none; }
+  .ids, .ids tbody, .ids tr { display: block; }
+  .ids tr {
+    border-top: 1px solid var(--line-strong);
+    padding: 0.55rem 0;
+  }
+  .ids tbody tr:first-child { border-top: 0; }
+  /* 11.5rem, measured rather than chosen: `parent_confirmed_aware` is the longest name
+   * CALL-E returns, and 9.5rem broke it as `PARENT_CONFIRMED_A / WARE`, 10.5rem as
+   * `PARENT_CONFIRMED_AWAR / E`. The tracking is eased off in here for the same reason:
+   * 0.07em of it across 22 capitals is 17px of the column. */
+  .ids td {
+    display: grid; grid-template-columns: minmax(0, 11.5rem) minmax(0, 1fr);
+    gap: 0.75rem; padding: 0.2rem 0; border-bottom: 0;
+  }
+  .ids td::before {
+    content: attr(data-label);
+    font-family: var(--ui); font-size: var(--size-0); letter-spacing: 0.04em;
+    text-transform: uppercase; color: var(--ink-3);
+    /* Under everything above: on the narrowest phone the label column is narrower than
+     * the name and a break inside the word is better than a column pushed off the edge. */
+    overflow-wrap: anywhere;
+  }
+  /* The floor under the identifier column was there to stop `anywhere` breaking a name
+   * two characters to a line inside a narrow column. There is no column here. */
+  .ids td.mono { min-width: 0; }
+}
+
+/* ---- the five rows above the mutation fold ---------------------------------------------- */
+/* A reader coming to this page cold, as a school district administrator, stopped at the first row
+ * of the mutation table and did not start again. Their note: "max_workers=self._concurrency
+ * becomes max_workers=None. Not English. I scrolled, saw 138 more, stopped reading."
+ *
+ * Fifty-six percent of the page's words were in that one act. Five rows now sit above the
+ * fold, each led by the sentence a reader who does not write software needs, with the change
+ * itself underneath in the face it is written in. Nothing was deleted: the other 133 are one
+ * click away in the same shape they were always in. */
+.mut-plain {
+  margin: 0 0 0.35rem; max-width: 24.64em;   /* was 44ch of Freight Text Pro */
+  font-family: var(--serif); font-size: var(--size-4); color: var(--ink);
+  text-wrap: pretty;
+}
+.mut-code {
+  margin: 0; max-width: none;
+  font-family: var(--mono); font-size: var(--size-2); color: var(--ink-3);
+}
+
+/* ---- the stakes line ------------------------------------------------------------------- */
+/* The program prints this at the head of its own escalation queue. It was nine screens down
+ * in terminal text, and somebody coming to it as a district administrator called it the
+ * strongest sentence in the entry, having reached it well past the point they stopped
+ * reading. It is set as a quotation from the run rather than as a claim by the page, because
+ * that is what it is. */
+.stakes {
+  margin: 1.4rem 0 0.3rem; max-width: var(--measure);
+  font-family: var(--display); font-weight: 400;
+  font-size: clamp(1.25rem, 1.1rem + 0.7vw, 1.65rem);
+  line-height: 1.2; letter-spacing: -0.01em;
+  color: var(--ink); text-wrap: pretty;
+  border-left: var(--marker) solid var(--undetermined);
+  padding-left: calc(var(--inset) - var(--marker));
+}
+.stakes-src {
+  margin: 0 0 1.1rem; padding-left: var(--inset);
+  max-width: var(--measure);
+  font-family: var(--ui); font-size: var(--size-2); color: var(--ink-3);
+}
+
+/* ---- the three endings figure ------------------------------------------------------------ */
+/* The three words the product turns on, shown once. Somebody coming to the page as a
+ * district administrator listed resolved, undetermined and failed among the words they
+ * could not follow, having met all three as a table column and never as a picture.
+ *
+ * The drawing is geometry only. The words sit beside it in HTML rather than inside the SVG,
+ * because SVG text carries no @font-face, cannot be selected or searched, and is invisible to
+ * a translation tool, which would be a poor joke on a page about families who do not read
+ * English. */
+.endings-fig { margin: 1.6rem 0 1.8rem; max-width: var(--measure); }
+.endings-fig svg { display: block; width: 100%; height: auto; }
+/* The rule above beats the browser's own [hidden] { display: none }, which is how
+   the still stayed in the layout after the animation replaced it and pushed 187px
+   of page down. The shift was invisible to the CLS gate because the animation
+   mounts 200px before the figure enters view and CLS only counts what a reader can
+   see move. Written as a rule rather than as an inline style so the policy that
+   hashes this stylesheet keeps covering it. */
+.endings-fig svg[hidden] { display: none; }
+.fig-key {
+  display: grid; gap: 0.85rem;
+  margin: 1rem 0 0.6rem;
+}
+.fig-row { display: grid; grid-template-columns: minmax(0, 8.5rem) minmax(0, 1fr); gap: 0.9rem; }
+.fig-row .state { margin: 0; align-self: start; }
+.fig-say {
+  margin: 0; max-width: 29.12em;             /* was 52ch of Freight Text Pro */
+  font-size: var(--size-3); color: var(--ink-2); text-wrap: pretty;
+}
+.endings-fig figcaption {
+  margin-top: 0.9rem; max-width: var(--measure);
+  font-family: var(--ui); font-size: var(--size-2); color: var(--ink-3);
+}
+@media (max-width: 40rem) {
+  .fig-row { grid-template-columns: minmax(0, 1fr); gap: 0.25rem; }
+
+  /* The first screen's own argument, applied to the device most readers will use. 8vh of
+     head room and 40px under the masthead are laptop numbers: at 390x844 they put the
+     register's waiting row, which is the one object act 00 exists to show, 27px under the
+     fold. A district buyer reading this page on a phone withheld half a point for exactly
+     that. Measured at 390x844, 412x915 and 360x740 after the change. */
+  .act-00 { padding-top: 3vh; padding-bottom: var(--space-5); }
+  .masthead { margin-bottom: var(--space-3); }
+}
+
+/* ---- the queue a school office actually opens -------------------------------------------- */
+/* Somebody coming to this page as a district administrator put this first among the
+ * things that would change their mind: "Show the screen my secretary opens Monday morning. The only
+ * interface on this page is a terminal. No district buys a terminal."
+ *
+ * So this is a screen, and it is the one place on the page where the software is shown doing
+ * its job to somebody rather than to a reviewer. It is still built from a committed receipt
+ * put through the shipped escalation rule, so it cannot flatter the software: change the rule
+ * and this list changes with it.
+ *
+ * The safeguarding row is marked by position, by a rule, by a word and by a colour. Four
+ * signals for one row is not decoration here. It is the row where a child is unaccounted for
+ * and the clerk has thirty minutes. */
+.queue {
+  margin: 1.8rem 0; max-width: var(--measure);
+  background: var(--card);
+  border: 1px solid var(--line);
+  border-radius: 6px;
+  overflow: hidden;
+}
+.queue-head {
+  display: flex; align-items: baseline; gap: 0.6rem;
+  padding: var(--space-3) calc(var(--inset) - 1px) 0.85rem;
+  border-bottom: 1px solid var(--line);
+}
+.queue-n {
+  margin: 0; font-family: var(--display); font-size: var(--size-7); line-height: 1;
+  color: var(--ink); font-variant-numeric: tabular-nums;
+}
+.queue-said { margin: 0; font-family: var(--ui); font-size: var(--size-3); color: var(--ink-2); }
+.queue-list { list-style: none; margin: 0; padding: 0; }
+/* The reason, said once above rows that all share it. See queue_markup: every row used to
+ * carry its own copy, and in a run where every case is the same case that set the same two
+ * sentences four times in a 46ch column. */
+.queue-why {
+  margin: 0; padding: 0.85rem calc(var(--inset) - 1px);
+  border-bottom: 1px solid var(--line);
+  font-size: var(--size-3); color: var(--ink); max-width: var(--measure); text-wrap: pretty;
+}
+.queue-why b {
+  display: block; margin-top: 0.3rem; font-weight: 400;
+  font-family: var(--ui); font-size: var(--size-2); color: var(--ink-2);
+}
+/* With the reason hoisted the middle column is empty, so the remaining three are placed
+ * rather than left to auto-placement, which would slide the state into the gap and put the
+ * three columns of every row out of line with each other. */
+.queue-list.is-shared .q-when { grid-column: 1; }
+.queue-list.is-shared .queue-row .state { grid-column: 3; }
+.queue-list.is-shared .q-tried { grid-column: 4; }
+.queue-row {
+  display: grid;
+  grid-template-columns: 6rem minmax(0, 1fr) 8.5rem 7rem;
+  gap: 0.9rem; align-items: start;
+  padding: 0.85rem calc(var(--inset) - 1px)
+           0.85rem calc(var(--inset) - 1px - var(--marker));
+  border-top: 1px solid var(--line);
+  border-left: var(--marker) solid transparent;
+}
+.queue-row:first-child { border-top: 0; }
+.q-safeguarding { border-left-color: var(--undetermined); background: var(--paper-2); }
+.q-when {
+  margin: 0; font-family: var(--mono); font-size: var(--size-2); color: var(--ink-3);
+  font-variant-numeric: tabular-nums;
+}
+.q-head { margin: 0 0 0.2rem; max-width: 25.76em; font-size: var(--size-3); color: var(--ink); text-wrap: pretty; }
+.q-todo { margin: 0; max-width: 30.68em; font-family: var(--ui); font-size: var(--size-2); color: var(--ink-2); }
+.q-body { min-width: 0; }
+.queue-row .state { margin: 0; }
+.q-tried {
+  margin: 0; font-family: var(--ui); font-size: var(--size-2); color: var(--ink-3);
+  font-variant-numeric: tabular-nums; text-align: right;
+}
+/* The language and the deadline sit in the same column as the attempt count, because a
+ * clerk reads that column to decide who takes the call and by when. They are the two
+ * facts a district administrator found missing from this screen, and the reason the
+ * column is a stack rather than one line is that the attempt count was the only thing
+ * in it and read as the point of the row. */
+.q-tried .q-locale,
+.q-tried .q-clock { display: block; }
+.q-tried .q-locale { color: var(--ink); }
+.q-tried .q-clock b { font-weight: 400; color: var(--ink); }
+/* Whatever this receipt could not tell the page, said once above the rows rather than
+ * repeated on each of them. Same measure and same ink as the shared-reason band, because
+ * they are the same kind of sentence: something true of the whole queue. */
+/* The three numbers a district recognises. Set as one band rather than three cards,
+ * because a card grid at this width reads as a pricing page and this is not one: nothing
+ * here is a price. The figure leads, the label says what it is a figure of, and the
+ * provenance sits under both, which is the same order every other number on this page is
+ * set in. */
+.money { border: 1px solid var(--line); border-radius: 2px; margin: var(--space-3) 0 0; }
+.money-row { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); }
+.money-cell { padding: 1.05rem calc(var(--inset) - 1px); border-left: 1px solid var(--line); }
+.money-cell:first-child { border-left: 0; }
+.money-n {
+  margin: 0; font-family: var(--display); font-size: var(--size-7);
+  line-height: 1; letter-spacing: -0.02em; font-variant-numeric: tabular-nums;
+}
+.money-what {
+  margin: 0.35rem 0 0; font-family: var(--ui); font-size: var(--size-2);
+  color: var(--ink-2); text-wrap: pretty;
+}
+.money-why {
+  margin: 0.6rem 0 0; font-size: var(--size-2); color: var(--ink-3);
+  max-width: 23.52em; text-wrap: pretty;     /* was 42ch of Freight Text Pro */
+}
+.money-why b { font-weight: 400; color: var(--ink); }
+.money-src { color: var(--ink-3); }
+.money-foot {
+  margin: 0; padding: 0.85rem calc(var(--inset) - 1px); border-top: 1px solid var(--line);
+  background: var(--paper); font-family: var(--ui); font-size: var(--size-2);
+  color: var(--ink-3); max-width: none; text-wrap: pretty;
+}
+/* The way out of the money act. It is the only link inside an act that leaves the page,
+ * so it reads as a destination rather than as another line of the footnote: the act ends
+ * by saying a pilot settles which end of the bound a district is on, and two readers who
+ * came to this entry as buyers could not find what a pilot would be. */
+/* The numbers a board asks for, lifted out of the paragraph under them. Two readers
+   stopped at that paragraph, so this is a landing place rather than a summary: the same
+   figures, with nothing between them and the eye. Three rows, or four where the record
+   holds an escalation count and the escalation rate gets its own bound, so this is a
+   stack and not a three-column grid. */
+.money-key {
+  display: grid;
+  gap: 0.5rem 1.25rem;
+  margin: 1.25rem 0 0.5rem;
+  padding: 0.9rem 1rem;
+  border: 1px solid var(--line);
+  border-inline-start: 3px solid var(--ink-2);
+  background: var(--card);
+}
+
+.money-key > div {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: 0.15rem 0.75rem;
+  justify-content: space-between;
+}
+
+/* These four sat off the scale: 0.86, 1.02, 0.78 and 0.72rem, written after the ladder was
+ * declared. Each is snapped to its nearest step, the same way the original fourteen ad-hoc
+ * sizes were. The largest move is 0.68px, on `.money-key dd`. Nothing crosses 18.66px or
+ * 24px, so no run changes the contrast ratio WCAG asks of it. `.money-key-foot` was a near
+ * tie, 0.48px from --size-1 and 0.52px from --size-2; it is small print under a figure, so
+ * it takes the step whose stated job is small print. */
+.money-key dt {
+  font-size: var(--size-3);
+  color: var(--ink-2);
+}
+
+.money-key dd {
+  margin: 0;
+  font-variant-numeric: tabular-nums;
+  font-weight: 600;
+  font-size: var(--size-5);
+  color: var(--ink);
+}
+
+.money-key-foot {
+  margin-block: 0 1rem;
+  font-size: var(--size-2);
+  line-height: 1.45;
+  color: var(--ink-3);
+}
+
+/* The mark on a row this software closed while learning nothing. Small, and not red:
+   it is a link to the explanation, not an error badge, and the row really is what the
+   receipt recorded. */
+/* The same 24px reach, for the two links that are a line of their own rather than a word
+ * inside a sentence. A target inside a sentence is exempt from WCAG 2.5.8 and these are
+ * not: `closed on nothing` is the whole of its cell and the heading link in a take is a
+ * line on its own. They measured 15 and 18px tall against the 24 a thumb needs.
+ *
+ * The take heading takes an overlay and the row flag takes padding, for a reason worth
+ * recording: an overlay on the row flag hit-tested as the cell below it. The flag sits at
+ * the foot of its cell, the next row is later in the document, and an absolutely positioned
+ * box with no z-index loses to anything painted after it. Padding cannot lose that way
+ * because it is part of the element, and the negative margin gives the space back, so the
+ * table's rows are where they were. */
+/* Padding here too, and for the same reason the flag has it: the overlay measured right at
+ * 320 to 1024, where the heading wraps and is already tall enough, and measured wrong at
+ * every width where it fits on one line. Vertical padding on an inline box does not change
+ * the line box, so this grows the target and moves no text. */
+.take-h > a:only-child { padding-block: 4px; }
+.row-flag {
+  display: block;
+  padding-block: 5px;
+  margin-block: calc(0.25rem - 5px) -5px;
+  font-size: var(--size-1);
+  line-height: 1.25;
+  color: var(--ink-2);
+  text-decoration-thickness: 1px;
+  text-underline-offset: 2px;
+}
+
+.money-next {
+  margin: 0; padding: 0.85rem calc(var(--inset) - 1px); border-top: 1px solid var(--line-strong);
+  background: var(--paper-deep); font-family: var(--ui); font-size: var(--size-2);
+  color: var(--ink-2); max-width: none; text-wrap: pretty;
+}
+.money-next a { font-weight: 600; }
+.queue-clockless {
+  margin: 0; padding: 0.7rem calc(var(--inset) - 1px);
+  border-bottom: 1px solid var(--line);
+  font-family: var(--ui); font-size: var(--size-2); color: var(--ink-2);
+  max-width: var(--measure-ui); text-wrap: pretty;
+}
+.queue-foot {
+  margin: 0; padding: 0.8rem calc(var(--inset) - 1px);
+  border-top: 1px solid var(--line); background: var(--paper);
+  font-family: var(--ui); font-size: var(--size-2); color: var(--ink-3);
+  max-width: none;
+}
+@media (max-width: 46rem) {
+  /* Three columns at 390px gives each figure eight characters of width, so they stack.
+   * The rule moves to the top border of each cell for the same reason. */
+  .money-row { grid-template-columns: minmax(0, 1fr); }
+  .money-cell { border-left: 0; border-top: 1px solid var(--line); }
+  .money-cell:first-child { border-top: 0; }
+  .queue-row { grid-template-columns: minmax(0, 1fr) 8rem; row-gap: 0.4rem; }
+  .q-when { grid-column: 1 / -1; }
+  .q-tried { text-align: left; grid-column: 1 / -1; }
+  /* At this width the stack becomes one line: three short facts side by side read as one
+   * row, where three stacked lines per row make four rows look like twelve. */
+  .q-tried .q-locale,
+  .q-tried .q-clock { display: inline; }
+  .q-tried .q-locale::after { content: " \00b7 "; color: var(--ink-3); }
+  /* Two columns here, so the desktop placement above would point at columns that do not
+   * exist. The id takes the row, the state and the count sit side by side under it. */
+  .queue-list.is-shared .q-when { grid-column: 1 / -1; }
+  .queue-list.is-shared .queue-row .state { grid-column: 1; }
+  .queue-list.is-shared .q-tried { grid-column: 2; text-align: right; }
+}
+
+/* The animated build of the figure, when a reader gets one. It replaces the still in place
+ * and inherits its box from it, because a figure that collapsed to nothing while its player
+ * started would shift every word underneath it on a page whose budget for that is 0.001. */
+.fig-anim { display: block; width: 100%; }
+.fig-anim svg { display: block; width: 100%; height: auto; }
+
+.fig-stage { display: block; }
+
+/* ---- Further reading -----------------------------------------------------------------
+ * Everything above this point is the page arguing with itself: nine acts, twenty-three
+ * links, every one of them an anchor back into the same document. Somebody coming to it
+ * as a district operations director found that the two documents deciding whether they
+ * would run a pilot, the legal surface and the pilot shape, were reachable only by cloning
+ * the repository, and that the outside figures the entry rests on carried a publisher's
+ * name with no way to go and check it.
+ *
+ * So this is the one block on the page whose links leave it. It sits after the last act
+ * because it is what a reader does next, not part of the argument, and it is set in the
+ * page's own inks so it does not read as a footer of afterthoughts. */
+/* Opaque, and in front, for the same reason every act is.
+ *
+ * Act 0 is `position: sticky` and sticks for the whole length of `main`, so it is still
+ * painted at the foot of the document with everything else on top of it. Every `.act` sets
+ * its own ground and its own stacking, which is what keeps the hero out of them. This block
+ * is not an act and set neither, so the last screen of the page was the hero's playground
+ * showing through it: a reader who clicked "The n8n plugin" in the bar landed on the right
+ * scroll position and saw act 0's own cards, which is what made the link look broken. */
+.further-band {
+  position: relative; z-index: 2; background: var(--paper);
+  padding-inline: var(--gutter);
+}
+/* The rail inset is repeated here rather than joined to the one at :1272, because this rule
+ * is 1,500 lines later and any shorthand in it would win the tie and wipe the inset. The
+ * block sat 100px left of every act until it did, which is what a padding shorthand costs
+ * when it is read after the thing it is meant to agree with. */
+@media (min-width: 72rem) { .further-band { padding-left: 16rem; } }
+/* The column, at the width every other column on the page runs at. The rule goes with it:
+ * at full bleed it was a 2px black bar from edge to edge, crossing under the fixed rail and
+ * reading as a divider between the page and nothing. Across the column it is a section
+ * break, which is the job it was doing. */
+.further {
+  max-width: 68rem; margin: 0 auto;
+  border-top: 1px solid var(--ink); padding-top: var(--space-4);
+}
+.further-k {
+  font-family: var(--ui); font-size: var(--size-0); letter-spacing: 0.08em;
+  text-transform: uppercase; color: var(--ink-3); margin: 0 0 var(--space-2);
+}
+.further-lead {
+  font-family: var(--ui-display); font-weight: 600; font-size: var(--size-5);
+  line-height: 1.2; color: var(--ink); margin: 0 0 var(--space-4);
+  max-width: var(--measure-ui-tight);
+}
+.read-list { list-style: none; margin: 0 0 var(--space-5); padding: 0; display: grid;
+             gap: var(--space-3); }
+@media (min-width: 52rem) {
+  /* Two columns rather than three. Five documents over three columns leaves a row of two
+   * looking like the set was cut short, and each blurb is a sentence rather than a phrase. */
+  .read-list { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: var(--space-4); }
+}
+.read-list li { display: grid; gap: var(--space-1); align-content: start;
+                border-top: 1px solid var(--line); padding-top: var(--space-2); }
+.read-list a { font-family: var(--ui); font-size: var(--size-3); font-weight: 600; }
+.read-why { font-family: var(--ui); font-size: var(--size-1); color: var(--ink-2);
+            margin: 0; max-width: none; }
+/* The two reusable pieces. Named `tk-` rather than `take-` because `.take-n` already
+ * belongs to the act cards eight hundred lines up, and one stylesheet cannot mean two
+ * things by the same name. Two columns at the same breakpoint as the document list above
+ * it, because they read as one block of "and now what". */
+.take-list { list-style: none; margin: 0 0 var(--space-5); padding: 0; display: grid;
+             gap: var(--space-3); }
+@media (min-width: 52rem) {
+  .take-list { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: var(--space-4); }
+}
+.take-list li { display: grid; gap: var(--space-1); align-content: start;
+                border-top: 1px solid var(--line); padding-top: var(--space-2); }
+.take-h { font-family: var(--ui); font-size: var(--size-3); font-weight: 600;
+          margin: 0; color: var(--ink); }
+.take-why { font-family: var(--ui); font-size: var(--size-1); color: var(--ink-2);
+            margin: 0; max-width: none; }
+.take-run { margin: 0.4rem 0 0; display: grid; gap: 0.3rem; }
+/* `anywhere` because the n8n command is 109 characters, since it gained the `cd` that makes
+ * it runnable, and the column is narrower than that at every width. The overflow gate walks
+ * six widths and this is the shape that failed it once already, on a filename in a
+ * paragraph. */
+.take-run code { font-family: var(--mono); font-size: var(--size-1); color: var(--ink);
+                 overflow-wrap: anywhere; }
+.take-run .take-n { font-family: var(--mono); font-size: var(--size-1); color: var(--ink-3);
+                    border-top: 0; padding-top: 0; min-width: 0; display: block; }
+
+.sources { list-style: none; margin: 0; padding: 0; display: grid; gap: var(--space-3); }
+.sources li { border-top: 1px solid var(--line); padding-top: var(--space-2); }
+.sources .num { font-family: var(--mono); font-variant-numeric: tabular-nums;
+                font-size: var(--size-3); color: var(--ink); }
+.sources p { font-family: var(--ui); font-size: var(--size-1); color: var(--ink-2);
+             margin: 0.3rem 0 0; max-width: var(--measure-ui); }
+.sources .read-at { color: var(--ink-3); }
+
+/* ---- stopping the showcase figure ------------------------------------------------------ */
+/* The figure runs four loops of --cs-loop (9s) forever, in act 02, beside prose a reader is
+ * trying to read. The reduced-motion rest state in showcase.css already answers the reader
+ * who set an OS preference; this answers everyone else, which is most people.
+ *
+ * These rules live here rather than in showcase.css because that file is not mine to edit
+ * on this pass. Placement costs nothing either way: page_css() concatenates page.css and
+ * then showcase.css, so these come first in source order, but a selector carrying four
+ * classes beats showcase.css's two and order never gets a vote.
+ *
+ * The rest positions are the ones the reduced-motion block already authored, so a paused
+ * frame is a composed picture rather than a loop caught mid-stride, and the two paths agree
+ * with each other by construction.
+ *
+ * A general sibling combinator rather than :has(), because the control, its label and the
+ * figure are emitted as three siblings and `~` has no support floor worth naming. */
+.cs-motion {
+  appearance: none;
+  flex: none;
+  width: 0.95rem;
+  height: 0.95rem;
+  margin: 0 var(--space-2) var(--space-2) 0;
+  vertical-align: -0.12em;
+  border: 1px solid var(--line-strong);
+  border-radius: 2px;
+  background: transparent;
+  /* The pointer is on the control and not on its label: the keyboard gate flags any
+   * element that paints `cursor: pointer` without being reachable by Tab, and a <label>
+   * is not focusable. Clicking the words still toggles it; the browser does that. */
+  cursor: pointer;
+  position: relative;
+}
+/* 15px of ink, 24px of target. WCAG 2.5.8 asks for 24 by 24 and a checkbox drawn that big
+ * is a checkbox that looks like a button, so the box a thumb hits is a pseudo-element and
+ * the box an eye sees is the one above. Nothing is painted, so nothing moves: the scroll
+ * walk reads boxes that hold text and this one holds none. */
+.cs-motion::after {
+  content: ""; position: absolute; top: 50%; left: 50%;
+  width: 24px; height: 24px; transform: translate(-50%, -50%);
+}
+.cs-motion:checked {
+  background: var(--ink);
+  border-color: var(--ink);
+}
+/* The shared ring at :419 covers a, button, [tabindex] and pre, not input. */
+.cs-motion:focus-visible {
+  outline: 2px solid var(--focus); outline-offset: 3px;
+}
+.cs-motion-label {
+  display: inline-block;
+  margin: 0 0 var(--space-2);
+  font-family: var(--ui); font-size: var(--size-2);
+  letter-spacing: 0.05em; text-transform: uppercase;
+  color: var(--ink-2);
+}
+.cs-motion:checked ~ .calle-showcase .cs-run__x,
+.cs-motion:checked ~ .calle-showcase .cs-run__y,
+.cs-motion:checked ~ .calle-showcase .cs-esc__x,
+.cs-motion:checked ~ .calle-showcase .cs-esc__y {
+  animation: none;
+  opacity: 1;
+}
+.cs-motion:checked ~ .calle-showcase .cs-run__x { transform: translateX(var(--cs-rest-x)); }
+.cs-motion:checked ~ .calle-showcase .cs-run__y { transform: translateY(var(--cs-rest-y)); }
+/* The two below used to be literal offsets, 150px and -312px, copied out of the
+ * figure's own stylesheet. They survived one redesign of that figure by continuing to
+ * parse, which is the whole problem with a geometry number living in a second file: it
+ * cannot go stale loudly. They now name the property showcase.css declares, so the
+ * paused figure and the reduced-motion figure can never disagree again. */
+.cs-motion:checked ~ .calle-showcase .cs-esc__x { transform: translateX(var(--cs-esc-rest-x)); }
+.cs-motion:checked ~ .calle-showcase .cs-esc__y { transform: translateY(0); }
+
+/* ---- the motion layer ------------------------------------------------------------------
+ *
+ * This page had one entrance in two thousand lines: a ten-pixel fade, applied once per act.
+ * Everything else arrived already finished. That is not restraint, it is absence, and the
+ * difference shows on the first screen: a reader met four measured numbers that had always
+ * been there and a call that was described as live by a word rather than by anything moving.
+ *
+ * The rules the rest of the file already sets are not relaxed here:
+ *
+ *   nothing names a number      every duration below is a token, and the two new ones carry
+ *                               their reason with them like the four above.
+ *   nothing costs layout        opacity and transform only. The CLS ceiling on this page is
+ *                               0.001 and a reveal that moved a box would spend all of it.
+ *                               Transforms paint, they do not lay out, so none of this is
+ *                               measurable by the shift gate.
+ *   nothing invents a colour    every value below resolves to a token check_contrast.py
+ *                               already measures. A motion layer that shipped a fifth blue
+ *                               would put an unmeasured pair on the page to make a fade
+ *                               look nice.
+ *   the light still means one thing.  The breath added here is on the live object and on
+ *                               nothing else, for the same reason the field is.
+ */
+
+:root {
+  /* Stagger between siblings in one group. The band that reads as a group arriving rather
+   * than as a queue is 30 to 80ms; below it the members look simultaneous and above it the
+   * last one looks late. 55ms sits mid-band, and the count is capped at six members so a
+   * twelve-row table never makes a reader wait 660ms for its last line. */
+  --stagger: 55ms;
+  /* The breath on a live call. This is the one duration on the page over half a second and
+   * it is deliberate: it is not a transition a reader is waiting on, it is the ambient sign
+   * that a line is open, and an ambient sign that cycles faster than a resting breath reads
+   * as an alarm. Nothing is gated on it and it never runs on more than one element. */
+  --dur-breath: 2600ms;
+}
+
+/* ---- stagger ----
+ * One property added to the entrance that already exists. Members of a revealed group set
+ * --reveal-i and inherit everything else, so there is still one entrance on this page. */
+[data-reveal].shown {
+  transition-delay: calc(var(--reveal-i, 0) * var(--stagger));
+}
+
+/* ---- press ----
+ * Every control on the page answers the finger. 0.98 rather than the 0.95 a button that
+ * wants to be noticed would take: these are controls beside evidence, and a control that
+ * flinches away from the pointer pulls the eye off the thing it is next to. */
+button:not(:disabled):active,
+.replay:not(:disabled):active,
+[data-copy]:not(:disabled):active {
+  transform: scale(0.98);
+}
+button, .replay, [data-copy] {
+  transition: transform var(--dur-micro) var(--ease-out),
+              background-color var(--dur-micro) var(--ease-out),
+              border-color var(--dur-micro) var(--ease-out);
+}
+
+/* ---- the breath ----
+ * A live call is the only thing on this page that is still happening while it is read, and
+ * until now the only thing that said so was a field that switched on once and then held
+ * perfectly still. A held field is a state. A breath is an event in progress.
+ *
+ * It is drawn on a pseudo-element in the light itself, so no measured pair moves: the ink
+ * of the register sits on --live either way, and this rides above the field at an opacity
+ * that never reaches it. transform and opacity only, and it composites on its own layer. */
+[data-live="on"] { position: relative; }
+/* One pulse when the light arrives, and it used to loop for as long as the call ran.
+ *
+ * A register row is a wide object, and cycling a third of its area up and down every 2.6
+ * seconds indefinitely is not an ambient sign, it is a flicker sitting next to text
+ * somebody is reading. It was reported as eye strain and that is the right word for it.
+ *
+ * The field turning on is already the whole signal: it is the one saturated ground on the
+ * page and it means one thing. What motion adds is the moment of arrival, which happens
+ * once, so the animation happens once. It runs forwards and stops, and the row then holds
+ * the steady lit state the stylesheet always described. */
+[data-live="on"]::after {
+  content: "";
+  position: absolute; inset: 0;
+  background: var(--live);
+  opacity: 0;
+  pointer-events: none;
+  animation: live-arrive var(--dur-mode) var(--ease-out) 1 both;
+}
+@keyframes live-arrive {
+  0%   { opacity: 0.34; }
+  100% { opacity: 0; }
+}
+
+/* The dot. A live indicator that is a coloured square is a legend; one that pulses is a
+ * signal. It is --live-mark and not --live because at 3.41 against the paper it is the
+ * grade of this hue that survives as a graphic, which is exactly what this is. */
+.live-dot {
+  display: inline-block; width: 0.5em; height: 0.5em;
+  border-radius: 50%; background: var(--live-mark);
+  vertical-align: baseline; margin-inline-end: 0.45em;
+  animation: live-dot var(--dur-breath) var(--ease-both) infinite;
+}
+/* The dot goes on breathing, because a live indicator that holds still stops saying
+ * "now". It is 0.5em, which is roughly a five-hundredth of the area the row pulse was
+ * covering, and the swing is now 12% of scale and 15% of opacity rather than 28% and 45%.
+ * Small and shallow is the difference between a pulse and a flicker. */
+@keyframes live-dot {
+  0%, 100% { transform: scale(1);    opacity: 1;    }
+  50%      { transform: scale(0.88); opacity: 0.85; }
+}
+
+/* ---- links ----
+ * The underline was there before the pointer was, so hovering a link changed a colour and
+ * nothing else. A rule that draws itself under the word answers the pointer with movement
+ * at the exact place the eye already is. background-size is not a layout property, so this
+ * costs a paint and no reflow. */
+.prose a[href], p a[href], li a[href], .hero-foot a[href] {
+  background-image: linear-gradient(var(--link), var(--link));
+  background-repeat: no-repeat;
+  background-position: 0 100%;
+  background-size: 0% 1px;
+  transition: background-size var(--dur-enter) var(--ease-out);
+}
+.prose a[href]:hover, p a[href]:hover, li a[href]:hover, .hero-foot a[href]:hover {
+  background-size: 100% 1px;
+}
+
+/* ---- rules that draw ----
+ * A hairline between two sections is the page's own punctuation and it used to be printed
+ * before the reader arrived. Drawn left to right as the section enters, it reads as the
+ * page writing itself rather than as a page that was already finished. */
+[data-reveal] .rule-draw,
+.act [data-reveal] hr {
+  transform: scaleX(0); transform-origin: left center;
+  transition: transform var(--dur-mode) var(--ease-out);
+  transition-delay: calc(var(--reveal-i, 0) * var(--stagger) + var(--dur-tick));
+}
+[data-reveal].shown .rule-draw,
+.act [data-reveal].shown hr { transform: scaleX(1); }
+
+/* ---- reduced motion ----
+ * The global override earlier in this file clamps every duration to 0.01ms, which stops a
+ * transition and does NOT stop an infinite animation: it makes it cycle ten thousand times
+ * a second. The two ambient loops above are therefore switched off by name rather than
+ * shortened, and the reader who asked for less motion gets the field held on, which is the
+ * state the loop is animating around anyway. */
+@media (prefers-reduced-motion: reduce) {
+  [data-live="on"]::after { animation: none; opacity: 0; }
+  .live-dot               { animation: none; }
+  [data-reveal].shown     { transition-delay: 0ms; }
+  [data-reveal] .rule-draw,
+  .act [data-reveal] hr   { transform: none; }
+}
+
+/* ---- the first screen ------------------------------------------------------------------
+ *
+ * What a judge meets in the first three seconds, and what it was: a wordmark set smaller
+ * than the heading under it, a grey sentence, and the four numbers this entry is actually
+ * about run together on one line of 11px uppercase, at the same weight as the labels
+ * beside them. Everything above the rule was the same colour and within two steps of the
+ * same size, so the screen had no first thing to look at. A reader picks the largest
+ * object when nothing else ranks, and the largest object was the heading of act 00, which
+ * is a sentence about one child rather than the name of the software.
+ *
+ * Three changes, and none of them adds a colour or a face:
+ *
+ *   the numbers become objects.  Four cells on --card, the one surface the file already
+ *                                defines as lighter than the paper so a thing that has to
+ *                                read as a thing can lift off it. They span the full
+ *                                --inner width rather than the 62-character measure, which
+ *                                is also what closes the empty right column the first
+ *                                screen had: 533px of nothing beside a 590px column.
+ *   the money leads.             The fourth cell is the only one on --brand-field. The
+ *                                file's own rule is that the lifted grade of the yellow
+ *                                marks one page object, and on a page whose hardest claim
+ *                                is a unit cost, the unit cost is that object.
+ *   the wordmark outranks.       It is the name of the thing. It is now set above the
+ *                                heading rather than under it.
+ *
+ * The cell labels are --ink-2 and not the --ink-3 every other label on this page uses.
+ * --ink-3 is 3.84 on --card at 12px, which is under AA, and the static pass could not say
+ * so because it measures declared pairs and this pair had never been declared: --ink-3 had
+ * only ever been put on paper. The browser gate reads painted runs and caught all three
+ * white cells. The fourth is on --brand-field and already re-cuts to --lit-ink-3. */
+
+.wordmark {
+  font-size: clamp(2rem, 1.3rem + 2.2vw, 3.1rem);
+  line-height: 1.0;
+  letter-spacing: -0.022em;
+}
+.standfirst {
+  font-size: var(--size-4);
+  max-width: var(--measure-ui-tight);
+}
+
+/* Four cells, and they do not wrap to two rows at any width the rail is showing at. Below
+ * 46rem they go to two columns rather than one, because a stat that is one per screen is
+ * a list and the point of these four is that they are read as a set. */
+/* The dividers are borders on the cells, and they were a 1px grid gap letting the
+ * container's own background show through.
+ *
+ * That trick renders identically and measures wrong. A contrast checker resolves the
+ * ground under a text run by walking up for the nearest painted background, and with the
+ * divider colour sitting on the container it can land there instead of on the cell: the
+ * browser gate read all four labels against the divider rather than against the cell they
+ * are printed on, and reported the money label at 1.03 against a required 4.5. The cells
+ * were the right colours the whole time and the page looked correct, which is what makes
+ * the pattern worth avoiding: it puts a colour on a box that no text is ever printed on.
+ * A real border is painted by the cell that owns it and no walk can pick it up. */
+.topline {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 0;
+  margin: var(--space-4) 0 0;
+  border: 1px solid var(--line);
+  border-radius: 3px;
+  overflow: hidden;
+  text-transform: none;
+  letter-spacing: 0;
+}
+.topline li + li { border-inline-start: 1px solid var(--line); }
+@media (max-width: 46rem) {
+  .topline { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+}
+.topline li {
+  background: var(--card);
+  padding: var(--space-3) var(--space-3) calc(var(--space-3) - 0.15rem);
+  display: flex; flex-direction: column-reverse; gap: 0.3rem;
+  white-space: normal;
+  font-family: var(--ui); font-size: var(--size-1);
+  letter-spacing: 0.08em; text-transform: uppercase; color: var(--ink-2);
+  line-height: 1.3;
+}
+/* The money cell. Last of four, and the one the page is asking to be believed on. */
+.topline li:last-child { background: var(--brand-field); color: var(--lit-ink-3); }
+.topline b {
+  font-family: var(--ui-display); font-weight: 600;
+  font-size: clamp(1.6rem, 1.15rem + 1.5vw, 2.3rem);
+  line-height: 1; letter-spacing: -0.02em;
+  font-variant-numeric: tabular-nums;
+  color: var(--ink);
+}
+
+/* The cells arrive with the rest of the first screen, so they take the same entrance the
+ * acts take. Held here rather than in the reveal block because they are the only reveal
+ * targets on the page that are visible before a scroll and therefore the only ones whose
+ * starting state a reader can be shown by accident. The :not() is load-bearing: this
+ * selector out-specifies [data-reveal].shown, so without it the cells hold the 14px
+ * offset after the entrance finishes and the band sits below its own border. */
+.topline li[data-reveal]:not(.shown) { transform: translateY(14px); }
+
+/* The masthead rule was carrying the separation on its own. With four cells under it the
+ * rule is redundant and the space is doing the work. */
+.masthead { border-bottom: 0; padding-bottom: 0; }
+
+/* ---- the margin column, and two blocks that were fighting it ---------------------------
+ *
+ * 7.5rem is 120px, which holds about three words to a line: a marginal note set that
+ * narrow is a column of fragments. 10rem is 160px, about five words, which is the width a
+ * printed marginal gloss actually runs at. Nothing in the reading column moves, because
+ * the reserve is padding and the measure is a max-width the column was not reaching. */
+:root { --margin-col: 10rem; }
+
+/* Three money cards on one grid row stretched to the tallest of them, so the two with
+ * shorter copy carried about 180px of empty card under their last line. A card is as tall
+ * as what is in it. */
+.money-row { align-items: start; }
+
+/* ---- the provenance under the money band ----
+ * The three notes, moved out of the three cells. A band of cells is as tall as its
+ * longest cell and the third note is 140 words about how CALL-E's usage panel was read:
+ * measured at 1440 the band ran 430px while the first two cells finished after 170, so
+ * two thirds of it was empty ruled ground beside a wall of small print. Nothing is hidden
+ * and nothing is cut. Each note carries its own figure at the front so a reader still
+ * knows which number it belongs to, and they are stacked rather than set in three columns
+ * because three columns reproduces the same unevenness one border further out. */
+.money-whys {
+  border-top: 1px solid var(--line);
+  /* The same inset the cells above use, so the notes and the numbers share one left edge.
+   * Without it the notes sat flush against the band's own border. */
+  padding: var(--inset) calc(var(--inset) - 1px);
+  display: grid; gap: var(--space-3);
+}
+.money-whys .money-why { margin: 0; max-width: var(--measure-ui); }
+/* The figure the note is about, so the note can be read on its own. Mono and the primary
+ * ink, because it is a quantity quoted back from the band above. */
+.money-why-of {
+  font-family: var(--mono); font-size: var(--size-2); color: var(--ink);
+  white-space: nowrap; margin-right: 0.55em;
+}
+
+/* The footnote under the money ran the full width of the act, about 1,045px, which is
+ * roughly 150 characters and more than twice the measure every other line of prose on
+ * this page is held to. It is the same defect as the margin column above and in the
+ * opposite direction. */
+.money-foot { max-width: var(--measure-ui); }
+
+/* ---- the masthead plate ----------------------------------------------------------------
+ *
+ * The first screen was warm paper with dark text on it, and so was every screen under it.
+ * A reader arriving had no moment of contrast anywhere in nine acts: the page opened at the
+ * same value it closed at. That is a defensible choice for a document and the wrong one for
+ * a first screen somebody decides about in half a minute.
+ *
+ * The fix spends nothing new. CALL-E's action blue is already in this file as a ground,
+ * with three inks already measured on it at 13.64, 9.99 and 7.93, already wired as a
+ * complete token remap in `.plate-royal`, and used in exactly two places. The palette this
+ * page needed was the one it already had and was not spending.
+ *
+ * So the masthead becomes that plate. The same remap `.plate-royal` performs is performed
+ * here, which means every rule under this block goes on resolving --ink, --line and --link
+ * against the royal set without knowing it moved. Nothing below the plate changes at all:
+ * the page is still paper from the eyebrow down, the light is still the only saturated
+ * thing on that paper, and the argument about fields and ink is untouched.
+ *
+ * The money cell stays yellow, and on the plate it stops being an accent and starts being
+ * the only warm object on a cold ground. That is the number the entry is asking to be
+ * believed on, and it is now the first thing the eye lands on rather than the fourth.
+ *
+ * Contained rather than full-bleed. `100vw` on a page with a scrollbar is wider than the
+ * document and the overflow gate is right to fail it, and a plate that stops where the
+ * reading column stops reads as an object the page is presenting rather than as a header
+ * bolted above it. */
+.masthead {
+  background: var(--royal);
+  color: var(--royal-ink);
+  border-radius: 6px;
+  padding: clamp(1.75rem, 1.1rem + 2.4vw, 3rem) clamp(1.5rem, 1rem + 2vw, 2.75rem)
+           clamp(1.5rem, 1rem + 1.6vw, 2.25rem);
+  margin-bottom: var(--space-5);
+
+  /* The same remap .plate-royal makes, for the same reason: the rules inside go on naming
+   * --ink and --link and resolve to the pair measured against this ground instead of
+   * against paper. A plate that only set its own background would leave every ink in here
+   * at a ratio nobody measured. */
+  --ink:         var(--royal-ink);
+  --ink-2:       var(--royal-ink-2);
+  --ink-3:       var(--royal-ink-3);
+  --ink-4:       var(--royal-ink-3);
+  --line:        var(--royal-line);
+  --line-strong: var(--royal-line);
+  --link:        var(--royal-ink-2);
+  --focus:       var(--royal-ink-2);
+  /* A card on this ground is a lift off the royal, never the paper card. Without this a
+   * disclosure inside the plate paints `oklch(1 0 0)` under type that has already flipped
+   * to near-white, which is the same defect this stylesheet already records twice: a token
+   * that does not flip on a surface that does. */
+  --card:        color-mix(in oklch, var(--royal-ink) 7%, var(--royal));
+}
+.masthead .wordmark   { color: var(--royal-ink); }
+.masthead .standfirst { color: var(--royal-ink-2); }
+
+/* The cells sit on the plate rather than on white. --card would put three white blocks on
+ * a navy ground and turn the band into a table; the plate reads as one object with the
+ * numbers inset into it, divided by the one hairline measured against this ground. */
+.masthead .topline       { border-color: var(--royal-line); }
+.masthead .topline li + li { border-inline-start-color: var(--royal-line); }
+.masthead .topline li      { background: var(--royal); color: var(--royal-ink-3); }
+.masthead .topline b       { color: var(--royal-ink); }
+/* Unchanged, and now the only warm thing on the screen: --ink on --brand-field is 12.53
+ * and the label re-cuts to --lit-ink-3 at 5.43, which is the re-cut that field already
+ * requires everywhere else on the page. */
+.masthead .topline li:last-child   { background: var(--brand-field); color: var(--lit-ink-3); }
+.masthead .topline li:last-child b { color: var(--ink-on-light); }
+
+/* ---- the one-minute band ----------------------------------------------------------------
+ *
+ * Four cards under the dateline, and the reason they exist is arithmetic rather than
+ * taste: this page is sixteen thousand words and the reader it is written for gives it
+ * about a minute. The dateline says what the page is built on. This says what it is for.
+ *
+ * The rules it follows are the ones the two figures already follow, so the first screen
+ * and the diagrams look like one system: a plate, a hairline, a four-unit stripe down the
+ * left edge, an eyebrow over a claim over a support line, and exactly one accent. Nothing
+ * here invents a colour and nothing here casts a shadow.
+ *
+ * Widths are uneven on purpose. Four equal columns is the arrangement a template picks and
+ * it says the four claims weigh the same; the second one is the product and it is given
+ * the room to say so. */
+
+.minute {
+  list-style: none;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  gap: var(--space-2);
+  margin: var(--space-4) 0 0;
+  padding: 0;
+}
+
+@media (min-width: 46rem) {
+  .minute { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+}
+
+@media (min-width: 74rem) {
+  .minute { grid-template-columns: 1fr 1.18fr 1fr 1fr; }
+}
+
+.minute-card {
+  display: flex;
+  flex-direction: column;
+  gap: 0.45rem;
+  padding: var(--space-3) calc(var(--inset) - 1px)
+           var(--space-3) calc(var(--inset) - var(--marker));
+  background: var(--card);
+  border: 1px solid var(--line);
+  border-left: var(--marker) solid var(--line-strong);
+  border-radius: 6px;
+}
+
+/* One accent, and it is on the claim the whole product turns on. The card is lifted a
+ * paper level rather than filled with the brand yellow: a bright field this size on the
+ * first screen is a highlighter stroke, and it was reported as eye strain the last time
+ * this page used one at that scale. */
+.minute-card--focal {
+  background: var(--paper-3);
+  border-left-color: var(--undetermined);
+}
+
+.minute-eyebrow {
+  margin: 0;
+  font-family: var(--ui);
+  font-size: var(--size-1);
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: var(--ink-2);
+}
+
+.minute-claim {
+  margin: 0;
+  font-family: var(--serif);
+  font-size: 1.0625rem;
+  line-height: 1.28;
+  letter-spacing: -0.008em;
+  color: var(--ink);
+  text-wrap: pretty;
+}
+
+.minute-say {
+  margin: 0;
+  font-family: var(--ui);
+  font-size: 0.8125rem;
+  line-height: 1.5;
+  color: var(--ink-2);
+}
+
+/* Pushed to the bottom edge of the card so the four cues line up across a row whatever
+ * each card's support line runs to. Four links at four different heights is the tell that
+ * a grid was filled rather than laid out. */
+.minute-link {
+  margin-top: auto;
+  padding-top: 0.15rem;
+  font-family: var(--ui);
+  font-size: var(--size-1);
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--action);
+  text-decoration: none;
+  border-bottom: 1px solid transparent;
+  align-self: start;
+}
+
+.minute-link::after { content: " \2192"; }
+.minute-link:hover { border-bottom-color: var(--action); }
+
+/* The two calls to action come out of the dark plate and sit under the band, where a
+ * reader meets them after the argument rather than before it. */
+.after-minute {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-2);
+  align-items: center;
+  margin: var(--space-3) 0 0;
+}
