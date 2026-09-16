@@ -23,13 +23,13 @@ Awesome Phone Call Agents is an early community hub for developers and workflow 
 > [!NOTE]
 > New here? Start with the [`call-reminder`](skills/call-reminder/) and [`google-form-callback`](skills/google-form-callback/) skills, use [`outbound-call-skill-creator`](skills/outbound-call-skill-creator/) when you need to generate a focused outbound workflow skill, try the [`python/batch-runner`](apps/python/batch-runner/) app, and read [`docs/roadmap.md`](docs/roadmap.md) for open community directions.
 
-| Contribution area | Good examples | Where to contribute |
-| --- | --- | --- |
-| [`apps/typescript/vouch`](apps/typescript/vouch/) | TypeScript / Next.js | Consent-scoped employment verification: no consent artifact, no dial. Requested vs permitted fields (California SB 1162 strips salary), third-party gatekeeper is a first-class disposition. Fixture replay by default. |
-| [`apps/typescript/headcount`](apps/typescript/headcount/) | TypeScript / Next.js | CDC CASPER-style disaster household needs assessment: the unreached count is the product, voicemail is not a reach, unsupported fields strike through, and fail-closed cards go to a human. Fixture replay by default. |
-| Agent Skills | Customer callbacks, appointment confirmation, lead qualification, order exception follow-up, service dispatch, incident escalation | `skills/` |
-| Workflow Plugins | Dify tools, n8n nodes, Zapier actions, HubSpot workflow actions, Feishu/Lark automation nodes | `plugins/` |
-| User-facing Apps | Call chat, call review console, call scheduler UI, customer callback app, business call workbench | `apps/` |
+| Contribution area                                         | Good examples                                                                                                                      | Where to contribute                                                                                                                                                                                                     |
+| --------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| [`apps/typescript/vouch`](apps/typescript/vouch/)         | TypeScript / Next.js                                                                                                               | Consent-scoped employment verification: no consent artifact, no dial. Requested vs permitted fields (California SB 1162 strips salary), third-party gatekeeper is a first-class disposition. Fixture replay by default. |
+| [`apps/typescript/headcount`](apps/typescript/headcount/) | TypeScript / Next.js                                                                                                               | CDC CASPER-style disaster household needs assessment: the unreached count is the product, voicemail is not a reach, unsupported fields strike through, and fail-closed cards go to a human. Fixture replay by default.  |
+| Agent Skills                                              | Customer callbacks, appointment confirmation, lead qualification, order exception follow-up, service dispatch, incident escalation | `skills/`                                                                                                                                                                                                               |
+| Workflow Plugins                                          | Dify tools, n8n nodes, Zapier actions, HubSpot workflow actions, Feishu/Lark automation nodes                                      | `plugins/`                                                                                                                                                                                                              |
+| User-facing Apps                                          | Call chat, call review console, call scheduler UI, customer callback app, business call workbench                                  | `apps/`                                                                                                                                                                                                                 |
 
 The community roadmap is a direction guide, not a fixed release plan. Small examples, platform notes, workflow sketches, templates, and focused demos are all useful.
 
@@ -204,8 +204,10 @@ This project is an awesome list for AI-agent phone-call workflows. Add resources
 
 - [Cold Chain Sentinel](https://github.com/piyushxlabs/cold-chain-sentinel) - Autonomous voice triage engine intercepting reefer temperature excursions via CALL-E in-cab driver calls.
 - [`conversation-clarify`](skills/conversation-clarify/) - Detects a written reply that agrees without saying which option, or commits without saying when, then settles it with one bounded disclosed CALL-E phone call and writes the answer back into the thread bound to the recipient's own words, or refuses to answer at all.
+
 ### Apps
 
+- [Relay](apps/web/relay/) - Proactive business-operations web app that uses CALL-E to handle employee, customer, and SaaS lifecycle conversations, capture structured outcomes, and trigger operational follow-ups. ([GitHub](https://github.com/hanaanllone/Relay-An-AI-Agent-for-Optimizing-Business-Operations))
 
 - [Senior Phone AI](apps/typescript/senior-phone-ai/) - Next.js CALL-E demo for older Australians with a shared source-backed daily briefing, explicitly confirmed calls, and combined call/SMS history. Because the current CALL-E integration cannot invoke the app's web-search tool during a provider-hosted call, new requests use consent-gated post-call search followed by an SMS preview or Twilio delivery; preview adapters keep the default path side-effect free.
 
@@ -282,12 +284,11 @@ This project is an awesome list for AI-agent phone-call workflows. Add resources
 - [SafeOps](https://github.com/saikumar040060/safeops) - Experimental runtime authorization layer for CALL-E outcomes using policy checks and human approval; author-reported evidence covers one real outbound call controlling a seeded local demo refund and a blocked manipulated-transcript case, not a real payment refund or a production exactly-once guarantee. Evidence is not independently verified: [`submissions/calle.md`](https://github.com/saikumar040060/safeops/blob/main/submissions/calle.md).
 - [OOO-Pilot](https://github.com/balajianbalagan/ooopilot) - Slack-based AI work proxy that places real CALL-E phone calls on an absent employee's behalf, verifies coworker claims against Jira before treating them as fact, and reports discrepancies in a return-to-work summary.
 
--  [VendorPulse](https://github.com/Eman2123/VendorPlus) - Autonomous CALL-E-powered vendor check-in tool that calls suppliers about order status, scores delivery risk, and escalates high-risk vendors for human review.
+- [VendorPulse](https://github.com/Eman2123/VendorPlus) - Autonomous CALL-E-powered vendor check-in tool that calls suppliers about order status, scores delivery risk, and escalates high-risk vendors for human review.
 
 - [hivemind-closer](apps/python/hivemind-closer/) - Mock-first lead qualifier that folds one structured CALL-E result into a deterministic bargaining board with immediate graceful exit on opt-out and a code-enforced 20-call budget; dry-run preview by default.
 - [Ringbolt](https://github.com/voyagi/ringbolt) - On-call line that phones a human when production breaks, holds a two-way conversation about the incident, and runs the authorized runbook fix only after verifying the spoken confirmation against the call transcript, with a no-call local stand-in by default. [Demo](https://ringbolt.taranity.com) · [Video](https://www.youtube.com/watch?v=EIm87clsks8)
-Runnable demo apps live under [`apps/`](apps/). They are not a CALL-E SDK and do not define a supported application API.
-
+  Runnable demo apps live under [`apps/`](apps/). They are not a CALL-E SDK and do not define a supported application API.
 
 - [FixFast](https://github.com/DheerajBishnoi/FixFast-Powered_by_Call-E) - Experimental contractor-dispatch simulator and CALL-E workflow comparing ETA and callout fees; quote grounding is heuristic, and the live path may advance after an ambiguous provider error, so use simulation for evaluation and manually reconcile uncertain calls before further dispatch.
 - [Ringback](https://github.com/DrGitman/Ringback.git) - Callback-first front door for university admin offices: a reasoning agent reads the caller's question against their student record and curated institution documents, then either briefs one CALL-E call or routes the case to a named office without dialling. Third-party callers and requests needing a signature never reach a call. Mock transport with no calls by default.
@@ -422,15 +423,15 @@ Runnable demo apps live under [`apps/`](apps/). They are not a CALL-E SDK and do
 | [`apps/python/bytelytic-clinic-os`](apps/python/bytelytic-clinic-os/) | Python | Autonomous healthcare clinic operating system for patient appointment confirmations, 2-hour no-show recovery, 30/60/90-day recalls, and insurance prior authorization payor IVR calls via CALL-E. |
 | [`apps/typescript/withheld`](apps/typescript/withheld/) ([live](https://withheld.vercel.app/)) | TypeScript | Errands for people who cannot answer a phone. When the other side offers to ring back, the agent declines and asks for a window to call *in* instead, so a callback offer continues the errand across legs rather than ending it, and the person never answers a phone at any point. No number is disclosed because there is no field to put one in: the recipient result schema has none. Every reported answer is bound to a callee turn, a commitment counts only inside declared windows, and what the caller actually said is scanned afterwards against the authorised fact list, masked. Chains propose the next call, never schedule it. Fixture replay by default, no credentials; live calls need an explicit flag. |
 - [VERIFY](https://github.com/DivineDomokuma10/verifyam) - Disclosed listing-verification app that calls the agent or landlord behind a rental ad and returns a schema-validated transcript-backed claim (Verified/Warning/Inconclusive) with transcript evidence and an optional mock mode. Verdicts represent transcript-supported assessments, not independent authority verification.
-| [`apps/python/positive-contact`](apps/python/positive-contact/) | Python | PSPS Medical Baseline live-contact confirmation with a safe support loop: disclosed CALL-E calls, transcript-evidenced acknowledgement, retry and alternate-contact ladder, operator-approved identity-free supplier availability calls, field-visit work orders and denominator-honest reporting. Fixture mode by default. |
+  | [`apps/python/positive-contact`](apps/python/positive-contact/) | Python | PSPS Medical Baseline live-contact confirmation with a safe support loop: disclosed CALL-E calls, transcript-evidenced acknowledgement, retry and alternate-contact ladder, operator-approved identity-free supplier availability calls, field-visit work orders and denominator-honest reporting. Fixture mode by default. |
 
 The default e2e tests use a local fake broker/OAuth/MCP server or dry-run paths, so they do not require real CALL-E credentials or browser login. Live verification is opt-in in each app README.
+
 - [callhook](apps/go/callhook/) - Event-driven CALL-E calling platform: webhook in, structured outcome back, with goal-driven campaigns that early-stop, 19 doc-verified platform integrations, an MCP server, and a war-room UI in one zero-dependency Go binary. Dry-run by default. [Demo](https://callhook.onrender.com) · [Video](https://youtu.be/66siB3kIYMk)
 
-
 ### Community apps
-- [DocuFollow AI](https://github.com/naadai/docufollow-ai) - Consent-first document collection workflow for admissions and professional teams that records CALL-E follow-up outcomes and keeps live calls behind an explicit staff-controlled safety setting.
 
+- [DocuFollow AI](https://github.com/naadai/docufollow-ai) - Consent-first document collection workflow for admissions and professional teams that records CALL-E follow-up outcomes and keeps live calls behind an explicit staff-controlled safety setting.
 
 - [Maché](https://github.com/NathanNarh/Mache) - Author-described design for CALL-E supplier quote collection and procurement review; the supplied source link was not publicly accessible during review on 2026-09-15, so this is an unverified external design reference, not an included runnable app or evidence of automatic purchase-order execution.
 - [Discharge Guardian](docs/community-apps/discharge-guardian.md) - Author-proposed CALL-E post-discharge follow-up design with advisory care-team review; documentation only, with source currently unavailable and no included runnable or verified offline pipeline.
@@ -440,9 +441,8 @@ The default e2e tests use a local fake broker/OAuth/MCP server or dry-run paths,
 
 - [Openline](https://openlinecall.vercel.app/) - Human-approved service-availability verification app that turns a request into an inspectable CALL-E phone plan and returns evidence-backed next steps, with a no-call simulation path. ([repository](https://github.com/Datwebguy/openline))
 - [Ashtrac Dispatch](https://github.com/Alikhan207/ashtrac-dispatch) - Autonomous emergency service dispatch agent that uses CALL-E to call service providers sequentially, adapts to declinations, and locks in the first confirmed ETA and price quote.
-  
-Externally hosted user-facing apps built on CALL-E. They live in their own repositories, so review their setup, credential handling, and call side effects before running them.
 
+Externally hosted user-facing apps built on CALL-E. They live in their own repositories, so review their setup, credential handling, and call side effects before running them.
 
 - [odo-sync](https://github.com/clinton-lynx/odo-sync) - Schedules vehicle service reminders via CALL-E phone calls 15, 10, and 5 days before service is due, recording structured booking and callback outcomes.
 - [CallBridge Connect](https://github.com/Senseiglobal/callbridge-connect) - Consent-first creative-project check-ins using the CALL-E Python SDK, with no-call sample previews, explicit live dispatch, and a structured next-action brief for human review. See the [integration notes](docs/community-apps/callbridge-connect.md).
@@ -458,7 +458,6 @@ Externally hosted user-facing apps built on CALL-E. They live in their own repos
 
 - [Off the Hook: The Memory Line](https://github.com/tivastreasures-ops/off-the-hook) - Operator-character message-taking line: CALL-E conducts an in-character disclosed-automation call (free tier) that can terminate on a physical rotary phone via SIP/ATA, with structured results rendered as a keepsake Message Slip; paid tier adds a custom ElevenLabs voice, Stripe billing, and email-keyed call balances. Live:[The Memory Line](https://off-the-hook.replit.app)
 
-
 - [Vanguard](apps/typescript/vangaurd/) - External TypeScript/Vike dashboard for CALL-E call orchestration, telemetry and token usage.
 - [Khoj](https://github.com/manyamharshitha/KHOJ) - Consent-first CALL-E verification calls to Indian rental brokers that check rent, deposit and availability against the advert and keep the full transcript. See the [CALL-E integration notes](https://github.com/manyamharshitha/KHOJ#call-e-integration-notes).
 - [Novyra](https://novyra-rgaa.onrender.com/) - External AI-powered lifestyle app with a CALL-E phone workflow for personalized user interactions.
@@ -470,17 +469,17 @@ No-code and low-code workflow plugins live under [`plugins/`](plugins/). They ar
 
 Plugins should be explicit about inputs, outbound call side effects, credential handling, preview or dry-run behavior, and how a workflow builder can disable or roll back the integration.
 
-| Plugin | Platform | Purpose |
-| --- | --- | --- |
-| [`plugins/n8n-calle-api`](plugins/n8n-calle-api/) | n8n | Importable CALL-E API workflow template for one-by-one outbound calls, metadata round trips, call status signals, transcripts, summaries, and structured results. |
-| [`plugins/n8n-nodes-calle`](plugins/n8n-nodes-calle/) | n8n | Documentation-only pointer to the standalone `@call-e/n8n-nodes-calle` community node package for native outbound-call nodes. |
-| [`plugins/dify-template`](plugins/dify-template/) | Dify | Importable Dify workflow DSL template for a one-shot outbound call tool with dry-run preview, API health gating, and masked results. |
-| [`plugins/hubspot-calle`](plugins/hubspot-calle/) | HubSpot | Static HubSpot Projects app for creating CALL-E call tasks from CRM records and workflow App Cards. |
-| [`plugins/zapier-calle`](plugins/zapier-calle/) | Zapier | Zapier Platform CLI integration for outbound CALL-E calls with callback-based waiting, fail-closed dispositions, dry-run preview, and payload-derived idempotency keys. |
-| [`plugins/slack-calle-bridge`](plugins/slack-calle-bridge/) | Slack | Signed slash-command bridge for previewing and explicitly confirming one CALL-E phone task, with masked structured results and deterministic retry protection. |
-| [`plugins/airtable-calle-certa`](plugins/airtable-calle-certa/) | Airtable | Consent-bound Verification of Employment from a table: the recipient result schema is derived from the base's own column definitions, consent is a per-row hash that a filled-down cell cannot forge, and the number supplied on the application is never dialed. |
-| [`plugins/firstbell-absence-calls`](plugins/firstbell-absence-calls/) | n8n | Importable school-absence call wave that dials each family in that family's own language, keeps a call that connected without producing a usable answer separate from one that did, and ships with a dry run that places no calls and needs no API key. |
-| [`plugins/google-sheets-callguardian`](plugins/google-sheets-callguardian/) | Google Sheets | Apps Script menu that gates CALL-E behind consent, call-window, do-not-call, and attempt-cap checks plus live in-call opt-out detection, with every decision written to a tamper-evident, hash-chained audit log — run directly from a spreadsheet. |
+| Plugin                                                                      | Platform      | Purpose                                                                                                                                                                                                                                                           |
+| --------------------------------------------------------------------------- | ------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| [`plugins/n8n-calle-api`](plugins/n8n-calle-api/)                           | n8n           | Importable CALL-E API workflow template for one-by-one outbound calls, metadata round trips, call status signals, transcripts, summaries, and structured results.                                                                                                 |
+| [`plugins/n8n-nodes-calle`](plugins/n8n-nodes-calle/)                       | n8n           | Documentation-only pointer to the standalone `@call-e/n8n-nodes-calle` community node package for native outbound-call nodes.                                                                                                                                     |
+| [`plugins/dify-template`](plugins/dify-template/)                           | Dify          | Importable Dify workflow DSL template for a one-shot outbound call tool with dry-run preview, API health gating, and masked results.                                                                                                                              |
+| [`plugins/hubspot-calle`](plugins/hubspot-calle/)                           | HubSpot       | Static HubSpot Projects app for creating CALL-E call tasks from CRM records and workflow App Cards.                                                                                                                                                               |
+| [`plugins/zapier-calle`](plugins/zapier-calle/)                             | Zapier        | Zapier Platform CLI integration for outbound CALL-E calls with callback-based waiting, fail-closed dispositions, dry-run preview, and payload-derived idempotency keys.                                                                                           |
+| [`plugins/slack-calle-bridge`](plugins/slack-calle-bridge/)                 | Slack         | Signed slash-command bridge for previewing and explicitly confirming one CALL-E phone task, with masked structured results and deterministic retry protection.                                                                                                    |
+| [`plugins/airtable-calle-certa`](plugins/airtable-calle-certa/)             | Airtable      | Consent-bound Verification of Employment from a table: the recipient result schema is derived from the base's own column definitions, consent is a per-row hash that a filled-down cell cannot forge, and the number supplied on the application is never dialed. |
+| [`plugins/firstbell-absence-calls`](plugins/firstbell-absence-calls/)       | n8n           | Importable school-absence call wave that dials each family in that family's own language, keeps a call that connected without producing a usable answer separate from one that did, and ships with a dry run that places no calls and needs no API key.           |
+| [`plugins/google-sheets-callguardian`](plugins/google-sheets-callguardian/) | Google Sheets | Apps Script menu that gates CALL-E behind consent, call-window, do-not-call, and attempt-cap checks plus live in-call opt-out detection, with every decision written to a tamper-evident, hash-chained audit log — run directly from a spreadsheet.               |
 
 ### Safety patterns
 
