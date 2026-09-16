@@ -1,0 +1,19 @@
+# dependencies
+node_modules
+
+# next
+.next
+next-env.d.ts
+out
+
+# env — never commit secrets
+.env.local
+.env*.local
+
+# optional runtime store snapshot
+data/.store.json
+
+# misc
+.DS_Store
+*.tsbuildinfo
+.vercel
