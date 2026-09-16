@@ -70,6 +70,14 @@ def test_authorized_destination():
 def test_mask_phone():
     assert safety.mask_phone("+15555550142") == "+1******0142"
     assert safety.mask_phone("+442071838750") == "+4*******8750"
+    assert safety.mask_phone("+1 (555) 555-0142") == "+1 (***) ***-0142"
+    assert safety.mask_phone("(555) 555-0142") == "(***) ***-0142"
+    assert safety.mask_phone("555-555-0142") == "***-***-0142"
+    assert safety.mask_phone("555.555.0142") == "***.***.0142"
+    assert safety.mask_phone("555 555 0142") == "*** *** 0142"
+    assert safety.mask_phone("+44 20 7183 8750") == "+4* ** **** 8750"
+    assert safety.mask_phone("020 7183 8750") == "0** **** 8750"
+    assert safety.mask_phone("1-555-555-0142") == "1-***-***-0142"
     assert safety.mask_phone("123") == "1**"
     assert safety.mask_phone("") == "<empty>"
 
@@ -82,3 +90,42 @@ def test_mask_text():
     assert "secret_token_xyz12345" not in masked
     assert "[REDACTED_TOKEN]" in masked
     assert "key_987654321" not in masked
+
+
+def test_mask_text_grouped_and_national_phone_numbers():
+    # Grouped international
+    t1 = "Spoke with operator at +1 (555) 555-0142: hold confirmed"
+    m1 = safety.mask_text(t1)
+    assert "+1 (555) 555-0142" not in m1
+    assert "+1 (***) ***-0142" in m1
+
+    # National parentheses
+    t2 = "Transferred to (555) 555-0142 for supervisor escalation"
+    m2 = safety.mask_text(t2)
+    assert "(555) 555-0142" not in m2
+    assert "(***) ***-0142" in m2
+
+    # National hyphenated & dotted
+    t3 = "Evidence: called 555-555-0142 and 555.010.0123"
+    m3 = safety.mask_text(t3)
+    assert "555-555-0142" not in m3
+    assert "***-***-0142" in m3
+    assert "555.010.0123" not in m3
+    assert "***.***.0123" in m3
+
+    # UK national 0-prefixed
+    t4 = "Transferred to London dispatch at 020 7183 8750"
+    m4 = safety.mask_text(t4)
+    assert "020 7183 8750" not in m4
+    assert "0** **** 8750" in m4
+
+
+def test_mask_text_protects_timestamps_ips_and_metrics():
+    text = "Incident INC-003 at 2026-09-15T10:19:48Z: host 10.0.5.42:22 psi 52.3 score 0.88 date 2026-09-15"
+    masked = safety.mask_text(text)
+    assert "INC-003" in masked
+    assert "2026-09-15T10:19:48Z" in masked
+    assert "10.0.5.42:22" in masked
+    assert "52.3" in masked
+    assert "0.88" in masked
+    assert "2026-09-15" in masked

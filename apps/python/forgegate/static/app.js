@@ -103,15 +103,64 @@
       .replace(/"/g, "&quot;");
   }
 
+  function maskPhone(val) {
+    if (!val || typeof val !== "string") return val || "";
+    const trimmed = val.trim();
+    const digits = [];
+    for (let i = 0; i < trimmed.length; i++) {
+      if (/\d/.test(trimmed[i])) digits.push(i);
+    }
+    if (digits.length <= 5) {
+      return digits.length > 1 ? trimmed[0] + "*".repeat(trimmed.length - 1) : "*";
+    }
+    let keepHeadCount = 0;
+    if (trimmed.startsWith("+")) {
+      keepHeadCount = 1;
+    } else if (digits.length === 11 && trimmed[digits[0]] === "1") {
+      keepHeadCount = 1;
+    } else if ((digits.length === 10 || digits.length === 11) && trimmed[digits[0]] === "0") {
+      keepHeadCount = 1;
+    }
+    const headSet = new Set(digits.slice(0, keepHeadCount));
+    const tailSet = new Set(digits.slice(-4));
+    let out = "";
+    for (let i = 0; i < trimmed.length; i++) {
+      if (/\d/.test(trimmed[i]) && !headSet.has(i) && !tailSet.has(i)) {
+        out += "*";
+      } else {
+        out += trimmed[i];
+      }
+    }
+    return out;
+  }
+
   function maskText(text) {
     if (!text) return "";
-    return String(text)
-      .replace(/\+[1-9][0-9]{7,14}/g, m => {
-        if (m.length <= 5) return m[0] + "*".repeat(m.length - 1);
-        return m.slice(0, 2) + "*".repeat(m.length - 6) + m.slice(-4);
-      })
-      .replace(/Bearer\s+[A-Za-z0-9_\-\.]{8,}/gi, "Bearer [REDACTED_TOKEN]")
-      .replace(/(?:calle|api|secret|token)[_-]?(?:key)?[\"'\s:=]+[A-Za-z0-9_\-\.]{8,}/gi, "$1[REDACTED_KEY]");
+    let str = String(text);
+    // Protect datetimes, dates, times, decimals, incident IDs, IPs
+    const kept = [];
+    const protectRegex = /\d{4}-\d{2}-\d{2}[T ]\d{2}:\d{2}(?::\d{2}(?:\.\d+)?)?(?:Z|[+-]\d{2}:?\d{2})?|\d{4}-\d{2}-\d{2}|\b\d{1,2}:\d{2}(?::\d{2})?\s*(?:[ap]\.?m\.?)?\b|\b(?:\d{1,3}\.){3}\d{1,3}(?::\d+)?\b|\bINC-\d+\b|(?<![\d.])\d{1,4}\.\d{1,3}(?![\d.])/gi;
+    str = str.replace(protectRegex, m => {
+      kept.push(m);
+      return `\x00${kept.length - 1}\x00`;
+    });
+
+    // Mask phone numbers (E.164, grouped, national, international)
+    const phoneRegex = /(?<![\w@.])(?:(?:\+[1-9][\d\s().-]{6,20}\d)|(?:\(?\d{3}\)?[\s.-]\d{3}[\s.-]\d{4})|(?:\b0[1-9][\d\s.-]{7,14}\d\b))(?![\w])/g;
+    str = str.replace(phoneRegex, m => {
+      const digitCount = (m.match(/\d/g) || []).length;
+      return (digitCount >= 7 && digitCount <= 15) ? maskPhone(m) : m;
+    });
+
+    // Mask Bearer tokens
+    str = str.replace(/Bearer\s+[A-Za-z0-9_\-\.]{8,}/gi, "Bearer [REDACTED_TOKEN]");
+
+    // Mask API keys
+    str = str.replace(/(?:calle|api|secret|token)[_-]?(?:key)?[\"'\s:=]+[A-Za-z0-9_\-\.]{8,}/gi, "$1[REDACTED_KEY]");
+
+    // Restore protected tokens
+    str = str.replace(/\x00(\d+)\x00/g, (_, idx) => kept[parseInt(idx, 10)]);
+    return str;
   }
 
   function fmtTime(iso) {

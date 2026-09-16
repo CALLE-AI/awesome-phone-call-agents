@@ -94,3 +94,67 @@ def test_poll_timeout_resolves_to_unclear_and_preserves_intent(monkeypatch):
     assert res.task_completed is False
     assert "timeout" in res.reason.lower()
     assert calle_client.resolve_action_state(res.disposition) == "HELD"
+
+
+def test_place_call_via_sdk_passes_idempotency_key_when_supported(monkeypatch):
+    class MockCalls:
+        def __init__(self):
+            self.calls = []
+
+        def create_and_wait(self, task, result_schema, idempotency_key=None):
+            self.calls.append({"task": task, "idempotency_key": idempotency_key})
+            return {
+                "call_id": "call_mock_1",
+                "task_completed": True,
+                "status": "completed",
+                "structured_result": {"disposition": "APPROVE", "reason": "verified"},
+                "evidence": ["all ok"],
+            }
+
+    mock_client = type("MockClient", (), {"calls": MockCalls()})()
+    monkeypatch.setattr(calle_client, "_sdk_client", lambda: mock_client)
+
+    result = calle_client._place_call_via_sdk("verify unit", "test_key_123")
+    assert result.disposition == "APPROVE"
+    assert len(mock_client.calls.calls) == 1
+    assert mock_client.calls.calls[0]["idempotency_key"] == "test_key_123"
+
+
+def test_place_call_via_sdk_fails_closed_if_signature_does_not_accept_key(monkeypatch):
+    class MockCallsNoKey:
+        def __init__(self):
+            self.calls = []
+
+        def create_and_wait(self, task, result_schema):  # No idempotency_key parameter
+            self.calls.append({"task": task})
+            return {}
+
+    mock_client = type("MockClient", (), {"calls": MockCallsNoKey()})()
+    monkeypatch.setattr(calle_client, "_sdk_client", lambda: mock_client)
+
+    with pytest.raises(calle_client.CalleDispatchError, match="does not accept 'idempotency_key'"):
+        calle_client._place_call_via_sdk("verify unit", "test_key_123")
+
+    # Method must NOT have been called
+    assert len(mock_client.calls.calls) == 0
+
+
+def test_place_call_via_sdk_fails_closed_on_type_error_without_redial(monkeypatch):
+    call_count = 0
+
+    class MockCallsFailing:
+        def create_and_wait(self, task, result_schema, idempotency_key=None):
+            nonlocal call_count
+            call_count += 1
+            # Simulates an unexpected TypeError occurring during execution
+            raise TypeError("unexpected type error during execution")
+
+    mock_client = type("MockClient", (), {"calls": MockCallsFailing()})()
+    monkeypatch.setattr(calle_client, "_sdk_client", lambda: mock_client)
+
+    with pytest.raises(calle_client.CalleDispatchError, match="CALL-E SDK call failed"):
+        calle_client._place_call_via_sdk("verify unit", "test_key_123")
+
+    # Must fail closed immediately and NEVER redial
+    assert call_count == 1
+

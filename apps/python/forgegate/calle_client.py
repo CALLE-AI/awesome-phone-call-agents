@@ -38,6 +38,7 @@ Security & Safety Controls:
 from __future__ import annotations
 
 import hashlib
+import inspect
 import os
 import time
 import urllib.parse
@@ -247,19 +248,33 @@ def place_call(
 
 def _place_call_via_sdk(task: str, key: str) -> CallResult:
     client = _sdk_client()
+    call_fn = getattr(getattr(client, "calls", None), "create_and_wait", None)
+    if call_fn is None:
+        raise CalleDispatchError("CALL-E SDK client.calls.create_and_wait method not available.")
+
+    # Determine signature support before the first request to avoid unkeyed dispatches or ambiguous redials
+    kwargs: dict[str, Any] = {
+        "task": task,
+        "result_schema": DISPOSITION_RESULT_SCHEMA,
+    }
     try:
-        try:
-            result = client.calls.create_and_wait(
-                task=task,
-                result_schema=DISPOSITION_RESULT_SCHEMA,
-                idempotency_key=key,
+        sig = inspect.signature(call_fn)
+        has_key = "idempotency_key" in sig.parameters
+        has_varkw = any(p.kind == inspect.Parameter.VAR_KEYWORD for p in sig.parameters.values())
+        if has_key or has_varkw:
+            kwargs["idempotency_key"] = key
+        else:
+            raise CalleDispatchError(
+                "CALL-E SDK calls.create_and_wait does not accept 'idempotency_key'; "
+                "refusing unkeyed call dispatch."
             )
-        except TypeError:
-            # Fallback if specific SDK version does not take idempotency_key kwarg
-            result = client.calls.create_and_wait(
-                task=task,
-                result_schema=DISPOSITION_RESULT_SCHEMA,
-            )
+    except (ValueError, TypeError):
+        # If signature cannot be inspected, pass idempotency_key directly
+        kwargs["idempotency_key"] = key
+
+    # Single call invocation: fail closed on any exception after submission; do not catch TypeError to redial
+    try:
+        result = call_fn(**kwargs)
     except Exception as exc:
         err = safety.mask_text(str(exc))
         raise CalleDispatchError(f"CALL-E SDK call failed: {err}") from exc

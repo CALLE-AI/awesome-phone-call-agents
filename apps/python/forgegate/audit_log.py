@@ -32,7 +32,7 @@ def append_entry(entry: dict) -> dict:
     sanitized.setdefault("timestamp", datetime.now(timezone.utc).isoformat())
 
     # Mask any free text fields before writing
-    for field in ("task_text", "reason", "transcript_evidence", "error", "description"):
+    for field in ("task_text", "reason", "transcript_evidence", "error", "description", "proposed_action", "post_action_reason"):
         if field in sanitized and isinstance(sanitized[field], str):
             sanitized[field] = safety.mask_text(sanitized[field])
 

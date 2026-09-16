@@ -18,6 +18,36 @@ from typing import Optional
 E164_PATTERN = re.compile(r"^\+[1-9][0-9]{7,14}$")
 DIALABLE_PATTERN = re.compile(r"\+[1-9][0-9]{7,14}")
 
+# Non-phone tokens that must survive display masking untouched:
+# ISO datetimes, dates, times, IPv4 addresses + optional port, incident IDs, decimals (temperatures, metrics)
+_PROTECT_PATTERN = re.compile(
+    r"""
+    \d{4}-\d{2}-\d{2}[T ]\d{2}:\d{2}(?::\d{2}(?:\.\d+)?)?(?:Z|[+-]\d{2}:?\d{2})?  # ISO datetime
+  | \d{4}-\d{2}-\d{2}                                                              # Date
+  | \b\d{1,2}:\d{2}(?::\d{2})?\s*(?:[ap]\.?m\.?)?\b                                # Clock time
+  | \b(?:[0-9]{1,3}\.){3}[0-9]{1,3}(?::[0-9]+)?\b                                 # IPv4 + optional port
+  | \bINC-\d+\b                                                                     # Incident ID
+  | (?<![\d.])\d{1,4}\.\d{1,3}(?![\d.])                                            # Decimals (e.g. 52.3, 0.88)
+    """,
+    re.X | re.I,
+)
+
+# Loose candidate matcher for phone numbers in free text:
+# International (+ prefixed), NANP grouped/national, UK/EU 0-prefixed, separated digit runs
+_PHONE_LIKE_PATTERN = re.compile(
+    r"""
+    (?<![\w@.])
+    (?:
+        (?:\+[1-9][\d\s().-]{6,20}\d)
+      | (?:\(?\d{3}\)?[\s.-]\d{3}[\s.-]\d{4})
+      | (?:\b0[1-9][\d\s.-]{7,14}\d\b)
+      | (?:\+[1-9][0-9]{7,14})
+    )
+    (?![\w])
+    """,
+    re.X,
+)
+
 ALLOWLIST_ENV = "FORGEGATE_ALLOWED_DESTINATIONS"
 FALLBACK_ALLOWLIST_ENV = "CALLE_ALLOWED_DESTINATIONS"
 
@@ -115,8 +145,11 @@ def assert_authorized_destination(
 def mask_phone(phone: str) -> str:
     """Mask subscriber digits, keeping country prefix and last 3-4 digits.
 
-    `+15555550142` -> `+1*******0142`.
-    Safe to call on unvalidated or invalid inputs.
+    `+15555550142` -> `+1******0142`.
+    `+1 (555) 555-0142` -> `+1 (***) ***-0142`.
+    `(555) 555-0142` -> `(***) ***-0142`.
+    `555-555-0142` -> `***-***-0142`.
+    Safe to call on unvalidated, national, or grouped inputs.
     """
     if not isinstance(phone, str):
         return "<invalid>"
@@ -128,7 +161,15 @@ def mask_phone(phone: str) -> str:
     if len(digits) <= 5:
         return val[0] + "*" * (len(val) - 1) if len(val) > 1 else "*"
 
-    keep_head = digits[:1]
+    if val.startswith("+"):
+        keep_head = digits[:1]
+    elif len(digits) == 11 and val[digits[0]] == "1":
+        keep_head = digits[:1]
+    elif len(digits) in (10, 11) and val[digits[0]] == "0":
+        keep_head = digits[:1]
+    else:
+        keep_head = []
+
     keep_tail = digits[-4:]
     out = []
     for i, c in enumerate(val):
@@ -143,23 +184,49 @@ def mask_text(text: str) -> str:
     """Mask phone numbers, bearer credentials, and API tokens in free text.
 
     Applied across logging, audit records, API responses, and UI view models.
+    Protects timestamps, dates, IP addresses, incident IDs, and metrics before masking.
     """
     if not text:
         return ""
-    # Mask dialable numbers
-    sanitized = DIALABLE_PATTERN.sub(lambda m: mask_phone(m.group(0)), str(text))
-    # Mask Bearer tokens
+
+    raw_str = str(text)
+
+    # 1. Protect non-phone tokens (timestamps, IPs, metrics, incident IDs)
+    kept: list[str] = []
+
+    def _protect(m: re.Match) -> str:
+        kept.append(m.group(0))
+        return f"\x00{len(kept) - 1}\x00"
+
+    guarded = _PROTECT_PATTERN.sub(_protect, raw_str)
+
+    # 2. Mask candidate phone numbers (E.164, grouped, national, international)
+    def _mask_candidate(m: re.Match) -> str:
+        candidate = m.group(0)
+        digit_count = sum(1 for c in candidate if c.isdigit() or not c.isascii())
+        if 7 <= digit_count <= 15:
+            return mask_phone(candidate)
+        return candidate
+
+    sanitized = _PHONE_LIKE_PATTERN.sub(_mask_candidate, guarded)
+
+    # 3. Mask Bearer tokens
     sanitized = re.sub(
         r"(Bearer\s+)[A-Za-z0-9_\-\.]{8,}",
         r"\1[REDACTED_TOKEN]",
         sanitized,
         flags=re.IGNORECASE,
     )
-    # Mask generic API keys
+
+    # 4. Mask generic API keys
     sanitized = re.sub(
         r"((?:calle|api|secret|token)[_-]?(?:key)?[\"'\s:=]+)[A-Za-z0-9_\-\.]{8,}",
         r"\1[REDACTED_KEY]",
         sanitized,
         flags=re.IGNORECASE,
     )
+
+    # 5. Restore protected tokens
+    sanitized = re.sub(r"\x00(\d+)\x00", lambda m: kept[int(m.group(1))], sanitized)
+
     return sanitized
