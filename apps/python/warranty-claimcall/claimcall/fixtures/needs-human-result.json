@@ -1,0 +1,25 @@
+{
+  "call_id": "fixture_fee_offered",
+  "status": "completed",
+  "task_completed": true,
+  "completion_confidence": 0.85,
+  "result": {
+    "outcome": "paid_service_offered",
+    "recipient_verified": "yes",
+    "claim_reference": "AUR-SVC-2026-44901",
+    "coverage_status": "pending_review",
+    "documents_requested": [],
+    "appointment_options": [],
+    "fee": { "amount": 500.0, "currency": "INR", "scope": "Bench inspection charge, refunded if the fault is found to be covered", "accepted": false },
+    "follow_up_by": null,
+    "needs_human": true,
+    "uncertainty_reasons": ["Warranty status is unclear until inspection.", "An inspection fee was proposed and not accepted."]
+  },
+  "evidence": ["A 500 rupee inspection charge was proposed. The assistant declined to accept it and escalated to the owner."],
+  "transcript": [
+    { "speaker": "agent", "at_seconds": 2, "text": "Hello, I am an automated assistant calling on behalf of Ravi about a warranty service request." },
+    { "speaker": "representative", "at_seconds": 30, "text": "I can log case AUR-SVC-2026-44901, but because the unit is close to the end of the warranty period there is a five hundred rupee inspection charge. It is refunded if the fault turns out to be covered." },
+    { "speaker": "agent", "at_seconds": 52, "text": "I am not authorised to accept any charge. I will record the five hundred rupee inspection fee and the owner will decide." },
+    { "speaker": "representative", "at_seconds": 63, "text": "That is fine, the case stays open until they confirm." }
+  ]
+}

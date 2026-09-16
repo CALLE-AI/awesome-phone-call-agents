@@ -1,0 +1,37 @@
+{
+  "call_id": "fixture_claim_registered",
+  "status": "completed",
+  "task_completed": true,
+  "completion_confidence": 0.93,
+  "started_at": "2026-09-05T09:12:04+05:30",
+  "ended_at": "2026-09-05T09:15:41+05:30",
+  "duration_seconds": 217,
+  "result": {
+    "outcome": "claim_registered",
+    "recipient_verified": "yes",
+    "claim_reference": "AUR-SVC-2026-44810",
+    "coverage_status": "pending_review",
+    "documents_requested": ["Copy of the purchase invoice", "Photograph of the serial label inside the charging case"],
+    "appointment_options": [],
+    "fee": null,
+    "follow_up_by": "2026-09-09",
+    "needs_human": false,
+    "uncertainty_reasons": ["Coverage is confirmed only after the service centre inspects the unit."]
+  },
+  "evidence": [
+    "Representative confirmed the desk as Auralite Demo Service Desk.",
+    "Reference number was read back and confirmed twice."
+  ],
+  "transcript": [
+    { "speaker": "agent", "at_seconds": 2, "text": "Hello, I am an automated assistant calling on behalf of Ravi about a warranty service request. Am I through to the Auralite Demo Service Desk?" },
+    { "speaker": "representative", "at_seconds": 9, "text": "Yes, this is Auralite Demo Service Desk. How can I help?" },
+    { "speaker": "agent", "at_seconds": 14, "text": "Thank you. The product is an Auralite Buds S2, model AB-S2-BLK, purchased on 20 January 2026 from DemoMart Electronics, invoice DM slash 2026 slash 0142. The serial is AURS2-3391-77TQ. The right earbud no longer charges. Can a warranty service claim be registered?" },
+    { "speaker": "representative", "at_seconds": 41, "text": "Yes, I can register that. The unit is within the twelve month window. Let me create a case for you." },
+    { "speaker": "representative", "at_seconds": 78, "text": "Your case reference is A U R hyphen S V C hyphen 2026 hyphen 4 4 8 1 0." },
+    { "speaker": "agent", "at_seconds": 88, "text": "Let me read that back: AUR-SVC-2026-44810. Is that correct?" },
+    { "speaker": "representative", "at_seconds": 95, "text": "That is correct, AUR-SVC-2026-44810." },
+    { "speaker": "agent", "at_seconds": 101, "text": "What documents are needed next?" },
+    { "speaker": "representative", "at_seconds": 106, "text": "Please email a copy of the purchase invoice and a photograph of the serial label inside the charging case. Coverage is confirmed once our technician inspects the unit." },
+    { "speaker": "agent", "at_seconds": 128, "text": "Understood. I will pass that to the owner. Thank you for your help." }
+  ]
+}

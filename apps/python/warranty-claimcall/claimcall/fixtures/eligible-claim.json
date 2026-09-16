@@ -1,0 +1,27 @@
+{
+  "owner_display_name": "Ravi",
+  "issue": "The right earbud no longer charges after normal use. The left one still works.",
+  "product": {
+    "brand": "Auralite",
+    "name": "Auralite Buds S2",
+    "model": "AB-S2-BLK",
+    "serial_number": "AURS2-3391-77TQ",
+    "purchase_date": "2026-01-20",
+    "invoice_number": "DM/2026/0142",
+    "seller": "DemoMart Electronics Pvt Ltd"
+  },
+  "recipient": {
+    "organization": "Auralite Demo Service Desk",
+    "phone_e164": "+15005550006"
+  },
+  "language": "en-IN",
+  "approved_windows": [
+    { "start": "2026-09-09T10:00:00+05:30", "end": "2026-09-09T18:00:00+05:30", "timezone": "Asia/Kolkata" }
+  ],
+  "max_fee": 0.0,
+  "currency": "INR",
+  "questions": [
+    "Is a service visit or a depot drop-off required for this fault?"
+  ],
+  "synthetic": true
+}
