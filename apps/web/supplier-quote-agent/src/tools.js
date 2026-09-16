@@ -46,7 +46,7 @@ const tools = [
   {
     name: 'place_call',
     description:
-      'Hand a task whose status is already "approved" to the call provider (a deterministic fake by default; the real CALL-E integration only when explicitly configured) to dial the supplier and record the outcome as {outcome, summary, next_action} on the task. Does NOT: approve a task itself, retry automatically on failure, or act on a task that is not yet approved — it refuses those and says to ask the owner instead of dialing. ' +
+      'Hand a task whose status is already "approved" to the call provider — which provider dials is an operator setting (CALL_PROVIDER at process start: a deterministic fake by default, the real CALL-E integration only when explicitly configured), never a per-call choice — and dial the supplier, recording the outcome as {outcome, summary, next_action} on the task. Does NOT: approve a task itself, retry automatically on failure, choose or reconfigure the provider, or act on a task that is not yet approved — it refuses those and says to ask the owner instead of dialing. ' +
       OWNER_ONLY_CLAUSE,
     inputSchema: {
       type: 'object',
@@ -54,10 +54,6 @@ const tools = [
         id: {
           type: 'string',
           description: 'ID of the approved task to dial'
-        },
-        provider: {
-          type: 'string',
-          description: 'Override the call provider ("fake" or "calle"); defaults to CALL_PROVIDER env var, or "fake"'
         },
         scenario: {
           type: 'string',
@@ -73,7 +69,7 @@ const tools = [
   {
     name: 'cancel_call',
     description:
-      'Abort a call that is currently in flight (dialing, connected, or wrapping up) for an approved task, ending it immediately and marking the task "cancelled". Does NOT: approve, reject, or retry a task, and does NOT no-op-succeed when nothing is dialing — it refuses instead. ' +
+      'Abort a call that is currently in flight (dialing, connected, or wrapping up) for an approved task. Against the fake provider this genuinely ends the call and marks the task "cancelled"; against the real CALL-E integration, which has no client cancel operation, it only stops this app waiting and marks the task "cancel_requested" — the phone call itself may still be ringing or connecting. Does NOT: approve, reject, or retry a task, and does NOT no-op-succeed when nothing is dialing — it refuses instead. ' +
       OWNER_ONLY_CLAUSE,
     inputSchema: {
       type: 'object',
@@ -128,7 +124,7 @@ const tools = [
   {
     name: 'get_task',
     description:
-      'Read a single task by id: its plan, status (pending/planned/approved/completed/failed/cancelled/rejected), in-flight call stage, and outcome if it has one. Does NOT: change the task in any way — this is a read-only lookup. ' +
+      'Read a single task by id: its plan, status (pending/planned/approved/completed/failed/cancelled/cancel_requested/rejected), in-flight call stage, and outcome if it has one. Does NOT: change the task in any way — this is a read-only lookup. ' +
       OWNER_ONLY_CLAUSE,
     inputSchema: {
       type: 'object',

@@ -85,18 +85,23 @@ stateDiagram-v2
     planned --> approved: approve_task -- OWNER ONLY
     planned --> rejected: reject_task -- OWNER ONLY
     approved --> rejected: reject_task -- OWNER ONLY
+    approved --> planned: update_task changes plan/suppliers -- approval invalidated
     approved --> completed: place_call (agent), provider returns
     approved --> failed: provider error
-    approved --> cancelled: cancel_call (agent or owner)
+    approved --> cancelled: cancel_call, fake provider (abort is authoritative)
+    approved --> cancel_requested: cancel_call, real provider (no cancel op -- outcome unknown)
     completed --> planned: retry_with_plan
     failed --> planned: retry_with_plan
     cancelled --> planned: retry_with_plan
+    cancel_requested --> planned: retry_with_plan
     rejected --> planned: retry_with_plan
     note right of approved
         place_call refuses any status
         other than "approved".
         Only approve_task can set it,
         and it is not a registered tool.
+        Changing the approved plan or
+        supplier list forces re-approval.
     end note
 ```
 
@@ -126,6 +131,16 @@ reaches `invoke()` without going through `tools.js`.
 around layers 1 and 2. `invoke.js` refuses it if it tries to set `status` to `"approved"`
 or `"rejected"`, and names the right action in the error.
 
+**4. Approval covers content, not just a status flag.**
+Two paths otherwise let an approval outlive what it actually covers: `create_task` would
+have honoured a caller-supplied `status`/`approvedAt`/`approvedBy` and minted a task
+already approved, and `update_task` would have let a caller change `plan` or `suppliers`
+on an *already-approved* task while leaving `status: "approved"` untouched. Both are
+closed in `invoke.js`: `create_task` strips those fields unconditionally (a task is
+always born `pending`), and `update_task` forces status back to `planned` — clearing
+`approvedAt`/`approvedBy` — the moment it touches `plan` or `suppliers` on a task that
+was `approved`. `place_call` only ever dials the plan and supplier the owner actually saw.
+
 On top of those, `place_call` refuses to dial a task whose status is not `approved`, and
 its refusal tells the caller what to do instead rather than failing blankly:
 
@@ -134,14 +149,34 @@ its refusal tells the caller what to do instead rather than failing blankly:
 ## Where a real call could happen
 
 Exactly one place: `CallEProvider.placeCall()` in `src/providers/calle-provider.js`, and
-only when `CALL_PROVIDER=calle` **and** `CALLE_API_KEY` is set. Everything else in the
-app — every test, the default `npm start`, the whole demo — runs on `FakeCallProvider`,
-which reads canned outcomes from `fake-provider/canned-responses.json` and never opens a
-socket.
+only when `CALL_PROVIDER=calle` **and** `CALLE_API_KEY` is set — both read from the
+process environment, never from a request. `place_call`'s `args` cannot select which
+provider runs or pass it a `baseUrl`/`apiKey`: `invoke.js`'s `placeCall()` resolves the
+provider from `CALL_PROVIDER` alone and only ever forwards the test-only
+`providerOptions` hook when that resolves to the fake provider — the real one is always
+constructed with zero per-call overrides. `CallEProvider` additionally refuses to
+construct against a non-`https://` base URL, and refuses to dial a destination that
+isn't a clean ASCII E.164 phone number. Everything else in the app — every test, the
+default `npm start`, the whole demo — runs on `FakeCallProvider`, which reads canned
+outcomes from `fake-provider/canned-responses.json` and never opens a socket.
 
 `CallEProvider` takes its `fetchImpl` by injection, which is why its request shape and
 response parsing can be unit-tested against `tests/fixtures/calle-responses.json` with no
 network at all. No test ever constructs it with the real `fetch`.
+
+## Network exposure
+
+The server (`src/server.js`) binds to `127.0.0.1` only, and a middleware
+(`src/local-only.js`) refuses any request whose remote socket address isn't loopback —
+defense in depth for a proxy or a future change to that bind. `actor` is still a plain,
+unauthenticated string in the request body — nothing on this machine is prevented from
+claiming to be `"owner"` — but `POST /api/invoke` refuses a request that omits `actor`
+entirely rather than defaulting it to `"owner"` (a real gap found and closed the same day
+as the fixes above: a caller that simply left the field out got the most privileged
+identity for free). The safety this entry demonstrates rests on nothing but this machine
+ever being able to reach the server at all, plus that removed default; it does not rest
+on `actor` being independently verified, which would need real sessions this local demo
+deliberately doesn't have.
 
 ## Deliberate limits
 

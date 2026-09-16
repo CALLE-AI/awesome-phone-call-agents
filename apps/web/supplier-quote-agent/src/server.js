@@ -3,33 +3,42 @@ const path = require('path');
 const { invoke, activityLog } = require('./invoke');
 const store = require('./store');
 const { tools } = require('./tools');
+const { maskDeep } = require('./mask');
+const { localOnlyMiddleware } = require('./local-only');
 
 const app = express();
 const PORT = process.env.PORT || 3000;
 
+app.use(localOnlyMiddleware);
 app.use(express.json());
 app.use(express.static(path.join(__dirname, '../public')));
 
 app.get('/api/state', (req, res) => {
-  res.json(store.getState());
+  res.json(maskDeep(store.getState()));
 });
 
 app.get('/api/activity-log', (req, res) => {
-  res.json(activityLog.getAll());
+  res.json(maskDeep(activityLog.getAll()));
 });
 
 app.get('/api/tasks', (req, res) => {
-  res.json(store.listTasks());
+  res.json(maskDeep(store.listTasks()));
 });
 
 app.post('/api/invoke', async (req, res) => {
   try {
-    const { tool, args, actor = 'owner' } = req.body;
+    // No silent default: a caller that omits `actor` gets nothing, never the most
+    // privileged identity. The dashboard's own fetch() always sends `actor: 'owner'`
+    // explicitly (public/index.html) — this is deliberate friction for anything else.
+    const { tool, args, actor } = req.body;
     if (!tool) {
       return res.status(400).json({ error: 'tool required' });
     }
+    if (!actor) {
+      return res.status(400).json({ error: 'actor required' });
+    }
     const result = await invoke(tool, args || {}, actor);
-    res.json(result);
+    res.json(maskDeep(result));
   } catch (error) {
     res.status(500).json({ error: error.message });
   }
@@ -48,7 +57,14 @@ app.get('/', (req, res) => {
   res.sendFile(path.join(__dirname, '../public/index.html'));
 });
 
-app.listen(PORT, () => {
-  // eslint-disable-next-line no-console
-  console.log(`CALL-E dashboard server listening on http://localhost:${PORT}`);
-});
+// Exported so tests can drive the real Express app over a real (ephemeral, loopback)
+// socket instead of only calling invoke() in-process — the HTTP layer itself (this
+// file) is where local-only enforcement and the actor-required check actually live.
+module.exports = { app };
+
+if (require.main === module) {
+  app.listen(PORT, '127.0.0.1', () => {
+    // eslint-disable-next-line no-console
+    console.log(`CALL-E dashboard server listening on http://localhost:${PORT} (local only)`);
+  });
+}
