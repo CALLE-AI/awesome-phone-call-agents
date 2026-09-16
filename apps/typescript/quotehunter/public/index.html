@@ -1,0 +1,927 @@
+<!DOCTYPE html>
+<html class="light" lang="en">
+
+<head>
+  <meta charset="utf-8" />
+  <meta content="width=device-width, initial-scale=1.0" name="viewport" />
+  <title>QuoteHunter</title>
+  <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
+
+  <!-- Tailwind CSS -->
+  <script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+
+  <!-- Fonts & Icons -->
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin="" />
+  <link
+    href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&display=swap"
+    rel="stylesheet" />
+
+  <script id="tailwind-config">
+    tailwind.config = {
+      darkMode: "class",
+      theme: {
+        extend: {
+          fontFamily: {
+            "sans": ["Plus Jakarta Sans", "-apple-system", "BlinkMacSystemFont", "sans-serif"],
+          }
+        }
+      }
+    }
+  </script>
+
+  <style>
+    body {
+      font-family: 'Plus Jakarta Sans', sans-serif;
+    }
+
+    .audio-bar {
+      width: 3px;
+      height: 12px;
+      background-color: #006c49;
+      border-radius: 2px;
+      display: inline-block;
+      margin: 0 1px;
+      animation: bounce 1s infinite ease-in-out;
+    }
+
+    .audio-bar:nth-child(1) {
+      animation-delay: -0.8s;
+      height: 8px;
+    }
+
+    .audio-bar:nth-child(2) {
+      animation-delay: -0.6s;
+      height: 16px;
+    }
+
+    .audio-bar:nth-child(3) {
+      animation-delay: -0.4s;
+      height: 20px;
+    }
+
+    .audio-bar:nth-child(4) {
+      animation-delay: -0.2s;
+      height: 16px;
+    }
+
+    .audio-bar:nth-child(5) {
+      animation-delay: 0s;
+      height: 10px;
+    }
+
+    .audio-bar-dark {
+      width: 2.5px;
+      background-color: #000000;
+      border-radius: 2px;
+      display: inline-block;
+      margin: 0 1px;
+      animation: bounce 0.9s infinite ease-in-out;
+    }
+
+    .audio-bar-dark:nth-child(1) {
+      animation-delay: -0.7s;
+      height: 8px;
+    }
+
+    .audio-bar-dark:nth-child(2) {
+      animation-delay: -0.5s;
+      height: 14px;
+    }
+
+    .audio-bar-dark:nth-child(3) {
+      animation-delay: -0.3s;
+      height: 18px;
+    }
+
+    .audio-bar-dark:nth-child(4) {
+      animation-delay: -0.1s;
+      height: 12px;
+    }
+
+    .audio-bar-dark:nth-child(5) {
+      animation-delay: 0s;
+      height: 6px;
+    }
+
+    @keyframes bounce {
+
+      0%,
+      100% {
+        transform: scaleY(0.45);
+      }
+
+      50% {
+        transform: scaleY(1);
+      }
+    }
+
+    .pulse-ring {
+      animation: pulse-ring 2s cubic-bezier(0.215, 0.61, 0.355, 1) infinite;
+    }
+
+    @keyframes pulse-ring {
+      0% {
+        transform: scale(0.8);
+        box-shadow: 0 0 0 0 rgba(0, 108, 73, 0.4);
+      }
+
+      70% {
+        transform: scale(1);
+        box-shadow: 0 0 0 8px rgba(0, 108, 73, 0);
+      }
+
+      100% {
+        transform: scale(0.8);
+        box-shadow: 0 0 0 0 rgba(0, 108, 73, 0);
+      }
+    }
+
+    .modal-overlay {
+      position: fixed;
+      inset: 0;
+      background: rgba(0, 0, 0, 0.4);
+      backdrop-filter: blur(4px);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      z-index: 100;
+      padding: 16px;
+    }
+
+    .modal-card {
+      background: #FFFFFF;
+      border-radius: 1.25rem;
+      box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.1), 0 10px 10px -5px rgba(0, 0, 0, 0.04);
+      border: 1px solid #e5e7eb;
+      max-width: 520px;
+      width: 100%;
+      max-height: 90vh;
+      overflow-y: auto;
+    }
+
+    .hidden-view {
+      display: none !important;
+    }
+  </style>
+</head>
+
+<body
+  class="bg-white text-gray-900 antialiased h-screen overflow-hidden flex selection:bg-gray-900 selection:text-white">
+
+  <!-- ─── QuoteHunter Custom Clean Splash Screen (Matching App Design) ── -->
+  <div id="render-splash-screen"
+    class="fixed inset-0 z-[99999] bg-[#ffffff] flex flex-col items-center justify-center p-6 text-gray-900 select-none transition-all duration-400 ease-out"
+    role="status" aria-live="polite">
+    
+    <!-- Subtle clean dot pattern matching app's crisp canvas -->
+    <div class="absolute inset-0 bg-[radial-gradient(#e5e7eb_1px,transparent_1px)] [background-size:24px_24px] pointer-events-none opacity-60"></div>
+
+    <div class="relative z-10 flex flex-col items-center max-w-sm w-full text-center">
+      
+      <!-- Brand Emblem matching the exact sidebar brand -->
+      <div class="relative mb-3">
+        <div class="w-14 h-14 rounded-2xl bg-gray-900 text-white flex items-center justify-center shadow-md shadow-gray-900/10">
+          <span class="material-symbols-outlined text-[28px]">smart_toy</span>
+        </div>
+        <!-- Live status green dot -->
+        <span class="absolute -top-1 -right-1 flex h-3.5 w-3.5">
+          <span class="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"></span>
+          <span class="relative inline-flex rounded-full h-3.5 w-3.5 bg-emerald-500 border-2 border-white"></span>
+        </span>
+      </div>
+
+      <!-- App Title & Tagline -->
+      <h1 class="text-xl font-bold tracking-tight text-gray-900 leading-tight">QuoteHunter</h1>
+      <p class="text-xs text-gray-400 font-normal mt-0.5">AI Negotiation Hub</p>
+
+      <!-- Loading / Wake Status Indicator -->
+      <div class="mt-8 flex flex-col items-center gap-3 w-full">
+        <!-- Audio equalizer bars matching the app's native visualizer -->
+        <div class="flex items-center gap-1 h-5 my-1">
+          <span class="audio-bar-dark"></span>
+          <span class="audio-bar-dark"></span>
+          <span class="audio-bar-dark"></span>
+          <span class="audio-bar-dark"></span>
+          <span class="audio-bar-dark"></span>
+        </div>
+
+        <p id="splash-status-text" class="text-xs font-medium text-gray-700 text-center">Connecting to server...</p>
+        
+        <!-- Timer shown if container is waking up on Render -->
+        <p id="splash-timer-text" class="text-[11px] text-gray-400 font-mono text-center">
+          Waking instance: <span id="splash-timer" class="font-semibold text-gray-700">0s</span>
+        </p>
+
+        <!-- Minimalist progress bar -->
+        <div class="w-44 h-1 bg-gray-100 rounded-full overflow-hidden relative mt-1">
+          <div id="splash-progress" class="h-full bg-gray-900 rounded-full w-1/3 animate-pulse transition-all duration-300"></div>
+        </div>
+
+        <!-- Render Free Tier Standby Hint -->
+        <div id="splash-wake-hint" class="mt-4 px-3.5 py-2.5 rounded-xl bg-gray-50 border border-gray-100 text-[11px] text-gray-500 text-center leading-relaxed max-w-xs">
+          <span>Render free tier spins down after 15m of inactivity. Waking container (~15–30s)...</span>
+        </div>
+      </div>
+
+    </div>
+  </div>
+
+  <!-- ─── SideNavBar ─────────────────────────────────────────────────── -->
+  <aside
+    class="bg-[#fafbfc] text-gray-700 w-64 fixed left-0 top-0 bottom-0 border-r border-gray-200/80 flex flex-col h-full py-5 px-3.5 z-40 select-none font-sans">
+
+    <!-- Brand Header -->
+    <div class="mb-5 flex items-center gap-2.5 px-1.5">
+      <div class="w-8 h-8 rounded-lg bg-gray-900 text-white flex items-center justify-center shadow-xs shrink-0">
+        <span class="material-symbols-outlined text-[18px]">smart_toy</span>
+      </div>
+      <div>
+        <h1 class="text-sm font-semibold text-gray-900 tracking-tight leading-tight">QuoteHunter</h1>
+        <p class="text-[11px] text-gray-400 font-normal">AI Negotiation Hub</p>
+      </div>
+    </div>
+
+    <!-- CTA Button -->
+    <button id="btn-new-chat"
+      class="bg-gray-900 hover:bg-gray-800 text-white text-xs font-medium rounded-xl py-2.5 px-3.5 mb-4 w-full flex justify-center items-center gap-2 transition-all shadow-xs cursor-pointer">
+      <span class="material-symbols-outlined text-[16px] font-light">add</span>
+      <span>New Negotiation</span>
+    </button>
+
+    <!-- Navigation Links -->
+    <nav class="flex-1 overflow-y-auto space-y-0.5 pr-0.5">
+      <!-- <a class="flex items-center gap-2.5 py-2 px-2.5 rounded-xl text-gray-600 font-normal text-xs hover:bg-gray-100/70 hover:text-gray-900 transition-colors"
+        href="#" onclick="switchView('home'); return false;">
+        <span class="material-symbols-outlined text-[18px] text-gray-400 font-light">search</span>
+        <span>Search</span>
+      </a> -->
+
+      <!-- Recents Section with Dynamic Thread History -->
+      <div class="pt-3 pb-1">
+        <div
+          class="flex items-center justify-between px-2.5 py-1.5 text-[11px] font-medium text-gray-400 uppercase tracking-wider">
+          <span class="flex items-center gap-1.5">
+            <span class="material-symbols-outlined text-[14px] text-gray-400 font-light">history</span>
+            <span>Recents</span>
+          </span>
+          <div class="flex items-center gap-1.5">
+            <span class="text-[10px] font-mono bg-gray-200/80 text-gray-600 px-1.5 py-0.2 rounded-full font-normal"
+              id="recents-badge">0</span>
+            <button id="btn-clear-all-history" type="button" title="Clear all stored history"
+              class="text-gray-400 hover:text-rose-600 p-0.5 rounded transition-colors hidden cursor-pointer flex items-center justify-center">
+              <span class="material-symbols-outlined text-[14px]">delete_sweep</span>
+            </button>
+          </div>
+        </div>
+
+        <!-- Recents List -->
+        <div class="mt-1 space-y-0.5" id="recents-list">
+          <p class="text-xs text-gray-400 italic px-2.5 py-2" id="no-recents-msg">No recent negotiations</p>
+        </div>
+      </div>
+
+    </nav>
+  </aside>
+
+  <!-- ─── Main Content Viewport ──────────────────────────────────────── -->
+  <div class="ml-64 flex-1 flex flex-col h-screen relative bg-white min-w-0 overflow-x-hidden">
+
+    <!-- ═════════════════════════════════════════════════════════════════ -->
+    <!-- VIEW 1: HOME VIEW (Minimalist, Clean Centered Vibe)              -->
+    <!-- ═════════════════════════════════════════════════════════════════ -->
+    <main id="view-home"
+      class="flex-1 overflow-y-auto p-6 sm:p-12 flex flex-col justify-center items-center min-w-0 w-full">
+      <div class="max-w-4xl sm:max-w-[940px] w-full mx-auto space-y-7 -mt-6 px-2 sm:px-4">
+
+        <!-- Hero Header with extra bottom space -->
+        <header class="text-center mb-8 sm:mb-10">
+          <h2 class="text-2xl sm:text-[32px] font-normal text-[#1e293b] tracking-normal">
+            Let QuoteHunter make the call for you
+          </h2>
+        </header>
+
+        <!-- Wider Central Prompt Card with decreased height -->
+        <form id="hunt-form"
+          class="bg-white border border-[#d6dbe1] rounded-2xl p-4 sm:p-5 shadow-[0_1px_4px_rgba(0,0,0,0.03)] relative focus-within:border-gray-400 focus-within:shadow-md transition-all">
+          <textarea id="job-desc"
+            class="w-full h-16 sm:h-[76px] bg-transparent border-none resize-none focus:ring-0 text-[15px] sm:text-base text-gray-800 placeholder:text-gray-400 font-normal outline-none leading-relaxed"
+            placeholder="Tell QuoteHunter who to call and what to say"></textarea>
+
+          <div class="flex items-center justify-between pt-2.5 mt-1 border-t border-gray-100">
+            <div class="flex items-center gap-2 flex-wrap" id="selected-numbers-container">
+              <button type="button" onclick="openAddVendorModal()"
+                class="w-8 h-8 rounded-lg hover:bg-gray-100 text-gray-400 hover:text-gray-700 flex items-center justify-center transition-colors cursor-pointer"
+                title="Add Phone Number">
+                <span class="material-symbols-outlined text-[20px] font-light">add</span>
+              </button>
+            </div>
+
+            <!-- Action Call Button -->
+            <button type="submit" id="btn-launch-hunt"
+              class="bg-[#5f6368] hover:bg-[#474a4d] text-white w-9 h-9 sm:w-10 sm:h-10 rounded-full flex items-center justify-center transition-all active:scale-95 shadow-sm shrink-0 cursor-pointer"
+              title="Make Call">
+              <span class="material-symbols-outlined text-[19px]">call</span>
+            </button>
+          </div>
+        </form>
+
+        <!-- 4 Minimalist Option Buttons (Original text with clean minimalist line icons, no emojis) -->
+        <div class="grid grid-cols-2 sm:grid-cols-4 gap-3 sm:gap-3.5">
+          <button type="button"
+            class="preset-chip bg-white border border-[#d6dbe1] rounded-xl py-3 px-4 flex items-center gap-2.5 hover:border-gray-400 hover:bg-gray-50/70 transition-all text-left group shadow-[0_1px_2px_rgba(0,0,0,0.02)] cursor-pointer"
+            data-category="painting">
+            <span
+              class="material-symbols-outlined text-[19px] text-[#64748b] group-hover:text-gray-900 font-light shrink-0">format_paint</span>
+            <span class="text-xs sm:text-[13px] font-normal text-[#334155] group-hover:text-gray-900 truncate">Painting
+              RFQ</span>
+          </button>
+
+          <button type="button"
+            class="preset-chip bg-white border border-[#d6dbe1] rounded-xl py-3 px-4 flex items-center gap-2.5 hover:border-gray-400 hover:bg-gray-50/70 transition-all text-left group shadow-[0_1px_2px_rgba(0,0,0,0.02)] cursor-pointer"
+            data-category="plumbing">
+            <span
+              class="material-symbols-outlined text-[19px] text-[#64748b] group-hover:text-gray-900 font-light shrink-0">plumbing</span>
+            <span class="text-xs sm:text-[13px] font-normal text-[#334155] group-hover:text-gray-900 truncate">Plumbing
+              Repair</span>
+          </button>
+
+          <button type="button"
+            class="preset-chip bg-white border border-[#d6dbe1] rounded-xl py-3 px-4 flex items-center gap-2.5 hover:border-gray-400 hover:bg-gray-50/70 transition-all text-left group shadow-[0_1px_2px_rgba(0,0,0,0.02)] cursor-pointer"
+            data-category="electrical">
+            <span
+              class="material-symbols-outlined text-[19px] text-[#64748b] group-hover:text-gray-900 font-light shrink-0">electric_bolt</span>
+            <span
+              class="text-xs sm:text-[13px] font-normal text-[#334155] group-hover:text-gray-900 truncate">Electrical
+              Work</span>
+          </button>
+
+          <button type="button"
+            class="preset-chip bg-white border border-[#d6dbe1] rounded-xl py-3 px-4 flex items-center gap-2.5 hover:border-gray-400 hover:bg-gray-50/70 transition-all text-left group shadow-[0_1px_2px_rgba(0,0,0,0.02)] cursor-pointer"
+            data-category="carpentry">
+            <span
+              class="material-symbols-outlined text-[19px] text-[#64748b] group-hover:text-gray-900 font-light shrink-0">handyman</span>
+            <span class="text-xs sm:text-[13px] font-normal text-[#334155] group-hover:text-gray-900 truncate">Custom
+              Carpentry</span>
+          </button>
+        </div>
+
+      </div>
+    </main>
+
+    <!-- ═════════════════════════════════════════════════════════════════ -->
+    <!-- VIEW 2: RECENT THREAD VIEW (Live Swarm & Best Quote Found)        -->
+    <!-- ═════════════════════════════════════════════════════════════════ -->
+    <section id="view-thread"
+      class="flex-1 flex flex-col h-full hidden-view font-sans min-w-0 w-full overflow-x-hidden">
+
+      <!-- Top Thread Header Bar -->
+      <header
+        class="bg-[#fafbfc] h-14 flex items-center justify-between px-6 sm:px-8 border-b border-gray-200/80 shrink-0 z-10 min-w-0">
+        <div class="flex items-center gap-2.5 min-w-0 flex-1 pr-4">
+          <span class="material-symbols-outlined text-gray-400 text-[18px] font-light shrink-0">forum</span>
+          <h2 class="text-xs sm:text-[13px] font-medium text-gray-800 truncate" id="top-bar-title">
+            Call and inquire if they are available to paint a 3BHK apartment at the earliest. Ask the estimated total
+            price and completion timeline
+          </h2>
+        </div>
+        <div class="flex items-center gap-2 shrink-0">
+          <span id="thread-status-badge"
+            class="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full bg-emerald-50 text-emerald-800 border border-emerald-200/80 text-[11px] font-medium">
+            <span class="w-1.5 h-1.5 rounded-full bg-emerald-600 animate-pulse"></span>
+            <span>Live Swarm</span>
+          </span>
+        </div>
+      </header>
+
+      <!-- Scrollable Thread Body -->
+      <div class="flex-1 overflow-y-auto px-6 sm:px-12 py-6 pb-12 space-y-6 min-w-0">
+
+        <!-- User Prompt Speech Bubble (Image 1) -->
+        <div class="flex justify-end min-w-0">
+          <div
+            class="bg-[#f0f4f9] text-gray-900 rounded-2xl px-5 py-3.5 max-w-2xl border border-gray-200/50 shadow-2xs break-words">
+            <p class="text-xs sm:text-[13px] leading-relaxed font-normal break-words" id="thread-user-prompt">
+              Call and inquire if they are available to paint a 3BHK apartment at the earliest. Ask the estimated total
+              price and completion timeline
+            </p>
+          </div>
+        </div>
+
+        <!-- Bot Working / Progress Pill (Matches Image 1) -->
+        <div id="thread-bot-status-container" class="flex items-center gap-3">
+          <div class="w-8 h-8 rounded-full bg-black text-white flex items-center justify-center shadow-xs shrink-0">
+            <span class="material-symbols-outlined text-[17px]">smart_toy</span>
+          </div>
+          <div id="thread-working-pill"
+            class="inline-flex items-center gap-2 px-3 py-1.5 bg-white border border-gray-200/90 rounded-full text-xs text-gray-700 shadow-2xs font-sans">
+            <span class="w-3.5 h-3.5 border-2 border-gray-300 border-t-gray-800 rounded-full animate-spin"></span>
+            <span id="thread-working-timer">Working for 1s</span>
+          </div>
+        </div>
+
+        <!-- Bento Grid: Swarm & Details Panel -->
+        <div class="grid grid-cols-1 lg:grid-cols-12 gap-6 items-start transition-all hidden-view" id="thread-content-grid">
+
+          <!-- Left Column: Live Call Swarm (Matches Image 2) -->
+          <div class="lg:col-span-5 space-y-2 transition-all" id="thread-swarm-column">
+            <div class="flex items-center gap-2">
+              <span class="material-symbols-outlined text-gray-700 text-[18px] font-light">chat_bubble</span>
+              <h3 class="text-sm sm:text-base font-semibold text-gray-900">Live Call Swarm</h3>
+            </div>
+
+            <div class="bg-[#fbfcfd] border border-[#eaedf0] rounded-2xl p-3.5 space-y-2.5 shadow-2xs"
+              id="thread-swarm-container">
+              <div class="space-y-2.5" id="thread-swarm-list">
+                <!-- Swarm dynamic cards -->
+              </div>
+            </div>
+          </div>
+
+          <!-- Right Column: Negotiation Details Panel (Inline, ONLY visible when negotiation task is over) -->
+          <div class="lg:col-span-7 space-y-3 hidden-view transition-all" id="thread-details-column">
+            <h3 class="text-[11px] font-medium uppercase tracking-wider text-gray-400 flex items-center gap-1.5">
+              <span class="material-symbols-outlined text-gray-500 text-sm font-light">receipt_long</span>
+              <span id="details-section-title">Negotiation Details</span>
+            </h3>
+
+            <div id="vendor-details-card"
+              class="bg-white border border-gray-200/90 rounded-2xl p-5 sm:p-6 flex flex-col justify-between shadow-xs space-y-5 transition-all">
+              <div>
+                <!-- Header Info -->
+                <div class="flex justify-between items-start gap-4 min-w-0">
+                  <div class="min-w-0 flex-1 pr-2">
+                    <div class="flex items-center gap-2 flex-wrap">
+                      <h4 class="text-base sm:text-lg lg:text-xl font-medium text-gray-900 truncate"
+                        id="detail-vendor-name">Raj Painters</h4>
+                      <span id="detail-best-badge"
+                        class="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-amber-50 border border-amber-200 text-amber-800 text-[10px] font-semibold shrink-0">
+                        <span class="material-symbols-outlined text-[12px]">star</span>
+                        <span>Best Quote</span>
+                      </span>
+                    </div>
+                    <div class="mt-1">
+                      <span id="detail-vendor-phone" class="text-xs text-gray-400 font-mono">+91 *******210</span>
+                    </div>
+                  </div>
+                  <div class="text-right shrink-0 max-w-[50%] min-w-0">
+                    <div class="text-xl sm:text-2xl font-semibold text-emerald-700 tracking-tight font-mono truncate"
+                      id="detail-quote-price">₹11,800</div>
+                    <div class="text-[11px] text-gray-400 font-normal mt-0.5 truncate" id="detail-quote-terms">Includes
+                      Materials</div>
+                  </div>
+                </div>
+
+                <!-- Badges Grid -->
+                <div class="grid grid-cols-2 gap-3 mt-4">
+                  <div class="bg-gray-50/80 border border-gray-100 rounded-xl p-2.5">
+                    <div class="text-[10px] font-medium uppercase tracking-wider text-gray-400">Timeline</div>
+                    <div class="text-xs sm:text-sm font-medium text-gray-800 mt-0.5 truncate" id="detail-timeline">2-3
+                      Days</div>
+                  </div>
+                  <div class="bg-gray-50/80 border border-gray-100 rounded-xl p-2.5">
+                    <div class="text-[10px] font-medium uppercase tracking-wider text-gray-400">Extra Terms</div>
+                    <div class="text-xs sm:text-sm font-medium text-gray-800 mt-0.5 truncate" id="detail-conditions">No
+                      Hidden Charges</div>
+                  </div>
+                </div>
+
+                <!-- Spoken Evidence Quote Box -->
+                <div class="mt-4">
+                  <label class="text-[11px] font-medium uppercase text-gray-400 block mb-1.5 flex items-center gap-1.5">
+                    <span class="material-symbols-outlined text-[14px]">record_voice_over</span>
+                    <span>Verbatim Spoken Audio Evidence</span>
+                  </label>
+                  <div
+                    class="bg-[#fafbfc] p-3.5 rounded-xl border border-gray-200/70 text-xs text-gray-700 italic leading-relaxed font-normal relative"
+                    id="detail-evidence-container">
+                    <span
+                      class="material-symbols-outlined absolute top-2 right-2 text-gray-300 text-2xl font-light">format_quote</span>
+                    <p class="pr-6" id="detail-evidence-text">
+                      "Yes, we can do it for 11,800 final price. We'll start tomorrow morning and finish by Thursday
+                      evening. Quality paint guaranteed."
+                    </p>
+                  </div>
+                </div>
+
+                <!-- Provider Notes -->
+                <div class="mt-3">
+                  <label class="text-[11px] font-medium uppercase text-gray-400 block mb-1.5">Provider Stated
+                    Terms</label>
+                  <div
+                    class="bg-[#fafbfc] p-3 rounded-xl border border-gray-200/70 text-xs text-gray-600 leading-relaxed font-normal"
+                    id="detail-notes-text">
+                    Standard emulsion with ceiling primer coat. Free touch-up within 1 year warranty.
+                  </div>
+                </div>
+              </div>
+
+              <!-- Action Buttons -->
+              <div class="flex gap-3 pt-2 border-t border-gray-100">
+                <button type="button" id="btn-detail-view-conversation"
+                  class="flex-1 bg-white hover:bg-gray-50 border border-gray-200 text-gray-700 text-xs font-medium rounded-xl py-2.5 px-4 transition-colors shadow-2xs cursor-pointer flex items-center justify-center gap-1.5">
+                  <span class="material-symbols-outlined text-[15px] text-gray-500">record_voice_over</span>
+                  <span>View Full Conversation</span>
+                </button>
+                <button type="button" id="btn-detail-confirm-booking"
+                  class="flex-1 bg-gray-900 hover:bg-black text-white text-xs font-medium rounded-xl py-2.5 px-4 transition-all shadow-xs cursor-pointer flex items-center justify-center gap-1.5 active:scale-[0.98]">
+                  <span class="material-symbols-outlined text-[15px]">call</span>
+                  <span>Contact &amp; Book</span>
+                </button>
+              </div>
+
+            </div>
+          </div>
+
+        </div>
+
+      </div>
+    </section>
+
+  </div>
+
+  <!-- ─── Booking & Contact Dossier Modal (Human Hand-Off) ─────────────── -->
+  <div id="booking-dossier-modal" class="modal-overlay hidden-view" role="dialog" aria-modal="true"
+    aria-labelledby="dossier-vendor-name">
+    <div
+      class="modal-card max-w-[520px] w-full bg-white rounded-3xl border border-gray-200/90 shadow-2xl overflow-hidden font-sans flex flex-col">
+
+      <!-- Top Header -->
+      <div class="px-6 sm:px-7 pt-6 pb-4 border-b border-gray-100 flex items-center justify-between">
+        <div class="flex items-center gap-3">
+          <div
+            class="w-10 h-10 rounded-2xl bg-emerald-50 border border-emerald-100/80 flex items-center justify-center text-emerald-600 shrink-0 shadow-2xs">
+            <span class="material-symbols-outlined text-[22px]">verified_user</span>
+          </div>
+          <div>
+            <div class="flex items-center gap-2">
+              <h3 class="text-base font-semibold text-gray-900 tracking-tight" id="dossier-vendor-name">Urban Colors
+                Ltd.</h3>
+              <span
+                class="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-emerald-50 text-emerald-700 border border-emerald-200/60 text-[10px] font-medium">
+                Verified Deal
+              </span>
+            </div>
+            <p class="text-xs text-gray-400 font-normal mt-0.5">Negotiation summary &amp; direct contact</p>
+          </div>
+        </div>
+        <button type="button" id="btn-close-dossier"
+          class="w-8 h-8 rounded-full hover:bg-gray-100 text-gray-400 hover:text-gray-700 flex items-center justify-center transition-colors cursor-pointer"
+          title="Close">
+          <span class="material-symbols-outlined text-[18px]">close</span>
+        </button>
+      </div>
+
+      <!-- Body Content -->
+      <div class="p-6 sm:p-7 space-y-5 max-h-[75vh] overflow-y-auto">
+
+        <!-- Hero Price & Timeline Card with Generous Padding -->
+        <div
+          class="bg-gradient-to-br from-gray-50/90 to-[#f8fafc] border border-gray-200/80 rounded-2xl p-5 sm:p-6 space-y-2.5">
+          <div class="flex items-start justify-between gap-4">
+            <div class="shrink-0">
+              <span class="text-[11px] font-medium uppercase tracking-wider text-gray-400 block mb-1">Negotiated
+                Quote</span>
+              <span class="text-2xl sm:text-[28px] font-bold text-gray-900 font-sans tracking-tight"
+                id="dossier-price">$4,300</span>
+            </div>
+            <div class="text-right max-w-[62%]">
+              <span class="text-[11px] font-medium uppercase tracking-wider text-gray-400 block mb-1.5">Estimated
+                Timeline</span>
+              <div
+                class="inline-flex items-center text-right px-3.5 py-1.5 rounded-xl bg-white border border-gray-200/90 text-xs font-medium text-gray-700 shadow-2xs leading-relaxed"
+                id="dossier-timeline">
+                Within 2-3 Days
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Direct Contact Card -->
+        <div class="bg-[#f8fafc] border border-gray-200/80 rounded-2xl p-4 space-y-3">
+          <div class="flex items-center justify-between">
+            <span class="text-[11px] font-medium uppercase tracking-wider text-gray-400">Direct Phone Number</span>
+            <button type="button" id="btn-dossier-copy-phone"
+              class="px-2.5 py-1 rounded-lg bg-white hover:bg-gray-100 text-gray-600 border border-gray-200 text-[11px] font-medium transition-colors cursor-pointer inline-flex items-center gap-1 shadow-2xs">
+              <span class="material-symbols-outlined text-[13px]">content_copy</span>
+              <span>Copy</span>
+            </button>
+          </div>
+
+          <div class="font-mono text-xl font-bold tracking-normal text-gray-900" id="dossier-unmasked-phone">
+            +1 555 010 0100
+          </div>
+
+          <!-- Quick Action Buttons -->
+          <div class="grid grid-cols-2 gap-2.5 pt-1">
+            <a id="dossier-call-link" href="#"
+              class="bg-gray-900 hover:bg-black text-white py-2.5 px-3 rounded-xl text-xs font-medium transition-all shadow-xs flex items-center justify-center gap-2 text-center active:scale-[0.98]">
+              <span class="material-symbols-outlined text-[16px]">call</span>
+              <span>Call Provider</span>
+            </a>
+            <a id="dossier-whatsapp-link" href="#" target="_blank" rel="noopener noreferrer"
+              class="bg-[#25D366]/10 hover:bg-[#25D366]/20 text-[#0d7348] border border-[#25D366]/30 py-2.5 px-3 rounded-xl text-xs font-medium transition-all shadow-2xs flex items-center justify-center gap-2 text-center active:scale-[0.98]">
+              <span class="material-symbols-outlined text-[16px]">chat</span>
+              <span>Message on WhatsApp</span>
+            </a>
+          </div>
+        </div>
+
+        <!-- Agreed Scope & Terms -->
+        <div class="space-y-1.5">
+          <span class="text-[11px] font-medium uppercase tracking-wider text-gray-400 block px-1">Agreed Terms &amp;
+            Scope</span>
+          <div class="bg-white border border-gray-200/80 rounded-xl p-3.5 text-xs text-gray-700 leading-relaxed"
+            id="dossier-terms">
+            Standard emulsion with ceiling primer coat. Free touch-up within 1 year warranty.
+          </div>
+        </div>
+
+        <!-- Verbatim Spoken Evidence Quote -->
+        <div class="space-y-1.5">
+          <span class="text-[11px] font-medium uppercase tracking-wider text-gray-400 block px-1">Spoken Audio
+            Evidence</span>
+          <div
+            class="bg-[#f0f4f9]/70 border border-gray-200/60 rounded-xl p-3.5 text-xs text-gray-600 italic leading-relaxed relative"
+            id="dossier-evidence-container">
+            <p id="dossier-evidence">
+              "Yes, we can do it for 11,800 final price. We can start immediately and finish within 2-3 days."
+            </p>
+          </div>
+        </div>
+
+      </div>
+
+      <!-- Modal Footer -->
+      <div class="px-6 py-4 border-t border-gray-100 bg-[#fafbfc] flex items-center justify-between">
+        <button type="button" id="btn-dossier-copy-all"
+          class="px-3 py-2 text-xs font-medium text-gray-600 hover:text-gray-900 hover:bg-gray-200/60 rounded-xl transition-colors cursor-pointer inline-flex items-center gap-1.5">
+          <span class="material-symbols-outlined text-[15px] text-gray-500">assignment</span>
+          <span>Copy Full Deal Sheet</span>
+        </button>
+        <button type="button" id="btn-dossier-done"
+          class="px-5 py-2 bg-gray-900 hover:bg-black text-white text-xs font-medium rounded-xl transition-colors shadow-xs cursor-pointer">
+          Done
+        </button>
+      </div>
+
+    </div>
+  </div>
+
+  <!-- ─── Add Phone Number Modal ──────────────────────────────────────── -->
+  <div id="add-vendor-modal" class="modal-overlay hidden-view" role="dialog" aria-modal="true"
+    aria-labelledby="add-vendor-title">
+    <div class="modal-card max-w-md w-full bg-white rounded-2xl border border-gray-200 shadow-xl overflow-hidden">
+      <div class="p-5 border-b border-gray-100 flex items-center justify-between">
+        <div>
+          <h3 class="text-base sm:text-[17px] font-medium text-gray-900" id="add-vendor-title">Add phone number</h3>
+          <p class="text-xs text-gray-400 font-normal mt-0.5">Specify who CALL-E should reach out to</p>
+        </div>
+        <button id="btn-close-add-modal" type="button" aria-label="Close dialog"
+          class="text-gray-400 hover:text-gray-700 text-xl p-1 leading-none rounded-lg transition-colors">&times;</button>
+      </div>
+
+      <form id="add-vendor-form" class="p-5 space-y-4">
+        <div>
+          <label for="input-vendor-name" class="block text-xs font-medium text-gray-700 mb-1.5">Contact / Business
+            Name</label>
+          <input id="input-vendor-name" type="text" placeholder="e.g. Acme Painting, John Doe (optional)"
+            class="w-full px-3.5 py-2.5 rounded-xl border border-gray-200 text-sm text-gray-800 placeholder:text-gray-400 outline-none focus:border-gray-800 transition-all" />
+        </div>
+
+        <div>
+          <label for="input-vendor-phone" class="block text-xs font-medium text-gray-700 mb-1.5">Phone Number (with
+            country code)</label>
+          <input id="input-vendor-phone" type="tel" placeholder="+15550100100 or +15550100101" required
+            class="w-full px-3.5 py-2.5 rounded-xl border border-gray-200 text-sm font-mono text-gray-800 placeholder:text-gray-400 outline-none focus:border-gray-800 transition-all" />
+          <p id="phone-validation-error" class="text-[11px] text-rose-500 font-medium mt-1.5 hidden"></p>
+          <p id="phone-validation-hint" class="text-[11px] text-gray-400 mt-1.5">Include country code starting with '+'
+            followed by 8-15 digits (e.g. +1 555 010 0100 or +1 555 010 0101)</p>
+        </div>
+
+        <div class="flex items-center justify-end gap-2.5 pt-3 border-t border-gray-100">
+          <button id="btn-cancel-add-modal" type="button"
+            class="px-4 py-2 text-xs font-medium text-gray-500 hover:text-gray-900 rounded-lg transition-colors">Cancel</button>
+          <button type="submit"
+            class="px-5 py-2.5 bg-[#5f6368] hover:bg-[#474a4d] text-white text-xs font-medium rounded-xl transition-colors shadow-xs">Add
+            Number</button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <!-- ─── Pre-Call Verification Modal ─────────────────────────────────── -->
+  <div id="verify-call-modal" class="modal-overlay hidden-view" role="dialog" aria-modal="true"
+    aria-labelledby="verify-call-title">
+    <div
+      class="modal-card max-w-md w-full bg-white rounded-2xl border border-gray-200 shadow-2xl p-6 space-y-4 font-sans">
+      <div class="flex items-center gap-3">
+        <div
+          class="w-10 h-10 rounded-full bg-teal-50 border border-teal-100 flex items-center justify-center text-teal-700 shrink-0">
+          <span class="material-symbols-outlined text-[22px]">phone_forwarded</span>
+        </div>
+        <div>
+          <h3 class="text-base font-semibold text-gray-900" id="verify-call-title">Check Call Details</h3>
+          <p class="text-xs text-gray-500 mt-0.5">Please review your prompt &amp; vendor numbers before placing the
+            call.</p>
+        </div>
+      </div>
+
+      <div class="space-y-2.5 bg-gray-50/80 rounded-xl p-3.5 border border-gray-200/70 text-xs text-gray-700 font-sans">
+        <div>
+          <span class="text-[11px] font-medium text-gray-400 uppercase tracking-wider block mb-1">Target Phone(s)</span>
+          <div id="verify-call-phones-preview" class="font-medium text-gray-800 flex flex-wrap gap-1.5">
+          </div>
+        </div>
+
+        <div class="pt-2 border-t border-gray-200/60">
+          <span class="text-[11px] font-medium text-gray-400 uppercase tracking-wider block mb-1">AI Prompt /
+            Requirements</span>
+          <p id="verify-call-prompt-preview"
+            class="text-xs text-gray-800 leading-relaxed break-words max-h-28 overflow-y-auto pr-1">
+          </p>
+        </div>
+      </div>
+
+      <div class="flex items-center justify-end gap-2.5 pt-2">
+        <button type="button" id="btn-cancel-verify-call"
+          class="px-4 py-2.5 text-xs font-medium text-gray-600 hover:text-gray-900 hover:bg-gray-100 rounded-xl transition-colors cursor-pointer">
+          Edit Details
+        </button>
+        <button type="button" id="btn-confirm-verify-call"
+          class="px-5 py-2.5 bg-gray-900 hover:bg-black text-white text-xs font-medium rounded-xl transition-colors shadow-xs cursor-pointer inline-flex items-center gap-1.5">
+          <span class="material-symbols-outlined text-[15px]">call</span>
+          <span>Yes, Make Call</span>
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <!-- ─── Custom Delete Confirmation Modal ─────────────────────────────── -->
+  <div id="delete-thread-modal" class="modal-overlay hidden-view" role="alertdialog" aria-modal="true"
+    aria-labelledby="delete-thread-title">
+    <div
+      class="modal-card max-w-sm w-full bg-white rounded-2xl border border-gray-200 shadow-2xl p-6 space-y-4 font-sans">
+      <div class="flex items-center gap-3">
+        <div
+          class="w-10 h-10 rounded-full bg-rose-50 border border-rose-100 flex items-center justify-center text-rose-600 shrink-0">
+          <span class="material-symbols-outlined text-[20px]">delete</span>
+        </div>
+        <div>
+          <h3 class="text-base font-semibold text-gray-900" id="delete-thread-title">Delete negotiation?</h3>
+          <p class="text-xs text-gray-500 mt-0.5">This action cannot be undone.</p>
+        </div>
+      </div>
+
+      <div
+        class="bg-gray-50 rounded-xl p-3 border border-gray-100 text-xs text-gray-700 leading-relaxed break-words max-h-32 overflow-y-auto font-sans"
+        id="delete-thread-title-preview">
+        Painting RFQ
+      </div>
+
+      <div class="flex items-center justify-end gap-2.5 pt-2">
+        <button type="button" id="btn-cancel-delete-modal"
+          class="px-4 py-2 text-xs font-medium text-gray-600 hover:text-gray-900 hover:bg-gray-100 rounded-xl transition-colors cursor-pointer">
+          Cancel
+        </button>
+        <button type="button" id="btn-confirm-delete-modal"
+          class="px-4 py-2 bg-rose-600 hover:bg-rose-700 text-white text-xs font-medium rounded-xl transition-colors shadow-xs cursor-pointer inline-flex items-center gap-1.5">
+          <span class="material-symbols-outlined text-[15px]">delete</span>
+          <span>Delete</span>
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <!-- ─── Universal Custom Confirmation Modal ──────────────────────────── -->
+  <div id="custom-confirm-modal" class="modal-overlay hidden-view" role="alertdialog" aria-modal="true"
+    aria-labelledby="confirm-modal-title">
+    <div
+      class="modal-card max-w-sm w-full bg-white rounded-2xl border border-gray-200 shadow-2xl p-6 space-y-4 font-sans">
+      <div class="flex items-center gap-3">
+        <div id="confirm-modal-icon-container"
+          class="w-10 h-10 rounded-full bg-rose-50 border border-rose-100 flex items-center justify-center text-rose-600 shrink-0">
+          <span class="material-symbols-outlined text-[20px]" id="confirm-modal-icon">help_outline</span>
+        </div>
+        <div>
+          <h3 class="text-base font-semibold text-gray-900" id="confirm-modal-title">Confirm Action</h3>
+          <p class="text-xs text-gray-500 mt-0.5" id="confirm-modal-subtitle">Are you sure you want to proceed?</p>
+        </div>
+      </div>
+
+      <div
+        class="bg-gray-50 rounded-xl p-3 border border-gray-100 text-xs text-gray-700 leading-relaxed break-words hidden-view"
+        id="confirm-modal-body">
+      </div>
+
+      <div class="flex items-center justify-end gap-2.5 pt-2">
+        <button type="button" id="btn-cancel-confirm-modal"
+          class="px-4 py-2 text-xs font-medium text-gray-600 hover:text-gray-900 hover:bg-gray-100 rounded-xl transition-colors cursor-pointer">
+          Cancel
+        </button>
+        <button type="button" id="btn-action-confirm-modal"
+          class="px-4 py-2 bg-gray-900 hover:bg-black text-white text-xs font-medium rounded-xl transition-colors shadow-xs cursor-pointer inline-flex items-center gap-1.5">
+          <span id="confirm-modal-btn-text">Confirm</span>
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <!-- ─── Floating Toast Notification Container ────────────────────────── -->
+  <div id="toast-container" class="fixed bottom-6 right-6 z-50 flex flex-col gap-2 pointer-events-none"></div>
+
+  <!-- ─── Conversation Detail Modal (Turn-by-Turn & Audio Player) ─────── -->
+  <div id="conversation-modal" class="modal-overlay hidden-view" role="dialog" aria-modal="true"
+    aria-labelledby="conv-modal-title">
+    <div
+      class="modal-card max-w-3xl w-full bg-white rounded-2xl border border-gray-200 shadow-2xl overflow-hidden flex flex-col max-h-[92vh] font-sans">
+
+      <!-- Top Modal Header -->
+      <div class="px-6 py-4 border-b border-gray-100 flex items-start justify-between bg-[#fafbfc]">
+        <div class="space-y-1.5">
+          <div class="flex items-center gap-2 flex-wrap">
+            <div
+              class="w-6 h-6 rounded-lg bg-gray-100 border border-gray-200 flex items-center justify-center text-gray-700 shrink-0">
+              <span class="material-symbols-outlined text-[15px]">smart_toy</span>
+            </div>
+            <h3 class="text-sm sm:text-base font-semibold text-gray-900" id="conv-modal-title">Conversation Detail</h3>
+            <span
+              class="px-1.5 py-0.2 rounded bg-gray-100 text-gray-600 text-[10px] font-medium border border-gray-200">E</span>
+            <span id="conv-duration-badge"
+              class="px-2 py-0.5 rounded-full bg-emerald-50 text-emerald-700 border border-emerald-200 text-[11px] font-medium inline-flex items-center gap-1">
+              <span class="material-symbols-outlined text-[13px]">timer</span>
+              <span id="conv-duration-text">Duration 1m 50s</span>
+            </span>
+          </div>
+
+          <div class="flex items-center gap-2 text-xs text-gray-400 flex-wrap">
+            <span id="conv-phone" class="font-mono text-gray-600 font-medium">+91 *******948</span>
+            <span>•</span>
+            <span id="conv-date">Aug 24, 2026, 10:55 AM</span>
+            <span>•</span>
+            <span class="text-gray-500">ByRobot</span>
+          </div>
+
+          <div class="flex items-center gap-1.5 text-[11px] text-gray-400 font-mono">
+            <span id="conv-call-hash">aff5e5c8652440d0af3b55c7bba121d1</span>
+            <button type="button" id="btn-copy-call-hash" title="Copy Call ID"
+              class="hover:text-gray-700 transition-colors cursor-pointer p-0.5">
+              <span class="material-symbols-outlined text-[13px]">content_copy</span>
+            </button>
+          </div>
+        </div>
+
+        <div class="flex items-center gap-1 text-gray-400">
+          <button id="btn-close-conv-modal" type="button" aria-label="Close dialog"
+            class="w-8 h-8 rounded-lg hover:bg-gray-100 flex items-center justify-center text-gray-500 hover:text-gray-900 transition-colors cursor-pointer"
+            title="Close">
+            <span class="material-symbols-outlined text-xl">close</span>
+          </button>
+        </div>
+      </div>
+
+      <!-- Audio Player Bar (Matches Reference Image) -->
+      <div class="px-6 py-3 border-b border-gray-100 bg-white space-y-2">
+        <div class="flex items-center justify-between text-xs text-gray-500 font-mono">
+          <span id="conv-audio-id" class="font-normal truncate max-w-md">aff5e5c8652440d0af3b55c7bba121d1</span>
+        </div>
+
+        <div class="flex items-center gap-3">
+          <!-- Play / Pause Button -->
+          <button type="button" id="btn-play-pause-audio"
+            class="w-8 h-8 rounded-full bg-teal-500 hover:bg-teal-600 text-white flex items-center justify-center transition-all shadow-2xs shrink-0 cursor-pointer">
+            <span class="material-symbols-outlined text-[18px]" id="audio-play-icon">play_arrow</span>
+          </button>
+
+          <!-- Audio Progress Scrubber -->
+          <div class="flex-1 relative flex items-center">
+            <input type="range" id="audio-scrubber" min="0" max="100" value="0" step="0.1"
+              class="w-full h-1.5 bg-gray-200 rounded-lg appearance-none cursor-pointer accent-teal-500" />
+          </div>
+
+          <!-- Time Indicator -->
+          <span class="text-xs font-mono text-gray-500 shrink-0" id="audio-time-display">00:00 / 01:50</span>
+
+          <!-- Playback Speed -->
+          <select id="audio-speed-select"
+            class="text-xs font-medium text-gray-700 bg-gray-50 hover:bg-gray-100 border border-gray-200 rounded-lg px-2 py-1 outline-none cursor-pointer">
+            <option value="1">1X</option>
+            <option value="1.25">1.25X</option>
+            <option value="1.5">1.5X</option>
+            <option value="2">2X</option>
+          </select>
+        </div>
+      </div>
+
+      <!-- Turn-by-Turn Chat Area (Matches Reference Image) -->
+      <div id="conv-turns-container" class="flex-1 overflow-y-auto p-6 sm:p-8 space-y-6 bg-[#fbfcfd] max-h-[55vh]">
+        <!-- Dynamic turns rendered by app.js -->
+      </div>
+
+    </div>
+  </div>
+
+  <script src="/app.js"></script>
+</body>
+
+</html>
