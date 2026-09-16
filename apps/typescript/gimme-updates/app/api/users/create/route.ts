@@ -4,6 +4,7 @@ import { NextRequest, NextResponse } from "next/server";
 
 import { db, users } from "@/db";
 import { ingestEmailsForUser } from "@/lib/emailIngestion";
+import { maskPhoneNumber } from "@/lib/privacy";
 
 // Loose E.164 check: a leading "+", then 8-15 digits total, first digit 1-9.
 const E164_PATTERN = /^\+[1-9]\d{7,14}$/;
@@ -50,6 +51,6 @@ export async function POST(request: NextRequest) {
   return NextResponse.json({
     id: user.id,
     name: user.name,
-    phoneNumber: user.phoneNumber,
+    phoneNumber: maskPhoneNumber(user.phoneNumber),
   });
 }

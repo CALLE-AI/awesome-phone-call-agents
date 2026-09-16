@@ -2,6 +2,7 @@ import { eq } from "drizzle-orm";
 import { NextRequest, NextResponse } from "next/server";
 
 import { db, users } from "@/db";
+import { maskPhoneNumber } from "@/lib/privacy";
 
 // Accepts "HH:mm" (24-hour), e.g. "13:05" or "09:30".
 const TIME_PATTERN = /^([01]\d|2[0-3]):([0-5]\d)$/;
@@ -39,5 +40,10 @@ export async function POST(
     .where(eq(users.id, userId))
     .returning();
 
-  return NextResponse.json(updated);
+  return NextResponse.json({
+    id: updated.id,
+    name: updated.name,
+    phoneNumber: maskPhoneNumber(updated.phoneNumber),
+    callTime: updated.callTime,
+  });
 }

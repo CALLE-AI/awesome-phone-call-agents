@@ -45,6 +45,9 @@ export const emails = sqliteTable("emails", {
   dueDate: integer("due_date", { mode: "timestamp" }),
   decision: text("decision"),
   decisionDetail: text("decision_detail"),
+  // "pending" | "resolved" | "reminder_scheduled" | "followup_in_progress"
+  // | "unresolved". "unresolved" means a CALL-E attempt failed or came back
+  // ambiguous — do not auto-retry; requires manual reconciliation.
   status: text("status").notNull().default("pending"),
   createdAt: integer("created_at", { mode: "timestamp" })
     .notNull()
@@ -61,6 +64,16 @@ export const reminders = sqliteTable("reminders", {
     .references(() => emails.id),
   remindAt: integer("remind_at", { mode: "timestamp" }).notNull(),
   fired: integer("fired", { mode: "boolean" }).notNull().default(false),
+  // True when this row was created while fake/dry-run mode was active.
+  // Cron must never place a real call for these, even if real calling is
+  // later enabled — simulated reminders stay simulated.
+  isSimulated: integer("is_simulated", { mode: "boolean" })
+    .notNull()
+    .default(false),
+  // "pending" | "fired" | "unresolved". "unresolved" means a CALL-E attempt
+  // failed or came back ambiguous — do not auto-retry; requires manual
+  // reconciliation. Distinct from both pending (still due) and fired (done).
+  status: text("status").notNull().default("pending"),
   createdAt: integer("created_at", { mode: "timestamp" })
     .notNull()
     .default(sql`(unixepoch())`),

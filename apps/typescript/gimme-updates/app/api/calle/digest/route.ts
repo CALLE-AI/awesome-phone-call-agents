@@ -2,7 +2,7 @@ import { eq } from "drizzle-orm";
 import { NextRequest, NextResponse } from "next/server";
 
 import { db, users } from "@/db";
-import { runDigestForUser } from "@/lib/digest";
+import { runDigestForUser, toPublicDigestResult } from "@/lib/digest";
 
 export async function POST(request: NextRequest) {
   const body = await request.json().catch(() => null);
@@ -47,5 +47,5 @@ export async function POST(request: NextRequest) {
     );
   }
 
-  return NextResponse.json(result);
+  return NextResponse.json(toPublicDigestResult(result));
 }

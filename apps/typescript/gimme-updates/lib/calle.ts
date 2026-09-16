@@ -2,6 +2,8 @@ import { randomUUID } from "crypto";
 
 import { CalleClient } from "@call-e/calle";
 
+import { maskPhoneNumber } from "@/lib/privacy";
+
 // Lazily constructed, same pattern as lib/openrouter.ts's OpenAI client:
 // avoid throwing at module load time just because CALLE_API_KEY is missing.
 let calleClient: CalleClient | undefined;
@@ -17,10 +19,32 @@ function getCalleClient(): CalleClient {
   return calleClient;
 }
 
-// Defaults to true (dry run) unless explicitly set to the string "false".
-// This protects our limited free CALL-E call credits while iterating —
-// real calls only go out when someone deliberately opts in.
-export const CALLE_DRY_RUN = process.env.CALLE_DRY_RUN !== "false";
+// Public deployments must leave this unset or "false". Real outbound CALL-E
+// calls are only possible when an operator explicitly sets
+// ALLOW_REAL_CALLS=true. Anything else forces fake/dry-run behavior, even
+// if CALLE_DRY_RUN is "false" — so a publicly reachable demo cannot place
+// real calls to arbitrary submitted numbers.
+export const ALLOW_REAL_CALLS = process.env.ALLOW_REAL_CALLS === "true";
+
+// Effective dry-run flag used everywhere we decide whether to call CALL-E.
+// Forced on unless ALLOW_REAL_CALLS is exactly "true"; when real calls are
+// allowed, this still defaults to true unless CALLE_DRY_RUN is the string
+// "false".
+export const CALLE_DRY_RUN =
+  !ALLOW_REAL_CALLS || process.env.CALLE_DRY_RUN !== "false";
+
+/**
+ * True when a CALL-E result is good enough to apply side effects (email
+ * decisions, reminder firing). Failed or ambiguous results must not be
+ * treated as "still pending" — callers should mark them unresolved so the
+ * next cron tick does not silently retry.
+ */
+export function isCalleResultResolved(call: {
+  status: string;
+  taskCompleted: boolean | null;
+}): boolean {
+  return call.status === "completed" && call.taskCompleted === true;
+}
 
 const URGENCY_ORDER: Record<string, number> = { high: 0, medium: 1, low: 2 };
 
@@ -168,14 +192,12 @@ export async function runDigestCall(
   const task = buildTask(sortedEmails);
 
   if (CALLE_DRY_RUN) {
-    console.log(
-      "[calle] CALLE_DRY_RUN is true — not placing a real call. Would have sent:",
-      JSON.stringify(
-        { phoneNumber, task, resultSchema: RESULT_SCHEMA },
-        null,
-        2
-      )
-    );
+    console.log("[calle] dry-run digest call — not placing a real call", {
+      phoneNumber: maskPhoneNumber(phoneNumber),
+      emailCount: sortedEmails.length,
+      schema: "digest-decisions",
+      allowRealCalls: ALLOW_REAL_CALLS,
+    });
 
     return {
       id: `dry-run-${randomUUID()}`,
@@ -188,17 +210,32 @@ export async function runDigestCall(
 
   const client = getCalleClient();
 
+  console.log("[calle] placing digest call", {
+    phoneNumber: maskPhoneNumber(phoneNumber),
+    emailCount: sortedEmails.length,
+  });
+
   const call = await client.calls.createAndWait({
     task,
     resultSchema: RESULT_SCHEMA,
     recipients: [{ phones: [phoneNumber] }],
   });
 
+  const structuredResult =
+    call.structuredResult as DigestStructuredResult | null;
+
+  console.log("[calle] digest call finished", {
+    callId: call.id,
+    status: call.status,
+    taskCompleted: call.taskCompleted,
+    decisionCount: structuredResult?.decisions?.length ?? 0,
+  });
+
   return {
     id: call.id,
     status: call.status,
     taskCompleted: call.taskCompleted,
-    structuredResult: call.structuredResult as DigestStructuredResult | null,
+    structuredResult,
     evidence: call.evidence,
   };
 }
@@ -247,14 +284,11 @@ export async function runReminderCall(
   const task = buildReminderTask(email);
 
   if (CALLE_DRY_RUN) {
-    console.log(
-      "[calle] CALLE_DRY_RUN is true — not placing a real reminder call. Would have sent:",
-      JSON.stringify(
-        { phoneNumber, task, resultSchema: REMINDER_RESULT_SCHEMA },
-        null,
-        2
-      )
-    );
+    console.log("[calle] dry-run reminder call — not placing a real call", {
+      phoneNumber: maskPhoneNumber(phoneNumber),
+      schema: "reminder-acknowledged",
+      allowRealCalls: ALLOW_REAL_CALLS,
+    });
 
     return {
       id: `dry-run-${randomUUID()}`,
@@ -267,6 +301,10 @@ export async function runReminderCall(
 
   const client = getCalleClient();
 
+  console.log("[calle] placing reminder call", {
+    phoneNumber: maskPhoneNumber(phoneNumber),
+  });
+
   const call = await client.calls.createAndWait({
     task,
     resultSchema: REMINDER_RESULT_SCHEMA,
@@ -274,6 +312,13 @@ export async function runReminderCall(
   });
 
   const structured = call.structuredResult as { acknowledged?: boolean } | null;
+
+  console.log("[calle] reminder call finished", {
+    callId: call.id,
+    status: call.status,
+    taskCompleted: call.taskCompleted,
+    acknowledged: structured?.acknowledged ?? null,
+  });
 
   return {
     id: call.id,

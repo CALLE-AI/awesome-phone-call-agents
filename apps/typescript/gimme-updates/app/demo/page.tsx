@@ -21,9 +21,10 @@ interface DigestCallResponse {
     id: string | null;
     status: string;
     taskCompleted: boolean | null;
-    evidence: string[];
+    dryRun: boolean;
   };
   emails: DigestEmailResult[];
+  unresolved: boolean;
 }
 
 interface ReminderItem {
@@ -262,10 +263,10 @@ export default function Home() {
 
               {callResult && (
                 <div className="space-y-2 rounded-md bg-zinc-50 p-3 text-sm dark:bg-zinc-950">
-                  {isDryRunCall && (
+                  {(callResult.call.dryRun || isDryRunCall) && (
                     <p className="font-medium text-amber-600 dark:text-amber-400">
-                      This is a simulated call. CALLE_DRY_RUN is on, so no
-                      real phone call was placed.
+                      This is a simulated call. Real calling is disabled, so
+                      no real phone call was placed.
                     </p>
                   )}
                   <p className="text-zinc-600 dark:text-zinc-400">

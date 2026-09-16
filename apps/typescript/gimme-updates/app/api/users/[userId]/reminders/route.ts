@@ -26,7 +26,13 @@ export async function GET(
     })
     .from(reminders)
     .innerJoin(emails, eq(reminders.emailId, emails.id))
-    .where(and(eq(reminders.userId, userId), eq(reminders.fired, false)))
+    .where(
+      and(
+        eq(reminders.userId, userId),
+        eq(reminders.fired, false),
+        eq(reminders.status, "pending")
+      )
+    )
     .orderBy(reminders.remindAt);
 
   const result = rows.map((row) => ({

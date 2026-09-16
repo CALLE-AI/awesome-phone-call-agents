@@ -29,7 +29,8 @@ Fill in `.env`:
 - `DATABASE_URL` — SQLite file path, e.g. `./dev.db`
 - `OPENROUTER_API_KEY` — used for email classification (category, urgency, summary, due date) via OpenRouter
 - `CALLE_API_KEY` — your CALL-E API key
-- `CALLE_DRY_RUN` — **defaults to `true`**. See "Dry-run behavior" below.
+- `ALLOW_REAL_CALLS` — **defaults to `false`**. Required safety switch for any public deployment. See below.
+- `CALLE_DRY_RUN` — **defaults to `true`**. Even when set to `false`, real calls are still blocked unless `ALLOW_REAL_CALLS=true`.
 
 Then:
 ```bash
@@ -40,17 +41,36 @@ npm run dev
 
 Visit `localhost:3000` to try the public signup flow, or `npm run db:seed` for a single local demo user.
 
-## Dry-run behavior (important)
+## Public deployment safety (required)
 
-`CALLE_DRY_RUN=true` (the default) means **no real phone call is placed**. The app logs the exact task text and `resultSchema` it would have sent to CALL-E, and returns a fake but realistic structured result so the rest of the pipeline (decision storage, reminder scheduling, dashboard display) can be tested safely without consuming CALL-E call credits.
+**Any publicly reachable deployment must keep `ALLOW_REAL_CALLS` unset or `false`.** This is the required safety posture for this demo: the signup and digest routes accept any E.164 number with no proof that the submitter owns it, so a public instance must not be able to place real CALL-E calls.
 
-Set `CALLE_DRY_RUN=false` to place real calls. We recommend testing with dry-run on first, then flipping it off for a single deliberate real-call test, since CALL-E call credits are limited.
+When `ALLOW_REAL_CALLS` is not exactly the string `true`, the app **forces dry-run/fake CALL-E behavior** regardless of `CALLE_DRY_RUN`. Setting `CALLE_DRY_RUN=false` alone cannot enable real calling.
+
+To place real calls, an operator must set both:
+
+```bash
+ALLOW_REAL_CALLS=true
+CALLE_DRY_RUN=false
+```
+
+Do this only on a private/operator-controlled environment, and only for numbers you are authorized to call.
+
+Reminders created while fake/dry-run mode is active are stored with `isSimulated=true`. Cron will skip those rows and never promote them to a real call if you later flip the flags. Failed or ambiguous CALL-E results are marked `unresolved` (not left `pending`) so the next cron tick cannot silently redial.
+
+Phone numbers in logs and API responses are masked to the last 4 digits (for example `+91XXXXXX1234`). Full task text, CALL-E result payloads, and transcripts are not returned to the client.
+
+## Dry-run behavior
+
+`CALLE_DRY_RUN` defaults to `true`. Combined with `ALLOW_REAL_CALLS` (above), that means **no real phone call is placed** unless an operator has explicitly enabled real calling. In fake mode the app still runs the rest of the pipeline (decision storage, reminder scheduling, dashboard display) against a realistic structured result, without consuming CALL-E call credits.
+
+We recommend testing with fake mode on first, then enabling real calls only for a single deliberate test, since CALL-E call credits are limited.
 
 ## Side effects
 
-- Real calls (when `CALLE_DRY_RUN=false`) place an actual outbound phone call to the phone number provided at signup.
+- Real calls (only when `ALLOW_REAL_CALLS=true` **and** `CALLE_DRY_RUN=false`) place an actual outbound phone call to the phone number provided at signup.
 - A basic rate-limit guard restricts each user to one real digest call, to avoid unintentional credit usage from repeated testing or demo clicks. Dry-run calls are not limited.
-- Reminder calls (via the cron route) place a second real call when a scheduled reminder comes due, if not in dry-run mode.
+- Reminder calls (via the cron route) place a second real call when a scheduled **non-simulated** reminder comes due, if real calling is enabled. Simulated reminders are skipped.
 
 ## Cancellation
 
