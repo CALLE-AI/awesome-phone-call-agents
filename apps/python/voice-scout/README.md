@@ -45,10 +45,11 @@ python app.py --demo
 # Preview a lead; still does not call
 python app.py --lead examples/synthetic_lead.json
 
-# Live call only after explicit review and approval
+# Live call only after explicit review and authorization
+# Add "authorized_live_call": true only to a lead you own or are authorized to call.
 export CALLE_API_KEY
 export CALLE_GOAL_ID
-python app.py --live --lead examples/synthetic_lead.json --output result.json
+python app.py --live --lead /path/to/authorized_test_lead.json --output result.json
 ```
 
 The API key is read from the environment and is never stored in the lead file or result output.
@@ -74,7 +75,8 @@ The browser UI is preview-only unless `DEMO_ENABLE_LIVE=true`. In live mode, a v
   "lead_source": "local_directory",
   "known_company_size": "small",
   "known_workflow": "Phone calls and web inquiries are handled by the owner",
-  "known_pain_points": "Missed calls during repair appointments"
+  "known_pain_points": "Missed calls during repair appointments",
+  "authorized_live_call": false
 }
 ```
 
