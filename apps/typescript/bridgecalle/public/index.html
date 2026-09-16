@@ -182,7 +182,7 @@
 
     function loadData() {
       // Clear all old unmasked local storage keys
-      ['bc_persons', 'bc_persons_v2', 'bc_persons_v3', 'bc_persons_v4', 'bc_persons_v5', 'bc_persons_v6', 'bc_persons_v7', 'bc_persons_v8', 'bc_self_phone', 'bc_self_phone_v5', 'bc_self_phone_v6', 'bc_self_phone_v7', 'bc_self_phone_v8'].forEach(k => localStorage.removeItem(k));
+      ['bc_persons', 'bc_persons_v2', 'bc_persons_v3', 'bc_persons_v4', 'bc_persons_v5', 'bc_persons_v6', 'bc_persons_v7', 'bc_self_phone', 'bc_self_phone_v5', 'bc_self_phone_v6', 'bc_self_phone_v7', 'bc_self_phone_v8'].forEach(k => localStorage.removeItem(k));
 
       const savedSelfPhone = localStorage.getItem('bc_self_phone_v9');
       if (savedSelfPhone && isValidE164(savedSelfPhone)) {
@@ -355,9 +355,17 @@
             alert(`ℹ️ Dry-run preview mode complete for ${person.name || 'Human'}.`);
           }
         } else {
-          alert('Call task response: Not connected.');
+          const errData = await response.json().catch(() => ({}));
+          newCallLog.status = 'SUBMISSION_FAILED';
+          newCallLog.duration = '0s';
+          newCallLog.points = ['Live call task submission failed at provider.'];
+          saveData();
+          alert('Call task response: ' + (errData.message || 'Unable to initiate call task at provider.'));
         }
       } catch (err) {
+        newCallLog.status = 'DRY_RUN_PREVIEW';
+        newCallLog.duration = 'Preview Only';
+        saveData();
         banner.classList.add('hidden');
         alert(`ℹ️ Dry-run preview mode complete for ${person.name || 'Human'}.`);
       }
@@ -556,7 +564,7 @@
           logsContainer.className = 'space-y-3';
 
           logs.forEach(log => {
-            const isNotConn = log.status && (log.status.includes('NOT') || log.status.includes('FAILED'));
+            const isNotConn = log.status && (log.status.includes('NOT') || log.status.includes('FAILED') || log.status.includes('FAIL'));
             const badgeClass = isNotConn ? 'bg-red-100 text-red-800' : 'bg-emerald-100 text-emerald-800';
             const statusLabel = isNotConn ? 'NOT CONNECTED' : (log.status || 'COMPLETED');
 

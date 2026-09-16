@@ -22,12 +22,13 @@ function maskPhone(phone) {
 
 app.post('/api/calls/trigger', async (req, res) => {
   try {
-    const { seniorName, seniorPhone, execute, confirmOptIn } = req.body;
+    const { seniorName, seniorPhone, execute, confirmOptIn, operatorKey } = req.body;
     const apiKey = process.env.CALLE_API_KEY || '';
 
     if (!seniorPhone || !E164_REGEX.test(seniorPhone)) {
       return res.status(400).json({
         success: false,
+        mode: 'invalid_input',
         message: 'Invalid phone number. A valid E.164 phone number is required (e.g. standards-reserved +15550100000 or sample +919876543210).'
       });
     }
@@ -36,12 +37,21 @@ app.post('/api/calls/trigger', async (req, res) => {
     const masked = maskPhone(seniorPhone);
     const isIndia = seniorPhone.startsWith('+91');
 
-    // Dry-run preview mode by default unless live execution and opt-in are explicitly authorized
-    if (!execute || !confirmOptIn || !apiKey) {
+    // Operator Authorization / Local Boundary Verification
+    const clientIp = req.ip || req.socket.remoteAddress || '';
+    const isLocal = ['127.0.0.1', '::1', '::ffff:127.0.0.1'].includes(clientIp) || req.hostname === 'localhost';
+    const serverOperatorKey = process.env.OPERATOR_KEY || process.env.OPERATOR_SECRET || '';
+    const reqKey = req.headers['x-operator-key'] || operatorKey || '';
+    const isOperatorAuthorized = serverOperatorKey ? (reqKey === serverOperatorKey) : true;
+
+    const isLiveAuthorized = (isLocal || (serverOperatorKey && isOperatorAuthorized)) && isOperatorAuthorized;
+
+    // Dry-run preview mode by default unless live execution, opt-in, and local/operator authorization are ALL present
+    if (!execute || !confirmOptIn || !apiKey || !isLiveAuthorized) {
       return res.json({
         success: true,
         mode: 'preview',
-        message: 'Dry-run preview mode (no network call placed). Provide server CALLE_API_KEY and pass execute: true & confirmOptIn: true for live calls.',
+        message: 'Dry-run preview mode (no network call placed). Requires server CALLE_API_KEY, local operator authorization, and explicit execute flags.',
         call: {
           calleCallId: `calle_preview_${Date.now()}`,
           maskedPhone: masked,
@@ -67,10 +77,12 @@ app.post('/api/calls/trigger', async (req, res) => {
 
     const data = await response.json();
     if (!response.ok) {
-      console.error('[CALL-E Engine] Provider response error:', data.error || data);
+      // Omit/sanitize raw provider error output to prevent internal diagnostic leaks
+      console.error(`[CALL-E Engine] Provider returned HTTP ${response.status} failure status.`);
       return res.status(400).json({
         success: false,
-        message: 'Unable to initiate call task at provider. Please verify phone number and try again.'
+        mode: 'live_failed',
+        message: 'Unable to initiate call task at provider. Please verify phone number and parameters.'
       });
     }
 
@@ -85,7 +97,12 @@ app.post('/api/calls/trigger', async (req, res) => {
       }
     });
   } catch (err) {
-    res.status(500).json({ success: false, message: 'Server error triggering call.' });
+    console.error('[CALL-E Engine] Internal server error encountered during dispatch.');
+    res.status(500).json({
+      success: false,
+      mode: 'server_error',
+      message: 'Server error processing call task.'
+    });
   }
 });
 
