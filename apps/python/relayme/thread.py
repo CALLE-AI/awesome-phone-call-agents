@@ -81,7 +81,7 @@ def build_thread(task: dict, result: dict, transcript: Iterable[dict] | None) ->
     thread.append(Message(ROLE_YOU, redact(task.get("question", "").strip())))
 
     # 2. The plan shown back before the call, so the user stays in control.
-    business = task.get("business_display_name", "the business")
+    business = redact(task.get("business_display_name", "the business"))
     thread.append(Message(
         ROLE_RELAYME,
         f"I'll call {business}, say I'm an AI assistant calling for you, and ask that. "

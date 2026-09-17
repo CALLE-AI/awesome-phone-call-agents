@@ -94,7 +94,7 @@ def print_preview(task: dict, goal: str) -> None:
     print("RelayMe call preview  (no call is placed in this step)")
     print("=" * 68)
     print(f"  Task ID:      {task['task_id']}")
-    print(f"  Calling:      {task['business_display_name']}")
+    print(f"  Calling:      {redact(task['business_display_name'])}")
     print(f"  Number:       {mask_phone(task['to_phone_e164'])}")
     print(f"  Idempotency:  relayme:{task['task_id']}")
     print("\n  Question the agent will ask:")
