@@ -1,26 +1,49 @@
-# Safety Reference — call-script-compliance-auditor
+# Examples
 
-## Legal Disclaimer
+## Example 1: Successful Audit (UK FCA)
 
-**This skill is a heuristic regulatory analysis tool. It is NOT a substitute for qualified legal counsel.**
+**Input Script (`script.txt`):**
+> Hello, my name is Alex and I'm calling from Acme Financial Services. We would like to tell you about our loan products. There is no rush — please take whatever time you need to consider. If you would like to opt out of future calls, please let me know. Please note that your home may be at risk if you do not keep up repayments. We are authorised and regulated by the Financial Conduct Authority.
 
-Every compliance report includes a mandatory `false_positive_disclaimer`. Always obtain professional legal review before deploying any call script in a regulated context.
+**Command:**
+```bash
+python3 scripts/audit_script.py --script script.txt --jurisdiction UK_FCA
+```
 
-## False Positive Risk
+**Output Excerpt:**
+```json
+{
+  "jurisdiction": "UK_FCA",
+  "overall_verdict": "PASS",
+  "risk_level": "NONE",
+  "fail_count": 0,
+  "warn_count": 0
+}
+```
 
-| Risk | Scenario | Impact |
-|---|---|---|
-| False positive (FAIL) | Opt-out offered verbally but not in script text | Flagged as missing |
-| False negative (PASS) | Prohibited phrase uses unusual wording | Missed by patterns |
-| Jurisdiction mismatch | Using EU_GDPR for a US script | Wrong rules applied |
+## Example 2: Failed Audit (High-Pressure Tactics)
 
-## Privacy
+**Input Script (`bad_script.txt`):**
+> This is a limited-time offer that expires tonight. You'll get the best rate if you decide right now.
 
-Raw script text is hashed only. Evidence snippets (≤100 chars) may be sensitive.
-
-## Recommended Workflow
-
-1. Run before every new or modified call script deployment.
-2. All `FAIL` checks: remediate and re-audit.
-3. All `WARN` checks: legal professional review.
-4. Archive reports alongside call recordings for audit trail.
+**Output Excerpt:**
+```json
+{
+  "jurisdiction": "UK_FCA",
+  "overall_verdict": "FAIL",
+  "risk_level": "HIGH",
+  "checks": [
+    {
+      "requirement_id": "FCA_CD_COMM_3",
+      "requirement": "FCA Consumer Duty \u2014 No false urgency or artificial time pressure",
+      "status": "FAIL",
+      "suggested_rewrite": "This offer is available for a limited period. Please take whatever time you need to consider it carefully."
+    }
+  ],
+  "flags": [
+    "REQUIRES_LEGAL_REVIEW",
+    "PRESSURE_TACTIC_DETECTED",
+    "HIGH_COMPLIANCE_RISK"
+  ]
+}
+```

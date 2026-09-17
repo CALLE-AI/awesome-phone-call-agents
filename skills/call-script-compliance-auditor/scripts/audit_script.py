@@ -432,6 +432,13 @@ def audit(
     rules = RULES[jurisdiction]
 
     checks = [check_rule(rule, raw) for rule in rules]
+    
+    # Compliance check for phone numbers (PR 288)
+    phone_pattern = re.compile(r'\b(?:\+?1[-.\s]?)?\(?[2-9]\d{2}\)?[-.\s]?\d{3}[-.\s]?\d{4}\b')
+    for match in phone_pattern.finditer(raw):
+        if not "555-01" in match.group():
+            raise ValueError(f"Compliance Error: Real phone numbers are prohibited. Use 555-01xx range. Got {match.group()}")
+
     verdict = overall_verdict(checks)
     risk = risk_level(checks)
     flags = build_flags(checks)

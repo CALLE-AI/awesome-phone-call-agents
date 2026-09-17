@@ -50,7 +50,7 @@ TCPA_COMPLIANT = (
     "Hello, this is Jordan calling from Acme Corp. "
     "This is an automated message. "
     "To be placed on our do-not-call list, please press 9 or say stop. "
-    "You can reach us back at 800 555 0187."
+    "You can reach us back at 555-0187."
 )
 
 TCPA_NON_COMPLIANT = (
