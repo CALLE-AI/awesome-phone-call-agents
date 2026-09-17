@@ -63,7 +63,9 @@ npm run preview
 
 ## Backend Demo Mode
 
-ClinicCall includes a credential-free demo backend so the application can be tested without making real phone calls.
+ClinicCall includes a no-call demo backend that needs no CALL-E credentials.
+Patient and history routes still require a private operator password because
+demo calling does not prevent operators from entering private patient records.
 
 From the `backend` directory:
 
@@ -76,6 +78,11 @@ Activate the virtual environment and install dependencies:
 ```bash
 pip install -r requirements.txt
 ```
+
+Set `CLINICCALL_OPERATOR_PASSWORD` to a private, non-demo password through your
+local environment or untracked backend `.env` file. There is no working default;
+the former `demo-password` value is rejected. The username defaults to `demo`
+and can be changed with `CLINICCALL_OPERATOR_USERNAME`.
 
 Start the API:
 
@@ -93,14 +100,20 @@ In demo mode, starting a patient call simulates the call and records it in call 
 
 ### Demo workflow
 
-1. Start the backend.
-2. Start the frontend.
+1. Start the backend with your private operator password configured.
+2. Start the frontend, open the dashboard, and enter those credentials at runtime.
 3. Add a patient.
 4. Create an appointment.
 5. Open the Call Center.
 6. Select the patient.
 7. Start the call.
 8. The simulated call appears in call history.
+
+The frontend defaults to `http://127.0.0.1:8000`. Set `VITE_API_URL` to your own
+backend when needed, and use HTTPS for any non-loopback deployment. Never put
+operator passwords in `VITE_` variables: those are public build-time values.
+Sign-in credentials remain only in page memory; reloading signs the operator out.
+The public landing page does not read patient records or require sign-in.
 
 ## API Endpoints
 
@@ -185,5 +198,4 @@ To reproduce the live integration test:
 5. Start the outbound reminder call through the ClinicCall backend.
 
 API credentials must be supplied by the tester and must not be committed to the repository.
-
 

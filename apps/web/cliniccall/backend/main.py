@@ -59,7 +59,7 @@ OPERATOR_USERNAME = os.getenv(
 
 OPERATOR_PASSWORD = os.getenv(
     "CLINICCALL_OPERATOR_PASSWORD",
-    "demo-password",
+    "",
 )
 
 security = HTTPBasic()
@@ -68,6 +68,14 @@ security = HTTPBasic()
 def require_operator(
     credentials: HTTPBasicCredentials = Depends(security),
 ):
+    # Demo calling can still store private patient records. Never protect
+    # those routes with an absent or publicly documented demo password.
+    if not OPERATOR_PASSWORD.strip() or OPERATOR_PASSWORD == "demo-password":
+        raise HTTPException(
+            status_code=503,
+            detail="Configure a private operator password before using patient routes.",
+        )
+
     correct_username = secrets.compare_digest(
         credentials.username,
         OPERATOR_USERNAME,

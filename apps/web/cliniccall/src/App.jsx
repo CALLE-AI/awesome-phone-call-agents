@@ -2,33 +2,12 @@
 import "./App.css";
 
 const API_URL =
-  import.meta.env.VITE_API_URL || "https://cliniccall-api.onrender.com";
-
-const OPERATOR_USERNAME =
-  import.meta.env.VITE_OPERATOR_USERNAME || "demo";
-
-const OPERATOR_PASSWORD =
-  import.meta.env.VITE_OPERATOR_PASSWORD || "demo-password";
-
-const AUTH_HEADERS = {
-  Authorization: `Basic ${btoa(
-    `${OPERATOR_USERNAME}:${OPERATOR_PASSWORD}`
-  )}`,
-};
-
-async function apiFetch(path, options = {}) {
-  const headers = {
-    ...AUTH_HEADERS,
-    ...(options.headers || {}),
-  };
-
-  return fetch(`${API_URL}${path}`, {
-    ...options,
-    headers,
-  });
-}
+  import.meta.env.VITE_API_URL || "http://127.0.0.1:8000";
 
 function App() {
+  const [operatorUsername, setOperatorUsername] = useState("demo");
+  const [operatorPassword, setOperatorPassword] = useState("");
+  const [operatorAuthorization, setOperatorAuthorization] = useState("");
   const [started, setStarted] = useState(false);
   const [activePage, setActivePage] = useState("Dashboard");
   const [patients, setPatients] = useState([]);
@@ -47,8 +26,38 @@ function App() {
   const [message, setMessage] = useState("");
 
   useEffect(() => {
-    loadAll();
-  }, []);
+    if (operatorAuthorization) loadAll();
+  }, [operatorAuthorization]);
+
+  async function apiFetch(path, options = {}) {
+    return fetch(`${API_URL}${path}`, {
+      ...options,
+      headers: {
+        ...options.headers,
+        Authorization: operatorAuthorization,
+      },
+    });
+  }
+
+  async function signIn(event) {
+    event.preventDefault();
+    setMessage("");
+    try {
+      const authorization = `Basic ${btoa(`${operatorUsername}:${operatorPassword}`)}`;
+      const response = await fetch(`${API_URL}/patients`, {
+        headers: { Authorization: authorization },
+      });
+      if (!response.ok) {
+        setMessage("Sign-in failed. Check the operator credentials and backend configuration.");
+        return;
+      }
+      // Keep credentials only in this page's memory, never in the build or storage.
+      setOperatorAuthorization(authorization);
+      setOperatorPassword("");
+    } catch {
+      setMessage("Unable to sign in. Check the API address and operator credentials.");
+    }
+  }
 
   async function loadAll() {
     await Promise.all([loadPatients(), loadAppointments(), loadCallHistory()]);
@@ -376,6 +385,27 @@ function App() {
           </div>
         </section>
       </div>
+    );
+  }
+
+  if (!operatorAuthorization) {
+    return (
+      <main className="landing">
+        <form className="hero-copy" onSubmit={signIn}>
+          <h1>Operator sign-in</h1>
+          <p>Use the private credentials configured on your backend. Reloading signs you out.</p>
+          <label>
+            Username
+            <input value={operatorUsername} onChange={(event) => setOperatorUsername(event.target.value)} autoComplete="username" required />
+          </label>
+          <label>
+            Password
+            <input type="password" value={operatorPassword} onChange={(event) => setOperatorPassword(event.target.value)} autoComplete="current-password" required />
+          </label>
+          <button className="main-cta" type="submit">Sign in</button>
+          {message && <p role="alert">{message}</p>}
+        </form>
+      </main>
     );
   }
 
