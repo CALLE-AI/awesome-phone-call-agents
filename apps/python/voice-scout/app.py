@@ -24,6 +24,11 @@ SCHEMA: dict[str, Any] = {
 }
 
 E164_RE = re.compile(r"\+[1-9][0-9]{7,14}")
+# Display-only heuristic; the live destination still uses strict E164_RE.
+PHONE_TEXT_RE = re.compile(
+    r"(?<!\w)(?:\+[1-9](?:[ ().-]*[0-9]){7,14}"
+    r"|\(?[0-9]{3}\)?[ .-][0-9]{3}[ .-][0-9]{4})(?!\w)"
+)
 SENSITIVE_KEY_RE = re.compile(r"(?:api[_-]?key|access[_-]?token|authorization|secret|password)", re.IGNORECASE)
 PHONE_KEY_RE = re.compile(r"(?:phone|recipient|destination|caller|callee)", re.IGNORECASE)
 
@@ -42,7 +47,7 @@ def sanitize_result(value: Any, key: str = "") -> Any:
         text = value
         if PHONE_KEY_RE.search(key):
             return mask_phone(text)
-        return E164_RE.sub(lambda match: mask_phone(match.group(0)), text)
+        return PHONE_TEXT_RE.sub(lambda match: mask_phone(match.group(0)), text)
     return value
 
 
@@ -138,7 +143,8 @@ def main() -> int:
     lead = load_lead(lead_path)
     try:
         result = run_live(lead) if args.live else preview(lead)
-    except (RuntimeError, ValueError):
+    except Exception:
+        # Provider exceptions may include request data; do not print their text.
         print("Live CALL-E run failed; check the explicit authorized lead, credentials, Goal ID, phone number, and account status.", file=sys.stderr)
         return 1
     encoded = json.dumps(result, indent=2, sort_keys=True)

@@ -1,6 +1,9 @@
 import json
+import contextlib
+import io
 import tempfile
 import unittest
+from unittest.mock import patch
 from pathlib import Path
 import sys
 
@@ -41,6 +44,32 @@ class VoiceScoutTests(unittest.TestCase):
         path.write_text(json.dumps({"id": "x", "business_name": "Test", "industry": "Test", "phone": "+١٥٥٥٠٠٠٠٠٠٠"}))
         with self.assertRaises(ValueError):
             app.load_lead(path)
+
+    def test_grouped_phone_display_does_not_change_private_lead(self):
+        lead = {
+            "phone": "+12025550123",
+            "notes": "Call +1 (202) 555-0123 or (202) 555-0124 on 2026-09-17.",
+        }
+        original = dict(lead)
+        public = app.safe_lead(lead)
+        self.assertEqual(lead, original)
+        self.assertNotIn("202) 555", json.dumps(public))
+        self.assertNotIn(lead["phone"], json.dumps(public))
+        self.assertIn("2026-09-17", public["notes"])
+
+    def test_cli_provider_exception_is_coarse_and_not_retried(self):
+        for exception_type in (OSError, Exception):
+            with self.subTest(exception=exception_type.__name__):
+                stderr = io.StringIO()
+                with patch.object(sys, "argv", ["app.py", "--live", "--lead", "synthetic.json"]), \
+                     patch.object(app, "load_lead", return_value={}), \
+                     patch.object(app, "run_live", side_effect=exception_type("Synthetic +12025550123 diagnostic")) as run, \
+                     contextlib.redirect_stderr(stderr):
+                    self.assertEqual(app.main(), 1)
+                run.assert_called_once()
+                self.assertNotIn("+12025550123", stderr.getvalue())
+                self.assertNotIn("diagnostic", stderr.getvalue())
+                self.assertIn("Live CALL-E run failed", stderr.getvalue())
 
 
 if __name__ == "__main__":
