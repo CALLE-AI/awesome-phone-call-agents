@@ -1,0 +1,170 @@
+<!doctype html>
+<html lang="en" data-app="forgegate">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>ForgeGate — SOC Command Center</title>
+  <meta name="description" content="ForgeGate: AI-powered voice verification gate for autonomous security incident response." />
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Oswald:wght@400;500;600;700&family=Work+Sans:wght@400;500;600&family=JetBrains+Mono:wght@400;500;700&display=swap" rel="stylesheet" />
+  <link rel="stylesheet" href="styles.css" />
+</head>
+<body>
+<!--
+  ForgeGate SOC Command Center
+  3-panel layout: Incident Queue | Call Status + Ticket | Activity Feed
+  Theme: blackened-steel + aged-brass exchange panel, warm tungsten lamp light.
+-->
+<div class="soc" id="app">
+
+  <!-- ═══ COMMAND BAR ═══ -->
+  <header class="command-bar">
+    <div class="command-bar__brand">
+      <svg class="command-bar__mark" viewBox="0 0 48 48" aria-hidden="true">
+        <circle cx="24" cy="24" r="21" class="command-bar__mark-ring" />
+        <circle cx="24" cy="24" r="7.5" class="command-bar__mark-hole" />
+      </svg>
+      <div>
+        <h1 class="command-bar__title">ForgeGate</h1>
+        <p class="command-bar__subtitle">SOC Command Center</p>
+      </div>
+    </div>
+    <div class="command-bar__controls">
+      <div class="status-lamp" id="modeLamp" data-state="pending">
+        <span class="status-lamp__dot" aria-hidden="true"></span>
+        <span class="status-lamp__label" id="modeLabel">CONNECTING…</span>
+      </div>
+      <div class="status-field">
+        <span class="status-field__label">Threshold</span>
+        <span class="status-field__value" id="thresholdValue">—</span>
+      </div>
+      <button class="cmd-btn reset-btn" id="resetBtn" type="button" title="Clear all incidents and logs">RESET</button>
+    </div>
+  </header>
+
+  <!-- ═══ 3-PANEL BODY ═══ -->
+  <div class="soc__panels">
+
+    <!-- ─── LEFT: INCIDENT QUEUE ─── -->
+    <aside class="panel panel--queue" id="queuePanel">
+      <div class="panel__header">
+        <h2 class="panel__title">Incident Queue</h2>
+        <button class="cmd-btn create-btn" id="createBtn" type="button">+ NEW</button>
+      </div>
+
+      <!-- Create Incident Form (hidden by default) -->
+      <form class="create-form" id="createForm" hidden>
+        <div class="create-form__field">
+          <label class="create-form__label" for="cfSource">Source</label>
+          <select class="create-form__input" id="cfSource">
+            <option value="ids_alert">IDS Alert</option>
+            <option value="access_control">Access Control</option>
+            <option value="hvac_sensor">HVAC Sensor</option>
+            <option value="rfid+gas_sensor">RFID + Gas Sensor</option>
+            <option value="firewall">Firewall</option>
+            <option value="endpoint_agent">Endpoint Agent</option>
+            <option value="manual">Manual Report</option>
+          </select>
+        </div>
+        <div class="create-form__field">
+          <label class="create-form__label">Severity</label>
+          <div class="severity-select" id="cfSeverity">
+            <button type="button" class="severity-opt" data-severity="critical" data-active="false">CRIT</button>
+            <button type="button" class="severity-opt" data-severity="high" data-active="false">HIGH</button>
+            <button type="button" class="severity-opt" data-severity="medium" data-active="true">MED</button>
+            <button type="button" class="severity-opt" data-severity="low" data-active="false">LOW</button>
+          </div>
+        </div>
+        <div class="create-form__field">
+          <label class="create-form__label" for="cfDescription">Description</label>
+          <input class="create-form__input" id="cfDescription" type="text" placeholder="Unauthorized access attempt…" required />
+        </div>
+        <div class="create-form__field">
+          <label class="create-form__label" for="cfAction">Proposed Action</label>
+          <input class="create-form__input" id="cfAction" type="text" placeholder="Isolate host and revoke keys…" required />
+        </div>
+        <div class="create-form__actions">
+          <button class="cmd-btn cmd-btn--primary" type="submit">CREATE & DISPATCH</button>
+          <button class="cmd-btn" type="button" id="cfCancel">CANCEL</button>
+        </div>
+      </form>
+
+      <!-- Quick-fire scenario buttons -->
+      <div class="scenario-strip" id="scenarioStrip">
+        <p class="scenario-strip__loading">Loading scenarios…</p>
+      </div>
+
+      <!-- Incident card list -->
+      <div class="incident-list" id="incidentList">
+        <p class="incident-list__empty" id="queueEmpty">No incidents. Fire a scenario or create one.</p>
+      </div>
+    </aside>
+
+    <!-- ─── CENTER: CALL STATUS + TICKET ─── -->
+    <main class="panel panel--center" id="centerPanel">
+      <!-- Call Status Widget -->
+      <div class="call-status" id="callStatus" data-phase="idle">
+        <div class="call-status__ring" aria-hidden="true">
+          <svg viewBox="0 0 80 80">
+            <circle cx="40" cy="40" r="34" class="call-status__ring-track" />
+            <circle cx="40" cy="40" r="34" class="call-status__ring-arc" />
+          </svg>
+          <span class="call-status__icon">📞</span>
+        </div>
+        <div class="call-status__info">
+          <span class="call-status__phase" id="callPhaseLabel">No Active Call</span>
+          <span class="call-status__timer" id="callTimer"></span>
+        </div>
+      </div>
+
+      <!-- Ticket Detail -->
+      <section class="ticket" id="ticketSection">
+        <h2 class="panel__title">Ticket Detail</h2>
+        <p class="ticket__empty" id="ticketEmpty">Select an incident from the queue to view details.</p>
+        <div class="ticket__body" id="ticketBody" hidden></div>
+      </section>
+
+      <!-- Post-Call Actions -->
+      <div class="post-actions" id="postActions" hidden>
+        <h3 class="post-actions__title">Pending Decision</h3>
+        <p class="post-actions__hint">This incident is <strong>HELD</strong>. The proposed action was blocked. Choose how to proceed:</p>
+        <div class="post-actions__field">
+          <label class="create-form__label" for="paReason">Reason (optional)</label>
+          <input class="create-form__input" id="paReason" type="text" placeholder="Escalating to CISO for review…" />
+        </div>
+        <div class="post-actions__btns">
+          <button class="cmd-btn cmd-btn--danger" id="btnDiscard" type="button">✕ DISCARD</button>
+          <button class="cmd-btn cmd-btn--escalate" id="btnEscalate" type="button">⬆ ESCALATE</button>
+        </div>
+      </div>
+
+      <!-- Resolution banner for non-HELD states -->
+      <div class="resolution-banner" id="resolutionBanner" hidden></div>
+    </main>
+
+    <!-- ─── RIGHT: ACTIVITY FEED ─── -->
+    <aside class="panel panel--feed" id="feedPanel">
+      <div class="panel__header">
+        <h2 class="panel__title">Activity Feed</h2>
+        <span class="feed-badge" id="feedCount">0</span>
+      </div>
+      <div class="activity-feed" id="activityFeed">
+        <p class="activity-feed__empty" id="feedEmpty">Waiting for events…</p>
+      </div>
+    </aside>
+
+  </div>
+
+  <!-- ═══ FOOTER ═══ -->
+  <footer class="soc__footer">
+    <p>ForgeGate is <strong>fail-closed</strong>: anything short of a clean, transcript-backed APPROVE holds the action. All OT actions on this console are simulated — no real hardware changes are ever made.</p>
+  </footer>
+
+  <!-- Toast -->
+  <div class="toast" id="toast" role="status" aria-live="polite" hidden></div>
+
+</div>
+<script src="app.js"></script>
+</body>
+</html>

@@ -1,0 +1,12 @@
+{
+  "shop_id": "demo-pune-corner-shop",
+  "call_type": "inventory",
+  "phone": "+919000000000",
+  "region": "IN",
+  "locale": "hi",
+  "currency": "INR",
+  "language_style": "hindi-english",
+  "recipient_consented": true,
+  "max_minutes": 3,
+  "products_to_ask": ["Rice", "Atta", "Cooking oil", "Sugar", "Toor dal"]
+}

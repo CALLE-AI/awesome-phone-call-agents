@@ -1,0 +1,32 @@
+{
+  "check_in_completed": true,
+  "products": [
+    {
+      "name": "Rice",
+      "quantity_estimate": 8,
+      "unit": "bags",
+      "running_low": false,
+      "supplier_mentioned": "Supplier A",
+      "last_purchase_price": 45000
+    },
+    {
+      "name": "Indomie",
+      "quantity_estimate": 12,
+      "unit": "cartons",
+      "running_low": true
+    },
+    {
+      "name": "Sugar",
+      "quantity_estimate": 4,
+      "unit": "bags",
+      "running_low": true
+    },
+    {
+      "name": "Cooking oil",
+      "quantity_estimate": 6,
+      "unit": "bottles",
+      "running_low": false
+    }
+  ],
+  "owner_notes": "Market slow yesterday but rice still moving."
+}

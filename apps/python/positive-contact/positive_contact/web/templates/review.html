@@ -1,0 +1,11 @@
+{% extends "base.html" %}
+{% block body %}
+<div class="page-heading"><div><h2>Human review</h2>
+<p class="sub">Automation is paused for these contacts. The deadline is not: anything still open at the
+field-visit cutoff becomes a truck roll. Confirming requires citing a span or typing a reason, and is
+recorded against your operator id.</p></div><span class="mode">person in control</span></div>
+{% if message %}<div class="banner">{{ message }}</div>{% endif %}
+<div hx-get="/review/rows" hx-trigger="every 5s" hx-swap="innerHTML">
+  {% include "_review_rows.html" %}
+</div>
+{% endblock %}

@@ -1,0 +1,25 @@
+{
+  "id": "12-unstable-selfcorrect-price",
+  "category": "self-correction",
+  "description": "Would qualify for verified — lookup gap, check language, invoice corroboration — but the value was revised mid-answer. Unstable values never grade verified.",
+  "turns": [
+    { "speaker": "bot", "text": "Good morning, QuoteDesk assistant calling about the copper wire order.", "offset_seconds": 0 },
+    { "speaker": "user", "text": "Haan, bolo.", "offset_seconds": 5 },
+    { "speaker": "bot", "text": "What is the current rate for the copper wire spool?", "offset_seconds": 9 },
+    { "speaker": "user", "text": "Hold on, checking now.", "offset_seconds": 14 },
+    { "speaker": "user", "text": "It is 410 rupees. Sorry, I mean 415 rupees, the rate changed on invoice INV-88.", "offset_seconds": 25 }
+  ],
+  "fields": [
+    {
+      "field": "unit_price",
+      "value": 415,
+      "expects": "price",
+      "questionTurn": 2,
+      "answerTurns": [4],
+      "critical": true,
+      "expectedGrade": "asserted",
+      "expectUnstable": true,
+      "expectSignals": ["A", "B", "C", "I"]
+    }
+  ]
+}

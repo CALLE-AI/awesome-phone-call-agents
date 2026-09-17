@@ -1,0 +1,109 @@
+{
+  "call_id": "call_sal_20260816",
+  "idempotency_key": "shopvoice-demo-lagos-corner-shop-sales-2026-08-16",
+  "status": "completed",
+  "task_completed": true,
+  "completion_confidence": {
+    "score": 0.91,
+    "label": "high"
+  },
+  "evidence": [
+    "Owner estimated about 22,000 NGN in sales for Sunday.",
+    "Owner named Indomie as the best sellers.",
+    "Owner confirmed no restocking purchases today."
+  ],
+  "structured_result": {
+    "sales_day_completed": true,
+    "estimated_revenue": 22000,
+    "currency": "NGN",
+    "top_sellers": [
+      "Indomie"
+    ],
+    "owner_notes": "Short day. I close by 3pm.",
+    "procurement_spend": 0
+  },
+  "metadata": {
+    "shop_id": "demo-lagos-corner-shop",
+    "call_type": "sales",
+    "call_date": "2026-08-16"
+  },
+  "recipients": [
+    {
+      "phones": [
+        "+2348000000000"
+      ],
+      "region": "NG",
+      "locale": "en",
+      "structured_result": {
+        "sales_day_completed": true,
+        "estimated_revenue": 22000,
+        "currency": "NGN",
+        "top_sellers": [
+          "Indomie"
+        ],
+        "owner_notes": "Short day. I close by 3pm.",
+        "procurement_spend": 0
+      },
+      "attempts": [
+        {
+          "attempt": 1,
+          "status": "completed",
+          "started_at": "2026-08-16T19:30:00+01:00",
+          "duration_seconds": 42,
+          "transcript_turns": [
+            {
+              "offset_seconds": 0,
+              "speaker": "bot",
+              "text": "Good evening. How business today?"
+            },
+            {
+              "offset_seconds": 3,
+              "speaker": "user",
+              "text": "E dey go."
+            },
+            {
+              "offset_seconds": 5,
+              "speaker": "bot",
+              "text": "I be AI assistant for your shop manager service. This call fit dey recorded."
+            },
+            {
+              "offset_seconds": 11,
+              "speaker": "bot",
+              "text": "Roughly how much you sell today?"
+            },
+            {
+              "offset_seconds": 15,
+              "speaker": "user",
+              "text": "Like 22,000 naira."
+            },
+            {
+              "offset_seconds": 20,
+              "speaker": "bot",
+              "text": "Which thing sell pass today?"
+            },
+            {
+              "offset_seconds": 24,
+              "speaker": "user",
+              "text": "Indomie sell pass."
+            },
+            {
+              "offset_seconds": 28,
+              "speaker": "bot",
+              "text": "You buy anything for shop today?"
+            },
+            {
+              "offset_seconds": 32,
+              "speaker": "user",
+              "text": "No, I no buy anything today."
+            },
+            {
+              "offset_seconds": 37,
+              "speaker": "bot",
+              "text": "Thank you. I go note am."
+            }
+          ]
+        }
+      ]
+    }
+  ]
+}

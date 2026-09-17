@@ -1,0 +1,66 @@
+{
+  "_fixture_source": "Recorded CALL-E delivery captured from a real provider POST to an independent public sink for call_iDGTQWVCt9IhS-Om8NdnTQ, event evt_245e7b10d5a75ce14d0d8e9d, type call.failed, received 2026-09-12T20:25:00Z. The recipient phone is masked.",
+  "headers": {
+    "call-e-event-id": "evt_245e7b10d5a75ce14d0d8e9d"
+  },
+  "body": {
+    "created_at": "2026-09-12T20:24:59.478536Z",
+    "data": {
+      "completed_at": "2026-09-12T20:24:59.478536Z",
+      "completion_confidence": {
+        "label": "high",
+        "score": 0.9
+      },
+      "created_at": "2026-09-12T20:23:16.919315Z",
+      "evidence": [
+        "The call ended with no answer.",
+        "No recipient or voicemail was reached.",
+        "The delivery message was not confirmed."
+      ],
+      "failure_code": "call_failed",
+      "failure_message": "calling task status=NO ANSWER (Hangup by: bot)",
+      "id": "call_iDGTQWVCt9IhS-Om8NdnTQ",
+      "metadata": {
+        "call_run_id": "t2.6-sink-probe",
+        "purpose": "webhook sink control"
+      },
+      "object": "call_task",
+      "recipients": [
+        {
+          "attempts": [
+            {
+              "completed_at": "2026-09-12T20:24:02Z",
+              "failure_code": "408",
+              "failure_message": null,
+              "id": "att_f7355d5d5da38a9d",
+              "phone": "+91XXXXXXXXXX",
+              "provider_call_id": "f0fa4c7b6ef043268f871d060093fe75",
+              "started_at": "2026-09-12T20:24:02Z",
+              "status": "failed",
+              "summary": "The first call did not connect and the recipient may be unavailable; suggested retry is in about 45 minutes\u2014confirm this retry time, provide a different retry time, or retry immediately.",
+              "transcript_turns": []
+            }
+          ],
+          "id": "rcp_0e634adb96301d41",
+          "locale": "en-IN",
+          "phones": [
+            "+91XXXXXXXXXX"
+          ],
+          "region": "IN",
+          "status": "failed",
+          "structured_result": null,
+          "summary": "The first call did not connect and the recipient may be unavailable; suggested retry is in about 45 minutes\u2014confirm this retry time, provide a different retry time, or retry immediately."
+        }
+      ],
+      "status": "failed",
+      "structured_result": {
+        "heard": "no"
+      },
+      "summary": "The first call did not connect and the recipient may be unavailable; suggested retry is in about 45 minutes\u2014confirm this retry time, provide a different retry time, or retry immediately.",
+      "task": "This is an authorised Orma webhook-delivery probe. Say exactly: 'This is a webhook delivery test.' Then end the call immediately. Collect no information.",
+      "task_completed": false
+    },
+    "id": "evt_245e7b10d5a75ce14d0d8e9d",
+    "type": "call.failed"
+  }
+}
