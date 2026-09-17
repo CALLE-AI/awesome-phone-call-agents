@@ -32,7 +32,7 @@ Most phone-agent projects are one workflow. callhook is the layer underneath:
   requeue, budgets hard-stop, and the campaign stops the moment the goal is
   met (E2E-verified: goal met in 12 of 15 budgeted calls; 18 people never
   called).
-- **19 native webhook integrations** — Stripe, Slack, Shopify, HubSpot,
+- **19 webhook integrations** (18 verified platform adapters + a generic HTTP fallback) — Stripe, Slack, Shopify, HubSpot,
   GitHub, AWS SNS and more, each with its signature scheme verified against
   the vendor's own documentation, plus an n8n community node and a Zapier
   CLI app.
@@ -71,7 +71,8 @@ integration uses the Developer API directly, stdlib HTTP only:
 
 ```bash
 curl -fsSL https://callhook.github.io/install.sh | bash
-./callhook/callhook_linux_amd64/callhook
+# run the binary at the path the installer printed
+# (supported: linux/amd64, linux/arm64, darwin/amd64, darwin/arm64)
 # → war room at http://localhost:8080
 ```
 
@@ -82,10 +83,27 @@ callhook/backend && go run ./cmd/callhook`. Full reference:
 ## Credential handling
 
 The only credential is `CALLHOOK_API_KEY` (your CALL-E key), read from the
-environment — never written to disk by callhook, never logged. Optional
-`CALLHOOK_INTAKE_TOKEN` gates every `/api/*` endpoint (bearer) and
-`CALLHOOK_WEBHOOK_SECRET` gates the CALL-E webhook. Per-platform webhook
-secrets are separate env vars, one per integration.
+environment — never written to disk by callhook, never logged.
+
+Inbound auth is **required on any deployment exposed beyond localhost**:
+
+- `CALLHOOK_INTAKE_TOKEN` — bearer token for every `/api/*` endpoint
+- `CALLHOOK_WEBHOOK_SECRET` — shared secret for the CALL-E terminal webhook
+  (`X-Callhook-Secret` header)
+
+Both may be omitted only for a local dry-run. Per-platform webhook secrets
+are separate env vars, one per integration.
+
+Outbound: with `CALLHOOK_CALLBACK_SECRET` set, every outcome callback
+carries `X-Callhook-Signature: sha256=<hex>` — an HMAC-SHA256 of the raw
+body under that secret. Receivers of the transcript-bearing payload should
+verify it before trusting the contents:
+
+```python
+import hmac, hashlib
+expected = "sha256=" + hmac.new(secret, raw_body, hashlib.sha256).hexdigest()
+hmac.compare_digest(expected, request.headers["X-Callhook-Signature"])
+```
 
 ## Dry-run behavior (the default)
 
@@ -102,7 +120,8 @@ POSTs structured outcomes to the `callback_url` each event carries. Business
 writes happen only post-call, from the validated structured result, and are
 policy-gated: uncertain outcomes escalate instead of writing. Polite-hours
 gating defers calls outside 9:00–20:00 recipient-local, weekdays. Every
-action is recorded in a per-session audit trail shown in the war room.
+action is recorded in a per-session audit trail shown in the war room, where
+phone numbers are masked (`+9192 ••• 3153`) in list and detail views.
 
 ## Cancellation
 
@@ -114,3 +133,8 @@ action is recorded in a per-session audit trail shown in the war room.
   skipped and never called.
 - The server shuts down gracefully on SIGINT/SIGTERM; in-flight campaigns
   resume from their journal on restart.
+- Boundary: shutdown does not cancel a call already accepted by CALL-E (it
+  completes on the provider side; redelivered webhooks plus journal replay
+  pick up its outcome on restart) and does not cancel `not_before` scheduled
+  single events (they fire on the next boot). There is no single-call cancel
+  route; only campaigns can be stopped mid-flight.
