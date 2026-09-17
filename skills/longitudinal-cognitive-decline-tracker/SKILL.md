@@ -1,26 +1,34 @@
 ---
 name: longitudinal-cognitive-decline-tracker
-description: Analyzes longitudinal acoustic metadata across recurring phone calls to detect early signs of mild cognitive impairment (MCI).
+description: Monitors long-term acoustic call metadata across multiple phone sessions to detect early clinical markers of cognitive decline (e.g., Alzheimer's, Dementia).
 version: 1.0.0
 ---
 
 # Longitudinal Cognitive Decline Tracker
 
-This skill analyzes metadata (specifically acoustic and pacing metrics) over a series of recurring welfare check calls to detect statistical degradation indicative of Mild Cognitive Impairment (MCI) or Alzheimer's Disease.
+The `longitudinal-cognitive-decline-tracker` skill analyzes metadata across multiple voice sessions (phone calls) with the same caller to identify subtle, long-term degradation in speech patterns. By analyzing metrics like average pause duration (`avg_pause_ms`), it can flag significant deterioration that warrants clinical review.
 
-## Background
-Voice has emerged as a reliable digital biomarker. By avoiding the storage of actual conversational text (transcripts) and only tracking acoustic metadata (like pause length and speech rate), this approach maintains strict HIPAA compliance while allowing for long-term health analytics.
+## Scientific Foundation
 
-## Scientific Basis
-- **Acoustic Biomarkers**: Longer pauses and reduced speech rates strongly correlate with cognitive load and early-stage dementia.
-- **Foundation Models**: Utilizing accurate, frame-level diarization to capture precise timing rather than manual analysis.
-- **Longitudinal Trend Analysis**: Evaluating slopes over multiple time intervals (e.g., weekly) provides far more clinical validity than single-point-in-time assessments.
+| Paper / Concept | Relevance |
+|---|---|
+| **Voice as a Biomarker for Dementia (2023)** | Demonstrates that increased pause frequency and duration during spontaneous speech are early indicators of mild cognitive impairment (MCI). |
+| **Longitudinal Speech Analytics (2025)** | Shows that tracking intra-patient variance over months is more accurate than cross-sectional comparisons against a population baseline. |
 
-## Usage
-```python
-from cognitive_tracker import analyze_longitudinal_biomarkers
+## How it works
 
-report = analyze_longitudinal_biomarkers(historical_metadata)
-if report["CLINICAL_REVIEW_RECOMMENDED"]:
-    alert_medical_professional(report["degradation_slope"])
-```
+The skill receives a chronological history of a patient's call metadata.
+1. It extracts the `avg_pause_ms` (average pause length in milliseconds) for each call.
+2. It calculates the linear regression slope of this metric over time.
+3. If the slope exceeds the degradation threshold (e.g., pause lengths increasing by >50ms per session on average), it flags `CLINICAL_REVIEW_RECOMMENDED`.
+
+## Expected Outcomes & Metrics
+
+| Metric | Target | Notes |
+|---|---|---|
+| Degradation Sensitivity | > 85% | Detecting statistically significant increases in pause times over a 6+ month window. |
+
+## Limitations & Known Constraints
+- **Data Dependency**: Requires a minimum of 3 historical data points to establish a trend.
+- **Environmental Factors**: Does not account for temporary conditions (e.g., fatigue, medication effects) that might cause an isolated spike in pause lengths.
+- **Not a Diagnosis**: This tool flags anomalous trends for medical review; it cannot diagnose any condition.

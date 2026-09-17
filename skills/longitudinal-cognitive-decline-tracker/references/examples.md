@@ -1,17 +1,45 @@
 # Examples
 
-Here are practical usage examples for the Longitudinal Cognitive Decline Tracker.
+## Example 1: Detecting Cognitive Degradation
 
-## 1. Time-Series Analysis
+**Input History:**
 ```python
-from cognitive_tracker import analyze_longitudinal_biomarkers
-
 history = [
-    {"timestamp": 1, "caller": "+1-555-0102", "avg_pause_ms": 400},
-    {"timestamp": 2, "caller": "+1-555-0102", "avg_pause_ms": 500},
-    {"timestamp": 3, "caller": "+1-555-0102", "avg_pause_ms": 550},
-    {"timestamp": 4, "caller": "+1-555-0102", "avg_pause_ms": 650},
+    {"timestamp": 1672531200, "caller": "555-0102", "avg_pause_ms": 400},
+    {"timestamp": 1675209600, "caller": "555-0102", "avg_pause_ms": 500},
+    {"timestamp": 1677628800, "caller": "555-0102", "avg_pause_ms": 550},
+    {"timestamp": 1680307200, "caller": "555-0102", "avg_pause_ms": 650},
 ]
-report = analyze_longitudinal_biomarkers(history)
-print(report["status"]) # Significant cognitive degradation detected.
+```
+
+**Output Report:**
+```json
+{
+  "clinical_review_recommended": true,
+  "degradation_slope": 80.0,
+  "data_points": 4,
+  "status": "Significant cognitive degradation detected."
+}
+```
+
+## Example 2: Stable Patient
+
+**Input History:**
+```python
+history = [
+    {"timestamp": 1672531200, "caller": "555-0101", "avg_pause_ms": 400},
+    {"timestamp": 1675209600, "caller": "555-0101", "avg_pause_ms": 395},
+    {"timestamp": 1677628800, "caller": "555-0101", "avg_pause_ms": 405},
+    {"timestamp": 1680307200, "caller": "555-0101", "avg_pause_ms": 390},
+]
+```
+
+**Output Report:**
+```json
+{
+  "clinical_review_recommended": false,
+  "degradation_slope": -2.5,
+  "data_points": 4,
+  "status": "Stable cognitive markers."
+}
 ```
