@@ -1,0 +1,17 @@
+{
+  "onboarding_completed": true,
+  "display_name": "Ada Corner Shop",
+  "phone": "+2348000000000",
+  "region": "NG",
+  "locale": "en",
+  "currency": "NGN",
+  "language_style": "pidgin-english",
+  "timezone": "Africa/Lagos",
+  "consent_to_store": true,
+  "consent_to_future_calls": true,
+  "typical_products": [
+    { "name": "Rice", "unit": "bags", "reference_cost": 45000 },
+    { "name": "Indomie", "unit": "cartons", "reference_cost": 9000 }
+  ],
+  "preferred_supplier_nickname": "Mama Sikiru"
+}

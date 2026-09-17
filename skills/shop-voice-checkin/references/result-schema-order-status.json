@@ -1,0 +1,34 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "result-schema-order-status.json",
+  "title": "Shop voice order status callback result",
+  "description": "Structured result of the owner callback after a vendor order call. No payment is transferred as part of this call.",
+  "type": "object",
+  "required": ["status_callback_completed", "order_id", "status_reported"],
+  "additionalProperties": false,
+  "properties": {
+    "status_callback_completed": {
+      "type": "boolean",
+      "description": "True when the status update was delivered to the owner."
+    },
+    "order_id": {
+      "type": "string",
+      "minLength": 1,
+      "description": "Ledger order this callback reports on."
+    },
+    "status_reported": {
+      "type": "string",
+      "enum": ["placed", "unavailable", "delayed"],
+      "description": "Matches the order status categories used elsewhere in the ledger."
+    },
+    "eta_text": {
+      "type": "string",
+      "description": "Delivery estimate relayed to the owner, if any."
+    },
+    "amount_confirmed": {
+      "type": "number",
+      "exclusiveMinimum": 0,
+      "description": "Only set if a quoted amount was read back and confirmed."
+    }
+  }
+}

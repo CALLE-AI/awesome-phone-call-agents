@@ -1,0 +1,95 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>{% block title %}Reachable{% endblock %}</title>
+<style>
+  :root {
+    --ink: #171c22; --muted: #5f6b78; --line: #dde3e9; --bg: #f5f7f9;
+    --panel: #fff; --ok: #0d6b41; --wait: #7a5600; --stop: #a32a25; --link: #1a4fd0;
+    --urgent-bg: #fdf1f0; --urgent-line: #a32a25;
+  }
+  * { box-sizing: border-box; }
+  body { margin: 0; background: var(--bg); color: var(--ink);
+         font: 15px/1.55 -apple-system, "Segoe UI", Roboto, Helvetica, Arial, sans-serif; }
+  a { color: var(--link); }
+  header { background: var(--ink); color: #fff; padding: 11px 20px;
+           display: flex; gap: 18px; align-items: center; flex-wrap: wrap; }
+  header a { color: #fff; text-decoration: none; opacity: .82; }
+  header a:hover, header a.on { opacity: 1; }
+  header .brand { font-weight: 700; letter-spacing: .02em; }
+  .mode { margin-left: auto; font-weight: 700; font-size: 12px; letter-spacing: .1em;
+          padding: 4px 11px; border-radius: 3px; }
+  .mode.DRY { background: #24557f; }
+  .mode.FAKE { background: #6f4e00; }
+  .mode.LIVE { background: var(--stop); }
+  main { max-width: 1060px; margin: 22px auto; padding: 0 20px 70px; }
+  h1 { font-size: 22px; margin: 0 0 4px; }
+  h2 { font-size: 13px; margin: 26px 0 10px; text-transform: uppercase;
+       letter-spacing: .09em; color: var(--muted); }
+  .panel { background: var(--panel); border: 1px solid var(--line); border-radius: 6px;
+           padding: 15px 18px; margin-bottom: 14px; }
+  .panel.urgent { background: var(--urgent-bg); border-left: 4px solid var(--urgent-line); }
+  table { width: 100%; border-collapse: collapse; }
+  th, td { text-align: left; padding: 8px 10px; border-bottom: 1px solid var(--line);
+           vertical-align: top; }
+  th { font-size: 11px; text-transform: uppercase; letter-spacing: .07em; color: var(--muted); }
+  tr:last-child td { border-bottom: 0; }
+  code, pre, .mono { font-family: ui-monospace, SFMono-Regular, Consolas, monospace; font-size: 13px; }
+  pre { background: #f1f4f7; border: 1px solid var(--line); border-radius: 4px;
+        padding: 12px; overflow-x: auto; white-space: pre-wrap; }
+  .pill { display: inline-block; font-size: 11px; padding: 2px 8px; border-radius: 10px;
+          background: #eceff3; color: var(--muted); letter-spacing: .03em; }
+  .pill.ok { background: #e3f3ea; color: var(--ok); }
+  .pill.stop { background: #fbe9e8; color: var(--stop); }
+  .pill.wait { background: #fbf1dd; color: var(--wait); }
+  .tick { color: var(--ok); font-weight: 700; }
+  .cross { color: var(--muted); font-weight: 700; }
+  .muted { color: var(--muted); }
+  .stop { color: var(--stop); }
+  button { font: inherit; padding: 8px 14px; border-radius: 4px; border: 1px solid var(--ink);
+           background: var(--ink); color: #fff; cursor: pointer; }
+  button.secondary { background: #fff; color: var(--ink); }
+  button.danger { background: var(--stop); border-color: var(--stop); }
+  input[type=text], textarea, select { width: 100%; padding: 8px; border: 1px solid var(--line);
+                                       border-radius: 4px; font: inherit; }
+  label { display: block; margin: 10px 0 4px; font-size: 13px; color: var(--muted); }
+  .banner { border-left: 3px solid var(--wait); background: #fffaf0; padding: 10px 14px;
+            margin-bottom: 14px; font-size: 14px; }
+  .counters { display: flex; gap: 10px; flex-wrap: wrap; }
+  .counter { background: var(--panel); border: 1px solid var(--line); border-radius: 6px;
+             padding: 10px 14px; min-width: 128px; }
+  .counter .n { font-size: 22px; font-weight: 700; }
+  .counter .k { font-size: 11px; text-transform: uppercase; letter-spacing: .06em;
+                color: var(--muted); }
+  .inline { display: inline; }
+</style>
+</head>
+<body>
+<header>
+  <span class="brand">Reachable</span>
+  <a href="/">Today</a>
+  <a href="/contacts">Contact health</a>
+  <a href="/tasks">Staff tasks</a>
+  <a href="/decisions">Decisions not to call</a>
+  <a href="/import">Import</a>
+  <span class="mode {{ mode.split('-')[0] }}">{{ mode }}</span>
+</header>
+<main>
+{% if mode == 'DRY-RUN' %}
+  <div class="banner">
+    Dry run. <code>REACHABLE_LIVE_CALLS</code> is not set, so no call can be placed from
+    this process. Calls are rendered and stored as previews.
+  </div>
+{% elif mode == 'FAKE' %}
+  <div class="banner">
+    Live mode, pointed at the local fake CALL-E server. Calls run end to end but no
+    telephone rings.
+  </div>
+{% endif %}
+{% block body %}{% endblock %}
+</main>
+{% block scripts %}{% endblock %}
+</body>
+</html>

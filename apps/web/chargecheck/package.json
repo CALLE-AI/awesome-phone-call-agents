@@ -1,0 +1,24 @@
+{
+  "name": "chargecheck",
+  "version": "0.1.0",
+  "private": true,
+  "description": "ChargeCheck - verifies EV charging station availability in real time by calling the station with CALL-E.",
+  "scripts": {
+    "dev": "next dev",
+    "build": "next build",
+    "start": "next start",
+    "lint": "next lint"
+  },
+  "dependencies": {
+    "@call-e/calle": "^0.7.0",
+    "next": "14.2.35",
+    "react": "^18.3.1",
+    "react-dom": "^18.3.1"
+  },
+  "devDependencies": {
+    "@types/node": "^20.14.9",
+    "@types/react": "^18.3.3",
+    "@types/react-dom": "^18.3.0",
+    "typescript": "^5.5.3"
+  }
+}
