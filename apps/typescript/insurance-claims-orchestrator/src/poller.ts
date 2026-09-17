@@ -92,17 +92,20 @@ export async function calleApiCaller(
 // Rules:
 // - A confirmed intake requires the provider to report "completed" AND the AI's
 //   own self-reported `outcome` to be a confirmed outcome ("completed").
-// - If the AI reported a specific known outcome (refused/unclear/voicemail/
-//   no_answer), preserve it verbatim — never overwrite a refusal with success.
-// - Ambiguous provider failures ("failed"/"cancelled") map to "unclear", which
-//   is NOT retryable, rather than "no_answer", which is.
+// - Only after provider completion, preserve a specific known AI outcome
+//   (refused/unclear/voicemail/no_answer) — never overwrite a refusal with success.
+// - Every non-completed provider status maps to "unclear", regardless of the
+//   reported result. This is NOT retryable, unlike "no_answer".
 function deriveOutcome(
   providerStatus: string,
   result: ({ outcome?: string } & Record<string, unknown>) | undefined
 ): CallOutcome {
+  // A partial result cannot turn an ambiguous provider outcome into a redial.
+  if (providerStatus !== "completed") return "unclear";
+
   const reported = normalizeReportedOutcome(result?.outcome);
 
-  // If the AI self-reported a known outcome, that is the source of truth.
+  // The provider completed; a known self-reported outcome may now be used.
   if (reported) {
     // Success requires provider completion too; otherwise it's ambiguous.
     if (CONFIRMED_OUTCOMES.has(reported)) {

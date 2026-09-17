@@ -72,8 +72,6 @@ Phone must be E.164 format. The number is masked in all output.
 4. Register steps with `chain.addStep()`
 5. Keep `dryRun = true` in all demos
 
-See `skills/insurance-claims-orchestrator/references/two-call-pattern.md` for full guidance.
-
 ## Safety
 
 - Dry-run is the default — `--live` flag required for real calls
@@ -92,5 +90,3 @@ See `skills/insurance-claims-orchestrator/references/two-call-pattern.md` for fu
   To cancel or manage an in-flight call, use the CALL-E dashboard/API directly.
 - This app does not implement provider-side idempotency/deduplication. Re-running
   `--live` against the same number can place another real call.
-
-See `skills/insurance-claims-orchestrator/references/safety.md` for the full contract.
