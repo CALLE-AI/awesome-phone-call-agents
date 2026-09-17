@@ -1,0 +1,21 @@
+{
+  "call_id": "call-pay-consent-demo-001",
+  "shop_id": "demo-lagos-corner-shop",
+  "call_type": "payment_consent",
+  "status": "completed",
+  "confidence": 0.94,
+  "metadata": {
+    "call_date": "2026-09-07",
+    "order_id": "ord-fish-1",
+    "intent_id": "pay-demo-fish-1"
+  },
+  "structured_result": {
+    "payment_consent_completed": true,
+    "owner_approved_payment": true,
+    "order_id": "ord-fish-1",
+    "amount": 45000,
+    "currency": "NGN",
+    "vendor_display_name": "Mama Sikiru",
+    "owner_notes": "Yes, pay her for the fish order."
+  }
+}

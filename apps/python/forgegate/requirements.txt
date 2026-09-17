@@ -1,0 +1,14 @@
+fastapi>=0.110
+uvicorn[standard]>=0.29
+pydantic>=2.6
+requests>=2.31
+python-dotenv>=1.0
+
+pytest>=8.0
+httpx>=0.27
+
+# Only needed to place a real (non-dry-run) call. calle_client.py falls
+# back to CALL-E's plain REST API when this isn't installed, but the SDK
+# is the documented, supported path - install before flipping
+# CALLE_DRY_RUN=false.
+# calle-ai
