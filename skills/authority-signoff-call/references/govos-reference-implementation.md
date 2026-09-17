@@ -1,19 +1,25 @@
 # Reference implementation: GovOS
 
 [GovOS](https://github.com/shubhangi-mish/agents-for-humans/tree/main/govos)
-is a Strands Agents-based autonomous incident-response system for Delhi
-(built for a separate hackathon), included here as a real, tested production
-use of this exact pattern rather than a hypothetical.
+is a Strands Agents-based autonomous incident-response **simulation** for
+Delhi (built for a separate hackathon) — an experimental administrative
+demo, not a deployed government system, exactly as its own call scripts say
+below ("a government-operations simulation app," "simulated scenario").
+It's included here as a real, tested use of this exact pattern against
+CALL-E's live API rather than a hypothetical description.
 
 ## Where it's authorized
 
 GovOS runs several Strands agents (Intel, Resource, Policy, Comms,
-Orchestrator) that investigate a real-world incident signal, dispatch
-response units, and auto-authorize actions that exceed field-level scope
-under real delegated-authority tiers — a District Magistrate tier for
-routine emergency spend, a Police Commissioner tier for law-and-order
-actions, and a DDMA (Delhi Disaster Management Authority — chaired by the
-Chief Minister) tier for city-wide or high-value sanctions. This
+Orchestrator) that read a real-world incident signal (real Delhi news
+headlines) and simulate the response inside the app — recording a
+simulated dispatch and auto-authorizing simulated actions that exceed
+field-level scope, modeled on real delegated-authority tiers: a District
+Magistrate tier for routine emergency spend, a Police Commissioner tier for
+law-and-order actions, and a DDMA (Delhi Disaster Management Authority —
+chaired by the Chief Minister) tier for city-wide or high-value sanctions.
+No real unit is actually dispatched and no real money moves; the tiers and
+their names are real, the actions taken under them in GovOS are not. This
 auto-authorization happens instantly; the incident never pauses waiting for
 a person, by design.
 
@@ -111,4 +117,7 @@ the same fire incident placed a real call through the live CALL-E API:
   misclassification as `override`.
 
 This is real, verified evidence that the safe-by-default → live-call path
-works end to end against the production CALL-E API, not just in dry run.
+works end to end against CALL-E's real, live API — not a sandbox, and not
+just in dry run. It is evidence about the *integration*, not a claim that
+GovOS itself is deployed government infrastructure — it is a hackathon
+simulation, and its own call scripts say so explicitly.

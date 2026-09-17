@@ -1,25 +1,25 @@
 ---
 name: authority-signoff-call
-description: Built for real emergency-response automation — when an autonomous government/incident-response agent auto-authorizes an action under a real delegated-authority tier (a duty magistrate, an on-call commissioner, a disaster-management chair) without waiting for a human, this places one real CALL-E phone call to reach the accountable official directly, wherever they are, and get a real attributable confirm-or-override on what was done in their name. Proven in production inside GovOS, a live autonomous emergency-response system that runs Delhi's real government response chain during real incidents.
+description: Places one real CALL-E phone call to the specific named authority a decision was already auto-authorized under (a duty magistrate, an on-call commissioner, a disaster-management chair) — for autonomous agent systems that resolve things on their own and need a real, attributable post-hoc confirm/override channel, not a pre-action approval gate. Demonstrated end to end, including a real placed CALL-E call, inside GovOS — an experimental incident-response simulation built for a separate hackathon, not a deployed government system.
 license: MIT
 ---
 
 # Authority Sign-Off Call
 
-Autonomous agents that run real emergency or government-operations
-response — dispatch, budget release, disaster-management sanctions — often
-can't wait for a human before acting, and shouldn't: the whole point of
-automating incident response is that it doesn't stall on a dashboard nobody's
-watching. But someone real is still accountable for what got authorized in
-their name, and a push notification they might never open doesn't close that
-loop. A phone call does.
+Autonomous agents that simulate or automate incident-response and
+government-operations decisions — dispatch, budget release,
+disaster-management sanctions — are often designed not to wait for a human
+before acting, since the whole point is that the workflow doesn't stall on a
+dashboard nobody's watching. But someone real is still accountable for what
+got authorized in their name, and a push notification they might never open
+doesn't close that loop. A phone call does.
 
 This skill is exactly that call: it reaches the specific named official a
 decision was auto-authorized under — on their own pre-registered line,
 wherever they actually are — reads the decision out loud, and returns a
-real, attributable `confirm` or `override`. It's the accountability step
-that makes "the agent already acted, no human blocked it" safe to ship in a
-government or emergency-response system, not just a demo convenience.
+real, attributable `confirm` or `override`. It is one accountability
+primitive, not a certified safety mechanism — see "Rules you must follow"
+below for the hard limit on what the returned decision may be used for.
 
 It does not invent a decision-application mechanism. It feeds the structured
 outcome into whatever function your system already uses to apply a human
@@ -107,21 +107,31 @@ directly with the CALL-E SDK:
    means the app returns a dry-run result and places no call — the
    safe-by-default path, not an error mode to route around.
 3. Read the exit code / `decision` field the same way as Surface 1 —
-   `confirm` (stands, do nothing), `override` (unwind it through your
-   system's existing decision-application function), `unclear` (nothing has
-   changed).
+   `confirm` (stands, do nothing), `override` (route to your system's
+   existing decision-application function — see the important limit on
+   `override` in "Rules you must follow" below before wiring this to
+   anything consequential), `unclear` (nothing has changed).
 4. Pass a stable `idempotency_key` derived from the decision's own ID —
    never regenerate one for the same decision on retry; that risks a
    duplicate dial to a real phone.
 
 See the app's [README](../../apps/python/authority-signoff-call/README.md)
 for exact commands and the full exit-code table. This is the surface
-[GovOS](references/govos-reference-implementation.md) actually uses in
-production: its incident engine fires the call as a background task the
-moment a DDMA-tier approval is created.
+[GovOS](references/govos-reference-implementation.md) uses in its own
+experimental incident engine, which fires the call as a background task the
+moment an authority-tiered approval is created.
 
 ## Rules you must follow
 
+- **Never let `confirm`/`override` alone automatically unwind a real
+  emergency or financial action.** The `decision` field is a single spoken
+  answer, unverified against a transcript read-back or any second channel —
+  it proves someone answered the phone and said a word, not that they
+  understood the full record or that the number reached the right person.
+  For consequential domains (a real emergency dispatch, a real financial
+  transfer, anything irreversible), route `override` to a human for manual
+  reconciliation, not a blind automatic reversal. Reserve fully automatic
+  application of the result for genuinely low-stakes, reversible decisions.
 - Never call anyone but the pre-registered number for *this specific*
   authority. No recipient lists, no third parties, no "call whoever's
   available."
@@ -150,8 +160,8 @@ moment a DDMA-tier approval is created.
   exact CALL-E `result_schema` used, and what `confirm` / `override` /
   `unclear` mean.
 - [`references/govos-reference-implementation.md`](references/govos-reference-implementation.md):
-  a production system using this exact pattern, including a captured
-  dry-run log line from a live run.
+  an experimental system using this exact pattern, including a captured
+  dry-run log line and a real placed call against CALL-E's live API.
 - [`assets/dry-run-example.txt`](assets/dry-run-example.txt): real,
   unmodified output from running the app's `request` mode with no
   credentials configured — this is what "safe by default" actually prints.

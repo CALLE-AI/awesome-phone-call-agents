@@ -6,7 +6,7 @@
     "decision": {
       "type": "string",
       "enum": ["confirm", "override", "unclear"],
-      "description": "confirm: the accountable person wants the auto-authorized decision to stand as-is. override: they reject it — the caller must unwind the decision the same way any other rejection channel would. unclear: no clear answer was obtained (no answer, ambiguous response, call error) — the original decision still stands unchanged; this is not a rejection."
+      "description": "confirm: the accountable person wants the auto-authorized decision to stand as-is. override: they reject it — for a low-stakes, reversible decision the caller may unwind it the same way any other rejection channel would; for a real emergency or financial action, route this to a human for manual reconciliation instead of an automatic reversal, since this field is one unverified spoken word, not a transcript-confirmed instruction. unclear: no clear answer was obtained (no answer, ambiguous response, call error) — the original decision still stands unchanged; this is not a rejection."
     },
     "notes": {
       "type": "string",

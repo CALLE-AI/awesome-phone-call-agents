@@ -65,16 +65,22 @@ def main() -> int:
         print("error: --idempotency-key is required for --mode request", file=sys.stderr)
         return 30
 
-    result = asyncio.run(
-        request_signoff_call(
-            authority_name=args.authority,
-            context=args.context,
-            decision_summary=args.decision,
-            authorizing_tier=args.tier,
-            amount=args.amount,
-            idempotency_key=args.idempotency_key,
+    try:
+        result = asyncio.run(
+            request_signoff_call(
+                authority_name=args.authority,
+                context=args.context,
+                decision_summary=args.decision,
+                authorizing_tier=args.tier,
+                amount=args.amount,
+                idempotency_key=args.idempotency_key,
+            )
         )
-    )
+    except ValueError as exc:
+        # validate_e164() raises here for a malformed CALLE_SIGNOFF_PHONE —
+        # str(exc) already masks the number, never print the raw env var.
+        print(f"error: {exc}", file=sys.stderr)
+        return 30
 
     if result["dry_run"]:
         print(f"[DRY RUN — {result['dry_run_reason']}] No call placed. Would have said:", file=sys.stderr)

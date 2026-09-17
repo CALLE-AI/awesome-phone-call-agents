@@ -19,16 +19,26 @@ repository for that pattern) — it is for systems that already resolve
 things autonomously and need a real, attributable post-hoc confirm/veto
 channel, not a blocking gate before the action runs.
 
+IMPORTANT: the returned "decision" is one spoken word, not verified against
+a transcript read-back or a second channel. For a real emergency or
+financial action, do not let "override" alone automatically unwind it —
+route it to a human for manual reconciliation instead. Reserve fully
+automatic handling of the result for genuinely low-stakes, reversible
+decisions. See references/safety.md and SKILL.md's "Rules you must follow".
+
 Safe by default: with no CALLE_API_KEY, no recipient phone number, or the
 enable flag not explicitly "true", this never places a real call — it
 returns a dry-run result describing exactly what it would have said. A
 call failure (busy/no-answer/timeout/API error) also resolves as
 "unclear" rather than raising, so a flaky phone line can never leave a
-caller's workflow hanging.
+caller's workflow hanging. CALLE_SIGNOFF_PHONE is validated as ASCII E.164
+before every real call and masked anywhere it could appear in output — see
+validate_e164() / mask_phone() below.
 
-Reference implementation using this exact pattern in production:
-GovOS (https://github.com/shubhangi-mish/agents-for-humans/tree/main/govos),
-a Strands Agents-based autonomous incident-response system for Delhi. See
+Demonstrated end to end, including a real call placed against CALL-E's live
+API, inside GovOS (https://github.com/shubhangi-mish/agents-for-humans/tree/main/govos),
+a Strands Agents-based autonomous incident-response *simulation* for Delhi —
+an experimental hackathon project, not a deployed government system. See
 ../../../skills/authority-signoff-call/references/govos-reference-implementation.md.
 """
 
@@ -37,6 +47,7 @@ from __future__ import annotations
 import asyncio
 import logging
 import os
+import re
 from typing import Any
 
 logger = logging.getLogger("authority_signoff_call")
@@ -49,6 +60,35 @@ RESULT_SCHEMA: dict[str, Any] = {
         "notes": {"type": "string"},
     },
 }
+
+# E.164, ASCII only: + then 8-15 ASCII digits, no leading 0 after +. re.ASCII
+# stops Python's \d from matching non-ASCII decimal digits (e.g. Arabic-Indic
+# ٠-٩) that would otherwise pass a plain \d check while never being dialable.
+_E164_ASCII_RE = re.compile(r"^\+[1-9]\d{7,14}$", re.ASCII)
+
+
+def validate_e164(phone: str) -> str:
+    """Raises ValueError (with the phone masked, never echoed raw) if
+    `phone` isn't an ASCII E.164 number. Called before every real call so a
+    malformed or non-ASCII destination never reaches the CALL-E API."""
+    value = (phone or "").strip()
+    if not value.isascii() or not _E164_ASCII_RE.fullmatch(value):
+        raise ValueError(
+            f"CALLE_SIGNOFF_PHONE must be ASCII E.164 (+ then 8-15 digits, "
+            f"e.g. +447700900123), got {mask_phone(value)!r}"
+        )
+    return value
+
+
+def mask_phone(phone: str) -> str:
+    """Keeps a country-ish prefix and the last 3 digits. Safe for stdout,
+    logs, and error text — never print or log a raw phone number. Anything
+    that isn't plain ASCII (so not a real E.164 number to begin with) is
+    fully redacted rather than partially echoed back."""
+    value = (phone or "").strip()
+    if not value.isascii() or len(value) < 7:
+        return "****"
+    return value[:3] + ("*" * (len(value) - 6)) + value[-3:]
 
 
 def _dry_run_reason() -> str | None:
@@ -120,13 +160,19 @@ async def request_signoff_call(
         logger.info("[DRY RUN — %s] Would call %s to sign off: %s", reason, authority_name, task)
         return {"decision": "unclear", "dry_run": True, "raw": None, "dry_run_reason": reason, "task": task}
 
+    # Validate before every real call, never after — a malformed or
+    # non-ASCII destination must never reach the CALL-E API. The masked
+    # form is what appears in the log line below, never the raw number.
+    phone = validate_e164(os.environ["CALLE_SIGNOFF_PHONE"])
+    logger.info("Placing sign-off call to %s (idempotency_key=%s)", mask_phone(phone), idempotency_key)
+
     def _place_call() -> dict[str, Any]:
         from calle import CalleClient  # imported lazily — an optional runtime dependency
 
         client = CalleClient(api_key=os.environ["CALLE_API_KEY"])
         return client.calls.create_and_wait(
             task=task,
-            recipient={"phone": os.environ["CALLE_SIGNOFF_PHONE"]},
+            recipient={"phone": phone},
             result_schema=RESULT_SCHEMA,
             metadata={"source": "authority-signoff-call"},
             idempotency_key=idempotency_key,
@@ -138,6 +184,8 @@ async def request_signoff_call(
         # call it directly on an asyncio event loop.
         call = await asyncio.to_thread(_place_call)
     except Exception:
+        # Never interpolate the raw phone into an exception/log line —
+        # idempotency_key is enough to trace this back to the decision.
         logger.exception("Sign-off call failed (idempotency_key=%s)", idempotency_key)
         return {"decision": "unclear", "dry_run": False, "raw": None, "error": True, "task": task}
 

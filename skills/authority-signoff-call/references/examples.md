@@ -19,10 +19,15 @@ Say to the user: "Here's exactly what the call would say — nothing has been
 dialed. Want me to place it for real?" Only run `request` after they confirm,
 and only if `CALLE_SIGNOFF_PHONE` is the Chief Minister's own registered line.
 
-If the call resolves `override`, tell the user plainly: "The Chief Minister
-rejected this by phone. I'm unwinding the auto-authorization now the same way
-a dashboard rejection would." Then call the host system's own
-decision-application function — never invent a second unwind path.
+If the call resolves `override`, do **not** automatically unwind a
+real emergency dispatch or spend from this alone — the decision is one
+spoken word, not verified against a transcript read-back. Tell the user
+plainly: "The Chief Minister rejected this by phone. This needs manual
+reconciliation, not an automatic reversal — flag it in your system for a
+person to review and apply the correction." Only call the host system's own
+decision-application function directly if that system's own policy treats
+this specific class of decision as safe to auto-reverse; never invent a
+second unwind path either way.
 
 ## Example 2 — Finance auto-release policy
 
