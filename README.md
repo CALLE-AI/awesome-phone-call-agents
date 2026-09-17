@@ -272,6 +272,7 @@ This project is an awesome list for AI-agent phone-call workflows. Add resources
 - [HOLDLINE](https://github.com/Elioz404/HOLDLINE) - Evidence-gated batch phone enquiries with per-target verdicts checked against the transcript, a freshness ledger that skips repeat calls, and an MCP server with a no-account simulation mode. [Demo](https://holdline-j0ku.onrender.com)
 - [GridGate](https://github.com/ashczar77/grid-gate) - Experimental local reference workbench for consent-gated emergency provider cascade simulations during Eskom load-shedding, featuring dry-run planning by default, early exit on fulfilled quotes, and CALL-E voice verification.
 - [Later, Me.](https://github.com/shirosenagi-design/later-me) - Windows CALL-E app for scheduling a real phone call to your future self, with a four-hour minimum, one pending reservation, and optional post-call Relationship Trace.
+- [Mazō Executive Coach](apps/typescript/mazo/) - Autonomous AI executive coach that initiates real-time CALL-E phone calls to break through decision paralysis, secure commitments, and extract structured action items.
 - [MeasureBack](apps/python/measureback/) - CALL-E recipe interview that clarifies household measures, preserves quoted corrections and scales quantities in Python; authored examples run without a call.
 - [Post-Discharge Check](docs/post-discharge-check/) - External, synthetic care-team interface simulation illustrating CALL-E check-in transcripts, advisory flags, and a local escalation inbox; not a clinical workflow implementation or verified live integration.
 - [SchemaRelay](https://github.com/14188769700lbk-dev/schemarelay) - Consent-gated CALL-E owner interviews that turn data schema-change questions into human-review evidence packets, with a no-call dry run by default.
@@ -302,6 +303,7 @@ Runnable demo apps live under [`apps/`](apps/). They are not a CALL-E SDK and do
 
 | App | Language | Purpose |
 | --- | --- | --- |
+| [`apps/typescript/mazo`](apps/typescript/mazo/) | TypeScript / Node | Autonomous AI executive coach that initiates real-time phone calls via CALL-E to turn overthinking into decisive action, with safe dry-run simulation, archetype selection, and structured task extraction. |
 | [`apps/web/harvest-relay`](apps/web/harvest-relay/) | JavaScript / Node | Cold-storage and refrigerated-transport handoff planner with a synthetic no-call default, a CALL-E REST adapter, and reviewed result imports feeding the same constraint solver. |
 | [`apps/typescript/senior-phone-ai`](apps/typescript/senior-phone-ai/) | TypeScript / Next.js | Shared Australian daily knowledge injected into confirmed CALL-E calls, consent-gated post-call search, SMS previews or Twilio delivery, and per-call conversation/SMS history with a no-call default. |
 | [`apps/typescript/avelis`](apps/typescript/avelis/) | JavaScript / Node.js | Breast follow-up evidence and clinician handoff; six fictional cases and an opt-in CALL-E / DeepSeek workflow with local recovery. |

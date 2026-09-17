@@ -1,0 +1,25 @@
+{
+  "name": "mazo-executive-coach",
+  "version": "1.0.0",
+  "description": "Autonomous AI Executive Coach that initiates real-time phone check-ins and strategic voice sessions via CALL-E, turning overthinking into decisive action.",
+  "main": "mazo-coach.js",
+  "bin": {
+    "mazo-coach": "./mazo-coach.js"
+  },
+  "scripts": {
+    "start": "node mazo-coach.js",
+    "test": "node --test test/mazo.test.js"
+  },
+  "engines": {
+    "node": ">=18.0.0"
+  },
+  "keywords": [
+    "call-e",
+    "ai-agent",
+    "voice-coaching",
+    "executive-coach",
+    "accountability",
+    "phone-calls"
+  ],
+  "license": "MIT"
+}
