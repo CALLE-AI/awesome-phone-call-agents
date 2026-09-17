@@ -25,14 +25,14 @@ CARD_STEADY = prepare(
 )
 
 GOOD_TRANSCRIPT = [
-    {"role": "agent",  "text": "I really appreciate our long relationship and wanted to discuss renewal."},
+    {"role": "agent",  "text": "Hello, calling 555-0199. I really appreciate our long relationship and wanted to discuss renewal."},
     {"role": "callee", "text": "Yes, we value the partnership too."},
     {"role": "agent",  "text": "We'd like to continue at a 4% increase for a 2-year term."},
     {"role": "callee", "text": "That sounds reasonable. We agree to the 4% for 2 years."},
 ]
 
 BAD_TRANSCRIPT = [
-    {"role": "agent",  "text": "We need a 10% increase. That's our final offer. Take it or leave it."},
+    {"role": "agent",  "text": "Calling 555-0122. We need a 10% increase. That's our final offer. Take it or leave it."},
     {"role": "callee", "text": "That seems high."},
     {"role": "agent",  "text": "Actually, let me offer you 8% right now without you even asking."},
     {"role": "callee", "text": "OK if you insist. Deal."},

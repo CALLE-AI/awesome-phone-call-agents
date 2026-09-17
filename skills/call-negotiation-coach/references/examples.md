@@ -1,34 +1,39 @@
-# Examples — call-negotiation-coach
+# Examples
 
-## Example 1: Pre-call strategy card for a Steady-type supplier
+## Example 1: Pre-Call Preparation
 
+**Command:**
 ```bash
 python3 scripts/negotiation_coach.py prepare \
-    --goal "Renew annual software licence at 0–5% price increase" \
-    --batna "Switch to open-source alternative, estimated 3-month migration" \
+    --goal "Renew contract at <= 5% increase" \
+    --batna "Switch to Supplier B at 15% higher" \
     --counterparty-disc Steady \
-    --concern-mode collaborating \
     --dry-run
 ```
 
-**Expected output excerpt**:
+**Output Excerpt:**
 ```json
 {
-  "dual_concern_mode": "Collaborating",
-  "counterparty_disc": "Steady",
+  "mode": "prepare",
+  "batna_floor_note": "Walk away if outcome is worse than: Switch to Supplier B at 15% higher",
   "tactic_sequence": [
-    {"step": 1, "tactic": "rapport_building"},
-    {"step": 2, "tactic": "label_emotion"},
-    {"step": 3, "tactic": "timed_concession"},
-    {"step": 4, "tactic": "interest_exploration"}
+    {
+      "step": 1,
+      "tactic": "rapport_building",
+      "script_hint": "Acknowledge the relationship before discussing numbers."
+    },
+    {
+      "step": 2,
+      "tactic": "label_emotion",
+      "script_hint": "It sounds like cost certainty matters more than the headline rate."
+    }
   ]
 }
 ```
 
----
+## Example 2: Post-Call Debrief (Successful)
 
-## Example 2: Post-call debrief
-
+**Command:**
 ```bash
 python3 scripts/negotiation_coach.py debrief \
     --transcript transcript.json \
@@ -36,20 +41,17 @@ python3 scripts/negotiation_coach.py debrief \
     --dry-run
 ```
 
----
-
-## Example 3: Integration with client-persona-profiler
-
-```bash
-# Step 1: Profile the counterparty
-python3 ../client-persona-profiler/scripts/profile_caller.py \
-    --transcript last_call.json --dry-run --out persona.json
-
-# Step 2: Pass DISC archetype to negotiation coach
-DISC=$(python3 -c "import json; print(json.load(open('persona.json'))['disc_primary'])")
-python3 scripts/negotiation_coach.py prepare \
-    --goal "Reduce vendor cost by 10%" \
-    --batna "In-house build estimated 6 months" \
-    --counterparty-disc "$DISC" \
-    --dry-run
+**Output Excerpt:**
+```json
+{
+  "mode": "debrief",
+  "reached_agreement": true,
+  "batna_violated": false,
+  "tactic_adherence": {
+    "rapport_building": "EXECUTED",
+    "label_emotion": "SKIPPED"
+  },
+  "anti_patterns_detected": [],
+  "flags": []
+}
 ```
