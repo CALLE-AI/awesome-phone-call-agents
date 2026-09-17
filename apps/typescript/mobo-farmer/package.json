@@ -6,7 +6,9 @@
     "dev": "next dev",
     "build": "next build",
     "start": "next start",
-    "lint": "eslint"
+    "lint": "eslint",
+    "demo": "node scripts/demo.js",
+    "demo:live": "echo Live requires --live flag + approval && exit 1"
   },
   "dependencies": {
     "@call-e/calle": "^0.7.0",
