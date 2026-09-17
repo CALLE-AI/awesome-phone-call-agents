@@ -1,0 +1,19 @@
+{
+  "name": "Voicemail, then a retry",
+  "description": "The first contact-check call reaches an answering machine, which hears only a request to call the school office and never a child's name. The case returns to ready, and a second call under a fresh human authorisation reaches the contact and verifies them. A third call is refused because the attempt budget is spent.",
+  "clock": "2026-09-11T10:30:00+01:00",
+  "config": { "REACHABLE_MAX_ATTEMPTS": "2" },
+  "steps": [
+    { "action": "import" },
+    { "action": "contact_check" },
+    { "action": "call", "case": "CC-2026-autumn-C-2088", "script": "voicemail" },
+    { "action": "call", "case": "CC-2026-autumn-C-2088", "script": "clean_identity" },
+    { "action": "call", "case": "CC-2026-autumn-C-2088", "script": "clean_identity" }
+  ],
+  "expect": {
+    "cases": { "CC-2026-autumn-C-2088": "CC_VERIFIED" },
+    "contact_health": { "C-2088": "verified" },
+    "decisions": ["ATTEMPT_BUDGET_SPENT"],
+    "calls_placed": 2
+  }
+}

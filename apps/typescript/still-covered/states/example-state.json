@@ -1,0 +1,12 @@
+{
+  "id": "example-state",
+  "state_name": "Example State",
+  "program_name": "Example State Medicaid",
+  "caller_org": "Example State Health Plan",
+  "start_date": "2027-01-01",
+  "report_how": "online at benefits.example.org, by calling 1-800-555-0100, or with help from a free navigator",
+  "callback_phone": "1-800-555-0100",
+  "navigator_line": "1-800-555-0101",
+  "voicemail": "Hello, this is Example State Health Plan with an important message about your health coverage. Please call us back at 1-800-555-0100. Thank you.",
+  "self_attestation_note": "In 2027 the state accepts your own word for most exemptions, and it may ask for documents later."
+}

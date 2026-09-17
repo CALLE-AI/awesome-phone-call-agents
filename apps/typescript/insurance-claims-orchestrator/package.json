@@ -1,0 +1,19 @@
+{
+  "name": "insurance-claims-orchestrator",
+  "version": "1.0.0",
+  "description": "Two-call consent-first insurance claims intake orchestrator using CALL-E. Dry-run by default.",
+  "type": "module",
+  "scripts": {
+    "dry-run": "tsx scripts/dry-run.ts",
+    "test": "node --import tsx/esm --test tests/ClaimChain.test.ts",
+    "check": "tsc --noEmit"
+  },
+  "devDependencies": {
+    "@types/node": "^22.0.0",
+    "tsx": "^4.20.0",
+    "typescript": "^5.8.0"
+  },
+  "engines": {
+    "node": ">=18.0.0"
+  }
+}
