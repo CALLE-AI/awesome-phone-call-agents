@@ -191,7 +191,6 @@ This project is an awesome list for AI-agent phone-call workflows. Add resources
 
 ### Apps
 
-- [TransferSignal](https://github.com/vj68/transfer-signal) - Hospital-to-hospital capacity-verification workbench for urgent patient transfers, using CALL-E for real phone conversations and deterministic transcript validation before results reach the transfer team.
 
 - [SiteWitness](apps/typescript/sitewitness/) - Local site-history interview workspace that carries reviewed evidence gaps into individually approved CALL-E calls, with exact transcript quotations, human year review, and a no-call rehearsal mode.
 - [Rebuttal Dispute Call](apps/python/rebuttal-dispute-call/) - One disclosed CALL-E call to a disputing customer, cross-examined against its transcript before it becomes chargeback evidence, with six scripted no-call scenarios and a live path gated by per-run consent, an allowlist and local calling hours.
@@ -377,6 +376,7 @@ The default e2e tests use a local fake broker/OAuth/MCP server or dry-run paths,
 
 Externally hosted user-facing apps built on CALL-E. They live in their own repositories, so review their setup, credential handling, and call side effects before running them.
 
+- [TransferSignal](https://github.com/vj68/transfer-signal) - Hospital-to-hospital capacity-verification workbench for urgent patient transfers, using CALL-E for real phone conversations and deterministic transcript validation before results reach the transfer team.
 - [FrontDesk Phone Follow-Through](https://github.com/TayseerLaz/frontdesk-core) - Cash-on-delivery order confirmation calls inside a multi-tenant WhatsApp AI front desk: chat orders are confirmed by a CALL-E call briefed from the real order rows, results written back to the order and the inbox thread; dry-run default, verified-number override, per-tenant daily cap. See the [integration notes](docs/community-apps/frontdesk-phone-follow-through.md).
 - [Care Call AI](https://github.com/NeoSPU/care-call-ai) - Practical-support outreach app for charities with approved CALL-E rounds, no-call preflight, operator gates, and reviewed request/order handoff. [Demo video](https://youtu.be/Hc2bWjTnKFQ) · [Integration notes](docs/community-apps/care-call-ai.md).
 - [ProofMesh](https://github.com/fokrulanthro16-eng/proofmesh) - A consent-first CALL-E phone verification platform that turns supervised conversations into auditable, machine-readable facts with human approval, regional controls, and honest uncertainty handling. See the [integration notes](docs/community-apps/proofmesh.md).
