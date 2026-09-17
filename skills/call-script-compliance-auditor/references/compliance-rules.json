@@ -1,0 +1,28 @@
+{
+  "US_TCPA": [
+    {"req_id": "TCPA_1", "requirement": "Caller name and organisation disclosed at call start", "regulation_ref": "47 U.S.C. § 227(d)(3)(A)", "check_type": "REQUIRED"},
+    {"req_id": "TCPA_2", "requirement": "Opt-out mechanism offered during call", "regulation_ref": "47 U.S.C. § 227(b)(2)(C)", "check_type": "REQUIRED"},
+    {"req_id": "TCPA_3", "requirement": "DNC registry reference or no-call list mention", "regulation_ref": "47 U.S.C. § 227(c) + 16 C.F.R. § 310.4(b)", "check_type": "WARN_IF_ABSENT"},
+    {"req_id": "TCPA_4", "requirement": "Callback number or contact information provided", "regulation_ref": "47 U.S.C. § 227(d)(3)(B)", "check_type": "WARN_IF_ABSENT"}
+  ],
+  "EU_GDPR": [
+    {"req_id": "GDPR_ART13_1", "requirement": "Identity of the data controller disclosed", "regulation_ref": "GDPR Article 13(1)(a)", "check_type": "REQUIRED"},
+    {"req_id": "GDPR_ART13_2", "requirement": "Purpose of data processing disclosed before collection", "regulation_ref": "GDPR Article 13(1)(c)", "check_type": "REQUIRED"},
+    {"req_id": "GDPR_ART13_3", "requirement": "Right to withdraw consent mentioned", "regulation_ref": "GDPR Article 13(2)(c)", "check_type": "REQUIRED"},
+    {"req_id": "GDPR_ART13_4", "requirement": "Data retention period or criteria disclosed", "regulation_ref": "GDPR Article 13(2)(a)", "check_type": "WARN_IF_ABSENT"},
+    {"req_id": "GDPR_ART7",    "requirement": "Consent obtained before collecting personal data", "regulation_ref": "GDPR Article 7", "check_type": "REQUIRED"}
+  ],
+  "UK_FCA": [
+    {"req_id": "FCA_CD_COMM_1", "requirement": "Caller identity and firm name disclosure", "regulation_ref": "FCA PS22/9 §4.21", "check_type": "REQUIRED"},
+    {"req_id": "FCA_CD_COMM_2", "requirement": "FCA authorisation available on request", "regulation_ref": "FCA PS22/9 §4.22", "check_type": "WARN_IF_ABSENT"},
+    {"req_id": "FCA_CD_COMM_3", "requirement": "No false urgency or artificial time pressure", "regulation_ref": "FCA PS22/9 §4.39(c)", "check_type": "PROHIBITED"},
+    {"req_id": "FCA_CD_COMM_4", "requirement": "No pressure to decide immediately", "regulation_ref": "FCA PS22/9 §4.39(d)", "check_type": "PROHIBITED"},
+    {"req_id": "FCA_CD_COMM_5", "requirement": "Opt-out mechanism offered", "regulation_ref": "FCA PS22/9 §4.40", "check_type": "REQUIRED"},
+    {"req_id": "FCA_CD_COMM_6", "requirement": "Risk warning for financial products", "regulation_ref": "FCA PS22/9 §4.55", "check_type": "WARN_IF_ABSENT"}
+  ],
+  "US_HIPAA": [
+    {"req_id": "HIPAA_1", "requirement": "Caller identifies themselves and their organisation", "regulation_ref": "45 C.F.R. § 164.510(b)", "check_type": "REQUIRED"},
+    {"req_id": "HIPAA_2", "requirement": "No unnecessary PHI disclosure (diagnosis, prescription, test results)", "regulation_ref": "45 C.F.R. § 164.502(b)", "check_type": "PROHIBITED"},
+    {"req_id": "HIPAA_3", "requirement": "Callee identity confirmed before PHI disclosure", "regulation_ref": "45 C.F.R. § 164.510(b)(3)", "check_type": "REQUIRED"}
+  ]
+}
