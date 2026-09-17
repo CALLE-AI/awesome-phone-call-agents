@@ -363,11 +363,12 @@
           alert('Call task response: ' + (errData.message || 'Unable to initiate call task at provider.'));
         }
       } catch (err) {
-        newCallLog.status = 'DRY_RUN_PREVIEW';
-        newCallLog.duration = 'Preview Only';
+        newCallLog.status = 'PREVIEW_UNCONFIRMED';
+        newCallLog.duration = 'Unknown';
+        newCallLog.points = ['The preview request did not return a usable response. This interface does not request live execution.'];
         saveData();
         banner.classList.add('hidden');
-        alert(`ℹ️ Dry-run preview mode complete for ${person.name || 'Human'}.`);
+        alert('Preview could not be confirmed. Check the server before trying again.');
       }
     }
 

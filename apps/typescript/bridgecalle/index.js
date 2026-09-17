@@ -37,21 +37,18 @@ app.post('/api/calls/trigger', async (req, res) => {
     const masked = maskPhone(seniorPhone);
     const isIndia = seniorPhone.startsWith('+91');
 
-    // Operator Authorization / Local Boundary Verification
-    const clientIp = req.ip || req.socket.remoteAddress || '';
-    const isLocal = ['127.0.0.1', '::1', '::ffff:127.0.0.1'].includes(clientIp) || req.hostname === 'localhost';
+    // Every live request requires the configured operator secret. Host headers
+    // and proxy/local addresses are not proof of operator authorization.
     const serverOperatorKey = process.env.OPERATOR_KEY || process.env.OPERATOR_SECRET || '';
     const reqKey = req.headers['x-operator-key'] || operatorKey || '';
-    const isOperatorAuthorized = serverOperatorKey ? (reqKey === serverOperatorKey) : true;
-
-    const isLiveAuthorized = (isLocal || (serverOperatorKey && isOperatorAuthorized)) && isOperatorAuthorized;
+    const isLiveAuthorized = Boolean(serverOperatorKey) && reqKey === serverOperatorKey;
 
     // Dry-run preview mode by default unless live execution, opt-in, and local/operator authorization are ALL present
     if (!execute || !confirmOptIn || !apiKey || !isLiveAuthorized) {
       return res.json({
         success: true,
         mode: 'preview',
-        message: 'Dry-run preview mode (no network call placed). Requires server CALLE_API_KEY, local operator authorization, and explicit execute flags.',
+        message: 'Dry-run preview mode (no network call placed). Live execution requires server CALLE_API_KEY, a configured matching operator secret, and explicit execute and opt-in flags.',
         call: {
           calleCallId: `calle_preview_${Date.now()}`,
           maskedPhone: masked,
