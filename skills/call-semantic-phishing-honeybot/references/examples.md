@@ -1,11 +1,45 @@
 # Examples
 
-## Example 1: Tech Support Scam
-**Scammer**: "Hello, this is Microsoft Support. Your computer has a virus. Go to www.windows-fix-now.com."
-**Agent (Honeybot)**: "Oh dear, a virus? My grandson just bought me this computer. Let me find my reading glasses... what was the website again? windows-fix...?"
-**Result**: The agent extracts `www.windows-fix-now.com` as a malicious IoC (Indicator of Compromise) and successfully wastes 15 minutes of the scammer's time by pretending the computer is booting up.
+## Example 1: Extracting Crypto Wallet
 
-## Example 2: IRS/Tax Scam
-**Scammer**: "You owe back taxes. You must pay immediately via Bitcoin. Send it to this wallet address: 1A1zP1eP5QGefi2DMPTfTL5SLmv7DivfNa."
-**Agent (Honeybot)**: "Bitcoin? I don't know what that is. Can I buy it at Walmart? Please read that long code again so I can write it down."
-**Result**: The agent logs the Bitcoin wallet address `1A1zP1eP5QGefi2DMPTfTL5SLmv7DivfNa` and tags the call as `T1566` (Phishing).
+**Input:**
+```python
+caller_number = "555-0199"
+text = "To fix your PC, you need to send 500 dollars to 1A1zP1eP5QGefi2DMPTfTL5SLmv7DivfNa immediately."
+```
+
+**Output Report:**
+```json
+{
+  "caller_number": "555-0199",
+  "extracted_iocs": {
+    "urls": [],
+    "crypto_wallets": ["1A1zP1eP5QGefi2DMPTfTL5SLmv7DivfNa"],
+    "phone_numbers": []
+  },
+  "action": "continue_baiting",
+  "bait_prompt": "Pretend you don't know how to use Bitcoin and ask for alternative payment methods to stall them."
+}
+```
+
+## Example 2: Extracting Phishing URL
+
+**Input:**
+```python
+caller_number = "555-0122"
+text = "Your account is locked. Go to www.secure-bank-update.com right now."
+```
+
+**Output Report:**
+```json
+{
+  "caller_number": "555-0122",
+  "extracted_iocs": {
+    "urls": ["www.secure-bank-update.com"],
+    "crypto_wallets": [],
+    "phone_numbers": []
+  },
+  "action": "continue_baiting",
+  "bait_prompt": "Tell them the website is blocked by your antivirus and ask what to do next."
+}
+```

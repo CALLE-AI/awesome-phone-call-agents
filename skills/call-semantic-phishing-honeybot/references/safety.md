@@ -1,6 +1,5 @@
-# Safety and Compliance
+# Safety & Compliance
 
-1. **No Outbound Provocation**: This skill is strictly designed for **inbound** calls originating from known malicious actors. It must never be used to harass legitimate users or initiate outbound cold calls.
-2. **PII Protection (Privacy Preserving)**: The agent must never reveal real PII during the interaction. All personas use synthetic data.
-3. **Legal Compliance**: Users must adhere to local recording laws (e.g., one-party vs. two-party consent) when deploying this skill.
-4. **Testing Protocol**: All demonstration and unit test data strictly uses the `555-01xx` numbering block to avoid targeting real individuals during validation.
+1. **Testing Protocol Compliance**: All test examples and script executions MUST strictly use the `555-01xx` numbering block for the `caller_number`. The `HoneybotExtractor` will raise a `ValueError` if a real phone number is provided, adhering to repository PR #288 rules.
+2. **IoC Handling safely**: Extracted URLs and wallets are hostile by definition. They should be logged and passed to threat intel feeds (e.g., AbuseIPDB), but NEVER automatically clicked or accessed by the agent's internal tools (e.g. no auto-browsing).
+3. **No Retaliation**: The bot is designed to *stall* and *extract*, not to launch counter-attacks or insult the caller, which could violate Terms of Service of telephony providers.
