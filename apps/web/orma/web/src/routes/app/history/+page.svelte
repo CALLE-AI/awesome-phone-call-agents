@@ -41,6 +41,7 @@
 		moodNone: boolean
 		live: boolean
 		noConnection: boolean
+		connectionNotice: string
 		hasResult: boolean
 		summary: LastCallSummary
 		short: string
@@ -54,11 +55,15 @@
 			const result = resultsByRun.get(run.id)
 			const summary = lastCallSummary(run, rows.mentions, rows.commitments, result?.structured ?? null, zone, now)
 			const duration = durationLabel(durationSeconds(transcript?.raw))
-			const mood = moodView(run)
+			const mood = run.state === 'failed' ? { label: 'not heard', none: true } : moodView(run)
 			const live = (LIVE_STATES as readonly string[]).includes(run.state)
 			const noConnection = run.disposition === 'not_answered' || run.state === 'failed'
+			// Abandoned submissions also use failed/not_answered; neither proves that no call connected.
+			const connectionNotice = run.state === 'failed'
+				? 'The call outcome is unknown. Check CALL-E before trying again.'
+				: 'The call did not connect.'
 			const at = formatClock(run.dispatched_at ?? run.scheduled_for, zone)
-			const disposition = dispositionLabel(run.disposition)
+			const disposition = run.state === 'failed' ? 'Outcome unknown' : dispositionLabel(run.disposition)
 			const meta = live
 				? 'On the call'
 				: [at, duration, disposition].filter(Boolean).join(' · ')
@@ -69,7 +74,7 @@
 			const short = live
 				? 'On the call.'
 				: noConnection
-					? 'The call did not connect.'
+					? connectionNotice
 					: parts.length > 0
 						? parts.join(' · ')
 						: 'Nothing new'
@@ -81,6 +86,7 @@
 				moodNone: mood.none,
 				live,
 				noConnection,
+				connectionNotice,
 				hasResult: result?.valid ?? false,
 				summary,
 				short,
@@ -125,7 +131,7 @@
 				<Badge>retired {view.summary.retired}</Badge><Badge>committed {view.summary.committed}</Badge><Badge>captured {view.summary.captured}</Badge><Badge>mentions {view.summary.mentionCount}</Badge>
 			</div>
 			{#if view.noConnection}
-				<p class="muted">The call did not connect.</p>
+				<p class="muted">{view.connectionNotice}</p>
 			{/if}
 			{#if view.summary.lines.length > 0}
 				<div class="lines">
