@@ -29,6 +29,7 @@ Always interpret the flag in context. A single signal does not indicate overload
 - Evidence snippets are limited to 100 characters.
 - PII (phone numbers, email addresses) in evidence snippets is not redacted — this is inherent to the input data. Do not share reports containing caller PII without appropriate data handling controls.
 - The `validate_load_report.py` validator scans for PII **in structured fields** (call_id, flags) and fails if found there.
+- **Testing Protocol**: All demonstration and unit test data strictly uses the `555-01xx` numbering block to avoid PII violations during validation. Real phone numbers must never be used in test environments.
 
 ## Not a Medical Device
 

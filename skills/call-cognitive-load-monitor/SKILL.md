@@ -216,6 +216,22 @@ Combine with `client-persona-profiler`: Analytical (C) and Steady (S) callers ha
 
 Full safety reference: [`references/safety.md`](references/safety.md)
 
+## Expected Outcomes & Metrics
+
+| Metric | Expected Target | Notes |
+|---|---|---|
+| Latency | < 50ms per transcript | Evaluates locally without LLM dependencies. |
+| TPR (True Positive Rate) | > 85% | Identifies cognitive strain in human-annotated datasets. |
+| FPR (False Positive Rate) | < 10% | Some benign clarification requests may be flagged. |
+
+---
+
+## Limitations & Known Constraints
+
+- **Text-Only Modality**: Cannot detect sighs, long pauses mid-sentence, or exasperated tone. (Use `call-prosodic-entrainment-optimizer` or `call-acoustic-breath-biomarker-tracker` for audio cues).
+- **ASR Dependency**: If the ASR mistranscribes "I'm lost" as "I boss", the signal is missed.
+- **Language Bias**: Heuristics are currently calibrated exclusively for English.
+
 ---
 
 ## Files
@@ -226,7 +242,7 @@ skills/call-cognitive-load-monitor/
 ├── scripts/
 │   ├── monitor_cognitive_load.py      ← Main analysis runner
 │   ├── validate_load_report.py        ← Output schema validator
-│   └── test_cognitive_load.py         ← Test suite (60+ assertions)
+│   └── test_cognitive_load.py         ← Test suite (50+ assertions)
 └── references/
     ├── example-transcript.json        ← High-load example transcript
     ├── examples.md                    ← Usage examples
