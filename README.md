@@ -120,7 +120,9 @@ This project is an awesome list for AI-agent phone-call workflows. Add resources
 
 ### Skills
 
-
+- [`call-synthetic-counterparty-detector`](skills/call-synthetic-counterparty-detector/) - Detects if the counterparty in a phone call is an AI agent using acoustic fingerprints (PDSM, micro-latency variance) to prevent infinite politeness loops and enable M2M protocol switching.
+- [`call-emotional-contagion-monitor`](skills/call-emotional-contagion-monitor/) - Tracks transcript sentiment during a phone call to detect alignment bias and emotional mirroring, preventing LLMs from escalating negative callee emotions.
+- [`longitudinal-cognitive-decline-tracker`](skills/longitudinal-cognitive-decline-tracker/) - Analyzes longitudinal acoustic metadata across recurring phone calls to detect early signs of mild cognitive impairment (MCI).
 - [`call-fraud-shield`](skills/call-fraud-shield/) - Post-call fraud detection skill that uses conversational trajectory analysis and a scam archetype library to score transcripts for vishing, spam, social engineering, and scam-script patterns, returning a structured risk card with XAI-explained evidence spans and a recommended action.
 - [`neighbour-welfare-sweep`](skills/neighbour-welfare-sweep/) - Hazard-conditioned welfare-check calls to a registry of at-risk residents during a heat warning, outage or flood: triage the roster against that hazard so calls go out worst-first, compile hazard-critical facts into required CALL-E result-schema fields, treat an unanswered call as a finding that escalates, and stop every responder handoff and ambulance, fire or police dispatch at a named human.
 - [`lesson-language-phone-practice`](skills/lesson-language-phone-practice/) - Consent-gated, lesson-derived phone rehearsal with a one-minute maximum, transcript-bound formative evidence, and no automatic redial.
