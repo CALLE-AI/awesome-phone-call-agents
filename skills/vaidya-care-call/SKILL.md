@@ -65,6 +65,8 @@ Destination: +91••••••5837
 Destination authorization: VALID
 Live call: NOT STARTED
 Operator approval: REQUIRED
+```
+
 Operator-Approved Live Run
 
 A live CALL-E call requires explicit operator approval.

@@ -34,6 +34,8 @@ Safety gate: PASS
 Destination: +91••••••5837
 Live call: NOT STARTED
 Operator approval: REQUIRED
+```
+
 Operator Approval
 
 A live call requires explicit operator approval after the preview has been generated.

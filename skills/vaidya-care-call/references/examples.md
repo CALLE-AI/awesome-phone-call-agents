@@ -16,6 +16,7 @@ Destination authorization: VALID
 CALL PREVIEW
 Live call: NOT STARTED
 Operator approval: REQUIRED
+```
 
 No phone call occurs in this mode.
 
@@ -77,4 +78,3 @@ After Provider Acceptance
 Call ID: call_demo_••••
 Provider status: accepted
 Cancellation: provider-dependent
-
