@@ -78,8 +78,11 @@ function maskSensitiveOutput(str, explicitTarget = targetPhone) {
   if (explicitTarget) {
     sanitized = sanitized.split(explicitTarget).join(maskPhone(explicitTarget));
   }
-  // Mask any E.164 numbers (+ followed by 7-15 digits)
-  sanitized = sanitized.replace(/\+[1-9]\d{6,14}/g, match => maskPhone(match));
+  // Mask phone-bearing display text, including grouped and national forms.
+  sanitized = sanitized.replace(
+    /(?<![A-Za-z0-9])(?:\+[1-9][0-9(). -]{6,}[0-9]|\(?[0-9]{3}\)?[ .-][0-9]{3}[ .-][0-9]{4}|0[1-9][0-9 .-]{6,}[0-9])(?![A-Za-z0-9])/g,
+    match => /^\+[1-9][0-9]{6,14}$/.test(match) ? maskPhone(match) : '[number hidden]'
+  );
   // Mask Bearer tokens
   sanitized = sanitized.replace(/Bearer\s+[^\s"'\r\n,}]+/gi, 'Bearer [REDACTED]');
   // Mask structured plan secrets, quoted JSON confirmation_token keys, API keys, and auth credentials
@@ -156,7 +159,7 @@ async function main() {
   }
 
   console.log(`👤 Client:   ${maskUser(userName)}`);
-  console.log(`🎯 Coach:    ${coachRole}`);
+  console.log(`🎯 Coach:    ${maskSensitiveOutput(coachRole)}`);
   console.log(`📞 Recipient: ${maskPhone(targetPhone)}`);
   console.log(`💡 Topic:    ${maskTopic(sessionTopic)}`);
   console.log(`🔄 Call Type: ${sessionMode === 'followup' ? 'Follow-Up Verification Check-in' : 'Momentum Kickoff Call'}`);
@@ -178,7 +181,7 @@ async function main() {
     console.log('• Simulated Call Status: COMPLETED (Duration: 2m 15s)');
     console.log('\n--- [STRUCTURED OUTPUT EXTRACTED (SIMULATION FIXTURE)] ---');
 
-    console.log(JSON.stringify(simulateExtraction({ sessionMode, coachRole, userName }), null, 2));
+    console.log(maskSensitiveOutput(JSON.stringify(simulateExtraction({ sessionMode, coachRole, userName }), null, 2)));
 
     console.log('\n✅ Dry-run completed successfully with 0 telephone side-effects.');
     console.log('💡 Tip: Try the verification loop with: node mazo-coach.js --mode followup');
