@@ -1,6 +1,5 @@
-# Safety and Compliance
+# Safety & Compliance
 
-1. **Feedback Loop Constraints**: The agent's reflection engine must be constrained by rigid system guardrails so that it cannot "learn" to bypass safety protocols (e.g., learning to share PII if a user rates it highly for doing so).
-2. **NIST AI RMF (Continuous Monitoring)**: This skill strictly adheres to the NIST AI RMF guidelines for TE.1-2 by providing an audited, transparent mechanism for continuous AI monitoring and improvement.
-3. **Data Retention**: Transcripts used for LLM-as-a-Judge evaluations must be purged of PII before the reflection step to ensure the long-term RAG memory bank contains zero sensitive data.
-4. **Testing Protocol**: All demonstration and unit test data strictly uses the `555-01xx` numbering block to ensure privacy compliance.
+1. **Testing Protocol Compliance**: All test examples and script executions MUST strictly use the `555-01xx` numbering block. The `SelfReflectionScorer` will raise a `ValueError` if a real phone number is provided, adhering to repository PR #288 rules.
+2. **PII in Critiques**: The LLM-as-a-Judge prompt must be instructed to NEVER include user PII (names, SSNs, phone numbers) in the generated `critique` or `recommendation` fields, as these fields are logged for agent tuning.
+3. **Judge Hallucination**: The self-reflection model must be temperature 0.0 to avoid hallucinating mistakes that did not actually occur in the transcript.

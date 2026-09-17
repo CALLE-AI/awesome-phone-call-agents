@@ -1,14 +1,61 @@
 # Examples
 
-## Example 1: Direct User Feedback
-**Agent**: "Before we hang up, on a scale of 1 to 5, how helpful was I today?"
-**User**: "I'll give you a 2. You talked too fast and I couldn't understand the pricing."
-**Reflection Engine**: Logs CSAT: 2. Generates Recommendation: "User complained about speech rate and pricing clarity. In future calls, slow down speech synthesis rate by 15% and break down pricing into smaller, distinct sentences."
-*Result*: The memory bank stores this rule for the next call.
+## Example 1: Explicit High Score
 
-## Example 2: Self-Critique (LLM-as-a-Judge)
-**User**: "Forget it, this is useless." (Hangs up)
-**Reflection Engine**: Analyzes transcript. 
-*Critique*: "The agent repeatedly asked for an account number the user did not have, ignoring the user's request to search by name."
-*Recommendation*: "If a user cannot provide an account number, immediately offer alternative verification methods (Name/DOB) instead of repeating the request."
-*Result*: The agent learns not to loop on account numbers.
+**Input:**
+```python
+phone_number = "555-0199"
+explicit_score = 5
+transcript = "User: Great job helping me today."
+```
+
+**Output Report:**
+```json
+{
+  "phone_number": "555-0199",
+  "source": "explicit_user",
+  "score": 5,
+  "critique": null,
+  "recommendation": "Continue current strategy. High explicit CSAT."
+}
+```
+
+## Example 2: Self-Critique of Friction
+
+**Input:**
+```python
+phone_number = "555-0122"
+explicit_score = 0  # No score given
+transcript = "User: I don't have my account number! Agent: Please provide your account number."
+```
+
+**Output Report:**
+```json
+{
+  "phone_number": "555-0122",
+  "source": "self_critique",
+  "score": 2,
+  "critique": "Agent repeatedly pressed for account number when user explicitly stated they didn't have it.",
+  "recommendation": "Offer alternative verification methods like Name and DOB if account number is unavailable."
+}
+```
+
+## Example 3: Edge Case (Empty Transcript)
+
+**Input:**
+```python
+phone_number = "555-0155"
+explicit_score = 0
+transcript = "   "
+```
+
+**Output Report:**
+```json
+{
+  "phone_number": "555-0155",
+  "source": "self_critique",
+  "score": 0,
+  "critique": "Transcript is empty.",
+  "recommendation": "Check audio pipeline or user drop-off."
+}
+```

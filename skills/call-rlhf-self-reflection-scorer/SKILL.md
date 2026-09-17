@@ -1,25 +1,44 @@
 ---
 name: call-rlhf-self-reflection-scorer
-description: A post-call skill where the agent requests user feedback, or defaults to an LLM-as-a-Judge self-critique. It extracts recommendations and saves them to a long-term Memory Bank (RAG) for continuous self-improvement.
+description: A post-call Reinforcement Learning from Human Feedback (RLHF) scorer that acts as an LLM-as-a-Judge to evaluate call quality, identify mistakes, and recommend prompt patches.
 version: 1.0.0
 ---
 
 # RLHF Self-Reflection Scorer
 
-This skill transforms static conversational agents into evolving entities capable of Reinforcement Learning from Human Feedback (RLHF) and AI Feedback (RLAIF). At the conclusion of a call, the agent actively seeks a score (CSAT/NPS) from the user. 
+This skill acts as an automated QA (Quality Assurance) evaluator for AI phone agents. By analyzing the transcript immediately after a call ends, it identifies friction points (e.g. asking for unavailable info, failing to de-escalate) and generates actionable recommendations for the agent's next interaction.
 
-If the user declines or hangs up, the agent leverages the "LLM-as-a-Judge" technique to evaluate its own performance based on the call transcript. It then distills "Recommendations for Improvement" which are stored in a continuous RAG (Retrieval-Augmented Generation) memory stream. Subsequent calls retrieve these lessons to avoid repeating mistakes.
+## Scientific Foundation
+
+| Paper / Concept | Relevance |
+|---|---|
+| **LLM-as-a-Judge** | Using a strong LLM to evaluate the outputs of an agentic LLM correlates highly with human CSAT (Customer Satisfaction). |
+| **Self-Reflection (Reflexion)** | Agents that critique their own past transcripts and generate "verbal reinforcement" prompts perform significantly better on subsequent tasks. |
+| **RLHF (Reinforcement Learning from Human Feedback)** | Incorporating explicit user scores (if provided post-call) alongside automated critiques bridges the gap between simulated and real-world quality. |
 
 ## How it works
 
-1. **Explicit Feedback**: During the call wrap-up, the agent asks: "On a scale of 1 to 5, how would you rate my assistance today?"
-2. **Implicit Feedback (Self-Critique)**: If the call ends abruptly, the agent runs a separate LLM prompt (the "Judge") over the transcript.
-3. **Reflection**: The Judge LLM outputs a critique and a structured recommendation.
-4. **Memory Injection**: The recommendation is embedded into the system's Long-Term Memory. In the next call with the same or similar profile, the agent's pre-prompt includes: "In previous calls, you made [Mistake X]. Ensure you do [Action Y] instead."
+1. The skill receives the transcript and any explicit CSAT score given by the user (if applicable).
+2. If the user gave a high score (>= 4), the interaction is marked as successful.
+3. If the score is low or missing, the skill runs an LLM critique against the transcript to find the root cause of friction.
+4. It outputs an `EvaluationResult` containing the score, the identified critique, and a specific system prompt recommendation to fix the behavior.
 
-## Use Cases
-- Sales agents that autonomously learn objection-handling techniques.
-- Support agents that adjust their verbosity based on user frustration markers.
+## Decision Matrix
 
-## Integration
-This runs primarily as an asynchronous post-call webhook, utilizing a separate LLM invocation to guarantee unbiased judging and reflection.
+| Explicit Score | Transcript Sentiment | Outcome | Action |
+|---|---|---|---|
+| `>= 4` | Any | `EXPLICIT_USER` (High) | Maintain current strategy |
+| `< 4` | Any | `EXPLICIT_USER` (Low) | Generate critique to explain low score |
+| `None` | Smooth | `SELF_CRITIQUE` (High) | Baseline evaluation |
+| `None` | Friction detected | `SELF_CRITIQUE` (Low) | Flag friction point and generate patch |
+
+## Expected Outcomes & Metrics
+
+| Metric | Target | Notes |
+|---|---|---|
+| Critique Relevance | > 90% | The LLM-generated critique should match human QA audits. |
+| Recommendation Actionability | > 85% | Recommendations must be directly usable as system prompt instructions. |
+
+## Limitations & Known Constraints
+- **Self-Correction Loop**: This skill only generates the critique. A separate meta-agent is required to actually update the core agent's prompt based on these recommendations.
+- **Cost**: Running an LLM-as-a-Judge on every call adds inference overhead.
