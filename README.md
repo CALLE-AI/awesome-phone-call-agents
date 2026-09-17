@@ -208,6 +208,7 @@ This project is an awesome list for AI-agent phone-call workflows. Add resources
 - [`conversation-clarify`](skills/conversation-clarify/) - Detects a written reply that agrees without saying which option, or commits without saying when, then settles it with one bounded disclosed CALL-E phone call and writes the answer back into the thread bound to the recipient's own words, or refuses to answer at all.
 ### Apps
 
+- [Gimme Updates](apps/typescript/gimme-updates/) - Daily phone call that reads a user's important emails aloud and captures spoken reminders/follow-ups, built for blind and elderly users who can't navigate a screen-based inbox.
 
 - [Senior Phone AI](apps/typescript/senior-phone-ai/) - Next.js CALL-E demo for older Australians with a shared source-backed daily briefing, explicitly confirmed calls, and combined call/SMS history. Because the current CALL-E integration cannot invoke the app's web-search tool during a provider-hosted call, new requests use consent-gated post-call search followed by an SMS preview or Twilio delivery; preview adapters keep the default path side-effect free.
 
