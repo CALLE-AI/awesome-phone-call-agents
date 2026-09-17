@@ -37,7 +37,7 @@ For international business travelers and cross-border entrepreneurs, language ba
 * **Destination Authorization:** Every dial requires explicit confirmation of the (masked) number and language before the request is sent — nothing calls automatically.
 
 
-* **Origin Allowlisting:** API requests are only ever sent to the approved CALL-E host (`[https://api.heycall-e.com](https://api.heycall-e.com)`); a misconfigured `BASE_URL` is refused rather than silently leaking credentials elsewhere.
+* **Origin Allowlisting:** API requests are only ever sent to the approved [CALL-E host](https://api.heycall-e.com); a misconfigured `BASE_URL` is refused rather than silently leaking credentials elsewhere.
 
 
 
@@ -53,6 +53,7 @@ For international business travelers and cross-border entrepreneurs, language ba
 ├── 📄 CALL-E.png            # Brand logo shown on the main menu
 ├── 📄 .gitignore            # Guardrail file preventing the exposure of private environment keys
 └── 📄 README.md             # Authoritative project documentation and architectural deep dive
+```
 
 ---
 

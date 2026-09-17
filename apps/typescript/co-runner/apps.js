@@ -60,7 +60,13 @@ function maskPhone(phone) {
 // nothing to the digits themselves.
 function maskPhoneNumbersInText(text) {
     if (!text) return text;
-    return String(text).replace(/\+\d{6,15}/g, (match) => maskPhone(match));
+    return String(text).replace(
+        /(?<![A-Za-z0-9])(?:\+[1-9][0-9(). -]{6,}[0-9]|\(?[0-9]{3}\)?[ .-][0-9]{3}[ .-][0-9]{4}|0[1-9][0-9 .-]{6,}[0-9])(?![A-Za-z0-9])/g,
+        (match) => {
+            const digits = match.replace(/[^0-9]/g, '');
+            return digits.length >= 7 ? '[number hidden]' : match;
+        }
+    );
 }
 
 window.addEventListener('DOMContentLoaded', () => {
