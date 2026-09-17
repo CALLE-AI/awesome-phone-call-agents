@@ -1,0 +1,51 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "result-schema-reorder-offer.json",
+  "title": "Shop voice reorder offer result",
+  "description": "Structured result after asking the owner whether to place a restock order for items running low. No vendor is dialed as part of this call.",
+  "type": "object",
+  "required": ["reorder_offer_completed", "owner_wants_to_order", "items"],
+  "additionalProperties": false,
+  "properties": {
+    "reorder_offer_completed": {
+      "type": "boolean",
+      "description": "True when the yes/no reorder question was answered clearly."
+    },
+    "owner_wants_to_order": {
+      "type": "boolean",
+      "description": "True only when the owner explicitly said yes to placing an order."
+    },
+    "items": {
+      "type": "array",
+      "description": "Per-item order detail. Empty if the owner declined.",
+      "items": {
+        "type": "object",
+        "required": ["name", "quantity_needed", "unit"],
+        "additionalProperties": false,
+        "properties": {
+          "name": { "type": "string", "minLength": 1 },
+          "quantity_needed": { "type": "number", "exclusiveMinimum": 0 },
+          "unit": { "type": "string", "minLength": 1 },
+          "vendor_name": {
+            "type": "string",
+            "description": "Spoken vendor name, saved or new. Omit if the owner did not name one."
+          },
+          "vendor_goods": {
+            "type": "array",
+            "items": { "type": "string" },
+            "description": "What the vendor sells, as the owner described it. Only set for a new vendor."
+          },
+          "vendor_phone_e164": {
+            "type": "string",
+            "pattern": "^\\+[1-9][0-9]{7,14}$",
+            "description": "Only set if the owner stated the number. Never invented."
+          }
+        }
+      }
+    },
+    "owner_notes": {
+      "type": "string",
+      "description": "Optional free-text; must not contain financial advice or loan discussion."
+    }
+  }
+}

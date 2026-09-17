@@ -1,0 +1,43 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Shop Check-In</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Archivo:wght@400;500;600;700&family=Caveat:wght@500;600&display=swap">
+<link rel="stylesheet" href="/app.css">
+</head>
+<body>
+
+<header class="topbar">
+  <div class="topbar-in">
+    <span class="wordmark"><span class="mark"></span>Shop Check-In</span>
+    <nav class="nav" id="nav">
+      <a href="#/customers" data-nav="customers">Customers</a>
+      <a href="#/schedule" data-nav="schedule">Schedule</a>
+    </nav>
+    <a class="btn ghost" href="#/add">Add a shop</a>
+  </div>
+</header>
+
+<main class="wrap" id="view"><p class="loading">Loading</p></main>
+
+<!-- unit suggestions, filled from /api/config so the server owns the list.
+     Suggestions only: the field is free text and the column is TEXT. -->
+<datalist id="unitList"></datalist>
+
+<dialog class="modal" id="callModal" aria-labelledby="mTitle">
+  <div class="modal-head">
+    <span class="grow"><h2 id="mTitle">Place check-in call</h2><p id="mSub"></p></span>
+    <button class="modal-x" id="mX" type="button" aria-label="Close">&times;</button>
+  </div>
+  <div class="modal-body" id="mBody"></div>
+  <div class="modal-foot" id="mFoot"></div>
+</dialog>
+
+<script src="/chain.js"></script>
+<script src="/app.js"></script>
+</body>
+</html>
