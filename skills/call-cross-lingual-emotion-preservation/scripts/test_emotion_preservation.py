@@ -226,3 +226,40 @@ def test_card_no_relay_agent_turns_abstains():
 def test_card_empty_turns_abstains():
     card = build_parity_card("Urgent please.", [])
     assert card["emotion_assessment"] == "unclear"
+
+
+def test_craft_known_scenario_builds_goal():
+    plan = craft_goal("emotion-relay")
+    assert plan["skill"] == "call-cross-lingual-emotion-preservation"
+    assert plan["mode"] == "craft"
+    assert plan["scenario"] == "emotion-relay"
+    assert plan["language"] == "en"
+    assert plan["intensity"] == "high"
+    assert "strongest natural urgency phrasing" in plan["goal"]
+
+
+def test_craft_intensity_variants():
+    assert "concerned request" in craft_goal("emotion-relay", intensity="medium")["goal"]
+    assert "calm, neutral tone" in craft_goal("emotion-relay", intensity="low")["goal"]
+
+
+def test_craft_unknown_scenario_raises():
+    try:
+        craft_goal("translation")
+    except ValueError as exc:
+        assert "unknown scenario" in str(exc).lower()
+    else:
+        raise AssertionError("expected ValueError")
+
+
+def test_craft_invalid_intensity_raises():
+    try:
+        craft_goal("emotion-relay", intensity="extreme")
+    except ValueError as exc:
+        assert "intensity" in str(exc).lower()
+    else:
+        raise AssertionError("expected ValueError")
+
+
+def test_craft_language_passthrough():
+    assert craft_goal("emotion-relay", language="es")["language"] == "es"
