@@ -318,3 +318,72 @@ def craft_goal(
             "Use fictional +1 555-01xx numbers for any test calls.",
         ],
     }
+
+
+def main(argv: list[str] | None = None) -> int:
+    parser = argparse.ArgumentParser(description=__doc__)
+    sub = parser.add_subparsers(dest="command", required=True)
+
+    p_craft = sub.add_parser("craft", help="Generate a one-time spoken challenge and the plan_call goal.")
+    p_craft.add_argument("--scenario", required=True, help=f"One of {sorted(CRAFT_SCENARIOS)}.")
+    p_craft.add_argument("--secret-env", default="CALL_ATTEST_SECRET", help="Environment variable holding the shared secret (default: CALL_ATTEST_SECRET).")
+    p_craft.add_argument("--nonce", default=None, help="Pin a nonce (default: random 6-hex).")
+    p_craft.add_argument("--language", default=None, help="BCP-47 tag passed through to plan_call (default: en).")
+    p_craft.add_argument("--out", default=None, help="Write the plan to this path (default: stdout).")
+
+    p_verify = sub.add_parser("verify", help="Verify a finished transcript's spoken response code.")
+    p_verify.add_argument("--transcript", required=True, help="Path to a CALL-E call result JSON file.")
+    p_verify.add_argument("--nonce", required=True, help="The nonce spoken in the challenge.")
+    p_verify.add_argument("--expected-code", required=True, help="The expected code from craft output, e.g. 'BLUE ORANGE SEVEN 42'.")
+    p_verify.add_argument("--ledger", default=None, help="JSONL nonce ledger for replay detection (optional).")
+    p_verify.add_argument("--out", default=None, help="Write the card to this path (default: stdout).")
+
+    args = parser.parse_args(argv)
+
+    if args.command == "craft":
+        try:
+            payload = craft_goal(
+                args.scenario,
+                language=args.language,
+                nonce=args.nonce,
+                secret_env=args.secret_env,
+            )
+        except ValueError as exc:
+            print(f"ERROR: {exc}", file=sys.stderr)
+            return 2
+    else:
+        path = Path(args.transcript)
+        if not path.is_file():
+            print(f"ERROR: transcript file not found: {path}", file=sys.stderr)
+            return 2
+        try:
+            data = load_call_result(path)
+        except json.JSONDecodeError as exc:
+            print(f"ERROR: invalid JSON in transcript file: {exc}", file=sys.stderr)
+            return 2
+        except ValueError as exc:
+            print(f"ERROR: {exc}", file=sys.stderr)
+            return 2
+        except OSError as exc:
+            print(f"ERROR: cannot read transcript file: {exc}", file=sys.stderr)
+            return 2
+        payload = build_attestation_card(
+            data["turns"],
+            nonce=args.nonce,
+            expected_code=args.expected_code,
+            ledger_path=Path(args.ledger) if args.ledger else None,
+        )
+        if data.get("call_id"):
+            payload = {"call_id": data["call_id"], **payload}
+
+    output = json.dumps(payload, indent=2, ensure_ascii=False)
+    if args.out:
+        Path(args.out).write_text(output + "\n", encoding="utf-8")
+        print(f"Written to {args.out}", file=sys.stderr)
+    else:
+        print(output)
+    return 0
+
+
+if __name__ == "__main__":
+    sys.exit(main())

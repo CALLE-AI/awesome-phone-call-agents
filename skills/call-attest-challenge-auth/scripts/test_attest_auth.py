@@ -289,3 +289,105 @@ def test_craft_language_passthrough():
         assert craft_goal("attestation-call", secret_env="ATTEST_TEST_SECRET", nonce="4f2a91", language="de")["language"] == "de"
     finally:
         del os.environ["ATTEST_TEST_SECRET"]
+
+
+def _run_cli(*args: str, env_extra: dict | None = None, env_remove: list[str] | None = None) -> subprocess.CompletedProcess:
+    import os
+    env = dict(os.environ)
+    if env_extra:
+        env.update(env_extra)
+    for key in env_remove or []:
+        env.pop(key, None)
+    cmd = [sys.executable, str(SCRIPTS / "attest_auth.py"), *args]
+    return subprocess.run(cmd, capture_output=True, text=True, env=env)
+
+
+def test_cli_craft_with_secret_env_outputs_plan():
+    proc = _run_cli("craft", "--scenario", "attestation-call", "--nonce", "4f2a91",
+                    "--secret-env", "ATTEST_TEST_SECRET",
+                    env_extra={"ATTEST_TEST_SECRET": "s3cret"})
+    assert proc.returncode == 0
+    plan = json.loads(proc.stdout)
+    assert plan["nonce"] == "4f2a91"
+    assert len(plan["expected_response"]["code"]) == 4
+
+
+def test_cli_craft_missing_secret_exits_2():
+    proc = _run_cli("craft", "--scenario", "attestation-call", env_remove=["ATTEST_TEST_SECRET"])
+    assert proc.returncode == 2
+    assert "secret" in proc.stderr.lower()
+
+
+def test_cli_verify_verified_fixture_outputs_card():
+    with tempfile.TemporaryDirectory() as td:
+        ledger = Path(td) / "ledger.jsonl"
+        proc = _run_cli(
+            "verify",
+            "--transcript", str(EXAMPLE_VERIFIED),
+            "--nonce", "4f2a91",
+            "--expected-code", "BLUE ORANGE SEVEN 42",
+            "--ledger", str(ledger),
+        )
+        assert proc.returncode == 0
+        card = json.loads(proc.stdout)
+        assert card["attestation"] == "VERIFIED"
+        assert ledger.is_file()
+
+
+def test_cli_verify_mismatch_fixture_outputs_card():
+    proc = _run_cli(
+        "verify",
+        "--transcript", str(EXAMPLE_MISMATCH),
+        "--nonce", "4f2a91",
+        "--expected-code", "BLUE ORANGE SEVEN 42",
+    )
+    assert proc.returncode == 0
+    assert json.loads(proc.stdout)["attestation"] == "FAILED_MISMATCH"
+
+
+def test_cli_verify_missing_transcript_exits_2():
+    proc = _run_cli("verify", "--transcript", "missing.json", "--nonce", "4f2a91", "--expected-code", "BLUE ORANGE SEVEN 42")
+    assert proc.returncode == 2
+    assert "not found" in proc.stderr.lower()
+
+
+def test_cli_verify_requires_expected_code():
+    proc = _run_cli("verify", "--transcript", str(EXAMPLE_VERIFIED), "--nonce", "4f2a91")
+    assert proc.returncode == 2
+
+
+def test_cli_verify_invalid_json_exits_2():
+    with tempfile.TemporaryDirectory() as td:
+        p = Path(td) / "bad.json"
+        p.write_text("{not json", encoding="utf-8")
+        proc = _run_cli("verify", "--transcript", str(p), "--nonce", "4f2a91", "--expected-code", "BLUE")
+    assert proc.returncode == 2
+
+
+def test_cli_craft_writes_out_file():
+    with tempfile.TemporaryDirectory() as td:
+        out = Path(td) / "plan.json"
+        proc = _run_cli("craft", "--scenario", "attestation-call", "--nonce", "4f2a91", "--out", str(out),
+                        "--secret-env", "ATTEST_TEST_SECRET",
+                        env_extra={"ATTEST_TEST_SECRET": "s3cret"})
+        assert proc.returncode == 0
+        plan = json.loads(out.read_text(encoding="utf-8"))
+    assert plan["mode"] == "craft"
+
+
+def _main() -> int:
+    failures = 0
+    for name, fn in sorted(globals().items()):
+        if name.startswith("test_") and callable(fn):
+            try:
+                fn()
+                print(f"PASS {name}")
+            except AssertionError:
+                failures += 1
+                print(f"FAIL {name}")
+    print(f"{failures} failure(s)")
+    return 1 if failures else 0
+
+
+if __name__ == "__main__":
+    raise SystemExit(_main())
