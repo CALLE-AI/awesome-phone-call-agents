@@ -1,0 +1,77 @@
+[build-system]
+requires = ["setuptools>=68", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "parcelbridge"
+version = "0.1.0-public-ref"
+description = "Reference app demonstrating the refusal-first pattern for AI phone-agent integration. Offline-fake default mode; live-mode stub refuses to dial by design."
+readme = "README.md"
+requires-python = ">=3.9"
+license = { text = "MIT" }
+authors = [
+    { name = "ParcelBridge Contributors" },
+]
+keywords = [
+    "ai-phone-agent",
+    "refusal-first",
+    "offline-fake",
+    "reference-app",
+    "parcelbridge",
+    "awesome-phone-call-agents",
+]
+classifiers = [
+    "Development Status :: 3 - Alpha",
+    "Intended Audience :: Developers",
+    "License :: OSI Approved :: MIT License",
+    "Operating System :: OS Independent",
+    "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3.9",
+    "Programming Language :: Python :: 3.10",
+    "Programming Language :: Python :: 3.11",
+    "Programming Language :: Python :: 3.12",
+    "Topic :: Software Development :: Libraries :: Python Modules",
+]
+dependencies = []
+
+[project.optional-dependencies]
+dev = [
+    "pytest>=7.0",
+]
+
+[project.scripts]
+parcelbridge = "parcelbridge.cli:main"
+
+[tool.setuptools]
+packages = ["parcelbridge", "parcelbridge.bridge"]
+
+[tool.setuptools.package-data]
+parcelbridge = ["py.typed"]
+"parcelbridge.bridge" = ["*.py"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+python_files = ["test_*.py"]
+addopts = "-ra --strict-markers"
+markers = [
+    "offline_only: marks tests as offline-only (no network, no credentials)",
+]
+
+[tool.parcelbridge]
+mode_default = "offline"
+live_mode_status = "documentation_stub"
+run_call_implemented = false
+authorization_state_machine = "single_use_plan_only"
+transport_category = "A. OFFICIAL_PROGRAMMATIC_IN_MEMORY"
+disclosure_required = true
+sanitized = true
+has_recipient_content = false
+has_oauth_tokens = false
+has_phone_numbers = false
+has_plan_ids = false
+has_real_endpoints = false
+has_real_urls = false
+has_real_hostnames = false
+has_real_ports = false
+has_real_pids = false
+has_real_account_info = false
