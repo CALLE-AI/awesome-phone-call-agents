@@ -65,3 +65,25 @@ def test_load_empty_transcript_returns_no_turns():
         p = _write_result(Path(td), {"status": "completed", "transcript": []})
         data = load_call_result(p)
     assert data["turns"] == []
+
+
+def test_mask_ten_digit_phone_keeps_last_two():
+    # run "1 415 555 0155" is 14 chars (11 digits) -> 12 hashes + last 2 chars
+    assert mask_pii("call +1 415 555 0155 now") == "call +############55 now"
+
+
+def test_mask_exactly_seven_digits_is_masked():
+    assert mask_pii("ref 555-0155 closed") == "ref ######55 closed"
+
+
+def test_short_digit_runs_untouched():
+    text = "Nonce 4f2a91, code 42, order 12345"
+    assert mask_pii(text) == text
+
+
+def test_mask_separators_count_toward_one_run():
+    assert mask_pii("id 415.555.0155 x9") == "id ##########55 x9"
+
+
+def test_mask_trailing_separator_not_part_of_run():
+    assert mask_pii("num 5550155, please") == "num #####55, please"
