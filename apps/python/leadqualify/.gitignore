@@ -1,0 +1,26 @@
+
+# Environment variables (secrets rakha hai)
+.env
+
+
+# Database files (local test data)
+*.db
+test_leads.db
+leads.db
+
+
+# Python cache
+__pycache__/
+.pytest_cache/
+
+
+
+# Virtual environment
+myenv/
+venv/
+
+
+
+
+
+.env  *.db  __pycache__/  .pytest_cache/  myenvn/  venv/ 
