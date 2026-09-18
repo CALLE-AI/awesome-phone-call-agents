@@ -121,7 +121,7 @@ This project is an awesome list for AI-agent phone-call workflows. Add resources
 ### Skills
 
 
-- [`call-multilingual-code-switching-aligner`](skills/call-multilingual-code-switching-aligner/) - Multilingual phone-call agent skill that dynamically analyzes and mirrors a caller's code-switching (e.g., Spanglish, Hinglish) to build rapport and reduce cognitive load.
+- [`call-multilingual-code-switching-aligner`](skills/call-multilingual-code-switching-aligner/) - Offline experimental English/Spanish lexicon helper returning suggested code-switching styles; ASR, prompt updates, and rapport evaluation remain host responsibilities.
 - [`call-fraud-shield`](skills/call-fraud-shield/) - Post-call fraud detection skill that uses conversational trajectory analysis and a scam archetype library to score transcripts for vishing, spam, social engineering, and scam-script patterns, returning a structured risk card with XAI-explained evidence spans and a recommended action.
 - [`neighbour-welfare-sweep`](skills/neighbour-welfare-sweep/) - Hazard-conditioned welfare-check calls to a registry of at-risk residents during a heat warning, outage or flood: triage the roster against that hazard so calls go out worst-first, compile hazard-critical facts into required CALL-E result-schema fields, treat an unanswered call as a finding that escalates, and stop every responder handoff and ambulance, fire or police dispatch at a named human.
 - [`lesson-language-phone-practice`](skills/lesson-language-phone-practice/) - Consent-gated, lesson-derived phone rehearsal with a one-minute maximum, transcript-bound formative evidence, and no automatic redial.
