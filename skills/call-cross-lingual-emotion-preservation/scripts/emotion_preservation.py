@@ -74,7 +74,8 @@ def load_call_result(path: Path) -> dict[str, Any]:
         ]
     else:
         turns = []
-    # Normalize status casing so flat fixtures ("completed") and real
+    # Keep raw status casing (sibling convention); flat fixtures use
+    # "completed", get_call_run uses "COMPLETED".
     # get_call_run payloads ("COMPLETED") compare consistently.
     status = data.get("status") or payload.get("status")
     return {
