@@ -81,8 +81,50 @@ def load_call_result(path: Path) -> dict[str, Any]:
 # replace each stub with its real implementation.
 
 
-def classify_callee_turn(text: str, previous_agent_text: str) -> str:  # pragma: no cover
-    raise NotImplementedError
+# Turn classification. A callee turn is one of:
+#   backchannel  short listening sound after an agent STATEMENT ("Mm-hmm.")
+#   barge_in     frustration / hold language anywhere in the turn
+#   substantive  everything else, including short answers to agent QUESTIONS
+# The question-vs-statement rule: a short vocabulary turn that answers a
+# trailing-question agent turn is an ANSWER, not a backchannel. Bare "look"
+# is deliberately NOT a barge-in marker ("I will look into that").
+BACKCHANNEL = "backchannel"
+BARGE_IN = "barge_in"
+SUBSTANTIVE = "substantive"
+
+_BARGE_IN_RE = re.compile(
+    r"\b(?:wait|hold on|hang on|stop|enough|listen,|slow down|too fast|"
+    r"one at a time|let me (?:write|say|ask|finish|talk)|you'?re going too)\b",
+    re.IGNORECASE,
+)
+_QUESTION_END_RE = re.compile(r"\?\s*$")
+_TOKENS_RE = re.compile(r"[a-z'-]+")
+
+# A turn counts as a backchannel only if it is at most 4 words and every
+# word is listening vocabulary. "yes"/"sure" are included for the statement
+# case; the question rule above keeps them as answers when they answer one.
+BACKCHANNEL_WORDS = {
+    "mm", "mm-hmm", "mmm", "hmm", "mhm", "uh-huh", "yeah", "yep", "yup",
+    "yes", "right", "ok", "okay", "sure", "got", "it", "i", "see", "makes",
+    "sense", "sounds", "good", "go", "on", "keep", "going", "please",
+    "continue", "of", "course", "that", "works",
+}
+
+
+def _is_backchannel_text(text: str) -> bool:
+    tokens = _TOKENS_RE.findall(text.lower())
+    return 0 < len(tokens) <= 4 and all(token in BACKCHANNEL_WORDS for token in tokens)
+
+
+def classify_callee_turn(text: str, previous_agent_text: str) -> str:
+    """Classify one callee turn given the agent turn immediately before it."""
+    if _BARGE_IN_RE.search(text):
+        return BARGE_IN
+    if _is_backchannel_text(text):
+        if _QUESTION_END_RE.search(previous_agent_text or ""):
+            return SUBSTANTIVE
+        return BACKCHANNEL
+    return SUBSTANTIVE
 
 
 def build_pacing_card(turns: list[dict[str, str]]) -> dict[str, Any]:  # pragma: no cover

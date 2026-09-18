@@ -85,3 +85,54 @@ def test_mask_separators_count_toward_one_run():
 
 def test_mask_trailing_separator_not_part_of_run():
     assert mask_pii("num 5550188, please") == "num #####88, please"
+
+
+def test_classify_backchannel_variants_after_statement():
+    assert classify_callee_turn("Mm-hmm.", "Your results came back normal.") == "backchannel"
+    assert classify_callee_turn("Yeah.", "The doctor reviewed them yesterday.") == "backchannel"
+    assert classify_callee_turn("Right, okay.", "No follow-up is needed.") == "backchannel"
+    assert classify_callee_turn("Got it.", "The total is settled.") == "backchannel"
+    assert classify_callee_turn("Sounds good, go on.", "Here is the first part.") == "backchannel"
+
+
+def test_classify_answer_to_question_is_substantive():
+    assert classify_callee_turn("Yes, please.", "Would you like the summary sent?") == "substantive"
+    assert classify_callee_turn("Mm-hmm.", "Did you receive the message?") == "substantive"
+
+
+def test_classify_barge_in_variants():
+    assert classify_callee_turn("Wait, wait, slow down.", "") == "barge_in"
+    assert classify_callee_turn("Hold on, how much is the total again?", "") == "barge_in"
+    assert classify_callee_turn("Enough, just tell me when it arrives.", "") == "barge_in"
+    assert classify_callee_turn("Hang on a second.", "") == "barge_in"
+
+
+def test_classify_barge_in_precedence_over_backchannel():
+    assert classify_callee_turn("Wait, ok, ok.", "Statement not question.") == "barge_in"
+
+
+def test_classify_substantive_long_answer():
+    assert classify_callee_turn("Yes, Thursday at ten works for me.", "Is Tuesday still good?") == "substantive"
+
+
+def test_classify_word_count_limit():
+    # vocabulary words, but after a statement -> too long for a backchannel
+    assert classify_callee_turn("Yeah, the Tuesday one is fine.", "Your appointment is on Tuesday.") == "substantive"
+
+
+def test_classify_look_not_a_barge_in():
+    # deliberate deviation: bare "look" is excluded (false-positive vector)
+    assert classify_callee_turn("I will look into that, thanks.", "") == "substantive"
+
+
+def test_classify_question_mark_detection_uses_trailing_question():
+    assert classify_callee_turn("Sure.", "Anything else I can help with?") == "substantive"
+    assert classify_callee_turn("Sure.", "That is all I needed to say.") == "backchannel"
+
+
+def test_classify_no_previous_agent_text_backchannel():
+    assert classify_callee_turn("Okay.", "") == "backchannel"
+
+
+def test_classify_plain_substantive():
+    assert classify_callee_turn("Thank you for calling.", "It arrives Thursday.") == "substantive"
