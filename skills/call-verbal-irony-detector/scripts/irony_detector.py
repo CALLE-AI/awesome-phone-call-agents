@@ -29,6 +29,26 @@ DISCLAIMER = (
 )
 
 
+# A candidate is a digit run in which every separator (space, dash, dot,
+# comma, slash) sits BETWEEN two ASCII digits. That prevents trailing
+# separators from being masked and keeps "10:00" or "3rd" untouched because
+# their digit runs are shorter than 7. ASCII [0-9] only, never \d.
+_DIGIT_RUN_RE = re.compile(r"[0-9](?:[ ,./-][0-9]|[0-9])*")
+
+
+def _mask_match(m: re.Match[str]) -> str:
+    run = m.group(0)
+    digit_count = sum(1 for ch in run if ch in "0123456789")
+    if digit_count < 7:
+        return run
+    return "#" * (len(run) - 2) + run[-2:]
+
+
+def mask_pii(text: str) -> str:
+    """Mask any 7+-digit run (separators included) keeping the last 2 chars."""
+    return _DIGIT_RUN_RE.sub(_mask_match, text)
+
+
 def load_call_result(path: Path) -> dict[str, Any]:
     """Load a CALL-E call result and normalize its transcript to turns.
 
@@ -58,10 +78,6 @@ def load_call_result(path: Path) -> dict[str, Any]:
 
 # Added in Task 2 to keep the planned import surface importable; Tasks 3-6
 # replace each stub with its real implementation.
-
-
-def mask_pii(text: str) -> str:  # pragma: no cover - replaced in Task 3
-    raise NotImplementedError
 
 
 def score_turn(turn_text: str, context_before: str) -> Any:  # pragma: no cover
