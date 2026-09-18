@@ -120,6 +120,8 @@ This project is an awesome list for AI-agent phone-call workflows. Add resources
 
 ### Skills
 
+
+- [`call-emotional-contagion-monitor`](skills/call-emotional-contagion-monitor/) - Offline experimental keyword-based transcript review with suggested de-escalation prompts, without altering live calls or guaranteeing behavior.
 - [`call-synthetic-counterparty-detector`](skills/call-synthetic-counterparty-detector/) - Offline experimental pattern checks on supplied call metadata; advisory only, with no identity certification or live protocol switching.
 
 - [`call-fraud-shield`](skills/call-fraud-shield/) - Post-call fraud detection skill that uses conversational trajectory analysis and a scam archetype library to score transcripts for vishing, spam, social engineering, and scam-script patterns, returning a structured risk card with XAI-explained evidence spans and a recommended action.
