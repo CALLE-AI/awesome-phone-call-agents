@@ -1,6 +1,6 @@
 ---
 name: call-cognitive-load-monitor
-description: Post-call cognitive overload analysis skill. Analyses a CALL-E transcript for caller cognitive overload signals — repetition requests, confusion phrases, self-corrections, and interaction-dynamic markers (turn-taking imbalance, silence gaps) — returning a structured overload report with per-phase load scores, script simplification patches, and a consent-validity flag. Backed by arXiv:2606.12971 (2026), arXiv:2502.06922 (2025), and the NASA-TLX cognitive load framework.
+description: Offline experimental CALL-E transcript heuristics for repetition, confusion phrases and conversational proxies, with advisory scores and script suggestions for human review; not a cognitive assessment or consent determination.
 license: MIT
 ---
 
@@ -8,7 +8,7 @@ license: MIT
 
 > **Detect when your caller is overwhelmed — before it costs you the call.**
 
-Cognitive overload during a phone call leads to missed consents, forced repeats, premature hang-ups, and unnecessary human escalations. This skill silently analyses every CALL-E transcript for scientifically grounded overload signals — acoustic biomarkers, linguistic confusion markers, and conversational dynamics — returning a structured report with phase-by-phase load scores, script simplification patches, and a consent-validity assessment.
+This skill analyzes supplied text for heuristic confusion markers and conversational proxies. It does not measure acoustics, administer a cognitive assessment, or establish consent validity. Reports and suggested script changes require human review; no live integration, message sending or follow-up call is performed.
 
 ---
 
@@ -16,23 +16,13 @@ Cognitive overload during a phone call leads to missed consents, forced repeats,
 
 Most call-centre quality tools measure whether the **agent** performed well. This skill measures whether the **caller** was able to process what was said. When cognitive load peaks — especially at closing, where consent and commitment are given — the validity of that interaction is at risk.
 
-**Regulatory relevance**: Under FCA Consumer Duty (2023, enforced 2024+) and EU AI Act Article 13 (2025), operators must demonstrate that customers understood what they agreed to. A call flagged `CONSENT_AT_RISK` provides a documented reason for a follow-up confirmation call.
+**Advisory scope**: A `CONSENT_AT_RISK` label is a suggestion for human review, not a regulatory finding or authorization for a follow-up call. No label establishes that consent is valid or invalid.
 
 ---
 
-## Scientific Foundation
+## Research Scope
 
-| Paper / Source | Year | Relevance |
-|---|---|---|
-| **"Predicting Cognitive Load in Dyadic Conversations via Interaction Dynamics"** arXiv:2606.12971 | 2026 | Turn-taking overlap, speaker-switch frequency, and participation imbalance as CL predictors in naturalistic phone settings |
-| **"Synthetic Audio Data for Cognitive State Modeling"** arXiv:2502.06922 | Feb 2025 | TTS-based fine-tuning; identifies acoustic cognitive signals orthogonal to text features |
-| **"PROCESS-2: Speech Corpus for Cognitive Impairment Assessment"** arXiv:2605.14888 | May 2026 | State-of-the-art reproducible benchmark for naturalistic conversational variability |
-| **NASA Task Load Index (NASA-TLX)** — Hart & Staveland | 1988, gold standard | Six-dimension cognitive workload measurement scale; defines the ground-truth construct |
-| **Cognitive Load Theory** — Sweller, van Merriënboer & Paas | *Educational Psychology Review*, 2019 | Germane / intrinsic / extraneous load model — the theoretical baseline for marker categorisation |
-| **FCA Consumer Duty** | July 2023 (enforcement July 2024) | "Good customer outcomes" — operators must evidence caller understanding, not just script compliance |
-| **EU AI Act Article 13** | Official Journal of the EU, 2024 | Transparency obligations including comprehensibility of AI-generated communications |
-
-Full citations: [`references/research-papers.md`](references/research-papers.md)
+The weights and thresholds are unvalidated demonstration choices, not a reproduction of a published acoustic model. Background and claim limitations: [`references/research-papers.md`](references/research-papers.md).
 
 ---
 
@@ -210,13 +200,15 @@ Combine with `client-persona-profiler`: Analytical (C) and Steady (S) callers ha
 
 ## Privacy & Safety
 
-- No PII is stored. Transcript is processed in memory; only the structured report is written to disk.
-- `validate_load_report.py` scans for phone numbers and email addresses in output and fails validation if any are found.
+- Reports contain copied transcript evidence and script-patch text and may contain private data. Keep real-input reports local and access-controlled; use synthetic inputs for examples and tests. Do not publish reports without review.
+- The separate `validate_load_report.py` check is not automatically run before writing and is not a complete PII redactor or privacy guarantee.
 - The consent-validity flag is **advisory only**. A human must review before any regulatory or legal action.
 
 Full safety reference: [`references/safety.md`](references/safety.md)
 
 ## Expected Outcomes & Metrics
+
+The following numbers are unvalidated design targets, not measured results.
 
 | Metric | Expected Target | Notes |
 |---|---|---|
@@ -228,7 +220,8 @@ Full safety reference: [`references/safety.md`](references/safety.md)
 
 ## Limitations & Known Constraints
 
-- **Text-Only Modality**: Cannot detect sighs, long pauses mid-sentence, or exasperated tone. (Use `call-prosodic-entrainment-optimizer` or `call-acoustic-breath-biomarker-tracker` for audio cues).
+- **Text-Only Modality**: Cannot detect sighs, actual silence duration, or exasperated tone. Silence and load fields are text-based proxies, not acoustic measurements.
+- **Prototype options**: `--threshold` is currently accepted but unused; reported levels use built-in constants. Short transcripts and a `CONSENT_VALID` label do not prove that a closing phase or consent occurred.
 - **ASR Dependency**: If the ASR mistranscribes "I'm lost" as "I boss", the signal is missed.
 - **Language Bias**: Heuristics are currently calibrated exclusively for English.
 

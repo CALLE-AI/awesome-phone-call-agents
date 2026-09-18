@@ -25,7 +25,7 @@ Always interpret the flag in context. A single signal does not indicate overload
 
 ## Privacy
 
-- No raw transcript text is written to disk in the report output.
+- Reports may write copied transcript evidence and script-patch text to disk; these are private input excerpts, not anonymized data.
 - Evidence snippets are limited to 100 characters.
 - PII (phone numbers, email addresses) in evidence snippets is not redacted — this is inherent to the input data. Do not share reports containing caller PII without appropriate data handling controls.
 - The `validate_load_report.py` validator scans for PII **in structured fields** (call_id, flags) and fails if found there.
