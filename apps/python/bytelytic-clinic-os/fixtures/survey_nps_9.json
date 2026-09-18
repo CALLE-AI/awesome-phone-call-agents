@@ -1,0 +1,18 @@
+{
+  "status": "completed",
+  "task_completed": true,
+  "recipient_masked": "+1555***2834",
+  "completion_confidence": {
+    "score": 0.94,
+    "label": "high"
+  },
+  "evidence": [
+    "Patient gave NPS score of 9 and praised the staff's professionalism."
+  ],
+  "structured_result": {
+    "nps_score": 9,
+    "would_recommend": "yes",
+    "main_feedback": "Staff was very professional and the wait time was minimal."
+  },
+  "dry_run": true
+}

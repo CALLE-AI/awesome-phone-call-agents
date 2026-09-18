@@ -1,0 +1,41 @@
+{
+  "version": "7",
+  "dialect": "sqlite",
+  "entries": [
+    {
+      "idx": 0,
+      "version": "6",
+      "when": 1787037726624,
+      "tag": "0000_light_brood",
+      "breakpoints": true
+    },
+    {
+      "idx": 1,
+      "version": "6",
+      "when": 1787049757511,
+      "tag": "0001_familiar_doorman",
+      "breakpoints": true
+    },
+    {
+      "idx": 2,
+      "version": "6",
+      "when": 1787640567457,
+      "tag": "0002_dusty_mantis",
+      "breakpoints": true
+    },
+    {
+      "idx": 3,
+      "version": "6",
+      "when": 1787671198681,
+      "tag": "0003_colossal_red_skull",
+      "breakpoints": true
+    },
+    {
+      "idx": 4,
+      "version": "6",
+      "when": 1788692986173,
+      "tag": "0004_fat_enchantress",
+      "breakpoints": true
+    }
+  ]
+}

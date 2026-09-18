@@ -1,0 +1,41 @@
+{
+  "shop_id": "demo-pune-corner-shop",
+  "display_name": "Pune Corner Shop",
+  "phone": "+919000000000",
+  "region": "IN",
+  "locale": "hi",
+  "currency": "INR",
+  "timezone": "Asia/Kolkata",
+  "recipient_consented": true,
+  "consent_source": "Voice onboarding call (fictional demo record)",
+  "consent_timestamp": "2026-08-01T10:00:00+05:30",
+  "language_style": "hindi-english",
+  "typical_products": [
+    {
+      "name": "Rice",
+      "unit": "kg",
+      "reference_cost": 60
+    },
+    {
+      "name": "Atta",
+      "unit": "kg",
+      "reference_cost": 40
+    },
+    {
+      "name": "Cooking oil",
+      "unit": "litres",
+      "reference_cost": 180
+    },
+    {
+      "name": "Sugar",
+      "unit": "kg",
+      "reference_cost": 45
+    },
+    {
+      "name": "Toor dal",
+      "unit": "kg",
+      "reference_cost": 140
+    }
+  ],
+  "notes": "Fictional masked India profile for preview, fixtures, and tests. Never use a real phone number in git."
+}

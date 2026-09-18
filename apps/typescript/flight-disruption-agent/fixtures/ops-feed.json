@@ -1,0 +1,37 @@
+[
+  {
+    "publish_after_seconds": 0,
+    "event": {
+      "id": "feed_2026-09-20_NA812_delay",
+      "type": "flight.delayed",
+      "occurred_at": "2026-09-20T06:40:00+07:00",
+      "flight": { "code": "NA 812", "scheduled_departure": "2026-09-20T09:40:00+07:00" },
+      "delay_minutes": 150,
+      "cause": "operational",
+      "reason": "a technical inspection"
+    }
+  },
+  {
+    "publish_after_seconds": 20,
+    "event": {
+      "id": "feed_2026-09-20_NA721_delay",
+      "type": "flight.delayed",
+      "occurred_at": "2026-09-20T05:30:00+07:00",
+      "flight": { "code": "NA 721", "scheduled_departure": "2026-09-20T08:10:00+07:00" },
+      "delay_minutes": 90,
+      "cause": "force_majeure",
+      "reason": "weather at the destination"
+    }
+  },
+  {
+    "publish_after_seconds": 60,
+    "event": {
+      "id": "feed_2026-09-20_NA721_cancel",
+      "type": "flight.cancelled",
+      "occurred_at": "2026-09-20T06:15:00+07:00",
+      "flight": { "code": "NA 721", "scheduled_departure": "2026-09-20T08:10:00+07:00" },
+      "cause": "force_majeure",
+      "reason": "weather at the destination"
+    }
+  }
+]

@@ -1,0 +1,13 @@
+{
+  "workflow_id": "demo-inventory-checkin-001",
+  "call_type": "inventory",
+  "phone": "+2348000000000",
+  "region": "NG",
+  "locale": "en",
+  "currency": "NGN",
+  "shop_id": "demo-lagos-corner-shop",
+  "recipient_consented": true,
+  "language_style": "pidgin-english",
+  "products_to_ask": ["Rice", "Indomie", "Sugar", "Cooking oil"],
+  "max_minutes": 4
+}
