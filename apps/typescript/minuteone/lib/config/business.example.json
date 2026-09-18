@@ -1,0 +1,52 @@
+{
+  "business": {
+    "name": "Riverside Home Services",
+    "openingLine": "Hi, this is Ava calling from Riverside Home Services about the quote request you just submitted online — do you have a minute?"
+  },
+  "questions": [
+    {
+      "id": "service_type",
+      "prompt": "What kind of service are you looking for — repair, installation, or an inspection?",
+      "type": "single_select",
+      "options": ["repair", "installation", "inspection", "other"],
+      "weight": 20,
+      "qualifyingAnswers": ["repair", "installation"]
+    },
+    {
+      "id": "timeline",
+      "prompt": "How soon are you hoping to get this done?",
+      "type": "single_select",
+      "options": ["this_week", "this_month", "just_researching"],
+      "weight": 30,
+      "qualifyingAnswers": ["this_week", "this_month"]
+    },
+    {
+      "id": "property_type",
+      "prompt": "Is this for a house or an apartment/condo?",
+      "type": "single_select",
+      "options": ["house", "apartment", "condo", "other"],
+      "weight": 15,
+      "qualifyingAnswers": ["house", "apartment", "condo"]
+    },
+    {
+      "id": "budget_confirmed",
+      "prompt": "Our service calls start at $150 — is that something that works for you?",
+      "type": "boolean",
+      "weight": 25,
+      "qualifyingAnswers": ["true"]
+    },
+    {
+      "id": "best_callback_window",
+      "prompt": "What's the best time for our technician to reach you or visit?",
+      "type": "text",
+      "weight": 10
+    }
+  ],
+  "businessHours": {
+    "timezone": "America/New_York",
+    "days": ["mon", "tue", "wed", "thu", "fri"],
+    "start": "09:00",
+    "end": "18:00"
+  },
+  "qualifyingScore": 60
+}
