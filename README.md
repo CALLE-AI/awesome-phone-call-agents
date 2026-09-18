@@ -463,6 +463,7 @@ The default e2e tests use a local fake broker/OAuth/MCP server or dry-run paths,
 Externally hosted user-facing apps built on CALL-E. They live in their own repositories, so review their setup, credential handling, and call side effects before running them.
 
 
+- [Broker CALL-E Agent](https://github.com/OmkarP1919/Call-e) - Real-estate phone agent that uses CALL-E to call customers, collect property requirements, and return evidence-backed structured results for broker follow-up.
 - [TransferSignal](https://github.com/vj68/transfer-signal) - Hospital-to-hospital capacity-verification workbench for urgent patient transfers, using CALL-E for real phone conversations and deterministic transcript validation before results reach the transfer team.
 - [odo-sync](https://github.com/clinton-lynx/odo-sync) - Schedules vehicle service reminders via CALL-E phone calls 15, 10, and 5 days before service is due, recording structured booking and callback outcomes.
 - [CallBridge Connect](https://github.com/Senseiglobal/callbridge-connect) - Consent-first creative-project check-ins using the CALL-E Python SDK, with no-call sample previews, explicit live dispatch, and a structured next-action brief for human review. See the [integration notes](docs/community-apps/callbridge-connect.md).
