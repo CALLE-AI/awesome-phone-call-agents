@@ -375,6 +375,78 @@ def test_cli_craft_writes_out_file():
     assert plan["mode"] == "craft"
 
 
+def test_load_number_transcript_yields_no_turns():
+    with tempfile.TemporaryDirectory() as td:
+        p = _write_result(Path(td), {"status": "completed", "transcript": 42})
+        assert load_call_result(p)["turns"] == []
+
+
+def test_load_whitespace_only_string_transcript_yields_no_turns():
+    with tempfile.TemporaryDirectory() as td:
+        p = _write_result(Path(td), {"status": "completed", "transcript": "   "})
+        assert load_call_result(p)["turns"] == []
+
+
+def test_load_mixed_list_skips_non_dict_and_defaults_missing_text():
+    with tempfile.TemporaryDirectory() as td:
+        p = _write_result(Path(td), {
+            "status": "completed",
+            "transcript": [{"speaker": "CALLEE", "text": "hi"}, "junk", {"speaker": "agent"}, 5],
+        })
+        data = load_call_result(p)
+    assert data["turns"] == [
+        {"speaker": "CALLEE", "text": "hi"},
+        {"speaker": "agent", "text": ""},
+    ]
+
+
+def test_card_nonce_in_callee_turn_does_not_count_as_challenge():
+    turns = [
+        {"speaker": "agent", "text": "Hello, this is an automated assistant."},
+        {"speaker": "callee", "text": "My word is 4f2a91, and BLUE ORANGE SEVEN 42"},
+    ]
+    card = build_attestation_card(turns, nonce="4f2a91", expected_code="BLUE ORANGE SEVEN 42")
+    assert card["attestation"] == "FAILED_NO_RESPONSE"
+    assert card["reason"] == "challenge_not_spoken"
+
+
+def test_card_second_callee_reply_is_ignored():
+    turns = [
+        {"speaker": "agent", "text": "My word is 4f2a91. Reply with the code."},
+        {"speaker": "callee", "text": "RED APPLE FIVE 99"},
+        {"speaker": "callee", "text": "BLUE ORANGE SEVEN 42"},
+    ]
+    card = build_attestation_card(turns, nonce="4f2a91", expected_code="BLUE ORANGE SEVEN 42")
+    assert card["attestation"] == "FAILED_MISMATCH"
+    assert [e["turn_index"] for e in card["evidence"]] == [0, 1]
+
+
+def test_nonce_in_ledger_tolerates_blank_and_malformed_lines():
+    from attest_auth import _nonce_in_ledger
+    with tempfile.TemporaryDirectory() as td:
+        ledger = Path(td) / "ledger.jsonl"
+        ledger.write_text('\n{bad json\n\n{"nonce": "other"}\n{"nonce": "4f2a91"}\n', encoding="utf-8")
+        assert _nonce_in_ledger(ledger, "4f2a91") is True
+        assert _nonce_in_ledger(Path(td) / "missing.jsonl", "4f2a91") is False
+
+
+def test_card_challenge_found_in_first_agent_turn_then_agent_followup():
+    turns = [
+        {"speaker": "agent", "text": "Coordination check. My word is 4f2a91. Reply with the code."},
+        {"speaker": "agent", "text": "Still waiting..."},
+        {"speaker": "callee", "text": "BLUE ORANGE SEVEN 42"},
+    ]
+    card = build_attestation_card(turns, nonce="4f2a91", expected_code="BLUE ORANGE SEVEN 42")
+    assert card["attestation"] == "VERIFIED"
+    assert card["evidence"][0]["turn_index"] == 0
+
+
+def test_load_null_transcript_yields_no_turns():
+    with tempfile.TemporaryDirectory() as td:
+        p = _write_result(Path(td), {"status": "completed", "transcript": None})
+        assert load_call_result(p)["turns"] == []
+
+
 def _main() -> int:
     failures = 0
     for name, fn in sorted(globals().items()):
