@@ -1,0 +1,96 @@
+{
+  "company": {
+    "name": "AcmeCloud",
+    "tagline": "Cloud software for modern teams",
+    "business_type": "SaaS subscription",
+    "description": "AcmeCloud provides cloud-based productivity and collaboration software through recurring subscriptions.",
+    "currency": "USD"
+  },
+
+  "product": {
+    "name": "AcmeCloud Workspace",
+    "category": "Cloud productivity platform"
+  },
+
+  "plans": [
+    {
+      "id": "starter",
+      "name": "Starter",
+      "description": "Essential features for individuals and small teams"
+    },
+    {
+      "id": "pro",
+      "name": "Pro",
+      "description": "Advanced features for growing teams"
+    },
+    {
+      "id": "business",
+      "name": "Business",
+      "description": "Advanced administration and collaboration for organizations"
+    }
+  ],
+
+  "retention_policy": {
+    "principles": [
+      "Understand the customer's actual reason before presenting an offer.",
+      "Only present offers explicitly authorized by the company.",
+      "Never invent, modify, combine, or stack offers.",
+      "If no suitable authorized action exists, do not improvise.",
+      "Customers may request a human at any time."
+    ],
+
+    "offers": [
+      {
+        "id": "save20",
+        "label": "20% off for 3 months",
+        "description": "Apply a 20% subscription discount for the next three billing months.",
+        "plan_in": [
+          "pro",
+          "business"
+        ],
+        "min_tenure_months": 6,
+        "reasons": [
+          "price"
+        ],
+        "requires_human": false
+      },
+      {
+        "id": "pause30",
+        "label": "30-day subscription pause",
+        "description": "Pause the subscription for up to 30 days.",
+        "plan_in": [
+          "starter",
+          "pro",
+          "business"
+        ],
+        "min_tenure_months": 3,
+        "reasons": [
+          "temporary_need",
+          "low_usage"
+        ],
+        "requires_human": false
+      },
+      {
+        "id": "support_escalation",
+        "label": "Priority human support callback",
+        "description": "Create a priority callback request for a human support representative.",
+        "plan_in": [
+          "starter",
+          "pro",
+          "business"
+        ],
+        "min_tenure_months": 0,
+        "reasons": [
+          "support_experience",
+          "technical_issue"
+        ],
+        "requires_human": true
+      }
+    ],
+
+    "no_offer_reasons": [
+      "competitor",
+      "other"
+    ]
+  }
+}
