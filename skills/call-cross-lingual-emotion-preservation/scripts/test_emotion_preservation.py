@@ -263,3 +263,95 @@ def test_craft_invalid_intensity_raises():
 
 def test_craft_language_passthrough():
     assert craft_goal("emotion-relay", language="es")["language"] == "es"
+
+
+def _run_cli(*args: str) -> subprocess.CompletedProcess:
+    cmd = [sys.executable, str(SCRIPTS / "emotion_preservation.py"), *args]
+    return subprocess.run(cmd, capture_output=True, text=True)
+
+
+def test_cli_analyze_fixtures_outputs_card():
+    proc = _run_cli(
+        "analyze",
+        "--source-context", str(EXAMPLE_SOURCE),
+        "--relay-transcript", str(EXAMPLE_RELAY),
+    )
+    assert proc.returncode == 0
+    card = json.loads(proc.stdout)
+    assert card["drift"] == "FLATTENED"
+    assert card["recommended_action"]["action"] == "re_relay_with_calibrated_goal"
+
+
+def test_cli_analyze_missing_source_exits_2():
+    proc = _run_cli("analyze", "--source-context", "missing.json", "--relay-transcript", str(EXAMPLE_RELAY))
+    assert proc.returncode == 2
+    assert "not found" in proc.stderr.lower()
+
+
+def test_cli_analyze_missing_relay_exits_2():
+    proc = _run_cli("analyze", "--source-context", str(EXAMPLE_SOURCE), "--relay-transcript", "missing.json")
+    assert proc.returncode == 2
+
+
+def test_cli_analyze_invalid_relay_json_exits_2():
+    with tempfile.TemporaryDirectory() as td:
+        p = Path(td) / "bad.json"
+        p.write_text("{not json", encoding="utf-8")
+        proc = _run_cli("analyze", "--source-context", str(EXAMPLE_SOURCE), "--relay-transcript", str(p))
+    assert proc.returncode == 2
+
+
+def test_cli_analyze_non_dict_relay_json_exits_2():
+    with tempfile.TemporaryDirectory() as td:
+        p = Path(td) / "list.json"
+        p.write_text("[1, 2, 3]", encoding="utf-8")
+        proc = _run_cli("analyze", "--source-context", str(EXAMPLE_SOURCE), "--relay-transcript", str(p))
+    assert proc.returncode == 2
+
+
+def test_cli_analyze_includes_call_id_when_present():
+    proc = _run_cli(
+        "analyze",
+        "--source-context", str(EXAMPLE_SOURCE),
+        "--relay-transcript", str(EXAMPLE_RELAY),
+    )
+    card = json.loads(proc.stdout)
+    assert card["call_id"] == "example-relay-001"
+
+
+def test_cli_craft_writes_out_file():
+    with tempfile.TemporaryDirectory() as td:
+        out = Path(td) / "plan.json"
+        proc = _run_cli("craft", "--scenario", "emotion-relay", "--intensity", "medium", "--out", str(out))
+        assert proc.returncode == 0
+        plan = json.loads(out.read_text(encoding="utf-8"))
+    assert plan["mode"] == "craft"
+    assert plan["intensity"] == "medium"
+
+
+def test_cli_craft_unknown_scenario_exits_2():
+    proc = _run_cli("craft", "--scenario", "nope")
+    assert proc.returncode == 2
+
+
+def test_cli_craft_invalid_intensity_exits_2():
+    proc = _run_cli("craft", "--scenario", "emotion-relay", "--intensity", "extreme")
+    assert proc.returncode == 2
+
+
+def _main() -> int:
+    failures = 0
+    for name, fn in sorted(globals().items()):
+        if name.startswith("test_") and callable(fn):
+            try:
+                fn()
+                print(f"PASS {name}")
+            except AssertionError:
+                failures += 1
+                print(f"FAIL {name}")
+    print(f"{failures} failure(s)")
+    return 1 if failures else 0
+
+
+if __name__ == "__main__":
+    raise SystemExit(_main())

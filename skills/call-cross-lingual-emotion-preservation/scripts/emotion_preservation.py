@@ -269,3 +269,72 @@ def craft_goal(scenario: str, language: str | None = None, intensity: str = "hig
             "Use fictional +1 555-01xx numbers for any test calls.",
         ],
     }
+
+
+def _load_analysis_inputs(args: argparse.Namespace) -> tuple[str, list[dict[str, str]], str | None] | None:
+    source_path = Path(args.source_context)
+    relay_path = Path(args.relay_transcript)
+    if not source_path.is_file():
+        print(f"ERROR: source context file not found: {source_path}", file=sys.stderr)
+        return None
+    if not relay_path.is_file():
+        print(f"ERROR: relay transcript file not found: {relay_path}", file=sys.stderr)
+        return None
+    try:
+        source_text = load_source_context(source_path)
+        relay = load_call_result(relay_path)
+    except json.JSONDecodeError as exc:
+        print(f"ERROR: invalid JSON in input file: {exc}", file=sys.stderr)
+        return None
+    except ValueError as exc:
+        print(f"ERROR: {exc}", file=sys.stderr)
+        return None
+    except OSError as exc:
+        print(f"ERROR: cannot read input file: {exc}", file=sys.stderr)
+        return None
+    return source_text, relay["turns"], relay.get("call_id")
+
+
+def main(argv: list[str] | None = None) -> int:
+    parser = argparse.ArgumentParser(description=__doc__)
+    sub = parser.add_subparsers(dest="command", required=True)
+
+    p_analyze = sub.add_parser("analyze", help="Audit emotion parity between a source context and a relayed CALL-E call.")
+    p_analyze.add_argument("--source-context", required=True, help="Requester's call-result JSON or plain-text note.")
+    p_analyze.add_argument("--relay-transcript", required=True, help="Path to the relayed CALL-E call result JSON.")
+    p_analyze.add_argument("--out", default=None, help="Write the card to this path (default: stdout).")
+
+    p_craft = sub.add_parser("craft", help="Emit an intensity-calibrated relay goal for the next plan_call.")
+    p_craft.add_argument("--scenario", required=True, help=f"One of {sorted(CRAFT_SCENARIOS)}.")
+    p_craft.add_argument("--language", default=None, help="BCP-47 tag passed through to plan_call (default: en).")
+    p_craft.add_argument("--intensity", default="high", help="One of: high, medium, low (default: high).")
+    p_craft.add_argument("--out", default=None, help="Write the plan to this path (default: stdout).")
+
+    args = parser.parse_args(argv)
+
+    if args.command == "analyze":
+        loaded = _load_analysis_inputs(args)
+        if loaded is None:
+            return 2
+        source_text, relay_turns, relay_call_id = loaded
+        payload = build_parity_card(source_text, relay_turns)
+        if relay_call_id:
+            payload = {"call_id": relay_call_id, **payload}
+    else:
+        try:
+            payload = craft_goal(args.scenario, language=args.language, intensity=args.intensity)
+        except ValueError as exc:
+            print(f"ERROR: {exc}", file=sys.stderr)
+            return 2
+
+    output = json.dumps(payload, indent=2, ensure_ascii=False)
+    if args.out:
+        Path(args.out).write_text(output + "\n", encoding="utf-8")
+        print(f"Written to {args.out}", file=sys.stderr)
+    else:
+        print(output)
+    return 0
+
+
+if __name__ == "__main__":
+    sys.exit(main())
