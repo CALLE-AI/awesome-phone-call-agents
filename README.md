@@ -121,6 +121,8 @@ This project is an awesome list for AI-agent phone-call workflows. Add resources
 ### Skills
 
 
+
+- [`call-acoustic-breath-biomarker-tracker`](skills/call-acoustic-breath-biomarker-tracker/) - Offline nonclinical demonstration that scores supplied speech/pause durations and returns illustrative review labels; no audio capture, diagnosis, patient triage, or handoff is implemented.
 - [`call-negotiation-coach`](skills/call-negotiation-coach/) - Offline experimental negotiation tactic cards and heuristic post-call debriefs for human review, without accepting deals or executing transactions.
 - [`longitudinal-cognitive-decline-tracker`](skills/longitudinal-cognitive-decline-tracker/) - Offline experimental pause-duration trends from synthetic call metadata for human review, not cognitive assessment or diagnosis.
 - [`call-emotional-contagion-monitor`](skills/call-emotional-contagion-monitor/) - Offline experimental keyword-based transcript review with suggested de-escalation prompts, without altering live calls or guaranteeing behavior.
