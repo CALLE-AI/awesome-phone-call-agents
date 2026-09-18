@@ -339,6 +339,72 @@ def test_cli_craft_invalid_intensity_exits_2():
     assert proc.returncode == 2
 
 
+def test_load_number_transcript_yields_no_turns():
+    with tempfile.TemporaryDirectory() as td:
+        p = _write_result(Path(td), {"status": "completed", "transcript": 42})
+        assert load_call_result(p)["turns"] == []
+
+
+def test_load_whitespace_only_string_transcript_yields_no_turns():
+    with tempfile.TemporaryDirectory() as td:
+        p = _write_result(Path(td), {"status": "completed", "transcript": "   "})
+        assert load_call_result(p)["turns"] == []
+
+
+def test_load_mixed_list_skips_non_dict_and_defaults_missing_text():
+    with tempfile.TemporaryDirectory() as td:
+        p = _write_result(Path(td), {
+            "status": "completed",
+            "transcript": [{"speaker": "CALLEE", "text": "hi"}, "junk", {"speaker": "agent"}, 5],
+        })
+        data = load_call_result(p)
+    assert data["turns"] == [
+        {"speaker": "CALLEE", "text": "hi"},
+        {"speaker": "agent", "text": ""},
+    ]
+
+
+def test_load_source_context_agent_only_transcript_raises():
+    with tempfile.TemporaryDirectory() as td:
+        p = Path(td) / "src.json"
+        p.write_text(json.dumps({
+            "status": "completed",
+            "transcript": [{"speaker": "agent", "text": "Hello, this is the clinic."}],
+        }), encoding="utf-8")
+        try:
+            load_source_context(p)
+        except ValueError as exc:
+            assert "transcript" in str(exc).lower()
+        else:
+            raise AssertionError("expected ValueError")
+
+
+def test_load_source_context_skips_non_dict_and_empty_text():
+    with tempfile.TemporaryDirectory() as td:
+        p = Path(td) / "src.json"
+        p.write_text(json.dumps({
+            "transcript": [
+                {"speaker": "agent", "text": "ignore me"},
+                "junk",
+                {"speaker": "callee", "text": ""},
+                {"speaker": "CALLEE", "text": "This is urgent, she needs it right now."},
+            ],
+        }), encoding="utf-8")
+        text = load_source_context(p)
+    assert "urgent" in text.lower()
+    assert "ignore" not in text
+
+
+def test_card_high_source_low_relay_flattened_far():
+    card = build_parity_card(
+        "Urgent, immediately please.",
+        [{"speaker": "agent", "text": "Calling about a routine delivery."}],
+    )
+    assert card["drift"] == "FLATTENED"
+    assert card["parity_score"] == 0.0
+    assert card["recommended_action"]["action"] == "re_relay_with_calibrated_goal"
+
+
 def _main() -> int:
     failures = 0
     for name, fn in sorted(globals().items()):
