@@ -65,6 +65,21 @@ describe("DineLine CALL-E preference intake", () => {
     }
   });
 
+  it("redacts phone-bearing preference summary and evidence copies", async () => {
+    const result = await run(new PhoneBearingIntakeProvider());
+
+    expect(result.kind).toBe("completed");
+    if (result.kind === "completed") {
+      expect(result.outcome.usableForSearch).toBe(true);
+      expect(result.outcome.summary).toBe(
+        "Dinner preferences confirmed at [phone redacted].",
+      );
+      expect(result.outcome.evidence).toEqual([
+        "The diner confirmed every field by calling [phone redacted].",
+      ]);
+    }
+  });
+
   it("fails closed and never retries an ambiguous preference dispatch", async () => {
     const contract = makeContract();
     const provider = new ThrowingIntakeProvider();
@@ -80,6 +95,18 @@ describe("DineLine CALL-E preference intake", () => {
       idempotencyKey: contract.idempotencyKey,
     });
     expect(provider.callCount).toBe(1);
+  });
+
+  it("redacts phone numbers copied from preference-provider errors", async () => {
+    const result = await run(
+      new ThrowingIntakeProvider("Provider 202-555-0199 timed out"),
+    );
+
+    expect(result.kind).toBe("dispatch_unknown");
+    if (result.kind === "dispatch_unknown") {
+      expect(result.outcome.summary).toContain("[phone redacted]");
+      expect(result.outcome.summary).not.toContain("202");
+    }
   });
 
   it("stores an accepted call ID and reconciles it without another dispatch", async () => {
@@ -146,13 +173,47 @@ class ThrowingIntakeProvider implements PreferenceIntakeProvider {
   readonly name = "timeout-intake-fixture";
   callCount = 0;
 
+  constructor(readonly message = "Provider timed out") {}
+
   async execute(
     _contract: ApprovedPreferenceIntakeContract,
     _idempotencyKey: string,
     _context: IntakeExecutionContext,
   ): Promise<ProviderCallResult> {
     this.callCount += 1;
-    throw new Error("Provider timed out");
+    throw new Error(this.message);
+  }
+}
+
+class PhoneBearingIntakeProvider implements PreferenceIntakeProvider {
+  readonly name = "phone-bearing-intake-fixture";
+
+  async execute(): Promise<ProviderCallResult> {
+    return {
+      providerCallId: "fixture-phone-bearing-intake",
+      status: "completed",
+      taskCompleted: true,
+      completionConfidence: { score: 0.98, label: "high" },
+      structuredResult: {
+        location: "Manhattan, New York",
+        cuisine: "Italian",
+        date: "2026-09-18",
+        time: "19:30",
+        timeZone: "America/New_York",
+        partySize: 2,
+        budget: "upscale",
+        atmosphere: "quiet",
+        dietaryNeeds: [],
+        notes: null,
+      },
+      evidence: [
+        "The diner confirmed every field by calling +1 (202) 555-0199.",
+      ],
+      summary: "Dinner preferences confirmed at 202-555-0198.",
+      transcript: [],
+      failureCode: null,
+      failureMessage: null,
+    };
   }
 }
 

@@ -68,6 +68,33 @@ describe("DineLine CALL-E booking closure loop", () => {
     }
   });
 
+  it("redacts phone-bearing provider copies after using the private evidence", async () => {
+    const contract = makeContract();
+    const result = await run(
+      new ScriptedProvider({
+        ...confirmedResult(contract),
+        evidence: [
+          "The reservation is confirmed; call +1 (202) 555-0199 with questions.",
+        ],
+        summary: "Reservation confirmed by 202-555-0198.",
+        transcript: [
+          "restaurant: The reservation is confirmed; call +12025550199.",
+        ],
+      }),
+    );
+
+    expect(result.kind).toBe("completed");
+    if (result.kind === "completed") {
+      expect(result.outcome.outcome).toBe("confirmed");
+      expect(result.outcome.summary).toBe(
+        "Reservation confirmed by [phone redacted].",
+      );
+      expect(result.outcome.evidence).toEqual([
+        "The reservation is confirmed; call [phone redacted] with questions.",
+      ]);
+    }
+  });
+
   it("rejects a structured confirmation when the transcript says no confirmation", async () => {
     const contract = makeContract();
     const result = await run(
@@ -91,6 +118,18 @@ describe("DineLine CALL-E booking closure loop", () => {
       expect(result.state).toBe("dispatch_unknown");
       expect(result.outcome.outcome).toBe("uncertain");
       expect(result.outcome.summary).toContain("timed out");
+    }
+  });
+
+  it("redacts phone numbers copied from provider errors", async () => {
+    const result = await run(
+      new ThrowingProvider("Provider +1 (202) 555-0199 timed out"),
+    );
+
+    expect(result.kind).toBe("dispatch_unknown");
+    if (result.kind === "dispatch_unknown") {
+      expect(result.outcome.summary).toContain("[phone redacted]");
+      expect(result.outcome.summary).not.toContain("202");
     }
   });
 
@@ -199,12 +238,14 @@ class ThrowingProvider implements BookingCallProvider {
   readonly name = "timeout-fixture";
   callCount = 0;
 
+  constructor(readonly message = "Provider timed out") {}
+
   async execute(
     _contract: ApprovedBookingContract,
     _idempotencyKey: string,
   ): Promise<ProviderCallResult> {
     this.callCount += 1;
-    throw new Error("Provider timed out");
+    throw new Error(this.message);
   }
 }
 

@@ -6,6 +6,10 @@ import {
   type RequiredPreferenceField,
 } from "../domain/dining-preferences.js";
 import type { ProviderCallResult } from "../providers/calle/types.js";
+import {
+  redactPhoneEvidence,
+  redactPhoneNumbers,
+} from "../security/phone-redaction.js";
 
 export interface VerifiedPreferenceOutcome {
   preferences: DiningPreferences | null;
@@ -44,7 +48,7 @@ export function verifyPreferenceOutcome(
       confidence,
       summary:
         "DineLine could not verify a complete dinner request. Please fill in the missing details on screen.",
-      evidence,
+      evidence: redactPhoneEvidence(evidence),
       needsUserInput: true,
     };
   }
@@ -58,11 +62,13 @@ export function verifyPreferenceOutcome(
     confidence,
     summary:
       missingFields.length === 0
-        ? raw.summary ?? "Dinner preferences captured and confirmed."
+        ? redactPhoneNumbers(
+            raw.summary ?? "Dinner preferences captured and confirmed.",
+          )
         : `DineLine captured the request, but still needs: ${missingFields.join(
             ", ",
           )}.`,
-    evidence,
+    evidence: redactPhoneEvidence(evidence),
     needsUserInput: missingFields.length > 0,
   };
 }

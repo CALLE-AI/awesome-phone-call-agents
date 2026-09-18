@@ -5,6 +5,10 @@ import {
   type VerifiedBookingOutcome,
 } from "../domain/call-result.js";
 import type { ProviderCallResult } from "../providers/calle/types.js";
+import {
+  redactPhoneEvidence,
+  redactPhoneNumbers,
+} from "../security/phone-redaction.js";
 
 const contradictionPattern =
   /\b(not confirmed|wasn(?:'|’)t confirmed|no confirmation|not booked|no reservation|unavailable|not available|no availability|could not confirm|couldn(?:'|’)t confirm|unable to confirm|didn(?:'|’)t confirm|declined)\b/i;
@@ -68,8 +72,8 @@ export function verifyBookingOutcome(
       outcome: "confirmed",
       providerCallId: raw.providerCallId,
       confidence,
-      summary: raw.summary ?? "Reservation confirmed.",
-      evidence,
+      summary: redactPhoneNumbers(raw.summary ?? "Reservation confirmed."),
+      evidence: redactPhoneEvidence(evidence),
       needsHumanReview: false,
       confirmationCode: result.confirmationCode,
       alternativeDate: null,
@@ -114,8 +118,8 @@ function resolvedNonConfirmation(
     outcome,
     providerCallId: raw.providerCallId,
     confidence: raw.completionConfidence?.score ?? 0,
-    summary: raw.summary ?? fallbackSummary,
-    evidence,
+    summary: redactPhoneNumbers(raw.summary ?? fallbackSummary),
+    evidence: redactPhoneEvidence(evidence),
     needsHumanReview: true,
     confirmationCode: null,
     alternativeDate: null,
@@ -132,8 +136,8 @@ function uncertain(
     outcome: "uncertain",
     providerCallId: raw.providerCallId || null,
     confidence: raw.completionConfidence?.score ?? 0,
-    summary,
-    evidence,
+    summary: redactPhoneNumbers(summary),
+    evidence: redactPhoneEvidence(evidence),
     needsHumanReview: true,
     confirmationCode: null,
     alternativeDate: null,

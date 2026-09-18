@@ -13,6 +13,7 @@ import type {
   IdempotencyStore,
   ReservationState,
 } from "./idempotency-store.js";
+import { redactPhoneNumbers } from "../security/phone-redaction.js";
 import {
   verifyPreferenceOutcome,
   type VerifiedPreferenceOutcome,
@@ -200,6 +201,7 @@ function unknownPreferenceOutcome(
   providerCallId: string | null,
   message: string,
 ): VerifiedPreferenceOutcome {
+  const publicMessage = redactPhoneNumbers(message);
   return {
     preferences: null,
     usableForSearch: false,
@@ -207,8 +209,8 @@ function unknownPreferenceOutcome(
     providerCallId,
     confidence: 0,
     summary: providerCallId
-      ? `CALL-E accepted the planning call, but DineLine has not confirmed the final result yet. Do not call again. Check this call's status instead. ${message}`
-      : `CALL-E preference intake failed safely: ${message}`,
+      ? `CALL-E accepted the planning call, but DineLine has not confirmed the final result yet. Do not call again. Check this call's status instead. ${publicMessage}`
+      : `CALL-E preference intake failed safely: ${publicMessage}`,
     evidence: [],
     needsUserInput: true,
   };

@@ -100,6 +100,71 @@ describe("DineLine CALL-E interface server", () => {
     });
   });
 
+  it("does not expose real-call readiness on a non-loopback bind host", async () => {
+    const baseUrl = await startServer({
+      HOST: "0.0.0.0",
+      DINELINE_CALL_MODE: "real",
+      CALLE_API_KEY: "test-key",
+      DINELINE_ALLOW_REAL_CALLS: "true",
+      DINELINE_ALLOWED_BOOKING_PHONES: "+12025550143",
+      DINELINE_ALLOW_REAL_INTAKE_CALLS: "true",
+      DINELINE_ALLOWED_INTAKE_PHONES: "+12025550109",
+    });
+    const response = await fetch(`${baseUrl}/api/config`);
+    const body = await jsonBody(response);
+
+    expect(response.status).toBe(200);
+    expect(body).toMatchObject({
+      mode: "real",
+      realCallReady: false,
+      bookingCallReady: false,
+      intakeCallReady: false,
+    });
+  });
+
+  it.each([
+    "/api/intake/execute",
+    "/api/intake/reconcile",
+    "/api/n8n/intake/dispatch",
+    "/api/execute",
+    "/api/reconcile",
+    "/api/n8n/dispatch",
+  ])("blocks the live route %s on a non-loopback bind host", async (route) => {
+    const baseUrl = await startServer({
+      HOST: "0.0.0.0",
+      DINELINE_CALL_MODE: "real",
+      CALLE_API_KEY: "test-key",
+      DINELINE_ALLOW_REAL_CALLS: "true",
+      DINELINE_ALLOWED_BOOKING_PHONES: "+12025550143",
+      DINELINE_ALLOW_REAL_INTAKE_CALLS: "true",
+      DINELINE_ALLOWED_INTAKE_PHONES: "+12025550109",
+    });
+    const result = await postJson(`${baseUrl}${route}`, {});
+
+    expect(result.response.status).toBe(403);
+    expect(result.body.error).toContain("local-only");
+  });
+
+  it("keeps fixture execution available on a non-loopback bind host", async () => {
+    const baseUrl = await startServer({
+      HOST: "0.0.0.0",
+      DINELINE_CALL_MODE: "fixture",
+    });
+    const request = makeIntakeRequest("session-public-fixture");
+    const preview = await postJson(`${baseUrl}/api/intake/preview`, request);
+    const result = await postJson(`${baseUrl}/api/intake/execute`, {
+      request,
+      approvedRequestId: preview.body.preview.requestId,
+      scenario: "complete",
+    });
+
+    expect(result.response.status).toBe(200);
+    expect(result.body).toMatchObject({
+      mode: "fixture",
+      execution: { kind: "completed" },
+    });
+  });
+
   it("previews a stable preference request and masks the diner phone", async () => {
     const baseUrl = await startServer();
     const request = makeIntakeRequest();
@@ -249,13 +314,30 @@ describe("DineLine CALL-E interface server", () => {
     });
   });
 
-  it("builds a stable preview and masks the phone number", async () => {
+  it("builds a stable preview and masks every phone-bearing copy", async () => {
     const baseUrl = await startServer();
-    const first = await postJson(`${baseUrl}/api/preview`, makeDraft());
-    const second = await postJson(`${baseUrl}/api/preview`, makeDraft());
+    const draft = makeDraft();
+    draft.restaurant.name = "Santoro House +1 (202) 555-0198";
+    draft.restaurant.address = "Text 202-555-0197 before arrival";
+    draft.reservation.guestName = "Demo Guest 202.555.0196";
+    draft.reservation.specialRequests = "Call +12025550195 if delayed";
+    const first = await postJson(`${baseUrl}/api/preview`, draft);
+    const second = await postJson(`${baseUrl}/api/preview`, draft);
 
     expect(first.response.status).toBe(200);
     expect(first.body.preview.restaurant.phone).toBe("+1******0143");
+    expect(first.body.preview.restaurant.name).toBe(
+      "Santoro House [phone redacted]",
+    );
+    expect(first.body.preview.restaurant.address).toBe(
+      "Text [phone redacted] before arrival",
+    );
+    expect(first.body.preview.reservation.guestName).toBe(
+      "Demo Guest [phone redacted]",
+    );
+    expect(first.body.preview.reservation.specialRequests).toBe(
+      "Call [phone redacted] if delayed",
+    );
     expect(first.body.preview.contractId).toMatch(/^[a-f0-9]{64}$/);
     expect(first.body.preview.correlationId).toMatch(/^dle_[a-f0-9]{24}$/);
     expect(second.body.preview.contractId).toBe(first.body.preview.contractId);

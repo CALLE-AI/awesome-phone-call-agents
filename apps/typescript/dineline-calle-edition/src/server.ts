@@ -50,11 +50,21 @@ import {
   type BookingCallProvider,
   type ProviderCallResult,
 } from "./providers/calle/types.js";
+import { redactPhoneNumbers } from "./security/phone-redaction.js";
 import { BookingCallService } from "./services/booking-call-service.js";
 import { FileIdempotencyStore } from "./services/idempotency-store.js";
 import { PreferenceIntakeService } from "./services/preference-intake-service.js";
 
 const MAX_JSON_BODY_BYTES = 64 * 1024;
+const DEFAULT_BIND_HOST = "127.0.0.1";
+const liveExecutionPaths = new Set([
+  "/api/intake/execute",
+  "/api/intake/reconcile",
+  "/api/n8n/intake/dispatch",
+  "/api/execute",
+  "/api/reconcile",
+  "/api/n8n/dispatch",
+]);
 
 const ExecuteRequestSchema = z
   .object({
@@ -112,6 +122,7 @@ export function createDineLineRequestHandler(
   const publicRoot = path.join(projectRoot, "public");
   const journalRoot = options.journalRoot ?? path.join(projectRoot, ".call-journal", "ui");
   const environment = options.environment ?? process.env;
+  const bindHost = environment.HOST ?? DEFAULT_BIND_HOST;
   const now = options.now ?? (() => new Date());
 
   return (request: IncomingMessage, response: ServerResponse) => {
@@ -119,6 +130,7 @@ export function createDineLineRequestHandler(
       publicRoot,
       journalRoot,
       environment,
+      bindHost,
       now,
     });
   };
@@ -128,6 +140,7 @@ interface RequestContext {
   publicRoot: string;
   journalRoot: string;
   environment: NodeJS.ProcessEnv;
+  bindHost: string;
   now: () => Date;
 }
 
@@ -140,12 +153,15 @@ async function handleRequest(
 
   try {
     const url = new URL(request.url ?? "/", "http://localhost");
+    assertLocalOnlyLiveRoute(request.method, url.pathname, context);
 
     if (request.method === "GET" && url.pathname === "/api/config") {
       const mode = context.environment.DINELINE_CALL_MODE === "real" ? "real" : "fixture";
       const hasApiKey = Boolean(context.environment.CALLE_API_KEY);
+      const localLiveBoundaryReady = isLoopbackHost(context.bindHost);
       const bookingCallReady =
         mode === "real" &&
+        localLiveBoundaryReady &&
         context.environment.DINELINE_ALLOW_REAL_CALLS === "true" &&
         hasApiKey &&
         hasValidAllowedPhoneNumbers(
@@ -153,6 +169,7 @@ async function handleRequest(
         );
       const intakeCallReady =
         mode === "real" &&
+        localLiveBoundaryReady &&
         context.environment.DINELINE_ALLOW_REAL_INTAKE_CALLS === "true" &&
         hasApiKey &&
         hasValidAllowedPhoneNumbers(
@@ -420,12 +437,12 @@ async function handleRequest(
     sendJson(response, 404, { error: "Not found" });
   } catch (error) {
     if (error instanceof HttpError) {
-      sendJson(response, error.status, { error: error.message });
+      sendJson(response, error.status, { error: redactPhoneNumbers(error.message) });
       return;
     }
 
     if (error instanceof CallReconciliationRejectedError) {
-      sendJson(response, 409, { error: error.message });
+      sendJson(response, 409, { error: redactPhoneNumbers(error.message) });
       return;
     }
 
@@ -434,14 +451,16 @@ async function handleRequest(
         error: "The request did not match the DineLine contract.",
         issues: error.issues.map((issue) => ({
           path: issue.path.join("."),
-          message: issue.message,
+          message: redactPhoneNumbers(issue.message),
         })),
       });
       return;
     }
 
     const message = error instanceof Error ? error.message : "Unknown server error";
-    sendJson(response, 500, { error: `Request failed safely: ${message}` });
+    sendJson(response, 500, {
+      error: `Request failed safely: ${redactPhoneNumbers(message)}`,
+    });
   }
 }
 
@@ -453,11 +472,15 @@ function serializeContractPreview(contract: ApprovedBookingContract) {
     correlationId: createCorrelationId(contract.contractId),
     approvedAt: contract.approvedAt,
     restaurant: {
-      name: contract.restaurant.name,
-      address: contract.restaurant.address,
+      name: redactPhoneNumbers(contract.restaurant.name),
+      address: redactPhoneNumbers(contract.restaurant.address),
       phone: maskPhone(contract.restaurant.phone),
     },
-    reservation: contract.reservation,
+    reservation: {
+      ...contract.reservation,
+      guestName: redactPhoneNumbers(contract.reservation.guestName),
+      specialRequests: redactPhoneNumbers(contract.reservation.specialRequests),
+    },
     policy: contract.policy,
   };
 }
@@ -606,6 +629,47 @@ function setSecurityHeaders(response: ServerResponse): void {
   response.setHeader("Cross-Origin-Resource-Policy", "same-origin");
 }
 
+function assertLocalOnlyLiveRoute(
+  method: string | undefined,
+  pathname: string,
+  context: RequestContext,
+): void {
+  if (
+    method === "POST" &&
+    liveExecutionPaths.has(pathname) &&
+    context.environment.DINELINE_CALL_MODE === "real" &&
+    !isLoopbackHost(context.bindHost)
+  ) {
+    throw new HttpError(
+      403,
+      "Real CALL-E execution and reconciliation are local-only. Use a loopback HOST or fixture mode.",
+    );
+  }
+}
+
+function isLoopbackHost(host: string): boolean {
+  const normalized = host.trim().toLowerCase().replace(/^\[|\]$/g, "").replace(/\.$/, "");
+
+  if (
+    normalized === "localhost" ||
+    normalized === "::1" ||
+    normalized === "0:0:0:0:0:0:0:1"
+  ) {
+    return true;
+  }
+
+  if (normalized.startsWith("::ffff:")) {
+    return isLoopbackHost(normalized.slice("::ffff:".length));
+  }
+
+  const octets = normalized.split(".");
+  return (
+    octets.length === 4 &&
+    octets[0] === "127" &&
+    octets.every((octet) => /^\d{1,3}$/.test(octet) && Number(octet) <= 255)
+  );
+}
+
 function sendJson(response: ServerResponse, status: number, value: unknown): void {
   response.writeHead(status, {
     "Content-Type": "application/json; charset=utf-8",
@@ -625,7 +689,7 @@ class HttpError extends Error {
 
 if (process.argv[1] && path.resolve(process.argv[1]) === fileURLToPath(import.meta.url)) {
   const port = Number(process.env.PORT ?? 4173);
-  const host = process.env.HOST ?? "127.0.0.1";
+  const host = process.env.HOST ?? DEFAULT_BIND_HOST;
   const server = createDineLineServer();
   server.listen(port, host, () => {
     console.log(`DineLine CALL-E Edition is ready at http://${host}:${port}`);

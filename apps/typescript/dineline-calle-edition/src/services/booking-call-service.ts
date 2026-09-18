@@ -14,6 +14,7 @@ import type {
   IdempotencyStore,
   ReservationState,
 } from "./idempotency-store.js";
+import { redactPhoneNumbers } from "../security/phone-redaction.js";
 import { verifyBookingOutcome } from "./result-verifier.js";
 
 export type BookingCallExecution =
@@ -196,13 +197,14 @@ function unknownBookingOutcome(
   providerCallId: string | null,
   message: string,
 ): VerifiedBookingOutcome {
+  const publicMessage = redactPhoneNumbers(message);
   return {
     outcome: "uncertain",
     providerCallId,
     confidence: 0,
     summary: providerCallId
-      ? `CALL-E accepted the call, but DineLine has not confirmed the final result yet. Do not call again. Check this call's status instead. ${message}`
-      : `CALL-E execution failed safely: ${message}`,
+      ? `CALL-E accepted the call, but DineLine has not confirmed the final result yet. Do not call again. Check this call's status instead. ${publicMessage}`
+      : `CALL-E execution failed safely: ${publicMessage}`,
     evidence: [],
     needsHumanReview: true,
     confirmationCode: null,
