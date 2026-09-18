@@ -1,0 +1,11 @@
+{
+  "ticket_id": "AP-2026-1183",
+  "vendor_id": "V-0417",
+  "received_on": "2026-09-04",
+  "channel": "email",
+  "requested_by_name": "Priya Raman",
+  "new_bank_name": "Meridian Commerce Bank",
+  "new_account_last4": "4472",
+  "callback_phone": "+12025550199",
+  "notes": "Email said: 'We have moved our banking. Please update before the next payment run. Call me on my new direct line if you need to confirm.'"
+}

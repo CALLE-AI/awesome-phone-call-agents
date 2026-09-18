@@ -1,0 +1,26 @@
+{
+  "vendors": [
+    {
+      "vendor_id": "V-0417",
+      "legal_name": "Northwind Packaging Supplies",
+      "known_phone": "+12025550147",
+      "known_phone_since": "2024-03-11",
+      "region": "US",
+      "locale": "en-US",
+      "authorized_contacts": ["Priya Raman", "Daniel Okafor"],
+      "current_bank_name": "First Harbor Bank",
+      "current_account_last4": "8821"
+    },
+    {
+      "vendor_id": "V-0902",
+      "legal_name": "Coastal Freight Services",
+      "known_phone": "+12025550163",
+      "known_phone_since": "2026-09-01",
+      "region": "US",
+      "locale": "en-US",
+      "authorized_contacts": ["Maria Lindqvist"],
+      "current_bank_name": "Union Trust Bank",
+      "current_account_last4": "3305"
+    }
+  ]
+}
