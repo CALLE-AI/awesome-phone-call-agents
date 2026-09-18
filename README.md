@@ -226,6 +226,7 @@ This project is an awesome list for AI-agent phone-call workflows. Add resources
 - [`conversation-clarify`](skills/conversation-clarify/) - Detects a written reply that agrees without saying which option, or commits without saying when, then settles it with one bounded disclosed CALL-E phone call and writes the answer back into the thread bound to the recipient's own words, or refuses to answer at all.
 ### Apps
 
+- [DineLine CALL-E Edition](apps/typescript/dineline-calle-edition/) - Two-agent restaurant concierge with user-approved choice, separate CALL-E roles, n8n Google Places integration, duplicate-call protection, and evidence-checked outcomes; fixture-only public mode by default.
 - [BridgeCalle](apps/typescript/bridgecalle/) - Senior-accessible active listening voice companion web app powered by CALL-E API & SDK.
 
 
@@ -320,6 +321,7 @@ Runnable demo apps live under [`apps/`](apps/). They are not a CALL-E SDK and do
 
 | App | Language | Purpose |
 | --- | --- | --- |
+| [`apps/typescript/dineline-calle-edition`](apps/typescript/dineline-calle-edition/) | TypeScript / Node | Two-agent restaurant concierge that collects dining preferences, supports a grounded Google Places choice in n8n, binds the diner's exact approval, and verifies Agent Jake's CALL-E booking result; fixture-only public mode by default. |
 | [`apps/typescript/mazo`](apps/typescript/mazo/) | TypeScript / Node | Autonomous AI executive coach that initiates real-time phone calls via CALL-E to turn overthinking into decisive action, with safe dry-run simulation, archetype selection, and structured task extraction. |
 | [`apps/web/harvest-relay`](apps/web/harvest-relay/) | JavaScript / Node | Cold-storage and refrigerated-transport handoff planner with a synthetic no-call default, a CALL-E REST adapter, and reviewed result imports feeding the same constraint solver. |
 | [`apps/typescript/senior-phone-ai`](apps/typescript/senior-phone-ai/) | TypeScript / Next.js | Shared Australian daily knowledge injected into confirmed CALL-E calls, consent-gated post-call search, SMS previews or Twilio delivery, and per-call conversation/SMS history with a no-call default. |
