@@ -77,10 +77,6 @@ def load_call_result(path: Path) -> dict[str, Any]:
         "turns": turns,
     }
 
-# Added in Task 3 to keep the planned import surface importable; Tasks 4-6
-# replace each stub with its real implementation.
-
-
 # Turn classification. A callee turn is one of:
 #   backchannel  short listening sound after an agent STATEMENT ("Mm-hmm.")
 #   barge_in     frustration / hold language anywhere in the turn
@@ -258,5 +254,21 @@ def build_pacing_card(turns: list[dict[str, str]]) -> dict[str, Any]:
     return card
 
 
-def craft_goal(scenario: str, language: str | None = None) -> dict[str, Any]:  # pragma: no cover
-    raise NotImplementedError
+CRAFT_SCENARIOS = {"pacing-followup"}
+
+
+def craft_goal(scenario: str, language: str | None = None) -> dict[str, Any]:
+    """Emit plan_call inputs for a pacing-aware follow-up call."""
+    if scenario not in CRAFT_SCENARIOS:
+        raise ValueError(f"unknown scenario: {scenario!r}; expected one of {sorted(CRAFT_SCENARIOS)}")
+    return {
+        "skill": "call-semantic-barge-in-analyzer",
+        "mode": "craft",
+        "scenario": scenario,
+        "language": language or "en",
+        "goal": PACING_GOAL,
+        "notes": [
+            "Heuristic skill: this template is a starting point; adapt wording to the case.",
+            "Use fictional +1 555-01xx numbers for any test calls.",
+        ],
+    }
