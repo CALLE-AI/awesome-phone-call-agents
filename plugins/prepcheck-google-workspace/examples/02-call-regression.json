@@ -1,0 +1,32 @@
+{
+  "_comment": "Callback 48 hours later. The kit has now been collected, but a step recorded as complete on the previous call is reported as not done. prep_status is 'partial' on both calls, so a workflow tracking only overall status sees no change. PrepCheck compares the per-item arrays, records a regression, and emails staff.",
+  "status": "completed",
+  "task_completed": true,
+  "completion_confidence": {
+    "score": 0.9,
+    "label": "high"
+  },
+  "metadata": {
+    "row_id": "P001",
+    "checkpoint": "T72",
+    "source": "prepcheck"
+  },
+  "recipients": [
+    {
+      "structured_result": {
+        "prep_status": "partial",
+        "items_completed": [
+          "collected the bowel prep kit from the pharmacy"
+        ],
+        "items_outstanding": [
+          "stopped taking iron tablets"
+        ],
+        "outstanding_plan": "nothing arranged yet",
+        "wants_reschedule": "no",
+        "flag_for_staff": false,
+        "identity_verified": true,
+        "asked_to_stop": false
+      }
+    }
+  ]
+}

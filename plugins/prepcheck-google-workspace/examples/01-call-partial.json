@@ -1,0 +1,32 @@
+{
+  "_comment": "First call at the 72-hour checkpoint. The patient has stopped the iron tablets but has not collected the prep kit, and says they will. PrepCheck records this as PARTIAL and schedules a callback 48 hours later. No call is placed by posting this file.",
+  "status": "completed",
+  "task_completed": true,
+  "completion_confidence": {
+    "score": 0.9,
+    "label": "high"
+  },
+  "metadata": {
+    "row_id": "P001",
+    "checkpoint": "T72",
+    "source": "prepcheck"
+  },
+  "recipients": [
+    {
+      "structured_result": {
+        "prep_status": "partial",
+        "items_completed": [
+          "stopped taking iron tablets"
+        ],
+        "items_outstanding": [
+          "collected the bowel prep kit from the pharmacy"
+        ],
+        "outstanding_plan": "will collect it tomorrow afternoon",
+        "wants_reschedule": "no",
+        "flag_for_staff": false,
+        "identity_verified": true,
+        "asked_to_stop": false
+      }
+    }
+  ]
+}

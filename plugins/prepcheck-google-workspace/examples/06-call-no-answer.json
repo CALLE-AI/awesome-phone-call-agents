@@ -1,0 +1,19 @@
+{
+  "_comment": "The call did not reach the patient. PrepCheck retries twice at different times of day, then hands the patient to staff rather than continuing to dial.",
+  "status": "no_answer",
+  "task_completed": false,
+  "completion_confidence": {
+    "score": 0.0,
+    "label": "low"
+  },
+  "metadata": {
+    "row_id": "P002",
+    "checkpoint": "T72",
+    "source": "prepcheck"
+  },
+  "recipients": [
+    {
+      "structured_result": {}
+    }
+  ]
+}

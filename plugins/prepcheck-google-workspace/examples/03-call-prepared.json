@@ -1,0 +1,31 @@
+{
+  "_comment": "Every step for this checkpoint confirmed. The patient advances to the 24-hour checkpoint rather than finishing; only the final checkpoint terminates.",
+  "status": "completed",
+  "task_completed": true,
+  "completion_confidence": {
+    "score": 0.95,
+    "label": "high"
+  },
+  "metadata": {
+    "row_id": "P001",
+    "checkpoint": "T72",
+    "source": "prepcheck"
+  },
+  "recipients": [
+    {
+      "structured_result": {
+        "prep_status": "prepared",
+        "items_completed": [
+          "collected the bowel prep kit from the pharmacy",
+          "stopped taking iron tablets"
+        ],
+        "items_outstanding": [],
+        "outstanding_plan": "",
+        "wants_reschedule": "no",
+        "flag_for_staff": false,
+        "identity_verified": true,
+        "asked_to_stop": false
+      }
+    }
+  ]
+}
