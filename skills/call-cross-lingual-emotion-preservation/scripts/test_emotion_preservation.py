@@ -135,3 +135,94 @@ def test_load_source_context_json_without_transcript_raises():
             assert "transcript" in str(exc).lower()
         else:
             raise AssertionError("expected ValueError")
+
+
+def _card_from_fixtures() -> dict:
+    source = load_source_context(EXAMPLE_SOURCE)
+    relay = load_call_result(EXAMPLE_RELAY)
+    return build_parity_card(source, relay["turns"])
+
+
+def test_card_fixture_flattened_with_relay_goal():
+    card = _card_from_fixtures()
+    assert card["skill"] == "call-cross-lingual-emotion-preservation"
+    assert card["analysis_mode"] == "heuristic"
+    assert card["drift"] == "FLATTENED"
+    assert card["parity_score"] == 0.5
+    assert card["source_intensity"]["level"] == "high"
+    assert card["relay_intensity"]["level"] == "medium"
+    assert card["recommended_action"]["action"] == "re_relay_with_calibrated_goal"
+    assert card["reason"] is None
+    assert "disclaimer" in card and card["disclaimer"]
+
+
+def test_card_evidence_has_both_sides():
+    card = _card_from_fixtures()
+    sides = {e["side"] for e in card["evidence"]}
+    assert sides == {"source", "relay"}
+
+
+def test_card_masks_digits_in_evidence():
+    card = _card_from_fixtures()
+    for entry in card["evidence"]:
+        assert "5550166" not in json.dumps(entry)
+        assert "415" not in entry["span"] or "#" in entry["span"]
+
+
+def test_card_preserved_when_levels_match():
+    source = "She is worried and would like it soon."
+    relay = [
+        {"speaker": "agent", "text": "She is concerned and would like it soon."},
+        {"speaker": "callee", "text": "We can arrange that."},
+    ]
+    card = build_parity_card(source, relay)
+    assert card["drift"] == "PRESERVED"
+    assert card["parity_score"] == 1.0
+    assert card["recommended_action"]["action"] == "proceed"
+
+
+def test_card_amplified_when_relay_exceeds_source():
+    source = "She is worried about the delivery."
+    relay = [
+        {"speaker": "agent", "text": "This is an emergency, we need it immediately, right now."},
+        {"speaker": "callee", "text": "Understood."},
+    ]
+    card = build_parity_card(source, relay)
+    assert card["drift"] == "AMPLIFIED"
+    assert card["parity_score"] == 0.5
+    assert card["recommended_action"]["action"] == "re_relay_with_calibrated_goal"
+
+
+def test_card_flattened_far_gets_zero_parity():
+    source = "Urgent, immediately, she is in pain."
+    relay = [
+        {"speaker": "agent", "text": "Calling about a delivery arrangement for the records."},
+        {"speaker": "callee", "text": "Fine."},
+    ]
+    card = build_parity_card(source, relay)
+    assert card["drift"] == "FLATTENED"
+    assert card["parity_score"] == 0.0
+
+
+def test_card_relay_goal_guidance_matches_craft():
+    from emotion_preservation import craft_goal
+    card = _card_from_fixtures()
+    plan = craft_goal("emotion-relay", intensity="high")
+    assert card["recommended_action"]["guidance"] == plan["goal"]
+
+
+def test_card_empty_source_abstains():
+    card = build_parity_card("", [{"speaker": "agent", "text": "Hello."}])
+    assert card["emotion_assessment"] == "unclear"
+    assert card["reason"] == "empty_source_context"
+
+
+def test_card_no_relay_agent_turns_abstains():
+    card = build_parity_card("Urgent please.", [{"speaker": "callee", "text": "Hello?"}])
+    assert card["emotion_assessment"] == "unclear"
+    assert card["reason"] == "no_agent_turns_in_relay"
+
+
+def test_card_empty_turns_abstains():
+    card = build_parity_card("Urgent please.", [])
+    assert card["emotion_assessment"] == "unclear"
