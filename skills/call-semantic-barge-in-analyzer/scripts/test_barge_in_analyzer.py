@@ -136,3 +136,17 @@ def test_classify_no_previous_agent_text_backchannel():
 
 def test_classify_plain_substantive():
     assert classify_callee_turn("Thank you for calling.", "It arrives Thursday.") == "substantive"
+
+
+def test_classify_wait_for_and_stop_by_not_barge_ins():
+    assert classify_callee_turn("I will wait for the email.", "") == "substantive"
+    assert classify_callee_turn("You can stop by the pharmacy anytime.", "") == "substantive"
+
+
+def test_classify_wait_comma_still_barge_in():
+    assert classify_callee_turn("Wait, let me write that down.", "") == "barge_in"
+
+
+def test_classify_question_detection_handles_trailing_quotes():
+    assert classify_callee_turn("Yes.", "Okay, you are free tomorrow?'") == "substantive"
+    assert classify_callee_turn("Yes.", "Okay, you are free tomorrow?\u201d") == "substantive"

@@ -93,11 +93,12 @@ BARGE_IN = "barge_in"
 SUBSTANTIVE = "substantive"
 
 _BARGE_IN_RE = re.compile(
-    r"\b(?:wait|hold on|hang on|stop|enough|listen,|slow down|too fast|"
+    r"\b(?:wait(?! (?:for|until|till)\b)|hold on|hang on|stop(?! (?:by|at|in)\b)|"
+    r"enough|listen,|slow down|too fast|"
     r"one at a time|let me (?:write|say|ask|finish|talk)|you'?re going too)\b",
     re.IGNORECASE,
 )
-_QUESTION_END_RE = re.compile(r"\?\s*$")
+_QUESTION_END_RE = re.compile(r"\?[\"'\u201d\u2019)\s]*$")
 _TOKENS_RE = re.compile(r"[a-z'-]+")
 
 # A turn counts as a backchannel only if it is at most 4 words and every
