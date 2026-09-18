@@ -93,13 +93,20 @@ SENSITIVE_DISCLOSURE = "sensitive_disclosure"
 
 _VERIFICATION_Q_RE = re.compile(
     r"\b(?:may i (?:speak|talk) (?:to|with)|can i (?:speak|talk) (?:to|with)|"
-    r"am i (?:speaking|talking) (?:to|with)|is this (?:mr|mrs|ms|dr)\b|"
+    r"am i (?:speaking|talking) (?:to|with)|is this (?:mr|mrs|ms|dr|the)\b|"
     r"can you confirm (?:that )?you(?:'re| are)|are you (?:the )?(?:mr|mrs|ms|dr)\b)",
     re.IGNORECASE,
 )
+# Anchored complete-reply forms first ("Speaking.", "Yes, I am.") so that
+# "Speaking of ..." and "Yes, I am interested ..." cannot match; then
+# phrase-level forms. Known false negative, accepted: bare first-name
+# verification ("Is this Dana?") does not count as a verification question
+# because names are not modeled; such calls degrade to UNVERIFIED, which
+# fails safe toward human review.
 _IDENTITY_CONFIRM_RE = re.compile(
-    r"\b(?:yes,? this is|this is (?:he|she)|^speaking\b|yes,? speaking|"
-    r"yes,? i am|that'?s me|i'?m (?:the one|him|her))\b",
+    r"^(?:speaking|yes,? i am)[.!?]*$"
+    r"|\b(?:yes,? this is|this is (?:he|she)|yes,? speaking|"
+    r"that'?s me|i'?m (?:the one|him|her))\b",
     re.IGNORECASE,
 )
 _WRONG_PARTY_RE = re.compile(

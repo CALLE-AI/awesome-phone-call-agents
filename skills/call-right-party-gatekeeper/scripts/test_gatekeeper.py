@@ -133,3 +133,16 @@ def test_signal_roles_route_patterns_to_sides():
     assert detect_signals("callee", "May I speak to Dana?") == []
     # identity confirmation only counts from the callee side
     assert detect_signals("agent", "Yes, this is Dana.") == []
+
+
+def test_signal_speaking_of_not_identity_confirmation():
+    assert detect_signals("callee", "Speaking of the weather, it's raining.") == []
+
+
+def test_signal_yes_i_am_requires_complete_reply():
+    assert "identity_confirmation" in detect_signals("callee", "Yes, I am.")
+    assert detect_signals("callee", "Yes, I am interested in the plan.") == []
+
+
+def test_signal_is_this_the_verified_as_question():
+    assert "verification_question" in detect_signals("agent", "Is this the account holder?")
