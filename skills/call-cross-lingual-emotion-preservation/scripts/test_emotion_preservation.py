@@ -85,3 +85,53 @@ def test_mask_separators_count_toward_one_run():
 
 def test_mask_trailing_separator_not_part_of_run():
     assert mask_pii("num 5550166, please") == "num #####66, please"
+
+
+def test_intensity_high_markers():
+    result = intensity_of("This is urgent. Deliver immediately, right now.")
+    assert result["level"] == "high"
+    assert result["score"] >= 4
+
+
+def test_intensity_medium_markers():
+    result = intensity_of("She is worried and would like it soon.")
+    assert result["level"] == "medium"
+    assert result["score"] >= 1
+
+
+def test_intensity_low_neutral_text():
+    result = intensity_of("The delivery address is confirmed for the records.")
+    assert result["level"] == "low"
+    assert result["score"] == 0
+
+
+def test_intensity_markers_listed():
+    result = intensity_of("Urgent, she is in pain today.")
+    assert "urgent" in [m.lower() for m in result["markers"]]
+    assert "pain" in [m.lower() for m in result["markers"]]
+
+
+def test_load_source_context_from_call_result_json():
+    text = load_source_context(EXAMPLE_SOURCE)
+    assert "urgent" in text.lower()
+    assert "heart medication" in text
+
+
+def test_load_source_context_from_plain_text():
+    with tempfile.TemporaryDirectory() as td:
+        p = Path(td) / "note.txt"
+        p.write_text("Operator note: caller sounded urgent about medication.", encoding="utf-8")
+        text = load_source_context(p)
+    assert "urgent" in text
+
+
+def test_load_source_context_json_without_transcript_raises():
+    with tempfile.TemporaryDirectory() as td:
+        p = Path(td) / "notacall.json"
+        p.write_text('{"status": "completed"}', encoding="utf-8")
+        try:
+            load_source_context(p)
+        except ValueError as exc:
+            assert "transcript" in str(exc).lower()
+        else:
+            raise AssertionError("expected ValueError")

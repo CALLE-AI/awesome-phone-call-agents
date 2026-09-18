@@ -88,12 +88,55 @@ def load_call_result(path: Path) -> dict[str, Any]:
 # replace each stub with its real implementation.
 
 
-def intensity_of(text: str) -> dict[str, Any]:  # pragma: no cover
-    raise NotImplementedError
+# Emotion-intensity lexicon (English only; see module docstring). High
+# markers are urgency/panic vocabulary; medium markers are worry vocabulary.
+# Score: 2 per high marker + 1 per medium; level: high >= 3, medium >= 1.
+_HIGH_URGENCY_RE = re.compile(
+    r"\b(?:urgent(?:ly)?|immediately|right now|as soon as possible|"
+    r"emergency|critical|danger|hurry|please please|can'?t breathe|"
+    r"bleeding|terrified|panicking)\b",
+    re.IGNORECASE,
+)
+_MEDIUM_URGENCY_RE = re.compile(
+    r"\b(?:worried|concerned|anxious|scared|afraid|pain|important|"
+    r"soon|today|quickly|uncomfortable)\b",
+    re.IGNORECASE,
+)
 
 
-def load_source_context(path: Path) -> str:  # pragma: no cover
-    raise NotImplementedError
+def intensity_of(text: str) -> dict[str, Any]:
+    """Score the emotional intensity of one text block."""
+    markers = [m.group(0) for m in _HIGH_URGENCY_RE.finditer(text)]
+    medium_markers = [m.group(0) for m in _MEDIUM_URGENCY_RE.finditer(text)]
+    score = 2 * len(markers) + len(medium_markers)
+    level = "high" if score >= 3 else ("medium" if score >= 1 else "low")
+    return {"score": score, "level": level, "markers": markers + medium_markers}
+
+
+def load_source_context(path: Path) -> str:
+    """Load the requester's context: a call-result JSON (callee turns) or plain text."""
+    raw = path.read_text(encoding="utf-8")
+    try:
+        data = json.loads(raw)
+    except json.JSONDecodeError:
+        return raw.strip()
+    if not isinstance(data, dict):
+        raise ValueError("source context must be a JSON object or plain text")
+    payload = data.get("result") if isinstance(data.get("result"), dict) else data
+    transcript = payload.get("transcript")
+    if isinstance(transcript, list):
+        texts = [
+            str(item.get("text", ""))
+            for item in transcript
+            if isinstance(item, dict) and str(item.get("speaker", "")).lower().strip() in CALLEE_ROLES
+        ]
+        joined = " ".join(t for t in texts if t).strip()
+        if joined:
+            return joined
+        raise ValueError("source context JSON has no transcript")
+    if isinstance(transcript, str) and transcript.strip():
+        return transcript.strip()
+    raise ValueError("source context JSON has no transcript")
 
 
 def build_parity_card(source_context: str, relay_turns: list[dict[str, str]]) -> dict[str, Any]:  # pragma: no cover
