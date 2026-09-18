@@ -285,3 +285,57 @@ def craft_goal(scenario: str, language: str | None = None) -> dict[str, Any]:
             "Use fictional +1 555-01xx numbers for any test calls.",
         ],
     }
+
+
+def main(argv: list[str] | None = None) -> int:
+    parser = argparse.ArgumentParser(description=__doc__)
+    sub = parser.add_subparsers(dest="command", required=True)
+
+    p_analyze = sub.add_parser("analyze", help="Audit a finished CALL-E call result for verify-before-disclose ordering.")
+    p_analyze.add_argument("--transcript", required=True, help="Path to a CALL-E call result JSON file.")
+    p_analyze.add_argument("--out", default=None, help="Write the card to this path (default: stdout).")
+
+    p_craft = sub.add_parser("craft", help="Emit a verification-first goal for the next plan_call.")
+    p_craft.add_argument("--scenario", required=True, help=f"One of {sorted(CRAFT_SCENARIOS)}.")
+    p_craft.add_argument("--language", default=None, help="BCP-47 tag passed through to plan_call (default: en).")
+    p_craft.add_argument("--out", default=None, help="Write the plan to this path (default: stdout).")
+
+    args = parser.parse_args(argv)
+
+    if args.command == "analyze":
+        path = Path(args.transcript)
+        if not path.is_file():
+            print(f"ERROR: transcript file not found: {path}", file=sys.stderr)
+            return 2
+        try:
+            data = load_call_result(path)
+        except json.JSONDecodeError as exc:
+            print(f"ERROR: invalid JSON in transcript file: {exc}", file=sys.stderr)
+            return 2
+        except ValueError as exc:
+            print(f"ERROR: {exc}", file=sys.stderr)
+            return 2
+        except OSError as exc:
+            print(f"ERROR: cannot read transcript file: {exc}", file=sys.stderr)
+            return 2
+        payload = build_gate_card(data["turns"])
+        if data.get("call_id"):
+            payload = {"call_id": data["call_id"], **payload}
+    else:
+        try:
+            payload = craft_goal(args.scenario, language=args.language)
+        except ValueError as exc:
+            print(f"ERROR: {exc}", file=sys.stderr)
+            return 2
+
+    output = json.dumps(payload, indent=2, ensure_ascii=False)
+    if args.out:
+        Path(args.out).write_text(output + "\n", encoding="utf-8")
+        print(f"Written to {args.out}", file=sys.stderr)
+    else:
+        print(output)
+    return 0
+
+
+if __name__ == "__main__":
+    sys.exit(main())

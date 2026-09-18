@@ -265,3 +265,83 @@ def test_craft_goal_matches_card_retry_guidance():
     assert card["recommended_action"]["action"] == "stop_and_retry_with_script"
     assert plan["goal"] == card["recommended_action"]["guidance"]
     assert plan["goal"] == VERIFICATION_FIRST_GOAL
+
+
+def _run_cli(*args: str) -> subprocess.CompletedProcess:
+    cmd = [sys.executable, str(SCRIPTS / "gatekeeper.py"), *args]
+    return subprocess.run(cmd, capture_output=True, text=True)
+
+
+def test_cli_analyze_verified_fixture_outputs_card():
+    proc = _run_cli("analyze", "--transcript", str(EXAMPLE_VERIFIED))
+    assert proc.returncode == 0
+    card = json.loads(proc.stdout)
+    assert card["right_party_status"] == "CONFIRMED"
+
+
+def test_cli_analyze_wrong_party_fixture_outputs_card():
+    proc = _run_cli("analyze", "--transcript", str(EXAMPLE_WRONG_PARTY))
+    assert proc.returncode == 0
+    card = json.loads(proc.stdout)
+    assert card["right_party_status"] == "WRONG_PARTY"
+    assert card["recommended_action"]["action"] == "human_review"
+
+
+def test_cli_analyze_missing_file_exits_2():
+    proc = _run_cli("analyze", "--transcript", "does-not-exist.json")
+    assert proc.returncode == 2
+    assert "not found" in proc.stderr.lower()
+
+
+def test_cli_analyze_invalid_json_exits_2():
+    with tempfile.TemporaryDirectory() as td:
+        p = Path(td) / "bad.json"
+        p.write_text("{not json", encoding="utf-8")
+        proc = _run_cli("analyze", "--transcript", str(p))
+    assert proc.returncode == 2
+
+
+def test_cli_analyze_non_dict_json_exits_2():
+    with tempfile.TemporaryDirectory() as td:
+        p = Path(td) / "list.json"
+        p.write_text("[1, 2, 3]", encoding="utf-8")
+        proc = _run_cli("analyze", "--transcript", str(p))
+    assert proc.returncode == 2
+
+
+def test_cli_analyze_includes_call_id_when_present():
+    proc = _run_cli("analyze", "--transcript", str(EXAMPLE_WRONG_PARTY))
+    card = json.loads(proc.stdout)
+    assert card["call_id"] == "example-wrong-party-001"
+
+
+def test_cli_craft_writes_out_file():
+    with tempfile.TemporaryDirectory() as td:
+        out = Path(td) / "plan.json"
+        proc = _run_cli("craft", "--scenario", "sensitive-outreach", "--out", str(out))
+        assert proc.returncode == 0
+        plan = json.loads(out.read_text(encoding="utf-8"))
+    assert plan["mode"] == "craft"
+
+
+def test_cli_craft_unknown_scenario_exits_2():
+    proc = _run_cli("craft", "--scenario", "nope")
+    assert proc.returncode == 2
+
+
+def _main() -> int:
+    failures = 0
+    for name, fn in sorted(globals().items()):
+        if name.startswith("test_") and callable(fn):
+            try:
+                fn()
+                print(f"PASS {name}")
+            except AssertionError:
+                failures += 1
+                print(f"FAIL {name}")
+    print(f"{failures} failure(s)")
+    return 1 if failures else 0
+
+
+if __name__ == "__main__":
+    raise SystemExit(_main())
