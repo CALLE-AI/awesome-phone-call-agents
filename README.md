@@ -119,6 +119,7 @@ Avoid: `- [call-reminder](skills/call-reminder/) - A great tool for calling peop
 This project is an awesome list for AI-agent phone-call workflows. Add resources only when they directly help agents package, schedule, execute, or safely operate phone-call tasks.
 
 ### Skills
+- [scam-mirror](skills/scam-mirror/) - Dispatches two short-lived CALL-E flies (published official line + suspect line) and returns a trust verdict with evidence hashes, grounded in real Drosophila connectome neuron personas.
 
 - [`longitudinal-cognitive-decline-tracker`](skills/longitudinal-cognitive-decline-tracker/) - Offline experimental pause-duration trends from synthetic call metadata for human review, not cognitive assessment or diagnosis.
 
