@@ -140,3 +140,77 @@ def test_thanks_a_lot_after_complaint_is_irony():
     assert result.score == 3
     assert "thanks_a_lot" in result.rules
     assert "context_contrast" in result.rules
+
+
+def _analyze_fixture(path: Path) -> dict:
+    data = load_call_result(path)
+    return analyze_turns(data["turns"])
+
+
+def test_analyze_ironic_fixture_high_confidence_card():
+    card = _analyze_fixture(EXAMPLE_IRONIC)
+    assert card["skill"] == "call-verbal-irony-detector"
+    assert card["analysis_mode"] == "heuristic"
+    assert card["irony_detected"] is True
+    assert card["confidence"] == "high"
+    assert card["stated_sentiment"] == "positive"
+    assert card["inferred_sentiment"] == "negative"
+    assert card["recommended_action"]["action"] == "retry_with_deescalation_goal"
+    assert "disclaimer" in card and card["disclaimer"]
+
+
+def test_analyze_evidence_points_at_the_ironic_turn():
+    card = _analyze_fixture(EXAMPLE_IRONIC)
+    span = card["evidence"][0]
+    assert span["turn_index"] == 3
+    assert span["speaker"] == "callee"
+    assert "Oh, great" in span["span"]
+    assert "oh_great" in span["rules"]
+
+
+def test_analyze_masks_phone_numbers_in_evidence():
+    card = _analyze_fixture(EXAMPLE_IRONIC)
+    for span in card["evidence"]:
+        assert "55550123" not in json.dumps(span)
+        assert "415" not in span["span"] or "#" in span["span"]
+
+
+def test_analyze_sincere_fixture_detects_nothing():
+    card = _analyze_fixture(EXAMPLE_SINCERE)
+    assert card["irony_detected"] is False
+    assert card["confidence"] == "none"
+    assert card["recommended_action"]["action"] == "continue"
+    assert card["evidence"] == []
+
+
+def test_analyze_low_confidence_uses_verify_prompt():
+    turns = [
+        {"speaker": "agent", "text": "Your refund was late, we apologise."},
+        {"speaker": "callee", "text": "Great, thanks for that."},
+    ]
+    card = analyze_turns(turns)
+    assert card["confidence"] == "low"
+    assert card["recommended_action"]["action"] == "verify_literal_intent_prompt"
+
+
+def test_analyze_no_callee_turns_abstains():
+    card = analyze_turns([{"speaker": "agent", "text": "Hello? Hello?"}])
+    assert card["irony_assessment"] == "unclear"
+    assert card["reason"] == "insufficient_callee_signal"
+    assert card["irony_detected"] is False
+
+
+def test_analyze_empty_turns_abstains():
+    card = analyze_turns([])
+    assert card["irony_assessment"] == "unclear"
+
+
+def test_analyze_medium_confidence_between_low_and_high():
+    # one marker and no complaint vocabulary in context -> score 2 -> medium
+    turns = [
+        {"speaker": "agent", "text": "Would you like a replacement?"},
+        {"speaker": "callee", "text": "Oh, brilliant."},
+    ]
+    card = analyze_turns(turns)
+    assert card["confidence"] == "medium"
+    assert card["recommended_action"]["action"] == "retry_with_deescalation_goal"

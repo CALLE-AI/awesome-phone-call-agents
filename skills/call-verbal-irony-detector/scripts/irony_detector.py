@@ -145,8 +145,99 @@ def score_turn(turn_text: str, context_before: str) -> TurnScore:
 # Remaining stubs; later tasks replace each with its real implementation.
 
 
-def analyze_turns(turns: list[dict[str, str]]) -> dict[str, Any]:  # pragma: no cover
-    raise NotImplementedError
+DEESCALATION_GOAL = (
+    "You are calling back about this person's recent complaint. Open by "
+    "acknowledging their frustration in one sentence before anything else. "
+    "Speak at most two sentences per turn, then pause for a reply. Before "
+    "acting on any positive-sounding statement made during a complaint "
+    "discussion (for example 'great', 'fine', 'perfect'), confirm the "
+    "literal intent with one short question such as 'Just to confirm - "
+    "would you like me to keep the booking?'. If the caller sounds "
+    "frustrated, offer to hand them to a human."
+)
+
+VERIFY_INTENT_PROMPT = (
+    "On the next contact, ask one short confirmation question such as "
+    "'Just to confirm - did you mean that literally?' before acting on "
+    "positive-sounding statements made in a complaint context."
+)
+
+
+def _confidence_for(score: int) -> str:
+    if score >= 3:
+        return "high"
+    if score == 2:
+        return "medium"
+    if score == 1:
+        return "low"
+    return "none"
+
+
+def analyze_turns(turns: list[dict[str, str]]) -> dict[str, Any]:
+    """Build the irony card from normalized turns."""
+    card: dict[str, Any] = {
+        "skill": "call-verbal-irony-detector",
+        "analysis_mode": "heuristic",
+        "irony_assessment": "assessed",
+        "irony_detected": False,
+        "confidence": "none",
+        "stated_sentiment": "neutral",
+        "inferred_sentiment": "neutral",
+        "evidence": [],
+        "recommended_action": {"action": "continue", "guidance": None},
+        "disclaimer": DISCLAIMER,
+    }
+
+    context_parts: list[str] = []
+    evidence: list[dict[str, Any]] = []
+    best_score = 0
+    for index, turn in enumerate(turns):
+        speaker = str(turn.get("speaker", "")).lower().strip()
+        text = str(turn.get("text", "")).strip()
+        if speaker in CALLEE_ROLES and text:
+            result = score_turn(text, " ".join(context_parts))
+            if result.score > 0:
+                evidence.append(
+                    {
+                        "turn_index": index,
+                        "speaker": speaker,
+                        "span": mask_pii(text),
+                        "rules": result.rules,
+                        "score": result.score,
+                    }
+                )
+                best_score = max(best_score, result.score)
+        if text:
+            context_parts.append(text)
+
+    if not any(
+        str(t.get("speaker", "")).lower().strip() in CALLEE_ROLES and str(t.get("text", "")).strip()
+        for t in turns
+    ):
+        card["irony_assessment"] = "unclear"
+        card["reason"] = "insufficient_callee_signal"
+        return card
+
+    if not evidence:
+        return card
+
+    confidence = _confidence_for(best_score)
+    card["confidence"] = confidence
+    card["irony_detected"] = confidence in {"high", "medium"}
+    card["stated_sentiment"] = "positive"
+    card["inferred_sentiment"] = "negative"
+    card["evidence"] = evidence
+    if confidence in {"high", "medium"}:
+        card["recommended_action"] = {
+            "action": "retry_with_deescalation_goal",
+            "guidance": DEESCALATION_GOAL,
+        }
+    else:
+        card["recommended_action"] = {
+            "action": "verify_literal_intent_prompt",
+            "guidance": VERIFY_INTENT_PROMPT,
+        }
+    return card
 
 
 def craft_goal(scenario: str, language: str | None = None) -> dict[str, Any]:  # pragma: no cover
