@@ -5,14 +5,9 @@ call-script-compliance-auditor · audit_script.py
 Checks a call script clause-by-clause against a regulatory profile.
 Supported jurisdictions: US_TCPA, EU_GDPR, UK_FCA, US_HIPAA
 
-Scientific basis:
-  arXiv:2026 — Runtime Compliance Verification for AI Agents
-  PrivaCI-Bench arXiv (2025) — LLM privacy compliance benchmarks
-  EU AI Act Art.12/13/52 (2025)
-  FCA Consumer Duty Final Rules PS22/9 (2022, enforced 2024)
-  TCPA 47 U.S.C. § 227 + FCC Rules
-  GDPR Articles 13 & 14 (Official Journal of the EU)
-  HIPAA Privacy Rule 45 C.F.R. § 164.510
+Experimental scope: illustrative phrase checks, not verified legal coverage,
+regulatory certification, or a reproduction of a published benchmark.
+Report labels require qualified review and never authorize a real call.
 
 Usage:
     python3 scripts/audit_script.py \
@@ -40,7 +35,7 @@ RULES: dict[str, list[dict]] = {
         {
             "req_id": "FCA_CD_COMM_1",
             "requirement": "FCA Consumer Duty — Caller identity and firm name disclosure",
-            "regulation_ref": "FCA PS22/9 §4.21",
+            "regulation_ref": "Illustrative UK_FCA checklist; no verified clause mapping",
             "check_type": "REQUIRED",
             "presence_patterns": [
                 r"\bmy name is\b", r"\bi'?m calling from\b",
@@ -50,7 +45,7 @@ RULES: dict[str, list[dict]] = {
         {
             "req_id": "FCA_CD_COMM_2",
             "requirement": "FCA Consumer Duty — FCA authorisation available on request",
-            "regulation_ref": "FCA PS22/9 §4.22",
+            "regulation_ref": "Illustrative UK_FCA checklist; no verified clause mapping",
             "check_type": "WARN_IF_ABSENT",
             "presence_patterns": [
                 r"\bFCA (authoris|authoriz)\w+\b", r"\bfinancial conduct authority\b",
@@ -60,7 +55,7 @@ RULES: dict[str, list[dict]] = {
         {
             "req_id": "FCA_CD_COMM_3",
             "requirement": "FCA Consumer Duty — No false urgency or artificial time pressure",
-            "regulation_ref": "FCA PS22/9 §4.39(c)",
+            "regulation_ref": "Illustrative UK_FCA checklist; no verified clause mapping",
             "check_type": "PROHIBITED",
             "prohibited_patterns": [
                 r"\bexpires? (tonight|today|in \d+ (hour|minute))\b",
@@ -75,7 +70,7 @@ RULES: dict[str, list[dict]] = {
         {
             "req_id": "FCA_CD_COMM_4",
             "requirement": "FCA Consumer Duty — No pressure to decide immediately",
-            "regulation_ref": "FCA PS22/9 §4.39(d)",
+            "regulation_ref": "Illustrative UK_FCA checklist; no verified clause mapping",
             "check_type": "PROHIBITED",
             "prohibited_patterns": [
                 r"\bdecide (right now|immediately|on the call)\b",
@@ -88,7 +83,7 @@ RULES: dict[str, list[dict]] = {
         {
             "req_id": "FCA_CD_COMM_5",
             "requirement": "FCA Consumer Duty — Opt-out mechanism offered",
-            "regulation_ref": "FCA PS22/9 §4.40",
+            "regulation_ref": "Illustrative UK_FCA checklist; no verified clause mapping",
             "check_type": "REQUIRED",
             "presence_patterns": [
                 r"\bopt.?out\b", r"\bno longer wish to receive\b",
@@ -99,7 +94,7 @@ RULES: dict[str, list[dict]] = {
         {
             "req_id": "FCA_CD_COMM_6",
             "requirement": "FCA Consumer Duty — Risk warning for financial products",
-            "regulation_ref": "FCA PS22/9 §4.55",
+            "regulation_ref": "Illustrative UK_FCA checklist; no verified clause mapping",
             "check_type": "WARN_IF_ABSENT",
             "presence_patterns": [
                 r"\byour (home|property|capital) (may be|is) at risk\b",
@@ -134,7 +129,7 @@ RULES: dict[str, list[dict]] = {
         },
         {
             "req_id": "GDPR_ART13_3",
-            "requirement": "GDPR Art.13(1)(e) — Right to withdraw consent mentioned",
+            "requirement": "Illustrative consent-withdrawal phrase check",
             "regulation_ref": "GDPR Article 13(2)(c)",
             "check_type": "REQUIRED",
             "presence_patterns": [
@@ -220,8 +215,8 @@ RULES: dict[str, list[dict]] = {
     "US_HIPAA": [
         {
             "req_id": "HIPAA_1",
-            "requirement": "HIPAA §164.510(b) — Caller identifies themselves and their organisation",
-            "regulation_ref": "45 C.F.R. § 164.510(b)",
+            "requirement": "Illustrative healthcare caller identity phrase check",
+            "regulation_ref": "Illustrative US_HIPAA checklist; no verified clause mapping",
             "check_type": "REQUIRED",
             "presence_patterns": [
                 r"\bmy name is\b", r"\bi'?m calling from\b",
@@ -230,7 +225,7 @@ RULES: dict[str, list[dict]] = {
         },
         {
             "req_id": "HIPAA_2",
-            "requirement": "HIPAA §164.510 — Minimum necessary PHI disclosed",
+            "requirement": "Illustrative healthcare sensitive-term check, not a disclosure decision",
             "regulation_ref": "45 C.F.R. § 164.502(b)",
             "check_type": "PROHIBITED",
             "prohibited_patterns": [
@@ -243,8 +238,8 @@ RULES: dict[str, list[dict]] = {
         },
         {
             "req_id": "HIPAA_3",
-            "requirement": "HIPAA §164.510(b)(3) — Callee identity confirmed before PHI disclosure",
-            "regulation_ref": "45 C.F.R. § 164.510(b)(3)",
+            "requirement": "Illustrative healthcare callee identity phrase check",
+            "regulation_ref": "Illustrative US_HIPAA checklist; no verified clause mapping",
             "check_type": "REQUIRED",
             "presence_patterns": [
                 r"\bam i speaking (with|to)\b",
