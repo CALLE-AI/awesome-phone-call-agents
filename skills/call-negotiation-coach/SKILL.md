@@ -8,13 +8,9 @@ version: 1.0.0
 
 The `call-negotiation-coach` skill acts as a pre-call strategy generator and post-call debrief analyzer. It arms AI agents (or human agents) with customized negotiation tactics based on the counterparty's DISC profile and tracks adherence to those tactics in the post-call transcript.
 
-## Scientific Foundation
+## Experimental Scope
 
-| Paper / Source | Relevance |
-|---|---|
-| **BATNA-Aware Reward Design (2025)** | Prevents LLM-based agents from accepting deals that fall below the Best Alternative to a Negotiated Agreement (BATNA). |
-| **MIT Sloan Warmth×Dominance (2024)** | Shows that combining high dominance (anchoring) with high warmth (rapport) maximizes joint value. |
-| **Dual Concern Model** (Pruitt & Carnevale, 1993) | Formalizes conflict resolution into five styles: Collaborating, Competing, Accommodating, Avoiding, and Compromising. |
+This offline reference organizes familiar negotiation concepts into tactic cards and heuristic debriefs. It does not implement a validated negotiation policy, enforce a BATNA, accept deals, or execute financial actions. Research attributions and performance targets are not validation of this prototype; see [research scope](references/research-papers.md).
 
 ## How it works
 
@@ -51,6 +47,8 @@ Analyzes the transcript against the `strategy_card` to:
 | `emotional_capitulation` | Conceding due to emotional pressure (e.g. "I'm sorry you are angry, let me lower the price"). |
 
 ## Expected Outcomes & Metrics
+
+The following numbers are unvalidated aspirations, not measured results or guarantees.
 
 | Metric | Target | Notes |
 |---|---|---|

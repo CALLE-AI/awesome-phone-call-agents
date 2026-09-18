@@ -5,15 +5,9 @@ call-negotiation-coach · negotiation_coach.py
 Pre-call strategy engine and post-call debrief for negotiation calls.
 Implements BATNA/ZOPA/Dual Concern Model + DISC-matched tactics.
 
-Scientific basis:
-  arXiv:2411.05816 (Nov 2024) — LLM as strategic negotiator with explicit tactics
-  AgenticPay arXiv (2026) — BATNA-aware reward design; multi-agent buyer-seller framework
-  NegotiationArena (2024) — Probing irrational LLM negotiation behaviours
-  MIT Sloan Warmth×Dominance (2024) — Warmth + assertiveness maximises joint value
-  BATNA-Aware Reward Design (ResearchGate, 2025) — Tunable utility floor for walk-away
-  Dual Concern Model — Pruitt & Carnevale (1993)
-  Fisher, Ury & Patton — Getting to Yes, 3rd ed. (2011)
-  INTERSPEECH 2024 — Rapport building strategies for voice agents
+Experimental scope: familiar negotiation concepts arranged as illustrative
+tactics and lexical debrief checks. No validated research implementation,
+outcome guarantee, BATNA enforcement or automatic agreement is provided.
 
 Usage:
     # Pre-call
@@ -40,48 +34,48 @@ from pathlib import Path
 from typing import Any
 
 # ---------------------------------------------------------------------------
-# Tactic library (backed by arXiv:2411.05816, NegotiationArena, MIT Sloan 2024)
+# Illustrative tactic library; rationales are suggestions, not empirical claims.
 # ---------------------------------------------------------------------------
 
 TACTIC_LIBRARY: dict[str, dict] = {
     "rapport_building": {
         "description": "Open with shared history, express appreciation, establish trust.",
-        "rationale": "Steady and Influential counterparties respond poorly to immediate transactional openers. INTERSPEECH 2024: name use and appreciation framing increases subsequent concession willingness.",
+        "rationale": "Illustrative suggestion: acknowledge the relationship before discussing terms; no concession benefit is guaranteed.",
         "script_hint": "Acknowledge the relationship before discussing numbers.",
     },
     "anchor_high": {
         "description": "State an opening position above your target to shape the perceived range.",
-        "rationale": "Anchoring bias: the first number uttered anchors the negotiation range. NegotiationArena 2024: agents that anchor strongly achieve higher utility floors.",
+        "rationale": "Illustrative suggestion: choose an opening position deliberately; this prototype does not establish an optimal price.",
         "script_hint": "State your opening figure confidently. Do not justify it immediately.",
     },
     "label_emotion": {
         "description": "Name the counterparty's concern explicitly before offering a concession.",
-        "rationale": "MIT Sloan Warmth×Dominance (2024): labelling reduces reactance and increases perceived empathy, enabling larger concession to be received positively.",
+        "rationale": "Illustrative suggestion: acknowledge a concern before discussing a concession; do not assume the other party's emotional state.",
         "script_hint": "It sounds like cost certainty matters more than the headline rate.",
     },
     "timed_concession": {
         "description": "Offer a concession contingent on a reciprocal commitment (term, volume, speed).",
-        "rationale": "arXiv:2411.05816: contingent concessions increase joint value vs unconditional price drops. Time-dependent patterns prevent value leak.",
+        "rationale": "Illustrative suggestion: make any proposed concession conditional on terms a human has reviewed.",
         "script_hint": "I can move to [X] if you can commit to [Y-term/volume].",
     },
     "batna_reference": {
         "description": "Reference your BATNA as a credible walk-away alternative.",
-        "rationale": "AgenticPay 2026: BATNA-aware reward designs prevent agents from accepting sub-optimal deals. Fisher & Ury: BATNA sets the true walk-away threshold.",
+        "rationale": "Illustrative suggestion: consider the stated alternative before accepting terms; this tool does not enforce a walk-away threshold.",
         "script_hint": "We do have an alternative arrangement we could pursue, though we would prefer to resolve this with you.",
     },
     "interest_exploration": {
         "description": "Ask open questions to surface underlying interests beyond stated positions.",
-        "rationale": "Getting to Yes (Fisher & Ury): interest-based negotiation produces durable agreements; position-based bargaining leads to deadlock.",
+        "rationale": "Illustrative suggestion: ask about underlying interests rather than assuming the headline position is the only concern.",
         "script_hint": "What's most important to you in how this contract works going forward?",
     },
     "silence": {
         "description": "Allow 3–5 seconds of silence after making a strong point or anchoring.",
-        "rationale": "Research on negotiation dynamics shows that silence after an anchor creates psychological pressure for the counterparty to respond and potentially concede.",
+        "rationale": "Illustrative suggestion: leave space for a response without using silence as coercion.",
         "script_hint": "State your figure, then wait. Resist the urge to fill the silence.",
     },
     "conditional_close": {
         "description": "Propose a conditional agreement that both sides can accept.",
-        "rationale": "MIT Sloan 2024: conditional offers reduce impasse rates by giving both sides a face-saving path to agreement.",
+        "rationale": "Illustrative suggestion: state conditions clearly and obtain human authorization before any actual agreement.",
         "script_hint": "If you can confirm [condition] today, I'm authorised to agree to [outcome].",
     },
 }
