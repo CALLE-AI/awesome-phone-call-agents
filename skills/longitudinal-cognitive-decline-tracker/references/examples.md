@@ -1,6 +1,8 @@
 # Examples
 
-## Example 1: Detecting Cognitive Degradation
+These are synthetic no-call fixtures. The report labels are advisory, not clinical findings.
+
+## Example 1: Increasing Pause Duration
 
 **Input History:**
 ```python
@@ -18,11 +20,11 @@ history = [
   "clinical_review_recommended": true,
   "degradation_slope": 80.0,
   "data_points": 4,
-  "status": "Significant cognitive degradation detected."
+  "status": "Increasing pause trend in supplied data; advisory only, not a diagnosis."
 }
 ```
 
-## Example 2: Stable Patient
+## Example 2: No Increasing Pause Trend
 
 **Input History:**
 ```python
@@ -40,6 +42,6 @@ history = [
   "clinical_review_recommended": false,
   "degradation_slope": -2.5,
   "data_points": 4,
-  "status": "Stable cognitive markers."
+  "status": "No threshold-crossing pause trend in supplied data; not a cognitive assessment."
 }
 ```

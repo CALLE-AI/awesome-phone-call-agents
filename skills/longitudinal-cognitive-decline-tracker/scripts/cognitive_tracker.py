@@ -5,8 +5,8 @@ from typing import List, Dict, Any, Optional
 
 class ClinicalStatus(str, Enum):
     INSUFFICIENT_DATA = "Insufficient data"
-    STABLE = "Stable cognitive markers."
-    DEGRADATION_DETECTED = "Significant cognitive degradation detected."
+    STABLE = "No threshold-crossing pause trend in supplied data; not a cognitive assessment."
+    DEGRADATION_DETECTED = "Increasing pause trend in supplied data; advisory only, not a diagnosis."
 
 @dataclass
 class CallRecord:
@@ -23,7 +23,7 @@ class LongitudinalReport:
 
 def analyze_longitudinal_biomarkers(history: List[Dict[str, Any]]) -> LongitudinalReport:
     """
-    Analyzes historical acoustic metadata to detect a degrading trend in cognitive markers.
+    Calculates an advisory pause-duration trend from supplied synthetic metadata.
     Uses basic linear regression logic on 'avg_pause_ms'.
     """
     report = LongitudinalReport(

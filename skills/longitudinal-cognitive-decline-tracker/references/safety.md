@@ -1,5 +1,5 @@
 # Safety & Compliance
 
-1. **Testing Protocol Compliance**: All test examples and script executions MUST strictly use the `555-01xx` numbering block for the `caller` field. The analyzer will raise a `ValueError` if a real phone number is provided, adhering to repository PR #288 rules.
-2. **Medical Device Disclaimer**: This software is not an FDA-approved medical device. It must not be used as the sole basis for clinical diagnosis. The output is strictly for flagging records for human clinical review.
-3. **Data Anonymization**: Longitudinal acoustic data is considered highly sensitive Protected Health Information (PHI) under HIPAA. In production, the `caller` field should ideally be a hashed UUID rather than a raw phone number.
+1. **Synthetic inputs only**: Use fictional `555-01xx` caller labels in no-call examples. The simple prefix check is not a privacy filter; never supply real contact details or patient records.
+2. **Medical Device Disclaimer**: This is an unvalidated demonstration, not a medical device or clinical decision tool. No real care, triage, diagnosis, or external mutation may be automated from its output.
+3. **Privacy limits**: Removing transcripts or hashing identifiers does not by itself establish de-identification or an exemption from privacy obligations. Do not claim this prototype establishes HIPAA compliance.
