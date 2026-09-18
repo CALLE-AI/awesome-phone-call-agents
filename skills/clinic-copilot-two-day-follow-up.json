@@ -1,0 +1,8 @@
+{
+  "name": "clinic-copilot-two-day-follow-up",
+  "description": "Outbound clinic follow-up",
+  "version": "1.0.0",
+  "outbound": true,
+  "input": ["patient_name", "visit_date"],
+  "output": ["patient_name", "feeling", "needs_nurse_callback", "follow_up_booked"]
+}
