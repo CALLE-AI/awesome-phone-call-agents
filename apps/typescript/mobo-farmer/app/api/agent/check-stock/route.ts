@@ -3,90 +3,72 @@ export const dynamic = 'force-dynamic';
 import { calleClient, hasCalleKey } from '@/lib/calle';
 import { inputStockSchema, marketPriceSchema, waterAllocationSchema } from '@/lib/agentSchemas';
 
+const E164 = /^\+[1-9]\d{7,14}$/;
+const SA_E164 = /^\+27\d{9}$/;
+
 export async function POST(req: Request) {
   try {
     const body = await req.json();
-    const { taskType, userIntent, phone, mockMode } = body;
+    const { taskType, userIntent, phone, mockMode, live, confirmLive } = body;
 
-    // Use mock mode if explicitly requested or if no API key is available
-    if (!hasCalleKey || mockMode) {
-      await new Promise(resolve => setTimeout(resolve, 2000)); // 2s delay
+    const allowLiveEnv = process.env.ALLOW_LIVE_CALLS === 'true';
+    const liveIntent = live === true && confirmLive === true && req.headers.get('x-live-intent') === 'true';
+    const operatorApproved =!!process.env.OPERATOR_APPROVAL_TOKEN && req.headers.get('x-operator-approval') === process.env.OPERATOR_APPROVAL_TOKEN;
+
+    const shouldUseMock = mockMode ||!hasCalleKey ||!allowLiveEnv ||!liveIntent ||!operatorApproved;
+
+    if (shouldUseMock) {
+      await new Promise(r => setTimeout(r, 1500));
       return NextResponse.json({
+        mode: 'dry-run',
+        live: false,
         query: { taskType, userIntent },
-        summary: `Mock summary: Called about ${userIntent}. Supplier confirmed availability.`,
-        status: "completed",
-        transcript: "Mock transcript: Yes we have it in stock, R875 per bag...",
-        structured: { item_available: true, price_per_bag: 875, stock_quantity: 60 }
+        summary: `Mock: Called about ${userIntent}. Supplier confirmed availability.`,
+        status: 'completed',
+        transcript: 'Mock transcript: Yes we have L33 in stock, R875 per bag, 60 bags available...',
+        structured: { item_available: true, price_per_bag: 875, stock_quantity: 60, next_delivery_date: '2026-09-20' },
+        note: 'Synthetic fixture. Live requires ALLOW_LIVE_CALLS=true + body {live:true, confirmLive:true} + headers x-live-intent:true + x-operator-approval:TOKEN + destination in ALLOWED_E164'
       });
     }
 
-    // Live mode using CALL-E SDK
-    let basePrompt = '';
-    let resultSchema: any = null;
-
-    switch (taskType) {
-      case 'Find Buyer':
-        basePrompt = `You are MoboFarmer assistant calling a market or buyer on behalf of a farmer in South Africa.
-Farmer's request: "${userIntent}"
-Ask what produce grades they accept, their price per kg, if they do farm pickups, and their payment terms (how many days to pay).`;
-        resultSchema = marketPriceSchema;
-        break;
-      case 'Check Water Allocation':
-      case 'Schedule Service': // Using same schema for simplicity if needed
-        basePrompt = `You are MoboFarmer assistant calling the Water Association, Municipality, or a service provider on behalf of a farmer in South Africa.
-Farmer's request: "${userIntent}"
-Ask about their water allocation (in liters), ration days schedule, or confirm the requested service time and cost.`;
-        resultSchema = waterAllocationSchema;
-        break;
-      case 'Check Input Stock':
-      default:
-        basePrompt = `You are MoboFarmer assistant calling a supplier on behalf of a farmer in South Africa.
-Farmer's request: "${userIntent}"
-Ask follow-ups based on supplier answers. If item not available, ask for alternatives, price, delivery date, when to call back. Pronounce L33 as "L thirty-three".`;
-        resultSchema = inputStockSchema;
-        break;
+    if (!phone ||!E164.test(phone) ||!SA_E164.test(phone)) {
+      return NextResponse.json({ error: 'Invalid E.164. Must be +27XXXXXXXXX', status: 'unknown', message: 'manual-reconciliation required' }, { status: 400 });
+    }
+    const allowList = (process.env.ALLOWED_E164 || '').split(',').map(s=>s.trim()).filter(Boolean);
+    if (allowList.length > 0 &&!allowList.includes(phone)) {
+      return NextResponse.json({ error: `Destination ${phone} not in ALLOWED_E164 allowlist`, status: 'unknown' }, { status: 403 });
     }
 
-    const fullPrompt = `${basePrompt}
+    let basePrompt = '';
+    let resultSchema: any = null;
+    switch (taskType) {
+      case 'Find Buyer':
+        basePrompt = `You are MoboFarmer assistant calling a market or buyer on behalf of a farmer in South Africa. Farmer's request: "${userIntent}" Ask what produce grades they accept, price per kg, farm pickups, payment terms.`;
+        resultSchema = marketPriceSchema; break;
+      case 'Check Water Allocation':
+      case 'Schedule Service':
+        basePrompt = `You are MoboFarmer assistant calling the Water Association/Municipality on behalf of a farmer. Request: "${userIntent}" Ask about allocation liters, ration days, confirm service time/cost.`;
+        resultSchema = waterAllocationSchema; break;
+      default:
+        basePrompt = `You are MoboFarmer assistant calling a supplier on behalf of a farmer. Request: "${userIntent}" Ask follow-ups. Pronounce L33 as "L thirty-three".`;
+        resultSchema = inputStockSchema; break;
+    }
 
-Task Type: ${taskType}
-
-Have a natural conversation, not a single fixed question.
-If put on hold, note wait time.
-
-At END, give verbal summary for confirmation: "Just to summarize: I called about [X], you said [Y], next step is [Z]. Is that correct?" Wait for yes/no.
-
-Keep under 90s. Language: English. Region: US, Locale: en-US (ZA disabled per Sep 14 coverage update).`;
+    const fullPrompt = `${basePrompt}\nTask Type: ${taskType}\nHave natural conversation. At END give verbal summary: "Just to summarize: I called about [X], you said [Y], next step is [Z]. Is that correct?" Keep under 90s. Language: English.`;
 
     const call = await calleClient.calls.create({
       task: fullPrompt,
-      resultSchema: resultSchema,
-      recipients: [{ phones: [phone], region: "US", locale: "en-US" }],
+      resultSchema,
+      recipients: [{ phones: [phone], region: 'US', locale: 'en-US' }],
       metadata: { taskType, userIntent }
     });
 
-    return NextResponse.json({
-      callId: call.id
-    });
-    
-  } catch (error: any) {
-    console.error("Agent Call Error:", error);
-    
-    // Handle the case where the user's intent is too vague for the AI to make a call
-    if (error?.code === 'call_not_ready' && error?.details?.questions?.length > 0) {
-      return NextResponse.json(
-        { 
-          status: "failed", 
-          message: "The AI needs more info before calling.", 
-          error: "The AI needs more info: " + error.details.questions[0]
-        },
-        { status: 200 }
-      );
-    }
+    return NextResponse.json({ callId: call.id, live: true, mode: 'live' });
 
-    return NextResponse.json(
-      { status: "no_answer", message: "Supplier didn't answer, will retry", error: error?.message || "Unknown error" },
-      { status: 200 } // Keep 200 to prevent crash, just handle soft failure in UI
-    );
+  } catch (error: any) {
+    if (error?.code === 'call_not_ready') {
+      return NextResponse.json({ status: 'unknown', message: 'manual-reconciliation required', error: error.details?.questions?.[0] }, { status: 200 });
+    }
+    return NextResponse.json({ status: 'unknown', message: 'manual-reconciliation required', error: error?.message || 'Unknown error' }, { status: 200 });
   }
 }

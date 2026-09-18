@@ -66,7 +66,7 @@ export function NewAgentTaskModal({ isOpen, onClose, onCallStarted }: { isOpen: 
           await new Promise(resolve => setTimeout(resolve, 2000));
           const statusRes = await fetch(`/api/agent/status?callId=${result.callId}`);
           const statusData = await statusRes.json();
-          if (statusData.status === 'completed' || statusData.status === 'failed' || statusData.status === 'no_answer') {
+          if (statusData.status === 'completed' || statusData.status === 'failed' || statusData.status === 'unknown') {
             result = statusData;
             break;
           }
@@ -76,7 +76,7 @@ export function NewAgentTaskModal({ isOpen, onClose, onCallStarted }: { isOpen: 
       // Delete active call since it finished
       try { await deleteDoc(activeCallRef); } catch (e) { console.error(e); }
       
-      if (result.status !== 'no_answer' && result.status !== 'failed' && !result.error) {
+      if (result.status !== 'unknown' && result.status !== 'failed' && !result.error) {
         // Save to recentResults
         const recentResultRef = doc(db, 'recentResults', tempId);
         await setDoc(recentResultRef, {
