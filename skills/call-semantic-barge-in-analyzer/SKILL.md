@@ -1,6 +1,6 @@
 ---
 name: call-semantic-barge-in-analyzer
-description: Post-call cooperation skill. Classifies callee turns in a CALL-E transcript as backchannels ("mm-hmm", "right, okay"), frustration barge-ins ("wait", "hold on", "slow down"), or substantive answers - disambiguating answers from backchannels via the preceding agent question - and computes pacing metrics including backchannel density and whether the agent shortened its turns after the first interruption. Returns a cooperation profile (ENGAGED_COOPERATIVE / NEUTRAL / FRUSTRATED_INTERRUPTING / DISENGAGED) with a pacing recommendation and a ready-to-use pacing goal for the next plan_call. Heuristic mode only, runs offline. Grounded in full-duplex turn-taking research (Moshi, DuplexGen), adapted to post-call transcripts.
+description: Post-call cooperation skill. Classifies callee turns in a CALL-E transcript as backchannels ("mm-hmm", "right, okay"), frustration barge-ins ("wait", "hold on", "slow down"), or substantive answers - disambiguating answers from backchannels via the preceding agent question - and computes pacing metrics including backchannel density and whether the agent shortened its turns after the first interruption. Returns a cooperation profile (ENGAGED_COOPERATIVE / NEUTRAL / FRUSTRATED_INTERRUPTING / DISENGAGED) with a pacing recommendation and a ready-to-use pacing goal for the next plan_call. Heuristic mode only, runs offline. Grounded in full-duplex turn-taking research (Moshi arXiv 2410.00037, DuplexGen arXiv 2607.26178), adapted to post-call transcripts.
 license: MIT
 ---
 
@@ -74,8 +74,8 @@ recommends on `shorten_turns`, so analysis and next call stay consistent.
 
 | Research | Relevance |
 |---|---|
-| Moshi: a speech-text foundation model for real-time dialogue (Kyutai, 2024) | Full-duplex turn-taking with backchannels; this skill is the post-call, transcript-only approximation |
-| DuplexGen: Adaptive Synthesis of Human-AI Turn-Taking Dialogues (2026) | Turn-taking dialogue synthesis; motivates the backchannel-vs-barge-in distinction |
+| Moshi: a speech-text foundation model for real-time dialogue (Kyutai, 2024, arXiv 2410.00037) | Full-duplex turn-taking with backchannels; this skill is the post-call, transcript-only approximation |
+| DuplexGen: Adaptive Synthesis of Human-AI Turn-Taking Dialogues (2026, arXiv 2607.26178) | Turn-taking dialogue synthesis; motivates the backchannel-vs-barge-in distinction |
 
 Both papers model real-time full-duplex behavior; CALL-E exposes
 transcripts without timing, so this skill deliberately implements the
