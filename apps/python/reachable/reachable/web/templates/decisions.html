@@ -1,0 +1,36 @@
+{% extends "base.html" %}
+{% block title %}Decisions not to call &middot; Reachable{% endblock %}
+{% block body %}
+
+<h1>Decisions not to call</h1>
+<p class="muted">
+  Reachable refuses more often than it calls, and every refusal has a name and a reason.
+  A refusal to place a call is a distinct outcome from any result of a call.
+</p>
+
+<div class="panel">
+  <table>
+    <tr><th>When</th><th>Pupil</th><th>Contact</th><th>Reason</th><th>Kind</th><th>Detail</th></tr>
+    {% for d in decisions %}
+    <tr>
+      <td class="mono muted">{{ d['at'][:19].replace('T', ' ') }}</td>
+      <td>{{ names.get(d['pupil_id'], d['pupil_id'] or '—') }}</td>
+      <td class="mono muted">{{ d['contact_id'] or '—' }}</td>
+      <td class="mono {{ 'stop' if d['kind'] == 'terminal' else 'wait' }}">{{ d['reason'] }}</td>
+      <td class="mono muted">{{ d['kind'] }}</td>
+      <td class="muted">{{ d['detail'] }}</td>
+    </tr>
+    {% else %}
+    <tr><td colspan="6" class="muted">Nothing refused yet.</td></tr>
+    {% endfor %}
+  </table>
+</div>
+
+<p class="muted" style="font-size:13px">
+  A <strong>hold</strong> re-arms next cycle &mdash; outside the calling window, a non-school
+  day, a call already in flight. A <strong>terminal</strong> reason does not &mdash; a
+  vulnerable pupil, an invalid number, a language the UK line cannot serve, a reason
+  already recorded.
+</p>
+
+{% endblock %}

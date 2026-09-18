@@ -1,0 +1,15 @@
+{
+  "task_id": "relayme-demo-wrongnumber",
+  "mock_transcript": [
+    {"speaker": "agent", "text": "Hi, I'm an AI assistant calling for someone. Is this Maple Street Pharmacy?"},
+    {"speaker": "callee", "text": "No, this is a private residence. You have the wrong number."},
+    {"speaker": "agent", "text": "I'm sorry to bother you. I'll stop here. Have a good day."}
+  ],
+  "structured_result": {
+    "answer": "",
+    "outcome": "wrong_number",
+    "transcript_summary": "The number reached a private residence, not the pharmacy. Stopped without asking the question.",
+    "follow_up_needed": true,
+    "disclosed_ai": true
+  }
+}

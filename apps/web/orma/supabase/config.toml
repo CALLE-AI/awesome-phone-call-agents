@@ -1,0 +1,94 @@
+# T3.1 owns [functions.telegram]. Telegram posts webhooks with no JWT.
+# T5.1 owns the [auth] block only. It must not change verify_jwt here.
+
+[functions.telegram]
+verify_jwt = false
+
+# T2.1 owns this block. pg_cron authenticates with the named materialise secret
+# API key, which @supabase/server validates in the handler.
+[functions.materialise]
+verify_jwt = false
+
+# T2.4 owns this block. The minute cron uses the same named Vault scheduler
+# key as Materialise, which @supabase/server validates in the handler.
+[functions.tick]
+verify_jwt = false
+
+# T2.6 owns this block. CALL-E sends no Supabase JWT, so the handler gates
+# every request with ORMA_WEBHOOK_SECRET embedded in its webhook path.
+[functions.calle-webhook]
+verify_jwt = false
+
+# T10.2 owns this block. The handler verifies its caller JWT itself so it can
+# return deliberate refusal reasons without granting anonymous access.
+[functions.confirm-phone]
+verify_jwt = false
+
+# T4.2a owns this block. The handler answers a missing or expired token with a
+# clean 401 protocol error, so the gateway JWT check stays off.
+[functions.mcp]
+verify_jwt = false
+
+# T7.3 owns this block. The weekly analysis cron uses the named materialise
+# secret API key, which @supabase/server validates in the handler.
+[functions.analysis]
+verify_jwt = false
+# T5.2 owns this block. The Login Widget posts with no session JWT, so the
+# gateway check stays off. The handler still verifies HMAC and auth_date.
+[functions.auth-telegram]
+verify_jwt = false
+
+# T5.1 owns everything below. Email magic link is the only email login path.
+# Custom SMTP sends from Supabase's own servers, so the Edge Function port
+# block does not apply here. Resend's SMTP interface is the sender, so one
+# account stands behind auth mail and receipt mail.
+
+[auth]
+# Canonical app origin. Verify links land here when no redirect_to matches.
+site_url = "https://orma.nryn.dev"
+# Exact origin for bare redirect_to values, glob for any in-app path.
+# Nothing else is allowed: localhost and other origins stay closed in prod.
+additional_redirect_urls = ["https://orma.nryn.dev", "https://orma.nryn.dev/**"]
+enable_signup = true
+
+[auth.email]
+enable_signup = true
+# One second between sends to one address, so ten requests a minute all clear.
+max_frequency = "1s"
+# Live signups confirm by email, so the rebuild keeps the confirmation step.
+enable_confirmations = true
+# The live project pins eight digit codes, so the rebuild keeps that length.
+otp_length = 8
+
+[auth.email.smtp]
+enabled = true
+# Resend SMTP interface. The password is the Resend API key, read at push time.
+host = "smtp.resend.com"
+port = 587
+user = "resend"
+pass = "env(RESEND_API_KEY)"
+admin_email = "env(RESEND_FROM)"
+sender_name = "Orma"
+
+# Email links go straight to the app callback. The default links point at the
+# project host, which some networks cannot reach.
+[auth.email.template.magic_link]
+subject = "Your Orma sign-in link"
+content_path = "./supabase/templates/magic_link.html"
+
+[auth.email.template.confirmation]
+subject = "Confirm your Orma account"
+content_path = "./supabase/templates/confirmation.html"
+
+# The live project allows TOTP enrollment and verification, so the rebuild
+# matches it.
+[auth.mfa.totp]
+enroll_enabled = true
+verify_enabled = true
+
+[auth.rate_limit]
+# The done-when pin sends ten links in one minute, and earlier rounds send
+# more into the same rolling hour. Ninety an hour keeps that pin safe.
+# Resend's free tier allows 100 emails per day, the real ceiling and far
+# above demo volume.
+email_sent = 90

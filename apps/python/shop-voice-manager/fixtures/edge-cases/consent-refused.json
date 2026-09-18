@@ -1,0 +1,64 @@
+{
+  "call_id": "call_inv_20260818_refused",
+  "idempotency_key": "shopvoice-demo-lagos-corner-shop-inventory-2026-08-18",
+  "status": "completed",
+  "task_completed": false,
+  "completion_confidence": {
+    "score": 0.0,
+    "label": "none"
+  },
+  "evidence": [
+    "Owner declined to continue the check-in and asked not to be called again."
+  ],
+  "structured_result": null,
+  "metadata": {
+    "shop_id": "demo-lagos-corner-shop",
+    "call_type": "inventory",
+    "call_date": "2026-08-18"
+  },
+  "recipients": [
+    {
+      "phones": [
+        "+2348000000000"
+      ],
+      "region": "NG",
+      "locale": "en",
+      "structured_result": null,
+      "attempts": [
+        {
+          "attempt": 1,
+          "status": "completed",
+          "started_at": "2026-08-18T07:15:00+01:00",
+          "duration_seconds": 22,
+          "transcript_turns": [
+            {
+              "offset_seconds": 0,
+              "speaker": "bot",
+              "text": "Good morning o. How market?"
+            },
+            {
+              "offset_seconds": 3,
+              "speaker": "user",
+              "text": "Who be this?"
+            },
+            {
+              "offset_seconds": 5,
+              "speaker": "bot",
+              "text": "I be AI assistant wey dey help you track your shop. This call fit dey recorded."
+            },
+            {
+              "offset_seconds": 11,
+              "speaker": "user",
+              "text": "No, I no want. No call me again."
+            },
+            {
+              "offset_seconds": 15,
+              "speaker": "bot",
+              "text": "I hear you. I go stop the calls. Sorry for the disturb. Bye."
+            }
+          ]
+        }
+      ]
+    }
+  ]
+}

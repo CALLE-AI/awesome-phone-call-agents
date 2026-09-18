@@ -1,0 +1,44 @@
+{
+  "shop_id": "demo-lagos-corner-shop",
+  "display_name": "Ada Corner Shop",
+  "currency": "NGN",
+  "week_start": "2026-08-10",
+  "week_end": "2026-08-16",
+  "days_with_data": 7,
+  "estimated_revenue": 425000,
+  "procurement_spend": 310000,
+  "estimated_gross": 115000,
+  "products_running_low": [
+    "Indomie",
+    "Sugar"
+  ],
+  "slow_moving_method": "top-sellers",
+  "slow_moving_products": [
+    {
+      "name": "Cooking oil",
+      "quantity_estimate": 14.0,
+      "unit": "bottles",
+      "unit_cost": 3000.0,
+      "capital_estimate": 42000,
+      "consumed": 11.0,
+      "average_held": 17.57,
+      "turnover": 0.626,
+      "ever_top_seller": false
+    },
+    {
+      "name": "Milo",
+      "quantity_estimate": 9.0,
+      "unit": "tins",
+      "unit_cost": 5000.0,
+      "capital_estimate": 45000,
+      "consumed": 1.0,
+      "average_held": 8.71,
+      "turnover": 0.1148,
+      "ever_top_seller": false
+    }
+  ],
+  "slow_moving_capital": 87000,
+  "calls_placed": 14,
+  "calls_completed": 14,
+  "narrative": "This week you sold about ₦425,000. You spent about ₦310,000 restocking.\nProducts running low: Indomie, Sugar.\nApproximate capital in slow-moving stock: ₦87,000."
+}

@@ -1,0 +1,115 @@
+[
+  {
+    "pnr": "K7Q2XA",
+    "passenger": "Alya Rahman",
+    "phone": "+15550100101",
+    "flightId": "NA721-2026-09-20",
+    "fareFamily": "flex",
+    "farePaid": 2450000,
+    "channel": ["tripkita", "nusantara-air"],
+    "ticket": "000-2400000101",
+    "simulatedAnswer": { "kind": "keep" }
+  },
+  {
+    "pnr": "M3P8RD",
+    "passenger": "Daniel Wijaya",
+    "phone": "+15550100102",
+    "flightId": "NA721-2026-09-20",
+    "fareFamily": "saver",
+    "farePaid": 1680000,
+    "channel": ["tripkita", "dist-lintas", "dist-samudra", "nusantara-air"],
+    "ticket": "000-2400000102",
+    "simulatedAnswer": { "kind": "refund" }
+  },
+  {
+    "pnr": "T5W1LC",
+    "passenger": "Sari Pratiwi",
+    "phone": "+15550100103",
+    "flightId": "NA721-2026-09-20",
+    "fareFamily": "basic",
+    "farePaid": 1320000,
+    "channel": ["tripkita", "dist-lintas", "nusantara-air"],
+    "ticket": "000-2400000103",
+    "simulatedAnswer": { "kind": "move", "flightId": "NA729-2026-09-20" }
+  },
+  {
+    "pnr": "B9H4ZN",
+    "passenger": "Kevin Tan",
+    "phone": "+15550100104",
+    "flightId": "NA721-2026-09-20",
+    "fareFamily": "saver",
+    "farePaid": 1680000,
+    "channel": ["tripkita", "dist-samudra", "nusantara-air"],
+    "ticket": "000-2400000104",
+    "simulatedAnswer": { "kind": "human" }
+  },
+  {
+    "pnr": "R2D6YU",
+    "passenger": "Maya Lestari",
+    "phone": "+15550100105",
+    "flightId": "NA721-2026-09-20",
+    "fareFamily": "basic",
+    "farePaid": 1320000,
+    "channel": ["tripkita", "nusantara-air"],
+    "ticket": "000-2400000105",
+    "simulatedAnswer": { "kind": "no_answer" }
+  },
+  {
+    "pnr": "H8J3PV",
+    "passenger": "Rizky Hidayat",
+    "phone": "+15550100106",
+    "flightId": "NA812-2026-09-20",
+    "fareFamily": "saver",
+    "farePaid": 1490000,
+    "channel": ["tripkita", "dist-lintas", "nusantara-air"],
+    "ticket": "000-2400000106",
+    "simulatedAnswer": { "kind": "move", "flightId": "NA816-2026-09-20" }
+  },
+  {
+    "pnr": "W4N7QS",
+    "passenger": "Putri Anggraini",
+    "phone": "+15550100107",
+    "flightId": "NA812-2026-09-20",
+    "fareFamily": "flex",
+    "farePaid": 2180000,
+    "channel": ["tripkita", "nusantara-air"],
+    "ticket": "000-2400000107",
+    "simulatedAnswer": { "kind": "refund" },
+    "simulatedAirlineDesk": "approves"
+  },
+  {
+    "pnr": "L6F2KM",
+    "passenger": "Nadia Kusuma",
+    "phone": "+15550100108",
+    "flightId": "NA725-2026-09-20",
+    "fareFamily": "flex",
+    "farePaid": 2450000,
+    "channel": ["tripkita", "nusantara-air"],
+    "ticket": "000-2400000108",
+    "simulatedAnswer": { "kind": "move", "flightId": "NA729-2026-09-20" }
+  },
+  {
+    "pnr": "P3X9GA",
+    "passenger": "Bima Saputra",
+    "phone": "+15550100109",
+    "flightId": "NA725-2026-09-20",
+    "fareFamily": "saver",
+    "farePaid": 1790000,
+    "channel": ["tripkita", "dist-samudra", "nusantara-air"],
+    "ticket": "000-2400000109",
+    "simulatedAnswer": { "kind": "refund" },
+    "simulatedAirlineDesk": "approves"
+  },
+  {
+    "pnr": "C5V8EJ",
+    "passenger": "Dewi Halim",
+    "phone": "+15550100110",
+    "flightId": "NA725-2026-09-20",
+    "fareFamily": "basic",
+    "farePaid": 1450000,
+    "channel": ["tripkita", "dist-lintas", "nusantara-air"],
+    "ticket": "000-2400000110",
+    "simulatedAnswer": { "kind": "human" },
+    "simulatedAirlineDesk": "refused"
+  }
+]

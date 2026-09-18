@@ -1,0 +1,27 @@
+{
+  "id": "15-asserted-readback-refused-price",
+  "category": "readback-refused",
+  "description": "Identical to fixture 13 except the person brushes off the read-back without repeating the value. Read-back was requested and not complied, so verified is blocked; caps at asserted.",
+  "turns": [
+    { "speaker": "bot", "text": "Hi, QuoteDesk assistant calling to finalise the rate on your order.", "offset_seconds": 0 },
+    { "speaker": "user", "text": "Yes, tell me.", "offset_seconds": 5 },
+    { "speaker": "bot", "text": "What is the final per unit rate for order 5 5 2 0?", "offset_seconds": 9 },
+    { "speaker": "user", "text": "One second, let me check.", "offset_seconds": 14 },
+    { "speaker": "user", "text": "It is 4,500 rupees per unit, stock is at the Taloja godown.", "offset_seconds": 25 },
+    { "speaker": "bot", "text": "Just to confirm, that is 4,500 rupees per unit, correct?", "offset_seconds": 31 },
+    { "speaker": "user", "text": "Yeah, yeah, that is what I said.", "offset_seconds": 36 }
+  ],
+  "fields": [
+    {
+      "field": "unit_price",
+      "value": 4500,
+      "expects": "price",
+      "questionTurn": 2,
+      "answerTurns": [4],
+      "readbackRequested": true,
+      "critical": true,
+      "expectedGrade": "asserted",
+      "expectSignals": ["A", "B", "C"]
+    }
+  ]
+}

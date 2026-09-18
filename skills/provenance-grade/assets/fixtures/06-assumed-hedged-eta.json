@@ -1,0 +1,23 @@
+{
+  "id": "06-assumed-hedged-eta",
+  "category": "hedged-assumed",
+  "description": "Multiple hedge terms stacked on a duration answer.",
+  "turns": [
+    { "speaker": "bot", "text": "Hello, QuoteDesk assistant calling about the compressor order.", "offset_seconds": 0 },
+    { "speaker": "user", "text": "Yes, speaking.", "offset_seconds": 5 },
+    { "speaker": "bot", "text": "When can you deliver the compressor unit to our Chennai site?", "offset_seconds": 9 },
+    { "speaker": "user", "text": "I think around five days, usually it is quick.", "offset_seconds": 15 }
+  ],
+  "fields": [
+    {
+      "field": "eta_days",
+      "value": 5,
+      "expects": "duration",
+      "questionTurn": 2,
+      "answerTurns": [3],
+      "critical": true,
+      "expectedGrade": "assumed",
+      "expectSignals": ["D"]
+    }
+  ]
+}

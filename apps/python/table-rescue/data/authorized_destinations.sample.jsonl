@@ -1,0 +1,6 @@
+{"phone": "+15550101", "name": "Fictional Guest One", "authorized_by": "sample-operator", "authorized_at": "2026-09-07T00:00:00+07:00"}
+{"phone": "+15550102", "name": "Fictional Guest Two", "authorized_by": "sample-operator", "authorized_at": "2026-09-07T00:00:00+07:00"}
+{"phone": "+15550103", "name": "Fictional Guest Three", "authorized_by": "sample-operator", "authorized_at": "2026-09-07T00:00:00+07:00"}
+{"phone": "+15550111", "name": "Fictional Waitlist One", "authorized_by": "sample-operator", "authorized_at": "2026-09-07T00:00:00+07:00"}
+{"phone": "+15550112", "name": "Fictional Waitlist Two", "authorized_by": "sample-operator", "authorized_at": "2026-09-07T00:00:00+07:00"}
+{"phone": "+15550113", "name": "Fictional Waitlist Three", "authorized_by": "sample-operator", "authorized_at": "2026-09-07T00:00:00+07:00"}

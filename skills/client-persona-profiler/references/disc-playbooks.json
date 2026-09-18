@@ -1,0 +1,68 @@
+{
+  "Dominant": {
+    "archetype": "Dominant",
+    "disc_key": "D",
+    "open_with": "Get to the point quickly. State the value proposition in the first sentence.",
+    "communication_style": "Direct, results-focused, minimal small talk.",
+    "avoid": "Long explanations, emotional appeals, passive language, excessive options.",
+    "close_with": "Present one clear recommended action with a specific outcome.",
+    "escalation_signal": "Caller interrupts, challenges assumptions, or asks 'what's the bottom line?'",
+    "loyalty_lever": "Respect their time. Offer exclusive or priority access. Acknowledge results they've achieved.",
+    "churn_warning": "Any sense of wasted time, bureaucracy, or indecision will accelerate churn."
+  },
+  "Influential": {
+    "archetype": "Influential",
+    "disc_key": "I",
+    "open_with": "Start with energy and warmth. Reference shared experiences or mutual connections.",
+    "communication_style": "Enthusiastic, story-driven, people-oriented.",
+    "avoid": "Cold, purely data-driven talk; ignoring their feelings; rushing past pleasantries.",
+    "close_with": "Paint a picture of success. Make them feel part of a community or movement.",
+    "escalation_signal": "Caller shares personal stories, asks about other customers' experiences.",
+    "loyalty_lever": "Recognition, community belonging, being told they are valued. Public acknowledgment if appropriate.",
+    "churn_warning": "Feeling ignored, unvalued, or replaced. Lack of human warmth in interactions."
+  },
+  "Steady": {
+    "archetype": "Steady",
+    "disc_key": "S",
+    "open_with": "Be warm and patient. Acknowledge any inconvenience before moving forward.",
+    "communication_style": "Calm, reassuring, step-by-step. Avoid surprises.",
+    "avoid": "Sudden changes, hard pressure tactics, rushing decisions, ambiguity.",
+    "close_with": "Confirm the next steps clearly. Offer a follow-up to ensure they feel supported.",
+    "escalation_signal": "Caller asks 'what happens next?' or wants to involve others before deciding.",
+    "loyalty_lever": "Consistency, reliability, remembering past interactions, not changing their experience without warning.",
+    "churn_warning": "Any unexpected change to their routine, product, or point of contact."
+  },
+  "Analytical": {
+    "archetype": "Analytical",
+    "disc_key": "C",
+    "open_with": "Lead with facts, data, and specifics. Reference documented policies or evidence.",
+    "communication_style": "Precise, structured, logic-driven. Cite sources when possible.",
+    "avoid": "Emotional appeals, vague generalisations, premature commitments, off-the-cuff claims.",
+    "close_with": "Offer written confirmation. Give them time to evaluate. Provide a clear policy reference.",
+    "escalation_signal": "Caller asks for documentation, questions assumptions, or says 'can you send that in writing?'",
+    "loyalty_lever": "Transparency, consistency between what is said and what is delivered. Detailed reporting.",
+    "churn_warning": "Discovered discrepancies between promises and reality. Lack of documentation."
+  },
+  "Undetermined": {
+    "archetype": "Undetermined",
+    "disc_key": "?",
+    "open_with": "Use a balanced, professional tone. Ask an open question to learn more about their preference.",
+    "communication_style": "Neutral and adaptable. Mirror the caller's pace and register.",
+    "avoid": "Assuming a style before sufficient signal is gathered.",
+    "close_with": "Summarise clearly and ask if they have further questions.",
+    "escalation_signal": "Gather more turns before updating archetype classification.",
+    "loyalty_lever": "Consistent quality of service. Follow up to learn their preferences over time.",
+    "churn_warning": "Inconsistent experience. Not enough data yet to predict."
+  },
+  "Unknown": {
+    "archetype": "Unknown",
+    "disc_key": "?",
+    "open_with": "Use a professional, neutral tone.",
+    "communication_style": "Neutral and respectful.",
+    "avoid": "Assumptions without evidence.",
+    "close_with": "Offer a clear summary and next step.",
+    "escalation_signal": "N/A",
+    "loyalty_lever": "Consistent, high-quality service.",
+    "churn_warning": "Inconsistent experience."
+  }
+}
