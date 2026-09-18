@@ -128,8 +128,134 @@ def classify_callee_turn(text: str, previous_agent_text: str) -> str:
     return SUBSTANTIVE
 
 
-def build_pacing_card(turns: list[dict[str, str]]) -> dict[str, Any]:  # pragma: no cover
-    raise NotImplementedError
+PACING_GOAL = (
+    "You are calling someone who previously showed frustration with long "
+    "explanations. Speak at most two sentences per turn, then pause for a "
+    "reply. After each key point, invite a confirmation ('Does that make "
+    "sense?'). If the person says 'wait', 'hold on', or asks you to slow "
+    "down, stop immediately, acknowledge them, and let them speak. Restate "
+    "your understanding in one sentence before closing."
+)
+
+MAINTAIN_GUIDANCE = (
+    "The callee engaged with short confirmations and full answers. Keep the "
+    "current chunked pacing: short statements with room to acknowledge."
+)
+
+PAUSE_AND_CONFIRM_GUIDANCE = (
+    "The callee neither encouraged nor interrupted. Invite participation: "
+    "ask direct questions, pause after each point, and confirm understanding "
+    "before moving on."
+)
+
+
+def _is_callee(speaker: str) -> bool:
+    return str(speaker).lower().strip() in CALLEE_ROLES
+
+
+def build_pacing_card(turns: list[dict[str, str]]) -> dict[str, Any]:
+    """Classify callee turns, compute pacing metrics, build the card."""
+    card: dict[str, Any] = {
+        "skill": "call-semantic-barge-in-analyzer",
+        "analysis_mode": "heuristic",
+        "pacing_assessment": "assessed",
+        "reason": None,
+        "cooperation_profile": None,
+        "metrics": {},
+        "evidence": [],
+        "pacing_recommendation": {"recommendation": "pause_and_confirm", "guidance": PAUSE_AND_CONFIRM_GUIDANCE},
+        "disclaimer": DISCLAIMER,
+    }
+
+    classifications: list[tuple[int, str, str]] = []  # (turn_index, side, classification)
+    agent_word_counts: list[tuple[int, int]] = []  # (turn_index, word_count)
+    previous_agent_text = ""
+    for index, turn in enumerate(turns):
+        speaker = str(turn.get("speaker", ""))
+        text = str(turn.get("text", "")).strip()
+        if not text:
+            continue
+        if _is_callee(speaker):
+            classification = classify_callee_turn(text, previous_agent_text)
+            classifications.append((index, "callee", classification))
+            previous_agent_text = ""
+        else:
+            agent_word_counts.append((index, len(text.split())))
+            previous_agent_text = text
+
+    callee_classes = [c for _, side, c in classifications if side == "callee"]
+    backchannel_count = callee_classes.count(BACKCHANNEL)
+    barge_in_count = callee_classes.count(BARGE_IN)
+    substantive_count = callee_classes.count(SUBSTANTIVE)
+    callee_turns = len(callee_classes)
+
+    if callee_turns == 0:
+        card["pacing_assessment"] = "unclear"
+        card["reason"] = "insufficient_callee_signal"
+        return card
+
+    evidence = [
+        {
+            "turn_index": index,
+            "speaker": "callee",
+            "span": mask_pii(str(turns[index].get("text", ""))),
+            "classification": classification,
+        }
+        for index, side, classification in classifications
+        if classification in {BACKCHANNEL, BARGE_IN}
+    ]
+
+    first_barge_index = next((i for i, _, c in classifications if c == BARGE_IN), None)
+    agent_adapted = False
+    if first_barge_index is not None:
+        before = [count for idx, count in agent_word_counts if idx < first_barge_index]
+        after = [count for idx, count in agent_word_counts if idx > first_barge_index]
+        if before and after:
+            agent_adapted = sum(after) / len(after) < sum(before) / len(before)
+
+    substantive_texts = [
+        str(turns[i].get("text", "")).split()
+        for i, _, c in classifications
+        if c == SUBSTANTIVE
+    ]
+    all_answers_short = bool(substantive_texts) and all(len(words) <= 3 for words in substantive_texts)
+
+    if barge_in_count >= 2:
+        profile = "FRUSTRATED_INTERRUPTING"
+    elif backchannel_count >= 2 and barge_in_count == 0:
+        profile = "ENGAGED_COOPERATIVE"
+    elif callee_turns >= 3 and all_answers_short and backchannel_count == 0 and barge_in_count == 0:
+        profile = "DISENGAGED"
+    else:
+        profile = "NEUTRAL"
+
+    recommendation = {
+        "FRUSTRATED_INTERRUPTING": ("shorten_turns", PACING_GOAL),
+        "ENGAGED_COOPERATIVE": ("maintain_pacing", MAINTAIN_GUIDANCE),
+        "DISENGAGED": ("pause_and_confirm", PAUSE_AND_CONFIRM_GUIDANCE),
+        "NEUTRAL": ("pause_and_confirm", PAUSE_AND_CONFIRM_GUIDANCE),
+    }[profile]
+
+    card["cooperation_profile"] = profile
+    card["metrics"] = {
+        "callee_turns": callee_turns,
+        "backchannel_count": backchannel_count,
+        "barge_in_count": barge_in_count,
+        "substantive_count": substantive_count,
+        "backchannel_density": round(backchannel_count / callee_turns, 2),
+        "avg_agent_turn_words": (
+            round(sum(count for _, count in agent_word_counts) / len(agent_word_counts), 1)
+            if agent_word_counts
+            else 0.0
+        ),
+        "agent_adapted_after_barge_in": agent_adapted,
+    }
+    card["evidence"] = evidence
+    card["pacing_recommendation"] = {
+        "recommendation": recommendation[0],
+        "guidance": recommendation[1],
+    }
+    return card
 
 
 def craft_goal(scenario: str, language: str | None = None) -> dict[str, Any]:  # pragma: no cover
