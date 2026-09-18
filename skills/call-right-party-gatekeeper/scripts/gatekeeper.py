@@ -151,8 +151,124 @@ def detect_signals(speaker: str, text: str) -> list[str]:
     return signals
 
 
-def build_gate_card(turns: list[dict[str, str]]) -> dict[str, Any]:  # pragma: no cover
-    raise NotImplementedError
+VERIFICATION_FIRST_GOAL = (
+    "You are calling a named recipient about a personal matter. Open by "
+    "identifying yourself as an automated assistant and naming your "
+    "organization. Then ask to speak to the recipient by name ('May I speak "
+    "to <name>?'). Do not state the purpose of the call or any account, "
+    "payment, medical, or policy detail until the recipient confirms their "
+    "identity ('Am I speaking with <name>?'). If someone else answers, say "
+    "only that you will call back later, offer to leave a callback number, "
+    "and end the call without revealing the subject. After confirmation, "
+    "state the matter in one sentence and proceed."
+)
+
+HUMAN_REVIEW_GUIDANCE = (
+    "Verification ordering could not be established, or sensitive content "
+    "may have reached someone other than the intended recipient. A human "
+    "should read the transcript and decide whether to re-contact and what "
+    "to disclose."
+)
+
+PROCEED_GUIDANCE = (
+    "The intended recipient was confirmed before any sensitive content "
+    "appeared. Continue the workflow."
+)
+
+
+def _has_side(turns: list[dict[str, str]], callee: bool) -> bool:
+    for turn in turns:
+        speaker = str(turn.get("speaker", "")).lower().strip()
+        is_callee = speaker in CALLEE_ROLES
+        if is_callee == callee and str(turn.get("text", "")).strip():
+            return True
+    return False
+
+
+def build_gate_card(turns: list[dict[str, str]]) -> dict[str, Any]:
+    """Audit verify-before-disclose ordering and build the gate card.
+
+    Known accepted behavior: a callee asking "Who's calling?" fires
+    third_party_signal; that is ambiguous between the recipient asking for
+    clarification and an actual third party answering, so it only moves the
+    verdict toward the cautious stop-and-retry or (with a later explicit
+    confirmation) is superseded by CONFIRMED.
+    """
+    card: dict[str, Any] = {
+        "skill": "call-right-party-gatekeeper",
+        "analysis_mode": "heuristic",
+        "gate_assessment": "assessed",
+        "reason": None,
+        "right_party_status": None,
+        "verification_before_disclosure": False,
+        "evidence": [],
+        "recommended_action": {"action": "human_review", "guidance": None},
+        "disclaimer": DISCLAIMER,
+    }
+
+    if not _has_side(turns, callee=False) or not _has_side(turns, callee=True):
+        card["gate_assessment"] = "unclear"
+        card["reason"] = "insufficient_signal"
+        return card
+
+    verification_idx: int | None = None
+    disclosure_idx: int | None = None
+    callee_signals: list[str] = []
+    evidence: list[dict[str, Any]] = []
+    for index, turn in enumerate(turns):
+        speaker = str(turn.get("speaker", "")).lower().strip()
+        text = str(turn.get("text", "")).strip()
+        if not text:
+            continue
+        side = "callee" if speaker in CALLEE_ROLES else "agent"
+        for signal in detect_signals(speaker, text):
+            evidence.append(
+                {
+                    "turn_index": index,
+                    "speaker": side,
+                    "span": mask_pii(text),
+                    "signal": signal,
+                }
+            )
+            if signal == VERIFICATION_QUESTION and verification_idx is None:
+                verification_idx = index
+            if signal == SENSITIVE_DISCLOSURE and disclosure_idx is None:
+                disclosure_idx = index
+            if signal in {IDENTITY_CONFIRMATION, WRONG_PARTY_SIGNAL, THIRD_PARTY_SIGNAL}:
+                callee_signals.append(signal)
+
+    if WRONG_PARTY_SIGNAL in callee_signals:
+        status = "WRONG_PARTY"
+    elif IDENTITY_CONFIRMATION in callee_signals:
+        status = "CONFIRMED"
+    elif THIRD_PARTY_SIGNAL in callee_signals:
+        status = "THIRD_PARTY_PRESENT"
+    else:
+        status = "UNVERIFIED"
+
+    card["evidence"] = evidence
+    card["right_party_status"] = status
+    card["verification_before_disclosure"] = verification_idx is not None and (
+        disclosure_idx is None or verification_idx < disclosure_idx
+    )
+    disclosure_violation = disclosure_idx is not None and not card["verification_before_disclosure"]
+
+    if status == "CONFIRMED":
+        action = "proceed" if card["verification_before_disclosure"] else "human_review"
+    elif status == "WRONG_PARTY":
+        action = "human_review" if disclosure_violation else "stop_and_retry_with_script"
+    elif status == "THIRD_PARTY_PRESENT":
+        action = "stop_and_retry_with_script"
+    else:
+        action = "human_review"
+
+    guidance_map = {
+        "proceed": PROCEED_GUIDANCE,
+        "stop_and_retry_with_script": VERIFICATION_FIRST_GOAL,
+        "human_review": HUMAN_REVIEW_GUIDANCE,
+    }
+    card["recommended_action"] = {"action": action, "guidance": guidance_map[action]}
+    return card
 
 
 def craft_goal(scenario: str, language: str | None = None) -> dict[str, Any]:  # pragma: no cover

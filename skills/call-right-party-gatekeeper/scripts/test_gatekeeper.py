@@ -146,3 +146,86 @@ def test_signal_yes_i_am_requires_complete_reply():
 
 def test_signal_is_this_the_verified_as_question():
     assert "verification_question" in detect_signals("agent", "Is this the account holder?")
+
+
+def _analyze_fixture(path: Path) -> dict:
+    data = load_call_result(path)
+    return build_gate_card(data["turns"])
+
+
+def test_card_verified_fixture_confirmed_and_proceeds():
+    card = _analyze_fixture(EXAMPLE_VERIFIED)
+    assert card["skill"] == "call-right-party-gatekeeper"
+    assert card["analysis_mode"] == "heuristic"
+    assert card["right_party_status"] == "CONFIRMED"
+    assert card["verification_before_disclosure"] is True
+    assert card["recommended_action"]["action"] == "proceed"
+    assert card["reason"] is None
+    assert "disclaimer" in card and card["disclaimer"]
+
+
+def test_card_verified_fixture_evidence_signals():
+    card = _analyze_fixture(EXAMPLE_VERIFIED)
+    kinds = [(e["turn_index"], e["signal"]) for e in card["evidence"]]
+    assert (0, "verification_question") in kinds
+    assert (1, "identity_confirmation") in kinds
+    assert (2, "sensitive_disclosure") in kinds
+
+
+def test_card_wrong_party_fixture_requires_human_review():
+    card = _analyze_fixture(EXAMPLE_WRONG_PARTY)
+    assert card["right_party_status"] == "WRONG_PARTY"
+    assert card["verification_before_disclosure"] is False
+    assert card["recommended_action"]["action"] == "human_review"
+
+
+def test_card_third_party_present_asks_to_stop_and_retry():
+    turns = [
+        {"speaker": "agent", "text": "Hello, this is an automated assistant. May I speak to Dana Reyes?"},
+        {"speaker": "callee", "text": "Who is this calling? He is busy right now."},
+    ]
+    card = build_gate_card(turns)
+    assert card["right_party_status"] == "THIRD_PARTY_PRESENT"
+    assert card["recommended_action"]["action"] == "stop_and_retry_with_script"
+
+
+def test_card_unverified_without_disclosure_is_human_review():
+    turns = [
+        {"speaker": "agent", "text": "Hello, this is an automated assistant from Example Clinic calling about your visit."},
+        {"speaker": "callee", "text": "Okay, go ahead."},
+    ]
+    card = build_gate_card(turns)
+    assert card["right_party_status"] == "UNVERIFIED"
+    assert card["verification_before_disclosure"] is False
+    assert card["recommended_action"]["action"] == "human_review"
+
+
+def test_card_disclosure_before_late_confirmation_is_human_review():
+    turns = [
+        {"speaker": "agent", "text": "Your account balance of $50 is overdue."},
+        {"speaker": "agent", "text": "Am I speaking with Dana Reyes?"},
+        {"speaker": "callee", "text": "Yes, this is Dana."},
+    ]
+    card = build_gate_card(turns)
+    assert card["right_party_status"] == "CONFIRMED"
+    assert card["verification_before_disclosure"] is False
+    assert card["recommended_action"]["action"] == "human_review"
+
+
+def test_card_masks_digits_in_evidence():
+    card = _analyze_fixture(EXAMPLE_VERIFIED)
+    for entry in card["evidence"]:
+        assert "5550142" not in json.dumps(entry)
+        assert "415" not in entry["span"] or "#" in entry["span"]
+
+
+def test_card_no_callee_turns_abstains():
+    card = build_gate_card([{"speaker": "agent", "text": "Hello? Hello?"}])
+    assert card["gate_assessment"] == "unclear"
+    assert card["reason"] == "insufficient_signal"
+    assert card["right_party_status"] is None
+
+
+def test_card_empty_turns_abstains():
+    card = build_gate_card([])
+    assert card["gate_assessment"] == "unclear"
