@@ -120,6 +120,7 @@ This project is an awesome list for AI-agent phone-call workflows. Add resources
 
 ### Skills
 
+- [`longitudinal-cognitive-decline-tracker`](skills/longitudinal-cognitive-decline-tracker/) - Offline experimental pause-duration trends from synthetic call metadata for human review, not cognitive assessment or diagnosis.
 
 - [`call-emotional-contagion-monitor`](skills/call-emotional-contagion-monitor/) - Offline experimental keyword-based transcript review with suggested de-escalation prompts, without altering live calls or guaranteeing behavior.
 - [`call-synthetic-counterparty-detector`](skills/call-synthetic-counterparty-detector/) - Offline experimental pattern checks on supplied call metadata; advisory only, with no identity certification or live protocol switching.
