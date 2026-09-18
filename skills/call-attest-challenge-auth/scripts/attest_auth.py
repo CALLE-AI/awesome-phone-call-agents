@@ -88,9 +88,6 @@ def load_call_result(path: Path) -> dict[str, Any]:
     }
 
 
-# Added in Task 3 to keep the planned import surface importable; Tasks 4-6
-# replace each stub with its real implementation.
-
 COLORS = ("BLUE", "RED", "GREEN", "ORANGE", "WHITE", "BLACK", "YELLOW", "PURPLE")
 NUMBER_WORDS = ("ZERO", "ONE", "TWO", "THREE", "FOUR", "FIVE", "SIX", "SEVEN", "EIGHT", "NINE")
 
@@ -277,5 +274,47 @@ def build_attestation_card(
     return card
 
 
-def craft_goal(scenario: str, language: str | None = None, nonce: str | None = None, secret_env: str = "CALL_ATTEST_SECRET") -> dict[str, Any]:  # pragma: no cover
-    raise NotImplementedError
+CRAFT_SCENARIOS = {"attestation-call"}
+
+
+def craft_goal(
+    scenario: str,
+    language: str | None = None,
+    nonce: str | None = None,
+    secret_env: str = "CALL_ATTEST_SECRET",
+) -> dict[str, Any]:
+    """Emit a one-time spoken challenge and the plan_call goal that uses it."""
+    if scenario not in CRAFT_SCENARIOS:
+        raise ValueError(f"unknown scenario: {scenario!r}; expected one of {sorted(CRAFT_SCENARIOS)}")
+    secret = os.environ.get(secret_env, "")
+    if not secret:
+        raise ValueError(f"secret environment variable {secret_env!r} is not set; refusing to derive a code")
+    challenge_nonce = nonce or secrets.token_hex(3)
+    code = derive_code(secret, challenge_nonce)
+    goal = (
+        "You are an automated assistant placing a machine-to-machine "
+        "coordination check with another automated assistant. Identify "
+        "yourself as an automated assistant, then say exactly: "
+        f"'Coordination check. My word is {challenge_nonce}. Please reply "
+        "with the response code.' Wait for their reply without "
+        "interrupting. After they reply, thank them and state the purpose "
+        "of your call in one sentence. If they do not reply with a code "
+        "after two attempts, end the call politely without disclosing "
+        "anything."
+    )
+    return {
+        "skill": "call-attest-challenge-auth",
+        "mode": "craft",
+        "scenario": scenario,
+        "language": language or "en",
+        "nonce": challenge_nonce,
+        "goal": goal,
+        "expected_response": {
+            "code": code,
+            "note": "Keep this locally and pass it to verify; do not disclose it in the goal or the call.",
+        },
+        "notes": [
+            "Heuristic skill: this template is a starting point; adapt wording to the case.",
+            "Use fictional +1 555-01xx numbers for any test calls.",
+        ],
+    }
