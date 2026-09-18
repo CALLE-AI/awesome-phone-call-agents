@@ -1,20 +1,16 @@
 ---
 name: call-emotional-contagion-monitor
-description: Tracks transcript sentiment during a phone call to detect alignment bias and emotional mirroring, preventing LLMs from escalating negative callee emotions.
+description: Offline experimental keyword-based transcript review with suggested de-escalation prompts, without altering live calls or guaranteeing behavior.
 version: 1.0.0
 ---
 
 # Emotional Contagion Monitor
 
-This skill analyzes post-call transcripts to ensure the AI agent adheres to de-escalation protocols and does not succumb to "emotional contagion" when faced with an aggressive or highly emotional human caller.
+This skill checks supplied post-call transcripts using a small lexicon and suggests prompt changes for human review. It does not apply those changes, measure internal emotions, or guarantee de-escalation.
 
-## Scientific Foundation
+## Research Scope
 
-| Paper / Framework | Relevance |
-|---|---|
-| **Chain-of-Affective Dynamics (LLMs-CoA)** | Demonstrates that LLMs maintain internal affective states that can be influenced by negative sustained inputs, leading to breakdown of guardrails. |
-| **Emergent Emotional Contagion in AI** | Shows how affect propagates in AI interactions (EmotionBench tests). |
-| **Crisis De-escalation Metrics** | By tracking `Callee_Arousal` against `Agent_Valence`, we can mathematically detect points where the agent's professionalism breaks down. |
+Related literature is background inspiration, not validation of the prototype or its thresholds. See [research scope](references/research-papers.md). The scores are keyword heuristics, not calibrated measures of professionalism.
 
 ## Background
 
@@ -45,6 +41,8 @@ Current generation LLMs have an inherent "alignment bias" where they tend to mir
 | `valence_threshold` | `0.60` | `0.40 - 0.80` | Threshold below which agent is considered defensive/unprofessional. |
 
 ## Expected Outcomes & Metrics
+
+The following numbers are unvalidated design targets, not measured results.
 
 | Metric | Target | Notes |
 |---|---|---|
