@@ -574,3 +574,5 @@ Out of scope:
 ## License
 
 MIT. See [`LICENSE`](LICENSE).
+
+- [CampusPaws(CanineGuard Radar)](https://github.com/piyushmalhan2007-code/dogs-finder-in-campus): Emergency animal reporting skill.
