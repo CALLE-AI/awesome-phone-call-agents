@@ -91,21 +91,73 @@ def load_call_result(path: Path) -> dict[str, Any]:
 # Added in Task 3 to keep the planned import surface importable; Tasks 4-6
 # replace each stub with its real implementation.
 
+COLORS = ("BLUE", "RED", "GREEN", "ORANGE", "WHITE", "BLACK", "YELLOW", "PURPLE")
+NUMBER_WORDS = ("ZERO", "ONE", "TWO", "THREE", "FOUR", "FIVE", "SIX", "SEVEN", "EIGHT", "NINE")
 
-def derive_code(secret: str, nonce: str) -> list[str]:  # pragma: no cover
-    raise NotImplementedError
+_CONFUSABLES = {
+    "FOR": "FOUR",
+    "FORE": "FOUR",
+    "TO": "TWO",
+    "TOO": "TWO",
+    "WON": "ONE",
+    "ATE": "EIGHT",
+    "TREE": "THREE",
+}
+_DIGIT_WORDS = {str(i): word for i, word in enumerate(NUMBER_WORDS)}
 
 
-def _normalize_tokens(text: str) -> list[str]:  # pragma: no cover
-    raise NotImplementedError
+def derive_code(secret: str, nonce: str) -> list[str]:
+    """Derive the 4-token spoken code from HMAC-SHA256(secret, nonce)."""
+    digest = hmac.new(secret.encode("utf-8"), nonce.encode("utf-8"), hashlib.sha256).digest()
+    value = int.from_bytes(digest[:8], "big")
+    return [
+        COLORS[value % len(COLORS)],
+        COLORS[(value // len(COLORS)) % len(COLORS)],
+        NUMBER_WORDS[(value // (len(COLORS) * len(COLORS))) % len(NUMBER_WORDS)],
+        f"{(value // (len(COLORS) * len(COLORS) * len(NUMBER_WORDS))) % 100:02d}",
+    ]
 
 
-def _levenshtein(a: str, b: str) -> int:  # pragma: no cover
-    raise NotImplementedError
+def _normalize_tokens(text: str) -> list[str]:
+    """Uppercase alnum tokens; digit strings expand to digit words; confusables fold."""
+    tokens: list[str] = []
+    for raw in re.findall(r"[A-Z0-9]+", str(text).upper()):
+        if raw.isdigit():
+            tokens.extend(_DIGIT_WORDS[ch] for ch in raw)
+        else:
+            tokens.append(_CONFUSABLES.get(raw, raw))
+    return tokens
 
 
-def _match_response(expected: list[str], heard: list[str]) -> bool:  # pragma: no cover
-    raise NotImplementedError
+def _levenshtein(a: str, b: str) -> int:
+    """Classic dynamic-programming edit distance."""
+    if len(a) < len(b):
+        a, b = b, a
+    previous = list(range(len(b) + 1))
+    for i, char_a in enumerate(a, start=1):
+        current = [i]
+        for j, char_b in enumerate(b, start=1):
+            current.append(
+                min(
+                    previous[j] + 1,
+                    current[j - 1] + 1,
+                    previous[j - 1] + (char_a != char_b),
+                )
+            )
+        previous = current
+    return previous[-1]
+
+
+def _match_response(expected: list[str], heard: list[str], max_edit: int = 1) -> bool:
+    """True when expected appears in heard, in order, each pair within max_edit."""
+    i = 0
+    for exp in expected:
+        while i < len(heard) and _levenshtein(exp, heard[i]) > max_edit:
+            i += 1
+        if i >= len(heard):
+            return False
+        i += 1
+    return True
 
 
 def build_attestation_card(turns: list[dict[str, str]], nonce: str, expected_code: str, ledger_path: Path | None = None) -> dict[str, Any]:  # pragma: no cover

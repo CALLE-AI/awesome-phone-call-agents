@@ -9,6 +9,7 @@ Run:
 from __future__ import annotations
 
 import json
+import re
 import subprocess
 import sys
 import tempfile
@@ -87,3 +88,57 @@ def test_mask_separators_count_toward_one_run():
 
 def test_mask_trailing_separator_not_part_of_run():
     assert mask_pii("num 5550155, please") == "num #####55, please"
+
+
+def test_derive_code_deterministic():
+    assert derive_code("s3cret", "4f2a91") == derive_code("s3cret", "4f2a91")
+
+
+def test_derive_code_nonce_sensitive():
+    assert derive_code("s3cret", "4f2a91") != derive_code("s3cret", "4f2a92")
+
+
+def test_derive_code_format():
+    from attest_auth import COLORS, NUMBER_WORDS
+    code = derive_code("s3cret", "4f2a91")
+    assert len(code) == 4
+    assert code[0] in COLORS
+    assert code[1] in COLORS
+    assert code[2] in NUMBER_WORDS
+    assert re.fullmatch(r"[0-9]{2}", code[3])
+
+
+def test_normalize_expands_digit_strings():
+    assert _normalize_tokens("42") == ["FOUR", "TWO"]
+
+
+def test_normalize_confusables():
+    assert _normalize_tokens("FOR") == ["FOUR"]
+    assert _normalize_tokens("blue, orange TOO") == ["BLUE", "ORANGE", "TWO"]
+
+
+def test_levenshtein_distances():
+    assert _levenshtein("FOUR", "FOUR") == 0
+    assert _levenshtein("FOUR", "FOR") == 1
+    assert _levenshtein("BLUE", "BLEU") == 2
+
+
+def test_match_response_exact():
+    expected = _normalize_tokens("BLUE ORANGE SEVEN 42")
+    assert _match_response(expected, _normalize_tokens("BLUE ORANGE SEVEN 42")) is True
+
+
+def test_match_response_fuzzy_one_edit():
+    expected = _normalize_tokens("BLUE ORANGE SEVEN 42")
+    assert _match_response(expected, _normalize_tokens("BLUE ORANJE SEVEN FOUR TWO")) is True
+
+
+def test_match_response_wrong_code_fails():
+    expected = _normalize_tokens("BLUE ORANGE SEVEN 42")
+    assert _match_response(expected, _normalize_tokens("RED APPLE FIVE 99")) is False
+
+
+def test_match_response_order_and_extras():
+    expected = _normalize_tokens("BLUE ORANGE SEVEN 42")
+    assert _match_response(expected, _normalize_tokens("OK BLUE PLEASE ORANGE SEVEN FOUR TWO")) is True
+    assert _match_response(expected, _normalize_tokens("ORANGE BLUE SEVEN FOUR TWO")) is False
