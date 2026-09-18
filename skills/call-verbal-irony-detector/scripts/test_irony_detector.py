@@ -123,3 +123,20 @@ def test_score_positive_without_complaint_context_not_flagged():
 def test_score_negative_only_turn_not_irony():
     result = score_turn("This is terrible service.", "My refund was late again.")
     assert result.score == 0
+
+
+def test_thanks_a_lot_without_complaint_not_scored():
+    result = score_turn("Thanks a lot for your help.", "")
+    assert result.score == 0
+
+
+def test_best_ever_sincere_not_scored():
+    result = score_turn("That is the best service I have ever had.", "")
+    assert result.score == 0
+
+
+def test_thanks_a_lot_after_complaint_is_irony():
+    result = score_turn("Thanks a lot.", "You cancelled it and I waited twice.")
+    assert result.score == 3
+    assert "thanks_a_lot" in result.rules
+    assert "context_contrast" in result.rules

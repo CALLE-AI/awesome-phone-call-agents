@@ -76,21 +76,27 @@ def load_call_result(path: Path) -> dict[str, Any]:
     }
 
 
-# Lexicons. Rule A: an irony marker is a positive-sounding phrase that is
-# routinely used to express the opposite in complaint contexts. Rule B
-# (context_contrast): a positive-word turn preceded by complaint vocabulary
-# earlier in the call. Scores: 2 per marker (capped at 4), +1 contrast bonus.
+# Lexicons. Rule A: a strong irony marker is a positive-sounding phrase that
+# is routinely used to express the opposite ("oh great", "just perfect").
+# Weak markers ("thanks a lot", "best ... ever") are routinely sincere, so
+# they only score when the complaint-context contrast rule also fires
+# (Rule B). Scores: 2 per counted marker (capped at 4), +1 contrast bonus.
 IRONY_MARKERS: list[tuple[str, str]] = [
     ("oh_great", r"\boh,? great\b"),
     ("just_perfect", r"\bjust perfect\b"),
     ("great_just_great", r"\bgreat,? just great\b"),
-    ("thanks_a_lot", r"\bthanks a lot\b"),
     ("yeah_right", r"\byeah,? right\b"),
     ("oh_brilliant", r"\boh,? (?:brilliant|fantastic|wonderful)\b"),
     ("sure_why_not", r"\bsure,? why not\b"),
-    ("best_ever", r"\bbest\b.{0,20}\bever\b"),
     ("what_a_surprise", r"\bwhat a (?:surprise|treat|joy)\b"),
     ("love_that_when", r"\b(?:i )?love (?:that|it) when\b"),
+]
+
+# Routinely sincere markers: count only alongside a complaint-context
+# contrast (see score_turn).
+WEAK_MARKERS: list[tuple[str, str]] = [
+    ("thanks_a_lot", r"\bthanks a lot\b"),
+    ("best_ever", r"\bbest\b.{0,20}\bever\b"),
 ]
 
 _COMPLAINT_RE = re.compile(
@@ -117,12 +123,16 @@ def score_turn(turn_text: str, context_before: str) -> TurnScore:
     """Score one callee turn for verbal irony.
 
     context_before is the concatenated earlier turn text of the call.
+    Weak markers only count when the contrast rule fires, so sincere
+    gratitude in a neutral conversation stays at zero.
     """
-    matched = [name for name, pattern in IRONY_MARKERS if re.search(pattern, turn_text, re.IGNORECASE)]
+    strong = [name for name, pattern in IRONY_MARKERS if re.search(pattern, turn_text, re.IGNORECASE)]
+    weak = [name for name, pattern in WEAK_MARKERS if re.search(pattern, turn_text, re.IGNORECASE)]
     contrast = bool(
         _COMPLAINT_RE.search(context_before)
-        and _POSITIVE_RE.search(turn_text)
+        and (_POSITIVE_RE.search(turn_text) or bool(weak))
     )
+    matched = strong + (weak if contrast else [])
     score = min(2 * len(matched), 4)
     if contrast:
         score += 1
