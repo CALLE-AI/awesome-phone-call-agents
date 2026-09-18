@@ -39,7 +39,7 @@ def _write_result(tmp: Path, payload: dict) -> Path:
 
 def test_load_list_of_turns_nested_result():
     data = load_call_result(EXAMPLE_RELAY)
-    assert data["status"] == "COMPLETED"
+    assert data["status"] == "completed"
     assert data["turns"][0]["speaker"] == "agent"
     assert "Maria Lopez" in data["turns"][0]["text"]
 
