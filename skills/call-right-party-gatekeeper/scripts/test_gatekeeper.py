@@ -345,3 +345,64 @@ def _main() -> int:
 
 if __name__ == "__main__":
     raise SystemExit(_main())
+
+
+def test_load_number_transcript_yields_no_turns():
+    with tempfile.TemporaryDirectory() as td:
+        p = _write_result(Path(td), {"status": "completed", "transcript": 42})
+        assert load_call_result(p)["turns"] == []
+
+
+def test_load_whitespace_only_string_transcript_yields_no_turns():
+    with tempfile.TemporaryDirectory() as td:
+        p = _write_result(Path(td), {"status": "completed", "transcript": "   "})
+        assert load_call_result(p)["turns"] == []
+
+
+def test_load_mixed_list_skips_non_dict_and_defaults_missing_text():
+    with tempfile.TemporaryDirectory() as td:
+        p = _write_result(Path(td), {
+            "status": "completed",
+            "transcript": [{"speaker": "CALLEE", "text": "hi"}, "junk", {"speaker": "agent"}, 5],
+        })
+        data = load_call_result(p)
+    assert data["turns"] == [
+        {"speaker": "CALLEE", "text": "hi"},
+        {"speaker": "agent", "text": ""},
+    ]
+
+
+def test_card_wrong_party_without_disclosure_stops_and_retries():
+    turns = [
+        {"speaker": "agent", "text": "Hello, this is an automated assistant. May I speak to Dana Reyes?"},
+        {"speaker": "callee", "text": "Sorry, you have the wrong number."},
+    ]
+    card = build_gate_card(turns)
+    assert card["right_party_status"] == "WRONG_PARTY"
+    assert card["verification_before_disclosure"] is True
+    assert card["recommended_action"]["action"] == "stop_and_retry_with_script"
+
+
+def test_card_third_party_then_confirmation_becomes_confirmed():
+    turns = [
+        {"speaker": "agent", "text": "Hello, this is an automated assistant. May I speak to Dana Reyes?"},
+        {"speaker": "callee", "text": "Who is this calling?"},
+        {"speaker": "agent", "text": "I am an assistant from Example Clinic."},
+        {"speaker": "callee", "text": "Yes, this is Dana."},
+    ]
+    card = build_gate_card(turns)
+    assert card["right_party_status"] == "CONFIRMED"
+    assert card["verification_before_disclosure"] is True
+    assert card["recommended_action"]["action"] == "proceed"
+
+
+def test_card_disclosure_then_question_no_confirmation_is_unverified_review():
+    turns = [
+        {"speaker": "agent", "text": "Your account balance of $50 is overdue."},
+        {"speaker": "agent", "text": "Am I speaking with Dana Reyes?"},
+        {"speaker": "callee", "text": "Maybe, who wants to know?"},
+    ]
+    card = build_gate_card(turns)
+    assert card["right_party_status"] == "UNVERIFIED"
+    assert card["verification_before_disclosure"] is False
+    assert card["recommended_action"]["action"] == "human_review"
