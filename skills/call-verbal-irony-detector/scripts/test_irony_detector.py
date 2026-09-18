@@ -87,3 +87,39 @@ def test_mask_separators_count_toward_one_run():
 
 def test_mask_trailing_separator_not_part_of_run():
     assert mask_pii("num 5550100, please") == "num #####00, please"
+
+
+def test_score_direct_marker_positive_after_complaint():
+    context = "You cancelled it and I waited 40 minutes on hold."
+    result = score_turn("Oh, great. Just perfect.", context)
+    assert result.score >= 3
+    assert "oh_great" in result.rules
+    assert result.context_contrast is True
+
+
+def test_score_multiple_markers_cap_at_four():
+    result = score_turn("Oh, great, just perfect, yeah right.", "")
+    assert result.score == 4
+
+
+def test_score_contrast_rule_positive_after_complaint():
+    result = score_turn("Great, thanks for that.", "My refund was late again.")
+    assert result.score == 1
+    assert result.context_contrast is True
+    assert "context_contrast" in result.rules
+
+
+def test_score_contrast_requires_positive_word():
+    result = score_turn("Still no refund then.", "My refund was late again.")
+    assert result.score == 0
+    assert result.context_contrast is False
+
+
+def test_score_positive_without_complaint_context_not_flagged():
+    result = score_turn("Great, thank you for sorting that out.", "Your appointment is on Tuesday.")
+    assert result.score == 0
+
+
+def test_score_negative_only_turn_not_irony():
+    result = score_turn("This is terrible service.", "My refund was late again.")
+    assert result.score == 0

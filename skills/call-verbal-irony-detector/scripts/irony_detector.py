@@ -76,12 +76,63 @@ def load_call_result(path: Path) -> dict[str, Any]:
     }
 
 
-# Added in Task 2 to keep the planned import surface importable; Tasks 3-6
-# replace each stub with its real implementation.
+# Lexicons. Rule A: an irony marker is a positive-sounding phrase that is
+# routinely used to express the opposite in complaint contexts. Rule B
+# (context_contrast): a positive-word turn preceded by complaint vocabulary
+# earlier in the call. Scores: 2 per marker (capped at 4), +1 contrast bonus.
+IRONY_MARKERS: list[tuple[str, str]] = [
+    ("oh_great", r"\boh,? great\b"),
+    ("just_perfect", r"\bjust perfect\b"),
+    ("great_just_great", r"\bgreat,? just great\b"),
+    ("thanks_a_lot", r"\bthanks a lot\b"),
+    ("yeah_right", r"\byeah,? right\b"),
+    ("oh_brilliant", r"\boh,? (?:brilliant|fantastic|wonderful)\b"),
+    ("sure_why_not", r"\bsure,? why not\b"),
+    ("best_ever", r"\bbest\b.{0,20}\bever\b"),
+    ("what_a_surprise", r"\bwhat a (?:surprise|treat|joy)\b"),
+    ("love_that_when", r"\b(?:i )?love (?:that|it) when\b"),
+]
+
+_COMPLAINT_RE = re.compile(
+    r"\b(cancel{1,2}ed?|refund|late|broken|wasted?|on hold|third time|"
+    r"useless|charged?|error|wrong|complaint|waited)\b",
+    re.IGNORECASE,
+)
+_POSITIVE_RE = re.compile(
+    r"\b(good|great|thanks|thank you|perfect|wonderful|fantastic|brilliant|appreciate)\b",
+    re.IGNORECASE,
+)
 
 
-def score_turn(turn_text: str, context_before: str) -> Any:  # pragma: no cover
-    raise NotImplementedError
+class TurnScore:
+    """Score of one callee turn against the irony rules."""
+
+    def __init__(self, score: int, rules: list[str], context_contrast: bool) -> None:
+        self.score = score
+        self.rules = rules
+        self.context_contrast = context_contrast
+
+
+def score_turn(turn_text: str, context_before: str) -> TurnScore:
+    """Score one callee turn for verbal irony.
+
+    context_before is the concatenated earlier turn text of the call.
+    """
+    matched = [name for name, pattern in IRONY_MARKERS if re.search(pattern, turn_text, re.IGNORECASE)]
+    contrast = bool(
+        _COMPLAINT_RE.search(context_before)
+        and _POSITIVE_RE.search(turn_text)
+    )
+    score = min(2 * len(matched), 4)
+    if contrast:
+        score += 1
+    rules = list(matched)
+    if contrast:
+        rules.append("context_contrast")
+    return TurnScore(score=score, rules=rules, context_contrast=contrast)
+
+
+# Remaining stubs; later tasks replace each with its real implementation.
 
 
 def analyze_turns(turns: list[dict[str, str]]) -> dict[str, Any]:  # pragma: no cover
