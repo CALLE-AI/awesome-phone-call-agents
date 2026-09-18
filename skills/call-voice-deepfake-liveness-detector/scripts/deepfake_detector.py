@@ -2,8 +2,9 @@
 call-voice-deepfake-liveness-detector
 Core acoustic liveness analysis engine.
 
-Detects AI-synthesized (deepfaked) voices during inbound phone calls by computing
-a multi-feature liveness score from acoustic properties of the audio stream.
+Offline experimental scoring of supplied numeric acoustic features.
+Returns illustrative review labels; no audio extraction, identity verification,
+call blocking, or benchmark validation is implemented here.
 
 Scientific basis:
   - ASVspoof 2021 (IEEE/ACM TASLP 2023): DOI 10.1109/TASLP.2023.3285283
@@ -52,7 +53,7 @@ class LivenessResult:
     recommended_action: str
 
 
-# Thresholds calibrated against ASVspoof 2021 evaluation benchmarks
+# Illustrative thresholds, not validated against ASVspoof or NIST benchmarks
 SYNTHETIC_THRESHOLD = 0.35          # Below this → flag as synthetic
 HUMAN_THRESHOLD = 0.70              # Above this → confident human
 MIN_QUALITY_NOISE_DB = -80.0        # Below this noise floor → audio too clean, suspicious

@@ -17,11 +17,11 @@
 3. **FTC Voice Cloning Challenge — Winners Announced April 2024**
    - **Publication**: U.S. Federal Trade Commission Official Press Release, April 2024
    - **URL**: https://www.ftc.gov/news-events/news/press-releases/2024/04/ftc-announces-winners-voice-cloning-challenge
-   - **Relevance**: Official regulatory acknowledgement of the voice cloning threat. Validates the practical need for this skill. Winning solutions (including Pindrop's real-time detection and DeFake's watermarking approach) directly inform the architectural design of this skill.
+   - **Relevance**: Background on voice-cloning risks and distinct mitigation approaches. DeFake uses adversarial distortion to resist cloning, not watermarking; these projects do not validate this local scorer.
 
 4. **NIST Speaker Recognition Evaluation (SRE) Program**
    - **URL**: https://sre.nist.gov
-   - **Relevance**: NIST's ongoing evaluation framework for speaker recognition systems, providing standardized test corpora and performance benchmarks that this skill's liveness scoring model is validated against.
+   - **Relevance**: Background on speaker-recognition evaluation. This contribution does not establish validation against NIST corpora.
 
 ## Supporting Literature
 
@@ -29,6 +29,4 @@
    - **DOI**: https://doi.org/10.48550/arXiv.2109.00537
    - **Relevance**: Provides the taxonomy of attack types (A01–A19 TTS systems, V01–V06 VC systems) that defines the threat model for this skill's feature extraction design.
 
-6. **A Comparative Study of Recent Works on Fake Audio Detection** (Survey, 2023)
-   - **URL**: https://arxiv.org/abs/2310.02617
-   - **Relevance**: Comprehensive survey of spectral and temporal features most effective for distinguishing real from AI-generated speech.
+The previously listed arXiv:2310.02617 citation concerned unrelated Mini-EUSO astrophysics and has been removed.

@@ -1,5 +1,7 @@
 # Examples
 
+Fictional integration scenarios, not recorded calls or exact helper outputs. The helper returns numeric heuristic labels only; it never authenticates a person, authorizes a payment, blocks a call, or makes an emergency decision. Use an independently trusted verification channel; do not collect a PIN on an untrusted inbound call.
+
 ## Example 1: CEO / Executive Impersonation Attempt (Fully Synthetic)
 
 **Scenario**: A call arrives from a number spoofed to look like the CEO's mobile. The voice claims to authorize an urgent wire transfer.
@@ -17,7 +19,7 @@
 }
 ```
 
-**Agent Action**: Liveness score `0.21` is well below the `0.35` threshold. The agent does **not** proceed with the wire transfer. It inserts a friction challenge: *"To authorize this transaction, I need to verify your identity. Can you provide your employee PIN and call back on the number registered in our system?"* The event is flagged for the security team.
+**Agent Action**: Liveness score `0.21` is well below the `0.35` threshold. The agent does **not** proceed with the wire transfer. It inserts a friction challenge: *"To authorize this transaction, I need to verify your identity. Please end this call and use your independently verified organizational channel."* The event is flagged for the security team.
 
 ---
 
@@ -33,8 +35,8 @@
   "phase_noise_floor_db": -85.1,
   "pitch_jitter_coefficient": 0.0042,
   "liveness_score": 0.29,
-  "classification": "LIKELY_SYNTHETIC",
-  "confidence": "MEDIUM"
+  "classification": "SYNTHETIC",
+  "confidence": "HIGH"
 }
 ```
 
