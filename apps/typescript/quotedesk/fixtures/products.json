@@ -1,0 +1,23 @@
+{
+  "note": "Product catalog stub. Real inventory/catalog integration is deliberately not built; this JSON stands in for it. Keys are substrings matched against the product URL.",
+  "products": [
+    {
+      "urlContains": "predator-helios-16-ai",
+      "family": "Predator Helios 16 AI",
+      "cpu": "Intel Core Ultra 9 275HX",
+      "gpu": "RTX 5080",
+      "ramGb": 32,
+      "storageGb": 2048,
+      "panel": "OLED 240Hz"
+    },
+    {
+      "urlContains": "rog-strix-scar-18",
+      "family": "ROG Strix Scar 18",
+      "cpu": "Intel Core Ultra 9 275HX",
+      "gpu": "RTX 5090",
+      "ramGb": 64,
+      "storageGb": 4096,
+      "panel": "Mini LED 240Hz"
+    }
+  ]
+}
