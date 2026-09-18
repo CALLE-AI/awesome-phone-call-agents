@@ -1,6 +1,6 @@
 # Customer Churn Rescue — Python Reference App
 
-A small Streamlit reference application demonstrating the `customer-churn-rescue` CALL-E Agent Skill.
+A small Streamlit reference application for policy-bounded customer retention using CALL-E.
 
 ## Purpose
 
@@ -123,12 +123,7 @@ Only synthetic examples are included in the repository. Real call results should
 
 ## Testing
 
-Skill tests do not place phone calls:
 
-```powershell
-cd ..\..\..\..\skills\customer-churn-rescue
-python scripts\self_test.py
-```
 
 Validate the demo result directly:
 
