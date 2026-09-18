@@ -1,5 +1,7 @@
 # Examples
 
+These are fictional design scenarios, not recorded calls or measured outcomes. The helper has no TTS integration or timer. For reproducible numeric behavior, use the source tests. SUPPORT only lowers or holds parameters; any changes over time require a separate host.
+
 ## Example 1: Outbound Sales Call — Low-Energy Prospect Gradually Lifted
 
 **Scenario**: An outbound sales agent calls a prospect. The prospect sounds tired and speaks slowly at ~98 WPM, low pitch (92 Hz average F0), soft energy.
@@ -10,21 +12,21 @@
   "caller_number": "555-0122",
   "caller_features": { "f0_hz": 92.0, "speech_rate_wpm": 98, "rms_energy": 0.18 },
   "agent_features":  { "f0_hz": 145.0, "speech_rate_wpm": 165, "rms_energy": 0.61 },
-  "entrainment_score": 0.41,
-  "status": "LOW_ENTRAINMENT"
+  "entrainment_score": 0.9645,
+  "status": "OPTIMAL"
 }
 ```
 
 **TTS Directive Issued (t=6s)**:
 ```json
 {
-  "pitch_shift_semitones": -2.1,
-  "rate_multiplier": 0.88,
-  "energy_scale": 0.73
+  "pitch_shift_semitones": 0.0,
+  "rate_multiplier": 1.0,
+  "energy_scale": 1.0
 }
 ```
 
-**Result at t=30s**:
+**Hypothetical later host measurement (not produced by the helper)**:
 ```json
 {
   "entrainment_score": 0.79,
@@ -32,7 +34,7 @@
 }
 ```
 
-**Outcome**: The agent's voice is now perceived as warmer and more in sync with the prospect. Their engagement increases — they start asking questions about the product. Call ends with a demo booked.
+**Outcome**: These initial inputs produce an identity directive. No rapport improvement or booked demo follows from the helper's output.
 
 ---
 
@@ -45,7 +47,7 @@
 | Phase | Agent rate | Agent pitch | Entrainment score |
 |---|---|---|---|
 | t=0s (calibrate) | 140 WPM | 140 Hz | — |
-| t=6s (match up) | 155 WPM | 155 Hz (↑ toward caller) | 0.81 |
+| t=6s (hold) | 140 WPM | 140 Hz (no upward matching) | not measured |
 | t=15s (lead down) | 140 WPM | 140 Hz (↓ gradually) | 0.77 |
 | t=30s (settled) | 125 WPM | 128 Hz (↓ further) | 0.83 |
 
@@ -62,7 +64,7 @@
 }
 ```
 
-**Outcome**: By first mirroring the caller's anxious pace (Match) then gradually decelerating (Lead), the agent guides the caller toward a calmer rhythm. The caller's speech rate drops from 175 to 130 WPM over 45 seconds. Intake completed successfully with no call abandonment.
+**Outcome**: SUPPORT never raises pitch or rate. The later downward values illustrate a possible host-controlled sequence, not measured caller calming or a completed healthcare intake.
 
 ---
 

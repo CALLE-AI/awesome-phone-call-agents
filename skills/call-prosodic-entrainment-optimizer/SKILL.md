@@ -1,6 +1,6 @@
 ---
 name: call-prosodic-entrainment-optimizer
-description: A phone-call agent skill that measures real-time vocal entrainment between agent and caller and dynamically adjusts TTS speech parameters to maximize convergence, increasing rapport, trust, and call outcome success rates.
+description: Offline experimental phone-workflow helper that compares supplied prosodic features and suggests bounded TTS parameter changes. Use for synthetic demonstrations and host integration planning.
 version: 1.0.0
 ---
 
@@ -8,9 +8,9 @@ version: 1.0.0
 
 **Vocal entrainment** is the natural, subconscious phenomenon where people synchronize their speech patterns — pitch, pace, rhythm, and intensity — with their conversation partner. This synchronization is one of the most robustly documented proxies for **rapport, trust, and cooperative intent** in human communication, first formalized by Howard Giles' *Communication Accommodation Theory* (1973) and now computationally validated through deep learning (Nasir et al., IEEE TAFFC 2022).
 
-This skill applies this principle directly to AI phone-call agents: it continuously measures the degree of entrainment between caller and agent, and **dynamically injects prosodic parameter deltas into the TTS synthesis engine** to maintain optimal convergence. The result is a caller who feels genuinely heard and mirrored — leading to measurably better CSAT scores, higher conversion rates, and lower early hang-up rates.
+The supplied Python helper is an offline, stateless heuristic over supplied numeric features. It returns a score and suggested TTS deltas; it does not capture audio, inject TTS settings, log adjustments, or measure caller rapport. Audio extraction, timing, consent, and any application of suggestions belong to a separate host integration. It is not a clinical, crisis-response, or financial decision tool.
 
-> No existing skill in this repository operates at the prosodic real-time adaptation layer. This skill fills that gap entirely.
+> Research-inspired prototype: the studies below motivate the design but do not validate this implementation or its outcomes.
 
 ## Scientific Foundation
 
@@ -23,13 +23,13 @@ This skill applies this principle directly to AI phone-call agents: it continuou
 
 ## How It Works
 
-The skill operates as middleware between the ASR layer and TTS synthesis engine:
+A proposed host integration could place this helper between feature extraction and TTS. The shipped helper only computes suggestions:
 
 ### Step 1: Baseline Calibration (first 5 seconds)
-During the first 5-second window, the system collects caller prosodic features without issuing any TTS directive. Status: `CALIBRATING`. This prevents jarring early adjustments before the caller's vocal profile is established.
+The host may set `is_calibrating=True` during a chosen warm-up window. This returns `CALIBRATING` and an identity directive; the helper itself has no clock, feature collection, or automatic five-second calibration.
 
 ### Step 2: Feature Extraction (per 1-second window)
-Three prosodic features are extracted from the caller's audio stream:
+The host must supply three features; no audio extractor is included:
 - **Fundamental Frequency (F0, Hz)**: Perceived pitch — speaker identity and emotional state marker.
 - **Speech Rate (WPM)**: Cognitive load and urgency indicator.
 - **RMS Energy (normalized)**: Loudness and engagement level.
@@ -44,7 +44,7 @@ Cosine similarity is computed between the L2-normalized caller and agent prosodi
 | `entrainment_score` | Status | Action |
 |---|---|---|
 | `>= 0.90` | `OPTIMAL` | **No directive** — back off to avoid over-mirroring |
-| `0.75 – 0.89` | `TARGET_REACHED` | Monitor only — minor drift allowed |
+| `0.75 – 0.89` | `TARGET_REACHED` | Bounded directive may still be returned |
 | `< 0.75` | `LOW_ENTRAINMENT` | Issue `TTSDirective` with bounded parameter deltas |
 | First 5s | `CALIBRATING` | Identity directive — no adjustment |
 
@@ -56,7 +56,7 @@ Cosine similarity is computed between the L2-normalized caller and agent prosodi
 | `rate_multiplier` | Proportional to WPM ratio | [0.80, 1.20] |
 | `energy_scale` | Proportional to RMS energy ratio | [0.70, 1.30] |
 
-All adjustments are capped at **5% movement per 5-second window** to ensure natural-feeling gradual convergence.
+The formula uses a fixed `0.05` fraction of the feature difference, subject to the caps above. This is not a 5% output cap or a time-based rate limit; the host controls invocation timing.
 
 ## Mode Presets
 
@@ -64,17 +64,19 @@ All adjustments are capped at **5% movement per 5-second window** to ensure natu
 |---|---|---|
 | `DEFAULT` | General inbound/outbound | Balanced bidirectional convergence |
 | `SALES` | Outbound sales, lead qualification | Converge toward caller's energy to build rapport |
-| `SUPPORT` | Healthcare, mental health, crisis lines | **Downward-only**: never raises pitch or speeds up; used to de-escalate anxious callers via "Match & Lead" |
+| `SUPPORT` | Synthetic downward-only demonstration | Never raises pitch, rate, or energy; no clinical de-escalation efficacy is established |
 
 ## Key Features
 
-- **Non-intrusive**: Max 5% adjustment per window — gradual shifts are imperceptible to the caller.
+- **Bounded suggestions**: Parameter caps are enforced per invocation; perceptual effects have not been measured.
 - **Anti-over-mirroring**: Backs off automatically at `score >= 0.90` to prevent the "uncanny valley" of identical-sounding voices.
-- **Per-call baseline calibration**: 5-second warm-up window before any directive is issued.
+- **Host-controlled calibration**: `is_calibrating=True` suppresses adjustments.
 - **Fail-safe on zero/silence**: Muted callers, zero-rate speech, and whispering are all handled without crashes or division-by-zero errors.
-- **SUPPORT mode de-escalation**: Implements the evidence-based "Match & Lead" technique — mirror the caller's anxious pace first, then gradually guide them to a calmer rhythm.
+- **SUPPORT mode**: Only holds or lowers pitch, rate, and energy. It does not implement an upward matching phase or establish de-escalation efficacy.
 
 ## Configuration Reference
+
+Source constants and proposed host settings are listed below, not a runtime configuration API. The helper has no window-duration or calibration-duration parameter.
 
 | Parameter | Default | Range | Description |
 |---|---|---|---|
@@ -83,23 +85,25 @@ All adjustments are capped at **5% movement per 5-second window** to ensure natu
 | `MAX_PITCH_DELTA` | `3.0` semitones | `1.0 – 5.0` | Safety cap on pitch adjustment per window |
 | `MAX_RATE_DELTA` | `0.20` (±20%) | `0.10 – 0.30` | Safety cap on rate multiplier delta |
 | `MAX_ENERGY_DELTA` | `0.30` (±30%) | `0.15 – 0.40` | Safety cap on energy scale delta |
-| `step_factor` | `0.05` (5%) | `0.02 – 0.10` | Max convergence movement per window |
+| `step_factor` | `0.05` | Source edit only | Fixed interpolation factor, not an output/time cap |
 | `window_duration_s` | `1.0` | `0.5 – 2.0` | Feature extraction window length |
 | `calibration_duration_s` | `5.0` | `3.0 – 10.0` | Baseline collection period |
 
 ## Expected Outcomes & Metrics
 
-Based on Communication Accommodation Theory literature and prosodic modulation studies:
+The following are design hypotheses or operating targets, not measured outcomes of this helper:
 
 | Metric | Expected Improvement | Notes |
 |---|---|---|
-| CSAT Score | +12–23% | Empirical range from prosodic accommodation studies (arXiv:2109.01775) |
-| Call Abandonment Rate | −15–20% | Entrainment reduces early hang-ups |
-| First Call Resolution (FCR) | +8–12% | Higher rapport → more information disclosed |
+| CSAT Score | Not measured | Requires a separate evaluation |
+| Call Abandonment Rate | Not measured | No outcome improvement is established |
+| First Call Resolution (FCR) | Not measured | No outcome improvement is established |
 | Entrainment Score (avg call) | 0.78 – 0.85 | Target operating range |
 | Directive latency | < 10ms | Synthesis parameter update time |
 
 ## Use Cases
+
+Proposed research contexts only, not validated clinical, crisis-response, sales, or financial deployments:
 
 - **Outbound sales calls**: Mirror the prospect's energy and cadence to build trust before pitching.
 - **Healthcare intake**: Automatically slow pace and lower pitch to match an elderly or anxious caller, reducing cognitive load and improving information capture.
@@ -111,7 +115,7 @@ Based on Communication Accommodation Theory literature and prosodic modulation s
 
 - **Cosine similarity is angle-based**: Features that point in the same direction in feature space can score high even with different magnitudes. This is expected behavior — the system is measuring *style* convergence, not *energy* matching. The energy scale directive handles amplitude alignment separately.
 - **TTS dependency**: The `TTSDirective` output requires a TTS engine that accepts real-time prosodic parameter overrides (e.g., SSML `<prosody>` tags or equivalent API). Not all TTS providers support this.
-- **Non-verbal speakers**: Callers who primarily use short utterances, fillers, or are non-verbal cannot provide stable F0/rate estimates. The system will remain in `CALIBRATING` status for such calls.
+- **Non-verbal speakers**: The host must detect missing/unreliable features and choose whether to keep calibration enabled. The helper does not infer this condition.
 - **Accent diversity**: Threshold calibration must include diverse vocal profiles to prevent systematic bias against non-standard prosodic patterns.
 
 ## Integration
@@ -132,6 +136,6 @@ Based on Communication Accommodation Theory literature and prosodic modulation s
 
 ## References
 
-See [`references/research-papers.md`](references/research-papers.md) for all verified DOI citations.
-See [`references/safety.md`](references/safety.md) for safety, consent, and ISO 42001 compliance guidelines.
+See [`references/research-papers.md`](references/research-papers.md) for research inspiration; citations are not implementation validation.
+See [`references/safety.md`](references/safety.md) for safety and host responsibilities; no ISO conformity is established.
 See [`references/examples.md`](references/examples.md) for end-to-end scenario walkthroughs.

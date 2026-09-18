@@ -5,8 +5,8 @@
 ### 1. Transparent and Bounded Adaptation
 The skill must never make speech adjustments that could be perceived as manipulative or deceptive:
 - **Maximum single-window adjustment**: No single TTS directive may shift pitch by more than 3 semitones, rate by more than 20%, or energy by more than 30%.
-- **Gradual convergence only**: Adjustments are applied incrementally (up to 5% per 5-second window) to ensure natural-feeling evolution rather than sudden shifts.
-- **Audit logging**: Every TTSDirective issued is logged with a timestamp, the triggering entrainment score, and the delta applied. This supports ISO/IEC 42001 transparency requirements.
+- **Host timing**: The helper uses a 0.05 interpolation factor with separate parameter caps. It does not enforce a five-second window or 5% output limit; a host must choose and evaluate an application cadence.
+- **Audit logging**: No logger is included. A future host may log suitably minimized adjustment metadata; this prototype makes no standards-compliance claim.
 
 ### 2. No Emotional Manipulation
 This skill is designed to increase **rapport and comfort**, not to exploit psychological vulnerabilities:

@@ -1,10 +1,10 @@
 """
 call-prosodic-entrainment-optimizer
-Real-time vocal entrainment measurement and TTS directive generation.
+Offline experimental feature comparison and TTS directive suggestion.
 
 Computes cosine similarity between caller and agent prosodic feature vectors,
 and generates TTS parameter deltas to converge agent speech toward the caller's
-prosodic style, improving rapport and call outcome metrics.
+prosodic style. No audio, TTS, timing, logging, or outcome evaluation is included.
 
 Scientific basis:
   - Communication Accommodation Theory (Giles et al., 2023): DOI 10.1016/j.langsci.2023.101571
@@ -135,13 +135,14 @@ def generate_tts_directive(
 ) -> TTSDirective:
     """
     Generates bounded TTS parameter deltas to converge agent speech toward caller.
-    Adjustments are capped at 5% per call to ensure gradual, natural-feeling shifts.
+    Uses a fixed 0.05 interpolation factor and independent parameter caps.
+    This does not enforce a 5% output cap or an elapsed-time window.
     """
     if score >= OPTIMAL_CEILING:
         return TTSDirective()  # No adjustment: already at optimal entrainment
 
     # Compute deltas proportional to the divergence, capped by safety limits
-    step_factor = 0.05  # max 5% movement per window
+    step_factor = 0.05  # interpolation factor; host controls invocation timing
 
     # Pitch: convert Hz delta to semitones
     f0_delta_hz = caller.f0_hz - agent.f0_hz
@@ -185,7 +186,7 @@ def optimize_entrainment(
         caller: Prosodic features extracted from the caller's audio.
         agent: Current prosodic features of the agent's TTS output.
         mode: CallMode preset (SALES, SUPPORT, DEFAULT).
-        is_calibrating: True during the first 5s baseline window.
+        is_calibrating: Host-controlled flag suppressing adjustments; no timer here.
 
     Returns:
         EntrainmentResult containing score, status, and TTSDirective.
