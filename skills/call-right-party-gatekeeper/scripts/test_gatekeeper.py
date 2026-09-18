@@ -87,3 +87,49 @@ def test_mask_separators_count_toward_one_run():
 
 def test_mask_trailing_separator_not_part_of_run():
     assert mask_pii("num 5550142, please") == "num #####42, please"
+
+
+def test_signal_verification_question_detected():
+    signals = detect_signals("agent", "May I speak to Dana Reyes?")
+    assert "verification_question" in signals
+
+
+def test_signal_verification_question_am_i_speaking():
+    signals = detect_signals("agent", "Am I speaking with the account holder?")
+    assert "verification_question" in signals
+
+
+def test_signal_identity_confirmation_variants():
+    assert "identity_confirmation" in detect_signals("callee", "Yes, this is Dana.")
+    assert "identity_confirmation" in detect_signals("callee", "Speaking.")
+    assert "identity_confirmation" in detect_signals("callee", "This is he.")
+
+
+def test_signal_wrong_party_variants():
+    assert "wrong_party_signal" in detect_signals("callee", "Sorry, you have the wrong number.")
+    assert "wrong_party_signal" in detect_signals("callee", "Can I take a message?")
+    assert "wrong_party_signal" in detect_signals("callee", "She is not here right now.")
+
+
+def test_signal_third_party_variants():
+    assert "third_party_signal" in detect_signals("callee", "Who is this calling?")
+    assert "third_party_signal" in detect_signals("callee", "I'm his wife, I can ask him for you.")
+    assert "third_party_signal" in detect_signals("callee", "He is busy right now.")
+
+
+def test_signal_sensitive_disclosure_variants():
+    assert "sensitive_disclosure" in detect_signals("agent", "Your account balance of $84.20 is settled.")
+    assert "sensitive_disclosure" in detect_signals("agent", "We are calling about your invoice.")
+    assert "sensitive_disclosure" in detect_signals("agent", "Can you confirm your date of birth?")
+
+
+def test_signal_no_false_positive_on_plain_turns():
+    assert detect_signals("agent", "Hello, this is an automated assistant from Example Clinic.") == []
+    assert detect_signals("callee", "Great, thank you for letting me know.") == []
+
+
+def test_signal_roles_route_patterns_to_sides():
+    # verification questions only count from the agent side
+    assert detect_signals("callee", "May I speak to Dana?") == []
+    # identity confirmation only counts from the callee side
+    assert detect_signals("agent", "Yes, this is Dana.") == []

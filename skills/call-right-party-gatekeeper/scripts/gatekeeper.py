@@ -78,12 +78,70 @@ def load_call_result(path: Path) -> dict[str, Any]:
     }
 
 
-# Added in Task 3 to keep the planned import surface importable; Tasks 4-6
-# replace each stub with its real implementation.
+# Added in Task 3 to keep the planned import surface importable; Tasks 5-6
+# replace the remaining stubs with their real implementations.
 
 
-def detect_signals(speaker: str, text: str) -> list[str]:  # pragma: no cover
-    raise NotImplementedError
+# Signal vocabulary. Detection is deliberately one-sided: verification
+# questions and sensitive disclosures are agent-side patterns; identity
+# confirmations, wrong-party and third-party indicators are callee-side.
+VERIFICATION_QUESTION = "verification_question"
+IDENTITY_CONFIRMATION = "identity_confirmation"
+WRONG_PARTY_SIGNAL = "wrong_party_signal"
+THIRD_PARTY_SIGNAL = "third_party_signal"
+SENSITIVE_DISCLOSURE = "sensitive_disclosure"
+
+_VERIFICATION_Q_RE = re.compile(
+    r"\b(?:may i (?:speak|talk) (?:to|with)|can i (?:speak|talk) (?:to|with)|"
+    r"am i (?:speaking|talking) (?:to|with)|is this (?:mr|mrs|ms|dr)\b|"
+    r"can you confirm (?:that )?you(?:'re| are)|are you (?:the )?(?:mr|mrs|ms|dr)\b)",
+    re.IGNORECASE,
+)
+_IDENTITY_CONFIRM_RE = re.compile(
+    r"\b(?:yes,? this is|this is (?:he|she)|^speaking\b|yes,? speaking|"
+    r"yes,? i am|that'?s me|i'?m (?:the one|him|her))\b",
+    re.IGNORECASE,
+)
+_WRONG_PARTY_RE = re.compile(
+    r"\b(?:wrong number|you have the wrong|no one by that name|"
+    r"(?:he|she|they) (?:is|are) not (?:here|available|home)|"
+    r"(?:he|she|they) can'?t come to the phone|take a message|"
+    r"not (?:here|available) right now)\b",
+    re.IGNORECASE,
+)
+_THIRD_PARTY_RE = re.compile(
+    r"\b(?:who(?:'s| is) (?:this|calling)|can i (?:ask|tell) (?:him|her|them)|"
+    r"i'?m (?:his|her|their) (?:wife|husband|son|daughter|mother|father|friend|roommate|neighbor)|"
+    r"(?:he|she|they) (?:is|are) (?:busy|at work|asleep|in a meeting)|"
+    r"i'?ll (?:get|go get) (?:him|her|them))\b",
+    re.IGNORECASE,
+)
+_SENSITIVE_RE = re.compile(
+    r"\b(?:account (?:number|balance)|balance (?:of|is)|invoice|"
+    r"prescription|diagnosis|test results?|medical|policy (?:number|details)|"
+    r"claim (?:number|details|status)|date of birth|social security|payment of|"
+    r"(?:amount|total|charge) of)\b|\$\s?[0-9]",
+    re.IGNORECASE,
+)
+
+
+def detect_signals(speaker: str, text: str) -> list[str]:
+    """Return the signal types present in one turn, routed by side."""
+    is_callee = str(speaker).lower().strip() in CALLEE_ROLES
+    signals: list[str] = []
+    if not is_callee:
+        if _VERIFICATION_Q_RE.search(text):
+            signals.append(VERIFICATION_QUESTION)
+        if _SENSITIVE_RE.search(text):
+            signals.append(SENSITIVE_DISCLOSURE)
+    else:
+        if _IDENTITY_CONFIRM_RE.search(text):
+            signals.append(IDENTITY_CONFIRMATION)
+        if _WRONG_PARTY_RE.search(text):
+            signals.append(WRONG_PARTY_SIGNAL)
+        if _THIRD_PARTY_RE.search(text):
+            signals.append(THIRD_PARTY_SIGNAL)
+    return signals
 
 
 def build_gate_card(turns: list[dict[str, str]]) -> dict[str, Any]:  # pragma: no cover
