@@ -1,29 +1,29 @@
 ---
 name: call-acoustic-breath-biomarker-tracker
-description: A telehealth phone-call agent skill that detects dyspnea and respiratory distress from acoustic markers (pause-to-speech ratio) and automatically escalates to a human operator.
+description: Offline nonclinical phone-workflow demonstration over supplied speech/pause durations. Returns illustrative pause-ratio labels, not medical findings or an actual emergency handoff.
 version: 1.0.0
 ---
 
 # Acoustic Breath Biomarker Tracker
 
-This skill enables AI phone-call agents to analyze acoustic properties in real-time during a telehealth conversation to detect potential dyspnea (shortness of breath) or respiratory distress. By measuring the pause-to-speech ratio and detecting abnormal speech deceleration, the agent can interrupt the normal script and immediately trigger an emergency escalation (e.g., transferring to a registered nurse).
+This experimental helper calculates a pause ratio from synthetic, pre-segmented durations. It does not capture audio, run VAD, detect a medical condition, assess patient safety, or execute a handoff. Its `DYSPNEA_DETECTED`, `NORMAL`, and action enums are illustrative legacy labels, not clinical conclusions. Do not use this prototype for patient triage or emergency decisions.
 
 ## Scientific Foundation
 
 | Paper / Framework | Source | Relevance |
 |---|---|---|
 | Detection of Mild Dyspnea from Pairs of Speech Recordings | IEEE ICASSP (2020) | Provides the acoustic feature extraction models for identifying respiratory variations and abnormal pause mechanics. |
-| Biomarkers in respiratory diseases | European Respiratory Review (2019) | Validates physiological mapping of acoustic biomarkers to respiratory failure states. |
-| COVID-19-related voice disorders: a scoping review | PubMed (2023) | Modern acoustic analysis of breathing alterations caused by severe viral respiratory infections. |
+| Biomarkers in respiratory diseases | Breathe editorial (2019) | General background, not validation of pause-ratio clinical inference. |
+| COVID-19-related voice disorders: a scoping review | PubMed (2026) | Background on voice disorders, not validation of this helper. |
 | Software as a Medical Device (SaMD) | FDA (2023) | Regulatory framework for AI algorithms evaluating biological states. |
 
 ## How it works
 
-1. The agent captures the user's speech stream via the microphone.
-2. Voice Activity Detection (VAD) calculates the ratio of silence/pauses versus active speech during the caller's turns.
+1. Supply synthetic `AudioSegment` durations to the helper.
+2. Audio capture and VAD are not included; any future host would provide its own inputs.
 3. The `process_call_stream` function evaluates the extracted segments.
-4. If the caller exhibits a high pause-to-speech ratio (e.g., needing to breathe between every 2-3 words), dyspnea is flagged.
-5. If dyspnea is flagged, the agent halts the default workflow and invokes the emergency handoff skill.
+4. A pause ratio at or above the illustrative threshold selects the legacy `DYSPNEA_DETECTED` enum; it does not establish dyspnea.
+5. `ESCALATE_TO_HUMAN` is returned as a demo label only. No workflow is halted and no nurse transfer or emergency handoff occurs.
 
 ## Decision Matrix
 
@@ -42,6 +42,8 @@ This skill enables AI phone-call agents to analyze acoustic properties in real-t
 
 ## Expected Outcomes & Metrics
 
+The figures below are unvalidated design aspirations, not clinical sensitivity, specificity, or handoff guarantees.
+
 | Metric | Target | Notes |
 |---|---|---|
 | Escalation Latency | < 1 second | Critical for emergency health response. |
@@ -52,12 +54,14 @@ This skill enables AI phone-call agents to analyze acoustic properties in real-t
 
 - **Codec Degradation**: Low-bitrate connections may obscure acoustic pauses or falsely introduce silence gaps (packet loss).
 - **Background Noise**: Heavy environmental noise might be misclassified as speech by VAD, lowering the calculated pause ratio.
-- **Not a Diagnostic Tool**: Acts purely as a triage mechanism, not a medical diagnostic device.
+- **Not a Clinical Tool**: This is not a diagnostic or patient-triage mechanism. Low scores do not establish that a person is safe.
 
-## Use Cases
+## Possible Future Research Contexts
+
+These contexts require separate clinical evaluation and human-governed systems; they are not supported patient-care uses of this prototype.
 - Post-discharge monitoring for COPD or heart failure patients.
 - Daily check-in phone calls for patients with severe asthma.
 - Triage in automated telehealth intake systems.
 
 ## Integration
-This skill runs concurrently with conversational dialogue models. It processes acoustic features decoupled from semantic meaning, ensuring it catches signs of distress even if the user does not explicitly say "I can't breathe."
+No dialogue-model or telephony integration is included. For a future host, this numeric demonstration must not delay human review or override an explicit report of distress.

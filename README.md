@@ -121,7 +121,7 @@ This project is an awesome list for AI-agent phone-call workflows. Add resources
 ### Skills
 
 
-- [`call-acoustic-breath-biomarker-tracker`](skills/call-acoustic-breath-biomarker-tracker/) - Telehealth phone-call agent skill that detects dyspnea and respiratory distress from acoustic markers (pause-to-speech ratio) and automatically escalates to a human operator.
+- [`call-acoustic-breath-biomarker-tracker`](skills/call-acoustic-breath-biomarker-tracker/) - Offline nonclinical demonstration that scores supplied speech/pause durations and returns illustrative review labels; no audio capture, diagnosis, patient triage, or handoff is implemented.
 - [`call-fraud-shield`](skills/call-fraud-shield/) - Post-call fraud detection skill that uses conversational trajectory analysis and a scam archetype library to score transcripts for vishing, spam, social engineering, and scam-script patterns, returning a structured risk card with XAI-explained evidence spans and a recommended action.
 - [`neighbour-welfare-sweep`](skills/neighbour-welfare-sweep/) - Hazard-conditioned welfare-check calls to a registry of at-risk residents during a heat warning, outage or flood: triage the roster against that hazard so calls go out worst-first, compile hazard-critical facts into required CALL-E result-schema fields, treat an unanswered call as a finding that escalates, and stop every responder handoff and ambulance, fire or police dispatch at a named human.
 - [`lesson-language-phone-practice`](skills/lesson-language-phone-practice/) - Consent-gated, lesson-derived phone rehearsal with a one-minute maximum, transcript-bound formative evidence, and no automatic redial.

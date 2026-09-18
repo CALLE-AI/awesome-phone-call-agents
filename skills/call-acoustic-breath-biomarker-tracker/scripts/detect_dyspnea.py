@@ -1,8 +1,9 @@
 """
 call-acoustic-breath-biomarker-tracker
 
-Detects dyspnea and respiratory distress from acoustic markers (pause-to-speech ratio)
-and automatically escalates to a human operator.
+Offline nonclinical pause-ratio demonstration over supplied synthetic segments.
+Legacy clinical-sounding enums are illustrative labels, not medical findings.
+No audio capture, diagnosis, patient triage, or emergency handoff is implemented.
 """
 
 from dataclasses import dataclass

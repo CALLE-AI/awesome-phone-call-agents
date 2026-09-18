@@ -1,5 +1,7 @@
 # Examples
 
+Fictional, synthetic calculations only—not patient records, medical findings, or executed call workflows. Clinical-sounding legacy enum names are illustrative; no transfer or triage action is performed by the helper.
+
 ## Example 1: Healthy Patient Check-in
 The patient speaks fluently without frequent pauses. The pause-to-speech ratio is low.
 
@@ -26,7 +28,7 @@ The patient struggles to complete a sentence: "I... am having... a lot of... che
   "recommended_action": "ESCALATE_TO_HUMAN"
 }
 ```
-**Result**: The agent immediately says: "It sounds like you're having trouble breathing. Please stay on the line, I am transferring you to a clinical nurse right away," and executes the handoff.
+**Result**: The helper returns the illustrative review enum only. It cannot transfer to a nurse; do not promise an executed handoff or use this fixture as patient-care guidance.
 
 ## Example 3: Edge Case — No Audio Data
 The caller is completely silent or the packet loss is so severe that no audio segments are detected.
@@ -40,4 +42,4 @@ The caller is completely silent or the packet loss is so severe that no audio se
   "recommended_action": "INDETERMINATE"
 }
 ```
-**Result**: The agent falls back to semantic checks (e.g., "Are you still there? Can you hear me?") instead of triggering a false positive escalation.
+**Result**: The helper returns `INDETERMINATE` without asking questions or executing an action.
