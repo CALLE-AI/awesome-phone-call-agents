@@ -1,31 +1,33 @@
 ---
 name: call-semantic-phishing-honeybot
-description: An active defense phone call honeybot that engages voice phishers (vishing) to extract Indicators of Compromise (IoCs) and stall attacks.
+description: Offline experimental text-turn helper for phone scam-review demonstrations. Extracts candidate IoCs and suggests bait responses; it does not place, intercept, or answer calls.
 version: 1.0.0
 ---
 
 # Semantic Phishing Honeybot
 
-The `call-semantic-phishing-honeybot` skill is an active cyber-defense tool. Rather than simply blocking known spam numbers, this skill actively engages suspected scammers in conversation, using semantic baiting techniques to extract actionable threat intelligence (IoCs) like cryptocurrency wallets, malicious URLs, and drop-phone numbers.
+The supplied helper uses regex over synthetic transcript text and returns candidate URLs, wallet strings, phone-like strings, and predefined response suggestions. It does not determine that a person is a scammer, operate a call, browse extracted URLs, or send threat reports. Any future engagement must be operator-authorized, bounded, stoppable, and separate from this offline demonstration.
 
 ## Scientific Foundation
 
 | Paper / Concept | Relevance |
 |---|---|
-| **Active Defense & Honeybots (2024)** | Demonstrates that conversational LLMs can keep scammers on the line for an average of 14 minutes, significantly increasing the cost of their operations. |
+| **Active Defense & Honeybots** | Email scam-baiting research motivates this design; it does not establish phone-call duration or effectiveness. |
 | **Social Engineering Taxonomy** | Uses established psychological countermeasures (acting confused, feigning compliance) to trigger the scammer into repeating technical instructions (IoCs). |
 | **Vishing Kill-Chain Analysis** | Targets the "Action/Exploitation" phase of the voice phishing kill chain to capture the final payload (e.g. the Bitcoin wallet). |
 
 ## How it works
 
-1. The bot answers or intercepts a call from a flagged/untrusted number.
-2. It processes the scammer's speech in real-time, using regex and NLP to identify requested actions (e.g. "go to this website" or "send Bitcoin").
+1. Supply a synthetic transcript turn and fictional caller identifier; no call is answered or intercepted.
+2. The helper applies regex to the text to extract candidate indicators.
 3. It dynamically generates a `bait_prompt` tailored to the scammer's current objective:
     - If the scammer wants Bitcoin, the bot feigns ignorance about crypto to drag out the call.
     - If the scammer provides a URL, the bot pretends its antivirus blocked it to gather alternative domains.
-4. Extracted IoCs are logged in the `HoneybotResponse` for threat intelligence sharing.
+4. Candidates are returned in `HoneybotResponse`; they are neither verified nor automatically logged/shared.
 
 ## Expected Outcomes & Metrics
+
+These are unvalidated design targets for a future integration, not measurements or effects of the local helper.
 
 | Metric | Target | Notes |
 |---|---|---|
@@ -34,4 +36,4 @@ The `call-semantic-phishing-honeybot` skill is an active cyber-defense tool. Rat
 
 ## Limitations & Known Constraints
 - **Pattern Matching Limits**: The current IoC extraction relies on basic regex (e.g. base58 for Bitcoin). It may miss newer or obfuscated wallet formats.
-- **Resource Exhaustion**: Running an LLM indefinitely to stall a scammer can incur high token costs.
+- **Integration Boundary**: No LLM or calling loop is included. A future host must impose an operator-controlled stop and duration limit; returned `continue_baiting` is a suggestion, not authority to continue a call.
