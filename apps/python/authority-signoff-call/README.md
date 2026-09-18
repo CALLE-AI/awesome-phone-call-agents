@@ -64,7 +64,7 @@ python cli.py request \
 
 `request` mode is itself safe-by-default: if any of `CALLE_API_KEY`,
 `CALLE_SIGNOFF_PHONE`, or `CALLE_SIGNOFF_ENABLED=true` is missing, it never
-places a call — it prints exactly what it would have said (to stderr) and
+places a call — it prints a contact/credential-masked script preview (to stderr) and
 exits 20. See [`../../../skills/authority-signoff-call/assets/dry-run-example.txt`](../../../skills/authority-signoff-call/assets/dry-run-example.txt)
 for a real captured run of this.
 
@@ -103,7 +103,12 @@ result = await request_signoff_call(
 - Validates `CALLE_SIGNOFF_PHONE` as ASCII E.164 before every real call
   (`validate_e164()`) — a malformed or non-ASCII value is rejected with exit
   code 30, never silently sent to CALL-E. The number is masked (`mask_phone()`)
-  anywhere it could appear in output; never logged or printed raw.
+  in destination logs and phone-bearing task/authority display copies. Known
+  CALL-E key formats and the configured API key are redacted from those copies.
+  Provider failures use a coarse diagnostic without raw exception text or traceback.
+  The private provider task, recipient and idempotency key remain unchanged.
+  This is bounded contact/credential masking, not general-purpose PII anonymization:
+  keep previews private, and never print, log or publish the library's `raw` result.
 - Never places a real call without all three of `CALLE_API_KEY`,
   `CALLE_SIGNOFF_PHONE`, and `CALLE_SIGNOFF_ENABLED=true` explicitly set.
 - A call failure (busy, no answer, timeout, API error) resolves as

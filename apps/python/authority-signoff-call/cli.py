@@ -27,7 +27,7 @@ import argparse
 import asyncio
 import sys
 
-from signoff_call import build_task, request_signoff_call
+from signoff_call import build_task, public_text, request_signoff_call
 
 
 def main() -> int:
@@ -55,9 +55,9 @@ def main() -> int:
             authorizing_tier=args.tier,
             amount=args.amount,
         )
-        print("Would call:", args.authority)
-        print("Call script:")
-        print(task)
+        print("Would call:", public_text(args.authority))
+        print("Call script (masked preview):")
+        print(public_text(task))
         print("\nNo call placed. Nothing here required credentials.")
         return 0
 
@@ -79,12 +79,12 @@ def main() -> int:
     except ValueError as exc:
         # validate_e164() raises here for a malformed CALLE_SIGNOFF_PHONE —
         # str(exc) already masks the number, never print the raw env var.
-        print(f"error: {exc}", file=sys.stderr)
+        print(f"error: {public_text(str(exc))}", file=sys.stderr)
         return 30
 
     if result["dry_run"]:
         print(f"[DRY RUN — {result['dry_run_reason']}] No call placed. Would have said:", file=sys.stderr)
-        print(result["task"], file=sys.stderr)
+        print(public_text(result["task"]), file=sys.stderr)
         return 20
 
     decision = result["decision"]

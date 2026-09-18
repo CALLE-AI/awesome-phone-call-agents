@@ -65,6 +65,9 @@ RESULT_SCHEMA: dict[str, Any] = {
 # stops Python's \d from matching non-ASCII decimal digits (e.g. Arabic-Indic
 # ٠-٩) that would otherwise pass a plain \d check while never being dialable.
 _E164_ASCII_RE = re.compile(r"^\+[1-9]\d{7,14}$", re.ASCII)
+_PHONE_TEXT_RE = re.compile(
+    r"(?<!\w)(?:\+\d[\d ().-]{6,}\d|\(?\d{3}\)?[ .-]\d{3}[ .-]\d{4})(?!\w)"
+)
 
 
 def validate_e164(phone: str) -> str:
@@ -89,6 +92,22 @@ def mask_phone(phone: str) -> str:
     if not value.isascii() or len(value) < 7:
         return "****"
     return value[:3] + ("*" * (len(value) - 6)) + value[-3:]
+
+
+def public_text(value: str) -> str:
+    """Mask contact/credential display copies, never private call inputs.
+
+    This is a bounded output filter, not general-purpose PII anonymization.
+    """
+    text = str(value)
+    key = os.getenv("CALLE_API_KEY")
+    if key:
+        text = text.replace(key, "[credential redacted]")
+    phone = os.getenv("CALLE_SIGNOFF_PHONE", "").strip()
+    if phone:
+        text = text.replace(phone, mask_phone(phone))
+    text = re.sub(r"\b(?:iams_(?:live|test)_|calle_)[A-Za-z0-9_-]+\b", "[credential redacted]", text)
+    return _PHONE_TEXT_RE.sub(lambda match: mask_phone(match.group()), text)
 
 
 def _dry_run_reason() -> str | None:
@@ -146,7 +165,9 @@ async def request_signoff_call(
 ) -> dict[str, Any]:
     """Places (or, if not configured/enabled, simulates) the sign-off
     call. Returns {"decision": "confirm"|"override"|"unclear",
-    "dry_run": bool, "raw": <full CALL-E result or None>}."""
+    "dry_run": bool, "raw": <private CALL-E result or None>}.
+    The task field is a masked display copy; raw is private integration data
+    and must not be printed, logged, or published wholesale."""
     task = build_task(
         authority_name=authority_name,
         context=context,
@@ -154,17 +175,18 @@ async def request_signoff_call(
         authorizing_tier=authorizing_tier,
         amount=amount,
     )
+    display_task = public_text(task)
 
     reason = _dry_run_reason()
     if reason:
-        logger.info("[DRY RUN — %s] Would call %s to sign off: %s", reason, authority_name, task)
-        return {"decision": "unclear", "dry_run": True, "raw": None, "dry_run_reason": reason, "task": task}
+        logger.info("[DRY RUN — %s] Would call %s to sign off: %s", reason, public_text(authority_name), display_task)
+        return {"decision": "unclear", "dry_run": True, "raw": None, "dry_run_reason": reason, "task": display_task}
 
     # Validate before every real call, never after — a malformed or
     # non-ASCII destination must never reach the CALL-E API. The masked
     # form is what appears in the log line below, never the raw number.
     phone = validate_e164(os.environ["CALLE_SIGNOFF_PHONE"])
-    logger.info("Placing sign-off call to %s (idempotency_key=%s)", mask_phone(phone), idempotency_key)
+    logger.info("Placing sign-off call to %s", mask_phone(phone))
 
     def _place_call() -> dict[str, Any]:
         from calle import CalleClient  # imported lazily — an optional runtime dependency
@@ -184,13 +206,12 @@ async def request_signoff_call(
         # call it directly on an asyncio event loop.
         call = await asyncio.to_thread(_place_call)
     except Exception:
-        # Never interpolate the raw phone into an exception/log line —
-        # idempotency_key is enough to trace this back to the decision.
-        logger.exception("Sign-off call failed (idempotency_key=%s)", idempotency_key)
-        return {"decision": "unclear", "dry_run": False, "raw": None, "error": True, "task": task}
+        # SDK exception messages/tracebacks can contain request data or keys.
+        logger.warning("Sign-off call failed; outcome unclear. Reconcile before another attempt.")
+        return {"decision": "unclear", "dry_run": False, "raw": None, "error": True, "task": display_task}
 
     structured = call.get("structured_result") or {}
     decision = structured.get("decision", "unclear")
     if decision not in ("confirm", "override", "unclear"):
         decision = "unclear"
-    return {"decision": decision, "dry_run": False, "raw": call, "task": task}
+    return {"decision": decision, "dry_run": False, "raw": call, "task": display_task}
