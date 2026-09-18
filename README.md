@@ -120,6 +120,7 @@ This project is an awesome list for AI-agent phone-call workflows. Add resources
 
 ### Skills
 
+- [`call-right-party-gatekeeper`](skills/call-right-party-gatekeeper/) - Post-call compliance skill that audits whether a CALL-E call verified the recipient's identity before disclosing sensitive content, detects wrong-party and third-party answers, and crafts a verification-first goal that reveals nothing until the recipient confirms.
 
 
 - [call-prosodic-entrainment-optimizer](skills/call-prosodic-entrainment-optimizer/) - Offline experimental skill that compares supplied prosodic features and suggests bounded TTS parameter changes; audio extraction and TTS application are host responsibilities.
