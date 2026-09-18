@@ -337,6 +337,64 @@ def test_cli_craft_unknown_scenario_exits_2():
     assert proc.returncode == 2
 
 
+def test_load_number_transcript_yields_no_turns():
+    with tempfile.TemporaryDirectory() as td:
+        p = _write_result(Path(td), {"status": "completed", "transcript": 42})
+        assert load_call_result(p)["turns"] == []
+
+
+def test_load_whitespace_only_string_transcript_yields_no_turns():
+    with tempfile.TemporaryDirectory() as td:
+        p = _write_result(Path(td), {"status": "completed", "transcript": "   "})
+        assert load_call_result(p)["turns"] == []
+
+
+def test_load_mixed_list_skips_non_dict_and_defaults_missing_text():
+    with tempfile.TemporaryDirectory() as td:
+        p = _write_result(Path(td), {
+            "status": "completed",
+            "transcript": [{"speaker": "CALLEE", "text": "hi"}, "junk", {"speaker": "agent"}, 5],
+        })
+        data = load_call_result(p)
+    assert data["turns"] == [
+        {"speaker": "CALLEE", "text": "hi"},
+        {"speaker": "agent", "text": ""},
+    ]
+
+
+def test_card_consecutive_agent_turns_last_one_is_context():
+    turns = [
+        {"speaker": "agent", "text": "Your results came back normal."},
+        {"speaker": "agent", "text": "Do you want them emailed to you?"},
+        {"speaker": "callee", "text": "Sure."},
+        {"speaker": "agent", "text": "Anything else I can help with?"},
+        {"speaker": "callee", "text": "No."},
+        {"speaker": "agent", "text": "Have a good day."},
+        {"speaker": "callee", "text": "Fine."},
+    ]
+    card = build_pacing_card(turns)
+    # all three callee turns are short non-vocabulary answers -> DISENGAGED
+    assert card["cooperation_profile"] == "DISENGAGED"
+    assert card["metrics"]["substantive_count"] == 3
+
+
+def test_card_single_backchannel_is_neutral_not_engaged():
+    turns = [
+        {"speaker": "agent", "text": "Here is the summary of your visit."},
+        {"speaker": "callee", "text": "Mm-hmm."},
+    ]
+    card = build_pacing_card(turns)
+    assert card["metrics"]["backchannel_count"] == 1
+    assert card["cooperation_profile"] == "NEUTRAL"
+
+
+def test_card_single_callee_turn_no_agent_metrics():
+    card = build_pacing_card([{"speaker": "callee", "text": "I need to reschedule my appointment please."}])
+    assert card["cooperation_profile"] == "NEUTRAL"
+    assert card["metrics"]["avg_agent_turn_words"] == 0.0
+    assert card["metrics"]["agent_adapted_after_barge_in"] is False
+
+
 def _main() -> int:
     failures = 0
     for name, fn in sorted(globals().items()):
