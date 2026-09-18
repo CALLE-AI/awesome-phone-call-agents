@@ -1,20 +1,16 @@
 ---
 name: call-synthetic-counterparty-detector
-description: Analyzes phone call acoustic metadata and linguistics to detect if the counterparty is an AI/synthetic voice, triggering machine-to-machine protocols.
+description: Offline experimental pattern checks on supplied call metadata and text, returning advisory synthetic-voice hints without certifying identity or switching live protocols.
 version: 1.0.0
 ---
 
 # Synthetic Counterparty Detector
 
-The `call-synthetic-counterparty-detector` skill is designed to identify when your AI agent is talking to another AI agent (a "synthetic counterparty"). By analyzing acoustic metadata (latency variance, continuous speech duration) and linguistic patterns, it calculates a confidence score. If the score breaches the threshold, the agent can switch to a highly efficient Machine-to-Machine (M2M) communication protocol.
+The `call-synthetic-counterparty-detector` skill computes a heuristic score from supplied metadata and text. It does not extract audio features, implement PDSM, authenticate identity, or switch protocols. Its recommendation is an experimental hint for human review, not a calibrated probability or permission to bypass safeguards.
 
-## Scientific Foundation
+## Research Scope
 
-| Paper / Concept | Relevance |
-|---|---|
-| **Deepfake Audio Detection** | AI voice pipelines have deterministic latency and lack biological respiratory constraints, creating measurable acoustic anomalies. |
-| **Linguistic Determinism** | LLMs, even when prompted to use fillers, often fail to distribute them naturally during complex reasoning tasks. |
-| **Machine-to-Machine Negotiation (2025)** | Two AI agents negotiating via API or structured high-speed audio is orders of magnitude faster than simulating human conversation. |
+The latency, duration and filler-word thresholds are demonstration choices, not a reproduced or validated deepfake model. See [research scope](references/research-papers.md).
 
 ## How it works
 
@@ -29,8 +25,8 @@ If the combined confidence score is >= 0.7, it flags `SYNTHETIC_COUNTERPARTY = T
 
 | Metric | Target | Notes |
 |---|---|---|
-| Detection Accuracy | > 92% | Tested against state-of-the-art TTS models. |
-| False Positive Rate | < 2% | Ensuring humans are not incorrectly treated as machines. |
+| Detection Accuracy | > 92% aspiration | Unvalidated target; no TTS benchmark is supplied. |
+| False Positive Rate | < 2% aspiration | Unvalidated target; false classifications are possible. |
 
 ## Limitations & Known Constraints
 - **Metadata Dependency**: This skill relies entirely on the telephony provider (e.g., Twilio, Deepgram) supplying accurate turn latency and speech duration metadata.
