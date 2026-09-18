@@ -160,8 +160,121 @@ def _match_response(expected: list[str], heard: list[str], max_edit: int = 1) ->
     return True
 
 
-def build_attestation_card(turns: list[dict[str, str]], nonce: str, expected_code: str, ledger_path: Path | None = None) -> dict[str, Any]:  # pragma: no cover
-    raise NotImplementedError
+ACCEPT_GUIDANCE = (
+    "The response code matched the expected one-time code. Continue the "
+    "workflow."
+)
+REJECT_GUIDANCE = (
+    "The response code did not match, or no usable reply arrived. Do not "
+    "disclose anything further to this counterparty and end the call."
+)
+REPLAY_GUIDANCE = (
+    "This nonce was already used in a previous verified call. A replay or "
+    "configuration error is suspected; generate a fresh challenge before "
+    "continuing."
+)
+
+
+def _is_callee(speaker: str) -> bool:
+    return str(speaker).lower().strip() in CALLEE_ROLES
+
+
+def _nonce_in_ledger(ledger_path: Path | None, nonce: str) -> bool:
+    if ledger_path is None or not ledger_path.is_file():
+        return False
+    for line in ledger_path.read_text(encoding="utf-8").splitlines():
+        line = line.strip()
+        if not line:
+            continue
+        try:
+            if json.loads(line).get("nonce") == nonce:
+                return True
+        except json.JSONDecodeError:
+            continue
+    return False
+
+
+def _append_nonce_to_ledger(ledger_path: Path, nonce: str) -> None:
+    entry = {"nonce": nonce, "used_at": datetime.now(timezone.utc).isoformat()}
+    with ledger_path.open("a", encoding="utf-8") as handle:
+        handle.write(json.dumps(entry) + "\n")
+
+
+def build_attestation_card(
+    turns: list[dict[str, str]],
+    nonce: str,
+    expected_code: str,
+    ledger_path: Path | None = None,
+) -> dict[str, Any]:
+    """Verify the spoken challenge-response in a finished transcript."""
+    card: dict[str, Any] = {
+        "skill": "call-attest-challenge-auth",
+        "analysis_mode": "heuristic",
+        "attestation": None,
+        "nonce": nonce,
+        "reason": None,
+        "evidence": [],
+        "recommended_action": {"action": "reject_caller", "guidance": REJECT_GUIDANCE},
+        "disclaimer": DISCLAIMER,
+    }
+
+    challenge_index = None
+    for index, turn in enumerate(turns):
+        text = str(turn.get("text", ""))
+        if not _is_callee(turn.get("speaker", "")) and nonce.lower() in text.lower():
+            challenge_index = index
+            card["evidence"].append(
+                {
+                    "side": "agent",
+                    "turn_index": index,
+                    "span": mask_pii(text),
+                    "kind": "challenge_spoken",
+                }
+            )
+            break
+
+    if challenge_index is None:
+        card["attestation"] = "FAILED_NO_RESPONSE"
+        card["reason"] = "challenge_not_spoken"
+        return card
+
+    response_text = ""
+    for index, turn in enumerate(turns):
+        if index <= challenge_index:
+            continue
+        if _is_callee(turn.get("speaker", "")) and str(turn.get("text", "")).strip():
+            response_text = str(turn["text"]).strip()
+            card["evidence"].append(
+                {
+                    "side": "callee",
+                    "turn_index": index,
+                    "span": mask_pii(response_text),
+                    "kind": "response_heard",
+                }
+            )
+            break
+
+    if not response_text:
+        card["attestation"] = "FAILED_NO_RESPONSE"
+        card["reason"] = "no_response_after_challenge"
+        return card
+
+    if _nonce_in_ledger(ledger_path, nonce):
+        card["attestation"] = "REPLAY_SUSPECTED"
+        card["recommended_action"] = {"action": "investigate_replay", "guidance": REPLAY_GUIDANCE}
+        return card
+
+    expected_tokens = _normalize_tokens(expected_code)
+    heard_tokens = _normalize_tokens(response_text)
+    if _match_response(expected_tokens, heard_tokens):
+        card["attestation"] = "VERIFIED"
+        card["recommended_action"] = {"action": "accept_and_continue", "guidance": ACCEPT_GUIDANCE}
+        if ledger_path is not None:
+            _append_nonce_to_ledger(ledger_path, nonce)
+    else:
+        card["attestation"] = "FAILED_MISMATCH"
+        card["recommended_action"] = {"action": "reject_caller", "guidance": REJECT_GUIDANCE}
+    return card
 
 
 def craft_goal(scenario: str, language: str | None = None, nonce: str | None = None, secret_env: str = "CALL_ATTEST_SECRET") -> dict[str, Any]:  # pragma: no cover

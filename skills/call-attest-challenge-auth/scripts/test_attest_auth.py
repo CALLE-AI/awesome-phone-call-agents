@@ -142,3 +142,89 @@ def test_match_response_order_and_extras():
     expected = _normalize_tokens("BLUE ORANGE SEVEN 42")
     assert _match_response(expected, _normalize_tokens("OK BLUE PLEASE ORANGE SEVEN FOUR TWO")) is True
     assert _match_response(expected, _normalize_tokens("ORANGE BLUE SEVEN FOUR TWO")) is False
+
+
+def _card_from_fixture(path: Path, ledger: Path | None = None) -> dict:
+    data = load_call_result(path)
+    return build_attestation_card(
+        data["turns"],
+        nonce="4f2a91",
+        expected_code="BLUE ORANGE SEVEN 42",
+        ledger_path=ledger,
+    )
+
+
+def test_card_verified_fixture():
+    card = _card_from_fixture(EXAMPLE_VERIFIED)
+    assert card["skill"] == "call-attest-challenge-auth"
+    assert card["analysis_mode"] == "heuristic"
+    assert card["attestation"] == "VERIFIED"
+    assert card["reason"] is None
+    assert card["recommended_action"]["action"] == "accept_and_continue"
+    assert "disclaimer" in card and card["disclaimer"]
+    kinds = {e["kind"] for e in card["evidence"]}
+    assert kinds == {"challenge_spoken", "response_heard"}
+
+
+def test_card_mismatch_fixture():
+    card = _card_from_fixture(EXAMPLE_MISMATCH)
+    assert card["attestation"] == "FAILED_MISMATCH"
+    assert card["recommended_action"]["action"] == "reject_caller"
+
+
+def test_card_no_response_after_challenge():
+    turns = [
+        {"speaker": "agent", "text": "Coordination check. My word is 4f2a91. Please reply with the response code."},
+        {"speaker": "agent", "text": "No reply? Ending the call."},
+    ]
+    card = build_attestation_card(turns, nonce="4f2a91", expected_code="BLUE ORANGE SEVEN 42")
+    assert card["attestation"] == "FAILED_NO_RESPONSE"
+    assert card["reason"] == "no_response_after_challenge"
+    assert card["recommended_action"]["action"] == "reject_caller"
+
+
+def test_card_challenge_not_spoken():
+    turns = [
+        {"speaker": "agent", "text": "Hello, this is an automated assistant calling about your order."},
+        {"speaker": "callee", "text": "BLUE ORANGE SEVEN 42"},
+    ]
+    card = build_attestation_card(turns, nonce="4f2a91", expected_code="BLUE ORANGE SEVEN 42")
+    assert card["attestation"] == "FAILED_NO_RESPONSE"
+    assert card["reason"] == "challenge_not_spoken"
+
+
+def test_card_replay_detected_and_not_reappended():
+    with tempfile.TemporaryDirectory() as td:
+        ledger = Path(td) / "ledger.jsonl"
+        ledger.write_text(json.dumps({"nonce": "4f2a91", "used_at": "2026-09-18T00:00:00+00:00"}) + "\n", encoding="utf-8")
+        card = _card_from_fixture(EXAMPLE_VERIFIED, ledger=ledger)
+        assert card["attestation"] == "REPLAY_SUSPECTED"
+        assert card["recommended_action"]["action"] == "investigate_replay"
+        assert len(ledger.read_text(encoding="utf-8").strip().splitlines()) == 1
+
+
+def test_card_verified_appends_nonce_to_ledger():
+    with tempfile.TemporaryDirectory() as td:
+        ledger = Path(td) / "ledger.jsonl"
+        card = _card_from_fixture(EXAMPLE_VERIFIED, ledger=ledger)
+        assert card["attestation"] == "VERIFIED"
+        lines = [json.loads(line) for line in ledger.read_text(encoding="utf-8").strip().splitlines()]
+        assert len(lines) == 1
+        assert lines[0]["nonce"] == "4f2a91"
+        assert "used_at" in lines[0]
+
+
+def test_card_masks_digits_in_evidence():
+    turns = [
+        {"speaker": "agent", "text": "Coordination check. My word is 4f2a91. Reply with the code or call 415 555 0155."},
+        {"speaker": "callee", "text": "BLUE ORANGE SEVEN 42"},
+    ]
+    card = build_attestation_card(turns, nonce="4f2a91", expected_code="BLUE ORANGE SEVEN 42")
+    for entry in card["evidence"]:
+        assert "5550155" not in json.dumps(entry)
+        assert "415" not in entry["span"] or "#" in entry["span"]
+
+
+def test_card_no_ledger_still_verifies():
+    card = _card_from_fixture(EXAMPLE_VERIFIED, ledger=None)
+    assert card["attestation"] == "VERIFIED"
