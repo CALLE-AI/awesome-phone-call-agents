@@ -78,10 +78,6 @@ def load_call_result(path: Path) -> dict[str, Any]:
     }
 
 
-# Added in Task 3 to keep the planned import surface importable; Tasks 5-6
-# replace the remaining stubs with their real implementations.
-
-
 # Signal vocabulary. Detection is deliberately one-sided: verification
 # questions and sensitive disclosures are agent-side patterns; identity
 # confirmations, wrong-party and third-party indicators are callee-side.
@@ -271,5 +267,21 @@ def build_gate_card(turns: list[dict[str, str]]) -> dict[str, Any]:
     return card
 
 
-def craft_goal(scenario: str, language: str | None = None) -> dict[str, Any]:  # pragma: no cover
-    raise NotImplementedError
+CRAFT_SCENARIOS = {"sensitive-outreach"}
+
+
+def craft_goal(scenario: str, language: str | None = None) -> dict[str, Any]:
+    """Emit plan_call inputs for a verification-first outreach call."""
+    if scenario not in CRAFT_SCENARIOS:
+        raise ValueError(f"unknown scenario: {scenario!r}; expected one of {sorted(CRAFT_SCENARIOS)}")
+    return {
+        "skill": "call-right-party-gatekeeper",
+        "mode": "craft",
+        "scenario": scenario,
+        "language": language or "en",
+        "goal": VERIFICATION_FIRST_GOAL,
+        "notes": [
+            "Heuristic skill: this template is a starting point; adapt wording to the case.",
+            "Use fictional +1 555-01xx numbers for any test calls.",
+        ],
+    }

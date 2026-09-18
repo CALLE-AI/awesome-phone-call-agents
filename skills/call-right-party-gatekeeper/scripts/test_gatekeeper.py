@@ -229,3 +229,39 @@ def test_card_no_callee_turns_abstains():
 def test_card_empty_turns_abstains():
     card = build_gate_card([])
     assert card["gate_assessment"] == "unclear"
+
+
+def test_craft_known_scenario_builds_goal():
+    plan = craft_goal("sensitive-outreach")
+    assert plan["skill"] == "call-right-party-gatekeeper"
+    assert plan["mode"] == "craft"
+    assert plan["scenario"] == "sensitive-outreach"
+    assert plan["language"] == "en"
+    assert "May I speak" in plan["goal"]
+    assert "without revealing the subject" in plan["goal"]
+
+
+def test_craft_unknown_scenario_raises():
+    try:
+        craft_goal("cold-call")
+    except ValueError as exc:
+        assert "unknown scenario" in str(exc).lower()
+    else:
+        raise AssertionError("expected ValueError")
+
+
+def test_craft_language_passthrough():
+    assert craft_goal("sensitive-outreach", language="es")["language"] == "es"
+
+
+def test_craft_goal_matches_card_retry_guidance():
+    from gatekeeper import VERIFICATION_FIRST_GOAL
+    plan = craft_goal("sensitive-outreach")
+    turns = [
+        {"speaker": "agent", "text": "Hello, this is an automated assistant. May I speak to Dana Reyes?"},
+        {"speaker": "callee", "text": "Who is this calling? He is busy right now."},
+    ]
+    card = build_gate_card(turns)
+    assert card["recommended_action"]["action"] == "stop_and_retry_with_script"
+    assert plan["goal"] == card["recommended_action"]["guidance"]
+    assert plan["goal"] == VERIFICATION_FIRST_GOAL
