@@ -122,6 +122,7 @@ This project is an awesome list for AI-agent phone-call workflows. Add resources
 
 
 
+- [call-voice-deepfake-liveness-detector](skills/call-voice-deepfake-liveness-detector/) - Offline experimental scorer for supplied acoustic features, illustrating voice-fraud review signals; it does not capture audio, authenticate callers, or block calls.
 - [`call-rlhf-self-reflection-scorer`](skills/call-rlhf-self-reflection-scorer/) - Offline experimental post-call feedback scorer using supplied ratings and simple text heuristics; returns review suggestions without calling an LLM, training a model, or saving to RAG.
 - [`call-multilingual-code-switching-aligner`](skills/call-multilingual-code-switching-aligner/) - Offline experimental English/Spanish lexicon helper returning suggested code-switching styles; ASR, prompt updates, and rapport evaluation remain host responsibilities.
 - [`call-semantic-phishing-honeybot`](skills/call-semantic-phishing-honeybot/) - Offline experimental text-turn IoC extractor with suggested scam-baiting responses; it does not intercept, answer, or prolong real calls.
