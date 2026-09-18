@@ -310,6 +310,61 @@ def test_card_has_reason_none_when_assessed():
     assert card["reason"] is None
 
 
+def test_load_number_transcript_yields_no_turns():
+    with tempfile.TemporaryDirectory() as td:
+        p = _write_result(Path(td), {"status": "completed", "transcript": 42})
+        assert load_call_result(p)["turns"] == []
+
+
+def test_load_whitespace_only_string_transcript_yields_no_turns():
+    with tempfile.TemporaryDirectory() as td:
+        p = _write_result(Path(td), {"status": "completed", "transcript": "   "})
+        assert load_call_result(p)["turns"] == []
+
+
+def test_load_mixed_list_skips_non_dict_and_defaults_missing_text():
+    with tempfile.TemporaryDirectory() as td:
+        p = _write_result(Path(td), {
+            "status": "completed",
+            "transcript": [{"speaker": "CALLEE", "text": "hi"}, "junk", {"speaker": "agent"}, 5],
+        })
+        data = load_call_result(p)
+    assert data["turns"] == [
+        {"speaker": "CALLEE", "text": "hi"},
+        {"speaker": "agent", "text": ""},
+    ]
+
+
+def test_best_ever_after_complaint_is_irony():
+    result = score_turn("That is the best support ever.", "You cancelled it and I waited twice.")
+    assert result.score == 3
+    assert "best_ever" in result.rules
+    assert "context_contrast" in result.rules
+
+
+def test_analyze_evidence_span_masks_phone_inside_ironic_turn():
+    turns = [
+        {"speaker": "agent", "text": "Your order was cancelled again."},
+        {"speaker": "callee", "text": "Oh, great. Just perfect. Call me back at 415 555 0100."},
+    ]
+    card = analyze_turns(turns)
+    assert "#" in card["evidence"][0]["span"]
+    assert "5550100" not in json.dumps(card)
+
+
+def test_analyze_duplicate_irony_across_turns_yields_two_evidence_entries():
+    turns = [
+        {"speaker": "agent", "text": "Your order was cancelled again."},
+        {"speaker": "callee", "text": "Oh, great."},
+        {"speaker": "agent", "text": "Sorry about that."},
+        {"speaker": "callee", "text": "Just perfect."},
+    ]
+    card = analyze_turns(turns)
+    assert len(card["evidence"]) == 2
+    assert card["confidence"] == "high"
+    assert card["irony_detected"] is True
+
+
 def _main() -> int:
     failures = 0
     for name, fn in sorted(globals().items()):
