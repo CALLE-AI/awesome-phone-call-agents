@@ -1,0 +1,91 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>GetPaid — polite invoice follow-up calls</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Fraunces:ital,opsz,wght@0,9..144,400;0,9..144,500;0,9..144,600;1,9..144,500&family=Inter:wght@400;500;600&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="/static/style.css">
+</head>
+<body>
+
+<header class="hero">
+  <div class="hero-inner">
+    <p class="kicker">an agent skill built on CALL-E</p>
+    <h1>Nobody likes chasing a late invoice.<br>Let something else make the call.</h1>
+    <p class="hero-sub">
+      GetPaid places one warm, non-awkward check-in call to a client on your behalf —
+      never a debt collector, always disclosed as an AI — and comes back with a plain
+      answer: paid, a new date, or something you need to know about.
+    </p>
+    <div class="mode-pill" id="modePill">checking mode…</div>
+    <div class="mode-pill budget-pill" id="liveCallBudget" hidden></div>
+    <div class="review-banner exhausted-banner" id="creditsExhaustedBanner" hidden>
+      ⚠ Demo credits exhausted — see the recorded video instead of a live call.
+    </div>
+  </div>
+</header>
+
+<main>
+  <section class="panel add-panel">
+    <h2>Add an invoice</h2>
+    <form id="invoiceForm">
+      <div class="grid">
+        <label>Your name
+          <input name="freelancer_name" required placeholder="Priya Shah">
+        </label>
+        <label>Client name
+          <input name="client_name" required placeholder="Bram at Fenwick Studio">
+        </label>
+        <label>Client phone (E.164)
+          <input name="client_phone" required placeholder="+14155550123">
+        </label>
+        <label>Invoice #
+          <input name="invoice_number" required placeholder="INV-0042">
+        </label>
+        <label>Amount
+          <input name="amount" required placeholder="2,400">
+        </label>
+        <label>Currency
+          <input name="currency" value="USD" required>
+        </label>
+        <label>Due date
+          <input name="due_date" type="date" required>
+        </label>
+        <label>Region
+          <select name="region">
+            <option value="US">US</option>
+            <option value="GB">GB</option>
+            <option value="CA">CA</option>
+            <option value="AU">AU</option>
+            <option value="DE">DE</option>
+            <option value="FR">FR</option>
+            <option value="MX">MX</option>
+            <option value="BR">BR</option>
+            <option value="IN">IN</option>
+          </select>
+        </label>
+      </div>
+      <button type="submit" class="btn-primary">Track invoice</button>
+    </form>
+  </section>
+
+  <section class="panel">
+    <div class="panel-head">
+      <h2>Your invoices</h2>
+      <button id="runFollowUps" class="btn-ghost">Check for overdue promises</button>
+    </div>
+    <div id="invoiceList" class="invoice-list">
+      <p class="empty">No invoices yet — add one above to try it out.</p>
+    </div>
+  </section>
+</main>
+
+<footer>
+  <p>Every call is disclosed as an AI, keeps to the facts, and never commits you or the client to anything — GetPaid only gathers information. Built for the CALL-E "Your Code Is Calling" hackathon.</p>
+</footer>
+
+<script src="/static/app.js"></script>
+</body>
+</html>
