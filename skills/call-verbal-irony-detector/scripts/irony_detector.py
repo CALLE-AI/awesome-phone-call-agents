@@ -142,9 +142,6 @@ def score_turn(turn_text: str, context_before: str) -> TurnScore:
     return TurnScore(score=score, rules=rules, context_contrast=contrast)
 
 
-# Remaining stubs; later tasks replace each with its real implementation.
-
-
 DEESCALATION_GOAL = (
     "You are calling back about this person's recent complaint. Open by "
     "acknowledging their frustration in one sentence before anything else. "
@@ -240,5 +237,21 @@ def analyze_turns(turns: list[dict[str, str]]) -> dict[str, Any]:
     return card
 
 
-def craft_goal(scenario: str, language: str | None = None) -> dict[str, Any]:  # pragma: no cover
-    raise NotImplementedError
+CRAFT_SCENARIOS = {"complaint-followup"}
+
+
+def craft_goal(scenario: str, language: str | None = None) -> dict[str, Any]:
+    """Emit plan_call inputs for a de-escalation follow-up call."""
+    if scenario not in CRAFT_SCENARIOS:
+        raise ValueError(f"unknown scenario: {scenario!r}; expected one of {sorted(CRAFT_SCENARIOS)}")
+    return {
+        "skill": "call-verbal-irony-detector",
+        "mode": "craft",
+        "scenario": scenario,
+        "language": language or "en",
+        "goal": DEESCALATION_GOAL,
+        "notes": [
+            "Heuristic skill: this template is a starting point; adapt wording to the case.",
+            "Use fictional +1 555-01xx numbers for any test calls.",
+        ],
+    }

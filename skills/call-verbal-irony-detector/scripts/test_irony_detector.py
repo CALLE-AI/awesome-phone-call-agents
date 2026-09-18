@@ -214,3 +214,32 @@ def test_analyze_medium_confidence_between_low_and_high():
     card = analyze_turns(turns)
     assert card["confidence"] == "medium"
     assert card["recommended_action"]["action"] == "retry_with_deescalation_goal"
+
+
+def test_craft_known_scenario_builds_goal():
+    plan = craft_goal("complaint-followup")
+    assert plan["skill"] == "call-verbal-irony-detector"
+    assert plan["mode"] == "craft"
+    assert plan["scenario"] == "complaint-followup"
+    assert plan["language"] == "en"
+    assert "acknowledging their frustration" in plan["goal"]
+    assert "confirm the literal intent" in plan["goal"].lower()
+
+
+def test_craft_unknown_scenario_raises():
+    try:
+        craft_goal("win-back")
+    except ValueError as exc:
+        assert "unknown scenario" in str(exc).lower()
+    else:
+        raise AssertionError("expected ValueError")
+
+
+def test_craft_language_passthrough():
+    assert craft_goal("complaint-followup", language="vi")["language"] == "vi"
+
+
+def test_craft_goal_matches_card_guidance():
+    plan = craft_goal("complaint-followup")
+    card = _analyze_fixture(EXAMPLE_IRONIC)
+    assert plan["goal"] == card["recommended_action"]["guidance"]
