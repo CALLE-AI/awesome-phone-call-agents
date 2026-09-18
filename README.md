@@ -120,6 +120,7 @@ This project is an awesome list for AI-agent phone-call workflows. Add resources
 
 ### Skills
 
+- [`call-semantic-barge-in-analyzer`](skills/call-semantic-barge-in-analyzer/) - Post-call cooperation skill that classifies callee turns as backchannels, frustration barge-ins, or substantive answers, profiles how well the call's pacing worked, and returns a tuned pacing goal for the next plan_call.
 
 
 - [call-prosodic-entrainment-optimizer](skills/call-prosodic-entrainment-optimizer/) - Offline experimental skill that compares supplied prosodic features and suggests bounded TTS parameter changes; audio extraction and TTS application are host responsibilities.
