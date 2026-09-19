@@ -67,7 +67,11 @@ Use this Agent Skills folder pattern:
 
 
 ```text
-- **[MediCall](https://github.com/RafalW3bCraft/medicall)** — Pre-arrival care coordination powered by CALL-E. Places outbound calls to confirm appointments, collects patient-reported changes with consent, and routes outcomes through a deterministic policy engine (`ROUTINE` / `HUMAN_REVIEW` / `ESCALATION`). Evidence-linked staff handoff card for every review outcome. No LLM in the decision path. · [SKILL.md](https://github.com/RafalW3bCraft/medicall/blob/main/SKILL.md)
+skill-name/
+├── SKILL.md
+├── references/
+├── scripts/
+└── assets/
 ```
 
 ### App directory template
