@@ -32,7 +32,7 @@ Output:
   },
   "notes": [
     "Heuristic skill: this template is a starting point; adapt wording to the case.",
-    "Use fictional +1 555-01xx numbers for any test calls."
+    "Keep fictional fixtures offline; any host-run live call requires separate explicit intent and an authorized E.164 destination."
   ]
 }
 ```
@@ -72,9 +72,9 @@ Output:
   ],
   "recommended_action": {
     "action": "accept_and_continue",
-    "guidance": "The response code matched the expected one-time code. Continue the workflow."
+    "guidance": "The supplied response fuzzily matched the supplied expected code. Review this coordination signal; it does not authorize disclosure or consequential actions."
   },
-  "disclaimer": "Heuristic spoken-code verification over a phonetic channel. This proves one-time pre-shared coordination, nothing more; it gives no resistance to a determined man-in-the-middle. Treat FAILED and REPLAY findings as reasons to stop and investigate."
+  "disclaimer": "Offline heuristic spoken-code match, not identity authentication. Fuzzy near-matches may pass and the optional local ledger is advisory. Do not authorize sensitive disclosure or consequential actions from this result."
 }
 ```
 
@@ -112,6 +112,6 @@ Output:
     "action": "reject_caller",
     "guidance": "The response code did not match, or no usable reply arrived. Do not disclose anything further to this counterparty and end the call."
   },
-  "disclaimer": "Heuristic spoken-code verification over a phonetic channel. This proves one-time pre-shared coordination, nothing more; it gives no resistance to a determined man-in-the-middle. Treat FAILED and REPLAY findings as reasons to stop and investigate."
+  "disclaimer": "Offline heuristic spoken-code match, not identity authentication. Fuzzy near-matches may pass and the optional local ledger is advisory. Do not authorize sensitive disclosure or consequential actions from this result."
 }
 ```

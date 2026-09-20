@@ -6,8 +6,8 @@ Twin-mode heuristic skill:
   verify  check a finished transcript's reply against the expected code,
           with a JSONL nonce ledger for replay detection
 
-Companion to dialtone-handshake: DIALTONE recognizes the other end is AI;
-this skill proves one-time pre-shared coordination. The secret comes from
+Companion to dialtone-handshake: this illustrates an advisory spoken-code
+match, not identity authentication or disclosure authorization. The secret comes from
 an environment variable, never the command line. Runs offline,
 deterministic, no LLM, no network. Input errors exit 2.
 """
@@ -32,10 +32,9 @@ from typing import Any
 CALLEE_ROLES = {"callee", "customer", "patient", "caller", "recipient"}
 
 DISCLAIMER = (
-    "Heuristic spoken-code verification over a phonetic channel. This "
-    "proves one-time pre-shared coordination, nothing more; it gives no "
-    "resistance to a determined man-in-the-middle. Treat FAILED and "
-    "REPLAY findings as reasons to stop and investigate."
+    "Offline heuristic spoken-code match, not identity authentication. "
+    "Fuzzy near-matches may pass and the optional local ledger is advisory. "
+    "Do not authorize sensitive disclosure or consequential actions from this result."
 )
 
 
@@ -158,8 +157,8 @@ def _match_response(expected: list[str], heard: list[str], max_edit: int = 1) ->
 
 
 ACCEPT_GUIDANCE = (
-    "The response code matched the expected one-time code. Continue the "
-    "workflow."
+    "The supplied response fuzzily matched the supplied expected code. "
+    "Review this coordination signal; it does not authorize disclosure or consequential actions."
 )
 REJECT_GUIDANCE = (
     "The response code did not match, or no usable reply arrived. Do not "
@@ -315,7 +314,7 @@ def craft_goal(
         },
         "notes": [
             "Heuristic skill: this template is a starting point; adapt wording to the case.",
-            "Use fictional +1 555-01xx numbers for any test calls.",
+            "Keep fictional fixtures offline; any host-run live call requires separate explicit intent and an authorized E.164 destination.",
         ],
     }
 

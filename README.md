@@ -120,7 +120,7 @@ This project is an awesome list for AI-agent phone-call workflows. Add resources
 
 ### Skills
 
-- [`call-attest-challenge-auth`](skills/call-attest-challenge-auth/) - One-time spoken challenge-response for agent-to-agent CALL-E calls: derives an HMAC-based response code from an environment-variable secret, verifies the transcript reply with fuzzy matching, and detects nonce replay via a JSONL ledger.
+- [`call-attest-challenge-auth`](skills/call-attest-challenge-auth/) - Offline experimental HMAC-derived spoken-code matching with an optional advisory nonce ledger; not identity authentication, a secure replay defense or authorization for sensitive actions.
 
 
 - [call-prosodic-entrainment-optimizer](skills/call-prosodic-entrainment-optimizer/) - Offline experimental skill that compares supplied prosodic features and suggests bounded TTS parameter changes; audio extraction and TTS application are host responsibilities.

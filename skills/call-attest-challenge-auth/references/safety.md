@@ -2,14 +2,14 @@
 
 ## Honest security model
 
-- This protocol proves ONE-TIME PRE-SHARED COORDINATION over a phonetic
-  channel, nothing more. It gives no resistance to a determined
-  man-in-the-middle who can hear the code and relay it; this file and the
-  SKILL.md say so explicitly.
+- This is an offline coordination illustration, not authentication.
+  Matching a supplied transcript to a supplied expected code proves neither
+  identity nor authorized access. A listener can relay a heard code.
 - The spoken code is audible to anyone on the call or recording it. Never
   use it to authenticate a human or protect high-value operations.
-- Fuzzy matching (edit distance <= 1 per token) trades a little strictness
-  for ASR noise; a near-miss code still fails closed to FAILED_MISMATCH.
+- Fuzzy matching (edit distance <= 1 per token) accepts some near-miss
+  codes for ASR noise. VERIFIED is an advisory match label, not a safe
+  authorization decision; never release sensitive information on its basis.
 
 ## Secret handling
 
@@ -28,14 +28,20 @@
   an investigate_replay action.
 - The ledger is advisory: without one, verification still works but
   replays are not detected.
+- The local ledger does not provide concurrent/crash-proof replay defense.
+  Keep the example sequential and do not use it for security decisions.
 
 ## Data handling
 
 - The skill never places calls and makes no network requests.
 - Evidence spans are masked: any 7+-digit run keeps only its last 2
   characters.
+- This limited digit-run masking does not anonymize all phone formats,
+  names, emails or private text. Keep real transcripts and cards private.
 
 ## Test-call policy
 
-Any live verification must target fictional +1 555-01xx numbers or the
-organization's published test hotline, per repository policy.
+Use fictional fixtures only for offline tests; do not dial reserved example
+numbers. Any separate host-run live test requires explicit per-run intent
+and an authorized, valid E.164 destination. These helpers neither authorize
+nor place calls; a suggested follow-up is not permission to call again.
