@@ -120,7 +120,7 @@ This project is an awesome list for AI-agent phone-call workflows. Add resources
 
 ### Skills
 
-- [`call-cross-lingual-emotion-preservation`](skills/call-cross-lingual-emotion-preservation/) - Post-call QA companion to language-bridge-call that compares the requester's emotional intensity against what the relayed call actually expressed, flagging FLATTENED or AMPLIFIED drift and returning an intensity-calibrated relay goal.
+- [`call-cross-lingual-emotion-preservation`](skills/call-cross-lingual-emotion-preservation/) - Offline experimental comparison of English urgency markers in source and relay text, with advisory wording suggestions; both inputs require English text or operator-prepared translations.
 
 
 - [call-prosodic-entrainment-optimizer](skills/call-prosodic-entrainment-optimizer/) - Offline experimental skill that compares supplied prosodic features and suggests bounded TTS parameter changes; audio extraction and TTS application are host responsibilities.

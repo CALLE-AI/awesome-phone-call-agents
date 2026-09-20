@@ -84,7 +84,7 @@ Output:
   "goal": "You are relaying an urgent request. Convey the urgency using the strongest natural urgency phrasing in the target language; keep explicit time markers ('immediately', 'today'); do not soften or add politeness that downplays urgency. State what is needed and the deadline in your first two sentences, then confirm the receiver understood the urgency.",
   "notes": [
     "Heuristic skill: this template is a starting point; adapt wording to the case.",
-    "Use fictional +1 555-01xx numbers for any test calls."
+    "Keep fictional fixtures offline; any host-run live call requires separate explicit intent and an authorized E.164 destination."
   ]
 }
 ```

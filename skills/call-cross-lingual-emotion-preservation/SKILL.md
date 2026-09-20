@@ -1,6 +1,6 @@
 ---
 name: call-cross-lingual-emotion-preservation
-description: Post-call QA skill for cross-language relays. Compares the requester's emotional intensity (from their original call result or an operator note) against what the relayed CALL-E call actually expressed in the agent's own turns, using an English urgency-intensity lexicon. Returns a parity card with FLATTENED / PRESERVED / AMPLIFIED drift, a parity score, evidence spans from both sides, and either a proceed action or an intensity-calibrated relay goal for the next plan_call. Companion to language-bridge-call; it audits and calibrates, never relays. Heuristic mode only, runs offline. Intensity-mapping design informed by zero-shot emotion transfer research (ZEST, ICASSP 2024).
+description: Offline experimental QA helper for CALL-E relay transcripts. Compares English urgency-marker levels in source and relay-agent text; both inputs must be English or operator-prepared English translations. Returns advisory lexical drift labels and suggested relay wording, without translating, measuring emotional state, certifying relay fidelity or placing calls.
 license: MIT
 ---
 
@@ -9,8 +9,9 @@ license: MIT
 > **When the message crosses a language, does the urgency survive?**
 
 `language-bridge-call` relays a request across languages in two legs. This
-skill is its QA companion: it checks whether the second leg preserved the
-emotional intensity of the first. A panicked "today, immediately, please"
+skill is an experimental QA companion: it compares English urgency-marker
+levels in supplied text from both legs. It does not measure actual emotion
+or prove that a translation preserved it. A phrase such as "today, immediately, please"
 that arrives as "sometime this week would be fine" is a failed relay even
 when the words are translated correctly.
 
@@ -30,9 +31,10 @@ when the words are translated correctly.
 - to audit the relay callee's own emotions; only the relay agent's
   expressed intensity is measured, because the relay speaks on the
   requester's behalf
-- on non-English source contexts; the intensity lexicon is English-only
-  (the relay target language does not matter - CALL-E's language
-  parameter handles that, and only the English source side is scored)
+- on non-English source OR relay text; the same English-only lexicon scores
+  both. Provide operator-prepared English translations when needed; this
+  script does not translate. A target-language parameter does not change
+  the scorer. Non-English text can produce misleading low scores.
 
 ## Workflow
 
@@ -45,6 +47,8 @@ python3 scripts/emotion_preservation.py analyze --source-context path/to/source.
 `--source-context` accepts the requester's call-result JSON (callee turns
 are used) or a plain-text operator note. `--relay-transcript` accepts the
 relay leg's CALL-E result (nested `get_call_run` or flat fixture shape).
+Both texts must be English or separately translated into English by the
+operator. The script does not detect or enforce language eligibility.
 Emits a card:
 
 - `source_intensity` / `relay_intensity`: {score, level, markers}; the
@@ -56,6 +60,11 @@ Emits a card:
   empty or the relay has no agent turns
 - `recommended_action`: `re_relay_with_calibrated_goal` (with the goal text
   calibrated to the SOURCE intensity) or `proceed`
+
+These are legacy action labels for human review. Scores and low/medium/high
+levels are illustrative lexicon thresholds, not empirically calibrated
+emotion measures. Neither `proceed` nor a re-relay suggestion authorizes a
+new call, emergency response or other consequential action.
 
 ### Craft the calibrated relay goal
 

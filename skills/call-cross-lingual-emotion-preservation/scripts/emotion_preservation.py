@@ -267,7 +267,7 @@ def craft_goal(scenario: str, language: str | None = None, intensity: str = "hig
         "goal": relay_goal_for_intensity(intensity),
         "notes": [
             "Heuristic skill: this template is a starting point; adapt wording to the case.",
-            "Use fictional +1 555-01xx numbers for any test calls.",
+            "Keep fictional fixtures offline; any host-run live call requires separate explicit intent and an authorized E.164 destination.",
         ],
     }
 
