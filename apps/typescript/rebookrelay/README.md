@@ -5,6 +5,8 @@ description: Autonomous revenue recovery that detects calendar no-shows and casc
 
 # RebookRelay
 
+This directory is documentation for the external experimental project linked below, not a bundled runnable app or a production-readiness certification. The setup commands run that external source.
+
 No-show recovery platform for service-based businesses (clinics, dental, salons). Detects missed appointments on Google Calendar, makes AI voice calls via CALL-E to the original client, and cascades open slots down a prioritized waitlist until the slot is filled.
 
 **Default mode is DRY_RUN** — the dashboard demo simulates the full cascade flow without placing real phone calls. Set `CALL_E_DRY_RUN=false` in `.env` to enable live calls (requires a verified CALL-E API key and destination numbers you own).
@@ -112,7 +114,7 @@ The default mode (`CALL_E_DRY_RUN=true`) logs every cascade step to the database
 
 ## Cascade Timeout
 
-The Inngest workflow waits up to 10 minutes for a webhook response before marking the call as `NO_ANSWER` and advancing to the next waitlist person. This timeout is configurable in the Inngest function definition.
+The Inngest workflow waits up to 10 minutes for a webhook response. A missing response is marked `TIMEOUT` and stops the cascade for manual reconciliation; it is not treated as `NO_ANSWER` and does not automatically advance to another person. The wait duration is configured in the Inngest function definition.
 
 ## Source Code
 
