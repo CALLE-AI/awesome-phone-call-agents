@@ -72,7 +72,7 @@ export default function App() {
     error_queue_received: 0,
     resolution_queue_received: 0,
     recent_incidents: [],
-    oncall_engineer: { name: 'Alex Morgan', phone: '+15550199', locale: 'en-IN', region: 'IN' }
+    oncall_engineer: { name: 'Alex Morgan', phone: '+15550199', locale: 'en-US', region: 'US' }
   });
   const [incidents, setIncidents] = useState([]);
   const [selectedIncident, setSelectedIncident] = useState(null);

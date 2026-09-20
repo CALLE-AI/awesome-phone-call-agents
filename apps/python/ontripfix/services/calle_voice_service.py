@@ -1,6 +1,7 @@
 import logging
 import os
 import re
+from urllib.parse import urlsplit
 
 import requests
 
@@ -19,16 +20,77 @@ CALLE_API_ENDPOINT = os.environ.get(
     "CALLE_API_ENDPOINT", "https://api.heycall-e.com/v1/calls"
 )
 
+ENABLE_OUTBOUND_CALLS = os.environ.get(
+    "ENABLE_OUTBOUND_CALLS", "false"
+).lower() in ("true", "1", "yes")
+
+APPROVED_CALLE_HOSTS = {
+    "api.heycall-e.com",
+    "docs.heycall-e.com",
+}
+custom_hosts = os.environ.get("APPROVED_CALLE_DOMAINS", "")
+if custom_hosts:
+    APPROVED_CALLE_HOSTS.update(
+        [h.strip().lower() for h in custom_hosts.split(",") if h.strip()]
+    )
+
+ASCII_E164_RE = re.compile(r"^\+[1-9]\d{6,14}$")
+
+
+def validate_https_origin(endpoint_url: str) -> str:
+    """Restricts credentialed endpoint to approved HTTPS origins only."""
+    parsed = urlsplit(endpoint_url)
+    if parsed.scheme.lower() != "https":
+        raise ValueError(
+            f"Insecure endpoint rejected: '{endpoint_url}'. Credentialed endpoints must use HTTPS."
+        )
+    hostname = (parsed.hostname or "").lower()
+    if hostname not in APPROVED_CALLE_HOSTS:
+        raise ValueError(
+            f"Untrusted origin '{hostname}' rejected. Must be one of approved hosts: {sorted(APPROVED_CALLE_HOSTS)}"
+        )
+    return endpoint_url
+
 
 def format_e164(phone: str) -> str:
-    """Formats phone number strictly into E.164 standard (+15550199, +15550198)."""
-    if not phone:
-        return "+15550199"
-    has_plus = phone.strip().startswith("+")
-    digits = re.sub(r"\D", "", phone)
-    if has_plus:
-        return f"+{digits}"
-    return f"+{digits}" if len(digits) > 10 else f"+1{digits}"
+    """
+    Validates and formats recipient phone number strictly into ASCII E.164 (+[1-9]\\d{6,14}).
+    Rejects empty, non-ASCII, or invalid telephone structures.
+    """
+    if not phone or not isinstance(phone, str) or not phone.isascii():
+        raise ValueError(
+            f"Phone number must be a non-empty ASCII string. Received: {repr(phone)}"
+        )
+    digits_only = re.sub(r"[\s\-\(\)\.]", "", phone.strip())
+    if not digits_only.startswith("+"):
+        digits_only = f"+{digits_only}"
+    if not ASCII_E164_RE.match(digits_only):
+        raise ValueError(
+            f"Phone number '{phone}' cannot be formatted into a valid ASCII E.164 recipient standard."
+        )
+    return digits_only
+
+
+def is_authorized_recipient(phone: str) -> bool:
+    """
+    Ensures recipient is an explicitly authorized ASCII E.164 number.
+    By default permits fictional reservation range (+15550100 to +15550199)
+    or numbers explicitly listed in AUTHORIZED_RECIPIENT_PHONES.
+    """
+    try:
+        canonical = format_e164(phone)
+    except ValueError:
+        return False
+
+    if canonical.startswith("+155501"):
+        return True
+
+    env_authorized = [
+        p.strip()
+        for p in os.environ.get("AUTHORIZED_RECIPIENT_PHONES", "").split(",")
+        if p.strip()
+    ]
+    return canonical in env_authorized
 
 
 def mask_phone_number(phone: str) -> str:
@@ -41,29 +103,52 @@ def mask_phone_number(phone: str) -> str:
     return f"{s[:3]}••••••{s[-4:]}"
 
 
-
 class CallEVoiceService:
     def __init__(self):
         self.api_key = os.environ.get("CALLE_API_KEY")
         logger.info(
-            f"[Call-E Service] Call-E Voice API endpoint set to '{CALLE_API_ENDPOINT}'. Using CalleClient SDK: {CalleClient is not None}"
+            f"[Call-E Service] Endpoint: '{CALLE_API_ENDPOINT}'. Outbound Calls Enabled: {ENABLE_OUTBOUND_CALLS}. SDK Available: {CalleClient is not None}"
         )
 
-    def call_on_call_engineer(self, result_schema: dict):
+    def call_on_call_engineer(self, result_schema: dict) -> dict:
         """
         Calls on-call engineer using Call-E Python SDK (https://docs.heycall-e.com/calls).
-        Presents detailed error, Playbook, Jira history, and requests resolution steps with result_schema extraction.
+        Enforces:
+        - Default to no-call (sandbox/fake mode unless ENABLE_OUTBOUND_CALLS=true)
+        - Explicit authorized ASCII E.164 recipient validation
+        - Approved HTTPS origin checking
+        - Rejection of HTTP redirects
+        - Bound approval (no fabrication upon error or timeout)
         """
-        engineer = result_schema["oncall_engineer"]
+        engineer = result_schema.get("oncall_engineer", {})
         eng_name = engineer.get("name", "Alex Morgan")
-        phone = format_e164(engineer.get("phone", "+15550199"))
-        locale = engineer.get("locale", "en-US")
-        region = engineer.get("region", "US")
-        user_id = engineer.get("userid") or engineer.get("user_id", "s9a3h7")
+        raw_phone = engineer.get("phone", "+15550199")
 
         error_context = result_schema.get("error_context", {})
         dag_id = error_context.get("dag_id", "retail_inventory_etl")
         task_id = error_context.get("task_id", "transform_inventory_sql")
+        incident_id = result_schema.get("incident_id")
+
+        # 1. Validate ASCII E.164 format
+        try:
+            phone = format_e164(raw_phone)
+        except ValueError as e:
+            logger.error(f"❌ [Call-E Safety Violation] Invalid recipient phone '{raw_phone}': {e}")
+            return {
+                "approved": False,
+                "user_id_validated": False,
+                "status": "INVALID_RECIPIENT",
+                "error": str(e),
+                "dag_id": dag_id,
+                "task_id": task_id,
+                "incident_id": incident_id,
+                "is_sandbox": not ENABLE_OUTBOUND_CALLS,
+            }
+
+        locale = engineer.get("locale", "en-US")
+        region = engineer.get("region", "US")
+        user_id = engineer.get("userid") or engineer.get("user_id", "a7m9x1")
+
         error_msg = error_context.get("error_message", "")
         playbook = result_schema.get("playbook_details", {})
         jira = result_schema.get("jira_history", [])
@@ -107,134 +192,278 @@ class CallEVoiceService:
             "additionalProperties": False,
         }
 
-
         call_payload = {
             "task": prompt_text,
             "recipients": [{"phones": [phone], "locale": locale, "region": region}],
             "result_schema": incident_result_schema,
             "metadata": {
                 "agent_id": "call_e_incident_response_agent",
-                "incident_id": result_schema.get("incident_id"),
+                "incident_id": incident_id,
             },
         }
 
         logger.info("\n" + "=" * 75)
         logger.info(
-            f"📞 [CALL-E PYTHON SDK OUTBOUND CALL] Target: On-Call Engineer {eng_name} ({mask_phone_number(phone)})"
+            f"📞 [CALL-E VOICE AI] Recipient: {eng_name} ({mask_phone_number(phone)}) | Outbound Enabled: {ENABLE_OUTBOUND_CALLS}"
         )
         logger.info("=" * 75)
 
-        if self.api_key:
-            try:
-                if CalleClient is not None:
-                    base_url = (
-                        CALLE_API_ENDPOINT.replace("/v1/calls", "")
-                        .replace("/calls", "")
-                        .rstrip("/")
+        # 2. DEFAULT TO NO-CALL (Local Sandbox Operation)
+        if not ENABLE_OUTBOUND_CALLS:
+            logger.info(
+                f"[Call-E Voice AI] Sandbox operation active (ENABLE_OUTBOUND_CALLS=false). Simulating local authorized response for fixture {eng_name}."
+            )
+            logger.info(
+                f"🔐 [Call-E Security Validation] Verification Step: On-Call Engineer {eng_name} provided User ID '{user_id}'."
+            )
+            logger.info(
+                f"🗣️ [{eng_name} via Call-E Voice AI Sandbox]: 'User ID {user_id} verified. Approved. Please run: ALTER TABLE daily_store_inventory_agg ADD COLUMN inventory_status TEXT DEFAULT \'OK\'; then validate data.'"
+            )
+            logger.info("=" * 75 + "\n")
+
+            return {
+                "approved": True,
+                "user_id_validated": True,
+                "user_id": user_id,
+                "engineer_name": eng_name,
+                "engineer_phone": phone,
+                "resolution_instructions": "ALTER TABLE daily_store_inventory_agg ADD COLUMN inventory_status TEXT DEFAULT 'OK';",
+                "dag_id": dag_id,
+                "task_id": task_id,
+                "incident_id": incident_id,
+                "is_sandbox": True,
+                "status": "APPROVED",
+            }
+
+        # 3. LIVE CALL DISPATCH PATH
+        if not is_authorized_recipient(phone):
+            logger.error(
+                f"❌ [Call-E Safety Violation] Recipient '{mask_phone_number(phone)}' is not in authorized recipients list."
+            )
+            return {
+                "approved": False,
+                "user_id_validated": False,
+                "status": "UNAUTHORIZED_RECIPIENT",
+                "error": f"Recipient '{mask_phone_number(phone)}' is not in authorized recipient whitelist.",
+                "dag_id": dag_id,
+                "task_id": task_id,
+                "incident_id": incident_id,
+                "is_sandbox": False,
+            }
+
+        if not self.api_key:
+            logger.error("❌ [Call-E Configuration] ENABLE_OUTBOUND_CALLS=true but CALLE_API_KEY is not set.")
+            return {
+                "approved": False,
+                "user_id_validated": False,
+                "status": "MISSING_CREDENTIALS",
+                "error": "CALLE_API_KEY required for live outbound call dispatch.",
+                "dag_id": dag_id,
+                "task_id": task_id,
+                "incident_id": incident_id,
+                "is_sandbox": False,
+            }
+
+        try:
+            validated_endpoint = validate_https_origin(CALLE_API_ENDPOINT)
+            parsed = urlsplit(validated_endpoint)
+            base_url = f"https://{parsed.netloc}"
+
+            if CalleClient is not None:
+                client = CalleClient(api_key=self.api_key, base_url=base_url)
+                created_call = client.calls.create(
+                    task=prompt_text,
+                    recipients=[
+                        {"phones": [phone], "locale": locale, "region": region}
+                    ],
+                    result_schema=incident_result_schema,
+                    metadata={
+                        "agent_id": "call_e_incident_response_agent",
+                        "incident_id": incident_id,
+                    },
+                )
+                call_id = (
+                    created_call.get("id")
+                    if isinstance(created_call, dict)
+                    else getattr(created_call, "id", str(created_call))
+                )
+                logger.info(f"[Call-E SDK] Call created: id={call_id}")
+                if not call_id:
+                    return {
+                        "approved": False,
+                        "user_id_validated": False,
+                        "status": "CREATION_FAILED",
+                        "error": "Call creation did not return a call ID",
+                        "dag_id": dag_id,
+                        "task_id": task_id,
+                        "incident_id": incident_id,
+                        "is_sandbox": False,
+                    }
+
+                logger.info(f"[Call-E SDK] Waiting for call '{call_id}' to complete...")
+                completed_call = client.calls.wait_for_result(
+                    call_id, timeout_seconds=300, interval_seconds=10
+                )
+                if not completed_call or not isinstance(completed_call, dict):
+                    return {
+                        "approved": False,
+                        "user_id_validated": False,
+                        "status": "TIMED_OUT",
+                        "error": "Call did not return a valid result dictionary.",
+                        "dag_id": dag_id,
+                        "task_id": task_id,
+                        "incident_id": incident_id,
+                        "is_sandbox": False,
+                    }
+
+                call_status = completed_call.get("status")
+                if call_status != "completed":
+                    logger.warning(
+                        f"[Call-E SDK] Call '{call_id}' finished with non-completed status: {call_status}"
                     )
-                    if not base_url:
-                        base_url = "https://api.heycall-e.com"
-                    client = CalleClient(api_key=self.api_key, base_url=base_url)
-                    created_call = client.calls.create(
-                        task=prompt_text,
-                        recipients=[
-                            {"phones": [phone], "locale": locale, "region": region}
-                        ],
-                        result_schema=incident_result_schema,
-                        metadata={
-                            "agent_id": "call_e_incident_response_agent",
-                            "incident_id": result_schema.get("incident_id"),
-                        },
+                    return {
+                        "approved": False,
+                        "user_id_validated": False,
+                        "status": call_status or "FAILED",
+                        "error": f"Call ended with status '{call_status}'",
+                        "dag_id": dag_id,
+                        "task_id": task_id,
+                        "incident_id": incident_id,
+                        "is_sandbox": False,
+                    }
+
+                res_data = completed_call.get("result") or completed_call.get("result_schema") or {}
+                uid_validated = bool(res_data.get("user_id_validated") is True)
+                app_val = str(res_data.get("approved", "")).lower()
+                is_approved = uid_validated and (app_val in ("yes", "true"))
+                instructions = res_data.get("resolution_instructions", "")
+
+                return {
+                    "approved": is_approved,
+                    "user_id_validated": uid_validated,
+                    "user_id": user_id if uid_validated else None,
+                    "engineer_name": eng_name,
+                    "engineer_phone": phone,
+                    "resolution_instructions": instructions if is_approved else "",
+                    "status": "APPROVED" if is_approved else "REJECTED_OR_UNCONFIRMED",
+                    "evidence_summary": res_data.get("evidence_summary", ""),
+                    "dag_id": dag_id,
+                    "task_id": task_id,
+                    "incident_id": incident_id,
+                    "is_sandbox": False,
+                }
+
+            else:
+                # REST API fallback with strict redirect rejection
+                response = requests.post(
+                    validated_endpoint,
+                    json=call_payload,
+                    headers={
+                        "Authorization": f"Bearer {self.api_key}",
+                        "Content-Type": "application/json",
+                    },
+                    timeout=10,
+                    allow_redirects=False,
+                )
+                if response.is_redirect or response.status_code in [301, 302, 303, 307, 308]:
+                    raise ValueError(
+                        f"HTTP Redirect rejected for credentialed Call-E endpoint: HTTP {response.status_code}"
                     )
-                    call_id = (
-                        created_call.get("id")
-                        if isinstance(created_call, dict)
-                        else getattr(created_call, "id", created_call)
+
+                if response.status_code not in [200, 201, 202]:
+                    logger.error(
+                        f"[Call-E API] Request returned HTTP {response.status_code}: {response.text}"
                     )
-                    logger.info(
-                        f"[Call-E SDK] Call created via CalleClient SDK: id={call_id}"
-                    )
-                    if call_id:
-                        logger.info(
-                            f"[Call-E SDK] Waiting for call '{call_id}' to complete..."
-                        )
-                        completed_call = client.calls.wait_for_result(
-                            call_id, timeout_seconds=300, interval_seconds=20
-                        )
-                        logger.info(
-                            f"[Call-E SDK] Call '{call_id}' finished: status={completed_call.get('status')}, task_completed={completed_call.get('task_completed')}"
-                        )
-                else:
-                    response = requests.post(
-                        CALLE_API_ENDPOINT,
-                        json=call_payload,
-                        headers={
-                            "Authorization": f"Bearer {self.api_key}",
-                            "Content-Type": "application/json",
-                        },
+                    return {
+                        "approved": False,
+                        "user_id_validated": False,
+                        "status": f"HTTP_{response.status_code}",
+                        "error": response.text,
+                        "dag_id": dag_id,
+                        "task_id": task_id,
+                        "incident_id": incident_id,
+                        "is_sandbox": False,
+                    }
+
+                resp_data = response.json() if response.text else {}
+                call_id = resp_data.get("id")
+                if not call_id:
+                    return {
+                        "approved": False,
+                        "user_id_validated": False,
+                        "status": "NO_CALL_ID",
+                        "error": "No call ID returned in REST response",
+                        "dag_id": dag_id,
+                        "task_id": task_id,
+                        "incident_id": incident_id,
+                        "is_sandbox": False,
+                    }
+
+                # Poll status with redirect rejection
+                import time
+
+                deadline = time.time() + 120
+                final_res = None
+                while time.time() < deadline:
+                    poll_res = requests.get(
+                        f"{base_url}/v1/calls/{call_id}",
+                        headers={"Authorization": f"Bearer {self.api_key}"},
                         timeout=10,
+                        allow_redirects=False,
                     )
-                    if response.status_code in [200, 201, 202]:
-                        resp_data = response.json() if response.text else {}
-                        call_id = resp_data.get("id")
-                        logger.info(
-                            f"[Call-E API] Call triggered via REST (HTTP {response.status_code}). id={call_id}"
-                        )
-                        if call_id:
-                            logger.info(
-                                f"[Call-E API] Polling call status for '{call_id}'..."
-                            )
-                            import time
+                    if poll_res.is_redirect or poll_res.status_code in [301, 302, 303, 307, 308]:
+                        raise ValueError(f"HTTP Redirect rejected in polling: HTTP {poll_res.status_code}")
+                    if poll_res.status_code == 200:
+                        p_data = poll_res.json()
+                        p_status = p_data.get("status")
+                        if p_status in ["completed", "failed", "canceled"]:
+                            final_res = p_data
+                            break
+                    time.sleep(2)
 
-                            base_url = (
-                                CALLE_API_ENDPOINT.replace("/v1/calls", "")
-                                .replace("/calls", "")
-                                .rstrip("/")
-                            )
-                            deadline = time.time() + 120
-                            while time.time() < deadline:
-                                poll_res = requests.get(
-                                    f"{base_url}/v1/calls/{call_id}",
-                                    headers={"Authorization": f"Bearer {self.api_key}"},
-                                    timeout=10,
-                                )
-                                if poll_res.status_code == 200:
-                                    status = poll_res.json().get("status")
-                                    if status in ["completed", "failed", "canceled"]:
-                                        logger.info(
-                                            f"[Call-E API] Call '{call_id}' reached terminal status: {status}"
-                                        )
-                                        break
-                                time.sleep(2)
-                    else:
-                        logger.warning(
-                            f"[Call-E API] Call API request returned HTTP {response.status_code}: {response.text}"
-                        )
-            except Exception as e:
-                logger.warning(f"[Call-E API/SDK] API call info: {e}")
-                raise
+                if not final_res or final_res.get("status") != "completed":
+                    term_status = (final_res.get("status") if final_res else "TIMED_OUT") or "FAILED"
+                    return {
+                        "approved": False,
+                        "user_id_validated": False,
+                        "status": term_status,
+                        "error": f"Call ended with terminal status: {term_status}",
+                        "dag_id": dag_id,
+                        "task_id": task_id,
+                        "incident_id": incident_id,
+                        "is_sandbox": False,
+                    }
 
-        # Simulate voice dialogue response from engineer
-        logger.info(
-            f"🔐 [Call-E Security Validation] Verification Step: On-Call Engineer {eng_name} provided User ID '{user_id}'."
-        )
-        logger.info(
-            f"🗣️ [{eng_name} via Call-E Voice AI]: 'User ID {user_id} verified. Approved. Please run: ALTER TABLE daily_store_inventory_agg ADD COLUMN inventory_status TEXT DEFAULT \'OK\'; then validate data.'"
-        )
-        logger.info("=" * 75 + "\n")
+                r_data = final_res.get("result") or final_res.get("result_schema") or {}
+                uid_validated = bool(r_data.get("user_id_validated") is True)
+                app_val = str(r_data.get("approved", "")).lower()
+                is_approved = uid_validated and (app_val in ("yes", "true"))
+                return {
+                    "approved": is_approved,
+                    "user_id_validated": uid_validated,
+                    "user_id": user_id if uid_validated else None,
+                    "engineer_name": eng_name,
+                    "engineer_phone": phone,
+                    "resolution_instructions": r_data.get("resolution_instructions", "") if is_approved else "",
+                    "status": "APPROVED" if is_approved else "REJECTED_OR_UNCONFIRMED",
+                    "dag_id": dag_id,
+                    "task_id": task_id,
+                    "incident_id": incident_id,
+                    "is_sandbox": False,
+                }
 
-        return {
-            "approved": True,
-            "user_id_validated": True,
-            "user_id": user_id,
-            "engineer_name": eng_name,
-            "engineer_phone": phone,
-            "resolution_instructions": "ALTER TABLE daily_store_inventory_agg ADD COLUMN inventory_status TEXT DEFAULT 'OK';",
-            "dag_id": dag_id,
-            "task_id": task_id,
-            "incident_id": result_schema.get("incident_id"),
-        }
-
+        except Exception as e:
+            logger.error(f"❌ [Call-E Outbound Error] Failed to complete live call: {e}")
+            return {
+                "approved": False,
+                "user_id_validated": False,
+                "status": "ERROR",
+                "error": str(e),
+                "dag_id": dag_id,
+                "task_id": task_id,
+                "incident_id": incident_id,
+                "is_sandbox": False,
+            }
 
     def call_post_validation(
         self,
@@ -250,11 +479,17 @@ class CallEVoiceService:
         If not solved: informs failure and requests joining Zoom bridge.
         """
         eng_name = engineer_info.get("name", "Alex Morgan")
-        phone = format_e164(engineer_info.get("phone", "+15550199"))
+        raw_phone = engineer_info.get("phone", "+15550199")
+
+        try:
+            phone = format_e164(raw_phone)
+        except ValueError as e:
+            logger.error(f"[Call-E Service] Post-validation phone validation failed: {e}")
+            return
 
         logger.info("\n" + "=" * 75)
         logger.info(
-            f"📞 [CALL-E PYTHON SDK FOLLOW-UP CALL] Target: {eng_name} ({mask_phone_number(phone)})"
+            f"📞 [CALL-E FOLLOW-UP CALL] Target: {eng_name} ({mask_phone_number(phone)}) | Outbound Enabled: {ENABLE_OUTBOUND_CALLS}"
         )
         logger.info("=" * 75)
 
@@ -273,120 +508,92 @@ class CallEVoiceService:
                 f"Data validation failed. Please join the emergency Zoom bridge immediately: {zoom_url}'"
             )
 
-        followup_schema = {
-            "type": "object",
-            "required": ["acknowledged", "evidence_summary"],
-            "properties": {
-                "acknowledged": {
-                    "type": "string",
-                    "enum": ["yes", "no", "unknown"],
-                    "description": "Whether the engineer acknowledged the post-validation status update. Use yes when acknowledged, no when rejected, and unknown if unconfirmed.",
-                },
-                "evidence_summary": {
-                    "type": "string",
-                    "description": "One concise sentence summarizing the engineer's response to the follow-up.",
-                },
-            },
-            "additionalProperties": False,
-        }
+        if not ENABLE_OUTBOUND_CALLS or not self.api_key:
+            logger.info(
+                f"[Call-E Voice AI] Sandbox/Fake-only mode active. Skipping live follow-up outbound call to {eng_name} ({mask_phone_number(phone)})."
+            )
+            logger.info(script)
+            logger.info("=" * 75 + "\n")
+            return
 
-        if self.api_key:
-            try:
-                if CalleClient is not None:
-                    base_url = (
-                        CALLE_API_ENDPOINT.replace("/v1/calls", "")
-                        .replace("/calls", "")
-                        .rstrip("/")
+        if not is_authorized_recipient(phone):
+            logger.error(
+                f"[Call-E Safety Violation] Recipient '{mask_phone_number(phone)}' is not an authorized recipient."
+            )
+            return
+
+        try:
+            validated_endpoint = validate_https_origin(CALLE_API_ENDPOINT)
+            parsed = urlsplit(validated_endpoint)
+            base_url = f"https://{parsed.netloc}"
+
+            followup_schema = {
+                "type": "object",
+                "required": ["acknowledged", "evidence_summary"],
+                "properties": {
+                    "acknowledged": {
+                        "type": "string",
+                        "enum": ["yes", "no", "unknown"],
+                        "description": "Whether the engineer acknowledged the post-validation status update.",
+                    },
+                    "evidence_summary": {
+                        "type": "string",
+                        "description": "One concise sentence summarizing the engineer's response to the follow-up.",
+                    },
+                },
+                "additionalProperties": False,
+            }
+
+            if CalleClient is not None:
+                client = CalleClient(api_key=self.api_key, base_url=base_url)
+                created_call = client.calls.create(
+                    task=script,
+                    recipients=[
+                        {
+                            "phones": [phone],
+                            "locale": engineer_info.get("locale", "en-US"),
+                            "region": engineer_info.get("region", "US"),
+                        }
+                    ],
+                    result_schema=followup_schema,
+                    metadata={"dag_id": dag_id, "success": success},
+                )
+                call_id = (
+                    created_call.get("id")
+                    if isinstance(created_call, dict)
+                    else getattr(created_call, "id", str(created_call))
+                )
+                logger.info(f"[Call-E SDK] Follow-up call created: id={call_id}")
+                if call_id:
+                    client.calls.wait_for_result(
+                        call_id, timeout_seconds=120, interval_seconds=5
                     )
-                    if not base_url:
-                        base_url = "https://api.heycall-e.com"
-                    client = CalleClient(api_key=self.api_key, base_url=base_url)
-                    created_call = client.calls.create(
-                        task=script,
-                        recipients=[
+            else:
+                response = requests.post(
+                    validated_endpoint,
+                    json={
+                        "task": script,
+                        "recipients": [
                             {
                                 "phones": [phone],
                                 "locale": engineer_info.get("locale", "en-US"),
                                 "region": engineer_info.get("region", "US"),
                             }
                         ],
-                        result_schema=followup_schema,
-                        metadata={"dag_id": dag_id, "success": success},
-                    )
-                    call_id = (
-                        created_call.get("id")
-                        if isinstance(created_call, dict)
-                        else getattr(created_call, "id", created_call)
-                    )
-                    logger.info(
-                        f"[Call-E SDK] Follow-up call created via CalleClient SDK: id={call_id}"
-                    )
-                    if call_id:
-                        logger.info(
-                            f"[Call-E SDK] Waiting for follow-up call '{call_id}' to complete..."
-                        )
-                        completed_call = client.calls.wait_for_result(
-                            call_id, timeout_seconds=120, interval_seconds=2
-                        )
-                        logger.info(
-                            f"[Call-E SDK] Follow-up call '{call_id}' finished: status={completed_call.get('status')}"
-                        )
-                else:
-                    response = requests.post(
-                        CALLE_API_ENDPOINT,
-                        json={
-                            "task": script,
-                            "recipients": [
-                                {
-                                    "phones": [phone],
-                                    "locale": engineer_info.get("locale", "en-US"),
-                                    "region": engineer_info.get("region", "US"),
-                                }
-                            ],
-                            "result_schema": followup_schema,
-                            "metadata": {"dag_id": dag_id, "success": success},
-                        },
-                        headers={
-                            "Authorization": f"Bearer {self.api_key}",
-                            "Content-Type": "application/json",
-                        },
-                        timeout=10,
-                    )
-                    if response.status_code in [200, 201, 202]:
-                        logger.info(
-                            "[Call-E API] Follow-up call placed successfully via REST (HTTP OK)."
-                        )
-                    else:
-                        logger.info(
-                            f"[Call-E API] Follow-up call REST status: HTTP {response.status_code}"
-                        )
-            except Exception as e:
-                logger.warning(f"[Call-E API/SDK] Follow-up call info: {e}")
+                        "result_schema": followup_schema,
+                        "metadata": {"dag_id": dag_id, "success": success},
+                    },
+                    headers={
+                        "Authorization": f"Bearer {self.api_key}",
+                        "Content-Type": "application/json",
+                    },
+                    timeout=10,
+                    allow_redirects=False,
+                )
+                if response.is_redirect or response.status_code in [301, 302, 303, 307, 308]:
+                    raise ValueError(f"HTTP Redirect rejected in follow-up call: {response.status_code}")
+        except Exception as e:
+            logger.warning(f"[Call-E API/SDK] Follow-up call warning: {e}")
 
         logger.info(script)
         logger.info("=" * 75 + "\n")
-
-
-if __name__ == "__main__":
-    calle = CallEVoiceService()
-    dummy_schema = {
-        "incident_id": "INC-1001",
-        "oncall_engineer": {"name": "Alex Morgan", "phone": "+15550199"},
-        "error_context": {
-            "dag_id": "retail_inventory_etl",
-            "task_id": "transform_inventory_sql",
-            "error_message": "no column named inventory_status",
-        },
-        "playbook_details": {
-            "id": "PB-SQL-001",
-            "title": "Missing Column",
-            "recommended_sql": "ALTER TABLE daily_store_inventory_agg ADD COLUMN inventory_status TEXT DEFAULT 'OK';",
-        },
-        "jira_history": [{"key": "RETAIL-4021"}],
-    }
-    calle.call_post_validation(
-        dummy_schema["oncall_engineer"],
-        "retail_inventory_etl",
-        "transform_inventory_sql",
-        success=True,
-    )

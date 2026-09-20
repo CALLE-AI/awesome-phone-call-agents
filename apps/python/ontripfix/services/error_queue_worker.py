@@ -221,10 +221,49 @@ def process_error_queue(resolution_queue_push_func):
 
         resolution_response = calle_service.call_on_call_engineer(result_schema)
         resolution_response["result_schema"] = result_schema
-        user_id_val = resolution_response.get("user_id_validated", True)
+        user_id_val = bool(resolution_response.get("user_id_validated") is True)
+        is_approved = user_id_val and (resolution_response.get("approved") in (True, "yes"))
         user_id_str = resolution_response.get(
-            "user_id", engineer.get("userid") or engineer.get("user_id", "s9a3h7")
+            "user_id", engineer.get("userid") or engineer.get("user_id", "a7m9x1")
         )
+
+        if not is_approved:
+            reason = (
+                resolution_response.get("error")
+                or resolution_response.get("status")
+                or "Remediation unconfirmed or declined by on-call engineer."
+            )
+            logger.warning(
+                f"🛑 [Incident Escalation] Halting automatic remediation for '{incident_id}'. Bound approval failed: approved={resolution_response.get('approved')}, user_id_validated={user_id_val}. Reason: {reason}"
+            )
+            log_incident_update(incident_id, {"status": "AWAITING_MANUAL_INTERVENTION"})
+            log_step(
+                incident_id,
+                4,
+                "Remediation Authorization Halt",
+                "FAILED",
+                f"Automatic remediation blocked: User ID validated={user_id_val}, Approved={resolution_response.get('approved')}. Reason: {reason}",
+            )
+            log_service_event(
+                incident_id,
+                "CALLE_VOICE",
+                "REMEDIATION_BLOCKED",
+                "WARNING",
+                f"Remediation halted without explicit bound approval. Reason: {reason}",
+                {"resolution": resolution_response},
+            )
+            if jira_key:
+                add_jira_comment(
+                    jira_key,
+                    f"⚠️ AUTOMATIC REMEDIATION BLOCKED: On-Call contact did not yield explicit authenticated approval.\n"
+                    f"- User ID Validated: {user_id_val}\n"
+                    f"- Approval Status: {resolution_response.get('approved')}\n"
+                    f"- Reason: {reason}\n"
+                    f"Ticket remains IN PROGRESS awaiting human manual triage.",
+                )
+            log_queue_action("ERROR_QUEUE", incident_id, "STOPPED_UNAPPROVED", payload)
+            error_queue.task_done()
+            continue
 
         if jira_key:
             add_jira_comment(
@@ -240,7 +279,6 @@ def process_error_queue(resolution_queue_push_func):
             f"Call completed. Engineer User ID '{user_id_str}' validated: {user_id_val}. Remediation approved: {resolution_response.get('approved')}",
             {"resolution": resolution_response},
         )
-
 
         # 5. Push resolution payload to Resolution Queue
         log_queue_action("ERROR_QUEUE", incident_id, "PROCESSED", payload)

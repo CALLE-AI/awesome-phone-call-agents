@@ -108,3 +108,78 @@ def test_fastapi_endpoints():
     assert "error_queue" in queues_res.json()
 
 
+def test_ascii_e164_format_and_rejection():
+    from services.calle_voice_service import format_e164, is_authorized_recipient
+
+    # Valid ASCII E.164
+    assert format_e164("+15550199") == "+15550199"
+    assert format_e164("+1-555-0199") == "+15550199"
+    assert format_e164("+919876543210") == "+919876543210"
+
+    # Fictional range authorization
+    assert is_authorized_recipient("+15550199") is True
+    assert is_authorized_recipient("+15550101") is True
+
+    # Rejection of invalid / non-ASCII / malformed formats
+    with pytest.raises(ValueError):
+        format_e164("")
+    with pytest.raises(ValueError):
+        format_e164("invalid_phone")
+    with pytest.raises(ValueError):
+        format_e164("+15550199\u0660")  # Non-ASCII digit
+    with pytest.raises(ValueError):
+        format_e164("+1")  # Too short
+
+
+def test_approved_https_origin_validation():
+    from services.calle_voice_service import validate_https_origin
+
+    # Valid HTTPS approved origin
+    assert validate_https_origin("https://api.heycall-e.com/v1/calls") == "https://api.heycall-e.com/v1/calls"
+    assert validate_https_origin("https://docs.heycall-e.com/calls") == "https://docs.heycall-e.com/calls"
+
+    # Insecure HTTP rejected
+    with pytest.raises(ValueError, match="must use HTTPS"):
+        validate_https_origin("http://api.heycall-e.com/v1/calls")
+
+    # Untrusted domain rejected
+    with pytest.raises(ValueError, match="Untrusted origin"):
+        validate_https_origin("https://malicious-site.com/calls")
+
+
+def test_no_call_default_and_unapproved_halt():
+    from services.calle_voice_service import CallEVoiceService
+
+    service = CallEVoiceService()
+
+    # When recipient is invalid, call fails safely without fabrication
+    invalid_schema = {
+        "incident_id": "INC-TEST-FAIL",
+        "oncall_engineer": {"name": "Test Eng", "phone": "not-a-phone"},
+        "error_context": {},
+    }
+    res = service.call_on_call_engineer(invalid_schema)
+    assert res["approved"] is False
+    assert res["user_id_validated"] is False
+    assert res["status"] == "INVALID_RECIPIENT"
+
+
+def test_fastapi_data_masking():
+    from fastapi.testclient import TestClient
+    from fastapi_app.app import app
+
+    client = TestClient(app)
+    roster_res = client.get("/api/roster")
+    assert roster_res.status_code == 200
+    roster_data = roster_res.json()
+    eng_phone = roster_data.get("engineer", {}).get("phone", "")
+    assert "••••" in eng_phone
+
+    stats_res = client.get("/api/dashboard/stats")
+    assert stats_res.status_code == 200
+    stats_data = stats_res.json()
+    oncall_phone = stats_data.get("oncall_engineer", {}).get("phone", "")
+    assert "••••" in oncall_phone
+
+
+

@@ -135,16 +135,66 @@ def health_check():
     }
 
 
+from services.calle_voice_service import mask_phone_number
+import re
+
+WEBHOOK_SECRET = os.environ.get("ONTRIPFIX_WEBHOOK_SECRET")
+
+
+def mask_sensitive_data(val: Any) -> Any:
+    """Masks phone numbers, emails, and user IDs across nested dictionaries, lists, and strings."""
+    if isinstance(val, dict):
+        masked = {}
+        for k, v in val.items():
+            if k in ("phone", "engineer_phone") and isinstance(v, str):
+                masked[k] = mask_phone_number(v)
+            elif k in ("email", "engineer_email") and isinstance(v, str) and "@" in v:
+                u, d = v.split("@", 1)
+                masked[k] = f"{u[:2]}••••@{d}"
+            elif k in ("userid", "user_id") and isinstance(v, str) and len(v) > 2:
+                masked[k] = f"{v[:2]}••••"
+            else:
+                masked[k] = mask_sensitive_data(v)
+        return masked
+    elif isinstance(val, list):
+        return [mask_sensitive_data(item) for item in val]
+    elif isinstance(val, str):
+        return re.sub(r"(\+\d{1,3})\d{4,10}(\d{4})", r"\1••••••\2", val)
+    return val
+
+
+def verify_trigger_authorization(request: Request):
+    """
+    Validates webhook secret if configured via ONTRIPFIX_WEBHOOK_SECRET.
+    When not configured, triggers operate under safe local fake-only sandbox rules.
+    """
+    if WEBHOOK_SECRET:
+        secret = (
+            request.headers.get("X-Ontripfix-Secret")
+            or request.headers.get("X-Webhook-Secret")
+        )
+        auth = request.headers.get("Authorization")
+        if auth and auth.startswith("Bearer "):
+            secret = auth.split(" ", 1)[1]
+        if secret != WEBHOOK_SECRET:
+            raise HTTPException(
+                status_code=401,
+                detail="Unauthorized: invalid or missing webhook secret header.",
+            )
+
+
 @app.post(
     "/api/airflow-failure-webhook",
     status_code=202,
     summary="Airflow Failure Webhook Interceptor",
 )
-def airflow_failure_webhook(payload: AirflowWebhookPayload):
+def airflow_failure_webhook(payload: AirflowWebhookPayload, request: Request):
     """
     FastAPI HTTP Webhook Endpoint for Airflow `on_failure_callback`.
     Intercepts DAG failure telemetry, enqueues to Error Queue, and returns incident ID immediately.
+    Protected with optional webhook authorization.
     """
+    verify_trigger_authorization(request)
     payload_dict = payload.model_dump()
     incident_id = enqueue_error_payload(payload_dict)
 
@@ -159,65 +209,68 @@ def airflow_failure_webhook(payload: AirflowWebhookPayload):
 
 @app.get("/api/dashboard/stats", summary="Get Dashboard KPI Metrics")
 def dashboard_stats():
-    """Returns aggregate metrics, queue counts, and recent incidents for the React Dashboard."""
+    """Returns aggregate metrics, queue counts, and recent incidents with masked contacts."""
     stats = get_dashboard_stats()
     oncall = get_ontripfix_on_call_engineer()
-    stats["oncall_engineer"] = oncall.get("engineer", {})
+    stats["oncall_engineer"] = mask_sensitive_data(oncall.get("engineer", {}))
     stats["shift_name"] = oncall.get("shift_name", "OnTripFix On-Call Shift")
-    return stats
+    return mask_sensitive_data(stats)
 
 
 @app.get("/api/incidents", summary="List All Incidents")
 def list_incidents():
-    """Lists all incidents recorded in the telemetry database."""
-    return get_all_incidents()
+    """Lists all incidents recorded in the telemetry database with masked recipient details."""
+    return mask_sensitive_data(get_all_incidents())
 
 
 @app.get("/api/incidents/{incident_id}", summary="Get Incident Timeline Details")
 def incident_details(incident_id: str):
-    """Retrieves step-by-step progress timeline (1 to 6) and service logs for a specific incident."""
+    """Retrieves step-by-step progress timeline (1 to 6) and service logs with masked contacts."""
     details = get_incident_details(incident_id)
     if not details:
         raise HTTPException(
             status_code=404, detail=f"Incident '{incident_id}' not found."
         )
-    return details
+    return mask_sensitive_data(details)
 
 
 @app.get("/api/queues", summary="Inspect Queue Messages")
 def inspect_queues():
-    """Returns received and pending messages for both Error Queue and Resolution Queue."""
-    return get_queue_messages()
+    """Returns received and pending messages for both Error Queue and Resolution Queue with masked contacts."""
+    return mask_sensitive_data(get_queue_messages())
 
 
 @app.get("/api/logs", summary="Get Audit Logs")
 def audit_logs(limit: int = 60):
-    """Returns timestamped audit logs across all microservices (Airflow, FastAPI, Jira, Confluence, Call-E, LangGraph)."""
-    return get_audit_logs(limit=limit)
+    """Returns timestamped audit logs across microservices with sanitized contact data."""
+    return mask_sensitive_data(get_audit_logs(limit=limit))
 
 
 @app.get("/api/roster", summary="Get Active On-Call Roster")
 def get_roster():
-    """Returns active on-call engineer roster configuration."""
-    return get_ontripfix_on_call_engineer()
+    """Returns active on-call engineer roster configuration with masked phone and credentials."""
+    roster = get_ontripfix_on_call_engineer()
+    return mask_sensitive_data(roster)
 
 
 @app.post(
     "/api/simulation/trigger", status_code=202, summary="Trigger Simulation Incident"
 )
-def trigger_simulation(background_tasks: BackgroundTasks):
-    """Allows one-click incident simulation directly from the React Dashboard."""
+def trigger_simulation(request: Request, background_tasks: BackgroundTasks):
+    """Allows one-click incident simulation directly from the React Dashboard in local fake-only sandbox mode."""
+    verify_trigger_authorization(request)
     test_payload = {
         "dag_id": "retail_inventory_etl",
         "task_id": "transform_inventory_sql",
         "execution_date": "2026-09-06T22:00:00",
         "error_message": "sqlite3.OperationalError: table daily_store_inventory_agg has no column named inventory_status",
+        "is_simulation": True,
     }
     incident_id = enqueue_error_payload(test_payload)
     return {
         "status": "SIMULATION_TRIGGERED",
         "incident_id": incident_id,
-        "message": "Test incident triggered and enqueued onto Error Queue.",
+        "message": "Test incident triggered and enqueued onto Error Queue in local fake-only sandbox mode.",
     }
 
 
