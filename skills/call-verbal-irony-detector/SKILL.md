@@ -1,6 +1,6 @@
 ---
 name: call-verbal-irony-detector
-description: Post-call pragmatics skill. Analyses a CALL-E transcript for verbal irony - the mismatch between what the callee literally says (positive words) and what they mean (negative intent) in complaint contexts - using an irony-marker lexicon plus context-contrast scoring. Returns a structured card with evidence spans, calibrated confidence or an explicit abstention, and a ready-to-use de-escalation goal for the next plan_call. Heuristic mode only, runs offline. Grounded in SarcNet (LREC-COLING 2024) and MUStARD++ (arXiv 2310.01430), adapted to text-only transcripts.
+description: Offline experimental CALL-E transcript helper using English irony markers and complaint-context scoring. Returns advisory evidence spans, illustrative confidence buckets or abstention, and suggested de-escalation wording. It does not establish a person's intent, authorize another call or perform consequential actions.
 license: MIT
 ---
 
@@ -46,6 +46,10 @@ or the flat shape used by sibling skill fixtures. Emits a card:
 - `irony_assessment: "unclear"` with a reason when the callee never spoke
 - `recommended_action`: `retry_with_deescalation_goal` (with the goal text),
   `verify_literal_intent_prompt`, or `continue`
+
+Confidence labels are fixed heuristic score buckets, not empirically calibrated
+probabilities. Action names are review suggestions only; confirm the person's
+intent and separately approve any follow-up call or consequential action.
 
 ### Craft the follow-up goal
 

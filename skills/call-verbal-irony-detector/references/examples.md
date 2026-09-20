@@ -88,7 +88,7 @@ Output:
   "goal": "You are calling back about this person's recent complaint. Open by acknowledging their frustration in one sentence before anything else. Speak at most two sentences per turn, then pause for a reply. Before acting on any positive-sounding statement made during a complaint discussion (for example 'great', 'fine', 'perfect'), confirm the literal intent with one short question such as 'Just to confirm - would you like me to keep the booking?'. If the caller sounds frustrated, offer to hand them to a human.",
   "notes": [
     "Heuristic skill: this template is a starting point; adapt wording to the case.",
-    "Use fictional +1 555-01xx numbers for any test calls."
+    "Keep fictional fixtures offline; any host-run live call requires separate explicit intent and an authorized E.164 destination."
   ]
 }
 ```
