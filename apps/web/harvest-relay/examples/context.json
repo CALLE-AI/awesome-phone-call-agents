@@ -1,0 +1,29 @@
+{
+  "id": "harvest-relay-TEST-integration",
+  "name": "TEST — import two synthetic CALL-E responses",
+  "provenance": "synthetic",
+  "evidence_mode": "test",
+  "notice": "TEST fixture. All providers, quotes, call IDs, conversations and lot facts are fictional. No actual call, booking or shipment is evidenced.",
+  "service_date": "2026-09-14",
+  "timezone": "America/Los_Angeles",
+  "now_min": 780,
+  "lot": {
+    "id": "LOT-TEST-042",
+    "commodity": "Strawberries",
+    "quantity_kg": 900,
+    "min_temp_c": 0,
+    "max_temp_c": 4,
+    "latest_arrival_min": 900,
+    "budget_usd": 500,
+    "origin": "Greenacre Co-op (fictional)"
+  },
+  "storages": [
+    { "id": "orchard", "name": "Orchard Cold Store", "status": "unknown" },
+    { "id": "riverside", "name": "Riverside Fresh Hub", "status": "unknown" },
+    { "id": "hillcrest", "name": "Hillcrest Warehouse", "status": "unknown" }
+  ],
+  "carriers": [
+    { "id": "swift", "name": "Swift Reefer", "status": "unknown" },
+    { "id": "local", "name": "Local Co-op Van", "status": "unknown" }
+  ]
+}

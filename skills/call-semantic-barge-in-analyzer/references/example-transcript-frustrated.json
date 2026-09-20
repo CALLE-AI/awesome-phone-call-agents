@@ -1,0 +1,14 @@
+{
+  "call_id": "example-barge-in-001",
+  "status": "completed",
+  "callee_masked": "+155****0188",
+  "transcript": [
+    {"speaker": "agent", "text": "Hello, this is an automated assistant from Example Pharmacy calling to review the five items on your order, explain the changes to our delivery policy, go over the payment options available this month, and confirm the updated shipping address on your account for the third time."},
+    {"speaker": "callee", "text": "Wait, wait, slow down."},
+    {"speaker": "agent", "text": "Of course. I will start again with the order items, then the delivery policy changes, then the payment options, and finally the shipping address confirmation."},
+    {"speaker": "callee", "text": "Hold on, how much is the total again?"},
+    {"speaker": "agent", "text": "The total is $42.10 including delivery."},
+    {"speaker": "callee", "text": "Enough, just tell me when it arrives."},
+    {"speaker": "agent", "text": "It arrives Thursday. Goodbye."}
+  ]
+}

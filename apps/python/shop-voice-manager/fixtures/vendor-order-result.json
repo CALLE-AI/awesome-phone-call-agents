@@ -1,0 +1,9 @@
+{
+  "vendor_order_completed": true,
+  "available": true,
+  "items": [
+    { "name": "Fish", "quantity": 2, "unit": "cooler boxes" }
+  ],
+  "quoted_amount": 45000,
+  "eta_text": "around 4pm today"
+}

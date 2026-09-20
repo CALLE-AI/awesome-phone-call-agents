@@ -1,0 +1,11 @@
+{
+  "call_id": "example-relay-001",
+  "status": "completed",
+  "callee_masked": "+155****0166",
+  "transcript": [
+    {"speaker": "agent", "text": "Hello, this is an automated assistant calling on behalf of Maria Lopez about her mother's medication delivery. She would like it arranged soon."},
+    {"speaker": "callee", "text": "Sure, we can deliver tomorrow afternoon."},
+    {"speaker": "agent", "text": "Thank you, that works. Goodbye."},
+    {"speaker": "callee", "text": "Goodbye."}
+  ]
+}

@@ -1,0 +1,217 @@
+"""Authority sign-off via a real phone call (CALL-E).
+
+Pattern: an autonomous agent system already auto-authorized a high-stakes
+action under a real, named delegated-authority tier (a policy, an on-call
+role, a legal signatory, a budget owner — whatever your system's own
+authority model defines). The person that decision was made *in the name
+of* has not necessarily seen it yet. This places a real phone call to
+THAT person's own pre-registered number — never a third party, never an
+emergency number, never anyone who has not explicitly configured their own
+line for this — explains the decision in plain language, and returns a
+structured confirm/override you feed back into whatever function your
+system already uses to apply a human decision to that record. It does not
+gate the action (the action already happened); it closes the accountability
+loop after the fact.
+
+This is deliberately narrower than a pre-action approval gate (see
+`deployment-approval-call` and `incident-escalation-call` in this
+repository for that pattern) — it is for systems that already resolve
+things autonomously and need a real, attributable post-hoc confirm/veto
+channel, not a blocking gate before the action runs.
+
+IMPORTANT: the returned "decision" is one spoken word, not verified against
+a transcript read-back or a second channel. For a real emergency or
+financial action, do not let "override" alone automatically unwind it —
+route it to a human for manual reconciliation instead. Reserve fully
+automatic handling of the result for genuinely low-stakes, reversible
+decisions. See references/safety.md and SKILL.md's "Rules you must follow".
+
+Safe by default: with no CALLE_API_KEY, no recipient phone number, or the
+enable flag not explicitly "true", this never places a real call — it
+returns a dry-run result describing exactly what it would have said. A
+call failure (busy/no-answer/timeout/API error) also resolves as
+"unclear" rather than raising, so a flaky phone line can never leave a
+caller's workflow hanging. CALLE_SIGNOFF_PHONE is validated as ASCII E.164
+before every real call and masked anywhere it could appear in output — see
+validate_e164() / mask_phone() below.
+
+Demonstrated end to end, including a real call placed against CALL-E's live
+API, inside GovOS (https://github.com/shubhangi-mish/agents-for-humans/tree/main/govos),
+a Strands Agents-based autonomous incident-response *simulation* for Delhi —
+an experimental hackathon project, not a deployed government system. See
+../../../skills/authority-signoff-call/references/govos-reference-implementation.md.
+"""
+
+from __future__ import annotations
+
+import asyncio
+import logging
+import os
+import re
+from typing import Any
+
+logger = logging.getLogger("authority_signoff_call")
+
+RESULT_SCHEMA: dict[str, Any] = {
+    "type": "object",
+    "required": ["decision"],
+    "properties": {
+        "decision": {"type": "string", "enum": ["confirm", "override", "unclear"]},
+        "notes": {"type": "string"},
+    },
+}
+
+# E.164, ASCII only: + then 8-15 ASCII digits, no leading 0 after +. re.ASCII
+# stops Python's \d from matching non-ASCII decimal digits (e.g. Arabic-Indic
+# ٠-٩) that would otherwise pass a plain \d check while never being dialable.
+_E164_ASCII_RE = re.compile(r"^\+[1-9]\d{7,14}$", re.ASCII)
+_PHONE_TEXT_RE = re.compile(
+    r"(?<!\w)(?:\+\d[\d ().-]{6,}\d|\(?\d{3}\)?[ .-]\d{3}[ .-]\d{4})(?!\w)"
+)
+
+
+def validate_e164(phone: str) -> str:
+    """Raises ValueError (with the phone masked, never echoed raw) if
+    `phone` isn't an ASCII E.164 number. Called before every real call so a
+    malformed or non-ASCII destination never reaches the CALL-E API."""
+    value = (phone or "").strip()
+    if not value.isascii() or not _E164_ASCII_RE.fullmatch(value):
+        raise ValueError(
+            f"CALLE_SIGNOFF_PHONE must be ASCII E.164 (+ then 8-15 digits, "
+            f"e.g. +447700900123), got {mask_phone(value)!r}"
+        )
+    return value
+
+
+def mask_phone(phone: str) -> str:
+    """Keeps a country-ish prefix and the last 3 digits. Safe for stdout,
+    logs, and error text — never print or log a raw phone number. Anything
+    that isn't plain ASCII (so not a real E.164 number to begin with) is
+    fully redacted rather than partially echoed back."""
+    value = (phone or "").strip()
+    if not value.isascii() or len(value) < 7:
+        return "****"
+    return value[:3] + ("*" * (len(value) - 6)) + value[-3:]
+
+
+def public_text(value: str) -> str:
+    """Mask contact/credential display copies, never private call inputs.
+
+    This is a bounded output filter, not general-purpose PII anonymization.
+    """
+    text = str(value)
+    key = os.getenv("CALLE_API_KEY")
+    if key:
+        text = text.replace(key, "[credential redacted]")
+    phone = os.getenv("CALLE_SIGNOFF_PHONE", "").strip()
+    if phone:
+        text = text.replace(phone, mask_phone(phone))
+    text = re.sub(r"\b(?:iams_(?:live|test)_|calle_)[A-Za-z0-9_-]+\b", "[credential redacted]", text)
+    return _PHONE_TEXT_RE.sub(lambda match: mask_phone(match.group()), text)
+
+
+def _dry_run_reason() -> str | None:
+    if not os.getenv("CALLE_API_KEY"):
+        return "CALLE_API_KEY not set"
+    if not os.getenv("CALLE_SIGNOFF_PHONE"):
+        return "CALLE_SIGNOFF_PHONE not set"
+    if os.getenv("CALLE_SIGNOFF_ENABLED", "false").lower() != "true":
+        return 'CALLE_SIGNOFF_ENABLED is not "true"'
+    return None
+
+
+def build_task(
+    *, authority_name: str, context: str, decision_summary: str, authorizing_tier: str, amount: str | None
+) -> str:
+    """The natural-language call goal handed to CALL-E. Kept as a plain
+    function so a caller can preview exactly what will be said without
+    placing a call.
+
+    Frames this explicitly as reviewing an already-recorded log entry, not
+    issuing or seeking a live operational directive — verified necessary
+    against the real CALL-E API (see references/safety.md's "Lesson from
+    testing"): an earlier version of this text that described the decision
+    in direct operational language ("Deploy Medical/Ambulance Unit...
+    hospital access blocked") was rejected outright by CALL-E's own
+    call-creation safety check as seeking "an operational decision for an
+    active emergency or disaster response." That rejection was correct
+    behavior on CALL-E's part — this skill is a post-hoc log review, never
+    a live directive, and the call script should say so unambiguously
+    rather than rely on a classifier inferring it."""
+    amount_clause = f" (amount: {amount})" if amount else ""
+    return (
+        "This is a routine administrative call about a decision already recorded by an "
+        "automated system. It is not a live emergency, does not seek a real-time operational "
+        "decision, and does not direct or affect any live incident, dispatch, or safety-critical "
+        f"process — say this plainly if asked. The purpose of this call is to get "
+        f"{authority_name}'s approval on one matter: reviewing one log entry. Speak clearly and "
+        f"briefly, and state up front that you're calling to get their approval on this matter. "
+        f"Context: {context}. The system's policy engine already recorded the following as "
+        f"authorized under {authorizing_tier}{amount_clause}: \"{decision_summary}\". Ask whether "
+        "they want to CONFIRM this log entry as recorded, or OVERRIDE it (flag it for correction). "
+        "Politely end the call once you have a clear answer. If they are unavailable or the line "
+        "doesn't answer, record the outcome as unclear."
+    )
+
+
+async def request_signoff_call(
+    *,
+    authority_name: str,
+    context: str,
+    decision_summary: str,
+    authorizing_tier: str,
+    amount: str | None = None,
+    idempotency_key: str,
+) -> dict[str, Any]:
+    """Places (or, if not configured/enabled, simulates) the sign-off
+    call. Returns {"decision": "confirm"|"override"|"unclear",
+    "dry_run": bool, "raw": <private CALL-E result or None>}.
+    The task field is a masked display copy; raw is private integration data
+    and must not be printed, logged, or published wholesale."""
+    task = build_task(
+        authority_name=authority_name,
+        context=context,
+        decision_summary=decision_summary,
+        authorizing_tier=authorizing_tier,
+        amount=amount,
+    )
+    display_task = public_text(task)
+
+    reason = _dry_run_reason()
+    if reason:
+        logger.info("[DRY RUN — %s] Would call %s to sign off: %s", reason, public_text(authority_name), display_task)
+        return {"decision": "unclear", "dry_run": True, "raw": None, "dry_run_reason": reason, "task": display_task}
+
+    # Validate before every real call, never after — a malformed or
+    # non-ASCII destination must never reach the CALL-E API. The masked
+    # form is what appears in the log line below, never the raw number.
+    phone = validate_e164(os.environ["CALLE_SIGNOFF_PHONE"])
+    logger.info("Placing sign-off call to %s", mask_phone(phone))
+
+    def _place_call() -> dict[str, Any]:
+        from calle import CalleClient  # imported lazily — an optional runtime dependency
+
+        client = CalleClient(api_key=os.environ["CALLE_API_KEY"])
+        return client.calls.create_and_wait(
+            task=task,
+            recipient={"phone": phone},
+            result_schema=RESULT_SCHEMA,
+            metadata={"source": "authority-signoff-call"},
+            idempotency_key=idempotency_key,
+            timeout_seconds=180.0,
+        )
+
+    try:
+        # create_and_wait polls with a blocking sleep internally — never
+        # call it directly on an asyncio event loop.
+        call = await asyncio.to_thread(_place_call)
+    except Exception:
+        # SDK exception messages/tracebacks can contain request data or keys.
+        logger.warning("Sign-off call failed; outcome unclear. Reconcile before another attempt.")
+        return {"decision": "unclear", "dry_run": False, "raw": None, "error": True, "task": display_task}
+
+    structured = call.get("structured_result") or {}
+    decision = structured.get("decision", "unclear")
+    if decision not in ("confirm", "override", "unclear"):
+        decision = "unclear"
+    return {"decision": decision, "dry_run": False, "raw": call, "task": display_task}

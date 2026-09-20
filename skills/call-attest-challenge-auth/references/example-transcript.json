@@ -1,0 +1,12 @@
+{
+  "status": "COMPLETED",
+  "result": {
+    "post_summary": "Coordination check completed; response code accepted.",
+    "transcript": [
+      {"speaker": "agent", "text": "Hello. This is an automated assistant placing a coordination check. My word is 4f2a91. Please reply with the response code."},
+      {"speaker": "callee", "text": "BLUE ORANGE SEVEN 42"},
+      {"speaker": "agent", "text": "Thank you. Coordination confirmed. I will continue with the purpose of my call. Goodbye."}
+    ]
+  },
+  "callee_phone": "+14155550155"
+}

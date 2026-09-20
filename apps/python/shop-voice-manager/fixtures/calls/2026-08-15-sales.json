@@ -1,0 +1,137 @@
+{
+  "call_id": "call_sal_20260815",
+  "idempotency_key": "shopvoice-demo-lagos-corner-shop-sales-2026-08-15",
+  "status": "completed",
+  "task_completed": true,
+  "completion_confidence": {
+    "score": 0.88,
+    "label": "high"
+  },
+  "evidence": [
+    "Owner estimated about 88,000 NGN in sales for Saturday.",
+    "Owner named Indomie, Rice, Sugar as the best sellers.",
+    "Owner reported restocking Indomie x5, Milo x1."
+  ],
+  "structured_result": {
+    "sales_day_completed": true,
+    "estimated_revenue": 88000,
+    "currency": "NGN",
+    "top_sellers": [
+      "Indomie",
+      "Rice",
+      "Sugar"
+    ],
+    "owner_notes": "Best day this week. Indomie nearly finish again.",
+    "procurement_spend": 50000,
+    "procurement_items": [
+      {
+        "name": "Indomie",
+        "amount": 45000,
+        "supplier": "Chidinma Distributors"
+      },
+      {
+        "name": "Milo",
+        "amount": 5000,
+        "supplier": "Mama Nkechi Provisions"
+      }
+    ]
+  },
+  "metadata": {
+    "shop_id": "demo-lagos-corner-shop",
+    "call_type": "sales",
+    "call_date": "2026-08-15"
+  },
+  "recipients": [
+    {
+      "phones": [
+        "+2348000000000"
+      ],
+      "region": "NG",
+      "locale": "en",
+      "structured_result": {
+        "sales_day_completed": true,
+        "estimated_revenue": 88000,
+        "currency": "NGN",
+        "top_sellers": [
+          "Indomie",
+          "Rice",
+          "Sugar"
+        ],
+        "owner_notes": "Best day this week. Indomie nearly finish again.",
+        "procurement_spend": 50000,
+        "procurement_items": [
+          {
+            "name": "Indomie",
+            "amount": 45000,
+            "supplier": "Chidinma Distributors"
+          },
+          {
+            "name": "Milo",
+            "amount": 5000,
+            "supplier": "Mama Nkechi Provisions"
+          }
+        ]
+      },
+      "attempts": [
+        {
+          "attempt": 1,
+          "status": "completed",
+          "started_at": "2026-08-15T19:30:00+01:00",
+          "duration_seconds": 42,
+          "transcript_turns": [
+            {
+              "offset_seconds": 0,
+              "speaker": "bot",
+              "text": "Good evening. How business today?"
+            },
+            {
+              "offset_seconds": 3,
+              "speaker": "user",
+              "text": "E dey go."
+            },
+            {
+              "offset_seconds": 5,
+              "speaker": "bot",
+              "text": "I be AI assistant for your shop manager service. This call fit dey recorded."
+            },
+            {
+              "offset_seconds": 11,
+              "speaker": "bot",
+              "text": "Roughly how much you sell today?"
+            },
+            {
+              "offset_seconds": 15,
+              "speaker": "user",
+              "text": "Like 88,000 naira."
+            },
+            {
+              "offset_seconds": 20,
+              "speaker": "bot",
+              "text": "Which thing sell pass today?"
+            },
+            {
+              "offset_seconds": 24,
+              "speaker": "user",
+              "text": "Indomie sell pass."
+            },
+            {
+              "offset_seconds": 28,
+              "speaker": "bot",
+              "text": "You buy anything for shop today?"
+            },
+            {
+              "offset_seconds": 32,
+              "speaker": "user",
+              "text": "Yes, I buy indomie."
+            },
+            {
+              "offset_seconds": 37,
+              "speaker": "bot",
+              "text": "Thank you. I go note am."
+            }
+          ]
+        }
+      ]
+    }
+  ]
+}
