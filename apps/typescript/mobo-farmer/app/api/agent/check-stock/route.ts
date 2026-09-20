@@ -35,8 +35,8 @@ export async function POST(req: Request) {
       return NextResponse.json({ error: 'Invalid E.164. Must be +27XXXXXXXXX', status: 'unknown', message: 'manual-reconciliation required' }, { status: 400 });
     }
     const allowList = (process.env.ALLOWED_E164 || '').split(',').map(s=>s.trim()).filter(Boolean);
-    if (allowList.length > 0 &&!allowList.includes(phone)) {
-      return NextResponse.json({ error: `Destination ${phone} not in ALLOWED_E164 allowlist`, status: 'unknown' }, { status: 403 });
+    if (!allowList.includes(phone)) {
+      return NextResponse.json({ error: 'Destination is not authorized in ALLOWED_E164', status: 'unknown' }, { status: 403 });
     }
 
     let basePrompt = '';
