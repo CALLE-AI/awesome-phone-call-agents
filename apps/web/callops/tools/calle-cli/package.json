@@ -1,0 +1,14 @@
+{
+  "name": "callops-calle-cli-runtime",
+  "version": "0.0.0",
+  "private": true,
+  "description": "Locally pinned CALL-E CLI runtime for controlled CallOps authentication.",
+  "license": "MIT",
+  "engines": {
+    "node": ">=22"
+  },
+  "dependencies": {
+    "@call-e/cli": "0.3.7",
+    "@call-e/core": "0.2.3"
+  }
+}

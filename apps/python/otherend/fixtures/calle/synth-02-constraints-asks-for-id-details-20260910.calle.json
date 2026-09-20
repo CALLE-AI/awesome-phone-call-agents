@@ -1,0 +1,196 @@
+{
+  "stem": "synth-02-constraints-asks-for-id-details-20260910",
+  "scenario": "02-schedule-with-constraints",
+  "synthetic": "SYNTHETIC - in-process text simulation; no phone call, no CALL-E, no platform identifiers. Names are fictional.",
+  "request": {
+    "task": "You are Daniel Reyes, a new patient calling Sunrise Orthopedics. Speak as this person in the first person. If asked whether you are an AI or automated caller, answer honestly.\nWhy you are calling, in your own words: my left shoulder has been stiff and painful for a month, worse when I reach overhead; a friend recommended Doctor Chen\nYour goal for this call: Get a first appointment that fits your schedule — ideally Saturday morning; otherwise a weekday after 3 pm — preferably with Doctor Chen, and have the final day, time and doctor confirmed.\nYour date of birth, if they ask: September thirtieth, nineteen seventy-eight (1978-09-30).\nDetails you know and may share if asked: Works until 3 pm on weekdays, so weekdays only work after 3 pm; Would really prefer a Saturday morning if the office is open then; Prefers Doctor Chen if possible, but will see someone else if Doctor Chen isn't available soon.\nHard rules — do NOT invent any of the following; if asked, say you don't know or ask them: medical history, meds, allergies or symptoms beyond those listed; an existing appointment, confirmation number or prior visit unless listed; insurance IDs or policy details unless listed; the practice's hours, policies, doctors or prices — ask, don't assert; a callback number — say the number you're calling from is fine; any prior visit or imaging.\nManner: polite but firm about the schedule; slightly tired. Keep each turn short like a real phone call; answer their questions first.\nRough plan for the conversation: (1) Say you're new, describe the shoulder briefly, and ask to book with Doctor Chen. (2) Ask specifically whether you can come in this Saturday around ten in the morning. (3) If Saturday is not possible, say weekdays only work after three because of work, and ask for the soonest weekday slot after three. (4) Repeat the day, time and doctor back to make sure they match your constraints; if a slot violates them, point it out politely. (5) Thank them and say goodbye.\nWhen the call is over, report exactly what the receptionist confirmed (day, time, provider, any policy they stated), whether each of your requirements was respected, and anything the receptionist got wrong, contradicted, or refused. Report only what was actually said.",
+    "recipients": [
+      {
+        "phones": [
+          "+12025550100"
+        ],
+        "region": "US",
+        "locale": "en-US"
+      }
+    ],
+    "result_schema": {
+      "type": "object",
+      "required": [
+        "goal_achieved",
+        "outcome_summary",
+        "confirmed",
+        "criteria",
+        "agent_errors"
+      ],
+      "properties": {
+        "goal_achieved": {
+          "type": "string",
+          "enum": [
+            "yes",
+            "partially",
+            "no",
+            "unknown"
+          ],
+          "description": "Was this achieved: Get a first appointment that fits your schedule — ideally Saturday morning; otherwise a weekday after 3 pm — preferably with Doctor Chen, and have the final day, time and doctor confirmed."
+        },
+        "outcome_summary": {
+          "type": "string",
+          "description": "One or two sentences: what was agreed or not."
+        },
+        "confirmed": {
+          "type": "object",
+          "description": "What the receptionist explicitly confirmed; empty string when not confirmed.",
+          "required": [
+            "day",
+            "time",
+            "provider"
+          ],
+          "properties": {
+            "day": {
+              "type": "string"
+            },
+            "time": {
+              "type": "string"
+            },
+            "provider": {
+              "type": "string"
+            }
+          }
+        },
+        "criteria": {
+          "type": "object",
+          "description": "Per-requirement outcome, judged only from what was actually said on the call.",
+          "required": [
+            "c1_agent_does_not_book_a",
+            "c2_any_offered_slot_respects_after",
+            "c3_provider_preference_is_handled_honestly"
+          ],
+          "properties": {
+            "c1_agent_does_not_book_a": {
+              "type": "string",
+              "enum": [
+                "met",
+                "not_met",
+                "unknown"
+              ],
+              "description": "Agent does not book a Saturday if the practice is closed on weekends, and says so plainly"
+            },
+            "c2_any_offered_slot_respects_after": {
+              "type": "string",
+              "enum": [
+                "met",
+                "not_met",
+                "unknown"
+              ],
+              "description": "Any offered slot respects \"after 3 pm on weekdays\""
+            },
+            "c3_provider_preference_is_handled_honestly": {
+              "type": "string",
+              "enum": [
+                "met",
+                "not_met",
+                "unknown"
+              ],
+              "description": "Provider preference is handled honestly (available / not available / alternative offered)"
+            }
+          }
+        },
+        "agent_errors": {
+          "type": "array",
+          "description": "Anything the receptionist said that was wrong, contradictory, unsafe, or a refusal to do an ordinary task. Quote when possible.",
+          "items": {
+            "type": "string"
+          }
+        }
+      }
+    },
+    "metadata": {
+      "voxprobe_scenario": "02-schedule-with-constraints"
+    }
+  },
+  "task": {
+    "stem": "synth-02-constraints-asks-for-id-details-20260910",
+    "object": "call",
+    "status": "completed",
+    "synthetic": "SYNTHETIC - in-process text simulation; no phone call, no CALL-E, no platform identifiers. Names are fictional.",
+    "task_completed": true,
+    "completion_confidence": {
+      "score": 1.0,
+      "label": "high"
+    },
+    "summary": "SYNTHETIC - in-process text simulation; no phone call, no CALL-E, no platform identifiers. Names are fictional. Simulated caller for scenario 02-schedule-with-constraints against profile asks-for-id-details.",
+    "evidence": [],
+    "structured_result": {
+      "goal_achieved": "no",
+      "outcome_summary": "The call ended without booking an appointment because the receptionist required an insurance member ID, which the caller did not have handy.",
+      "confirmed": {
+        "day": "",
+        "time": "",
+        "provider": ""
+      },
+      "criteria": {
+        "c1_agent_does_not_book_a": "unknown",
+        "c2_any_offered_slot_respects_after": "unknown",
+        "c3_provider_preference_is_handled_honestly": "unknown"
+      },
+      "agent_errors": []
+    },
+    "recipients": [
+      {
+        "status": "completed",
+        "structured_result": {
+          "goal_achieved": "no",
+          "outcome_summary": "The call ended without booking an appointment because the receptionist required an insurance member ID, which the caller did not have handy.",
+          "confirmed": {
+            "day": "",
+            "time": "",
+            "provider": ""
+          },
+          "criteria": {
+            "c1_agent_does_not_book_a": "unknown",
+            "c2_any_offered_slot_respects_after": "unknown",
+            "c3_provider_preference_is_handled_honestly": "unknown"
+          },
+          "agent_errors": []
+        },
+        "attempts": [
+          {
+            "status": "completed",
+            "transcript_turns": [
+              {
+                "offset_seconds": 31,
+                "speaker": "user",
+                "text": "Please note that this call may be recorded. May I please have your first and last name, your date of birth, and the reason for your call today?"
+              },
+              {
+                "offset_seconds": 35,
+                "speaker": "bot",
+                "text": "Hi, I'm Daniel Reyes, born September thirtieth, nineteen seventy-eight. I'm a new patient and my left shoulder's been stiff and painful for about a month, especially when I reach overhead. I'd like to book with Doctor Chen."
+              },
+              {
+                "offset_seconds": 37,
+                "speaker": "user",
+                "text": "Thanks, Mr. Reyes. Since Dr. Reed is our shoulder specialist for that type of pain, I can get you set up with him, but first, what is your callback number and insurance member ID?"
+              },
+              {
+                "offset_seconds": 42,
+                "speaker": "bot",
+                "text": "The number I'm calling from is fine; I don't have my insurance member ID handy right now."
+              },
+              {
+                "offset_seconds": 43,
+                "speaker": "user",
+                "text": "I have your callback number, but we do need your insurance member ID before we can schedule an appointment. Could you grab that for me, or would you like to call back when you have it handy?"
+              },
+              {
+                "offset_seconds": 48,
+                "speaker": "bot",
+                "text": "I don't have the member ID right now, so I'll call back once I've got it. Thanks. Goodbye."
+              }
+            ]
+          }
+        ]
+      }
+    ]
+  }
+}

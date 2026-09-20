@@ -1,0 +1,29 @@
+{
+  "_note": "FICTIONAL example — E.164 reserved test number, not a real person. Contains all 17 questions worth of data.",
+  "phone": "+15550001234",
+  "call_id": "fixture-loss-report-001",
+  "outcome": "completed",
+  "structured_result": {
+    "outcome": "completed",
+    "incident_description": "My car was rear-ended while stopped at a red light on Route 50.",
+    "incident_date": "2026-09-10",
+    "incident_time": "14:30",
+    "incident_location": "Route 50, northbound near mile marker 42",
+    "incident_cause": "Another vehicle rear-ended me",
+    "safety_concern": "No immediate injuries, but neck pain",
+    "property_damaged": "2015 Honda Civic sedan - front bumper, hood, windshield",
+    "damage_description": "Front bumper crushed, hood crumpled, windshield cracked. Estimated $4,200 in damage.",
+    "damage_cause": "Rear-end collision at low speed",
+    "witnesses_contacted": "Yes, one witness from the other vehicle, contact: John Smith 555-0555",
+    "official_report_made": "Yes, police report filed",
+    "police_report_number": "2026-45821",
+    "photos_taken": "Yes, took 8 photos of damage and scene",
+    "mitigation_steps": "Had car towed to local repair shop, filed police report same day",
+    "repairs_already_performed": "Towing to repair facility only",
+    "estimates_invoices_received": "Yes, preliminary estimate from repair shop: $4,200",
+    "other_involved_parties": "Other driver, insurance: State Farm, policy number PRV-34892",
+    "additional_information": "Other driver admitted fault at scene. Police report confirms fault determination.",
+    "policy_number": "POL-TEST-7890",
+    "claimant_phone": "+15550001234"
+  }
+}

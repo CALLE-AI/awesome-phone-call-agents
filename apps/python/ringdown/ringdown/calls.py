@@ -1,9 +1,11 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
+from datetime import datetime
 from typing import Any, Literal, Mapping
 
 TERMINAL_STATUSES = frozenset({"completed", "failed", "canceled"})
+SPEAKERS = frozenset({"bot", "user"})
 STATUS_MAP = {
     "COMPLETED": "completed",
     "FAILED": "failed",
@@ -35,6 +37,7 @@ class CallSnapshot:
     recipient_phone: str | None
     metadata: dict[str, str]
     turns: tuple[Turn, ...]
+    duration_seconds: float | None
 
     @property
     def terminal(self) -> bool:
@@ -62,9 +65,28 @@ def parse_turns(raw: Any) -> tuple[Turn, ...]:
     for entry in raw:
         if not isinstance(entry, dict):
             continue
-        speaker = "user" if entry.get("speaker") == "user" else "bot"
+        speaker = str(entry.get("speaker", "")).strip().lower()
+        if speaker not in SPEAKERS:
+            raise ValueError(
+                f"a transcript turn names {entry.get('speaker')!r} as its speaker, "
+                f"and only {' and '.join(sorted(SPEAKERS))} can be told apart"
+            )
         turns.append(Turn(speaker=speaker, text=str(entry.get("text", ""))))
     return tuple(turns)
+
+
+def _duration(attempt: Mapping[str, Any]) -> float | None:
+    started, ended = attempt.get("started_at"), attempt.get("completed_at")
+    if not started or not ended:
+        return None
+    try:
+        return (moment(ended) - moment(started)).total_seconds()
+    except ValueError:
+        return None
+
+
+def moment(stamp: str) -> datetime:
+    return datetime.fromisoformat(str(stamp).replace("Z", "+00:00"))
 
 
 def snapshot_from(body: Mapping[str, Any]) -> CallSnapshot:
@@ -85,6 +107,7 @@ def snapshot_from(body: Mapping[str, Any]) -> CallSnapshot:
         recipient_phone=last.get("phone") or (first.get("phones") or [None])[0],
         metadata=dict(body.get("metadata") or {}),
         turns=parse_turns(last.get("transcript_turns")),
+        duration_seconds=_duration(last),
     )
 
 

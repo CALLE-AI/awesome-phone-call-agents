@@ -1,0 +1,23 @@
+{
+  "name": "window-agreed",
+  "description": "The callee offers to ring back. The caller declines, asks when to call instead, and the callee names a time. This is the happy path the whole app is built around.",
+  "status": "completed",
+  "now": "2026-09-14T10:00:00Z",
+  "turns": [
+    { "speaker": "caller", "text": "Good morning. I'm an automated assistant calling on behalf of Amina Otieno, with her permission. She is an existing patient of Dr Mwangi and I'm calling to book a follow-up." },
+    { "speaker": "callee", "text": "Right, let me see. What is the earliest appointment you have with Dr Mwangi?" },
+    { "speaker": "caller", "text": "What is the earliest appointment you have with Dr Mwangi?" },
+    { "speaker": "callee", "text": "Dr Mwangi has Tuesday the fifteenth at half nine, or the Thursday afternoon." },
+    { "speaker": "caller", "text": "Can you arrange a sign language interpreter for the appointment? The patient is Deaf and communicates in writing." },
+    { "speaker": "callee", "text": "I would have to check with the coordinator about the interpreter. I can ring you back once I know." },
+    { "speaker": "caller", "text": "I'm not able to take a call back. When should I call you instead?" },
+    { "speaker": "callee", "text": "Try me tomorrow between ten and twelve, I'll have spoken to her by then." },
+    { "speaker": "caller", "text": "Thank you, I'll call then. Goodbye." }
+  ],
+  "expect": {
+    "status": "window_agreed",
+    "next_action": "schedule_next_leg",
+    "number_disclosed": false,
+    "callback_requested_by_callee": true
+  }
+}

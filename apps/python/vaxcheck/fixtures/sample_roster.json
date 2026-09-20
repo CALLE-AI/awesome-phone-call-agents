@@ -1,0 +1,56 @@
+{
+  "session": {
+    "school_name": "Riverside Primary School",
+    "vaccine_name": "HPV vaccine (dose 1)",
+    "session_date": "2026-10-02",
+    "nurse_contact": "the school office on +1 415 555 0100",
+    "programme": "school immunisation programme",
+    "region": "US",
+    "language": "English"
+  },
+  "_note": "All numbers are NANPA reserved fictional numbers (555-01xx). Replace with numbers you are authorised to call before using --execute.",
+  "students": [
+    {
+      "student_id": "S-041",
+      "student_name": "Aisha Rahman",
+      "class_name": "P5-B",
+      "guardian_name": "Nadia Rahman",
+      "guardian_phone": "+14155550101"
+    },
+    {
+      "student_id": "S-042",
+      "student_name": "Marcus Tan",
+      "class_name": "P5-B",
+      "guardian_name": "Grace Tan",
+      "guardian_phone": "+14155550102"
+    },
+    {
+      "student_id": "S-043",
+      "student_name": "Priya Menon",
+      "class_name": "P5-C",
+      "guardian_name": "Deepa Menon",
+      "guardian_phone": "+14155550103"
+    },
+    {
+      "student_id": "S-044",
+      "student_name": "Daniel Okafor",
+      "class_name": "P5-C",
+      "guardian_name": "Chidi Okafor",
+      "guardian_phone": "+14155550104"
+    },
+    {
+      "student_id": "S-045",
+      "student_name": "Sofia Reyes",
+      "class_name": "P5-A",
+      "guardian_name": "Elena Reyes",
+      "guardian_phone": "+14155550105"
+    },
+    {
+      "student_id": "S-046",
+      "student_name": "Yusuf Ali",
+      "class_name": "P5-A",
+      "guardian_name": "Hana Ali",
+      "guardian_phone": "+14155550106"
+    }
+  ]
+}

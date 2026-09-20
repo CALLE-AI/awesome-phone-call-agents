@@ -1,0 +1,107 @@
+{
+  "recordedFrom": "15 responses in fixtures/calls",
+  "fingerprint": {
+    "shape": [
+      "completedAt:null",
+      "completedAt:string",
+      "completionConfidence.label:string",
+      "completionConfidence.score:number",
+      "completionConfidence:null",
+      "completionConfidence:object",
+      "createdAt:string",
+      "evidence:array",
+      "evidence[]:string",
+      "failureCode:null",
+      "failureCode:string",
+      "failureMessage:null",
+      "failureMessage:string",
+      "id:string",
+      "metadata:object",
+      "object:string",
+      "recipients:array",
+      "recipients[].attempts:array",
+      "recipients[].attempts[].completedAt:string",
+      "recipients[].attempts[].failureCode:null",
+      "recipients[].attempts[].failureCode:string",
+      "recipients[].attempts[].failureMessage:null",
+      "recipients[].attempts[].id:string",
+      "recipients[].attempts[].phone:string",
+      "recipients[].attempts[].providerCallId:string",
+      "recipients[].attempts[].startedAt:string",
+      "recipients[].attempts[].status:string",
+      "recipients[].attempts[].summary:string",
+      "recipients[].attempts[].transcriptTurns:array",
+      "recipients[].attempts[].transcriptTurns[].offset_seconds:number",
+      "recipients[].attempts[].transcriptTurns[].speaker:string",
+      "recipients[].attempts[].transcriptTurns[].text:string",
+      "recipients[].attempts[].transcriptTurns[]:object",
+      "recipients[].attempts[]:object",
+      "recipients[].id:string",
+      "recipients[].locale:string",
+      "recipients[].phones:array",
+      "recipients[].phones[]:string",
+      "recipients[].region:string",
+      "recipients[].status:string",
+      "recipients[].structuredResult:null",
+      "recipients[].structuredResult:object",
+      "recipients[].summary:null",
+      "recipients[].summary:string",
+      "recipients[]:object",
+      "status:string",
+      "structuredResult:null",
+      "summary:null",
+      "summary:string",
+      "task:string",
+      "taskCompleted:boolean",
+      "taskCompleted:null"
+    ],
+    "vocabulary": {
+      "object": [
+        "call_task"
+      ],
+      "recipients[].attempts[].failureCode": [
+        "404",
+        "486",
+        "603"
+      ],
+      "recipients[].attempts[].status": [
+        "completed",
+        "failed"
+      ],
+      "recipients[].attempts[].transcriptTurns[].speaker": [
+        "bot",
+        "user"
+      ],
+      "recipients[].locale": [
+        "en-US"
+      ],
+      "recipients[].region": [
+        "US"
+      ],
+      "recipients[].status": [
+        "completed",
+        "failed",
+        "pending"
+      ],
+      "status": [
+        "completed",
+        "failed",
+        "queued"
+      ],
+      "taskCompleted": [
+        "false",
+        "true"
+      ]
+    },
+    "quirks": [
+      "connected-call-timestamps-are-well-formed",
+      "failed-attempt-timestamp-has-no-zone",
+      "failed-attempt-timestamp-lags-four-hours",
+      "raw-sip-code-as-failure-code",
+      "recipient-speaks-after-the-agent-stops",
+      "single-attempt-reported",
+      "structured-result-without-conversation",
+      "summary-suggests-retry-for-unreachable-destination"
+    ]
+  }
+}

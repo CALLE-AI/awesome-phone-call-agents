@@ -1,0 +1,60 @@
+{
+  "id": "call_fictional_riverside_0001",
+  "object": "call_task",
+  "status": "completed",
+  "task": "You are ProcurePulse, an AI assistant calling Riverside Produce on behalf of Harbor & Vine ...",
+  "recipients": [
+    {
+      "id": "rcp_fictional_0001",
+      "phones": ["+14155550142"],
+      "locale": "en-US",
+      "region": "US",
+      "status": "completed",
+      "structured_result": {
+        "reached": "yes",
+        "item_match": "exact",
+        "available_quantity": "20",
+        "unit": "kg",
+        "unit_price": "14.50",
+        "currency": "USD",
+        "extra_fees": "0",
+        "fulfillment_method": "pickup",
+        "ready_at": "2026-09-11T18:15:00-07:00",
+        "quote_expires_at": "2026-09-11T20:00:00-07:00",
+        "contact_name": "Sam",
+        "conditions": "None stated",
+        "certainty": "high"
+      },
+      "summary": "Sam at Riverside Produce can supply 20 kg of Genovese basil at $14.50/kg with no fees, ready for pickup by 6:15 PM.",
+      "attempts": [
+        {
+          "id": "att_fictional_0001",
+          "phone": "+14155550142",
+          "status": "completed",
+          "started_at": "2026-09-11T23:12:05Z",
+          "completed_at": "2026-09-11T23:12:41Z",
+          "summary": "Sam at Riverside Produce can supply 20 kg of Genovese basil at $14.50/kg with no fees, ready for pickup by 6:15 PM.",
+          "transcript_turns": [
+            { "offset_seconds": 0, "speaker": "bot", "text": "Hi, this is ProcurePulse, an AI assistant for Harbor and Vine. Is this Riverside Produce?" },
+            { "offset_seconds": 6, "speaker": "user", "text": "Yep, Sam here." },
+            { "offset_seconds": 14, "speaker": "user", "text": "Fourteen fifty a kilo. No fees if you pick it up." },
+            { "offset_seconds": 24, "speaker": "user", "text": "Boxed by six fifteen. Price is good till eight." }
+          ],
+          "provider_call_id": "provider_fictional_0001",
+          "failure_code": null,
+          "failure_message": null
+        }
+      ]
+    }
+  ],
+  "structured_result": null,
+  "summary": "Riverside Produce quoted 20 kg of Genovese basil at $14.50/kg, no fees, pickup at 6:15 PM.",
+  "task_completed": true,
+  "completion_confidence": { "score": 0.94, "label": "high" },
+  "evidence": ["Sam confirmed 20 kg in stock at $14.50 per kg with no pickup fee."],
+  "metadata": { "request_id": "harbor-vine-basil-0911", "vendor_id": "riverside-produce", "purpose": "supplier_quote" },
+  "failure_code": null,
+  "failure_message": null,
+  "created_at": "2026-09-11T23:12:00Z",
+  "completed_at": "2026-09-11T23:12:44Z"
+}

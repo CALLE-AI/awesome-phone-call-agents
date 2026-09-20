@@ -1,0 +1,7 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1440" height="810" viewBox="0 0 1440 810" role="img" aria-label="Fictional safety lock verification panel">
+  <rect width="1440" height="810" fill="#08111f"/><rect x="92" y="72" width="1256" height="666" rx="24" fill="#11213b" stroke="#50e3c2" stroke-width="3"/>
+  <text x="150" y="155" fill="#ffffff" font-family="Arial" font-size="42" font-weight="700">Navigator Outreach · Safety Lock</text>
+  <text x="150" y="205" fill="#9fb3c8" font-family="Arial" font-size="24">FICTIONAL / LOCAL VERIFICATION · NO CALL PLACED</text>
+  <g font-family="Arial" font-size="32"><text x="185" y="320" fill="#50e3c2">● Execution disabled</text><text x="185" y="405" fill="#50e3c2">● GO disabled</text><text x="185" y="490" fill="#50e3c2">● Maximum calls = 0</text><text x="185" y="575" fill="#50e3c2">● Shutdown active</text></g>
+  <rect x="150" y="630" width="880" height="62" rx="10" fill="#173753"/><text x="178" y="672" fill="#ffffff" font-family="Arial" font-size="24">Mock-only posture: external connection false · telephone call attempted false</text>
+</svg>

@@ -1,0 +1,25 @@
+[project]
+name = "shop-voice-manager"
+version = "0.1.0"
+description = "Voice-first business record for informal retailers: CALL-E check-ins become a shop ledger and a weekly summary."
+requires-python = ">=3.11"
+
+# Empty on purpose. store.py, ingest.py, summarize.py and demo_ledger.py import
+# only the standard library, which is why the demo runs on a clean checkout with
+# nothing installed. The live path (R5) needs the CALL-E SDK, but live_call.py
+# imports it lazily inside build_client, so the demo, the tests and --help all
+# work without it. It is an extra, not a dependency.
+dependencies = []
+
+[project.optional-dependencies]
+dev = [
+  "pytest>=8.0",
+  "jsonschema>=4.0",   # validate_fixtures falls back without it; pinned so CI is exact
+]
+live = [
+  "calle-ai>=0.1.0",   # only needed for --execute; see README "Live calls"
+]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+addopts = "-q"

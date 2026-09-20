@@ -28,7 +28,7 @@ class _StubClient(CallEClient):
 
 def test_preview_masks_the_extracted_number_by_default(monkeypatch, capsys):
     exit_code = _run_preview(
-        monkeypatch, ["--email", SAMPLES, "--sender-domain", "secure-alerts-billing.com"]
+        monkeypatch, ["--email", SAMPLES]
     )
     out = capsys.readouterr().out
     assert exit_code == screen.EXIT_OK
@@ -39,7 +39,7 @@ def test_preview_masks_the_extracted_number_by_default(monkeypatch, capsys):
 def test_preview_shows_full_number_when_requested(monkeypatch, capsys):
     exit_code = _run_preview(
         monkeypatch,
-        ["--email", SAMPLES, "--sender-domain", "secure-alerts-billing.com", "--show-full-number"],
+        ["--email", SAMPLES, "--show-full-number"],
     )
     out = capsys.readouterr().out
     assert exit_code == screen.EXIT_OK
@@ -59,7 +59,7 @@ def test_preview_masks_the_number_even_when_it_shares_the_claimed_reason_line(mo
         encoding="utf-8",
     )
     exit_code = _run_preview(
-        monkeypatch, ["--email", str(email), "--sender-domain", "secure-alerts-billing.com"]
+        monkeypatch, ["--email", str(email)]
     )
     out = capsys.readouterr().out
     assert exit_code == screen.EXIT_OK
@@ -88,7 +88,6 @@ def test_live_run_exits_54_on_recipient_mismatch(monkeypatch, capsys, tmp_path):
         monkeypatch,
         [
             "--email", SAMPLES,
-            "--sender-domain", "secure-alerts-billing.com",
             "--live", "--confirm",
             "--to-phone", "+18005550187",
             "--allow-number", "+18005550187",
@@ -111,7 +110,6 @@ def test_unrestricted_without_confirm_number_is_refused(monkeypatch, capsys):
         monkeypatch,
         [
             "--email", SAMPLES,
-            "--sender-domain", "secure-alerts-billing.com",
             "--live", "--confirm",
             "--to-phone", "+18005550187",
             "--unrestricted",
@@ -127,7 +125,6 @@ def test_unrestricted_with_mismatched_confirm_number_is_refused(monkeypatch, cap
         monkeypatch,
         [
             "--email", SAMPLES,
-            "--sender-domain", "secure-alerts-billing.com",
             "--live", "--confirm",
             "--to-phone", "+18005550187",
             "--unrestricted",
@@ -150,7 +147,6 @@ def test_unrestricted_with_matching_confirm_number_proceeds(monkeypatch, capsys,
         monkeypatch,
         [
             "--email", SAMPLES,
-            "--sender-domain", "secure-alerts-billing.com",
             "--live", "--confirm",
             "--to-phone", "+18005550187",
             "--unrestricted",

@@ -1,0 +1,58 @@
+{
+  "_evidence_source": "synthetic: modeled on the FTC-documented preference scammers show for irreversible payment rails (see references/scam-red-flags.md)",
+  "category": "scam_pattern",
+  "case": {
+    "case_id": "case_f06",
+    "account_holder_name": "Priya Nair",
+    "on_file_phone": "+14155550106",
+    "claimed_transaction_amount": "9800.00",
+    "claimed_recipient": "Unverified crypto wallet",
+    "claimed_payment_method": "cryptocurrency",
+    "request_supplied_callback_number": null
+  },
+  "call": {
+    "id": "call_f06",
+    "status": "completed",
+    "task": "Verify a flagged $9,800 cryptocurrency transaction to an unverified wallet.",
+    "failure_code": null,
+    "failure_message": null,
+    "task_completed": true,
+    "completion_confidence": {"score": 0.9, "label": "high"},
+    "summary": "Account holder confirmed she was specifically told to pay in cryptocurrency."
+  },
+  "attempts": [
+    {
+      "id": "attempt_f06",
+      "phone": "+14155550106",
+      "status": "completed",
+      "started_at": "2026-09-10T14:20:00Z",
+      "completed_at": "2026-09-10T14:23:15Z",
+      "summary": "Account holder confirmed irreversible-payment insistence, otherwise calm.",
+      "transcript_turns": [
+        {"speaker": "bot", "text": "Did anyone ask you to keep this transaction private?"},
+        {"speaker": "user", "text": "No."},
+        {"speaker": "bot", "text": "Is there time pressure on this payment?"},
+        {"speaker": "user", "text": "No, not really."},
+        {"speaker": "bot", "text": "Can you describe your relationship to the recipient?"},
+        {"speaker": "user", "text": "It's a 'support technician' who fixed my computer last week."},
+        {"speaker": "bot", "text": "Were you asked to pay by wire, gift card, or cryptocurrency specifically?"},
+        {"speaker": "user", "text": "Yes, he said it had to be cryptocurrency, no other way would work."}
+      ],
+      "provider_call_id": "prov_f06",
+      "failure_code": null,
+      "failure_message": null
+    }
+  ],
+  "events": [
+    {"id": "evt_f06a", "type": "call.dialing", "call_id": "call_f06", "created_at": "2026-09-10T14:20:00Z", "level": "info", "status": "in_progress", "message": "Dialing account holder.", "details": {"region": "US"}},
+    {"id": "evt_f06b", "type": "call.completed", "call_id": "call_f06", "created_at": "2026-09-10T14:23:15Z", "level": "info", "status": "completed", "message": "Call completed.", "details": {"region": "US", "locale": "en-US"}}
+  ],
+  "signals": {
+    "secrecy_demand_present": false,
+    "urgency_pressure_present": false,
+    "relationship_explained": false,
+    "irreversible_payment_demanded": true,
+    "explicit_hold_requested": false
+  },
+  "expected_disposition": "ADVISE_BLOCK"
+}

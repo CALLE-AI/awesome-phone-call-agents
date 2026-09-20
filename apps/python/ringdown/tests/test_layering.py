@@ -10,7 +10,7 @@ import pytest
 PACKAGE = Path(__file__).resolve().parent.parent / "ringdown"
 
 PURE = ("extract", "dispositions", "calls", "checks", "canonical", "incident", "script",
-        "adapter", "exits")
+        "adapter", "exits", "task")
 
 FORBIDDEN = [
     ("extract", "ringdown.calle"),
@@ -20,6 +20,10 @@ FORBIDDEN = [
     ("calls", "ringdown.calle"),
     ("checks", "ringdown.verify"),
     ("audit", "ringdown.escalate"),
+    ("audit", "ringdown.notes"),
+    ("task", "ringdown.incident"),
+    ("adapter", "ringdown.notes"),
+    ("incident", "ringdown.notes"),
 ]
 
 
@@ -60,3 +64,12 @@ def test_a_layer_that_never_calls_out_does_not_drag_in_the_http_client(module):
 
 def test_reading_a_ledger_does_not_load_the_provider_client():
     assert not loads("audit", "ringdown.calle")
+
+
+def test_only_the_cli_ever_asks_a_model_for_anything():
+    askers = {
+        path.stem
+        for path in PACKAGE.glob("*.py")
+        if path.stem != "suggest" and "ringdown.suggest" in imports_of(path.stem)
+    }
+    assert askers == {"__main__"}
