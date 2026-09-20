@@ -67,6 +67,7 @@ CALL-E CLI parameters and command flags are documented in [`cli-reference.md`](h
 
 Use this Agent Skills folder pattern:
 
+
 ```text
 skill-name/
 ├── SKILL.md
