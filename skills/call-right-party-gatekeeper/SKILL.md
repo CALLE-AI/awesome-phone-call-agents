@@ -1,6 +1,6 @@
 ---
 name: call-right-party-gatekeeper
-description: Post-call compliance skill. Audits a CALL-E transcript for right-party contact - whether the agent verified the recipient's identity BEFORE disclosing sensitive content (account, payment, medical, or policy details) - and detects wrong-party and third-party answers. Returns a structured card with evidence spans, a verification_before_disclosure ordering flag, and a recommended action (proceed / stop_and_retry_with_script / human_review). Also crafts a verification-first goal for the next plan_call. Heuristic mode only, runs offline.
+description: Offline experimental CALL-E transcript helper that compares recognized callee confirmation phrases with detected sensitive-disclosure keywords. Returns advisory right-party signals, an ordering flag and a suggested verification-first goal. It does not verify identity, certify compliance, authorize disclosure or place calls.
 license: MIT
 ---
 
@@ -12,12 +12,13 @@ In collections, healthcare, and any sensitive outreach, disclosing account
 or medical details to the wrong listener is a compliance failure even when
 the call otherwise goes well. This skill audits finished CALL-E calls for
 the ordering question: did the agent confirm the recipient before the first
-sensitive disclosure?
+sensitive disclosure keyword? This is an advisory English phrase check,
+not identity verification or legal-compliance certification.
 
 ## When To Use
 
-- after any CALL-E call that carries account, payment, medical, or policy
-  content, to prove the verify-before-disclose ordering held
+- after an authorized CALL-E call, to flag recognized confirmation/disclosure
+  ordering for human review, not to prove identity or permission to disclose
 - to detect wrong-party answers ("wrong number", "can I take a message")
   and third-party answers ("who is this calling?", "he is busy right now")
 - to generate a verification-first goal for the next `plan_call` that
@@ -48,13 +49,19 @@ or the flat shape used by sibling skill fixtures. Emits a card:
 - `right_party_status`: CONFIRMED / WRONG_PARTY / THIRD_PARTY_PRESENT /
   UNVERIFIED
 - `verification_before_disclosure`: ordering flag (false when disclosure
-  preceded verification or verification never happened)
+  preceded the first recognized callee confirmation or no confirmation was
+  recognized; only detected phrases are compared)
 - `evidence`: turn index, masked span, signal type for every detected
   verification question, identity confirmation, wrong-party signal,
   third-party signal, and sensitive disclosure
 - `gate_assessment: "unclear"` with a reason when one side never spoke
 - `recommended_action`: `proceed`, `stop_and_retry_with_script` (with the
   verification-first goal text), or `human_review` (with review guidance)
+
+All action labels are review suggestions. `proceed` never authorizes sensitive
+disclosure or a consequential action; `stop_and_retry_with_script` never
+authorizes another call. The operator must independently verify identity,
+decide what can be disclosed and approve any new call.
 
 ### Craft the verification-first goal
 
@@ -71,8 +78,8 @@ consistent.
 Right-party contact verification and third-party disclosure limits are
 long-standing practice in collections and healthcare outreach (for example
 FDCPA third-party disclosure rules and HIPAA minimum-necessary handling).
-This skill operationalizes the audit side of that practice for CALL-E
-transcripts; it claims no research results and attributes none.
+This skill illustrates a narrow phrase-ordering review for CALL-E transcripts;
+it is not a legal assessment and claims no research results.
 
 ## Differences from sibling skills
 

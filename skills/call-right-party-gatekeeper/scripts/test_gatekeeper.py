@@ -379,8 +379,43 @@ def test_card_wrong_party_without_disclosure_stops_and_retries():
     ]
     card = build_gate_card(turns)
     assert card["right_party_status"] == "WRONG_PARTY"
-    assert card["verification_before_disclosure"] is True
+    assert card["verification_before_disclosure"] is False
     assert card["recommended_action"]["action"] == "stop_and_retry_with_script"
+
+
+def test_card_confirmation_after_disclosure_requires_review():
+    turns = [
+        {"speaker": "agent", "text": "May I speak to Example Person?"},
+        {"speaker": "agent", "text": "Your account balance is due."},
+        {"speaker": "callee", "text": "Speaking."},
+    ]
+    card = build_gate_card(turns)
+    assert card["right_party_status"] == "CONFIRMED"
+    assert card["verification_before_disclosure"] is False
+    assert card["recommended_action"]["action"] == "human_review"
+
+
+def test_card_confirmation_before_disclosure_is_ordered():
+    turns = [
+        {"speaker": "agent", "text": "May I speak to Example Person?"},
+        {"speaker": "callee", "text": "Speaking."},
+        {"speaker": "agent", "text": "Your account balance is due."},
+    ]
+    card = build_gate_card(turns)
+    assert card["right_party_status"] == "CONFIRMED"
+    assert card["verification_before_disclosure"] is True
+    assert card["recommended_action"]["action"] == "proceed"
+
+
+def test_card_question_without_confirmation_is_not_verified():
+    turns = [
+        {"speaker": "agent", "text": "May I speak to Example Person?"},
+        {"speaker": "callee", "text": "Maybe, who wants to know?"},
+    ]
+    card = build_gate_card(turns)
+    assert card["right_party_status"] == "UNVERIFIED"
+    assert card["verification_before_disclosure"] is False
+    assert card["recommended_action"]["action"] == "human_review"
 
 
 def test_card_third_party_then_confirmation_becomes_confirmed():

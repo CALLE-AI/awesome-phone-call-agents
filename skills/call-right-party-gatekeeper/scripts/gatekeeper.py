@@ -167,8 +167,8 @@ HUMAN_REVIEW_GUIDANCE = (
 )
 
 PROCEED_GUIDANCE = (
-    "The intended recipient was confirmed before any sensitive content "
-    "appeared. Continue the workflow."
+    "A recognized confirmation preceded detected disclosure keywords. "
+    "This is an advisory text signal, not identity verification or permission to disclose."
 )
 
 
@@ -226,7 +226,7 @@ def build_gate_card(turns: list[dict[str, str]]) -> dict[str, Any]:
                     "signal": signal,
                 }
             )
-            if signal == VERIFICATION_QUESTION and verification_idx is None:
+            if signal == IDENTITY_CONFIRMATION and verification_idx is None:
                 verification_idx = index
             if signal == SENSITIVE_DISCLOSURE and disclosure_idx is None:
                 disclosure_idx = index
@@ -282,7 +282,7 @@ def craft_goal(scenario: str, language: str | None = None) -> dict[str, Any]:
         "goal": VERIFICATION_FIRST_GOAL,
         "notes": [
             "Heuristic skill: this template is a starting point; adapt wording to the case.",
-            "Use fictional +1 555-01xx numbers for any test calls.",
+            "Keep fictional fixtures offline; any host-run live call requires separate explicit intent and an authorized E.164 destination.",
         ],
     }
 

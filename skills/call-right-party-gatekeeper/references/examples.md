@@ -41,7 +41,7 @@ Output:
   ],
   "recommended_action": {
     "action": "proceed",
-    "guidance": "The intended recipient was confirmed before any sensitive content appeared. Continue the workflow."
+    "guidance": "A recognized confirmation preceded detected disclosure keywords. This is an advisory text signal, not identity verification or permission to disclose."
   },
   "disclaimer": "Heuristic text-only analysis. Verification and disclosure signals are phrased in many ways this lexicon does not cover; treat WRONG_PARTY and disclosure-ordering findings as reasons for human review, not as proof."
 }
@@ -103,7 +103,7 @@ Output:
   "goal": "You are calling a named recipient about a personal matter. Open by identifying yourself as an automated assistant and naming your organization. Then ask to speak to the recipient by name ('May I speak to <name>?'). Do not state the purpose of the call or any account, payment, medical, or policy detail until the recipient confirms their identity ('Am I speaking with <name>?'). If someone else answers, say only that you will call back later, offer to leave a callback number, and end the call without revealing the subject. After confirmation, state the matter in one sentence and proceed.",
   "notes": [
     "Heuristic skill: this template is a starting point; adapt wording to the case.",
-    "Use fictional +1 555-01xx numbers for any test calls."
+    "Keep fictional fixtures offline; any host-run live call requires separate explicit intent and an authorized E.164 destination."
   ]
 }
 ```
