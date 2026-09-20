@@ -121,6 +121,7 @@ This project is an awesome list for AI-agent phone-call workflows. Add resources
 
 ### Skills
 
+- [`call-attest-challenge-auth`](skills/call-attest-challenge-auth/) - Offline experimental HMAC-derived spoken-code matching with an optional advisory nonce ledger; not identity authentication, a secure replay defense or authorization for sensitive actions.
 - [`call-cross-lingual-emotion-preservation`](skills/call-cross-lingual-emotion-preservation/) - Offline experimental comparison of English urgency markers in source and relay text, with advisory wording suggestions; both inputs require English text or operator-prepared translations.
 - [`call-semantic-barge-in-analyzer`](skills/call-semantic-barge-in-analyzer/) - Post-call cooperation skill that classifies callee turns as backchannels, frustration barge-ins, or substantive answers, profiles how well the call's pacing worked, and returns a tuned pacing goal for the next plan_call.
 - [`call-right-party-gatekeeper`](skills/call-right-party-gatekeeper/) - Offline experimental transcript helper comparing recognized confirmation phrases and disclosure keywords for human review; not identity verification, permission to disclose or compliance certification.
