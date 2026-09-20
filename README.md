@@ -121,6 +121,7 @@ This project is an awesome list for AI-agent phone-call workflows. Add resources
 
 ### Skills
 
+- [`call-right-party-gatekeeper`](skills/call-right-party-gatekeeper/) - Offline experimental transcript helper comparing recognized confirmation phrases and disclosure keywords for human review; not identity verification, permission to disclose or compliance certification.
 - [`call-verbal-irony-detector`](skills/call-verbal-irony-detector/) - Offline experimental English irony-marker and complaint-context scorer, returning advisory evidence and suggested de-escalation wording without determining intent or authorizing a follow-up call.
 
 
