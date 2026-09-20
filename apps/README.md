@@ -10,6 +10,7 @@ Current apps:
 
 | App | Language | Purpose |
 | --- | --- | --- |
+| [`typescript/dineline-calle-edition`](typescript/dineline-calle-edition/) | TypeScript / Node | Two-agent restaurant concierge that collects dining preferences, supports a grounded Google Places choice in n8n, binds the diner's exact approval, and verifies Agent Jake's CALL-E booking result; fixture-only public mode by default. |
 | [`web/orma`](web/orma/) | TypeScript / SvelteKit / Deno / Supabase | Daily two-minute accountability calls. SQL briefs CALL-E, so the call leads with what you keep not doing, captures new items, and lets you drop one without argument. Consent rows, a one-time code call before any number is dialled daily, cancel and pause, plus Telegram and MCP surfaces. Dry run by default, with a local Supabase stack and recorded fixtures. |
 | [`web/harvest-relay`](web/harvest-relay/) | JavaScript / Node | Cold-storage and refrigerated-transport handoff planner with a synthetic no-call default, a CALL-E REST adapter, and reviewed result imports feeding the same constraint solver. |
 | [`typescript/senior-phone-ai`](typescript/senior-phone-ai/) | TypeScript / Next.js | Consent-first browser Realtime search, authorized reminders and CALL-E actions, grounded post-call summaries, and a private family dashboard with a no-call default. |
