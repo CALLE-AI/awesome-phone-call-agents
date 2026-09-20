@@ -38,3 +38,15 @@ describe("POST /api/calle/webhook — idempotency (F-008)", () => {
     expect(secondJson.deduped).toBe(true);
   });
 });
+
+describe("POST /api/calle/webhook — untrusted body not written in mock mode (reviewer fix 3)", () => {
+  it("returns 202 and ignores body-supplied evidence in mock mode", async () => {
+    delete process.env.GOODFAITH_LIVE;
+    delete process.env.CALLE_API_KEY;
+    const res = await POST(webhookReq("ev_mock_ignore_1", envelope));
+    expect(res.status).toBe(202);
+    const json = await res.json();
+    expect(json.ok).toBe(true);
+    expect(json.note).toContain("mock mode");
+  });
+});

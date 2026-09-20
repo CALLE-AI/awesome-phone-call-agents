@@ -34,8 +34,8 @@ The whole product rests on four CALL-E capabilities. Each one is load-bearing fo
 | Surface | What it does | Where it lives |
 |---|---|---|
 | 1. Multi-recipient parallel calls | One task fans out to every clinic via `recipients[]`, dialed in parallel, rolled into a single result | `src/lib/calle.ts` (`createQuoteCall`) |
-| 2. Per-recipient structured extraction | A locked `recipientResultSchema` pulls `cash_price`, `price_basis`, includes/excludes, and the quoted sentence out of each call as typed JSON | `src/lib/schemas.ts` (`RECIPIENT_RESULT_SCHEMA`), sent in `src/lib/calle.ts` |
-| 3. Completion-confidence gating | Any call below 0.6 confidence is held back for review and never ranked, fail-closed | `src/lib/normalize.ts` (`CONFIDENCE_THRESHOLD`, `normalizeRecipient`) |
+| 2. Per-recipient structured extraction | GoodFaith requests structured fields (`cash_price`, `price_basis`, includes/excludes, the quoted sentence). Because the current CALL-E API tier does not accept JSON result schemas, it does not send them; it derives each field deterministically from the call transcript and summary | `src/lib/schemas.ts` (`RECIPIENT_RESULT_SCHEMA`), derived in `src/lib/extract.ts` |
+| 3. Completion-confidence gating | CALL-E's model confidence is used as a gate (not a correctness guarantee): any call below 0.6 is held back for review and never ranked, fail-closed | `src/lib/normalize.ts` (`CONFIDENCE_THRESHOLD`, `normalizeRecipient`) |
 | 4. Evidence / transcript audit trail | Every ranked price traces to the exact transcript turn it was said in; a price with no traceable utterance is refused | `src/lib/normalize.ts` (`findEvidence`), `src/components/AuditTrail.tsx` |
 
 **Also implemented:**
@@ -50,6 +50,10 @@ The `/proof` page maps each surface to its code and recomputes the sample rollup
 ## The no-fabricated-quotes invariant
 
 A price only ranks if it traces to a real utterance. Every ranked row must have a non-empty `quoted_verbatim` whose text appears in that recipient's transcript turns. This is made structurally unrepresentable: `NormalizedResult.ranked` can only be `true` when `quoted_verbatim` is a non-empty string. A ranked row without evidence cannot be constructed. `scripts/verify-claims.ts` fails the build if any displayed price lacks a traceable utterance and is not mock-badged.
+
+This is a traceability guarantee, not an accuracy guarantee. The price extraction and comparability normalization are heuristic and advisory: GoodFaith derives them from the transcript, so a user should confirm the final price with the clinic before relying on it. What GoodFaith guarantees precisely is that no number is *ranked* unless it traces back to a real quoted sentence, and that CALL-E's model confidence is used only as a gate, never as a claim that the extracted number is correct.
+
+Clinic phone numbers are masked in every API response and in the UI (for example `+1512•••0142`); the full number is used only server-side to place a call. Provider diagnostics and summaries surfaced to the client are also scrubbed of phone numbers.
 
 ## Run it
 
@@ -91,6 +95,8 @@ A real outbound call is placed only when both `GOODFAITH_LIVE=1` and `CALLE_API_
 | `CALLE_WEBHOOK_URL` | public HTTPS for terminal webhook events | unset |
 | `CALLE_GOAL_ID` | enables the optional Goals path | unset |
 | `PLACES_API_KEY` | live Google Places clinic sourcing | unset, falls back to a seeded list |
+| `GOODFAITH_ALLOWED_RECIPIENTS` | comma-separated E.164 numbers authorized for live calls; live dialing is refused unless set | unset (live calls refused) |
+| `GOODFAITH_WEBHOOK_SECRET` | if set, the webhook requires header `X-GoodFaith-Webhook-Secret` to match | unset (no shared secret) |
 
 ## Safety
 

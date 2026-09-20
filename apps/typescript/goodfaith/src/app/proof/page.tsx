@@ -16,12 +16,12 @@ const LOAD_BEARING = [
   },
   {
     title: "2. Per-recipient structured extraction",
-    body: "We request a locked recipient_result_schema (cash_price, price_basis, includes/excludes, quoted sentence). The current CALL-E API tier rejects server-side JSON schemas (400 not supported), so we derive each field deterministically from the returned summary and transcript, and still refuse to rank any price we cannot trace to a real quoted sentence.",
+    body: "GoodFaith requests structured fields (cash_price, price_basis, includes/excludes, quoted sentence). Because the current CALL-E API tier does not accept JSON result schemas (400 not supported), it does not send them; instead it derives each field deterministically from the call transcript and summary. Extraction is heuristic and advisory, so confirm the final price with the clinic, but a price is never ranked unless it traces to a real quoted sentence.",
     file: "lib/schemas.ts + lib/extract.ts",
   },
   {
     title: "3. Completion-confidence gating",
-    body: "CALL-E's completion_confidence score gates the ranking: any call below 0.6 is held back for review and never ranked, fail-closed.",
+    body: "CALL-E's model completion_confidence score is used as a gate, not a correctness guarantee: any call below 0.6 is held back for review and never ranked, fail-closed.",
     file: "lib/normalize.ts · CONFIDENCE_THRESHOLD",
   },
   {
@@ -57,6 +57,11 @@ export default function ProofPage() {
           <h1 className="font-serif text-4xl tracking-tight">How the CALL-E integration works</h1>
           <p className="mt-3 text-lg text-paper-300">
             Four surfaces do the real work. Each one is load-bearing for the result you see.
+          </p>
+          <p className="mt-3 text-sm text-paper-400">
+            Price extraction and comparability normalization are heuristic and advisory. Confirm the final
+            price with the clinic. The one guarantee we keep precisely: a price is never ranked unless it
+            traces back to a real quoted sentence in the transcript.
           </p>
         </div>
 
@@ -104,7 +109,7 @@ export default function ProofPage() {
 
         <details className="card p-5">
           <summary className="cursor-pointer font-serif text-lg text-paper-200 transition-colors hover:text-paper-100">
-            Sample rollup (result_schema JSON)
+            Sample rollup (derived from the transcript)
           </summary>
           <pre className="mt-4 overflow-x-auto rounded-lg bg-ink-950/60 p-4 text-xs leading-relaxed text-paper-300">
             {JSON.stringify(n.rollup, null, 2)}

@@ -25,9 +25,9 @@ GoodFaith enforces comparability first.
 
 GoodFaith rests on **four load-bearing CALL-E surfaces**, not a point-count:
 1. Multi-recipient parallel calls (`recipients[]`).
-2. Per-recipient structured extraction (`recipient_result_schema`).
-3. `completion_confidence` gating (fail-closed at 0.6).
-4. Evidence / transcript audit trail.
+2. Per-recipient structured extraction (requested via `recipient_result_schema`; the current CALL-E API tier does not accept the JSON schemas, so fields are derived deterministically from the call transcript and summary). This extraction is heuristic and advisory.
+3. `completion_confidence` gating (fail-closed at 0.6; this is CALL-E's model confidence used as a gate, not a correctness guarantee).
+4. Evidence / transcript audit trail. A price is never ranked unless it traces to a real quoted sentence; that is a traceability guarantee, not a guarantee the number is correct.
 
 Also implemented: idempotent webhook (`CALL-E-Event-Id`), live call-events stream, `metadata.rfq_id`
 correlation, server-side-only credentials. Optional/stretch: Goals API path (`CALLE_GOAL_ID`).

@@ -5,6 +5,31 @@ import type { CallTask, CallRecipient } from "@/lib/calle-types";
 
 export const CONFIDENCE_THRESHOLD = 0.6;
 
+// Strict E.164: a leading +, a non-zero country digit, then 7-14 more digits.
+export function isE164(s: string): boolean {
+  return /^\+[1-9]\d{7,14}$/.test(s);
+}
+
+// Mask a phone for display: keep the leading country+area digits and the last four,
+// bullet the middle. "+15125550142" -> "+1512•••0142". Unparseable input -> "•••".
+export function maskPhone(p: string | null | undefined): string {
+  if (!p) return "•••";
+  const m = /^\+([1-9]\d{7,14})$/.exec(p.trim());
+  if (!m) return "•••";
+  const digits = m[1];
+  if (digits.length <= 8) return "•••";
+  const head = digits.slice(0, 4);
+  const tail = digits.slice(-4);
+  return `+${head}•••${tail}`;
+}
+
+// Replace any E.164-like substring in free text with its masked form, so provider
+// diagnostics or summaries never surface a full clinic phone number to the client.
+export function scrubPhones(text: string | null | undefined): string {
+  if (!text) return "";
+  return text.replace(/\+[1-9]\d{7,14}/g, (m) => maskPhone(m));
+}
+
 export type RowStatus = "ranked" | "non_comparable" | "needs_review" | "no_quote";
 export type RejectionCode =
   | "NO_EVIDENCE"
@@ -76,12 +101,13 @@ function findEvidence(recipient: CallRecipient, verbatim: string | null | undefi
   for (const attempt of recipient.attempts ?? []) {
     for (const turn of attempt.transcript_turns ?? []) {
       if (turn.text && turn.text.toLowerCase().includes(needle.slice(0, Math.min(needle.length, 24)))) {
-        return { quoted_verbatim: verbatim, offset_seconds: turn.offset_seconds, speaker: turn.speaker };
+        // Scrub any phone number inside the quoted sentence before it leaves the server.
+        return { quoted_verbatim: scrubPhones(verbatim), offset_seconds: turn.offset_seconds, speaker: turn.speaker };
       }
     }
   }
-  // verbatim present but not traceable to a turn -> return the verbatim without a turn ref
-  return { quoted_verbatim: verbatim, offset_seconds: null, speaker: null };
+  // verbatim present but not traceable to a turn -> return the (scrubbed) verbatim without a turn ref
+  return { quoted_verbatim: scrubPhones(verbatim), offset_seconds: null, speaker: null };
 }
 
 function landedCost(r: RecipientResult): { landed: number | null; comparable: boolean } {
@@ -105,9 +131,12 @@ function normalizeRecipient(
   fair: FairPriceEntry | null
 ): NormalizedResult {
   const r: RecipientResult | null = recipient.structured_result;
+  // Never emit a full clinic phone number to the client: mask it, and if the name falls
+  // back to the raw phone, mask that too so the fallback path stays scrubbed.
+  const nameFallback = recipient.name ?? (recipient.phone ? maskPhone(recipient.phone) : "Unknown clinic");
   const base: NormalizedResult = {
-    name: recipient.name ?? recipient.phone ?? "Unknown clinic",
-    phone: recipient.phone ?? null,
+    name: nameFallback,
+    phone: recipient.phone ? maskPhone(recipient.phone) : null,
     status: "no_quote",
     rejection: "NO_QUOTE",
     ranked: false,
@@ -123,18 +152,19 @@ function normalizeRecipient(
     pct_vs_fair: null,
     quoted_verbatim: null,
     evidence: null,
-    summary: recipient.summary ?? null,
+    summary: recipient.summary ? scrubPhones(recipient.summary) : null,
   };
 
   // K9: null structured_result -> unknown, no_quote bucket, never crash.
   if (!r) return base;
 
   base.price_basis = r.price_basis ?? "unknown";
-  base.includes = r.includes ?? [];
-  base.excludes = r.excludes ?? [];
+  // Scrub transcript-derived free-text fields: in live mode a clinic could speak a phone number.
+  base.includes = (r.includes ?? []).map(scrubPhones);
+  base.excludes = (r.excludes ?? []).map(scrubPhones);
   base.requires_consult_first = !!r.requires_consult_first;
   base.earliest_appointment_days = r.earliest_appointment_days ?? null;
-  base.quoted_verbatim = r.quoted_verbatim ?? null;
+  base.quoted_verbatim = r.quoted_verbatim ? scrubPhones(r.quoted_verbatim) : null;
 
   // INVARIANT 2: confidence gate (fail-closed).
   if (r.outcome !== "quoted") {

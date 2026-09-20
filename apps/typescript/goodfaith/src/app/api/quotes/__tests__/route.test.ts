@@ -3,10 +3,13 @@ import { describe, it, expect, beforeEach } from "vitest";
 import { NextRequest } from "next/server";
 import { POST } from "../route";
 
-function req(body: unknown): NextRequest {
+let ipCounter = 0;
+function req(body: unknown, ip?: string): NextRequest {
+  // Unique per-request IP by default so the per-IP rate limit never interferes across tests.
+  const forwarded = ip ?? `10.0.0.${++ipCounter}`;
   return new NextRequest("http://localhost:3000/api/quotes", {
     method: "POST",
-    headers: { "content-type": "application/json" },
+    headers: { "content-type": "application/json", "x-forwarded-for": forwarded },
     body: JSON.stringify(body),
   });
 }
@@ -15,6 +18,7 @@ beforeEach(() => {
   // Ensure mock mode (no live), independent of the machine's env.
   delete process.env.GOODFAITH_LIVE;
   delete process.env.CALLE_API_KEY;
+  delete process.env.GOODFAITH_ALLOWED_RECIPIENTS;
 });
 
 describe("POST /api/quotes — validation (F-004, F-011)", () => {
@@ -41,5 +45,71 @@ describe("POST /api/quotes — validation (F-004, F-011)", () => {
     expect(json.error).toBeNull();
     expect(json.data.mode).toBe("mock");
     expect(json.data.rfq_id).toMatch(/^rfq_/);
+  });
+});
+
+describe("POST /api/quotes — E.164 + dedupe (reviewer fix 1)", () => {
+  it("rejects a clinic with an empty phone (400, names the entry)", async () => {
+    const res = await POST(req({ procedure: "MRI", code: "72148", clinics: [{ name: "Empty Phone Clinic", phone: "" }] }));
+    expect(res.status).toBe(400);
+    const json = await res.json();
+    expect(json.error).toContain("Empty Phone Clinic");
+  });
+
+  it("rejects a clinic with a garbage phone (400)", async () => {
+    const res = await POST(req({ procedure: "MRI", code: "72148", clinics: [{ name: "Garbage", phone: "+1512" }] }));
+    expect(res.status).toBe(400);
+  });
+
+  it("rejects duplicate recipient phones (400)", async () => {
+    const res = await POST(
+      req({
+        procedure: "MRI",
+        code: "72148",
+        clinics: [
+          { name: "A", phone: "+15125550142" },
+          { name: "B", phone: "+15125550142" },
+        ],
+      })
+    );
+    expect(res.status).toBe(400);
+    const json = await res.json();
+    expect(json.error).toContain("duplicate recipient phone: +15125550142");
+  });
+});
+
+describe("POST /api/quotes — live allowlist (reviewer fix 1)", () => {
+  beforeEach(() => {
+    process.env.GOODFAITH_LIVE = "1";
+    process.env.CALLE_API_KEY = "iams_test_key";
+  });
+
+  it("refuses live dialing with 403 when the allowlist is empty", async () => {
+    delete process.env.GOODFAITH_ALLOWED_RECIPIENTS;
+    const res = await POST(req({ procedure: "MRI", code: "72148", clinics: [{ name: "Lone Star", phone: "+15125550142" }] }));
+    expect(res.status).toBe(403);
+    const json = await res.json();
+    expect(json.error).toContain("GOODFAITH_ALLOWED_RECIPIENTS");
+  });
+
+  it("returns 403 for a recipient not on a non-empty allowlist", async () => {
+    process.env.GOODFAITH_ALLOWED_RECIPIENTS = "+15125550188";
+    const res = await POST(req({ procedure: "MRI", code: "72148", clinics: [{ name: "Lone Star", phone: "+15125550142" }] }));
+    expect(res.status).toBe(403);
+    const json = await res.json();
+    expect(json.error).toContain("recipient not authorized for live calls: +15125550142");
+  });
+});
+
+describe("POST /api/quotes — rate limit (reviewer fix 1)", () => {
+  it("returns 429 after 20 requests from the same IP in a window", async () => {
+    const ip = "203.0.113.7";
+    const body = { procedure: "MRI", code: "72148", clinics: [{ name: "Lone Star", phone: "+15125550142" }] };
+    let last = 200;
+    for (let i = 0; i < 21; i++) {
+      const res = await POST(req(body, ip));
+      last = res.status;
+    }
+    expect(last).toBe(429);
   });
 });

@@ -1,7 +1,7 @@
 // File: src/app/api/quotes/[id]/route.ts
 import { NextRequest, NextResponse } from "next/server";
 import { getRfq, codeFromRfqId } from "@/lib/store";
-import { getCall } from "@/lib/calle";
+import { reloadCall } from "@/lib/calle";
 import { isLive } from "@/lib/env";
 import { loadFixture } from "@/lib/fixtures";
 import { normalizeCallTask } from "@/lib/normalize";
@@ -43,7 +43,7 @@ export async function GET(_req: NextRequest, ctx: { params: Promise<{ id: string
   // Prefer the stored terminal task (webhook may have updated it); else fetch/reload.
   const task: CallTask =
     rec.task ??
-    (await getCall(rec.callId, rec.code, {
+    (await reloadCall(rec.callId, rec.code, {
       procedure: rec.procedure,
       code: rec.code,
       clinics: rec.clinics,

@@ -51,7 +51,9 @@ export interface CreateQuoteResult {
 }
 
 function client(): CalleClient {
-  return new CalleClient({ apiKey: env.calleApiKey()!, baseUrl: env.calleBaseUrl() });
+  // calleBaseUrlChecked() throws unless the base URL is an approved HTTPS CALL-E origin,
+  // so the API key is never sent to an http:// or non-CALL-E host.
+  return new CalleClient({ apiKey: env.calleApiKey()!, baseUrl: env.calleBaseUrlChecked() });
 }
 
 export { isLive };
@@ -166,13 +168,25 @@ export async function createQuoteCall(input: CreateQuoteInput): Promise<CreateQu
   return { callId: task.id, mode: "live", task };
 }
 
-export async function getCall(callId: string, code: string, input?: CreateQuoteInput): Promise<CallTask> {
+export async function reloadCall(callId: string, code: string, input?: CreateQuoteInput): Promise<CallTask> {
   if (!isLive()) {
     return loadFixture(code);
   }
   const c = client();
   const call = await c.calls.get(callId);
   return mapCallToTask(call, input ?? { procedure: "", code, clinics: [], rfqId: "" });
+}
+
+// Authoritative re-fetch of a call by id, straight from CALL-E through the approved origin.
+// The webhook uses this to derive evidence from CALL-E itself instead of trusting the posted
+// body. Callable only in live mode (isLive()); mock mode has no call to re-fetch.
+export async function getCall(callId: string): Promise<CallTask> {
+  if (!isLive()) {
+    throw new Error("getCall requires live mode");
+  }
+  const c = client();
+  const call = await c.calls.get(callId);
+  return mapCallToTask(call, { procedure: "", code: "", clinics: [], rfqId: "" });
 }
 
 export async function listCallEvents(callId: string, code: string): Promise<CallEvent[]> {
