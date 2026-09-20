@@ -121,6 +121,7 @@ This project is an awesome list for AI-agent phone-call workflows. Add resources
 
 ### Skills
 
+- [`call-verbal-irony-detector`](skills/call-verbal-irony-detector/) - Offline experimental English irony-marker and complaint-context scorer, returning advisory evidence and suggested de-escalation wording without determining intent or authorizing a follow-up call.
 
 
 - [call-prosodic-entrainment-optimizer](skills/call-prosodic-entrainment-optimizer/) - Offline experimental skill that compares supplied prosodic features and suggests bounded TTS parameter changes; audio extraction and TTS application are host responsibilities.
