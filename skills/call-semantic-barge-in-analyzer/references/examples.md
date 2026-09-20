@@ -119,7 +119,7 @@ Output:
   "goal": "You are calling someone who previously showed frustration with long explanations. Speak at most two sentences per turn, then pause for a reply. After each key point, invite a confirmation ('Does that make sense?'). If the person says 'wait', 'hold on', or asks you to slow down, stop immediately, acknowledge them, and let them speak. Restate your understanding in one sentence before closing.",
   "notes": [
     "Heuristic skill: this template is a starting point; adapt wording to the case.",
-    "Use fictional +1 555-01xx numbers for any test calls."
+    "Keep fictional fixtures offline; any host-run live call requires separate explicit intent and an authorized E.164 destination."
   ]
 }
 ```
