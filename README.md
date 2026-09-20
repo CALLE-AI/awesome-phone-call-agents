@@ -67,6 +67,7 @@ CALL-E CLI parameters and command flags are documented in [`cli-reference.md`](h
 
 Use this Agent Skills folder pattern:
 
+
 ```text
 skill-name/
 ├── SKILL.md
@@ -121,6 +122,9 @@ This project is an awesome list for AI-agent phone-call workflows. Add resources
 ### Skills
 
 - [`call-cross-lingual-emotion-preservation`](skills/call-cross-lingual-emotion-preservation/) - Offline experimental comparison of English urgency markers in source and relay text, with advisory wording suggestions; both inputs require English text or operator-prepared translations.
+- [`call-semantic-barge-in-analyzer`](skills/call-semantic-barge-in-analyzer/) - Post-call cooperation skill that classifies callee turns as backchannels, frustration barge-ins, or substantive answers, profiles how well the call's pacing worked, and returns a tuned pacing goal for the next plan_call.
+- [`call-right-party-gatekeeper`](skills/call-right-party-gatekeeper/) - Offline experimental transcript helper comparing recognized confirmation phrases and disclosure keywords for human review; not identity verification, permission to disclose or compliance certification.
+- [`call-verbal-irony-detector`](skills/call-verbal-irony-detector/) - Offline experimental English irony-marker and complaint-context scorer, returning advisory evidence and suggested de-escalation wording without determining intent or authorizing a follow-up call.
 
 
 - [call-prosodic-entrainment-optimizer](skills/call-prosodic-entrainment-optimizer/) - Offline experimental skill that compares supplied prosodic features and suggests bounded TTS parameter changes; audio extraction and TTS application are host responsibilities.
@@ -227,6 +231,7 @@ This project is an awesome list for AI-agent phone-call workflows. Add resources
 - [`conversation-clarify`](skills/conversation-clarify/) - Detects a written reply that agrees without saying which option, or commits without saying when, then settles it with one bounded disclosed CALL-E phone call and writes the answer back into the thread bound to the recipient's own words, or refuses to answer at all.
 ### Apps
 
+- [DineLine CALL-E Edition](apps/typescript/dineline-calle-edition/) - Two-agent restaurant concierge with user-approved choice, separate CALL-E roles, n8n Google Places integration, duplicate-call protection, and evidence-checked outcomes; fixture-only public mode by default.
 - [BridgeCalle](apps/typescript/bridgecalle/) - Senior-accessible active listening voice companion web app powered by CALL-E API & SDK.
 
 
@@ -321,6 +326,7 @@ Runnable demo apps live under [`apps/`](apps/). They are not a CALL-E SDK and do
 
 | App | Language | Purpose |
 | --- | --- | --- |
+| [`apps/typescript/dineline-calle-edition`](apps/typescript/dineline-calle-edition/) | TypeScript / Node | Two-agent restaurant concierge that collects dining preferences, supports a grounded Google Places choice in n8n, binds the diner's exact approval, and verifies Agent Jake's CALL-E booking result; fixture-only public mode by default. |
 | [`apps/typescript/mazo`](apps/typescript/mazo/) | TypeScript / Node | Autonomous AI executive coach that initiates real-time phone calls via CALL-E to turn overthinking into decisive action, with safe dry-run simulation, archetype selection, and structured task extraction. |
 | [`apps/web/harvest-relay`](apps/web/harvest-relay/) | JavaScript / Node | Cold-storage and refrigerated-transport handoff planner with a synthetic no-call default, a CALL-E REST adapter, and reviewed result imports feeding the same constraint solver. |
 | [`apps/typescript/senior-phone-ai`](apps/typescript/senior-phone-ai/) | TypeScript / Next.js | Shared Australian daily knowledge injected into confirmed CALL-E calls, consent-gated post-call search, SMS previews or Twilio delivery, and per-call conversation/SMS history with a no-call default. |
@@ -426,6 +432,7 @@ Runnable demo apps live under [`apps/`](apps/). They are not a CALL-E SDK and do
 | [`python/warrantyops`](apps/python/warrantyops/) | Python | Post-submission warranty-claim exception resolver whose most dangerous field is guarded by its own state machine: a claim, case or credit reference stays UNCONFIRMED until a read-back is performed, answered affirmatively, and that answer is found in the counterparty's own transcript turns, and extraction confidence is not an accepted input. Transport failure never becomes a claim status, a stale source version never receives a write-back, and the default path replays synthetic fixtures with zero calls. |
 | [`apps/typescript/callsweep`](apps/typescript/callsweep/) | TypeScript | Calls many local businesses, haggles each one down toward your budget on the call, ranks their offers by the best overall deal (price, what's included, availability), and books the one you pick. Dry-run no-call path by default with fictional sample shops. |
 | [`apps/typescript/arc-platform`](apps/typescript/arc-platform/) | TypeScript | Approval-gated radio and creator rate calls that read the quoted figure back digit by digit and record nothing as confirmed without a spoken yes; simulated by default when no API key is set, with duplicate-call protection and a masked, published call archive. |
+| [`apps/typescript/rebookrelay`](apps/typescript/rebookrelay/) | TypeScript | External experimental reference for calendar no-show recovery and CALL-E waitlist calls using Inngest. Dry-run calls by default; ambiguous outcomes stop the cascade for manual reconciliation. |
 | [`apps/python/casechaser`](apps/python/casechaser/) | Python | Chases an open claim, refund, repair, or delivery case to closure: every company promise becomes a dated, quoted commitment, broken ones climb a fixed escalation ladder, offers and denials stop at the customer, and a masked evidence pack is ready for the written complaint. Fixture mode by default. |
 | [`apps/typescript/collex-ai`](apps/typescript/collex-ai/) | TypeScript | Lead follow-up call-agent that turns a lead into a RAG-personalized CALL-E task, then classifies CALL-E's structured call result into hot/warm/lost outcomes. Dry-run-by-default with fixture leads no database or real credentials needed to run. |
 | [`apps/python/claimcall`](apps/python/claimcall/) | Python | Human-approved airline disruption resolution: identifies missing case facts, turns them into bounded CALL-E objectives, and converts the call into structured commitments, evidence, before/after case state, and the traveller's next action. Synthetic no-call mode by default. |
