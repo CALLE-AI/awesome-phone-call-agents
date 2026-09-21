@@ -92,6 +92,64 @@ uv run python receiver.py --database .tmp/fixture-replays.sqlite3 --replay fixtu
 These commands do not access the network and cannot create a call. Delete
 `.tmp/fixture-replays.sqlite3` after inspection if it is no longer useful.
 
+### Offline application outcomes
+
+The three fixtures above exercise receiver delivery and storage. The following
+five synthetic fixtures exercise application decisions. They use the same
+webhook envelope and the fields needed by this demo; they are not captured
+service responses or complete API response examples.
+
+| Fixture | Result | Suggested application handling |
+| --- | --- | --- |
+| `call-booked.json` | `booked` | Record the reported booking; verify its details before acting. |
+| `call-declined.json` | `declined` | Record the refusal; do not automatically call again. |
+| `call-callback.json` | `callback` | Queue for human follow-up; do not automatically place a call. |
+| `call-unanswered.json` | `unanswered` | Leave unresolved and review contact policy before any new attempt. |
+| `call-unknown.json` | `null` | Keep the outcome unknown and review the evidence. |
+
+[outcome-schema.json](outcome-schema.json) is an example caller-defined
+`result_schema` shared by these cases. It requires `outcome` and
+`outcome_evidence`, with an explicit `unknown` choice when evidence is
+insufficient. It describes the offline examples; `create_call.py` continues
+to use its own human-callback schema.
+
+These outcome names are application choices, not CALL-E lifecycle statuses or
+event types. All five fixtures have `status: completed`; that status alone
+does not prove that anyone answered or a booking succeeded. The unanswered
+fixture explicitly supplies synthetic no-answer evidence and a matching
+extracted result. A null result, missing transcript, or generic failure must
+not be converted to `unanswered`. See the public
+[Calls result contract](https://docs.heycall-e.com/calls#task-completion) and
+[webhook contract](https://docs.heycall-e.com/webhooks).
+
+Run both the receiver replay and the application decision for every case:
+
+```bash
+for outcome in booked declined callback unanswered unknown; do
+  uv run python receiver.py --database .tmp/outcomes.sqlite3 --replay "fixtures/call-$outcome.json"
+  uv run python outcomes.py "fixtures/call-$outcome.json"
+done
+```
+
+For example, the callback decision prints:
+
+```json
+{"outcome": "callback", "next_action": "Queue for human follow-up; do not place a call automatically."}
+```
+
+Repeating the loop returns `duplicate: true` for existing receiver receipts.
+`outcomes.py` only prints advice: it does not read credentials, contact the
+network, book anything, update application state, or create calls. A failed or
+canceled call, null result, unrecognized value, or missing evidence produces
+`unknown`. The existing receiver database still stores only its documented
+receipt fields; it does not persist these new outcome values.
+
+In a live application, pass the API-verified call snapshot to
+`application_outcome`, not the unsigned webhook body. Its field checks do not
+authenticate a result or prove the evidence is true. Review the supporting
+call evidence before acting, and handle durable business-state updates in
+your application. Delete `.tmp/outcomes.sqlite3` to reset the offline receipts.
+
 ## Run the receiver
 
 The server listens on loopback by default. Its live server mode requires
