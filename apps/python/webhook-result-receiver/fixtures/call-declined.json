@@ -1,0 +1,22 @@
+{
+  "id": "evt_fixture_declined_001",
+  "type": "call.completed",
+  "created_at": "2026-01-15T13:00:00Z",
+  "data": {
+    "id": "call_fixture_declined_001",
+    "status": "completed",
+    "task": "Synthetic offline example: report the outcome supported by the fictional call evidence.",
+    "task_completed": true,
+    "evidence": [
+      "Synthetic evidence: the fictional recipient explicitly declined the offer."
+    ],
+    "metadata": {
+      "workflow": "webhook-result-receiver",
+      "workflow_id": "workflow_fixture_declined"
+    },
+    "structured_result": {
+      "outcome": "declined",
+      "outcome_evidence": "Synthetic evidence: the fictional recipient explicitly declined the offer."
+    }
+  }
+}
