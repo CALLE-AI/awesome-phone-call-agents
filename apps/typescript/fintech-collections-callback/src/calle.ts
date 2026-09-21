@@ -4,7 +4,7 @@
 import { CalleClient } from "@call-e/calle";
 import type { Call } from "@call-e/calle";
 import type { OverdueAccount, CollectionsResult } from "./types.js";
-import { resolveBaseUrl } from "./safety.js";
+import { resolveBaseUrl, maskPhoneText } from "./safety.js";
 
 export type CalleClientLike = CalleClient;
 
@@ -43,7 +43,7 @@ export function createCalleClient(apiKey: string, baseUrl?: string): CalleClient
   return new CalleClient({ apiKey, baseUrl: resolveBaseUrl(baseUrl) });
 }
 
-/** Deterministic idempotency key so a retried run never double-dials an account. */
+/** Stable intent key; provider retention and manual reconciliation still apply. */
 export function idempotencyKey(account: OverdueAccount): string {
   return `collections_${account.accountId}_${account.dueDate}`.replace(/[^a-zA-Z0-9_]/g, "_");
 }
@@ -118,9 +118,10 @@ export function mapResult(raw: Call["recipients"][number]["structuredResult"] | 
   if (!raw || typeof raw !== "object") return undefined;
   const r = raw as RawResult;
   return {
-    outcome: r.outcome ?? "unknown",
-    promiseToPayDate: r.promise_to_pay_date,
-    callbackAt: r.callback_at,
-    notes: r.notes,
+    outcome: RECIPIENT_RESULT_SCHEMA.properties.outcome.enum.includes(r.outcome as CollectionsResult["outcome"])
+      ? r.outcome! : "unknown",
+    promiseToPayDate: maskPhoneText(r.promise_to_pay_date),
+    callbackAt: maskPhoneText(r.callback_at),
+    notes: maskPhoneText(r.notes),
   };
 }

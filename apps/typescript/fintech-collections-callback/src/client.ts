@@ -124,8 +124,9 @@ async function run(opts: RunOptions): Promise<CallOutcome[]> {
         at,
       });
       console.log(`[live] ${account.accountId} ${masked} — ${res.status} — ${res.structured?.outcome ?? "no-result"}`);
-    } catch (err) {
-      const message = err instanceof Error ? err.message : String(err);
+    } catch {
+      // Provider diagnostics may contain phones, request bodies or credentials.
+      const message = "Call outcome is unknown; check the provider dashboard before retrying.";
       // Ambiguous: CALL-E may already have accepted the call. Do NOT place any
       // further call — record an unresolved checkpoint and halt the batch so a
       // second side effect can't happen before this one is reconciled.

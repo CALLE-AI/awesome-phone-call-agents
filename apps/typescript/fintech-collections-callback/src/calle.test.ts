@@ -68,3 +68,16 @@ test("mapResult leaves optional fields undefined when absent", () => {
     notes: undefined,
   });
 });
+
+test("mapResult masks phone-bearing fields and rejects arbitrary outcome text", () => {
+  const result = mapResult({
+    outcome: "callback +12025550143",
+    promise_to_pay_date: "+1 (202) 555-0143",
+    callback_at: "+12025550143",
+    notes: "Please call +1 202 555 0143.",
+  });
+  assert.equal(result?.outcome, "unknown");
+  assert.equal(result?.promiseToPayDate, "+*********43");
+  assert.equal(result?.callbackAt, "+*********43");
+  assert.equal(result?.notes, "Please call +*********43.");
+});

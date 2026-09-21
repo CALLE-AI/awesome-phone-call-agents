@@ -24,7 +24,7 @@ export function resolveBaseUrl(raw?: string): string {
   try {
     url = new URL(candidate);
   } catch {
-    throw new Error(`CALLE_BASE_URL is not a valid URL: ${candidate}`);
+    throw new Error("CALLE_BASE_URL is not a valid URL.");
   }
 
   const host = url.hostname.toLowerCase();
@@ -36,7 +36,7 @@ export function resolveBaseUrl(raw?: string): string {
   if (isOfficial || isLoopback) return url.origin;
 
   throw new Error(
-    `Refusing to send credentials to non-allowlisted CALLE_BASE_URL "${candidate}". ` +
+    "Refusing to send credentials to non-allowlisted CALLE_BASE_URL. " +
       `Allowed: https://*.heycall-e.com, or a loopback host for local testing.`,
   );
 }
@@ -51,6 +51,12 @@ export function maskPhone(phone: string): string {
   const digits = phone.replace(/\D/g, "");
   if (digits.length <= 2) return `${plus}${"*".repeat(digits.length)}`;
   return `${plus}${"*".repeat(digits.length - 2)}${digits.slice(-2)}`;
+}
+
+/** Mask international-format phone text in provider-returned report fields. */
+export function maskPhoneText(value: unknown): string | undefined {
+  if (typeof value !== "string") return undefined;
+  return value.replace(/\+[1-9][0-9 ().-]{6,}[0-9]/g, maskPhone);
 }
 
 /**

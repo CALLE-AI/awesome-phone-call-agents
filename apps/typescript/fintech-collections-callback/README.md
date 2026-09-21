@@ -1,6 +1,6 @@
 # fintech-collections-callback
 
-A runnable phone-call workflow app that places **consent-gated, compliant
+A runnable experimental phone-call workflow app that demonstrates **consent-gated
 payment-reminder calls** to overdue fintech accounts using
 [CALL-E](https://www.heycall-e.com), and returns a **structured collections
 outcome** per account (promise-to-pay date, dispute, or callback request).
@@ -21,8 +21,8 @@ places those calls under a spend cap, and writes an auditable report.
    - valid **IANA timezone**, used to enforce **quiet hours** (no calls before
      08:00 or at/after 21:00 local time);
    - a per-run **spend cap** on the number of calls.
-3. For each allowed account, calls CALL-E with a task that **verifies the right
-   party before disclosing any debt detail**, keeps compliance rules fixed in
+3. For each allowed account, calls CALL-E with a task that **instructs the agent to
+   verify the right party before disclosing any debt detail**, keeps safety rules fixed in
    code (identify as automated, no threats, never collect payment on the call),
    and passes a `recipientResultSchema` so the result comes back structured.
 4. Writes a JSON report of every decision and outcome, with **phone numbers masked**.
@@ -32,7 +32,7 @@ CALL-E is imported and invoked at runtime in
 [`src/client.ts`](src/client.ts) and [`src/gate.ts`](src/gate.ts); the safety
 boundary helpers live in [`src/safety.ts`](src/safety.ts).
 
-## Safety boundaries (enforced in code)
+## Safety boundaries and demo limitations
 
 - **Live never dials the checked-in fixtures.** `--live` fails closed unless an
   operator supplies the recipient at run time via `--smoke` (`SMOKE_*` env);
@@ -40,9 +40,12 @@ boundary helpers live in [`src/safety.ts`](src/safety.ts).
 - **Credentials stay on-net.** `CALLE_BASE_URL` is allowlisted to official
   `https://*.heycall-e.com` (or a loopback host) before the bearer key is
   attached — it is never sent to an arbitrary origin.
-- **Right-party first.** No amount or due date is spoken until the named party
-  confirms their identity; a wrong party ends the call with nothing disclosed.
-- **Outputs are masked.** Destinations are masked in both logs and reports.
+- **Right-party first is a prompt instruction, not an identity guarantee.** The
+  agent is instructed to withhold debt details until identity is confirmed and
+  end the call for a wrong party. This demo does not certify model compliance.
+- **Outputs are masked.** Destinations and recognized international-format phone
+  text are masked in reports; provider errors are replaced with generic diagnostics.
+  This is not a general personal-data scrubber: keep local reports private.
 - **Ambiguous calls halt the batch.** If a create/wait error leaves it unknown
   whether a call was placed, the run stops and records the outcome as
   `unresolved` for reconciliation, rather than risking another side effect.
@@ -97,8 +100,8 @@ a recipient you supply at run time via `--smoke` (`SMOKE_*` env), so it always
 targets an operator-authorized number.
 
 Each call goes out via `client.calls.createAndWait(...)`, guarded by a
-deterministic idempotency key (`collections_<accountId>_<dueDate>`) so a re-run
-never double-dials. If a create/wait error leaves the outcome ambiguous, the run
+deterministic idempotency key (`collections_<accountId>_<dueDate>`) to request
+provider deduplication, subject to its retention and semantics. If a create/wait error leaves the outcome ambiguous, the run
 **halts** and marks it `unresolved` instead of continuing.
 
 ### Live smoke test (one number you control) — the only live path
@@ -144,8 +147,9 @@ Recognized variables (only `SMOKE_PHONE` is required):
   billable call) and are subject to telecom regulations in the recipient's
   jurisdiction. You are responsible for having a lawful basis and consent to
   call each recipient.
-- The call script **verifies the right party before disclosing** the amount or
-  due date; a wrong party ends the call with nothing revealed.
+- The call prompt **requests right-party verification before disclosing** the
+  amount or due date; this is an experimental safeguard, not certified identity
+  verification, legal compliance, or authorization for automatic collections action.
 - Phone numbers are **masked** in console output and in the JSON report.
 - Dry-run mode has no external side effects.
 - The only local side effect is a report written under `runs/` (see below).
@@ -154,9 +158,8 @@ Recognized variables (only `SMOKE_PHONE` is required):
 
 - Press **Ctrl-C** to cancel a run: no new call is started, the in-progress
   report is still written, and remaining accounts are left untouched.
-- Because the idempotency key is derived from the account and due date, safely
-  **re-running the batch will not re-dial** accounts already handled for that
-  billing cycle — the effective rollback for "I ran it twice."
+- The account/due-date key requests provider deduplication; it is not a durable
+  local call checkpoint. Reconcile ambiguous outcomes before any manual rerun.
 - A call already answered cannot be un-placed; the report records it so
   operators can reconcile.
 - If a call's creation is **ambiguous** (it may have been accepted before the
