@@ -1,7 +1,7 @@
 import express from "express";
 import { describe, expect, it } from "vitest";
 
-import { calleRouter } from "../server/calle/router";
+import { hardenedCalleRouter } from "../server/calle/router-hardened";
 import { verifyWebhookSignature } from "../server/calle/webhook";
 
 function listen(app: express.Express) {
@@ -20,11 +20,11 @@ function listen(app: express.Express) {
   });
 }
 
-describe("CALL-E Express gateway", () => {
-  it("creates, fetches, and lists mock calls through /api/calle", async () => {
+describe("CALL-E hardened Express gateway", () => {
+  it("creates, fetches, and lists mock calls through authenticated loopback /api/calle", async () => {
     const app = express();
     app.use(express.json());
-    app.use("/api/calle", calleRouter);
+    app.use("/api/calle", hardenedCalleRouter);
     const { url, close } = await listen(app);
     try {
       const created = await fetch(`${url}/api/calle/calls`, {
@@ -59,7 +59,7 @@ describe("CALL-E Express gateway", () => {
   it("rejects a webhook without a valid HMAC", async () => {
     const app = express();
     app.use(express.json());
-    app.use("/api/calle", calleRouter);
+    app.use("/api/calle", hardenedCalleRouter);
     const { url, close } = await listen(app);
     try {
       const response = await fetch(`${url}/api/calle/webhook`, {

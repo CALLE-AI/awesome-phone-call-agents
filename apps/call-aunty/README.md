@@ -20,20 +20,29 @@ CALLE_ALLOWED_REGIONS=US,CA,GB,AU,SG
 CALLE_TRANSPORT=rest
 CALLE_DEMO_MODE=true
 CALLE_LIVE_CALLS=false
+CALLE_KILL_SWITCH=false
+CALLE_LIVE_INTENT_REQUIRED=true
+CALLE_LIVE_LOOPBACK_ONLY=true
+CALLE_ALLOW_LOOPBACK_OPERATOR=true
+CALLE_OPERATOR_TOKEN=
+CALLE_APPROVED_ORIGINS=
+CALLE_APPROVED_PROVIDER_ORIGINS=https://api.heycall-e.com
+CALLE_REJECT_REDIRECTS=true
+CALLE_REQUIRE_HTTPS_ORIGIN=true
 ```
 
-Default checkout is demo/mock mode: `/api/calle` returns deterministic `call_mock_*` results so CI and UI work without placing a live call. `CALLE_API_KEY` stays on Express; the React Native app only calls `/api/calle/*`.
+Default checkout is demo/mock mode. `CALLE_API_KEY` stays on Express and is configuration only; it never authorizes a live call. The React Native app uses protected tRPC workflow procedures, not the direct `/api/calle` operator gateway.
 
 ### Live authorized demo
 
-1. Set `CALLE_DEMO_MODE=false`, `CALLE_MOCK_MODE=false`, `CALLE_LIVE_CALLS=true`, and a server-side `CALLE_API_KEY`. REST is the default transport; `CALLE_TRANSPORT=sdk` keeps `@call-e/calle`.
+1. Set `CALLE_DEMO_MODE=false`, `CALLE_MOCK_MODE=false`, `CALLE_LIVE_CALLS=true`, and a server-side `CALLE_API_KEY`. REST is the only supported live transport.
 2. Start `pnpm dev`.
 3. Open Settings → **CALL-E phone agent**, or a CHW record → **Open CALL-E phone agent**. Use a consenting E.164 recipient.
 4. Confirm the UI shows queued / in-progress / completed / failed, plus structured result and evidence. Server logs must redact keys and full phone numbers.
 5. Repeating the same idempotency key does not create a second CALL-E task.
 6. Only call recipients who authorized the interaction. Do not collect passwords, OTPs, or payment credentials.
 
-See `docs/calle-api/CALLE_API_UPGRADE.md` for the gateway pack, `docs/calle-api-v4/README.md` for the additive v4 layer, and `docs/calle-v5/` for the existing workflow/command-center stack.
+See [`docs/calle-api/PR726_HARDENING.md`](docs/calle-api/PR726_HARDENING.md) for the direct-gateway policy, `docs/calle-api-v4/README.md` for the internal additive v4 layer, and `docs/calle-v5/` for the workflow/command-center stack.
 
 ## Scripts
 
@@ -41,6 +50,7 @@ See `docs/calle-api/CALLE_API_UPGRADE.md` for the gateway pack, `docs/calle-api-
 pnpm test
 pnpm check
 pnpm test:calle-api
+pnpm test:calle-security
 pnpm run calle:health
 ```
 

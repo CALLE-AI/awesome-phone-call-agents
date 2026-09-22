@@ -26,6 +26,9 @@ export function classifyRetryError(opts: {
   status: CallWorkflowStatus;
   failureCode: CallFailureCode | null;
 }): RetryErrorClass {
+  // Unknown means a create or read may have changed provider state. It is a manual
+  // reconciliation state, never an invitation for another automatic call attempt.
+  if (opts.status === "unknown") return "not_retriable";
   if (
     opts.failureCode === "missing_consent" ||
     opts.failureCode === "urgent_state_conflict" ||
