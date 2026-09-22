@@ -43,13 +43,21 @@ Output:
       ]
     },
     {
-      "kind": "date",
+      "kind": "date_weekday",
       "values_a": [
-        "tuesday",
+        "tuesday"
+      ],
+      "values_b": [
+        "wednesday"
+      ],
+      "status": "CONTRADICTED"
+    },
+    {
+      "kind": "date_day",
+      "values_a": [
         "15"
       ],
       "values_b": [
-        "wednesday",
         "16"
       ],
       "status": "CONTRADICTED"
@@ -68,7 +76,7 @@ Output:
       ]
     }
   ],
-  "contradiction_count": 1,
+  "contradiction_count": 2,
   "verdict": "CONTRADICTIONS_FOUND",
   "recommended_action": {
     "action": "verify_before_next_call",
@@ -121,18 +129,28 @@ Output:
       ]
     },
     {
-      "kind": "date",
+      "kind": "date_weekday",
       "values_a": [
-        "tuesday",
+        "tuesday"
+      ],
+      "values_b": [
+        "tuesday"
+      ],
+      "status": "CONSISTENT",
+      "shared": [
+        "tuesday"
+      ]
+    },
+    {
+      "kind": "date_day",
+      "values_a": [
         "15"
       ],
       "values_b": [
-        "tuesday",
         "15"
       ],
       "status": "CONSISTENT",
       "shared": [
-        "tuesday",
         "15"
       ]
     },

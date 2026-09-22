@@ -74,6 +74,8 @@ _WEEKDAY_RE = re.compile(r"\b(monday|tuesday|wednesday|thursday|friday|saturday|
 _ORDINAL_RE = re.compile(r"\bthe ([0-9]{1,2})(?:st|nd|rd|th)\b", re.IGNORECASE)
 _AMOUNT_RE = re.compile(r"[$]([0-9][0-9 ,./-]*[0-9]|[0-9])\b|\b([0-9][0-9 ,./-]*[0-9]|[0-9])\s+(?:dollars|usd)\b", re.IGNORECASE)
 _TIME_RE = re.compile(r"\b(?:at\s+)?([0-9]{1,2})(?::([0-9]{2}))?\s*(a\.?m\.?|p\.?m\.?)\b", re.IGNORECASE)
+# 24-hour clock without a meridiem marker ("14:00").
+_TIME_24H_RE = re.compile(r"\b([0-9]{1,2}):([0-9]{2})\b")
 
 
 def _norm_digits(text: str) -> str:
@@ -88,15 +90,18 @@ def extract_agent_facts(turns: list[dict[str, str]]) -> dict[str, list[str]]:
         if str(t.get("speaker", "")).lower().strip() not in CALLEE_ROLES
         and str(t.get("text", "")).strip()
     )
-    facts: dict[str, list[str]] = {"amount": [], "date": [], "time": []}
+    # Weekday and day-of-number are separate sub-kinds so "Tuesday the
+    # 15th" vs "Wednesday the 15th" still contradicts on the weekday
+    # instead of hiding behind the shared day number.
+    facts: dict[str, list[str]] = {"amount": [], "date_weekday": [], "date_day": [], "time": []}
     for m in _WEEKDAY_RE.finditer(agent_text):
         v = m.group(1).lower()
-        if v not in facts["date"]:
-            facts["date"].append(v)
+        if v not in facts["date_weekday"]:
+            facts["date_weekday"].append(v)
     for m in _ORDINAL_RE.finditer(agent_text):
         v = _norm_digits(m.group(1))
-        if v and v not in facts["date"]:
-            facts["date"].append(v)
+        if v and v not in facts["date_day"]:
+            facts["date_day"].append(v)
     for m in _AMOUNT_RE.finditer(agent_text):
         v = _norm_digits(m.group(1) or m.group(2))
         if v and v not in facts["amount"]:
@@ -111,6 +116,10 @@ def extract_agent_facts(turns: list[dict[str, str]]) -> dict[str, list[str]]:
         if meridiem == "am" and h == 12:
             h = 0
         v = f"{h:02d}{minute}"
+        if v not in facts["time"]:
+            facts["time"].append(v)
+    for m in _TIME_24H_RE.finditer(agent_text):
+        v = f"{int(m.group(1)):02d}{m.group(2)}"
         if v not in facts["time"]:
             facts["time"].append(v)
     return facts
@@ -185,11 +194,16 @@ def analyze_pair(turns_a: list[dict[str, str]], turns_b: list[dict[str, str]]) -
     comparisons: list[dict[str, Any]] = []
     contradictions = 0
     shared_kinds = 0
-    for kind in ("amount", "date", "time"):
+    for kind, display in (
+        ("amount", "amount"),
+        ("date_weekday", "date_weekday"),
+        ("date_day", "date_day"),
+        ("time", "time"),
+    ):
         va, vb = facts_a[kind], facts_b[kind]
         if not va and not vb:
             continue
-        entry: dict[str, Any] = {"kind": kind, "values_a": [mask_pii(v) for v in va], "values_b": [mask_pii(v) for v in vb]}
+        entry: dict[str, Any] = {"kind": display, "values_a": [mask_pii(v) for v in va], "values_b": [mask_pii(v) for v in vb]}
         shared = [v for v in va if v in vb]
         if shared:
             shared_kinds += 1

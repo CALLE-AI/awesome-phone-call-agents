@@ -110,7 +110,13 @@ def test_extract_facts_weekday_ordinal_amount_time():
         _turns(("agent", "The fee is $45, drop-off on Tuesday the 15th at 2 p.m."), ("callee", "Okay."))
     )
     assert facts["amount"] == ["45"]
-    assert "tuesday" in facts["date"] and "15" in facts["date"]
+    assert facts["date_weekday"] == ["tuesday"]
+    assert facts["date_day"] == ["15"]
+    assert facts["time"] == ["1400"]
+
+
+def test_extract_facts_24h_clock():
+    facts = extract_agent_facts(_turns(("agent", "The window opens at 14:00 sharp."), ("callee", "Okay.")))
     assert facts["time"] == ["1400"]
 
 
@@ -135,7 +141,7 @@ def test_extract_facts_midday_midnight_normalization():
 
 
 def test_extract_facts_empty():
-    assert extract_agent_facts(_turns(("agent", "Hello, just checking in."), ("callee", "Hi."))) == {"amount": [], "date": [], "time": []}
+    assert extract_agent_facts(_turns(("agent", "Hello, just checking in."), ("callee", "Hi."))) == {"amount": [], "date_weekday": [], "date_day": [], "time": []}
 
 
 # ---------------------------------------------------------------- analysis
@@ -148,9 +154,10 @@ def test_analyze_contradiction_fixture():
     by_kind = {c["kind"]: c for c in card["comparisons"]}
     assert by_kind["amount"]["status"] == "CONSISTENT"
     assert by_kind["time"]["status"] == "CONSISTENT"
-    assert by_kind["date"]["status"] == "CONTRADICTED"
+    assert by_kind["date_weekday"]["status"] == "CONTRADICTED"
+    assert by_kind["date_day"]["status"] == "CONTRADICTED"
     assert card["verdict"] == "CONTRADICTIONS_FOUND"
-    assert card["contradiction_count"] == 1
+    assert card["contradiction_count"] == 2
     assert card["recommended_action"]["action"] == "verify_before_next_call"
     assert card["analysis_mode"] == "heuristic"
 
@@ -179,7 +186,20 @@ def test_analyze_reschedule_not_contradiction():
     b = _turns(("agent", "Your delivery is on the 15th."), ("callee", "Fine."))
     card = analyze_pair(a, b)
     by_kind = {c["kind"]: c for c in card["comparisons"]}
-    assert by_kind["date"]["status"] == "CONSISTENT"
+    assert "date_weekday" not in by_kind
+    assert by_kind["date_day"]["status"] == "CONSISTENT"
+
+
+def test_analyze_weekday_change_same_day_number_contradicts():
+    # Same day-of-month, different weekday: the weekday sub-kind catches
+    # what a single merged date bucket would have hidden.
+    a = _turns(("agent", "Your pickup is Tuesday the 15th."), ("callee", "Okay."))
+    b = _turns(("agent", "Your pickup is Wednesday the 15th."), ("callee", "Fine."))
+    card = analyze_pair(a, b)
+    by_kind = {c["kind"]: c for c in card["comparisons"]}
+    assert by_kind["date_weekday"]["status"] == "CONTRADICTED"
+    assert by_kind["date_day"]["status"] == "CONSISTENT"
+    assert card["verdict"] == "CONTRADICTIONS_FOUND"
 
 
 def test_analyze_only_stated():

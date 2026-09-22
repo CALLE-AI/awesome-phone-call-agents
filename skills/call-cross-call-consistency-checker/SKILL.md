@@ -46,7 +46,10 @@ python3 scripts/cross_call_consistency_checker.py analyze \
 Reads the real `get_call_run` result shape (`{status, result: {transcript}}`)
 or the flat fixture shape used by sibling skills. Emits a card:
 
-- `comparisons[]` per fact kind (`amount` / `date` / `time`):
+- `comparisons[]` per fact kind (`amount` / `date_weekday` /
+  `date_day` / `time`; weekdays and day-of-months are separate sub-kinds
+  so "Tuesday the 15th" vs "Wednesday the 15th" contradicts on the
+  weekday instead of hiding behind the shared day number):
   - `CONSISTENT` with the shared values when the calls overlap
   - `CONTRADICTED` when both calls state the kind and share no value
   - `ONLY_STATED` when just one call mentions the kind
