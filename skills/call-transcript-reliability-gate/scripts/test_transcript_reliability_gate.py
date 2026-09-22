@@ -485,6 +485,20 @@ def test_main_returns_int(tmp_path=None):
     assert main(["craft", "--scenario", "number-critical-call"]) == 0
 
 
+def test_cli_analyze_unusable_fixture():
+    path = SKILL_DIR / "references" / "example-transcript-unusable.json"
+    proc = subprocess.run(
+        [sys.executable, str(SCRIPTS / "transcript_reliability_gate.py"), "analyze", "--transcript", str(path)],
+        capture_output=True,
+        text=True,
+    )
+    assert proc.returncode == 0
+    card = json.loads(proc.stdout)
+    assert card["verdict"] == "UNUSABLE"
+    assert card["harm_review_required"] is True
+    assert card["recommended_action"]["action"] == "do_not_act_on_transcript"
+
+
 # ---------------------------------------------------------------- runner
 
 

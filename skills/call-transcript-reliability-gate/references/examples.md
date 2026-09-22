@@ -115,3 +115,53 @@ Output:
 
 The goal feeds `plan_call` directly; the digit-by-digit and read-back
 wording reduces the chance the NEXT transcript needs a SUSPECT card.
+
+## Example 4: harm-category content routes to human review (UNUSABLE)
+
+Fixture: `references/example-transcript-unusable.json` - the only callee
+turn carries content in the documented violence category. Whether
+hallucinated or a genuine emergency, a human must decide; the card refuses
+to bless the transcript.
+
+Command:
+
+```bash
+python3 skills/call-transcript-reliability-gate/scripts/transcript_reliability_gate.py analyze \
+  --transcript skills/call-transcript-reliability-gate/references/example-transcript-unusable.json
+```
+
+Output:
+
+```json
+{
+  "skill": "call-transcript-reliability-gate",
+  "analysis_mode": "heuristic",
+  "reliability_assessment": "assessed",
+  "reason": null,
+  "verdict": "UNUSABLE",
+  "evidence": [
+    {
+      "turn_index": 1,
+      "speaker": "callee",
+      "span": "He kept saying he would kill them all if the phone rang again.",
+      "rules": [
+        "harm_violence"
+      ]
+    }
+  ],
+  "signals_summary": {
+    "harm_violence": 1
+  },
+  "fields_to_reconfirm": [],
+  "harm_review_required": true,
+  "recommended_action": {
+    "action": "do_not_act_on_transcript",
+    "guidance": "Content matching documented ASR-hallucination harm categories was found. A human must review the audio before anything in this transcript is used."
+  },
+  "disclaimer": "Heuristic text-only analysis. These signals are reasons to re-confirm values or seek the audio, not proof that the provider hallucinated. A clean verdict does not certify transcription accuracy."
+}
+```
+
+Note the fail-safe design: the skill does not claim the line was
+hallucinated. A genuine emergency and a hallucinated phantom get the same
+routing - a human with the audio.
