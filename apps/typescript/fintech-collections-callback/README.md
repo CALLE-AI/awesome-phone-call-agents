@@ -10,7 +10,7 @@ operations: first-party soft collections and appointment/payment reminders —
 where *who you may call, when, and what you may say* is as important as the call
 itself. An operator (or an agent administering this workflow) hands the app a
 batch of accounts; the app decides which ones are eligible to dial right now,
-places those calls under a spend cap, and writes an auditable report.
+places those calls under a call-count cap, and writes an auditable report.
 
 ## What it does
 
@@ -20,7 +20,7 @@ places those calls under a spend cap, and writes an auditable report.
    - valid **E.164** phone number;
    - valid **IANA timezone**, used to enforce **quiet hours** (no calls before
      08:00 or at/after 21:00 local time);
-   - a per-run **spend cap** on the number of calls.
+   - a per-run **call-count cap**, which does not set a monetary spending limit.
 3. For each allowed account, calls CALL-E with a task that **instructs the agent to
    verify the right party before disclosing any debt detail**, keeps safety rules fixed in
    code (identify as automated, no threats, never collect payment on the call),
@@ -82,7 +82,7 @@ needs no key, so no `.env` is required for it.
 
 The app is **dry-run by default and places no calls**. It runs the full gate and
 prints exactly which accounts *would* be dialed and which are blocked and why —
-counting eligible accounts against the same spend cap a live run would use.
+counting eligible accounts against the same call-count cap a live run would use.
 
 ```bash
 npm run dry-run
@@ -143,10 +143,10 @@ Recognized variables (only `SMOKE_PHONE` is required):
 
 ## Side effects
 
-- **Live mode places real phone calls** that cost money (CALL-E bills per
-  billable call) and are subject to telecom regulations in the recipient's
-  jurisdiction. You are responsible for having a lawful basis and consent to
-  call each recipient.
+- **Live mode places real phone calls** with usage-based charges (see the
+  [current pricing FAQ](https://www.heycall-e.com/)) and is subject to telecom
+  regulations in the recipient's jurisdiction. You are responsible for having
+  a lawful basis and consent to call each recipient.
 - The call prompt **requests right-party verification before disclosing** the
   amount or due date; this is an experimental safeguard, not certified identity
   verification, legal compliance, or authorization for automatic collections action.
@@ -169,15 +169,18 @@ Recognized variables (only `SMOKE_PHONE` is required):
 ## Where results are stored
 
 Every run writes a timestamped JSON report to `runs/<ISO-timestamp>.json`
-containing the mode, spend cap, per-account decisions, structured outcomes, and
-estimated cost. The `runs/` directory is git-ignored.
+containing the mode, call-count cap, per-account decisions, and structured outcomes.
+`costPerCallUsd` is `null` because there is no fixed per-call price. `estCostUsd`
+is `null` for live runs, including unresolved calls, and `0` for dry-runs.
+Check [Dashboard billing](https://dashboard.heycall-e.com/account/billing) for
+actual charges. The `runs/` directory is git-ignored.
 
 ## Project layout
 
 ```
 fintech-collections-callback/
 ├── src/
-│   ├── client.ts     # entry point: batch loop, spend cap, cancellation, report
+│   ├── client.ts     # entry point: batch loop, call-count cap, cancellation, report
 │   ├── gate.ts       # consent + E.164 + IANA timezone + quiet-hours checks
 │   ├── calle.ts      # the only CALL-E SDK integration (task + structured result)
 │   ├── safety.ts     # base-URL allowlist, output masking, fail-closed live guard

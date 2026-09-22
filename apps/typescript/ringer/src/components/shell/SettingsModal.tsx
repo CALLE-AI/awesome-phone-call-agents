@@ -1,6 +1,5 @@
 import { useState } from 'react'
 import {
-  BadgeCheck,
   ExternalLink,
   Eye,
   EyeOff,
@@ -157,7 +156,6 @@ export function SettingsModal({
             </div>
           </div>
 
-          {/* Shared-line testing and purchased-number setup have different requirements. */}
           <div className="rounded-2xl border border-border bg-surface-2 p-4">
             <p className="mb-3 flex items-center gap-1.5 text-sm font-bold text-ink">
               <Rocket className="size-4 text-primary" /> Before your first live call
@@ -165,27 +163,19 @@ export function SettingsModal({
             <ol className="flex flex-col gap-3.5">
               <SetupStep
                 n={1}
-                icon={<BadgeCheck className="size-4" />}
-                title="Check purchased-number activation"
-                desc="Purchased numbers require identity verification before outbound activation. Check current availability in the Dashboard."
-                href={DASHBOARD}
-                action="Verify in dashboard"
-              />
-              <SetupStep
-                n={2}
-                icon={<Radio className="size-4" />}
-                title="Choose your outbound line"
-                desc="Shared numbers support single-recipient tests. For API batches, select an activated purchased number as the default outbound line."
-                href={DASHBOARD}
-                action="Get a number"
-              />
-              <SetupStep
-                n={3}
                 icon={<KeyRound className="size-4" />}
                 title="Add your API key"
                 desc="Paste your key above — or the operator can configure one on the server."
                 href={`${DASHBOARD}/account/api-keys`}
                 action="API keys"
+              />
+              <SetupStep
+                n={2}
+                icon={<Radio className="size-4" />}
+                title="Choose your outbound line"
+                desc="Single-recipient tests can use shared numbers without buying a number or completing KYC. Purchased numbers require KYC for outbound activation; for API batches, select an eligible activated number as your default outbound line."
+                href={DASHBOARD}
+                action="Manage numbers"
               />
             </ol>
             <p className="mt-3.5 border-t border-border pt-3 text-xs leading-relaxed text-muted">

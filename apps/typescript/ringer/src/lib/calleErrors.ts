@@ -1,9 +1,6 @@
 /**
  * Turn a CALL-E API error code into human, actionable guidance. The codes are
- * the stable ones in `CalleErrorCode` (see calle/types.ts). Several of them mean
- * the account isn't ready for live outbound yet (identity verification / a
- * purchased number / balance) — for those we point the user at the dashboard so
- * the live path is reachable instead of a dead end.
+ * the stable ones in `CalleErrorCode` (see calle/types.ts).
  */
 
 const DASHBOARD = 'https://dashboard.heycall-e.com'
@@ -28,13 +25,13 @@ export function guidanceForError(code?: string | null): ErrorGuidance | null {
     case 'forbidden':
     case 'policy_violation':
       return {
-        hint: 'Your CALL-E account may need identity (KYC) verification before it can place outbound calls. Complete verification in the dashboard, then try again.',
+        hint: 'CALL-E rejected this request because of account permissions or a calling policy. Check the error details above and your account status in the Dashboard.',
         action: { label: 'Open CALL-E dashboard', href: DASHBOARD },
       }
     case 'insufficient_balance':
       return {
-        hint: 'Your CALL-E balance is too low for this call. Top up, or check your remaining free-call allowance.',
-        action: { label: 'Open CALL-E dashboard', href: DASHBOARD },
+        hint: 'Your CALL-E credit balance is too low for this call. Check your balance and usage charges in Dashboard billing.',
+        action: { label: 'Open Dashboard billing', href: `${DASHBOARD}/account/billing` },
       }
     case 'unsupported_region':
       return {

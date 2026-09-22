@@ -1,11 +1,11 @@
 // Entry point. Iterates overdue accounts, runs the pre-dial gate, and (in live
-// mode) places one CALL-E call per allowed account under a spend cap. Dry-run is
+// mode) places one CALL-E call per allowed account under a call-count cap. Dry-run is
 // the default and never touches the network.
 //
 //   npm run dry-run                        # default: no calls placed
 //   npm run dev -- --live --smoke          # live requires operator-authorized
 //                                          # SMOKE_* input + CALLE_API_KEY
-//   npm run dev -- --max-calls=3           # override the dry-run spend cap
+//   npm run dev -- --max-calls=3           # override the dry-run call-count cap
 //
 // Live mode fails closed on the checked-in fixtures: it will only dial a
 // recipient supplied at run time via --smoke (SMOKE_* env).
@@ -32,7 +32,6 @@ if (typeof process.loadEnvFile === "function") {
   }
 }
 
-const COST_PER_CALL_USD = 0.05;
 const DEFAULT_MAX_CALLS = 10;
 
 interface CliArgs {
@@ -96,7 +95,7 @@ async function run(opts: RunOptions): Promise<CallOutcome[]> {
 
     if (placed >= opts.maxCalls) {
       outcomes.push({ accountId: account.accountId, phone: masked, mode, placed: false, blockedReason: "spend-cap-reached", at });
-      console.log(`[skip] ${account.accountId} — spend cap reached (${opts.maxCalls} calls)`);
+      console.log(`[skip] ${account.accountId} — call limit reached (${opts.maxCalls} calls)`);
       continue;
     }
 
@@ -149,9 +148,9 @@ async function writeReport(opts: CliArgs, outcomes: CallOutcome[]): Promise<stri
     mode: opts.live ? "live" : "dry-run",
     smoke: opts.smoke,
     maxCalls: opts.maxCalls,
-    costPerCallUsd: COST_PER_CALL_USD,
+    costPerCallUsd: null,
     placedCount,
-    estCostUsd: Number((placedCount * COST_PER_CALL_USD).toFixed(2)),
+    estCostUsd: opts.live ? null : 0,
     outcomes,
   };
   await writeFile(file, JSON.stringify(report, null, 2), "utf8");
@@ -184,9 +183,11 @@ async function main(): Promise<void> {
   const placedCount = outcomes.filter((o) => o.placed).length;
   const unresolved = outcomes.filter((o) => o.unresolved).length;
   const skipped = outcomes.length - placedCount - unresolved;
-  const estCost = (placedCount * COST_PER_CALL_USD).toFixed(2);
+  const charges = args.live
+    ? "See https://dashboard.heycall-e.com/account/billing for actual charges."
+    : "No CALL-E charges (dry-run).";
   const halt = unresolved ? `, ${unresolved} UNRESOLVED (batch halted — reconcile)` : "";
-  console.log(`\nSummary: ${placedCount} placed, ${skipped} skipped${halt}. Est. cost: $${estCost}`);
+  console.log(`\nSummary: ${placedCount} placed, ${skipped} skipped${halt}. ${charges}`);
 
   const file = await writeReport(effectiveArgs, outcomes);
   console.log(`Results written to ${file}`);
