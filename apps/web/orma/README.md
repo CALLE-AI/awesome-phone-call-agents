@@ -293,8 +293,8 @@ The table below lists every external effect and its trigger:
 
 | Effect | Trigger | Target | Cost or retention |
 |---|---|---|---|
-| Phone call | `tick` dispatches a due run with dry run off, a confirmed number and live consent | Callee phone number | Consumes CALL-E balance ($0.05 per call after 20 free) |
-| Confirmation call | "Call me with a code", dry run off | The caller's saved number | $0.05 per attempt after 20 free. Limits in Number confirmation |
+| Phone call | `tick` dispatches a due run with dry run off, a confirmed number and live consent | Callee phone number | Consumes CALL-E credits; Call Fee + applicable Success Fee |
+| Confirmation call | "Call me with a code", dry run off | The caller's saved number | Call fees may apply even without connection. Limits in Number confirmation |
 | Cron `tick-runs` | `pg_cron` every minute | `tick` function | Function invocations and `call_runs` writes |
 | Cron `materialise-runs` | `pg_cron` daily at 00:10 UTC | `materialise` function | Database row writes |
 | Cron `analysis-report` | `pg_cron` every Monday at 06:20 UTC | `analysis` function, `pattern_reports` table | Vertex AI Gemini token usage |
@@ -304,7 +304,7 @@ The table below lists every external effect and its trigger:
 | Email pattern report | Weekly analysis, the profile has `email_receipts` on | User email address | Resend API email delivery |
 | Telegram webhook registration | `telegram` function boot, or a GET to its secret path | Telegram Bot API `setWebhook` | Free |
 | Stored voice note | User sends a voice note to the bot | `item-audio` storage bucket and `items.audio_url` | Transcribed with Gemini. Kept until the account is deleted |
-| CALL-E spend | Each live outbound call request | CALL-E account | \$0.05 per call after 20 free calls |
+| CALL-E spend | Each live outbound call request | CALL-E account | Variable charges; see [Dashboard billing](https://dashboard.heycall-e.com/account/billing) |
 
 ## Cancellation
 
@@ -354,7 +354,7 @@ A dry run marks the run `billable = false` with `terminal_writer = 'dry_run'`. I
 
 A confirmation attempt in dry run places no call. `confirm-phone` stores the request in `phone_confirmations.dry_run_request`, with the number, the webhook secret and the code masked. The row moves to `dialled` with no `calle_call_id`. When `ORMA_ENV` is not `production`, the response also carries the code, so a local test can finish. In production it never does.
 
-Setting `ORMA_DRY_RUN=false` enables live telephony. Real calls cost \$0.05 each after CALL-E's 20 initial free calls.
+Setting `ORMA_DRY_RUN=false` enables live telephony. New CALL-E users receive 100 free credits (US$1); this is a credit balance, not a fixed number of calls. See the [current pricing FAQ](https://www.heycall-e.com/) and [Dashboard billing](https://dashboard.heycall-e.com/account/billing) for actual charges.
 
 ## Credentials
 

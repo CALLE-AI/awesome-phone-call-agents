@@ -59,7 +59,7 @@ python3 client.py --request your-authorized-appointment.json \
   --execute --confirm-consent --output ../../tickets/live.json
 ```
 
-`--execute` without `--confirm-consent` or without `CALLE_API_KEY` is refused. New CALL-E accounts include 20 free calls after signup at [heycall-e.com](https://www.heycall-e.com/).
+`--execute` without `--confirm-consent` or without `CALLE_API_KEY` is refused. New CALL-E users receive 100 free credits (US$1); this is a credit balance, not a fixed number of calls. See the [current pricing FAQ](https://www.heycall-e.com/) and [Dashboard billing](https://dashboard.heycall-e.com/account/billing) for actual charges.
 
 
 ## Sample phone number

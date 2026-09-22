@@ -790,7 +790,7 @@ def triage(neighbours: Iterable[Any], hazard: Any) -> list[RiskAssessment]:
 def call_order(neighbours: Iterable[Any], hazard: Any) -> list[str]:
     """Neighbour ids in the order the sweep should dial them.
 
-    Order is the part of this system that survives contact with reality. The free tier is 20 calls,
+    Order is the part of this system that survives contact with reality. The signup credit allowance is limited,
     a volunteer's evening is shorter than her list, and a sweep can die halfway through on a flat
     phone battery. Whatever fraction of the roster actually gets called, it has to be the *right*
     fraction: the man whose oxygen concentrator has two hours of battery is dialled before the

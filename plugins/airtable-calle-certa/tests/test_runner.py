@@ -15,7 +15,7 @@ from certa.airtable import AirtableError, FieldMap, FixtureAirtable
 from certa.audit import AuditLog
 from certa.calle import Disposition
 from certa.consent import derive_token
-from certa.runner import PRICE_PER_CALL_USD, RunError, execute, plan, reconcile
+from certa.runner import RunError, execute, plan, reconcile
 from certa.tasks import TASK_SPEC_VERSION
 from certa.schema import UNKNOWN
 from certa.transport import FixtureTransport, TransportError
@@ -148,17 +148,18 @@ class Planning(Base):
             table=TABLE, view=VIEW, requester_name=REQUESTER,
         )
         self.assertIn("cancelled", result.skipped[0].reason)
+        self.assertEqual(result.estimated_cost_usd, 0.0)
 
     def test_hidden_rows_are_surfaced_in_the_plan(self):
         client = self.client([consented()] * 9, view_records=[consented()] * 2)
         result = plan(client, table=TABLE, view=VIEW, requester_name=REQUESTER)
         self.assertEqual(result.scope.hidden, 7)
 
-    def test_cost_estimate_uses_the_published_price(self):
+    def test_call_count_does_not_determine_charges(self):
         result = plan(
             self.client([consented()] * 3), table=TABLE, view=VIEW, requester_name=REQUESTER
         )
-        self.assertAlmostEqual(result.estimated_cost_usd, 3 * PRICE_PER_CALL_USD, places=2)
+        self.assertIsNone(result.estimated_cost_usd)
 
 
 class Caps(Base):

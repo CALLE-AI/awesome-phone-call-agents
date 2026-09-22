@@ -157,7 +157,7 @@ export function SettingsModal({
             </div>
           </div>
 
-          {/* First-live-call onboarding: real outbound needs KYC + a number */}
+          {/* Shared-line testing and purchased-number setup have different requirements. */}
           <div className="rounded-2xl border border-border bg-surface-2 p-4">
             <p className="mb-3 flex items-center gap-1.5 text-sm font-bold text-ink">
               <Rocket className="size-4 text-primary" /> Before your first live call
@@ -166,16 +166,16 @@ export function SettingsModal({
               <SetupStep
                 n={1}
                 icon={<BadgeCheck className="size-4" />}
-                title="Verify your identity (KYC)"
-                desc="CALL-E requires identity verification before it will place outbound calls."
+                title="Check purchased-number activation"
+                desc="Purchased numbers require identity verification before outbound activation. Check current availability in the Dashboard."
                 href={DASHBOARD}
                 action="Verify in dashboard"
               />
               <SetupStep
                 n={2}
                 icon={<Radio className="size-4" />}
-                title="Get a phone number"
-                desc="Buy a CALL-E number (or connect a SIP trunk) so your calls have a caller ID. Some regions restrict outbound."
+                title="Choose your outbound line"
+                desc="Shared numbers support single-recipient tests. For API batches, select an activated purchased number as the default outbound line."
                 href={DASHBOARD}
                 action="Get a number"
               />
@@ -189,8 +189,8 @@ export function SettingsModal({
               />
             </ol>
             <p className="mt-3.5 border-t border-border pt-3 text-xs leading-relaxed text-muted">
-              New accounts include free calls; after that, each completed call is about{' '}
-              <span className="font-semibold text-ink">$0.05</span>. Demo Mode is always free.
+              New accounts receive 100 free credits. Live calls have usage-based charges;
+              check CALL-E Dashboard billing for actual costs. Demo Mode is always free.
             </p>
           </div>
           </>

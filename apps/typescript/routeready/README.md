@@ -61,7 +61,7 @@ In the app, press **Start the day**. The demo day is a fictional Dhaka route wit
 | Failed attempts at the door | 2 | 0 |
 | Minutes waiting at doors | 3 | 0 |
 | Trips avoided (customer said later or not today) | 0 | 2 |
-| Calls placed | 0 | 7 ($0.35 at $0.05 each) |
+| Calls placed | 0 | 7 (simulated; no CALL-E charge) |
 | Route finished | 11:26 | 11:10 |
 
 The two runs share the same ground truth for every customer; only what the route knows differs.

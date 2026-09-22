@@ -1,7 +1,7 @@
 """Prove that the default paths cannot reach the network.
 
 This is the test that protects a credit balance. CALL-E has no sandbox, every
-placed call costs five credits and rings a real telephone, and the offline
+placed call may incur variable charges and rings a real telephone, and the offline
 promise -- "clone it, run it, no account needed" -- is the whole reason a
 reviewer would try this tool at all. Both claims rest on the same property, and
 until now that property was documented rather than enforced.

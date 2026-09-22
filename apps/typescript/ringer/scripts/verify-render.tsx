@@ -193,8 +193,8 @@ render('HistoryDrawer (scheduled + watches)', h(HistoryDrawer, {
 // Pure-helper checks (pricing + error guidance).
 const assert = (cond: boolean, msg: string) => { if (!cond) throw new Error(`assert failed: ${msg}`); console.log(`  ✓ ${msg}`) }
 console.log('\n[assert] pricing + error guidance')
-assert(estimateCost(1).formattedTotal === '$0.05', 'estimateCost(1) = $0.05')
-assert(estimateCost(3).breakdown === '3 calls × $0.05 = $0.15', 'estimateCost(3) breakdown = 3 × $0.05 = $0.15')
+assert(estimateCost(1).total === null, 'live-call cost is unknown before settlement')
+assert(estimateCost(3).breakdown === '3 calls · usage-based charges', 'batch size does not imply a fixed price')
 assert(estimateCost(0).total === 0, 'estimateCost(0) = 0')
 assert(guidanceForError('forbidden')?.action?.href.includes('heycall-e.com') === true, 'forbidden → dashboard link')
 assert(guidanceForError('insufficient_balance') !== null, 'insufficient_balance has guidance')

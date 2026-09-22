@@ -90,7 +90,7 @@ The same normalisation applies to `cooling`, `heating`, `mobility` and `age_band
 
 `call_order(roster, hazard)` returns neighbour ids, worst first. Sorting is `(-score, time_to_harm_h, name, id)` — deterministic to the last field, so a shuffled roster cannot reorder, and at equal scores a two-hour battery outranks an eight-hour one.
 
-The free tier is 20 calls, a volunteer's evening is shorter than her list, and a sweep can die halfway through on a flat phone battery. **Whatever fraction of the roster actually gets called has to be the right fraction.** If only six calls happen tonight, those six should be the six where a call changes the outcome.
+The [signup allowance](https://www.heycall-e.com/) is 100 credits, not a fixed number of calls; a volunteer's evening is shorter than her list, and a sweep can die halfway through on a flat phone battery. **Whatever fraction of the roster actually gets called has to be the right fraction.** If only six calls happen tonight, those six should be the six where a call changes the outcome.
 
 People who never opted in are **dropped here**, not sorted to the bottom, so no downstream code path can dial them by walking one index too far. Consent is then checked a second time on the row at the moment of dialling: a guard that exists only one layer up is one an off-by-one gets past, and the thing on the other side of it is somebody's phone ringing after they said no.
 
