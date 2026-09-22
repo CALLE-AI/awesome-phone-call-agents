@@ -73,7 +73,7 @@ def load_call_result(path: Path) -> dict[str, Any]:
 _WEEKDAY_RE = re.compile(r"\b(monday|tuesday|wednesday|thursday|friday|saturday|sunday)\b", re.IGNORECASE)
 _ORDINAL_RE = re.compile(r"\bthe ([0-9]{1,2})(?:st|nd|rd|th)\b", re.IGNORECASE)
 _AMOUNT_RE = re.compile(r"[$]([0-9][0-9 ,./-]*[0-9]|[0-9])\b|\b([0-9][0-9 ,./-]*[0-9]|[0-9])\s+(?:dollars|usd)\b", re.IGNORECASE)
-_TIME_RE = re.compile(r"\bat ([0-9]{1,2})(?::([0-9]{2}))?\s*(a\.?m\.?|p\.?m\.?)", re.IGNORECASE)
+_TIME_RE = re.compile(r"\b(?:at\s+)?([0-9]{1,2})(?::([0-9]{2}))?\s*(a\.?m\.?|p\.?m\.?)\b", re.IGNORECASE)
 
 
 def _norm_digits(text: str) -> str:
