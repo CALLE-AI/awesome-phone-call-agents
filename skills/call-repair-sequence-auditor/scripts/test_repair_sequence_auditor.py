@@ -514,6 +514,19 @@ def test_main_returns_int():
     assert main(["craft", "--scenario", "high-trouble-redial"]) == 0
 
 
+def test_cli_analyze_moderate_fixture():
+    path = SKILL_DIR / "references" / "example-transcript-moderate.json"
+    proc = subprocess.run(
+        [sys.executable, str(SCRIPTS / "repair_sequence_auditor.py"), "analyze", "--transcript", str(path)],
+        capture_output=True,
+        text=True,
+    )
+    assert proc.returncode == 0
+    card = json.loads(proc.stdout)
+    assert card["comprehension_trouble"] == "MODERATE"
+    assert card["unresolved_repairs"] == 0
+    assert card["recommended_action"]["guidance"] is not None
+
 # ---------------------------------------------------------------- runner
 
 

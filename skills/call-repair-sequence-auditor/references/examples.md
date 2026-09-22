@@ -144,3 +144,61 @@ Output:
 
 The goal is the same template the HIGH card recommends, so analysis and the
 next call stay consistent.
+
+## Example 4: a moderate-trouble call (all repairs resolved)
+
+Fixture: `references/example-transcript-moderate.json` - two repairs, both
+properly re-delivered by the agent.
+
+Command:
+
+```bash
+python3 skills/call-repair-sequence-auditor/scripts/repair_sequence_auditor.py analyze \
+  --transcript skills/call-repair-sequence-auditor/references/example-transcript-moderate.json
+```
+
+Output:
+
+```json
+{
+  "skill": "call-repair-sequence-auditor",
+  "analysis_mode": "heuristic",
+  "repair_assessment": "assessed",
+  "reason": null,
+  "comprehension_trouble": "MODERATE",
+  "repair_events": [
+    {
+      "repair_turn_index": 1,
+      "repair_type": "open_class",
+      "span": "Sorry, what?",
+      "trouble_source_index": 0,
+      "trouble_profile": [
+        "digit_dense"
+      ],
+      "resolution": "ADDRESSED"
+    },
+    {
+      "repair_turn_index": 3,
+      "repair_type": "candidate_understanding",
+      "span": "Is it the 12th or the 21st?",
+      "trouble_source_index": 2,
+      "trouble_profile": [
+        "digit_dense"
+      ],
+      "resolution": "ADDRESSED"
+    }
+  ],
+  "repairs_initiated": 2,
+  "unresolved_repairs": 0,
+  "dominant_trouble_type": "digit_dense",
+  "repair_baseline_note": "Human conversation runs at roughly one repair every 1.4 minutes (Dingemanse et al. 2015, twelve-language sample). Transcripts carry no reliable offsets here, so this card reports counts per call instead of a rate; treat the baseline as illustrative only.",
+  "recommended_action": {
+    "action": "continue",
+    "guidance": "Multiple repairs in one call, all resolved. The wording still caused trouble; consider the simplified goal wording on the next contact."
+  },
+  "disclaimer": "Heuristic text-only conversation analysis. Repair detection here is a lexical approximation of conversation-analytic other-initiated repair; prosodic and timing cues are invisible in transcripts, so counts under-report rather than over-report. Verdicts advise a human, they decide nothing."
+}
+```
+
+The agent handled both repairs, so no redial is recommended - but the card
+still names the cause (digit-dense wording) for the next goal draft.
