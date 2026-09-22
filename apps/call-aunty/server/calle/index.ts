@@ -33,4 +33,6 @@ export { validateCallPolicy } from "./api-policy";
 export { hardenedCalleRouter } from "./router-hardened";
 export { assertLiveExecutionAllowed, LIVE_INTENT_HEADER, LIVE_INTENT_VALUE } from "./live-gate";
 export { SECURITY_RULES, classifySecurity } from "./security-helpers";
+export { assertProviderCallContract, assertProviderEventPageContract } from "./provider-contract";
+export { getCalleReleaseReadiness } from "./release-readiness";
 export * from "./types";

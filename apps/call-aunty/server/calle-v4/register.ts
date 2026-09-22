@@ -1,6 +1,5 @@
 import type { Express } from "express";
 import { loadCalleV4Config } from "./config";
-import { CalleProvider } from "./client";
 import { DemoCalleProvider } from "./demo-provider";
 import { MemoryCallRepository, type CallRepository } from "./repository";
 import { CallService } from "./service";
@@ -16,11 +15,10 @@ let runtime: CalleV4Runtime | null = null;
 export function getCalleV4Runtime(): CalleV4Runtime {
   if (runtime) return runtime;
   const config = loadCalleV4Config();
-  // A provider failure in live mode must remain a provider failure, never become a
-  // completed demo result. Demo mode remains explicitly selected by configuration.
-  const provider: Provider = config.demoMode || !config.apiKey
-    ? new DemoCalleProvider()
-    : new CalleProvider(config);
+  // V4 is an internal compatibility and fixture surface, never a second route to
+  // live provider traffic. All live execution remains exclusively in the protected
+  // CALL-E workflow/direct gateway, where intent, recipient, and ambiguity locks run.
+  const provider: Provider = new DemoCalleProvider();
   const repo = createDrizzleCallRepository() ?? new MemoryCallRepository();
   const service = new CallService(provider, repo, config);
   runtime = { service, repo, provider };

@@ -10,6 +10,8 @@ import { getMockCall, mockCall, mockEvents } from "./mock";
 import { secureCalleHttp, unwrapSecureCall, unwrapSecureEventPage } from "./http-secure";
 import { CalleManualReviewError, isManualReviewError } from "./uncertain-state";
 import type { CallEventPage, CallTask, CalleTransport, CreateCallRequest } from "./runtime-types";
+import { assertProviderEventPageContract } from "./provider-contract";
+import { fingerprintIdempotencyKey } from "./idempotency";
 
 function isTerminal(status: string): boolean {
   return status === "completed" || status === "failed" || status === "canceled";
@@ -65,7 +67,7 @@ export class HardenedCalleGateway {
     if (this.assertLiveOrMock() === "mock") return mockCall(request);
     // secureCalleHttp gives POST exactly one attempt and throws manual review if the
     // provider state may have changed after a lost or invalid response.
-    return unwrapSecureCall(await secureCalleHttp<unknown>({
+    const response = await secureCalleHttp<unknown>({
       method: "POST",
       path: "/v1/calls",
       idempotencyKey: request.idempotencyKey,
@@ -77,7 +79,25 @@ export class HardenedCalleGateway {
         metadata: request.metadata,
         webhook_url: request.webhookUrl,
       },
-    }));
+    });
+    try {
+      return unwrapSecureCall(response);
+    } catch {
+      // A 2xx response with an invalid or unfamiliar call envelope may represent an
+      // accepted provider submission. Preserve the idempotency ambiguity lock instead
+      // of returning a normal validation error that callers could retry blindly.
+      throw new CalleManualReviewError({
+        state: "unknown",
+        manualReviewRequired: true,
+        operation: "create",
+        callId: null,
+        idempotencyKeyFingerprint: fingerprintIdempotencyKey(request.idempotencyKey),
+        reason: "invalid_success_payload",
+        providerStatus: 200,
+        retryAttempted: false,
+        remediation: "manual_review_before_retry",
+      });
+    }
   }
 
   async getCall(id: string): Promise<CallTask> {
@@ -98,7 +118,9 @@ export class HardenedCalleGateway {
     if (transport === "mock" || id.startsWith("call_mock_")) return mockEvents(id);
     const suffix = cursor ? `?cursor=${encodeURIComponent(cursor)}` : "";
     try {
-      return unwrapSecureEventPage(await secureCalleHttp<unknown>({ method: "GET", path: `/v1/calls/${encodeURIComponent(id)}/events${suffix}` }));
+      const page = unwrapSecureEventPage(await secureCalleHttp<unknown>({ method: "GET", path: `/v1/calls/${encodeURIComponent(id)}/events${suffix}` }));
+      assertProviderEventPageContract(page);
+      return page;
     } catch (error) {
       if (error instanceof CalleAuthError || error instanceof CalleValidationError) throw error;
       throw unknownReadError(error, id, "events");

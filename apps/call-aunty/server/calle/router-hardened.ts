@@ -9,8 +9,9 @@ import { authorizeDirectRecipientSet } from "./recipient-authority";
 import { CreateCallRequestSchema } from "./types";
 import { publicError, redactObject } from "./utilities";
 import { scenarios } from "./scenarios";
-import { parseWebhook } from "./webhook";
+import { acceptCalleWebhook } from "./webhook";
 import { isManualReviewError } from "./uncertain-state";
+import { getCalleReleaseReadiness } from "./release-readiness";
 
 export const hardenedCalleRouter = express.Router();
 
@@ -47,8 +48,13 @@ hardenedCalleRouter.get("/health", (_req, res) => {
     killSwitch: config.killSwitch,
     liveIntentRequired: config.liveIntentRequired,
     liveLoopbackOnly: config.liveLoopbackOnly,
+    readiness: getCalleReleaseReadiness(),
     timestamp: new Date().toISOString(),
   });
+});
+
+hardenedCalleRouter.get("/readiness", requireOperator, (_req, res) => {
+  res.json(redactObject({ ok: true, ...getCalleReleaseReadiness() }));
 });
 
 // Direct provider operations are server-operator tools. The Expo application uses tRPC workflows.
@@ -118,8 +124,14 @@ hardenedCalleRouter.post("/webhook", (req, res) => {
         : typeof req.body === "string"
           ? req.body
           : JSON.stringify(req.body ?? {});
-    const event = parseWebhook(body, req.header("x-calle-signature") ?? undefined);
-    res.json(redactObject({ ok: true, callId: event.id, status: event.status }));
+    const receipt = acceptCalleWebhook(body, req.header("x-calle-signature") ?? undefined);
+    res.status(receipt.duplicate ? 200 : 202).json(redactObject({
+      ok: true,
+      duplicate: receipt.duplicate,
+      receiptId: receipt.receiptId,
+      callId: receipt.event.id,
+      status: receipt.event.status,
+    }));
   } catch (error) {
     const safe = publicError(error);
     res.status(401).json(redactObject({ ok: false, code: "INVALID_WEBHOOK", error: safe.message }));

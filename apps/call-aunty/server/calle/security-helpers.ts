@@ -48,4 +48,7 @@ export const SECURITY_RULES = Object.freeze([
   "recipient-is-e164",
   "recipient-is-trusted",
   "live-errors-never-become-mock-success",
+  "provider-payload-is-contract-checked",
+  "webhook-is-hmac-verified-and-deduplicated",
+  "v4-is-not-a-live-provider-path",
 ]);

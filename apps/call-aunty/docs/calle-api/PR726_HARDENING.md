@@ -42,3 +42,17 @@ Run the focused regression coverage with:
 ```bash
 pnpm test:calle-security
 ```
+
+## Final-submission controls
+
+Provider call and event responses are contract-checked before the hardened live gateway treats them as known state. Calls require a non-empty ID and a documented lifecycle status; event pages require a list of stable, typed event objects. Malformed or unfamiliar provider data remains a redacted `502` provider-contract failure rather than entering the workflow as a valid call.
+
+Inbound direct-gateway webhooks require a configured HMAC secret. Verified payloads receive a bounded, 24-hour SHA-256 receipt ledger that reports duplicate deliveries without retaining the raw payload. Duplicate deliveries return success and do not trigger duplicate downstream handling. The internal V4 compatibility surface also requires HMAC verification and is deliberately **demo-only**; it cannot become a second live-provider route.
+
+Use the repeatable fail-closed preflight command before a release or recorded demonstration:
+
+```bash
+pnpm calle:readiness
+```
+
+When `CALLE_LIVE_CALLS=true`, the preflight requires `CALLE_API_KEY`, `CALLE_WEBHOOK_SECRET`, explicit live intent, an inactive kill switch, and exact HTTPS approved origins. The repository CI workflow runs this preflight, security regression suite, CALL-E regression suite, TypeScript check, and server build for CALL AUNTY changes.

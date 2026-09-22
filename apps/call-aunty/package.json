@@ -18,6 +18,7 @@
     "test:calle-api": "cross-env CALLE_MOCK_MODE=true vitest run tests/calle.core.test.ts tests/calle.utilities.test.ts tests/calle.router.test.ts tests/calle.endpoint-smoke.test.ts tests/calle.scenario-matrix.test.ts tests/calle.result-matrix.test.ts tests/calle.contract-matrix.test.ts tests/calle.integration-matrix.test.ts",
     "test:calle-security": "vitest run tests/calle-security",
     "calle:health": "node scripts/calle-health-gate.mjs",
+    "calle:readiness": "node scripts/calle-release-readiness.mjs",
     "calle:progress": "node scripts/validate-v5-progress.mjs",
     "test:billing": "vitest run tests/billing-v6.test.ts tests/workflow-errors.test.ts",
     "billing:health": "node scripts/billing-health-gate.mjs",

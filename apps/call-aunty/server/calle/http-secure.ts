@@ -12,6 +12,7 @@ import { fingerprintIdempotencyKey } from "./idempotency";
 import { CalleManualReviewError, type UncertainOperation } from "./uncertain-state";
 import type { CallEvent, CallEventPage, CallTask } from "./runtime-types";
 import { redactObject } from "./utilities";
+import { assertProviderCallContract } from "./provider-contract";
 
 function buildAbsoluteUrl(path: string): URL {
   const config = loadHardenedCalleConfig();
@@ -169,5 +170,7 @@ export function unwrapSecureEventPage(data: unknown): CallEventPage {
 }
 
 export function unwrapSecureCall(data: unknown): CallTask {
-  return unwrapSecurePayload<CallTask>(data);
+  const call = unwrapSecurePayload<CallTask>(data);
+  assertProviderCallContract(call);
+  return call;
 }
