@@ -45,7 +45,7 @@ def stop_active_drivers() -> list[str]:
 def reset_demo(settings: Settings) -> dict[str, Any]:
     """Wipe and re-seed. Returns the ids the UI needs to reattach.
 
-    `SpentCall` survives — see `app.seed.wipe`. The free tier is 20 real calls for the life of the
+    `SpentCall` survives — see `app.seed.wipe`. The live-call budget is retained for the life of the
     account, and a reset button that handed them back would let the next demo spend them again.
     """
     stopped = stop_active_drivers()

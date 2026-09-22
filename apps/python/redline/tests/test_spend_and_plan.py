@@ -25,7 +25,6 @@ from redline.calle.plan import (
     plan_call,
 )
 from redline.spend import (
-    CREDITS_PER_CALL,
     SpendLedger,
     Wetness,
     WetOperationRefusedError,
@@ -80,10 +79,10 @@ class TestSpendLedger:
             ledger.record_wet("calls.create")
         assert ledger.calls_placed == 2
 
-    def test_credits_are_counted_at_five_per_call(self) -> None:
+    def test_credits_are_unknown_until_settlement(self) -> None:
         ledger = SpendLedger(call_budget=3)
         ledger.record_wet("calls.create")
-        assert ledger.credits_spent == CREDITS_PER_CALL
+        assert ledger.credits_spent is None
 
     def test_assert_nothing_was_spent_names_what_spent_it(self) -> None:
         ledger = SpendLedger(call_budget=1)
@@ -104,12 +103,12 @@ class TestSpendLedger:
         ledger.record_dry("plan_call")
         assert "0 calls, 0 credits" in ledger.summary_line()
         ledger.record_wet("calls.create")
-        assert "5 credits" in ledger.summary_line()
+        assert "charges" in ledger.summary_line()
 
     def test_wetness_decides_the_price(self) -> None:
         ledger = SpendLedger(call_budget=1)
         assert ledger.record_dry("plan_call").credits == 0
-        assert ledger.record_wet("calls.create").credits == CREDITS_PER_CALL
+        assert ledger.record_wet("calls.create").credits is None
         assert ledger.operations[0].wetness is Wetness.DRY
         assert ledger.operations[1].wetness is Wetness.WET
 

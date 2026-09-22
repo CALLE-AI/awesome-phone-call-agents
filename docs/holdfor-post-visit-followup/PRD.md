@@ -385,6 +385,8 @@ is a bug that should be unreachable, not a state to handle.
 
 ## The call budget
 
+This section preserves the original test-budget assumption. New CALL-E users receive 100 free credits (US$1); this is a credit balance, not a fixed number of calls. See the [current pricing FAQ](https://www.heycall-e.com/) and [Dashboard billing](https://dashboard.heycall-e.com/account/billing) for actual charges.
+
 Twenty free calls is the binding constraint, not the two days. One end-to-end run of
 the chain costs **two** calls.
 

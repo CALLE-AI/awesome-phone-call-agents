@@ -444,8 +444,7 @@ From the `call-e-integrations` README supported-regions table:
   production use with a local phone number, contact the CALL-E team to enable a
   local line for the destination country."
 
-CALL-E supports many languages across 40+ countries, but **the UK row lists
-English only**. A contact who needs another language therefore cannot be served
+The [current supported-regions table](https://github.com/CALLE-AI/call-e-integrations#supported-regions-and-languages) defines platform coverage; **the UK row lists English only**. A contact who needs another language therefore cannot be served
 on a UK line, and Reachable routes them to a human rather than calling them in a
 language they may not speak. That is a policy decision forced by the source, and
 it is a genuine product improvement over calling anyway.
@@ -457,8 +456,7 @@ and [`skills/appointment-confirm/SKILL.md:108`](../../../../skills/appointment-c
 
 ### 2.9 Call allowance
 
-"New users get 20 free calls to get started" (`call-e-integrations` README),
-repeated on the Devpost page with a form to request more.
+New CALL-E users receive 100 free credits (US$1); this is a credit balance, not a fixed number of calls. See the [current pricing FAQ](https://www.heycall-e.com/) and [Dashboard billing](https://dashboard.heycall-e.com/account/billing) for actual charges.
 
 ---
 

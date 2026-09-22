@@ -193,11 +193,13 @@ render('HistoryDrawer (scheduled + watches)', h(HistoryDrawer, {
 // Pure-helper checks (pricing + error guidance).
 const assert = (cond: boolean, msg: string) => { if (!cond) throw new Error(`assert failed: ${msg}`); console.log(`  ✓ ${msg}`) }
 console.log('\n[assert] pricing + error guidance')
-assert(estimateCost(1).formattedTotal === '$0.05', 'estimateCost(1) = $0.05')
-assert(estimateCost(3).breakdown === '3 calls × $0.05 = $0.15', 'estimateCost(3) breakdown = 3 × $0.05 = $0.15')
+assert(estimateCost(1).total === null, 'live-call cost is unknown before settlement')
+assert(estimateCost(3).breakdown === '3 calls · usage-based charges', 'batch size does not imply a fixed price')
 assert(estimateCost(0).total === 0, 'estimateCost(0) = 0')
 assert(guidanceForError('forbidden')?.action?.href.includes('heycall-e.com') === true, 'forbidden → dashboard link')
-assert(guidanceForError('insufficient_balance') !== null, 'insufficient_balance has guidance')
+assert(!/KYC|identity verification/i.test(guidanceForError('forbidden')!.hint), 'permission errors do not imply KYC')
+assert(!/KYC|identity verification/i.test(guidanceForError('policy_violation')!.hint), 'policy errors do not imply KYC')
+assert(guidanceForError('insufficient_balance')?.action?.href.endsWith('/account/billing') === true, 'insufficient_balance points to actual credit billing')
 assert(guidanceForError('unknown_code_xyz') === null, 'unknown code → no guidance')
 // A raw/partial live response may omit array fields (evidence, recipients,
 // attempts) that the demo always populates. The outcome UI must not crash.
