@@ -513,6 +513,19 @@ def test_main_returns_int():
     assert main(["craft", "--scenario", "fact-bearing-call"]) == 0
 
 
+def test_cli_analyze_uncertain_fixture():
+    path = SKILL_DIR / "references" / "example-transcript-uncertain.json"
+    proc = subprocess.run(
+        [sys.executable, str(SCRIPTS / "sycophancy_guard.py"), "analyze", "--transcript", str(path)],
+        capture_output=True,
+        text=True,
+    )
+    assert proc.returncode == 0
+    card = json.loads(proc.stdout)
+    assert card["verdict"] == "UNCERTAIN"
+    assert card["stance_counts"]["UNADDRESSED"] == 1
+    assert card["recommended_action"]["action"] == "review_unaddressed_pushback"
+
 # ---------------------------------------------------------------- runner
 
 
