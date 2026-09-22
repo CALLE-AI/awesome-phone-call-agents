@@ -16,14 +16,12 @@ export async function ingestEvent(
   secret?: string,
   signature?: string,
 ): Promise<{ accepted: boolean; deduplicated: boolean; eventId: string }> {
-  if (secret) {
-    if (!signature || !verifySignature(raw, signature, secret)) {
-      throw new Error("Invalid webhook signature");
-    }
+  if (!secret || !signature || !verifySignature(raw, signature, secret)) {
+    throw new Error("Invalid webhook signature");
   }
   const event = JSON.parse(raw) as CalleEvent;
-  if (!event?.id || !event.data?.id) {
-    throw new Error("Webhook payload missing event or call id");
+  if (!event?.id || !event.data?.id || !event.type) {
+    throw new Error("Webhook payload missing event id, type, or call id");
   }
   const fresh = await repo.putEvent(event);
   if (fresh) await repo.putCall(event.data);

@@ -23,7 +23,9 @@ export function getChwQueueRecord(
   index?: number,
 ): ChwQueueRecord {
   const resolvedIndex = index ?? DEMO_QUEUE.findIndex((row) => row.id === item.id);
-  const record = resolvedIndex >= 0 ? records?.[resolvedIndex] : undefined;
+  // Localization bundles can be incomplete during a staged app update. Prefer the
+  // requested row, then the first available safe copy rather than showing a raw ID.
+  const record = (resolvedIndex >= 0 ? records?.[resolvedIndex] : undefined) ?? records?.[0];
   if (record?.name.trim()) return record;
   return {
     name: item.id,

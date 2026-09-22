@@ -21,16 +21,10 @@ export function loadCalleConfig(env: typeof ENV = ENV): CalleConfig {
   let mode: CalleConfig["mode"] = "dry_run";
   if (killSwitch) mode = "disabled";
   else if (demoMode) mode = "demo";
-  else if (configured && liveCallsEnabled) mode = "live";
+  // A key configures the client; it does not select or authorize live transport.
+  else if (liveCallsEnabled) mode = "live";
 
-  return {
-    apiKey,
-    liveCallsEnabled,
-    killSwitch,
-    configured,
-    demoMode,
-    mode,
-  };
+  return { apiKey, liveCallsEnabled, killSwitch, configured, demoMode, mode };
 }
 
 /** Safe metadata for diagnostics — no secrets. */
@@ -60,7 +54,7 @@ function parsePositiveInt(value: string | undefined, fallback: number) {
   return Number.isFinite(parsed) && parsed > 0 ? Math.floor(parsed) : fallback;
 }
 
-/** Server-only CALL-E REST/SDK gateway config. Safe to import from server tests. */
+/** Server-only CALL-E REST gateway configuration. SDK transport is intentionally disabled. */
 export const calleConfig = {
   apiKey: (process.env.CALLE_API_KEY ?? ENV.calleApiKey).trim() || undefined,
   baseUrl: (process.env.CALLE_BASE_URL ?? ENV.calleBaseUrl ?? "https://api.heycall-e.com").replace(/\/+$/, ""),
@@ -78,12 +72,10 @@ export const calleConfig = {
       .map((region) => region.trim().toUpperCase())
       .filter(Boolean),
   ),
-  transport: (process.env.CALLE_TRANSPORT === "sdk" ? "sdk" : "rest") as "sdk" | "rest",
+  transport: "rest" as const,
 } as const;
 
 export function requireCalleApiKey() {
-  if (!calleConfig.apiKey) {
-    throw new Error("CALLE_API_KEY is not configured on the server");
-  }
+  if (!calleConfig.apiKey) throw new Error("CALLE_API_KEY is not configured on the server");
   return calleConfig.apiKey;
 }

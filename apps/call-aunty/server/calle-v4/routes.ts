@@ -8,6 +8,7 @@ import { reconcileOpenCalls } from "./reconcile";
 import type { CallRepository } from "./repository";
 import type { Provider } from "./types";
 import type { CalleV4Config } from "./config";
+import { redactObject, sanitizeText } from "../calle/utilities";
 
 function userIdFrom(req: Request): string {
   const header = req.headers["x-user-id"];
@@ -24,11 +25,19 @@ export function createCalleRouter(opts: {
   const { service, repo, provider, config } = opts;
   const router = Router();
 
+  // Preserve private call objects internally while sanitizing every V4 operator
+  // response immediately before it leaves Express.
+  router.use((_req, res, next) => {
+    const sendJson = res.json.bind(res);
+    res.json = ((body: unknown) => sendJson(redactObject(body))) as typeof res.json;
+    next();
+  });
+
   router.get("/health", async (_req, res) => {
     try {
       res.json(await health(provider, config));
     } catch (error) {
-      const message = error instanceof Error ? error.message : "Health check failed";
+      const message = error instanceof Error ? sanitizeText(error.message) : "Health check failed";
       res.status(503).json({ ok: false, error: message });
     }
   });
@@ -64,7 +73,7 @@ export function createCalleRouter(opts: {
       });
       res.status(201).json(call);
     } catch (error) {
-      const message = error instanceof Error ? error.message : "CALL-E request failed";
+      const message = error instanceof Error ? sanitizeText(error.message) : "CALL-E request failed";
       res.status(400).json({ error: message });
     }
   });
@@ -77,7 +86,7 @@ export function createCalleRouter(opts: {
       }
       res.json(await service.refresh(req.params.id));
     } catch (error) {
-      const message = error instanceof Error ? error.message : "Provider refresh failed";
+      const message = error instanceof Error ? sanitizeText(error.message) : "Provider refresh failed";
       res.status(502).json({ error: message });
     }
   });
@@ -91,7 +100,7 @@ export function createCalleRouter(opts: {
       }
       res.json(await provider.getEvents(req.params.id, req.query.cursor as string | undefined));
     } catch (error) {
-      const message = error instanceof Error ? error.message : "Events lookup failed";
+      const message = error instanceof Error ? sanitizeText(error.message) : "Events lookup failed";
       res.status(502).json({ error: message });
     }
   });
@@ -100,7 +109,7 @@ export function createCalleRouter(opts: {
     try {
       res.json(await service.reconcile(req.params.id));
     } catch (error) {
-      const message = error instanceof Error ? error.message : "Reconcile failed";
+      const message = error instanceof Error ? sanitizeText(error.message) : "Reconcile failed";
       res.status(502).json({ error: message });
     }
   });
@@ -111,7 +120,7 @@ export function createCalleRouter(opts: {
       const calls = await createBatch(service, userIdFrom(req), items);
       res.status(201).json({ calls });
     } catch (error) {
-      const message = error instanceof Error ? error.message : "Batch failed";
+      const message = error instanceof Error ? sanitizeText(error.message) : "Batch failed";
       res.status(400).json({ error: message });
     }
   });
@@ -124,7 +133,7 @@ export function createCalleRouter(opts: {
         reached: outcomeCounts(calls, "reached"),
       });
     } catch (error) {
-      const message = error instanceof Error ? error.message : "Analytics failed";
+      const message = error instanceof Error ? sanitizeText(error.message) : "Analytics failed";
       res.status(500).json({ error: message });
     }
   });
@@ -134,7 +143,7 @@ export function createCalleRouter(opts: {
       const ids: string[] = Array.isArray(req.body?.ids) ? req.body.ids : [];
       res.json({ results: await reconcileOpenCalls(provider, repo, ids) });
     } catch (error) {
-      const message = error instanceof Error ? error.message : "Bulk reconcile failed";
+      const message = error instanceof Error ? sanitizeText(error.message) : "Bulk reconcile failed";
       res.status(502).json({ error: message });
     }
   });
@@ -160,9 +169,9 @@ export function webhookHandler(repo: CallRepository, secret?: string) {
         (req.headers["x-calle-signature"] as string | undefined) ??
         (req.headers["x-webhook-signature"] as string | undefined);
       const result = await ingestEvent(raw, repo, secret, signature);
-      res.status(result.deduplicated ? 200 : 202).json(result);
+      res.status(result.deduplicated ? 200 : 202).json(redactObject(result));
     } catch (error) {
-      const message = error instanceof Error ? error.message : "Webhook rejected";
+      const message = error instanceof Error ? sanitizeText(error.message) : "Webhook rejected";
       const status = message.includes("signature") ? 401 : 400;
       res.status(status).json({ error: message });
     }

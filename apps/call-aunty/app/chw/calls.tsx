@@ -4,7 +4,6 @@ import { router } from "expo-router";
 
 import { BackLink } from "@/components/call-aunty/back-link";
 import { ScreenHeader } from "@/components/call-aunty/screen-header";
-import { CalleApiDemoPanel } from "@/components/calle-v4/api-demo-panel";
 import { ScreenContainer } from "@/components/screen-container";
 import { IconSymbol } from "@/components/ui/icon-symbol";
 import { useLanguage } from "@/contexts/language-context";
@@ -155,7 +154,6 @@ export default function CallCommandCenterScreen() {
           </Text>
         </Pressable>
 
-        <CalleApiDemoPanel />
 
         {localHeroId ? (
           <Text style={[styles.meta, { color: colors.success }]}>
