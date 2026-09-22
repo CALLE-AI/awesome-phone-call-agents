@@ -425,6 +425,19 @@ def test_main_returns_int():
     assert main(["craft", "--scenario", "disclosure-first-call"]) == 0
 
 
+def test_cli_analyze_no_check_fixture():
+    path = SKILL_DIR / "references" / "example-transcript-no-check.json"
+    proc = subprocess.run(
+        [sys.executable, str(SCRIPTS / "disclosure_comprehension_auditor.py"), "analyze", "--transcript", str(path)],
+        capture_output=True,
+        text=True,
+    )
+    assert proc.returncode == 0
+    card = json.loads(proc.stdout)
+    assert card["verdict"] == "DISCLOSED_NO_CHECK"
+    assert card["disclosure_early"] is True
+    assert card["comprehension_check_present"] is False
+
 # ---------------------------------------------------------------- runner
 
 

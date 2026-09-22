@@ -88,11 +88,10 @@ Output:
 }
 ```
 
-Intermediate verdicts from the tests: LATE_DISCLOSURE (disclosure after
-the first agent turn), DISCLOSED_NO_CHECK (disclosure without a
-comprehension question), PARTIAL_NO_ACK (question asked, no affirmative
-reply visible). A check placed after business content already delivered
-does not count - the pitch cannot precede the person's knowing consent.
+Remaining verdicts from the tests: LATE_DISCLOSURE (disclosure after the
+first agent turn) and PARTIAL_NO_ACK (question asked, no affirmative reply
+visible). A check placed after business content already delivered does not
+count - the pitch cannot precede the person's knowing consent.
 
 ## Example 3: craft the disclosure-first goal
 
@@ -118,3 +117,47 @@ Output:
   ]
 }
 ```
+
+## Example 4: disclosed but never checked (DISCLOSED_NO_CHECK)
+
+Fixture: `references/example-transcript-no-check.json` - the disclosure
+opens the call correctly, but no comprehension question is ever asked
+before business content begins.
+
+Command:
+
+```bash
+python3 skills/call-ai-disclosure-comprehension-auditor/scripts/disclosure_comprehension_auditor.py analyze   --transcript skills/call-ai-disclosure-comprehension-auditor/references/example-transcript-no-check.json
+```
+
+Output:
+
+```json
+{
+  "skill": "call-ai-disclosure-comprehension-auditor",
+  "analysis_mode": "heuristic",
+  "disclosure_assessment": "assessed",
+  "reason": null,
+  "disclosure_present": true,
+  "disclosure_early": true,
+  "comprehension_check_present": false,
+  "acknowledgment_captured": false,
+  "evidence": [
+    {
+      "kind": "disclosure",
+      "turn_index": 0,
+      "span": "Hello, this is an automated assistant calling from Example Freight."
+    }
+  ],
+  "verdict": "DISCLOSED_NO_CHECK",
+  "recommended_action": {
+    "action": "elicit_acknowledgment_next_call",
+    "guidance": "The agent disclosed but never checked the person understood. Next contact: pair the disclosure with one short comprehension question."
+  },
+  "disclaimer": "Heuristic text-only analysis. Absence of a captured acknowledgment does not prove the person failed to understand - people understand and stay silent all the time. This card measures what the transcript shows, offers compliance-routing advice, and is not legal advice."
+}
+```
+
+The disclosure itself was early and well-formed; what is missing is the
+check that the person actually registered it - the card routes to the
+comprehension question on the next contact rather than assuming.
