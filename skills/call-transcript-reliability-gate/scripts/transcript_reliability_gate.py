@@ -193,29 +193,21 @@ def _script_switches(text: str) -> list[str]:
 def grade_turn(text: str) -> dict[str, Any]:
     """Grade one turn against every reliability signal."""
     rules: list[str] = []
-    spans: dict[str, str] = {}
 
-    loops = _find_loops(text)
-    if loops:
+    if _find_loops(text):
         rules.append("loop_repetition")
-        spans["loop_repetition"] = loops[0]
 
     for name, pattern in _BOILERPLATE_PATTERNS:
         if re.search(pattern, text, re.IGNORECASE):
-            if "boilerplate_phantom" not in rules:
-                rules.append("boilerplate_phantom")
-            spans.setdefault("boilerplate_phantom", "")
+            rules.append("boilerplate_phantom")
             break
 
     for name, pattern in _HARM_PATTERNS:
         if re.search(pattern, text, re.IGNORECASE):
             rules.append(name)
-            spans[name] = ""
 
-    switches = _script_switches(text)
-    if switches:
+    if _script_switches(text):
         rules.append("non_english_insertion")
-        spans["non_english_insertion"] = ",".join(switches)
 
     stripped = text.strip()
     if stripped and not _WORD_RE.search(stripped) and not any(ch.isascii() and ch.isalnum() for ch in stripped):
@@ -224,7 +216,7 @@ def grade_turn(text: str) -> dict[str, Any]:
     if len(_WORD_RE.findall(text)) > _EXTREME_TURN_WORDS:
         rules.append("extreme_turn_length")
 
-    return {"rules": rules, "spans": spans}
+    return {"rules": rules}
 
 
 def _extract_fields_to_reconfirm(text: str) -> list[str]:
@@ -319,6 +311,14 @@ def analyze_turns(turns: list[dict[str, str]]) -> dict[str, Any]:
         )
     if len(turns) == 1:
         signal_counts["single_turn_call"] = 1
+        evidence.append(
+            {
+                "turn_index": None,
+                "speaker": None,
+                "span": None,
+                "rules": ["single_turn_call"],
+            }
+        )
 
     card["signals_summary"] = dict(signal_counts)
     card["evidence"] = evidence

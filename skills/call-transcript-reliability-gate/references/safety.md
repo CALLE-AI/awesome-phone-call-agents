@@ -16,12 +16,15 @@
   the absence of text-visible symptoms, not a certificate of accuracy.
 - Recall-oriented by design: the harm lexicon is narrow but routes to human
   review on any match, because hallucinated harm content and genuine
-  emergencies both need a person.
+  emergencies both need a person. Violence terms require a directed object,
+  so self-directed hyperbole ("this price will kill me") does not fire, but
+  directed phrasing ("this offer will kill you") does and routes to review -
+  accepted over-flagging in the safe direction.
 - Known blind spots: hallucinations that read as fluent, plausible speech
-  produce no text-visible symptom and pass clean; hyperbole guards exist
-  ("this price will kill me" does not fire) at the cost of missing oblique
-  phrasings; accented Latin names are deliberately not flagged, so short
-  foreign insertions in Latin script are invisible to this skill.
+  produce no text-visible symptom and pass clean; the directed-object guard
+  misses oblique phrasings; accented Latin names are deliberately not
+  flagged, so short foreign insertions in Latin script are invisible to
+  this skill.
 - Non-English transcripts: the script-switch signal assumes an
   otherwise-English call; results on non-English calls under-detect rather
   than over-detect.
