@@ -121,6 +121,7 @@ This project is an awesome list for AI-agent phone-call workflows. Add resources
 
 ### Skills
 
+- [`call-transcript-reliability-gate`](skills/call-transcript-reliability-gate/) - Offline experimental transcript auditor that grades CALL-E results RELIABLE/SUSPECT/UNUSABLE from text-visible ASR-hallucination symptoms (loops, boilerplate phantoms, harm categories) and crafts ASR-risk-aware goals; not proof of hallucination, an accuracy certificate, or authorization to act.
 - [`calle-developer`](skills/calle-developer/) - Build application integrations with the CALL-E API and SDKs using current contracts, existing examples, restart recovery and verified results.
 - [`call-attest-challenge-auth`](skills/call-attest-challenge-auth/) - Offline experimental HMAC-derived spoken-code matching with an optional advisory nonce ledger; not identity authentication, a secure replay defense or authorization for sensitive actions.
 - [`call-cross-lingual-emotion-preservation`](skills/call-cross-lingual-emotion-preservation/) - Offline experimental comparison of English urgency markers in source and relay text, with advisory wording suggestions; both inputs require English text or operator-prepared translations.
