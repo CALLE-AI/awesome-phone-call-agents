@@ -202,3 +202,72 @@ Output:
   ]
 }
 ```
+
+## Example 4: a courtesy call with nothing comparable (NOTHING_TO_COMPARE)
+
+Fixture: `references/example-transcript-b-nocompare.json` - a follow-up
+call that states no amounts, dates, or times at all.
+
+Command:
+
+```bash
+python3 skills/call-cross-call-consistency-checker/scripts/cross_call_consistency_checker.py analyze   --transcript-a skills/call-cross-call-consistency-checker/references/example-transcript-a.json   --transcript-b skills/call-cross-call-consistency-checker/references/example-transcript-b-nocompare.json
+```
+
+Output:
+
+```json
+{
+  "call_a": null,
+  "call_b": null,
+  "skill": "call-cross-call-consistency-checker",
+  "analysis_mode": "heuristic",
+  "consistency_assessment": "assessed",
+  "reason": null,
+  "comparisons": [
+    {
+      "kind": "amount",
+      "values_a": [
+        "45"
+      ],
+      "values_b": [],
+      "status": "ONLY_STATED"
+    },
+    {
+      "kind": "date_weekday",
+      "values_a": [
+        "tuesday"
+      ],
+      "values_b": [],
+      "status": "ONLY_STATED"
+    },
+    {
+      "kind": "date_day",
+      "values_a": [
+        "15"
+      ],
+      "values_b": [],
+      "status": "ONLY_STATED"
+    },
+    {
+      "kind": "time",
+      "values_a": [
+        "1400"
+      ],
+      "values_b": [],
+      "status": "ONLY_STATED"
+    }
+  ],
+  "contradiction_count": 0,
+  "verdict": "NOTHING_TO_COMPARE",
+  "recommended_action": {
+    "action": "continue",
+    "guidance": "No comparable agent-stated values (amounts, dates, times) in both calls."
+  },
+  "disclaimer": "Heuristic text-only comparison of agent-stated values. A CONTRADICTED kind may reflect a legitimately changed record - a rescheduled delivery, an updated price. Every contradiction routes to verification against the record, never to blame."
+}
+```
+
+Nothing contradicted, nothing confirmed: the second call simply restated
+no values, so every fact kind lands in ONLY_STATED and the card says so
+instead of guessing.

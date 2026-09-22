@@ -364,6 +364,19 @@ def test_main_returns_int():
     assert main(["craft", "--scenario", "consistency-guarded-callback"]) == 0
 
 
+def test_cli_analyze_nocompare_fixture():
+    a = SKILL_DIR / "references" / "example-transcript-a.json"
+    b = SKILL_DIR / "references" / "example-transcript-b-nocompare.json"
+    proc = subprocess.run(
+        [sys.executable, str(SCRIPTS / "cross_call_consistency_checker.py"), "analyze", "--transcript-a", str(a), "--transcript-b", str(b)],
+        capture_output=True,
+        text=True,
+    )
+    assert proc.returncode == 0
+    card = json.loads(proc.stdout)
+    assert card["verdict"] == "NOTHING_TO_COMPARE"
+    assert all(c["status"] == "ONLY_STATED" for c in card["comparisons"])
+
 # ---------------------------------------------------------------- runner
 
 
