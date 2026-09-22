@@ -1,0 +1,16 @@
+{
+  "status": "COMPLETED",
+  "result": {
+    "post_summary": "Agent stated the fee and window, promised a discount, and hedged the pickup time.",
+    "transcript": [
+      {"speaker": "agent", "text": "Hello, this is an automated assistant calling from Example Depot. Our records show the fee is $45."},
+      {"speaker": "callee", "text": "Okay."},
+      {"speaker": "agent", "text": "I think the window might open around 2 p.m., you would have to check."},
+      {"speaker": "callee", "text": "And the pickup date?"},
+      {"speaker": "agent", "text": "Also, you get free delivery on Friday because you are a loyal customer, and the pickup is Tuesday the 15th."},
+      {"speaker": "callee", "text": "Great, thanks."},
+      {"speaker": "agent", "text": "Thank you. Goodbye."}
+    ]
+  },
+  "callee_phone": "+14155550171"
+}
