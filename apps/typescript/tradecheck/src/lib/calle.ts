@@ -1,4 +1,18 @@
-import { CalleClient } from "@call-e/calle";
+/**
+ * calle.ts — CALL-E live verification call client.
+ *
+ * Safety rules enforced here:
+ *  - Phone numbers are masked in all server-side logs (last 4 digits only).
+ *  - All outbound fetch calls use `redirect: 'error'` to prevent
+ *    credential-bearing Bearer tokens from being forwarded to a redirect target.
+ *  - Raw provider diagnostic payloads are NOT logged; only the error type and
+ *    message are surfaced so internal provider details never reach server logs.
+ *  - `confidenceNote` is always set to 'advisory_estimate' — confidence scores
+ *    are heuristic estimates, not live-verified metrics.
+ *  - `requiresReconciliation` is set to true whenever the outcome is ambiguous
+ *    so the chat orchestrator can enforce a user reconciliation step before
+ *    allowing any further call tool invocations.
+ */
 
 export interface CalleResult {
   reached_business: 'yes' | 'no' | 'unclear';
@@ -9,7 +23,20 @@ export interface CalleResult {
   red_flags?: string[];
   verdict: 'verified_reachable' | 'discrepancy_found' | 'could_not_verify';
   transcript?: string | null;
+  /** Advisory heuristic score (0–100). Never a live-verified metric. */
   confidence?: number;
+  /**
+   * Always 'advisory_estimate'. Confidence scores are heuristic estimates
+   * derived from the call outcome fields — they do not guarantee supplier
+   * legitimacy or financial health.
+   */
+  confidenceNote?: 'advisory_estimate';
+  /**
+   * Set to true when the call outcome is ambiguous (reached_business === 'unclear'
+   * or verdict === 'could_not_verify'). The orchestrator must present the result
+   * to the user and obtain explicit intent before invoking any call tool again.
+   */
+  requiresReconciliation?: boolean;
   error?: boolean;
 }
 
@@ -20,6 +47,19 @@ export interface CalleCallParams {
   claimedTerms: string;
   language?: string;
   region: string | 'IN' | 'INTERNATIONAL'; // 'IN' for India, 'INTERNATIONAL' for Nigeria/other
+}
+
+// ---------------------------------------------------------------------------
+// Internal helpers
+// ---------------------------------------------------------------------------
+
+/**
+ * Returns a log-safe representation of a phone number with all but the last
+ * four digits replaced by asterisks, e.g. "+91987654****".
+ */
+function maskPhone(phone: string): string {
+  if (phone.length <= 4) return '****';
+  return phone.slice(0, -4).replace(/\d/g, '*') + phone.slice(-4);
 }
 
 const TASK_TEMPLATE = (p: CalleCallParams) =>
@@ -47,50 +87,76 @@ const RESULT_SCHEMA = {
   additionalProperties: false,
 };
 
+// ---------------------------------------------------------------------------
+// Public API
+// ---------------------------------------------------------------------------
+
 export async function placeVerificationCall(params: CalleCallParams): Promise<CalleResult> {
   try {
-    if (!process.env.CALLE_API_KEY || !process.env.CALLE_BASE_URL) {
-      throw new Error('Missing CALL-E environment variables');
+    const apiKey = process.env.CALLE_API_KEY;
+    const baseUrlRaw = process.env.CALLE_BASE_URL;
+
+    if (!apiKey || !baseUrlRaw) {
+      throw new Error('Missing CALL-E environment variables (CALLE_API_KEY / CALLE_BASE_URL)');
     }
 
-    const client = new CalleClient({
-      apiKey: process.env.CALLE_API_KEY,
-      baseUrl: process.env.CALLE_BASE_URL,
+    const baseUrl = baseUrlRaw.replace(/\/$/, '');
+
+    // Verify the base URL uses HTTPS so credentials are never sent over plain HTTP.
+    if (!baseUrl.startsWith('https://')) {
+      throw new Error('CALLE_BASE_URL must use HTTPS to protect credential transport');
+    }
+
+    // Log a masked summary — never log the raw phone number.
+    console.info('[calle] placing verification call', {
+      phone: maskPhone(params.phoneNumber),
+      company: params.companyName,
+      region: params.region,
     });
 
-    console.log(params)
-
-    const apiKey = process.env.CALLE_API_KEY!;
-    const baseUrl = process.env.CALLE_BASE_URL!.replace(/\/$/, '');
-
     // 1. Create the call
+    // redirect: 'error' prevents the Bearer token from being forwarded if
+    // the server issues a redirect (e.g. HTTP→HTTPS or domain change).
     const createRes = await fetch(`${baseUrl}/v1/calls`, {
       method: 'POST',
+      redirect: 'error',
       headers: {
         'Authorization': `Bearer ${apiKey}`,
-        'Content-Type': 'application/json'
+        'Content-Type': 'application/json',
       },
       body: JSON.stringify({
         task: `Call ${params.phoneNumber}. ` + TASK_TEMPLATE(params),
         result_schema: RESULT_SCHEMA,
-      })
+      }),
     });
+
     if (!createRes.ok) {
-      throw new Error(`Failed to create call: ${await createRes.text()}`);
+      // Do not expose raw provider response text in the error message.
+      throw new Error(`CALL-E returned HTTP ${createRes.status} when creating call`);
     }
+
     const createData = await createRes.json();
     const callId = createData.id;
 
     // 2. Wait for completion
     let callData = createData;
-    while (callData.status !== 'completed' && callData.status !== 'failed' && callData.status !== 'canceled') {
+    while (
+      callData.status !== 'completed' &&
+      callData.status !== 'failed' &&
+      callData.status !== 'canceled'
+    ) {
       await new Promise(resolve => setTimeout(resolve, 3000));
+
       const getRes = await fetch(`${baseUrl}/v1/calls/${callId}`, {
-        headers: { 'Authorization': `Bearer ${apiKey}` }
+        redirect: 'error',
+        headers: { 'Authorization': `Bearer ${apiKey}` },
       });
+
       if (!getRes.ok) {
-        throw new Error(`Failed to get call status: ${await getRes.text()}`);
+        // Do not expose raw provider response text in the error message.
+        throw new Error(`CALL-E returned HTTP ${getRes.status} when polling call status`);
       }
+
       callData = await getRes.json();
     }
 
@@ -99,32 +165,57 @@ export async function placeVerificationCall(params: CalleCallParams): Promise<Ca
     }
 
     const structured = callData.structured_result as unknown as CalleResult;
-    
-    // Extract transcript from new backend schema locations
-    const transcript = callData.transcript || 
-                       callData.evidence?.[0]?.transcript || 
-                       callData.recipients?.[0]?.attempts?.[0]?.transcript || 
-                       undefined;
-                       
+
+    // Extract transcript from known backend schema locations.
+    const transcript =
+      callData.transcript ||
+      callData.evidence?.[0]?.transcript ||
+      callData.recipients?.[0]?.attempts?.[0]?.transcript ||
+      undefined;
+
     structured.transcript = transcript;
-    // Derive a simple confidence score from verdict + reached_business
+
+    // Confidence is a heuristic estimate — label it accordingly.
     structured.confidence = deriveConfidence(structured);
+    structured.confidenceNote = 'advisory_estimate';
+
+    // Flag ambiguous outcomes so the orchestrator can require user reconciliation.
+    if (
+      structured.reached_business === 'unclear' ||
+      structured.verdict === 'could_not_verify'
+    ) {
+      structured.requiresReconciliation = true;
+    }
+
     return structured;
 
-  } catch (err: any) {
-    console.error('CALL-E error:', err);
-    if (err.details) {
-      console.error('CALL-E Validation Details:', JSON.stringify(err.details, null, 2));
-    }
+  } catch (err: unknown) {
+    // Log only the error type and message — never log provider-internal details
+    // such as validation payloads or raw response bodies, which may contain PII
+    // or expose internal API behaviour.
+    const message = err instanceof Error ? err.message : String(err);
+    console.warn('[calle] call failed:', message);
+
     return {
       reached_business: 'unclear',
       verdict: 'could_not_verify',
       confidence: 0,
+      confidenceNote: 'advisory_estimate',
+      requiresReconciliation: true,
       error: true,
     };
   }
 }
 
+// ---------------------------------------------------------------------------
+// Private helpers
+// ---------------------------------------------------------------------------
+
+/**
+ * Derives a heuristic confidence score from the call result fields.
+ * These values are ADVISORY ESTIMATES only — they are not live-verified metrics
+ * and do not guarantee supplier legitimacy or financial health.
+ */
 function deriveConfidence(result: CalleResult): number {
   if (result.verdict === 'verified_reachable' && result.reached_business === 'yes') return 92;
   if (result.verdict === 'discrepancy_found') return 75;

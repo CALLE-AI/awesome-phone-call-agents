@@ -1,15 +1,19 @@
-import { google, createGoogleGenerativeAI } from '@ai-sdk/google';
+import { createGoogleGenerativeAI } from '@ai-sdk/google';
 import { streamText, generateText, tool, convertToModelMessages, stepCountIs } from 'ai';
 import type { UIMessage } from 'ai';
 import { z } from 'zod';
 import { verifyGSTIN } from '@/lib/gstin';
-import { placeVerificationCall } from '@/lib/calle';
+import { placeVerificationCall, type CalleCallParams, type CalleResult } from '@/lib/calle';
 import { verifyCACCompany } from '@/lib/cac';
 import { verifyUKCompany } from '@/lib/companieshouse';
 import { verifyChinaCompany } from '@/lib/china';
 import { verifyUSCompany } from '@/lib/us';
 
 export const maxDuration = 120; // CALL-E calls can take up to 60s
+
+// ---------------------------------------------------------------------------
+// LLM key rotation
+// ---------------------------------------------------------------------------
 
 const keysString = process.env.GEMINI_API_KEYS || process.env.GEMINI_API_KEY;
 
@@ -26,50 +30,225 @@ const apiKeys = keysString.split(',').map(key => key.trim()).filter(Boolean);
 
 function getRandomGoogleAI() {
   const randomKey = apiKeys[Math.floor(Math.random() * apiKeys.length)];
-  return createGoogleGenerativeAI({
-    apiKey: randomKey,
-  });
+  return createGoogleGenerativeAI({ apiKey: randomKey });
 }
+
+// ---------------------------------------------------------------------------
+// Live-call authorisation
+// ---------------------------------------------------------------------------
+
+/**
+ * E.164 phone number validation regex.
+ * Requires a leading '+', a non-zero country code digit, then 6–14 digits total.
+ * Example valid values: +919876543210, +2348012345678, +442071234567
+ */
+const E164_REGEX = /^\+[1-9]\d{6,14}$/;
+
+/**
+ * The HTTPS origin that is permitted to unlock live outbound calls.
+ * Must be set via TRADECHECK_ALLOWED_ORIGIN (e.g. https://tradecheck.example.com).
+ * If not set, live calls are permanently disabled — preview/fake mode is the
+ * only available path, which is acceptable for demo/fake-only hosting.
+ */
+const ALLOWED_ORIGIN = process.env.TRADECHECK_ALLOWED_ORIGIN?.replace(/\/$/, '') ?? null;
+
+/**
+ * Checks whether the incoming request carries explicit authorisation to place
+ * a live outbound call. ALL THREE conditions must be satisfied simultaneously:
+ *
+ * 1. `TRADECHECK_ALLOWED_ORIGIN` environment variable is set — if it is not,
+ *    live calling is disabled entirely and this function always returns false.
+ *
+ * 2. The request `Origin` header (or `Referer`, as a fallback) must exactly
+ *    match the approved origin. This prevents any arbitrary caller that merely
+ *    knows the approval header value from bypassing the gate.
+ *
+ * 3. The request header `X-TradeCheck-Live-Call` must equal `approved`.
+ *    This is the explicit, user-initiated approval gate — your client should
+ *    only set this header after presenting the user with a clear confirmation
+ *    that a real outbound call will be placed and that it cannot be cancelled
+ *    once dispatched.
+ *
+ * If any condition fails, all call tools fall back to the preview/simulated
+ * path — no live call is placed.
+ */
+function isLiveCallAuthorised(req: Request): boolean {
+  // Condition 1: allowed origin must be configured.
+  if (!ALLOWED_ORIGIN) return false;
+
+  // Condition 2: origin must match the approved value.
+  const origin = req.headers.get('Origin');
+  const referer = req.headers.get('Referer');
+  const requestOrigin = origin ?? (referer ? new URL(referer).origin : null);
+  if (!requestOrigin || requestOrigin !== ALLOWED_ORIGIN) return false;
+
+  // Condition 3: explicit per-request approval header.
+  return req.headers.get('X-TradeCheck-Live-Call') === 'approved';
+}
+
+/** Returns true if `phone` is a well-formed E.164 number. */
+function isValidE164(phone: string): boolean {
+  return E164_REGEX.test(phone);
+}
+
+// ---------------------------------------------------------------------------
+// Simulated (preview) call helper
+// ---------------------------------------------------------------------------
+
+/**
+ * Shared simulated-call helper. Returns a synthetic CalleResult with an
+ * AI-generated transcript. Used for ALL call tools when live calling is not
+ * authorised or not available.
+ *
+ * IMPORTANT: Results produced by this function are SYNTHETIC / ADVISORY only.
+ * They must never be presented to users as verified live evidence.
+ */
+async function simulateCall(
+  params: CalleCallParams & { contactName?: string },
+  countryContext: string,
+  googleAI: ReturnType<typeof createGoogleGenerativeAI>
+): Promise<CalleResult> {
+  await new Promise(r => setTimeout(r, 1500)); // simulate call latency
+
+  const { text: simulatedTranscript } = await generateText({
+    model: googleAI('gemini-2.5-flash'),
+    prompt:
+      `Simulate a realistic phone call transcript between an AI verification agent (Agent) and a supplier (Supplier). ` +
+      `The agent is calling on behalf of a buyer to verify the supplier's details. ` +
+      `Country context: ${countryContext}\n` +
+      `Company: ${params.companyName}\n` +
+      `Contact Person: ${params.contactName || 'A representative'}\n` +
+      `Product: ${params.productCategory}\n` +
+      `Claimed terms: ${params.claimedTerms}\n` +
+      `Language: ${params.language || 'English'}\n\n` +
+      `Make the conversation sound natural, professional, and typical of a business verification call. ` +
+      `The supplier should confirm the business name, product availability, and terms. ` +
+      `Format as markdown with **Agent:** and **Supplier:** prefixes. Do not include any other text besides the transcript.`,
+  });
+
+  return {
+    reached_business: 'yes',
+    confirmed_business_name: params.companyName,
+    product_match: 'matches',
+    stated_price_or_terms: params.claimedTerms,
+    advance_payment_requested: '30% upfront, 70% on dispatch',
+    red_flags: ['[PREVIEW — not a real call. This is an AI-simulated result for demonstration only. Treat all data as synthetic and advisory.]'],
+    verdict: 'verified_reachable',
+    transcript: simulatedTranscript,
+    confidence: 40,
+    confidenceNote: 'advisory_estimate',
+  };
+}
+
+// ---------------------------------------------------------------------------
+// Reconciliation-blocked response helper
+// ---------------------------------------------------------------------------
+
+/**
+ * Returns a structured error result indicating that a previous call produced
+ * an ambiguous outcome and must be reconciled by the user before any further
+ * call tools can run.
+ *
+ * The chat orchestrator enforces this at the code level — the LLM system prompt
+ * alone is not sufficient because the model can still invoke tools.
+ */
+function reconciliationBlockedResult(): CalleResult {
+  return {
+    reached_business: 'unclear',
+    verdict: 'could_not_verify',
+    confidence: 0,
+    confidenceNote: 'advisory_estimate',
+    requiresReconciliation: true,
+    error: true,
+    red_flags: [
+      '[BLOCKED] A previous call returned an ambiguous outcome. ' +
+      'Please review the result above and clarify your intent before attempting another call.',
+    ],
+  };
+}
+
+// ---------------------------------------------------------------------------
+// POST handler
+// ---------------------------------------------------------------------------
 
 export async function POST(req: Request) {
   const { messages }: { messages: UIMessage[] } = await req.json();
 
   const googleAI = getRandomGoogleAI();
+  const liveAuthorised = isLiveCallAuthorised(req);
+
+  /**
+   * Code-level reconciliation gate.
+   *
+   * Set to true the first time any call tool returns an ambiguous outcome
+   * (reached_business === 'unclear' OR requiresReconciliation === true).
+   * While true, every subsequent call tool returns a blocked error without
+   * placing or simulating any call, forcing the LLM to surface the ambiguous
+   * result to the user and await explicit clarification.
+   *
+   * The system prompt reinforces this behaviour, but this closure is the
+   * authoritative enforcement point.
+   */
+  let pendingReconciliation = false;
+
+  /** Inspects a call result and arms the reconciliation gate if needed. */
+  function checkReconciliation(result: CalleResult): CalleResult {
+    if (result.reached_business === 'unclear' || result.requiresReconciliation) {
+      pendingReconciliation = true;
+    }
+    return result;
+  }
 
   const result = streamText({
-    model: googleAI('gemini-3.6-flash'),
+    model: googleAI('gemini-2.5-flash'),
     system: `You are an AI Copilot for TradeCheck, an AI-powered trade partner verification tool.
 Your job is to gather information about a trade deal and run the appropriate checks.
+
+IMPORTANT — CALL TOOL BEHAVIOUR:
+- All "call" tools run in PREVIEW (simulated) mode by default. Results labelled "[PREVIEW — not a real call]" are AI-generated simulations and are SYNTHETIC/ADVISORY — they are NOT live verified evidence and must be presented to the user as such.
+- To place a REAL outbound call, the client must set the request header "X-TradeCheck-Live-Call: approved" AND originate from the approved application origin AND provide a valid E.164 phone number. Without all three conditions, the preview path always runs.
+- A submitted live call CANNOT be cancelled once dispatched to the CALL-E service. Make this clear to the user before they opt in to live calling.
+
+IMPORTANT — AMBIGUOUS OUTCOMES (requiresReconciliation):
+- If any call tool returns "requiresReconciliation: true" or "blocked: 'awaiting_reconciliation'", you MUST stop immediately, present the ambiguous outcome to the user, and ask them to clarify their intent BEFORE calling any call tool again. The system enforces this at the code level — attempting to redial will return a blocked error.
+
+CONFIDENCE VALUES:
+- Confidence scores in results are ADVISORY ESTIMATES only (confidenceNote: "advisory_estimate"). They are heuristic values derived from call outcome fields — they are not live-verified metrics and do not guarantee the legitimacy or financial health of a supplier.
+
+REGISTRY DATA DISCLAIMER:
+- Documentary checks (GSTIN, CAC, Companies House, USCC, SEC EDGAR) return publicly registered data. This confirms legal registration status at the time of the API query — it does not confirm current trading legitimacy or financial health.
+- The CAC lookup uses public registry data via third-party aggregators; results should be treated as indicative.
+- The China USCC lookup uses a third-party data aggregator (not a direct government API); treat results as indicative only.
 
 WORKFLOW FOR INDIA SUPPLIER (full check):
 1. Gather ALL of the following before starting any verification: business name, GSTIN, phone number (with +91 country code), product category, quoted deal terms, preferred call language (default: English/Hindi), and the name of the contact person (optional).
 2. Call \`verifySupplier\` with the GSTIN for the documentary check.
 3. After the documentary result comes back, call \`callSupplier\` with all details.
-4. Summarise the outcome.
+4. Summarise the outcome. If the call result is a PREVIEW (simulated), label it clearly as synthetic/advisory.
 
 WORKFLOW FOR NIGERIA SUPPLIER (full check):
 1. Gather ALL of the following before starting any verification: business name or RC number, phone number (with +234 country code), product category, quoted deal terms, preferred call language (default: English), and the name of the contact person (optional).
 2. Call \`verifyNigeriaSupplier\` with the company name or RC number for the CAC documentary check.
 3. After the CAC result comes back, call \`callNigeriaSupplier\` with all details.
-4. Summarise the outcome.
+4. Summarise the outcome. If the call result is a PREVIEW (simulated), label it clearly as synthetic/advisory.
 
 WORKFLOW FOR UK SUPPLIER (full check):
 1. Gather ALL of the following before starting any verification: company name or Companies House number, phone number (with +44 country code), product category, quoted deal terms, and the name of the contact person (optional).
 2. Call \`verifyUKSupplier\` with the company name or number for the Companies House documentary check.
 3. After the Companies House result comes back, call \`callUKSupplier\` with all details.
-4. Summarise the outcome.
+4. Summarise the outcome. If the call result is a PREVIEW (simulated), label it clearly as synthetic/advisory.
 
 WORKFLOW FOR CHINA SUPPLIER (full check):
 1. Gather ALL of the following before starting any verification: company name or USCC (Unified Social Credit Code), phone number (with +86 country code), product category, quoted deal terms, preferred call language (default: Mandarin/English), and the name of the contact person (optional).
 2. Call \`verifyChinaSupplier\` with the company name or USCC for the documentary check.
 3. After the documentary check result comes back, call \`callChinaSupplier\` with all details.
-4. Summarise the outcome.
+4. Summarise the outcome. If the call result is a PREVIEW (simulated), label it clearly as synthetic/advisory.
 
 WORKFLOW FOR US SUPPLIER (full check):
 1. Gather ALL of the following before starting any verification: company name or EIN (Employer Identification Number), phone number (with +1 country code), product category, quoted deal terms, and the name of the contact person (optional).
 2. Call \`verifyUSSupplier\` with the company name or EIN for the documentary check.
 3. After the documentary check result comes back, call \`callUSSupplier\` with all details.
-4. Summarise the outcome.
+4. Summarise the outcome. If the call result is a PREVIEW (simulated), label it clearly as synthetic/advisory.
 
 Gather all necessary information upfront before calling any verification tools to aid user experience. Ask 1–2 questions at a time. Be concise, professional, and friendly. Determine which path to take based on what the user tells you.`,
     messages: await convertToModelMessages(messages),
@@ -87,9 +266,9 @@ Gather all necessary information upfront before calling any verification tools t
       }),
 
       callSupplier: tool({
-        description: 'Place a live CALL-E verification call to an Indian supplier. Only call this AFTER verifySupplier has returned a result.',
+        description: 'Place a verification call to an Indian supplier. Only call this AFTER verifySupplier has returned a result. Runs as a PREVIEW simulation by default; live mode requires X-TradeCheck-Live-Call: approved header, a matching approved origin, and a valid E.164 phone number.',
         inputSchema: z.object({
-          phoneNumber: z.string().describe('Supplier phone number with country code, e.g. +919876543210'),
+          phoneNumber: z.string().describe('Supplier phone number in E.164 format, e.g. +919876543210'),
           companyName: z.string().describe('Name of the supplier company'),
           productCategory: z.string().describe('Product or service category being sourced'),
           claimedTerms: z.string().describe('The deal terms the listing claimed (price, MOQ, payment terms)'),
@@ -97,7 +276,14 @@ Gather all necessary information upfront before calling any verification tools t
           contactName: z.string().optional().describe('Name of the person to contact, if provided'),
         }),
         execute: async (params) => {
-          return await placeVerificationCall({ ...params, region: 'IN' });
+          if (pendingReconciliation) return reconciliationBlockedResult();
+          if (!isValidE164(params.phoneNumber)) {
+            return { error: true, message: 'Phone number must be in E.164 format (e.g. +919876543210).' };
+          }
+          if (liveAuthorised) {
+            return checkReconciliation(await placeVerificationCall({ ...params, region: 'IN' }));
+          }
+          return checkReconciliation(await simulateCall({ ...params, region: 'IN' }, 'India', googleAI));
         },
       }),
 
@@ -113,9 +299,9 @@ Gather all necessary information upfront before calling any verification tools t
       }),
 
       callNigeriaSupplier: tool({
-        description: 'Place a CALL-E verification call to a Nigerian supplier. Only call this AFTER verifyNigeriaSupplier has returned a result.',
+        description: 'Place a verification call to a Nigerian supplier. Only call this AFTER verifyNigeriaSupplier has returned a result. Runs as a PREVIEW simulation by default; live mode requires X-TradeCheck-Live-Call: approved header, a matching approved origin, and a valid E.164 phone number.',
         inputSchema: z.object({
-          phoneNumber: z.string().describe('Supplier phone number with country code, e.g. +2348012345678'),
+          phoneNumber: z.string().describe('Supplier phone number in E.164 format, e.g. +2348012345678'),
           companyName: z.string().describe('Name of the Nigerian supplier company'),
           productCategory: z.string().describe('Product or service category being sourced'),
           claimedTerms: z.string().describe('The deal terms the listing claimed (price, MOQ, payment terms)'),
@@ -123,37 +309,14 @@ Gather all necessary information upfront before calling any verification tools t
           contactName: z.string().optional().describe('Name of the person to contact, if provided'),
         }),
         execute: async (params) => {
-          // AI-simulated call for regions where live calling is unavailable
-          if (process.env.DEMO_MODE === 'true') {
-            await new Promise(r => setTimeout(r, 2000)); // simulate call latency
-            
-            const { text: simulatedTranscript } = await generateText({
-              model: googleAI('gemini-3.6-flash'),
-              prompt: `Simulate a realistic phone call transcript between an AI verification agent (Agent) and a Nigerian supplier (Supplier).
-              The agent is calling on behalf of a buyer to verify the supplier's details.
-              Company: ${params.companyName}
-              Contact Person: ${params.contactName || 'A representative'}
-              Product: ${params.productCategory}
-              Claimed terms: ${params.claimedTerms}
-              Language: ${params.language || 'English'}
-
-              Make the conversation sound natural, professional, and typical of a business verification call in Nigeria. The supplier should confirm the business name, product availability, and terms.
-              Format as markdown with **Agent:** and **Supplier:** prefixes. Do not include any other text besides the transcript.`
-            });
-
-            return {
-              reached_business: 'yes',
-              confirmed_business_name: params.companyName,
-              product_match: 'matches',
-              stated_price_or_terms: params.claimedTerms,
-              advance_payment_requested: '30% upfront, 70% on dispatch',
-              red_flags: [],
-              verdict: 'verified_reachable',
-              transcript: simulatedTranscript,
-              confidence: 88,
-            };
+          if (pendingReconciliation) return reconciliationBlockedResult();
+          if (!isValidE164(params.phoneNumber)) {
+            return { error: true, message: 'Phone number must be in E.164 format (e.g. +2348012345678).' };
           }
-          return await placeVerificationCall({ ...params, region: 'INTERNATIONAL' });
+          if (liveAuthorised) {
+            return checkReconciliation(await placeVerificationCall({ ...params, region: 'INTERNATIONAL' }));
+          }
+          return checkReconciliation(await simulateCall({ ...params, region: 'INTERNATIONAL' }, 'Nigeria', googleAI));
         },
       }),
 
@@ -169,9 +332,9 @@ Gather all necessary information upfront before calling any verification tools t
       }),
 
       callUKSupplier: tool({
-        description: 'Place a CALL-E verification call to a UK supplier. Only call this AFTER verifyUKSupplier has returned a result.',
+        description: 'Place a verification call to a UK supplier. Only call this AFTER verifyUKSupplier has returned a result. Runs as a PREVIEW simulation by default; live mode requires X-TradeCheck-Live-Call: approved header, a matching approved origin, and a valid E.164 phone number.',
         inputSchema: z.object({
-          phoneNumber: z.string().describe('Supplier phone number with country code, e.g. +442071234567'),
+          phoneNumber: z.string().describe('Supplier phone number in E.164 format, e.g. +442071234567'),
           companyName: z.string().describe('Name of the UK supplier company'),
           productCategory: z.string().describe('Product or service category being sourced'),
           claimedTerms: z.string().describe('The deal terms the listing claimed (price, MOQ, payment terms)'),
@@ -179,7 +342,14 @@ Gather all necessary information upfront before calling any verification tools t
           contactName: z.string().optional().describe('Name of the person to contact, if provided'),
         }),
         execute: async (params) => {
-          return await placeVerificationCall({ ...params, region: 'INTERNATIONAL' });
+          if (pendingReconciliation) return reconciliationBlockedResult();
+          if (!isValidE164(params.phoneNumber)) {
+            return { error: true, message: 'Phone number must be in E.164 format (e.g. +442071234567).' };
+          }
+          if (liveAuthorised) {
+            return checkReconciliation(await placeVerificationCall({ ...params, region: 'INTERNATIONAL' }));
+          }
+          return checkReconciliation(await simulateCall({ ...params, region: 'INTERNATIONAL' }, 'United Kingdom', googleAI));
         },
       }),
 
@@ -195,9 +365,9 @@ Gather all necessary information upfront before calling any verification tools t
       }),
 
       callChinaSupplier: tool({
-        description: 'Place a CALL-E verification call to a Chinese supplier. Only call this AFTER verifyChinaSupplier has returned a result.',
+        description: 'Place a verification call to a Chinese supplier. Only call this AFTER verifyChinaSupplier has returned a result. Runs as a PREVIEW simulation by default; live mode requires X-TradeCheck-Live-Call: approved header, a matching approved origin, and a valid E.164 phone number.',
         inputSchema: z.object({
-          phoneNumber: z.string().describe('Supplier phone number with country code, e.g. +861234567890'),
+          phoneNumber: z.string().describe('Supplier phone number in E.164 format, e.g. +861234567890'),
           companyName: z.string().describe('Name of the Chinese supplier company'),
           productCategory: z.string().describe('Product or service category being sourced'),
           claimedTerms: z.string().describe('The deal terms the listing claimed (price, MOQ, payment terms)'),
@@ -205,41 +375,14 @@ Gather all necessary information upfront before calling any verification tools t
           contactName: z.string().optional().describe('Name of the person to contact, if provided'),
         }),
         execute: async (params) => {
-          // Attempt LIVE call first
-          const liveResult = await placeVerificationCall({ ...params, region: 'INTERNATIONAL' });
-          
-          // Fallback to simulation ONLY if live call failed and we are in demo mode
-          if (liveResult.error && process.env.DEMO_MODE === 'true') {
-            await new Promise(r => setTimeout(r, 2000)); // simulate call latency
-            
-            const { text: simulatedTranscript } = await generateText({
-              model: googleAI('gemini-3.6-flash'),
-              prompt: `Simulate a realistic phone call transcript between an AI verification agent (Agent) and a Chinese supplier (Supplier).
-              The agent is calling on behalf of a buyer to verify the supplier's details.
-              Company: ${params.companyName}
-              Contact Person: ${params.contactName || 'A representative'}
-              Product: ${params.productCategory}
-              Claimed terms: ${params.claimedTerms}
-              Language: ${params.language || 'Mandarin (translated to English for display)'}
-
-              Make the conversation sound natural, professional, and typical of a business verification call in China. The supplier should confirm the business name, product availability, and terms.
-              Format as markdown with **Agent:** and **Supplier:** prefixes. Do not include any other text besides the transcript.`
-            });
-
-            return {
-              reached_business: 'yes',
-              confirmed_business_name: params.companyName,
-              product_match: 'matches',
-              stated_price_or_terms: params.claimedTerms,
-              advance_payment_requested: '30% upfront, 70% on dispatch',
-              red_flags: ['[DEMO] Live call failed, showing simulated result instead'],
-              verdict: 'verified_reachable',
-              transcript: simulatedTranscript,
-              confidence: 88,
-            };
+          if (pendingReconciliation) return reconciliationBlockedResult();
+          if (!isValidE164(params.phoneNumber)) {
+            return { error: true, message: 'Phone number must be in E.164 format (e.g. +861234567890).' };
           }
-          
-          return liveResult;
+          if (liveAuthorised) {
+            return checkReconciliation(await placeVerificationCall({ ...params, region: 'INTERNATIONAL' }));
+          }
+          return checkReconciliation(await simulateCall({ ...params, region: 'INTERNATIONAL' }, 'China', googleAI));
         },
       }),
 
@@ -255,9 +398,9 @@ Gather all necessary information upfront before calling any verification tools t
       }),
 
       callUSSupplier: tool({
-        description: 'Place a CALL-E verification call to a US supplier. Only call this AFTER verifyUSSupplier has returned a result.',
+        description: 'Place a verification call to a US supplier. Only call this AFTER verifyUSSupplier has returned a result. Runs as a PREVIEW simulation by default; live mode requires X-TradeCheck-Live-Call: approved header, a matching approved origin, and a valid E.164 phone number.',
         inputSchema: z.object({
-          phoneNumber: z.string().describe('Supplier phone number with country code, e.g. +15551234567'),
+          phoneNumber: z.string().describe('Supplier phone number in E.164 format, e.g. +15551234567'),
           companyName: z.string().describe('Name of the US supplier company'),
           productCategory: z.string().describe('Product or service category being sourced'),
           claimedTerms: z.string().describe('The deal terms the listing claimed (price, MOQ, payment terms)'),
@@ -265,7 +408,14 @@ Gather all necessary information upfront before calling any verification tools t
           contactName: z.string().optional().describe('Name of the person to contact, if provided'),
         }),
         execute: async (params) => {
-          return await placeVerificationCall({ ...params, region: 'US' });
+          if (pendingReconciliation) return reconciliationBlockedResult();
+          if (!isValidE164(params.phoneNumber)) {
+            return { error: true, message: 'Phone number must be in E.164 format (e.g. +15551234567).' };
+          }
+          if (liveAuthorised) {
+            return checkReconciliation(await placeVerificationCall({ ...params, region: 'US' }));
+          }
+          return checkReconciliation(await simulateCall({ ...params, region: 'US' }, 'United States', googleAI));
         },
       }),
     },
