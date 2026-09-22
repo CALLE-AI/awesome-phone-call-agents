@@ -3,7 +3,8 @@ import { NextRequest, NextResponse } from "next/server";
 import { createQuoteCall } from "@/lib/calle";
 import { putRfq, newRfqId } from "@/lib/store";
 import { env, isLive } from "@/lib/env";
-import { isE164 } from "@/lib/normalize";
+import { isE164, maskPhone, scrubPhones } from "@/lib/normalize";
+import { requireCaller } from "@/lib/auth";
 
 export const runtime = "nodejs";
 
@@ -50,6 +51,11 @@ function rateLimited(ip: string): boolean {
 }
 
 export async function POST(req: NextRequest) {
+  // Live quote creation places real calls and spends CALL-E credits, so it requires a
+  // caller token. Mock mode is the public demo and is left open (requireCaller returns null).
+  const unauthorized = requireCaller(req);
+  if (unauthorized) return unauthorized;
+
   if (rateLimited(clientIp(req))) {
     return NextResponse.json(
       { data: null, error: "rate limit exceeded: max 20 requests per minute" },
@@ -91,14 +97,14 @@ export async function POST(req: NextRequest) {
   // is rejected so the endpoint can never be coaxed into dialing an arbitrary string.
   for (const c of clinics) {
     if (!isE164(c.phone)) {
-      return bad(`clinic "${c.name}" has an invalid or missing E.164 phone`);
+      return bad(`clinic "${scrubPhones(c.name)}" has an invalid or missing E.164 phone`);
     }
   }
 
   // Reject duplicate destinations: two clinics resolving to the same phone.
   const seen = new Set<string>();
   for (const c of clinics) {
-    if (seen.has(c.phone)) return bad(`duplicate recipient phone: ${c.phone}`);
+    if (seen.has(c.phone)) return bad(`duplicate recipient phone: ${maskPhone(c.phone)}`);
     seen.add(c.phone);
   }
 
@@ -115,7 +121,7 @@ export async function POST(req: NextRequest) {
     const allowSet = new Set(allow);
     for (const c of clinics) {
       if (!allowSet.has(c.phone)) {
-        return forbidden(`recipient not authorized for live calls: ${c.phone}`);
+        return forbidden(`recipient not authorized for live calls: ${maskPhone(c.phone)}`);
       }
     }
   }
@@ -138,7 +144,7 @@ export async function POST(req: NextRequest) {
     // Graceful degradation: never 500 the client into a crash.
     const msg = e instanceof Error ? e.message : "call creation failed";
     return NextResponse.json(
-      { data: null, error: `CALL-E ${isLive() ? "live" : "mock"} call failed: ${msg}` },
+      { data: null, error: scrubPhones(`CALL-E ${isLive() ? "live" : "mock"} call failed: ${msg}`) },
       { status: 502 }
     );
   }

@@ -3,10 +3,17 @@ import { NextRequest, NextResponse } from "next/server";
 import { getRfq, codeFromRfqId } from "@/lib/store";
 import { listCallEvents } from "@/lib/calle";
 import { isLive } from "@/lib/env";
+import { scrubPhones } from "@/lib/normalize";
+import { requireCaller } from "@/lib/auth";
 
 export const runtime = "nodejs";
 
-export async function GET(_req: NextRequest, ctx: { params: Promise<{ id: string }> }) {
+export async function GET(req: NextRequest, ctx: { params: Promise<{ id: string }> }) {
+  // Private read: in live mode the event stream carries real call diagnostics, so it
+  // requires a caller token. Mock mode is the public demo and stays open.
+  const unauthorized = requireCaller(req);
+  if (unauthorized) return unauthorized;
+
   const { id } = await ctx.params;
   const rec = getRfq(id);
 
@@ -23,6 +30,6 @@ export async function GET(_req: NextRequest, ctx: { params: Promise<{ id: string
     return NextResponse.json({ data: { events }, error: null });
   } catch (e) {
     const msg = e instanceof Error ? e.message : "events fetch failed";
-    return NextResponse.json({ data: { events: [] }, error: msg }, { status: 200 });
+    return NextResponse.json({ data: { events: [] }, error: scrubPhones(msg) }, { status: 200 });
   }
 }

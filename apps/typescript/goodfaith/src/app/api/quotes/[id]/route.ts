@@ -4,14 +4,20 @@ import { getRfq, codeFromRfqId } from "@/lib/store";
 import { reloadCall } from "@/lib/calle";
 import { isLive } from "@/lib/env";
 import { loadFixture } from "@/lib/fixtures";
-import { normalizeCallTask } from "@/lib/normalize";
+import { normalizeCallTask, scrubPhones } from "@/lib/normalize";
+import { requireCaller } from "@/lib/auth";
 import type { CallTask } from "@/lib/calle-types";
 import fairPrices from "../../../../../data/fair-prices.json";
 import type { FairPrices } from "@/lib/normalize";
 
 export const runtime = "nodejs";
 
-export async function GET(_req: NextRequest, ctx: { params: Promise<{ id: string }> }) {
+export async function GET(req: NextRequest, ctx: { params: Promise<{ id: string }> }) {
+  // Private read: in live mode this returns real transcript-derived quote data, so it
+  // requires a caller token. Mock mode is the public demo and stays open.
+  const unauthorized = requireCaller(req);
+  if (unauthorized) return unauthorized;
+
   const { id } = await ctx.params;
   const rec = getRfq(id);
 
@@ -41,14 +47,24 @@ export async function GET(_req: NextRequest, ctx: { params: Promise<{ id: string
   }
 
   // Prefer the stored terminal task (webhook may have updated it); else fetch/reload.
-  const task: CallTask =
-    rec.task ??
-    (await reloadCall(rec.callId, rec.code, {
-      procedure: rec.procedure,
-      code: rec.code,
-      clinics: rec.clinics,
-      rfqId: rec.rfqId,
-    }));
+  // A reload failure must never surface a raw provider diagnostic (which can carry a phone).
+  let task: CallTask;
+  try {
+    task =
+      rec.task ??
+      (await reloadCall(rec.callId, rec.code, {
+        procedure: rec.procedure,
+        code: rec.code,
+        clinics: rec.clinics,
+        rfqId: rec.rfqId,
+      }));
+  } catch (e) {
+    const msg = e instanceof Error ? e.message : "reload failed";
+    return NextResponse.json(
+      { data: null, error: scrubPhones(`could not load quote: ${msg}`) },
+      { status: 502 }
+    );
+  }
   const normalized = normalizeCallTask(task, fairPrices as FairPrices, rec.code);
 
   return NextResponse.json({

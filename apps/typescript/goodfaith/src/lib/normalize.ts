@@ -131,9 +131,18 @@ function normalizeRecipient(
   fair: FairPriceEntry | null
 ): NormalizedResult {
   const r: RecipientResult | null = recipient.structured_result;
-  // Never emit a full clinic phone number to the client: mask it, and if the name falls
-  // back to the raw phone, mask that too so the fallback path stays scrubbed.
-  const nameFallback = recipient.name ?? (recipient.phone ? maskPhone(recipient.phone) : "Unknown clinic");
+  // Never emit a full clinic phone number to the client. The adapter may set `name` to the
+  // raw phone when no real name is known (calle.ts mapRecipient), so a bare `?? phone` fallback
+  // is not enough: mask a name that IS a phone, scrub any phone embedded in a real name, and
+  // only then fall back to the (masked) recipient phone or "Unknown clinic".
+  const rawName = recipient.name?.trim();
+  const nameFallback = rawName
+    ? isE164(rawName)
+      ? maskPhone(rawName)
+      : scrubPhones(rawName)
+    : recipient.phone
+      ? maskPhone(recipient.phone)
+      : "Unknown clinic";
   const base: NormalizedResult = {
     name: nameFallback,
     phone: recipient.phone ? maskPhone(recipient.phone) : null,

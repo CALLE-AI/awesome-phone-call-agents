@@ -31,6 +31,9 @@ export const env = {
   live: () => read("GOODFAITH_LIVE") === "1",
   persist: () => read("GOODFAITH_PERSIST") === "1",
   webhookSecret: () => read("GOODFAITH_WEBHOOK_SECRET"),
+  // Bearer token a caller must present to drive live-privileged endpoints (live quote
+  // creation, private quote/event reads). Empty = live access refused (fail-closed).
+  apiToken: () => read("GOODFAITH_API_TOKEN"),
   // Comma-separated E.164 numbers authorized to receive live calls. Empty = none.
   allowedRecipients: (): string[] =>
     (read("GOODFAITH_ALLOWED_RECIPIENTS") ?? "")

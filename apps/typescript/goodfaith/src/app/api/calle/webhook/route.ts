@@ -36,10 +36,10 @@ export async function POST(req: NextRequest) {
 
   markEvent(eventId);
 
-  // The posted body is NOT trusted as evidence. Take ONLY the call id and rfq correlation
-  // from it; the actual CallTask is re-fetched authoritatively from CALL-E below.
+  // The posted body is NOT trusted as evidence OR for correlation. Take ONLY the call id
+  // from it; the actual CallTask is re-fetched authoritatively from CALL-E below, and the
+  // target RFQ is resolved from OUR stored callId->rfq mapping — never from body metadata.
   const callId = body.data?.id;
-  const rfqIdFromMeta = (body.data?.metadata?.rfq_id as string | undefined) ?? undefined;
   if (!callId) {
     return NextResponse.json({ ok: false, error: "missing call id" }, { status: 400 });
   }
@@ -59,9 +59,19 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ ok: false, error: "could not verify call" }, { status: 200 });
   }
 
-  const rec = rfqIdFromMeta ? undefined : findRfqByCallId(callId);
-  const targetRfq = rfqIdFromMeta ?? rec?.rfqId;
-  if (targetRfq) updateRfqTask(targetRfq, task);
+  // Bind strictly by the stored callId->rfq mapping. This is the ONLY correlation source,
+  // so call A's evidence can never be steered onto RFQ B by a forged body.metadata.rfq_id.
+  const rec = findRfqByCallId(callId);
+  if (!rec) {
+    return NextResponse.json({ ok: true, note: "no matching rfq for call" }, { status: 200 });
+  }
 
+  // Defense in depth: the authoritatively re-fetched task must agree with the stored binding.
+  const fetchedRfqId = (task.metadata?.rfq_id as string | undefined) ?? undefined;
+  if (fetchedRfqId && fetchedRfqId !== rec.rfqId) {
+    return NextResponse.json({ ok: false, error: "call/rfq binding mismatch" }, { status: 409 });
+  }
+
+  updateRfqTask(rec.rfqId, task);
   return NextResponse.json({ ok: true });
 }

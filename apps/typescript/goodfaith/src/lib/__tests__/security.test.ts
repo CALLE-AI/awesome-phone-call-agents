@@ -123,6 +123,31 @@ describe("normalized output never leaks a full E.164", () => {
     expect(JSON.stringify(n)).not.toMatch(/\+15125550142/);
   });
 
+  it("masks a name that IS a raw E.164 (the adapter sets name=phone; the ?? fallback never fires)", () => {
+    // Reviewer fix 3: calle.ts mapRecipient sets name to the raw phone when no real name is
+    // known, so recipient.name is a non-null phone string. A bare `name ?? maskPhone(phone)`
+    // would pass it through unmasked; assert the E.164-named path is masked too.
+    const n = normalizeCallTask(
+      taskWith([recipient({ name: "+15125550142", summary: undefined })]),
+      FAIR,
+      "72148"
+    );
+    const row = n.results[0];
+    expect(row.name).toBe("+1512•••0142");
+    expect(JSON.stringify(n)).not.toMatch(/\+15125550142/);
+  });
+
+  it("scrubs a phone embedded inside an otherwise-real clinic name", () => {
+    const n = normalizeCallTask(
+      taskWith([recipient({ name: "Lone Star (call +15125550142)", summary: undefined })]),
+      FAIR,
+      "72148"
+    );
+    const row = n.results[0];
+    expect(row.name).toContain("•••");
+    expect(row.name).not.toContain("+15125550142");
+  });
+
   it("scrubs phones from transcript-derived quoted_verbatim, includes, and excludes", () => {
     const leaky = recipient({
       name: "Leaky Imaging",

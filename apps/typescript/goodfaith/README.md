@@ -36,7 +36,7 @@ The whole product rests on four CALL-E capabilities. Each one is load-bearing fo
 | 1. Multi-recipient parallel calls | One task fans out to every clinic via `recipients[]`, dialed in parallel, rolled into a single result | `src/lib/calle.ts` (`createQuoteCall`) |
 | 2. Per-recipient structured extraction | GoodFaith requests structured fields (`cash_price`, `price_basis`, includes/excludes, the quoted sentence). Because the current CALL-E API tier does not accept JSON result schemas, it does not send them; it derives each field deterministically from the call transcript and summary | `src/lib/schemas.ts` (`RECIPIENT_RESULT_SCHEMA`), derived in `src/lib/extract.ts` |
 | 3. Completion-confidence gating | CALL-E's model confidence is used as a gate (not a correctness guarantee): any call below 0.6 is held back for review and never ranked, fail-closed | `src/lib/normalize.ts` (`CONFIDENCE_THRESHOLD`, `normalizeRecipient`) |
-| 4. Evidence / transcript audit trail | Every ranked price traces to the exact transcript turn it was said in; a price with no traceable utterance is refused | `src/lib/normalize.ts` (`findEvidence`), `src/components/AuditTrail.tsx` |
+| 4. Evidence / transcript audit trail | Every ranked price is matched back to a transcript turn it appears in (heuristic substring match, advisory); a price with no traceable utterance is refused, not ranked | `src/lib/normalize.ts` (`findEvidence`), `src/components/AuditTrail.tsx` |
 
 **Also implemented:**
 

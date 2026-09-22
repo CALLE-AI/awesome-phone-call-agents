@@ -26,7 +26,7 @@ const LOAD_BEARING = [
   },
   {
     title: "4. Evidence / transcript audit trail",
-    body: "Every ranked price is traced back to the exact transcript turn it was said in. A price with no traceable utterance is refused, not ranked.",
+    body: "Every ranked price is matched back to a transcript turn it appears in, using a heuristic substring match (advisory, not a proof the number is correct). A price with no traceable utterance is refused, not ranked.",
     file: "components/AuditTrail.tsx + lib/normalize.ts · findEvidence",
   },
 ];
