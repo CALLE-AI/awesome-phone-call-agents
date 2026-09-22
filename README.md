@@ -121,6 +121,7 @@ This project is an awesome list for AI-agent phone-call workflows. Add resources
 
 ### Skills
 
+- [`call-repair-sequence-auditor`](skills/call-repair-sequence-auditor/) - Offline experimental conversation-analysis helper that detects callee repair sequences (huh, repeat that, did you say X), profiles the agent wording that caused them, flags ignored repairs, and crafts chunked redial goals; not a comprehension measurement or authorization to call again.
 - [`calle-developer`](skills/calle-developer/) - Build application integrations with the CALL-E API and SDKs using current contracts, existing examples, restart recovery and verified results.
 - [`call-attest-challenge-auth`](skills/call-attest-challenge-auth/) - Offline experimental HMAC-derived spoken-code matching with an optional advisory nonce ledger; not identity authentication, a secure replay defense or authorization for sensitive actions.
 - [`call-cross-lingual-emotion-preservation`](skills/call-cross-lingual-emotion-preservation/) - Offline experimental comparison of English urgency markers in source and relay text, with advisory wording suggestions; both inputs require English text or operator-prepared translations.
