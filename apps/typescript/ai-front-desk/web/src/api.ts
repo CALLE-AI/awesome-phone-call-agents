@@ -57,7 +57,6 @@ export interface CallLog {
 export interface AppStatus {
   dryRun: boolean;
   liveCallsUsed: number;
-  freeTierTotal: number;
 }
 
 const API_KEY_STORAGE_KEY = "ai-front-desk:api-key";
