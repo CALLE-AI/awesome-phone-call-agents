@@ -399,6 +399,19 @@ def test_main_returns_int():
     assert main(["craft", "--scenario", "calibrated-fact-stating"]) == 0
 
 
+def test_calling_about_opening_not_hedge():
+    # "about" is the canonical call-opening word, not a hedge; the opening
+    # restating goal facts must stay CALIBRATED.
+    card = analyze_with_goal(
+        _turns(
+            ("agent", "Hello, I am calling about your delivery on Tuesday the 15th."),
+            ("callee", "Okay."),
+        ),
+        GOAL,
+    )
+    assert card["over_hedges"] == []
+    assert card["verdict"] == "CALIBRATED"
+
 # ---------------------------------------------------------------- runner
 
 

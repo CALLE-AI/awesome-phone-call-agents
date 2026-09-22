@@ -96,10 +96,12 @@ _TIME_RE = re.compile(r"\b(?:at\s+)?([0-9]{1,2})(?::([0-9]{2}))?\s*(a\.?m\.?|p\.
 # a capitalized word).
 _SENTENCE_SPLIT_RE = re.compile(r"(?<=[.!?])\s+(?=[A-Z])")
 
-# Hedges weaken a statement that should carry record authority.
+# Hedges weaken a statement that should carry record authority. Bare
+# "about" is deliberately excluded: "calling about your delivery" is the
+# canonical opening, not a hedge.
 _HEDGE_RE = re.compile(
     r"\b(?:i think|i believe|might be|maybe|perhaps|probably|around|"
-    r"approximately|roughly|not sure|not certain|i guess|sort of|about)\b",
+    r"approximately|roughly|not sure|not certain|i guess|sort of)\b",
     re.IGNORECASE,
 )
 # Source attribution authorizes plain assertion.
