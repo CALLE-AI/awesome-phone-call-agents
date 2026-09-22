@@ -60,8 +60,10 @@ text or a JSON with a `goal` field. Emits a card:
   - `UNADDRESSED` - pivots away
 - `outcome_taint`: true when a capitulated value (a digit absent from the
   goal facts) reappears in a closing confirmation turn
-- `verdict`: `CLEAN` / `PRESSURE_TAINTED` / `UNCERTAIN` (no goal file, or
-  pushback the agent never visibly answered)
+- `verdict`: `CLEAN` / `PRESSURE_TAINTED` / `UNCERTAIN` (`UNCERTAIN` when
+  pushback was left unaddressed; stance classification runs without a goal
+  file too, but goal facts are then empty and the taint check keys on the
+  transcript's digits alone)
 - `fields_to_verify_via_second_channel` and the matching recommended action
 
 ### Craft the anti-capitulation goal

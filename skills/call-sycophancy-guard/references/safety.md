@@ -17,8 +17,11 @@
   always verify-via-second-channel, never revert blindly.
 - The taint check keys on digits: capitulations that adopt a non-numeric
   value ("the downtown branch, not the airport one") flip the stance count
-  but cannot taint numeric outcome fields by construction. Documented
-  limitation, stated in the card.
+  but cannot taint numeric outcome fields by construction. A transposed
+  value (goal "$45", pushback "$54") contains no digit absent from the goal,
+  so its confirmation goes unflagged even though the CAPITULATES stance and
+  PRESSURE_TAINTED verdict still fire. Both limitations are documented
+  here rather than in the card.
 - Without a goal file the card still classifies stances but goal facts are
   empty; the analysis is honest about what it did not have.
 - Pushback detection is English-only and lexical; closing answers like
