@@ -1,15 +1,15 @@
 {
-  "_comment": "The call did not reach the patient. no_answer is one of the statuses recognised as a genuine non-contact, and it is the only class of outcome that earns another dial: two retries at different times of day, then the patient is handed to staff. An unrecognised or non-terminal status is held instead of retried.",
+  "_comment": "A status the integration does not recognise. This is not the same as an unanswered call: PrepCheck holds the patient for review rather than guessing that a retry is safe. The same path covers non-terminal statuses such as in_progress or ringing arriving early.",
   "_matching": "Replace REPLACE_WITH_call_id_FROM_SHEET with the value in the row's call_id column after placing a dry-run call. A result that cannot be matched to the call in flight is held for review rather than applied.",
   "call_id": "REPLACE_WITH_call_id_FROM_SHEET",
-  "status": "no_answer",
+  "status": "carrier_congestion",
   "task_completed": false,
   "completion_confidence": {
     "score": 0.0,
     "label": "low"
   },
   "metadata": {
-    "row_id": "P002",
+    "row_id": "P001",
     "checkpoint": "T72",
     "source": "prepcheck"
   },

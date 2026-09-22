@@ -91,6 +91,16 @@ function diffReadiness_(previousSnapshot, completedNow, outstandingNow) {
   };
 }
 
+/** Masks each item and drops anything that is not a non-empty string. */
+function sanitiseItems_(items) {
+  if (!Array.isArray(items)) return [];
+  return items
+    .filter(i => typeof i === 'string')
+    .map(i => maskFreeText_(i, 120))
+    .filter(Boolean)
+    .slice(0, 20);
+}
+
 /**
  * Called from the webhook handler on every completed call, before the state
  * transition. Writes the trajectory columns and returns the diff so the
@@ -104,15 +114,18 @@ function recordReadiness_(r, result) {
     previous = null;
   }
 
-  const diff = diffReadiness_(
-    previous,
-    result.items_completed || [],
-    result.items_outstanding || []
-  );
+  // The item arrays come back from the provider, so they are free text. They
+  // are sanitised once, here, and that sanitised form is what gets both
+  // compared and stored — comparing raw against masked would register a
+  // change that never happened.
+  const completed = sanitiseItems_(result.items_completed);
+  const outstanding = sanitiseItems_(result.items_outstanding);
+
+  const diff = diffReadiness_(previous, completed, outstanding);
 
   const snapshot = {
-    completed: result.items_completed || [],
-    outstanding: result.items_outstanding || [],
+    completed: completed,
+    outstanding: outstanding,
     checkpoint: r.checkpoint,
     at: new Date().toISOString()
   };
@@ -176,9 +189,14 @@ function resetRow(rowId) {
   logEvent_(rowId, '', CHECKPOINTS[0], 'RESET', 'Returned to first checkpoint.');
 }
 
-/** Rotates the webhook shared secret without changing the deployment URL. */
+/**
+ * Rotates the webhook shared secret without changing the deployment URL.
+ * The new value is not logged — read it from Project Settings > Script
+ * Properties. Execution logs outlive the session and are visible to every
+ * editor of the project.
+ */
 function rotateWebhookSecret() {
-  const secret = Utilities.getUuid();
-  props_().setProperty('WEBHOOK_SECRET', secret);
-  Logger.log('New webhook secret: ' + secret);
+  props_().setProperty('WEBHOOK_SECRET', Utilities.getUuid());
+  Logger.log('Webhook secret rotated. Read the new value from ' +
+    'Project Settings > Script Properties.');
 }

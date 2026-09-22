@@ -36,6 +36,19 @@ const STATE = {
   CONFIRMED: 'CONFIRMED'
 };
 
+/**
+ * Call statuses we recognise as terminal.
+ *
+ * Only a genuine non-contact earns another dial. A status we do not
+ * recognise, or a terminal failure we cannot interpret, is not the same as
+ * "nobody picked up" and must not be treated like one — an unrecognised
+ * status is a gap in our understanding of the provider, and guessing at it
+ * with a retry means calling a real person on the strength of a guess.
+ */
+const RETRYABLE_NO_CONTACT = ['no_answer', 'busy', 'voicemail', 'unreachable'];
+const TERMINAL_FAILURE = ['failed', 'canceled', 'cancelled', 'declined',
+                          'rejected', 'blocked'];
+
 /** Guard rails. */
 const MAX_PARTIAL_CYCLES = 2;   // "I'll do it today" repeats before escalation
 const MAX_NO_ANSWER_ATTEMPTS = 2;
@@ -83,12 +96,21 @@ function getStaffEmail_() {
 }
 
 /**
- * ASCII E.164 only. Anything else never reaches a dispatch call.
- * Rejects Unicode digits, spaces, dashes, brackets and leading zeros.
+ * ASCII E.164 only, matched against the whole string.
+ *
+ * JavaScript's `$` anchors at end-of-input rather than before a trailing
+ * newline (unlike Python and PCRE), but this does not rely on that: the
+ * value is rejected outright if it carries surrounding whitespace or any
+ * non-ASCII-printable character, and the match is then required to span the
+ * entire string by length. Unicode digits, spaces, dashes, brackets, leading
+ * zeros and stray line endings all fail.
  */
 function isE164_(value) {
   const s = String(value == null ? '' : value);
-  return /^\+[1-9][0-9]{7,14}$/.test(s);
+  if (!s || s !== s.trim()) return false;
+  if (/[^\x20-\x7E]/.test(s)) return false;
+  const m = /^\+[1-9][0-9]{7,14}$/.exec(s);
+  return m !== null && m[0].length === s.length;
 }
 
 /** Masks a phone number for logs and previews: +1202*****43 */
@@ -99,16 +121,37 @@ function maskPhone_(value) {
 }
 
 /**
- * Anything a caller said, or a provider returned, is untrusted free text.
- * It never lands in a log verbatim: it is truncated and stripped of
- * characters that could break out of a cell or a log line.
+ * Anything a caller said, or a provider returned, is untrusted free text and
+ * may carry things that must never reach a log or a shared spreadsheet cell:
+ * a phone number echoed back in an error, a token in a URL, an API key in a
+ * stack trace.
+ *
+ * Redaction runs before truncation, so a secret cannot survive by sitting
+ * past the character limit.
  */
 function maskFreeText_(value, max) {
   const limit = max || 120;
-  const s = String(value == null ? '' : value)
+  let s = String(value == null ? '' : value)
     .replace(/[\r\n\t]+/g, ' ')
-    .replace(/[<>]/g, '')
-    .trim();
+    .replace(/[<>]/g, '');
+
+  // Credentials first: query tokens, bearer headers, and named key fields.
+  s = s.replace(/([?&](?:token|key|secret|api[_-]?key|access[_-]?token)=)[^&\s"']+/gi,
+                '$1[redacted]');
+  s = s.replace(/\b(bearer|basic)\s+[A-Za-z0-9._~+\/=-]{8,}/gi, '$1 [redacted]');
+  s = s.replace(/\b((?:api[_-]?key|secret|token|password)["'\s:=]{1,4})[A-Za-z0-9._~+\/-]{8,}/gi,
+                '$1[redacted]');
+
+  // Anything shaped like a key or an id: long opaque runs and UUIDs.
+  s = s.replace(/\b[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}\b/gi,
+                '[redacted-id]');
+  s = s.replace(/\b[A-Za-z0-9_-]{24,}\b/g, '[redacted]');
+
+  // Phone numbers, whether E.164 or loosely formatted.
+  s = s.replace(/\+[0-9][0-9\s().-]{6,17}[0-9]/g, m => maskPhone_(m.replace(/[^\d+]/g, '')));
+  s = s.replace(/\b[0-9][0-9\s().-]{8,16}[0-9]\b/g, m => maskPhone_(m.replace(/[^\d]/g, '')));
+
+  s = s.trim();
   if (!s) return '';
   return s.length > limit ? s.slice(0, limit) + '…' : s;
 }
@@ -126,5 +169,10 @@ function setupScriptProperties() {
     WEBHOOK_SECRET: Utilities.getUuid(),
     STAFF_EMAIL: ''
   }, false);
-  Logger.log('Webhook secret: ' + getWebhookSecret_());
+  // The secret is deliberately not printed. Execution logs are retained by
+  // the platform and are visible to anyone with edit access to the project;
+  // a shared secret does not belong in them. Read it once from
+  // Project Settings → Script Properties when you need it.
+  Logger.log('Script properties set. Read WEBHOOK_SECRET from ' +
+    'Project Settings > Script Properties — it is not logged.');
 }

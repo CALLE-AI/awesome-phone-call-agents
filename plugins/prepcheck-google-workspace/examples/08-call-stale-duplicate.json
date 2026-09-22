@@ -1,5 +1,7 @@
 {
   "_comment": "A duplicate of an earlier result, replayed. The row is no longer IN_CALL, so PrepCheck refuses to apply it a second time and holds the patient for review. Without this check a replayed webhook would advance the follow-up counter and schedule another call to a real person.",
+  "_matching": "Replace REPLACE_WITH_call_id_FROM_SHEET with the value in the row's call_id column after placing a dry-run call. A result that cannot be matched to the call in flight is held for review rather than applied.",
+  "call_id": "REPLACE_WITH_call_id_FROM_SHEET",
   "status": "completed",
   "task_completed": true,
   "completion_confidence": {

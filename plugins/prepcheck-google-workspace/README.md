@@ -107,13 +107,28 @@ everything rather than treating "unconfigured" as "open"; with one configured,
 a request without a matching `?token=` is rejected and logged.
 
 A terminal result is applied **once**, and only for the call the patient is
-actually waiting on. The row must be in `IN_CALL`, the checkpoint in the
-payload must match the row's current checkpoint, and any `call_id` must match
-the one in flight. A result that fails any of those checks is stale,
-duplicated, or out of order: it is recorded and the patient is held for staff
-review, rather than being applied a second time. This matters because a
-duplicate post would otherwise advance the follow-up counter and schedule
-another call to a real person.
+actually waiting on. The row must be in `IN_CALL`, and the payload must carry
+both a `checkpoint` and a `call_id` that match the call in flight. These are
+required rather than optional — a payload that omits an identifier cannot be
+matched, and an unmatched result is not something to act on. Anything that
+fails a check is recorded and the patient is held for staff review. This
+matters because a duplicate post would otherwise advance the follow-up counter
+and schedule another call to a real person.
+
+A result must also be **terminal and interpretable** before anything acts on
+it. Only a recognised non-contact earns another dial:
+
+| Status class | Examples | What happens |
+|---|---|---|
+| Non-contact | `no_answer`, `busy`, `voicemail`, `unreachable` | Retry, capped at two |
+| Completed | `completed` | Interpret the structured result |
+| Terminal failure | `failed`, `canceled`, `declined`, `blocked` | Held — not the same as unanswered |
+| Anything else | `in_progress`, `ringing`, or a status the provider adds later | Held — not guessed at |
+
+A `completed` call that returns no `prep_status`, reports `task_completed`
+false, or never confirmed it was speaking to the patient is also held. None of
+those are failed calls, and treating them as one would mean dialling a real
+person on the strength of a guess.
 
 These outcomes stop the workflow instead of scheduling anything:
 
@@ -122,7 +137,9 @@ These outcomes stop the workflow instead of scheduling anything:
 | `asked_to_stop` | The patient opted out |
 | `flag_for_staff` | Something clinical or unclear came up |
 | A regression | The clinic's record is wrong; calling again builds on bad data |
-| Unknown or unreadable status | Nothing reliable to act on |
+| Unknown, non-terminal or unreadable status | Nothing reliable to act on |
+| Terminal failure that is not a non-contact | Not the same as nobody answering |
+| Identity never confirmed on the call | Nothing it reported can be relied on |
 | Stale or duplicate result | Already handled, or not ours |
 | Two follow-ups with no progress | Calling a third time is not working |
 
@@ -138,6 +155,16 @@ prose and the result schema, so you can read exactly what CALL-E would work
 from. The webhook secret is redacted and the recipient's number is masked in
 that log: the sheet is something a clinic will share and screenshot.
 
+The same redaction runs over everything untrusted before it reaches a log or a
+cell — provider error bodies, status strings, anything the caller said. Query
+tokens, bearer headers, named key fields, UUIDs, long opaque strings and
+phone numbers are replaced, and redaction runs *before* truncation so a secret
+cannot survive by sitting past the character limit. The webhook secret is
+never written to the execution log either: `setupScriptProperties()` and
+`rotateWebhookSecret()` tell you to read it from Project Settings rather than
+printing it, because execution logs outlive the session and are visible to
+every editor of the project.
+
 Notifications in this mode are logged as `NOTIFY_SUPPRESSED` rather than sent.
 There is no default staff address — an install without `STAFF_EMAIL` set emails
 nobody rather than falling back to whoever ran the script.
@@ -148,7 +175,10 @@ accepted for a call in flight, each post needs a dry-run call placed first:
 
 ```bash
 # in the Apps Script editor, with LIVE_CALLS_ENABLED = false:
-#   callRowNow('P001')        → row moves to IN_CALL, nothing is dialled
+#   callRowNow('P001')     → row moves to IN_CALL, nothing is dialled
+#
+# then copy the row's call_id into the example, replacing
+# REPLACE_WITH_call_id_FROM_SHEET, and post it:
 
 curl "$WEBHOOK_URL?token=$WEBHOOK_SECRET" \
   --request POST \
@@ -156,9 +186,26 @@ curl "$WEBHOOK_URL?token=$WEBHOOK_SECRET" \
   --data @examples/01-call-partial.json
 ```
 
+Copying the call id by hand is the point rather than an inconvenience — it is
+the same check the integration applies, and posting without it shows the
+refusal path.
+
 Repeat that pair with `02` to see a regression detected, with `prep_status`
 identical on both calls. Post `02` a second time without placing a call first
 and it is refused as stale — which is the behaviour worth checking.
+
+## Tests
+
+```bash
+node tests/webhook.test.js
+```
+
+Runs the real `Config.gs`, `Regression.gs` and `Webhook.gs` under Node with
+the Google services mocked — no network, no spreadsheet, no calls, no email.
+It checks the property that matters most for a workflow that can dial people:
+only a genuine non-contact (`no_answer`, `busy`, `voicemail`, `unreachable`)
+schedules another call. Every unknown, incomplete, non-terminal, unmatched or
+replayed result stops for staff review, and nothing sensitive reaches a cell.
 
 ## Cancellation and rollback
 

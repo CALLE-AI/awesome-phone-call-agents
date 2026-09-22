@@ -83,15 +83,72 @@ function handleCallResult_(body) {
       'awaiting one (state: ' + r.state + '). Not applied.');
   }
 
-  if (meta.checkpoint && meta.checkpoint !== r.checkpoint) {
+  // Identifiers are required, not optional. A payload that omits them cannot
+  // be matched to the call in flight, and an unmatched result is not
+  // something to act on.
+  if (!meta.checkpoint) {
+    return hold_(r, 'Terminal result carries no checkpoint, so it cannot be ' +
+      'matched to the call in flight. Not applied.');
+  }
+  if (meta.checkpoint !== r.checkpoint) {
     return hold_(r, 'Terminal result is for checkpoint ' +
       maskFreeText_(meta.checkpoint, 12) + ' but this patient is at ' +
       r.checkpoint + '. Not applied.');
   }
-
-  if (body.call_id && r.call_id && String(body.call_id) !== String(r.call_id)) {
+  if (!body.call_id) {
+    return hold_(r, 'Terminal result carries no call id, so it cannot be ' +
+      'matched to the call in flight. Not applied.');
+  }
+  if (String(body.call_id) !== String(r.call_id)) {
     return hold_(r, 'Terminal result is for a different call than the one ' +
       'in flight. Not applied.');
+  }
+
+  // ---- the result must be terminal and interpretable before anything acts
+  // on it. Unknown, incomplete and non-terminal outcomes stop here. ----
+
+  if (!status) {
+    return hold_(r, 'Call result carries no status. Nothing to act on.');
+  }
+
+  const known = status === 'completed' ||
+                RETRYABLE_NO_CONTACT.indexOf(status) >= 0 ||
+                TERMINAL_FAILURE.indexOf(status) >= 0;
+
+  if (!known) {
+    // Includes in_progress, queued, ringing and anything the provider adds
+    // later. A status we cannot interpret is not a failed call.
+    return hold_(r, 'Call status "' + maskFreeText_(status, 40) + '" is not ' +
+      'a recognised terminal outcome. Held rather than guessed at.');
+  }
+
+  if (TERMINAL_FAILURE.indexOf(status) >= 0) {
+    return hold_(r, 'Call ended as "' + maskFreeText_(status, 40) + '". This ' +
+      'is not the same as an unanswered call, so it is not retried.');
+  }
+
+  // A genuine non-contact: nobody was reached, and dialling again is the
+  // right response. This is the only path that schedules another call.
+  if (RETRYABLE_NO_CONTACT.indexOf(status) >= 0) {
+    return onNoAnswer_(r, status);
+  }
+
+  // status === 'completed' from here. The call happened; whether the goal
+  // was met is a separate question, and an unmet one is not a retry.
+  if (!body.task_completed) {
+    return hold_(r, 'The call connected but the task was not completed. ' +
+      'A person should decide what happens next.');
+  }
+  if (!result.prep_status) {
+    return hold_(r, 'The call completed without a preparation status. ' +
+      'Nothing reliable to act on.');
+  }
+
+  // Reached someone, but never confirmed it was the patient. Nothing was
+  // established, so this is held rather than retried.
+  if (result.identity_verified !== true) {
+    return hold_(r, 'The call did not confirm it was speaking to the ' +
+      'patient, so nothing it reported can be relied on.');
   }
 
   // ---- outcomes that stop the workflow rather than schedule another call ----
@@ -104,17 +161,6 @@ function handleCallResult_(body) {
   if (result.flag_for_staff) {
     return hold_(r, 'Patient raised a clinical or unclear point on the call. ' +
       'A clinician should follow up.');
-  }
-
-  // Did not reach the patient at all. Retrying an unanswered call is the one
-  // case where dialling again is appropriate.
-  if (status !== 'completed' || !body.task_completed || !result.prep_status) {
-    return onNoAnswer_(r, status);
-  }
-
-  // Reached someone, but never confirmed it was the patient.
-  if (result.identity_verified === false) {
-    return onNoAnswer_(r, 'identity_unverified');
   }
 
   // Compare this call's per-item results against the previous call's.
