@@ -120,4 +120,4 @@ Because Co-Runner is an optimized client-side application, you don't need to ins
 * **Not built for high-stakes or urgent use.** Outcomes aren't guaranteed, calls can fail or time out, and there's no cancellation path — this is not suitable for emergencies or time-critical calls.
 
 
-* **Billing is flat-rate, not duration-based.** Per CALL-E's current pricing, each billable call costs a flat rate regardless of length — this app doesn't (and can't meaningfully) optimize cost by ending calls early.
+* **Usage-based billing.** CALL-E charges a Call Fee plus a Success Fee when the task's defined business goal is achieved. Call usage is measured in 10-second increments; preparation and pre-connection costs may apply even when a call does not connect. See the [pricing FAQ](https://www.heycall-e.com/) and [Dashboard billing](https://dashboard.heycall-e.com/account/billing) for actual charges.
