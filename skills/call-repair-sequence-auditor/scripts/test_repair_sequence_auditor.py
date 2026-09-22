@@ -354,6 +354,40 @@ def test_analyze_moderate_single_ignored():
     assert card["recommended_action"]["action"] == "verify_understanding_prompt"
 
 
+def test_analyze_moderate_all_resolved_has_guidance():
+    card = analyze_turns(
+        _turns(
+            ("agent", "Your pickup is Thursday November 12th between 2 and 4 p.m."),
+            ("callee", "Sorry, what?"),
+            ("agent", "I said your pickup is on Thursday November 12th."),
+            ("callee", "Is it the 12th or the 21st?"),
+            ("agent", "It is the 12th, one two."),
+            ("callee", "Got it, thanks."),
+            ("agent", "Goodbye."),
+        )
+    )
+    assert card["comprehension_trouble"] == "MODERATE"
+    assert card["unresolved_repairs"] == 0
+    assert card["recommended_action"]["action"] == "continue"
+    assert card["recommended_action"]["guidance"] is not None
+
+
+def test_empty_agent_turn_after_repair_is_skipped():
+    # A placeholder empty agent turn must not read as end-of-call; the
+    # later real agent turn decides the resolution.
+    turns = [
+        {"speaker": "agent", "text": "Your pickup is Thursday November 12th."},
+        {"speaker": "callee", "text": "Sorry, what?"},
+        {"speaker": "agent", "text": ""},
+        {"speaker": "agent", "text": "I said your pickup is on Thursday November 12th."},
+        {"speaker": "callee", "text": "Got it."},
+        {"speaker": "agent", "text": "Goodbye."},
+    ]
+    card = analyze_turns(turns)
+    assert card["repairs_initiated"] == 1
+    assert card["repair_events"][0]["resolution"] == "ADDRESSED"
+
+
 def test_disclaimer_present():
     card = analyze_turns(_turns(("agent", "hi"), ("callee", "hello")))
     assert "under-report" in card["disclaimer"]

@@ -300,14 +300,17 @@ def analyze_turns(turns: list[dict[str, str]]) -> dict[str, Any]:
         repair_type = classify_repair(text, source_text)
         if repair_type is None:
             continue
-        # Next agent turn after the repair decides resolution.
+        # Next non-empty agent turn after the repair decides resolution.
+        # Empty agent-side turns (normalizer placeholders) are skipped, not
+        # treated as end-of-call.
         resolution = "END_OF_CALL"
         for fwd in range(index + 1, len(turns)):
             next_speaker = str(turns[fwd].get("speaker", "")).lower().strip()
             if next_speaker not in CALLEE_ROLES:
                 next_text = str(turns[fwd].get("text", "")).strip()
-                if next_text:
-                    resolution = classify_resolution(next_text, repair_type, source_text)
+                if not next_text:
+                    continue
+                resolution = classify_resolution(next_text, repair_type, source_text)
                 break
         profile = profile_trouble_source(source_text)
         events.append(
@@ -352,6 +355,15 @@ def analyze_turns(turns: list[dict[str, str]]) -> dict[str, Any]:
                 "One repair was left unresolved. On the next contact, open by "
                 "asking the person to state back the key fact in their own "
                 "words before anything else."
+            ),
+        }
+    elif card["comprehension_trouble"] == "MODERATE":
+        card["recommended_action"] = {
+            "action": "continue",
+            "guidance": (
+                "Multiple repairs in one call, all resolved. The wording still "
+                "caused trouble; consider the simplified goal wording on the "
+                "next contact."
             ),
         }
     return card
