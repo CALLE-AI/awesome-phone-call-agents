@@ -1,0 +1,9 @@
+Agent: Good morning o. How market? I dey call from your shop manager service.
+Owner: Morning. Business dey small-small.
+Agent: How many bags of rice you get now?
+Owner: About eight.
+Agent: Indomie remain how many carton?
+Owner: Like twelve, but e dey finish fast.
+Agent: Which thing don almost finish?
+Owner: Sugar na four bags left.
+Agent: Thank you. I go note am.

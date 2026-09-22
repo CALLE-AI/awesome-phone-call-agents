@@ -1,0 +1,3 @@
+# Trunkline is standard-library only. Nothing to install for runtime.
+# pytest is a development-only dependency (see pyproject.toml) and is not
+# needed to run the app or the console.

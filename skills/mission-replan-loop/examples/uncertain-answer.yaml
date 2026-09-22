@@ -1,0 +1,24 @@
+# "We should probably be there around 5:30" must NOT satisfy a 17:30 cutoff.
+input:
+  mission: { objective: "Protect Shipment #4821's departure", deadline: "17:30" }
+  constraints:
+    - { key: pickup_time, operator: lte, value: "17:30", mandatory: true }
+  strategy: { id: strategy_01, type: replacement_carrier, target: "Carrier B" }
+  call_result:
+    call_id: call_031
+    target: "Carrier B"
+    status: completed
+    facts: { pickup_time: "17:30", pickup_time_confirmed: false }
+
+output:
+  strategy_status: uncertain
+  evidence:
+    - { fact: pickup_time, value: "17:30", source_call: call_031, target: "Carrier B",
+        confidence: low, status: uncertain }
+  constraint_results:
+    - { constraint: pickup_time, required: "17:30", observed: "17:30", status: uncertain }
+  replan: { required: false }
+  next_operation:
+    type: clarification
+    objective: "Ask Carrier B to confirm a firm pickup time."
+    required_information: [pickup_time]

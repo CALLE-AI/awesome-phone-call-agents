@@ -1,0 +1,15 @@
+{
+  "task_id": "relayme-demo-0001",
+  "to_phone_e164": "+15550000123",
+  "business_display_name": "Maple Street Pharmacy",
+  "question": "Is the prescription under the name Jordan Rivera ready for pickup?",
+  "caller_context": "checking on a prescription pickup for the person I'm assisting",
+  "consent": true,
+  "allowed_followups": [
+    "Roughly what time today will it be ready?",
+    "Which counter should they collect it from?"
+  ],
+  "language": "English",
+  "region": "US",
+  "timezone": "America/New_York"
+}

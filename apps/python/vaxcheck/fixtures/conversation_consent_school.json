@@ -1,0 +1,21 @@
+{
+  "_scenario": "Clean consent. Guardian identified, no allergies, well, no prior dose. The only path that clears without a human.",
+  "recipient_status": "completed",
+  "task_completed": true,
+  "completion_confidence": 0.94,
+  "summary": "Guardian confirmed identity and consented to the school session.",
+  "evidence": ["Guardian said 'yes, go ahead with the school one'."],
+  "structured_result": {
+    "reached_guardian": "yes",
+    "identity_confirmed": "yes",
+    "consent": "granted",
+    "route": "school_session",
+    "prior_dose_reported": "no",
+    "prior_dose_detail": "",
+    "allergy_reported": "none",
+    "allergy_detail": "",
+    "unwell_today": "no",
+    "guardian_questions": "",
+    "callback_requested": "no"
+  }
+}

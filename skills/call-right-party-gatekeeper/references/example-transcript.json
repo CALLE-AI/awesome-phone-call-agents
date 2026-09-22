@@ -1,0 +1,14 @@
+{
+  "status": "COMPLETED",
+  "result": {
+    "post_summary": "Appointment confirmed with the intended recipient after identity verification.",
+    "transcript": [
+      {"speaker": "agent", "text": "Hello, this is an automated assistant calling from Example Clinic. May I speak to Dana Reyes?"},
+      {"speaker": "callee", "text": "Yes, this is Dana."},
+      {"speaker": "agent", "text": "Thank you, Dana. I am calling to confirm your Thursday appointment. Your account balance of $84.20 is already settled, so nothing is due."},
+      {"speaker": "callee", "text": "Great, thank you for letting me know."},
+      {"speaker": "agent", "text": "You will get a reminder the day before. Goodbye."}
+    ]
+  },
+  "callee_phone": "+14155550142"
+}

@@ -1,0 +1,20 @@
+{
+  "id": "17-unstated-voicemail-eta",
+  "category": "voicemail",
+  "description": "The call reached voicemail. No human answered anything. Every field is unstated — never a grade.",
+  "turns": [
+    { "speaker": "bot", "text": "Hi, this is the QuoteDesk assistant calling about your pending order.", "offset_seconds": 0 },
+    { "speaker": "user", "text": "You have reached Sharma Traders. We are closed right now. Please leave a message after the tone.", "offset_seconds": 6 }
+  ],
+  "fields": [
+    {
+      "field": "eta_days",
+      "value": null,
+      "expects": "duration",
+      "questionTurn": null,
+      "answerTurns": [],
+      "critical": true,
+      "expectedGrade": "unstated"
+    }
+  ]
+}
