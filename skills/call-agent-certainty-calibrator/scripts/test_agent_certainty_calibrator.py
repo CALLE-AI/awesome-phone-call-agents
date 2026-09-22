@@ -412,6 +412,27 @@ def test_calling_about_opening_not_hedge():
     assert card["over_hedges"] == []
     assert card["verdict"] == "CALIBRATED"
 
+def test_cli_analyze_overassertive_fixture():
+    path = SKILL_DIR / "references" / "example-transcript-overassertive.json"
+    proc = subprocess.run(
+        [
+            sys.executable,
+            str(SCRIPTS / "agent_certainty_calibrator.py"),
+            "analyze",
+            "--transcript",
+            str(path),
+            "--goal-file",
+            str(EXAMPLE_GOAL),
+        ],
+        capture_output=True,
+        text=True,
+    )
+    assert proc.returncode == 0
+    card = json.loads(proc.stdout)
+    assert card["verdict"] == "OVERASSERTIVE"
+    assert {a["value"] for a in card["over_assertions"]} == {"friday", "30"}
+    assert card["over_hedges"] == []
+
 # ---------------------------------------------------------------- runner
 
 

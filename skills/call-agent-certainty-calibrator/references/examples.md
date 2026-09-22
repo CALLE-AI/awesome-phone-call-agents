@@ -137,3 +137,65 @@ Output:
   ]
 }
 ```
+
+## Example 4: invented specifics on top of a correct record (OVERASSERTIVE)
+
+Fixture: `references/example-transcript-overassertive.json` - the record
+facts are stated perfectly, then the agent invents a loyalty program and a
+deadline that exist nowhere in the goal.
+
+Command:
+
+```bash
+python3 skills/call-agent-certainty-calibrator/scripts/agent_certainty_calibrator.py analyze   --transcript skills/call-agent-certainty-calibrator/references/example-transcript-overassertive.json   --goal-file skills/call-agent-certainty-calibrator/references/example-goal.txt
+```
+
+Output:
+
+```json
+{
+  "skill": "call-agent-certainty-calibrator",
+  "analysis_mode": "heuristic",
+  "calibration_assessment": "assessed",
+  "reason": null,
+  "goal_facts": {
+    "amount": [
+      "45"
+    ],
+    "date": [
+      "tuesday",
+      "15"
+    ],
+    "time": [
+      "1400"
+    ]
+  },
+  "over_assertions": [
+    {
+      "turn_index": 2,
+      "kind": "date",
+      "value": "friday",
+      "sentence": "Great news - your fee is waived under the Friday loyalty program, and the discount expires on the 30th, so book today."
+    },
+    {
+      "turn_index": 2,
+      "kind": "date",
+      "value": "30",
+      "sentence": "Great news - your fee is waived under the Friday loyalty program, and the discount expires on the 30th, so book today."
+    }
+  ],
+  "over_hedges": [],
+  "calibrated_statements": 3,
+  "verdict": "OVERASSERTIVE",
+  "recommended_action": {
+    "action": "verify_unsourced_values",
+    "guidance": "Agent statements did not match the goal facts. Over-asserted values may be invented specifics missing from the goal (verify before reuse); hedged record facts should be restated with their source. Compare with the record, not with the transcript alone."
+  },
+  "disclaimer": "Heuristic text-only analysis of value statements. An OVER-ASSERTED value may be true and merely missing from the goal text; an OVER-HEDGED fact may still have been understood. Findings route to verification against the record, never to assumptions about the agent's knowledge."
+}
+```
+
+The three record facts count as CALIBRATED; the invented "Friday" program
+and "the 30th" deadline are flagged as unsourced - values in neither the
+goal nor the callee's mouth. The person already thanked the agent for
+them, which is exactly when this card earns its keep.
