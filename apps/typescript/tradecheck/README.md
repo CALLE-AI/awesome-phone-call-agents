@@ -4,11 +4,11 @@
 [![Next.js](https://img.shields.io/badge/Next.js-15-black)](https://nextjs.org/)
 [![AI SDK](https://img.shields.io/badge/Vercel_AI_SDK-latest-black)](https://sdk.vercel.ai/)
 
-**TradeCheck** is an AI-powered Copilot that helps you verify international trade partners before you close a deal. It combines real-time documentary checks (government registries) with live AI voice calls (powered by Call-E) to ensure you are dealing with legitimate businesses.
+**TradeCheck** is an AI-powered Copilot that helps you verify international trade partners before you close a deal. It combines real-time documentary checks (government registries and third-party aggregators) with simulated AI voice calls (powered by Call-E) to provide advisory insights on business legitimacy.
 
 ## Live Demo
 
-[<img src="/public/dashboard.png" alt="TradeCheck Live App" width="100%" style="border-radius: 12px; border: 1px solid #e5e7eb;">](https://tradecheck-demo.vercel.app)
+[<img src="/public/dashboard.png" alt="TradeCheck Live App" width="100%" style="border-radius: 12px; border: 1px solid #e5e7eb;">](https://tradecheck-five.vercel.app)
 
 👉 **[Launch TradeCheck Web App](https://tradecheck-five.vercel.app)** 👈
 
@@ -20,9 +20,9 @@
   - 🇮🇳 **India:** GSTIN verification via sandbox and live APIs.
   - 🇳🇬 **Nigeria:** CAC (Corporate Affairs Commission) registry lookup.
   - 🇬🇧 **UK:** Companies House direct API integration.
-  - 🇨🇳 **China:** CNBizAPI integration.
+  - 🇨🇳 **China:** CNBizAPI integration (Third-party aggregator; results are indicative, not guaranteed legitimacy).
   - 🇺🇸 **United States:** EIN/State-level entity verification.
-- **Live Voice Verification:** Integrates with [Call-E](https://heycall-e.com) to place automated phone calls to suppliers. Verifies their identity, product availability, and quoted terms.
+- **Simulated Voice Verification:** Uses [Call-E](https://heycall-e.com) logic to simulate automated phone calls to suppliers for demonstration purposes. Returns synthetic/advisory results for identity, product availability, and quoted terms.
 
 ## Tech Stack
 

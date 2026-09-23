@@ -107,6 +107,11 @@ export async function placeVerificationCall(params: CalleCallParams): Promise<Ca
       throw new Error('CALLE_BASE_URL must use HTTPS to protect credential transport');
     }
 
+    // Restrict credentialed requests to approved HTTPS CALL-E origins.
+    if (baseUrl !== 'https://api.call-e.com' && baseUrl !== 'https://api.heycall-e.com') {
+      throw new Error('CALLE_BASE_URL must be an approved CALL-E origin');
+    }
+
     // Log a masked summary — never log the raw phone number.
     console.info('[calle] placing verification call', {
       phone: maskPhone(params.phoneNumber),
@@ -173,7 +178,19 @@ export async function placeVerificationCall(params: CalleCallParams): Promise<Ca
       callData.recipients?.[0]?.attempts?.[0]?.transcript ||
       undefined;
 
-    structured.transcript = transcript;
+    // Mask phone numbers from transcript and red flags before returning
+    const phoneRegex = new RegExp(params.phoneNumber.replace('+', '\\+'), 'g');
+    const masked = maskPhone(params.phoneNumber);
+
+    if (transcript && typeof transcript === 'string') {
+      structured.transcript = transcript.replace(phoneRegex, masked);
+    } else {
+      structured.transcript = transcript;
+    }
+
+    if (structured.red_flags && Array.isArray(structured.red_flags)) {
+      structured.red_flags = structured.red_flags.map(flag => flag.replace(phoneRegex, masked));
+    }
 
     // Confidence is a heuristic estimate — label it accordingly.
     structured.confidence = deriveConfidence(structured);

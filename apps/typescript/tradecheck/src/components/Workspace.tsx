@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { useChat } from '@ai-sdk/react';
 import { ChatBubble } from './ui/ChatBubble';
 import { Input } from './ui/Input';
@@ -479,7 +479,7 @@ export function Workspace() {
                 <>
                   <div className="flex items-center gap-2 mb-1">
                     <div className={`w-5 h-5 rounded-full flex items-center justify-center text-xs font-bold flex-shrink-0 ${latestChinaResult ? 'bg-black text-white' : 'bg-gray-200 text-gray-500'}`}>1</div>
-                    <span className="text-sm font-medium text-primary-text">China Verification Check</span>
+                    <span className="text-sm font-medium text-primary-text">China Verification (Third-party/Advisory)</span>
                   </div>
                   {isCheckingChina && (
                     <div className="bg-white border border-gray-200 rounded-lg p-6 flex flex-col items-center justify-center h-36">

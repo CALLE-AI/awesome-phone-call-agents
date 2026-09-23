@@ -5,7 +5,7 @@ import { CalleResult } from '@/lib/calle';
 
 const VERDICT_CONFIG = {
   verified_reachable: {
-    label: 'Verified & Reachable',
+    label: 'Reachable (Simulated)',
     badgeVariant: 'verified' as const,
     icon: '✓',
     bgAccent: 'border-l-4 border-l-success',
@@ -57,7 +57,7 @@ export function CallVerdictCard({
       <div className="flex justify-between items-start">
         <div className="flex items-center gap-2">
           <span className="text-xl">{config.icon}</span>
-          <h3 className="text-base font-bold text-primary-text">Live Call Verdict</h3>
+          <h3 className="text-base font-bold text-primary-text">Call Verdict (Simulated/Advisory)</h3>
         </div>
         <Badge variant={config.badgeVariant}>{config.label}</Badge>
       </div>
