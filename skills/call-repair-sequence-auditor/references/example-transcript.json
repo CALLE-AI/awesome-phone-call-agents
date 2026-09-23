@@ -1,0 +1,18 @@
+{
+  "status": "COMPLETED",
+  "result": {
+    "post_summary": "Customer eventually confirmed the pickup window after several clarifications.",
+    "transcript": [
+      {"speaker": "agent", "text": "Hello, this is an automated assistant calling from Example Depot about your pickup scheduled for Thursday November 12th between 2 and 4 p.m. at the downtown branch on 4475 Example Parkway."},
+      {"speaker": "callee", "text": "Sorry, what?"},
+      {"speaker": "agent", "text": "Your pickup is on Thursday November 12th from 2 to 4 p.m."},
+      {"speaker": "callee", "text": "Is it the 12th or the 21st?"},
+      {"speaker": "agent", "text": "It is the 12th, one two, not the 21st."},
+      {"speaker": "callee", "text": "Can you repeat that?"},
+      {"speaker": "agent", "text": "Anyway, the branch closes at 6 p.m. and you need your confirmation code."},
+      {"speaker": "callee", "text": "Wait, which one?"},
+      {"speaker": "agent", "text": "The downtown branch on Example Parkway. That is all I have. Goodbye."}
+    ]
+  },
+  "callee_phone": "+14155550188"
+}
