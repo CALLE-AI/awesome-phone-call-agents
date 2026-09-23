@@ -1,5 +1,5 @@
 {
-  "_comment": "The patient cannot be ready in time. PrepCheck releases the slot, emails the scheduling staff, and stops calling. The agent does not offer a new date — rebooking stays with a person.",
+  "_comment": "The patient cannot be ready in time. PrepCheck requests scheduling-staff review and stops calling; it does not release the slot. The agent does not offer a new date — rebooking stays with a person.",
   "_matching": "Replace REPLACE_WITH_call_id_FROM_SHEET with the value in the row's call_id column after placing a dry-run call. A result that cannot be matched to the call in flight is held for review rather than applied.",
   "call_id": "REPLACE_WITH_call_id_FROM_SHEET",
   "status": "completed",
