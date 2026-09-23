@@ -35,7 +35,7 @@ The rules page names four criteria. The write-up below is arranged to hit them i
 |---|---|
 | **Real World Impact** | Procurement teams genuinely do phone three vendors for the same three numbers. The entry automates the calling and refuses to automate the buying. |
 | **Quality of the Idea** | Most call agents put "ask a human first" in a prompt. This one makes approval structurally unreachable from the tool surface — and proves it with tests that try to break in four different ways. |
-| **Technical Implementation** | One `invoke()` chokepoint shared by UI and agent; four independent enforcement layers; a provider adapter that makes the real integration unit-testable with zero network. 103 tests, and one real billed call placed end to end (docs/real-call.md). |
+| **Technical Implementation** | One `invoke()` chokepoint shared by UI and agent; four independent enforcement layers; a provider adapter that makes the real integration unit-testable with zero network. 262 tests, and one real billed call placed end to end (docs/real-call.md). |
 | **Product Experience & Demo** | The demo shows an agent *being refused* three different ways before a person clicks Approve — the refusal is the product. |
 
 ## 3. Text to paste

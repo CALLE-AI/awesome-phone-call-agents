@@ -149,20 +149,29 @@ its refusal tells the caller what to do instead rather than failing blankly:
 ## Where a real call could happen
 
 Exactly one place: `CallEProvider.placeCall()` in `src/providers/calle-provider.js`, and
-only when `CALL_PROVIDER=calle` **and** `CALLE_API_KEY` is set — both read from the
-process environment, never from a request. `place_call`'s `args` cannot select which
+only when `CALL_PROVIDER=calle`, `CALLE_API_KEY` is set, **and** the supplier's number is
+listed in `CALLE_ALLOWED_DESTINATIONS` — all read from the process environment, never
+from a request. `place_call`'s `args` cannot select which
 provider runs or pass it a `baseUrl`/`apiKey`: `invoke.js`'s `placeCall()` resolves the
 provider from `CALL_PROVIDER` alone and only ever forwards the test-only
 `providerOptions` hook when that resolves to the fake provider — the real one is always
-constructed with zero per-call overrides. `CallEProvider` additionally refuses to
-construct against a non-`https://` base URL, and refuses to dial a destination that
-isn't a clean ASCII E.164 phone number. Everything else in the app — every test, the
+constructed with zero per-call overrides. `CallEProvider` additionally pins the API key
+to one parsed origin, `https://api.heycall-e.com` — a base URL naming any other host,
+port, path or userinfo is refused at construction (and, with `CALL_PROVIDER=calle`, at
+server startup) — sends every request with
+`redirect: 'error'`, and refuses a response that was redirected or came from another
+origin. It dials only a complete E.164 number (NANP: a full 10-digit number, no N11
+service code) that is not in a range reserved for fiction (`src/fictional-numbers.js`)
+and is on the operator's allowlist; a refused destination never reaches the network and
+never marks the task dialing. Everything else in the app — every test, the
 default `npm start`, the whole demo — runs on `FakeCallProvider`, which reads canned
 outcomes from `fake-provider/canned-responses.json` and never opens a socket.
 
 `CallEProvider` takes its `fetchImpl` by injection, which is why its request shape and
 response parsing can be unit-tested against `tests/fixtures/calle-responses.json` with no
-network at all. No test ever constructs it with the real `fetch`.
+network at all. The one test that hands it the real `fetch` points it at a loopback
+server answering `302`, to prove Node's own `fetch` refuses the redirect without ever
+contacting its target.
 
 ## Network exposure
 

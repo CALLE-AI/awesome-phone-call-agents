@@ -54,16 +54,12 @@ if ! grep -q "LICENSE" README.md; then
   exit 1
 fi
 
-# Every sample phone number must sit in the NANP block reserved for fiction
-# (+1-555-0100 .. +1-555-0199), per the hackathon's submission checklist.
-echo "Verifying phone numbers are fictional..."
-if grep -rhoE '\+1-[0-9]{3}-[0-9]{4}' \
-     --include='*.js' --include='*.jsx' --include='*.json' --include='*.md' \
-     --include='*.html' . --exclude-dir=node_modules \
-   | sort -u | grep -vE '^\+1-555-01[0-9]{2}$'; then
-  echo "ERROR: phone number(s) above are outside the reserved +1-555-01xx range"
-  exit 1
-fi
+# Every sample phone number must be one reserved for fiction, per the hackathon's
+# submission checklist. Two jest suites run by `npm test` below check it:
+# tests/fictional-numbers.test.js reads every "+", "00" or "011" number, and
+# tests/non-phone-digit-runs.test.js reads every other digit run the masker would treat as
+# a phone number — both against src/fictional-numbers.js, the same table the real provider
+# refuses to dial. (The grep that used to live here only saw "+1-ddd-dddd".)
 
 # A fresh worktree has no node_modules — bootstrap deterministically from the
 # committed lockfile before running anything that needs them (mirrors

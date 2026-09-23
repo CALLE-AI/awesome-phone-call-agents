@@ -5,6 +5,7 @@ const store = require('./store');
 const { tools } = require('./tools');
 const { maskDeep } = require('./mask');
 const { localOnlyMiddleware } = require('./local-only');
+const { getProvider } = require('./providers');
 
 const app = express();
 const PORT = process.env.PORT || 3000;
@@ -40,7 +41,8 @@ app.post('/api/invoke', async (req, res) => {
     const result = await invoke(tool, args || {}, actor);
     res.json(maskDeep(result));
   } catch (error) {
-    res.status(500).json({ error: error.message });
+    // An error message is display text like any other response field.
+    res.status(500).json(maskDeep({ error: error.message }));
   }
 });
 
@@ -63,6 +65,19 @@ app.get('/', (req, res) => {
 module.exports = { app };
 
 if (require.main === module) {
+  // invoke.js builds the provider per call; building the real one once here as well means a
+  // bad CALLE_BASE_URL, allowlist entry, or key format stops the server at startup instead
+  // of surfacing on the owner's first approved call. The messages never carry the values.
+  const providerName = process.env.CALL_PROVIDER || 'fake';
+  if (providerName !== 'fake') {
+    try {
+      getProvider(providerName);
+    } catch (error) {
+      // eslint-disable-next-line no-console
+      console.error(`Refusing to start: ${error.message}`);
+      process.exit(1);
+    }
+  }
   app.listen(PORT, '127.0.0.1', () => {
     // eslint-disable-next-line no-console
     console.log(`CALL-E dashboard server listening on http://localhost:${PORT} (local only)`);

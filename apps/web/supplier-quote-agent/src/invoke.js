@@ -1,5 +1,21 @@
 const store = require('./store');
 const { getProvider } = require('./providers');
+const { MASK_SIGNATURE } = require('./mask');
+
+// Every response masks phone numbers, and the dashboard pre-fills its plan editor from a
+// response — so a plan saved back verbatim would store "•••••NN" where the owner's words
+// were. Refused rather than stored, so the corruption is visible at the moment it happens.
+function assertPlanNotMasked(plan) {
+  const texts = [plan.goal, plan.fallback]
+    .concat(plan.script_points || [], plan.success_criteria || [])
+    .filter((t) => typeof t === 'string');
+  if (texts.some((t) => MASK_SIGNATURE.test(t))) {
+    throw new Error(
+      'Plan text contains a masked phone number ("•••••" followed by two digits) — it was ' +
+      'copied from a masked view. Rewrite that part of the plan in full before saving it.'
+    );
+  }
+}
 
 class ActivityLog {
   constructor() {
@@ -66,6 +82,9 @@ async function invoke(tool, args, actor) {
         // eslint-disable-next-line no-unused-vars
         const { id: _id, approvedAt, approvedBy, rejectedAt, rejectedBy, rejectReason, ...updates } =
           { ...(args && args.updates) };
+        if (updates.plan && typeof updates.plan === 'object') {
+          assertPlanNotMasked(updates.plan);
+        }
         const task = store.getTask(args.id);
         // Changing what an approval actually covers — the plan or who gets called —
         // invalidates that approval rather than silently carrying it over; place_call
@@ -95,10 +114,9 @@ async function invoke(tool, args, actor) {
         break;
       case 'plan_call': {
         const { id, goal, script_points, success_criteria, fallback } = args;
-        result = store.updateTask(id, {
-          plan: { goal, script_points, success_criteria, fallback },
-          status: 'planned'
-        });
+        const plan = { goal, script_points, success_criteria, fallback };
+        assertPlanNotMasked(plan);
+        result = store.updateTask(id, { plan, status: 'planned' });
         break;
       }
       case 'place_call':
@@ -162,7 +180,7 @@ async function placeCall({ id, scenario, providerOptions } = {}) {
     );
   }
 
-  // Which provider dials is an operator decision (CALL_PROVIDER at process start), never
+  // Which provider dials is an operator decision (CALL_PROVIDER in the server environment), never
   // a per-call one — no field in args can select or reconfigure it. providerOptions is a
   // same-process test hook (e.g. a `wait` that never resolves on its own, so a concurrent
   // cancel_call has something real to interrupt) and is honoured only for the fake
@@ -240,6 +258,8 @@ function cancelCall({ id } = {}) {
 // never set status to "approved" — a fresh owner approval is required before
 // place_call will dial it again.
 function retryWithPlan({ id, goal, script_points, success_criteria, fallback } = {}) {
+  const plan = { goal, script_points, success_criteria, fallback };
+  assertPlanNotMasked(plan);
   const task = store.getTask(id);
   // cancel_requested is retryable too — against the real provider a cancelled wait
   // leaves the provider-side outcome unknown, with no automatic reconciliation, so
@@ -261,10 +281,7 @@ function retryWithPlan({ id, goal, script_points, success_criteria, fallback } =
   delete task.rejectedBy;
   delete task.rejectReason;
 
-  return store.updateTask(id, {
-    plan: { goal, script_points, success_criteria, fallback },
-    status: 'planned'
-  });
+  return store.updateTask(id, { plan, status: 'planned' });
 }
 
 // Owner-only. Never a registered tool (see tools.js) — this is the only function in

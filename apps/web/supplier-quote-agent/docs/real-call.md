@@ -15,13 +15,18 @@ cp .env.example .env     # CALLE_API_KEY + DEMO_SUPPLIER_PHONE filled in; .env i
 npm run start:real       # node --env-file=.env src/server.js
 ```
 
+**Re-running it today needs one more line in `.env`:** `CALLE_ALLOWED_DESTINATIONS`, set to
+the same number as `DEMO_SUPPLIER_PHONE`. That allowlist was added after this run, in
+response to the maintainer's second review on the upstream PR — the real provider now
+dials nothing that isn't on it.
+
 Then, from the dashboard at `http://localhost:3000`: **Plan Call** → **Approve** →
 **Place Call**.
 
 `CALL_PROVIDER=calle`, so `place_call` reached `CallEProvider` and
 `https://api.heycall-e.com/v1/calls` — the fake provider was not involved at any point.
 The supplier number is the owner's own phone, supplied via `DEMO_SUPPLIER_PHONE` and
-masked below; it is never committed, and `task_1`'s seeded default stays in the
+masked below; it lives only in the untracked `.env`, and `task_1`'s seeded default stays in the
 fictional `+1-555-01xx` block.
 
 ## Authentication, checked before dialing
@@ -50,7 +55,7 @@ observable in the audit trail rather than only in the tests.
 
 ## The call
 
-- **Dialled:** the owner's own phone (`+•••••50`), answered and played the supplier
+- **Dialled:** the owner's own phone (`+•••••50`, exactly as the API masks it), answered and played the supplier
 - **Approved:** `2026-09-12T21:33:16.765Z`
 - **Call finished:** `2026-09-12T21:36:10.707Z` — roughly **2m50s** end to end
 - **Line region:** International. CALL-E routes `+91` (India) over its international

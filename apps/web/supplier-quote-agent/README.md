@@ -30,14 +30,14 @@ dialing and the note-taking; the human does the deciding.**
 | | |
 |---|---|
 | **Default mode** | `FakeCallProvider`. No network, no timers, no credentials, no calls. |
-| **How a real call becomes possible** | Only with `CALL_PROVIDER=calle` **and** `CALLE_API_KEY` set in the environment. Both. Missing either one, the provider refuses to dial. |
+| **How a real call becomes possible** | Only with `CALL_PROVIDER=calle`, `CALLE_API_KEY` set, **and** the supplier's number listed in `CALLE_ALLOWED_DESTINATIONS`. All three. Missing any one, the provider refuses to dial — before the task is marked dialing and before any request is made. |
 | **What the agent can do** | Plan a call, dial an already-approved task, cancel a call in flight, re-plan a finished one, read state. |
 | **What the agent can never do** | Approve or reject a task, or mint one already approved — not through a tool, not through `create_task`/`update_task`, not by calling `invoke()` directly. Changing the plan or the supplier on an approved task returns it to `planned`; the old approval never carries over to new content. |
 | **Cancellation** | `cancel_call` aborts a call that is currently ringing or connected. Against the real provider this can only stop local waiting, not the phone call — see [Cancelling and rolling back](#cancelling-and-rolling-back). |
 | **Recurring jobs** | None. There is no scheduler, no cron, no retry daemon. Every call is placed by an explicit `place_call` against a task a human approved. |
-| **Phone numbers** | Every number in this repository is in the NANP block reserved for fiction (`+1-555-0100` … `+1-555-0199`). No real contact information. Every user-facing API response masks phone numbers, including a known number if it reappears in unrelated free text such as a call summary (`src/mask.js`); the real provider validates a destination is a clean, ASCII E.164 number before dialing (`src/providers/calle-provider.js`). |
+| **Phone numbers** | Every sample number in this repository is in a range reserved for fiction — NANP `555-0100` … `555-0199` in geographic area codes, or Ofcom's drama ranges. `tests/fictional-numbers.test.js` enforces that for every internationally written number (`+`, `00` or `011` prefix, any separators, fullwidth/Arabic-Indic/Devanagari digits). No real contact information. Every API response, error responses included, masks phone numbers (`src/mask.js`): phone-named fields of any shape; every number those fields carry wherever it reappears (grouped, bracketed, dotted, with `(0)`, national trunk form, `00` prefix, invisible separators); and, in free text such as summaries and errors, every run of 7 or more digits whatever the words around it. The exceptions are dates, clock times, decimals, amounts after a currency sign, `/` quantity lists and identifier tokens. A long reference or quantity written as a bare digit run is masked along with phone numbers, by design. The real provider dials only a complete E.164 number (NANP: a full 10-digit number, no N11 service codes) that is not reserved for fiction and is listed in `CALLE_ALLOWED_DESTINATIONS` (`src/providers/calle-provider.js`). |
 | **Network exposure** | The server binds to `127.0.0.1` only and refuses any request whose remote address isn't loopback (`src/local-only.js`). `actor` still isn't verified — this is a local demo app — but `POST /api/invoke` refuses a request that omits it (`src/server.js`) rather than silently treating a missing actor as `"owner"`, so nothing gets the most privileged identity for free. |
-| **Secrets** | None committed. Credentials are read from environment variables at construction time, never from a request, and never written to disk or logs. `CALLE_BASE_URL` must be `https://`; the provider refuses to construct otherwise. |
+| **Secrets** | None committed. Credentials are read from environment variables at construction time, never from a request, and never written to disk or logs — a key with whitespace or control characters in it is refused rather than sent, and a failed request is reported by its error code only, since fetch's own messages can quote headers. `CALLE_API_KEY` is only ever sent to the parsed origin `https://api.heycall-e.com`: `CALLE_BASE_URL` may name nothing else (no other host, port, path, or userinfo), every request sets `redirect: 'error'`, and a response that was redirected or came from another origin is refused. |
 
 ## Stack
 
@@ -85,17 +85,23 @@ npm test
 > call-e-supplier-quote-agent@0.1.0 test
 > jest --passWithNoTests
 
-PASS tests/store.test.js
-PASS tests/call-flow.test.js
-PASS tests/demo-script.test.js
-PASS tests/invoke.test.js
+PASS tests/fictional-numbers.test.js
+PASS tests/server-http.test.js
 PASS tests/providers.test.js
+PASS tests/mask.test.js
 PASS tests/approval-gate.test.js
+PASS tests/store.test.js
+PASS tests/invoke.test.js
+PASS tests/local-only.test.js
+PASS tests/invoke-provider-security.test.js
+PASS tests/demo-script.test.js
+PASS tests/call-flow.test.js
+PASS tests/server-boot.test.js
+PASS tests/non-phone-digit-runs.test.js
 
-Test Suites: 6 passed, 6 total
-Tests:       57 passed, 57 total
+Test Suites: 13 passed, 13 total
+Tests:       269 passed, 269 total
 Snapshots:   0 total
-Time:        0.459 s
 Ran all test suites.
 ```
 
@@ -104,12 +110,20 @@ Ran all test suites.
 | `tests/approval-gate.test.js` | The thesis. Pins the tool registry to an exact allow-list; asserts no registered tool matches approve/reject under any spelling; asserts every tool description states the rule; asserts `approve_task`/`reject_task` refuse a non-owner even when called directly on `invoke()`; asserts `update_task` cannot sneak a task to `approved`. |
 | `tests/demo-script.test.js` | Runs `SPEC.md`'s demo script end to end — three suppliers, one rejected outright, one cancelled mid-dial and retried. |
 | `tests/call-flow.test.js` | `plan_call → approve_task → place_call → outcome`, and the three ways `place_call` refuses an unapproved task. |
-| `tests/providers.test.js` | `FakeCallProvider`'s status sequence and its handling of an abort that interrupts a wait which never resolves on its own; `CallEProvider`'s request shape and response parsing, against fixtures only. |
-| `tests/invoke.test.js` | The `invoke()` chokepoint itself. |
+| `tests/providers.test.js` | `FakeCallProvider`'s status sequence and its handling of an abort that interrupts a wait which never resolves on its own; `CallEProvider`'s request shape and response parsing against fixtures; the pinned API origin (every look-alike, userinfo, port, path and plain-`http` base URL refused), `redirect: 'error'` on every request, redirected and cross-origin responses refused; and destination authorization — every bundled sample refused, an empty or non-matching `CALLE_ALLOWED_DESTINATIONS` refused, all before the task is marked dialing. |
+| `tests/mask.test.js` | Masking: known numbers in every spelling (grouped, national, `(0)`, `00`, invisible separators, unicode dashes, fullwidth/Devanagari digits); every leak spelling the reviews found (reference words, extensions, labels, mixed separators); the dates, times, prices, ids and quantity lists that must come through untouched; the deliberate over-masks; plan/SKU round-trips; linear time on hostile input and scale with many known numbers. |
+| `tests/server-http.test.js` | The real Express app over a loopback socket: the actor check, and that no error response or activity-log entry carries the digits of a phone number. |
+| `tests/fictional-numbers.test.js` | Every internationally written number (`+`, `00` or `011` prefix) in the app's own files is in a range reserved for fiction (`src/fictional-numbers.js`). |
+| `tests/non-phone-digit-runs.test.js` | Every digit run in the app's own files that the masker would treat as a phone number, national spellings included, reads as a fictional number or is listed in `tests/fixtures/non-phone-digit-runs.json` with the reason it isn't a phone number. |
+| `tests/server-boot.test.js` | With `CALL_PROVIDER=calle`, a bad `CALLE_BASE_URL`, a sample number in the allowlist, or a malformed key stops the server at startup, naming the variable but never its value. |
+| `tests/invoke.test.js` | The `invoke()` chokepoint itself, including refusing plan text copied back from a masked view. |
 | `tests/store.test.js` | Seeded state and quote upsert by supplier+SKU. |
 
-No test opens a socket, sets a real API key, or constructs `CallEProvider` with the real
-`fetch`.
+No test contacts CALL-E or holds a real API key. Every socket a test opens is
+loopback-only: the Express app in `server-http.test.js`; two local servers in
+`providers.test.js`, one answering `302` towards the other, to prove Node's real `fetch`
+refuses the redirect without contacting its target; and the child processes in
+`server-boot.test.js`, which exit before they listen.
 
 ## Lint
 
@@ -122,8 +136,8 @@ npm run lint
 > eslint src/ tests/ --ext .js,.jsx --fix
 
 /…/src/dashboard.jsx
-  223:7  warning  Unexpected console statement  no-console
-  240:7  warning  Unexpected console statement  no-console
+  227:7  warning  Unexpected console statement  no-console
+  245:7  warning  Unexpected console statement  no-console
 
 ✖ 2 problems (0 errors, 2 warnings)
 ```
@@ -295,22 +309,23 @@ dial with, never something a response body needs to echo back in full.
 
 ## Credentials and real calls
 
-Four environment variables, none of which has a value in this repository:
+Five environment variables, none of which has a value in this repository:
 
 | Variable | Meaning |
 |---|---|
 | `CALL_PROVIDER` | `fake` (default) or `calle`. Only `calle` touches the network. |
 | `CALLE_API_KEY` | Required by the real provider. Without it, `place_call` refuses to dial. Get one from https://dashboard.heycall-e.com/ — no CLI or local install needed. |
-| `CALLE_BASE_URL` | Optional override; defaults to `https://api.heycall-e.com` (CALL-E's documented REST API). |
+| `CALLE_BASE_URL` | Optional; defaults to `https://api.heycall-e.com` (CALL-E's documented REST API), which is also the only origin it may name — anything else stops the server at startup (and is refused again on every call), so the API key cannot be pointed elsewhere. |
 | `DEMO_SUPPLIER_PHONE` | Optional. Dials `task_1`'s first supplier at a number you own instead of its fictional seed. |
+| `CALLE_ALLOWED_DESTINATIONS` | Comma-separated E.164 numbers the real provider may dial. Unset or empty means none — every live call is refused. A malformed entry, or one reserved for fiction, stops the server at startup. |
 
-`CALL_PROVIDER`, `CALLE_API_KEY` and `CALLE_BASE_URL` are read as constructor defaults in
+`CALL_PROVIDER`, `CALLE_API_KEY`, `CALLE_BASE_URL` and `CALLE_ALLOWED_DESTINATIONS` are read as constructor defaults in
 `src/providers/calle-provider.js`, evaluated at construction rather than at import, so
-merely importing the module has no effect. **None of the three is ever settable from a
+merely importing the module has no effect. **None of them is ever settable from a
 request** — `place_call`'s `args` cannot choose the provider or reconfigure its
-credentials or base URL, only the process environment can, so nothing an agent or an
-HTTP caller sends can redirect the real API key anywhere but the pinned `https://`
-origin. `CallEProvider` calls `POST /v1/calls` and polls `GET /v1/calls/:id` until the
+credentials, base URL, or allowlist, only the process environment can, so nothing an
+agent or an HTTP caller sends can redirect the real API key anywhere but the pinned
+origin, or authorize a number the operator did not list. `CallEProvider` calls `POST /v1/calls` and polls `GET /v1/calls/:id` until the
 call reaches one of `completed`/`failed`/`canceled` — a real call is not synchronous.
 
 **Running a real call places a real phone call and is billed to the CALL-E account behind
@@ -320,10 +335,11 @@ provider is the fake one, and the real key lives only in an untracked `.env`.
 `task_1`'s seeded suppliers use fictional `+1-555-01xx` numbers (required — see
 "Additional Requirements" in `SPEC.md`), so **there is no real number for a real call to
 reach** until you supply one. `DEMO_SUPPLIER_PHONE` does that without the number ever
-touching a tracked file:
+touching a tracked file, and listing the same number in `CALLE_ALLOWED_DESTINATIONS`
+authorizes it:
 
 ```bash
-cp .env.example .env     # then fill in CALLE_API_KEY and DEMO_SUPPLIER_PHONE
+cp .env.example .env     # then fill in CALLE_API_KEY, DEMO_SUPPLIER_PHONE, CALLE_ALLOWED_DESTINATIONS
 npm run start:real       # node --env-file=.env; .env is gitignored
 ```
 
@@ -332,7 +348,8 @@ Place Call). Repeat runs need no re-typing — the key stays in `.env`. Or run t
 path headless:
 
 ```bash
-CALL_PROVIDER=calle CALLE_API_KEY=<your-key> node -e "
+CALL_PROVIDER=calle CALLE_API_KEY=<your-key> DEMO_SUPPLIER_PHONE=<your-number> \
+  CALLE_ALLOWED_DESTINATIONS=<your-number> node -e "
 const { invoke } = require('./src/invoke');
 (async () => {
   await invoke('plan_call', { id: 'task_1', goal: 'Get a quote for WIDGET-42' }, 'owner');

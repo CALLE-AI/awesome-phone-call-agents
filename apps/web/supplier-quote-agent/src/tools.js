@@ -10,7 +10,7 @@ const tools = [
   {
     name: 'plan_call',
     description:
-      'Store a call plan brief (goal, script points, success criteria, fallback) on a task, visible on the task card before any dial happens. Does NOT: approve the task, place the call, or set anything other than the plan and a "planned" status. ' +
+      'Store a call plan brief (goal, script points, success criteria, fallback) on a task, visible on the task card before any dial happens. Does NOT: approve the task, place the call, or set anything other than the plan and a "planned" status. Refuses plan text that contains a masked phone number (five \u2022 bullets and two digits, as responses display numbers) — that text was copied from a masked view; write the number in full or leave it out. ' +
       OWNER_ONLY_CLAUSE,
     inputSchema: {
       type: 'object',
@@ -46,7 +46,7 @@ const tools = [
   {
     name: 'place_call',
     description:
-      'Hand a task whose status is already "approved" to the call provider — which provider dials is an operator setting (CALL_PROVIDER at process start: a deterministic fake by default, the real CALL-E integration only when explicitly configured), never a per-call choice — and dial the supplier, recording the outcome as {outcome, summary, next_action} on the task. Does NOT: approve a task itself, retry automatically on failure, choose or reconfigure the provider, or act on a task that is not yet approved — it refuses those and says to ask the owner instead of dialing. ' +
+      'Hand a task whose status is already "approved" to the call provider — which provider dials is an operator setting (CALL_PROVIDER in the server environment: a deterministic fake by default, the real CALL-E integration only when explicitly configured), never a per-call choice — and dial the supplier, recording the outcome as {outcome, summary, next_action} on the task. Does NOT: approve a task itself, retry automatically on failure, choose or reconfigure the provider, or act on a task that is not yet approved — it refuses those and says to ask the owner instead of dialing. With the real integration it also refuses, before any request and without marking the task dialing, a supplier number that is incomplete, in a range reserved for fiction (every sample number in this app is), or not on the operator-configured CALLE_ALLOWED_DESTINATIONS list; no argument of this tool can change that list, so do not retry — tell the owner. ' +
       OWNER_ONLY_CLAUSE,
     inputSchema: {
       type: 'object',
@@ -88,7 +88,7 @@ const tools = [
   {
     name: 'retry_with_plan',
     description:
-      'Replace the plan on a task that already completed, failed, was cancelled, or was rejected, and reset its status back to "planned" for a fresh attempt. Does NOT: approve the task — a "planned" task still requires the owner to approve it again before place_call will dial it, and retry_with_plan can never move a task to "approved" on its own. ' +
+      'Replace the plan on a task that already completed, failed, was cancelled, or was rejected, and reset its status back to "planned" for a fresh attempt. Does NOT: approve the task — a "planned" task still requires the owner to approve it again before place_call will dial it, and retry_with_plan can never move a task to "approved" on its own. Refuses plan text that contains a masked phone number (five \u2022 bullets and two digits, as responses display numbers) — that text was copied from a masked view; write the number in full or leave it out. ' +
       OWNER_ONLY_CLAUSE,
     inputSchema: {
       type: 'object',

@@ -93,6 +93,62 @@ describe('POST /api/invoke over a real socket', () => {
   });
 });
 
+// A number leaks if its digits survive in any spelling, so the check is a digit run that
+// tolerates separators — never one exact string.
+function digitRunPattern(digits) {
+  return new RegExp(digits.split('').join('[^0-9]{0,4}'));
+}
+
+describe('phone numbers never cross the socket in error copies (#524 item 2)', () => {
+  test('an error echoing a caller-supplied number is masked in the response and the activity log', async () => {
+    const result = await postInvoke({ tool: 'get_task', args: { id: '+44 20 7946 0958' }, actor: 'owner' });
+    expect(result.body.success).toBe(false);
+    expect(result.body.error).toMatch(/not found/);
+    expect(JSON.stringify(result.body)).not.toMatch(digitRunPattern('2079460958'));
+
+    const log = await getJson('/api/activity-log');
+    expect(JSON.stringify(log.body)).not.toMatch(digitRunPattern('2079460958'));
+  });
+
+  // With the real provider selected and a key present, a sample destination is refused
+  // before any request — global fetch is stubbed to prove it is never reached.
+  test('the real provider refuses a sample destination, and the response carries no digits of it', async () => {
+    const saved = { provider: process.env.CALL_PROVIDER, key: process.env.CALLE_API_KEY };
+    const realFetch = global.fetch;
+    global.fetch = jest.fn(() => Promise.reject(new Error('network must never be reached')));
+    process.env.CALL_PROVIDER = 'calle';
+    process.env.CALLE_API_KEY = 'test-key-not-real';
+    try {
+      const created = await postInvoke({
+        tool: 'create_task',
+        args: { name: 'Sample number', sku: 'HTTP-4', quantity: 1, suppliers: [{ name: 'Acme', phone: '+1 (202) 555-0147' }] },
+        actor: 'owner'
+      });
+      const id = created.body.result.id;
+      await postInvoke({ tool: 'plan_call', args: { id, goal: 'Get a quote' }, actor: 'agent' });
+      await postInvoke({ tool: 'approve_task', args: { id }, actor: 'owner' });
+
+      const placed = await postInvoke({ tool: 'place_call', args: { id }, actor: 'agent' });
+
+      expect(placed.body.success).toBe(false);
+      expect(placed.body.error).toMatch(/reserved for fiction/);
+      expect(JSON.stringify(placed.body)).not.toMatch(digitRunPattern('2025550147'));
+      expect(global.fetch).not.toHaveBeenCalled();
+      const state = await getJson('/api/state');
+      expect(state.body.tasks.find((t) => t.id === id).status).toBe('failed');
+    } finally {
+      global.fetch = realFetch;
+      for (const [name, value] of [['CALL_PROVIDER', saved.provider], ['CALLE_API_KEY', saved.key]]) {
+        if (value === undefined) {
+          delete process.env[name];
+        } else {
+          process.env[name] = value;
+        }
+      }
+    }
+  });
+});
+
 describe('GET routes over a real socket', () => {
   test('/api/state masks phone numbers in the seeded task', async () => {
     const result = await getJson('/api/state');
@@ -100,5 +156,15 @@ describe('GET routes over a real socket', () => {
     const task1 = result.body.tasks.find((t) => t.id === 'task_1');
     expect(task1.suppliers[0].phone).not.toContain('555');
     expect(task1.suppliers[0].phone).toMatch(/^\+•+\d{2}$/);
+  });
+});
+
+describe('a nationally written number echoed back as an id (#524 item 2, second pass)', () => {
+  test('get_task with a phone number as its id: masked in the error and in the activity log', async () => {
+    const result = await postInvoke({ tool: 'get_task', args: { id: '0161 496 0123' }, actor: 'owner' });
+    expect(result.body.error).toBe('Task •••••23 not found');
+    expect(JSON.stringify(result.body)).not.toMatch(digitRunPattern('01614960123'));
+    const log = await getJson('/api/activity-log');
+    expect(JSON.stringify(log.body)).not.toMatch(digitRunPattern('01614960123'));
   });
 });

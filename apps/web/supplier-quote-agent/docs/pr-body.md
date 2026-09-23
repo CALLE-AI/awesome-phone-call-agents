@@ -55,7 +55,8 @@ goes into their repository.
 ```bash
 git config core.hooksPath .githooks          # enables their pre-push branch-name hook
 python3 scripts/create_branch.py feat/supplier-quote-agent
-# copy entries/call-e/ -> apps/web/supplier-quote-agent/  (exclude node_modules/)
+# tracked files only — never node_modules/ or an untracked .env:
+git -C <hackathons-2026> archive <sha> entries/call-e | tar -x --strip-components=2 -C apps/web/supplier-quote-agent/
 python3 scripts/validate_repository.py
 ```
 
@@ -99,13 +100,122 @@ Calls go through a `CallProvider` adapter. The default `FakeCallProvider` is
 deterministic — no network, no real timers, canned outcomes from JSON — so the entire test
 suite and the whole demo run with no credentials and place no calls. `CallEProvider` is
 the real integration and takes its `fetch` by injection, which is how its request shape
-and response parsing are unit-tested against fixtures without opening a socket. It refuses
-to dial when `CALLE_API_KEY` is unset.
+and response parsing are unit-tested against fixtures without opening a socket. It sends
+`CALLE_API_KEY` only to the pinned origin `https://api.heycall-e.com`, never follows a
+redirect, and dials only a complete, non-fictional number the operator listed in
+`CALLE_ALLOWED_DESTINATIONS` — with none listed, it dials nothing.
 
-Node 20+, Express, React, Jest, ESLint. 103 tests across 10 suites; `npm test` and
-`npm run lint` both green.
+Node 20+, Express, React, Jest, ESLint. 269 tests across 13 suites; `npm test` and
+`npm run lint:check` both green (0 errors).
 
-## Changes since the last review
+## Changes since the second review
+
+[@Ray-56's second review](https://github.com/CALLE-AI/awesome-phone-call-agents/pull/524)
+left three must-fix items. Each is closed, with tests that fail against the previous code:
+
+1. **Pin the parsed approved HTTPS credential origin and reject redirects.**
+   `CALLE_BASE_URL` is now parsed with `new URL()` and must resolve to exactly
+   `https://api.heycall-e.com` — the parsed origin, compared against a one-entry
+   allowlist, not a string prefix — with no userinfo, port, path, query or fragment. A
+   look-alike host (`api.heycall-e.com.evil.example`), another port, or `http://` is
+   refused at construction, and the refusal never repeats the configured value. Request
+   URLs are built with `new URL(path, pinnedOrigin)`; a call id returned by the API must be
+   a plain token and is `encodeURIComponent`-ed, so it can never become a dot-segment or
+   another host. Every request sets `redirect: 'error'`, so a 3xx is never followed and
+   the `Authorization` header is never replayed; independently, a response that reports
+   `redirected` or whose `url` is on another origin is refused before its body is read.
+   Tests: `tests/providers.test.js` → *"CallEProvider — the API key only ever reaches the
+   pinned origin"*, including one that hands the provider Node's real `fetch` against a
+   loopback server answering `302`, and asserts the redirect target is never contacted.
+2. **Sanitize grouped/other phone-bearing summary and error display copies.**
+   `src/mask.js` now masks:
+   - (a) any phone-named field (`phone`, `mobile`, `tel`, `fax`, `whatsapp`,
+     `contact_number`), at any depth and of any shape;
+   - (b) every number those fields carry, wherever it reappears: grouped, bracketed,
+     dotted, with `(0)`, in national trunk form, with a `00`/`011` prefix, as the NANP
+     local number, split by invisible characters (zero-width space, soft hyphen), or in
+     fullwidth, Arabic-Indic or Devanagari digits;
+   - (c) in free text (summaries, transcripts, notes, error messages, activity-log
+     arguments, ids), every run of 7 or more digits joined by short separators, whatever
+     the words around it. Two review rounds on our side showed that any rule reading
+     nearby words ("call", "order", "Accounts:", "x 12") can be steered into leaking a
+     number, so the rule reads shape only.
+
+   A run is left alone only when it has an exact shape of its own:
+   - a date or a date range, in either day/month order;
+   - a clock-time range (`0900-1700`), or a date followed by the hour of a clock time;
+   - a decimal with up to three places, or an IPv4 address;
+   - a `/` list of quantities (`100/500/1000`);
+   - an amount right after a currency sign or code (`$1234567`, `USD 1250`);
+   - a token that is part of an identifier: a UUID, `Q-20260913-0147`, `SKU-1234567`.
+
+   A phone word right before a run (`Tel`, `Mob`, `call`, …) can only switch those
+   identifier and amount exceptions off, never switch masking off. The trade-off is
+   deliberate and pinned by tests: a long reference or quantity written as a bare digit
+   run ("PO 1234567890", "MOQ 2500000", "tiers 250-500-1000") is masked too. To keep a
+   real call's figures readable, `RESULT_SCHEMA` now asks CALL-E for currency symbols and
+   thousands separators in the summary (`$12.50`, `2,500,000 units`).
+
+   Plan text and SKUs get only the unmistakable shapes (`+`, a bracketed area code, and,
+   for plans, a `00`/`011` prefix), because the dashboard builds new plans from them.
+   Because the dashboard also pre-fills its plan editor from a masked response,
+   `plan_call`/`retry_with_plan`/`update_task` refuse plan text carrying the mask mark
+   rather than storing it. The dashboard now shows that refusal, and any other, in a
+   banner instead of ignoring it. The provider's own refusal messages mask the number, and
+   the server's `500` path goes through the same masking.
+
+   Every pattern is linear on hostile input, including runs that never end. This is
+   tested per tier, as is masking 100 known numbers across 500 strings.
+
+   A third adversarial pass against this exact rule (after it first shipped) found and
+   closed three more shape-only bypasses: padding a number with 4+ separator chars split it
+   into two sub-7-digit fragments, neither long enough to mask on its own; the "amount after
+   a currency sign" exclusion had no length cap, so a full number glued to `$` or a currency
+   code was read as an unbounded price; and "any word ending in a hyphen" or "any letter
+   right after the run" read as an identifier, when only a capitalized prefix (`SKU-`, `Q-`)
+   or an actual extension marker should. One narrower, accepted limitation remains and is
+   documented in code next to `RUN`: a currency word glued to a run with zero space
+   (`Rs2025550147`) isn't caught, because the same lookbehind that keeps an id like
+   `task_1234567` intact also refuses to start a run right after any letter — closing it
+   would mean guessing "real identifier" from "currency word" by the word's own spelling,
+   the nearby-word heuristic this whole rule exists to avoid.
+
+   Tests: `tests/mask.test.js`, and `tests/server-http.test.js` → *"phone numbers never
+   cross the socket in error copies"*, which checks the raw response body and activity
+   log over a real socket.
+3. **Reject incomplete/synthetic sample destinations and require an explicit authorized
+   valid live destination.** Destination parsing now requires a complete number: for
+   `+1`, exactly a 3-digit area code and a 7-digit number, neither starting with 0/1, and
+   no N11 service code — so the bundled short form `+1-555-0100` (`+15550100`) is refused
+   as incomplete. A number in a range reserved for fiction (NANP `555-0100`–`0199` in any
+   geographic area code; Ofcom's drama ranges), however it is spelled (`(0)` or a trunk
+   `0` after `+44` included), is refused as synthetic. And nothing is dialled unless
+   it is listed in the new `CALLE_ALLOWED_DESTINATIONS` (comma-separated E.164, validated
+   at construction, and at server startup when `CALL_PROVIDER=calle` — a malformed or
+   fictional entry stops the server). Unset means no live
+   destination is authorized. All of this runs before the task is marked `dialing` and
+   before any request is made. The fictional ranges live in one table
+   (`src/fictional-numbers.js`) that is also what `tests/fictional-numbers.test.js` checks
+   every internationally written number in the app against; a second scan,
+   `tests/non-phone-digit-runs.test.js`, holds every phone-shaped digit run in the app
+   (national spellings included) to the same table or to a short, reasoned list of
+   non-phone fixtures. The provider test feeds the first scan through the default
+   policy and requires each number to be refused on its own merits, not just by an empty
+   allowlist, so "fictional in the repo" and "refused
+   live" cannot drift apart. Tests: `tests/providers.test.js` → *"only an explicitly
+   authorized, complete, real destination is dialled"*.
+
+Hardening found by our own adversarial review of this round: a `CALLE_API_KEY` holding a
+newline or space (as `node --env-file` can produce) is now refused rather than sent. Any
+fetch failure before a response is reported by its error code only, because undici's
+header-validation errors quote the header, key included. With `CALL_PROVIDER=calle`, the
+server now validates the provider at startup (`tests/server-boot.test.js`).
+
+Not in this round, and noted as follow-ups rather than blockers: showing the exact dial
+target on the approval card, and per-country number validation beyond NANP (outside
+`+1`, the operator allowlist is the completeness check).
+
+## Changes after the first review
 
 [@Ray-56's review](https://github.com/CALLE-AI/awesome-phone-call-agents/pull/524#issuecomment-5660969858)
 found four real gaps between what this app claimed and what its HTTP surface actually
@@ -178,18 +288,19 @@ enforced. All four are fixed, each with new tests pinning the fixed behavior dow
 |---|---|
 | English only | No CJK anywhere in the app: `grep -rlP '[\x{3400}-\x{9fff}]'` over every `.js/.jsx/.json/.md/.html` returns nothing. Their validator's `validate_english_only()` also covers `apps/` and passes. |
 | Naming conventions | `check_branch_name.py --branch feat/supplier-quote-agent` exits 0 (output above). |
-| No secrets | Only environment-variable *names* appear (`CALLE_API_KEY`, `CALLE_BASE_URL`, `CALL_PROVIDER`), never values. The single literal in the tests is `'test-key'`, an obvious fixture passed to an injected `fetch` that never leaves the process. No `.env`, `.pem` or credential file is tracked. |
-| Side effects described | `README.md` opens with a "Safety model" table, and has dedicated "Credentials and real calls" and "Cancelling and rolling back" sections. `docs/architecture.md` has "Where a real call could happen" — exactly one function, gated on two environment variables. |
-| Fictional phone numbers | Every number in the app is in the NANP block reserved for fiction, `+1-555-0100`…`+1-555-0199`. Full list: `555-0100`, `555-0101`, `555-0102`, `555-0103`, `555-0104`, `555-0123`. |
+| No secrets | Only environment-variable *names* appear (`CALLE_API_KEY`, `CALLE_BASE_URL`, `CALL_PROVIDER`, `CALLE_ALLOWED_DESTINATIONS`, `DEMO_SUPPLIER_PHONE`), never values. The credential-shaped literals in the tests are `'test-key'`, passed to an injected `fetch` that never leaves the process, and `'test-key-not-real'`, set only while global `fetch` is stubbed to fail if reached. No `.env`, `.pem` or credential file is tracked. |
+| Side effects described | `README.md` opens with a "Safety model" table, and has dedicated "Credentials and real calls" and "Cancelling and rolling back" sections. `docs/architecture.md` has "Where a real call could happen" — exactly one function, gated on three environment variables, one of them the destination allowlist. |
+| Fictional phone numbers | Every sample number in the app is in a range reserved for fiction — NANP `555-0100`…`555-0199` in geographic area codes, or Ofcom's drama ranges. `tests/fictional-numbers.test.js` fails the suite on any internationally written number (`+`, `00` or `011` prefix) outside that table; `tests/non-phone-digit-runs.test.js` covers national spellings without a prefix the same way. The real provider refuses the same ranges as live destinations. |
 | Cancellation | There are no recurring or scheduled workflows — no cron, queue or retry daemon; a call happens only on an explicit `place_call` against a human-approved task. For a call already in flight, `cancel_call` aborts it (the fake provider races its pacing against the abort signal, so a call stuck ringing is genuinely interrupted), and `retry_with_plan` rolls a task back to `planned`. **Stated plainly, not overclaimed: against the real provider `cancel_call` cannot cancel the phone call** — the Calls API "does not expose an operation for clients to cancel a call after it has been created" — so the task is marked `cancel_requested`, never `cancelled`, and the outcome is left for the owner to reconcile rather than guessed at. Documented under "Cancelling and rolling back". |
-| No-call path by default | `FakeCallProvider` is the default; `CallEProvider` requires `CALL_PROVIDER=calle` **and** `CALLE_API_KEY`. `tests/call-flow.test.js` asserts `process.env.CALLE_API_KEY` is undefined and that `place_call` still succeeds. |
+| No-call path by default | `FakeCallProvider` is the default; `CallEProvider` requires `CALL_PROVIDER=calle`, `CALLE_API_KEY`, **and** the destination in `CALLE_ALLOWED_DESTINATIONS` (empty by default, so even a configured key dials nothing). `tests/call-flow.test.js` asserts `process.env.CALLE_API_KEY` is undefined and that `place_call` still succeeds. |
 | Validator passes | Run locally against a fresh clone of this repository with the app copied into `apps/web/supplier-quote-agent/`: `Repository validation passed.` (exit 0). The owner should re-run it in their own clone immediately before opening the PR. |
 
 ## Safety notes
 
-- **Real-world side effect:** with `CALL_PROVIDER=calle` and a valid `CALLE_API_KEY`,
-  `place_call` places a genuine outbound phone call, billed to the CALL-E account behind
-  the key. Without both, no call is possible and the provider refuses.
+- **Real-world side effect:** with `CALL_PROVIDER=calle`, a valid `CALLE_API_KEY`, and
+  the supplier's number listed in `CALLE_ALLOWED_DESTINATIONS`, `place_call` places a
+  genuine outbound phone call, billed to the CALL-E account behind the key. Without all
+  three, no call is possible and the provider refuses before any request is made.
 - **No autonomous dialing:** an approval is per-task and does not persist across a retry.
 - **State is in memory:** restarting the process is itself a complete rollback.
 - **No authentication, but local-only:** `actor` is a string in the request body, not
@@ -199,17 +310,19 @@ enforced. All four are fixed, each with new tests pinning the fixed behavior dow
   internet-facing would need the owner identity to come from a real session.
 - **Provider selection and credentials are environment-only:** no field in a request can
   choose the call provider or override its base URL/API key; the real provider is always
-  constructed from `CALL_PROVIDER`/`CALLE_API_KEY`/`CALLE_BASE_URL` alone, and refuses to
-  construct against anything but an `https://` origin.
+  constructed from the environment alone, and the key is only ever sent to the parsed,
+  pinned origin `https://api.heycall-e.com` — any other `CALLE_BASE_URL` is refused, and
+  redirects are never followed.
 
 ## Testing
 
 ```bash
 npm install
-npm test          # 103 passing, 10 suites
-npm run lint      # 0 errors
+npm test          # 269 passing, 13 suites
+npm run lint:check  # 0 errors
 bash verify.sh    # docs present, then test + lint
 ```
 
-No test opens a socket, sets a real API key, or constructs `CallEProvider` with the real
-`fetch`.
+No test contacts CALL-E or holds a real API key. Every socket is loopback: the Express
+app over HTTP, two local servers proving Node's real `fetch` refuses a `302` without
+contacting its target, and startup-check child processes that exit before listening.

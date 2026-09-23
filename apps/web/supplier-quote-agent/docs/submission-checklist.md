@@ -77,31 +77,41 @@ everything under `apps/` — see the validator run at the bottom of this file.
 
 ### [x] Use only fictional or masked phone numbers in samples and tests (no real contact information)
 
-Every phone number in the entry is inside `+1-555-0100`–`+1-555-0199`, the NANP block
-reserved for fictional use:
+Every sample phone number in the entry sits in a range regulators reserve for fiction —
+never allocated to a real line. Those ranges are one table, `src/fictional-numbers.js`:
+NANP `555-0100`–`555-0199` (in geographic area codes — not toll-free 8XX, where 555 is
+not reserved — plus the short `+1-555-01xx` form the seed data uses) and Ofcom's drama
+ranges (e.g. London `020 7946 0000`–`0999`, mobile `07700 900000`–`900999`, Tyneside
+`0191 498 0000`–`0999`).
+
+`tests/fictional-numbers.test.js` enforces it on every `npm test` (and so on every
+`verify.sh`). It reads every internationally written number of 7–15 digits from every
+text file in the app: `+`, `00` or `011` prefix, any common separators, with fullwidth,
+Arabic-Indic and Devanagari digits and unicode dashes folded first. It fails on any that
+isn't in that table, and reports the offender masked, so the failure message cannot
+itself republish a real number. A second test, `tests/non-phone-digit-runs.test.js`, covers national spellings without
+a prefix (`020 7946 0958`). It reads every digit run the masker would hide as a phone
+number and requires each to read as a fictional number, or to be listed with a reason in
+`tests/fixtures/non-phone-digit-runs.json`. There are seven such entries: sequential-digit
+PO/SKU fixtures, a quote reference, two quantities, the account part of the standard
+documentation IBAN, and a GitHub issue-comment id from a linked review URL. The guard's
+own "not reserved" test inputs are built at run time by
+moving one digit of a reserved number out of its block, so no number that could belong to
+a real line is ever written into the repository. The same table, and the first scan, feed
+the provider test that refuses every one of these numbers as a live destination, so
+"fictional in the repo" and "refused live" cannot drift apart.
+
+Every distinct number the scan finds, normalized (a trunk `0` kept where the source kept
+it):
 
 ```
-$ grep -rhoE '\+1-[0-9]{3}-[0-9]{4}' --include='*.js' --include='*.jsx' \
-    --include='*.json' --include='*.md' --include='*.html' . \
-    --exclude-dir=node_modules | sort -u
-+1-555-0100
-+1-555-0101
-+1-555-0102
-+1-555-0103
-+1-555-0104
-+1-555-0123
-+1-555-0199
++12025550147   +12025550199   +15550100      +15550101      +15550102
++15550103      +15550104      +15550123      +15550199      +19115550123
++4402079460958 +442079460958  +442079460959  +447700900123  +447700900456
++447700900789
 ```
 
-(`+1-555-0199` appears only as the upper bound of the reserved range, quoted in prose.)
-
-Two test fixtures previously used numbers ending `-0999` and `-0200`, which carry the 555
-prefix but sit *outside* the reserved block. Moved to `+1-555-0104`
-(`tests/store.test.js`) and `+1-555-0103` (`tests/invoke.test.js`); neither value is
-asserted on, and the suite now stands at 65 passing.
-
-`verify.sh` now enforces this rather than trusting it — it fails the build on any
-`+1-…` number outside `555-01xx`, which is how the two strays above were found.
+This replaced a `verify.sh` grep that only recognised the `+1-ddd-dddd` spelling.
 
 ### [x] Include setup and installation instructions
 
@@ -115,12 +125,14 @@ needed to run it.
 Three places, deliberately:
 
 - `../README.md` → **Safety model** table, at the top of the file before anything else.
-- `../README.md` → **Credentials and real calls** — the two environment variables that
-  together make a real call possible, and the explicit statement that running one places
-  a real phone call billed to the CALL-E account behind the key.
+- `../README.md` → **Credentials and real calls** — the three environment variables that
+  together make a real call possible (`CALL_PROVIDER`, `CALLE_API_KEY`, and the
+  `CALLE_ALLOWED_DESTINATIONS` allowlist), and the explicit statement that running one
+  places a real phone call billed to the CALL-E account behind the key.
 - [`architecture.md`](architecture.md) → **Where a real call could happen** — exactly one
-  function, `CallEProvider.placeCall()`, reachable only with `CALL_PROVIDER=calle` **and**
-  `CALLE_API_KEY` set.
+  function, `CallEProvider.placeCall()`, reachable only with `CALL_PROVIDER=calle`,
+  `CALLE_API_KEY` set, **and** the destination on the allowlist — and even then the key
+  goes only to the pinned origin `https://api.heycall-e.com`, never through a redirect.
 
 The no-call default is enforced, not just documented: `tests/call-flow.test.js` asserts
 `process.env.CALLE_API_KEY` is undefined and that `place_call` still succeeds on the fake
@@ -148,12 +160,13 @@ restarting the process is a complete rollback to seeded state.
 ### [x] No secrets, API keys, or personal data in the repository
 
 Only environment-variable **names** appear — `CALL_PROVIDER`, `CALLE_API_KEY`,
-`CALLE_BASE_URL` — never values. `src/providers/calle-provider.js` reads them as
+`CALLE_BASE_URL`, `CALLE_ALLOWED_DESTINATIONS`, `DEMO_SUPPLIER_PHONE` — never values. `src/providers/calle-provider.js` reads them as
 constructor defaults, evaluated at construction rather than at import.
 
-The sole credential-shaped literal in the entry is `'test-key'`
-(`tests/providers.test.js`), passed to an injected `fetchImpl` that never leaves the
-process.
+The credential-shaped literals in the entry are `'test-key'` (`tests/providers.test.js`),
+passed to an injected `fetchImpl` that never leaves the process, and
+`'test-key-not-real'` (`tests/server-http.test.js`), set only while global `fetch` is
+stubbed to fail the test if it is ever reached.
 
 No credential file is tracked:
 
@@ -174,7 +187,7 @@ entry copied into `apps/web/supplier-quote-agent/` (excluding `node_modules/`):
 $ python3 scripts/validate_repository.py        # baseline, untouched clone
 Repository validation passed.
 
-$ rsync -a --exclude node_modules entries/call-e/ apps/web/supplier-quote-agent/
+$ git archive HEAD entries/call-e | tar -x --strip-components=2 -C apps/web/supplier-quote-agent/
 $ python3 scripts/validate_repository.py        # with this app in place
 Repository validation passed.
 ```

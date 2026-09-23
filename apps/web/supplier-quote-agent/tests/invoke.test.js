@@ -169,3 +169,31 @@ describe('invoke choicepoint', () => {
     expect(getResult.result.status).toBe('in-progress');
   });
 });
+
+describe('plan text copied from a masked view is refused, never stored (#524 item 2)', () => {
+  const maskedGoal = 'Call Acme on +•••••58 and ask for a quote.';
+
+  async function plannedTask() {
+    const created = await invoke('create_task', { name: 'Masked plan', sku: 'MASK-1', quantity: 1 }, 'owner');
+    const id = created.result.id;
+    await invoke('plan_call', { id, goal: 'Original goal' }, 'agent');
+    return id;
+  }
+
+  test.each([
+    ['plan_call', (id) => ['plan_call', { id, goal: maskedGoal }]],
+    ['plan_call (script point)', (id) => ['plan_call', { id, goal: 'ok', script_points: ['Read back •••••58'] }]],
+    ['retry_with_plan', (id) => ['retry_with_plan', { id, goal: maskedGoal }]],
+    ['update_task', (id) => ['update_task', { id, updates: { plan: { goal: maskedGoal } } }]]
+  ])('%s', async (_label, build) => {
+    const id = await plannedTask();
+    const [tool, args] = build(id);
+
+    const result = await invoke(tool, args, 'owner');
+
+    expect(result.success).toBe(false);
+    expect(result.error).toMatch(/masked phone number/);
+    const task = (await invoke('get_task', { id }, 'owner')).result;
+    expect(task.plan.goal).toBe('Original goal');
+  });
+});

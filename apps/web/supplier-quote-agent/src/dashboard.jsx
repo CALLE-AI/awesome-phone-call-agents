@@ -203,6 +203,10 @@ export default function Dashboard() {
     deliveryDeadline: ''
   });
   const [loading, setLoading] = useState(false);
+  // The last refusal from /api/invoke, shown until dismissed or the next action —
+  // otherwise a refused click (an unapproved dial, a plan saved back with a masked
+  // number in it) would look like a button that did nothing.
+  const [lastError, setLastError] = useState(null);
 
   useEffect(() => {
     fetchState();
@@ -234,7 +238,8 @@ export default function Dashboard() {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ tool, args, actor: 'owner' })
       });
-      await res.json();
+      const body = await res.json();
+      setLastError(body && body.error ? { tool, message: body.error } : null);
       await fetchState();
     } catch (error) {
       console.error('Error invoking tool:', error);
@@ -257,6 +262,15 @@ export default function Dashboard() {
   return (
     <div style={{ fontFamily: 'sans-serif', padding: '20px', maxWidth: '1200px', margin: '0 auto' }}>
       <h1>CALL-E Supplier Quote Agent Dashboard</h1>
+      {lastError && (
+        <div
+          role="alert"
+          style={{ padding: '12px 16px', marginBottom: '20px', backgroundColor: '#fdecea', color: '#611a15', border: '1px solid #f5c6cb', borderRadius: '4px', display: 'flex', justifyContent: 'space-between', gap: '12px' }}
+        >
+          <span><strong>{lastError.tool} refused: </strong>{lastError.message}</span>
+          <button onClick={() => setLastError(null)} style={{ cursor: 'pointer' }}>Dismiss</button>
+        </div>
+      )}
 
       <section style={{ marginBottom: '40px', padding: '20px', backgroundColor: '#f5f5f5', borderRadius: '8px' }}>
         <h2>Create New Quote Request</h2>

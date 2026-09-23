@@ -114,6 +114,9 @@ entries/call-e/
 │   ├── invoke.js               # The single invoke(tool, args, actor) chokepoint
 │   ├── store.js                # In-memory tasks + quotes, seeded
 │   ├── tools.js                # Agent-facing tool registry (9 tools)
+│   ├── mask.js                 # Phone masking for every HTTP response
+│   ├── fictional-numbers.js    # Ranges reserved for fiction (samples; refused live)
+│   ├── local-only.js           # Loopback-only request guard
 │   ├── dashboard.jsx           # React frontend component (readable source)
 │   └── providers/
 │       ├── call-provider.js    # Base class + shared status sequence
@@ -126,11 +129,21 @@ entries/call-e/
 │   ├── approval-gate.test.js   # The thesis: no tool can approve
 │   ├── demo-script.test.js     # The Demo Script above, end to end
 │   ├── call-flow.test.js       # plan -> approve -> place -> outcome
-│   ├── providers.test.js       # Both providers; CallEProvider on fixtures only
+│   ├── providers.test.js       # Both providers; CallEProvider on fixtures + loopback only
 │   ├── invoke.test.js          # The chokepoint itself
 │   ├── store.test.js           # Seeded state, quote upsert
+│   ├── mask.test.js            # Masking: known numbers, free text, round-trips, cost
+│   ├── server-http.test.js     # The real Express app over a loopback socket
+│   ├── server-boot.test.js     # Real-provider misconfiguration stops startup
+│   ├── local-only.test.js      # Loopback-only guard
+│   ├── invoke-provider-security.test.js  # No request can reconfigure the real provider
+│   ├── fictional-numbers.test.js         # Every +/00/011 number is fictional
+│   ├── non-phone-digit-runs.test.js      # Every other phone-like run: fictional or listed
+│   ├── helpers/
+│   │   └── repo-numbers.js     # The +/00/011 scan both guards share
 │   └── fixtures/
-│       └── calle-responses.json
+│       ├── calle-responses.json
+│       └── non-phone-digit-runs.json
 └── fake-provider/
     └── canned-responses.json   # Fake CALL-E outcomes for the demo
 ```
