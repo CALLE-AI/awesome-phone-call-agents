@@ -1,0 +1,14 @@
+{
+  "status": "COMPLETED",
+  "result": {
+    "post_summary": "Customer confirmed the Tuesday appointment.",
+    "transcript": [
+      {"speaker": "agent", "text": "Hello, this is an automated assistant calling from Example Clinic about your Tuesday appointment at 10 a.m."},
+      {"speaker": "callee", "text": "Yes, that is still good for me."},
+      {"speaker": "agent", "text": "Great. The address is 44 Example Street. Anything else I can help with?"},
+      {"speaker": "callee", "text": "No, that is everything. Thank you."},
+      {"speaker": "agent", "text": "Thank you. Goodbye."}
+    ]
+  },
+  "callee_phone": "+14155550117"
+}
