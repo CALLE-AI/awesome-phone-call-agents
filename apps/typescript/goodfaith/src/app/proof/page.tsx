@@ -16,7 +16,7 @@ const LOAD_BEARING = [
   },
   {
     title: "2. Per-recipient structured extraction",
-    body: "GoodFaith requests structured fields (cash_price, price_basis, includes/excludes, quoted sentence). Because the current CALL-E API tier does not accept JSON result schemas (400 not supported), it does not send them; instead it derives each field deterministically from the call transcript and summary. Extraction is heuristic and advisory, so confirm the final price with the clinic, but a price is never ranked unless it traces to a real quoted sentence.",
+    body: "GoodFaith requests structured fields (cash_price, price_basis, includes/excludes, quoted sentence). Because the current CALL-E API tier does not accept JSON result schemas (400 not supported), it does not send them; instead it derives each field deterministically from the call transcript and summary. Extraction and evidence association are heuristic and advisory; confirm the full quote and final price with the clinic.",
     file: "lib/schemas.ts + lib/extract.ts",
   },
   {
@@ -26,7 +26,7 @@ const LOAD_BEARING = [
   },
   {
     title: "4. Evidence / transcript audit trail",
-    body: "Every ranked price is matched back to a transcript turn it appears in, using a heuristic substring match (advisory, not a proof the number is correct). A price with no traceable utterance is refused, not ranked.",
+    body: "Ranked prices include a timed transcript reference found by matching up to the first 24 characters of quoted text. Missing matches or timestamps are held out. Partial matches can associate the wrong sentence or an unsupported price; this is advisory evidence, not an exact-quote guarantee.",
     file: "components/AuditTrail.tsx + lib/normalize.ts · findEvidence",
   },
 ];
@@ -60,8 +60,8 @@ export default function ProofPage() {
           </p>
           <p className="mt-3 text-sm text-paper-400">
             Price extraction and comparability normalization are heuristic and advisory. Confirm the final
-            price with the clinic. The one guarantee we keep precisely: a price is never ranked unless it
-            traces back to a real quoted sentence in the transcript.
+            price with the clinic. A short substring match supplies a transcript reference for review,
+            but does not prove that the full quote or extracted price is supported.
           </p>
         </div>
 

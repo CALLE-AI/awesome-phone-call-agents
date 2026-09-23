@@ -73,6 +73,14 @@ describe("maskPhone — display masking", () => {
 });
 
 describe("scrubPhones — free-text scrubbing", () => {
+  it("masks formatted international numbers in provider diagnostics and quoted text", () => {
+    for (const phone of ["+1 (512) 555-0142", "+1 512 555 0142", "+1.512.555.0142"]) {
+      expect(scrubPhones(`Provider diagnostic: ${phone}; review required`)).toBe(
+        "Provider diagnostic: +1512•••0142; review required"
+      );
+    }
+  });
+
   it("replaces E.164-like substrings with their masked form", () => {
     const out = scrubPhones("call failed for +15125550142 after 3 tries");
     expect(out).toBe("call failed for +1512•••0142 after 3 tries");

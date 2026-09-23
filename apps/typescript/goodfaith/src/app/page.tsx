@@ -12,14 +12,14 @@ export default function Home() {
 
       <main id="main" className="mx-auto max-w-5xl px-6 pb-4 pt-14 md:pt-20">
         <div className="grid gap-12 lg:grid-cols-[1.05fr_0.95fr] lg:gap-14">
-          {/* Hero — lead with the trust guarantee (E-4). */}
+          {/* Hero — describe the advisory evidence workflow. */}
           <div className="animate-fade-in">
             <p className="mb-5 inline-flex items-center gap-2 rounded-full border border-ink-700 bg-ink-900/60 px-3 py-1 text-xs font-medium uppercase tracking-widest text-accent">
-              The trust guarantee
+              Advisory quote comparison
             </p>
             <h1 className="font-serif text-[2.5rem] leading-[1.08] tracking-tight md:text-6xl">
-              Every price we rank traces to the exact sentence a clinic said.
-              <span className="text-accent"> Or we refuse to rank it.</span>
+              Compare clinic prices with transcript references.
+              <span className="text-accent"> Review the evidence before relying on a quote.</span>
             </h1>
 
             <p className="mt-6 max-w-lg text-lg leading-relaxed text-paper-300">
@@ -51,8 +51,8 @@ export default function Home() {
             </p>
 
             <p className="mt-8 max-w-lg text-sm leading-relaxed text-paper-400">
-              No fabricated numbers. Expand any winner in the results to hear the exact sentence a clinic said and the
-              moment in the transcript it was said.
+              Expand a ranked result to inspect its heuristically associated transcript text and timestamp.
+              Short substring matches can be wrong; confirm the full quote and final price with the clinic.
             </p>
           </div>
 

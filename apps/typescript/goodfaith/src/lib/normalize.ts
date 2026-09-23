@@ -23,11 +23,13 @@ export function maskPhone(p: string | null | undefined): string {
   return `+${head}•••${tail}`;
 }
 
-// Replace any E.164-like substring in free text with its masked form, so provider
-// diagnostics or summaries never surface a full clinic phone number to the client.
+// Mask E.164 and common international display formats in provider-derived text.
+// This is a phone-format heuristic, not general transcript anonymization.
 export function scrubPhones(text: string | null | undefined): string {
   if (!text) return "";
-  return text.replace(/\+[1-9]\d{7,14}/g, (m) => maskPhone(m));
+  return text.replace(/\+[1-9](?:[ ().-]*[0-9]){7,14}/g, (m) =>
+    maskPhone("+" + m.replace(/[^0-9]/g, ""))
+  );
 }
 
 export type RowStatus = "ranked" | "non_comparable" | "needs_review" | "no_quote";
