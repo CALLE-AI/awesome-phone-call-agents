@@ -36,8 +36,8 @@ export class CircuitBreaker {
   snapshot() { return { state: this.state, failures: this.failures, openedAt: this.openedAt || null }; }
 }
 
-const PHONE_E164_RE = /\+[1-9]\d{7,14}/g;
-const PHONE_LIKE_RE = /(?:\d[ .-]?){10,15}/g;
+const PHONE_E164_RE = /\+[1-9](?:[ ().-]*[0-9]){7,14}/g;
+const PHONE_LIKE_RE = /[0-9](?:[ ().-]*[0-9]){9,14}/g;
 const SECRET_KEY = /token|secret|password|api.?key|authorization|cookie|session/i;
 const PHONE_KEY = /phone|phones|recipient|destination|callee|caller|from|to/i;
 

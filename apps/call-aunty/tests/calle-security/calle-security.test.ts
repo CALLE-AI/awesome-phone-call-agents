@@ -121,4 +121,15 @@ describe("CALL-E direct gateway hardening", () => {
     process.env.CALLE_BASE_URL = "http://provider.example.test";
     expect(() => assertProviderUrlPolicy("/v1/calls")).toThrow(/HTTPS/i);
   });
+
+  it("does not let an arbitrary HTTPS base URL approve itself", () => {
+    delete process.env.CALLE_APPROVED_PROVIDER_ORIGINS;
+    process.env.CALLE_BASE_URL = "https://provider.example.test";
+    expect(() => assertProviderUrlPolicy("/v1/calls")).toThrow(/approved provider origin/i);
+    process.env.CALLE_BASE_URL = "https://api.heycall-e.com";
+    expect(assertProviderUrlPolicy("/v1/calls")).toBe("https://api.heycall-e.com/v1/calls");
+    process.env.CALLE_APPROVED_PROVIDER_ORIGINS = "https://provider.example.test";
+    process.env.CALLE_BASE_URL = "https://provider.example.test";
+    expect(assertProviderUrlPolicy("/v1/calls")).toBe("https://provider.example.test/v1/calls");
+  });
 });

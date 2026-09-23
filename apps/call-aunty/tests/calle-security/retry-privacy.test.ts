@@ -37,6 +37,16 @@ function listen(app: express.Express) {
 }
 
 describe("CALL-E retry, idempotency, and privacy boundaries", () => {
+  it("masks common parenthesized phone formats in public narrative copies", () => {
+    const text = "Callback +1 (202) 555-0143 or (202) 555-0143 before retrying.";
+    const privateInput = { task: text, transcript: text, error: new Error(text) };
+    const output = JSON.stringify(redactObject(privateInput));
+    expect(output).not.toContain("555-0143");
+    expect(output).toContain("•");
+    expect(privateInput.task).toBe(text);
+    expect(privateInput.error.message).toBe(text);
+  });
+
   beforeEach(() => resetIdempotencyStore());
   afterEach(() => vi.restoreAllMocks());
 

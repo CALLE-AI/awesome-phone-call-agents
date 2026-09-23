@@ -48,14 +48,11 @@ function parseOrigins(raw: string | undefined): Set<string> {
 export function loadHardenedCalleConfig(): HardenedCalleConfig {
   const base = loadCalleConfig();
   const approvedOrigins = parseOrigins(process.env.CALLE_APPROVED_ORIGINS);
-  const providerOrigin = originOf(process.env.CALLE_BASE_URL ?? calleConfig.baseUrl);
-  const allowedProviderOrigins = parseOrigins(process.env.CALLE_APPROVED_PROVIDER_ORIGINS);
-
-  // A configured provider URL is the allowlist default; deployments may narrow it with
-  // CALLE_APPROVED_PROVIDER_ORIGINS when they need a separate explicit allowlist.
-  if (allowedProviderOrigins.size === 0 && providerOrigin) {
-    allowedProviderOrigins.add(providerOrigin);
-  }
+  // Trust the known CALL-E origin by default, independently of the requested base URL.
+  // An alternative provider requires an explicit operator-maintained allowlist.
+  const allowedProviderOrigins = parseOrigins(
+    process.env.CALLE_APPROVED_PROVIDER_ORIGINS ?? "https://api.heycall-e.com",
+  );
 
   return {
     ...base,
