@@ -64,9 +64,10 @@ export const reminders = sqliteTable("reminders", {
     .references(() => emails.id),
   remindAt: integer("remind_at", { mode: "timestamp" }).notNull(),
   fired: integer("fired", { mode: "boolean" }).notNull().default(false),
-  // True when this row was created while fake/dry-run mode was active.
-  // Cron must never place a real call for these, even if real calling is
-  // later enabled — simulated reminders stay simulated.
+  // False only when the row was created by a verified real (non-simulated)
+  // digest call. Cron must never place a real call for simulated rows.
+  // Migration 0005 defaulted existing rows to false; 0006 sets those back
+  // to simulated and unresolved.
   isSimulated: integer("is_simulated", { mode: "boolean" })
     .notNull()
     .default(false),

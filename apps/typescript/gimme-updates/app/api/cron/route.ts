@@ -1,12 +1,20 @@
 import { randomUUID } from "crypto";
 
 import { and, eq, isNotNull, lte } from "drizzle-orm";
-import { NextResponse } from "next/server";
+import { NextRequest, NextResponse } from "next/server";
 
 import { callLogs, db, emails, reminders, users } from "@/db";
 import { isCalleResultResolved, runReminderCall } from "@/lib/calle";
 import { runDigestForUser } from "@/lib/digest";
-import { maskPhoneNumber } from "@/lib/privacy";
+import {
+  evaluateRealCallGate,
+  isOperatorAuthorized,
+} from "@/lib/operatorAuth";
+import {
+  maskPhoneNumber,
+  redactContextText,
+  redactProviderError,
+} from "@/lib/privacy";
 
 /**
  * Returns the current time as "HH:mm", using the server's local timezone.
@@ -37,7 +45,22 @@ async function runDueDigestCalls(currentTime: string) {
 
   const summary = await Promise.all(
     dueUsers.map(async (user) => {
-      const result = await runDigestForUser(user);
+      const gate = evaluateRealCallGate(user.phoneNumber, true);
+      if (gate.action === "reject") {
+        console.log("[cron] skipping digest; recipient is not allowlisted", {
+          userId: user.id,
+          phoneNumber: maskPhoneNumber(user.phoneNumber),
+        });
+        return {
+          userId: user.id,
+          called: false,
+          reason: "recipient_not_allowed",
+        };
+      }
+
+      const result = await runDigestForUser(user, {
+        operatorAuthorized: gate.action === "allow",
+      });
 
       if ("skipped" in result) {
         return {
@@ -130,17 +153,36 @@ async function runDueReminderCalls() {
         };
       }
 
+      const gate = evaluateRealCallGate(user.phoneNumber, true);
+      if (gate.action === "reject") {
+        console.log("[cron] skipping reminder; recipient is not allowlisted", {
+          reminderId: reminder.id,
+          phoneNumber: maskPhoneNumber(user.phoneNumber),
+          subject: redactContextText(email.subject),
+        });
+        return {
+          reminderId: reminder.id,
+          called: false,
+          reason: "recipient_not_allowed",
+        };
+      }
+
       try {
         console.log("[cron] placing reminder call", {
           reminderId: reminder.id,
           phoneNumber: maskPhoneNumber(user.phoneNumber),
+          subject: redactContextText(email.subject),
         });
 
-        const call = await runReminderCall(user.phoneNumber, {
-          sender: email.sender,
-          subject: email.subject,
-          summary: email.summary ?? email.subject,
-        });
+        const call = await runReminderCall(
+          user.phoneNumber,
+          {
+            sender: email.sender,
+            subject: email.subject,
+            summary: email.summary ?? email.subject,
+          },
+          { operatorAuthorized: true }
+        );
 
         const unresolved = !isCalleResultResolved(call);
 
@@ -190,7 +232,17 @@ async function runDueReminderCalls() {
           callStatus: call.status,
         };
       } catch (error) {
-        console.error("[cron] runReminderCall failed:", error);
+        console.error(
+          "[cron] runReminderCall failed:",
+          redactProviderError(error, {
+            phones: [user.phoneNumber],
+            sensitivePhrases: [
+              email.subject,
+              email.summary ?? "",
+              email.decisionDetail ?? "",
+            ].filter((value) => value.length > 0),
+          })
+        );
 
         await db.insert(callLogs).values({
           id: randomUUID(),
@@ -226,7 +278,14 @@ async function runDueReminderCalls() {
  *    is still pending, each getting its own short reminder call —
  *    except simulated reminders, which are logged and skipped.
  */
-export async function GET() {
+export async function GET(request: NextRequest) {
+  if (!isOperatorAuthorized(request)) {
+    return NextResponse.json(
+      { error: "Operator authorization is required." },
+      { status: 401 }
+    );
+  }
+
   const currentTime = getCurrentHHmm();
 
   const [digest, reminderRun] = await Promise.all([

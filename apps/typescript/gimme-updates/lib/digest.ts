@@ -18,6 +18,7 @@ import {
   type DigestAction,
   type DigestCallResult,
 } from "@/lib/calle";
+import { redactContextText, redactProviderError } from "@/lib/privacy";
 
 const URGENCY_ORDER: Record<string, number> = { high: 0, medium: 1, low: 2 };
 
@@ -65,14 +66,14 @@ export function toPublicDigestResult(result: DigestRunResult): PublicDigestResul
       id: result.call.id,
       status: result.call.status,
       taskCompleted: result.call.taskCompleted,
-      dryRun: CALLE_DRY_RUN,
+      dryRun: result.call.simulated || CALLE_DRY_RUN,
     },
     emails: result.emails.map((email) => ({
       id: email.id,
       sender: email.sender,
-      subject: email.subject,
+      subject: redactContextText(email.subject) ?? "",
       decision: email.decision,
-      decisionDetail: email.decisionDetail,
+      decisionDetail: redactContextText(email.decisionDetail),
       status: email.status,
     })),
     unresolved: result.unresolved,
@@ -149,12 +150,14 @@ function computeRemindAt(
  * If the CALL-E result is failed or ambiguous, pending emails are marked
  * "unresolved" instead of left "pending", so the next cron tick will not
  * silently retry them. Reminders created while fake/dry-run mode is active
- * are stored with isSimulated=true.
+ * are stored with isSimulated=true. isSimulated is false only when this
+ * run actually placed a verified real CALL-E call.
  *
  * Shared by app/api/calle/digest/route.ts and app/api/cron/route.ts.
  */
 export async function runDigestForUser(
-  user: User
+  user: User,
+  options: { operatorAuthorized: boolean }
 ): Promise<DigestRunResult | DigestSkipped> {
   const pendingEmails = await db.query.emails.findMany({
     where: and(eq(emails.userId, user.id), eq(emails.status, "pending")),
@@ -192,19 +195,32 @@ export async function runDigestForUser(
 
   const pendingEmailIds = sortedPendingEmails.map((email) => email.id);
 
+  const sensitivePhrases = sortedPendingEmails.flatMap((email) =>
+    [email.subject, email.summary, email.decisionDetail].filter(
+      (value): value is string => typeof value === "string" && value.length > 0
+    )
+  );
+
   let call: DigestCallResult;
   try {
-    call = await runDigestCall(user.phoneNumber, digestEmails);
+    call = await runDigestCall(user.phoneNumber, digestEmails, {
+      operatorAuthorized: options.operatorAuthorized,
+    });
   } catch (error) {
-    console.error("[digest] runDigestCall failed:", error);
+    console.error(
+      "[digest] runDigestCall failed:",
+      redactProviderError(error, {
+        phones: [user.phoneNumber],
+        sensitivePhrases,
+      })
+    );
     call = {
       id: null,
       status: "failed",
       taskCompleted: false,
       structuredResult: null,
-      evidence: [
-        error instanceof Error ? error.message : "Unknown error placing call",
-      ],
+      evidence: ["Call could not be placed."],
+      simulated: true,
     };
   }
 
@@ -294,7 +310,7 @@ export async function runDigestForUser(
           emailId: decision.emailId,
           remindAt: computeRemindAt(decision.reminderDate, dueDate),
           fired: false,
-          isSimulated: CALLE_DRY_RUN,
+          isSimulated: call.simulated,
           status: "pending",
         });
       }

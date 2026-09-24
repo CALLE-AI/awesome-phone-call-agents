@@ -2,6 +2,7 @@ import { eq } from "drizzle-orm";
 import { NextRequest, NextResponse } from "next/server";
 
 import { db, users } from "@/db";
+import { isOperatorAuthorized } from "@/lib/operatorAuth";
 import { maskPhoneNumber } from "@/lib/privacy";
 
 // Accepts "HH:mm" (24-hour), e.g. "13:05" or "09:30".
@@ -12,8 +13,14 @@ export async function POST(
   { params }: { params: Promise<{ userId: string }> }
 ) {
   const { userId } = await params;
-
   const body = await request.json().catch(() => null);
+
+  if (!isOperatorAuthorized(request, body)) {
+    return NextResponse.json(
+      { error: "Operator authorization is required." },
+      { status: 401 }
+    );
+  }
   const callTime = typeof body?.callTime === "string" ? body.callTime.trim() : "";
 
   if (!TIME_PATTERN.test(callTime)) {

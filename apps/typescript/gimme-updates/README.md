@@ -30,7 +30,9 @@ Fill in `.env`:
 - `OPENROUTER_API_KEY` — used for email classification (category, urgency, summary, due date) via OpenRouter
 - `CALLE_API_KEY` — your CALL-E API key
 - `ALLOW_REAL_CALLS` — **defaults to `false`**. Required safety switch for any public deployment. See below.
-- `CALLE_DRY_RUN` — **defaults to `true`**. Even when set to `false`, real calls are still blocked unless `ALLOW_REAL_CALLS=true`.
+- `CALLE_DRY_RUN` — **defaults to `true`**. Even when set to `false`, real calls are still blocked unless `ALLOW_REAL_CALLS=true`, the request presents `OPERATOR_SECRET`, and the destination is in `ALLOWED_RECIPIENTS`.
+- `OPERATOR_SECRET` — shared secret for the digest real-call path, cron, reminder reads, email fetch, and schedule updates. Send `Authorization: Bearer <secret>` or a JSON `operatorSecret` field.
+- `ALLOWED_RECIPIENTS` — comma-separated ASCII E.164 numbers. A real call is placed only when the target is in this list.
 
 Then:
 ```bash
@@ -45,18 +47,26 @@ Visit `localhost:3000` to try the public signup flow, or `npm run db:seed` for a
 
 **Any publicly reachable deployment must keep `ALLOW_REAL_CALLS` unset or `false`.** This is the required safety posture for this demo: the signup and digest routes accept any E.164 number with no proof that the submitter owns it, so a public instance must not be able to place real CALL-E calls.
 
-When `ALLOW_REAL_CALLS` is not exactly the string `true`, the app **forces dry-run/fake CALL-E behavior** regardless of `CALLE_DRY_RUN`. Setting `CALLE_DRY_RUN=false` alone cannot enable real calling.
+When `ALLOW_REAL_CALLS` is not exactly the string `true`, the app **forces dry-run/fake CALL-E behavior** regardless of `CALLE_DRY_RUN`. Setting `CALLE_DRY_RUN=false` alone cannot enable real calling. The digest and cron routes also reject a real-call attempt that does not present `OPERATOR_SECRET` (`401`). A valid secret still cannot call a number that is not ASCII E.164 and listed in `ALLOWED_RECIPIENTS` (`403`, and cron skips that recipient). Missing either check never places a call.
 
-To place real calls, an operator must set both:
+To place real calls, an operator must set all of:
 
 ```bash
 ALLOW_REAL_CALLS=true
 CALLE_DRY_RUN=false
+OPERATOR_SECRET=choose-a-long-random-secret
+ALLOWED_RECIPIENTS=+14155550100
+```
+
+Send the secret on each real-call or private-record request:
+
+```bash
+curl -H "Authorization: Bearer $OPERATOR_SECRET" https://<host>/api/cron
 ```
 
 Do this only on a private/operator-controlled environment, and only for numbers you are authorized to call.
 
-Reminders created while fake/dry-run mode is active are stored with `isSimulated=true`. Cron will skip those rows and never promote them to a real call if you later flip the flags. Failed or ambiguous CALL-E results are marked `unresolved` (not left `pending`) so the next cron tick cannot silently redial.
+Reminders created while fake/dry-run mode is active are stored with `isSimulated=true`. Only a verified real digest call stores `isSimulated=false`. Cron will skip simulated rows and never promote them to a real call if you later flip the flags. Reminders that existed before that distinction (migration 0005 defaulted `is_simulated` to false) are reset to simulated and `unresolved` by migration 0006. Failed or ambiguous CALL-E results are marked `unresolved` (not left `pending`) so the next cron tick cannot silently redial.
 
 Phone numbers in logs and API responses are masked to the last 4 digits (for example `+91XXXXXX1234`). Full task text, CALL-E result payloads, and transcripts are not returned to the client.
 
@@ -68,7 +78,7 @@ We recommend testing with fake mode on first, then enabling real calls only for 
 
 ## Side effects
 
-- Real calls (only when `ALLOW_REAL_CALLS=true` **and** `CALLE_DRY_RUN=false`) place an actual outbound phone call to the phone number provided at signup.
+- Real calls (only when `ALLOW_REAL_CALLS=true`, `CALLE_DRY_RUN=false`, the request includes `OPERATOR_SECRET`, and the number is in `ALLOWED_RECIPIENTS`) place an actual outbound phone call to that allowlisted number.
 - A basic rate-limit guard restricts each user to one real digest call, to avoid unintentional credit usage from repeated testing or demo clicks. Dry-run calls are not limited.
 - Reminder calls (via the cron route) place a second real call when a scheduled **non-simulated** reminder comes due, if real calling is enabled. Simulated reminders are skipped.
 

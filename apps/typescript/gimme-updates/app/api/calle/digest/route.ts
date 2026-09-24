@@ -3,6 +3,10 @@ import { NextRequest, NextResponse } from "next/server";
 
 import { db, users } from "@/db";
 import { runDigestForUser, toPublicDigestResult } from "@/lib/digest";
+import {
+  evaluateRealCallGate,
+  isOperatorAuthorized,
+} from "@/lib/operatorAuth";
 
 export async function POST(request: NextRequest) {
   const body = await request.json().catch(() => null);
@@ -28,7 +32,15 @@ export async function POST(request: NextRequest) {
     );
   }
 
-  const result = await runDigestForUser(user);
+  const operatorAuthorized = isOperatorAuthorized(request, body);
+  const gate = evaluateRealCallGate(user.phoneNumber, operatorAuthorized);
+  if (gate.action === "reject") {
+    return NextResponse.json({ error: gate.error }, { status: gate.status });
+  }
+
+  const result = await runDigestForUser(user, {
+    operatorAuthorized: gate.action === "allow",
+  });
 
   if ("skipped" in result) {
     if (result.reason === "rate_limited") {

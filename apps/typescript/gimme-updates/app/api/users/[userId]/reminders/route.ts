@@ -2,6 +2,8 @@ import { and, eq } from "drizzle-orm";
 import { NextRequest, NextResponse } from "next/server";
 
 import { db, emails, reminders } from "@/db";
+import { isOperatorAuthorized } from "@/lib/operatorAuth";
+import { redactContextText } from "@/lib/privacy";
 
 /**
  * Returns this user's non-fired reminders, joined with their email's
@@ -14,6 +16,13 @@ export async function GET(
   { params }: { params: Promise<{ userId: string }> }
 ) {
   const { userId } = await params;
+
+  if (!isOperatorAuthorized(_request)) {
+    return NextResponse.json(
+      { error: "Operator authorization is required." },
+      { status: 401 }
+    );
+  }
 
   const rows = await db
     .select({
@@ -40,8 +49,8 @@ export async function GET(
     remindAt: row.remindAt.toISOString(),
     email: {
       id: row.emailId,
-      subject: row.subject,
-      summary: row.summary,
+      subject: redactContextText(row.subject) ?? "",
+      summary: redactContextText(row.summary),
       sender: row.sender,
     },
   }));

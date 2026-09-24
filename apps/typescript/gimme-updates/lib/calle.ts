@@ -2,7 +2,8 @@ import { randomUUID } from "crypto";
 
 import { CalleClient } from "@call-e/calle";
 
-import { maskPhoneNumber } from "@/lib/privacy";
+import { evaluateRealCallGate } from "@/lib/operatorAuth";
+import { maskPhoneNumber, redactProviderError } from "@/lib/privacy";
 
 // Lazily constructed, same pattern as lib/openrouter.ts's OpenAI client:
 // avoid throwing at module load time just because CALLE_API_KEY is missing.
@@ -82,6 +83,8 @@ export interface DigestCallResult {
   taskCompleted: boolean | null;
   structuredResult: DigestStructuredResult | null;
   evidence: string[];
+  /** False only after a verified real CALL-E call was actually placed. */
+  simulated: boolean;
 }
 
 function sortByUrgency<T extends { urgency: string }>(items: T[]): T[] {
@@ -186,12 +189,14 @@ function buildFakeDecisions(
  */
 export async function runDigestCall(
   phoneNumber: string,
-  emailsInput: DigestEmailInput[]
+  emailsInput: DigestEmailInput[],
+  options: { operatorAuthorized: boolean }
 ): Promise<DigestCallResult> {
   const sortedEmails = sortByUrgency(emailsInput);
   const task = buildTask(sortedEmails);
+  const gate = evaluateRealCallGate(phoneNumber, options.operatorAuthorized);
 
-  if (CALLE_DRY_RUN) {
+  if (gate.action !== "allow") {
     console.log("[calle] dry-run digest call — not placing a real call", {
       phoneNumber: maskPhoneNumber(phoneNumber),
       emailCount: sortedEmails.length,
@@ -204,7 +209,8 @@ export async function runDigestCall(
       status: "completed",
       taskCompleted: true,
       structuredResult: { decisions: buildFakeDecisions(sortedEmails) },
-      evidence: ["CALLE_DRY_RUN=true — no real call was placed."],
+      evidence: ["No real call was placed."],
+      simulated: true,
     };
   }
 
@@ -215,11 +221,26 @@ export async function runDigestCall(
     emailCount: sortedEmails.length,
   });
 
-  const call = await client.calls.createAndWait({
-    task,
-    resultSchema: RESULT_SCHEMA,
-    recipients: [{ phones: [phoneNumber] }],
-  });
+  let call;
+  try {
+    call = await client.calls.createAndWait({
+      task,
+      resultSchema: RESULT_SCHEMA,
+      recipients: [{ phones: [phoneNumber] }],
+    });
+  } catch (error) {
+    console.error(
+      "[calle] digest call failed:",
+      redactProviderError(error, {
+        phones: [phoneNumber],
+        sensitivePhrases: sortedEmails.flatMap((email) => [
+          email.subject,
+          email.summary,
+        ]),
+      })
+    );
+    throw new Error("CALL-E digest call failed.");
+  }
 
   const structuredResult =
     call.structuredResult as DigestStructuredResult | null;
@@ -237,6 +258,7 @@ export async function runDigestCall(
     taskCompleted: call.taskCompleted,
     structuredResult,
     evidence: call.evidence,
+    simulated: false,
   };
 }
 
@@ -255,6 +277,8 @@ export interface ReminderCallResult {
   taskCompleted: boolean | null;
   acknowledged: boolean | null;
   evidence: string[];
+  /** False only after a verified real CALL-E call was actually placed. */
+  simulated: boolean;
 }
 
 const REMINDER_RESULT_SCHEMA = {
@@ -279,11 +303,13 @@ function buildReminderTask(email: ReminderCallEmailInput): string {
  */
 export async function runReminderCall(
   phoneNumber: string,
-  email: ReminderCallEmailInput
+  email: ReminderCallEmailInput,
+  options: { operatorAuthorized: boolean }
 ): Promise<ReminderCallResult> {
   const task = buildReminderTask(email);
+  const gate = evaluateRealCallGate(phoneNumber, options.operatorAuthorized);
 
-  if (CALLE_DRY_RUN) {
+  if (gate.action !== "allow") {
     console.log("[calle] dry-run reminder call — not placing a real call", {
       phoneNumber: maskPhoneNumber(phoneNumber),
       schema: "reminder-acknowledged",
@@ -295,7 +321,8 @@ export async function runReminderCall(
       status: "completed",
       taskCompleted: true,
       acknowledged: true,
-      evidence: ["CALLE_DRY_RUN=true — no real call was placed."],
+      evidence: ["No real call was placed."],
+      simulated: true,
     };
   }
 
@@ -305,11 +332,23 @@ export async function runReminderCall(
     phoneNumber: maskPhoneNumber(phoneNumber),
   });
 
-  const call = await client.calls.createAndWait({
-    task,
-    resultSchema: REMINDER_RESULT_SCHEMA,
-    recipients: [{ phones: [phoneNumber] }],
-  });
+  let call;
+  try {
+    call = await client.calls.createAndWait({
+      task,
+      resultSchema: REMINDER_RESULT_SCHEMA,
+      recipients: [{ phones: [phoneNumber] }],
+    });
+  } catch (error) {
+    console.error(
+      "[calle] reminder call failed:",
+      redactProviderError(error, {
+        phones: [phoneNumber],
+        sensitivePhrases: [email.subject, email.summary],
+      })
+    );
+    throw new Error("CALL-E reminder call failed.");
+  }
 
   const structured = call.structuredResult as { acknowledged?: boolean } | null;
 
@@ -326,5 +365,6 @@ export async function runReminderCall(
     taskCompleted: call.taskCompleted,
     acknowledged: structured?.acknowledged ?? null,
     evidence: call.evidence,
+    simulated: false,
   };
 }
