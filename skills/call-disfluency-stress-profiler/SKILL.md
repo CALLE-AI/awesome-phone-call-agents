@@ -6,9 +6,8 @@ license: MIT
 
 # call-disfluency-stress-profiler
 
-> **A contact who says "uh... I mean... well..." three times per sentence
-> is not fine. An agent that stumbles on every pricing question needs a
-> better script.**
+> **Repeated pauses and repairs can be useful prompts for human review,
+> but do not establish a speaker's emotional state or knowledge.**
 
 Spoken conversation carries signals that plain transcripts still preserve:
 disfluency. When a callee is stressed, confused, or overwhelmed, their
@@ -19,7 +18,7 @@ in its turns.
 
 This skill reads the finished `get_call_run` transcript, computes per-side
 disfluency rates, and flags `CALLEE_STRESSED` or `AGENT_HESITANT` when rates
-cross calibrated thresholds. It then offers a reassurance-paced follow-up
+cross illustrative, unvalidated demo thresholds. It then offers a reassurance-paced follow-up
 call goal or a script-review recommendation.
 
 ## When To Use
@@ -85,14 +84,18 @@ Emits the `plan_call` inputs JSON whose `goal` instructs the next call to
 adopt a calm, unhurried pace, pause after each question, acknowledge concerns
 explicitly, and ask one question per turn.
 
-## Scientific Foundation
+## Research Background
+
+These references provide conceptual background, not validation of this regex
+implementation or its 8%/6% defaults. Disfluency has many causes; the labels
+are advisory review cues, not measured stress or competence.
 
 | Research | Relevance |
 |---|---|
 | Shriberg, E. — *Preliminaries to a Theory of Speech Disfluencies* (PhD Thesis, UC Berkeley, 1994) | Gold-standard taxonomy for filled pauses, repetitions, and repairs in spoken dialogue; direct source for the marker categories in this skill |
 | Levelt, W.J.M. — *Monitoring and Self-Repair in Speech* (Cognition, Vol. 14, 1983, doi:10.1016/0010-0277(83)90026-4) | Theory of self-repair: speakers monitor their own speech and repair when cognitive load is high; repair rate correlates with stress and difficulty |
 | Kumar et al. — *Mind the Pause: Disfluency-Aware Objective Tuning for Multilingual Speech Correction with LLMs* (ACL 2026, arXiv:2605.12242) | Confirms that disfluency detection from text transcripts is technically feasible with high accuracy; provides methodology basis for lexical marker detection |
-| Hough et al. — *"Mm, Wat?" Detecting Other-Initiated Repair Requests in Spoken Dialogue* (EMNLP 2025) | Validates that repair sequences are detectable from transcript text; shows correlation between disfluency markers and conversational breakdown |
+| Ngo et al. — [*"Mm, Wat?" Detecting Other-initiated Repair Requests in Dialogue*](https://aclanthology.org/2025.emnlp-main.1168/) (EMNLP 2025) | Studies multimodal repair-initiation detection in Dutch dialogues; it does not validate this skill's stress thresholds |
 | CALL-E Official Documentation — *Transcript Structure and get_call_run Result Schema* (docs.heycall-e.com) | Defines the exact JSON shapes this skill parses: `transcript[].speaker`, `transcript[].text`, and the nested `result` wrapper |
 
 This skill implements a lexical/regex heuristic against the defined marker
