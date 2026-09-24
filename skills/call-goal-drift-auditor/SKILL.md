@@ -77,14 +77,17 @@ structured bounding template that instructs the agent to stay focused,
 redirect off-topic tangents, and confirm goal achievement explicitly before
 hanging up.
 
-## Scientific Foundation
+## Research Background
+
+These references motivate dialogue review; they do not independently validate
+this skill's keyword/confirmation heuristic or prove that a call goal was met.
 
 | Research | Relevance |
 |---|---|
 | Grosz, B.J. & Sidner, C.L. — *Attention, Intentions, and the Structure of Discourse* (Computational Linguistics, Vol. 12, No. 3, 1986, aclanthology.org/J86-3001) | Foundational theory of intentional discourse structure: global discourse purpose vs. local focus; goal drift is when global purpose is displaced by local tangents. Cited 3000+ times |
 | Grice, H.P. — *Logic and Conversation* (in Studies in the Way of Words, Harvard Univ. Press, 1989) | Maxim of Relevance: every conversational contribution should relate to the joint purpose; the theoretical basis for measuring on-topic ratio |
 | Burdisso et al. — *Dialog2Flow: Pre-training Soft-Contrastive Action-Driven Sentence Embeddings for Automatic Dialog Flow Extraction* (EMNLP 2024, arXiv:2410.18481) | Methodology for tracking dialogue trajectory in action-space; off-topic turns are trajectories departing the action-region of the stated goal |
-| Liang et al. — *TD-EVAL: Revisiting Task-Oriented Dialogue Evaluation by Combining Turn-Level Precision with Dialogue-Level Comparisons* (2025, arXiv:2504.19982) | Framework evaluating TOD agents by "conversation cohesion" and "policy compliance" at turn level — directly the methodology this skill operationalizes for goal adherence |
+| Acikgoz et al. — [*TD-EVAL: Revisiting Task-Oriented Dialogue Evaluation by Combining Turn-Level Precision with Dialogue-Level Comparisons*](https://arxiv.org/abs/2504.19982) (2025) | Background on turn- and dialogue-level evaluation; this skill's keyword heuristic is not an implementation or validation of TD-EVAL |
 | Choubey et al. — *Turning Conversations into Workflows: A Framework to Extract and Evaluate Dialog Workflows for Service AI Agents* (Salesforce AI Research, ACL 2025, arXiv:2502.17321) | Empirical validation that goal adherence is measurable from customer-agent transcripts on ABCD/SynthABCD datasets |
 
 This skill computes keyword overlap, on-topic ratio, and span detection
