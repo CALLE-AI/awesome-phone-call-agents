@@ -193,7 +193,7 @@ This project is an awesome list for AI-agent phone-call workflows. Add resources
 - [SchemaRelay](https://github.com/14188769700lbk-dev/schemarelay) - Consent-gated CALL-E owner interviews that turn data schema-change questions into human-review evidence packets, with a no-call dry run by default.
 - [ShohojSheba Voice](https://shohojsheba-call-e-preview.redwan-rahman.workers.dev/judge) - Consent-gated healthcare staffing dispatch that uses structured CALL-E results to advance after a verified decline, pauses on acceptance, and keeps final assignment human-controlled.
 
-[TradeCheck](apps/typescript/tradecheck) - Autonomous supplier and merchant verification agent that cross-references US SEC EDGAR filings and UK Companies House registries before placing evidence-gated CALL-E phone calls with transcript verification.
+[TradeCheck](apps/typescript/tradecheck) - Experimental supplier-check demo combining public registry lookups with synthetic CALL-E-style call previews; no real calls or legitimacy guarantees.
 
 - [WristCall AI](https://github.com/Baklolman69/WristCallAI) - Wear OS smartwatch assistant that searches Google via SerpApi, synthesizes call intent with Groq AI 120B, and dispatches autonomous phone calls via CALL-E with 3-bullet voice summaries.
 
@@ -204,7 +204,7 @@ Runnable demo apps live under [`apps/`](apps/). They are not a CALL-E SDK and do
 | [`apps/typescript/before-we-go`](apps/typescript/before-we-go/) | TypeScript / Node.js | Consent-gated restaurant enquiry callbacks grounded in a versioned fictional fact sheet, with transcript-linked customer needs, unresolved questions, and a reviewed staff handoff; synthetic no-call default. |
 | [`apps/typescript/kol`](apps/typescript/kol/) | TypeScript / Node | Evidence-gated healthcare claim-status calls that require transcript-grounded fields, the intended payer department, the actual question, and an independent IVR route receipt; includes a 640-case no-call evaluation and explicit live CALL-E path. |
 | [`apps/python/rolloff-scope`](apps/python/rolloff-scope/) | Python | Compares a fixed dumpster scope using evidence-bound mandatory fees; excludes incomplete or contradictory quotes, with no-call fixtures by default. |
-| [apps/typescript/tradecheck](apps/typescript/tradecheck) | TypeScript / Next.js | Autonomous merchant verification agent cross-referencing US SEC filings and UK Companies House registries before placing evidence-gated CALL-E phone calls. |
+| [apps/typescript/tradecheck](apps/typescript/tradecheck) | TypeScript / Next.js | Experimental supplier-check demo with public registry lookups and synthetic call previews; no real calls or legitimacy guarantees. |
 | [`apps/typescript/teamline`](apps/typescript/teamline/) | TypeScript / Node | Coach-authorized two-call workflow that gathers facility facts, requires a human decision, then communicates the approved change and captures structured family responses; sandbox/no-call mode is the default. |
 | [`apps/web/veyra`](apps/web/veyra/) | TypeScript / Next.js / Python | Natural-language campaign builder with exact recipient review, operator-gated live dispatch, fail-closed reconciliation, and fake mode enabled by default. |
 | [`apps/typescript/clarity`](apps/typescript/clarity/) | TypeScript / Next.js | Clarifies one job-application claim with an adaptive CALL-E follow-up, structured results, timestamped transcript evidence, and a synthetic no-call replay. |

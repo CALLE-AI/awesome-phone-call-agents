@@ -41,7 +41,7 @@ export function CallVerdictCard({
         <div className="relative w-8 h-8 mb-4">
           <div className="w-8 h-8 border-2 border-gray-200 border-t-black rounded-full animate-spin" />
         </div>
-        <span className="text-primary-text text-sm font-medium">Calling supplier...</span>
+        <span className="text-primary-text text-sm font-medium">Generating synthetic call preview...</span>
         <span className="text-secondary-text text-xs mt-1">This may take up to 60 seconds</span>
       </Card>
     );
@@ -110,7 +110,7 @@ export function CallVerdictCard({
       {/* Confidence & Transcript */}
       <div className="flex justify-between items-center pt-2 border-t border-gray-100">
         <div className="text-xs text-secondary-text">
-          Confidence: <span className="font-semibold text-primary-text">{data.confidence ?? '—'}%</span>
+          Advisory demo score (not verified): <span className="font-semibold text-primary-text">{data.confidence ?? '—'}%</span>
         </div>
         {data.transcript && onViewTranscript && (
           <button

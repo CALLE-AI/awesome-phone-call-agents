@@ -199,7 +199,7 @@ export function Workspace() {
               </div>
               <h1 className="text-xl font-bold text-primary-text mb-2">TradeCheck Copilot</h1>
               <p className="text-secondary-text text-sm max-w-xs">
-                Tell me about your trade deal. I&apos;ll ask a few questions, then run a documentary check and a live call to verify the supplier.
+                Explore a trade deal with registry lookups and synthetic call previews. No supplier is called; demo results do not establish legitimacy or agreed terms.
               </p>
             </div>
           ) : (
@@ -479,12 +479,12 @@ export function Workspace() {
                 <>
                   <div className="flex items-center gap-2 mb-1">
                     <div className={`w-5 h-5 rounded-full flex items-center justify-center text-xs font-bold flex-shrink-0 ${latestChinaResult ? 'bg-black text-white' : 'bg-gray-200 text-gray-500'}`}>1</div>
-                    <span className="text-sm font-medium text-primary-text">China Verification (Third-party/Advisory)</span>
+                    <span className="text-sm font-medium text-primary-text">China Preview (Synthetic — no registry lookup)</span>
                   </div>
                   {isCheckingChina && (
                     <div className="bg-white border border-gray-200 rounded-lg p-6 flex flex-col items-center justify-center h-36">
                       <div className="w-6 h-6 border-2 border-gray-400 border-t-black rounded-full animate-spin mb-3" />
-                      <span className="text-secondary-text text-sm">Querying Registry...</span>
+                      <span className="text-secondary-text text-sm">Generating synthetic example...</span>
                     </div>
                   )}
                   {latestChinaResult && (
@@ -496,7 +496,7 @@ export function Workspace() {
                             ? 'bg-green-100 text-green-800 border-green-200'
                             : 'bg-gray-100 text-gray-800 border-gray-200'
                         }`}>
-                          {latestChinaResult.isVerified ? 'Found' : 'Not Found'}
+                          {latestChinaResult.isVerified ? 'Synthetic example' : 'No example'}
                         </span>
                       </div>
                       <div className="grid grid-cols-2 gap-3 text-sm">
@@ -578,12 +578,12 @@ export function Workspace() {
                 </>
               )}
 
-              {/* Step 2: Live Call */}
+              {/* Step 2: Synthetic Call Preview */}
               {(activeCheckResult || latestCacResult || latestChResult || latestChinaResult || latestUsResult || isCalling || isCallingNg || isCallingUk || isCallingChina || isCallingUs || activeCallResult) && (
                 <>
                   <div className="flex items-center gap-2 mt-2 mb-1">
                     <div className={`w-5 h-5 rounded-full flex items-center justify-center text-xs font-bold flex-shrink-0 ${activeCallResult ? 'bg-black text-white' : 'bg-gray-200 text-gray-500'}`}>2</div>
-                    <span className="text-sm font-medium text-primary-text">Live Call Verification</span>
+                    <span className="text-sm font-medium text-primary-text">Synthetic Call Preview — no real call</span>
                   </div>
                   <CallVerdictCard
                     data={activeCallResult}
