@@ -77,24 +77,6 @@ export default function HistoryPage() {
                                     <p className="text-sm text-ink/70">
                                         🏥 {record.hospital}
                                     </p>
-
-                                    {record.type ===
-                                        "appointment" &&
-                                        record.patientName && (
-                                            <p className="text-sm text-ink/70">
-                                                👤{" "}
-                                                {record.patientName}
-                                            </p>
-                                        )}
-
-                                    {record.type ===
-                                        "appointment" &&
-                                        record.patientPhone && (
-                                            <p className="text-sm text-ink/70">
-                                                📞{" "}
-                                                {record.patientPhone}
-                                            </p>
-                                        )}
                                 </div>
 
                                 <span

@@ -1,30 +1,100 @@
-console.log("CALL-E API key loaded:", !!process.env.CALLE_API_KEY);
-console.log(
-    "CALL-E API key prefix:",
-    process.env.CALLE_API_KEY?.slice(0, 8)
-);
-
-
 import { NextResponse } from "next/server";
 import { CalleClient } from "@call-e/calle";
 
 const apiKey = process.env.CALLE_API_KEY;
+const internalSecret = process.env.CALLE_INTERNAL_SECRET;
 
-console.log("CALL-E API key loaded:", !!apiKey);
-console.log("CALL-E API key prefix:", apiKey?.slice(0, 8));
+const realCallsEnabled =
+    process.env.CALLE_ENABLE_REAL_CALLS === "true";
 
-const client = new CalleClient({
-    apiKey: apiKey!,
-});
+const allowedRecipients = new Set(
+    (process.env.CALLE_ALLOWED_RECIPIENTS ?? "")
+        .split(",")
+        .map((phone) => phone.trim())
+        .filter(Boolean)
+);
+
+const client = apiKey
+    ? new CalleClient({
+        apiKey,
+    })
+    : null;
+
+function isValidE164(phone: string): boolean {
+    return /^\+[1-9]\d{7,14}$/.test(phone);
+}
 
 export async function POST(req: Request) {
     try {
+        // Protect the real-call endpoint and private call results.
+        const authHeader = req.headers.get("authorization");
+
+        if (
+            !internalSecret ||
+            authHeader !== `Bearer ${internalSecret}`
+        ) {
+            return NextResponse.json(
+                {
+                    ok: false,
+                    error: "Unauthorized",
+                },
+                { status: 401 }
+            );
+        }
+
+        // Real calls are disabled unless explicitly enabled.
+        if (!realCallsEnabled) {
+            return NextResponse.json(
+                {
+                    ok: false,
+                    error: "Real CALL-E calls are disabled.",
+                },
+                { status: 403 }
+            );
+        }
+
+        if (!client) {
+            return NextResponse.json(
+                {
+                    ok: false,
+                    error: "CALL-E is not configured.",
+                },
+                { status: 500 }
+            );
+        }
+
         const { phone, vaccine } = await req.json();
 
         if (!phone || !vaccine) {
             return NextResponse.json(
-                { error: "phone and vaccine are required" },
+                {
+                    ok: false,
+                    error: "phone and vaccine are required",
+                },
                 { status: 400 }
+            );
+        }
+
+        if (
+            typeof phone !== "string" ||
+            !isValidE164(phone)
+        ) {
+            return NextResponse.json(
+                {
+                    ok: false,
+                    error: "Recipient must be a valid E.164 phone number.",
+                },
+                { status: 400 }
+            );
+        }
+
+        if (!allowedRecipients.has(phone)) {
+            return NextResponse.json(
+                {
+                    ok: false,
+                    error: "Recipient is not authorized for real calls.",
+                },
+                { status: 403 }
             );
         }
 
@@ -75,40 +145,20 @@ Do not provide medical advice. Only collect the provider's information.`,
             },
         });
 
-        const recipient = call.recipients[0];
-        const attempt = recipient?.attempts[0];
-
         return NextResponse.json({
-            call_id: call.id,
+            ok: true,
             status: call.status,
-
             result: call.structuredResult,
-            summary: call.summary,
             task_completed: call.taskCompleted,
             confidence: call.completionConfidence,
-            evidence: call.evidence,
-
-            failure_code: call.failureCode,
-            failure_message: call.failureMessage,
-
-            recipient_status: recipient?.status,
-            recipient_id: recipient?.id,
-
-            attempt_id: attempt?.id,
-            attempt_status: attempt?.status,
-            provider_call_id: attempt?.providerCallId,
-            attempt_failure_code: attempt?.failureCode,
-            attempt_failure_message: attempt?.failureMessage,
-            attempt_summary: attempt?.summary,
-            transcript: attempt?.transcriptTurns,
         });
     } catch (error) {
-        console.error("CALL-E error:", error);
+        console.error("CALL-E call failed.");
 
         return NextResponse.json(
             {
+                ok: false,
                 error: "CALL-E call failed",
-                details: error instanceof Error ? error.message : String(error),
             },
             { status: 500 }
         );

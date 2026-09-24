@@ -1,11 +1,27 @@
 import { NextRequest, NextResponse } from "next/server";
-import { exec } from "child_process";
+import { execFile } from "child_process";
 import { promisify } from "util";
 
-const execAsync = promisify(exec);
+const execFileAsync = promisify(execFile);
 
 export async function POST(req: NextRequest) {
     try {
+        const authHeader = req.headers.get("authorization");
+        const expectedSecret = process.env.CALLE_INTERNAL_SECRET;
+
+        if (
+            !expectedSecret ||
+            authHeader !== `Bearer ${expectedSecret}`
+        ) {
+            return NextResponse.json(
+                {
+                    ok: false,
+                    error: "Unauthorized",
+                },
+                { status: 401 }
+            );
+        }
+
         const { planId, confirmToken } = await req.json();
 
         if (!planId || !confirmToken) {
@@ -18,51 +34,42 @@ export async function POST(req: NextRequest) {
             );
         }
 
-        const command =
-            `npx @call-e/cli call run ` +
-            `--plan-id "${planId}" ` +
-            `--confirm-token "${confirmToken}" ` +
-            `--json`;
+        const npxCommand =
+            process.platform === "win32"
+                ? "npx.cmd"
+                : "npx";
 
-        console.log("Running CALL-E MCP run");
+        await execFileAsync(
+            npxCommand,
+            [
+                "@call-e/cli",
+                "call",
+                "run",
+                "--plan-id",
+                planId,
+                "--confirm-token",
+                confirmToken,
+                "--json",
+            ],
+            {
+                cwd: process.cwd(),
+                timeout: 180000,
+                windowsHide: true,
+                shell: false,
+            }
+        );
 
-        const { stdout, stderr } = await execAsync(command, {
-            cwd: process.cwd(),
-            timeout: 180000,
-            windowsHide: true,
+        return NextResponse.json({
+            ok: true,
+            status: "completed",
         });
-
-        if (stderr) {
-            console.log("CALL-E CLI:", stderr);
-        }
-
-        let result: unknown;
-
-        try {
-            result = JSON.parse(stdout);
-        } catch {
-            return NextResponse.json(
-                {
-                    ok: false,
-                    error: "CALL-E returned non-JSON output",
-                    raw: stdout,
-                    stderr,
-                },
-                { status: 500 }
-            );
-        }
-
-        return NextResponse.json(result);
-    } catch (error) {
-        console.error("CALL-E MCP run error:", error);
+    } catch {
+        console.error("CALL-E MCP run failed.");
 
         return NextResponse.json(
             {
                 ok: false,
-                error:
-                    error instanceof Error
-                        ? error.message
-                        : String(error),
+                error: "CALL-E MCP run failed.",
             },
             { status: 500 }
         );

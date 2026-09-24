@@ -5,6 +5,21 @@ import { CalleClient } from "@call-e/calle";
 const client = new CalleClient({
     apiKey: process.env.CALLE_API_KEY!,
 });
+const internalSecret = process.env.CALLE_INTERNAL_SECRET;
+
+const realCallsEnabled =
+    process.env.CALLE_ENABLE_REAL_CALLS === "true";
+
+const allowedRecipients = new Set(
+    (process.env.CALLE_ALLOWED_RECIPIENTS ?? "")
+        .split(",")
+        .map((phone) => phone.trim())
+        .filter(Boolean)
+);
+
+function isValidE164(phone: string): boolean {
+    return /^\+[1-9]\d{7,14}$/.test(phone);
+}
 
 /*
  * Extract all transcript turns.
@@ -235,6 +250,30 @@ function extractBookingResult(
 
 export async function POST(req: Request) {
     try {
+        const authHeader = req.headers.get("authorization");
+
+        if (
+            !internalSecret ||
+            authHeader !== `Bearer ${internalSecret}`
+        ) {
+            return NextResponse.json(
+                {
+                    ok: false,
+                    error: "Unauthorized",
+                },
+                {status: 401}
+            );
+        }
+
+        if (!realCallsEnabled) {
+            return NextResponse.json(
+                {
+                    ok: false,
+                    error: "Real CALL-E calls are disabled.",
+                },
+                {status: 403}
+            );
+        }
         const body = await req.json();
 
         const {
@@ -262,7 +301,7 @@ export async function POST(req: Request) {
                     error:
                         "Patient name, phone, vaccine, provider, date, and time are required.",
                 },
-                { status: 400 }
+                {status: 400}
             );
         }
 
@@ -278,13 +317,32 @@ export async function POST(req: Request) {
         if (!providerPhone) {
             return NextResponse.json(
                 {
-                    error:
-                        "No provider phone number is configured.",
+                    ok: false,
+                    error: "No provider phone number is configured.",
                 },
-                { status: 500 }
+                {status: 500}
             );
         }
 
+        if (!isValidE164(providerPhone)) {
+            return NextResponse.json(
+                {
+                    ok: false,
+                    error: "Configured provider number must be a valid E.164 phone number.",
+                },
+                {status: 400}
+            );
+        }
+
+        if (!allowedRecipients.has(providerPhone)) {
+            return NextResponse.json(
+                {
+                    ok: false,
+                    error: "Configured provider number is not authorized for real calls.",
+                },
+                {status: 403}
+            );
+        }
         /*
          * ============================================================
          * SECOND CALL-E CALL
@@ -300,38 +358,6 @@ export async function POST(req: Request) {
             "============================================================"
         );
 
-        console.log(
-            "CALL-E BOOKING CALL STARTING"
-        );
-
-        console.log(
-            "Provider phone:",
-            providerPhone
-        );
-
-        console.log(
-            "Vaccine:",
-            vaccine
-        );
-
-        console.log(
-            "Patient:",
-            patientName
-        );
-
-        console.log(
-            "Requested date:",
-            preferredDate
-        );
-
-        console.log(
-            "Requested time:",
-            preferredTime
-        );
-
-        console.log(
-            "============================================================"
-        );
 
         const call = await client.calls.createAndWait(
             {
@@ -405,99 +431,6 @@ Your job is to actually request the appointment from the provider and determine 
                     `vaxconnect-booking-${Date.now()}`,
             }
         );
-
-        /*
-         * ============================================================
-         * CALL-E DIAGNOSTICS
-         * ============================================================
-         */
-        const recipient =
-            call.recipients?.[0];
-
-        const attempt =
-            recipient?.attempts?.[0];
-
-        console.log(
-            "============================================================"
-        );
-
-        console.log(
-            "CALL-E BOOKING DIAGNOSTICS"
-        );
-
-        console.log(
-            "============================================================"
-        );
-
-        console.log(
-            "Call ID:",
-            call.id
-        );
-
-        console.log(
-            "Call status:",
-            call.status
-        );
-
-        console.log(
-            "Failure code:",
-            call.failureCode ?? "null"
-        );
-
-        console.log(
-            "Failure message:",
-            call.failureMessage ?? "null"
-        );
-
-        console.log(
-            "Task completed:",
-            call.taskCompleted ?? "null"
-        );
-
-        console.log(
-            "Completion confidence:",
-            call.completionConfidence ?? "null"
-        );
-
-        console.log(
-            "Summary:",
-            call.summary ?? "null"
-        );
-
-        console.log(
-            "Recipient status:",
-            recipient?.status ?? "null"
-        );
-
-        console.log(
-            "Recipient failure code:",
-            recipient?.failureCode ?? "null"
-        );
-
-        console.log(
-            "Recipient failure message:",
-            recipient?.failureMessage ?? "null"
-        );
-
-        console.log(
-            "Attempt status:",
-            attempt?.status ?? "null"
-        );
-
-        console.log(
-            "Attempt failure code:",
-            attempt?.failureCode ?? "null"
-        );
-
-        console.log(
-            "Attempt failure message:",
-            attempt?.failureMessage ?? "null"
-        );
-
-        console.log(
-            "============================================================"
-        );
-
         /*
          * Get transcript.
          */
@@ -527,71 +460,19 @@ Your job is to actually request the appointment from the provider and determine 
         if (call.status !== "completed") {
             return NextResponse.json(
                 {
+                    ok: false,
                     error:
-                        "CALL-E could not connect to the provider, so the appointment was not booked.",
-
-                    call_id: call.id,
-
-                    status: call.status,
-
+                        "CALL-E could not complete the provider call, so the appointment was not confirmed.",
                     booked: "unknown",
-
                     booking_result: {
                         booked: "unknown",
                         status: "unknown",
                         confirmed_date: "",
                         confirmed_time: "",
-                        provider_message:
-                            call.failureMessage ||
-                            "The CALL-E booking call did not connect to the provider.",
+                        provider_message: "",
                     },
-
-                    summary:
-                        call.summary || null,
-
-                    task_completed:
-                        call.taskCompleted ?? null,
-
-                    confidence:
-                        call.completionConfidence ??
-                        null,
-
-                    failure_code:
-                        call.failureCode ??
-                        null,
-
-                    failure_message:
-                        call.failureMessage ??
-                        null,
-
-                    recipient_status:
-                        recipient?.status ??
-                        null,
-
-                    recipient_failure_code:
-                        recipient?.failureCode ??
-                        null,
-
-                    recipient_failure_message:
-                        recipient?.failureMessage ??
-                        null,
-
-                    attempt_status:
-                        attempt?.status ??
-                        null,
-
-                    attempt_failure_code:
-                        attempt?.failureCode ??
-                        null,
-
-                    attempt_failure_message:
-                        attempt?.failureMessage ??
-                        null,
-
-                    transcript:
-                    transcriptTurns,
                 },
-                { status: 502 }
+                {status: 502}
             );
         }
 
@@ -602,39 +483,12 @@ Your job is to actually request the appointment from the provider and determine 
          */
         if (bookingResult.booked !== "yes") {
             return NextResponse.json({
-                call_id: call.id,
-
+                ok: true,
                 status: call.status,
-
-                booked:
-                bookingResult.booked,
-
-                booking_result:
-                bookingResult,
-
-                summary:
-                call.summary,
-
-                task_completed:
-                call.taskCompleted,
-
-                confidence:
-                call.completionConfidence,
-
-                evidence:
-                call.evidence,
-
-                failure_code:
-                call.failureCode,
-
-                failure_message:
-                call.failureMessage,
-
-                transcript:
-                transcriptTurns,
+                booked: bookingResult.booked,
+                booking_result: bookingResult,
             });
         }
-
         /*
          * ============================================================
          * CONFIRMED BOOKING
@@ -644,120 +498,23 @@ Your job is to actually request the appointment from the provider and determine 
             "CALL-E BOOKING CONFIRMED"
         );
 
-        console.log(
-            "Appointment confirmed for:",
-            patientName
-        );
 
         console.log(
             "============================================================"
         );
-
         return NextResponse.json({
-            call_id: call.id,
-
+            ok: true,
             status: call.status,
-
             booked: "yes",
-
-            booking_result:
-            bookingResult,
-
-            summary:
-            call.summary,
-
-            task_completed:
-            call.taskCompleted,
-
-            confidence:
-            call.completionConfidence,
-
-            evidence:
-            call.evidence,
-
-            failure_code:
-            call.failureCode,
-
-            failure_message:
-            call.failureMessage,
-
-            transcript:
-            transcriptTurns,
+            booking_result: bookingResult,
         });
     } catch (error) {
-        console.error(
-            "============================================================"
-        );
-
-        console.error(
-            "CALL-E APPOINTMENT REQUEST ERROR"
-        );
-
-        console.error(
-            "============================================================"
-        );
-
-        console.error(
-            error
-        );
-
-        const errorAny =
-            error as any;
-
-        console.error(
-            "Error message:",
-            error instanceof Error
-                ? error.message
-                : String(error)
-        );
-
-        console.error(
-            "Error code:",
-            errorAny?.code ??
-            "null"
-        );
-
-        console.error(
-            "Error status:",
-            errorAny?.status ??
-            "null"
-        );
-
-        console.error(
-            "Error failure code:",
-            errorAny?.failureCode ??
-            "null"
-        );
-
-        console.error(
-            "Error failure message:",
-            errorAny?.failureMessage ??
-            "null"
-        );
-
-        console.error(
-            "============================================================"
-        );
+        console.error("CALL-E appointment request failed.");
 
         return NextResponse.json(
             {
-                error:
-                    "Appointment call failed",
-
-                details:
-                    error instanceof Error
-                        ? error.message
-                        : String(error),
-
-                failure_code:
-                    errorAny?.failureCode ??
-                    errorAny?.code ??
-                    null,
-
-                failure_message:
-                    errorAny?.failureMessage ??
-                    errorAny?.message ??
-                    null,
+                ok: false,
+                error: "Appointment call failed.",
             },
             { status: 500 }
         );

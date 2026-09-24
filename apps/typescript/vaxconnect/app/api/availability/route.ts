@@ -44,11 +44,13 @@ function extractAvailability(result: any): AvailabilityResult {
         let answer = "";
 
         for (let j = i + 1; j < turns.length; j++) {
+            const nextTurn = turns[j];
+
             if (
-                turns[j].speaker === "user" &&
-                turns[j].text
+                nextTurn?.speaker === "user" &&
+                nextTurn.text
             ) {
-                answer = turns[j].text.trim();
+                answer = nextTurn.text.trim();
                 break;
             }
         }
@@ -142,14 +144,12 @@ function extractAvailability(result: any): AvailabilityResult {
         summaryLower.includes("available") &&
         !summaryLower.includes(
             "not available"
-        ) &&
-        !summaryLower.includes(
+        ) && !summaryLower.includes(
             "unavailable"
         )
     ) {
         available = true;
     }
-
     if (price === "Not provided") {
         const summaryPrice =
             summary.match(
