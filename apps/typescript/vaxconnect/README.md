@@ -1,36 +1,35 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
+# VaxConnect
 
-## Getting Started
+AI-powered vaccination planning, travel guidance, and verified vaccine availability using CALL-E.
 
-First, run the development server:
+## What it does
 
-```bash
-npm run dev
-# or
-yarn dev
-# or
-pnpm dev
-# or
-bun dev
-```
+VaxConnect helps users:
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+- Check child vaccination requirements
+- Check travel vaccination guidance
+- Find vaccine availability
+- Get vaccination information and guidance through an AI assistant powered by Google Gemini
+- Request appointment assistance through an AI phone agent powered by CALL-E
 
-You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
+## AI safety and scope
 
-This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
+VaxConnect is a demonstration application.
 
-## Learn More
+The Gemini-powered assistant provides general vaccination information and guidance for informational purposes. It is not a medical professional and does not provide medical diagnoses, treatment decisions, or personalized medical advice. Users should confirm vaccination decisions and requirements with a qualified healthcare professional or the relevant official health authority.
 
-To learn more about Next.js, take a look at the following resources:
+CALL-E is used to contact explicitly authorized recipients for the demonstration. Real calls are disabled by default.
 
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
+## Setup
 
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
+1. Install dependencies.
+2. Create a `.env.local` file.
+3. Add the required API credentials and configuration.
+4. Never commit `.env.local` or other credentials to the repository.
 
-## Deploy on Vercel
+For a safe default configuration:
 
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
-
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+```env
+CALLE_ENABLE_REAL_CALLS=false
+CALLE_ALLOWED_RECIPIENTS=
+CALLE_INTERNAL_SECRET=your-local-secret
