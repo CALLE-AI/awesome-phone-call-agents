@@ -50,7 +50,7 @@ def _print_plan(current: Plan) -> None:
         f"{len(current.skipped)} skipped   "
         f"{current.scope.hidden} hidden by this view's filter"
     )
-    print(f"  estimated: {current.call_count} calls  ~${current.estimated_cost_usd:.2f}")
+    print(f"  planned: {current.call_count} calls; actual charges: CALL-E Dashboard billing")
     print(RULE)
 
     for item in current.planned:

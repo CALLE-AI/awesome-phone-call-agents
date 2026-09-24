@@ -1,0 +1,15 @@
+{
+  "task_id": "relayme-demo-voicemail",
+  "mock_transcript": [
+    {"speaker": "agent", "text": "Hi, this is an AI assistant calling on behalf of someone who can't use the phone. I have a quick question about a prescription."},
+    {"speaker": "callee", "text": "You've reached Maple Street Pharmacy. We're closed. Please leave a message after the tone."},
+    {"speaker": "agent", "text": "Thank you, I'll try again during opening hours. Goodbye."}
+  ],
+  "structured_result": {
+    "answer": "",
+    "outcome": "voicemail",
+    "transcript_summary": "Reached a closed-hours voicemail greeting. No live person; no private details left.",
+    "follow_up_needed": true,
+    "disclosed_ai": true
+  }
+}

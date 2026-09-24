@@ -6,10 +6,11 @@ dials real numbers and wants its own key, and there is no test flag on
 somebody's telephone is where the code draws this line, and how hard it is to
 cross by accident.
 
-**Dry** operations are free and place no call: ``plan_call``, listing goals,
-validating a schema. **Wet** operations place a call and cost five credits
-each. Every operation that talks to CALL-E records itself here, and a wet one
-additionally requires an authorisation that has to be constructed deliberately.
+**Dry** operations place no call: ``plan_call``, listing goals,
+validating a schema. **Wet** operations place a call and may incur variable charges.
+Planning may consume quota even without a call. Every operation that talks to
+CALL-E records itself here, and a wet one additionally requires an authorisation
+that has to be constructed deliberately.
 
 The pattern comes from the CALL-E repository itself. Its most instructive test
 asserts on *which operations were invoked* rather than on what they returned,
@@ -29,22 +30,16 @@ from dataclasses import dataclass, field
 from enum import StrEnum
 
 __all__ = [
-    "CREDITS_PER_CALL",
     "Operation",
     "SpendLedger",
     "WetOperationRefusedError",
     "Wetness",
 ]
 
-#: What one placed call costs. Derived from the published rate of $0.05 per
-#: billable call and the 100-credits-per-dollar conversion in the hackathon
-#: prize table. Both are labelled early-stage and not final by CALL-E.
-CREDITS_PER_CALL = 5
-
 
 class Wetness(StrEnum):
     DRY = "dry"
-    """Free. Places no call. Safe to run in a loop, in CI, on a laptop."""
+    """Places no call. Live planning can still consume quota."""
 
     WET = "wet"
     """Places a call. Costs credits. Rings a telephone that belongs to
@@ -64,8 +59,8 @@ class Operation:
     detail: str = ""
 
     @property
-    def credits(self) -> int:
-        return CREDITS_PER_CALL if self.wetness is Wetness.WET else 0
+    def credits(self) -> int | None:
+        return None if self.wetness is Wetness.WET else 0
 
 
 @dataclass
@@ -115,8 +110,8 @@ class SpendLedger:
         return sum(1 for op in self.operations if op.wetness is Wetness.DRY)
 
     @property
-    def credits_spent(self) -> int:
-        return self.calls_placed * CREDITS_PER_CALL
+    def credits_spent(self) -> int | None:
+        return None if self.calls_placed else 0
 
     @property
     def names(self) -> tuple[str, ...]:
@@ -137,13 +132,15 @@ class SpendLedger:
     def summary_line(self) -> str:
         if not self.operations:
             return "no CALL-E operations"
-        parts = [f"{self.dry_operations} free"]
+        parts = [f"{self.dry_operations} no-call operations"]
         if self.calls_placed:
-            parts.append(f"{self.calls_placed} call(s), {self.credits_spent} credits")
+            parts.append(
+                f"{self.calls_placed} call(s), charges: see CALL-E Dashboard billing"
+            )
         else:
             parts.append("0 calls, 0 credits")
         return " - ".join(parts)
 
 
-def total_credits(operations: Sequence[Operation]) -> int:
-    return sum(op.credits for op in operations)
+def total_credits(operations: Sequence[Operation]) -> int | None:
+    return None if any(op.wetness is Wetness.WET for op in operations) else 0

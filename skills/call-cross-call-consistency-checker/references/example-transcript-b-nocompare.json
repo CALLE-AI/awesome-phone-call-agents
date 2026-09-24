@@ -1,0 +1,12 @@
+{
+  "status": "COMPLETED",
+  "result": {
+    "post_summary": "Courtesy call; no delivery values were stated.",
+    "transcript": [
+      {"speaker": "agent", "text": "Hello again from Example Depot, just calling to check that everything went smoothly with your order."},
+      {"speaker": "callee", "text": "Yes, all fine, thanks."},
+      {"speaker": "agent", "text": "Wonderful. Have a good day. Goodbye."}
+    ]
+  },
+  "callee_phone": "+14155550152"
+}

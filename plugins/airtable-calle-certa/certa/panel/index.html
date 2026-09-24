@@ -570,7 +570,7 @@ function renderPlan(p) {
   $("m-skip").textContent = p.skipped.length;
   $("m-hidden").textContent = p.hidden;
   $("fig-hidden").dataset.flag = String(p.hidden > 0);
-  $("m-cost").innerHTML = "$" + p.estimated_cost_usd.toFixed(2) + " <small>est.</small>";
+  $("m-cost").textContent = p.estimated_cost_usd === null ? "See CALL-E billing" : "$0.00";
   $("c-plan").textContent = p.call_count;
   $("c-skip").textContent = p.skipped.length;
 

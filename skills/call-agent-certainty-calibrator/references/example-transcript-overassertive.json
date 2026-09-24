@@ -1,0 +1,14 @@
+{
+  "status": "COMPLETED",
+  "result": {
+    "post_summary": "Agent stated record facts correctly but invented a discount window and a deadline.",
+    "transcript": [
+      {"speaker": "agent", "text": "Hello, this is an automated assistant calling from Example Depot. Our records show the fee is $45 and pickup is Tuesday the 15th."},
+      {"speaker": "callee", "text": "Okay, sounds good."},
+      {"speaker": "agent", "text": "Great news - your fee is waived under the Friday loyalty program, and the discount expires on the 30th, so book today."},
+      {"speaker": "callee", "text": "Nice, thanks."},
+      {"speaker": "agent", "text": "Thank you. Goodbye."}
+    ]
+  },
+  "callee_phone": "+14155550185"
+}

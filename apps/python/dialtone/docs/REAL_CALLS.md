@@ -30,6 +30,8 @@ Totals:
 
 ## Plan
 
+This section preserves the original test-budget assumption. New CALL-E users receive 100 free credits (US$1); this is a credit balance, not a fixed number of calls. See the [current pricing FAQ](https://www.heycall-e.com/) and [Dashboard billing](https://dashboard.heycall-e.com/account/billing) for actual charges.
+
 **Budget:** 8 of CALL-E's 20 free calls, and roughly 10 minutes of Vapi time (well within the $10 signup credit).
 
 **What gets committed:**

@@ -1,0 +1,147 @@
+{
+  "id": "call_mock_mri70551",
+  "status": "completed",
+  "task_completed": true,
+  "summary": "Called 4 imaging centers for a self-pay MRI brain (70551) cash price.",
+  "completion_confidence": { "score": 0.84, "label": "high" },
+  "evidence": ["4 recipients dialed", "2 all-inclusive quotes captured", "1 split-fee quote", "1 voicemail"],
+  "structured_result": { "clinics_reached": 3, "quotes_obtained": 2, "lowest_all_inclusive": 529 },
+  "metadata": { "rfq_id": "rfq_demo_70551" },
+  "created_at": "2026-09-14T08:00:00Z",
+  "completed_at": "2026-09-14T08:06:40Z",
+  "recipients": [
+    {
+      "name": "Bayou City Neuro Imaging",
+      "phone": "+17135550117",
+      "status": "completed",
+      "summary": "Billing quoted an all-inclusive self-pay price of $529 including the radiologist read.",
+      "structured_result": {
+        "reached_billing": true,
+        "quote_given": true,
+        "cash_price": 529,
+        "currency": "USD",
+        "price_basis": "all_inclusive",
+        "includes": ["scan", "radiologist read", "images on CD"],
+        "excludes": ["contrast (not needed for 70551)"],
+        "requires_consult_first": false,
+        "estimate_valid_days": 30,
+        "earliest_appointment_days": 2,
+        "cpt_or_code_confirmed": "70551",
+        "quoted_verbatim": "For a self-pay brain MRI without contrast our all-inclusive cash price is five hundred and twenty-nine dollars, and that includes the radiologist reading.",
+        "outcome": "quoted"
+      },
+      "attempts": [
+        {
+          "status": "completed",
+          "started_at": "2026-09-14T08:00:10Z",
+          "ended_at": "2026-09-14T08:03:50Z",
+          "transcript_turns": [
+            { "offset_seconds": 0, "speaker": "agent", "text": "Hi, I'm an assistant helping a self-pay patient get a cash price for an MRI of the brain without contrast, code 70551. Could you tell me your all-inclusive cash price?" },
+            { "offset_seconds": 15, "speaker": "clinic", "text": "Sure, let me check. For a self-pay brain MRI without contrast our all-inclusive cash price is five hundred and twenty-nine dollars, and that includes the radiologist reading." },
+            { "offset_seconds": 33, "speaker": "agent", "text": "Great. Does that include the images and is there any separate reading fee?" },
+            { "offset_seconds": 40, "speaker": "clinic", "text": "No separate fee, the read is included and we give you the images on a CD. The estimate is good for thirty days." },
+            { "offset_seconds": 54, "speaker": "agent", "text": "And the earliest appointment?" },
+            { "offset_seconds": 57, "speaker": "clinic", "text": "We have an opening tomorrow, about two days out." }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "Medical Center Radiology Group",
+      "phone": "+17135550163",
+      "status": "completed",
+      "summary": "Quoted a facility fee only; radiologist reads separately and bills on its own.",
+      "structured_result": {
+        "reached_billing": true,
+        "quote_given": true,
+        "cash_price": 560,
+        "currency": "USD",
+        "price_basis": "facility_only",
+        "includes": ["scan facility fee"],
+        "excludes": ["radiologist professional read (billed separately)"],
+        "requires_consult_first": false,
+        "estimate_valid_days": 14,
+        "earliest_appointment_days": 4,
+        "cpt_or_code_confirmed": "70551",
+        "quoted_verbatim": "The facility fee for the scan is five hundred and sixty dollars, but the radiologist reads and bills separately, so that part is not included.",
+        "outcome": "quoted"
+      },
+      "attempts": [
+        {
+          "status": "completed",
+          "started_at": "2026-09-14T08:00:12Z",
+          "ended_at": "2026-09-14T08:04:10Z",
+          "transcript_turns": [
+            { "offset_seconds": 0, "speaker": "agent", "text": "Hi, I'm helping a self-pay patient. What is your all-inclusive cash price for a brain MRI without contrast, 70551?" },
+            { "offset_seconds": 13, "speaker": "clinic", "text": "The facility fee for the scan is five hundred and sixty dollars, but the radiologist reads and bills separately, so that part is not included." },
+            { "offset_seconds": 29, "speaker": "agent", "text": "Do you know roughly what the reading fee runs?" },
+            { "offset_seconds": 34, "speaker": "clinic", "text": "That's through a separate group, I can't quote it, sorry." }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "Galleria Advanced MRI",
+      "phone": "+17135550154",
+      "status": "completed",
+      "summary": "Would not quote without an in-person consult and a physician order first.",
+      "structured_result": {
+        "reached_billing": true,
+        "quote_given": false,
+        "cash_price": null,
+        "currency": "USD",
+        "price_basis": "unknown",
+        "includes": [],
+        "excludes": [],
+        "requires_consult_first": true,
+        "estimate_valid_days": null,
+        "earliest_appointment_days": null,
+        "cpt_or_code_confirmed": null,
+        "quoted_verbatim": null,
+        "outcome": "needs_consult"
+      },
+      "attempts": [
+        {
+          "status": "completed",
+          "started_at": "2026-09-14T08:00:15Z",
+          "ended_at": "2026-09-14T08:02:30Z",
+          "transcript_turns": [
+            { "offset_seconds": 0, "speaker": "agent", "text": "Hi, I'm helping a self-pay patient get a cash estimate for a brain MRI, 70551. What's your all-inclusive price?" },
+            { "offset_seconds": 12, "speaker": "clinic", "text": "We can't give a price without a physician order and a consult first. You'd need to come in." }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "Memorial Open MRI",
+      "phone": "+17135550185",
+      "status": "completed",
+      "summary": "Reached voicemail; no quote captured.",
+      "structured_result": {
+        "reached_billing": false,
+        "quote_given": false,
+        "cash_price": null,
+        "currency": "USD",
+        "price_basis": "unknown",
+        "includes": [],
+        "excludes": [],
+        "requires_consult_first": false,
+        "estimate_valid_days": null,
+        "earliest_appointment_days": null,
+        "cpt_or_code_confirmed": null,
+        "quoted_verbatim": null,
+        "outcome": "voicemail"
+      },
+      "attempts": [
+        {
+          "status": "completed",
+          "started_at": "2026-09-14T08:00:18Z",
+          "ended_at": "2026-09-14T08:00:50Z",
+          "transcript_turns": [
+            { "offset_seconds": 0, "speaker": "clinic", "text": "You've reached Memorial Open MRI, we're closed. Please leave a message after the tone." }
+          ]
+        }
+      ]
+    }
+  ]
+}

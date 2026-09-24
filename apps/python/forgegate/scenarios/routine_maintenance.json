@@ -1,0 +1,7 @@
+{
+  "incident_id": "INC-006",
+  "source": "scheduler",
+  "signals": {"task": "firmware_update", "device": "plc_07"},
+  "risk_score": 0.25,
+  "proposed_action": "none - routine scheduled maintenance window"
+}

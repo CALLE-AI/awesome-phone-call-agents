@@ -36,7 +36,7 @@ printTable([
   ["Minutes waiting at doors", ...both((e) => e.metrics.doorWaitMinutes.toFixed(0))],
   ["Trips avoided (later / not today)", ...both((e) => `${e.metrics.tripsAvoided}`)],
   ["Calls placed", ...both((e) => `${e.metrics.calls}`)],
-  ["Call cost at $0.05 each", ...both((e) => `$${(e.metrics.calls * 0.05).toFixed(2)}`)],
+  ["CALL-E charges", "None (simulation)", "None (simulation)"],
   ["Kilometres driven", ...both((e) => e.metrics.kilometres.toFixed(1))],
   ["Route finished", ...both((e) => (e.metrics.finishedAt === null ? "-" : clock(e.metrics.finishedAt)))],
 ]);

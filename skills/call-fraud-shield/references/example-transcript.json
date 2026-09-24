@@ -1,0 +1,37 @@
+[
+  {
+    "call_id": "calle-example-001",
+    "role": "caller",
+    "text": "Hello, this is the fraud department at SecureBank. We have detected suspicious activity on your account."
+  },
+  {
+    "call_id": "calle-example-001",
+    "role": "callee",
+    "text": "Oh really? What kind of suspicious activity?"
+  },
+  {
+    "call_id": "calle-example-001",
+    "role": "caller",
+    "text": "Your account has been compromised. We need to verify your identity immediately. You must act within the next 10 minutes or your account will be suspended."
+  },
+  {
+    "call_id": "calle-example-001",
+    "role": "callee",
+    "text": "That sounds serious. What do I need to do?"
+  },
+  {
+    "call_id": "calle-example-001",
+    "role": "caller",
+    "text": "Please provide your one-time password that was just sent to your phone. Do not hang up and do not tell anyone about this call. This is a confidential security procedure."
+  },
+  {
+    "call_id": "calle-example-001",
+    "role": "callee",
+    "text": "I see, I did get an OTP. Should I read it to you?"
+  },
+  {
+    "call_id": "calle-example-001",
+    "role": "caller",
+    "text": "Yes, please provide the code immediately. Every second counts. If you delay, the fraudsters will empty your account."
+  }
+]

@@ -128,7 +128,7 @@ export function todayScreen(snap, day) {
       <div class="kpi lead"><b>${m.failedAttempts}</b><span>failed attempts${b ? ` · ${b.failedAttempts} without calls` : ""}</span></div>
       <div class="kpi"><b>${m.tripsAvoided}</b><span>wasted trips avoided</span></div>
       <div class="kpi"><b>${m.delivered}</b><span>delivered</span></div>
-      <div class="kpi"><b>${m.calls}</b><span>calls · $${(m.calls * 0.05).toFixed(2)}</span></div>
+      <div class="kpi"><b>${m.calls}</b><span>calls</span></div>
     </div>`;
   const compare = `
     <div class="panel">

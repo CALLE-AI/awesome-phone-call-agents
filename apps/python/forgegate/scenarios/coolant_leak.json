@@ -1,0 +1,7 @@
+{
+  "incident_id": "INC-004",
+  "source": "hvac_sensor",
+  "signals": {"coolant_psi": 12, "temp_c": 52.3, "zone": "datacenter_b"},
+  "risk_score": 0.93,
+  "proposed_action": "emergency shutdown cooling unit B and evacuate floor"
+}

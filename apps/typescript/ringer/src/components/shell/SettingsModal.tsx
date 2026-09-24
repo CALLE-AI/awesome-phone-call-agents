@@ -1,6 +1,5 @@
 import { useState } from 'react'
 import {
-  BadgeCheck,
   ExternalLink,
   Eye,
   EyeOff,
@@ -157,7 +156,6 @@ export function SettingsModal({
             </div>
           </div>
 
-          {/* First-live-call onboarding: real outbound needs KYC + a number */}
           <div className="rounded-2xl border border-border bg-surface-2 p-4">
             <p className="mb-3 flex items-center gap-1.5 text-sm font-bold text-ink">
               <Rocket className="size-4 text-primary" /> Before your first live call
@@ -165,32 +163,24 @@ export function SettingsModal({
             <ol className="flex flex-col gap-3.5">
               <SetupStep
                 n={1}
-                icon={<BadgeCheck className="size-4" />}
-                title="Verify your identity (KYC)"
-                desc="CALL-E requires identity verification before it will place outbound calls."
-                href={DASHBOARD}
-                action="Verify in dashboard"
-              />
-              <SetupStep
-                n={2}
-                icon={<Radio className="size-4" />}
-                title="Get a phone number"
-                desc="Buy a CALL-E number (or connect a SIP trunk) so your calls have a caller ID. Some regions restrict outbound."
-                href={DASHBOARD}
-                action="Get a number"
-              />
-              <SetupStep
-                n={3}
                 icon={<KeyRound className="size-4" />}
                 title="Add your API key"
                 desc="Paste your key above — or the operator can configure one on the server."
                 href={`${DASHBOARD}/account/api-keys`}
                 action="API keys"
               />
+              <SetupStep
+                n={2}
+                icon={<Radio className="size-4" />}
+                title="Choose your outbound line"
+                desc="Single-recipient tests can use shared numbers without buying a number or completing KYC. Purchased numbers require KYC for outbound activation; for API batches, select an eligible activated number as your default outbound line."
+                href={DASHBOARD}
+                action="Manage numbers"
+              />
             </ol>
             <p className="mt-3.5 border-t border-border pt-3 text-xs leading-relaxed text-muted">
-              New accounts include free calls; after that, each completed call is about{' '}
-              <span className="font-semibold text-ink">$0.05</span>. Demo Mode is always free.
+              New accounts receive 100 free credits. Live calls have usage-based charges;
+              check CALL-E Dashboard billing for actual costs. Demo Mode is always free.
             </p>
           </div>
           </>

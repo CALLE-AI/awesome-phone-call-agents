@@ -1,8 +1,6 @@
 /**
  * Call governor. Hard caps, quiet hours, blocklist, kill switch,
- * and a dry-run accountant. Twenty free calls is the binding constraint.
- *
- * Source: docs/build-plan.md §2.5. Implementation lands Friday AM.
+ * and a dry-run accountant. The project cap is local, not a CALL-E credit balance.
  */
 
 export type BudgetDecision =

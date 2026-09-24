@@ -48,11 +48,6 @@ from .tasks import TASK_SPEC_VERSION, TaskError, build_task
 from .transport import Transport
 from .types import BoundaryError, ConsentedEmployerContact, Relationship, redact
 
-# CALL-E's published early-stage price per billable call. Used only to show an
-# operator what a run would cost; the API exposes no balance endpoint
-# (CALL-E issue #183), so this is an estimate and the README says so.
-PRICE_PER_CALL_USD = 0.05
-
 DEFAULT_MAX_CALLS_PER_RUN = 25
 DEFAULT_POLL_FIRST_DELAY = 60.0
 DEFAULT_POLL_INTERVAL = 8.0
@@ -98,8 +93,8 @@ class Plan:
         return len(self.planned)
 
     @property
-    def estimated_cost_usd(self) -> float:
-        return round(self.call_count * PRICE_PER_CALL_USD, 2)
+    def estimated_cost_usd(self) -> float | None:
+        return 0.0 if self.call_count == 0 else None
 
 
 @dataclass(frozen=True, slots=True)
