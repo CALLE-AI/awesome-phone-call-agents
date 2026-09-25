@@ -1,4 +1,4 @@
-import json, os, sqlite3
+import json, os, re, sqlite3
 from datetime import datetime, timezone
 
 BASE = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
@@ -10,6 +10,32 @@ POLICY_DIR = os.path.join(DATA_DIR, 'policies')
 
 def now():
     return datetime.now(timezone.utc).isoformat()
+
+_PHONE_RE = re.compile(r'\+?\d[\d\s().-]{6,}\d')
+
+
+def mask_phone(phone):
+    """Mask a phone number for anything leaving the backend. Internal
+    code that needs the real number (execute_call, via entity()) must
+    keep reading it unmasked — never call this before placing a call."""
+    if not phone or not isinstance(phone, str):
+        return phone
+    digits = re.sub(r'\D', '', phone)
+    if len(digits) < 4:
+        return '•••'
+    return '••• ••• ' + digits[-4:]
+
+
+def redact(value):
+    """Recursively mask phone-shaped substrings inside free text —
+    call summaries, transcripts, structured results, provider errors."""
+    if isinstance(value, str):
+        return _PHONE_RE.sub('[redacted]', value)
+    if isinstance(value, dict):
+        return {k: redact(v) for k, v in value.items()}
+    if isinstance(value, list):
+        return [redact(v) for v in value]
+    return value
 
 
 def connect():
@@ -82,14 +108,21 @@ def get_state():
         'call_logs': [],
         'central_log': [dict(r) for r in conn.execute('SELECT * FROM central_log ORDER BY id DESC LIMIT 50')]
     }
+    
     for r in conn.execute('SELECT * FROM call_logs ORDER BY created_at DESC LIMIT 50'):
         d = dict(r)
-        d['structured_result'] = json.loads(r['structured_result']) if r['structured_result'] else None
-        d['transcript'] = json.loads(r['transcript']) if r['transcript'] else []
+        d['structured_result'] = redact(json.loads(r['structured_result']) if r['structured_result'] else None)
+        d['transcript'] = redact(json.loads(r['transcript']) if r['transcript'] else [])
+        d['summary'] = redact(d.get('summary'))
         state['call_logs'].append(d)
     conn.close()
+    for group in ('employees', 'customers', 'licenses'):
+        for item in state[group]:
+            if 'phone' in item: item['phone'] = mask_phone(item['phone'])
+            if 'owner_phone' in item: item['owner_phone'] = mask_phone(item['owner_phone'])
+    for row in state['central_log']:
+        row['text'] = redact(row.get('text'))
     return state
-
 
 def entity(pillar, entity_id):
     table = {'employee':'employees','customer':'customers','license':'licenses'}.get(pillar, pillar)

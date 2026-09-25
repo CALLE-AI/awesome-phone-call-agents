@@ -19,9 +19,10 @@ calls" sections.
 import os
 import threading
 import time as time_module
+import uuid
 from datetime import datetime
 
-from .db import get_state, entity as get_entity, update_entity
+from .db import get_state, entity as get_entity, update_entity, redact
 
 INTERVAL_SECONDS = int(os.environ.get('AUTOMATION_INTERVAL_SECONDS', '20'))
 CHECKIN_DEADLINE_HOUR = int(os.environ.get('CHECKIN_DEADLINE_HOUR', '10'))  # matches the employee policy's 10:00 AM
@@ -39,6 +40,7 @@ _tick_lock = threading.Lock()
 
 _in_flight = {}  # (pillar, entity_id) -> call_id, for live calls still awaiting a result
 
+_pending_reconciliation = {}  # (pillar, entity_id) -> unresolved attempt
 
 def wire(execute_call_fn, refresh_call_fn):
     """Dependency injection instead of importing app.py directly, which
@@ -76,38 +78,119 @@ def _mark_handled(pillar, e):
     fresh = get_entity(pillar, e['id']) or e
     update_entity(pillar, e['id'], {'_auto_handled_for': _signature(fresh)})
 
-
 def _fire(pillar, e, act, fired):
     key = (pillar, e['id'])
-    try:
-        result = _execute_call(pillar, e['id'], act)
-    except Exception as ex:
-        fired.append({'pillar': pillar, 'entityId': e['id'], 'act': act, 'error': str(ex)})
+
+    # Never create another call while the previous attempt is unresolved.
+    if key in _in_flight or key in _pending_reconciliation:
         return
+
+    # Generate the idempotency key BEFORE making the CALL-E request.
+    # If the request outcome becomes unknown, this exact key is preserved
+    # in _pending_reconciliation so the operation is not retried with a
+    # different key.
+    idempotency_key = f'relay-op-{uuid.uuid4().hex}'
+
+    try:
+        result = _execute_call(
+            pillar,
+            e['id'],
+            act,
+            idempotency_key=idempotency_key,
+            live_intent=True
+        )
+
+    except Exception as ex:
+        # The request may have reached CALL-E even if we never received
+        # its response. Do NOT retry automatically.
+        _pending_reconciliation[key] = {
+            'pillar': pillar,
+            'entity_id': e['id'],
+            'act': act,
+            'idempotency_key': idempotency_key,
+            'error': str(ex),
+            'detected_at': datetime.now().isoformat(),
+        }
+
+        fired.append({
+            'pillar': pillar,
+            'entityId': e['id'],
+            'act': act,
+            'status': 'pending_reconciliation',
+            'error': str(ex),
+        })
+        return
+
     if result.get('dryRun', True):
-        # Dry-run calls resolve synchronously inside execute_call() — the
-        # entity has already been updated, so it's safe to mark handled now.
+        # Dry-run calls resolve synchronously.
         _mark_handled(pillar, e)
+
+        fired.append({
+            'pillar': pillar,
+            'entityId': e['id'],
+            'act': act,
+            'callId': result.get('callId'),
+            'dryRun': True,
+            'status': 'completed',
+        })
+
     else:
-        # Live calls are still pending. Track it so a later tick can poll
-        # and resolve it, instead of re-firing on the same open condition
-        # every interval while it's still in flight.
-        _in_flight[key] = result.get('callId')
-    fired.append({'pillar': pillar, 'entityId': e['id'], 'act': act, 'callId': result.get('callId'), 'dryRun': result.get('dryRun', True)})
+        call_id = result.get('callId')
 
+        if not call_id:
+            # We received a response, but cannot safely identify the call.
+            # Hold the operation for reconciliation instead of retrying.
+            _pending_reconciliation[key] = {
+                'pillar': pillar,
+                'entity_id': e['id'],
+                'act': act,
+                'idempotency_key': idempotency_key,
+                'error': 'CALL-E response did not contain a call ID',
+                'detected_at': datetime.now().isoformat(),
+            }
 
+            fired.append({
+                'pillar': pillar,
+                'entityId': e['id'],
+                'act': act,
+                'status': 'pending_reconciliation',
+            })
+            return
+
+        _in_flight[key] = call_id
+
+        fired.append({
+            'pillar': pillar,
+            'entityId': e['id'],
+            'act': act,
+            'callId': call_id,
+            'dryRun': False,
+            'status': 'queued',
+        })
+        
 def _resolve_in_flight():
     if not _refresh_call:
         return
+
     for key, call_id in list(_in_flight.items()):
-        record = _refresh_call(call_id)
-        if record and record.get('status') in ('completed', 'failed', 'canceled'):
+        try:
+            record = _refresh_call(call_id)
+        except Exception:
+            # Keep the call in flight. Do not create another call.
+            continue
+
+        if record and record.get('status') in (
+            'completed',
+            'failed',
+            'canceled'
+        ):
             pillar, entity_id = key
             e = get_entity(pillar, entity_id)
+
             if e:
                 _mark_handled(pillar, e)
-            del _in_flight[key]
 
+            del _in_flight[key]
 
 def run_once():
     if _execute_call is None:
@@ -171,6 +254,18 @@ def run_once():
         _status['last_result'] = fired
     return fired
 
+def get_pending_reconciliation():
+    return {
+        f'{pillar}:{entity_id}': {
+            'pillar': info.get('pillar'),
+            'entity_id': info.get('entity_id'),
+            'act': info.get('act'),
+            'error': redact(info.get('error')),
+            'detected_at': info.get('detected_at'),
+        }
+        for (pillar, entity_id), info
+        in _pending_reconciliation.items()
+    }
 
 def start_background_loop():
     def _loop():
@@ -183,7 +278,20 @@ def start_background_loop():
     thread = threading.Thread(target=_loop, daemon=True, name='relay-automation')
     thread.start()
 
-
 def get_status():
     with _status_lock:
-        return dict(_status)
+        status = dict(_status)
+
+    status['last_result'] = [
+        {**item, 'error': redact(item['error'])} if 'error' in item else item
+        for item in status.get('last_result', [])
+    ]
+
+    status['in_flight'] = {
+        f'{pillar}:{entity_id}': call_id
+        for (pillar, entity_id), call_id in _in_flight.items()
+    }
+
+    status['pending_reconciliation'] = get_pending_reconciliation()
+
+    return status

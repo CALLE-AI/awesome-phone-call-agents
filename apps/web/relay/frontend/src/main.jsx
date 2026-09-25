@@ -50,7 +50,9 @@ function App() {
 
   const load = async () => {
     try {
-      const r = await fetch(`${API}/state`);
+      const r = await fetch(`${API}/state`, {
+      credentials: 'include'
+      });
       const d = await r.json();
       if (!r.ok || d.error) throw new Error(d.error || 'Unable to load state');
       setState(d);
@@ -62,7 +64,9 @@ function App() {
 
   const loadAutomation = async () => {
     try {
-      const r = await fetch(`${API}/automation/status`);
+      const r = await fetch(`${API}/automation/status`, {
+      credentials: 'include'
+      });
       const d = await r.json();
       if (r.ok) setAutomation(d);
     } catch (e) { /* keep last known status rather than erroring the whole page */ }
@@ -81,7 +85,10 @@ function App() {
   async function runAutomationNow() {
     setAutoRunning(true);
     try {
-      const r = await fetch(`${API}/automation/run-once`, { method: 'POST' });
+      const r = await fetch(`${API}/automation/run-once`, {
+      method: 'POST',
+      credentials: 'include'
+    });
       const d = await r.json();
       if (r.ok) { setAutomation(d.status); await load(); }
     } finally { setAutoRunning(false); }
@@ -114,12 +121,23 @@ function App() {
     setError('');
     try {
       const r = await fetch(`${API}/trigger-call`, {
-        method: 'POST', headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ pillar, entityId: entity.id, act }),
-      });
+      method: 'POST',
+      credentials: 'include',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+      pillar,
+      entityId: entity.id,
+      act,
+      liveIntent: true
+    }),
+    });
       const d = await r.json();
       if (!r.ok) throw new Error(d.error || 'Call failed');
-      setState(await (await fetch(`${API}/state`)).json());
+      setState(await (
+      await fetch(`${API}/state`, {
+        credentials: 'include'
+      })
+      ).json());
       setNotifications(true);
       window.setTimeout(() => setNotifications(false), 2800);
     } catch (e) { setError(e.message); }
@@ -127,7 +145,10 @@ function App() {
 
   async function post(pillar, data) {
     const r = await fetch(`${API}/entities/${pillar}`, {
-      method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(data),
+      method: 'POST',
+      credentials: 'include',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(data),
     });
     const d = await r.json();
     if (!r.ok) throw new Error(d.error || 'Save failed');
@@ -218,7 +239,12 @@ function Login({ onLogin }) {
     const url = newCo ? `${API}/company` : `${API}/login`;
     const body = newCo ? { name, email, password } : { email, password };
     try {
-      const r = await fetch(url, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) });
+      const r = await fetch(url, {
+      method: 'POST',
+      credentials: 'include',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(body)
+      });
       const d = await r.json(); if (!r.ok) throw new Error(d.error);
       onLogin();
     } catch (e) { setError(e.message); }
@@ -312,12 +338,21 @@ function Software({ items, onCall, onAdd }) {
 
 function SoftwareForm({ onAdd }) { const [x,setX]=useState({tool:'',dept:'',owner:'',owner_phone:'',seats_purchased:10,seats_active:5,cost_per_seat:10,renewal_date:'2026-12-31'}); return <div className="darkForm"><div className="eyebrow">ADD SUBSCRIPTION</div><h3>Track a software product</h3><div className="formGrid">{['tool','dept','owner','owner_phone','renewal_date'].map(k=><input key={k} placeholder={k.replaceAll('_',' ')} value={x[k]} onChange={e=>setX({...x,[k]:e.target.value})}/>)}<input type="number" placeholder="seats purchased" value={x.seats_purchased} onChange={e=>setX({...x,seats_purchased:+e.target.value})}/><input type="number" placeholder="active seats" value={x.seats_active} onChange={e=>setX({...x,seats_active:+e.target.value})}/><input type="number" placeholder="cost per seat" value={x.cost_per_seat} onChange={e=>setX({...x,cost_per_seat:+e.target.value})}/></div><button className="primary" onClick={() => onAdd(x)}>Save software</button></div>; }
 
-function Policies({ policies, meta, onSaved }) { const [local,setLocal]=useState(policies); const [saving,setSaving]=useState(''); const upload=async(k,file)=>{const fd=new FormData();fd.append('key',k);fd.append('file',file);const r=await fetch(`${API}/policies/upload`,{method:'POST',body:fd});if(!r.ok)throw Error((await r.json()).error);onSaved();}; const save=async k=>{setSaving(k);await fetch(`${API}/policies/${k}`,{method:'PUT',headers:{'Content-Type':'application/json'},body:JSON.stringify({content:local[k]})});setSaving('');onSaved();}; return <Page title="Company Policies" sub="Business-specific guardrails that Relay uses during conversations and actions."><div className="policyHero"><div className="policyHeroIcon">▤</div><div><strong>Policies power Relay's decisions</strong><p>Upload or edit the rules your agents should follow. The supplied demo policies are already loaded.</p></div></div><div className="policyGrid">{Object.entries(policies).map(([k,v])=><div className="policyCard" key={k}><div className="policyHeader"><div><div className="eyebrow">{k.toUpperCase()}</div><h3>{policyLabels[k]||k}</h3><small>{meta[k]?.filename || 'Not uploaded'} · updated {meta[k]?.updated_at || '—'}</small></div><label className="uploadButton">Upload<input type="file" accept=".txt,.md,text/plain,text/markdown" onChange={e=>e.target.files[0]&&upload(k,e.target.files[0])}/></label></div><textarea value={local[k]} onChange={e=>setLocal({...local,[k]:e.target.value})}/><button onClick={()=>save(k)}>{saving===k?'Saving…':'Save policy'}</button></div>)}</div></Page>; }
+function Policies({ policies, meta, onSaved }) { const [local,setLocal]=useState(policies); const [saving,setSaving]=useState(''); const upload=async(k,file)=>{const fd=new FormData();fd.append('key',k);fd.append('file',file);const r=await fetch(`${API}/policies/upload`,{method:'POST',credentials:'include',body:fd});if(!r.ok)throw Error((await r.json()).error);onSaved();}; const save=async k=>{setSaving(k);await fetch(`${API}/policies/${k}`,{method:'PUT',credentials: 'include',headers:{'Content-Type':'application/json'},body:JSON.stringify({content:local[k]})});setSaving('');onSaved();}; return <Page title="Company Policies" sub="Business-specific guardrails that Relay uses during conversations and actions."><div className="policyHero"><div className="policyHeroIcon">▤</div><div><strong>Policies power Relay's decisions</strong><p>Upload or edit the rules your agents should follow. The supplied demo policies are already loaded.</p></div></div><div className="policyGrid">{Object.entries(policies).map(([k,v])=><div className="policyCard" key={k}><div className="policyHeader"><div><div className="eyebrow">{k.toUpperCase()}</div><h3>{policyLabels[k]||k}</h3><small>{meta[k]?.filename || 'Not uploaded'} · updated {meta[k]?.updated_at || '—'}</small></div><label className="uploadButton">Upload<input type="file" accept=".txt,.md,text/plain,text/markdown" onChange={e=>e.target.files[0]&&upload(k,e.target.files[0])}/></label></div><textarea value={local[k]} onChange={e=>setLocal({...local,[k]:e.target.value})}/><button onClick={()=>save(k)}>{saving===k?'Saving…':'Save policy'}</button></div>)}</div></Page>; }
 
 function Meetings({ items, departments, onSaved }) {
   const [show,setShow]=useState(false), [saving,setSaving]=useState(false);
   const [x,setX]=useState({title:'',date:localDateKey(new Date()),time:'10:00',dept:departments[0]||''});
-  const save=async()=>{setSaving(true);try{const r=await fetch(`${API}/meetings/schedule`,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({...x})});const d=await r.json();if(!r.ok)throw Error(d.error||'Unable to schedule meeting');onSaved();setShow(false);}catch(e){alert(e.message)}finally{setSaving(false)}};
+  const save=async()=>{setSaving(true);
+    try{
+      const r = await fetch(`${API}/meetings/schedule`, {
+        method: 'POST',
+        credentials: 'include',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({...x})
+      });
+        
+      const d=await r.json();if(!r.ok)throw Error(d.error||'Unable to schedule meeting');onSaved();setShow(false);}catch(e){alert(e.message)}finally{setSaving(false)}};
   return <Page title="Meetings" sub="Schedule meetings by department and have Relay call the people who need the reminder." actions={<button className="primary" onClick={()=>setShow(!show)}>+ Schedule meeting</button>}>
     {show&&<div className="darkForm"><div className="eyebrow">NEW MEETING</div><h3>Schedule & notify a department</h3><div className="formGrid"><input placeholder="Meeting title" value={x.title} onChange={e=>setX({...x,title:e.target.value})}/><input type="date" value={x.date} onChange={e=>setX({...x,date:e.target.value})}/><input type="time" value={x.time} onChange={e=>setX({...x,time:e.target.value})}/><select value={x.dept} onChange={e=>setX({...x,dept:e.target.value})}>{departments.map(d=><option key={d}>{d}</option>)}</select></div><p className="formHint">Relay will call every employee in the selected department with a meeting reminder.</p><button className="primary" disabled={saving} onClick={save}>{saving?'Calling attendees…':'Schedule & call attendees'}</button></div>}
     <div className="meetingPageGrid">{items.slice().sort((a,b)=>`${a.date||''}${a.time}`.localeCompare(`${b.date||''}${b.time}`)).map(m=><div className="meetingCard" key={m.id}><div className="meetingTime"><b>{m.time}</b><span>{m.date||'Scheduled'}</span></div><div><div className="eyebrow">{m.dept||m.owner||'Company'}</div><h3>{m.title}</h3><p>{m.recipient_ids?.length||0} employees notified · {m.reminder_status||'Scheduled'}</p></div><span className={`meetingStatus ${m.reminder_status==='completed'?'done':''}`}>{m.reminder_status==='completed'?'Reminders sent':'Scheduled'}</span></div>)}</div>
@@ -327,7 +362,7 @@ function Meetings({ items, departments, onSaved }) {
 function Memos({ items, departments, onSaved }) {
   const [show,setShow]=useState(false), [saving,setSaving]=useState(false);
   const [x,setX]=useState({title:'',body:'',dept:departments[0]||'',status:'open'});
-  const save=async()=>{setSaving(true);try{const r=await fetch(`${API}/memos/publish`,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(x)});const d=await r.json();if(!r.ok)throw Error(d.error||'Unable to publish memo');onSaved();setShow(false);}catch(e){alert(e.message)}finally{setSaving(false)}};
+  const save=async()=>{setSaving(true);try{const r=await fetch(`${API}/memos/publish`,{method:'POST',credentials: 'include',headers:{'Content-Type':'application/json'},body:JSON.stringify(x)});const d=await r.json();if(!r.ok)throw Error(d.error||'Unable to publish memo');onSaved();setShow(false);}catch(e){alert(e.message)}finally{setSaving(false)}};
   return <Page title="Memos" sub="Publish department-specific updates and let Relay deliver them by phone." actions={<button className="primary" onClick={()=>setShow(!show)}>+ New memo</button>}>
     {show&&<div className="darkForm"><div className="eyebrow">NEW MEMO</div><h3>Create & notify a department</h3><div className="formGrid"><input placeholder="Memo title" value={x.title} onChange={e=>setX({...x,title:e.target.value})}/><select value={x.dept} onChange={e=>setX({...x,dept:e.target.value})}>{departments.map(d=><option key={d}>{d}</option>)}</select></div><textarea className="formTextarea" placeholder="Memo body" value={x.body} onChange={e=>setX({...x,body:e.target.value})}/><button className="primary" disabled={saving} onClick={save}>{saving?'Calling recipients…':'Publish & call recipients'}</button></div>}
     <div className="memoPageGrid">{items.map(m=><div className="memoCard" key={m.id}><div className="memoIcon">▤</div><div><div className="eyebrow">{m.dept||'COMPANY'}</div><h3>{m.title}</h3><p>{m.body}</p><small>{m.status} · {m.recipient_ids?.length||0} recipients · {m.delivery_status||'open'}</small></div></div>)}</div>
@@ -336,10 +371,16 @@ function Memos({ items, departments, onSaved }) {
 
 function Calls({ logs }) { const [filter,setFilter]=useState('All'); const filtered=logs.filter(x=>filter==='All'||x.pillar===filter); return <Page title="Call Logs" sub="Every operational call, transcript, structured outcome and audit event in one place." actions={<div className="filterGroup">{['All','employee','customer','license'].map(x=><button key={x} className={filter===x?'selected':''} onClick={()=>setFilter(x)}>{x}</button>)}</div>}>{filtered.length?<div className="callList">{filtered.map(x=><div className="callCard" key={x.id}><div className="callHeader"><div><span className="callType">{actLabels[x.act]||x.act}</span><small>{x.pillar} · {x.entity_id} · {x.created_at}</small></div><span className={`statusPill ${x.status==='completed'?'green':'yellow'}`}>{x.status}</span></div><p>{x.summary}</p><details><summary>View transcript & structured result</summary><div className="transcript">{(x.transcript||[]).map((t,i)=><p key={i}><b>{t.speaker==='bot'?'Relay':'Recipient'}:</b> {t.text}</p>)}</div><pre>{JSON.stringify(x.structured_result,null,2)}</pre></details></div>)}</div>:<Empty text="No calls match this filter."/>}</Page>; }
 
-function Analytics({ state }) { const [a,setA]=useState(null); useEffect(()=>{fetch(`${API}/analytics`).then(r=>r.json()).then(setA)},[state.call_logs.length,state.employees.length,state.licenses.length]); if(!a)return <Page title="Analytics" sub="Leadership-level visibility into operational efficiency."><div className="loadingBox">Calculating analytics…</div></Page>; const totalSeats=state.licenses.reduce((s,x)=>s+x.seats_purchased,0),activeSeats=state.licenses.reduce((s,x)=>s+x.seats_active,0),util=totalSeats?Math.round(activeSeats/totalSeats*100):0; return <Page title="Analytics" sub="Leadership-level visibility into operational efficiency and optimization opportunities."><div className="sectionKpis"><SmallStat label="Employee present" value={a.employee_status.present} tone="green"/><SmallStat label="Call completion" value={`${a.calls.total?Math.round(a.calls.completed/a.calls.total*100):0}%`} tone="purple"/><SmallStat label="SaaS utilization" value={`${util}%`} tone="purple"/><SmallStat label="Unused spend" value={`$${a.software.unused_monthly_spend.toLocaleString()}`} tone="yellow"/></div><div className="analyticsGrid"><ChartPanel title="Employee status" data={a.employee_status}/><ChartPanel title="Calls by pillar" data={a.calls.by_pillar}/><ChartPanel title="Customer plans" data={a.customer_plans}/></div><div className="insightBanner"><div><div className="eyebrow">OPTIMIZATION SIGNAL</div><h3>{util < 70 ? 'Software utilization is below target.' : 'Software utilization is healthy.'}</h3><p>Relay found <strong>${a.software.unused_monthly_spend.toLocaleString()}/month</strong> in potential unused SaaS spend.</p></div><span className="insightNumber">{util}%</span></div></Page>; }
+function Analytics({ state }) { const [a,setA]=useState(null); useEffect(() => {
+    fetch(`${API}/analytics`, {
+        credentials: 'include'
+    })
+        .then(r => r.json())
+        .then(setA)
+}, [state.call_logs.length, state.employees.length, state.licenses.length]); if(!a)return <Page title="Analytics" sub="Leadership-level visibility into operational efficiency."><div className="loadingBox">Calculating analytics…</div></Page>; const totalSeats=state.licenses.reduce((s,x)=>s+x.seats_purchased,0),activeSeats=state.licenses.reduce((s,x)=>s+x.seats_active,0),util=totalSeats?Math.round(activeSeats/totalSeats*100):0; return <Page title="Analytics" sub="Leadership-level visibility into operational efficiency and optimization opportunities."><div className="sectionKpis"><SmallStat label="Employee present" value={a.employee_status.present} tone="green"/><SmallStat label="Call completion" value={`${a.calls.total?Math.round(a.calls.completed/a.calls.total*100):0}%`} tone="purple"/><SmallStat label="SaaS utilization" value={`${util}%`} tone="purple"/><SmallStat label="Unused spend" value={`$${a.software.unused_monthly_spend.toLocaleString()}`} tone="yellow"/></div><div className="analyticsGrid"><ChartPanel title="Employee status" data={a.employee_status}/><ChartPanel title="Calls by pillar" data={a.calls.by_pillar}/><ChartPanel title="Customer plans" data={a.customer_plans}/></div><div className="insightBanner"><div><div className="eyebrow">OPTIMIZATION SIGNAL</div><h3>{util < 70 ? 'Software utilization is below target.' : 'Software utilization is healthy.'}</h3><p>Relay found <strong>${a.software.unused_monthly_spend.toLocaleString()}/month</strong> in potential unused SaaS spend.</p></div><span className="insightNumber">{util}%</span></div></Page>; }
 function ChartPanel({ title, data }) { const max=Math.max(...Object.values(data),1); return <section className="chartPanel"><div className="panelTitle"><div><h3>{title}</h3><span>Current snapshot</span></div></div><div className="horizontalBars">{Object.entries(data).map(([k,v])=><div key={k}><div><span>{k.replaceAll('_',' ')}</span><b>{v}</b></div><i style={{width:`${v/max*100}%`}} /></div>)}</div></section>; }
 
-function Settings({ settings, onSaved }) { const labels={meeting_scheduler:'Meeting scheduler',memo_broadcast:'Memo broadcasts',employee_operations:'Employee operations',customer_lifecycle:'Customer lifecycle',vendor_optimization:'Vendor / SaaS optimizer',automatic_followups:'Automatic follow-ups'}; const desc={meeting_scheduler:'Manage upcoming meetings and department reminder workflows.',memo_broadcast:'Allow Relay to deliver department-specific memos by phone.',employee_operations:'Enable employee check-ins, attendance and offboarding calls.',customer_lifecycle:'Enable customer renewal and service lifecycle calls.',vendor_optimization:'Enable software utilization and renewal optimization calls.',automatic_followups:'Allow future workflows to create follow-up tasks.'}; const change=async(k,v)=>{await fetch(`${API}/settings`,{method:'PATCH',headers:{'Content-Type':'application/json'},body:JSON.stringify({[k]:v})});onSaved()}; return <Page title="Settings" sub="Control which Relay capabilities are active for this company."><div className="settingsLayout"><div className="settingsIntro"><div className="settingsIcon">⚙</div><div><div className="eyebrow">AUTOMATION CONTROL CENTER</div><h2>Choose what Relay can operate</h2><p>These switches are enforced by the backend for call workflows. Turn a capability off to prevent its corresponding actions.</p></div></div><div className="settingsList">{Object.entries(settings).map(([k,v])=><div className="settingRow" key={k}><div className="settingIcon">{k==='employee_operations'?'♙':k==='customer_lifecycle'?'♧':k==='vendor_optimization'?'▣':k==='meeting_scheduler'?'□':k==='memo_broadcast'?'▤':'⌁'}</div><div className="settingCopy"><b>{labels[k]||k}</b><small>{desc[k]||''}</small></div><label className="switch"><input type="checkbox" checked={v} onChange={e=>change(k,e.target.checked)}/><span /></label></div>)}</div></div></Page>; }
+function Settings({ settings, onSaved }) { const labels={meeting_scheduler:'Meeting scheduler',memo_broadcast:'Memo broadcasts',employee_operations:'Employee operations',customer_lifecycle:'Customer lifecycle',vendor_optimization:'Vendor / SaaS optimizer',automatic_followups:'Automatic follow-ups'}; const desc={meeting_scheduler:'Manage upcoming meetings and department reminder workflows.',memo_broadcast:'Allow Relay to deliver department-specific memos by phone.',employee_operations:'Enable employee check-ins, attendance and offboarding calls.',customer_lifecycle:'Enable customer renewal and service lifecycle calls.',vendor_optimization:'Enable software utilization and renewal optimization calls.',automatic_followups:'Allow future workflows to create follow-up tasks.'}; const change=async(k,v)=>{await fetch(`${API}/settings`,{method:'PATCH',credentials: 'include',headers:{'Content-Type':'application/json'},body:JSON.stringify({[k]:v})});onSaved()}; return <Page title="Settings" sub="Control which Relay capabilities are active for this company."><div className="settingsLayout"><div className="settingsIntro"><div className="settingsIcon">⚙</div><div><div className="eyebrow">AUTOMATION CONTROL CENTER</div><h2>Choose what Relay can operate</h2><p>These switches are enforced by the backend for call workflows. Turn a capability off to prevent its corresponding actions.</p></div></div><div className="settingsList">{Object.entries(settings).map(([k,v])=><div className="settingRow" key={k}><div className="settingIcon">{k==='employee_operations'?'♙':k==='customer_lifecycle'?'♧':k==='vendor_optimization'?'▣':k==='meeting_scheduler'?'□':k==='memo_broadcast'?'▤':'⌁'}</div><div className="settingCopy"><b>{labels[k]||k}</b><small>{desc[k]||''}</small></div><label className="switch"><input type="checkbox" checked={v} onChange={e=>change(k,e.target.checked)}/><span /></label></div>)}</div></div></Page>; }
 
 function MeetingHeatmap({ meetings }) {
   const base=new Date(); base.setHours(0,0,0,0);
