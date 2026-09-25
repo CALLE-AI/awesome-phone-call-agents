@@ -131,6 +131,24 @@ export function resultSchemaJSON() {
   };
 }
 
+/**
+ * The contract check for the Calls transport: the schema about to be sent must be closed,
+ * emit every pinned field and require exactly the required ones. A silently truncated
+ * schema would let CALL-E return a partial object the card would then render.
+ *
+ * `preflight.mjs` reports this and `callsTransport.assertReady` enforces it, so a caller
+ * who skips preflight still cannot dial with a wrong schema. Empty means ready.
+ */
+export function emittedSchemaProblems(schema = resultSchemaJSON()) {
+  const emitted = Object.keys(schema?.properties ?? {});
+  const required = schema?.required ?? [];
+  const problems = [];
+  for (const f of contractFields()) if (!emitted.includes(f)) problems.push(`not emitted: ${f}`);
+  for (const f of CONTRACT.required) if (!required.includes(f)) problems.push(`not required: ${f}`);
+  if (schema?.additionalProperties !== false) problems.push('additionalProperties is not false');
+  return problems;
+}
+
 /** Every key the contract allows, required first. Used for the drift diff. */
 export function contractFields() {
   return [...CONTRACT.required, ...CONTRACT.optional];

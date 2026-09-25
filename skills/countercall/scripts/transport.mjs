@@ -27,7 +27,9 @@
  * Goal id is configured, and falls back to `calls` otherwise. Set COUNTERCALL_TRANSPORT to
  * force one.
  */
-import { CONTRACT, contractFields, resultSchemaJSON, validateResult } from './contract.mjs';
+import {
+  CONTRACT, contractFields, emittedSchemaProblems, resultSchemaJSON, validateResult,
+} from './contract.mjs';
 import { diffContract, publishedRunSpec } from './_lib.mjs';
 
 /** What every transport's `run` resolves to. `result` and `error` are mutually exclusive. */
@@ -145,11 +147,20 @@ export const callsTransport = {
   },
 
   /*
-   * Nothing to assert. There is no published artifact to drift against — the schema we send
-   * IS the schema we validate, generated from one source. This method exists so callers do
-   * not have to branch on transport.
+   * There is no published artifact to drift against — the schema we send IS the schema we
+   * validate, generated from one source. What can still go wrong is the generation, so the
+   * schema about to be sent is checked against the pinned contract: the same check preflight
+   * reports, run here so that `--live` enforces it rather than trusting preflight was run.
+   * `schema` is a parameter only so the refusal can be tested.
    */
-  async assertReady() {},
+  async assertReady(_client, _env, schema = resultSchemaJSON()) {
+    const problems = emittedSchemaProblems(schema);
+    if (problems.length) {
+      const error = new Error(`request-scoped schema does not match pinned contract v${CONTRACT.version}`);
+      error.drift = problems;
+      throw error;
+    }
+  },
 
   async run(client, office, procedure, key) {
     const request = this.describe(office, procedure, key);

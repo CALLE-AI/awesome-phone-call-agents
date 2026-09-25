@@ -7,8 +7,9 @@
  */
 import {
   validateOffice, diffContract, idempotencyKey, parseArgs, publishedRunSpec, loadOffices,
+  maskPhone, sanitizeText,
 } from './_lib.mjs';
-import { CONTRACT, contractFields, resultSchemaJSON } from './contract.mjs';
+import { CONTRACT, contractFields, emittedSchemaProblems, resultSchemaJSON } from './contract.mjs';
 import { selectTransport } from './transport.mjs';
 
 const PINNED = { version: CONTRACT.version, result_fields: contractFields() };
@@ -27,7 +28,7 @@ console.log('CounterCall preflight');
 console.log('---------------------');
 console.log(`  office             ${args.office}`);
 console.log(`  procedure          ${args.procedure}`);
-console.log(`  phone              ${office?.phone_e164 ?? '(none)'}`);
+console.log(`  phone              ${office?.phone_e164 ? maskPhone(office.phone_e164) : '(none)'}`);
 
 if (problems.length) {
   console.log(`  E.164              FAIL - ${problems.join('; ')}`);
@@ -48,21 +49,16 @@ console.log(`  transport          ${transport.name}`);
  * On `calls` there is nothing to fetch: the schema is generated from CONTRACT and sent with
  * the request, so what the server validates and what `validateResult` enforces come from one
  * source and cannot disagree. The check that matters is that the emitted schema is
- * well-formed and covers every pinned field — a silently truncated schema would let CALL-E
- * return a partial object the card would then render.
+ * well-formed and covers every pinned field. `call.mjs --live` and `bench.mjs --live` run
+ * the same `emittedSchemaProblems` before dialling; this reports it without dialling.
  */
 if (transport.name === 'calls') {
-  const schema = resultSchemaJSON();
-  const emitted = Object.keys(schema.properties);
-  const missing = contractFields().filter((f) => !emitted.includes(f));
-  const unrequired = CONTRACT.required.filter((f) => !schema.required.includes(f));
+  const emitted = Object.keys(resultSchemaJSON().properties);
+  const problems = emittedSchemaProblems();
 
-  if (missing.length || unrequired.length || schema.additionalProperties !== false) {
+  if (problems.length) {
     console.log('  contract           EMITTED SCHEMA IS WRONG');
-    for (const f of missing) console.log(`                     - not emitted: ${f}`);
-    for (const f of unrequired) console.log(`                     - not required: ${f}`);
-    if (schema.additionalProperties !== false)
-      console.log('                     - additionalProperties is not false');
+    for (const p of problems) console.log(`                     - ${p}`);
     console.log('');
     console.log('REFUSING TO DIAL. The request-scoped schema does not match the pinned contract.');
     process.exit(4);
@@ -100,7 +96,10 @@ if (transport.name === 'calls') {
       console.log('API key. Goals are owner-scoped: check the id, and check the key belongs to the');
       console.log('same account that published it. Cross-owner reads return 404, not 403.');
     } else {
-      console.log(`REFUSING TO DIAL. goals.get failed: ${status ?? '?'} ${err?.code ?? ''} ${err?.message ?? err}`);
+      const detail = sanitizeText(`${err?.code ?? ''} ${err?.message ?? err}`, {
+        secrets: [process.env.CALLE_API_KEY],
+      });
+      console.log(`REFUSING TO DIAL. goals.get failed: ${status ?? '?'} ${detail}`);
     }
     process.exit(4);
   }
@@ -108,7 +107,7 @@ if (transport.name === 'calls') {
   const drift = diffContract(PINNED, publishedRunSpec(goal));
   if (drift.length) {
     console.log('  contract           DRIFT DETECTED');
-    for (const d of drift) console.log(`                     - ${d}`);
+    for (const d of drift) console.log(`                     - ${sanitizeText(d)}`);
     console.log('');
     console.log('REFUSING TO DIAL. The published Goal no longer matches the contract this');
     console.log('skill was written against. Re-pin the contract and re-check the rendering.');

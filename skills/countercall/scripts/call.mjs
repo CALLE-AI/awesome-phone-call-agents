@@ -2,8 +2,12 @@
 /**
  * call.mjs — places the call. DRY RUN BY DEFAULT.
  *
- * Without --live this prints the exact request it would send and exits. A skill that
- * dials by default is a skill that dials by accident.
+ * Without --live this prints the request it would send and exits. A skill that dials by
+ * default is a skill that dials by accident. The printed copy has the destination number
+ * masked; the request sent on --live carries it whole.
+ *
+ * Every string that did not originate in this repo — SDK errors, vendor failure codes,
+ * values quoted back from a result — goes through `sanitizeText` before it is printed.
  *
  *   node scripts/call.mjs --office imigrasi-jaksel --procedure "perpanjangan paspor"
  *   node scripts/call.mjs --office imigrasi-jaksel --procedure "perpanjangan paspor" --live
@@ -12,7 +16,10 @@
  * one it runs the Calls API and sends the contract as a request-scoped schema. See
  * transport.mjs for why both exist. --transport goals|calls forces one.
  */
-import { validateOffice, idempotencyKey, parseArgs, loadOffices } from './_lib.mjs';
+import {
+  validateOffice, idempotencyKey, parseArgs, loadOffices, maskPhone, sanitizeText,
+  maskDestination, cleanResult,
+} from './_lib.mjs';
 import { validateResult } from './contract.mjs';
 import { renderCard, renderFailure } from './render.mjs';
 import { selectTransport, missingCredentials } from './transport.mjs';
@@ -39,7 +46,7 @@ let transport;
 try {
   transport = selectTransport(env);
 } catch (error) {
-  console.error(error.message);
+  console.error(sanitizeText(error.message));
   process.exit(2);
 }
 
@@ -50,9 +57,9 @@ const request = transport.describe(office, args.procedure, key, env);
 if (!args.live) {
   console.log(`DRY RUN - no call placed. Transport: ${transport.name}. Add --live to dial.`);
   console.log('');
-  console.log(JSON.stringify(request, null, 2));
+  console.log(JSON.stringify(maskDestination(request, office.phone_e164), null, 2));
   console.log('');
-  console.log(`This would ring ${office.phone_e164} (${office.name}).`);
+  console.log(`This would ring ${maskPhone(office.phone_e164)} (${office.name}).`);
   console.log(`Source: ${office.source_url}`);
   process.exit(0);
 }
@@ -68,27 +75,28 @@ if (missing.length) {
 
 const { CalleClient } = await import('@call-e/calle');
 const client = new CalleClient({ apiKey: env.CALLE_API_KEY });
+const clean = (text) => sanitizeText(text, { secrets: [env.CALLE_API_KEY] });
 
 // The drift guard is a precondition of dialling, not of preflight. A caller who skips
 // preflight still must not reach a drifted Goal.
 try {
   await transport.assertReady(client, env);
 } catch (error) {
-  console.error(`REFUSING TO DIAL: ${error.message}`);
-  for (const d of error.drift ?? []) console.error(`  - ${d}`);
+  console.error(`REFUSING TO DIAL: ${clean(error.message)}`);
+  for (const d of error.drift ?? []) console.error(`  - ${clean(d)}`);
   process.exit(4);
 }
 
-console.log(`Dialling ${office.phone_e164} via the ${transport.name} transport ...`);
+console.log(`Dialling ${maskPhone(office.phone_e164)} via the ${transport.name} transport ...`);
 const started = Date.now();
 try {
   const outcome = await transport.run(client, office, args.procedure, key, env);
   const seconds = ((Date.now() - started) / 1000).toFixed(1);
-  const meta = { procedure: args.procedure, runId: outcome.runId, calledAt: outcome.calledAt };
+  const meta = { procedure: args.procedure, runId: clean(outcome.runId), calledAt: outcome.calledAt };
 
   // `result` and `error` are mutually exclusive and either one is terminal.
   if (outcome.error) {
-    console.log(renderFailure(outcome.error.code ?? 'unknown', office, meta));
+    console.log(renderFailure(clean(outcome.error.code ?? 'unknown'), office, meta));
     console.log('');
     console.log(`Failed after ${seconds}s.`);
     process.exit(5);
@@ -102,14 +110,14 @@ try {
   if (invalid.length) {
     console.log(renderFailure('result_invalid', office, meta));
     console.log('');
-    for (const problem of invalid) console.log(`  - ${problem}`);
+    for (const problem of invalid) console.log(`  - ${clean(problem)}`);
     process.exit(5);
   }
 
-  console.log(renderCard(outcome.result, office, meta));
+  console.log(renderCard(cleanResult(outcome.result, office.phone_e164), office, meta));
   console.log('');
   console.log(`Answered in ${seconds}s.`);
 } catch (error) {
-  console.error(`${error?.constructor?.name ?? 'Error'}: ${error?.message ?? error}`);
+  console.error(clean(`${error?.constructor?.name ?? 'Error'}: ${error?.message ?? error}`));
   process.exit(1);
 }
