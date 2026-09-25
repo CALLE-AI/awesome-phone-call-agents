@@ -1,0 +1,1 @@
+import React from 'react';import {View,Text} from 'react-native';export function ResultCard({result}:{result:Record<string,unknown>|null|undefined}){if(!result)return <Text>No structured result yet.</Text>;return <View>{Object.entries(result).map(([k,v])=><View key={k}><Text>{k}</Text><Text>{typeof v==='object'?JSON.stringify(v):String(v)}</Text></View>)}</View>}

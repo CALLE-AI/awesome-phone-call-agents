@@ -1,0 +1,7 @@
+procedure,checkpoint,prep_item
+Colonoscopy,T72,collected the bowel prep kit from the pharmacy
+Colonoscopy,T72,stopped taking iron tablets
+Colonoscopy,T24,started the clear liquid diet
+Colonoscopy,T24,stopped eating solid food
+Upper Endoscopy,T72,completed the pre-procedure blood test
+Upper Endoscopy,T24,stopped eating solid food

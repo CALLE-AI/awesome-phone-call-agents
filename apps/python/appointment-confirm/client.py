@@ -94,7 +94,7 @@ def main(argv=None) -> int:
             if not api_key:
                 raise ValueError(
                     "CALLE_API_KEY is missing. For a real call, create a CALL-E account "
-                    "(20 free calls) at https://www.heycall-e.com/ then copy a key from "
+                    "(100 free credits) at https://www.heycall-e.com/ then copy a key from "
                     "https://dashboard.heycall-e.com/account/api-keys . "
                     "Until then, run --mock (no key, no dial)."
                 )

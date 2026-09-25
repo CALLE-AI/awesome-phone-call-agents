@@ -1,0 +1,21 @@
+{
+  "_comment": "The call did not reach the patient. no_answer is one of the statuses recognised as a genuine non-contact, and it is the only class of outcome that earns another dial: two retries at different times of day, then the patient is handed to staff. An unrecognised or non-terminal status is held instead of retried.",
+  "_matching": "Replace REPLACE_WITH_call_id_FROM_SHEET with the value in the row's call_id column after placing a dry-run call. A result that cannot be matched to the call in flight is held for review rather than applied.",
+  "call_id": "REPLACE_WITH_call_id_FROM_SHEET",
+  "status": "no_answer",
+  "task_completed": false,
+  "completion_confidence": {
+    "score": 0.0,
+    "label": "low"
+  },
+  "metadata": {
+    "row_id": "P002",
+    "checkpoint": "T72",
+    "source": "prepcheck"
+  },
+  "recipients": [
+    {
+      "structured_result": {}
+    }
+  ]
+}

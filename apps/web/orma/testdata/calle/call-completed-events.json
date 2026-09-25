@@ -1,0 +1,506 @@
+{
+  "object": "list",
+  "data": [
+    {
+      "id": "evt_3dcea41331fdf4d0750d00d0",
+      "type": "call.started",
+      "call_id": "call_tQA8nz1WGj9vfO30PxTosA",
+      "created_at": "2026-09-11T12:17:18.787883Z",
+      "level": "info",
+      "status": "completed",
+      "message": "run_call started.",
+      "details": {}
+    },
+    {
+      "id": "evt_85fe4a22fc6d92e7329e738c",
+      "type": "call.in_progress",
+      "call_id": "call_tQA8nz1WGj9vfO30PxTosA",
+      "created_at": "2026-09-11T12:17:21.414551Z",
+      "level": "info",
+      "status": "completed",
+      "message": "botlab create bot.",
+      "details": {}
+    },
+    {
+      "id": "evt_62d93c12f9ab93ea86629645",
+      "type": "call.in_progress",
+      "call_id": "call_tQA8nz1WGj9vfO30PxTosA",
+      "created_at": "2026-09-11T12:17:45.572051Z",
+      "level": "info",
+      "status": "completed",
+      "message": "calling resolve robot id.",
+      "details": {}
+    },
+    {
+      "id": "evt_8c8b267acf527e41ea6a9639",
+      "type": "call.in_progress",
+      "call_id": "call_tQA8nz1WGj9vfO30PxTosA",
+      "created_at": "2026-09-11T12:17:48.138322Z",
+      "level": "info",
+      "status": "completed",
+      "message": "calling create task.",
+      "details": {}
+    },
+    {
+      "id": "evt_e38cc7eb48b7deb82c14dc58",
+      "type": "call.completed",
+      "call_id": "call_tQA8nz1WGj9vfO30PxTosA",
+      "created_at": "2026-09-11T12:17:49.445898Z",
+      "level": "info",
+      "status": "completed",
+      "message": "calling task created.",
+      "details": {}
+    },
+    {
+      "id": "evt_6e8117801eb9241c707cb451",
+      "type": "call.updated",
+      "call_id": "call_tQA8nz1WGj9vfO30PxTosA",
+      "created_at": "2026-09-11T12:17:49.981331Z",
+      "level": "info",
+      "status": "completed",
+      "message": "calling task status=pending",
+      "details": {}
+    },
+    {
+      "id": "evt_19de91f422ac18ed5817c95e",
+      "type": "call.updated",
+      "call_id": "call_tQA8nz1WGj9vfO30PxTosA",
+      "created_at": "2026-09-11T12:17:55.157431Z",
+      "level": "info",
+      "status": "completed",
+      "message": "calling task status=calling",
+      "details": {}
+    },
+    {
+      "id": "evt_8855c0f4f2fbfe38960dc08a",
+      "type": "call.updated",
+      "call_id": "call_tQA8nz1WGj9vfO30PxTosA",
+      "created_at": "2026-09-11T12:18:00.230096Z",
+      "level": "info",
+      "status": "completed",
+      "message": "Call is ringing.",
+      "details": {}
+    },
+    {
+      "id": "evt_7cd638d711039c9e571a0d7e",
+      "type": "call.updated",
+      "call_id": "call_tQA8nz1WGj9vfO30PxTosA",
+      "created_at": "2026-09-11T12:18:18.444432Z",
+      "level": "info",
+      "status": "completed",
+      "message": "Call connected.",
+      "details": {}
+    },
+    {
+      "id": "evt_8303098d4328de23f758cd1f",
+      "type": "call.updated",
+      "call_id": "call_tQA8nz1WGj9vfO30PxTosA",
+      "created_at": "2026-09-11T12:18:19.118025Z",
+      "level": "info",
+      "status": "completed",
+      "message": "Bot is speaking: You\u2019ve mentioned the dentist three times.",
+      "details": {}
+    },
+    {
+      "id": "evt_ca60cbb3b3f0a5a71cbfbd14",
+      "type": "call.updated",
+      "call_id": "call_tQA8nz1WGj9vfO30PxTosA",
+      "created_at": "2026-09-11T12:18:21.160798Z",
+      "level": "info",
+      "status": "completed",
+      "message": "Bot is speaking: It\u2019s been 34 days.",
+      "details": {}
+    },
+    {
+      "id": "evt_3f852751295742ee581b5a49",
+      "type": "call.updated",
+      "call_id": "call_tQA8nz1WGj9vfO30PxTosA",
+      "created_at": "2026-09-11T12:18:31.799405Z",
+      "level": "info",
+      "status": "completed",
+      "message": "Bot is speaking: Hello, this is Orma.",
+      "details": {}
+    },
+    {
+      "id": "evt_3cc53b6ba11709c43d6ac8a8",
+      "type": "call.updated",
+      "call_id": "call_tQA8nz1WGj9vfO30PxTosA",
+      "created_at": "2026-09-11T12:18:35.675937Z",
+      "level": "info",
+      "status": "completed",
+      "message": "Callee said: bye",
+      "details": {}
+    },
+    {
+      "id": "evt_2ef36e7d690f6007809da86d",
+      "type": "call.updated",
+      "call_id": "call_tQA8nz1WGj9vfO30PxTosA",
+      "created_at": "2026-09-11T12:18:36.620991Z",
+      "level": "info",
+      "status": "completed",
+      "message": "Callee said: hi who is this",
+      "details": {}
+    },
+    {
+      "id": "evt_1c191575b8e5f9ae93dabd64",
+      "type": "call.updated",
+      "call_id": "call_tQA8nz1WGj9vfO30PxTosA",
+      "created_at": "2026-09-11T12:18:36.897025Z",
+      "level": "info",
+      "status": "completed",
+      "message": "Callee said: Hi, who is this?",
+      "details": {}
+    },
+    {
+      "id": "evt_22d1f567ad05e733e98a6584",
+      "type": "call.updated",
+      "call_id": "call_tQA8nz1WGj9vfO30PxTosA",
+      "created_at": "2026-09-11T12:18:37.198302Z",
+      "level": "info",
+      "status": "completed",
+      "message": "Bot is speaking: Sorry,",
+      "details": {}
+    },
+    {
+      "id": "evt_7c89126af7792870e9d1b220",
+      "type": "call.updated",
+      "call_id": "call_tQA8nz1WGj9vfO30PxTosA",
+      "created_at": "2026-09-11T12:18:37.726562Z",
+      "level": "info",
+      "status": "completed",
+      "message": "Bot is speaking: this is Orma, calling for your daily check-in.",
+      "details": {}
+    },
+    {
+      "id": "evt_a0c8057851b8404984019de3",
+      "type": "call.updated",
+      "call_id": "call_tQA8nz1WGj9vfO30PxTosA",
+      "created_at": "2026-09-11T12:18:45.286741Z",
+      "level": "info",
+      "status": "completed",
+      "message": "Callee said: bye",
+      "details": {}
+    },
+    {
+      "id": "evt_f4f57eaffbe928f7542ecd3b",
+      "type": "call.updated",
+      "call_id": "call_tQA8nz1WGj9vfO30PxTosA",
+      "created_at": "2026-09-11T12:18:45.584116Z",
+      "level": "info",
+      "status": "completed",
+      "message": "Callee said: hi who is this",
+      "details": {}
+    },
+    {
+      "id": "evt_5766a7d2d9541181c13056f9",
+      "type": "call.updated",
+      "call_id": "call_tQA8nz1WGj9vfO30PxTosA",
+      "created_at": "2026-09-11T12:18:45.905628Z",
+      "level": "info",
+      "status": "completed",
+      "message": "Callee said: hi who is this",
+      "details": {}
+    },
+    {
+      "id": "evt_c1773033c12fca3c4fc8a838",
+      "type": "call.updated",
+      "call_id": "call_tQA8nz1WGj9vfO30PxTosA",
+      "created_at": "2026-09-11T12:18:46.182258Z",
+      "level": "info",
+      "status": "completed",
+      "message": "Callee said: sorry can you say that again",
+      "details": {}
+    },
+    {
+      "id": "evt_4133d9930d043062cc36bd57",
+      "type": "call.updated",
+      "call_id": "call_tQA8nz1WGj9vfO30PxTosA",
+      "created_at": "2026-09-11T12:18:46.479545Z",
+      "level": "info",
+      "status": "completed",
+      "message": "Callee said: sorry can you say that again",
+      "details": {}
+    },
+    {
+      "id": "evt_560f7092fbc9a096cad3c91b",
+      "type": "call.updated",
+      "call_id": "call_tQA8nz1WGj9vfO30PxTosA",
+      "created_at": "2026-09-11T12:18:46.907891Z",
+      "level": "info",
+      "status": "completed",
+      "message": "Callee said: sorry can you say that again",
+      "details": {}
+    },
+    {
+      "id": "evt_9eb11085826d9adda9f10c01",
+      "type": "call.updated",
+      "call_id": "call_tQA8nz1WGj9vfO30PxTosA",
+      "created_at": "2026-09-11T12:18:47.184946Z",
+      "level": "info",
+      "status": "completed",
+      "message": "Callee said: Sorry, can you say that again?",
+      "details": {}
+    },
+    {
+      "id": "evt_b78911d3e99e606b18d200a5",
+      "type": "call.updated",
+      "call_id": "call_tQA8nz1WGj9vfO30PxTosA",
+      "created_at": "2026-09-11T12:18:47.559357Z",
+      "level": "info",
+      "status": "completed",
+      "message": "Bot is speaking: Of course,",
+      "details": {}
+    },
+    {
+      "id": "evt_b937572484d5fc00f0c90a25",
+      "type": "call.updated",
+      "call_id": "call_tQA8nz1WGj9vfO30PxTosA",
+      "created_at": "2026-09-11T12:18:48.137393Z",
+      "level": "info",
+      "status": "completed",
+      "message": "Bot is speaking: a quick update from Orma: you\u2019ve mentioned the dentist three times,",
+      "details": {}
+    },
+    {
+      "id": "evt_6d8aff2d72f54c0b28ea6f94",
+      "type": "call.updated",
+      "call_id": "call_tQA8nz1WGj9vfO30PxTosA",
+      "created_at": "2026-09-11T12:18:52.226292Z",
+      "level": "info",
+      "status": "completed",
+      "message": "Bot is speaking: and it\u2019s been 34 days.",
+      "details": {}
+    },
+    {
+      "id": "evt_36453f6069a8c717a06bb75d",
+      "type": "call.updated",
+      "call_id": "call_tQA8nz1WGj9vfO30PxTosA",
+      "created_at": "2026-09-11T12:18:57.984590Z",
+      "level": "info",
+      "status": "completed",
+      "message": "Callee said: bye",
+      "details": {}
+    },
+    {
+      "id": "evt_c87da6a657b872a70c666723",
+      "type": "call.updated",
+      "call_id": "call_tQA8nz1WGj9vfO30PxTosA",
+      "created_at": "2026-09-11T12:18:58.388608Z",
+      "level": "info",
+      "status": "completed",
+      "message": "Callee said: hi who is this",
+      "details": {}
+    },
+    {
+      "id": "evt_7da1d76a2f8784fbc6f48e4e",
+      "type": "call.updated",
+      "call_id": "call_tQA8nz1WGj9vfO30PxTosA",
+      "created_at": "2026-09-11T12:18:58.687750Z",
+      "level": "info",
+      "status": "completed",
+      "message": "Callee said: hi who is this",
+      "details": {}
+    },
+    {
+      "id": "evt_bad4a53ac167226cd212b80a",
+      "type": "call.updated",
+      "call_id": "call_tQA8nz1WGj9vfO30PxTosA",
+      "created_at": "2026-09-11T12:18:58.987827Z",
+      "level": "info",
+      "status": "completed",
+      "message": "Callee said: i will sort it out this week",
+      "details": {}
+    },
+    {
+      "id": "evt_4e3c543c762d3c74b631c6aa",
+      "type": "call.updated",
+      "call_id": "call_tQA8nz1WGj9vfO30PxTosA",
+      "created_at": "2026-09-11T12:18:59.265773Z",
+      "level": "info",
+      "status": "completed",
+      "message": "Callee said: i will sort it out this week",
+      "details": {}
+    },
+    {
+      "id": "evt_2dd1d0688c034b01833701da",
+      "type": "call.updated",
+      "call_id": "call_tQA8nz1WGj9vfO30PxTosA",
+      "created_at": "2026-09-11T12:19:00.495214Z",
+      "level": "info",
+      "status": "completed",
+      "message": "Callee said: I will sort it out this week.",
+      "details": {}
+    },
+    {
+      "id": "evt_3bf430e755ee087a613deff6",
+      "type": "call.updated",
+      "call_id": "call_tQA8nz1WGj9vfO30PxTosA",
+      "created_at": "2026-09-11T12:19:00.977822Z",
+      "level": "info",
+      "status": "completed",
+      "message": "Bot is speaking: Thanks, noted.",
+      "details": {}
+    },
+    {
+      "id": "evt_ce48ecc438ec2b41463b63d4",
+      "type": "call.updated",
+      "call_id": "call_tQA8nz1WGj9vfO30PxTosA",
+      "created_at": "2026-09-11T12:19:02.069695Z",
+      "level": "info",
+      "status": "completed",
+      "message": "Bot is speaking: What\u2019s new today that needs capturing?",
+      "details": {}
+    },
+    {
+      "id": "evt_5be5f86f75ba34ffefcf883d",
+      "type": "call.updated",
+      "call_id": "call_tQA8nz1WGj9vfO30PxTosA",
+      "created_at": "2026-09-11T12:19:03.514821Z",
+      "level": "info",
+      "status": "completed",
+      "message": "Callee said: Continental.",
+      "details": {}
+    },
+    {
+      "id": "evt_06c02e4337a5881e5ea1292d",
+      "type": "call.updated",
+      "call_id": "call_tQA8nz1WGj9vfO30PxTosA",
+      "created_at": "2026-09-11T12:19:09.223910Z",
+      "level": "info",
+      "status": "completed",
+      "message": "Bot is speaking: Okay,",
+      "details": {}
+    },
+    {
+      "id": "evt_298db082c3f575472c7375c2",
+      "type": "call.updated",
+      "call_id": "call_tQA8nz1WGj9vfO30PxTosA",
+      "created_at": "2026-09-11T12:19:09.669897Z",
+      "level": "info",
+      "status": "completed",
+      "message": "Bot is speaking: \u201cContinental\u201d. Should I track that as a new item?",
+      "details": {}
+    },
+    {
+      "id": "evt_ab92ff7c518dea8538b6aee6",
+      "type": "call.updated",
+      "call_id": "call_tQA8nz1WGj9vfO30PxTosA",
+      "created_at": "2026-09-11T12:19:10.769434Z",
+      "level": "info",
+      "status": "completed",
+      "message": "Callee said: bye",
+      "details": {}
+    },
+    {
+      "id": "evt_c210e6dcb5d8841cd4bbadef",
+      "type": "call.updated",
+      "call_id": "call_tQA8nz1WGj9vfO30PxTosA",
+      "created_at": "2026-09-11T12:19:11.067416Z",
+      "level": "info",
+      "status": "completed",
+      "message": "Callee interrupted: Hmm, \u201cContinental\u201d \u2014  ... [interrupted]",
+      "details": {}
+    },
+    {
+      "id": "evt_a6172cd0a9dd642bc11952fc",
+      "type": "call.updated",
+      "call_id": "call_tQA8nz1WGj9vfO30PxTosA",
+      "created_at": "2026-09-11T12:19:11.344752Z",
+      "level": "info",
+      "status": "completed",
+      "message": "Callee said: yes add it please",
+      "details": {}
+    },
+    {
+      "id": "evt_897c461ec02be58cc61ab4b7",
+      "type": "call.updated",
+      "call_id": "call_tQA8nz1WGj9vfO30PxTosA",
+      "created_at": "2026-09-11T12:19:11.691169Z",
+      "level": "info",
+      "status": "completed",
+      "message": "Callee said: yes add it please",
+      "details": {}
+    },
+    {
+      "id": "evt_506b034fdac457468fec07b0",
+      "type": "call.updated",
+      "call_id": "call_tQA8nz1WGj9vfO30PxTosA",
+      "created_at": "2026-09-11T12:19:11.988643Z",
+      "level": "info",
+      "status": "completed",
+      "message": "Callee said: yes add it please",
+      "details": {}
+    },
+    {
+      "id": "evt_f2f75f1d76c7d4f1441353a2",
+      "type": "call.updated",
+      "call_id": "call_tQA8nz1WGj9vfO30PxTosA",
+      "created_at": "2026-09-11T12:19:13.092573Z",
+      "level": "info",
+      "status": "completed",
+      "message": "Callee said: yes add it please",
+      "details": {}
+    },
+    {
+      "id": "evt_b9543df1fc2f89b7b1fb1402",
+      "type": "call.updated",
+      "call_id": "call_tQA8nz1WGj9vfO30PxTosA",
+      "created_at": "2026-09-11T12:19:13.390227Z",
+      "level": "info",
+      "status": "completed",
+      "message": "Callee said: Yes, add it please.",
+      "details": {}
+    },
+    {
+      "id": "evt_ee822fc78adb6845d27b1839",
+      "type": "call.updated",
+      "call_id": "call_tQA8nz1WGj9vfO30PxTosA",
+      "created_at": "2026-09-11T12:19:13.989987Z",
+      "level": "info",
+      "status": "completed",
+      "message": "Bot is speaking: Sure,",
+      "details": {}
+    },
+    {
+      "id": "evt_6bae7c01c4db7dc9125da46e",
+      "type": "call.updated",
+      "call_id": "call_tQA8nz1WGj9vfO30PxTosA",
+      "created_at": "2026-09-11T12:19:14.270436Z",
+      "level": "info",
+      "status": "completed",
+      "message": "Bot is speaking: I have captured that.",
+      "details": {}
+    },
+    {
+      "id": "evt_6c69ddb73d77e42485277b2f",
+      "type": "call.updated",
+      "call_id": "call_tQA8nz1WGj9vfO30PxTosA",
+      "created_at": "2026-09-11T12:19:20.365668Z",
+      "level": "info",
+      "status": "completed",
+      "message": "Callee said: is that everything for today",
+      "details": {}
+    },
+    {
+      "id": "evt_1cdb099cb6eefa1c22559f94",
+      "type": "call.updated",
+      "call_id": "call_tQA8nz1WGj9vfO30PxTosA",
+      "created_at": "2026-09-11T12:19:21.334846Z",
+      "level": "info",
+      "status": "completed",
+      "message": "Callee said: Is that everything for today?",
+      "details": {}
+    },
+    {
+      "id": "evt_7fde0dba8e6fd7d864838ba7",
+      "type": "call.updated",
+      "call_id": "call_tQA8nz1WGj9vfO30PxTosA",
+      "created_at": "2026-09-11T12:19:22.313260Z",
+      "level": "info",
+      "status": "completed",
+      "message": "Bot is speaking: On the open list",
+      "details": {}
+    }
+  ],
+  "next_cursor": "devcur_MTc4OTEyOTE2MjMxNC0w"
+}

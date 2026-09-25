@@ -1,0 +1,12 @@
+{
+  "_comment": "Digit runs in this app's own files that src/mask.js would hide as phone numbers but are not phone numbers, each with the reason. Checked by tests/non-phone-digit-runs.test.js; keys are the run's digits only.",
+  "runs": {
+    "1234567890": "Sequential-digit fixture standing in for a purchase-order number and a part-number SKU.",
+    "202609130042": "Quote-reference fixture: a date (2026-09-13) and a sequence number.",
+    "2500000": "Quantity fixture (2.5 million units) written without separators.",
+    "2505001000": "Quantity-tier fixture (250, 500, 1000) written with hyphens.",
+    "370400440532013000": "The account part of DE89 3704 0044 0532 0130 00, the standard documentation example IBAN.",
+    "0900170001614960123": "Office hours (0900-1700) glued to Ofcom's fictional 0161 496 0123, to show the pair is masked together.",
+    "5660969858": "GitHub issue-comment id in a linked PR #524 review URL (docs/pr-body.md), not a phone number."
+  }
+}

@@ -1,0 +1,20 @@
+{
+  "name": "window-unconfirmed",
+  "description": "The caller runs the gate correctly but the callee agrees in the abstract without naming a time. Agreement is not a window, so the chain pauses for a human.",
+  "status": "completed",
+  "now": "2026-09-14T10:00:00Z",
+  "turns": [
+    { "speaker": "caller", "text": "Good morning. I'm an automated assistant calling on behalf of Amina Otieno, with her permission." },
+    { "speaker": "caller", "text": "What is the earliest appointment you have with Dr Mwangi?" },
+    { "speaker": "callee", "text": "I'd need to look at the diary, it's not in front of me. Someone will call you about it." },
+    { "speaker": "caller", "text": "I'm not able to take a call back. When should I call you instead?" },
+    { "speaker": "callee", "text": "Yeah, sure, that's fine, whenever suits you really." },
+    { "speaker": "caller", "text": "Understood. Thank you for your time." }
+  ],
+  "expect": {
+    "status": "window_unconfirmed",
+    "next_action": "needs_human",
+    "number_disclosed": false,
+    "callback_requested_by_callee": true
+  }
+}

@@ -1,0 +1,14 @@
+{
+  "status": "COMPLETED",
+  "result": {
+    "post_summary": "Customer acknowledged the AI disclosure and confirmed the delivery.",
+    "transcript": [
+      {"speaker": "agent", "text": "Hello, this is an automated assistant - an AI program - calling on behalf of Example Grocers. Do you understand that you are talking to an automated assistant?"},
+      {"speaker": "callee", "text": "Yes, I understand. What is this about?"},
+      {"speaker": "agent", "text": "Your Thursday delivery window is 2 to 4 p.m. Does that still work for you?"},
+      {"speaker": "callee", "text": "That works fine."},
+      {"speaker": "agent", "text": "Great, it is confirmed. Goodbye."}
+    ]
+  },
+  "callee_phone": "+14155550126"
+}

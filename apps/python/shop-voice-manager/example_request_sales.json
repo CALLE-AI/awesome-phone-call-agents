@@ -1,0 +1,12 @@
+{
+  "workflow_id": "demo-sales-recap-001",
+  "call_type": "sales",
+  "phone": "+2348000000000",
+  "region": "NG",
+  "locale": "en",
+  "currency": "NGN",
+  "shop_id": "demo-lagos-corner-shop",
+  "recipient_consented": true,
+  "language_style": "pidgin-english",
+  "max_minutes": 4
+}

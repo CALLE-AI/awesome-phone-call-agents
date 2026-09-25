@@ -251,7 +251,7 @@ class TestLiveTransportGuards:
     def test_the_ledger_prices_a_live_run(self) -> None:
         transport = self.build(budget=2)
         transport.ledger.record_wet("calls.create", detail="one scenario")
-        assert transport.ledger.credits_spent == 5
+        assert transport.ledger.credits_spent is None
         assert transport.calls_placed == 1
 
     def test_the_api_origin_is_not_configurable(self) -> None:
@@ -265,7 +265,7 @@ class TestLiveTransportGuards:
 
 
 class TestPersonaScript:
-    """What a person reads while a five-credit call is connecting.
+    """What a person reads while a billable call is connecting.
 
     That setting is the whole specification. There is no time to interpret, no
     second take, and a turn the operator cannot act on is a call spent for

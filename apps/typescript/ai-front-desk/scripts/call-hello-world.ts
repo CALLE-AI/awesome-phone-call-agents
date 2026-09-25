@@ -1,6 +1,6 @@
 // Phase 0 smoke test: one real end-to-end CALL-E call to YOUR OWN phone.
 // Requires CALLE_DRY_RUN=false, CALLE_API_KEY, and LIVE_CALL_OVERRIDE_PHONE
-// in the environment. This spends 1 of the 20 free-tier calls — run it once.
+// in the environment. This consumes CALL-E credits — run it once.
 
 import { env, assertLiveCallAllowed } from "../src/config/env.js";
 import { prisma } from "../src/db/client.js";

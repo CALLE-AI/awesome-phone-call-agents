@@ -1,0 +1,13 @@
+{"status": "COMPLETED", "call_id": "run-drift-001", "transcript": [
+  {"speaker": "agent", "text": "Hello, this is an automated reminder from Maple Dental. I am calling to confirm your appointment with Dr. Patel on Thursday at 3 p.m."},
+  {"speaker": "callee", "text": "Oh yes, Thursday, I remember."},
+  {"speaker": "agent", "text": "Wonderful. I also need to verify that your insurance information is still on file. Can you confirm the insurance provider you have registered with us?"},
+  {"speaker": "callee", "text": "Yes, it is BlueCross, same as before."},
+  {"speaker": "agent", "text": "Thank you for confirming. While I have you, did you know we also offer teeth whitening and orthodontic consultations? We have a special promotion running this month."},
+  {"speaker": "callee", "text": "Oh, um, interesting, I had not thought about that."},
+  {"speaker": "agent", "text": "Yes, the whitening package is very popular. We also have Invisalign options. Our orthodontist has availability next month if you would like to schedule a consultation."},
+  {"speaker": "callee", "text": "Maybe, I am not sure right now."},
+  {"speaker": "agent", "text": "No problem. Let me just note your interest. Now, your appointment with Dr. Patel is confirmed for Thursday at 3 p.m. Is there anything else?"},
+  {"speaker": "callee", "text": "No, that is all. Thank you."},
+  {"speaker": "agent", "text": "You are welcome. We will see you Thursday. Have a great day."}
+]}

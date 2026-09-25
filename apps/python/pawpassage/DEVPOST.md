@@ -48,9 +48,9 @@ Confirmed hackathon requirements:
 | Language | Submission materials must be English, or include English translations. | Code-facing docs and this submission kit are English. |
 | New or existing work | New work is allowed; older work must explain significant updates made during the submission period. | PawPassage is new during the submission period. |
 
-No purchase or payment is required. The rules state that a new CALL-E account
-receives 20 free calls and that exhausting allocated calls pauses access rather
-than charging automatically. One authorized official-hotline call has now completed; the final credit charge was not yet shown in the account UI.
+No purchase or payment is required to enter. The [hackathon rules](https://call-e.devpost.com/rules)
+and current product signup allowance provide 100 free credits (US$1), not a fixed number of calls.
+See the [current pricing FAQ](https://www.heycall-e.com/) and [Dashboard billing](https://dashboard.heycall-e.com/account/billing). One authorized official-hotline call has now completed; the final credit charge was not yet shown in the account UI.
 
 The Most Valuable Feedback survey is separate and optional for the main
 project. Its stated deadline is September 18, 2026 at 11:45 p.m. SGT, with one
