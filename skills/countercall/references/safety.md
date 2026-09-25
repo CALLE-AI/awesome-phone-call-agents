@@ -27,7 +27,9 @@ The key exists because these are queues with real people in them, not an API. A 
 mints a fresh key is a bug, not a workaround. `no_answer` is the single exception: one
 retry under a `:v2` suffix, then abstain for the day.
 
-Call during the office's published opening hours only.
+Call during the office's published opening hours only. Nothing in the code enforces this:
+`offices.json` has no hours field, and `call.mjs --live` and `bench.mjs --live` dial whenever
+they are run. Check the office's own page for its hours, and its public holidays, first.
 
 ## Never infer a number
 

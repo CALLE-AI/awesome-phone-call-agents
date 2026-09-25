@@ -128,7 +128,7 @@ right and is expensive to get wrong: a stale schema produces results that look c
 ```text
 $ node scripts/preflight.mjs --office bad-entry --procedure "perpanjangan paspor"
 
-  phone              021-5225029
+  phone              021-xxxxxxx
   E.164              FAIL - not in E.164 format
 
 REFUSING TO DIAL. Numbers must match ^\+[1-9]\d{7,14}$ and come from the office's

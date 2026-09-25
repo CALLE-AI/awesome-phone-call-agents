@@ -52,8 +52,10 @@ This skill gathers **counter requirements only**.
 - When the clerk is unsure, the result says unsure. It never fills a gap with what is
   typical, and it never presents a hedge as a fact. A person may travel across a city on
   the strength of this answer.
-- It calls offices during their published opening hours only. A public line ringing out at
-  22:00 is not a data point, it is a nuisance.
+- Call offices during their published opening hours only. A public line ringing out at
+  22:00 is not a data point, it is a nuisance. **The code does not check this:** the seed
+  file carries no hours, and `call.mjs --live` and `bench.mjs --live` will dial at any time
+  of day. Checking the office's hours before either is the operator's job.
 
 Read `references/safety.md` before adapting this skill to a new institution. Some callees
 are not appropriate targets for an automated caller at all.
