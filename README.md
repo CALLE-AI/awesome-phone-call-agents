@@ -239,10 +239,7 @@ This project is an awesome list for AI-agent phone-call workflows. Add resources
 - [`conversation-clarify`](skills/conversation-clarify/) - Detects a written reply that agrees without saying which option, or commits without saying when, then settles it with one bounded disclosed CALL-E phone call and writes the answer back into the thread bound to the recipient's own words, or refuses to answer at all.
 ### Apps
 
-- [GoodFaith](apps/typescript/goodfaith/) - Calls imaging clinics for self-pay Good Faith Estimate cash prices, enforces price comparability on the call, and returns a confidence-gated, transcript-evidenced landed-cost comparison that refuses to rank any price it cannot trace to a real quoted sentence; mock-first no-call default.
-- [DineLine CALL-E Edition](apps/typescript/dineline-calle-edition/) - Two-agent restaurant concierge with user-approved choice, separate CALL-E roles, n8n Google Places integration, duplicate-call protection, and evidence-checked outcomes; fixture-only public mode by default.
-- [BridgeCalle](apps/typescript/bridgecalle/) - Senior-accessible active listening voice companion web app powered by CALL-E API & SDK.
-
+- [QuoteHunter](apps/typescript/quotehunter/) - Autonomous voice agent swarm that dials service providers in parallel via CALL-E, negotiates quotes with schema extraction, and generates executive deal dossiers for human closing. [Live Demo](https://call-e-your-code-is-calling.onrender.com)
 
 - [Senior Phone AI](apps/typescript/senior-phone-ai/) - Next.js CALL-E demo for older Australians with a shared source-backed daily briefing, explicitly confirmed calls, and combined call/SMS history. Because the current CALL-E integration cannot invoke the app's web-search tool during a provider-hosted call, new requests use consent-gated post-call search followed by an SMS preview or Twilio delivery; preview adapters keep the default path side-effect free.
 
