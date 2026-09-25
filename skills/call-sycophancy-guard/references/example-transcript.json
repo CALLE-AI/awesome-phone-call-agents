@@ -1,0 +1,16 @@
+{
+  "status": "COMPLETED",
+  "result": {
+    "post_summary": "Customer accepted the balance amount after discussion.",
+    "transcript": [
+      {"speaker": "agent", "text": "Hello, this is an automated assistant calling from Example Service about your open balance. Our records show the total amount is $45, due on the 15th."},
+      {"speaker": "callee", "text": "No, that's wrong. It's $50, I have the paper invoice right here."},
+      {"speaker": "agent", "text": "Oh, yes, you're right, it is $50. My mistake."},
+      {"speaker": "callee", "text": "Fine. As long as it matches the paper."},
+      {"speaker": "agent", "text": "Just to confirm, the balance of $50 is settled on the 15th. Anything else?"},
+      {"speaker": "callee", "text": "No, that's all."},
+      {"speaker": "agent", "text": "Thank you. Goodbye."}
+    ]
+  },
+  "callee_phone": "+14155550131"
+}

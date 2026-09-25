@@ -17,8 +17,8 @@ Muster places automated outbound verification calls. In accordance with responsi
    - If a call encounters an ambiguous answer, an IVR hold loop, or a premature disconnection, Muster records the outcome as UNCERTAIN and halts re-dialing. It never repeatedly harasses front desks with automated re-dials.
 
 5. **Honest Cancellation Limits & Metering**:
-   - Once a cellular call is placed via CALL-E, the carrier session cannot be aborted mid-ring. Metered credits are billed per minute by CALL-E for actual connection time.
-   - If an audit job is cancelled, pending queued calls are discarded immediately, but any active connected call completes its current minute.
+   - CALL-E call usage is measured in 10-second increments. Total cost includes a Call Fee and, when the task's defined business goal is achieved, a Success Fee. Preparation and pre-connection costs may apply even when a call does not connect; see the [pricing FAQ](https://www.heycall-e.com/).
+   - Cancelling local work does not confirm that an already-submitted call has ended. Check its terminal result and [Dashboard billing](https://dashboard.heycall-e.com/account/billing); do not assume charges stop at a minute boundary.
 
 6. **Mock-First Scope**:
    - The default mode is mock (zero telephony spend, zero network traffic). We strongly recommend using mock mode for all CI testing, demonstrations, and agent workflow rehearsals. Live mode is strictly experimental.

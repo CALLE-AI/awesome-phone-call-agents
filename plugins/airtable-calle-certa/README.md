@@ -254,7 +254,7 @@ sequenceDiagram
   C->>A: rows + table schema
   A-->>C: rows, answer columns
   C->>C: derive schema · check consent · resolve region
-  C-->>O: "1 call · $0.05 · 1 skipped (no sourced number)"
+  C-->>O: "1 call · usage-based charges · 1 skipped (no sourced number)"
   Note over O,C: zero side effects up to here
   O->>C: Run — explicit confirmation
   C->>C: append call.authorized, fsync
@@ -318,7 +318,7 @@ cannot fix and does not pretend to.
 - **An attacker with write access and the code can rebuild the log.** The chain makes tampering evident to someone holding an earlier head, not impossible.
 - **One writing process per log.** Appends are serialised in-process; two processes would interleave and break the chain.
 - **CALL-E has no cancel-in-flight operation.** `POST /v1/calls`, `GET /v1/calls/{id}` and `GET /v1/calls/{id}/events` are the whole surface. Cancelling a request guarantees **nothing further is dispatched**; a call already dialing runs to completion.
-- **Spend is estimated, not authoritative.** CALL-E exposes no balance endpoint (issue **#183**), so caps are enforced locally against a published $0.05 per call.
+- **Call count is capped, not spend.** The plugin cannot infer a dollar amount from the number of calls. CALL-E charges a Call Fee plus any applicable Success Fee; check [Dashboard billing](https://dashboard.heycall-e.com/account/billing) for actual charges.
 - **Airtable free plan: 1,000 API calls per workspace per month**, 5 requests/second. This plugin uses the Web API rather than an extension or scripted automation precisely so it runs on free, where neither is available.
 - **Number provenance is asserted by the operator**, recorded in a `Number source` column and carried into the call metadata. Certa does not itself source numbers.
 - **Revoking consent mid-run stops calls not yet placed, but cannot recall one already dialed.** Consent is re-read immediately before each call, so a revocation made while a batch is running does stop the rows still queued. A call already handed to CALL-E is gone: there is no cancel-in-flight operation to reach it with. Treat "revoked" as "nothing further will be dialed", not as "the call in progress will stop".

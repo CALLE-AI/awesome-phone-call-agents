@@ -2,6 +2,12 @@
 
 A dependency-free Node.js reference for contextual CALL-E conversations, structured observations, transcript evidence, and clinician handoff. Six fictional cases cover breast cancer treatment phases. This is a command-line reference, not the hosted Avelis website.
 
+## Why phone follow-up
+
+Breast cancer care can continue across surgery, chemotherapy, radiotherapy, endocrine treatment and long-term review. Much of the work that determines whether the plan is being followed—and whether symptoms or practical barriers have changed—happens between clinic visits. Digital reminders can prompt an action, but silence cannot explain whether a patient forgot, stopped because of a concern, could not access treatment or developed a new symptom.
+
+A phone conversation lowers the interaction burden for the patient and allows follow-up questions when an answer is incomplete, ambiguous or self-corrected. Avelis uses that conversation to continue from the recorded patient state and return an evidence-linked clinician handoff. The goal is to help the care team find the patients and unanswered questions that need human judgment, rather than give clinicians another unstructured call record.
+
 ## Start with real services
 
 Node.js 24 or later. The default entry is **LIVE MODE**, with no bundled credentials. Run `npm start` for setup instructions; it does not dial until you issue the explicit `start` command. Copy `.env.example` to `.env` and supply your own `CALLE_API_KEY`, `AVELIS_PLANNER_KEY`, `AVELIS_PLANNER_MODEL` and authorized `AVELIS_LIVE_PHONE`. The DeepSeek origin is prefilled. Keys and phone numbers are blank. There is no automatic fallback to simulation when configuration or an API fails.
@@ -39,7 +45,22 @@ Preview prints the actual breast-care request prompt and result schema with a ma
 5. `workflow.mjs` composes contract checking, bounded extraction repair, semantic verification and DeepSeek risk classification. Unsupported analysis remains UNKNOWN / UNRESOLVED rather than silently becoming GREEN.
 6. DeepSeek generates clinician drafts from orders, records, transcript, findings and unanswered questions. A separate model review can request one rewrite; rejected drafts are withheld. Planning and drafts are recommendations only.
 
+Patient history, treatment context, prior findings, unresolved questions and contact constraints are passed into the CALL-E task. The conversation can therefore ask what changed since the previous contact and pursue relevant missing details instead of restarting a generic questionnaire.
+
 The shared modules come from Avelis. The offline path demonstrates fixtures, not live model accuracy. The optional model path below uses actual model generation instead of the offline templates. Neither path executes a clinical action.
+
+## What CALL-E returns to Avelis
+
+CALL-E conducts the call from the contextual task and returns the recipient transcript plus a proposed structured result shaped by Avelis's schema. The result covers:
+
+- confirmed identity, permission to continue and how the call ended;
+- each original instruction or required protocol topic, including whether it was completed, incomplete, unclear or not asked;
+- patient-reported experiences, barriers, concerns and intentions;
+- patient requests, contact preferences and unanswered or contradictory questions;
+- treatment-phase consistency, protocol observations and symptom facts such as onset, severity, trend and functional impact;
+- limitations, clinician review needs and a concise factual care summary.
+
+Each material finding requests an exact full transcript turn and its turn index. Missing or ambiguous information stays `unknown`, `unclear` or `not_asked`; it is not filled in as a negative answer. This provider extraction is a proposal rather than the final clinical record: Avelis checks its contract, attempts bounded repair when needed, verifies claims against the transcript and keeps unsupported analysis unresolved for clinician review.
 
 ## Optional DeepSeek analysis of a fictional case
 

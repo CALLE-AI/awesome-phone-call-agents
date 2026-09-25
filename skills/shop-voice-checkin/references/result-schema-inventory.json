@@ -1,0 +1,51 @@
+{
+  "type": "object",
+  "required": ["check_in_completed", "products"],
+  "properties": {
+    "check_in_completed": {
+      "type": "boolean",
+      "description": "True when the shop owner completed the morning inventory check-in."
+    },
+    "products": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["name", "quantity_estimate", "unit"],
+        "properties": {
+          "name": {
+            "type": "string",
+            "description": "Product name as spoken by the shop owner."
+          },
+          "quantity_estimate": {
+            "type": "number",
+            "description": "Approximate quantity remaining; use best estimate from conversation."
+          },
+          "unit": {
+            "type": "string",
+            "description": "Unit spoken by the owner, e.g. bags, cartons, pieces."
+          },
+          "running_low": {
+            "type": "boolean",
+            "description": "True when the owner says stock is low or almost finished."
+          },
+          "supplier_mentioned": {
+            "type": "string",
+            "description": "Supplier name if the owner mentions where they buy this item."
+          },
+          "last_purchase_price": {
+            "type": "number",
+            "description": "Last purchase price in shop currency if stated on the call."
+          },
+          "is_new_item": {
+            "type": "boolean",
+            "description": "True when the owner introduces a product that was not in the prior inventory list. The ledger adds it as a new product row."
+          }
+        }
+      }
+    },
+    "owner_notes": {
+      "type": "string",
+      "description": "Optional free-text notes from the owner about the shop today."
+    }
+  }
+}

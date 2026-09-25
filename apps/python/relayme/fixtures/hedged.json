@@ -1,0 +1,15 @@
+{
+  "task_id": "relayme-demo-hedged",
+  "mock_transcript": [
+    {"speaker": "agent", "text": "Hi, I'm an AI assistant calling for someone. Is the prescription under the name Jordan Rivera ready for pickup?"},
+    {"speaker": "callee", "text": "Um, I think so? The pharmacist stepped out. It might be ready but I can't be sure right now."},
+    {"speaker": "agent", "text": "Understood. I won't record that as confirmed. Thank you for your time."}
+  ],
+  "structured_result": {
+    "answer": "",
+    "outcome": "partial",
+    "transcript_summary": "Staff member was unsure and could not confirm; the pharmacist was unavailable. No confirmed yes.",
+    "follow_up_needed": true,
+    "disclosed_ai": true
+  }
+}

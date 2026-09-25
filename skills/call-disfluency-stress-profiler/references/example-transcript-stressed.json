@@ -1,0 +1,8 @@
+{"status": "COMPLETED", "call_id": "run-disfluency-001", "transcript": [
+  {"speaker": "agent", "text": "Hello, this is an automated call from Valley Medical regarding your upcoming appointment."},
+  {"speaker": "callee", "text": "Um, yes, okay, uh, I actually, I mean, I thought that was, uh, cancelled? I, I, I wasn't sure."},
+  {"speaker": "agent", "text": "I understand. Your appointment is confirmed for Thursday at 10 a.m. Are you still available?"},
+  {"speaker": "callee", "text": "Well, uh, I think so, you know, it is just that, um, I have another thing, um, at the same time, maybe."},
+  {"speaker": "agent", "text": "No problem. We can reschedule. What time works best for you?"},
+  {"speaker": "callee", "text": "Um, um, you know, I actually, I mean, I don't know, uh, maybe like afternoon? I am not sure, er, Wednesday maybe?"}
+]}

@@ -356,13 +356,13 @@ export function Composer({
           </span>
         </label>
 
-        {/* Live readiness: KYC + a phone number are required for real outbound */}
+        {/* Purchased-number requirements apply to batch calling. */}
         {mode === 'live' && (
           <div className="flex items-start gap-2.5 rounded-xl border border-border bg-surface-2 px-4 py-3 text-xs leading-relaxed text-muted">
             <Info className="mt-0.5 size-4 shrink-0 text-primary" />
             <p>
-              Live calls use CALL-E credits (~{cost.formattedPerCall} each) and require identity
-              verification plus a phone number on your CALL-E account.{' '}
+              Live calls have usage-based charges. Shared numbers support single-recipient tests;
+              batches require an activated purchased number as your default outbound number.{' '}
               {onOpenSettings && (
                 <button
                   onClick={onOpenSettings}
@@ -387,7 +387,7 @@ export function Composer({
                 {mode === 'live' && <Wallet className="size-3.5 shrink-0 text-primary" />}
                 {mode === 'demo'
                   ? `${callCount} ${callCount === 1 ? 'call' : 'calls'} · Free in Demo — no credits used`
-                  : `Est. ${cost.formattedTotal} · ${callCount} ${callCount === 1 ? 'call' : 'calls'} · results in ~1 min`}
+                  : `${cost.breakdown} · ${cost.formattedTotal}`}
               </p>
             )}
           </div>

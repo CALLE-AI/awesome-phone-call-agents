@@ -1,0 +1,10 @@
+{
+  "call_id": "example-wrong-party-001",
+  "status": "completed",
+  "callee_masked": "+155****0142",
+  "transcript": [
+    {"speaker": "agent", "text": "Hello, this is an automated assistant from Example Clinic. I am calling about invoice INV-2211 and the outstanding balance of $120.00 on the account of Dana Reyes."},
+    {"speaker": "callee", "text": "Sorry, Dana is not available right now. Can I take a message?"},
+    {"speaker": "agent", "text": "No message needed, thank you. We will try again another time. Goodbye."}
+  ]
+}

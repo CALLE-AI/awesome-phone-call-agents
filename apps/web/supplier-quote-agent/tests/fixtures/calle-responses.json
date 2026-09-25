@@ -1,0 +1,28 @@
+{
+  "success": {
+    "id": "call_success_1",
+    "status": "completed",
+    "structured_result": {
+      "outcome": "quoted",
+      "summary": "Acme Corp quoted $11.75/unit with a 4-day lead time, Net 30 terms.",
+      "next_action": "review_quote"
+    }
+  },
+  "failure": {
+    "id": "call_failure_1",
+    "status": "failed",
+    "structured_result": {
+      "outcome": "failed",
+      "summary": "Call dropped after 12 seconds; no pricing captured.",
+      "next_action": "retry_call"
+    }
+  },
+  "no_structured_result": {
+    "id": "call_no_result_1",
+    "status": "failed"
+  },
+  "completed_no_structured_result": {
+    "id": "call_no_result_2",
+    "status": "completed"
+  }
+}
