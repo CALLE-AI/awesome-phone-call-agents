@@ -1,0 +1,65 @@
+# .gitignore written BEFORE git init — the CALL-E merge bar rejects any PR with a
+# real phone number, API key, or live transcript in files OR git history.
+
+# Secrets / credentials (commit only .env.example)
+.env
+.env.*
+!.env.example
+*.pem
+*.key
+secrets/
+.calle/
+
+# ⚠ Live-call artifacts — NEVER commit (top cause of PR rejection in this repo)
+# Real transcripts, recordings, and any fixture with a real (non-reserved) number.
+transcripts/
+recordings/
+call-logs/
+*.transcript.json
+fixtures/live/
+**/real-*.json
+
+# Node / TS
+node_modules/
+dist/
+build/
+*.tsbuildinfo
+.npm/
+.pnpm-store/
+
+# Next.js build output
+.next/
+out/
+next-env.d.ts
+
+# Python
+__pycache__/
+*.pyc
+.venv/
+.python-version
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+
+# Data / runtime output
+data/
+*.sqlite
+*.db
+tmp/
+.cache/
+
+# Browser / demo capture artifacts
+.playwright-mcp/
+playwright-report/
+test-results/
+*.webm
+*.mp4
+
+# Harness / editor local
+.claude
+.codex
+.agents
+.vscode/
+.idea/
+.DS_Store
+.vercel

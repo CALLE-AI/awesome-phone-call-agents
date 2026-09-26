@@ -1,0 +1,2 @@
+export interface QueuedCall {localId:string;task:string;phones:string[];clientRequestId:string;createdAt:number;attempts:number;}
+export class CallQueue {private items:QueuedCall[]=[];enqueue(x:Omit<QueuedCall,'attempts'>){this.items.push({...x,attempts:0});}peek(){return this.items[0];}remove(){this.items.shift();}size(){return this.items.length;}async drain(run:(x:QueuedCall)=>Promise<void>){while(this.items.length){const x=this.items[0];try{await run(x);this.remove()}catch{ x.attempts++; if(x.attempts>=3)this.remove(); else break;}}}}

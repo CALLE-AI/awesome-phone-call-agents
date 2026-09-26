@@ -272,36 +272,18 @@ was called is the only thing that distinguishes "resumed" from "dialled again".
 
 ## Verifying end to end without a real pharmacy
 
-CALL-E publishes an inbound testing hotline — **+1 276-322-9632** — that answers
-with a general-purpose conversational prompt. It's the recommended target for
-exercising this skill live without calling a business.
+Use a standards-reserved fictional number to exercise the offline planning path.
+The example cannot be dialed and must not be used for live verification.
 
 ```bash
-printf 'name,phone,address\nCALL-E Hotline,+12763229632,Inbound testing hotline\n' \
+printf 'name,phone,address\nFictional Pharmacy,+14155550132,Reserved offline example\n' \
   > pharmacies.hotline.csv
 
-python3 scripts/pharmacy_search.py --pharmacies pharmacies.hotline.csv           # offline
-python3 scripts/pharmacy_search.py --pharmacies pharmacies.hotline.csv --live    # 1 call
+python3 scripts/pharmacy_search.py --pharmacies pharmacies.hotline.csv
 ```
 
-The hotline isn't role-playing a pharmacist, so the extracted fields will be
-sparse or `unknown`. That's the expected result and it's still a useful check —
-it exercises plan, run, poll, the completion gate and the ledger, and confirms
-an incomplete stock check reports as one rather than inventing fields.
-
-**To verify the durable-run behaviour**, interrupt a live call mid-poll
-(`Ctrl+C`) and run the same command again:
-
-```
-  …9632: resuming run 4BJPgjIFv3gZ
-```
-
-It polls the existing run instead of planning a new one. Inspect
-`.pharmacy_runs.json` between the two invocations to see the entry sitting in
-`running` with its `run_id` recorded.
-
-This number is published by CALL-E for testing, so it is not masked here — the
-masking rule protects private numbers, not a public test endpoint.
+This checks planning without network access. Use the offline test suite to verify
+durable-run and duplicate-call behavior.
 
 ## Example
 

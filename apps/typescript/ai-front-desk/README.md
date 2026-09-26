@@ -27,11 +27,10 @@ came back, and the transcript — so it's visible, not a black box.
   <img src="docs/screenshots/call-activity-expanded.png" alt="Call Activity log showing a dry-run mock transcript" width="800">
 </p>
 
-*(Both screenshots are captured with `CALLE_DRY_RUN=true` — zero real phone calls placed.
-The sidebar's "DRY RUN" badge and "0/20 real calls used" counter, and the transcript's
-`[dry run]`-prefixed turns and mock JSON result, are visible in the second screenshot. This
-is what the same dashboard looks like with `CALLE_DRY_RUN=false` against a real call — the
-UI is otherwise identical.)*
+*(Both screenshots were captured with `CALLE_DRY_RUN=true` — zero real phone calls placed.
+Their `0/20` counter is an older display, not a CALL-E allowance. The current sidebar
+shows this app's recorded live-call count and links to Dashboard billing. The "DRY RUN"
+badge and `[dry run]`-prefixed transcript turns distinguish simulated results.)*
 
 Active development happens at
 [github.com/LihanCanCode/Ai_FrontDesk](https://github.com/LihanCanCode/Ai_FrontDesk); this
@@ -98,9 +97,11 @@ npm run hello-call   # places ONE real call as an integration smoke test
 
 Flip `CALLE_DRY_RUN` back to `true` afterward — the dashboard's simulate
 buttons and the cron sweep both read this flag on every call, so leaving it
-`false` means every subsequent click places a real call against your free
-tier's call budget (the dashboard sidebar shows a live `X/20 real calls used`
-counter).
+`false` means every subsequent click can place a real call and consume credits.
+The sidebar counts live calls recorded by this app; it does not measure your
+CALL-E balance. New users receive 100 free credits, not a fixed number of calls.
+See the [pricing FAQ](https://www.heycall-e.com/) and
+[Dashboard billing](https://dashboard.heycall-e.com/account/billing) for actual charges.
 
 ## Side effects, credentials, and cancellation
 

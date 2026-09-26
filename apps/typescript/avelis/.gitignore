@@ -1,0 +1,6 @@
+.env
+.env.*
+!.env.example
+*.private.json
+runs/
+node_modules/

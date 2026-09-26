@@ -1,0 +1,24 @@
+{
+  "name": "verity-verification-core",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "description": "Standalone verification core for CALL-E phone tasks: parse the transcript, flag ambiguity, and gate a task_completed claim behind independent evidence before any real-world action.",
+  "license": "MIT",
+  "scripts": {
+    "verify": "tsx src/cli.ts",
+    "demo": "tsx src/cli.ts --all",
+    "check": "tsc -p tsconfig.json --noEmit",
+    "test": "vitest run"
+  },
+  "dependencies": {
+    "luxon": "3.7.2"
+  },
+  "devDependencies": {
+    "@types/luxon": "3.7.5",
+    "@types/node": "22.15.0",
+    "tsx": "4.20.0",
+    "typescript": "5.9.3",
+    "vitest": "3.2.7"
+  }
+}

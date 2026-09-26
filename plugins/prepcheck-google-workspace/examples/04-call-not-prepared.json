@@ -1,0 +1,32 @@
+{
+  "_comment": "The patient cannot be ready in time. PrepCheck requests scheduling-staff review and stops calling; it does not release the slot. The agent does not offer a new date — rebooking stays with a person.",
+  "_matching": "Replace REPLACE_WITH_call_id_FROM_SHEET with the value in the row's call_id column after placing a dry-run call. A result that cannot be matched to the call in flight is held for review rather than applied.",
+  "call_id": "REPLACE_WITH_call_id_FROM_SHEET",
+  "status": "completed",
+  "task_completed": true,
+  "completion_confidence": {
+    "score": 0.9,
+    "label": "high"
+  },
+  "metadata": {
+    "row_id": "P002",
+    "checkpoint": "T72",
+    "source": "prepcheck"
+  },
+  "recipients": [
+    {
+      "structured_result": {
+        "prep_status": "not_prepared",
+        "items_completed": [],
+        "items_outstanding": [
+          "completed the pre-procedure blood test"
+        ],
+        "outstanding_plan": "no appointment booked, cannot get one in time",
+        "wants_reschedule": "yes",
+        "flag_for_staff": false,
+        "identity_verified": true,
+        "asked_to_stop": false
+      }
+    }
+  ]
+}

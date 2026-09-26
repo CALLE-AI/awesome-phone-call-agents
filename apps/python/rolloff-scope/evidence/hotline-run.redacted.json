@@ -1,0 +1,17 @@
+{
+  "ok": true,
+  "tool_name": "get_call_run",
+  "result": {
+    "isError": false,
+    "structuredContent": {
+      "run_id": "redacted_run_20260909",
+      "status": "COMPLETED",
+      "result": {
+        "call_ids": [
+          "redacted_call_1"
+        ],
+        "call_id": "redacted_call_1"
+      }
+    }
+  }
+}

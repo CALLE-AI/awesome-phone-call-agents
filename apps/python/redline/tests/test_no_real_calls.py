@@ -36,7 +36,7 @@ from redline.remediate import generate_patch
 from redline.runner import run_suite
 from redline.scenario import load_scenario, load_scenarios
 from redline.scenario.loader import ScenarioError
-from redline.spend import CREDITS_PER_CALL, SpendLedger, WetOperationRefusedError
+from redline.spend import SpendLedger, WetOperationRefusedError
 from redline.subject import SubjectUnderTest
 from redline.transport import LiveTransport, MockTransport
 from redline.verify import verify_patch
@@ -192,8 +192,7 @@ class TestOnlyTheLiveTransportCanSpend:
         with pytest.raises(WetOperationRefusedError):
             ledger.record_wet("run_call")
 
-    def test_one_call_costs_five_credits(self) -> None:
-        # Stated here because it is the number that makes the guard rails
-        # worth having: an unattended run of the catalogue would be a hundred
-        # calls and five hundred credits.
-        assert CREDITS_PER_CALL == 5
+    def test_call_count_does_not_determine_charges(self) -> None:
+        ledger = SpendLedger(call_budget=1)
+        ledger.record_wet("calls.create")
+        assert ledger.credits_spent is None

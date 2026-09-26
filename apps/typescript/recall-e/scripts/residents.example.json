@@ -1,0 +1,101 @@
+{
+  "residents": [
+    {
+      "id": "res_001",
+      "name": "Dorothy",
+      "pronoun": "her",
+      "room": "112",
+      "phone": "+15551234567",
+      "callerIdentity": "your friendly Reminiscence Companion check-in call",
+      "topics": [
+        {
+          "label": "her years as a schoolteacher",
+          "sampleQuestion": "I remember you used to teach, what was that like?"
+        }
+      ],
+      "familyReferences": [
+        { "name": "Linda", "relation": "daughter" }
+      ],
+      "otherReferences": [
+        { "label": "her cat, Whiskers" }
+      ],
+      "callCadence": "3x_weekly",
+      "consent": {
+        "setupBy": "staff_id_204",
+        "setupDate": "2026-08-15",
+        "consentOnFile": true
+      },
+      "callHistory": []
+    },
+    {
+      "id": "res_002",
+      "name": "Harold",
+      "pronoun": "his",
+      "room": "108",
+      "phone": "+15559876543",
+      "callerIdentity": "your friendly Reminiscence Companion check-in call",
+      "topics": [
+        {
+          "label": "his time serving in the Navy",
+          "sampleQuestion": "I heard you served in the Navy, what was that like?"
+        }
+      ],
+      "familyReferences": [
+        { "name": "Michael", "relation": "son" }
+      ],
+      "otherReferences": [
+        { "label": "his old workshop, where he built model ships" }
+      ],
+      "callCadence": "2x_weekly",
+      "consent": {
+        "setupBy": "staff_id_204",
+        "setupDate": "2026-08-20",
+        "consentOnFile": true
+      },
+      "callHistory": []
+    },
+    {
+      "id": "res_003",
+      "name": "Rosa",
+      "pronoun": "her",
+      "room": "203",
+      "phone": "+15552223333",
+      "language": "Spanish",
+      "callerIdentity": "tu llamada amistosa de Reminiscence Companion",
+      "openerTranslated": "Hola Rosa, esta es tu llamada amistosa de Reminiscence Companion, espero que tenga un buen día.",
+      "openerTranslatedEnglish": "Hi Rosa, this is your friendly Reminiscence Companion call, I hope you're having a good day.",
+      "topics": [
+        {
+          "label": "raising her four children",
+          "sampleQuestion": "I heard you raised four children, what was that season of life like?",
+          "labelTranslated": "haber criado a sus cuatro hijos",
+          "labelTranslatedEnglish": "having raised her four children",
+          "sampleQuestionTranslated": "Escuché que crió a sus cuatro hijos, ¿cómo fue esa etapa de su vida?",
+          "sampleQuestionTranslatedEnglish": "I heard you raised four children, what was that season of life like?"
+        }
+      ],
+      "familyReferences": [
+        {
+          "name": "Elena",
+          "relation": "granddaughter",
+          "relationTranslated": "nieta",
+          "relationTranslatedEnglish": "granddaughter"
+        }
+      ],
+      "otherReferences": [
+        {
+          "label": "her garden, especially her tomatoes",
+          "labelTranslated": "su jardín, especialmente sus tomates",
+          "labelTranslatedEnglish": "her garden, especially her tomatoes"
+        }
+      ],
+      "callCadence": "3x_weekly",
+      "consent": {
+        "setupBy": "staff_id_204",
+        "setupDate": "2026-08-22",
+        "consentOnFile": true
+      },
+      "callHistory": []
+    }
+  ]
+}

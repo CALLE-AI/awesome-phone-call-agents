@@ -1,0 +1,98 @@
+[
+  {
+    "name": "bank_security_alert",
+    "description": "Caller impersonates a bank's fraud or security department. Claims the account has been compromised. Requests OTP, card number, or a fund transfer to a 'safe account'.",
+    "keywords": [
+      "fraud department", "security team", "account suspended", "suspicious activity",
+      "verify your identity", "one-time password", "otp", "safe account",
+      "transfer your funds", "bank", "card number"
+    ],
+    "match_threshold": 3,
+    "category": "VISHING",
+    "harm_trajectory": "authority_establishment → urgency → credential_extraction"
+  },
+  {
+    "name": "irs_tax_authority_scam",
+    "description": "Caller impersonates the IRS, tax authority, or government agency. Threatens arrest, lawsuit, or asset seizure. Demands immediate payment via gift card or wire.",
+    "keywords": [
+      "irs", "tax authority", "warrant", "arrest", "legal action",
+      "lawsuit", "federal", "government", "back taxes", "penalty",
+      "gift card", "wire transfer", "pay immediately"
+    ],
+    "match_threshold": 3,
+    "category": "VISHING",
+    "harm_trajectory": "authority_claim → fear_induction → payment_demand"
+  },
+  {
+    "name": "tech_support_scam",
+    "description": "Caller claims to be from Microsoft, Apple, or another tech company. States the victim's device is infected. Asks for remote access or payment for fake software.",
+    "keywords": [
+      "microsoft", "apple", "google", "virus", "malware", "hacked",
+      "remote access", "tech support", "your computer", "windows",
+      "infected", "fix your device", "gift card", "subscription"
+    ],
+    "match_threshold": 3,
+    "category": "VISHING",
+    "harm_trajectory": "technical_authority → fear_induction → access_or_payment"
+  },
+  {
+    "name": "lottery_prize_scam",
+    "description": "Caller informs the victim they have won a lottery, prize, or sweepstakes. Requests an upfront fee or personal details to claim the prize.",
+    "keywords": [
+      "congratulations", "you have won", "prize", "lottery", "sweepstakes",
+      "selected", "winner", "claim your reward", "advance fee",
+      "processing fee", "tax on winnings", "personal details"
+    ],
+    "match_threshold": 3,
+    "category": "SCAM_SCRIPT",
+    "harm_trajectory": "excitement_trigger → advance_fee_request"
+  },
+  {
+    "name": "advance_fee_fraud",
+    "description": "Caller offers a large sum of money (inheritance, investment, contract) in exchange for an upfront fee, tax, or legal cost.",
+    "keywords": [
+      "inheritance", "investment opportunity", "large sum", "advance fee",
+      "legal fees", "transfer fee", "overseas funds", "release funds",
+      "percentage", "confidential", "secret deal"
+    ],
+    "match_threshold": 2,
+    "category": "SCAM_SCRIPT",
+    "harm_trajectory": "wealth_promise → trust_building → fee_extraction"
+  },
+  {
+    "name": "utility_cutoff_scam",
+    "description": "Caller impersonates a utility company (electricity, gas, water). Claims payment is overdue and service will be cut off immediately. Demands gift card or wire payment.",
+    "keywords": [
+      "electricity", "power company", "gas company", "utility",
+      "overdue bill", "cut off", "disconnect", "service termination",
+      "final notice", "pay now", "prepaid card", "gift card"
+    ],
+    "match_threshold": 3,
+    "category": "VISHING",
+    "harm_trajectory": "service_threat → urgency → payment_demand"
+  },
+  {
+    "name": "romance_scam",
+    "description": "Caller or contact has built a romantic relationship over time and now requests money for an emergency: medical bills, travel, or business.",
+    "keywords": [
+      "love you", "we met online", "emergency", "hospital", "stranded",
+      "send money", "western union", "money transfer", "help me",
+      "I need you", "we will be together", "trust me"
+    ],
+    "match_threshold": 2,
+    "category": "SCAM_SCRIPT",
+    "harm_trajectory": "emotional_bond → emergency_narrative → money_request"
+  },
+  {
+    "name": "robocall_spam",
+    "description": "Automated or semi-automated unsolicited marketing call. Not necessarily fraudulent but violates consent.",
+    "keywords": [
+      "press 1 to", "do not miss", "limited time offer", "act now",
+      "call back at", "special promotion", "selected customers",
+      "auto-dialer", "recorded message"
+    ],
+    "match_threshold": 2,
+    "category": "SPAM",
+    "harm_trajectory": "unsolicited_contact"
+  }
+]

@@ -1,0 +1,14 @@
+{
+  "status": "COMPLETED",
+  "result": {
+    "post_summary": "Customer confirmed the Friday delivery without clarification needs.",
+    "transcript": [
+      {"speaker": "agent", "text": "Hello, this is an automated assistant calling from Example Bakery about your Friday delivery."},
+      {"speaker": "callee", "text": "Yes, Friday is fine."},
+      {"speaker": "agent", "text": "Great, the driver will call when outside. Anything else?"},
+      {"speaker": "callee", "text": "No, that covers it. Thanks."},
+      {"speaker": "agent", "text": "Thank you. Goodbye."}
+    ]
+  },
+  "callee_phone": "+14155550109"
+}

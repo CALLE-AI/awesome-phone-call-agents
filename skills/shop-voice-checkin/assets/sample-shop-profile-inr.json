@@ -1,0 +1,19 @@
+{
+  "shop_id": "demo-pune-corner-shop",
+  "display_name": "Pune Corner Shop",
+  "phone": "+919000000000",
+  "region": "IN",
+  "locale": "hi",
+  "currency": "INR",
+  "timezone": "Asia/Kolkata",
+  "recipient_consented": true,
+  "language_style": "hindi-english",
+  "typical_products": [
+    { "name": "Rice", "unit": "kg" },
+    { "name": "Atta", "unit": "kg" },
+    { "name": "Cooking oil", "unit": "litres" },
+    { "name": "Sugar", "unit": "kg" },
+    { "name": "Toor dal", "unit": "kg" }
+  ],
+  "notes": "Fictional masked India profile for preview and tests. Do not use a real phone number in git."
+}

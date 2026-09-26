@@ -1,0 +1,299 @@
+{
+  "clinic": {
+    "name": "Riverbank Physiotherapy",
+    "public_callback_number": "+15550101000",
+    "reference_prefix": "RBP"
+  },
+  "course": {
+    "id": "knee-rehab-2026-07",
+    "programme": "post-operative knee rehabilitation",
+    "planned_sessions": 12,
+    "lapse_after_days": 21,
+    "bring": "shorts and your exercise sheet",
+    "offered_slots": [
+      {
+        "id": "s1",
+        "label": "Thursday 13 August, 2:00pm",
+        "date": "2026-08-13"
+      },
+      {
+        "id": "s2",
+        "label": "Tuesday 18 August, 9:30am",
+        "date": "2026-08-18"
+      }
+    ],
+    "concessions": [
+      {
+        "id": "evening_group",
+        "tier": 1,
+        "offer": "a place in the Wednesday evening group at 6pm",
+        "when": [
+          "work_or_childcare"
+        ]
+      },
+      {
+        "id": "taxi_voucher",
+        "tier": 2,
+        "offer": "a taxi voucher the clinic can arrange for each session",
+        "when": [
+          "transport",
+          "cost"
+        ]
+      },
+      {
+        "id": "phone_review",
+        "tier": 3,
+        "offer": "a phone review with a clinician instead of attending in person",
+        "when": [
+          "transport",
+          "work_or_childcare",
+          "cost"
+        ]
+      },
+      {
+        "id": "pause_two_weeks",
+        "tier": 4,
+        "offer": "pausing the course for two weeks and restarting without losing their place",
+        "when": [
+          "any"
+        ]
+      }
+    ]
+  },
+  "contact_policy": {
+    "min_days_between_calls": 7,
+    "max_calls_per_course": 3,
+    "grace_days_after_promise": 2
+  },
+  "patients": [
+    {
+      "id": "p_ivy",
+      "first_name": "Ivy",
+      "phone_e164": "+15550101001",
+      "consent_to_automated_contact": true,
+      "sessions": [
+        {
+          "date": "2026-07-14",
+          "status": "attended"
+        },
+        {
+          "date": "2026-07-16",
+          "status": "attended"
+        },
+        {
+          "date": "2026-07-21",
+          "status": "attended"
+        },
+        {
+          "date": "2026-07-23",
+          "status": "attended"
+        },
+        {
+          "date": "2026-07-28",
+          "status": "attended"
+        },
+        {
+          "date": "2026-07-30",
+          "status": "attended"
+        },
+        {
+          "date": "2026-08-06",
+          "status": "missed"
+        }
+      ],
+      "contact_log": []
+    },
+    {
+      "id": "p_omar",
+      "first_name": "Omar",
+      "phone_e164": "+15550101002",
+      "consent_to_automated_contact": true,
+      "sessions": [
+        {
+          "date": "2026-08-04",
+          "status": "attended"
+        },
+        {
+          "date": "2026-08-06",
+          "status": "missed"
+        }
+      ],
+      "contact_log": []
+    },
+    {
+      "id": "p_rosa",
+      "first_name": "Rosa",
+      "phone_e164": "+15550101003",
+      "consent_to_automated_contact": true,
+      "sessions": [
+        {
+          "date": "2026-07-21",
+          "status": "attended"
+        },
+        {
+          "date": "2026-07-23",
+          "status": "attended"
+        },
+        {
+          "date": "2026-07-28",
+          "status": "attended"
+        },
+        {
+          "date": "2026-08-04",
+          "status": "missed"
+        },
+        {
+          "date": "2026-08-06",
+          "status": "missed"
+        }
+      ],
+      "contact_log": []
+    },
+    {
+      "id": "p_tam",
+      "first_name": "Tam",
+      "phone_e164": "+15550101004",
+      "consent_to_automated_contact": true,
+      "sessions": [
+        {
+          "date": "2026-07-21",
+          "status": "attended"
+        },
+        {
+          "date": "2026-07-23",
+          "status": "attended"
+        },
+        {
+          "date": "2026-08-04",
+          "status": "missed"
+        }
+      ],
+      "contact_log": [
+        {
+          "date": "2026-07-30",
+          "outcome": "promised_return",
+          "promised_date": "2026-08-04"
+        }
+      ]
+    },
+    {
+      "id": "p_wu",
+      "first_name": "Wu",
+      "phone_e164": "+15550101005",
+      "consent_to_automated_contact": true,
+      "sessions": [
+        {
+          "date": "2026-07-07",
+          "status": "attended"
+        },
+        {
+          "date": "2026-07-09",
+          "status": "attended"
+        },
+        {
+          "date": "2026-07-14",
+          "status": "missed"
+        }
+      ],
+      "contact_log": []
+    },
+    {
+      "id": "p_kai",
+      "first_name": "Kai",
+      "phone_e164": "+15550101006",
+      "consent_to_automated_contact": true,
+      "sessions": [
+        {
+          "date": "2026-07-21",
+          "status": "attended"
+        },
+        {
+          "date": "2026-07-23",
+          "status": "attended"
+        },
+        {
+          "date": "2026-07-28",
+          "status": "attended"
+        },
+        {
+          "date": "2026-08-04",
+          "status": "missed"
+        }
+      ],
+      "contact_log": [
+        {
+          "date": "2026-08-04",
+          "outcome": "stopped_feels_better"
+        }
+      ]
+    },
+    {
+      "id": "p_lena",
+      "first_name": "Lena",
+      "phone_e164": "+15550101007",
+      "consent_to_automated_contact": false,
+      "sessions": [
+        {
+          "date": "2026-07-21",
+          "status": "attended"
+        },
+        {
+          "date": "2026-08-04",
+          "status": "missed"
+        },
+        {
+          "date": "2026-08-06",
+          "status": "missed"
+        }
+      ],
+      "contact_log": []
+    },
+    {
+      "id": "p_dev",
+      "first_name": "Dev",
+      "phone_e164": "+15550101008",
+      "consent_to_automated_contact": true,
+      "sessions": [
+        {
+          "date": "2026-07-28",
+          "status": "attended"
+        },
+        {
+          "date": "2026-07-30",
+          "status": "attended"
+        },
+        {
+          "date": "2026-08-04",
+          "status": "attended"
+        },
+        {
+          "date": "2026-08-06",
+          "status": "attended"
+        }
+      ],
+      "contact_log": []
+    },
+    {
+      "id": "p_sam",
+      "first_name": "Sam",
+      "phone_e164": "+15550101009",
+      "consent_to_automated_contact": true,
+      "sessions": [
+        {
+          "date": "2026-07-21",
+          "status": "attended"
+        },
+        {
+          "date": "2026-08-04",
+          "status": "missed"
+        }
+      ],
+      "contact_log": [
+        {
+          "date": "2026-07-28",
+          "outcome": "refused_contact"
+        }
+      ]
+    }
+  ]
+}

@@ -1,0 +1,37 @@
+{
+  "ok": true,
+  "tool_name": "get_call_run",
+  "status": "COMPLETED",
+  "structuredContent": {
+    "run_id": "CONTROLLED-PARTS-1",
+    "status": "COMPLETED",
+    "result": {
+      "summary": "The parts desk said order PX-204 shipped, arrives Tuesday, and has no backordered items. The structured payload also contained a tracking number that was never spoken.",
+      "activity": [
+        {
+          "status": "DIALING",
+          "message": "Calling the approved distributor line"
+        },
+        {
+          "status": "IN_PROGRESS",
+          "message": "Parts-order menu reached"
+        },
+        {
+          "status": "WAITING",
+          "message": "Waiting for the parts desk"
+        },
+        {
+          "status": "COMPLETED",
+          "message": "Order-status answer received"
+        }
+      ],
+      "structured_result": {
+        "shipping_status": "shipped",
+        "estimated_arrival": "Tuesday",
+        "backorder_status": "clear",
+        "tracking_number": "ZX-9081"
+      },
+      "transcript": "USER: Thank you for calling Example Parts. For existing parts orders, press 1.\nBOT: pressed 1\nUSER: Parts desk. How can I help?\nBOT: Hi, this is an AI assistant calling on behalf of Sam. I am checking existing order PX-204 only.\nUSER: The shipping status for order PX-204 is shipped.\nUSER: The arrival is Tuesday.\nUSER: The backorder status is clear; no items are backordered.\nUSER: A tracking number is not available on this line."
+    }
+  }
+}

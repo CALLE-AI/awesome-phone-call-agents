@@ -1,0 +1,76 @@
+{
+  "call_id": "call-onboarding-new-20260801",
+  "idempotency_key": "shopvoice-demo-pune-corner-shop-onboarding-2026-08-01",
+  "status": "completed",
+  "task_completed": true,
+  "completion_confidence": { "score": 0.91, "label": "high" },
+  "evidence": [
+    "New owner gave shop name, phone, region, and five staple products."
+  ],
+  "structured_result": {
+    "onboarding_completed": true,
+    "display_name": "Pune Corner Shop",
+    "phone": "+919000000000",
+    "region": "IN",
+    "locale": "hi",
+    "currency": "INR",
+    "language_style": "hindi-english",
+    "timezone": "Asia/Kolkata",
+    "consent_to_store": true,
+    "consent_to_future_calls": true,
+    "typical_products": [
+      { "name": "Rice", "unit": "kg", "reference_cost": 60 },
+      { "name": "Atta", "unit": "kg", "reference_cost": 40 }
+    ],
+    "preferred_supplier_nickname": "Sharma Ji"
+  },
+  "metadata": {
+    "shop_id": "demo-pune-corner-shop",
+    "call_type": "onboarding",
+    "call_date": "2026-08-01"
+  },
+  "recipients": [
+    {
+      "phones": ["+919000000000"],
+      "region": "IN",
+      "locale": "hi",
+      "structured_result": {
+        "onboarding_completed": true,
+        "display_name": "Pune Corner Shop",
+        "phone": "+919000000000",
+        "region": "IN",
+        "locale": "hi",
+        "currency": "INR",
+        "language_style": "hindi-english",
+        "timezone": "Asia/Kolkata",
+        "consent_to_store": true,
+        "consent_to_future_calls": true,
+        "typical_products": [
+          { "name": "Rice", "unit": "kg", "reference_cost": 60 },
+          { "name": "Atta", "unit": "kg", "reference_cost": 40 }
+        ],
+        "preferred_supplier_nickname": "Sharma Ji"
+      },
+      "attempts": [
+        {
+          "attempt": 1,
+          "status": "completed",
+          "started_at": "2026-08-01T10:00:00+05:30",
+          "duration_seconds": 90,
+          "transcript_turns": [
+            { "offset_seconds": 0, "speaker": "bot", "text": "Namaste, I be AI assistant. I go set up your shop account — can I ask few question?" },
+            { "offset_seconds": 5, "speaker": "user", "text": "Yes, go ahead." },
+            { "offset_seconds": 8, "speaker": "bot", "text": "What is your shop name, and phone number for confirm?" },
+            { "offset_seconds": 12, "speaker": "user", "text": "Pune Corner Shop, nine one two three four five six seven eight nine." },
+            { "offset_seconds": 20, "speaker": "bot", "text": "Thank you. Which region and language you prefer for calls?" },
+            { "offset_seconds": 25, "speaker": "user", "text": "India, Hindi-English mix." },
+            { "offset_seconds": 30, "speaker": "bot", "text": "Tell me 3 to 5 staple items you sell." },
+            { "offset_seconds": 34, "speaker": "user", "text": "Rice and atta mainly." },
+            { "offset_seconds": 38, "speaker": "bot", "text": "Do you agree we store this and call you for check-ins later?" },
+            { "offset_seconds": 42, "speaker": "user", "text": "Yes, that is fine." }
+          ]
+        }
+      ]
+    }
+  ]
+}

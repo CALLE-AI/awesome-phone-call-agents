@@ -1,0 +1,31 @@
+<svg width="120" height="120" viewBox="0 0 120 120" fill="none" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="GoodFaith">
+  <title>GoodFaith</title>
+  <!-- knockout mask: carves a thin gap where the green tick crosses the amber handset,
+       so the two colors never muddy at the join -->
+  <mask id="gf-cut">
+    <rect width="120" height="120" fill="white"/>
+    <path d="M55 71 L70 86 L98 45" stroke="black" stroke-width="16"
+          stroke-linecap="round" stroke-linejoin="round" fill="none"/>
+  </mask>
+  <!-- Trust seal / receipt-stamp ring -->
+  <circle cx="60" cy="60" r="53" stroke="#E0A25E" stroke-width="3" opacity="0.28"/>
+  <!-- Classic handset receiver, tilted -34deg; earpiece + mouthpiece read as a phone -->
+  <g transform="rotate(-34 59 54)" mask="url(#gf-cut)">
+    <path d="M44 27
+             c 5.2 0 9.5 4.3 9.5 9.5
+             c 0 2 -0.4 4 -1 5.9
+             c -0.5 1.6 -0.1 3.3 1.1 4.5
+             l 13 13
+             c 1.2 1.2 2.9 1.6 4.5 1.1
+             c 1.9 -0.6 3.9 -1 5.9 -1
+             c 5.2 0 9.5 4.3 9.5 9.5
+             c 0 5.2 -4.3 9.5 -9.5 9.5
+             C 56.2 88.5 31.5 63.8 31.5 36.5
+             c 0 -5.2 4.3 -9.5 9.5 -9.5
+             z"
+          fill="#E0A25E"/>
+  </g>
+  <!-- Verified green tick — the receipt the call earns -->
+  <path d="M55 71 L70 86 L98 45"
+        stroke="#7FB98B" stroke-width="9.5" stroke-linecap="round" stroke-linejoin="round" fill="none"/>
+</svg>

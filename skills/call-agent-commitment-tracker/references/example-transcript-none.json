@@ -1,0 +1,7 @@
+{"status": "COMPLETED", "call_id": "run-commit-002", "transcript": [
+  {"speaker": "agent", "text": "Good morning. This is an automated call from City Billing to discuss your account ending in 42. Your current balance is $320."},
+  {"speaker": "callee", "text": "Yes, I am aware. Is there anything else?"},
+  {"speaker": "agent", "text": "I just wanted to confirm the details on file are correct. Your address is on record as the one we have. Is there anything you would like to update?"},
+  {"speaker": "callee", "text": "No, that is fine."},
+  {"speaker": "agent", "text": "Great. Thank you for confirming. Have a good day."}
+]}

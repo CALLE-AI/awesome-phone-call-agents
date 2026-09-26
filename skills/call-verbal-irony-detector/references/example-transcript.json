@@ -1,0 +1,16 @@
+{
+  "status": "COMPLETED",
+  "result": {
+    "post_summary": "Customer confirmed keeping the booking.",
+    "transcript": [
+      {"speaker": "agent", "text": "Hello, this is an automated assistant calling from Example Clinic about your Tuesday appointment."},
+      {"speaker": "callee", "text": "You cancelled it last week and I waited 40 minutes on hold. Twice."},
+      {"speaker": "agent", "text": "I am sorry about the hold time. The appointment is currently still active. Would you like to keep it?"},
+      {"speaker": "callee", "text": "Oh, great. Just perfect. Keep it, sure, why not."},
+      {"speaker": "agent", "text": "Just to confirm, you would like to keep the Tuesday appointment?"},
+      {"speaker": "callee", "text": "Yes, keep it."},
+      {"speaker": "agent", "text": "Done. You will get a reminder the day before. Goodbye."}
+    ]
+  },
+  "callee_phone": "+14155550123"
+}

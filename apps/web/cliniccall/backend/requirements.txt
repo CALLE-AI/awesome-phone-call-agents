@@ -1,0 +1,5 @@
+fastapi
+uvicorn
+python-dotenv
+sqlmodel
+calle-ai==0.7.0

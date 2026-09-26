@@ -1,0 +1,76 @@
+{
+ "id": "train-human-021",
+ "label": "human",
+ "source": "sim-train",
+ "meta": {
+  "task": "book a table for two on Friday at 7 PM",
+  "hard": false
+ },
+ "turns": [
+  {
+   "speaker": "user",
+   "text": "Hi, who's calling?",
+   "offset_seconds": 1.71
+  },
+  {
+   "speaker": "bot",
+   "text": "Hi, I'm an AI assistant calling on behalf of Taylor Kim. I'd like to book a table for two people this Friday at 7 PM, under the name Taylor Kim.",
+   "offset_seconds": 3.52
+  },
+  {
+   "speaker": "user",
+   "text": "For two? Okay, so, I've got you down for Friday at seven.",
+   "offset_seconds": 14.99
+  },
+  {
+   "speaker": "user",
+   "text": "yeah",
+   "offset_seconds": 19.9
+  },
+  {
+   "speaker": "bot",
+   "text": "Is Friday at 7 available?",
+   "offset_seconds": 21.62
+  },
+  {
+   "speaker": "user",
+   "text": "Yep, you're all set.",
+   "offset_seconds": 24.01
+  },
+  {
+   "speaker": "bot",
+   "text": "Is Friday at 7 available?",
+   "offset_seconds": 26.68
+  },
+  {
+   "speaker": "user",
+   "text": "let me see, Sure.",
+   "offset_seconds": 31.08
+  },
+  {
+   "speaker": "bot",
+   "text": "Thank you so much, that's all I needed.",
+   "offset_seconds": 33.48
+  },
+  {
+   "speaker": "user",
+   "text": "No, that's everything.",
+   "offset_seconds": 36.8
+  },
+  {
+   "speaker": "user",
+   "text": "right",
+   "offset_seconds": 38.18
+  },
+  {
+   "speaker": "bot",
+   "text": "Thank you so much, that's all I needed.",
+   "offset_seconds": 39.49
+  },
+  {
+   "speaker": "user",
+   "text": "No problem, bye now.",
+   "offset_seconds": 43.2
+  }
+ ]
+}

@@ -86,13 +86,14 @@ export function maskDestination(value, destination) {
 }
 
 /**
- * Clean a validated result for the card. Terminal control sequences are removed and the
- * number that was dialled is masked if the clerk's words repeat it. Newlines survive,
- * because `required_documents_text` is one document per line; nothing else is rewritten,
- * because the clerk's own words are the product.
+ * Clean a validated result for the card. Mask phone-like text (including a different
+ * callback number), credentials and terminal controls in provider text. Keep document
+ * line breaks; the display copy is redacted, not a verbatim evidence archive.
  */
 export function cleanResult(result, destination) {
-  const strip = (v) => (typeof v === 'string' ? v.replace(ANSI, '').replace(CONTROL_KEEP_NEWLINE, '') : v);
+  const strip = (v) => (typeof v === 'string'
+    ? v.replace(ANSI, '').replace(CONTROL_KEEP_NEWLINE, '').split('\n').map((line) => sanitizeText(line)).join('\n')
+    : v);
   const stripped = Object.fromEntries(Object.entries(result).map(([k, v]) => [k, strip(v)]));
   return maskDestination(stripped, destination);
 }

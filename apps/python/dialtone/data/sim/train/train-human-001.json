@@ -1,0 +1,51 @@
+{
+ "id": "train-human-001",
+ "label": "human",
+ "source": "sim-train",
+ "meta": {
+  "task": "book a table for two on Friday at 7 PM",
+  "hard": false
+ },
+ "turns": [
+  {
+   "speaker": "user",
+   "text": "Yeah, hello.",
+   "offset_seconds": 1.64
+  },
+  {
+   "speaker": "bot",
+   "text": "Hi, I'm an AI assistant calling on behalf of Casey Brown. I'd like to book a table for two people this Friday at 7 PM, under the name Casey Brown.",
+   "offset_seconds": 3.08
+  },
+  {
+   "speaker": "user",
+   "text": "Hmm, seven is full, we could do seven thirty?",
+   "offset_seconds": 14.63
+  },
+  {
+   "speaker": "user",
+   "text": "okay",
+   "offset_seconds": 18.56
+  },
+  {
+   "speaker": "bot",
+   "text": "Is Friday at 7 available?",
+   "offset_seconds": 20.08
+  },
+  {
+   "speaker": "user",
+   "text": "so, Sure.",
+   "offset_seconds": 21.51
+  },
+  {
+   "speaker": "bot",
+   "text": "Could you confirm the booking under Casey Brown?",
+   "offset_seconds": 23.54
+  },
+  {
+   "speaker": "user",
+   "text": "uh, Okay, bye.",
+   "offset_seconds": 27.68
+  }
+ ]
+}

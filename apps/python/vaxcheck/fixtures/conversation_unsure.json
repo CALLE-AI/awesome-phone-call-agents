@@ -1,0 +1,21 @@
+{
+  "_scenario": "The most common real outcome: a guardian who does not remember. Consent is given, but the history is unclear, so a nurse checks the record.",
+  "recipient_status": "completed",
+  "task_completed": true,
+  "completion_confidence": 0.82,
+  "summary": "Guardian consented but could not recall the immunisation history.",
+  "evidence": ["Guardian said the record book is at home and they cannot remember."],
+  "structured_result": {
+    "reached_guardian": "yes",
+    "identity_confirmed": "yes",
+    "consent": "granted",
+    "route": "school_session",
+    "prior_dose_reported": "unsure",
+    "prior_dose_detail": "Thinks there may have been one at a clinic, record book at home.",
+    "allergy_reported": "unsure",
+    "allergy_detail": "Mentions a possible reaction to something, cannot recall what.",
+    "unwell_today": "no",
+    "guardian_questions": "",
+    "callback_requested": "no"
+  }
+}

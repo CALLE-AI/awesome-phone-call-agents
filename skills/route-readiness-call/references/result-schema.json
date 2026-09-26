@@ -1,0 +1,73 @@
+{
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "reached_recipient",
+    "readiness",
+    "ready_clock_time",
+    "handoff",
+    "cod_cash_ready",
+    "landmark",
+    "customer_quote",
+    "quote_in_english"
+  ],
+  "properties": {
+    "reached_recipient": {
+      "type": "string",
+      "enum": [
+        "yes",
+        "no",
+        "unknown"
+      ],
+      "description": "yes only when the person who answered confirms they are the customer for this order or can speak for them. no for a wrong number, voicemail, or no answer. unknown when unclear."
+    },
+    "readiness": {
+      "type": "string",
+      "enum": [
+        "ready_now",
+        "within_15_min",
+        "15_to_45_min",
+        "later_today",
+        "not_today",
+        "unknown"
+      ],
+      "description": "When the customer said they can receive the parcel. ready_now if they can receive it when the rider arrives. within_15_min or 15_to_45_min if they need that much extra time after the rider's expected arrival. later_today if they asked for a later time today. not_today if they cannot receive it today. unknown if they did not clearly say."
+    },
+    "ready_clock_time": {
+      "type": "string",
+      "description": "If the customer named a clock time when they can receive the parcel (for example 1 PM or 13:30), that time in 24-hour HH:MM form. Empty string otherwise."
+    },
+    "handoff": {
+      "type": "string",
+      "enum": [
+        "in_person",
+        "guard_or_neighbor",
+        "none",
+        "unknown"
+      ],
+      "description": "Who will receive the parcel: in_person if the customer will, guard_or_neighbor if they named a guard, neighbour or family member who can, none if nobody can, unknown if not discussed."
+    },
+    "cod_cash_ready": {
+      "type": "string",
+      "enum": [
+        "yes",
+        "no",
+        "not_applicable",
+        "unknown"
+      ],
+      "description": "Whether the cash-on-delivery amount will be ready. not_applicable if the order is prepaid. unknown if not discussed."
+    },
+    "landmark": {
+      "type": "string",
+      "description": "Directions or a landmark the customer gave to find their door, in their words. Empty string if none."
+    },
+    "customer_quote": {
+      "type": "string",
+      "description": "The customer's own words about when they can receive the parcel, quoted from the call in the language they spoke. Empty string if they did not say. Never paraphrase or invent."
+    },
+    "quote_in_english": {
+      "type": "string",
+      "description": "English translation of customer_quote. The same text when the customer spoke English. Empty string when customer_quote is empty."
+    }
+  }
+}

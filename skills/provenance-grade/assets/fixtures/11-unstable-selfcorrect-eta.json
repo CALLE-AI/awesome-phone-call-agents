@@ -1,0 +1,24 @@
+{
+  "id": "11-unstable-selfcorrect-eta",
+  "category": "self-correction",
+  "description": "Value stated then revised in the same breath. Final value taken, flagged unstable, capped below verified.",
+  "turns": [
+    { "speaker": "bot", "text": "Hi, QuoteDesk assistant calling about the Nashik depot delivery.", "offset_seconds": 0 },
+    { "speaker": "user", "text": "Yes?", "offset_seconds": 5 },
+    { "speaker": "bot", "text": "How many days for delivery to the Nashik depot?", "offset_seconds": 9 },
+    { "speaker": "user", "text": "Five days. Actually, no wait, six days, because Thursday is a holiday.", "offset_seconds": 14 }
+  ],
+  "fields": [
+    {
+      "field": "eta_days",
+      "value": 6,
+      "expects": "duration",
+      "questionTurn": 2,
+      "answerTurns": [3],
+      "critical": true,
+      "expectedGrade": "asserted",
+      "expectUnstable": true,
+      "expectSignals": ["I"]
+    }
+  ]
+}

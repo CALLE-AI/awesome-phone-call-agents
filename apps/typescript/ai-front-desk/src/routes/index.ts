@@ -48,7 +48,7 @@ api.get("/calls/:id", async (request, response) => {
 
 api.get("/status", async (_request, response) => {
   const liveCallsUsed = await prisma.callLog.count({ where: { dryRun: false } });
-  response.json({ dryRun: env.CALLE_DRY_RUN, liveCallsUsed, freeTierTotal: 20 });
+  response.json({ dryRun: env.CALLE_DRY_RUN, liveCallsUsed });
 });
 
 // ---- Simulate triggers -------------------------------------------------

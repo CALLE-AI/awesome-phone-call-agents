@@ -1,0 +1,251 @@
+@import "tailwindcss";
+
+@theme {
+  --font-display: var(--font-sora), ui-sans-serif, system-ui, sans-serif;
+  --font-sans: var(--font-inter), ui-sans-serif, system-ui, sans-serif;
+  --font-mono: var(--font-jetbrains-mono), ui-monospace, SFMono-Regular, monospace;
+  --color-canvas: #f6f7fb;
+}
+
+:root {
+  color-scheme: light;
+}
+
+html,
+body {
+  background: var(--color-canvas);
+  color: #0f172a;
+}
+
+body {
+  font-family: var(--font-sans);
+  -webkit-font-smoothing: antialiased;
+}
+
+::selection {
+  background: rgba(168, 85, 247, 0.18);
+}
+
+/* Surfaces */
+.card {
+  background: rgba(255, 255, 255, 0.88);
+  border: 1px solid rgba(226, 232, 240, 0.95);
+  box-shadow:
+    0 1px 2px rgba(15, 23, 42, 0.04),
+    0 16px 40px -24px rgba(15, 23, 42, 0.22);
+  backdrop-filter: blur(14px);
+  -webkit-backdrop-filter: blur(14px);
+}
+
+/* Brand gradients */
+.brand-bg {
+  background-image: linear-gradient(135deg, #6366f1 0%, #a855f7 42%, #ec4899 74%, #f97316 100%);
+}
+.brand-text {
+  background-image: linear-gradient(120deg, #6366f1 0%, #a855f7 40%, #ec4899 72%, #f97316 100%);
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
+}
+.blood-bg {
+  background-image: linear-gradient(135deg, #e11d48 0%, #f43f5e 45%, #fb923c 100%);
+}
+.blood-text {
+  background-image: linear-gradient(120deg, #e11d48 0%, #f43f5e 45%, #fb923c 100%);
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
+}
+.soft-brand {
+  background-image: linear-gradient(135deg, rgba(99, 102, 241, 0.09), rgba(236, 72, 153, 0.08) 60%, rgba(249, 115, 22, 0.07));
+}
+
+.gradient-ring {
+  position: relative;
+}
+.gradient-ring::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  padding: 1.5px;
+  border-radius: inherit;
+  background: linear-gradient(135deg, #6366f1, #a855f7, #ec4899, #f97316);
+  -webkit-mask: linear-gradient(#000 0 0) content-box, linear-gradient(#000 0 0);
+  -webkit-mask-composite: xor;
+  mask-composite: exclude;
+  pointer-events: none;
+}
+
+.dot-grid {
+  background-image: radial-gradient(rgba(15, 23, 42, 0.07) 1px, transparent 1px);
+  background-size: 22px 22px;
+  mask-image: radial-gradient(ellipse at 50% 0%, #000 25%, transparent 72%);
+}
+
+.aurora {
+  animation: aurora 20s ease-in-out infinite alternate;
+}
+
+.wave-bar {
+  animation: wave 0.95s ease-in-out infinite;
+  transform-origin: center;
+}
+
+.shimmer {
+  background: linear-gradient(100deg, transparent 20%, rgba(255, 255, 255, 0.7) 50%, transparent 80%);
+  background-size: 200% 100%;
+  animation: shimmer 2.2s linear infinite;
+}
+
+.skeleton {
+  background: linear-gradient(90deg, #eef0f6, #f8f9fc, #eef0f6);
+  background-size: 200% 100%;
+  animation: shimmer 1.4s linear infinite;
+}
+
+.scroll-thin {
+  scrollbar-width: thin;
+  scrollbar-color: rgba(100, 116, 139, 0.3) transparent;
+}
+
+.live-dot {
+  animation: live 1.4s ease-in-out infinite;
+}
+
+/* Map */
+.leaflet-container {
+  font-family: var(--font-sans);
+  background: #eef2f7;
+}
+.leaflet-control-attribution {
+  font-size: 10px !important;
+  background: rgba(255, 255, 255, 0.85) !important;
+  border-radius: 8px 0 0 0;
+}
+.leaflet-bar {
+  border: none !important;
+  box-shadow: 0 6px 18px -8px rgba(15, 23, 42, 0.3) !important;
+  border-radius: 12px !important;
+  overflow: hidden;
+}
+.leaflet-bar a {
+  color: #334155 !important;
+}
+.pb-divicon {
+  background: none;
+  border: none;
+}
+.pb-pin {
+  position: relative;
+  width: 30px;
+  height: 30px;
+}
+.pb-pin-body {
+  position: absolute;
+  inset: 3px;
+  border-radius: 9999px;
+  background: var(--pin);
+  color: #fff;
+  font: 700 11px/24px var(--font-sans);
+  text-align: center;
+  box-shadow:
+    0 0 0 3px #fff,
+    0 8px 16px -6px var(--pin);
+  transition: transform 0.2s ease;
+}
+.pb-pin.is-dim .pb-pin-body {
+  background: #cbd5e1;
+  box-shadow: 0 0 0 3px #fff;
+}
+.pb-pin.is-selected .pb-pin-body {
+  transform: scale(1.18);
+}
+.pb-pin-ping {
+  position: absolute;
+  inset: 0;
+  border-radius: 9999px;
+  background: var(--pin);
+  animation: pin-ping 1.6s cubic-bezier(0, 0, 0.2, 1) infinite;
+}
+.pb-you {
+  width: 18px;
+  height: 18px;
+  border-radius: 9999px;
+  background: linear-gradient(135deg, #6366f1, #ec4899);
+  box-shadow:
+    0 0 0 4px #fff,
+    0 0 0 12px rgba(168, 85, 247, 0.18);
+}
+.leaflet-tooltip.pb-tip {
+  border: none;
+  border-radius: 10px;
+  padding: 6px 10px;
+  font-size: 12px;
+  color: #0f172a;
+  box-shadow: 0 10px 24px -12px rgba(15, 23, 42, 0.4);
+}
+.route-line {
+  animation: dash 1.1s linear infinite;
+}
+
+@keyframes aurora {
+  0% {
+    transform: translate3d(-4%, -3%, 0) scale(1);
+  }
+  100% {
+    transform: translate3d(5%, 4%, 0) scale(1.12);
+  }
+}
+@keyframes wave {
+  0%,
+  100% {
+    transform: scaleY(0.3);
+  }
+  50% {
+    transform: scaleY(1);
+  }
+}
+@keyframes shimmer {
+  from {
+    background-position: 200% 0;
+  }
+  to {
+    background-position: -200% 0;
+  }
+}
+@keyframes pin-ping {
+  from {
+    transform: scale(0.6);
+    opacity: 0.55;
+  }
+  to {
+    transform: scale(2.3);
+    opacity: 0;
+  }
+}
+@keyframes dash {
+  to {
+    stroke-dashoffset: -28;
+  }
+}
+@keyframes live {
+  0%,
+  100% {
+    opacity: 1;
+  }
+  50% {
+    opacity: 0.35;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .aurora,
+  .wave-bar,
+  .shimmer,
+  .skeleton,
+  .pb-pin-ping,
+  .route-line,
+  .live-dot {
+    animation: none;
+  }
+}

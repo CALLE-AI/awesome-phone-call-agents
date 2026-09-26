@@ -1,0 +1,12 @@
+{
+  "status": "COMPLETED",
+  "result": {
+    "post_summary": "Call ended early; recipient distressed.",
+    "transcript": [
+      {"speaker": "agent", "text": "Hello, this is an automated assistant calling from Example Clinic about your Tuesday appointment."},
+      {"speaker": "callee", "text": "He kept saying he would kill them all if the phone rang again."},
+      {"speaker": "agent", "text": "I am sorry to hear that. I will not call again. Goodbye."}
+    ]
+  },
+  "callee_phone": "+14155550155"
+}
