@@ -1,0 +1,47 @@
+[
+  {
+    "customer_id": "C1001",
+    "name": "Asha",
+    "phone": "+1XXXXXXXX01",
+    "plan": "pro",
+    "tenure_months": 14,
+    "churn_status": "at_risk",
+    "trigger": "cancellation_request"
+  },
+  {
+    "customer_id": "C1002",
+    "name": "Ravi",
+    "phone": "+1XXXXXXXX02",
+    "plan": "pro",
+    "tenure_months": 9,
+    "churn_status": "at_risk",
+    "trigger": "cancellation_request"
+  },
+  {
+    "customer_id": "C1003",
+    "name": "Meera",
+    "phone": "+1XXXXXXXX03",
+    "plan": "business",
+    "tenure_months": 20,
+    "churn_status": "at_risk",
+    "trigger": "cancellation_request"
+  },
+  {
+    "customer_id": "C1004",
+    "name": "Arjun",
+    "phone": "+1XXXXXXXX04",
+    "plan": "starter",
+    "tenure_months": 7,
+    "churn_status": "at_risk",
+    "trigger": "cancellation_request"
+  },
+  {
+    "customer_id": "C1005",
+    "name": "Nida",
+    "phone": "+1XXXXXXXX05",
+    "plan": "starter",
+    "tenure_months": 4,
+    "churn_status": "at_risk",
+    "trigger": "cancellation_request"
+  },
+  ]
