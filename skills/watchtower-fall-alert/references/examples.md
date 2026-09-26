@@ -53,7 +53,7 @@ back:
 
 ```python
 task = (
-    "Call +15550101234. Identify yourself as Watchtower, a home "
+    "Call +12125550123. Identify yourself as Watchtower, a home "
     "safety monitoring assistant. Tell them: 'A possible fall was "
     "detected in the living room at 2026-08-09T14:12:03+00:00.' Ask "
     "them to make a decision: should this be dismissed as a false "
@@ -110,7 +110,7 @@ directly:
 
 ```python
 task = (
-    "Call +15550109876. Identify yourself as Watchtower, a home safety "
+    "Call +12125550199. Identify yourself as Watchtower, a home safety "
     "monitoring assistant. Tell them: 'A fall was detected in the "
     "living room at 2026-08-09T14:12:03+00:00, and the primary "
     "caregiver has escalated this. Please check on the resident now, "
@@ -168,26 +168,22 @@ curl http://localhost:5000/history?limit=5
 ]
 ```
 
-## 5. What a network failure looks like (and recovers from)
+## 5. What a network or call failure looks like
 
-If the result-polling step hits a transient timeout, you'll see retries
-before it either succeeds or falls back safely:
-
-```
-[Watchtower] CALL-E request failed on attempt 1/3: CALL-E API request timed out.
-[Watchtower] CALL-E request failed on attempt 2/3: CALL-E API request timed out.
-Caregiver call status: completed
-Task completed: True
-Structured result: {'decision': 'dismiss'}
-```
-
-Or, if all retries are exhausted:
+`calle_trigger.py` does not retry. If the call errors, or the result is
+ambiguous (incomplete task, unclear decision), it stops immediately and
+logs it as `unknown` — no automatic second attempt, no automatic
+escalation call:
 
 ```
-[Watchtower] All 3 attempts failed (CALL-E API request timed out.).
-Treating as 'unknown' - will escalate as a safe default.
-[Watchtower] Caregiver escalated. Calling secondary contact...
+[Watchtower] Caregiver call failed or its result is ambiguous: CALL-E API request timed out.
+[Watchtower] STOPPING - not retrying automatically. This requires manual operator review.
+[Watchtower] Result was ambiguous. STOPPING here by design - no retry, no automatic secondary call. Please review this event manually.
 ```
+
+This event is logged with `decision = 'unknown'` in the database (see
+Section 4) so it's visible on the dashboard and in `/history` for a
+human to follow up on.
 
 ## 6. Testing the CALL-E integration without the camera
 
