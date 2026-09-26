@@ -117,6 +117,7 @@ Current apps:
 | [`python/pawpassage`](python/pawpassage/) | Python | Approval-bound pet-journey evidence checks with an official SDK loopback demo, one-call intent tracking, and read-only recovery. |
 | [`typescript/continuum-call`](typescript/continuum-call/) | TypeScript / Node | Durable multi-call phone missions: a frozen intent plus a one-create reservation mean an unresolved or refused outcome blocks the next call instead of redialling, confirmed facts carry their source run into the next party's call, and a hash-chained Evidence Pack replays the mission and fails closed on tampering. Interactive mock is the default; live CALL-E is opt-in behind named operator gates. |
 | [`python/firstbell`](python/firstbell/) | Python | Calls the families whose school-absence notification went unanswered, each in that family's own language, and keeps three endings apart: a usable answer, a call that produced nothing, and nobody reached. Offline by default against a CALL-E double, so the demo needs no account and dials nobody. |
+| [`python/ordershield-ai`](python/ordershield-ai/) | Python / FastAPI | Autonomous anti-RTO & COD verification dispatcher: real-time outbound PSTN calls with touchtone DTMF & landmark capture, SHA-256 audit ledger, and zero-cost fixture replay. |
 
 Suggested grouping:
 
