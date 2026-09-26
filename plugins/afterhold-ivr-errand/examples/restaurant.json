@@ -1,0 +1,27 @@
+{
+  "archetype": "restaurant",
+  "e164": "+912222001100",
+  "display_name": "Pizza Hut Bandra",
+  "goal": "Confirm a 7:30 PM table for two tonight, ask about wait time, and capture any dietary accommodations the restaurant can hold.",
+  "language": "en-IN",
+  "extract_schema": {
+    "type": "object",
+    "required": ["outcome", "summary_for_user"],
+    "properties": {
+      "outcome": { "type": "string", "enum": ["resolved", "needs_human", "voicemail", "unavailable", "refused", "failed"] },
+      "summary_for_user": { "type": "string" },
+      "facts": {
+        "type": "object",
+        "properties": {
+          "reservation_time": { "type": "string" },
+          "party_size": { "type": "integer" },
+          "wait_minutes": { "type": "integer" },
+          "dietary_accommodations": { "type": "string" }
+        },
+        "additionalProperties": true
+      },
+      "next_step": { "type": "string" },
+      "callee_role": { "type": "string" }
+    }
+  }
+}

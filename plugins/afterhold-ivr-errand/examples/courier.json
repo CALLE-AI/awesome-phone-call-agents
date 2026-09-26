@@ -1,0 +1,27 @@
+{
+  "archetype": "courier",
+  "e164": "+914400001122",
+  "display_name": "BlueDart Chennai Hub",
+  "goal": "Check if AWB 8821 is out for delivery today. If delayed, get the rider contact and reschedule delivery for tomorrow morning.",
+  "language": "en-IN",
+  "extract_schema": {
+    "type": "object",
+    "required": ["outcome", "summary_for_user"],
+    "properties": {
+      "outcome": { "type": "string", "enum": ["resolved", "needs_human", "voicemail", "unavailable", "refused", "failed"] },
+      "summary_for_user": { "type": "string" },
+      "facts": {
+        "type": "object",
+        "properties": {
+          "tracking_number": { "type": "string" },
+          "status": { "type": "string", "enum": ["Out for delivery", "Delayed", "Delivered", "Not shipped", "Unknown"] },
+          "expected_time": { "type": "string" },
+          "rider_contact": { "type": "string" }
+        },
+        "additionalProperties": true
+      },
+      "next_step": { "type": "string" },
+      "callee_role": { "type": "string" }
+    }
+  }
+}
