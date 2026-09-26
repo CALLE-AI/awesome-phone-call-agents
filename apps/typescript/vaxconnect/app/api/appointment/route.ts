@@ -1,25 +1,15 @@
 
 import { NextResponse } from "next/server";
 import { CalleClient } from "@call-e/calle";
+import {
+    guardOperatorAndRealCalls,
+    guardRecipient,
+} from "@/lib/calle/security";
+import { maskErrorForLog, maskSensitiveText } from "@/lib/calle/mask";
 
 const client = new CalleClient({
     apiKey: process.env.CALLE_API_KEY!,
 });
-const internalSecret = process.env.CALLE_INTERNAL_SECRET;
-
-const realCallsEnabled =
-    process.env.CALLE_ENABLE_REAL_CALLS === "true";
-
-const allowedRecipients = new Set(
-    (process.env.CALLE_ALLOWED_RECIPIENTS ?? "")
-        .split(",")
-        .map((phone) => phone.trim())
-        .filter(Boolean)
-);
-
-function isValidE164(phone: string): boolean {
-    return /^\+[1-9]\d{7,14}$/.test(phone);
-}
 
 /*
  * Extract all transcript turns.
@@ -244,36 +234,18 @@ function extractBookingResult(
         status,
         confirmed_date: confirmedDate,
         confirmed_time: confirmedTime,
-        provider_message: providerMessage,
+        provider_message: maskSensitiveText(providerMessage, 300),
     };
 }
 
 export async function POST(req: Request) {
     try {
-        const authHeader = req.headers.get("authorization");
+        const authGate = guardOperatorAndRealCalls(req);
 
-        if (
-            !internalSecret ||
-            authHeader !== `Bearer ${internalSecret}`
-        ) {
-            return NextResponse.json(
-                {
-                    ok: false,
-                    error: "Unauthorized",
-                },
-                {status: 401}
-            );
+        if (authGate) {
+            return authGate;
         }
 
-        if (!realCallsEnabled) {
-            return NextResponse.json(
-                {
-                    ok: false,
-                    error: "Real CALL-E calls are disabled.",
-                },
-                {status: 403}
-            );
-        }
         const body = await req.json();
 
         const {
@@ -324,24 +296,10 @@ export async function POST(req: Request) {
             );
         }
 
-        if (!isValidE164(providerPhone)) {
-            return NextResponse.json(
-                {
-                    ok: false,
-                    error: "Configured provider number must be a valid E.164 phone number.",
-                },
-                {status: 400}
-            );
-        }
+        const recipientGate = guardRecipient(providerPhone);
 
-        if (!allowedRecipients.has(providerPhone)) {
-            return NextResponse.json(
-                {
-                    ok: false,
-                    error: "Configured provider number is not authorized for real calls.",
-                },
-                {status: 403}
-            );
+        if (recipientGate) {
+            return recipientGate;
         }
         /*
          * ============================================================
@@ -509,7 +467,10 @@ Your job is to actually request the appointment from the provider and determine 
             booking_result: bookingResult,
         });
     } catch (error) {
-        console.error("CALL-E appointment request failed.");
+        console.error(
+            "CALL-E appointment request failed:",
+            maskErrorForLog(error)
+        );
 
         return NextResponse.json(
             {

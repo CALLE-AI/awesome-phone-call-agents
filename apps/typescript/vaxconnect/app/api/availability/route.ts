@@ -1,6 +1,16 @@
 
 import { NextResponse } from "next/server";
 import { CalleClient } from "@call-e/calle";
+import {
+    REAL_CALLS_ENABLED,
+    guardOperatorAndRealCalls,
+    guardRecipient,
+} from "@/lib/calle/security";
+import {
+    maskCallForLog,
+    maskErrorForLog,
+    maskSensitiveText,
+} from "@/lib/calle/mask";
 
 const DEMO_PIN = "560001";
 
@@ -15,6 +25,35 @@ type AvailabilityResult = {
     appointment_required: string;
     earliest_availability: string;
 };
+
+/*
+ * DEMO PROVIDERS
+ *
+ * Not contacted. These are shown regardless of whether a live
+ * CALL-E call is attempted, and are the ONLY providers shown when
+ * CALLE_ENABLE_REAL_CALLS is not "true" (the default). This is the
+ * credential-free, no-call path documented in the README.
+ */
+const DEMO_PROVIDERS = [
+    {
+        hospital: "Demo Vaccination Centre",
+        provider_id: "demo-vaccination-centre",
+        available: true,
+        price: "₹700",
+        appointment_required: "Yes",
+        earliest_availability: "Tomorrow, 11:30 AM",
+        source: "DEMO PROVIDER" as const,
+    },
+    {
+        hospital: "Demo Community Clinic",
+        provider_id: "demo-community-clinic",
+        available: false,
+        price: "—",
+        appointment_required: "—",
+        earliest_availability: "Currently unavailable",
+        source: "DEMO PROVIDER" as const,
+    },
+];
 
 function extractAvailability(result: any): AvailabilityResult {
     const recipient = result?.recipients?.[0];
@@ -319,6 +358,29 @@ export async function POST(
             );
         }
 
+        /*
+         * No-call default: unless an operator has authenticated with
+         * CALLE_INTERNAL_SECRET AND explicitly enabled real calls, never
+         * reach the CALL-E SDK. This is also the credential-free,
+         * runnable-by-default path documented in the README: no
+         * CALLE_API_KEY or DEMO_PROVIDER_PHONE is required to reach it.
+         */
+        if (!REAL_CALLS_ENABLED) {
+            return NextResponse.json({
+                vaccine,
+                pinCode,
+                providers: DEMO_PROVIDERS,
+                call: null,
+                realCallsEnabled: false,
+            });
+        }
+
+        const authGate = guardOperatorAndRealCalls(request);
+
+        if (authGate) {
+            return authGate;
+        }
+
         const apiKey =
             process.env.CALLE_API_KEY;
 
@@ -345,18 +407,10 @@ export async function POST(
             );
         }
 
-        if (
-            !/^\+[1-9]\d{7,14}$/.test(
-                demoPhone
-            )
-        ) {
-            return NextResponse.json(
-                {
-                    error:
-                        "DEMO_PROVIDER_PHONE must be a valid E.164 phone number.",
-                },
-                { status: 500 }
-            );
+        const recipientGate = guardRecipient(demoPhone);
+
+        if (recipientGate) {
+            return recipientGate;
         }
 
         const client =
@@ -382,9 +436,7 @@ export async function POST(
 
         console.log(
             JSON.stringify(
-                result,
-                null,
-                2
+                maskCallForLog(result)
             )
         );
 
@@ -436,9 +488,7 @@ export async function POST(
 
             console.log(
                 JSON.stringify(
-                    result,
-                    null,
-                    2
+                    maskCallForLog(result)
                 )
             );
         }
@@ -449,9 +499,7 @@ export async function POST(
 
         console.log(
             JSON.stringify(
-                result,
-                null,
-                2
+                maskCallForLog(result)
             )
         );
 
@@ -490,15 +538,16 @@ export async function POST(
                             null,
 
                         failureMessage:
-                            result.failureMessage ??
-                            result
-                                .recipients?.[0]
-                                ?.attempts?.[0]
-                                ?.failureMessage ??
-                            null,
+                            maskSensitiveText(
+                                result.failureMessage ??
+                                result
+                                    .recipients?.[0]
+                                    ?.attempts?.[0]
+                                    ?.failureMessage
+                            ) || null,
 
                         summary:
-                            result.summary ??
+                            maskSensitiveText(result.summary) ||
                             null,
                     },
                 },
@@ -530,7 +579,7 @@ export async function POST(
                             null,
 
                         summary:
-                            result.summary ??
+                            maskSensitiveText(result.summary) ||
                             null,
                     },
                 },
@@ -578,59 +627,7 @@ export async function POST(
                     "CALL-E VERIFIED" as const,
             },
 
-            /*
-             * DEMO PROVIDER
-             *
-             * Not contacted.
-             */
-
-            {
-                hospital:
-                    "Demo Vaccination Centre",
-
-                provider_id:
-                    "demo-vaccination-centre",
-
-                available: true,
-
-                price: "₹700",
-
-                appointment_required:
-                    "Yes",
-
-                earliest_availability:
-                    "Tomorrow, 11:30 AM",
-
-                source:
-                    "DEMO PROVIDER" as const,
-            },
-
-            /*
-             * DEMO PROVIDER
-             *
-             * Not contacted.
-             */
-
-            {
-                hospital:
-                    "Demo Community Clinic",
-
-                provider_id:
-                    "demo-community-clinic",
-
-                available: false,
-
-                price: "—",
-
-                appointment_required:
-                    "—",
-
-                earliest_availability:
-                    "Currently unavailable",
-
-                source:
-                    "DEMO PROVIDER" as const,
-            },
+            ...DEMO_PROVIDERS,
         ];
 
         return NextResponse.json({
@@ -639,6 +636,8 @@ export async function POST(
             pinCode,
 
             providers,
+
+            realCallsEnabled: true,
 
             call: {
                 id:
@@ -654,27 +653,20 @@ export async function POST(
                     null,
 
                 summary:
-                    result.summary ??
+                    maskSensitiveText(result.summary) ||
                     null,
             },
         });
     } catch (error) {
         console.error(
-            "========== CALL-E AVAILABILITY EXCEPTION =========="
-        );
-
-        console.error(error);
-
-        console.error(
-            "===================================================="
+            "CALL-E AVAILABILITY EXCEPTION:",
+            maskErrorForLog(error)
         );
 
         return NextResponse.json(
             {
                 error:
-                    error instanceof Error
-                        ? error.message
-                        : "Failed to execute CALL-E availability enquiry",
+                    "Failed to execute CALL-E availability enquiry.",
             },
             { status: 500 }
         );
