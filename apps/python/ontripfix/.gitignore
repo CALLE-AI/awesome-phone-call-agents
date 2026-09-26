@@ -1,0 +1,6 @@
+airflow.*
+*.generated
+project-requirements.txt
+*.db
+config/*.json
+!config/*.json.example
