@@ -7,10 +7,16 @@ the flow without running the code themselves.
 
 ## Scenario
 
-A camera is monitoring a living room. `WATCHTOWER_ROOM=living_room`.
-`WATCHTOWER_CAREGIVER_PHONE` and `WATCHTOWER_SECONDARY_PHONE` are set to
-a family member's and a neighbor's numbers respectively (real numbers in
-an actual deployment; fictional placeholders in this doc).
+A camera is monitoring a living room (`ROOM = "living_room"` in
+`fall_detector.py`). `WATCHTOWER_CAREGIVER_PHONE` and
+`WATCHTOWER_SECONDARY_PHONE` are set to a family member's and a
+neighbor's numbers respectively (real numbers in an actual deployment;
+NANP-reserved fictional placeholders in this doc). The server is running
+with `WATCHTOWER_API_KEY` set, and this walkthrough shows a **live**
+run — i.e. `WATCHTOWER_CONFIRM_LIVE_CALL` and
+`WATCHTOWER_AUTHORIZED_NUMBERS` are also set (see `SKILL.md` → "Going
+live"). Without those, every step below runs as a dry run instead —
+same flow, no real call placed.
 
 ## 1. Detection
 
@@ -132,7 +138,7 @@ While `fall_detector.py` is running, you can query its state without
 using the dashboard at all:
 
 ```bash
-curl http://localhost:5000/status
+curl "http://localhost:5000/status?key=$WATCHTOWER_API_KEY"
 ```
 
 ```json
@@ -150,7 +156,7 @@ curl http://localhost:5000/status
 ```
 
 ```bash
-curl http://localhost:5000/history?limit=5
+curl "http://localhost:5000/history?limit=5&key=$WATCHTOWER_API_KEY"
 ```
 
 ```json
@@ -204,6 +210,13 @@ test_event = {
 handle_fall_event(test_event)
 ```
 
-This is the fastest way to verify your `CALLE_API_KEY` and phone number
-environment variables are configured correctly before relying on a real
-detected fall to trigger the first test call.
+Run with no environment variables set, this is a **dry run by
+default** — it prints exactly what call would be placed and returns a
+simulated `dismiss` decision, without needing `CALLE_API_KEY` or real
+phone numbers at all. To exercise the real CALL-E integration instead,
+set `CALLE_API_KEY`, both phone number variables, a matching
+`WATCHTOWER_AUTHORIZED_NUMBERS` allowlist, and
+`WATCHTOWER_CONFIRM_LIVE_CALL` (see `SKILL.md` → "Going live") before
+running this — this is the fastest way to verify that configuration is
+correct before relying on a real detected fall to trigger the first
+real call.
