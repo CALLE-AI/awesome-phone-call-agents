@@ -522,6 +522,8 @@ Externally hosted user-facing apps built on CALL-E. They live in their own repos
 - [Novyra](https://novyra-rgaa.onrender.com/) - External AI-powered lifestyle app with a CALL-E phone workflow for personalized user interactions.
 - [Vera](https://github.com/shalynmonet/vera) - Strands-orchestrated wellness companion that places recurring CALL-E calls to seniors, evaluates outcomes with Amazon Bedrock against each resident's own escalation criteria, and alerts caregivers automatically when something needs attention.
 
+- [Import Rescue](apps/python/import-rescue/) - One consented catalog-clarification callback returns quote-linked import settings and review rows, with a local no-call demo and no catalog writes.
+
 ### Plugins
 
 No-code and low-code workflow plugins live under [`plugins/`](plugins/). They are for workflow-platform nodes, actions, connectors, and recipes that help operators connect business events to phone-call agent workflows without writing a full app.
