@@ -1,0 +1,6 @@
+{
+  "task_description": "Customer disputes a $340 charge on the March billing cycle.",
+  "task_type": "billing",
+  "destination": "+15555010212",
+  "intended_outcome": "Confirm whether the disputed charge was reviewed and the resolution."
+}
