@@ -206,6 +206,7 @@ This project is an awesome list for AI-agent phone-call workflows. Add resources
 - [`incident-escalation-call`](skills/incident-escalation-call/) - Walks an on-call escalation ladder one phone call at a time and records an acknowledgement only when an owner and an ETA are both quoted by words the recipient spoke, then re-reads the call over a second transport before the incident is reported as owned.
 - [`hifi-hotel-negotiator`](skills/hifi-hotel-negotiator/) - Autonomous voice AI agent skill for hotel procurement, direct-booking rate negotiation, and reservation confirmation over the phone using CALL-E.
 - [`partline-part-sourcing`](skills/partline-part-sourcing/) - Preview-first industrial replacement-part sourcing that calls approved suppliers for exact part identity, quantity and shipping cutoffs, then ranks evidence-backed matches and leaves purchase and alternate approval to a human.
+- [`countercall`](skills/countercall/) - Calls a government service counter before a citizen travels there and returns a schema-validated checklist of what to bring — documents, fee, cash or card, originals or copies, appointment — leaving any field the clerk could not answer visibly empty instead of guessing it.
 - [`client-persona-profiler`](skills/client-persona-profiler/) - Post-call persona detection skill that classifies a caller's behavioural archetype (heuristic DISC keyword scoring), computes an RFMAP-style loyalty score across interactions, persists a privacy-preserving hashed local profile, and returns a personalised next-call strategy playbook with sensitive-topic human-review flags.
 
 - [`call-the-parts`](skills/call-the-parts/) - Sit back and relax while your CALL-E agent skill calls spare parts shops for the used automotive part you need. See [testing instructions](skills/call-the-parts/TESTING.md).
@@ -240,7 +241,9 @@ This project is an awesome list for AI-agent phone-call workflows. Add resources
 
 ### Apps
 
+
 - [Relay](apps/web/relay/) - Proactive business-operations web app that uses CALL-E to handle employee, customer, and SaaS lifecycle conversations, capture structured outcomes, and trigger operational follow-ups. ([GitHub](https://github.com/hanaanllone/Relay-An-AI-Agent-for-Optimizing-Business-Operations))
+- [Gimme Updates](apps/typescript/gimme-updates/) - Daily phone call that reads a user's important emails aloud and captures spoken reminders/follow-ups, built for blind and elderly users who can't navigate a screen-based inbox.
 - [GoodFaith](apps/typescript/goodfaith/) - Calls imaging clinics for self-pay Good Faith Estimate cash prices, enforces price comparability on the call, and returns a confidence-gated, transcript-evidenced landed-cost comparison that refuses to rank any price it cannot trace to a real quoted sentence; mock-first no-call default.
 - [DineLine CALL-E Edition](apps/typescript/dineline-calle-edition/) - Two-agent restaurant concierge with user-approved choice, separate CALL-E roles, n8n Google Places integration, duplicate-call protection, and evidence-checked outcomes; fixture-only public mode by default.
 - [BridgeCalle](apps/typescript/bridgecalle/) - Senior-accessible active listening voice companion web app powered by CALL-E API & SDK.
