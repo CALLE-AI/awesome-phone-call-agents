@@ -1,0 +1,11 @@
+[
+  {
+    "id": "imigrasi-jaksel",
+    "name": "Kantor Imigrasi Kelas I Khusus Non TPI Jakarta Selatan",
+    "city": "Jakarta Selatan",
+    "phone_e164": "+62XXXXXXXXXX",
+    "source_url": "https://jakartaselatan.imigrasi.go.id/",
+    "source_checked": null,
+    "procedures": ["perpanjangan paspor", "paspor baru"]
+  }
+]
