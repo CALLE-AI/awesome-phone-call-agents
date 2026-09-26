@@ -1,13 +1,15 @@
+import os
+import secrets
 import sqlite3
 import time
 from contextlib import contextmanager
 from datetime import datetime, timezone
-from typing import Iterator
+from typing import Iterator, Optional
 
 import cv2
 from ultralytics import YOLO
 import supervision as sv
-from fastapi import FastAPI
+from fastapi import FastAPI, Header, HTTPException, Query, Depends
 from fastapi.responses import StreamingResponse, HTMLResponse
 import uvicorn
 
@@ -17,6 +19,38 @@ model = YOLO("best.pt")
 tracker = sv.ByteTrack()
 app = FastAPI()
 box_annotator = sv.BoxAnnotator(thickness=2)
+
+# --- Authentication --------------------------------------------------------
+# All network-reachable routes (/detect, /status, /history, /) require an
+# API key. This defends against anyone else on the network viewing the
+# camera feed or event history. The key can be supplied either as a
+# header (X-Watchtower-Key) or a query parameter (?key=...) - the query
+# parameter option exists because <img src="/detect?key=..."> can't set
+# custom headers, and the dashboard needs to embed the video stream.
+#
+# WATCHTOWER_API_KEY must be set explicitly - there is no default. If
+# it's not set, the server refuses to start, rather than silently
+# running unauthenticated.
+
+WATCHTOWER_API_KEY = os.environ.get("WATCHTOWER_API_KEY")
+if not WATCHTOWER_API_KEY:
+    raise RuntimeError(
+        "WATCHTOWER_API_KEY is not set. Set it before starting the "
+        "server, e.g.:\n"
+        "  export WATCHTOWER_API_KEY=$(python -c \"import secrets; print(secrets.token_urlsafe(24))\")\n"
+        "This key is required on every request (header X-Watchtower-Key "
+        "or ?key=... query param) since /detect, /status, and /history "
+        "are reachable by anyone on the network otherwise."
+    )
+
+
+def require_api_key(
+    key: Optional[str] = Query(None),
+    x_watchtower_key: Optional[str] = Header(None),
+) -> None:
+    supplied = x_watchtower_key or key
+    if not supplied or not secrets.compare_digest(supplied, WATCHTOWER_API_KEY):
+        raise HTTPException(status_code=401, detail="Invalid or missing API key.")
 
 # --- Database logging ----------------------------------------------------
 # Lightweight SQLite logging, kept inline here rather than a separate
@@ -288,18 +322,18 @@ def generate_frame():
 
 
 @app.get('/detect')
-def get_frame():
+def get_frame(_auth: None = Depends(require_api_key)):
     return StreamingResponse(generate_frame(),
                               media_type='multipart/x-mixed-replace; boundary=frame')
 
 
 @app.get('/status')
-def get_status():
+def get_status(_auth: None = Depends(require_api_key)):
     return status_state
 
 
 @app.get('/history')
-def get_history(limit: int = 20):
+def get_history(limit: int = 20, _auth: None = Depends(require_api_key)):
     return get_recent_events(limit=limit)
 
 
@@ -374,7 +408,7 @@ DASHBOARD_HTML = """
 
     <div class="layout">
         <div class="video-panel">
-            <img src="/detect" alt="Live camera feed" />
+            <img src="/detect?key=__WATCHTOWER_KEY__" alt="Live camera feed" />
         </div>
 
         <div class="status-panel">
@@ -407,7 +441,7 @@ DASHBOARD_HTML = """
 
         async function pollStatus() {
             try {
-                const res = await fetch("/status");
+                const res = await fetch("/status?key=__WATCHTOWER_KEY__");
                 const data = await res.json();
 
                 const badge = document.getElementById("status-badge");
@@ -439,8 +473,13 @@ DASHBOARD_HTML = """
 
 
 @app.get('/', response_class=HTMLResponse)
-def dashboard():
-    return DASHBOARD_HTML
+def dashboard(_auth: None = Depends(require_api_key), key: str = Query(...)):
+    # The key that got this request past auth is passed through into
+    # the page itself, so the embedded video <img> tag and the /status
+    # polling fetch() calls can also authenticate - browsers can't set
+    # custom headers on <img src="...">, so the query-param path is
+    # what makes this work end to end.
+    return DASHBOARD_HTML.replace("__WATCHTOWER_KEY__", key)
 
 
 if __name__ == "__main__":

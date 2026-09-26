@@ -66,14 +66,20 @@ a real person's spoken decision, not a model's inference.
 ## 4. Handling ambiguous or missing decisions
 
 If CALL-E cannot extract a clear `dismiss` / `escalate` decision from the
-caregiver call — due to no pickup, a bad connection, or an unclear
-response — the result is `unknown`. Watchtower treats `unknown` as
-**escalate**, not as "do nothing."
+caregiver call — due to no pickup, a bad connection, an unclear response,
+or the call itself erroring — the result is `unknown`. **Watchtower stops
+here.** It does not retry the caregiver call, and it does not
+automatically call the secondary contact.
 
-Rationale: an unnecessary second phone call is a minor inconvenience. A
-missed fall because a call didn't connect and nothing happened next is a
-much worse outcome. When the two failure modes are this asymmetric, the
-system should fail toward the safer, more conservative action.
+Earlier versions of this skill treated `unknown` as an automatic
+escalation. On review, that turned out to be the wrong default: an
+automated system deciding on its own to place a second phone call,
+without any human having actually said "escalate," is itself an
+unauthorized escalation — the opposite of the human-approval principle
+this skill is supposed to enforce. An ambiguous result is logged with
+`call_status = 'resolved'` and `decision = 'unknown'` and is meant to be
+followed up on by a human operator, not resolved automatically by
+placing another call.
 
 ## 5. False-positive mitigation
 
@@ -100,15 +106,12 @@ model — there is no universally correct value.
 ## 6. Network and API failure handling
 
 CALL-E's call lifecycle involves two separate network steps: placing the
-call, and polling for its final result. A failure in the second step does
-**not** necessarily mean the call itself failed — the phone may have
-rung and been answered while the status-check request times out.
-
-`calle_trigger.py` retries the result-fetch step (with backoff) before
-giving up, and only falls back to treating the call as `unknown` (which,
-per Section 4, means escalate) after all retries are exhausted. This
-avoids two failure modes: treating a successful call as a failure, and
-silently swallowing a real network error.
+call, and polling for its final result. A failure in either step means
+`calle_trigger.py` **stops and treats the result as `unknown`** — it
+does not retry the call. Retrying a call that may have already reached
+and rung a distressed caregiver risks placing a duplicate, confusing
+call; per Section 4, an ambiguous outcome is surfaced for manual review
+rather than automatically resolved by trying again or escalating.
 
 The video stream in `fall_detector.py` also wraps the entire call
 sequence in a try/except, so a total CALL-E failure (e.g. API outage)
@@ -117,14 +120,28 @@ whole detection pipeline.
 
 ## 7. Credential handling
 
-- `CALLE_API_KEY` is read from an environment variable, never hardcoded.
+- `CALLE_API_KEY` is read from an environment variable, never hardcoded,
+  and is only required for live calls — dry runs need no credentials.
+- `WATCHTOWER_API_KEY` protects every network-reachable route
+  (`/detect`, `/status`, `/history`, `/`) and must be set explicitly; the
+  server refuses to start without it.
 - `WATCHTOWER_CAREGIVER_PHONE` and `WATCHTOWER_SECONDARY_PHONE` are also
-  environment variables, with fictional placeholder defaults
-  (`+15550101234`, `+15550109876`) so the code never ships with a real
-  number committed to version control, per this repository's contribution
-  rules.
-- No credentials or phone numbers are written to the SQLite log or
-  printed beyond what's needed for local debugging.
+  environment variables, defaulting to NANP's officially reserved
+  fictional range (`+12125550123`, `+12125550199` — the 555-0100 through
+  555-0199 block reserved for fiction and documentation) so the code
+  never ships with a real number committed to version control, per this
+  repository's contribution rules.
+- Both numbers must additionally appear, exactly, in
+  `WATCHTOWER_AUTHORIZED_NUMBERS` before a live call will be placed to
+  them — a well-formed number is not automatically an authorized one.
+- Real calls require an explicit `WATCHTOWER_CONFIRM_LIVE_CALL`
+  confirmation phrase set for that run. Without it, Watchtower always
+  runs in dry-run mode, regardless of whether `CALLE_API_KEY` is present.
+- All FastAPI routes (`/detect`, `/status`, `/history`, `/`) require an
+  API key (`WATCHTOWER_API_KEY`), since they are reachable by anyone on
+  the same network otherwise.
+- Phone numbers, structured call results, and error text are masked
+  before being printed or logged.
 
 ## 8. Data handling and retention
 

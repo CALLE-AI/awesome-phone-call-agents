@@ -60,8 +60,7 @@ Camera → YOLO fall detection → confidence + consecutive-frame + cooldown
 ## Setup
 
 Requires Python 3.10+, a webcam or camera source, a CALL-E account, and
-your own fall-detection YOLO model (or a suitable pretrained/fine-tuned
-substitute — see Limitations).
+your own fine-tuned fall-detection YOLO model (see Limitations).
 
 ```bash
 pip install ultralytics opencv-python supervision fastapi uvicorn calle-ai
@@ -69,29 +68,41 @@ pip install ultralytics opencv-python supervision fastapi uvicorn calle-ai
 pip install streamlit requests
 ```
 
-Set your CALL-E API key and the phone numbers Watchtower will call:
+**Watchtower is safe by default: it will not place a real phone call
+unless you explicitly opt in for that run.** Just running it with no
+extra setup performs a dry run and requires no CALL-E account or phone
+numbers at all.
+
+The server also requires an API key protecting its routes, since
+`/detect`, `/status`, and `/history` are reachable by anyone on the same
+network otherwise. This is required even for a dry run, since the video
+feed and dashboard are always network-reachable while the server runs:
+
+```bash
+export WATCHTOWER_API_KEY=$(python -c "import secrets; print(secrets.token_urlsafe(24))")
+```
+
+Place your trained model at `scripts/best.pt`. Confirm its class names
+match `FALL_CLASS_NAME` in `fall_detector.py` (defaults to `"fall"`,
+matching a model with `{0: 'non-fall', 1: 'fall'}`).
+
+### Going live (placing real calls)
+
+Real calls require ALL of the following set together — this is
+deliberately more than just an API key, so a real call is never placed
+by accident:
 
 ```bash
 export CALLE_API_KEY="your_calle_api_key"
-export WATCHTOWER_CAREGIVER_PHONE="+1..."      # primary contact, E.164 format
-export WATCHTOWER_SECONDARY_PHONE="+1..."      # escalation contact, E.164 format
+export WATCHTOWER_CAREGIVER_PHONE="+1..."          # primary contact, strict E.164
+export WATCHTOWER_SECONDARY_PHONE="+1..."          # escalation contact, strict E.164
+export WATCHTOWER_AUTHORIZED_NUMBERS="+1...,+1..." # must contain BOTH numbers above, exactly
+export WATCHTOWER_CONFIRM_LIVE_CALL="I_UNDERSTAND_THIS_PLACES_REAL_PHONE_CALLS"
 ```
 
-To try Watchtower without placing any real phone calls (useful for review,
-testing, or CI), set a dry-run flag instead:
-
-```bash
-export WATCHTOWER_DRY_RUN=1
-```
-
-With this set, `calle_trigger.py` logs exactly what call it would have
-placed (recipient, task, result schema) and returns a simulated decision
-instead of contacting the CALL-E API at all. No CALLE_API_KEY or real
-phone numbers are required in this mode.
-
-Place your trained model at `scripts/best.pt`. Confirm its class names match
-`FALL_CLASS_NAME` in `fall_detector.py` (defaults to `"fall"`, matching a
-model with `{0: 'non-fall', 1: 'fall'}`).
+If any of these is missing, misformatted, or doesn't match exactly,
+`calle_trigger.py` refuses to place the call rather than guessing or
+falling back to a default.
 
 ## Running it
 
@@ -100,10 +111,12 @@ cd scripts
 python fall_detector.py
 ```
 
-Open `http://localhost:5000/` for the built-in dashboard, or run the
-Streamlit version in a second terminal:
+Open `http://localhost:5000/?key=YOUR_WATCHTOWER_API_KEY` for the
+built-in dashboard, or run the Streamlit version in a second terminal
+(it reads `WATCHTOWER_API_KEY` from the environment automatically):
 
 ```bash
+export WATCHTOWER_API_KEY="the same key"
 streamlit run dashboard.py
 ```
 
@@ -189,9 +202,14 @@ Escalation call status: completed
 
 ## Limitations
 
-- Ships without a pretrained fall-detection model — you must supply your
-  own `best.pt` trained on fall/non-fall data (or adapt the detection
-  logic to a pose-based approach if you don't have one).
+- This skill does not include a fall/non-fall classification model. It
+  expects a YOLO-format weights file at `scripts/best.pt` fine-tuned on
+  fall/non-fall data, with class names matching `FALL_CLASS_NAME` in
+  `fall_detector.py`. Generic pretrained YOLO checkpoints (e.g.
+  `yolov8n.pt`) are trained for general object detection, not fall
+  classification, and will not work as a drop-in substitute without
+  fine-tuning on fall-specific data — or adapting the detection logic to
+  a pose-based approach instead.
 - Single-camera, single-resident design. Multi-room or multi-person
   support would need per-camera process instances and person-tracking
   across cameras, which this skill does not implement.
@@ -203,3 +221,8 @@ Escalation call status: completed
 - The SQLite log is local to the machine running `fall_detector.py` and
   is not encrypted at rest — consider this if logging real events for a
   real deployment.
+- An ambiguous or failed caregiver call result is not automatically
+  retried or escalated (see `references/safety.md` §4/§6) — it requires
+  a human to notice and follow up. This skill does not include an
+  operator-alerting mechanism (e.g. a second notification channel) for
+  ambiguous results beyond the dashboard and database log.

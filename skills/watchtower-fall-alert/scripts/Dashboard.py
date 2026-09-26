@@ -5,27 +5,45 @@ Streamlit dashboard for Watchtower.
 
 This is a pure display layer - it does NOT run the CV pipeline itself.
 It reads from the FastAPI backend (fall_detector.py) which must already
-be running:
+be running, and now requires an API key on every request:
 
-    - GET /detect  -> live annotated MJPEG video stream
-    - GET /status  -> JSON status: current state, last event, decision
+    - GET /detect?key=...  -> live annotated MJPEG video stream
+    - GET /status?key=...  -> JSON status: current state, last event, decision
+    - GET /history?key=... -> JSON event history
 
 Run (in a separate terminal from fall_detector.py):
 
     pip install streamlit requests --break-system-packages
+    export WATCHTOWER_API_KEY="the same key fall_detector.py is using"
     streamlit run dashboard.py
 
 Then make sure fall_detector.py is running at the same time, e.g.:
 
+    export WATCHTOWER_API_KEY="the same key"
     python fall_detector.py
 """
 
+import os
 import time
 
 import requests
 import streamlit as st
 
 FASTAPI_URL = "http://localhost:5000"
+
+WATCHTOWER_API_KEY = os.environ.get("WATCHTOWER_API_KEY")
+if not WATCHTOWER_API_KEY:
+    st.error(
+        "WATCHTOWER_API_KEY is not set. This dashboard talks to an "
+        "authenticated backend - set the same key fall_detector.py is "
+        "using, e.g.:\n\n"
+        "export WATCHTOWER_API_KEY=\"...\"\n\n"
+        "then restart Streamlit."
+    )
+    st.stop()
+
+AUTH_HEADERS = {"X-Watchtower-Key": WATCHTOWER_API_KEY}
+AUTH_QUERY = {"key": WATCHTOWER_API_KEY}
 
 st.set_page_config(page_title="Watchtower", page_icon="🛡️", layout="wide")
 
@@ -44,11 +62,13 @@ video_col, status_col = st.columns([2, 1])
 
 with video_col:
     st.subheader("Live feed")
-    # The FastAPI backend already streams annotated MJPEG frames at
-    # /detect - simplest way to show it inside Streamlit is to embed it
-    # directly as an <img> tag rather than re-processing frames here.
+    # The FastAPI backend streams annotated MJPEG frames at /detect. An
+    # <img> tag can't set custom headers, so the key is passed as a
+    # query parameter here instead - matching what fall_detector.py's
+    # require_api_key() dependency accepts.
     st.markdown(
-        f'<img src="{FASTAPI_URL}/detect" style="width:100%; border-radius:8px;">',
+        f'<img src="{FASTAPI_URL}/detect?key={WATCHTOWER_API_KEY}" '
+        f'style="width:100%; border-radius:8px;">',
         unsafe_allow_html=True,
     )
 
@@ -63,7 +83,7 @@ with status_col:
 
 def fetch_status() -> dict:
     try:
-        resp = requests.get(f"{FASTAPI_URL}/status", timeout=3)
+        resp = requests.get(f"{FASTAPI_URL}/status", headers=AUTH_HEADERS, timeout=3)
         resp.raise_for_status()
         return resp.json()
     except requests.RequestException:
@@ -101,7 +121,12 @@ def render_status(data: dict) -> None:
 
 def fetch_history(limit: int = 20) -> list:
     try:
-        resp = requests.get(f"{FASTAPI_URL}/history", params={"limit": limit}, timeout=3)
+        resp = requests.get(
+            f"{FASTAPI_URL}/history",
+            params={"limit": limit},
+            headers=AUTH_HEADERS,
+            timeout=3,
+        )
         resp.raise_for_status()
         return resp.json()
     except requests.RequestException:
