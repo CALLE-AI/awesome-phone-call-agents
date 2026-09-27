@@ -189,10 +189,9 @@ def call_caregiver(event: FallEvent) -> Decision:
         print("  Simulated decision: dismiss")
         return "dismiss"
 
-    _validate_destination(CAREGIVER_PHONE, "WATCHTOWER_CAREGIVER_PHONE")
-    client = _client()
-
     try:
+        _validate_destination(CAREGIVER_PHONE, "WATCHTOWER_CAREGIVER_PHONE")
+        client = _client()
         call = client.calls.create_and_wait(task=task, result_schema=result_schema)
     except Exception as exc:
         print(
@@ -248,10 +247,9 @@ def call_secondary_contact_for_escalation(event: FallEvent) -> None:
         print(f"  Would call: {_mask_phone(SECONDARY_CONTACT_PHONE)}")
         return
 
-    _validate_destination(SECONDARY_CONTACT_PHONE, "WATCHTOWER_SECONDARY_PHONE")
-    client = _client()
-
     try:
+        _validate_destination(SECONDARY_CONTACT_PHONE, "WATCHTOWER_SECONDARY_PHONE")
+        client = _client()
         call = client.calls.create_and_wait(task=task)
         print(f"[Watchtower] Escalation call status: {call.get('status', 'unknown')}")
     except Exception as exc:

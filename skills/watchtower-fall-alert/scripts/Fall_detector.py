@@ -15,7 +15,7 @@ import uvicorn
 
 from calle_trigger import handle_fall_event
 
-model = YOLO("best.pt")
+model = YOLO("awesome-phone-call-agents/skills/watchtower-fall-alert/scripts/best.pt")
 tracker = sv.ByteTrack()
 app = FastAPI()
 box_annotator = sv.BoxAnnotator(thickness=2)
