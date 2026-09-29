@@ -220,8 +220,8 @@ export class QuoteOrchestrator {
       if (['pending', 'initializing', 'dialing', 'ringing', 'in-call', 'analyzing'].includes(v.status)) {
         quoteStore.updateVendor(jobId, v.id, {
           status: 'failed',
-          transcriptSummary: 'Call cancellation requested by user.',
-          providerNotes: 'Job canceled by user request. In-flight carrier disconnect is advisory.',
+          transcriptSummary: 'Call cancellation requested (unconfirmed). Carrier-level disconnect cannot be verified.',
+          providerNotes: 'Job canceled by user request. Carrier-level disconnect is unconfirmed and should not be assumed.',
         });
       }
     });

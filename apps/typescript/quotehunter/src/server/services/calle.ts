@@ -69,8 +69,8 @@ export class CalleService {
 
   /**
    * Cancel and terminate all in-flight live calls and polling operations for a given job.
-   * Note: Dispatched cancellation requests signal the provider/carrier, but instantaneous
-   * carrier-level disconnect cannot be guaranteed due to telecom propagation latency.
+   * Note: Dispatched cancellation requests are speculative. Carrier-level disconnect
+   * is unconfirmed and should not be reported as observed termination.
    */
   async cancelJobCalls(jobId: string): Promise<void> {
     console.log(`🛑 [CALL-E Live] Canceling active operations for job ${jobId}...`);
@@ -87,16 +87,16 @@ export class CalleService {
     if (callIds && callIds.size > 0 && this.apiKey) {
       const cancelPromises = Array.from(callIds).map(async (callId) => {
         try {
-          console.log(`🛑 [CALL-E Live] Sending cancellation signal for call ${callId} (carrier disconnect is subject to propagation latency)...`);
+          console.log(`🛑 [CALL-E Live] Sending cancellation request for call ${callId} (carrier disconnect is unconfirmed)...`);
           const res = await fetch(`${this.baseUrl}/v1/calls/${callId}/cancel`, {
             method: 'POST',
             headers: { Authorization: `Bearer ${this.apiKey}` },
           }).catch(() => null);
 
           if (res && res.ok) {
-            console.log(`ℹ️ [CALL-E Live] Cancellation signal acknowledged by provider for call ${callId}`);
+            console.log(`ℹ️ [CALL-E Live] Cancellation request accepted by API for call ${callId} (carrier-level disconnect remains unconfirmed)`);
           } else {
-            console.log(`ℹ️ [CALL-E Live] Cancellation request dispatched for call ${callId}; carrier-level termination is advisory`);
+            console.log(`ℹ️ [CALL-E Live] Cancellation request dispatched for call ${callId}; carrier-level termination is unconfirmed`);
           }
         } catch (err: any) {
           console.warn(`Could not dispatch cancellation request for call ${callId}:`, err?.message || 'Network error');
@@ -210,7 +210,7 @@ Compliance & Safety:
 - Never commit to contracts, authorize work, or agree to payments. State that all estimates are for human review.
 - Extract structured data with verbatim spoken evidence accurately.`;
 
-        console.log(`📞 [CALL-E Live] Dispatching call to ${vendor.name} (${cleanedPhone})...`);
+        console.log(`📞 [CALL-E Live] Dispatching call to ${vendor.name} (${maskPhoneNumber(cleanedPhone)})...`);
         onVendorUpdate(vendor.id, { status: 'dialing' });
 
         // Build compliant payload
@@ -261,7 +261,7 @@ Compliance & Safety:
         }
 
         const callId = createData.id;
-        console.log(`📡 [CALL-E Live] Call placed successfully! Call ID: ${callId} for ${vendor.name}`);
+        console.log(`📡 [CALL-E Live] Call placed successfully! Call ID: ${callId} for ${vendor.name} (${maskPhoneNumber(cleanedPhone)})`);
 
         const currentCallIds = this.activeJobCallIds.get(jobId);
         if (currentCallIds) currentCallIds.add(callId);
@@ -288,7 +288,7 @@ Compliance & Safety:
           });
           return;
         }
-        console.error(`❌ [CALL-E Live] Unhandled error for ${vendor.name} (${vendor.phone}):`, err);
+        console.error(`❌ [CALL-E Live] Unhandled error for ${vendor.name} (${maskPhoneNumber(vendor.phone)}):`, err);
         onVendorUpdate(vendor.id, {
           status: 'error',
           providerNotes: `Error: ${err.message || 'Call failed'}`,
@@ -737,6 +737,7 @@ Compliance & Safety:
     }
 
     if (durationSeconds <= 0) {
+      // Advisory fallback: no provider-reported duration available
       durationSeconds = isDeclined ? 6 : 75;
     }
 
@@ -849,15 +850,15 @@ Compliance & Safety:
       const synthesized: Array<{ role: 'agent' | 'user'; text: string }> = [
         {
           role: 'agent',
-          text: `Hello, I am calling regarding painting services for a 3BHK flat including ceiling.`,
+          text: `[Synthetic reconstruction] Hello, I am calling regarding painting services for a 3BHK flat including ceiling.`,
         },
         {
           role: 'user',
-          text: `Hello. Yes, tell me.`,
+          text: `[Synthetic reconstruction] Hello. Yes, tell me.`,
         },
         {
           role: 'agent',
-          text: `Are you available for this job, and how many days will the work take?`,
+          text: `[Synthetic reconstruction] Are you available for this job, and how many days will the work take?`,
         },
         {
           role: 'user',
@@ -865,7 +866,7 @@ Compliance & Safety:
         },
         {
           role: 'agent',
-          text: `What is the estimated cost breakdown, including materials and labor?`,
+          text: `[Synthetic reconstruction] What is the estimated cost breakdown, including materials and labor?`,
         },
         {
           role: 'user',
@@ -873,7 +874,7 @@ Compliance & Safety:
         },
         {
           role: 'agent',
-          text: `Are there any additional terms, warranty, or hidden charges?`,
+          text: `[Synthetic reconstruction] Are there any additional terms, warranty, or hidden charges?`,
         },
         {
           role: 'user',
@@ -881,7 +882,7 @@ Compliance & Safety:
         },
         {
           role: 'agent',
-          text: `Understood, thank you for providing the quote details. Have a great day!`,
+          text: `[Synthetic reconstruction] Understood, thank you for providing the quote details. Have a great day!`,
         }
       ];
 
@@ -905,7 +906,7 @@ Compliance & Safety:
       turns = [
         {
           role: 'agent',
-          text: `Hi, I am QuoteHunter AI calling on behalf of a customer regarding a service inquiry. [interrupted]`,
+          text: `[Synthetic reconstruction] Hi, I am QuoteHunter AI calling on behalf of a customer regarding a service inquiry. [interrupted]`,
           timeRange: '00:00:01-00:00:03',
           latency: '0ms',
           duration: '00:02',
@@ -913,7 +914,7 @@ Compliance & Safety:
         },
         {
           role: 'user',
-          text: 'Sorry, I am busy right now, cannot take this call.',
+          text: '[Synthetic reconstruction] Sorry, I am busy right now, cannot take this call.',
           timeRange: '00:00:03-00:00:06',
           latency: '480ms',
           duration: '00:03',

@@ -2,22 +2,21 @@ import { Router } from 'express';
 import { quoteStore } from '../store.js';
 import { quoteOrchestrator } from '../services/orchestrator.js';
 import { CreateHuntRequest } from '../types.js';
+import { maskPhoneNumber, maskSensitiveText } from '../services/calle.js';
 
 export const quotesRouter = Router();
 
 /**
- * Helper to determine if a request originates from loopback (localhost)
+ * Helper to determine if a request originates from loopback (localhost).
+ * Only trusts the socket-level remote address (req.ip / req.socket.remoteAddress),
+ * never caller-controlled headers like Host or X-Forwarded-For.
  */
 const isLoopbackRequest = (req: any): boolean => {
   const ip = req.ip || req.socket?.remoteAddress || '';
-  const host = req.hostname || req.headers?.host || '';
   return (
     ip === '127.0.0.1' ||
     ip === '::1' ||
-    ip === '::ffff:127.0.0.1' ||
-    ip.includes('127.0.0.1') ||
-    host.startsWith('localhost') ||
-    host.startsWith('127.0.0.1')
+    ip === '::ffff:127.0.0.1'
   );
 };
 
@@ -39,7 +38,7 @@ quotesRouter.get('/', (req, res) => {
   if (!isAuthorizedRequest(req)) {
     return res.status(403).json({ success: false, error: 'Job listing access is restricted to loopback or authorized requests.' });
   }
-  const jobs = quoteStore.getAllJobs();
+  const jobs = quoteStore.getAllJobs().map(sanitizeJobForResponse);
   res.json({ success: true, jobs });
 });
 
@@ -52,7 +51,7 @@ quotesRouter.get('/:id', (req, res) => {
   if (!job) {
     return res.status(404).json({ success: false, error: 'Job not found' });
   }
-  res.json({ success: true, job });
+  res.json({ success: true, job: sanitizeJobForResponse(job) });
 });
 
 // POST cancel specific job by ID (protected private-job access or loopback-only)
@@ -67,7 +66,7 @@ quotesRouter.post('/:id/cancel', (req, res) => {
   quoteOrchestrator.cancelQuoteHunt(req.params.id);
   res.json({
     success: true,
-    message: 'Cancellation signal dispatched. Note: in-flight carrier disconnect is advisory and subject to telecom propagation latency.',
+    message: 'Cancellation signal dispatched (unconfirmed). Carrier-level disconnect cannot be verified and should not be assumed.',
   });
 });
 
@@ -117,13 +116,13 @@ quotesRouter.post('/', async (req, res) => {
       if (!cleaned.startsWith('+') || !/^\+[1-9]\d{7,14}$/.test(cleaned)) {
         return res.status(400).json({
           success: false,
-          error: `Invalid phone number "${v.phone}" for ${v.name || 'vendor'}. Phone numbers must include country code starting with '+' followed by 8-15 digits (e.g. +15550100100).`,
+          error: `Invalid phone number for ${v.name || 'vendor'}. Phone numbers must include country code starting with '+' followed by 8-15 digits (e.g. +15550100100).`,
         });
       }
       if (destinationPhones.has(cleaned)) {
         return res.status(400).json({
           success: false,
-          error: `Duplicate destination phone number detected: "${v.phone}". Each vendor call must have a unique destination.`,
+          error: `Duplicate destination phone number detected for ${v.name || 'vendor'}. Each vendor call must have a unique destination.`,
         });
       }
       destinationPhones.add(cleaned);
@@ -140,10 +139,30 @@ quotesRouter.post('/', async (req, res) => {
     res.status(201).json({
       success: true,
       message: isSimulate ? 'Simulated quote hunt initiated.' : 'Parallel live quote hunt initiated.',
-      job,
+      job: sanitizeJobForResponse(job),
     });
   } catch (err: any) {
     console.error('Failed to create quote hunt:', err);
     res.status(500).json({ success: false, error: err.message || 'Internal server error' });
   }
 });
+
+/**
+ * Sanitize job objects before sending to clients:
+ * - Mask raw vendor phone numbers
+ * - Strip raw provider diagnostics from transcripts/notes
+ */
+function sanitizeJobForResponse(job: any) {
+  if (!job) return job;
+  const sanitized = { ...job };
+  if (Array.isArray(sanitized.vendors)) {
+    sanitized.vendors = sanitized.vendors.map((v: any) => ({
+      ...v,
+      phone: maskPhoneNumber(v.phone),
+      providerNotes: v.providerNotes ? maskSensitiveText(v.providerNotes) : v.providerNotes,
+      transcriptSummary: v.transcriptSummary ? maskSensitiveText(v.transcriptSummary) : v.transcriptSummary,
+      evidenceSnippet: v.evidenceSnippet ? maskSensitiveText(v.evidenceSnippet) : v.evidenceSnippet,
+    }));
+  }
+  return sanitized;
+}
