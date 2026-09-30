@@ -1,0 +1,3 @@
+import crypto from 'node:crypto'; import {CallRepository} from './repository'; import {CalleEvent} from './types';
+export function verifySignature(raw:string,signature:string,secret:string){const expected=crypto.createHmac('sha256',secret).update(raw).digest('hex');return crypto.timingSafeEqual(Buffer.from(expected),Buffer.from(signature));}
+export async function ingestEvent(raw:string,repo:CallRepository,secret?:string,signature?:string){if(secret&&signature&&!verifySignature(raw,signature,secret))throw new Error('Invalid webhook signature');const event=JSON.parse(raw) as CalleEvent;const fresh=await repo.putEvent(event);if(fresh)await repo.putCall(event.data);return {accepted:true,deduplicated:!fresh,eventId:event.id};}

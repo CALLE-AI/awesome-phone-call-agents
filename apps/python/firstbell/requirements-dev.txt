@@ -1,0 +1,14 @@
+-r requirements.txt
+pytest==9.1.1
+
+# The page builder renders docs/ into pages so a reader who will not clone the
+# repository can still open the two documents that decide whether it is usable in a
+# school. Dev only: running firstbell itself needs nothing from this file.
+markdown-it-py==4.2.0
+
+# tools/make_figure.py draws the three-endings figure from the stylesheet's own inks, and
+# the page builder calls it. It was imported and pinned nowhere, so a machine set up from
+# these files failed the documented page build at the figure step, and the determinism gate
+# in tests/test_figure_is_generated.py went quiet through importorskip rather than saying it
+# could not run. An unpinned import is the one dependency shape this project had.
+lottie==0.7.2

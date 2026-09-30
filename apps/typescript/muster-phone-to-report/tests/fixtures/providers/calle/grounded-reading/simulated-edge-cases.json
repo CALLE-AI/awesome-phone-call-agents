@@ -1,0 +1,549 @@
+{
+  "contractVersion": "1.2.0",
+  "displayLabel": "SIMULATED",
+  "proofScope": "contract_only",
+  "requiredCoverageTags": [
+    "complete",
+    "negative_value",
+    "decimal_value",
+    "spoken_unit",
+    "normalized_unit",
+    "device_alarm",
+    "power_state",
+    "battery_state",
+    "confidence_linkage",
+    "missing_zone",
+    "not_applicable_zone",
+    "unexpected_zone",
+    "ambiguous",
+    "contradictory",
+    "truncated",
+    "null_structured_result"
+  ],
+  "groundingPolicy": {
+    "policyVersion": "simulated-checker/v1",
+    "confidenceDispositions": {
+      "SUPPORTED": "acceptable",
+      "INSUFFICIENT": "insufficient",
+      "UNRESOLVED": "unresolved"
+    },
+    "unitMappings": [
+      {
+        "ruleId": "unit_degrees_fahrenheit_to_ucum_v1",
+        "spokenUnit": "degrees Fahrenheit",
+        "normalizedUnit": "[degF]"
+      },
+      {
+        "ruleId": "unit_degrees_celsius_to_ucum_v1",
+        "spokenUnit": "degrees Celsius",
+        "normalizedUnit": "Cel"
+      }
+    ],
+    "stateMappings": [
+      {
+        "ruleId": "alarm_active_v1",
+        "kind": "alarm_state",
+        "spokenState": "alarm active",
+        "normalizedState": "active"
+      },
+      {
+        "ruleId": "alarm_clear_v1",
+        "kind": "alarm_state",
+        "spokenState": "alarm clear",
+        "normalizedState": "clear"
+      },
+      {
+        "ruleId": "power_mains_available_v1",
+        "kind": "power_state",
+        "spokenState": "mains power available",
+        "normalizedState": "mains_available"
+      },
+      {
+        "ruleId": "power_mains_failed_v1",
+        "kind": "power_state",
+        "spokenState": "mains power failed",
+        "normalizedState": "mains_failed"
+      },
+      {
+        "ruleId": "battery_normal_v1",
+        "kind": "battery_state",
+        "spokenState": "battery normal",
+        "normalizedState": "normal"
+      },
+      {
+        "ruleId": "battery_low_v1",
+        "kind": "battery_state",
+        "spokenState": "battery low",
+        "normalizedState": "low"
+      }
+    ]
+  },
+  "fixtureRevisions": [
+    {
+      "fixtureId": "sim_complete_primary",
+      "fixtureRevisionId": "sim_complete_primary_rev_1",
+      "revision": 1,
+      "provenance": "simulated",
+      "proofScope": "contract_only",
+      "displayLabel": "SIMULATED",
+      "opaqueRunRef": "sim_run_ref_complete_primary_0001",
+      "expectedZoneInventory": {
+        "inventoryId": "inventory_sim_complete_primary_v1",
+        "version": 1,
+        "adapterReportShapeRef": "simulated_report_shape_v1_unverified",
+        "shapeVerification": "unverified",
+        "displayLabel": "SIMULATED",
+        "zones": [
+          { "zoneId": "zone_freezer", "applicability": "required", "requiredFacets": ["measurement"] },
+          { "zoneId": "zone_incubator", "applicability": "required", "requiredFacets": ["measurement"] }
+        ]
+      },
+      "expectedDeviceStates": [
+        { "kind": "alarm_state", "subjectId": "alarm_primary" },
+        { "kind": "power_state", "subjectId": "power_primary" },
+        { "kind": "battery_state", "subjectId": "battery_primary" }
+      ],
+      "sourceCompleteness": { "status": "complete", "affectedSubjectIds": [] },
+      "records": [
+        {
+          "recordId": "lifecycle_complete_primary",
+          "recordRole": "provider_lifecycle",
+          "provenance": "simulated",
+          "custody": "repository_reviewed",
+          "displayLabel": "SIMULATED",
+          "runId": "sim_run_ref_complete_primary_0001",
+          "terminalStatus": "completed",
+          "selectedRevisionId": "result_complete_primary_rev_1"
+        },
+        {
+          "recordId": "evidence_complete_primary",
+          "recordRole": "retained_evidence",
+          "provenance": "simulated",
+          "custody": "repository_reviewed",
+          "displayLabel": "SIMULATED",
+          "evidenceRecords": [
+            { "evidenceId": "evidence_primary_001", "runId": "sim_run_ref_complete_primary_0001", "availability": "present", "reviewStatus": "reviewed", "sourceRevision": 1 }
+          ]
+        },
+        {
+          "recordId": "assertions_complete_primary",
+          "recordRole": "reviewed_evidence_assertion",
+          "provenance": "simulated",
+          "custody": "repository_reviewed",
+          "displayLabel": "SIMULATED",
+          "assertions": [
+            { "assertionId": "assert_primary_freezer_decimal", "evidenceId": "evidence_primary_001", "runId": "sim_run_ref_complete_primary_0001", "reviewStatus": "reviewed", "subjectKind": "measurement", "subjectId": "zone_freezer", "fieldPath": "exactDecimal.lexeme", "assertedValue": "-4.5" },
+            { "assertionId": "assert_primary_freezer_spoken_unit", "evidenceId": "evidence_primary_001", "runId": "sim_run_ref_complete_primary_0001", "reviewStatus": "reviewed", "subjectKind": "measurement", "subjectId": "zone_freezer", "fieldPath": "spokenUnit", "assertedValue": "degrees Fahrenheit" },
+            { "assertionId": "assert_primary_incubator_decimal", "evidenceId": "evidence_primary_001", "runId": "sim_run_ref_complete_primary_0001", "reviewStatus": "reviewed", "subjectKind": "measurement", "subjectId": "zone_incubator", "fieldPath": "exactDecimal.lexeme", "assertedValue": "12.25" },
+            { "assertionId": "assert_primary_incubator_spoken_unit", "evidenceId": "evidence_primary_001", "runId": "sim_run_ref_complete_primary_0001", "reviewStatus": "reviewed", "subjectKind": "measurement", "subjectId": "zone_incubator", "fieldPath": "spokenUnit", "assertedValue": "degrees Celsius" },
+            { "assertionId": "assert_primary_alarm_state", "evidenceId": "evidence_primary_001", "runId": "sim_run_ref_complete_primary_0001", "reviewStatus": "reviewed", "subjectKind": "alarm_state", "subjectId": "alarm_primary", "fieldPath": "spokenState", "assertedValue": "alarm active" },
+            { "assertionId": "assert_primary_power_state", "evidenceId": "evidence_primary_001", "runId": "sim_run_ref_complete_primary_0001", "reviewStatus": "reviewed", "subjectKind": "power_state", "subjectId": "power_primary", "fieldPath": "spokenState", "assertedValue": "mains power available" },
+            { "assertionId": "assert_primary_battery_state", "evidenceId": "evidence_primary_001", "runId": "sim_run_ref_complete_primary_0001", "reviewStatus": "reviewed", "subjectKind": "battery_state", "subjectId": "battery_primary", "fieldPath": "spokenState", "assertedValue": "battery normal" }
+          ]
+        },
+        {
+          "recordId": "result_complete_primary",
+          "recordRole": "structured_provider_output",
+          "provenance": "simulated",
+          "custody": "repository_reviewed",
+          "displayLabel": "SIMULATED",
+          "result": {
+            "state": "present",
+            "runId": "sim_run_ref_complete_primary_0001",
+            "resultRevisionId": "result_complete_primary_rev_1",
+            "value": {
+              "measurements": [
+                { "candidateId": "candidate_primary_freezer", "kind": "measurement", "runId": "sim_run_ref_complete_primary_0001", "zoneId": "zone_freezer", "exactDecimal": { "lexeme": "-4.5", "signToken": "-", "integralDigits": "4", "fractionalDigits": "5", "scale": 1 }, "spokenUnit": "degrees Fahrenheit", "normalizedUnit": "[degF]", "unitMappingRuleId": "unit_degrees_fahrenheit_to_ucum_v1", "confidenceToken": { "provider": "simulated_checker", "rawLexeme": "SUPPORTED", "semanticsVersion": "simulated-checker/v1", "sourceRef": "evidence_primary_001" }, "evidenceRefs": { "exactDecimal.lexeme": "assert_primary_freezer_decimal", "spokenUnit": "assert_primary_freezer_spoken_unit" } },
+                { "candidateId": "candidate_primary_incubator", "kind": "measurement", "runId": "sim_run_ref_complete_primary_0001", "zoneId": "zone_incubator", "exactDecimal": { "lexeme": "12.25", "signToken": "", "integralDigits": "12", "fractionalDigits": "25", "scale": 2 }, "spokenUnit": "degrees Celsius", "normalizedUnit": "Cel", "unitMappingRuleId": "unit_degrees_celsius_to_ucum_v1", "confidenceToken": { "provider": "simulated_checker", "rawLexeme": "SUPPORTED", "semanticsVersion": "simulated-checker/v1", "sourceRef": "evidence_primary_001" }, "evidenceRefs": { "exactDecimal.lexeme": "assert_primary_incubator_decimal", "spokenUnit": "assert_primary_incubator_spoken_unit" } }
+              ],
+              "alarmStates": [
+                { "candidateId": "candidate_primary_alarm", "kind": "alarm_state", "runId": "sim_run_ref_complete_primary_0001", "alarmId": "alarm_primary", "zoneId": "zone_freezer", "spokenState": "alarm active", "normalizedState": "active", "stateMappingRuleId": "alarm_active_v1", "confidenceToken": { "provider": "simulated_checker", "rawLexeme": "SUPPORTED", "semanticsVersion": "simulated-checker/v1", "sourceRef": "evidence_primary_001" }, "evidenceRefs": { "spokenState": "assert_primary_alarm_state" } }
+              ],
+              "powerStates": [
+                { "candidateId": "candidate_primary_power", "kind": "power_state", "runId": "sim_run_ref_complete_primary_0001", "powerSourceId": "power_primary", "spokenState": "mains power available", "normalizedState": "mains_available", "stateMappingRuleId": "power_mains_available_v1", "confidenceToken": { "provider": "simulated_checker", "rawLexeme": "SUPPORTED", "semanticsVersion": "simulated-checker/v1", "sourceRef": "evidence_primary_001" }, "evidenceRefs": { "spokenState": "assert_primary_power_state" } }
+              ],
+              "batteryStates": [
+                { "candidateId": "candidate_primary_battery", "kind": "battery_state", "runId": "sim_run_ref_complete_primary_0001", "batteryId": "battery_primary", "spokenState": "battery normal", "normalizedState": "normal", "stateMappingRuleId": "battery_normal_v1", "confidenceToken": { "provider": "simulated_checker", "rawLexeme": "SUPPORTED", "semanticsVersion": "simulated-checker/v1", "sourceRef": "evidence_primary_001" }, "evidenceRefs": { "spokenState": "assert_primary_battery_state" } }
+              ]
+            }
+          }
+        },
+        {
+          "recordId": "truth_complete_primary",
+          "recordRole": "reviewed_ground_truth",
+          "provenance": "repository_review",
+          "custody": "repository_reviewed",
+          "displayLabel": "SIMULATED",
+          "reviewedAt": "2026-08-03T20:00:00Z",
+          "reviewerRole": "simulated_ground_truth_reviewer",
+          "evidenceBasisRefs": [
+            "assert_primary_freezer_decimal",
+            "assert_primary_freezer_spoken_unit",
+            "assert_primary_incubator_decimal",
+            "assert_primary_incubator_spoken_unit",
+            "assert_primary_alarm_state",
+            "assert_primary_power_state",
+            "assert_primary_battery_state"
+          ],
+          "readings": [
+            { "zoneId": "zone_freezer", "lexeme": "-4.5", "spokenUnit": "degrees Fahrenheit", "normalizedUnit": "[degF]", "evidenceBasisRefs": ["assert_primary_freezer_decimal", "assert_primary_freezer_spoken_unit"] },
+            { "zoneId": "zone_incubator", "lexeme": "12.25", "spokenUnit": "degrees Celsius", "normalizedUnit": "Cel", "evidenceBasisRefs": ["assert_primary_incubator_decimal", "assert_primary_incubator_spoken_unit"] }
+          ],
+          "states": [
+            { "kind": "alarm_state", "subjectId": "alarm_primary", "normalizedState": "active", "evidenceBasisRefs": ["assert_primary_alarm_state"] },
+            { "kind": "power_state", "subjectId": "power_primary", "normalizedState": "mains_available", "evidenceBasisRefs": ["assert_primary_power_state"] },
+            { "kind": "battery_state", "subjectId": "battery_primary", "normalizedState": "normal", "evidenceBasisRefs": ["assert_primary_battery_state"] }
+          ]
+        },
+        {
+          "recordId": "expected_complete_primary",
+          "recordRole": "expected_derived",
+          "provenance": "derived",
+          "custody": "repository_reviewed",
+          "displayLabel": "SIMULATED",
+          "quality": "complete",
+          "zoneReconciliation": [
+            { "zoneId": "zone_freezer", "status": "supported" },
+            { "zoneId": "zone_incubator", "status": "supported" }
+          ],
+          "stateReconciliation": [
+            { "kind": "alarm_state", "subjectId": "alarm_primary", "status": "supported" },
+            { "kind": "battery_state", "subjectId": "battery_primary", "status": "supported" },
+            { "kind": "power_state", "subjectId": "power_primary", "status": "supported" }
+          ],
+          "unexpectedZones": [],
+          "unexpectedStates": [],
+          "reasonCodes": []
+        }
+      ]
+    },
+    {
+      "fixtureId": "sim_complete_secondary",
+      "fixtureRevisionId": "sim_complete_secondary_rev_1",
+      "revision": 1,
+      "provenance": "simulated",
+      "proofScope": "contract_only",
+      "displayLabel": "SIMULATED",
+      "opaqueRunRef": "sim_run_ref_complete_secondary_002",
+      "expectedZoneInventory": {
+        "inventoryId": "inventory_sim_complete_secondary_v1",
+        "version": 1,
+        "adapterReportShapeRef": "simulated_report_shape_v1_unverified",
+        "shapeVerification": "unverified",
+        "displayLabel": "SIMULATED",
+        "zones": [
+          { "zoneId": "zone_freezer", "applicability": "required", "requiredFacets": ["measurement"] },
+          { "zoneId": "zone_incubator", "applicability": "required", "requiredFacets": ["measurement"] }
+        ]
+      },
+      "expectedDeviceStates": [
+        { "kind": "alarm_state", "subjectId": "alarm_secondary" },
+        { "kind": "power_state", "subjectId": "power_secondary" },
+        { "kind": "battery_state", "subjectId": "battery_secondary" }
+      ],
+      "sourceCompleteness": { "status": "complete", "affectedSubjectIds": [] },
+      "records": [
+        { "recordId": "lifecycle_complete_secondary", "recordRole": "provider_lifecycle", "provenance": "simulated", "custody": "repository_reviewed", "displayLabel": "SIMULATED", "runId": "sim_run_ref_complete_secondary_002", "terminalStatus": "completed", "selectedRevisionId": "result_complete_secondary_rev_1" },
+        { "recordId": "evidence_complete_secondary", "recordRole": "retained_evidence", "provenance": "simulated", "custody": "repository_reviewed", "displayLabel": "SIMULATED", "evidenceRecords": [{ "evidenceId": "evidence_secondary_001", "runId": "sim_run_ref_complete_secondary_002", "availability": "present", "reviewStatus": "reviewed", "sourceRevision": 1 }] },
+        {
+          "recordId": "assertions_complete_secondary",
+          "recordRole": "reviewed_evidence_assertion",
+          "provenance": "simulated",
+          "custody": "repository_reviewed",
+          "displayLabel": "SIMULATED",
+          "assertions": [
+            { "assertionId": "assert_secondary_freezer_decimal", "evidenceId": "evidence_secondary_001", "runId": "sim_run_ref_complete_secondary_002", "reviewStatus": "reviewed", "subjectKind": "measurement", "subjectId": "zone_freezer", "fieldPath": "exactDecimal.lexeme", "assertedValue": "-6.75" },
+            { "assertionId": "assert_secondary_freezer_spoken_unit", "evidenceId": "evidence_secondary_001", "runId": "sim_run_ref_complete_secondary_002", "reviewStatus": "reviewed", "subjectKind": "measurement", "subjectId": "zone_freezer", "fieldPath": "spokenUnit", "assertedValue": "degrees Fahrenheit" },
+            { "assertionId": "assert_secondary_incubator_decimal", "evidenceId": "evidence_secondary_001", "runId": "sim_run_ref_complete_secondary_002", "reviewStatus": "reviewed", "subjectKind": "measurement", "subjectId": "zone_incubator", "fieldPath": "exactDecimal.lexeme", "assertedValue": "13.50" },
+            { "assertionId": "assert_secondary_incubator_spoken_unit", "evidenceId": "evidence_secondary_001", "runId": "sim_run_ref_complete_secondary_002", "reviewStatus": "reviewed", "subjectKind": "measurement", "subjectId": "zone_incubator", "fieldPath": "spokenUnit", "assertedValue": "degrees Celsius" },
+            { "assertionId": "assert_secondary_alarm_state", "evidenceId": "evidence_secondary_001", "runId": "sim_run_ref_complete_secondary_002", "reviewStatus": "reviewed", "subjectKind": "alarm_state", "subjectId": "alarm_secondary", "fieldPath": "spokenState", "assertedValue": "alarm clear" },
+            { "assertionId": "assert_secondary_power_state", "evidenceId": "evidence_secondary_001", "runId": "sim_run_ref_complete_secondary_002", "reviewStatus": "reviewed", "subjectKind": "power_state", "subjectId": "power_secondary", "fieldPath": "spokenState", "assertedValue": "mains power failed" },
+            { "assertionId": "assert_secondary_battery_state", "evidenceId": "evidence_secondary_001", "runId": "sim_run_ref_complete_secondary_002", "reviewStatus": "reviewed", "subjectKind": "battery_state", "subjectId": "battery_secondary", "fieldPath": "spokenState", "assertedValue": "battery low" }
+          ]
+        },
+        {
+          "recordId": "result_complete_secondary",
+          "recordRole": "structured_provider_output",
+          "provenance": "simulated",
+          "custody": "repository_reviewed",
+          "displayLabel": "SIMULATED",
+          "result": {
+            "state": "present",
+            "runId": "sim_run_ref_complete_secondary_002",
+            "resultRevisionId": "result_complete_secondary_rev_1",
+            "value": {
+              "measurements": [
+                { "candidateId": "candidate_secondary_freezer", "kind": "measurement", "runId": "sim_run_ref_complete_secondary_002", "zoneId": "zone_freezer", "exactDecimal": { "lexeme": "-6.75", "signToken": "-", "integralDigits": "6", "fractionalDigits": "75", "scale": 2 }, "spokenUnit": "degrees Fahrenheit", "normalizedUnit": "[degF]", "unitMappingRuleId": "unit_degrees_fahrenheit_to_ucum_v1", "confidenceToken": { "provider": "simulated_checker", "rawLexeme": "SUPPORTED", "semanticsVersion": "simulated-checker/v1", "sourceRef": "evidence_secondary_001" }, "evidenceRefs": { "exactDecimal.lexeme": "assert_secondary_freezer_decimal", "spokenUnit": "assert_secondary_freezer_spoken_unit" } },
+                { "candidateId": "candidate_secondary_incubator", "kind": "measurement", "runId": "sim_run_ref_complete_secondary_002", "zoneId": "zone_incubator", "exactDecimal": { "lexeme": "13.50", "signToken": "", "integralDigits": "13", "fractionalDigits": "50", "scale": 2 }, "spokenUnit": "degrees Celsius", "normalizedUnit": "Cel", "unitMappingRuleId": "unit_degrees_celsius_to_ucum_v1", "confidenceToken": { "provider": "simulated_checker", "rawLexeme": "SUPPORTED", "semanticsVersion": "simulated-checker/v1", "sourceRef": "evidence_secondary_001" }, "evidenceRefs": { "exactDecimal.lexeme": "assert_secondary_incubator_decimal", "spokenUnit": "assert_secondary_incubator_spoken_unit" } }
+              ],
+              "alarmStates": [{ "candidateId": "candidate_secondary_alarm", "kind": "alarm_state", "runId": "sim_run_ref_complete_secondary_002", "alarmId": "alarm_secondary", "zoneId": "zone_freezer", "spokenState": "alarm clear", "normalizedState": "clear", "stateMappingRuleId": "alarm_clear_v1", "confidenceToken": { "provider": "simulated_checker", "rawLexeme": "SUPPORTED", "semanticsVersion": "simulated-checker/v1", "sourceRef": "evidence_secondary_001" }, "evidenceRefs": { "spokenState": "assert_secondary_alarm_state" } }],
+              "powerStates": [{ "candidateId": "candidate_secondary_power", "kind": "power_state", "runId": "sim_run_ref_complete_secondary_002", "powerSourceId": "power_secondary", "spokenState": "mains power failed", "normalizedState": "mains_failed", "stateMappingRuleId": "power_mains_failed_v1", "confidenceToken": { "provider": "simulated_checker", "rawLexeme": "SUPPORTED", "semanticsVersion": "simulated-checker/v1", "sourceRef": "evidence_secondary_001" }, "evidenceRefs": { "spokenState": "assert_secondary_power_state" } }],
+              "batteryStates": [{ "candidateId": "candidate_secondary_battery", "kind": "battery_state", "runId": "sim_run_ref_complete_secondary_002", "batteryId": "battery_secondary", "spokenState": "battery low", "normalizedState": "low", "stateMappingRuleId": "battery_low_v1", "confidenceToken": { "provider": "simulated_checker", "rawLexeme": "SUPPORTED", "semanticsVersion": "simulated-checker/v1", "sourceRef": "evidence_secondary_001" }, "evidenceRefs": { "spokenState": "assert_secondary_battery_state" } }]
+            }
+          }
+        },
+        { "recordId": "truth_complete_secondary", "recordRole": "reviewed_ground_truth", "provenance": "repository_review", "custody": "repository_reviewed", "displayLabel": "SIMULATED", "reviewedAt": "2026-08-03T20:01:00Z", "reviewerRole": "simulated_ground_truth_reviewer", "evidenceBasisRefs": ["assert_secondary_freezer_decimal", "assert_secondary_freezer_spoken_unit", "assert_secondary_incubator_decimal", "assert_secondary_incubator_spoken_unit", "assert_secondary_alarm_state", "assert_secondary_power_state", "assert_secondary_battery_state"], "readings": [{ "zoneId": "zone_freezer", "lexeme": "-6.75", "spokenUnit": "degrees Fahrenheit", "normalizedUnit": "[degF]", "evidenceBasisRefs": ["assert_secondary_freezer_decimal", "assert_secondary_freezer_spoken_unit"] }, { "zoneId": "zone_incubator", "lexeme": "13.50", "spokenUnit": "degrees Celsius", "normalizedUnit": "Cel", "evidenceBasisRefs": ["assert_secondary_incubator_decimal", "assert_secondary_incubator_spoken_unit"] }], "states": [{ "kind": "alarm_state", "subjectId": "alarm_secondary", "normalizedState": "clear", "evidenceBasisRefs": ["assert_secondary_alarm_state"] }, { "kind": "power_state", "subjectId": "power_secondary", "normalizedState": "mains_failed", "evidenceBasisRefs": ["assert_secondary_power_state"] }, { "kind": "battery_state", "subjectId": "battery_secondary", "normalizedState": "low", "evidenceBasisRefs": ["assert_secondary_battery_state"] }] },
+        { "recordId": "expected_complete_secondary", "recordRole": "expected_derived", "provenance": "derived", "custody": "repository_reviewed", "displayLabel": "SIMULATED", "quality": "complete", "zoneReconciliation": [{ "zoneId": "zone_freezer", "status": "supported" }, { "zoneId": "zone_incubator", "status": "supported" }], "stateReconciliation": [{ "kind": "alarm_state", "subjectId": "alarm_secondary", "status": "supported" }, { "kind": "battery_state", "subjectId": "battery_secondary", "status": "supported" }, { "kind": "power_state", "subjectId": "power_secondary", "status": "supported" }], "unexpectedZones": [], "unexpectedStates": [], "reasonCodes": [] }
+      ]
+    },
+    {
+      "fixtureId": "sim_missing_zone",
+      "fixtureRevisionId": "sim_missing_zone_rev_1",
+      "revision": 1,
+      "provenance": "simulated",
+      "proofScope": "contract_only",
+      "displayLabel": "SIMULATED",
+      "opaqueRunRef": "sim_run_ref_missing_zone_000001",
+      "expectedZoneInventory": { "inventoryId": "inventory_sim_missing_zone_v1", "version": 1, "adapterReportShapeRef": "simulated_report_shape_v1_unverified", "shapeVerification": "unverified", "displayLabel": "SIMULATED", "zones": [{ "zoneId": "zone_freezer", "applicability": "required", "requiredFacets": ["measurement"] }, { "zoneId": "zone_incubator", "applicability": "required", "requiredFacets": ["measurement"] }] },
+      "expectedDeviceStates": [{ "kind": "alarm_state", "subjectId": "alarm_missing" }, { "kind": "power_state", "subjectId": "power_missing" }, { "kind": "battery_state", "subjectId": "battery_missing" }],
+      "sourceCompleteness": { "status": "complete", "affectedSubjectIds": [] },
+      "records": [
+        { "recordId": "lifecycle_missing_zone", "recordRole": "provider_lifecycle", "provenance": "simulated", "custody": "repository_reviewed", "displayLabel": "SIMULATED", "runId": "sim_run_ref_missing_zone_000001", "terminalStatus": "completed", "selectedRevisionId": "result_missing_zone_rev_1" },
+        { "recordId": "evidence_missing_zone", "recordRole": "retained_evidence", "provenance": "simulated", "custody": "repository_reviewed", "displayLabel": "SIMULATED", "evidenceRecords": [{ "evidenceId": "evidence_missing_001", "runId": "sim_run_ref_missing_zone_000001", "availability": "present", "reviewStatus": "reviewed", "sourceRevision": 1 }] },
+        { "recordId": "assertions_missing_zone", "recordRole": "reviewed_evidence_assertion", "provenance": "simulated", "custody": "repository_reviewed", "displayLabel": "SIMULATED", "assertions": [
+          { "assertionId": "assert_missing_freezer_decimal", "evidenceId": "evidence_missing_001", "runId": "sim_run_ref_missing_zone_000001", "reviewStatus": "reviewed", "subjectKind": "measurement", "subjectId": "zone_freezer", "fieldPath": "exactDecimal.lexeme", "assertedValue": "-4.5" },
+          { "assertionId": "assert_missing_freezer_spoken_unit", "evidenceId": "evidence_missing_001", "runId": "sim_run_ref_missing_zone_000001", "reviewStatus": "reviewed", "subjectKind": "measurement", "subjectId": "zone_freezer", "fieldPath": "spokenUnit", "assertedValue": "degrees Fahrenheit" },
+          { "assertionId": "assert_missing_alarm_state", "evidenceId": "evidence_missing_001", "runId": "sim_run_ref_missing_zone_000001", "reviewStatus": "reviewed", "subjectKind": "alarm_state", "subjectId": "alarm_missing", "fieldPath": "spokenState", "assertedValue": "alarm active" },
+          { "assertionId": "assert_missing_power_state", "evidenceId": "evidence_missing_001", "runId": "sim_run_ref_missing_zone_000001", "reviewStatus": "reviewed", "subjectKind": "power_state", "subjectId": "power_missing", "fieldPath": "spokenState", "assertedValue": "mains power available" },
+          { "assertionId": "assert_missing_battery_state", "evidenceId": "evidence_missing_001", "runId": "sim_run_ref_missing_zone_000001", "reviewStatus": "reviewed", "subjectKind": "battery_state", "subjectId": "battery_missing", "fieldPath": "spokenState", "assertedValue": "battery normal" }
+        ] },
+        { "recordId": "result_missing_zone", "recordRole": "structured_provider_output", "provenance": "simulated", "custody": "repository_reviewed", "displayLabel": "SIMULATED", "result": { "state": "present", "runId": "sim_run_ref_missing_zone_000001", "resultRevisionId": "result_missing_zone_rev_1", "value": {
+          "measurements": [{ "candidateId": "candidate_missing_freezer", "kind": "measurement", "runId": "sim_run_ref_missing_zone_000001", "zoneId": "zone_freezer", "exactDecimal": { "lexeme": "-4.5", "signToken": "-", "integralDigits": "4", "fractionalDigits": "5", "scale": 1 }, "spokenUnit": "degrees Fahrenheit", "normalizedUnit": "[degF]", "unitMappingRuleId": "unit_degrees_fahrenheit_to_ucum_v1", "confidenceToken": { "provider": "simulated_checker", "rawLexeme": "SUPPORTED", "semanticsVersion": "simulated-checker/v1", "sourceRef": "evidence_missing_001" }, "evidenceRefs": { "exactDecimal.lexeme": "assert_missing_freezer_decimal", "spokenUnit": "assert_missing_freezer_spoken_unit" } }],
+          "alarmStates": [{ "candidateId": "candidate_missing_alarm", "kind": "alarm_state", "runId": "sim_run_ref_missing_zone_000001", "alarmId": "alarm_missing", "zoneId": "zone_freezer", "spokenState": "alarm active", "normalizedState": "active", "stateMappingRuleId": "alarm_active_v1", "confidenceToken": { "provider": "simulated_checker", "rawLexeme": "SUPPORTED", "semanticsVersion": "simulated-checker/v1", "sourceRef": "evidence_missing_001" }, "evidenceRefs": { "spokenState": "assert_missing_alarm_state" } }],
+          "powerStates": [{ "candidateId": "candidate_missing_power", "kind": "power_state", "runId": "sim_run_ref_missing_zone_000001", "powerSourceId": "power_missing", "spokenState": "mains power available", "normalizedState": "mains_available", "stateMappingRuleId": "power_mains_available_v1", "confidenceToken": { "provider": "simulated_checker", "rawLexeme": "SUPPORTED", "semanticsVersion": "simulated-checker/v1", "sourceRef": "evidence_missing_001" }, "evidenceRefs": { "spokenState": "assert_missing_power_state" } }],
+          "batteryStates": [{ "candidateId": "candidate_missing_battery", "kind": "battery_state", "runId": "sim_run_ref_missing_zone_000001", "batteryId": "battery_missing", "spokenState": "battery normal", "normalizedState": "normal", "stateMappingRuleId": "battery_normal_v1", "confidenceToken": { "provider": "simulated_checker", "rawLexeme": "SUPPORTED", "semanticsVersion": "simulated-checker/v1", "sourceRef": "evidence_missing_001" }, "evidenceRefs": { "spokenState": "assert_missing_battery_state" } }]
+        } } },
+        { "recordId": "truth_missing_zone", "recordRole": "reviewed_ground_truth", "provenance": "repository_review", "custody": "repository_reviewed", "displayLabel": "SIMULATED", "reviewedAt": "2026-08-03T20:02:00Z", "reviewerRole": "simulated_ground_truth_reviewer", "evidenceBasisRefs": ["assert_missing_freezer_decimal", "assert_missing_freezer_spoken_unit", "assert_missing_alarm_state", "assert_missing_power_state", "assert_missing_battery_state"], "readings": [{ "zoneId": "zone_freezer", "lexeme": "-4.5", "spokenUnit": "degrees Fahrenheit", "normalizedUnit": "[degF]", "evidenceBasisRefs": ["assert_missing_freezer_decimal", "assert_missing_freezer_spoken_unit"] }], "states": [{ "kind": "alarm_state", "subjectId": "alarm_missing", "normalizedState": "active", "evidenceBasisRefs": ["assert_missing_alarm_state"] }, { "kind": "power_state", "subjectId": "power_missing", "normalizedState": "mains_available", "evidenceBasisRefs": ["assert_missing_power_state"] }, { "kind": "battery_state", "subjectId": "battery_missing", "normalizedState": "normal", "evidenceBasisRefs": ["assert_missing_battery_state"] }], "missingZones": ["zone_incubator"] },
+        { "recordId": "expected_missing_zone", "recordRole": "expected_derived", "provenance": "derived", "custody": "repository_reviewed", "displayLabel": "SIMULATED", "quality": "partial", "zoneReconciliation": [{ "zoneId": "zone_freezer", "status": "supported" }, { "zoneId": "zone_incubator", "status": "missing" }], "stateReconciliation": [{ "kind": "alarm_state", "subjectId": "alarm_missing", "status": "supported" }, { "kind": "battery_state", "subjectId": "battery_missing", "status": "supported" }, { "kind": "power_state", "subjectId": "power_missing", "status": "supported" }], "unexpectedZones": [], "unexpectedStates": [], "reasonCodes": ["EXPECTED_ZONE_MISSING"] }
+      ]
+    },
+    {
+      "fixtureId": "sim_ambiguous_duplicate",
+      "fixtureRevisionId": "sim_ambiguous_duplicate_rev_1",
+      "revision": 1,
+      "provenance": "simulated",
+      "proofScope": "contract_only",
+      "displayLabel": "SIMULATED",
+      "opaqueRunRef": "sim_run_ref_ambiguous_duplicate01",
+      "expectedZoneInventory": { "inventoryId": "inventory_sim_ambiguous_v1", "version": 1, "adapterReportShapeRef": "simulated_report_shape_v1_unverified", "shapeVerification": "unverified", "displayLabel": "SIMULATED", "zones": [{ "zoneId": "zone_freezer", "applicability": "required", "requiredFacets": ["measurement"] }, { "zoneId": "zone_incubator", "applicability": "required", "requiredFacets": ["measurement"] }] },
+      "expectedDeviceStates": [],
+      "sourceCompleteness": { "status": "complete", "affectedSubjectIds": [] },
+      "records": [
+        { "recordId": "lifecycle_ambiguous", "recordRole": "provider_lifecycle", "provenance": "simulated", "custody": "repository_reviewed", "displayLabel": "SIMULATED", "runId": "sim_run_ref_ambiguous_duplicate01", "terminalStatus": "completed", "selectedRevisionId": "result_ambiguous_rev_1" },
+        { "recordId": "evidence_ambiguous", "recordRole": "retained_evidence", "provenance": "simulated", "custody": "repository_reviewed", "displayLabel": "SIMULATED", "evidenceRecords": [{ "evidenceId": "evidence_ambiguous_001", "runId": "sim_run_ref_ambiguous_duplicate01", "availability": "present", "reviewStatus": "reviewed", "sourceRevision": 1 }] },
+        { "recordId": "assertions_ambiguous", "recordRole": "reviewed_evidence_assertion", "provenance": "simulated", "custody": "repository_reviewed", "displayLabel": "SIMULATED", "assertions": [
+          { "assertionId": "assert_ambiguous_freezer_a_decimal", "evidenceId": "evidence_ambiguous_001", "runId": "sim_run_ref_ambiguous_duplicate01", "reviewStatus": "reviewed", "subjectKind": "measurement", "subjectId": "zone_freezer", "fieldPath": "exactDecimal.lexeme", "assertedValue": "-4.5" },
+          { "assertionId": "assert_ambiguous_freezer_a_unit", "evidenceId": "evidence_ambiguous_001", "runId": "sim_run_ref_ambiguous_duplicate01", "reviewStatus": "reviewed", "subjectKind": "measurement", "subjectId": "zone_freezer", "fieldPath": "spokenUnit", "assertedValue": "degrees Fahrenheit" },
+          { "assertionId": "assert_ambiguous_freezer_b_decimal", "evidenceId": "evidence_ambiguous_001", "runId": "sim_run_ref_ambiguous_duplicate01", "reviewStatus": "reviewed", "subjectKind": "measurement", "subjectId": "zone_freezer", "fieldPath": "exactDecimal.lexeme", "assertedValue": "-4.5" },
+          { "assertionId": "assert_ambiguous_freezer_b_unit", "evidenceId": "evidence_ambiguous_001", "runId": "sim_run_ref_ambiguous_duplicate01", "reviewStatus": "reviewed", "subjectKind": "measurement", "subjectId": "zone_freezer", "fieldPath": "spokenUnit", "assertedValue": "degrees Fahrenheit" },
+          { "assertionId": "assert_ambiguous_incubator_decimal", "evidenceId": "evidence_ambiguous_001", "runId": "sim_run_ref_ambiguous_duplicate01", "reviewStatus": "reviewed", "subjectKind": "measurement", "subjectId": "zone_incubator", "fieldPath": "exactDecimal.lexeme", "assertedValue": "12.25" },
+          { "assertionId": "assert_ambiguous_incubator_unit", "evidenceId": "evidence_ambiguous_001", "runId": "sim_run_ref_ambiguous_duplicate01", "reviewStatus": "reviewed", "subjectKind": "measurement", "subjectId": "zone_incubator", "fieldPath": "spokenUnit", "assertedValue": "degrees Celsius" }
+        ] },
+        { "recordId": "result_ambiguous", "recordRole": "structured_provider_output", "provenance": "simulated", "custody": "repository_reviewed", "displayLabel": "SIMULATED", "result": { "state": "present", "runId": "sim_run_ref_ambiguous_duplicate01", "resultRevisionId": "result_ambiguous_rev_1", "value": {
+          "measurements": [
+            { "candidateId": "candidate_ambiguous_freezer_a", "kind": "measurement", "runId": "sim_run_ref_ambiguous_duplicate01", "zoneId": "zone_freezer", "exactDecimal": { "lexeme": "-4.5", "signToken": "-", "integralDigits": "4", "fractionalDigits": "5", "scale": 1 }, "spokenUnit": "degrees Fahrenheit", "normalizedUnit": "[degF]", "unitMappingRuleId": "unit_degrees_fahrenheit_to_ucum_v1", "confidenceToken": { "provider": "simulated_checker", "rawLexeme": "SUPPORTED", "semanticsVersion": "simulated-checker/v1", "sourceRef": "evidence_ambiguous_001" }, "evidenceRefs": { "exactDecimal.lexeme": "assert_ambiguous_freezer_a_decimal", "spokenUnit": "assert_ambiguous_freezer_a_unit" } },
+            { "candidateId": "candidate_ambiguous_freezer_b", "kind": "measurement", "runId": "sim_run_ref_ambiguous_duplicate01", "zoneId": "zone_freezer", "exactDecimal": { "lexeme": "-4.5", "signToken": "-", "integralDigits": "4", "fractionalDigits": "5", "scale": 1 }, "spokenUnit": "degrees Fahrenheit", "normalizedUnit": "[degF]", "unitMappingRuleId": "unit_degrees_fahrenheit_to_ucum_v1", "confidenceToken": { "provider": "simulated_checker", "rawLexeme": "SUPPORTED", "semanticsVersion": "simulated-checker/v1", "sourceRef": "evidence_ambiguous_001" }, "evidenceRefs": { "exactDecimal.lexeme": "assert_ambiguous_freezer_b_decimal", "spokenUnit": "assert_ambiguous_freezer_b_unit" } },
+            { "candidateId": "candidate_ambiguous_incubator", "kind": "measurement", "runId": "sim_run_ref_ambiguous_duplicate01", "zoneId": "zone_incubator", "exactDecimal": { "lexeme": "12.25", "signToken": "", "integralDigits": "12", "fractionalDigits": "25", "scale": 2 }, "spokenUnit": "degrees Celsius", "normalizedUnit": "Cel", "unitMappingRuleId": "unit_degrees_celsius_to_ucum_v1", "confidenceToken": { "provider": "simulated_checker", "rawLexeme": "SUPPORTED", "semanticsVersion": "simulated-checker/v1", "sourceRef": "evidence_ambiguous_001" }, "evidenceRefs": { "exactDecimal.lexeme": "assert_ambiguous_incubator_decimal", "spokenUnit": "assert_ambiguous_incubator_unit" } }
+          ], "alarmStates": [], "powerStates": [], "batteryStates": []
+        } } },
+        { "recordId": "truth_ambiguous", "recordRole": "reviewed_ground_truth", "provenance": "repository_review", "custody": "repository_reviewed", "displayLabel": "SIMULATED", "reviewedAt": "2026-08-03T20:03:00Z", "reviewerRole": "simulated_ground_truth_reviewer", "evidenceBasisRefs": ["assert_ambiguous_freezer_a_decimal", "assert_ambiguous_freezer_a_unit", "assert_ambiguous_freezer_b_decimal", "assert_ambiguous_freezer_b_unit", "assert_ambiguous_incubator_decimal", "assert_ambiguous_incubator_unit"], "readings": [{ "zoneId": "zone_incubator", "lexeme": "12.25", "spokenUnit": "degrees Celsius", "normalizedUnit": "Cel", "evidenceBasisRefs": ["assert_ambiguous_incubator_decimal", "assert_ambiguous_incubator_unit"] }], "states": [], "ambiguousZones": ["zone_freezer"] },
+        { "recordId": "expected_ambiguous", "recordRole": "expected_derived", "provenance": "derived", "custody": "repository_reviewed", "displayLabel": "SIMULATED", "quality": "partial", "zoneReconciliation": [{ "zoneId": "zone_freezer", "status": "ambiguous" }, { "zoneId": "zone_incubator", "status": "supported" }], "stateReconciliation": [], "unexpectedZones": [], "unexpectedStates": [], "reasonCodes": ["DUPLICATE_EQUIVALENT_CANDIDATES"] }
+      ]
+    },
+    {
+      "fixtureId": "sim_contradictory_sign",
+      "fixtureRevisionId": "sim_contradictory_sign_rev_1",
+      "revision": 1,
+      "provenance": "simulated",
+      "proofScope": "contract_only",
+      "displayLabel": "SIMULATED",
+      "opaqueRunRef": "sim_run_ref_contradictory_sign01",
+      "expectedZoneInventory": { "inventoryId": "inventory_sim_contradictory_v1", "version": 1, "adapterReportShapeRef": "simulated_report_shape_v1_unverified", "shapeVerification": "unverified", "displayLabel": "SIMULATED", "zones": [{ "zoneId": "zone_freezer", "applicability": "required", "requiredFacets": ["measurement"] }, { "zoneId": "zone_incubator", "applicability": "required", "requiredFacets": ["measurement"] }] },
+      "expectedDeviceStates": [],
+      "sourceCompleteness": { "status": "complete", "affectedSubjectIds": [] },
+      "records": [
+        { "recordId": "lifecycle_contradictory", "recordRole": "provider_lifecycle", "provenance": "simulated", "custody": "repository_reviewed", "displayLabel": "SIMULATED", "runId": "sim_run_ref_contradictory_sign01", "terminalStatus": "completed", "selectedRevisionId": "result_contradictory_rev_1" },
+        { "recordId": "evidence_contradictory", "recordRole": "retained_evidence", "provenance": "simulated", "custody": "repository_reviewed", "displayLabel": "SIMULATED", "evidenceRecords": [{ "evidenceId": "evidence_contradictory_001", "runId": "sim_run_ref_contradictory_sign01", "availability": "present", "reviewStatus": "reviewed", "sourceRevision": 1 }] },
+        { "recordId": "assertions_contradictory", "recordRole": "reviewed_evidence_assertion", "provenance": "simulated", "custody": "repository_reviewed", "displayLabel": "SIMULATED", "assertions": [
+          { "assertionId": "assert_contradictory_freezer_negative", "evidenceId": "evidence_contradictory_001", "runId": "sim_run_ref_contradictory_sign01", "reviewStatus": "reviewed", "subjectKind": "measurement", "subjectId": "zone_freezer", "fieldPath": "exactDecimal.lexeme", "assertedValue": "-4.5" },
+          { "assertionId": "assert_contradictory_freezer_negative_unit", "evidenceId": "evidence_contradictory_001", "runId": "sim_run_ref_contradictory_sign01", "reviewStatus": "reviewed", "subjectKind": "measurement", "subjectId": "zone_freezer", "fieldPath": "spokenUnit", "assertedValue": "degrees Fahrenheit" },
+          { "assertionId": "assert_contradictory_freezer_positive", "evidenceId": "evidence_contradictory_001", "runId": "sim_run_ref_contradictory_sign01", "reviewStatus": "reviewed", "subjectKind": "measurement", "subjectId": "zone_freezer", "fieldPath": "exactDecimal.lexeme", "assertedValue": "+4.5" },
+          { "assertionId": "assert_contradictory_freezer_positive_unit", "evidenceId": "evidence_contradictory_001", "runId": "sim_run_ref_contradictory_sign01", "reviewStatus": "reviewed", "subjectKind": "measurement", "subjectId": "zone_freezer", "fieldPath": "spokenUnit", "assertedValue": "degrees Fahrenheit" },
+          { "assertionId": "assert_contradictory_incubator_decimal", "evidenceId": "evidence_contradictory_001", "runId": "sim_run_ref_contradictory_sign01", "reviewStatus": "reviewed", "subjectKind": "measurement", "subjectId": "zone_incubator", "fieldPath": "exactDecimal.lexeme", "assertedValue": "12.25" },
+          { "assertionId": "assert_contradictory_incubator_unit", "evidenceId": "evidence_contradictory_001", "runId": "sim_run_ref_contradictory_sign01", "reviewStatus": "reviewed", "subjectKind": "measurement", "subjectId": "zone_incubator", "fieldPath": "spokenUnit", "assertedValue": "degrees Celsius" }
+        ] },
+        { "recordId": "result_contradictory", "recordRole": "structured_provider_output", "provenance": "simulated", "custody": "repository_reviewed", "displayLabel": "SIMULATED", "result": { "state": "present", "runId": "sim_run_ref_contradictory_sign01", "resultRevisionId": "result_contradictory_rev_1", "value": {
+          "measurements": [
+            { "candidateId": "candidate_contradictory_freezer_negative", "kind": "measurement", "runId": "sim_run_ref_contradictory_sign01", "zoneId": "zone_freezer", "exactDecimal": { "lexeme": "-4.5", "signToken": "-", "integralDigits": "4", "fractionalDigits": "5", "scale": 1 }, "spokenUnit": "degrees Fahrenheit", "normalizedUnit": "[degF]", "unitMappingRuleId": "unit_degrees_fahrenheit_to_ucum_v1", "confidenceToken": { "provider": "simulated_checker", "rawLexeme": "SUPPORTED", "semanticsVersion": "simulated-checker/v1", "sourceRef": "evidence_contradictory_001" }, "evidenceRefs": { "exactDecimal.lexeme": "assert_contradictory_freezer_negative", "spokenUnit": "assert_contradictory_freezer_negative_unit" } },
+            { "candidateId": "candidate_contradictory_freezer_positive", "kind": "measurement", "runId": "sim_run_ref_contradictory_sign01", "zoneId": "zone_freezer", "exactDecimal": { "lexeme": "+4.5", "signToken": "+", "integralDigits": "4", "fractionalDigits": "5", "scale": 1 }, "spokenUnit": "degrees Fahrenheit", "normalizedUnit": "[degF]", "unitMappingRuleId": "unit_degrees_fahrenheit_to_ucum_v1", "confidenceToken": { "provider": "simulated_checker", "rawLexeme": "SUPPORTED", "semanticsVersion": "simulated-checker/v1", "sourceRef": "evidence_contradictory_001" }, "evidenceRefs": { "exactDecimal.lexeme": "assert_contradictory_freezer_positive", "spokenUnit": "assert_contradictory_freezer_positive_unit" } },
+            { "candidateId": "candidate_contradictory_incubator", "kind": "measurement", "runId": "sim_run_ref_contradictory_sign01", "zoneId": "zone_incubator", "exactDecimal": { "lexeme": "12.25", "signToken": "", "integralDigits": "12", "fractionalDigits": "25", "scale": 2 }, "spokenUnit": "degrees Celsius", "normalizedUnit": "Cel", "unitMappingRuleId": "unit_degrees_celsius_to_ucum_v1", "confidenceToken": { "provider": "simulated_checker", "rawLexeme": "SUPPORTED", "semanticsVersion": "simulated-checker/v1", "sourceRef": "evidence_contradictory_001" }, "evidenceRefs": { "exactDecimal.lexeme": "assert_contradictory_incubator_decimal", "spokenUnit": "assert_contradictory_incubator_unit" } }
+          ], "alarmStates": [], "powerStates": [], "batteryStates": []
+        } } },
+        { "recordId": "truth_contradictory", "recordRole": "reviewed_ground_truth", "provenance": "repository_review", "custody": "repository_reviewed", "displayLabel": "SIMULATED", "reviewedAt": "2026-08-03T20:04:00Z", "reviewerRole": "simulated_ground_truth_reviewer", "evidenceBasisRefs": ["assert_contradictory_freezer_negative", "assert_contradictory_freezer_negative_unit", "assert_contradictory_freezer_positive", "assert_contradictory_freezer_positive_unit", "assert_contradictory_incubator_decimal", "assert_contradictory_incubator_unit"], "readings": [{ "zoneId": "zone_incubator", "lexeme": "12.25", "spokenUnit": "degrees Celsius", "normalizedUnit": "Cel", "evidenceBasisRefs": ["assert_contradictory_incubator_decimal", "assert_contradictory_incubator_unit"] }], "states": [], "contradictions": [{ "zoneId": "zone_freezer", "lexemes": ["-4.5", "+4.5"] }] },
+        { "recordId": "expected_contradictory", "recordRole": "expected_derived", "provenance": "derived", "custody": "repository_reviewed", "displayLabel": "SIMULATED", "quality": "partial", "zoneReconciliation": [{ "zoneId": "zone_freezer", "status": "contradictory" }, { "zoneId": "zone_incubator", "status": "supported" }], "stateReconciliation": [], "unexpectedZones": [], "unexpectedStates": [], "reasonCodes": ["EVIDENCE_CONTRADICTORY"] }
+      ]
+    },
+    {
+      "fixtureId": "sim_truncated_report",
+      "fixtureRevisionId": "sim_truncated_report_rev_1",
+      "revision": 1,
+      "provenance": "simulated",
+      "proofScope": "contract_only",
+      "displayLabel": "SIMULATED",
+      "opaqueRunRef": "sim_run_ref_truncated_report_001",
+      "expectedZoneInventory": { "inventoryId": "inventory_sim_truncated_v1", "version": 1, "adapterReportShapeRef": "simulated_report_shape_v1_unverified", "shapeVerification": "unverified", "displayLabel": "SIMULATED", "zones": [{ "zoneId": "zone_freezer", "applicability": "required", "requiredFacets": ["measurement"] }, { "zoneId": "zone_incubator", "applicability": "required", "requiredFacets": ["measurement"] }] },
+      "expectedDeviceStates": [],
+      "sourceCompleteness": { "status": "truncated", "affectedSubjectIds": ["zone_incubator"] },
+      "records": [
+        { "recordId": "lifecycle_truncated", "recordRole": "provider_lifecycle", "provenance": "simulated", "custody": "repository_reviewed", "displayLabel": "SIMULATED", "runId": "sim_run_ref_truncated_report_001", "terminalStatus": "completed", "selectedRevisionId": "result_truncated_rev_1" },
+        { "recordId": "evidence_truncated", "recordRole": "retained_evidence", "provenance": "simulated", "custody": "repository_reviewed", "displayLabel": "SIMULATED", "evidenceRecords": [{ "evidenceId": "evidence_truncated_001", "runId": "sim_run_ref_truncated_report_001", "availability": "present", "reviewStatus": "reviewed", "sourceRevision": 1 }] },
+        { "recordId": "assertions_truncated", "recordRole": "reviewed_evidence_assertion", "provenance": "simulated", "custody": "repository_reviewed", "displayLabel": "SIMULATED", "assertions": [
+          { "assertionId": "assert_truncated_freezer_decimal", "evidenceId": "evidence_truncated_001", "runId": "sim_run_ref_truncated_report_001", "reviewStatus": "reviewed", "subjectKind": "measurement", "subjectId": "zone_freezer", "fieldPath": "exactDecimal.lexeme", "assertedValue": "-4.5" },
+          { "assertionId": "assert_truncated_freezer_unit", "evidenceId": "evidence_truncated_001", "runId": "sim_run_ref_truncated_report_001", "reviewStatus": "reviewed", "subjectKind": "measurement", "subjectId": "zone_freezer", "fieldPath": "spokenUnit", "assertedValue": "degrees Fahrenheit" },
+          { "assertionId": "assert_truncated_incubator_decimal", "evidenceId": "evidence_truncated_001", "runId": "sim_run_ref_truncated_report_001", "reviewStatus": "reviewed", "subjectKind": "measurement", "subjectId": "zone_incubator", "fieldPath": "exactDecimal.lexeme", "assertedValue": "12.25" },
+          { "assertionId": "assert_truncated_incubator_unit", "evidenceId": "evidence_truncated_001", "runId": "sim_run_ref_truncated_report_001", "reviewStatus": "reviewed", "subjectKind": "measurement", "subjectId": "zone_incubator", "fieldPath": "spokenUnit", "assertedValue": "degrees Celsius" }
+        ] },
+        { "recordId": "result_truncated", "recordRole": "structured_provider_output", "provenance": "simulated", "custody": "repository_reviewed", "displayLabel": "SIMULATED", "result": { "state": "present", "runId": "sim_run_ref_truncated_report_001", "resultRevisionId": "result_truncated_rev_1", "value": {
+          "measurements": [
+            { "candidateId": "candidate_truncated_freezer", "kind": "measurement", "runId": "sim_run_ref_truncated_report_001", "zoneId": "zone_freezer", "exactDecimal": { "lexeme": "-4.5", "signToken": "-", "integralDigits": "4", "fractionalDigits": "5", "scale": 1 }, "spokenUnit": "degrees Fahrenheit", "normalizedUnit": "[degF]", "unitMappingRuleId": "unit_degrees_fahrenheit_to_ucum_v1", "confidenceToken": { "provider": "simulated_checker", "rawLexeme": "SUPPORTED", "semanticsVersion": "simulated-checker/v1", "sourceRef": "evidence_truncated_001" }, "evidenceRefs": { "exactDecimal.lexeme": "assert_truncated_freezer_decimal", "spokenUnit": "assert_truncated_freezer_unit" } },
+            { "candidateId": "candidate_truncated_incubator", "kind": "measurement", "runId": "sim_run_ref_truncated_report_001", "zoneId": "zone_incubator", "exactDecimal": { "lexeme": "12.25", "signToken": "", "integralDigits": "12", "fractionalDigits": "25", "scale": 2 }, "spokenUnit": "degrees Celsius", "normalizedUnit": "Cel", "unitMappingRuleId": "unit_degrees_celsius_to_ucum_v1", "confidenceToken": { "provider": "simulated_checker", "rawLexeme": "SUPPORTED", "semanticsVersion": "simulated-checker/v1", "sourceRef": "evidence_truncated_001" }, "evidenceRefs": { "exactDecimal.lexeme": "assert_truncated_incubator_decimal", "spokenUnit": "assert_truncated_incubator_unit" } }
+          ], "alarmStates": [], "powerStates": [], "batteryStates": []
+        } } },
+        { "recordId": "truth_truncated", "recordRole": "reviewed_ground_truth", "provenance": "repository_review", "custody": "repository_reviewed", "displayLabel": "SIMULATED", "reviewedAt": "2026-08-03T20:05:00Z", "reviewerRole": "simulated_ground_truth_reviewer", "evidenceBasisRefs": ["assert_truncated_freezer_decimal", "assert_truncated_freezer_unit", "assert_truncated_incubator_decimal", "assert_truncated_incubator_unit"], "readings": [{ "zoneId": "zone_freezer", "lexeme": "-4.5", "spokenUnit": "degrees Fahrenheit", "normalizedUnit": "[degF]", "evidenceBasisRefs": ["assert_truncated_freezer_decimal", "assert_truncated_freezer_unit"] }], "states": [], "truncatedSubjects": ["zone_incubator"] },
+        { "recordId": "expected_truncated", "recordRole": "expected_derived", "provenance": "derived", "custody": "repository_reviewed", "displayLabel": "SIMULATED", "quality": "partial", "zoneReconciliation": [{ "zoneId": "zone_freezer", "status": "supported" }, { "zoneId": "zone_incubator", "status": "ambiguous" }], "stateReconciliation": [], "unexpectedZones": [], "unexpectedStates": [], "reasonCodes": ["SOURCE_TRUNCATED"] }
+      ]
+    },
+    {
+      "fixtureId": "sim_null_structured_result",
+      "fixtureRevisionId": "sim_null_structured_result_rev_1",
+      "revision": 1,
+      "provenance": "simulated",
+      "proofScope": "contract_only",
+      "displayLabel": "SIMULATED",
+      "opaqueRunRef": "sim_run_ref_null_structured_0001",
+      "expectedZoneInventory": { "inventoryId": "inventory_sim_null_v1", "version": 1, "adapterReportShapeRef": "simulated_report_shape_v1_unverified", "shapeVerification": "unverified", "displayLabel": "SIMULATED", "zones": [{ "zoneId": "zone_freezer", "applicability": "required", "requiredFacets": ["measurement"] }, { "zoneId": "zone_incubator", "applicability": "required", "requiredFacets": ["measurement"] }] },
+      "expectedDeviceStates": [{ "kind": "alarm_state", "subjectId": "alarm_null" }, { "kind": "power_state", "subjectId": "power_null" }, { "kind": "battery_state", "subjectId": "battery_null" }],
+      "sourceCompleteness": { "status": "complete", "affectedSubjectIds": [] },
+      "records": [
+        { "recordId": "lifecycle_null", "recordRole": "provider_lifecycle", "provenance": "simulated", "custody": "repository_reviewed", "displayLabel": "SIMULATED", "runId": "sim_run_ref_null_structured_0001", "terminalStatus": "completed", "selectedRevisionId": "result_null_rev_1" },
+        { "recordId": "evidence_null", "recordRole": "retained_evidence", "provenance": "simulated", "custody": "repository_reviewed", "displayLabel": "SIMULATED", "evidenceRecords": [{ "evidenceId": "evidence_null_001", "runId": "sim_run_ref_null_structured_0001", "availability": "present", "reviewStatus": "reviewed", "sourceRevision": 1 }] },
+        { "recordId": "assertions_null", "recordRole": "reviewed_evidence_assertion", "provenance": "simulated", "custody": "repository_reviewed", "displayLabel": "SIMULATED", "assertions": [] },
+        { "recordId": "result_null", "recordRole": "structured_provider_output", "provenance": "simulated", "custody": "repository_reviewed", "displayLabel": "SIMULATED", "result": { "state": "null", "runId": "sim_run_ref_null_structured_0001", "resultRevisionId": "result_null_rev_1" } },
+        { "recordId": "truth_null", "recordRole": "reviewed_ground_truth", "provenance": "repository_review", "custody": "repository_reviewed", "displayLabel": "SIMULATED", "reviewedAt": "2026-08-03T20:06:00Z", "reviewerRole": "simulated_ground_truth_reviewer", "evidenceBasisRefs": [], "readings": [], "states": [] },
+        { "recordId": "expected_null", "recordRole": "expected_derived", "provenance": "derived", "custody": "repository_reviewed", "displayLabel": "SIMULATED", "quality": "unknown", "zoneReconciliation": [{ "zoneId": "zone_freezer", "status": "missing" }, { "zoneId": "zone_incubator", "status": "missing" }], "stateReconciliation": [{ "kind": "alarm_state", "subjectId": "alarm_null", "status": "missing" }, { "kind": "battery_state", "subjectId": "battery_null", "status": "missing" }, { "kind": "power_state", "subjectId": "power_null", "status": "missing" }], "unexpectedZones": [], "unexpectedStates": [], "reasonCodes": ["NULL_STRUCTURED_RESULT"] }
+      ]
+    },
+    {
+      "fixtureId": "sim_unexpected_zone",
+      "fixtureRevisionId": "sim_unexpected_zone_rev_1",
+      "revision": 1,
+      "provenance": "simulated",
+      "proofScope": "contract_only",
+      "displayLabel": "SIMULATED",
+      "opaqueRunRef": "sim_run_ref_unexpected_zone_00001",
+      "expectedZoneInventory": {
+        "inventoryId": "inventory_sim_unexpected_zone_v1",
+        "version": 1,
+        "adapterReportShapeRef": "simulated_report_shape_v1_unverified",
+        "shapeVerification": "unverified",
+        "displayLabel": "SIMULATED",
+        "zones": [
+          { "zoneId": "zone_freezer", "applicability": "required", "requiredFacets": ["measurement"] }
+        ]
+      },
+      "expectedDeviceStates": [],
+      "sourceCompleteness": { "status": "complete", "affectedSubjectIds": [] },
+      "records": [
+        { "recordId": "lifecycle_unexpected_zone", "recordRole": "provider_lifecycle", "provenance": "simulated", "custody": "repository_reviewed", "displayLabel": "SIMULATED", "runId": "sim_run_ref_unexpected_zone_00001", "terminalStatus": "completed", "selectedRevisionId": "result_unexpected_zone_rev_1" },
+        { "recordId": "evidence_unexpected_zone", "recordRole": "retained_evidence", "provenance": "simulated", "custody": "repository_reviewed", "displayLabel": "SIMULATED", "evidenceRecords": [{ "evidenceId": "evidence_unexpected_001", "runId": "sim_run_ref_unexpected_zone_00001", "availability": "present", "reviewStatus": "reviewed", "sourceRevision": 1 }] },
+        { "recordId": "assertions_unexpected_zone", "recordRole": "reviewed_evidence_assertion", "provenance": "simulated", "custody": "repository_reviewed", "displayLabel": "SIMULATED", "assertions": [
+          { "assertionId": "assert_unexpected_expected_decimal", "evidenceId": "evidence_unexpected_001", "runId": "sim_run_ref_unexpected_zone_00001", "reviewStatus": "reviewed", "subjectKind": "measurement", "subjectId": "zone_freezer", "fieldPath": "exactDecimal.lexeme", "assertedValue": "-4.5" },
+          { "assertionId": "assert_unexpected_expected_unit", "evidenceId": "evidence_unexpected_001", "runId": "sim_run_ref_unexpected_zone_00001", "reviewStatus": "reviewed", "subjectKind": "measurement", "subjectId": "zone_freezer", "fieldPath": "spokenUnit", "assertedValue": "degrees Fahrenheit" },
+          { "assertionId": "assert_unexpected_extra_decimal", "evidenceId": "evidence_unexpected_001", "runId": "sim_run_ref_unexpected_zone_00001", "reviewStatus": "reviewed", "subjectKind": "measurement", "subjectId": "zone_unexpected", "fieldPath": "exactDecimal.lexeme", "assertedValue": "7.25" },
+          { "assertionId": "assert_unexpected_extra_unit", "evidenceId": "evidence_unexpected_001", "runId": "sim_run_ref_unexpected_zone_00001", "reviewStatus": "reviewed", "subjectKind": "measurement", "subjectId": "zone_unexpected", "fieldPath": "spokenUnit", "assertedValue": "degrees Celsius" }
+        ] },
+        { "recordId": "result_unexpected_zone", "recordRole": "structured_provider_output", "provenance": "simulated", "custody": "repository_reviewed", "displayLabel": "SIMULATED", "result": { "state": "present", "runId": "sim_run_ref_unexpected_zone_00001", "resultRevisionId": "result_unexpected_zone_rev_1", "value": {
+          "measurements": [
+            { "candidateId": "candidate_unexpected_expected", "kind": "measurement", "runId": "sim_run_ref_unexpected_zone_00001", "zoneId": "zone_freezer", "exactDecimal": { "lexeme": "-4.5", "signToken": "-", "integralDigits": "4", "fractionalDigits": "5", "scale": 1 }, "spokenUnit": "degrees Fahrenheit", "normalizedUnit": "[degF]", "unitMappingRuleId": "unit_degrees_fahrenheit_to_ucum_v1", "confidenceToken": { "provider": "simulated_checker", "rawLexeme": "SUPPORTED", "semanticsVersion": "simulated-checker/v1", "sourceRef": "evidence_unexpected_001" }, "evidenceRefs": { "exactDecimal.lexeme": "assert_unexpected_expected_decimal", "spokenUnit": "assert_unexpected_expected_unit" } },
+            { "candidateId": "candidate_unexpected_extra", "kind": "measurement", "runId": "sim_run_ref_unexpected_zone_00001", "zoneId": "zone_unexpected", "exactDecimal": { "lexeme": "7.25", "signToken": "", "integralDigits": "7", "fractionalDigits": "25", "scale": 2 }, "spokenUnit": "degrees Celsius", "normalizedUnit": "Cel", "unitMappingRuleId": "unit_degrees_celsius_to_ucum_v1", "confidenceToken": { "provider": "simulated_checker", "rawLexeme": "SUPPORTED", "semanticsVersion": "simulated-checker/v1", "sourceRef": "evidence_unexpected_001" }, "evidenceRefs": { "exactDecimal.lexeme": "assert_unexpected_extra_decimal", "spokenUnit": "assert_unexpected_extra_unit" } }
+          ],
+          "alarmStates": [],
+          "powerStates": [],
+          "batteryStates": []
+        } } },
+        { "recordId": "truth_unexpected_zone", "recordRole": "reviewed_ground_truth", "provenance": "repository_review", "custody": "repository_reviewed", "displayLabel": "SIMULATED", "reviewedAt": "2026-08-03T20:07:00Z", "reviewerRole": "simulated_ground_truth_reviewer", "evidenceBasisRefs": ["assert_unexpected_expected_decimal", "assert_unexpected_expected_unit", "assert_unexpected_extra_decimal", "assert_unexpected_extra_unit"], "readings": [{ "zoneId": "zone_freezer", "lexeme": "-4.5", "spokenUnit": "degrees Fahrenheit", "normalizedUnit": "[degF]", "evidenceBasisRefs": ["assert_unexpected_expected_decimal", "assert_unexpected_expected_unit"] }], "states": [], "unexpectedZones": ["zone_unexpected"] },
+        { "recordId": "expected_unexpected_zone", "recordRole": "expected_derived", "provenance": "derived", "custody": "repository_reviewed", "displayLabel": "SIMULATED", "quality": "partial", "zoneReconciliation": [{ "zoneId": "zone_freezer", "status": "supported" }], "stateReconciliation": [], "unexpectedZones": [{ "zoneId": "zone_unexpected", "candidateIds": ["candidate_unexpected_extra"] }], "unexpectedStates": [], "reasonCodes": ["UNEXPECTED_ZONE"] }
+      ]
+    },
+    {
+      "fixtureId": "sim_reviewed_contract",
+      "fixtureRevisionId": "sim_reviewed_contract_rev_1",
+      "revision": 1,
+      "provenance": "simulated",
+      "proofScope": "contract_only",
+      "displayLabel": "SIMULATED",
+      "opaqueRunRef": "sim_run_ref_reviewed_contract_001",
+      "expectedZoneInventory": {
+        "inventoryId": "inventory_sim_reviewed_contract_v1",
+        "version": 1,
+        "adapterReportShapeRef": "simulated_report_shape_v1_unverified",
+        "shapeVerification": "unverified",
+        "displayLabel": "SIMULATED",
+        "zones": [
+          { "zoneId": "zone_freezer", "applicability": "required", "requiredFacets": ["measurement"] },
+          { "zoneId": "zone_incubator", "applicability": "required", "requiredFacets": ["measurement"] },
+          { "zoneId": "zone_spare_input", "applicability": "not_applicable", "requiredFacets": [], "reasonCode": "NOT_APPLICABLE_REVIEWED", "evidenceBasisRefs": ["assert_reviewed_spare_not_applicable"] }
+        ]
+      },
+      "expectedDeviceStates": [
+        { "kind": "alarm_state", "subjectId": "alarm_reviewed" },
+        { "kind": "power_state", "subjectId": "power_reviewed" },
+        { "kind": "battery_state", "subjectId": "battery_reviewed" }
+      ],
+      "sourceCompleteness": { "status": "complete", "affectedSubjectIds": [] },
+      "records": [
+        { "recordId": "lifecycle_reviewed_contract", "recordRole": "provider_lifecycle", "provenance": "simulated", "custody": "repository_reviewed", "displayLabel": "SIMULATED", "runId": "sim_run_ref_reviewed_contract_001", "terminalStatus": "completed", "selectedRevisionId": "result_reviewed_contract_rev_1" },
+        { "recordId": "evidence_reviewed_contract", "recordRole": "retained_evidence", "provenance": "simulated", "custody": "repository_reviewed", "displayLabel": "SIMULATED", "evidenceRecords": [{ "evidenceId": "evidence_reviewed_contract_001", "runId": "sim_run_ref_reviewed_contract_001", "availability": "present", "reviewStatus": "reviewed", "sourceRevision": 1 }] },
+        { "recordId": "assertions_reviewed_contract", "recordRole": "reviewed_evidence_assertion", "provenance": "simulated", "custody": "repository_reviewed", "displayLabel": "SIMULATED", "assertions": [
+          { "assertionId": "assert_reviewed_freezer_decimal", "evidenceId": "evidence_reviewed_contract_001", "runId": "sim_run_ref_reviewed_contract_001", "reviewStatus": "reviewed", "subjectKind": "measurement", "subjectId": "zone_freezer", "fieldPath": "exactDecimal.lexeme", "assertedValue": "-8.25" },
+          { "assertionId": "assert_reviewed_freezer_unit", "evidenceId": "evidence_reviewed_contract_001", "runId": "sim_run_ref_reviewed_contract_001", "reviewStatus": "reviewed", "subjectKind": "measurement", "subjectId": "zone_freezer", "fieldPath": "spokenUnit", "assertedValue": "degrees Fahrenheit" },
+          { "assertionId": "assert_reviewed_incubator_decimal", "evidenceId": "evidence_reviewed_contract_001", "runId": "sim_run_ref_reviewed_contract_001", "reviewStatus": "reviewed", "subjectKind": "measurement", "subjectId": "zone_incubator", "fieldPath": "exactDecimal.lexeme", "assertedValue": "14.00" },
+          { "assertionId": "assert_reviewed_incubator_unit", "evidenceId": "evidence_reviewed_contract_001", "runId": "sim_run_ref_reviewed_contract_001", "reviewStatus": "reviewed", "subjectKind": "measurement", "subjectId": "zone_incubator", "fieldPath": "spokenUnit", "assertedValue": "degrees Celsius" },
+          { "assertionId": "assert_reviewed_alarm_state", "evidenceId": "evidence_reviewed_contract_001", "runId": "sim_run_ref_reviewed_contract_001", "reviewStatus": "reviewed", "subjectKind": "alarm_state", "subjectId": "alarm_reviewed", "fieldPath": "spokenState", "assertedValue": "alarm clear" },
+          { "assertionId": "assert_reviewed_power_state", "evidenceId": "evidence_reviewed_contract_001", "runId": "sim_run_ref_reviewed_contract_001", "reviewStatus": "reviewed", "subjectKind": "power_state", "subjectId": "power_reviewed", "fieldPath": "spokenState", "assertedValue": "mains power failed" },
+          { "assertionId": "assert_reviewed_battery_state", "evidenceId": "evidence_reviewed_contract_001", "runId": "sim_run_ref_reviewed_contract_001", "reviewStatus": "reviewed", "subjectKind": "battery_state", "subjectId": "battery_reviewed", "fieldPath": "spokenState", "assertedValue": "battery low" },
+          { "assertionId": "assert_reviewed_spare_not_applicable", "evidenceId": "evidence_reviewed_contract_001", "runId": "sim_run_ref_reviewed_contract_001", "reviewStatus": "reviewed", "subjectKind": "expected_zone", "subjectId": "zone_spare_input", "fieldPath": "applicability", "assertedValue": "not_applicable" }
+        ] },
+        { "recordId": "result_reviewed_contract", "recordRole": "structured_provider_output", "provenance": "simulated", "custody": "repository_reviewed", "displayLabel": "SIMULATED", "result": { "state": "present", "runId": "sim_run_ref_reviewed_contract_001", "resultRevisionId": "result_reviewed_contract_rev_1", "value": {
+          "measurements": [
+            { "candidateId": "candidate_reviewed_freezer", "kind": "measurement", "runId": "sim_run_ref_reviewed_contract_001", "zoneId": "zone_freezer", "exactDecimal": { "lexeme": "-8.25", "signToken": "-", "integralDigits": "8", "fractionalDigits": "25", "scale": 2 }, "spokenUnit": "degrees Fahrenheit", "normalizedUnit": "[degF]", "unitMappingRuleId": "unit_degrees_fahrenheit_to_ucum_v1", "confidenceToken": { "provider": "simulated_checker", "rawLexeme": "SUPPORTED", "semanticsVersion": "simulated-checker/v1", "sourceRef": "evidence_reviewed_contract_001" }, "evidenceRefs": { "exactDecimal.lexeme": "assert_reviewed_freezer_decimal", "spokenUnit": "assert_reviewed_freezer_unit" } },
+            { "candidateId": "candidate_reviewed_incubator", "kind": "measurement", "runId": "sim_run_ref_reviewed_contract_001", "zoneId": "zone_incubator", "exactDecimal": { "lexeme": "14.00", "signToken": "", "integralDigits": "14", "fractionalDigits": "00", "scale": 2 }, "spokenUnit": "degrees Celsius", "normalizedUnit": "Cel", "unitMappingRuleId": "unit_degrees_celsius_to_ucum_v1", "confidenceToken": { "provider": "simulated_checker", "rawLexeme": "SUPPORTED", "semanticsVersion": "simulated-checker/v1", "sourceRef": "evidence_reviewed_contract_001" }, "evidenceRefs": { "exactDecimal.lexeme": "assert_reviewed_incubator_decimal", "spokenUnit": "assert_reviewed_incubator_unit" } }
+          ],
+          "alarmStates": [{ "candidateId": "candidate_reviewed_alarm", "kind": "alarm_state", "runId": "sim_run_ref_reviewed_contract_001", "alarmId": "alarm_reviewed", "zoneId": "zone_freezer", "spokenState": "alarm clear", "normalizedState": "clear", "stateMappingRuleId": "alarm_clear_v1", "confidenceToken": { "provider": "simulated_checker", "rawLexeme": "SUPPORTED", "semanticsVersion": "simulated-checker/v1", "sourceRef": "evidence_reviewed_contract_001" }, "evidenceRefs": { "spokenState": "assert_reviewed_alarm_state" } }],
+          "powerStates": [{ "candidateId": "candidate_reviewed_power", "kind": "power_state", "runId": "sim_run_ref_reviewed_contract_001", "powerSourceId": "power_reviewed", "spokenState": "mains power failed", "normalizedState": "mains_failed", "stateMappingRuleId": "power_mains_failed_v1", "confidenceToken": { "provider": "simulated_checker", "rawLexeme": "SUPPORTED", "semanticsVersion": "simulated-checker/v1", "sourceRef": "evidence_reviewed_contract_001" }, "evidenceRefs": { "spokenState": "assert_reviewed_power_state" } }],
+          "batteryStates": [{ "candidateId": "candidate_reviewed_battery", "kind": "battery_state", "runId": "sim_run_ref_reviewed_contract_001", "batteryId": "battery_reviewed", "spokenState": "battery low", "normalizedState": "low", "stateMappingRuleId": "battery_low_v1", "confidenceToken": { "provider": "simulated_checker", "rawLexeme": "SUPPORTED", "semanticsVersion": "simulated-checker/v1", "sourceRef": "evidence_reviewed_contract_001" }, "evidenceRefs": { "spokenState": "assert_reviewed_battery_state" } }]
+        } } },
+        { "recordId": "truth_reviewed_contract", "recordRole": "reviewed_ground_truth", "provenance": "repository_review", "custody": "repository_reviewed", "displayLabel": "SIMULATED", "reviewedAt": "2026-08-04T14:00:00Z", "reviewerRole": "simulated_ground_truth_reviewer", "evidenceBasisRefs": ["assert_reviewed_freezer_decimal", "assert_reviewed_freezer_unit", "assert_reviewed_incubator_decimal", "assert_reviewed_incubator_unit", "assert_reviewed_alarm_state", "assert_reviewed_power_state", "assert_reviewed_battery_state", "assert_reviewed_spare_not_applicable"],
+          "readings": [
+            { "zoneId": "zone_freezer", "lexeme": "-8.25", "spokenUnit": "degrees Fahrenheit", "normalizedUnit": "[degF]", "evidenceBasisRefs": ["assert_reviewed_freezer_decimal", "assert_reviewed_freezer_unit"] },
+            { "zoneId": "zone_incubator", "lexeme": "14.00", "spokenUnit": "degrees Celsius", "normalizedUnit": "Cel", "evidenceBasisRefs": ["assert_reviewed_incubator_decimal", "assert_reviewed_incubator_unit"] }
+          ],
+          "states": [
+            { "kind": "alarm_state", "subjectId": "alarm_reviewed", "normalizedState": "clear", "evidenceBasisRefs": ["assert_reviewed_alarm_state"] },
+            { "kind": "power_state", "subjectId": "power_reviewed", "normalizedState": "mains_failed", "evidenceBasisRefs": ["assert_reviewed_power_state"] },
+            { "kind": "battery_state", "subjectId": "battery_reviewed", "normalizedState": "low", "evidenceBasisRefs": ["assert_reviewed_battery_state"] }
+          ],
+          "notApplicableZones": [{ "zoneId": "zone_spare_input", "reasonCode": "NOT_APPLICABLE_REVIEWED", "evidenceBasisRefs": ["assert_reviewed_spare_not_applicable"] }],
+          "confidenceExpectations": [
+            { "candidateId": "candidate_reviewed_freezer", "kind": "measurement", "rawLexeme": "SUPPORTED", "semanticsVersion": "simulated-checker/v1", "sourceRef": "evidence_reviewed_contract_001", "disposition": "acceptable" },
+            { "candidateId": "candidate_reviewed_incubator", "kind": "measurement", "rawLexeme": "SUPPORTED", "semanticsVersion": "simulated-checker/v1", "sourceRef": "evidence_reviewed_contract_001", "disposition": "acceptable" },
+            { "candidateId": "candidate_reviewed_alarm", "kind": "alarm_state", "rawLexeme": "SUPPORTED", "semanticsVersion": "simulated-checker/v1", "sourceRef": "evidence_reviewed_contract_001", "disposition": "acceptable" },
+            { "candidateId": "candidate_reviewed_power", "kind": "power_state", "rawLexeme": "SUPPORTED", "semanticsVersion": "simulated-checker/v1", "sourceRef": "evidence_reviewed_contract_001", "disposition": "acceptable" },
+            { "candidateId": "candidate_reviewed_battery", "kind": "battery_state", "rawLexeme": "SUPPORTED", "semanticsVersion": "simulated-checker/v1", "sourceRef": "evidence_reviewed_contract_001", "disposition": "acceptable" }
+          ]
+        },
+        { "recordId": "expected_reviewed_contract", "recordRole": "expected_derived", "provenance": "derived", "custody": "repository_reviewed", "displayLabel": "SIMULATED", "quality": "complete", "zoneReconciliation": [{ "zoneId": "zone_freezer", "status": "supported" }, { "zoneId": "zone_incubator", "status": "supported" }, { "zoneId": "zone_spare_input", "status": "not_applicable" }], "stateReconciliation": [{ "kind": "alarm_state", "subjectId": "alarm_reviewed", "status": "supported" }, { "kind": "battery_state", "subjectId": "battery_reviewed", "status": "supported" }, { "kind": "power_state", "subjectId": "power_reviewed", "status": "supported" }], "unexpectedZones": [], "unexpectedStates": [], "reasonCodes": [] }
+      ]
+    }
+  ]
+}

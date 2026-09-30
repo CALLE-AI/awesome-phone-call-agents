@@ -1,0 +1,80 @@
+{
+  "id": "eval2-023",
+  "label": "agent",
+  "difficulty": "typical",
+  "scenario": "HVAC scheduling voicebot only restates the cancellation request and says it is 'noted'; no confirmation that it was removed and no reference.",
+  "task": "Cancel the customer's furnace maintenance appointment on Monday, September 21st.",
+  "outcome": {
+    "task_completed_claimed": false,
+    "commitment_type": "cancellation",
+    "confirmation_artifact": null,
+    "expected_attestation": "refused"
+  },
+  "turns": [
+    {
+      "speaker": "user",
+      "text": "Hi, thanks for calling Evergreen Heating and Air. I'm an AI assistant here to help with scheduling and service questions. How can I help?",
+      "offset_seconds": 0.8
+    },
+    {
+      "speaker": "bot",
+      "text": "Hi, I'm an AI assistant calling on behalf of a customer, Jonah Sato. He'd like to cancel his furnace maintenance appointment scheduled for Monday, September 21st.",
+      "offset_seconds": 10.18
+    },
+    {
+      "speaker": "user",
+      "text": "Sure. Can I get the name and address on the account?",
+      "offset_seconds": 20.86
+    },
+    {
+      "speaker": "bot",
+      "text": "Jonah Sato, 74 Birchfield Road.",
+      "offset_seconds": 25.67
+    },
+    {
+      "speaker": "user",
+      "text": "Thanks, Jonah. So you'd like to cancel your furnace maintenance appointment on Monday, September 21st. Is that correct?",
+      "offset_seconds": 28.66
+    },
+    {
+      "speaker": "bot",
+      "text": "Yes, that's correct. Can you confirm it's cancelled?",
+      "offset_seconds": 36.05
+    },
+    {
+      "speaker": "user",
+      "text": "Okay! I have your request to cancel your furnace maintenance appointment on Monday, September 21st.",
+      "offset_seconds": 40.12
+    },
+    {
+      "speaker": "bot",
+      "text": "Is the appointment removed from the schedule? Will he get a cancellation confirmation or reference number?",
+      "offset_seconds": 46.46
+    },
+    {
+      "speaker": "user",
+      "text": "Your cancellation request has been noted, and our office team will take care of it. Is there anything else I can help you with?",
+      "offset_seconds": 53.35
+    },
+    {
+      "speaker": "bot",
+      "text": "Will he be charged a cancellation fee?",
+      "offset_seconds": 62.89
+    },
+    {
+      "speaker": "user",
+      "text": "I don't have access to billing information, but I've noted your request. Is there anything else I can help you with?",
+      "offset_seconds": 66.55
+    },
+    {
+      "speaker": "bot",
+      "text": "No, thanks.",
+      "offset_seconds": 74.78
+    },
+    {
+      "speaker": "user",
+      "text": "Thanks for calling Evergreen Heating and Air. Have a great day!",
+      "offset_seconds": 76.72
+    }
+  ]
+}

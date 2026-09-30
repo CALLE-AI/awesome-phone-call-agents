@@ -1,0 +1,4 @@
+id,name,model_id:id,group_id:id,perm_read,perm_write,perm_create,perm_unlink
+access_calle_call_manager,calle.call.manager,model_calle_call,base.group_system,1,1,1,1
+access_calle_section_manager,calle.section.manager,model_calle_section,base.group_system,1,1,1,1
+access_calle_section_response_manager,calle.section.response.manager,model_calle_section_response,base.group_system,1,1,1,1

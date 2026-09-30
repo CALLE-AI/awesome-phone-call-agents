@@ -1,0 +1,38 @@
+# An execution failure: the platform could not place the call at all.
+#
+# The distinction this example exists for: nothing here says anything about
+# Carrier C. Invalidating its strategy, or moving to the next candidate, would
+# spend the whole list on a configuration error and then report "no candidate
+# could be reached" — a business conclusion covering a platform fault, with no
+# phone ever ringing.
+input:
+  mission:
+    objective: "Protect Shipment #4821's departure"
+    deadline: "17:30"
+  constraints:
+    - { key: pickup_time, operator: lte, value: "17:30", mandatory: true }
+    - { key: capacity_ok, operator: eq, value: true, mandatory: true }
+  strategy: { id: strategy_02, type: replacement_carrier, target: "Carrier C" }
+  call_result:
+    call_id: null
+    target: "Carrier C"
+    status: rejected
+    failure_code: unsupported_destination
+    failure_message: "The provider does not place calls to this destination."
+    facts: {}
+  available_targets: ["Carrier D"]
+  excluded_targets: ["Carrier A", "Carrier B"]
+
+output:
+  strategy_status: uncertain
+  failure_class: execution
+  evidence: []
+  constraint_results:
+    - { constraint: pickup_time, required: "17:30", observed: null, status: not_evaluated }
+    - { constraint: capacity_ok, required: true, observed: null, status: not_evaluated }
+  replan:
+    required: false
+    reason: "The call was never placed. Carrier C has not been evaluated."
+  escalate:
+    required: true
+    reason: "Calling is unavailable for this destination — a human must fix the configuration."

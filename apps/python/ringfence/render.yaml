@@ -1,0 +1,35 @@
+# Render Blueprint for the RingFence demo (customer + bank dashboard).
+#
+# This app is self-contained under apps/python/ringfence/, per this repo's
+# own contribution convention -- this file lives here rather than at the
+# repo root so it doesn't presume anything about how other apps in this
+# monorepo want to be deployed. When creating a Render Blueprint, point it
+# at this file's path directly; paths below are relative to this file's
+# own directory, not the repo root.
+#
+# The demo server is simulation-only and has no live-call path at all: it
+# cannot place a real call regardless of environment, which is why it is
+# the only surface in this project that is safe to deploy publicly. There
+# is deliberately no CALLE_API_KEY here, and setting one would change
+# nothing.
+#
+# RINGFENCE_DEMO_TOKEN is required: the server refuses to start on a
+# non-loopback bind without it, and with it every page and API route needs
+# the token (Authorization: Bearer, or ?token= once per browser). Render
+# generates the value; read it from the dashboard, then open the deployed
+# URL as https://<host>/?token=<value>.
+
+services:
+  - type: web
+    name: ringfence-demo
+    runtime: python
+    plan: free
+    buildCommand: pip install -e .
+    startCommand: python -m ringfence.demo_server --host 0.0.0.0 --port $PORT
+    healthCheckPath: /healthz
+    autoDeployTrigger: commit
+    envVars:
+      - key: PYTHON_VERSION
+        value: 3.11.9
+      - key: RINGFENCE_DEMO_TOKEN
+        generateValue: true

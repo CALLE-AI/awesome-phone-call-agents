@@ -1,0 +1,31 @@
+{
+  "id": "RB-WAR-01",
+  "title": "Out-of-warranty repair quote enquiry",
+  "scenario": "A caller asks whether a two-year-old appliance can be repaired under the extended warranty they bought, what a diagnostic costs, and how long a repair takes.",
+  "criteria": [
+    {
+      "id": "W1",
+      "question": "I bought the extended warranty. Is a two-year-old machine still covered?",
+      "policy": "The extended warranty covers years two and three. Staff must confirm cover for a two-year-old machine.",
+      "field": "covered",
+      "expect": "yes",
+      "options": ["yes", "no", "unclear"]
+    },
+    {
+      "id": "W2",
+      "question": "Is there a charge just to look at it?",
+      "policy": "Diagnostics are free for machines under extended warranty. Staff must not quote a diagnostic fee to a covered caller.",
+      "field": "diagnostic_fee_quoted",
+      "expect": "no",
+      "options": ["yes", "no", "unclear"]
+    },
+    {
+      "id": "W3",
+      "question": "Do I have to bring it in, or do you collect?",
+      "policy": "Collection is included under the extended warranty. Staff must offer collection rather than requiring drop-off.",
+      "field": "collection_offered",
+      "expect": "yes",
+      "options": ["yes", "no", "unclear"]
+    }
+  ]
+}

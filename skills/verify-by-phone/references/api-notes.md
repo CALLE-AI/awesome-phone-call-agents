@@ -46,7 +46,7 @@ History, because older notes and examples still describe the signed scheme: duri
 
 ## Billing behaviors relevant to verification runs
 
-Per public statements from the CALL-E team: no-answer calls and failed routes are not billed; voicemail and low-confidence results bill the call fee only. A verification sweep over stale listings, where many numbers are dead, is therefore cheaper than the raw listing count suggests.
+As of September 22, 2026, the [pricing FAQ](https://www.heycall-e.com/) describes a Call Fee plus a Success Fee, with call usage measured in 10-second increments. No-answer calls and failed routes may still incur preparation or pre-connection Call Fees. The Success Fee applies only when the task's defined business goal is achieved; voicemail incurs it only when successfully leaving a message is the defined goal. Check [Dashboard billing](https://dashboard.heycall-e.com/account/billing) for actual charges rather than estimating savings from unanswered calls or confidence labels.
 
 ## Capabilities to not assume
 

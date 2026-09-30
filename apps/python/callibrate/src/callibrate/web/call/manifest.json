@@ -1,0 +1,83 @@
+{
+  "hours_changed": [
+    {
+      "index": 0,
+      "role": "assistant",
+      "text": "Hello, this is an automated assistant calling on behalf of the community resource directory. Can I check what we publish for the weekly grocery pickup?",
+      "file": "hours_changed-00.mp3",
+      "seconds": 8.28
+    },
+    {
+      "index": 1,
+      "role": "provider",
+      "text": "Sure, go ahead.",
+      "file": "hours_changed-01.mp3",
+      "seconds": 1.32
+    },
+    {
+      "index": 2,
+      "role": "assistant",
+      "text": "Thank you. We publish it as Wednesdays, nine in the morning until twelve. Is that still right?",
+      "file": "hours_changed-02.mp3",
+      "seconds": 6.096
+    },
+    {
+      "index": 3,
+      "role": "provider",
+      "text": "That changed, actually. It is ten until one now.",
+      "file": "hours_changed-03.mp3",
+      "seconds": 3.408
+    },
+    {
+      "index": 4,
+      "role": "assistant",
+      "text": "Let me read that back so I have it exactly. Wednesdays, ten in the morning until one in the afternoon. Have I got that right?",
+      "file": "hours_changed-04.mp3",
+      "seconds": 7.608
+    },
+    {
+      "index": 5,
+      "role": "provider",
+      "text": "Yes, ten to one on Wednesdays is correct.",
+      "file": "hours_changed-05.mp3",
+      "seconds": 3.024
+    },
+    {
+      "index": 6,
+      "role": "assistant",
+      "text": "Thank you, that is very helpful. Have a good afternoon.",
+      "file": "hours_changed-06.mp3",
+      "seconds": 3.696
+    }
+  ],
+  "program_closed": [
+    {
+      "index": 0,
+      "role": "assistant",
+      "text": "Hello, this is an automated assistant calling on behalf of the community resource directory, about the service you run.",
+      "file": "program_closed-00.mp3",
+      "seconds": 6.984
+    },
+    {
+      "index": 1,
+      "role": "provider",
+      "text": "Oh. We are ending that program next month, it closed to new people already.",
+      "file": "program_closed-01.mp3",
+      "seconds": 4.752
+    },
+    {
+      "index": 2,
+      "role": "assistant",
+      "text": "Thank you for telling me. I will not ask you anything else about that, and I will not change your listing. Someone from the directory will be in touch.",
+      "file": "program_closed-02.mp3",
+      "seconds": 7.728
+    },
+    {
+      "index": 3,
+      "role": "provider",
+      "text": "That is fine, thank you.",
+      "file": "program_closed-03.mp3",
+      "seconds": 1.8
+    }
+  ]
+}

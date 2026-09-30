@@ -1,0 +1,19 @@
+{
+  "status": "completed",
+  "task_completed": true,
+  "recipient_masked": "+1555***2834",
+  "completion_confidence": {
+    "score": 0.96,
+    "label": "high"
+  },
+  "evidence": [
+    "Patient confirmed attendance for Tomorrow at 10:30 AM."
+  ],
+  "structured_result": {
+    "will_attend": "yes",
+    "preferred_reschedule_time": null,
+    "cancellation_reason": null,
+    "special_instructions_acknowledged": true
+  },
+  "dry_run": true
+}

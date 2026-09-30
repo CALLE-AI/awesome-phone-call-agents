@@ -1,0 +1,6 @@
+{
+  "outcome": "order_requested",
+  "items": [{ "product_id": "coffee-small", "quantity": 1 }],
+  "delivery_method": "unknown",
+  "customer_confirmed": "unknown"
+}

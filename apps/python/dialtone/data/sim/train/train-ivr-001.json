@@ -1,0 +1,56 @@
+{
+ "id": "train-ivr-001",
+ "label": "ivr",
+ "source": "sim-train",
+ "meta": {
+  "task": "ask for a quote for a brake replacement",
+  "hard": true
+ },
+ "turns": [
+  {
+   "speaker": "user",
+   "text": "Welcome to Parkview Auto Repair. In a few words, tell me what you're calling about. You can say things like appointments, billing, or hours.",
+   "offset_seconds": 0.58
+  },
+  {
+   "speaker": "bot",
+   "text": "Representative.",
+   "offset_seconds": 10.36
+  },
+  {
+   "speaker": "user",
+   "text": "I think you said appointments. Is that right? Say yes or no.",
+   "offset_seconds": 11.48
+  },
+  {
+   "speaker": "bot",
+   "text": "Representative.",
+   "offset_seconds": 16.82
+  },
+  {
+   "speaker": "user",
+   "text": "Okay, billing. Please hold while I transfer you. The current wait time is more than ten minutes.",
+   "offset_seconds": 17.92
+  },
+  {
+   "speaker": "bot",
+   "text": "Representative.",
+   "offset_seconds": 25.11
+  },
+  {
+   "speaker": "user",
+   "text": "I think you said appointments. Is that right? Say yes or no.",
+   "offset_seconds": 26.2
+  },
+  {
+   "speaker": "bot",
+   "text": "Representative.",
+   "offset_seconds": 31.55
+  },
+  {
+   "speaker": "user",
+   "text": "Okay, billing. Please hold while I transfer you. The current wait time is more than ten minutes.",
+   "offset_seconds": 32.63
+  }
+ ]
+}

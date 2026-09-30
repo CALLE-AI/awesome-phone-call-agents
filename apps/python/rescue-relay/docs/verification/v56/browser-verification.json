@@ -1,0 +1,20 @@
+{
+  "version": "5.6.0",
+  "passed": 10,
+  "checks": [
+    "The original assessment-and-feeding goal with conditional transport is accepted as one goal",
+    "The exact IF/ELSE correction preserves ELSE feeding without a forced menu or a saved report",
+    "Selecting is local; Confirm goal saves the full condition and still makes no inquiry",
+    "Find help collects offers for the whole conditional plan; future assessment is not an intake blocker",
+    "Review & approve shows branches and price ceilings; cancellation makes no callback",
+    "Approval accepts conditional contracts; transport and ELSE feeding remain on standby until assessment",
+    "Branch rules, assessment controls and helper cards reflow without horizontal overflow at 320–1440px",
+    "Opening or cancelling an assessment dialog records nothing and leaves both branches pending",
+    "An acknowledged NO result enables feeding only, makes no call and fabricates no completed work",
+    "The unused transport branch has no progress control; the rescue cannot close before actual help finishes"
+  ],
+  "javascript_errors": [],
+  "http_bridge": true,
+  "live_calls": false,
+  "external_model_inference": false
+}

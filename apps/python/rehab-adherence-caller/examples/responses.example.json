@@ -1,0 +1,391 @@
+{
+  "_comment": [
+    "Authored by hand, never captured. SECURITY.md forbids committing call recordings",
+    "and private call transcripts, so fixtures are written from what a clinician says",
+    "these calls sound like. Keyed by patient id.",
+    "Shape mirrors a real terminal call task from GET /v1/calls: the conversation",
+    "lives at recipients[].attempts[].transcript_turns[] with offset_seconds and a",
+    "lowercase speaker, and completion_confidence is an object. Keeping the fixture",
+    "in the real shape is the point -- a fixture in a shape the API does not return",
+    "passes tests while the live path returns nothing."
+  ],
+  "p_ivy": {
+    "status": "COMPLETED",
+    "task_completed": true,
+    "completion_confidence": {
+      "score": 0.94,
+      "label": "high"
+    },
+    "recipients": [
+      {
+        "id": "rcp_p_ivy",
+        "phones": [
+          "<RECIPIENT_E164_PHONE>"
+        ],
+        "locale": "en-AU",
+        "region": "AU",
+        "status": "completed",
+        "structured_result": {
+          "reached_patient": "yes",
+          "continued_after_ai_disclosure": "yes",
+          "attendance_intent": "will_attend",
+          "chosen_slot_id": "s1",
+          "barrier": "work_or_childcare",
+          "symptom_volunteered": "no",
+          "evidence_summary": "Said last week clashed with a shift and Thursday afternoon works.",
+          "concession_offered": "none",
+          "concession_accepted": "not_offered"
+        },
+        "attempts": [
+          {
+            "id": "att_p_ivy",
+            "status": "completed",
+            "transcript_turns": [
+              {
+                "offset_seconds": 0,
+                "speaker": "bot",
+                "text": "Hello, this is an automated assistant calling on behalf of Riverbank Physiotherapy. Your reference is RBP-CE9F41. If you would rather check this is genuine, hang up and ring the clinic on the number published on their website, and quote that reference."
+              },
+              {
+                "offset_seconds": 7,
+                "speaker": "user",
+                "text": "No, that's fine, I know who you are."
+              },
+              {
+                "offset_seconds": 14,
+                "speaker": "bot",
+                "text": "Thank you. Ivy missed a session last week and the clinic has kept her place. I can offer Thursday the thirteenth at two in the afternoon, or Tuesday the eighteenth at half past nine."
+              },
+              {
+                "offset_seconds": 21,
+                "speaker": "user",
+                "text": "Thursday afternoon is good. Last week clashed with a shift."
+              },
+              {
+                "offset_seconds": 28,
+                "speaker": "bot",
+                "text": "Thursday the thirteenth at two, booked. Please bring shorts and your exercise sheet. Thank you."
+              }
+            ],
+            "failure_code": null,
+            "failure_message": null
+          }
+        ]
+      }
+    ],
+    "structured_result": {
+      "reached_patient": "yes",
+      "continued_after_ai_disclosure": "yes",
+      "attendance_intent": "will_attend",
+      "chosen_slot_id": "s1",
+      "barrier": "work_or_childcare",
+      "symptom_volunteered": "no",
+      "evidence_summary": "Said last week clashed with a shift and Thursday afternoon works.",
+      "concession_offered": "none",
+      "concession_accepted": "not_offered"
+    },
+    "evidence": []
+  },
+  "p_omar": {
+    "status": "COMPLETED",
+    "task_completed": true,
+    "completion_confidence": {
+      "score": 0.88,
+      "label": "high"
+    },
+    "recipients": [
+      {
+        "id": "rcp_p_omar",
+        "phones": [
+          "<RECIPIENT_E164_PHONE>"
+        ],
+        "locale": "en-AU",
+        "region": "AU",
+        "status": "completed",
+        "structured_result": {
+          "reached_patient": "yes",
+          "continued_after_ai_disclosure": "yes",
+          "attendance_intent": "will_attend",
+          "chosen_slot_id": "s2",
+          "barrier": "transport",
+          "symptom_volunteered": "no",
+          "evidence_summary": "No bus since the route changed. Accepted a taxi voucher and took the Tuesday morning slot.",
+          "concession_offered": "taxi_voucher",
+          "concession_accepted": "yes"
+        },
+        "attempts": [
+          {
+            "id": "att_p_omar",
+            "status": "completed",
+            "transcript_turns": [
+              {
+                "offset_seconds": 0,
+                "speaker": "bot",
+                "text": "Hello, this is an automated assistant calling on behalf of Riverbank Physiotherapy, reference RBP-2A7D08."
+              },
+              {
+                "offset_seconds": 7,
+                "speaker": "user",
+                "text": "Right, okay."
+              },
+              {
+                "offset_seconds": 14,
+                "speaker": "bot",
+                "text": "Omar missed a session recently. Can I ask what is making it hard to get to the clinic?"
+              },
+              {
+                "offset_seconds": 21,
+                "speaker": "user",
+                "text": "There's no bus any more since they changed the route. I've got no way of getting there."
+              },
+              {
+                "offset_seconds": 28,
+                "speaker": "bot",
+                "text": "Thank you, I have noted that transport is the difficulty. I can offer Thursday the thirteenth at two, or Tuesday the eighteenth at half past nine. Would either work?"
+              },
+              {
+                "offset_seconds": 35,
+                "speaker": "user",
+                "text": "Neither, really. It's not the time, it's getting there at all."
+              },
+              {
+                "offset_seconds": 42,
+                "speaker": "bot",
+                "text": "I understand, the journey is the problem rather than the time. The clinic can arrange a taxi voucher for each session. Would that help?"
+              },
+              {
+                "offset_seconds": 50,
+                "speaker": "user",
+                "text": "Oh \u2014 yes, that would actually make a difference."
+              },
+              {
+                "offset_seconds": 56,
+                "speaker": "bot",
+                "text": "Then I will book Tuesday the eighteenth at half past nine and arrange the voucher. Please bring shorts and your exercise sheet."
+              }
+            ],
+            "failure_code": null,
+            "failure_message": null
+          }
+        ]
+      }
+    ],
+    "structured_result": {
+      "reached_patient": "yes",
+      "continued_after_ai_disclosure": "yes",
+      "attendance_intent": "will_attend",
+      "chosen_slot_id": "s2",
+      "barrier": "transport",
+      "symptom_volunteered": "no",
+      "evidence_summary": "No bus since the route changed. Accepted a taxi voucher and took the Tuesday morning slot.",
+      "concession_offered": "taxi_voucher",
+      "concession_accepted": "yes"
+    },
+    "evidence": []
+  },
+  "p_rosa": {
+    "status": "COMPLETED",
+    "task_completed": false,
+    "completion_confidence": {
+      "score": 0.71,
+      "label": "medium"
+    },
+    "recipients": [
+      {
+        "id": "rcp_p_rosa",
+        "phones": [
+          "<RECIPIENT_E164_PHONE>"
+        ],
+        "locale": "en-AU",
+        "region": "AU",
+        "status": "completed",
+        "structured_result": {
+          "reached_patient": "yes",
+          "continued_after_ai_disclosure": "yes",
+          "attendance_intent": "undecided",
+          "chosen_slot_id": "unknown",
+          "barrier": "health_concern",
+          "symptom_volunteered": "yes",
+          "evidence_summary": "Raised a health concern unprompted. Not assessed, not discussed, call ended politely.",
+          "concession_offered": "none",
+          "concession_accepted": "not_offered"
+        },
+        "attempts": [
+          {
+            "id": "att_p_rosa",
+            "status": "completed",
+            "transcript_turns": [
+              {
+                "offset_seconds": 0,
+                "speaker": "bot",
+                "text": "Hello, this is an automated assistant calling on behalf of Riverbank Physiotherapy, reference RBP-646B83."
+              },
+              {
+                "offset_seconds": 7,
+                "speaker": "user",
+                "text": "Yes, hello."
+              },
+              {
+                "offset_seconds": 14,
+                "speaker": "bot",
+                "text": "Rosa has missed some sessions recently. Can I ask what is making it hard to attend?"
+              },
+              {
+                "offset_seconds": 21,
+                "speaker": "user",
+                "text": "Honestly I've been having a bit of tightness in my chest when I walk up the hill to the clinic. Is that normal at this stage?"
+              },
+              {
+                "offset_seconds": 28,
+                "speaker": "bot",
+                "text": "I am not able to advise on that, and I will not try. I am going to ask a clinician to call you back today rather than book anything now. Thank you for telling me."
+              },
+              {
+                "offset_seconds": 35,
+                "speaker": "user",
+                "text": "Alright, thank you."
+              },
+              {
+                "offset_seconds": 42,
+                "speaker": "bot",
+                "text": "Someone will be in touch. Goodbye."
+              }
+            ],
+            "failure_code": null,
+            "failure_message": null
+          }
+        ]
+      }
+    ],
+    "structured_result": {
+      "reached_patient": "yes",
+      "continued_after_ai_disclosure": "yes",
+      "attendance_intent": "undecided",
+      "chosen_slot_id": "unknown",
+      "barrier": "health_concern",
+      "symptom_volunteered": "yes",
+      "evidence_summary": "Raised a health concern unprompted. Not assessed, not discussed, call ended politely.",
+      "concession_offered": "none",
+      "concession_accepted": "not_offered"
+    },
+    "evidence": []
+  },
+  "p_wu": {
+    "status": "VOICEMAIL",
+    "task_completed": false,
+    "completion_confidence": {
+      "score": 0.0,
+      "label": "low"
+    },
+    "recipients": [
+      {
+        "id": "rcp_p_wu",
+        "phones": [
+          "<RECIPIENT_E164_PHONE>"
+        ],
+        "locale": "en-AU",
+        "region": "AU",
+        "status": "voicemail",
+        "structured_result": null,
+        "attempts": [
+          {
+            "id": "att_p_wu",
+            "status": "voicemail",
+            "transcript_turns": [],
+            "failure_code": null,
+            "failure_message": null
+          }
+        ]
+      }
+    ],
+    "structured_result": null,
+    "evidence": []
+  },
+  "p_kai": {
+    "status": "COMPLETED",
+    "task_completed": true,
+    "completion_confidence": {
+      "score": 0.91,
+      "label": "high"
+    },
+    "recipients": [
+      {
+        "id": "rcp_p_kai",
+        "phones": [
+          "<RECIPIENT_E164_PHONE>"
+        ],
+        "locale": "en-AU",
+        "region": "AU",
+        "status": "completed",
+        "structured_result": {
+          "reached_patient": "yes",
+          "continued_after_ai_disclosure": "yes",
+          "attendance_intent": "considers_course_finished",
+          "chosen_slot_id": "none",
+          "barrier": "feels_better",
+          "symptom_volunteered": "no",
+          "evidence_summary": "Considers the course done and would like that confirmed by a person.",
+          "concession_offered": "none",
+          "concession_accepted": "not_offered"
+        },
+        "attempts": [
+          {
+            "id": "att_p_kai",
+            "status": "completed",
+            "transcript_turns": [
+              {
+                "offset_seconds": 0,
+                "speaker": "bot",
+                "text": "Hello, this is an automated assistant calling on behalf of Riverbank Physiotherapy, reference RBP-9C21B7."
+              },
+              {
+                "offset_seconds": 7,
+                "speaker": "user",
+                "text": "Hello."
+              },
+              {
+                "offset_seconds": 14,
+                "speaker": "bot",
+                "text": "A previous call recorded that Kai stopped attending because things had improved. I am not calling to book anything. Does Kai consider the course finished?"
+              },
+              {
+                "offset_seconds": 21,
+                "speaker": "user",
+                "text": "Yes, I think so. It sorted itself out."
+              },
+              {
+                "offset_seconds": 28,
+                "speaker": "bot",
+                "text": "Thank you. Would you like a clinician to confirm that with you, so it is recorded properly?"
+              },
+              {
+                "offset_seconds": 35,
+                "speaker": "user",
+                "text": "That would be good, yes."
+              },
+              {
+                "offset_seconds": 42,
+                "speaker": "bot",
+                "text": "I will arrange that. Goodbye."
+              }
+            ],
+            "failure_code": null,
+            "failure_message": null
+          }
+        ]
+      }
+    ],
+    "structured_result": {
+      "reached_patient": "yes",
+      "continued_after_ai_disclosure": "yes",
+      "attendance_intent": "considers_course_finished",
+      "chosen_slot_id": "none",
+      "barrier": "feels_better",
+      "symptom_volunteered": "no",
+      "evidence_summary": "Considers the course done and would like that confirmed by a person.",
+      "concession_offered": "none",
+      "concession_accepted": "not_offered"
+    },
+    "evidence": []
+  }
+}

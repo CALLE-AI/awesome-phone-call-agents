@@ -1,0 +1,12 @@
+{
+  "extends": "../../tsconfig.base.json",
+  "compilerOptions": {
+    "lib": ["ES2024", "DOM"],
+    "rootDir": ".",
+    "outDir": "../../.build/tools/openapi",
+    "tsBuildInfoFile": "../../.build/tools/openapi/.tsbuildinfo",
+    "types": ["node", "vitest"],
+    "skipLibCheck": true
+  },
+  "include": ["*.ts"]
+}

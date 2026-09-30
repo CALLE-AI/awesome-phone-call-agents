@@ -325,7 +325,8 @@ class TestVerify:
 
     def test_it_says_when_everything_is_closed(self, project: Path) -> None:
         result = runner.invoke(app, ["verify"])
-        assert "now closed" in result.output
+        assert "All modelled findings are closed" in result.output
+        assert "evidence: static (declared policy model)" in result.output
 
     def test_verification_does_not_modify_the_config(self, project: Path) -> None:
         original = (project / "redline.yaml").read_text("utf-8")

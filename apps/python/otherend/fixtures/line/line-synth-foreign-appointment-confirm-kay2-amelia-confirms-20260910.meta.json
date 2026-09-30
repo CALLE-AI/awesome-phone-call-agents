@@ -1,0 +1,7 @@
+{
+  "stem": "line-synth-foreign-appointment-confirm-kay2-amelia-confirms-20260910",
+  "kind": "synthetic",
+  "scenario_id": "foreign-appointment-confirm",
+  "target_id": "callee:kay2-amelia-confirms",
+  "note": "SYNTHETIC - in-process text simulation; no phone call, no CALL-E, no platform identifiers. Names are fictional."
+}

@@ -1,0 +1,18 @@
+{
+  "passed": 11,
+  "checks": [
+    "Bundled demo decodes as 1600 × 900 video in Chromium",
+    "Product demo media is under three minutes",
+    "Player does not auto-start the demo",
+    "Bundled video loads without a player error",
+    "Chapter click seeks and plays the actual MP4",
+    "Current chapter follows actual media playback",
+    "Full tutorial decodes with the expected complete duration",
+    "Switching to the tutorial does not autoplay it",
+    "Last tutorial chapter is seekable",
+    "Video player has no horizontal overflow on a phone-sized screen",
+    "Video playback and switching produce no JavaScript page errors"
+  ],
+  "javascript_errors": [],
+  "http_bridge": true
+}

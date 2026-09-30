@@ -1,0 +1,34 @@
+{
+  "fixture_version": 2,
+  "captured_at": "2026-09-10T21:36:11Z",
+  "source": "Live CALL-E MCP run against the official hackathon test hotline",
+  "run_id": "rHM-HeX8luVltZHgoWmsaA",
+  "call_id": "4bbd2c4d5b284577b2d10fdb5f382b7d",
+  "status": "COMPLETED",
+  "claim": "The verification call successfully reached the test endpoint",
+  "verdict": "UNRESOLVED",
+  "task_completed": true,
+  "completion_confidence": {
+    "score": 0.9,
+    "label": "high"
+  },
+  "authority_status": "non_authoritative",
+  "evidence_quality": "insufficient",
+  "qualifier": "The hotline could identify itself as the general inbound test hotline, but could not attest that this call reached a specific test endpoint.",
+  "summary": "The hotline did not confirm that the verification call successfully reached a specific test endpoint. It confirmed that the accurate report is that the hotline cannot confirm whether the statement is true.",
+  "evidence": [
+    "A live hotline agent answered and identified the line as a general inbound CALL-E/Collie test hotline.",
+    "The hotline said it could not confirm whether the verification call reached a specific test endpoint.",
+    "The hotline agreed that reporting it cannot confirm the statement is the right phrasing."
+  ],
+  "transcript": [
+    {"offset_seconds": 0, "speaker": "BOT", "text": "Hi, is this the official CALL-E test hotline?"},
+    {"offset_seconds": 11, "speaker": "USER", "text": "Thanks for calling. How can I help you today? I'm Collie, the AI based agent answering this hotline. If you wanna learn more, it's hey collie.com."},
+    {"offset_seconds": 12, "speaker": "BOT", "text": "I'm calling for CallProof to ask: is the statement, 'the verification call successfully reached the test endpoint,' true?"},
+    {"offset_seconds": 25, "speaker": "USER", "text": "I'm not sure I can confirm that from here. What exact proof or log details are you looking for?"},
+    {"offset_seconds": 26, "speaker": "BOT", "text": "Could you please state the relevant information?"},
+    {"offset_seconds": 40, "speaker": "USER", "text": "I can say that I'm Collie, an AI voice agent on a general inbound test hotline. But I can't confirm whether a verification call successfully reached a specific test endpoint."},
+    {"offset_seconds": 42, "speaker": "BOT", "text": "So I should report that the hotline can't confirm whether the statement is true."},
+    {"offset_seconds": 51, "speaker": "USER", "text": "Yes. That's the right way to phrase it."}
+  ]
+}

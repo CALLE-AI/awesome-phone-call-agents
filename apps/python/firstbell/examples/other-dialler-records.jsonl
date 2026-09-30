@@ -1,0 +1,9 @@
+# Call records in the shape tools/adopt_call_records.py reads, standing in for the export of
+# a dialler a district already owns. Six rows, chosen because each lands somewhere different.
+# Nothing here was dialled by this software and no line is a record of a real call.
+{"id": "S-2001", "numbers": ["+15550000101"], "answered": true, "consent_record": "CR-2001", "result": {"reason_category": "illness", "expected_return": "tomorrow", "parent_confirmed_aware": "yes", "spoke_with": "guardian"}}
+{"id": "S-2002", "numbers": ["+15550000102"], "answered": true, "consent_record": "CR-2002", "result": {"reason_category": "illness", "expected_return": "today", "parent_confirmed_aware": "yes", "spoke_with": "child"}}
+{"id": "S-2003", "numbers": ["+15550000103"], "answered": true, "consent_record": "CR-2003", "result": {"reason_category": "unknown", "expected_return": "unknown", "parent_confirmed_aware": "unknown", "spoke_with": "unknown"}}
+{"id": "S-2004", "numbers": ["+15550000104"], "answered": true, "consent_record": "CR-2004", "transcript": "Agent: Good morning, I am calling from the attendance office about Ravi. Parent: Oh yes, he is at home with me today, he had a temperature overnight so I kept him back. He should be in tomorrow."}
+{"id": "S-2005", "numbers": ["+15550000105"], "answered": true, "result": {"reason_category": "transport", "expected_return": "today", "parent_confirmed_aware": "yes", "spoke_with": "guardian"}}
+{"id": "S-2006", "numbers": ["+15550000106"], "answered": false, "consent_record": "CR-2006", "result": {"reason_category": "unknown", "expected_return": "unknown", "spoke_with": "voicemail"}}

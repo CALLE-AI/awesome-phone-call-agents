@@ -1,0 +1,354 @@
+<!doctype html>
+<html lang="en" x-data="app()" x-init="init()">
+<head>
+<meta charset="utf-8">
+<title>Fictional National Bank -- Send Money</title>
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<script defer src="https://cdn.jsdelivr.net/npm/alpinejs@3/dist/cdn.min.js"></script>
+<style>
+  :root { color-scheme: light; }
+  * { box-sizing: border-box; }
+  [x-cloak] { display: none !important; }
+  body {
+    font-family: -apple-system, system-ui, "Segoe UI", sans-serif;
+    max-width: 560px; margin: 2rem auto; padding: 0 1rem;
+    background: #f6f8fa; color: #1f2328;
+  }
+  .icon { width: 1.1em; height: 1.1em; vertical-align: -0.2em; flex-shrink: 0; }
+  .banner {
+    background: #1a3a5c; color: #fff; padding: 1rem 1.25rem; border-radius: 10px;
+    margin-bottom: 1rem; display: flex; align-items: center; justify-content: space-between; gap: 0.5rem;
+  }
+  .banner h1 { font-size: 1.1rem; margin: 0; display: flex; align-items: center; gap: 0.5rem; }
+  .sim-tag {
+    background: #ffd54a; color: #1f2328; font-weight: 700; font-size: 0.7rem;
+    padding: 0.2rem 0.6rem; border-radius: 999px; letter-spacing: 0.05em;
+  }
+  .card {
+    background: #fff; border: 1px solid #d0d7de; border-radius: 10px;
+    padding: 1.25rem; margin-bottom: 1rem; position: relative;
+  }
+  .card-header { display: flex; align-items: center; justify-content: space-between; }
+  .card-header h2 { margin: 0; }
+  .info-btn {
+    width: 1.8rem; height: 1.8rem; border-radius: 50%; border: 1px solid #d0d7de;
+    background: #f6f8fa; color: #57606a; cursor: pointer; display: flex;
+    align-items: center; justify-content: center; padding: 0; margin: 0; flex: none;
+  }
+  .info-popover {
+    position: absolute; top: 3.2rem; right: 1.25rem; z-index: 10;
+    width: 280px; max-width: calc(100vw - 2.5rem);
+    background: #1f2328; color: #fff; padding: 0.9rem 1rem; border-radius: 8px;
+    font-size: 0.8rem; line-height: 1.45; box-shadow: 0 8px 24px rgba(0,0,0,0.25);
+  }
+  @media (max-width: 480px) {
+    body { margin: 1rem auto; padding: 0 0.75rem; }
+    .card { padding: 1rem; }
+  }
+  label { display: block; font-size: 0.85rem; font-weight: 600; margin: 0.75rem 0 0.25rem; }
+  input, select {
+    width: 100%; padding: 0.55rem 0.7rem; border: 1px solid #d0d7de; border-radius: 6px;
+    font-size: 0.95rem; font-family: inherit;
+  }
+  button {
+    margin-top: 1.25rem; width: 100%; padding: 0.75rem; font-size: 1rem; font-weight: 600;
+    background: #1a3a5c; color: #fff; border: none; border-radius: 8px; cursor: pointer;
+  }
+  button:disabled { background: #9aa5b1; cursor: not-allowed; }
+  button.secondary { background: #eaeef2; color: #1f2328; }
+  .spinner {
+    width: 1.1em; height: 1.1em; border: 2px solid #d0d7de; border-top-color: #1a3a5c;
+    border-radius: 50%; display: inline-block; animation: spin 0.8s linear infinite;
+    vertical-align: -0.2em; margin-right: 0.5em;
+  }
+  @keyframes spin { to { transform: rotate(360deg); } }
+  .badge {
+    display: inline-flex; align-items: center; gap: 0.3em; padding: 0.25em 0.75em; border-radius: 999px;
+    color: #fff; font-weight: 700; font-size: 0.85rem;
+  }
+  .step { color: #57606a; font-size: 0.9rem; margin: 0.4rem 0; display: flex; align-items: center; gap: 0.4em; }
+  .step.done { color: #1a7f37; }
+  .bank-link-row { text-align: center; margin-top: 1rem; }
+  a.bank-link { font-size: 0.85rem; color: #1a3a5c; }
+  .hist-row { display: flex; align-items: center; gap: 0.6rem; padding: 0.6rem 0; border-bottom: 1px solid #eaeef2; font-size: 0.85rem; }
+  .hist-row:last-child { border-bottom: none; }
+  .hist-main { flex: 1; min-width: 0; }
+  .hist-title { font-weight: 600; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .hist-meta { color: #57606a; font-size: 0.78rem; }
+  .empty { color: #57606a; font-size: 0.85rem; text-align: center; padding: 1rem 0; }
+  .tabs { display: flex; gap: 0.25rem; margin-bottom: 1rem; background: #eaeef2; border-radius: 8px; padding: 0.25rem; }
+  .tab {
+    flex: 1; width: auto; margin: 0; text-align: center; padding: 0.5rem 0.75rem; border-radius: 6px;
+    font-size: 0.85rem; font-weight: 600; color: #57606a; cursor: pointer; display: flex;
+    align-items: center; justify-content: center; gap: 0.4em; border: none; background: transparent;
+  }
+  .tab.active { background: #fff; color: #1a3a5c; box-shadow: 0 1px 3px rgba(0,0,0,0.1); }
+</style>
+</head>
+<body>
+
+<div class="banner">
+  <h1 x-html="ICONS.landmark + ' Fictional National Bank'"></h1>
+  <span class="sim-tag">DEMO</span>
+</div>
+
+<div class="tabs">
+  <button class="tab" :class="{ active: activeTab === 'send' }" @click="activeTab = 'send'" x-html="ICONS.landmark + ' Send Money'"></button>
+  <button class="tab" :class="{ active: activeTab === 'history' }" @click="activeTab = 'history'" x-html="ICONS.history + ' History'"></button>
+</div>
+
+<div class="card" x-show="activeTab === 'send' && view === 'form'" x-cloak>
+  <div class="card-header">
+    <h2>Send Money</h2>
+    <button class="info-btn" @click="showInfo = !showInfo" aria-label="How this demo works" x-html="ICONS.info"></button>
+  </div>
+  <div class="info-popover" x-show="showInfo" x-cloak @click.outside="showInfo = false">
+    Whether this transaction needs an independent verification call is
+    decided automatically by the bank on submission &mdash; never by you.
+    Small transactions go straight through; larger ones run a verification
+    call before a recommendation comes back. This demo never places a real
+    call and never asks for a phone number: it replays a recorded call
+    through the real decision engine. Whatever comes back is a
+    recommendation for a fraud analyst, not a decision about your money.
+  </div>
+
+  <label for="account_holder_name">Your name</label>
+  <input id="account_holder_name" x-model="form.account_holder_name">
+
+  <label for="claimed_recipient">Sending to</label>
+  <input id="claimed_recipient" x-model="form.claimed_recipient">
+
+  <label for="claimed_transaction_amount">Amount (USD)</label>
+  <input id="claimed_transaction_amount" x-model="form.claimed_transaction_amount">
+
+  <label for="claimed_payment_method">Payment method</label>
+  <select id="claimed_payment_method" x-model="form.claimed_payment_method">
+    <option value="wire">Wire transfer</option>
+    <option value="ach_transfer">ACH transfer</option>
+    <option value="gift_card">Gift card</option>
+    <option value="cryptocurrency">Cryptocurrency</option>
+    <option value="check">Check</option>
+  </select>
+
+
+  <button @click="submit()" :disabled="submitting" x-text="submitting ? 'Submitting…' : 'Send Money'"></button>
+</div>
+
+<div class="card" x-show="activeTab === 'send' && view !== 'form'" x-cloak>
+  <h2 style="margin-top:0;">Transaction status</h2>
+  <div class="step done" x-html="ICONS.check + ' Transaction submitted'"></div>
+  <div class="step" :class="{ done: view === 'resolved' }" x-show="view === 'pending' || view === 'resolved'">
+    <span x-show="view === 'pending'"><span class="spinner"></span> Your bank is reviewing this transaction&hellip;</span>
+    <span x-show="view === 'resolved'" x-html="ICONS.check + ' Verification complete'"></span>
+  </div>
+
+  <template x-if="view === 'resolved' && record">
+    <div style="margin-top:1rem;">
+      <span class="badge" :style="`background:${dispositionColor()}`">
+        <span x-html="dispositionIcon()"></span>
+        <span x-text="record.disposition"></span>
+      </span>
+      <p style="margin-top:0.75rem;" x-text="dispositionText()"></p>
+      <p class="hist-meta">Reasons: <span x-text="(record.disposition_reasons || []).join(', ') || 'none'"></span></p>
+      <template x-if="record.requires_human_review">
+        <p class="hist-meta">Recommendation only &mdash; a person at your bank makes the final decision on this transaction.</p>
+      </template>
+      <button class="secondary" @click="reset()">Start a new transaction</button>
+    </div>
+  </template>
+</div>
+
+<div class="card" x-show="activeTab === 'history'" x-cloak>
+  <h2 style="margin-top:0; display:flex; align-items:center; gap:0.4em;" x-html="ICONS.history + ' Your transaction history'"></h2>
+  <template x-if="history.length === 0">
+    <p class="empty">No transactions yet.</p>
+  </template>
+  <template x-for="item in history" :key="item.id">
+    <div class="hist-row">
+      <span x-html="categoryIcon(item.category)"></span>
+      <div class="hist-main">
+        <div class="hist-title" x-text="`${item.claimed_recipient} — $${item.claimed_transaction_amount}`"></div>
+        <div class="hist-meta" x-text="formatWhen(item.submitted_at)"></div>
+      </div>
+      <template x-if="item.status === 'resolved'">
+        <span class="badge" :style="`background:${DISPOSITION_COLORS[item.disposition] || '#57606a'}`" x-text="item.disposition"></span>
+      </template>
+      <template x-if="item.status !== 'resolved'">
+        <span class="spinner"></span>
+      </template>
+    </div>
+  </template>
+</div>
+
+<div class="bank-link-row">
+  <a class="bank-link" href="/bank" target="_blank">Open the bank fraud-ops dashboard</a>
+</div>
+
+<script>
+const STORAGE_KEY = "ringfence_demo_case_id";
+const HISTORY_KEY = "ringfence_demo_history";
+const MAX_HISTORY = 25;
+
+const DISPOSITION_COLORS = {
+  NO_VERIFICATION_REQUIRED: "#1a7f37",
+  ADVISE_ALLOW: "#1a7f37",
+  ESCALATE_TO_HUMAN: "#9a6700",
+  ADVISE_BLOCK: "#cf222e",
+};
+// Every one of these is a recommendation awaiting a human at the bank --
+// the wording never claims the transfer has been released or stopped,
+// because this tool does not do either.
+const DISPOSITION_TEXT = {
+  NO_VERIFICATION_REQUIRED: "No verification call needed — below your bank's verification threshold.",
+  ADVISE_ALLOW: "No red flags found in the verification call. Recommended to proceed, pending your bank's review.",
+  ADVISE_BLOCK: "Red flags found in the verification call. Recommended to hold, pending your bank's review.",
+  ESCALATE_TO_HUMAN: "The verification call could not establish enough either way. Sent to your bank's fraud team to review.",
+};
+
+// Small, hand-built icon set (24x24 stroke icons, currentColor) -- no
+// icon-font or JS library dependency, no extra network request.
+const ICONS = {
+  landmark: `<svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="3 10 12 4 21 10"/><line x1="3" y1="10" x2="21" y2="10"/><line x1="5" y1="10" x2="5" y2="19"/><line x1="10" y1="10" x2="10" y2="19"/><line x1="14" y1="10" x2="14" y2="19"/><line x1="19" y1="10" x2="19" y2="19"/><line x1="3" y1="21" x2="21" y2="21"/></svg>`,
+  info: `<svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"/><line x1="12" y1="11" x2="12" y2="16"/><circle cx="12" cy="7.5" r="0.5" fill="currentColor" stroke="none"/></svg>`,
+  check: `<svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"/><polyline points="8 12.5 11 15.5 16 9"/></svg>`,
+  alertTriangle: `<svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3 L22 20 L2 20 Z"/><line x1="12" y1="9" x2="12" y2="14"/><circle cx="12" cy="17" r="0.5" fill="currentColor" stroke="none"/></svg>`,
+  helpCircle: `<svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"/><path d="M9.5 9.2a2.5 2.5 0 0 1 4.9.8c0 1.7-2.4 2-2.4 3.5"/><circle cx="12" cy="17" r="0.5" fill="currentColor" stroke="none"/></svg>`,
+  dot: `<svg class="icon" viewBox="0 0 24 24"><circle cx="12" cy="12" r="7" fill="currentColor"/></svg>`,
+  list: `<svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="5" y="3" width="14" height="18" rx="2"/><line x1="8" y1="8" x2="16" y2="8"/><line x1="8" y1="12" x2="16" y2="12"/><line x1="8" y1="16" x2="13" y2="16"/></svg>`,
+  history: `<svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"/><polyline points="12 7 12 12 16 14"/></svg>`,
+  arrowRight: `<svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="5" y1="12" x2="19" y2="12"/><polyline points="13 6 19 12 13 18"/></svg>`,
+};
+
+const CATEGORY_ICONS = {
+  scam_pattern: ICONS.alertTriangle,
+  clean_legitimate: ICONS.check,
+  escalation_case: ICONS.helpCircle,
+  no_verification_required: ICONS.check,
+};
+
+function app() {
+  return {
+    ICONS,
+    DISPOSITION_COLORS,
+    activeTab: "send", // "send" | "history"
+    view: "form", // "form" | "pending" | "resolved"
+    submitting: false,
+    showInfo: false,
+    record: null,
+    history: [],
+    form: {
+      account_holder_name: "Jordan Rivera",
+      claimed_recipient: "Alex Chen",
+      claimed_transaction_amount: "4500.00",
+      claimed_payment_method: "wire",
+    },
+
+    async init() {
+      await this.refreshHistory();
+      const savedId = localStorage.getItem(STORAGE_KEY);
+      if (!savedId) return;
+      const res = await fetch(`/api/demo/cases/${savedId}`);
+      if (!res.ok) { localStorage.removeItem(STORAGE_KEY); return; }
+      const record = await res.json();
+      this.record = record;
+      if (record.status === "resolved") {
+        this.view = "resolved";
+      } else {
+        this.view = "pending";
+        this.poll(savedId);
+      }
+    },
+
+    async submit() {
+      this.submitting = true;
+      let res, record;
+      try {
+        res = await fetch("/api/demo/cases", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(this.form),
+        });
+        record = await res.json();
+      } finally {
+        this.submitting = false;
+      }
+      if (!res.ok) { alert("Error: " + JSON.stringify(record)); return; }
+
+      this.record = record;
+      localStorage.setItem(STORAGE_KEY, record.id);
+      this.addToHistory(record.id);
+      await this.refreshHistory();
+      if (record.status === "resolved") {
+        this.view = "resolved";
+      } else {
+        this.view = "pending";
+        this.poll(record.id);
+      }
+    },
+
+    poll(caseId) {
+      setTimeout(async () => {
+        const res = await fetch(`/api/demo/cases/${caseId}`);
+        const record = await res.json();
+        this.record = record;
+        if (record.status === "resolved") {
+          this.view = "resolved";
+          this.refreshHistory();
+        } else {
+          this.poll(caseId);
+        }
+      }, 700);
+    },
+
+    reset() {
+      localStorage.removeItem(STORAGE_KEY);
+      this.record = null;
+      this.view = "form";
+    },
+
+    addToHistory(caseId) {
+      let ids = [];
+      try { ids = JSON.parse(localStorage.getItem(HISTORY_KEY)) || []; } catch { ids = []; }
+      ids = [caseId, ...ids.filter(id => id !== caseId)].slice(0, MAX_HISTORY);
+      localStorage.setItem(HISTORY_KEY, JSON.stringify(ids));
+    },
+
+    async refreshHistory() {
+      let ids = [];
+      try { ids = JSON.parse(localStorage.getItem(HISTORY_KEY)) || []; } catch { ids = []; }
+      if (!ids.length) { this.history = []; return; }
+      const res = await fetch("/api/demo/cases");
+      if (!res.ok) return;
+      const data = await res.json();
+      const byId = Object.fromEntries(data.cases.map(c => [c.id, c]));
+      this.history = ids.map(id => byId[id]).filter(Boolean);
+    },
+
+    categoryIcon(category) {
+      return CATEGORY_ICONS[category] || ICONS.list;
+    },
+    dispositionIcon() {
+      const map = {
+        NO_VERIFICATION_REQUIRED: ICONS.check,
+        ADVISE_ALLOW: ICONS.check,
+        ADVISE_BLOCK: ICONS.alertTriangle,
+        ESCALATE_TO_HUMAN: ICONS.helpCircle,
+      };
+      return map[this.record?.disposition] || "";
+    },
+    dispositionColor() {
+      return DISPOSITION_COLORS[this.record?.disposition] || "#57606a";
+    },
+    dispositionText() {
+      return DISPOSITION_TEXT[this.record?.disposition] || this.record?.disposition;
+    },
+    formatWhen(unixSeconds) {
+      if (!unixSeconds) return "";
+      return new Date(unixSeconds * 1000).toLocaleString();
+    },
+  };
+}
+</script>
+
+</body>
+</html>

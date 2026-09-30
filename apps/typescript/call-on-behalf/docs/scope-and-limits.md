@@ -211,9 +211,8 @@ the next step says not to.
 
 A call CALL-E has not finished with lands in the same place. Only a terminal status
 is read as a result: `completed`, `failed` or `canceled`, which is every terminal
-value in the SDK's own `CallStatus`. A no answer or a voicemail arrives as `failed`
-with a failure code or as a completed call whose transcript is a machine, so neither
-needs a status of its own. A call that is still `queued` or `in_progress` when the timeout runs
+value in the SDK's own `CallStatus`. No-answer and voicemail are not separate
+documented call statuses. A call that is still `queued` or `in_progress` when the timeout runs
 out has a transcript that is still being written, so the app reports
 `outcome_unknown` with `call_status` unknown and the call id kept. It states no
 verdict, no commitment and no privacy finding. Reading a call in flight as a result
@@ -229,9 +228,12 @@ the slot was held carries the whole errand: the questions, the answers and the
 agreement. That status is not read as nobody having answered. What was said comes
 from the transcript and the notes name the status as `call_failed` or
 `call_canceled` with the failure code beside it. The outcome is never `goal_met`,
-because a call that ended early may have been cut off partway through. A call with
-nobody on its transcript is still read from its failure code, which is where
-`voicemail` and `not_reached` come from.
+because a call that ended early may have been cut off partway through. Transcript
+evidence of a machine produces `voicemail` for any terminal status. Without person
+or machine evidence, a failed or canceled call produces the generic `call_failed`;
+a completed call produces `not_reached`. The Calls API's `failureCode` is
+[diagnostic context without a published enum](https://docs.heycall-e.com/errors#accepted-call-execution-outcomes),
+so its words or numbers never decide the outcome or establish why nobody answered.
 
 ## Who you may call
 

@@ -1,0 +1,28 @@
+[project]
+name = "otherend"
+version = "0.1.0"
+description = "Task pre-flight for CALL-E: rehearse a task against a programmable receptionist line you own, then grade what CALL-E reported against what the receptionist actually said."
+readme = "README.md"
+requires-python = ">=3.11"
+license = "MIT"
+dependencies = [
+  "voxprobe[calle]>=0.2.2",
+]
+
+[project.scripts]
+otherend = "otherend:main"
+
+[dependency-groups]
+dev = [
+  "pytest>=8,<9",
+]
+
+[build-system]
+requires = ["setuptools>=68"]
+build-backend = "setuptools.build_meta"
+
+[tool.setuptools]
+py-modules = ["otherend"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]

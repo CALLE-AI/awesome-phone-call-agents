@@ -1,0 +1,16 @@
+[project]
+name = "afterword"
+version = "0.1.0"
+description = "Death notification to institutions: captures what each requires, records contradictions, and closes nothing."
+requires-python = ">=3.10"
+dependencies = []
+
+[project.scripts]
+afterword = "afterword.cli:main"
+
+[build-system]
+requires = ["setuptools>=68"]
+build-backend = "setuptools.build_meta"
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]

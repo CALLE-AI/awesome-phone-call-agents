@@ -1,0 +1,18 @@
+{
+  "fixtureVersion": 1,
+  "sanitization": {
+    "manuallyReviewed": true,
+    "containsRawTranscript": false,
+    "containsRecordingUrl": false,
+    "containsRealPhoneNumber": false
+  },
+  "call": {
+    "id": "sanitized-pass",
+    "status": "completed"
+  },
+  "evaluation": {
+    "verdict": "pass",
+    "confidence": 0.96,
+    "summary": "The required outbound reminder behavior was satisfied in this manually sanitized example."
+  }
+}

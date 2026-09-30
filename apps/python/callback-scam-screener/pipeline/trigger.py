@@ -65,7 +65,7 @@ def _find_callback_phone(email_body: str) -> str | None:
     return match.group(1) if match else None
 
 
-def extract_alert(email_body: str, sender_domain: str) -> Alert | None:
+def extract_alert(email_body: str) -> Alert | None:
     """Flags an email as a suspected callback scam if it combines urgency
     language with a phone number to call back. Returns None otherwise —
     the pipeline never dials unless this bar is met."""
@@ -90,6 +90,5 @@ def extract_alert(email_body: str, sender_domain: str) -> Alert | None:
     return Alert(
         claimed_reason=reason_line,
         phone_number=phone_number,
-        sender_domain=sender_domain,
         source_email_excerpt=email_body.strip()[:500],
     )

@@ -1,0 +1,131 @@
+{
+  "call_id": "call_sal_20260810",
+  "idempotency_key": "shopvoice-demo-lagos-corner-shop-sales-2026-08-10",
+  "status": "completed",
+  "task_completed": true,
+  "completion_confidence": {
+    "score": 0.94,
+    "label": "high"
+  },
+  "evidence": [
+    "Owner estimated about 52,000 NGN in sales for Monday.",
+    "Owner named Indomie, Rice as the best sellers.",
+    "Owner confirmed no restocking purchases today."
+  ],
+  "structured_result": {
+    "sales_day_completed": true,
+    "estimated_revenue": 52000,
+    "currency": "NGN",
+    "top_sellers": [
+      "Indomie",
+      "Rice"
+    ],
+    "owner_notes": "Normal Monday. Nothing special.",
+    "procurement_spend": 0
+  },
+  "metadata": {
+    "shop_id": "demo-lagos-corner-shop",
+    "call_type": "sales",
+    "call_date": "2026-08-10"
+  },
+  "recipients": [
+    {
+      "phones": [
+        "+2348000000000"
+      ],
+      "region": "NG",
+      "locale": "en",
+      "structured_result": {
+        "sales_day_completed": true,
+        "estimated_revenue": 52000,
+        "currency": "NGN",
+        "top_sellers": [
+          "Indomie",
+          "Rice"
+        ],
+        "owner_notes": "Normal Monday. Nothing special.",
+        "procurement_spend": 0
+      },
+      "attempts": [
+        {
+          "attempt": 1,
+          "status": "completed",
+          "started_at": "2026-08-10T19:30:00+01:00",
+          "duration_seconds": 57,
+          "transcript_turns": [
+            {
+              "offset_seconds": 0,
+              "speaker": "bot",
+              "text": "Good evening. How business today?"
+            },
+            {
+              "offset_seconds": 3,
+              "speaker": "user",
+              "text": "E no bad. We try small."
+            },
+            {
+              "offset_seconds": 6,
+              "speaker": "bot",
+              "text": "I be AI assistant for your shop manager service. This call fit dey recorded. Make we talk how sales go today."
+            },
+            {
+              "offset_seconds": 13,
+              "speaker": "user",
+              "text": "Okay."
+            },
+            {
+              "offset_seconds": 14,
+              "speaker": "bot",
+              "text": "Roughly how much you sell today?"
+            },
+            {
+              "offset_seconds": 18,
+              "speaker": "user",
+              "text": "Em... like fifty-two thousand."
+            },
+            {
+              "offset_seconds": 23,
+              "speaker": "bot",
+              "text": "Fifty-two thousand, I don note am. Which thing sell pass today?"
+            },
+            {
+              "offset_seconds": 28,
+              "speaker": "user",
+              "text": "Indomie sell pass, then rice follow am."
+            },
+            {
+              "offset_seconds": 33,
+              "speaker": "bot",
+              "text": "Anything no move at all?"
+            },
+            {
+              "offset_seconds": 36,
+              "speaker": "user",
+              "text": "Milo. Milo just dey sit down."
+            },
+            {
+              "offset_seconds": 40,
+              "speaker": "bot",
+              "text": "You buy anything for shop today?"
+            },
+            {
+              "offset_seconds": 43,
+              "speaker": "user",
+              "text": "No, I no buy anything today."
+            },
+            {
+              "offset_seconds": 47,
+              "speaker": "bot",
+              "text": "Thank you. I go send you small summary when we gather enough days."
+            },
+            {
+              "offset_seconds": 52,
+              "speaker": "user",
+              "text": "Alright, thank you."
+            }
+          ]
+        }
+      ]
+    }
+  ]
+}

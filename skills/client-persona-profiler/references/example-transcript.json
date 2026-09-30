@@ -1,0 +1,34 @@
+[
+  {
+    "role": "agent",
+    "text": "Hello, this is Maya calling on behalf of Nexus Software. Am I speaking with the right person about your account?"
+  },
+  {
+    "role": "callee",
+    "text": "Yes, that's me. What's this about?"
+  },
+  {
+    "role": "agent",
+    "text": "Great! I'm calling to follow up on your subscription renewal. I noticed you've been with us for a while now, and I wanted to make sure everything is working well for you."
+  },
+  {
+    "role": "callee",
+    "text": "Yes, I've been happy with the service. Very stable and consistent. I like that nothing changes unexpectedly."
+  },
+  {
+    "role": "agent",
+    "text": "That's wonderful to hear. We do have a new feature package coming up. Would you like me to walk you through it step by step?"
+  },
+  {
+    "role": "callee",
+    "text": "Sure, I appreciate when things are explained carefully. I prefer to understand all the details before I make any decisions."
+  },
+  {
+    "role": "agent",
+    "text": "Absolutely. The upgrade includes three new modules. Shall I send you a written summary as well?"
+  },
+  {
+    "role": "callee",
+    "text": "Yes please, that would be perfect. I always like to have something in writing to review with my team."
+  }
+]

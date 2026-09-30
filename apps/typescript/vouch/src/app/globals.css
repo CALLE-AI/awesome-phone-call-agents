@@ -1,0 +1,106 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+:root {
+  color-scheme: light;
+}
+
+html,
+body {
+  min-height: 100%;
+  background: #f3f3f3;
+  color: #0d0d0d;
+}
+
+.font-sans,
+html,
+body {
+  font-family: var(--font-sans), sans-serif;
+}
+
+body {
+  font-feature-settings: "tnum" 1;
+}
+
+.tabular {
+  font-variant-numeric: tabular-nums;
+}
+
+button:focus-visible,
+a:focus-visible {
+  outline: 2px solid #0d0d0d;
+  outline-offset: 3px;
+}
+
+.phase-fill {
+  width: var(--phase-from);
+  animation: phase-fill linear both;
+}
+
+.phase-pin {
+  left: var(--phase-from);
+  animation: phase-pin linear both;
+}
+
+@keyframes phase-fill {
+  from {
+    width: var(--phase-from);
+  }
+  to {
+    width: 100%;
+  }
+}
+
+@keyframes phase-pin {
+  from {
+    left: var(--phase-from);
+  }
+  to {
+    left: 100%;
+  }
+}
+
+.live-ripple {
+  animation: live-ripple 1.8s cubic-bezier(0, 0, 0.2, 1) infinite;
+}
+
+.live-ripple-delay {
+  animation-delay: 0.9s;
+}
+
+@keyframes live-ripple {
+  0% {
+    transform: scale(0.35);
+    opacity: 0.45;
+  }
+  100% {
+    transform: scale(2.6);
+    opacity: 0;
+  }
+}
+
+.step-dot-fill {
+  animation: step-dot-fill 180ms ease-out both;
+}
+
+@keyframes step-dot-fill {
+  to {
+    background: #06c167;
+    box-shadow: none;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  * {
+    transition: none !important;
+  }
+
+  .phase-fill,
+  .phase-pin,
+  .live-ripple,
+  .live-ripple-delay,
+  .step-dot-fill {
+    animation: none !important;
+  }
+}

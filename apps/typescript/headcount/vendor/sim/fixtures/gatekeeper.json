@@ -1,0 +1,32 @@
+{
+  "id": "gatekeeper",
+  "status": "completed",
+  "task_completed": false,
+  "completion_confidence": { "score": 0.93, "label": "high" },
+  "disposition": "gatekeeper_refused",
+  "evidence": [
+    "A receptionist said employment verification is only handled through a third-party service and refused to transfer."
+  ],
+  "structured_result": {
+    "dialed_count": 1,
+    "reached_count": 1,
+    "unreached_count": 0,
+    "critical_count": 0
+  },
+  "recipient_structured_result": {
+    "employment_confirmed": "unknown",
+    "title_stated": null,
+    "start_date_stated": null,
+    "end_date_stated": null,
+    "eligible_for_rehire": "unknown",
+    "verifier_name": "Desk attendant",
+    "verifier_role": "receptionist",
+    "verifier_authority": "no",
+    "refusal_reason": "third_party_only"
+  },
+  "transcript_turns": [
+    { "offset_seconds": 0, "speaker": "bot", "text": "This is an automated verification assistant. I am calling to verify employment for a candidate who gave written authorization." },
+    { "offset_seconds": 8, "speaker": "user", "text": "We only verify through a third-party service. I can't transfer you to HR." },
+    { "offset_seconds": 14, "speaker": "bot", "text": "Understood. I will record that verification is handled only through a third-party service and end the call." }
+  ]
+}

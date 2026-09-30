@@ -1,0 +1,14 @@
+{
+  "_note": "FICTIONAL example — E.164 reserved test number, not a real person",
+  "phone": "+15550001234",
+  "call_id": "fixture-coverage-verify-001",
+  "outcome": "completed",
+  "structured_result": {
+    "outcome": "completed",
+    "policy_active": true,
+    "coverage_verified": "yes",
+    "prior_claims_12mo": false,
+    "adjuster_notified": true,
+    "claimant_questions": "Will my rates go up after this claim?"
+  }
+}

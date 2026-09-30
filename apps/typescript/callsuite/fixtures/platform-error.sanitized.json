@@ -1,0 +1,18 @@
+{
+  "fixtureVersion": 1,
+  "sanitization": {
+    "manuallyReviewed": true,
+    "containsRawTranscript": false,
+    "containsRecordingUrl": false,
+    "containsRealPhoneNumber": false
+  },
+  "call": {
+    "id": "sanitized-platform-error",
+    "status": "timed_out"
+  },
+  "evaluation": {
+    "verdict": "pass",
+    "confidence": 1,
+    "summary": "The terminal platform status overrides the optimistic structured payload."
+  }
+}

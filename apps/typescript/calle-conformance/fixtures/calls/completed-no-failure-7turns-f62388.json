@@ -1,0 +1,92 @@
+{
+  "id": "call_add98bda41f62388",
+  "object": "call_task",
+  "status": "completed",
+  "task": "Begin the call by saying, word for word: This is an automated call from an AI assistant. Then ask one question: can you hear me clearly? Accept whatever answer you get, thank them, and end the call. Do not say anything else.",
+  "recipients": [
+    {
+      "id": "rcp_bea49eaec089f334",
+      "phones": [
+        "+12025550142"
+      ],
+      "locale": "en-US",
+      "region": "US",
+      "status": "completed",
+      "structuredResult": {
+        "heard_clearly": "yes"
+      },
+      "summary": "The call completed: the recipient confirmed they could hear the AI assistant clearly. No follow-up is needed.",
+      "attempts": [
+        {
+          "id": "att_e6ef579c0954c9b9",
+          "phone": "+12025550142",
+          "status": "completed",
+          "startedAt": "2026-03-04T14:00:56.161000Z",
+          "completedAt": "2026-03-04T14:01:43.355000Z",
+          "summary": "The call completed: the recipient confirmed they could hear the AI assistant clearly. No follow-up is needed.",
+          "transcriptTurns": [
+            {
+              "offset_seconds": 0,
+              "speaker": "bot",
+              "text": "This is an automated call from an AI assistant."
+            },
+            {
+              "offset_seconds": 2,
+              "speaker": "bot",
+              "text": "Can you hear me clearly?"
+            },
+            {
+              "offset_seconds": 9,
+              "speaker": "user",
+              "text": "This is an automated call generated on a carrier test platform. Please report any abuse to the operator.com. Hello?"
+            },
+            {
+              "offset_seconds": 11,
+              "speaker": "bot",
+              "text": "Can you hear me clearly?"
+            },
+            {
+              "offset_seconds": 27,
+              "speaker": "user",
+              "text": "This is an automated call generated on a carrier test platform. Please report any abuse to the operator.com. Yes. I can hear you clearly."
+            },
+            {
+              "offset_seconds": 29,
+              "speaker": "bot",
+              "text": "Thank you."
+            },
+            {
+              "offset_seconds": 44,
+              "speaker": "user",
+              "text": "This is an automated call generated on a carrier test platform. Please report any abuse to the operator.com. Alright. Thank you. Goodbye."
+            }
+          ],
+          "providerCallId": "32a9df46d18879befb78ce09b102055c",
+          "failureCode": null,
+          "failureMessage": null
+        }
+      ]
+    }
+  ],
+  "structuredResult": null,
+  "summary": "The call completed: the recipient confirmed they could hear the AI assistant clearly. No follow-up is needed.",
+  "taskCompleted": true,
+  "completionConfidence": {
+    "score": 0.92,
+    "label": "high"
+  },
+  "evidence": [
+    "A live recipient responded during the call.",
+    "The recipient indicated they could hear clearly.",
+    "The bot thanked the recipient and ended the interaction."
+  ],
+  "metadata": {
+    "run": "corpus",
+    "probe": "live-connected",
+    "requiredLine": "This is an automated call from an AI assistant."
+  },
+  "failureCode": null,
+  "failureMessage": null,
+  "createdAt": "2026-03-04T14:00:00.000000Z",
+  "completedAt": "2026-03-04T14:01:59.932000Z"
+}

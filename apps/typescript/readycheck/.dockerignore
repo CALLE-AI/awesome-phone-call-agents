@@ -1,0 +1,14 @@
+node_modules
+dist
+data
+artifacts
+coverage
+playwright-report
+.DS_Store
+.env
+.env.*
+.git
+*.docx
+*.pdf
+ReadyCheck_Review_and_Build_Blueprint.md
+docs/CALLE_INSTALLATION.md

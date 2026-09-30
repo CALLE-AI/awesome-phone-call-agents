@@ -1,0 +1,27 @@
+{
+  "id": "14-verified-readback-complied-date",
+  "category": "readback-complied",
+  "description": "Delivery date verified: schedule lookup, exact date, unrequested dispatch hub, and the date repeated back on request.",
+  "turns": [
+    { "speaker": "bot", "text": "Hello, QuoteDesk assistant calling about the consignment for our Kochi store.", "offset_seconds": 0 },
+    { "speaker": "user", "text": "Haan, yes.", "offset_seconds": 5 },
+    { "speaker": "bot", "text": "Which day will the consignment reach our Kochi store?", "offset_seconds": 9 },
+    { "speaker": "user", "text": "Let me see the schedule, one second.", "offset_seconds": 13 },
+    { "speaker": "user", "text": "Delivery is Thursday the 18th, our truck leaves from the Wagholi hub.", "offset_seconds": 24 },
+    { "speaker": "bot", "text": "So that is Thursday the 18th, did I get that right?", "offset_seconds": 31 },
+    { "speaker": "user", "text": "Correct, Thursday the 18th.", "offset_seconds": 37 }
+  ],
+  "fields": [
+    {
+      "field": "delivery_day",
+      "value": "Thursday",
+      "expects": "date",
+      "questionTurn": 2,
+      "answerTurns": [4],
+      "readbackRequested": true,
+      "critical": true,
+      "expectedGrade": "verified",
+      "expectSignals": ["A", "B", "C", "F"]
+    }
+  ]
+}

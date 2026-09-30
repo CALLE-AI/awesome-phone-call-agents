@@ -1,0 +1,181 @@
+{% extends "base.html" %}
+{% block title %}{{ pupil.first_name }} &middot; Reachable{% endblock %}
+{% block body %}
+
+<h1>
+  {{ pupil.first_name }}
+  <span class="pill {{ 'stop' if case['state'].endswith('URGENT_HUMAN') else '' }}">{{ case['state'] }}</span>
+</h1>
+<p class="muted">
+  <span class="mono">{{ case['case_id'] }}</span>
+  {% if detail.get('sessions') %} &middot; sessions {{ detail['sessions'] }}{% endif %}
+  {% if detail.get('code_n_deadline') %}
+    &middot; code N must be amended by <strong>{{ detail['code_n_deadline'] }}</strong>
+    <span class="muted">(5 school days)</span>
+  {% endif %}
+</p>
+
+{% if case['state'] == 'PF_URGENT_HUMAN' %}
+<div class="panel urgent">
+  <strong>Escalated to the safeguarding lead.</strong>
+  <p class="muted" style="margin-bottom:0">
+    The contact may not have known about the absence, or does not know where
+    {{ pupil.first_name }} is. Reachable has stopped the cascade and placed no further
+    calls. It has not concluded anything.
+  </p>
+</div>
+{% endif %}
+
+<h2>Cascade</h2>
+<div class="panel">
+  <table>
+    <tr><th></th><th>Order</th><th>Contact</th><th>Number</th><th>Health</th><th>Attempts</th></tr>
+    {% for row in cascade %}
+    <tr>
+      <td>{{ '→' if row.current else '' }}</td>
+      <td class="mono">{{ row.contact_order }}</td>
+      <td>{{ row.contact_name }}{% if row.current %} <span class="pill">current</span>{% endif %}</td>
+      <td class="mono">{{ row.masked }}</td>
+      <td><span class="pill {{ row.tone }}">{{ row.status_text }}</span></td>
+      <td class="mono muted">{{ row.attempts }}</td>
+    </tr>
+    {% endfor %}
+  </table>
+</div>
+
+<h2>Guards</h2>
+<div class="panel">
+  <table>
+    {% for name, ok, note in guards %}
+    <tr>
+      <td style="width:26px">{% if ok %}<span class="tick">[x]</span>{% else %}<span class="cross">[ ]</span>{% endif %}</td>
+      <td>{{ name }}</td>
+      <td class="mono muted">{{ note }}</td>
+    </tr>
+    {% endfor %}
+  </table>
+  <p class="muted" style="font-size:13px; margin-bottom:0">
+    Every guard is checked in code immediately before a dial. There is no path that
+    places a call without passing all of them.
+  </p>
+</div>
+
+{% if can_call %}
+<h2>Call preview</h2>
+<div class="panel">
+  <table>
+    <tr><th>Destination</th><td class="mono">{{ preview.masked_destination }}</td></tr>
+    <tr><th>Region / locale</th><td class="mono">{{ preview.region }} / {{ preview.locale }}</td></tr>
+    <tr><th>Idempotency key</th><td class="mono">{{ preview.idempotency_key }}</td></tr>
+    <tr><th>Mode</th><td class="mono">{{ mode }}</td></tr>
+  </table>
+  <p class="muted" style="font-size:13px">
+    The key is derived from the case, pupil and contact, never from the attempt, and is
+    reserved before the request leaves this machine.
+  </p>
+
+  <h2 style="margin-top:18px">Exactly what will be said</h2>
+  <pre>{{ preview.task }}</pre>
+
+  <form method="post" action="/cases/{{ case['case_id'] }}/call">
+    <label for="confirm">
+      Type <code>{{ pupil.first_name }}</code> to confirm this specific call
+    </label>
+    <input type="text" id="confirm" name="confirm" autocomplete="off" required
+           style="max-width:260px">
+    <p style="margin-top:10px">
+      <button class="{{ 'danger' if mode == 'LIVE' else '' }}" type="submit">
+        {% if mode == 'LIVE' %}Place this call now{% else %}Run this call ({{ mode }}){% endif %}
+      </button>
+    </p>
+  </form>
+</div>
+{% endif %}
+
+{% if attempts %}
+<h2>Calls</h2>
+<div class="panel">
+  <table>
+    <tr><th>Contact</th><th>State</th><th>Disposition</th><th>Confidence</th><th>Why</th></tr>
+    {% for a in attempts %}
+    <tr>
+      <td class="mono">{{ a['contact_id'] }}</td>
+      <td class="mono">{{ a['state'] }}</td>
+      <td class="mono">{{ a['disposition'] or '—' }}</td>
+      <td class="mono">
+        {% if a['confidence_score'] is not none %}
+          {{ '%.2f'|format(a['confidence_score']) }} / {{ a['confidence_label'] }}
+        {% else %}—{% endif %}
+      </td>
+      <td class="muted">{{ a['disposition_reason'] }}</td>
+    </tr>
+    {% endfor %}
+  </table>
+</div>
+{% endif %}
+
+{% if quotes %}
+<h2>Evidence the recipient actually spoke</h2>
+<div class="panel">
+  {% for q in quotes %}<blockquote class="muted">&ldquo;{{ q }}&rdquo;</blockquote>{% endfor %}
+  <p class="muted" style="font-size:13px; margin-bottom:0">
+    Only turns labelled as spoken by the recipient. A turn from the assistant, or one
+    with an unknown speaker, is not evidence.
+  </p>
+</div>
+{% endif %}
+
+{% if suggested_reason %}
+<h2>Suggested register reason</h2>
+<div class="panel">
+  <p>
+    <span class="pill wait">{{ suggested_reason }}</span>
+    {% if reason_note %}{{ reason_note }}{% endif %}
+  </p>
+  <p class="muted" style="font-size:13px">
+    A suggestion for staff. Reachable never writes to the register and never records an
+    attendance code.
+  </p>
+  {% if not reason_approved %}
+  <form method="post" action="/cases/{{ case['case_id'] }}/approve-reason">
+    <button type="submit">Approve this suggestion</button>
+  </form>
+  {% else %}
+  <span class="pill ok">approved by staff</span>
+  {% endif %}
+</div>
+{% endif %}
+
+<h2>Timeline</h2>
+<div class="panel">
+  <table>
+    <tr><th>When</th><th>Event</th><th>Reason</th></tr>
+    {% for e in events %}
+    <tr>
+      <td class="mono muted">{{ e['at'][11:19] }}</td>
+      <td class="mono">{{ e['kind'] }}</td>
+      <td>
+        {{ e['reason'] }}
+        {% if e['fields'] and e['fields'] != '[]' %}
+        <div class="muted" style="font-size:12px">fields returned: {{ e['fields'] }}</div>
+        {% endif %}
+      </td>
+    </tr>
+    {% endfor %}
+  </table>
+</div>
+
+<h2>Staff actions</h2>
+<div class="panel">
+  <form method="post" action="/cases/{{ case['case_id'] }}/resolve">
+    <label for="target">Move this case to</label>
+    <select id="target" name="target" style="max-width:320px">
+      {% for option in resolve_options %}<option value="{{ option }}">{{ option }}</option>{% endfor %}
+    </select>
+    <label for="note">Note (optional)</label>
+    <input type="text" id="note" name="note" autocomplete="off">
+    <p style="margin-top:10px"><button class="secondary" type="submit">Record decision</button></p>
+  </form>
+</div>
+
+{% endblock %}

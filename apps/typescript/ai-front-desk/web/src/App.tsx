@@ -46,7 +46,6 @@ export function App() {
   }, [liveCall]);
 
   const liveDuration = `${Math.floor(liveSeconds / 60)}:${String(liveSeconds % 60).padStart(2, "0")}`;
-  const usedPct = status === null ? 0 : Math.min(100, (status.liveCallsUsed / status.freeTierTotal) * 100);
 
   return (
     <div className="layout">
@@ -84,11 +83,9 @@ export function App() {
             <>
               <div className="count">
                 <strong>{status.liveCallsUsed}</strong>
-                <span className="text-muted">/{status.freeTierTotal} real calls used</span>
+                <span className="text-muted"> real calls recorded here</span>
               </div>
-              <div className="bar">
-                <div className="bar-fill" style={{ width: `${usedPct}%` }} />
-              </div>
+              <a href="https://dashboard.heycall-e.com/account/billing">View CALL-E billing</a>
               <span className={`mode-badge ${status.dryRun ? "dry" : "live"}`}>
                 {!status.dryRun && <span className="dot" />}
                 {status.dryRun ? "DRY RUN" : "LIVE CALLS"}

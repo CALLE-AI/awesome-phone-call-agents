@@ -1,0 +1,67 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Conversation Clarify</title>
+<style>
+  /* Sized for the toolbar popup; the same file is the options page, where the
+     max-width simply stops it stretching. */
+  body {
+    font: 14px/1.5 system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+    width: 320px; max-width: 320px; margin: 0; padding: 16px; color: #202124;
+  }
+  h1 { font-size: 15px; margin: 0 0 12px; display: flex; align-items: center; gap: 7px; }
+  .ico { font-family: "Apple Color Emoji","Segoe UI Emoji","Noto Color Emoji",sans-serif; }
+
+  #status {
+    border-radius: 8px; padding: 10px 12px; font-size: 13px; margin-bottom: 14px;
+    background: #f1f3f4; color: #5f6368;
+  }
+  #status.ok   { background: #e6f4ea; color: #137333; }
+  #status.live { background: #fce8e6; color: #c5221f; }
+  #status.bad  { background: #fef7e0; color: #b06000; }
+  #status b { display: block; margin-bottom: 2px; }
+
+  label { display: block; margin-top: 12px; font-weight: 600; font-size: 12px; color: #5f6368; }
+  input { width: 100%; padding: 7px 9px; font: inherit; box-sizing: border-box;
+          border: 1px solid #dadce0; border-radius: 6px; background: #fff; color: inherit; }
+  small { color: #80868b; display: block; margin-top: 3px; font-size: 11px; }
+
+  button {
+    margin-top: 16px; width: 100%; padding: 9px; font: 500 14px/1 inherit; border: none;
+    border-radius: 6px; background: #1a73e8; color: #fff; cursor: pointer;
+  }
+  button:hover { background: #1765cc; }
+  #saved { font-size: 12px; color: #137333; margin-top: 8px; min-height: 16px; }
+  #saved.warn { color: #b06000; }
+  a { color: #1a73e8; }
+
+  @media (prefers-color-scheme: dark) {
+    body { background: #202124; color: #e8eaed; }
+    input { background: #292a2d; border-color: #5f6368; color: #e8eaed; }
+    #status { background: #292a2d; color: #9aa0a6; }
+  }
+</style>
+</head>
+<body>
+  <h1><span class="ico">&#128222;</span> Conversation Clarify</h1>
+
+  <div id="status">Checking the server…</div>
+
+  <label for="serverUrl">Server address</label>
+  <input id="serverUrl" placeholder="http://127.0.0.1:8000">
+
+  <label for="token">Shared token</label>
+  <input id="token" type="password" placeholder="local-dev-token">
+  <small>Must match CONVERSATION_CLARIFY_TOKEN on the server.</small>
+
+  <label for="callerName">Your name, as the caller should say it</label>
+  <input id="callerName" placeholder="Charles Miller">
+  <small>Spoken on the call: "calling on behalf of …".</small>
+
+  <button id="save">Save and re-check</button>
+  <div id="saved"></div>
+
+  <script src="options.js"></script>
+</body>
+</html>

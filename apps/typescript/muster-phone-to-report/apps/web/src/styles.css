@@ -1,0 +1,391 @@
+:root {
+  --status-normal-foreground: #146c3e;
+  --status-normal-background: #ebfff3;
+  --status-critical-foreground: #8a2f19;
+  --status-critical-background: #fff2ee;
+  --status-caution-foreground: #714000;
+  --status-caution-background: #fff4dc;
+  --status-uncertain-foreground: #4e3a72;
+  --status-uncertain-background: #f6f1ff;
+  --status-neutral-foreground: #4c5871;
+  --status-neutral-background: #f3f5f9;
+  color: var(--brand-carbon-slate);
+  background: var(--brand-field-paper);
+  font-family:
+    Inter,
+    ui-sans-serif,
+    system-ui,
+    -apple-system,
+    BlinkMacSystemFont,
+    "Segoe UI",
+    sans-serif;
+  line-height: 1.5;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+body {
+  min-width: 20rem;
+  margin: 0;
+}
+
+button,
+a {
+  font: inherit;
+}
+
+a {
+  color: var(--brand-instrument-teal);
+}
+
+button:focus-visible,
+a:focus-visible,
+[tabindex="-1"]:focus-visible {
+  outline: 3px solid #1f64c8;
+  outline-offset: 3px;
+}
+
+.skip-link {
+  position: fixed;
+  z-index: 10;
+  top: 0.5rem;
+  left: 0.5rem;
+  padding: 0.65rem 1rem;
+  background: var(--brand-clear-white);
+  transform: translateY(-200%);
+}
+
+.skip-link:focus {
+  transform: translateY(0);
+}
+
+.application-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+  padding: 1rem max(1rem, calc((100% - 76rem) / 2));
+  border-bottom: 1px solid #b8c8cc;
+  background: var(--brand-clear-white);
+}
+
+.application-header nav a {
+  display: inline-flex;
+  min-height: 2.75rem;
+  align-items: center;
+  padding: 0.5rem 0.75rem;
+  border-bottom: 3px solid var(--brand-instrument-teal);
+  color: var(--brand-muster-deep);
+  font-weight: 700;
+  text-decoration: none;
+}
+
+.fleet-page {
+  width: min(76rem, calc(100% - 2rem));
+  margin: 0 auto;
+  padding: 2rem 0 4rem;
+}
+
+.fleet-page__header h1,
+.fleet-page-error h1 {
+  margin: 0;
+  color: var(--brand-muster-deep);
+  font-size: clamp(2rem, 5vw, 3.25rem);
+  line-height: 1.1;
+}
+
+.eyebrow,
+.fleet-endpoint__site {
+  margin: 0 0 0.25rem;
+  color: var(--brand-carbon-slate);
+  font-size: 0.8rem;
+  font-weight: 800;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.fleet-heartbeat,
+.fleet-simulation-disclosure,
+.fleet-refresh-warning,
+.fleet-empty,
+.fleet-page-error {
+  margin: 1.25rem 0;
+  padding: 1rem 1.25rem;
+  border: 1px solid #8da1a8;
+  border-left-width: 0.5rem;
+  background: var(--brand-clear-white);
+}
+
+.fleet-heartbeat h2,
+.fleet-heartbeat p,
+.fleet-simulation-disclosure p {
+  margin: 0;
+}
+
+.fleet-heartbeat--current {
+  border-left-color: var(--status-normal-foreground);
+}
+
+.fleet-heartbeat--stale {
+  border-left-color: var(--status-caution-foreground);
+}
+
+.fleet-heartbeat--unavailable,
+.fleet-refresh-warning {
+  border-left-color: var(--status-neutral-foreground);
+  background: var(--status-neutral-background);
+}
+
+.fleet-heartbeat__limit {
+  margin-top: 0.4rem !important;
+  color: var(--brand-carbon-slate);
+  font-size: 0.88rem;
+}
+
+.fleet-simulation-disclosure {
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+}
+
+.simulation-badge {
+  display: inline-flex;
+  min-height: 2rem;
+  align-items: center;
+  gap: 0.35rem;
+  padding: 0.25rem 0.5rem;
+  border: 2px dashed currentColor;
+  border-radius: 0.35rem;
+  background: repeating-linear-gradient(135deg, #fff 0 5px, #e8edf6 5px 10px);
+  color: #263b67;
+  font-size: 0.72rem;
+  font-weight: 900;
+  letter-spacing: 0.07em;
+  white-space: nowrap;
+}
+
+.fleet-list-heading {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 1rem;
+  margin-top: 2rem;
+}
+
+.fleet-list {
+  display: grid;
+  gap: 0.75rem;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.fleet-endpoint {
+  display: grid;
+  grid-template-columns: minmax(12rem, 1fr) minmax(0, 3fr) auto;
+  gap: 1rem;
+  align-items: center;
+  padding: 1rem;
+  border: 1px solid #aebdc2;
+  border-radius: 0.5rem;
+  background: var(--brand-clear-white);
+}
+
+.fleet-endpoint__identity,
+.fleet-endpoint__facts > div {
+  min-width: 0;
+}
+
+.fleet-endpoint__identity h2 {
+  margin: 0;
+  overflow-wrap: anywhere;
+  color: var(--brand-muster-deep);
+  font-size: 1.1rem;
+}
+
+.fleet-endpoint__identity .simulation-badge {
+  margin-top: 0.5rem;
+}
+
+.fleet-endpoint__facts {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(8rem, 1fr));
+  gap: 0.8rem;
+  margin: 0;
+}
+
+.fleet-endpoint__facts dt {
+  color: var(--brand-carbon-slate);
+  font-size: 0.74rem;
+  font-weight: 800;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+
+.fleet-endpoint__facts dd {
+  margin: 0.25rem 0 0;
+  overflow-wrap: anywhere;
+  font-variant-numeric: tabular-nums;
+}
+
+.fleet-endpoint__incident {
+  grid-column: 1 / -1;
+}
+
+.fleet-status {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4rem;
+  padding: 0.25rem 0.45rem;
+  border: 2px solid currentColor;
+  border-radius: 0.35rem;
+  font-weight: 800;
+}
+
+.fleet-status--normal {
+  color: var(--status-normal-foreground);
+  background: var(--status-normal-background);
+}
+
+.fleet-status--critical {
+  color: var(--status-critical-foreground);
+  background: var(--status-critical-background);
+}
+
+.fleet-status--caution {
+  color: var(--status-caution-foreground);
+  background: var(--status-caution-background);
+}
+
+.fleet-status--uncertain {
+  color: var(--status-uncertain-foreground);
+  background: var(--status-uncertain-background);
+}
+
+.fleet-status--neutral {
+  border-style: dashed;
+  color: var(--status-neutral-foreground);
+  background: var(--status-neutral-background);
+}
+
+.fleet-endpoint__actions {
+  display: grid;
+  gap: 0.5rem;
+}
+
+.observation-lifecycle {
+  grid-column: 1 / -1;
+  padding: 1rem;
+  border: 1px solid #8da1a8;
+  border-left: 0.4rem solid var(--status-neutral-foreground);
+  background: var(--status-neutral-background);
+}
+
+.observation-lifecycle--complete {
+  border-left-color: var(--status-normal-foreground);
+}
+
+.observation-lifecycle--incomplete,
+.observation-lifecycle--admission_error,
+.observation-lifecycle--poll_error {
+  border-left-color: var(--status-caution-foreground);
+  background: var(--status-caution-background);
+}
+
+.observation-lifecycle h3,
+.observation-lifecycle p {
+  margin: 0;
+}
+
+.observation-lifecycle .simulation-badge,
+.observation-lifecycle button,
+.observation-lifecycle__result {
+  margin-top: 0.75rem;
+}
+
+.observation-lifecycle__result dl {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 0.75rem;
+}
+
+.observation-lifecycle__result dd {
+  margin: 0;
+  overflow-wrap: anywhere;
+}
+
+.fleet-endpoint__actions button,
+.fleet-page-error button {
+  min-height: 2.75rem;
+  padding: 0.55rem 0.8rem;
+  border: 2px solid var(--brand-muster-deep);
+  border-radius: 0.35rem;
+  background: var(--brand-muster-deep);
+  color: var(--brand-clear-white);
+  font-weight: 800;
+}
+
+.fleet-endpoint__actions button:disabled {
+  border-color: #67738c;
+  background: var(--status-neutral-background);
+  color: var(--status-neutral-foreground);
+  cursor: not-allowed;
+}
+
+.visually-hidden {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  white-space: nowrap;
+  border: 0;
+}
+
+@media (max-width: 767px) {
+  .application-header,
+  .fleet-simulation-disclosure {
+    align-items: flex-start;
+    flex-direction: column;
+  }
+
+  .fleet-page {
+    width: min(100% - 1rem, 40rem);
+    padding-top: 1rem;
+  }
+
+  .fleet-endpoint,
+  .fleet-endpoint__facts,
+  .observation-lifecycle__result dl {
+    grid-template-columns: 1fr;
+  }
+
+  .fleet-endpoint__incident {
+    grid-column: auto;
+  }
+
+  .fleet-endpoint__actions button {
+    width: 100%;
+  }
+}
+
+@media (forced-colors: active) {
+  .fleet-status,
+  .simulation-badge,
+  .fleet-endpoint {
+    border-color: CanvasText;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    scroll-behavior: auto !important;
+    transition-duration: 0.01ms !important;
+  }
+}

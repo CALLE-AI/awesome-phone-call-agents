@@ -1,0 +1,61 @@
+{
+ "id": "train-human-010",
+ "label": "human",
+ "source": "sim-train",
+ "meta": {
+  "task": "cancel a subscription",
+  "hard": false
+ },
+ "turns": [
+  {
+   "speaker": "user",
+   "text": "Summit Fitness, Ana speaking.",
+   "offset_seconds": 1.1
+  },
+  {
+   "speaker": "bot",
+   "text": "Hi, I'm an AI assistant calling on behalf of Alex Martin. I'd like to cancel the subscription for the account under Alex Martin.",
+   "offset_seconds": 2.81
+  },
+  {
+   "speaker": "user",
+   "text": "Right, let me pull up the account. Okay, that's cancelled.",
+   "offset_seconds": 11.92
+  },
+  {
+   "speaker": "bot",
+   "text": "Will there be a final charge?",
+   "offset_seconds": 16.73
+  },
+  {
+   "speaker": "user",
+   "text": "Uh, five to seven business days usually.",
+   "offset_seconds": 18.26
+  },
+  {
+   "speaker": "bot",
+   "text": "Can you confirm the cancellation is effective today?",
+   "offset_seconds": 21.76
+  },
+  {
+   "speaker": "user",
+   "text": "Okay, yeah that's fine.",
+   "offset_seconds": 25.19
+  },
+  {
+   "speaker": "user",
+   "text": "yeah",
+   "offset_seconds": 27.14
+  },
+  {
+   "speaker": "bot",
+   "text": "Thank you so much, that's all I needed.",
+   "offset_seconds": 28.48
+  },
+  {
+   "speaker": "user",
+   "text": "Okay, uh, bye.",
+   "offset_seconds": 31.8
+  }
+ ]
+}

@@ -14,6 +14,21 @@ TERMINAL_STATUSES = {
     "CANCELED", "CANCELLED", "VOICEMAIL", "BUSY", "EXPIRED",
 }
 
+
+def _normalize_status(status: str) -> str:
+    """CALL-E's real API returns "NO ANSWER" (a space) where this file's own
+    TERMINAL_STATUSES uses "NO_ANSWER" (an underscore) — confirmed against a
+    real call whose status field was literally "NO ANSWER". That mismatch
+    meant the polling loop below never recognized it as terminal, polled for
+    the full timeout, and raised AmbiguousCallOutcome for a call that had
+    actually already resolved cleanly within ~90 seconds. Collapsing
+    whitespace/underscores and uppercasing before every comparison — and
+    before this value is ever stored on CallMetadata — makes the terminal-
+    status check and everything downstream (scoring.py's SCOREABLE_CALL_
+    STATUS check, warning messages) robust to either rendering rather than
+    fixing this one observed case and leaving the class of bug in place."""
+    return re.sub(r"[\s_]+", "_", status.strip().upper())
+
 # One canned answer to CALL-E's planner clarifying question, used for exactly
 # one automatic refinement round in place_screening_call. This is the same
 # answer that got the very first real call (2026-08-09) from ready_to_run=false
@@ -140,7 +155,7 @@ class RealCallEClient(CallEClient):
 
         deadline = time.monotonic() + self.poll_timeout_seconds
         status = run
-        while status.get("status") not in TERMINAL_STATUSES:
+        while _normalize_status(status.get("status") or "") not in TERMINAL_STATUSES:
             if time.monotonic() > deadline:
                 # Same class of problem as the call-run timeout above: we do
                 # not know whether the call is still ringing, finished after
@@ -195,7 +210,7 @@ class RealCallEClient(CallEClient):
                 number_dialed=reported_number or phone_number,
                 duration_seconds=calling_meta.get("duration_seconds") or 0,
                 timestamp=datetime.datetime.now(datetime.timezone.utc).isoformat(),
-                status=status.get("status", "UNKNOWN"),
+                status=_normalize_status(status.get("status") or "UNKNOWN"),
                 call_id=run_id,
                 answered_by_machine=answered_by_machine,
             ),

@@ -1,0 +1,15 @@
+{
+  "task_id": "relayme-demo-refused",
+  "mock_transcript": [
+    {"speaker": "agent", "text": "Hi, I'm an AI assistant calling for someone. Is the prescription under the name Jordan Rivera ready for pickup?"},
+    {"speaker": "callee", "text": "I'm sorry, we can't share any prescription information over the phone with an automated system. The patient needs to come in with ID."},
+    {"speaker": "agent", "text": "That's completely understood. Thank you, I'll pass that along."}
+  ],
+  "structured_result": {
+    "answer": "",
+    "outcome": "refused",
+    "transcript_summary": "Pharmacy declined to share prescription status with an automated caller; patient must come in with ID.",
+    "follow_up_needed": true,
+    "disclosed_ai": true
+  }
+}

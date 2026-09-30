@@ -1,0 +1,10 @@
+{
+  "id": "$.event.data.id",
+  "title": "$.event.data.title",
+  "severity": "$.event.data.priority.summary",
+  "service": "$.event.data.service.summary",
+  "summary": "PagerDuty webhooks carry no long-form description; write the sentence the on-call engineer should hear here.",
+  "runbook_url": "$.event.data.html_url",
+  "ladder": ["primary", "secondary", "incident_commander"],
+  "timezone": "America/Argentina/Buenos_Aires"
+}

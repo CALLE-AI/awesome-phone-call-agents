@@ -1,0 +1,31 @@
+{
+  "name": "callsuite",
+  "version": "0.0.1",
+  "private": true,
+  "license": "MIT",
+  "type": "module",
+  "description": "Evidence-backed regression tests for CALL-E outbound workflows.",
+  "engines": {
+    "node": ">=22"
+  },
+  "packageManager": "pnpm@11.9.0",
+  "scripts": {
+    "check": "tsc --noEmit",
+    "test": "node --import tsx --test test/**/*.test.ts",
+    "callsuite": "tsx src/cli.ts",
+    "replay": "tsx src/cli.ts replay",
+    "demo": "tsx src/demo.ts",
+    "demo:serve": "tsx src/demo-server.ts",
+    "spike:dry-run": "tsx src/first-call.ts --dry-run",
+    "spike:live": "tsx src/first-call.ts --live"
+  },
+  "dependencies": {
+    "@call-e/calle": "0.6.0",
+    "dotenv": "17.4.2"
+  },
+  "devDependencies": {
+    "@types/node": "26.1.2",
+    "tsx": "4.23.8",
+    "typescript": "7.0.2"
+  }
+}

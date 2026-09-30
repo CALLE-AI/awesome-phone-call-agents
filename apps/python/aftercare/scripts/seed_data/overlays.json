@@ -1,0 +1,391 @@
+{
+  "base": {
+    "questions": [
+      "Ask how they feel overall compared to hospital discharge",
+      "Ask whether they are taking medications as prescribed",
+      "Ask whether they have any new or worsening symptoms",
+      "Ask whether they can manage daily activities at home"
+    ],
+    "keywords": [
+      "chest pain",
+      "can't breathe",
+      "shortness of breath",
+      "fainting",
+      "confusion",
+      "severe bleeding",
+      "unconscious"
+    ],
+    "fields": [
+      {
+        "field_key": "feeling_overall",
+        "field_type": "string",
+        "description": "How the patient feels overall compared to discharge",
+        "enums": ["better", "same", "worse", "unknown"]
+      },
+      {
+        "field_key": "medication_compliance",
+        "field_type": "string",
+        "description": "Whether medications are taken as prescribed",
+        "enums": ["yes", "partial", "no", "unknown"]
+      },
+      {
+        "field_key": "emergency_symptoms_reported",
+        "field_type": "boolean",
+        "description": "True if emergency warning signs were reported"
+      },
+      {
+        "field_key": "notes",
+        "field_type": "string",
+        "description": "Short clinical notes from the conversation"
+      }
+    ]
+  },
+  "categories": {
+    "infection": {
+      "questions": [
+        "Ask about fever, chills, or night sweats",
+        "Ask whether any wound or infection site looks worse",
+        "Ask about antibiotic medication compliance"
+      ],
+      "keywords": [
+        "high fever",
+        "rigors",
+        "spreading redness",
+        "pus",
+        "sepsis",
+        "vomiting"
+      ],
+      "fields": [
+        {
+          "field_key": "fever_or_chills",
+          "field_type": "string",
+          "description": "Fever or chills severity",
+          "enums": ["none", "mild", "moderate", "severe", "unknown"]
+        },
+        {
+          "field_key": "infection_site_worse",
+          "field_type": "string",
+          "description": "Whether infection site looks or feels worse",
+          "enums": ["yes", "no", "unknown"]
+        }
+      ]
+    },
+    "cardiac": {
+      "questions": [
+        "Ask about chest pain or pressure",
+        "Ask about swelling in legs or sudden weight gain",
+        "Ask whether activity tolerance is better, same, or worse"
+      ],
+      "keywords": [
+        "chest pain",
+        "heart racing",
+        "leg swelling",
+        "sudden weight gain",
+        "syncope",
+        "palpitations"
+      ],
+      "fields": [
+        {
+          "field_key": "chest_pain",
+          "field_type": "string",
+          "description": "Chest pain or pressure",
+          "enums": ["none", "mild", "moderate", "severe", "unknown"]
+        },
+        {
+          "field_key": "edema_or_weight_gain",
+          "field_type": "string",
+          "description": "Leg swelling or sudden weight gain",
+          "enums": ["none", "mild", "moderate", "severe", "unknown"]
+        },
+        {
+          "field_key": "activity_tolerance",
+          "field_type": "string",
+          "description": "Activity tolerance vs discharge",
+          "enums": ["better", "same", "worse", "unknown"]
+        }
+      ]
+    },
+    "respiratory": {
+      "questions": [
+        "Ask about cough and sputum changes",
+        "Ask whether breathing is harder than yesterday",
+        "Ask about oxygen use if prescribed"
+      ],
+      "keywords": [
+        "can't breathe",
+        "shortness of breath",
+        "wheezing",
+        "coughing blood",
+        "blue lips",
+        "high fever"
+      ],
+      "fields": [
+        {
+          "field_key": "breathing_vs_yesterday",
+          "field_type": "string",
+          "description": "Breathing compared to yesterday",
+          "enums": ["better", "same", "worse", "unknown"]
+        },
+        {
+          "field_key": "cough_or_sputum",
+          "field_type": "string",
+          "description": "Cough or sputum severity",
+          "enums": ["none", "mild", "moderate", "severe", "unknown"]
+        }
+      ]
+    },
+    "ortho": {
+      "questions": [
+        "Ask pain at the injury or surgery site on a 0-10 scale",
+        "Ask about swelling, numbness, or color change",
+        "Ask whether cast, brace, or dressing is intact",
+        "Ask whether they are mobilizing as advised"
+      ],
+      "keywords": [
+        "severe pain",
+        "numbness",
+        "blue fingers",
+        "blue toes",
+        "cast broken",
+        "bleeding",
+        "inability to move"
+      ],
+      "fields": [
+        {
+          "field_key": "pain_level",
+          "field_type": "integer",
+          "description": "Pain 0-10 at injury or surgery site",
+          "minimum": 0,
+          "maximum": 10
+        },
+        {
+          "field_key": "neurovascular_symptoms",
+          "field_type": "string",
+          "description": "Swelling, numbness, or color change",
+          "enums": ["none", "swelling", "numbness", "tingling", "color_change", "unknown"]
+        },
+        {
+          "field_key": "support_device_intact",
+          "field_type": "string",
+          "description": "Cast, brace, or dressing intact",
+          "enums": ["yes", "no", "not_applicable", "unknown"]
+        },
+        {
+          "field_key": "mobility_compliance",
+          "field_type": "string",
+          "description": "Following mobility advice",
+          "enums": ["yes", "partial", "no", "unknown"]
+        }
+      ]
+    },
+    "neuro": {
+      "questions": [
+        "Ask about headache, dizziness, or vision changes",
+        "Ask about weakness, numbness, or speech difficulty",
+        "Ask whether they can walk and care for themselves safely"
+      ],
+      "keywords": [
+        "worst headache",
+        "facial droop",
+        "slurred speech",
+        "one sided weakness",
+        "seizure",
+        "loss of consciousness",
+        "sudden vision loss"
+      ],
+      "fields": [
+        {
+          "field_key": "neuro_symptoms",
+          "field_type": "string",
+          "description": "Headache, weakness, speech, or vision issues",
+          "enums": ["none", "mild", "moderate", "severe", "unknown"]
+        },
+        {
+          "field_key": "functional_status",
+          "field_type": "string",
+          "description": "Ability to walk and self-care",
+          "enums": ["independent", "needs_help", "unable", "unknown"]
+        }
+      ]
+    },
+    "renal": {
+      "questions": [
+        "Ask about urine output changes",
+        "Ask about swelling in legs or face",
+        "Ask about nausea, fatigue, or confusion"
+      ],
+      "keywords": [
+        "no urine",
+        "severe swelling",
+        "confusion",
+        "chest pain",
+        "shortness of breath"
+      ],
+      "fields": [
+        {
+          "field_key": "urine_output_change",
+          "field_type": "string",
+          "description": "Change in urine output",
+          "enums": ["normal", "decreased", "increased", "unknown"]
+        },
+        {
+          "field_key": "swelling",
+          "field_type": "string",
+          "description": "Leg or facial swelling",
+          "enums": ["none", "mild", "moderate", "severe", "unknown"]
+        }
+      ]
+    },
+    "gi": {
+      "questions": [
+        "Ask about abdominal pain, nausea, or vomiting",
+        "Ask about bowel movement changes or blood in stool",
+        "Ask whether they are keeping food and fluids down"
+      ],
+      "keywords": [
+        "severe abdominal pain",
+        "vomiting blood",
+        "black stools",
+        "bloody stools",
+        "unable to keep fluids down",
+        "jaundice"
+      ],
+      "fields": [
+        {
+          "field_key": "abdominal_symptoms",
+          "field_type": "string",
+          "description": "Abdominal pain, nausea, or vomiting",
+          "enums": ["none", "mild", "moderate", "severe", "unknown"]
+        },
+        {
+          "field_key": "oral_intake",
+          "field_type": "string",
+          "description": "Ability to keep food and fluids down",
+          "enums": ["good", "partial", "poor", "unknown"]
+        }
+      ]
+    },
+    "endocrine": {
+      "questions": [
+        "Ask about blood sugar readings if they check at home",
+        "Ask about excessive thirst, urination, or dizziness",
+        "Ask whether diabetes or hormone medications are taken as prescribed"
+      ],
+      "keywords": [
+        "very high sugar",
+        "very low sugar",
+        "unconscious",
+        "confusion",
+        "vomiting",
+        "fruity breath"
+      ],
+      "fields": [
+        {
+          "field_key": "glucose_control",
+          "field_type": "string",
+          "description": "Perceived blood sugar control",
+          "enums": ["stable", "high", "low", "fluctuating", "unknown"]
+        },
+        {
+          "field_key": "warning_symptoms",
+          "field_type": "string",
+          "description": "Thirst, urination, dizziness related to glucose",
+          "enums": ["none", "mild", "moderate", "severe", "unknown"]
+        }
+      ]
+    },
+    "post_op": {
+      "questions": [
+        "Ask about surgical site pain on a 0-10 scale",
+        "Ask whether the incision looks red, swollen, or draining",
+        "Ask about fever and whether they are mobilizing as advised"
+      ],
+      "keywords": [
+        "wound opening",
+        "pus",
+        "spreading redness",
+        "high fever",
+        "severe pain",
+        "bleeding from wound"
+      ],
+      "fields": [
+        {
+          "field_key": "pain_level",
+          "field_type": "integer",
+          "description": "Surgical site pain 0-10",
+          "minimum": 0,
+          "maximum": 10
+        },
+        {
+          "field_key": "incision_concern",
+          "field_type": "string",
+          "description": "Incision redness, swelling, or drainage",
+          "enums": ["none", "mild", "moderate", "severe", "unknown"]
+        },
+        {
+          "field_key": "mobility_compliance",
+          "field_type": "string",
+          "description": "Following post-op mobility advice",
+          "enums": ["yes", "partial", "no", "unknown"]
+        }
+      ]
+    },
+    "mental_health": {
+      "questions": [
+        "Ask how their mood and sleep have been since discharge",
+        "Ask whether they are taking psychiatric medications as prescribed",
+        "Ask whether they feel safe and have support at home"
+      ],
+      "keywords": [
+        "suicidal",
+        "want to die",
+        "kill myself",
+        "self harm",
+        "hearing voices",
+        "not safe"
+      ],
+      "fields": [
+        {
+          "field_key": "mood_sleep",
+          "field_type": "string",
+          "description": "Mood and sleep since discharge",
+          "enums": ["better", "same", "worse", "unknown"]
+        },
+        {
+          "field_key": "safety_concern",
+          "field_type": "string",
+          "description": "Whether patient reports feeling unsafe",
+          "enums": ["no", "yes", "unknown"]
+        }
+      ]
+    },
+    "general": {
+      "questions": [
+        "Ask about pain level on a 0-10 scale if relevant",
+        "Ask whether they have had any emergency visits since discharge"
+      ],
+      "keywords": [
+        "severe pain",
+        "high fever",
+        "vomiting",
+        "dizziness",
+        "weakness"
+      ],
+      "fields": [
+        {
+          "field_key": "pain_level",
+          "field_type": "integer",
+          "description": "Pain 0-10 if applicable",
+          "minimum": 0,
+          "maximum": 10
+        },
+        {
+          "field_key": "unplanned_care",
+          "field_type": "string",
+          "description": "Emergency or unplanned care since discharge",
+          "enums": ["none", "clinic", "er", "readmission", "unknown"]
+        }
+      ]
+    }
+  }
+}

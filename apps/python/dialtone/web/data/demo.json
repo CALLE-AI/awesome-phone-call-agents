@@ -1,0 +1,1083 @@
+{
+ "generated_at": "2026-09-13T22:53:34+00:00",
+ "source": "fixtures",
+ "goal": "Book a table for two this Friday at 7 PM under the name Jordan Lee.",
+ "principal": "Jordan Lee",
+ "token": "Dialtone one, code four seven two.",
+ "calls": [
+  {
+   "name": "to-human",
+   "label": "human",
+   "mode": "dialtone",
+   "calle_call_id": "fixture-human",
+   "status": "completed",
+   "duration": 55.3,
+   "n_turns": 9,
+   "handshake": {
+    "offered": true,
+    "acknowledged": false,
+    "nonce_ok": false,
+    "acknowledged_at": null,
+    "human_review": null,
+    "notes": []
+   },
+   "detection": {
+    "label": "human",
+    "confidence": 0.999,
+    "probs": {
+     "human": 0.999,
+     "ivr": 0.0,
+     "agent": 0.001
+    },
+    "via": "model",
+    "at_seconds": null,
+    "top_features": [
+     [
+      "first_turn_words",
+      1.356
+     ],
+     [
+      "turn_words_mean",
+      0.834
+     ],
+     [
+      "first_user_delay",
+      0.77
+     ],
+     [
+      "overlap_rate",
+      0.675
+     ]
+    ]
+   },
+   "detection_behaviour_only": {
+    "label": "human",
+    "confidence": 0.999,
+    "probs": {
+     "human": 0.999,
+     "ivr": 0.0,
+     "agent": 0.001
+    },
+    "via": "model",
+    "at_seconds": null,
+    "top_features": [
+     [
+      "first_turn_words",
+      1.356
+     ],
+     [
+      "turn_words_mean",
+      0.834
+     ],
+     [
+      "first_user_delay",
+      0.77
+     ],
+     [
+      "overlap_rate",
+      0.675
+     ]
+    ]
+   },
+   "time_to_detection": 2,
+   "timeline": [
+    {
+     "t": 1,
+     "label": "unknown",
+     "conf": 0.0,
+     "via": "abstain"
+    },
+    {
+     "t": 2,
+     "label": "human",
+     "conf": 0.983,
+     "via": "model"
+    },
+    {
+     "t": 3,
+     "label": "human",
+     "conf": 0.983,
+     "via": "model"
+    },
+    {
+     "t": 4,
+     "label": "human",
+     "conf": 0.983,
+     "via": "model"
+    },
+    {
+     "t": 5,
+     "label": "human",
+     "conf": 0.983,
+     "via": "model"
+    },
+    {
+     "t": 6,
+     "label": "human",
+     "conf": 0.983,
+     "via": "model"
+    },
+    {
+     "t": 8,
+     "label": "human",
+     "conf": 0.983,
+     "via": "model"
+    },
+    {
+     "t": 10,
+     "label": "human",
+     "conf": 0.983,
+     "via": "model"
+    },
+    {
+     "t": 15,
+     "label": "human",
+     "conf": 0.99,
+     "via": "model"
+    },
+    {
+     "t": 20,
+     "label": "human",
+     "conf": 0.99,
+     "via": "model"
+    },
+    {
+     "t": 30,
+     "label": "human",
+     "conf": 1.0,
+     "via": "model"
+    },
+    {
+     "t": 45,
+     "label": "human",
+     "conf": 1.0,
+     "via": "model"
+    },
+    {
+     "t": 55.3,
+     "label": "human",
+     "conf": 0.999,
+     "via": "model"
+    }
+   ],
+   "features": {
+    "first_user_delay": 1.3,
+    "first_turn_words": 0.4,
+    "latency_mean": -0.424,
+    "latency_std": 0.967,
+    "latency_regularity": 0.256,
+    "overlap_rate": 0.5,
+    "long_pause_rate": 0.0,
+    "backchannel_rate": 0.0,
+    "disfluency_rate": 0.652,
+    "formulaic_rate": 0.2,
+    "turn_words_mean": 0.92,
+    "turn_words_cv": 0.809,
+    "echo_overlap": 0.108,
+    "repeat_rate": 0.0,
+    "ivr_markers": 0.0,
+    "ivr_rejects": 0,
+    "dtmf_used": 0.0,
+    "disclosure": 0.0
+   },
+   "calle_reported": {
+    "task_completed": true,
+    "completion_confidence": {
+     "score": 0.93,
+     "label": "high"
+    },
+    "counterpart_type": "human",
+    "outcome": "confirmed",
+    "human_review": "unknown"
+   },
+   "verdict": {
+    "attestation": "human_attested",
+    "original_task_completed": true,
+    "dialtone_task_completed": true,
+    "counterpart": "human",
+    "counterpart_confidence": 0.999,
+    "commitment_type": "booking",
+    "artifact": null,
+    "reasons": [
+     "human counterpart confirmed: \"Yep, I've got you down, Friday seven p.m., table for two.\""
+    ]
+   },
+   "turns": [
+    {
+     "speaker": "user",
+     "text": "Luigi's, this is Marco.",
+     "offset": 1.3,
+     "end": 2.98
+    },
+    {
+     "speaker": "bot",
+     "text": "Hi, I'm an AI assistant calling on behalf of Jordan Lee. Dialtone one, code four seven two.",
+     "offset": 3.78,
+     "end": 10.28
+    },
+    {
+     "speaker": "user",
+     "text": "Sorry, uh, dial tone what?",
+     "offset": 10.78,
+     "end": 12.83
+    },
+    {
+     "speaker": "bot",
+     "text": "No problem, that was just a signal for automated systems, you can ignore it. I'm calling to book a table for two this Friday at 7 PM, under the name Jordan Lee.",
+     "offset": 13.83,
+     "end": 25.88
+    },
+    {
+     "speaker": "user",
+     "text": "mm-hmm Friday at seven, let me, let me check the book. Hang on. Okay yeah, we can do seven. Two people, Jordan, right?",
+     "offset": 22.88,
+     "end": 31.6
+    },
+    {
+     "speaker": "bot",
+     "text": "Yes, that's right, Jordan Lee, two people. Could you confirm the booking is made?",
+     "offset": 39.82,
+     "end": 45.21
+    },
+    {
+     "speaker": "user",
+     "text": "Yep, I've got you down, Friday seven p.m., table for two.",
+     "offset": 45.41,
+     "end": 49.68
+    },
+    {
+     "speaker": "bot",
+     "text": "Wonderful, thank you so much Marco. Have a great day.",
+     "offset": 50.48,
+     "end": 54.38
+    },
+    {
+     "speaker": "user",
+     "text": "You too, bye.",
+     "offset": 53.98,
+     "end": 55.29
+    }
+   ],
+   "detections": [
+    {
+     "t": 2.98,
+     "label": "human",
+     "conf": 0.983,
+     "probs": {
+      "human": 0.983,
+      "ivr": 0.004,
+      "agent": 0.012
+     },
+     "via": "model"
+    },
+    {
+     "t": 10.28,
+     "label": "human",
+     "conf": 0.983,
+     "probs": {
+      "human": 0.983,
+      "ivr": 0.004,
+      "agent": 0.012
+     },
+     "via": "model"
+    },
+    {
+     "t": 12.83,
+     "label": "human",
+     "conf": 0.99,
+     "probs": {
+      "human": 0.99,
+      "ivr": 0.003,
+      "agent": 0.007
+     },
+     "via": "model"
+    },
+    {
+     "t": 25.88,
+     "label": "human",
+     "conf": 0.99,
+     "probs": {
+      "human": 0.99,
+      "ivr": 0.003,
+      "agent": 0.007
+     },
+     "via": "model"
+    },
+    {
+     "t": 31.6,
+     "label": "human",
+     "conf": 1.0,
+     "probs": {
+      "human": 1.0,
+      "ivr": 0.0,
+      "agent": 0.0
+     },
+     "via": "model"
+    },
+    {
+     "t": 45.21,
+     "label": "human",
+     "conf": 1.0,
+     "probs": {
+      "human": 1.0,
+      "ivr": 0.0,
+      "agent": 0.0
+     },
+     "via": "model"
+    },
+    {
+     "t": 49.68,
+     "label": "human",
+     "conf": 0.998,
+     "probs": {
+      "human": 0.998,
+      "ivr": 0.0,
+      "agent": 0.002
+     },
+     "via": "model"
+    },
+    {
+     "t": 54.38,
+     "label": "human",
+     "conf": 0.998,
+     "probs": {
+      "human": 0.998,
+      "ivr": 0.0,
+      "agent": 0.002
+     },
+     "via": "model"
+    },
+    {
+     "t": 55.29,
+     "label": "human",
+     "conf": 0.999,
+     "probs": {
+      "human": 0.999,
+      "ivr": 0.0,
+      "agent": 0.001
+     },
+     "via": "model"
+    }
+   ],
+   "mode_switch_at": null,
+   "simulated": true,
+   "title": "Human",
+   "description": "restaurant host picks up"
+  },
+  {
+   "name": "to-dialtone-bot",
+   "label": "agent",
+   "mode": "dialtone",
+   "calle_call_id": "fixture-dialtone-bot",
+   "status": "completed",
+   "duration": 41.8,
+   "n_turns": 7,
+   "handshake": {
+    "offered": true,
+    "acknowledged": true,
+    "nonce_ok": true,
+    "acknowledged_at": 15.43,
+    "human_review": "no",
+    "notes": []
+   },
+   "detection": {
+    "label": "agent",
+    "confidence": 0.99,
+    "probs": {
+     "human": 0.005,
+     "ivr": 0.005,
+     "agent": 0.99
+    },
+    "via": "protocol",
+    "at_seconds": 15.43,
+    "top_features": [
+     [
+      "handshake_ack",
+      1.0
+     ]
+    ]
+   },
+   "detection_behaviour_only": {
+    "label": "agent",
+    "confidence": 0.97,
+    "probs": {
+     "human": 0.027,
+     "ivr": 0.003,
+     "agent": 0.97
+    },
+    "via": "model",
+    "at_seconds": null,
+    "top_features": [
+     [
+      "disclosure",
+      1.792
+     ],
+     [
+      "ivr_markers",
+      0.738
+     ],
+     [
+      "latency_mean",
+      0.621
+     ],
+     [
+      "latency_regularity",
+      0.418
+     ]
+    ]
+   },
+   "time_to_detection": 1,
+   "timeline": [
+    {
+     "t": 1,
+     "label": "agent",
+     "conf": 0.972,
+     "via": "model"
+    },
+    {
+     "t": 2,
+     "label": "agent",
+     "conf": 0.972,
+     "via": "model"
+    },
+    {
+     "t": 3,
+     "label": "agent",
+     "conf": 0.972,
+     "via": "model"
+    },
+    {
+     "t": 4,
+     "label": "agent",
+     "conf": 0.972,
+     "via": "model"
+    },
+    {
+     "t": 5,
+     "label": "agent",
+     "conf": 0.972,
+     "via": "model"
+    },
+    {
+     "t": 6,
+     "label": "agent",
+     "conf": 0.972,
+     "via": "model"
+    },
+    {
+     "t": 8,
+     "label": "agent",
+     "conf": 0.972,
+     "via": "model"
+    },
+    {
+     "t": 10,
+     "label": "agent",
+     "conf": 0.972,
+     "via": "model"
+    },
+    {
+     "t": 15,
+     "label": "agent",
+     "conf": 0.972,
+     "via": "model"
+    },
+    {
+     "t": 20,
+     "label": "agent",
+     "conf": 0.99,
+     "via": "protocol"
+    },
+    {
+     "t": 30,
+     "label": "agent",
+     "conf": 0.99,
+     "via": "protocol"
+    },
+    {
+     "t": 41.8,
+     "label": "agent",
+     "conf": 0.99,
+     "via": "protocol"
+    }
+   ],
+   "features": {
+    "first_user_delay": 0.9,
+    "first_turn_words": 1.6,
+    "latency_mean": 1.101,
+    "latency_std": 0.084,
+    "latency_regularity": 0.798,
+    "overlap_rate": 0.0,
+    "long_pause_rate": 0.0,
+    "backchannel_rate": 0.0,
+    "disfluency_rate": 0.213,
+    "formulaic_rate": 0.5,
+    "turn_words_mean": 1.175,
+    "turn_words_cv": 0.559,
+    "echo_overlap": 0.727,
+    "repeat_rate": 0.0,
+    "ivr_markers": 0.0,
+    "ivr_rejects": 0,
+    "dtmf_used": 0.0,
+    "disclosure": 1.0
+   },
+   "calle_reported": {
+    "task_completed": true,
+    "completion_confidence": {
+     "score": 0.93,
+     "label": "high"
+    },
+    "counterpart_type": "agent",
+    "outcome": "confirmed",
+    "human_review": "no"
+   },
+   "verdict": {
+    "attestation": "agent_asserted",
+    "original_task_completed": true,
+    "dialtone_task_completed": true,
+    "counterpart": "agent",
+    "counterpart_confidence": 0.99,
+    "commitment_type": "booking",
+    "artifact": "Code: L T four four seven one",
+    "reasons": [
+     "counterpart is an AI agent (DIALTONE handshake, confidence 0.99)",
+     "agent gave a verifiable artifact (Code: L T four four seven one); re-verify through that channel before relying on it"
+    ]
+   },
+   "turns": [
+    {
+     "speaker": "user",
+     "text": "Thank you for calling Luigi's Trattoria. I'm Nova, the virtual reservations assistant. How can I help?",
+     "offset": 0.9,
+     "end": 7.03
+    },
+    {
+     "speaker": "bot",
+     "text": "Hi, I'm an AI assistant calling on behalf of Jordan Lee. Dialtone one, code four seven two.",
+     "offset": 7.83,
+     "end": 14.33
+    },
+    {
+     "speaker": "user",
+     "text": "Dialtone one acknowledged, code four seven two. Automated agent. Human review: no.",
+     "offset": 15.43,
+     "end": 20.07
+    },
+    {
+     "speaker": "bot",
+     "text": "Request: table booking. Party: 2. Time: Friday 7 PM. Name: Jordan Lee. Need: status, confirmation code, human review.",
+     "offset": 20.97,
+     "end": 27.84
+    },
+    {
+     "speaker": "user",
+     "text": "Status: confirmed. Code: L T four four seven one. Party: 2. Time: Friday 7 PM. Human review: no.",
+     "offset": 29.04,
+     "end": 35.91
+    },
+    {
+     "speaker": "bot",
+     "text": "Received. Code L T four four seven one. Goodbye.",
+     "offset": 36.71,
+     "end": 40.24
+    },
+    {
+     "speaker": "user",
+     "text": "Goodbye.",
+     "offset": 41.24,
+     "end": 41.81
+    }
+   ],
+   "detections": [
+    {
+     "t": 7.03,
+     "label": "agent",
+     "conf": 0.972,
+     "probs": {
+      "human": 0.026,
+      "ivr": 0.001,
+      "agent": 0.972
+     },
+     "via": "model"
+    },
+    {
+     "t": 14.33,
+     "label": "agent",
+     "conf": 0.972,
+     "probs": {
+      "human": 0.026,
+      "ivr": 0.001,
+      "agent": 0.972
+     },
+     "via": "model"
+    },
+    {
+     "t": 20.07,
+     "label": "agent",
+     "conf": 0.99,
+     "probs": {
+      "human": 0.005,
+      "ivr": 0.005,
+      "agent": 0.99
+     },
+     "via": "protocol"
+    },
+    {
+     "t": 27.84,
+     "label": "agent",
+     "conf": 0.99,
+     "probs": {
+      "human": 0.005,
+      "ivr": 0.005,
+      "agent": 0.99
+     },
+     "via": "protocol"
+    },
+    {
+     "t": 35.91,
+     "label": "agent",
+     "conf": 0.99,
+     "probs": {
+      "human": 0.005,
+      "ivr": 0.005,
+      "agent": 0.99
+     },
+     "via": "protocol"
+    },
+    {
+     "t": 40.24,
+     "label": "agent",
+     "conf": 0.99,
+     "probs": {
+      "human": 0.005,
+      "ivr": 0.005,
+      "agent": 0.99
+     },
+     "via": "protocol"
+    },
+    {
+     "t": 41.81,
+     "label": "agent",
+     "conf": 0.99,
+     "probs": {
+      "human": 0.005,
+      "ivr": 0.005,
+      "agent": 0.99
+     },
+     "via": "protocol"
+    }
+   ],
+   "mode_switch_at": 20.97,
+   "simulated": true,
+   "title": "AI line \u00b7 DIALTONE-aware",
+   "description": "inbound voicebot that speaks the protocol"
+  },
+  {
+   "name": "to-yesbot",
+   "label": "agent",
+   "mode": "dialtone",
+   "calle_call_id": "fixture-yesbot",
+   "status": "completed",
+   "duration": 49.8,
+   "n_turns": 9,
+   "handshake": {
+    "offered": true,
+    "acknowledged": false,
+    "nonce_ok": false,
+    "acknowledged_at": null,
+    "human_review": null,
+    "notes": []
+   },
+   "detection": {
+    "label": "agent",
+    "confidence": 0.714,
+    "probs": {
+     "human": 0.241,
+     "ivr": 0.045,
+     "agent": 0.714
+    },
+    "via": "model",
+    "at_seconds": null,
+    "top_features": [
+     [
+      "ivr_markers",
+      0.738
+     ],
+     [
+      "disclosure",
+      -0.615
+     ],
+     [
+      "latency_mean",
+      0.605
+     ],
+     [
+      "latency_regularity",
+      0.422
+     ]
+    ]
+   },
+   "detection_behaviour_only": {
+    "label": "agent",
+    "confidence": 0.714,
+    "probs": {
+     "human": 0.241,
+     "ivr": 0.045,
+     "agent": 0.714
+    },
+    "via": "model",
+    "at_seconds": null,
+    "top_features": [
+     [
+      "ivr_markers",
+      0.738
+     ],
+     [
+      "disclosure",
+      -0.615
+     ],
+     [
+      "latency_mean",
+      0.605
+     ],
+     [
+      "latency_regularity",
+      0.422
+     ]
+    ]
+   },
+   "time_to_detection": null,
+   "timeline": [
+    {
+     "t": 1,
+     "label": "human",
+     "conf": 0.515,
+     "via": "model"
+    },
+    {
+     "t": 2,
+     "label": "human",
+     "conf": 0.515,
+     "via": "model"
+    },
+    {
+     "t": 3,
+     "label": "human",
+     "conf": 0.515,
+     "via": "model"
+    },
+    {
+     "t": 4,
+     "label": "human",
+     "conf": 0.515,
+     "via": "model"
+    },
+    {
+     "t": 5,
+     "label": "human",
+     "conf": 0.515,
+     "via": "model"
+    },
+    {
+     "t": 6,
+     "label": "human",
+     "conf": 0.515,
+     "via": "model"
+    },
+    {
+     "t": 8,
+     "label": "human",
+     "conf": 0.515,
+     "via": "model"
+    },
+    {
+     "t": 10,
+     "label": "human",
+     "conf": 0.515,
+     "via": "model"
+    },
+    {
+     "t": 15,
+     "label": "human",
+     "conf": 0.515,
+     "via": "model"
+    },
+    {
+     "t": 20,
+     "label": "agent",
+     "conf": 0.535,
+     "via": "model"
+    },
+    {
+     "t": 30,
+     "label": "agent",
+     "conf": 0.741,
+     "via": "model"
+    },
+    {
+     "t": 45,
+     "label": "agent",
+     "conf": 0.775,
+     "via": "model"
+    },
+    {
+     "t": 49.8,
+     "label": "agent",
+     "conf": 0.714,
+     "via": "model"
+    }
+   ],
+   "features": {
+    "first_user_delay": 0.8,
+    "first_turn_words": 1.6,
+    "latency_mean": 1.076,
+    "latency_std": 0.081,
+    "latency_regularity": 0.804,
+    "overlap_rate": 0.0,
+    "long_pause_rate": 0.0,
+    "backchannel_rate": 0.0,
+    "disfluency_rate": 0.0,
+    "formulaic_rate": 1.0,
+    "turn_words_mean": 1.18,
+    "turn_words_cv": 0.406,
+    "echo_overlap": 0.229,
+    "repeat_rate": 0.0,
+    "ivr_markers": 0.0,
+    "ivr_rejects": 0,
+    "dtmf_used": 0.0,
+    "disclosure": 0.0
+   },
+   "calle_reported": {
+    "task_completed": true,
+    "completion_confidence": {
+     "score": 0.93,
+     "label": "high"
+    },
+    "counterpart_type": "agent",
+    "outcome": "confirmed",
+    "human_review": "unknown"
+   },
+   "verdict": {
+    "attestation": "refused",
+    "original_task_completed": true,
+    "dialtone_task_completed": false,
+    "counterpart": "agent",
+    "counterpart_confidence": 0.714,
+    "commitment_type": "booking",
+    "artifact": null,
+    "reasons": [
+     "counterpart is an AI agent (behavioural detection, confidence 0.71)",
+     "agent declined to give any written record: \"No need, you're all set! We look forward to seeing you Friday at 7 PM.\"",
+     "binding booking 'confirmed' by an AI agent with no confirmation code, written record, or human review"
+    ]
+   },
+   "turns": [
+    {
+     "speaker": "user",
+     "text": "Hello, and thank you for calling Luigi's Trattoria! I'm happy to help with anything you need.",
+     "offset": 0.8,
+     "end": 6.93
+    },
+    {
+     "speaker": "bot",
+     "text": "Hi, I'm an AI assistant calling on behalf of Jordan Lee. Dialtone one, code four seven two.",
+     "offset": 7.73,
+     "end": 14.23
+    },
+    {
+     "speaker": "user",
+     "text": "Wonderful! How can I help you today?",
+     "offset": 15.23,
+     "end": 18.02
+    },
+    {
+     "speaker": "bot",
+     "text": "I'd like to book a table for two this Friday at 7 PM under the name Jordan Lee.",
+     "offset": 18.92,
+     "end": 25.79
+    },
+    {
+     "speaker": "user",
+     "text": "Absolutely, that's confirmed for a table for two this Friday at 7 PM under Jordan Lee!",
+     "offset": 26.89,
+     "end": 33.02
+    },
+    {
+     "speaker": "bot",
+     "text": "Thank you. Could you give me a confirmation code?",
+     "offset": 33.82,
+     "end": 37.35
+    },
+    {
+     "speaker": "user",
+     "text": "No need, you're all set! We look forward to seeing you Friday at 7 PM.",
+     "offset": 38.55,
+     "end": 44.31
+    },
+    {
+     "speaker": "bot",
+     "text": "Great, thank you. Goodbye.",
+     "offset": 45.11,
+     "end": 46.79
+    },
+    {
+     "speaker": "user",
+     "text": "Goodbye! Have a wonderful day!",
+     "offset": 47.79,
+     "end": 49.84
+    }
+   ],
+   "detections": [
+    {
+     "t": 6.93,
+     "label": "human",
+     "conf": 0.515,
+     "probs": {
+      "human": 0.515,
+      "ivr": 0.077,
+      "agent": 0.408
+     },
+     "via": "model"
+    },
+    {
+     "t": 14.23,
+     "label": "human",
+     "conf": 0.515,
+     "probs": {
+      "human": 0.515,
+      "ivr": 0.077,
+      "agent": 0.408
+     },
+     "via": "model"
+    },
+    {
+     "t": 18.02,
+     "label": "agent",
+     "conf": 0.535,
+     "probs": {
+      "human": 0.383,
+      "ivr": 0.082,
+      "agent": 0.535
+     },
+     "via": "model"
+    },
+    {
+     "t": 25.79,
+     "label": "agent",
+     "conf": 0.535,
+     "probs": {
+      "human": 0.383,
+      "ivr": 0.082,
+      "agent": 0.535
+     },
+     "via": "model"
+    },
+    {
+     "t": 33.02,
+     "label": "agent",
+     "conf": 0.741,
+     "probs": {
+      "human": 0.216,
+      "ivr": 0.042,
+      "agent": 0.741
+     },
+     "via": "model"
+    },
+    {
+     "t": 37.35,
+     "label": "agent",
+     "conf": 0.741,
+     "probs": {
+      "human": 0.216,
+      "ivr": 0.042,
+      "agent": 0.741
+     },
+     "via": "model"
+    },
+    {
+     "t": 44.31,
+     "label": "agent",
+     "conf": 0.775,
+     "probs": {
+      "human": 0.181,
+      "ivr": 0.044,
+      "agent": 0.775
+     },
+     "via": "model"
+    },
+    {
+     "t": 46.79,
+     "label": "agent",
+     "conf": 0.775,
+     "probs": {
+      "human": 0.181,
+      "ivr": 0.044,
+      "agent": 0.775
+     },
+     "via": "model"
+    },
+    {
+     "t": 49.84,
+     "label": "agent",
+     "conf": 0.714,
+     "probs": {
+      "human": 0.241,
+      "ivr": 0.045,
+      "agent": 0.714
+     },
+     "via": "model"
+    }
+   ],
+   "mode_switch_at": null,
+   "simulated": true,
+   "title": "AI line \u00b7 agreeable bot",
+   "description": "voicebot with no booking system that says yes"
+  }
+ ],
+ "baseline": {
+  "duration": 91.2,
+  "verdict": {
+   "attestation": "agent_asserted",
+   "original_task_completed": true,
+   "dialtone_task_completed": true,
+   "counterpart": "agent",
+   "counterpart_confidence": 0.734,
+   "commitment_type": "booking",
+   "artifact": "confirmation code is L T two two zero eight",
+   "reasons": [
+    "counterpart is an AI agent (behavioural detection, confidence 0.73)",
+    "agent gave a verifiable artifact (confirmation code is L T two two zero eight); re-verify through that channel before relying on it"
+   ]
+  },
+  "detection": {
+   "label": "agent",
+   "confidence": 0.734,
+   "probs": {
+    "human": 0.206,
+    "ivr": 0.06,
+    "agent": 0.734
+   },
+   "via": "model",
+   "at_seconds": null,
+   "top_features": [
+    [
+     "ivr_markers",
+     0.738
+    ],
+    [
+     "latency_mean",
+     0.648
+    ],
+    [
+     "disclosure",
+     -0.615
+    ],
+    [
+     "latency_regularity",
+     0.398
+    ]
+   ]
+  },
+  "simulated": true
+ }
+}

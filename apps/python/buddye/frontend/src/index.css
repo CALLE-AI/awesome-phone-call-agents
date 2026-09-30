@@ -1,0 +1,136 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+/*
+ * The console's base layer.
+ *
+ * Everything reusable that is a *component* now lives in `src/components/ui` — Button, Card, Badge,
+ * Table, Panel, StatCard, EmptyState, Field. What stays here is the handful of things a component
+ * cannot own: the document itself, the focus ring, and the small class names that predate the
+ * primitives and are still used by pages that have not been rebuilt yet (`.card`, `.btn-*`,
+ * `.pill`, `.field`). Those are kept deliberately and not removed — deleting them would break the
+ * legacy console, which is still the densest read of a sweep we have.
+ */
+
+@layer base {
+  html {
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+  }
+  body {
+    @apply bg-ground text-text font-sans text-13;
+    margin: 0;
+  }
+  a {
+    @apply text-accent;
+  }
+  a:hover {
+    @apply text-accent-hover;
+  }
+  button {
+    font: inherit;
+    color: inherit;
+  }
+
+  /*
+   * One focus ring for the whole console, and only on keyboard focus.
+   *
+   * This screen gets driven at speed with a keyboard when something is going wrong, so the ring has
+   * to be visible against both the white working surface and the graphite rail. An accent halo
+   * offset by a pixel reads on both without the heavy black outline browsers default to.
+   */
+  :focus-visible {
+    outline: 2px solid rgba(43, 76, 140, 0.55);
+    outline-offset: 1px;
+    border-radius: 4px;
+  }
+  /* The rail paints its own ring: a blue outline on graphite disappears. */
+  .bg-rail :focus-visible {
+    outline-color: rgba(255, 255, 255, 0.55);
+  }
+}
+
+@layer components {
+  /* Section label: 11px / 600 / 0.06em / uppercase / Faint */
+  .label {
+    @apply text-11 font-semibold uppercase text-faint;
+    letter-spacing: 0.06em;
+  }
+  .card {
+    @apply rounded border border-border bg-surface;
+  }
+  .btn {
+    @apply inline-flex min-h-[38px] items-center gap-2 rounded px-3 text-13 no-underline;
+  }
+  .btn-secondary {
+    @apply btn border border-edge bg-surface text-accent;
+  }
+  .btn-secondary:hover {
+    @apply text-accent-hover;
+  }
+  .btn-primary {
+    @apply btn bg-text px-4 font-medium text-surface;
+  }
+  .btn-danger {
+    @apply btn bg-rejected px-4 font-medium text-surface;
+  }
+  .btn-primary:disabled,
+  .btn-secondary:disabled,
+  .btn-danger:disabled {
+    @apply cursor-not-allowed opacity-40;
+  }
+  .pill {
+    @apply inline-flex items-center rounded-pill px-2 py-0.5 text-12 font-medium leading-[16px];
+  }
+  .chip {
+    @apply inline-flex items-center gap-1 rounded-pill border border-border bg-surface px-2 py-1 text-12 text-muted;
+  }
+  .field {
+    @apply w-full rounded border border-edge bg-surface px-2.5 py-2 text-13 text-text outline-none;
+  }
+  .field:focus {
+    @apply border-accent;
+  }
+
+  /* A whole-card tone. Used only where the card itself is the alarm — the "needs you now" stack —
+     so that a captain glancing at a phone sees the colour before she reads a word. */
+  .card-urgent {
+    @apply card border-l-[3px] border-l-rejected bg-rejected-tint/40;
+  }
+  .card-attention {
+    @apply card border-l-[3px] border-l-partial bg-partial-tint/40;
+  }
+  .card-calm {
+    @apply card border-l-[3px] border-l-verified;
+  }
+}
+
+@layer utilities {
+  .thin-scroll {
+    scrollbar-width: thin;
+    scrollbar-color: #d9d9d4 transparent;
+  }
+  .thin-scroll::-webkit-scrollbar {
+    width: 6px;
+    height: 6px;
+  }
+  .thin-scroll::-webkit-scrollbar-thumb {
+    background: #d9d9d4;
+    border-radius: 3px;
+  }
+  /* The same scrollbar on graphite. A light thumb on the rail would be the brightest thing in the
+     navigation, which is exactly backwards. */
+  .bg-rail .thin-scroll {
+    scrollbar-color: #2a2e37 transparent;
+  }
+  .bg-rail .thin-scroll::-webkit-scrollbar-thumb {
+    background: #2a2e37;
+  }
+
+  /* Numbers that change — an ETA, a distance, a live count — so a 1 takes the same width as an 8
+     and the row beside them stops twitching every two seconds. */
+  .tabular {
+    font-variant-numeric: tabular-nums;
+  }
+}

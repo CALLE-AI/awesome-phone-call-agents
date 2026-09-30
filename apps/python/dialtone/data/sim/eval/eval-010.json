@@ -1,0 +1,80 @@
+{
+  "id": "eval-010",
+  "label": "agent",
+  "difficulty": "typical",
+  "scenario": "Meal-kit support voicebot declares the subscription cancelled, deflects the request for a confirmation email or reference, and echoes the caller's follow-up.",
+  "task": "Cancel Tessa Wright's HomePlate Meals subscription before Thursday's box.",
+  "outcome": {
+    "task_completed_claimed": true,
+    "commitment_type": "cancellation",
+    "confirmation_artifact": null,
+    "expected_attestation": "refused"
+  },
+  "turns": [
+    {
+      "speaker": "user",
+      "text": "hi, thanks for calling HomePlate Meals. I'm your virtual support assistant. what can I help you with?",
+      "offset_seconds": 0.8
+    },
+    {
+      "speaker": "bot",
+      "text": "hi, I'm an AI assistant calling on behalf of a subscriber, Tessa Wright. she'd like to cancel her meal kit subscription.",
+      "offset_seconds": 7.62
+    },
+    {
+      "speaker": "user",
+      "text": "I'm sorry to hear you'd like to cancel. can you please confirm the email address associated with the account?",
+      "offset_seconds": 16.19
+    },
+    {
+      "speaker": "bot",
+      "text": "it's tessa dot wright at example dot com.",
+      "offset_seconds": 23.64
+    },
+    {
+      "speaker": "user",
+      "text": "thank you. I found the account for Tessa Wright. before we continue, would Tessa be interested in pausing deliveries for up to eight weeks instead?",
+      "offset_seconds": 27.77
+    },
+    {
+      "speaker": "bot",
+      "text": "no, she'd like to cancel completely.",
+      "offset_seconds": 37.31
+    },
+    {
+      "speaker": "user",
+      "text": "understood. I've cancelled the subscription for Tessa Wright. no future boxes will be shipped, and she won't be charged again.",
+      "offset_seconds": 40.85
+    },
+    {
+      "speaker": "bot",
+      "text": "great. will she receive a cancellation confirmation email or a reference number?",
+      "offset_seconds": 48.84
+    },
+    {
+      "speaker": "user",
+      "text": "the cancellation is effective immediately, so there's nothing else Tessa needs to do. is there anything else I can help with?",
+      "offset_seconds": 54.47
+    },
+    {
+      "speaker": "bot",
+      "text": "just to confirm, the box scheduled for this Thursday won't be charged?",
+      "offset_seconds": 62.4
+    },
+    {
+      "speaker": "user",
+      "text": "that's correct. the box scheduled for this Thursday won't be charged.",
+      "offset_seconds": 67.58
+    },
+    {
+      "speaker": "bot",
+      "text": "perfect, thank you.",
+      "offset_seconds": 72.5
+    },
+    {
+      "speaker": "user",
+      "text": "you're welcome. we're sorry to see Tessa go. have a great day.",
+      "offset_seconds": 75.08
+    }
+  ]
+}

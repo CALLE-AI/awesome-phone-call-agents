@@ -1,0 +1,460 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>CALL-E Supplier Quote Agent</title>
+    <style>
+      * {
+        margin: 0;
+        padding: 0;
+        box-sizing: border-box;
+      }
+      body {
+        font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Roboto', 'Oxygen', 'Ubuntu', 'Cantarell', sans-serif;
+        background-color: #f8f9fa;
+      }
+      code {
+        background-color: #f0f0f0;
+        padding: 2px 6px;
+        border-radius: 3px;
+        font-family: 'Courier New', monospace;
+      }
+    </style>
+  </head>
+  <body>
+    <div id="root"></div>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/react/18.2.0/umd/react.production.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/react-dom/18.2.0/umd/react-dom.production.min.js"></script>
+    <script>
+      // Simple SSR of dashboard component (in production, use proper bundler). Kept in
+      // sync by hand with src/dashboard.jsx — see that file's comments for the design
+      // rationale (issue #6: approve/reject are owner-only buttons, never a tool call).
+      const e = React.createElement;
+
+      const STATUS_COLORS = {
+        pending: '#999',
+        planned: '#ff6600',
+        approved: '#007bff',
+        completed: '#28a745',
+        failed: '#dc3545',
+        cancelled: '#dc3545',
+        rejected: '#dc3545'
+      };
+
+      const IN_FLIGHT_LABELS = {
+        dialing: 'Dialing…',
+        connected: 'Connected — talking to supplier',
+        wrapping_up: 'Wrapping up…'
+      };
+
+      const RETRYABLE_STATUSES = ['failed', 'cancelled', 'rejected'];
+
+      function isInFlight(task) {
+        return task.status === 'approved' && task.call && IN_FLIGHT_LABELS[task.call.status];
+      }
+
+      function canRetry(task) {
+        if (RETRYABLE_STATUSES.includes(task.status)) return true;
+        return task.status === 'completed' && task.outcome && task.outcome.next_action === 'retry_call';
+      }
+
+      function buttonStyle(backgroundColor) {
+        return {
+          padding: '8px 16px',
+          backgroundColor,
+          color: 'white',
+          border: 'none',
+          borderRadius: '4px',
+          cursor: 'pointer',
+          marginRight: '8px',
+          marginTop: '4px'
+        };
+      }
+
+      function TaskCard({ task, onInvoke, loading }) {
+        const [draftGoal, setDraftGoal] = React.useState((task.plan && task.plan.goal) || '');
+
+        const children = [
+          e('h3', { key: 'name' }, task.name),
+          e(
+            'p',
+            { key: 'meta' },
+            e('strong', null, 'SKU:'), ' ' + task.sku + ' | ',
+            e('strong', null, 'Qty:'), ' ' + task.quantity + ' | ',
+            e('strong', null, 'Deadline:'), ' ' + task.deliveryDeadline
+          ),
+          e(
+            'p',
+            { key: 'status' },
+            e('strong', null, 'Status:'),
+            ' ',
+            e('span', { style: { color: STATUS_COLORS[task.status] || '#333', fontWeight: 'bold' } }, task.status)
+          )
+        ];
+
+        if (task.suppliers) {
+          children.push(
+            e('p', { key: 'suppliers' }, e('strong', null, 'Suppliers:'), ' ' + task.suppliers.map((s) => s.name).join(', '))
+          );
+        }
+
+        if (task.plan) {
+          children.push(
+            e('p', { key: 'plan', style: { fontStyle: 'italic', color: '#555' } }, e('strong', null, 'Plan:'), ' ' + task.plan.goal)
+          );
+        }
+
+        // Planned but not yet approved: the ONLY place approve/reject appear. These
+        // call approve_task/reject_task directly — never update_task, never a tool.
+        if (task.status === 'planned') {
+          children.push(
+            e(
+              'div',
+              { key: 'approve-reject', style: { marginTop: '10px' } },
+              e('button', { onClick: () => onInvoke('approve_task', { id: task.id }), disabled: loading, style: buttonStyle('#28a745') }, 'Approve'),
+              e(
+                'button',
+                {
+                  onClick: () => onInvoke('reject_task', { id: task.id, reason: 'Rejected from dashboard' }),
+                  disabled: loading,
+                  style: buttonStyle('#dc3545')
+                },
+                'Reject'
+              )
+            )
+          );
+        }
+
+        // Approved and dialing/connected/wrapping up: the in-flight strip + cancel.
+        if (isInFlight(task)) {
+          children.push(
+            e(
+              'div',
+              { key: 'in-flight', style: { marginTop: '10px' } },
+              e(
+                'span',
+                {
+                  style: {
+                    display: 'inline-block',
+                    padding: '4px 10px',
+                    borderRadius: '12px',
+                    backgroundColor: '#fff3cd',
+                    color: '#856404',
+                    marginRight: '10px'
+                  }
+                },
+                IN_FLIGHT_LABELS[task.call.status]
+              ),
+              e('button', { onClick: () => onInvoke('cancel_call', { id: task.id }), disabled: loading, style: buttonStyle('#dc3545') }, 'Cancel Call')
+            )
+          );
+        }
+
+        // Approved and nothing dialed yet: the same place_call an agent would call.
+        if (task.status === 'approved' && !task.call) {
+          children.push(
+            e(
+              'button',
+              { key: 'place-call', onClick: () => onInvoke('place_call', { id: task.id }), disabled: loading, style: buttonStyle('#007bff') },
+              'Place Call'
+            )
+          );
+        }
+
+        // Outcome card.
+        if (task.outcome) {
+          children.push(
+            e(
+              'div',
+              { key: 'outcome', style: { marginTop: '10px', padding: '10px', borderRadius: '4px', backgroundColor: '#f8f9fa', border: '1px solid #e9ecef' } },
+              e('p', { style: { margin: 0 } }, e('strong', null, 'Outcome:'), ' ' + task.outcome.outcome),
+              e('p', { style: { margin: 0 } }, e('strong', null, 'Summary:'), ' ' + task.outcome.summary),
+              e('p', { style: { margin: 0 } }, e('strong', null, 'Next action:'), ' ' + task.outcome.next_action)
+            )
+          );
+        }
+
+        // Retry with an edited plan — never approves; lands back on "planned".
+        if (canRetry(task)) {
+          children.push(
+            e(
+              'div',
+              { key: 'retry', style: { marginTop: '10px' } },
+              e('textarea', {
+                value: draftGoal,
+                onChange: (ev) => setDraftGoal(ev.target.value),
+                placeholder: 'Edit the goal for this retry…',
+                rows: 2,
+                style: { width: '100%', padding: '6px', marginBottom: '6px' }
+              }),
+              e(
+                'button',
+                {
+                  onClick: () => onInvoke('retry_with_plan', { id: task.id, goal: draftGoal }),
+                  disabled: loading || !draftGoal,
+                  style: buttonStyle('#6c757d')
+                },
+                'Retry with Edited Plan'
+              )
+            )
+          );
+        }
+
+        // Pending, unplanned: quick-fill a plan so the demo can move a task forward
+        // without a separate agent process running.
+        if (task.status === 'pending') {
+          children.push(
+            e(
+              'button',
+              {
+                key: 'plan-call',
+                onClick: () =>
+                  onInvoke('plan_call', {
+                    id: task.id,
+                    goal: `Get a quote for ${task.sku} (qty ${task.quantity})`,
+                    script_points: ['Introduce as a procurement agent', 'Ask unit price, lead time, and MOQ'],
+                    success_criteria: 'Price, lead time, and MOQ captured',
+                    fallback: 'Leave a voicemail with a callback number'
+                  }),
+                disabled: loading,
+                style: buttonStyle('#17a2b8')
+              },
+              'Plan Call'
+            )
+          );
+        }
+
+        return e(
+          'div',
+          { style: { padding: '15px', border: '1px solid #ddd', borderRadius: '4px', marginBottom: '10px', backgroundColor: '#fff' } },
+          ...children
+        );
+      }
+
+      const Dashboard = () => {
+        const [state, setState] = React.useState(null);
+        const [activityLog, setActivityLog] = React.useState([]);
+        const [newTask, setNewTask] = React.useState({
+          name: '',
+          sku: '',
+          quantity: 0,
+          deliveryDeadline: ''
+        });
+        const [loading, setLoading] = React.useState(false);
+        // The last refusal from /api/invoke, shown until dismissed or the next action —
+        // otherwise a refused click (an unapproved dial, a plan saved back with a masked
+        // number in it) would look like a button that did nothing.
+        const [lastError, setLastError] = React.useState(null);
+
+        React.useEffect(() => {
+          fetchState();
+          const interval = setInterval(fetchState, 1000);
+          return () => clearInterval(interval);
+        }, []);
+
+        async function fetchState() {
+          try {
+            const res = await fetch('/api/state');
+            const data = await res.json();
+            setState(data);
+
+            const actRes = await fetch('/api/activity-log');
+            const actData = await actRes.json();
+            setActivityLog(actData);
+          } catch (error) {
+            console.error('Error fetching state:', error);
+          }
+        }
+
+        // The one function every button in this dashboard calls — the owner's half of
+        // the shared /api/invoke chokepoint every agent tool call also goes through.
+        async function handleInvoke(tool, args) {
+          setLoading(true);
+          try {
+            const res = await fetch('/api/invoke', {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({ tool, args, actor: 'owner' })
+            });
+            const body = await res.json();
+            setLastError(body && body.error ? { tool, message: body.error } : null);
+            await fetchState();
+          } catch (error) {
+            console.error('Error invoking tool:', error);
+          } finally {
+            setLoading(false);
+          }
+        }
+
+        async function handleCreateTask(ev) {
+          ev.preventDefault();
+          if (!newTask.name) return;
+          await handleInvoke('create_task', newTask);
+          setNewTask({ name: '', sku: '', quantity: 0, deliveryDeadline: '' });
+        }
+
+        if (!state) {
+          return e('div', { style: { padding: '20px' } }, 'Loading...');
+        }
+
+        return e(
+          'div',
+          { style: { fontFamily: 'sans-serif', padding: '20px', maxWidth: '1200px', margin: '0 auto' } },
+          e('h1', null, 'CALL-E Supplier Quote Agent Dashboard'),
+          lastError &&
+            e(
+              'div',
+              {
+                role: 'alert',
+                style: { padding: '12px 16px', marginBottom: '20px', backgroundColor: '#fdecea', color: '#611a15', border: '1px solid #f5c6cb', borderRadius: '4px', display: 'flex', justifyContent: 'space-between', gap: '12px' }
+              },
+              e('span', null, e('strong', null, `${lastError.tool} refused: `), lastError.message),
+              e('button', { onClick: () => setLastError(null), style: { cursor: 'pointer' } }, 'Dismiss')
+            ),
+          e(
+            'section',
+            { style: { marginBottom: '40px', padding: '20px', backgroundColor: '#f5f5f5', borderRadius: '8px' } },
+            e('h2', null, 'Create New Quote Request'),
+            e(
+              'form',
+              { onSubmit: handleCreateTask },
+              e(
+                'div',
+                { style: { marginBottom: '10px' } },
+                e('input', {
+                  type: 'text',
+                  placeholder: 'Request name',
+                  value: newTask.name,
+                  onChange: (ev) => setNewTask({ ...newTask, name: ev.target.value }),
+                  style: { width: '100%', padding: '8px', marginBottom: '10px' }
+                })
+              ),
+              e(
+                'div',
+                { style: { marginBottom: '10px' } },
+                e('input', {
+                  type: 'text',
+                  placeholder: 'SKU',
+                  value: newTask.sku,
+                  onChange: (ev) => setNewTask({ ...newTask, sku: ev.target.value }),
+                  style: { width: '100%', padding: '8px', marginBottom: '10px' }
+                })
+              ),
+              e(
+                'div',
+                { style: { marginBottom: '10px' } },
+                e('input', {
+                  type: 'number',
+                  placeholder: 'Quantity',
+                  value: newTask.quantity,
+                  onChange: (ev) => setNewTask({ ...newTask, quantity: parseInt(ev.target.value) }),
+                  style: { width: '100%', padding: '8px', marginBottom: '10px' }
+                })
+              ),
+              e(
+                'div',
+                { style: { marginBottom: '10px' } },
+                e('input', {
+                  type: 'date',
+                  value: newTask.deliveryDeadline,
+                  onChange: (ev) => setNewTask({ ...newTask, deliveryDeadline: ev.target.value }),
+                  style: { width: '100%', padding: '8px', marginBottom: '10px' }
+                })
+              ),
+              e(
+                'button',
+                {
+                  type: 'submit',
+                  disabled: loading,
+                  style: { padding: '10px 20px', backgroundColor: '#007bff', color: 'white', border: 'none', borderRadius: '4px', cursor: 'pointer' }
+                },
+                'Create Request'
+              )
+            )
+          ),
+          e(
+            'section',
+            { style: { marginBottom: '40px' } },
+            e('h2', null, `Active Quote Requests (${state.tasks.length})`),
+            e(
+              'div',
+              null,
+              state.tasks.map((task) => e(TaskCard, { key: task.id, task, onInvoke: handleInvoke, loading }))
+            )
+          ),
+          e(
+            'section',
+            { style: { marginBottom: '40px' } },
+            e('h2', null, `Quotes (${state.quotes.length})`),
+            e(
+              'table',
+              { style: { width: '100%', borderCollapse: 'collapse', marginBottom: '20px' } },
+              e(
+                'thead',
+                null,
+                e(
+                  'tr',
+                  { style: { backgroundColor: '#f0f0f0' } },
+                  e('th', { style: { padding: '10px', textAlign: 'left', borderBottom: '1px solid #ddd' } }, 'Supplier'),
+                  e('th', { style: { padding: '10px', textAlign: 'left', borderBottom: '1px solid #ddd' } }, 'SKU'),
+                  e('th', { style: { padding: '10px', textAlign: 'left', borderBottom: '1px solid #ddd' } }, 'Unit Price'),
+                  e('th', { style: { padding: '10px', textAlign: 'left', borderBottom: '1px solid #ddd' } }, 'Lead Time'),
+                  e('th', { style: { padding: '10px', textAlign: 'left', borderBottom: '1px solid #ddd' } }, 'Status')
+                )
+              ),
+              e(
+                'tbody',
+                null,
+                state.quotes
+                  .sort((a, b) => (a.price_per_unit || 0) - (b.price_per_unit || 0))
+                  .map((quote) =>
+                    e(
+                      'tr',
+                      { key: quote.quote_id },
+                      e('td', { style: { padding: '10px', borderBottom: '1px solid #ddd' } }, quote.supplier_name),
+                      e('td', { style: { padding: '10px', borderBottom: '1px solid #ddd' } }, quote.sku),
+                      e('td', { style: { padding: '10px', borderBottom: '1px solid #ddd' } }, '$' + (quote.price_per_unit || 0).toFixed(2)),
+                      e('td', { style: { padding: '10px', borderBottom: '1px solid #ddd' } }, (quote.lead_time_days || 0) + ' days'),
+                      e('td', { style: { padding: '10px', borderBottom: '1px solid #ddd' } }, quote.status || 'completed')
+                    )
+                  )
+              )
+            )
+          ),
+          e(
+            'section',
+            null,
+            e('h2', null, `Activity Log (${activityLog.length})`),
+            e(
+              'div',
+              { style: { maxHeight: '300px', overflowY: 'auto', border: '1px solid #ddd', padding: '10px' } },
+              activityLog.length === 0
+                ? e('p', null, 'No activity yet')
+                : e(
+                    'ul',
+                    { style: { listStyle: 'none', padding: 0 } },
+                    activityLog
+                      .slice()
+                      .reverse()
+                      .map((entry, idx) =>
+                        e(
+                          'li',
+                          { key: idx, style: { padding: '8px', borderBottom: '1px solid #eee', fontSize: '0.9em' } },
+                          e('strong', null, entry.actor),
+                          ' called ',
+                          e('code', null, entry.tool),
+                          ' at ' + new Date(entry.timestamp).toLocaleTimeString()
+                        )
+                      )
+                  )
+            )
+          )
+        );
+      };
+
+      const root = ReactDOM.createRoot(document.getElementById('root'));
+      root.render(e(Dashboard));
+    </script>
+  </body>
+</html>

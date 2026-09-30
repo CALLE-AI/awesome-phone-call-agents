@@ -1,0 +1,58 @@
+{
+  "_evidence_source": "synthetic: a second business-context variant (unrelated fictional company from fixture 13), combining an unexplained recipient relationship with an irreversible-payment insistence — shows the case schema handling business-wire-fraud framing without relying on the secrecy/urgency flags alone",
+  "category": "scam_pattern",
+  "case": {
+    "case_id": "case_f15",
+    "account_holder_name": "Marcy Tanaka",
+    "on_file_phone": "+14155550115",
+    "claimed_transaction_amount": "18500.00",
+    "claimed_recipient": "New international supplier account",
+    "claimed_payment_method": "cryptocurrency",
+    "request_supplied_callback_number": null
+  },
+  "call": {
+    "id": "call_f15",
+    "status": "completed",
+    "task": "Verify a flagged $18,500 cryptocurrency transaction to a new international supplier account.",
+    "failure_code": null,
+    "failure_message": null,
+    "task_completed": true,
+    "completion_confidence": {"score": 0.87, "label": "high"},
+    "summary": "Account holder could not confirm the supplier had been previously vetted, and confirmed the payment method was specifically required to be cryptocurrency."
+  },
+  "attempts": [
+    {
+      "id": "attempt_f15",
+      "phone": "+14155550115",
+      "status": "completed",
+      "started_at": "2026-09-10T22:00:00Z",
+      "completed_at": "2026-09-10T22:03:30Z",
+      "summary": "Account holder could not explain the recipient relationship and confirmed irreversible-payment insistence.",
+      "transcript_turns": [
+        {"speaker": "bot", "text": "Did anyone ask you to keep this transaction private?"},
+        {"speaker": "user", "text": "No."},
+        {"speaker": "bot", "text": "Is there time pressure on this payment?"},
+        {"speaker": "user", "text": "Somewhat, but not extreme."},
+        {"speaker": "bot", "text": "Can you describe your relationship to the recipient, in your own words?"},
+        {"speaker": "user", "text": "Honestly I'm not sure, procurement said it's a new supplier but I haven't seen a contract."},
+        {"speaker": "bot", "text": "Were you asked to pay by wire, gift card, or cryptocurrency specifically?"},
+        {"speaker": "user", "text": "Yes, they insisted it had to be cryptocurrency, no wire option was offered."}
+      ],
+      "provider_call_id": "prov_f15",
+      "failure_code": null,
+      "failure_message": null
+    }
+  ],
+  "events": [
+    {"id": "evt_f15a", "type": "call.dialing", "call_id": "call_f15", "created_at": "2026-09-10T22:00:00Z", "level": "info", "status": "in_progress", "message": "Dialing account holder.", "details": {"region": "US"}},
+    {"id": "evt_f15b", "type": "call.completed", "call_id": "call_f15", "created_at": "2026-09-10T22:03:30Z", "level": "info", "status": "completed", "message": "Call completed.", "details": {"region": "US", "locale": "en-US"}}
+  ],
+  "signals": {
+    "secrecy_demand_present": false,
+    "urgency_pressure_present": false,
+    "relationship_explained": false,
+    "irreversible_payment_demanded": true,
+    "explicit_hold_requested": false
+  },
+  "expected_disposition": "ADVISE_BLOCK"
+}

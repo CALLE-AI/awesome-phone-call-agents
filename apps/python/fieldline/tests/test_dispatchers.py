@@ -1,10 +1,10 @@
 import pytest
 
-import fieldline.calle_client as cc
 from fieldline.calle_client import (
     DemoCalleDispatcher,
     LiveCalleDispatcher,
     ScriptExhaustedError,
+    UnknownCallOutcome,
 )
 from fieldline.demo_data import SCENARIOS
 
@@ -67,7 +67,7 @@ def test_demo_streams_turns():
     assert seen and seen[0][0] == "bot"
 
 
-# --- live dispatcher fail-soft ---------------------------------------
+# --- live dispatcher fails closed ---------------------------------------
 class _ExplodingCalls:
     def __init__(self):
         self.attempts = 0
@@ -82,12 +82,14 @@ class _ExplodingClient:
         self.calls = _ExplodingCalls()
 
 
-def test_live_dispatcher_fails_soft(monkeypatch):
-    monkeypatch.setattr(cc.time, "sleep", lambda s: None)
+def test_live_dispatcher_stops_after_ambiguous_connection_error():
     client = _ExplodingClient()
-    d = LiveCalleDispatcher(api_key="k", client=client)
-    call = d.create_and_wait(task="t", recipient={"phone": "+15555550100"}, metadata={"kind": "checkin"})
-    assert client.calls.attempts == 2  # one retry, idempotency-key safe
-    assert call["status"] == "failed"
-    assert call["failure_code"] == "client_unreachable"
-    assert call["metadata"] == {"kind": "checkin"}
+    d = LiveCalleDispatcher(
+        api_key="fake-test-key", client=client, authorized_phones={"+15555550100"}
+    )
+    for _ in range(2):
+        with pytest.raises(UnknownCallOutcome):
+            d.create_and_wait(
+                task="t", recipient={"phone": "+15555550100"}, metadata={"kind": "checkin"}
+            )
+    assert client.calls.attempts == 1  # ambiguity latches the transport closed

@@ -1,0 +1,22 @@
+{
+  "name": "@muster/infrastructure-jobs",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "sideEffects": false,
+  "types": "./dist/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js"
+    }
+  },
+  "scripts": {
+    "build": "tsc -b"
+  },
+  "dependencies": {
+    "@muster/application": "0.0.0",
+    "@muster/contracts": "0.0.0",
+    "pg-boss": "12.27.0"
+  }
+}

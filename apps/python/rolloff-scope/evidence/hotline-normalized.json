@@ -1,0 +1,57 @@
+{
+  "app": "RolloffScope",
+  "batch_errors": [
+    "recipient_count_mismatch",
+    "mcp_result_has_no_native_quote_schema"
+  ],
+  "booking_order_or_acceptance_performed": false,
+  "call_id": null,
+  "call_status": "completed",
+  "locked_scope": {
+    "container_size_cubic_yards": 20,
+    "delivery_window_requested": "Not requested in the hotline test",
+    "estimated_tonnage": 2.5,
+    "placement": "Not requested in the hotline test",
+    "rental_days": 7,
+    "service_area": "No service address supplied; fictional hotline exercise",
+    "waste_type": "non-hazardous household cleanout waste"
+  },
+  "quotes": [
+    {
+      "assumptions": [],
+      "base_rental_amount": null,
+      "classification": "unresolved",
+      "commitment_allowed": false,
+      "contradictions": [],
+      "currency": null,
+      "evidence": [],
+      "evidence_missing_fields": [],
+      "missing_fields": [
+        "recipient_result"
+      ],
+      "normalized_total": null,
+      "prohibited_materials": [],
+      "reasons": [
+        "missing_recipient_result"
+      ],
+      "recipient_status": "missing",
+      "requires_human_approval": true,
+      "vendor_id": "organizer-hotline",
+      "vendor_name": "Organizer test hotline, not a commercial vendor"
+    }
+  ],
+  "ranked_for_human_review": [],
+  "request_id": "rolloffscope-hotline-import-20260909",
+  "schema_version": "2.0",
+  "selection_authority": "human_only",
+  "source": {
+    "mcp_call_ids": [
+      "redacted_call_1"
+    ],
+    "mcp_run_id": "redacted_run_20260909",
+    "native_quote_schema_available": false,
+    "network_attempted": false,
+    "rest_call_id_verified": false,
+    "transport": "official_cli_get_call_run_file_import"
+  }
+}

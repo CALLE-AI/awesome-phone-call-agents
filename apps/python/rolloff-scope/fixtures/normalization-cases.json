@@ -1,0 +1,30 @@
+{
+  "schema_version": "2.0",
+  "cases": [
+    {
+      "name": "complete",
+      "recipient_index": 0,
+      "expected_classification": "comparable",
+      "expected_total": "615.00"
+    },
+    {
+      "name": "low_base_omits_overage_and_tax",
+      "recipient_index": 1,
+      "expected_classification": "incomplete",
+      "expected_total": null
+    },
+    {
+      "name": "contradictory_fee_answers",
+      "recipient_index": 2,
+      "expected_classification": "incomplete",
+      "expected_total": null
+    },
+    {
+      "name": "voicemail_refusal",
+      "recipient_index": 3,
+      "expected_classification": "unresolved",
+      "expected_total": null
+    }
+  ]
+}
+

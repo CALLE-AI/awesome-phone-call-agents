@@ -3,6 +3,7 @@ from __future__ import annotations
 import copy
 import importlib.util
 import json
+import os
 import subprocess
 import sys
 import tempfile
@@ -150,7 +151,13 @@ class PreviewTests(unittest.TestCase):
                  "--approved-digest", digest, "--output", str(target)],
                 check=True, capture_output=True, text=True,
             )
-            self.assertEqual(target.stat().st_mode & 0o777, 0o600)
+            # THE MODE IS A POSIX FACT AND ONLY THERE. Windows has no owner
+            # permission bits, `st_mode` comes back 0o666 whatever the file was
+            # created with, so this line fails on every Windows machine and
+            # says nothing about the code. The two assertions below, which are
+            # the ones about the number never reaching a stream, still run.
+            if os.name == "posix":
+                self.assertEqual(target.stat().st_mode & 0o777, 0o600)
             self.assertIn(raw["contact"]["phone_e164"], target.read_text())
             self.assertNotIn(raw["contact"]["phone_e164"], completed.stdout + completed.stderr)
 

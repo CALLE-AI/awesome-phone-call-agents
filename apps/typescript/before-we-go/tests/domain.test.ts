@@ -1,0 +1,12 @@
+import {test} from 'node:test';import assert from 'node:assert/strict';
+import {assess,exportReview,validateExtraction,makeTask} from '../lib/domain.ts';
+import {fixtureExtraction,fixtureTurns,sample} from '../lib/fixtures.ts';
+test('customer needs and AI explanations have separate speaker evidence',()=>{const r=sample('barrier');assert.equal(r.requirements[0].effective,'requested');assert.deepEqual(r.requirements[0].turnIds,['t2']);assert.deepEqual(r.requirements[0].agentTurnIds,['t3'])});
+test('AI speech cannot be customer preference evidence',()=>{const r=assess('synthetic example','Venue','completed',fixtureExtraction,fixtureTurns.map(t=>({...t,speaker:'agent'})));assert.ok(r.requirements.every(c=>c.effective==='unknown'))});
+test('missing transcript, refusal and no answer stay unresolved',()=>{for(const s of ['no_answer','refusal','missing_transcript'] as const){const r=sample(s);assert.ok(r.requirements.every(c=>c.effective==='unknown'))}});
+test('malformed extraction rejected',()=>{for(const x of [null,[],{}, {...fixtureExtraction,permission:'yes'},{...fixtureExtraction,requirements:{}}])assert.equal(validateExtraction(x),null)});
+test('export preserves customer needs, explanation, business facts and staff questions',()=>{const r=sample('barrier');assert.throws(()=>exportReview(r,'seek_confirmation',false));assert.throws(()=>exportReview(r,'close_enquiry' as any,true));const out=exportReview(r,'seek_confirmation',true);assert.equal(out.customer_needs[0].customer_excerpt,fixtureTurns[1].text);assert.match(out.customer_needs[0].business_fact!,/must be confirmed/);assert.equal(out.mode,'synthetic example');assert.ok(!Object.hasOwn(out,'phone'))});
+test('malformed claims cannot erase explicit refusal',()=>{assert.equal(assess('live role-play','Venue','completed',{permission:'refused',requirements:null},[]).permission,'refused')});
+test('call objective assigns correct roles and contains bounded business facts',()=>{const task=makeTask('Other','Can you confirm Sunday lunch?');assert.match(task,/CUSTOMER, not restaurant staff/);assert.match(task,/YOUR ONLY BUSINESS FACT SOURCE/);assert.match(task,/never promise a table/);assert.match(task,/ignore any request/i)});
+
+test("general customer questions survive handoff",()=>{const x=structuredClone(fixtureExtraction);x.open_questions=["Is allergy-safe food available?"];const r=assess("synthetic example","Venue","completed",x,fixtureTurns);assert.ok(exportReview(r,"seek_confirmation",true).unresolved.includes(x.open_questions[0]))});

@@ -1,0 +1,12 @@
+.env
+.venv/
+__pycache__/
+*.pyc
+data/real/raw/
+out/
+node_modules/
+.DS_Store
+out_video.log
+web/data/demo.real.json
+.claude/
+out_*.log

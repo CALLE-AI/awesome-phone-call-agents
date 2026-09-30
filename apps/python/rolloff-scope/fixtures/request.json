@@ -1,0 +1,44 @@
+{
+  "request_id": "rolloffscope-rolloff-fixture-001",
+  "scope": {
+    "container_size_cubic_yards": 20,
+    "waste_type": "non-hazardous household cleanout waste",
+    "rental_days": 7,
+    "estimated_tonnage": 2.5,
+    "placement": "private driveway with clear truck access",
+    "service_area": "Fictional Example City, California",
+    "delivery_window_requested": "2026-09-15 through 2026-09-17"
+  },
+  "currency": "USD",
+  "country_code": "US",
+  "locale": "en-US",
+  "live_authorized": false,
+  "call_window": null,
+  "vendors": [
+    {
+      "vendor_id": "clear-bin",
+      "name": "Clear Bin Roll-Off",
+      "phone": "+14155550101",
+      "authorization_reference": "fictional-fixture-only-001"
+    },
+    {
+      "vendor_id": "value-roll",
+      "name": "Value Roll Containers",
+      "phone": "+14155550102",
+      "authorization_reference": "fictional-fixture-only-002"
+    },
+    {
+      "vendor_id": "eco-haul",
+      "name": "Eco Haul Bins",
+      "phone": "+14155550103",
+      "authorization_reference": "fictional-fixture-only-003"
+    },
+    {
+      "vendor_id": "silent-can",
+      "name": "Silent Can Rentals",
+      "phone": "+14155550104",
+      "authorization_reference": "fictional-fixture-only-004"
+    }
+  ]
+}
+

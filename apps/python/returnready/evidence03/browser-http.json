@@ -1,0 +1,43 @@
+{
+  "status": "passed",
+  "mode": "actual local HTTP",
+  "real_phone_calls": 0,
+  "count": 18,
+  "checks": [
+    "Initial supplied address mismatch runs the actual Python comparison",
+    "Default interface cannot start a call",
+    "All matching words remain human-review only",
+    "Later correction invalidates earlier address match",
+    "Full later recipient turn appears beside the earlier value",
+    "Full source retains all six turns rather than truncating at the extraction",
+    "Export contains actual selected inputs, context evidence and no shipping clearance",
+    "Separate resumable file carries inputs rather than a trusted approval",
+    "Editing source instantly disables old exports",
+    "Malformed edit cannot revive an earlier review",
+    "Reopening restores inputs and recomputes the correction",
+    "Saved fake approval is ignored",
+    "Failed file import preserves the last coherent review",
+    "Old input is not made fresh by reopening a file",
+    "Caller-only quotations cannot satisfy recipient evidence",
+    "Correction and session controls fit a 390-pixel screen",
+    "No uncaught UI error",
+    "Tests make no CALL-E service request and place no real calls"
+  ],
+  "browser": "152.0.7977.0",
+  "requests": [
+    "http://127.0.0.1:56839/",
+    "http://127.0.0.1:56839/api/config",
+    "http://127.0.0.1:56839/api/demo",
+    "http://127.0.0.1:56839/api/inspect",
+    "http://127.0.0.1:56839/api/inspect",
+    "http://127.0.0.1:56839/api/inspect",
+    "http://127.0.0.1:56839/api/session/save",
+    "http://127.0.0.1:56839/api/session/open",
+    "http://127.0.0.1:56839/api/session/open",
+    "http://127.0.0.1:56839/api/session/open",
+    "http://127.0.0.1:56839/api/session/open",
+    "http://127.0.0.1:56839/api/inspect",
+    "http://127.0.0.1:56839/api/inspect"
+  ],
+  "scope": "Python engine and UI functionality with synthetic cases. Actual localhost HTTP with default CSP and no live provider."
+}

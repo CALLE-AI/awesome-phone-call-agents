@@ -1,0 +1,7937 @@
+{
+ "train": {
+  "source": "data/sim/train",
+  "n": 180,
+  "note": "templated generator (dialtone/sim/generate.py)"
+ },
+ "eval": {
+  "source": "data/sim/eval",
+  "n": 40,
+  "labels": {
+   "agent": 13,
+   "human": 14,
+   "ivr": 13
+  },
+  "note": "independently authored, blind to classifier code and training templates"
+ },
+ "detection_model_only": {
+  "full_call": {
+   "matrix": {
+    "human": {
+     "human": 13,
+     "ivr": 0,
+     "agent": 1,
+     "unknown": 0
+    },
+    "ivr": {
+     "human": 3,
+     "ivr": 10,
+     "agent": 0,
+     "unknown": 0
+    },
+    "agent": {
+     "human": 3,
+     "ivr": 0,
+     "agent": 10,
+     "unknown": 0
+    }
+   },
+   "accuracy": 0.825,
+   "macro_f1": 0.83,
+   "per_class": {
+    "human": {
+     "precision": 0.684,
+     "recall": 0.929,
+     "f1": 0.788,
+     "support": 14
+    },
+    "ivr": {
+     "precision": 1.0,
+     "recall": 0.769,
+     "f1": 0.87,
+     "support": 13
+    },
+    "agent": {
+     "precision": 0.909,
+     "recall": 0.769,
+     "f1": 0.833,
+     "support": 13
+    }
+   },
+   "n": 40,
+   "humans_treated_as_machine": 1,
+   "machines_treated_as_human": 6
+  },
+  "early": {
+   "3.0": {
+    "matrix": {
+     "human": {
+      "human": 13,
+      "ivr": 0,
+      "agent": 0,
+      "unknown": 1
+     },
+     "ivr": {
+      "human": 6,
+      "ivr": 6,
+      "agent": 1,
+      "unknown": 0
+     },
+     "agent": {
+      "human": 4,
+      "ivr": 0,
+      "agent": 8,
+      "unknown": 1
+     }
+    },
+    "accuracy": 0.675,
+    "macro_f1": 0.687,
+    "per_class": {
+     "human": {
+      "precision": 0.565,
+      "recall": 0.929,
+      "f1": 0.703,
+      "support": 14
+     },
+     "ivr": {
+      "precision": 1.0,
+      "recall": 0.462,
+      "f1": 0.632,
+      "support": 13
+     },
+     "agent": {
+      "precision": 0.889,
+      "recall": 0.615,
+      "f1": 0.727,
+      "support": 13
+     }
+    },
+    "n": 40,
+    "humans_treated_as_machine": 0,
+    "machines_treated_as_human": 10
+   },
+   "5.0": {
+    "matrix": {
+     "human": {
+      "human": 14,
+      "ivr": 0,
+      "agent": 0,
+      "unknown": 0
+     },
+     "ivr": {
+      "human": 6,
+      "ivr": 6,
+      "agent": 1,
+      "unknown": 0
+     },
+     "agent": {
+      "human": 4,
+      "ivr": 0,
+      "agent": 9,
+      "unknown": 0
+     }
+    },
+    "accuracy": 0.725,
+    "macro_f1": 0.717,
+    "per_class": {
+     "human": {
+      "precision": 0.583,
+      "recall": 1.0,
+      "f1": 0.737,
+      "support": 14
+     },
+     "ivr": {
+      "precision": 1.0,
+      "recall": 0.462,
+      "f1": 0.632,
+      "support": 13
+     },
+     "agent": {
+      "precision": 0.9,
+      "recall": 0.692,
+      "f1": 0.783,
+      "support": 13
+     }
+    },
+    "n": 40,
+    "humans_treated_as_machine": 0,
+    "machines_treated_as_human": 10
+   },
+   "8.0": {
+    "matrix": {
+     "human": {
+      "human": 14,
+      "ivr": 0,
+      "agent": 0,
+      "unknown": 0
+     },
+     "ivr": {
+      "human": 6,
+      "ivr": 6,
+      "agent": 1,
+      "unknown": 0
+     },
+     "agent": {
+      "human": 4,
+      "ivr": 0,
+      "agent": 9,
+      "unknown": 0
+     }
+    },
+    "accuracy": 0.725,
+    "macro_f1": 0.717,
+    "per_class": {
+     "human": {
+      "precision": 0.583,
+      "recall": 1.0,
+      "f1": 0.737,
+      "support": 14
+     },
+     "ivr": {
+      "precision": 1.0,
+      "recall": 0.462,
+      "f1": 0.632,
+      "support": 13
+     },
+     "agent": {
+      "precision": 0.9,
+      "recall": 0.692,
+      "f1": 0.783,
+      "support": 13
+     }
+    },
+    "n": 40,
+    "humans_treated_as_machine": 0,
+    "machines_treated_as_human": 10
+   },
+   "15.0": {
+    "matrix": {
+     "human": {
+      "human": 14,
+      "ivr": 0,
+      "agent": 0,
+      "unknown": 0
+     },
+     "ivr": {
+      "human": 4,
+      "ivr": 8,
+      "agent": 1,
+      "unknown": 0
+     },
+     "agent": {
+      "human": 4,
+      "ivr": 0,
+      "agent": 9,
+      "unknown": 0
+     }
+    },
+    "accuracy": 0.775,
+    "macro_f1": 0.774,
+    "per_class": {
+     "human": {
+      "precision": 0.636,
+      "recall": 1.0,
+      "f1": 0.778,
+      "support": 14
+     },
+     "ivr": {
+      "precision": 1.0,
+      "recall": 0.615,
+      "f1": 0.762,
+      "support": 13
+     },
+     "agent": {
+      "precision": 0.9,
+      "recall": 0.692,
+      "f1": 0.783,
+      "support": 13
+     }
+    },
+    "n": 40,
+    "humans_treated_as_machine": 0,
+    "machines_treated_as_human": 8
+   }
+  },
+  "time_to_detection": {
+   "human": {
+    "median_seconds": 1.5,
+    "committed": 12,
+    "never_committed_at_0.8": 2
+   },
+   "ivr": {
+    "median_seconds": 8.5,
+    "committed": 10,
+    "never_committed_at_0.8": 3
+   },
+   "agent": {
+    "median_seconds": 2,
+    "committed": 9,
+    "never_committed_at_0.8": 4
+   }
+  },
+  "by_difficulty": {
+   "typical": {
+    "n": 27,
+    "accuracy": 0.963
+   },
+   "hard": {
+    "n": 13,
+    "accuracy": 0.538
+   }
+  },
+  "rows": [
+   {
+    "id": "eval-001",
+    "label": "agent",
+    "difficulty": "typical",
+    "scenario": "Restaurant AI reservation assistant books a party, reads out a confirmation code and sends SMS confirmation.",
+    "predicted": "agent",
+    "confidence": 0.769,
+    "correct": true,
+    "time_to_detection": null,
+    "duration": 86.5,
+    "top_features": [
+     [
+      "ivr_markers",
+      0.74
+     ],
+     [
+      "disclosure",
+      -0.62
+     ],
+     [
+      "latency_mean",
+      0.55
+     ],
+     [
+      "latency_std",
+      0.39
+     ]
+    ],
+    "timeline": [
+     {
+      "t": 1,
+      "label": "agent",
+      "conf": 0.776,
+      "probs": {
+       "human": 0.119,
+       "ivr": 0.105,
+       "agent": 0.776
+      }
+     },
+     {
+      "t": 2,
+      "label": "agent",
+      "conf": 0.776,
+      "probs": {
+       "human": 0.119,
+       "ivr": 0.105,
+       "agent": 0.776
+      }
+     },
+     {
+      "t": 3,
+      "label": "agent",
+      "conf": 0.776,
+      "probs": {
+       "human": 0.119,
+       "ivr": 0.105,
+       "agent": 0.776
+      }
+     },
+     {
+      "t": 4,
+      "label": "agent",
+      "conf": 0.776,
+      "probs": {
+       "human": 0.119,
+       "ivr": 0.105,
+       "agent": 0.776
+      }
+     },
+     {
+      "t": 5,
+      "label": "agent",
+      "conf": 0.776,
+      "probs": {
+       "human": 0.119,
+       "ivr": 0.105,
+       "agent": 0.776
+      }
+     },
+     {
+      "t": 6,
+      "label": "agent",
+      "conf": 0.776,
+      "probs": {
+       "human": 0.119,
+       "ivr": 0.105,
+       "agent": 0.776
+      }
+     },
+     {
+      "t": 8,
+      "label": "agent",
+      "conf": 0.776,
+      "probs": {
+       "human": 0.119,
+       "ivr": 0.105,
+       "agent": 0.776
+      }
+     },
+     {
+      "t": 10,
+      "label": "agent",
+      "conf": 0.776,
+      "probs": {
+       "human": 0.119,
+       "ivr": 0.105,
+       "agent": 0.776
+      }
+     },
+     {
+      "t": 15,
+      "label": "agent",
+      "conf": 0.776,
+      "probs": {
+       "human": 0.119,
+       "ivr": 0.105,
+       "agent": 0.776
+      }
+     },
+     {
+      "t": 20,
+      "label": "agent",
+      "conf": 0.776,
+      "probs": {
+       "human": 0.119,
+       "ivr": 0.105,
+       "agent": 0.776
+      }
+     },
+     {
+      "t": 30,
+      "label": "agent",
+      "conf": 0.8,
+      "probs": {
+       "human": 0.151,
+       "ivr": 0.05,
+       "agent": 0.8
+      }
+     },
+     {
+      "t": 45,
+      "label": "agent",
+      "conf": 0.829,
+      "probs": {
+       "human": 0.109,
+       "ivr": 0.062,
+       "agent": 0.829
+      }
+     },
+     {
+      "t": 60,
+      "label": "agent",
+      "conf": 0.814,
+      "probs": {
+       "human": 0.153,
+       "ivr": 0.033,
+       "agent": 0.814
+      }
+     },
+     {
+      "t": 86.5,
+      "label": "agent",
+      "conf": 0.769,
+      "probs": {
+       "human": 0.189,
+       "ivr": 0.042,
+       "agent": 0.769
+      }
+     }
+    ]
+   },
+   {
+    "id": "eval-002",
+    "label": "human",
+    "difficulty": "typical",
+    "scenario": "Florist checks the delivery board and gives an informal ETA for a bouquet.",
+    "predicted": "human",
+    "confidence": 0.964,
+    "correct": true,
+    "time_to_detection": 1,
+    "duration": 42.4,
+    "top_features": [
+     [
+      "first_turn_words",
+      1.36
+     ],
+     [
+      "turn_words_mean",
+      0.82
+     ],
+     [
+      "disfluency_rate",
+      0.52
+     ],
+     [
+      "latency_std",
+      0.47
+     ]
+    ],
+    "timeline": [
+     {
+      "t": 1,
+      "label": "human",
+      "conf": 0.921,
+      "probs": {
+       "human": 0.921,
+       "ivr": 0.039,
+       "agent": 0.041
+      }
+     },
+     {
+      "t": 2,
+      "label": "human",
+      "conf": 0.921,
+      "probs": {
+       "human": 0.921,
+       "ivr": 0.039,
+       "agent": 0.041
+      }
+     },
+     {
+      "t": 3,
+      "label": "human",
+      "conf": 0.921,
+      "probs": {
+       "human": 0.921,
+       "ivr": 0.039,
+       "agent": 0.041
+      }
+     },
+     {
+      "t": 4,
+      "label": "human",
+      "conf": 0.921,
+      "probs": {
+       "human": 0.921,
+       "ivr": 0.039,
+       "agent": 0.041
+      }
+     },
+     {
+      "t": 5,
+      "label": "human",
+      "conf": 0.921,
+      "probs": {
+       "human": 0.921,
+       "ivr": 0.039,
+       "agent": 0.041
+      }
+     },
+     {
+      "t": 6,
+      "label": "human",
+      "conf": 0.921,
+      "probs": {
+       "human": 0.921,
+       "ivr": 0.039,
+       "agent": 0.041
+      }
+     },
+     {
+      "t": 8,
+      "label": "human",
+      "conf": 0.921,
+      "probs": {
+       "human": 0.921,
+       "ivr": 0.039,
+       "agent": 0.041
+      }
+     },
+     {
+      "t": 10,
+      "label": "human",
+      "conf": 0.921,
+      "probs": {
+       "human": 0.921,
+       "ivr": 0.039,
+       "agent": 0.041
+      }
+     },
+     {
+      "t": 15,
+      "label": "human",
+      "conf": 0.921,
+      "probs": {
+       "human": 0.921,
+       "ivr": 0.039,
+       "agent": 0.041
+      }
+     },
+     {
+      "t": 20,
+      "label": "human",
+      "conf": 0.942,
+      "probs": {
+       "human": 0.942,
+       "ivr": 0.023,
+       "agent": 0.035
+      }
+     },
+     {
+      "t": 30,
+      "label": "human",
+      "conf": 0.879,
+      "probs": {
+       "human": 0.879,
+       "ivr": 0.025,
+       "agent": 0.096
+      }
+     },
+     {
+      "t": 42.4,
+      "label": "human",
+      "conf": 0.964,
+      "probs": {
+       "human": 0.964,
+       "ivr": 0.01,
+       "agent": 0.026
+      }
+     }
+    ]
+   },
+   {
+    "id": "eval-003",
+    "label": "human",
+    "difficulty": "typical",
+    "scenario": "Dental receptionist looks up patient, offers slots, moves the appointment and verbally confirms both changes.",
+    "predicted": "human",
+    "confidence": 0.977,
+    "correct": true,
+    "time_to_detection": 2,
+    "duration": 61.8,
+    "top_features": [
+     [
+      "first_turn_words",
+      1.03
+     ],
+     [
+      "turn_words_mean",
+      0.77
+     ],
+     [
+      "latency_std",
+      0.64
+     ],
+     [
+      "overlap_rate",
+      0.44
+     ]
+    ],
+    "timeline": [
+     {
+      "t": 1,
+      "label": "unknown",
+      "conf": 0.0,
+      "probs": {
+       "human": 0.333,
+       "ivr": 0.333,
+       "agent": 0.333
+      }
+     },
+     {
+      "t": 2,
+      "label": "human",
+      "conf": 0.934,
+      "probs": {
+       "human": 0.934,
+       "ivr": 0.02,
+       "agent": 0.045
+      }
+     },
+     {
+      "t": 3,
+      "label": "human",
+      "conf": 0.934,
+      "probs": {
+       "human": 0.934,
+       "ivr": 0.02,
+       "agent": 0.045
+      }
+     },
+     {
+      "t": 4,
+      "label": "human",
+      "conf": 0.934,
+      "probs": {
+       "human": 0.934,
+       "ivr": 0.02,
+       "agent": 0.045
+      }
+     },
+     {
+      "t": 5,
+      "label": "human",
+      "conf": 0.934,
+      "probs": {
+       "human": 0.934,
+       "ivr": 0.02,
+       "agent": 0.045
+      }
+     },
+     {
+      "t": 6,
+      "label": "human",
+      "conf": 0.934,
+      "probs": {
+       "human": 0.934,
+       "ivr": 0.02,
+       "agent": 0.045
+      }
+     },
+     {
+      "t": 8,
+      "label": "human",
+      "conf": 0.934,
+      "probs": {
+       "human": 0.934,
+       "ivr": 0.02,
+       "agent": 0.045
+      }
+     },
+     {
+      "t": 10,
+      "label": "human",
+      "conf": 0.934,
+      "probs": {
+       "human": 0.934,
+       "ivr": 0.02,
+       "agent": 0.045
+      }
+     },
+     {
+      "t": 15,
+      "label": "human",
+      "conf": 0.995,
+      "probs": {
+       "human": 0.995,
+       "ivr": 0.003,
+       "agent": 0.002
+      }
+     },
+     {
+      "t": 20,
+      "label": "human",
+      "conf": 0.995,
+      "probs": {
+       "human": 0.995,
+       "ivr": 0.003,
+       "agent": 0.002
+      }
+     },
+     {
+      "t": 30,
+      "label": "human",
+      "conf": 0.985,
+      "probs": {
+       "human": 0.985,
+       "ivr": 0.001,
+       "agent": 0.014
+      }
+     },
+     {
+      "t": 45,
+      "label": "human",
+      "conf": 0.931,
+      "probs": {
+       "human": 0.931,
+       "ivr": 0.006,
+       "agent": 0.062
+      }
+     },
+     {
+      "t": 60,
+      "label": "human",
+      "conf": 0.975,
+      "probs": {
+       "human": 0.975,
+       "ivr": 0.002,
+       "agent": 0.023
+      }
+     },
+     {
+      "t": 61.8,
+      "label": "human",
+      "conf": 0.977,
+      "probs": {
+       "human": 0.977,
+       "ivr": 0.002,
+       "agent": 0.021
+      }
+     }
+    ]
+   },
+   {
+    "id": "eval-004",
+    "label": "human",
+    "difficulty": "typical",
+    "scenario": "Owner of a small pizzeria answers casually, checks a paper book, overlaps during name spelling.",
+    "predicted": "human",
+    "confidence": 0.998,
+    "correct": true,
+    "time_to_detection": 1,
+    "duration": 61.6,
+    "top_features": [
+     [
+      "first_turn_words",
+      1.52
+     ],
+     [
+      "overlap_rate",
+      1.14
+     ],
+     [
+      "turn_words_mean",
+      1.0
+     ],
+     [
+      "latency_mean",
+      0.5
+     ]
+    ],
+    "timeline": [
+     {
+      "t": 1,
+      "label": "human",
+      "conf": 0.975,
+      "probs": {
+       "human": 0.975,
+       "ivr": 0.01,
+       "agent": 0.015
+      }
+     },
+     {
+      "t": 2,
+      "label": "human",
+      "conf": 0.975,
+      "probs": {
+       "human": 0.975,
+       "ivr": 0.01,
+       "agent": 0.015
+      }
+     },
+     {
+      "t": 3,
+      "label": "human",
+      "conf": 0.975,
+      "probs": {
+       "human": 0.975,
+       "ivr": 0.01,
+       "agent": 0.015
+      }
+     },
+     {
+      "t": 4,
+      "label": "human",
+      "conf": 0.975,
+      "probs": {
+       "human": 0.975,
+       "ivr": 0.01,
+       "agent": 0.015
+      }
+     },
+     {
+      "t": 5,
+      "label": "human",
+      "conf": 0.975,
+      "probs": {
+       "human": 0.975,
+       "ivr": 0.01,
+       "agent": 0.015
+      }
+     },
+     {
+      "t": 6,
+      "label": "human",
+      "conf": 0.975,
+      "probs": {
+       "human": 0.975,
+       "ivr": 0.01,
+       "agent": 0.015
+      }
+     },
+     {
+      "t": 8,
+      "label": "human",
+      "conf": 0.975,
+      "probs": {
+       "human": 0.975,
+       "ivr": 0.01,
+       "agent": 0.015
+      }
+     },
+     {
+      "t": 10,
+      "label": "human",
+      "conf": 0.975,
+      "probs": {
+       "human": 0.975,
+       "ivr": 0.01,
+       "agent": 0.015
+      }
+     },
+     {
+      "t": 15,
+      "label": "human",
+      "conf": 1.0,
+      "probs": {
+       "human": 1.0,
+       "ivr": 0.0,
+       "agent": 0.0
+      }
+     },
+     {
+      "t": 20,
+      "label": "human",
+      "conf": 1.0,
+      "probs": {
+       "human": 1.0,
+       "ivr": 0.0,
+       "agent": 0.0
+      }
+     },
+     {
+      "t": 30,
+      "label": "human",
+      "conf": 0.996,
+      "probs": {
+       "human": 0.996,
+       "ivr": 0.002,
+       "agent": 0.003
+      }
+     },
+     {
+      "t": 45,
+      "label": "human",
+      "conf": 0.998,
+      "probs": {
+       "human": 0.998,
+       "ivr": 0.001,
+       "agent": 0.001
+      }
+     },
+     {
+      "t": 60,
+      "label": "human",
+      "conf": 0.998,
+      "probs": {
+       "human": 0.998,
+       "ivr": 0.001,
+       "agent": 0.001
+      }
+     },
+     {
+      "t": 61.6,
+      "label": "human",
+      "conf": 0.998,
+      "probs": {
+       "human": 0.998,
+       "ivr": 0.001,
+       "agent": 0.001
+      }
+     }
+    ]
+   },
+   {
+    "id": "eval-005",
+    "label": "human",
+    "difficulty": "typical",
+    "scenario": "Gym front-desk employee explains cancellations can't be done by phone; caller must come in.",
+    "predicted": "human",
+    "confidence": 0.946,
+    "correct": true,
+    "time_to_detection": 1,
+    "duration": 53.2,
+    "top_features": [
+     [
+      "first_turn_words",
+      1.19
+     ],
+     [
+      "turn_words_mean",
+      0.52
+     ],
+     [
+      "disclosure",
+      0.34
+     ],
+     [
+      "first_user_delay",
+      0.27
+     ]
+    ],
+    "timeline": [
+     {
+      "t": 1,
+      "label": "human",
+      "conf": 0.949,
+      "probs": {
+       "human": 0.949,
+       "ivr": 0.018,
+       "agent": 0.033
+      }
+     },
+     {
+      "t": 2,
+      "label": "human",
+      "conf": 0.949,
+      "probs": {
+       "human": 0.949,
+       "ivr": 0.018,
+       "agent": 0.033
+      }
+     },
+     {
+      "t": 3,
+      "label": "human",
+      "conf": 0.949,
+      "probs": {
+       "human": 0.949,
+       "ivr": 0.018,
+       "agent": 0.033
+      }
+     },
+     {
+      "t": 4,
+      "label": "human",
+      "conf": 0.949,
+      "probs": {
+       "human": 0.949,
+       "ivr": 0.018,
+       "agent": 0.033
+      }
+     },
+     {
+      "t": 5,
+      "label": "human",
+      "conf": 0.949,
+      "probs": {
+       "human": 0.949,
+       "ivr": 0.018,
+       "agent": 0.033
+      }
+     },
+     {
+      "t": 6,
+      "label": "human",
+      "conf": 0.949,
+      "probs": {
+       "human": 0.949,
+       "ivr": 0.018,
+       "agent": 0.033
+      }
+     },
+     {
+      "t": 8,
+      "label": "human",
+      "conf": 0.949,
+      "probs": {
+       "human": 0.949,
+       "ivr": 0.018,
+       "agent": 0.033
+      }
+     },
+     {
+      "t": 10,
+      "label": "human",
+      "conf": 0.949,
+      "probs": {
+       "human": 0.949,
+       "ivr": 0.018,
+       "agent": 0.033
+      }
+     },
+     {
+      "t": 15,
+      "label": "human",
+      "conf": 0.973,
+      "probs": {
+       "human": 0.973,
+       "ivr": 0.012,
+       "agent": 0.015
+      }
+     },
+     {
+      "t": 20,
+      "label": "human",
+      "conf": 0.896,
+      "probs": {
+       "human": 0.896,
+       "ivr": 0.029,
+       "agent": 0.075
+      }
+     },
+     {
+      "t": 30,
+      "label": "human",
+      "conf": 0.899,
+      "probs": {
+       "human": 0.899,
+       "ivr": 0.025,
+       "agent": 0.076
+      }
+     },
+     {
+      "t": 45,
+      "label": "human",
+      "conf": 0.876,
+      "probs": {
+       "human": 0.876,
+       "ivr": 0.025,
+       "agent": 0.099
+      }
+     },
+     {
+      "t": 53.2,
+      "label": "human",
+      "conf": 0.946,
+      "probs": {
+       "human": 0.946,
+       "ivr": 0.014,
+       "agent": 0.04
+      }
+     }
+    ]
+   },
+   {
+    "id": "eval-006",
+    "label": "human",
+    "difficulty": "hard",
+    "scenario": "Call-center rep reads a polished retention script: no disfluencies, even pacing, scripted empathy lines, very regular gaps.",
+    "predicted": "agent",
+    "confidence": 0.587,
+    "correct": false,
+    "time_to_detection": null,
+    "duration": 96.8,
+    "top_features": [
+     [
+      "ivr_markers",
+      0.74
+     ],
+     [
+      "disclosure",
+      -0.62
+     ],
+     [
+      "latency_regularity",
+      0.29
+     ],
+     [
+      "formulaic_rate",
+      0.15
+     ]
+    ],
+    "timeline": [
+     {
+      "t": 1,
+      "label": "unknown",
+      "conf": 0.0,
+      "probs": {
+       "human": 0.333,
+       "ivr": 0.333,
+       "agent": 0.333
+      }
+     },
+     {
+      "t": 2,
+      "label": "human",
+      "conf": 0.528,
+      "probs": {
+       "human": 0.528,
+       "ivr": 0.045,
+       "agent": 0.428
+      }
+     },
+     {
+      "t": 3,
+      "label": "human",
+      "conf": 0.528,
+      "probs": {
+       "human": 0.528,
+       "ivr": 0.045,
+       "agent": 0.428
+      }
+     },
+     {
+      "t": 4,
+      "label": "human",
+      "conf": 0.528,
+      "probs": {
+       "human": 0.528,
+       "ivr": 0.045,
+       "agent": 0.428
+      }
+     },
+     {
+      "t": 5,
+      "label": "human",
+      "conf": 0.528,
+      "probs": {
+       "human": 0.528,
+       "ivr": 0.045,
+       "agent": 0.428
+      }
+     },
+     {
+      "t": 6,
+      "label": "human",
+      "conf": 0.528,
+      "probs": {
+       "human": 0.528,
+       "ivr": 0.045,
+       "agent": 0.428
+      }
+     },
+     {
+      "t": 8,
+      "label": "human",
+      "conf": 0.528,
+      "probs": {
+       "human": 0.528,
+       "ivr": 0.045,
+       "agent": 0.428
+      }
+     },
+     {
+      "t": 10,
+      "label": "human",
+      "conf": 0.528,
+      "probs": {
+       "human": 0.528,
+       "ivr": 0.045,
+       "agent": 0.428
+      }
+     },
+     {
+      "t": 15,
+      "label": "human",
+      "conf": 0.528,
+      "probs": {
+       "human": 0.528,
+       "ivr": 0.045,
+       "agent": 0.428
+      }
+     },
+     {
+      "t": 20,
+      "label": "agent",
+      "conf": 0.481,
+      "probs": {
+       "human": 0.463,
+       "ivr": 0.056,
+       "agent": 0.481
+      }
+     },
+     {
+      "t": 30,
+      "label": "agent",
+      "conf": 0.481,
+      "probs": {
+       "human": 0.463,
+       "ivr": 0.056,
+       "agent": 0.481
+      }
+     },
+     {
+      "t": 45,
+      "label": "agent",
+      "conf": 0.749,
+      "probs": {
+       "human": 0.211,
+       "ivr": 0.04,
+       "agent": 0.749
+      }
+     },
+     {
+      "t": 60,
+      "label": "agent",
+      "conf": 0.694,
+      "probs": {
+       "human": 0.277,
+       "ivr": 0.029,
+       "agent": 0.694
+      }
+     },
+     {
+      "t": 96.8,
+      "label": "agent",
+      "conf": 0.587,
+      "probs": {
+       "human": 0.383,
+       "ivr": 0.03,
+       "agent": 0.587
+      }
+     }
+    ]
+   },
+   {
+    "id": "eval-007",
+    "label": "human",
+    "difficulty": "typical",
+    "scenario": "Hotel front-desk clerk finds a double charge, refunds it while on the call and reads out a refund reference.",
+    "predicted": "human",
+    "confidence": 0.952,
+    "correct": true,
+    "time_to_detection": 1,
+    "duration": 75.1,
+    "top_features": [
+     [
+      "first_turn_words",
+      1.19
+     ],
+     [
+      "latency_std",
+      1.0
+     ],
+     [
+      "latency_mean",
+      -0.58
+     ],
+     [
+      "turn_words_mean",
+      0.45
+     ]
+    ],
+    "timeline": [
+     {
+      "t": 1,
+      "label": "human",
+      "conf": 0.949,
+      "probs": {
+       "human": 0.949,
+       "ivr": 0.018,
+       "agent": 0.033
+      }
+     },
+     {
+      "t": 2,
+      "label": "human",
+      "conf": 0.949,
+      "probs": {
+       "human": 0.949,
+       "ivr": 0.018,
+       "agent": 0.033
+      }
+     },
+     {
+      "t": 3,
+      "label": "human",
+      "conf": 0.949,
+      "probs": {
+       "human": 0.949,
+       "ivr": 0.018,
+       "agent": 0.033
+      }
+     },
+     {
+      "t": 4,
+      "label": "human",
+      "conf": 0.949,
+      "probs": {
+       "human": 0.949,
+       "ivr": 0.018,
+       "agent": 0.033
+      }
+     },
+     {
+      "t": 5,
+      "label": "human",
+      "conf": 0.949,
+      "probs": {
+       "human": 0.949,
+       "ivr": 0.018,
+       "agent": 0.033
+      }
+     },
+     {
+      "t": 6,
+      "label": "human",
+      "conf": 0.949,
+      "probs": {
+       "human": 0.949,
+       "ivr": 0.018,
+       "agent": 0.033
+      }
+     },
+     {
+      "t": 8,
+      "label": "human",
+      "conf": 0.949,
+      "probs": {
+       "human": 0.949,
+       "ivr": 0.018,
+       "agent": 0.033
+      }
+     },
+     {
+      "t": 10,
+      "label": "human",
+      "conf": 0.949,
+      "probs": {
+       "human": 0.949,
+       "ivr": 0.018,
+       "agent": 0.033
+      }
+     },
+     {
+      "t": 15,
+      "label": "human",
+      "conf": 0.997,
+      "probs": {
+       "human": 0.997,
+       "ivr": 0.001,
+       "agent": 0.001
+      }
+     },
+     {
+      "t": 20,
+      "label": "human",
+      "conf": 0.997,
+      "probs": {
+       "human": 0.997,
+       "ivr": 0.001,
+       "agent": 0.001
+      }
+     },
+     {
+      "t": 30,
+      "label": "human",
+      "conf": 0.985,
+      "probs": {
+       "human": 0.985,
+       "ivr": 0.0,
+       "agent": 0.015
+      }
+     },
+     {
+      "t": 45,
+      "label": "human",
+      "conf": 0.985,
+      "probs": {
+       "human": 0.985,
+       "ivr": 0.0,
+       "agent": 0.015
+      }
+     },
+     {
+      "t": 60,
+      "label": "human",
+      "conf": 0.977,
+      "probs": {
+       "human": 0.977,
+       "ivr": 0.001,
+       "agent": 0.023
+      }
+     },
+     {
+      "t": 75.1,
+      "label": "human",
+      "conf": 0.952,
+      "probs": {
+       "human": 0.952,
+       "ivr": 0.002,
+       "agent": 0.047
+      }
+     }
+    ]
+   },
+   {
+    "id": "eval-008",
+    "label": "agent",
+    "difficulty": "typical",
+    "scenario": "E-commerce AI support agent claims a refund was submitted, insists no reference number is needed, and dodges the email-confirmation question.",
+    "predicted": "agent",
+    "confidence": 0.986,
+    "correct": true,
+    "time_to_detection": 1,
+    "duration": 86.9,
+    "top_features": [
+     [
+      "disclosure",
+      1.79
+     ],
+     [
+      "ivr_markers",
+      0.74
+     ],
+     [
+      "latency_regularity",
+      0.27
+     ],
+     [
+      "latency_mean",
+      0.26
+     ]
+    ],
+    "timeline": [
+     {
+      "t": 1,
+      "label": "agent",
+      "conf": 0.961,
+      "probs": {
+       "human": 0.022,
+       "ivr": 0.017,
+       "agent": 0.961
+      }
+     },
+     {
+      "t": 2,
+      "label": "agent",
+      "conf": 0.961,
+      "probs": {
+       "human": 0.022,
+       "ivr": 0.017,
+       "agent": 0.961
+      }
+     },
+     {
+      "t": 3,
+      "label": "agent",
+      "conf": 0.961,
+      "probs": {
+       "human": 0.022,
+       "ivr": 0.017,
+       "agent": 0.961
+      }
+     },
+     {
+      "t": 4,
+      "label": "agent",
+      "conf": 0.961,
+      "probs": {
+       "human": 0.022,
+       "ivr": 0.017,
+       "agent": 0.961
+      }
+     },
+     {
+      "t": 5,
+      "label": "agent",
+      "conf": 0.961,
+      "probs": {
+       "human": 0.022,
+       "ivr": 0.017,
+       "agent": 0.961
+      }
+     },
+     {
+      "t": 6,
+      "label": "agent",
+      "conf": 0.961,
+      "probs": {
+       "human": 0.022,
+       "ivr": 0.017,
+       "agent": 0.961
+      }
+     },
+     {
+      "t": 8,
+      "label": "agent",
+      "conf": 0.961,
+      "probs": {
+       "human": 0.022,
+       "ivr": 0.017,
+       "agent": 0.961
+      }
+     },
+     {
+      "t": 10,
+      "label": "agent",
+      "conf": 0.961,
+      "probs": {
+       "human": 0.022,
+       "ivr": 0.017,
+       "agent": 0.961
+      }
+     },
+     {
+      "t": 15,
+      "label": "agent",
+      "conf": 0.961,
+      "probs": {
+       "human": 0.022,
+       "ivr": 0.017,
+       "agent": 0.961
+      }
+     },
+     {
+      "t": 20,
+      "label": "agent",
+      "conf": 0.961,
+      "probs": {
+       "human": 0.022,
+       "ivr": 0.017,
+       "agent": 0.961
+      }
+     },
+     {
+      "t": 30,
+      "label": "agent",
+      "conf": 0.955,
+      "probs": {
+       "human": 0.028,
+       "ivr": 0.017,
+       "agent": 0.955
+      }
+     },
+     {
+      "t": 45,
+      "label": "agent",
+      "conf": 0.985,
+      "probs": {
+       "human": 0.008,
+       "ivr": 0.007,
+       "agent": 0.985
+      }
+     },
+     {
+      "t": 60,
+      "label": "agent",
+      "conf": 0.985,
+      "probs": {
+       "human": 0.009,
+       "ivr": 0.006,
+       "agent": 0.985
+      }
+     },
+     {
+      "t": 86.9,
+      "label": "agent",
+      "conf": 0.986,
+      "probs": {
+       "human": 0.009,
+       "ivr": 0.005,
+       "agent": 0.986
+      }
+     }
+    ]
+   },
+   {
+    "id": "eval-009",
+    "label": "agent",
+    "difficulty": "typical",
+    "scenario": "Salon virtual receptionist 'moves' the appointment by echoing the caller's proposed time, never checks stylist availability, and offers no confirmation.",
+    "predicted": "agent",
+    "confidence": 0.97,
+    "correct": true,
+    "time_to_detection": 2,
+    "duration": 76.0,
+    "top_features": [
+     [
+      "disclosure",
+      1.79
+     ],
+     [
+      "ivr_markers",
+      0.74
+     ],
+     [
+      "latency_mean",
+      0.49
+     ],
+     [
+      "latency_std",
+      0.46
+     ]
+    ],
+    "timeline": [
+     {
+      "t": 1,
+      "label": "unknown",
+      "conf": 0.0,
+      "probs": {
+       "human": 0.333,
+       "ivr": 0.333,
+       "agent": 0.333
+      }
+     },
+     {
+      "t": 2,
+      "label": "agent",
+      "conf": 0.981,
+      "probs": {
+       "human": 0.018,
+       "ivr": 0.001,
+       "agent": 0.981
+      }
+     },
+     {
+      "t": 3,
+      "label": "agent",
+      "conf": 0.981,
+      "probs": {
+       "human": 0.018,
+       "ivr": 0.001,
+       "agent": 0.981
+      }
+     },
+     {
+      "t": 4,
+      "label": "agent",
+      "conf": 0.981,
+      "probs": {
+       "human": 0.018,
+       "ivr": 0.001,
+       "agent": 0.981
+      }
+     },
+     {
+      "t": 5,
+      "label": "agent",
+      "conf": 0.981,
+      "probs": {
+       "human": 0.018,
+       "ivr": 0.001,
+       "agent": 0.981
+      }
+     },
+     {
+      "t": 6,
+      "label": "agent",
+      "conf": 0.981,
+      "probs": {
+       "human": 0.018,
+       "ivr": 0.001,
+       "agent": 0.981
+      }
+     },
+     {
+      "t": 8,
+      "label": "agent",
+      "conf": 0.981,
+      "probs": {
+       "human": 0.018,
+       "ivr": 0.001,
+       "agent": 0.981
+      }
+     },
+     {
+      "t": 10,
+      "label": "agent",
+      "conf": 0.981,
+      "probs": {
+       "human": 0.018,
+       "ivr": 0.001,
+       "agent": 0.981
+      }
+     },
+     {
+      "t": 15,
+      "label": "agent",
+      "conf": 0.981,
+      "probs": {
+       "human": 0.018,
+       "ivr": 0.001,
+       "agent": 0.981
+      }
+     },
+     {
+      "t": 20,
+      "label": "agent",
+      "conf": 0.981,
+      "probs": {
+       "human": 0.018,
+       "ivr": 0.001,
+       "agent": 0.981
+      }
+     },
+     {
+      "t": 30,
+      "label": "agent",
+      "conf": 0.977,
+      "probs": {
+       "human": 0.021,
+       "ivr": 0.002,
+       "agent": 0.977
+      }
+     },
+     {
+      "t": 45,
+      "label": "agent",
+      "conf": 0.971,
+      "probs": {
+       "human": 0.029,
+       "ivr": 0.0,
+       "agent": 0.971
+      }
+     },
+     {
+      "t": 60,
+      "label": "agent",
+      "conf": 0.968,
+      "probs": {
+       "human": 0.031,
+       "ivr": 0.001,
+       "agent": 0.968
+      }
+     },
+     {
+      "t": 76.0,
+      "label": "agent",
+      "conf": 0.97,
+      "probs": {
+       "human": 0.029,
+       "ivr": 0.001,
+       "agent": 0.97
+      }
+     }
+    ]
+   },
+   {
+    "id": "eval-010",
+    "label": "agent",
+    "difficulty": "typical",
+    "scenario": "Meal-kit support voicebot declares the subscription cancelled, deflects the request for a confirmation email or reference, and echoes the caller's follow-up.",
+    "predicted": "agent",
+    "confidence": 0.719,
+    "correct": true,
+    "time_to_detection": null,
+    "duration": 79.7,
+    "top_features": [
+     [
+      "ivr_markers",
+      0.74
+     ],
+     [
+      "disclosure",
+      -0.62
+     ],
+     [
+      "latency_mean",
+      0.5
+     ],
+     [
+      "latency_regularity",
+      0.27
+     ]
+    ],
+    "timeline": [
+     {
+      "t": 1,
+      "label": "human",
+      "conf": 0.44,
+      "probs": {
+       "human": 0.44,
+       "ivr": 0.224,
+       "agent": 0.336
+      }
+     },
+     {
+      "t": 2,
+      "label": "human",
+      "conf": 0.44,
+      "probs": {
+       "human": 0.44,
+       "ivr": 0.224,
+       "agent": 0.336
+      }
+     },
+     {
+      "t": 3,
+      "label": "human",
+      "conf": 0.44,
+      "probs": {
+       "human": 0.44,
+       "ivr": 0.224,
+       "agent": 0.336
+      }
+     },
+     {
+      "t": 4,
+      "label": "human",
+      "conf": 0.44,
+      "probs": {
+       "human": 0.44,
+       "ivr": 0.224,
+       "agent": 0.336
+      }
+     },
+     {
+      "t": 5,
+      "label": "human",
+      "conf": 0.44,
+      "probs": {
+       "human": 0.44,
+       "ivr": 0.224,
+       "agent": 0.336
+      }
+     },
+     {
+      "t": 6,
+      "label": "human",
+      "conf": 0.44,
+      "probs": {
+       "human": 0.44,
+       "ivr": 0.224,
+       "agent": 0.336
+      }
+     },
+     {
+      "t": 8,
+      "label": "human",
+      "conf": 0.44,
+      "probs": {
+       "human": 0.44,
+       "ivr": 0.224,
+       "agent": 0.336
+      }
+     },
+     {
+      "t": 10,
+      "label": "human",
+      "conf": 0.44,
+      "probs": {
+       "human": 0.44,
+       "ivr": 0.224,
+       "agent": 0.336
+      }
+     },
+     {
+      "t": 15,
+      "label": "human",
+      "conf": 0.44,
+      "probs": {
+       "human": 0.44,
+       "ivr": 0.224,
+       "agent": 0.336
+      }
+     },
+     {
+      "t": 20,
+      "label": "agent",
+      "conf": 0.473,
+      "probs": {
+       "human": 0.304,
+       "ivr": 0.223,
+       "agent": 0.473
+      }
+     },
+     {
+      "t": 30,
+      "label": "agent",
+      "conf": 0.71,
+      "probs": {
+       "human": 0.142,
+       "ivr": 0.148,
+       "agent": 0.71
+      }
+     },
+     {
+      "t": 45,
+      "label": "agent",
+      "conf": 0.735,
+      "probs": {
+       "human": 0.122,
+       "ivr": 0.143,
+       "agent": 0.735
+      }
+     },
+     {
+      "t": 60,
+      "label": "agent",
+      "conf": 0.775,
+      "probs": {
+       "human": 0.108,
+       "ivr": 0.117,
+       "agent": 0.775
+      }
+     },
+     {
+      "t": 79.7,
+      "label": "agent",
+      "conf": 0.719,
+      "probs": {
+       "human": 0.183,
+       "ivr": 0.099,
+       "agent": 0.719
+      }
+     }
+    ]
+   },
+   {
+    "id": "eval-011",
+    "label": "agent",
+    "difficulty": "hard",
+    "scenario": "Pet-resort voice agent introduces itself as 'Emily', never discloses being AI, sounds warm and certain, but gives no confirmation number or email.",
+    "predicted": "human",
+    "confidence": 0.639,
+    "correct": false,
+    "time_to_detection": null,
+    "duration": 82.7,
+    "top_features": [
+     [
+      "first_turn_words",
+      1.11
+     ],
+     [
+      "disclosure",
+      0.34
+     ],
+     [
+      "latency_mean",
+      -0.3
+     ],
+     [
+      "turn_words_mean",
+      0.3
+     ]
+    ],
+    "timeline": [
+     {
+      "t": 1,
+      "label": "human",
+      "conf": 0.901,
+      "probs": {
+       "human": 0.901,
+       "ivr": 0.041,
+       "agent": 0.058
+      }
+     },
+     {
+      "t": 2,
+      "label": "human",
+      "conf": 0.901,
+      "probs": {
+       "human": 0.901,
+       "ivr": 0.041,
+       "agent": 0.058
+      }
+     },
+     {
+      "t": 3,
+      "label": "human",
+      "conf": 0.901,
+      "probs": {
+       "human": 0.901,
+       "ivr": 0.041,
+       "agent": 0.058
+      }
+     },
+     {
+      "t": 4,
+      "label": "human",
+      "conf": 0.901,
+      "probs": {
+       "human": 0.901,
+       "ivr": 0.041,
+       "agent": 0.058
+      }
+     },
+     {
+      "t": 5,
+      "label": "human",
+      "conf": 0.901,
+      "probs": {
+       "human": 0.901,
+       "ivr": 0.041,
+       "agent": 0.058
+      }
+     },
+     {
+      "t": 6,
+      "label": "human",
+      "conf": 0.901,
+      "probs": {
+       "human": 0.901,
+       "ivr": 0.041,
+       "agent": 0.058
+      }
+     },
+     {
+      "t": 8,
+      "label": "human",
+      "conf": 0.901,
+      "probs": {
+       "human": 0.901,
+       "ivr": 0.041,
+       "agent": 0.058
+      }
+     },
+     {
+      "t": 10,
+      "label": "human",
+      "conf": 0.901,
+      "probs": {
+       "human": 0.901,
+       "ivr": 0.041,
+       "agent": 0.058
+      }
+     },
+     {
+      "t": 15,
+      "label": "human",
+      "conf": 0.886,
+      "probs": {
+       "human": 0.886,
+       "ivr": 0.053,
+       "agent": 0.06
+      }
+     },
+     {
+      "t": 20,
+      "label": "human",
+      "conf": 0.886,
+      "probs": {
+       "human": 0.886,
+       "ivr": 0.053,
+       "agent": 0.06
+      }
+     },
+     {
+      "t": 30,
+      "label": "human",
+      "conf": 0.777,
+      "probs": {
+       "human": 0.777,
+       "ivr": 0.051,
+       "agent": 0.171
+      }
+     },
+     {
+      "t": 45,
+      "label": "human",
+      "conf": 0.629,
+      "probs": {
+       "human": 0.629,
+       "ivr": 0.083,
+       "agent": 0.288
+      }
+     },
+     {
+      "t": 60,
+      "label": "human",
+      "conf": 0.632,
+      "probs": {
+       "human": 0.632,
+       "ivr": 0.067,
+       "agent": 0.301
+      }
+     },
+     {
+      "t": 82.7,
+      "label": "human",
+      "conf": 0.639,
+      "probs": {
+       "human": 0.639,
+       "ivr": 0.067,
+       "agent": 0.294
+      }
+     }
+    ]
+   },
+   {
+    "id": "eval-012",
+    "label": "ivr",
+    "difficulty": "typical",
+    "scenario": "Utility IVR demands an account PIN, ignores spoken requests for a representative with repeated verbatim prompt, then disconnects.",
+    "predicted": "ivr",
+    "confidence": 0.972,
+    "correct": true,
+    "time_to_detection": 15,
+    "duration": 77.4,
+    "top_features": [
+     [
+      "ivr_markers",
+      1.83
+     ],
+     [
+      "latency_std",
+      -1.31
+     ],
+     [
+      "ivr_rejects",
+      1.02
+     ],
+     [
+      "formulaic_rate",
+      0.53
+     ]
+    ],
+    "timeline": [
+     {
+      "t": 1,
+      "label": "ivr",
+      "conf": 0.614,
+      "probs": {
+       "human": 0.126,
+       "ivr": 0.614,
+       "agent": 0.26
+      }
+     },
+     {
+      "t": 2,
+      "label": "ivr",
+      "conf": 0.614,
+      "probs": {
+       "human": 0.126,
+       "ivr": 0.614,
+       "agent": 0.26
+      }
+     },
+     {
+      "t": 3,
+      "label": "ivr",
+      "conf": 0.614,
+      "probs": {
+       "human": 0.126,
+       "ivr": 0.614,
+       "agent": 0.26
+      }
+     },
+     {
+      "t": 4,
+      "label": "ivr",
+      "conf": 0.614,
+      "probs": {
+       "human": 0.126,
+       "ivr": 0.614,
+       "agent": 0.26
+      }
+     },
+     {
+      "t": 5,
+      "label": "ivr",
+      "conf": 0.614,
+      "probs": {
+       "human": 0.126,
+       "ivr": 0.614,
+       "agent": 0.26
+      }
+     },
+     {
+      "t": 6,
+      "label": "ivr",
+      "conf": 0.614,
+      "probs": {
+       "human": 0.126,
+       "ivr": 0.614,
+       "agent": 0.26
+      }
+     },
+     {
+      "t": 8,
+      "label": "ivr",
+      "conf": 0.614,
+      "probs": {
+       "human": 0.126,
+       "ivr": 0.614,
+       "agent": 0.26
+      }
+     },
+     {
+      "t": 10,
+      "label": "ivr",
+      "conf": 0.614,
+      "probs": {
+       "human": 0.126,
+       "ivr": 0.614,
+       "agent": 0.26
+      }
+     },
+     {
+      "t": 15,
+      "label": "ivr",
+      "conf": 0.976,
+      "probs": {
+       "human": 0.017,
+       "ivr": 0.976,
+       "agent": 0.008
+      }
+     },
+     {
+      "t": 20,
+      "label": "ivr",
+      "conf": 0.976,
+      "probs": {
+       "human": 0.017,
+       "ivr": 0.976,
+       "agent": 0.008
+      }
+     },
+     {
+      "t": 30,
+      "label": "ivr",
+      "conf": 0.986,
+      "probs": {
+       "human": 0.01,
+       "ivr": 0.986,
+       "agent": 0.004
+      }
+     },
+     {
+      "t": 45,
+      "label": "ivr",
+      "conf": 0.89,
+      "probs": {
+       "human": 0.086,
+       "ivr": 0.89,
+       "agent": 0.024
+      }
+     },
+     {
+      "t": 60,
+      "label": "ivr",
+      "conf": 0.949,
+      "probs": {
+       "human": 0.048,
+       "ivr": 0.949,
+       "agent": 0.003
+      }
+     },
+     {
+      "t": 77.4,
+      "label": "ivr",
+      "conf": 0.972,
+      "probs": {
+       "human": 0.026,
+       "ivr": 0.972,
+       "agent": 0.002
+      }
+     }
+    ]
+   },
+   {
+    "id": "eval-013",
+    "label": "ivr",
+    "difficulty": "typical",
+    "scenario": "Short department-store IVR: one menu, one keypress, recorded hours message.",
+    "predicted": "ivr",
+    "confidence": 0.994,
+    "correct": true,
+    "time_to_detection": 1,
+    "duration": 49.6,
+    "top_features": [
+     [
+      "ivr_markers",
+      2.37
+     ],
+     [
+      "turn_words_mean",
+      0.49
+     ],
+     [
+      "first_turn_words",
+      0.43
+     ],
+     [
+      "dtmf_used",
+      0.36
+     ]
+    ],
+    "timeline": [
+     {
+      "t": 1,
+      "label": "ivr",
+      "conf": 0.907,
+      "probs": {
+       "human": 0.009,
+       "ivr": 0.907,
+       "agent": 0.084
+      }
+     },
+     {
+      "t": 2,
+      "label": "ivr",
+      "conf": 0.907,
+      "probs": {
+       "human": 0.009,
+       "ivr": 0.907,
+       "agent": 0.084
+      }
+     },
+     {
+      "t": 3,
+      "label": "ivr",
+      "conf": 0.907,
+      "probs": {
+       "human": 0.009,
+       "ivr": 0.907,
+       "agent": 0.084
+      }
+     },
+     {
+      "t": 4,
+      "label": "ivr",
+      "conf": 0.907,
+      "probs": {
+       "human": 0.009,
+       "ivr": 0.907,
+       "agent": 0.084
+      }
+     },
+     {
+      "t": 5,
+      "label": "ivr",
+      "conf": 0.907,
+      "probs": {
+       "human": 0.009,
+       "ivr": 0.907,
+       "agent": 0.084
+      }
+     },
+     {
+      "t": 6,
+      "label": "ivr",
+      "conf": 0.907,
+      "probs": {
+       "human": 0.009,
+       "ivr": 0.907,
+       "agent": 0.084
+      }
+     },
+     {
+      "t": 8,
+      "label": "ivr",
+      "conf": 0.907,
+      "probs": {
+       "human": 0.009,
+       "ivr": 0.907,
+       "agent": 0.084
+      }
+     },
+     {
+      "t": 10,
+      "label": "ivr",
+      "conf": 0.907,
+      "probs": {
+       "human": 0.009,
+       "ivr": 0.907,
+       "agent": 0.084
+      }
+     },
+     {
+      "t": 15,
+      "label": "ivr",
+      "conf": 0.907,
+      "probs": {
+       "human": 0.009,
+       "ivr": 0.907,
+       "agent": 0.084
+      }
+     },
+     {
+      "t": 20,
+      "label": "ivr",
+      "conf": 0.995,
+      "probs": {
+       "human": 0.0,
+       "ivr": 0.995,
+       "agent": 0.004
+      }
+     },
+     {
+      "t": 30,
+      "label": "ivr",
+      "conf": 0.995,
+      "probs": {
+       "human": 0.0,
+       "ivr": 0.995,
+       "agent": 0.004
+      }
+     },
+     {
+      "t": 45,
+      "label": "ivr",
+      "conf": 0.994,
+      "probs": {
+       "human": 0.0,
+       "ivr": 0.994,
+       "agent": 0.006
+      }
+     },
+     {
+      "t": 49.6,
+      "label": "ivr",
+      "conf": 0.994,
+      "probs": {
+       "human": 0.0,
+       "ivr": 0.994,
+       "agent": 0.006
+      }
+     }
+    ]
+   },
+   {
+    "id": "eval-014",
+    "label": "human",
+    "difficulty": "hard",
+    "scenario": "Extremely terse print-shop worker answers in one or two words throughout.",
+    "predicted": "human",
+    "confidence": 1.0,
+    "correct": true,
+    "time_to_detection": 2,
+    "duration": 37.6,
+    "top_features": [
+     [
+      "first_user_delay",
+      1.78
+     ],
+     [
+      "backchannel_rate",
+      1.73
+     ],
+     [
+      "first_turn_words",
+      1.6
+     ],
+     [
+      "turn_words_mean",
+      1.49
+     ]
+    ],
+    "timeline": [
+     {
+      "t": 1,
+      "label": "unknown",
+      "conf": 0.0,
+      "probs": {
+       "human": 0.333,
+       "ivr": 0.333,
+       "agent": 0.333
+      }
+     },
+     {
+      "t": 2,
+      "label": "human",
+      "conf": 1.0,
+      "probs": {
+       "human": 1.0,
+       "ivr": 0.0,
+       "agent": 0.0
+      }
+     },
+     {
+      "t": 3,
+      "label": "human",
+      "conf": 1.0,
+      "probs": {
+       "human": 1.0,
+       "ivr": 0.0,
+       "agent": 0.0
+      }
+     },
+     {
+      "t": 4,
+      "label": "human",
+      "conf": 1.0,
+      "probs": {
+       "human": 1.0,
+       "ivr": 0.0,
+       "agent": 0.0
+      }
+     },
+     {
+      "t": 5,
+      "label": "human",
+      "conf": 1.0,
+      "probs": {
+       "human": 1.0,
+       "ivr": 0.0,
+       "agent": 0.0
+      }
+     },
+     {
+      "t": 6,
+      "label": "human",
+      "conf": 1.0,
+      "probs": {
+       "human": 1.0,
+       "ivr": 0.0,
+       "agent": 0.0
+      }
+     },
+     {
+      "t": 8,
+      "label": "human",
+      "conf": 1.0,
+      "probs": {
+       "human": 1.0,
+       "ivr": 0.0,
+       "agent": 0.0
+      }
+     },
+     {
+      "t": 10,
+      "label": "human",
+      "conf": 1.0,
+      "probs": {
+       "human": 1.0,
+       "ivr": 0.0,
+       "agent": 0.0
+      }
+     },
+     {
+      "t": 15,
+      "label": "human",
+      "conf": 1.0,
+      "probs": {
+       "human": 1.0,
+       "ivr": 0.0,
+       "agent": 0.0
+      }
+     },
+     {
+      "t": 20,
+      "label": "human",
+      "conf": 1.0,
+      "probs": {
+       "human": 1.0,
+       "ivr": 0.0,
+       "agent": 0.0
+      }
+     },
+     {
+      "t": 30,
+      "label": "human",
+      "conf": 1.0,
+      "probs": {
+       "human": 1.0,
+       "ivr": 0.0,
+       "agent": 0.0
+      }
+     },
+     {
+      "t": 37.6,
+      "label": "human",
+      "conf": 1.0,
+      "probs": {
+       "human": 1.0,
+       "ivr": 0.0,
+       "agent": 0.0
+      }
+     }
+    ]
+   },
+   {
+    "id": "eval-015",
+    "label": "agent",
+    "difficulty": "typical",
+    "scenario": "Silence on pickup; telecom voicebot can't access billing without a PIN and only files an untracked callback request.",
+    "predicted": "agent",
+    "confidence": 0.99,
+    "correct": true,
+    "time_to_detection": 5,
+    "duration": 79.4,
+    "top_features": [
+     [
+      "disclosure",
+      1.79
+     ],
+     [
+      "ivr_markers",
+      0.74
+     ],
+     [
+      "latency_mean",
+      0.4
+     ],
+     [
+      "latency_std",
+      0.33
+     ]
+    ],
+    "timeline": [
+     {
+      "t": 1,
+      "label": "unknown",
+      "conf": 0.0,
+      "probs": {
+       "human": 0.333,
+       "ivr": 0.333,
+       "agent": 0.333
+      }
+     },
+     {
+      "t": 2,
+      "label": "unknown",
+      "conf": 0.0,
+      "probs": {
+       "human": 0.333,
+       "ivr": 0.333,
+       "agent": 0.333
+      }
+     },
+     {
+      "t": 3,
+      "label": "unknown",
+      "conf": 0.0,
+      "probs": {
+       "human": 0.333,
+       "ivr": 0.333,
+       "agent": 0.333
+      }
+     },
+     {
+      "t": 4,
+      "label": "unknown",
+      "conf": 0.0,
+      "probs": {
+       "human": 0.333,
+       "ivr": 0.333,
+       "agent": 0.333
+      }
+     },
+     {
+      "t": 5,
+      "label": "agent",
+      "conf": 0.996,
+      "probs": {
+       "human": 0.001,
+       "ivr": 0.003,
+       "agent": 0.996
+      }
+     },
+     {
+      "t": 6,
+      "label": "agent",
+      "conf": 0.996,
+      "probs": {
+       "human": 0.001,
+       "ivr": 0.003,
+       "agent": 0.996
+      }
+     },
+     {
+      "t": 8,
+      "label": "agent",
+      "conf": 0.996,
+      "probs": {
+       "human": 0.001,
+       "ivr": 0.003,
+       "agent": 0.996
+      }
+     },
+     {
+      "t": 10,
+      "label": "agent",
+      "conf": 0.996,
+      "probs": {
+       "human": 0.001,
+       "ivr": 0.003,
+       "agent": 0.996
+      }
+     },
+     {
+      "t": 15,
+      "label": "agent",
+      "conf": 0.996,
+      "probs": {
+       "human": 0.001,
+       "ivr": 0.003,
+       "agent": 0.996
+      }
+     },
+     {
+      "t": 20,
+      "label": "agent",
+      "conf": 0.996,
+      "probs": {
+       "human": 0.001,
+       "ivr": 0.003,
+       "agent": 0.996
+      }
+     },
+     {
+      "t": 30,
+      "label": "agent",
+      "conf": 0.988,
+      "probs": {
+       "human": 0.009,
+       "ivr": 0.003,
+       "agent": 0.988
+      }
+     },
+     {
+      "t": 45,
+      "label": "agent",
+      "conf": 0.995,
+      "probs": {
+       "human": 0.003,
+       "ivr": 0.003,
+       "agent": 0.995
+      }
+     },
+     {
+      "t": 60,
+      "label": "agent",
+      "conf": 0.993,
+      "probs": {
+       "human": 0.003,
+       "ivr": 0.004,
+       "agent": 0.993
+      }
+     },
+     {
+      "t": 79.4,
+      "label": "agent",
+      "conf": 0.99,
+      "probs": {
+       "human": 0.004,
+       "ivr": 0.006,
+       "agent": 0.99
+      }
+     }
+    ]
+   },
+   {
+    "id": "eval-016",
+    "label": "human",
+    "difficulty": "hard",
+    "scenario": "Veterinary receptionist opens with a scripted 'thank you for calling X, how can I help you today?' greeting but is a real person.",
+    "predicted": "human",
+    "confidence": 0.798,
+    "correct": true,
+    "time_to_detection": null,
+    "duration": 70.2,
+    "top_features": [
+     [
+      "latency_std",
+      0.94
+     ],
+     [
+      "latency_mean",
+      -0.51
+     ],
+     [
+      "first_turn_words",
+      0.37
+     ],
+     [
+      "turn_words_mean",
+      0.34
+     ]
+    ],
+    "timeline": [
+     {
+      "t": 1,
+      "label": "human",
+      "conf": 0.52,
+      "probs": {
+       "human": 0.52,
+       "ivr": 0.021,
+       "agent": 0.458
+      }
+     },
+     {
+      "t": 2,
+      "label": "human",
+      "conf": 0.52,
+      "probs": {
+       "human": 0.52,
+       "ivr": 0.021,
+       "agent": 0.458
+      }
+     },
+     {
+      "t": 3,
+      "label": "human",
+      "conf": 0.52,
+      "probs": {
+       "human": 0.52,
+       "ivr": 0.021,
+       "agent": 0.458
+      }
+     },
+     {
+      "t": 4,
+      "label": "human",
+      "conf": 0.52,
+      "probs": {
+       "human": 0.52,
+       "ivr": 0.021,
+       "agent": 0.458
+      }
+     },
+     {
+      "t": 5,
+      "label": "human",
+      "conf": 0.52,
+      "probs": {
+       "human": 0.52,
+       "ivr": 0.021,
+       "agent": 0.458
+      }
+     },
+     {
+      "t": 6,
+      "label": "human",
+      "conf": 0.52,
+      "probs": {
+       "human": 0.52,
+       "ivr": 0.021,
+       "agent": 0.458
+      }
+     },
+     {
+      "t": 8,
+      "label": "human",
+      "conf": 0.52,
+      "probs": {
+       "human": 0.52,
+       "ivr": 0.021,
+       "agent": 0.458
+      }
+     },
+     {
+      "t": 10,
+      "label": "human",
+      "conf": 0.52,
+      "probs": {
+       "human": 0.52,
+       "ivr": 0.021,
+       "agent": 0.458
+      }
+     },
+     {
+      "t": 15,
+      "label": "human",
+      "conf": 0.52,
+      "probs": {
+       "human": 0.52,
+       "ivr": 0.021,
+       "agent": 0.458
+      }
+     },
+     {
+      "t": 20,
+      "label": "human",
+      "conf": 0.984,
+      "probs": {
+       "human": 0.984,
+       "ivr": 0.005,
+       "agent": 0.011
+      }
+     },
+     {
+      "t": 30,
+      "label": "human",
+      "conf": 0.913,
+      "probs": {
+       "human": 0.913,
+       "ivr": 0.015,
+       "agent": 0.072
+      }
+     },
+     {
+      "t": 45,
+      "label": "human",
+      "conf": 0.89,
+      "probs": {
+       "human": 0.89,
+       "ivr": 0.002,
+       "agent": 0.108
+      }
+     },
+     {
+      "t": 60,
+      "label": "human",
+      "conf": 0.759,
+      "probs": {
+       "human": 0.759,
+       "ivr": 0.009,
+       "agent": 0.232
+      }
+     },
+     {
+      "t": 70.2,
+      "label": "human",
+      "conf": 0.798,
+      "probs": {
+       "human": 0.798,
+       "ivr": 0.008,
+       "agent": 0.194
+      }
+     }
+    ]
+   },
+   {
+    "id": "eval-017",
+    "label": "ivr",
+    "difficulty": "typical",
+    "scenario": "Courier tracking IVR with long keypad entries; system reads delivery window and enrolls SMS updates.",
+    "predicted": "ivr",
+    "confidence": 0.825,
+    "correct": true,
+    "time_to_detection": 15,
+    "duration": 71.7,
+    "top_features": [
+     [
+      "ivr_markers",
+      2.37
+     ],
+     [
+      "latency_std",
+      -1.64
+     ],
+     [
+      "formulaic_rate",
+      0.41
+     ],
+     [
+      "dtmf_used",
+      0.36
+     ]
+    ],
+    "timeline": [
+     {
+      "t": 1,
+      "label": "ivr",
+      "conf": 0.762,
+      "probs": {
+       "human": 0.159,
+       "ivr": 0.762,
+       "agent": 0.079
+      }
+     },
+     {
+      "t": 2,
+      "label": "ivr",
+      "conf": 0.762,
+      "probs": {
+       "human": 0.159,
+       "ivr": 0.762,
+       "agent": 0.079
+      }
+     },
+     {
+      "t": 3,
+      "label": "ivr",
+      "conf": 0.762,
+      "probs": {
+       "human": 0.159,
+       "ivr": 0.762,
+       "agent": 0.079
+      }
+     },
+     {
+      "t": 4,
+      "label": "ivr",
+      "conf": 0.762,
+      "probs": {
+       "human": 0.159,
+       "ivr": 0.762,
+       "agent": 0.079
+      }
+     },
+     {
+      "t": 5,
+      "label": "ivr",
+      "conf": 0.762,
+      "probs": {
+       "human": 0.159,
+       "ivr": 0.762,
+       "agent": 0.079
+      }
+     },
+     {
+      "t": 6,
+      "label": "ivr",
+      "conf": 0.762,
+      "probs": {
+       "human": 0.159,
+       "ivr": 0.762,
+       "agent": 0.079
+      }
+     },
+     {
+      "t": 8,
+      "label": "ivr",
+      "conf": 0.762,
+      "probs": {
+       "human": 0.159,
+       "ivr": 0.762,
+       "agent": 0.079
+      }
+     },
+     {
+      "t": 10,
+      "label": "ivr",
+      "conf": 0.762,
+      "probs": {
+       "human": 0.159,
+       "ivr": 0.762,
+       "agent": 0.079
+      }
+     },
+     {
+      "t": 15,
+      "label": "ivr",
+      "conf": 0.916,
+      "probs": {
+       "human": 0.067,
+       "ivr": 0.916,
+       "agent": 0.018
+      }
+     },
+     {
+      "t": 20,
+      "label": "ivr",
+      "conf": 0.916,
+      "probs": {
+       "human": 0.067,
+       "ivr": 0.916,
+       "agent": 0.018
+      }
+     },
+     {
+      "t": 30,
+      "label": "ivr",
+      "conf": 0.826,
+      "probs": {
+       "human": 0.136,
+       "ivr": 0.826,
+       "agent": 0.038
+      }
+     },
+     {
+      "t": 45,
+      "label": "ivr",
+      "conf": 0.826,
+      "probs": {
+       "human": 0.136,
+       "ivr": 0.826,
+       "agent": 0.038
+      }
+     },
+     {
+      "t": 60,
+      "label": "ivr",
+      "conf": 0.808,
+      "probs": {
+       "human": 0.164,
+       "ivr": 0.808,
+       "agent": 0.028
+      }
+     },
+     {
+      "t": 71.7,
+      "label": "ivr",
+      "conf": 0.825,
+      "probs": {
+       "human": 0.152,
+       "ivr": 0.825,
+       "agent": 0.023
+      }
+     }
+    ]
+   },
+   {
+    "id": "eval-018",
+    "label": "agent",
+    "difficulty": "typical",
+    "scenario": "HVAC company AI assistant discloses it is AI and answers pricing questions precisely.",
+    "predicted": "agent",
+    "confidence": 0.989,
+    "correct": true,
+    "time_to_detection": 2,
+    "duration": 66.2,
+    "top_features": [
+     [
+      "disclosure",
+      1.79
+     ],
+     [
+      "ivr_markers",
+      0.74
+     ],
+     [
+      "latency_mean",
+      0.38
+     ],
+     [
+      "formulaic_rate",
+      -0.37
+     ]
+    ],
+    "timeline": [
+     {
+      "t": 1,
+      "label": "unknown",
+      "conf": 0.0,
+      "probs": {
+       "human": 0.333,
+       "ivr": 0.333,
+       "agent": 0.333
+      }
+     },
+     {
+      "t": 2,
+      "label": "agent",
+      "conf": 0.981,
+      "probs": {
+       "human": 0.012,
+       "ivr": 0.007,
+       "agent": 0.981
+      }
+     },
+     {
+      "t": 3,
+      "label": "agent",
+      "conf": 0.981,
+      "probs": {
+       "human": 0.012,
+       "ivr": 0.007,
+       "agent": 0.981
+      }
+     },
+     {
+      "t": 4,
+      "label": "agent",
+      "conf": 0.981,
+      "probs": {
+       "human": 0.012,
+       "ivr": 0.007,
+       "agent": 0.981
+      }
+     },
+     {
+      "t": 5,
+      "label": "agent",
+      "conf": 0.981,
+      "probs": {
+       "human": 0.012,
+       "ivr": 0.007,
+       "agent": 0.981
+      }
+     },
+     {
+      "t": 6,
+      "label": "agent",
+      "conf": 0.981,
+      "probs": {
+       "human": 0.012,
+       "ivr": 0.007,
+       "agent": 0.981
+      }
+     },
+     {
+      "t": 8,
+      "label": "agent",
+      "conf": 0.981,
+      "probs": {
+       "human": 0.012,
+       "ivr": 0.007,
+       "agent": 0.981
+      }
+     },
+     {
+      "t": 10,
+      "label": "agent",
+      "conf": 0.981,
+      "probs": {
+       "human": 0.012,
+       "ivr": 0.007,
+       "agent": 0.981
+      }
+     },
+     {
+      "t": 15,
+      "label": "agent",
+      "conf": 0.981,
+      "probs": {
+       "human": 0.012,
+       "ivr": 0.007,
+       "agent": 0.981
+      }
+     },
+     {
+      "t": 20,
+      "label": "agent",
+      "conf": 0.981,
+      "probs": {
+       "human": 0.012,
+       "ivr": 0.007,
+       "agent": 0.981
+      }
+     },
+     {
+      "t": 30,
+      "label": "agent",
+      "conf": 0.986,
+      "probs": {
+       "human": 0.007,
+       "ivr": 0.007,
+       "agent": 0.986
+      }
+     },
+     {
+      "t": 45,
+      "label": "agent",
+      "conf": 0.991,
+      "probs": {
+       "human": 0.007,
+       "ivr": 0.003,
+       "agent": 0.991
+      }
+     },
+     {
+      "t": 60,
+      "label": "agent",
+      "conf": 0.993,
+      "probs": {
+       "human": 0.005,
+       "ivr": 0.002,
+       "agent": 0.993
+      }
+     },
+     {
+      "t": 66.2,
+      "label": "agent",
+      "conf": 0.989,
+      "probs": {
+       "human": 0.008,
+       "ivr": 0.002,
+       "agent": 0.989
+      }
+     }
+    ]
+   },
+   {
+    "id": "eval-019",
+    "label": "ivr",
+    "difficulty": "hard",
+    "scenario": "Answering-machine style IVR recorded by the owner in a natural, warm voice with a filler; it keeps playing over the bot and loops.",
+    "predicted": "human",
+    "confidence": 0.957,
+    "correct": false,
+    "time_to_detection": 1,
+    "duration": 41.9,
+    "top_features": [
+     [
+      "latency_std",
+      1.32
+     ],
+     [
+      "first_turn_words",
+      0.86
+     ],
+     [
+      "overlap_rate",
+      0.67
+     ],
+     [
+      "disclosure",
+      0.34
+     ]
+    ],
+    "timeline": [
+     {
+      "t": 1,
+      "label": "human",
+      "conf": 0.847,
+      "probs": {
+       "human": 0.847,
+       "ivr": 0.057,
+       "agent": 0.096
+      }
+     },
+     {
+      "t": 2,
+      "label": "human",
+      "conf": 0.847,
+      "probs": {
+       "human": 0.847,
+       "ivr": 0.057,
+       "agent": 0.096
+      }
+     },
+     {
+      "t": 3,
+      "label": "human",
+      "conf": 0.847,
+      "probs": {
+       "human": 0.847,
+       "ivr": 0.057,
+       "agent": 0.096
+      }
+     },
+     {
+      "t": 4,
+      "label": "human",
+      "conf": 0.847,
+      "probs": {
+       "human": 0.847,
+       "ivr": 0.057,
+       "agent": 0.096
+      }
+     },
+     {
+      "t": 5,
+      "label": "human",
+      "conf": 0.847,
+      "probs": {
+       "human": 0.847,
+       "ivr": 0.057,
+       "agent": 0.096
+      }
+     },
+     {
+      "t": 6,
+      "label": "human",
+      "conf": 0.847,
+      "probs": {
+       "human": 0.847,
+       "ivr": 0.057,
+       "agent": 0.096
+      }
+     },
+     {
+      "t": 8,
+      "label": "human",
+      "conf": 0.847,
+      "probs": {
+       "human": 0.847,
+       "ivr": 0.057,
+       "agent": 0.096
+      }
+     },
+     {
+      "t": 10,
+      "label": "human",
+      "conf": 0.992,
+      "probs": {
+       "human": 0.992,
+       "ivr": 0.007,
+       "agent": 0.001
+      }
+     },
+     {
+      "t": 15,
+      "label": "human",
+      "conf": 0.992,
+      "probs": {
+       "human": 0.992,
+       "ivr": 0.007,
+       "agent": 0.001
+      }
+     },
+     {
+      "t": 20,
+      "label": "human",
+      "conf": 0.992,
+      "probs": {
+       "human": 0.992,
+       "ivr": 0.007,
+       "agent": 0.001
+      }
+     },
+     {
+      "t": 30,
+      "label": "human",
+      "conf": 0.981,
+      "probs": {
+       "human": 0.981,
+       "ivr": 0.017,
+       "agent": 0.001
+      }
+     },
+     {
+      "t": 41.9,
+      "label": "human",
+      "conf": 0.957,
+      "probs": {
+       "human": 0.957,
+       "ivr": 0.007,
+       "agent": 0.036
+      }
+     }
+    ]
+   },
+   {
+    "id": "eval-020",
+    "label": "ivr",
+    "difficulty": "typical",
+    "scenario": "Medical group appointment-confirmation IVR: DOB and phone entry, reads appointment record, confirms on keypress.",
+    "predicted": "ivr",
+    "confidence": 0.955,
+    "correct": true,
+    "time_to_detection": 15,
+    "duration": 76.6,
+    "top_features": [
+     [
+      "ivr_markers",
+      2.37
+     ],
+     [
+      "latency_std",
+      -0.85
+     ],
+     [
+      "formulaic_rate",
+      0.41
+     ],
+     [
+      "dtmf_used",
+      0.36
+     ]
+    ],
+    "timeline": [
+     {
+      "t": 1,
+      "label": "human",
+      "conf": 0.405,
+      "probs": {
+       "human": 0.405,
+       "ivr": 0.377,
+       "agent": 0.218
+      }
+     },
+     {
+      "t": 2,
+      "label": "human",
+      "conf": 0.405,
+      "probs": {
+       "human": 0.405,
+       "ivr": 0.377,
+       "agent": 0.218
+      }
+     },
+     {
+      "t": 3,
+      "label": "human",
+      "conf": 0.405,
+      "probs": {
+       "human": 0.405,
+       "ivr": 0.377,
+       "agent": 0.218
+      }
+     },
+     {
+      "t": 4,
+      "label": "human",
+      "conf": 0.405,
+      "probs": {
+       "human": 0.405,
+       "ivr": 0.377,
+       "agent": 0.218
+      }
+     },
+     {
+      "t": 5,
+      "label": "human",
+      "conf": 0.405,
+      "probs": {
+       "human": 0.405,
+       "ivr": 0.377,
+       "agent": 0.218
+      }
+     },
+     {
+      "t": 6,
+      "label": "human",
+      "conf": 0.405,
+      "probs": {
+       "human": 0.405,
+       "ivr": 0.377,
+       "agent": 0.218
+      }
+     },
+     {
+      "t": 8,
+      "label": "human",
+      "conf": 0.405,
+      "probs": {
+       "human": 0.405,
+       "ivr": 0.377,
+       "agent": 0.218
+      }
+     },
+     {
+      "t": 10,
+      "label": "human",
+      "conf": 0.405,
+      "probs": {
+       "human": 0.405,
+       "ivr": 0.377,
+       "agent": 0.218
+      }
+     },
+     {
+      "t": 15,
+      "label": "ivr",
+      "conf": 0.951,
+      "probs": {
+       "human": 0.039,
+       "ivr": 0.951,
+       "agent": 0.01
+      }
+     },
+     {
+      "t": 20,
+      "label": "ivr",
+      "conf": 0.951,
+      "probs": {
+       "human": 0.039,
+       "ivr": 0.951,
+       "agent": 0.01
+      }
+     },
+     {
+      "t": 30,
+      "label": "ivr",
+      "conf": 0.976,
+      "probs": {
+       "human": 0.018,
+       "ivr": 0.976,
+       "agent": 0.006
+      }
+     },
+     {
+      "t": 45,
+      "label": "ivr",
+      "conf": 0.856,
+      "probs": {
+       "human": 0.123,
+       "ivr": 0.856,
+       "agent": 0.021
+      }
+     },
+     {
+      "t": 60,
+      "label": "ivr",
+      "conf": 0.965,
+      "probs": {
+       "human": 0.027,
+       "ivr": 0.965,
+       "agent": 0.009
+      }
+     },
+     {
+      "t": 76.6,
+      "label": "ivr",
+      "conf": 0.955,
+      "probs": {
+       "human": 0.034,
+       "ivr": 0.955,
+       "agent": 0.011
+      }
+     }
+    ]
+   },
+   {
+    "id": "eval-021",
+    "label": "ivr",
+    "difficulty": "typical",
+    "scenario": "Airline DTMF flight-status line reads a deterministic status; bot's spoken thanks gets 'sorry, I didn't get that'.",
+    "predicted": "ivr",
+    "confidence": 0.971,
+    "correct": true,
+    "time_to_detection": 2,
+    "duration": 69.3,
+    "top_features": [
+     [
+      "ivr_markers",
+      2.37
+     ],
+     [
+      "latency_std",
+      -0.6
+     ],
+     [
+      "first_user_delay",
+      -0.56
+     ],
+     [
+      "formulaic_rate",
+      0.53
+     ]
+    ],
+    "timeline": [
+     {
+      "t": 1,
+      "label": "unknown",
+      "conf": 0.0,
+      "probs": {
+       "human": 0.333,
+       "ivr": 0.333,
+       "agent": 0.333
+      }
+     },
+     {
+      "t": 2,
+      "label": "ivr",
+      "conf": 0.897,
+      "probs": {
+       "human": 0.056,
+       "ivr": 0.897,
+       "agent": 0.047
+      }
+     },
+     {
+      "t": 3,
+      "label": "ivr",
+      "conf": 0.897,
+      "probs": {
+       "human": 0.056,
+       "ivr": 0.897,
+       "agent": 0.047
+      }
+     },
+     {
+      "t": 4,
+      "label": "ivr",
+      "conf": 0.897,
+      "probs": {
+       "human": 0.056,
+       "ivr": 0.897,
+       "agent": 0.047
+      }
+     },
+     {
+      "t": 5,
+      "label": "ivr",
+      "conf": 0.897,
+      "probs": {
+       "human": 0.056,
+       "ivr": 0.897,
+       "agent": 0.047
+      }
+     },
+     {
+      "t": 6,
+      "label": "ivr",
+      "conf": 0.897,
+      "probs": {
+       "human": 0.056,
+       "ivr": 0.897,
+       "agent": 0.047
+      }
+     },
+     {
+      "t": 8,
+      "label": "ivr",
+      "conf": 0.897,
+      "probs": {
+       "human": 0.056,
+       "ivr": 0.897,
+       "agent": 0.047
+      }
+     },
+     {
+      "t": 10,
+      "label": "ivr",
+      "conf": 0.897,
+      "probs": {
+       "human": 0.056,
+       "ivr": 0.897,
+       "agent": 0.047
+      }
+     },
+     {
+      "t": 15,
+      "label": "ivr",
+      "conf": 0.933,
+      "probs": {
+       "human": 0.047,
+       "ivr": 0.933,
+       "agent": 0.02
+      }
+     },
+     {
+      "t": 20,
+      "label": "ivr",
+      "conf": 0.917,
+      "probs": {
+       "human": 0.063,
+       "ivr": 0.917,
+       "agent": 0.02
+      }
+     },
+     {
+      "t": 30,
+      "label": "ivr",
+      "conf": 0.858,
+      "probs": {
+       "human": 0.073,
+       "ivr": 0.858,
+       "agent": 0.07
+      }
+     },
+     {
+      "t": 45,
+      "label": "ivr",
+      "conf": 0.979,
+      "probs": {
+       "human": 0.01,
+       "ivr": 0.979,
+       "agent": 0.011
+      }
+     },
+     {
+      "t": 60,
+      "label": "ivr",
+      "conf": 0.971,
+      "probs": {
+       "human": 0.017,
+       "ivr": 0.971,
+       "agent": 0.012
+      }
+     },
+     {
+      "t": 69.3,
+      "label": "ivr",
+      "conf": 0.971,
+      "probs": {
+       "human": 0.017,
+       "ivr": 0.971,
+       "agent": 0.012
+      }
+     }
+    ]
+   },
+   {
+    "id": "eval-022",
+    "label": "human",
+    "difficulty": "typical",
+    "scenario": "Hardware store clerk puts caller on a silent hold while checking the shelf, then confirms stock and holds an item.",
+    "predicted": "human",
+    "confidence": 0.997,
+    "correct": true,
+    "time_to_detection": 2,
+    "duration": 90.4,
+    "top_features": [
+     [
+      "latency_std",
+      1.49
+     ],
+     [
+      "first_turn_words",
+      1.27
+     ],
+     [
+      "first_user_delay",
+      0.94
+     ],
+     [
+      "turn_words_mean",
+      0.91
+     ]
+    ],
+    "timeline": [
+     {
+      "t": 1,
+      "label": "unknown",
+      "conf": 0.0,
+      "probs": {
+       "human": 0.333,
+       "ivr": 0.333,
+       "agent": 0.333
+      }
+     },
+     {
+      "t": 2,
+      "label": "human",
+      "conf": 0.983,
+      "probs": {
+       "human": 0.983,
+       "ivr": 0.004,
+       "agent": 0.013
+      }
+     },
+     {
+      "t": 3,
+      "label": "human",
+      "conf": 0.983,
+      "probs": {
+       "human": 0.983,
+       "ivr": 0.004,
+       "agent": 0.013
+      }
+     },
+     {
+      "t": 4,
+      "label": "human",
+      "conf": 0.983,
+      "probs": {
+       "human": 0.983,
+       "ivr": 0.004,
+       "agent": 0.013
+      }
+     },
+     {
+      "t": 5,
+      "label": "human",
+      "conf": 0.983,
+      "probs": {
+       "human": 0.983,
+       "ivr": 0.004,
+       "agent": 0.013
+      }
+     },
+     {
+      "t": 6,
+      "label": "human",
+      "conf": 0.983,
+      "probs": {
+       "human": 0.983,
+       "ivr": 0.004,
+       "agent": 0.013
+      }
+     },
+     {
+      "t": 8,
+      "label": "human",
+      "conf": 0.983,
+      "probs": {
+       "human": 0.983,
+       "ivr": 0.004,
+       "agent": 0.013
+      }
+     },
+     {
+      "t": 10,
+      "label": "human",
+      "conf": 0.983,
+      "probs": {
+       "human": 0.983,
+       "ivr": 0.004,
+       "agent": 0.013
+      }
+     },
+     {
+      "t": 15,
+      "label": "human",
+      "conf": 0.999,
+      "probs": {
+       "human": 0.999,
+       "ivr": 0.0,
+       "agent": 0.0
+      }
+     },
+     {
+      "t": 20,
+      "label": "human",
+      "conf": 0.999,
+      "probs": {
+       "human": 0.999,
+       "ivr": 0.0,
+       "agent": 0.0
+      }
+     },
+     {
+      "t": 30,
+      "label": "human",
+      "conf": 0.999,
+      "probs": {
+       "human": 0.999,
+       "ivr": 0.0,
+       "agent": 0.0
+      }
+     },
+     {
+      "t": 45,
+      "label": "human",
+      "conf": 0.999,
+      "probs": {
+       "human": 0.999,
+       "ivr": 0.0,
+       "agent": 0.0
+      }
+     },
+     {
+      "t": 60,
+      "label": "human",
+      "conf": 0.999,
+      "probs": {
+       "human": 0.999,
+       "ivr": 0.0,
+       "agent": 0.0
+      }
+     },
+     {
+      "t": 90.4,
+      "label": "human",
+      "conf": 0.997,
+      "probs": {
+       "human": 0.997,
+       "ivr": 0.0,
+       "agent": 0.003
+      }
+     }
+    ]
+   },
+   {
+    "id": "eval-023",
+    "label": "agent",
+    "difficulty": "hard",
+    "scenario": "Dealership service voice agent deliberately inserts 'um', 'let me see', and 'mm-hmm' backchannels to sound human; issues an appointment number and SMS.",
+    "predicted": "human",
+    "confidence": 0.782,
+    "correct": false,
+    "time_to_detection": null,
+    "duration": 83.8,
+    "top_features": [
+     [
+      "latency_std",
+      0.58
+     ],
+     [
+      "latency_mean",
+      -0.54
+     ],
+     [
+      "disfluency_rate",
+      0.51
+     ],
+     [
+      "disclosure",
+      0.34
+     ]
+    ],
+    "timeline": [
+     {
+      "t": 1,
+      "label": "human",
+      "conf": 0.639,
+      "probs": {
+       "human": 0.639,
+       "ivr": 0.05,
+       "agent": 0.311
+      }
+     },
+     {
+      "t": 2,
+      "label": "human",
+      "conf": 0.639,
+      "probs": {
+       "human": 0.639,
+       "ivr": 0.05,
+       "agent": 0.311
+      }
+     },
+     {
+      "t": 3,
+      "label": "human",
+      "conf": 0.639,
+      "probs": {
+       "human": 0.639,
+       "ivr": 0.05,
+       "agent": 0.311
+      }
+     },
+     {
+      "t": 4,
+      "label": "human",
+      "conf": 0.639,
+      "probs": {
+       "human": 0.639,
+       "ivr": 0.05,
+       "agent": 0.311
+      }
+     },
+     {
+      "t": 5,
+      "label": "human",
+      "conf": 0.639,
+      "probs": {
+       "human": 0.639,
+       "ivr": 0.05,
+       "agent": 0.311
+      }
+     },
+     {
+      "t": 6,
+      "label": "human",
+      "conf": 0.639,
+      "probs": {
+       "human": 0.639,
+       "ivr": 0.05,
+       "agent": 0.311
+      }
+     },
+     {
+      "t": 8,
+      "label": "human",
+      "conf": 0.639,
+      "probs": {
+       "human": 0.639,
+       "ivr": 0.05,
+       "agent": 0.311
+      }
+     },
+     {
+      "t": 10,
+      "label": "human",
+      "conf": 0.639,
+      "probs": {
+       "human": 0.639,
+       "ivr": 0.05,
+       "agent": 0.311
+      }
+     },
+     {
+      "t": 15,
+      "label": "human",
+      "conf": 0.639,
+      "probs": {
+       "human": 0.639,
+       "ivr": 0.05,
+       "agent": 0.311
+      }
+     },
+     {
+      "t": 20,
+      "label": "human",
+      "conf": 0.737,
+      "probs": {
+       "human": 0.737,
+       "ivr": 0.066,
+       "agent": 0.197
+      }
+     },
+     {
+      "t": 30,
+      "label": "human",
+      "conf": 0.737,
+      "probs": {
+       "human": 0.737,
+       "ivr": 0.066,
+       "agent": 0.197
+      }
+     },
+     {
+      "t": 45,
+      "label": "human",
+      "conf": 0.777,
+      "probs": {
+       "human": 0.777,
+       "ivr": 0.012,
+       "agent": 0.212
+      }
+     },
+     {
+      "t": 60,
+      "label": "human",
+      "conf": 0.735,
+      "probs": {
+       "human": 0.735,
+       "ivr": 0.025,
+       "agent": 0.24
+      }
+     },
+     {
+      "t": 83.8,
+      "label": "human",
+      "conf": 0.782,
+      "probs": {
+       "human": 0.782,
+       "ivr": 0.027,
+       "agent": 0.191
+      }
+     }
+    ]
+   },
+   {
+    "id": "eval-024",
+    "label": "human",
+    "difficulty": "typical",
+    "scenario": "Plumbing dispatcher looks up the job and confirms tomorrow's arrival window and diagnostic fee.",
+    "predicted": "human",
+    "confidence": 0.987,
+    "correct": true,
+    "time_to_detection": 1,
+    "duration": 51.3,
+    "top_features": [
+     [
+      "first_turn_words",
+      1.44
+     ],
+     [
+      "turn_words_mean",
+      1.05
+     ],
+     [
+      "latency_std",
+      0.59
+     ],
+     [
+      "disclosure",
+      0.34
+     ]
+    ],
+    "timeline": [
+     {
+      "t": 1,
+      "label": "human",
+      "conf": 0.95,
+      "probs": {
+       "human": 0.95,
+       "ivr": 0.023,
+       "agent": 0.027
+      }
+     },
+     {
+      "t": 2,
+      "label": "human",
+      "conf": 0.95,
+      "probs": {
+       "human": 0.95,
+       "ivr": 0.023,
+       "agent": 0.027
+      }
+     },
+     {
+      "t": 3,
+      "label": "human",
+      "conf": 0.95,
+      "probs": {
+       "human": 0.95,
+       "ivr": 0.023,
+       "agent": 0.027
+      }
+     },
+     {
+      "t": 4,
+      "label": "human",
+      "conf": 0.95,
+      "probs": {
+       "human": 0.95,
+       "ivr": 0.023,
+       "agent": 0.027
+      }
+     },
+     {
+      "t": 5,
+      "label": "human",
+      "conf": 0.95,
+      "probs": {
+       "human": 0.95,
+       "ivr": 0.023,
+       "agent": 0.027
+      }
+     },
+     {
+      "t": 6,
+      "label": "human",
+      "conf": 0.95,
+      "probs": {
+       "human": 0.95,
+       "ivr": 0.023,
+       "agent": 0.027
+      }
+     },
+     {
+      "t": 8,
+      "label": "human",
+      "conf": 0.95,
+      "probs": {
+       "human": 0.95,
+       "ivr": 0.023,
+       "agent": 0.027
+      }
+     },
+     {
+      "t": 10,
+      "label": "human",
+      "conf": 0.95,
+      "probs": {
+       "human": 0.95,
+       "ivr": 0.023,
+       "agent": 0.027
+      }
+     },
+     {
+      "t": 15,
+      "label": "human",
+      "conf": 0.962,
+      "probs": {
+       "human": 0.962,
+       "ivr": 0.013,
+       "agent": 0.025
+      }
+     },
+     {
+      "t": 20,
+      "label": "human",
+      "conf": 0.876,
+      "probs": {
+       "human": 0.876,
+       "ivr": 0.038,
+       "agent": 0.087
+      }
+     },
+     {
+      "t": 30,
+      "label": "human",
+      "conf": 0.961,
+      "probs": {
+       "human": 0.961,
+       "ivr": 0.004,
+       "agent": 0.035
+      }
+     },
+     {
+      "t": 45,
+      "label": "human",
+      "conf": 0.961,
+      "probs": {
+       "human": 0.961,
+       "ivr": 0.005,
+       "agent": 0.034
+      }
+     },
+     {
+      "t": 51.3,
+      "label": "human",
+      "conf": 0.987,
+      "probs": {
+       "human": 0.987,
+       "ivr": 0.003,
+       "agent": 0.01
+      }
+     }
+    ]
+   },
+   {
+    "id": "eval-025",
+    "label": "agent",
+    "difficulty": "typical",
+    "scenario": "Furniture retailer's AI assistant looks up an order and states delivery window, signature rule, and service level.",
+    "predicted": "agent",
+    "confidence": 0.992,
+    "correct": true,
+    "time_to_detection": 2,
+    "duration": 70.4,
+    "top_features": [
+     [
+      "disclosure",
+      1.79
+     ],
+     [
+      "ivr_markers",
+      0.74
+     ],
+     [
+      "latency_regularity",
+      0.34
+     ],
+     [
+      "first_turn_words",
+      0.32
+     ]
+    ],
+    "timeline": [
+     {
+      "t": 1,
+      "label": "unknown",
+      "conf": 0.0,
+      "probs": {
+       "human": 0.333,
+       "ivr": 0.333,
+       "agent": 0.333
+      }
+     },
+     {
+      "t": 2,
+      "label": "agent",
+      "conf": 0.985,
+      "probs": {
+       "human": 0.004,
+       "ivr": 0.011,
+       "agent": 0.985
+      }
+     },
+     {
+      "t": 3,
+      "label": "agent",
+      "conf": 0.985,
+      "probs": {
+       "human": 0.004,
+       "ivr": 0.011,
+       "agent": 0.985
+      }
+     },
+     {
+      "t": 4,
+      "label": "agent",
+      "conf": 0.985,
+      "probs": {
+       "human": 0.004,
+       "ivr": 0.011,
+       "agent": 0.985
+      }
+     },
+     {
+      "t": 5,
+      "label": "agent",
+      "conf": 0.985,
+      "probs": {
+       "human": 0.004,
+       "ivr": 0.011,
+       "agent": 0.985
+      }
+     },
+     {
+      "t": 6,
+      "label": "agent",
+      "conf": 0.985,
+      "probs": {
+       "human": 0.004,
+       "ivr": 0.011,
+       "agent": 0.985
+      }
+     },
+     {
+      "t": 8,
+      "label": "agent",
+      "conf": 0.985,
+      "probs": {
+       "human": 0.004,
+       "ivr": 0.011,
+       "agent": 0.985
+      }
+     },
+     {
+      "t": 10,
+      "label": "agent",
+      "conf": 0.985,
+      "probs": {
+       "human": 0.004,
+       "ivr": 0.011,
+       "agent": 0.985
+      }
+     },
+     {
+      "t": 15,
+      "label": "agent",
+      "conf": 0.985,
+      "probs": {
+       "human": 0.004,
+       "ivr": 0.011,
+       "agent": 0.985
+      }
+     },
+     {
+      "t": 20,
+      "label": "agent",
+      "conf": 0.985,
+      "probs": {
+       "human": 0.004,
+       "ivr": 0.011,
+       "agent": 0.985
+      }
+     },
+     {
+      "t": 30,
+      "label": "agent",
+      "conf": 0.981,
+      "probs": {
+       "human": 0.008,
+       "ivr": 0.011,
+       "agent": 0.981
+      }
+     },
+     {
+      "t": 45,
+      "label": "agent",
+      "conf": 0.981,
+      "probs": {
+       "human": 0.008,
+       "ivr": 0.011,
+       "agent": 0.981
+      }
+     },
+     {
+      "t": 60,
+      "label": "agent",
+      "conf": 0.993,
+      "probs": {
+       "human": 0.003,
+       "ivr": 0.004,
+       "agent": 0.993
+      }
+     },
+     {
+      "t": 70.4,
+      "label": "agent",
+      "conf": 0.992,
+      "probs": {
+       "human": 0.004,
+       "ivr": 0.004,
+       "agent": 0.992
+      }
+     }
+    ]
+   },
+   {
+    "id": "eval-026",
+    "label": "human",
+    "difficulty": "typical",
+    "scenario": "Mechanic gives a spoken price range for brake work with hedges and slang.",
+    "predicted": "human",
+    "confidence": 0.981,
+    "correct": true,
+    "time_to_detection": 1,
+    "duration": 62.3,
+    "top_features": [
+     [
+      "first_turn_words",
+      1.36
+     ],
+     [
+      "overlap_rate",
+      0.54
+     ],
+     [
+      "latency_std",
+      0.5
+     ],
+     [
+      "turn_words_mean",
+      0.5
+     ]
+    ],
+    "timeline": [
+     {
+      "t": 1,
+      "label": "human",
+      "conf": 0.95,
+      "probs": {
+       "human": 0.95,
+       "ivr": 0.021,
+       "agent": 0.029
+      }
+     },
+     {
+      "t": 2,
+      "label": "human",
+      "conf": 0.95,
+      "probs": {
+       "human": 0.95,
+       "ivr": 0.021,
+       "agent": 0.029
+      }
+     },
+     {
+      "t": 3,
+      "label": "human",
+      "conf": 0.95,
+      "probs": {
+       "human": 0.95,
+       "ivr": 0.021,
+       "agent": 0.029
+      }
+     },
+     {
+      "t": 4,
+      "label": "human",
+      "conf": 0.95,
+      "probs": {
+       "human": 0.95,
+       "ivr": 0.021,
+       "agent": 0.029
+      }
+     },
+     {
+      "t": 5,
+      "label": "human",
+      "conf": 0.95,
+      "probs": {
+       "human": 0.95,
+       "ivr": 0.021,
+       "agent": 0.029
+      }
+     },
+     {
+      "t": 6,
+      "label": "human",
+      "conf": 0.95,
+      "probs": {
+       "human": 0.95,
+       "ivr": 0.021,
+       "agent": 0.029
+      }
+     },
+     {
+      "t": 8,
+      "label": "human",
+      "conf": 0.95,
+      "probs": {
+       "human": 0.95,
+       "ivr": 0.021,
+       "agent": 0.029
+      }
+     },
+     {
+      "t": 10,
+      "label": "human",
+      "conf": 0.95,
+      "probs": {
+       "human": 0.95,
+       "ivr": 0.021,
+       "agent": 0.029
+      }
+     },
+     {
+      "t": 15,
+      "label": "human",
+      "conf": 0.999,
+      "probs": {
+       "human": 0.999,
+       "ivr": 0.001,
+       "agent": 0.0
+      }
+     },
+     {
+      "t": 20,
+      "label": "human",
+      "conf": 0.999,
+      "probs": {
+       "human": 0.999,
+       "ivr": 0.001,
+       "agent": 0.0
+      }
+     },
+     {
+      "t": 30,
+      "label": "human",
+      "conf": 0.974,
+      "probs": {
+       "human": 0.974,
+       "ivr": 0.004,
+       "agent": 0.021
+      }
+     },
+     {
+      "t": 45,
+      "label": "human",
+      "conf": 0.955,
+      "probs": {
+       "human": 0.955,
+       "ivr": 0.008,
+       "agent": 0.037
+      }
+     },
+     {
+      "t": 60,
+      "label": "human",
+      "conf": 0.957,
+      "probs": {
+       "human": 0.957,
+       "ivr": 0.009,
+       "agent": 0.034
+      }
+     },
+     {
+      "t": 62.3,
+      "label": "human",
+      "conf": 0.981,
+      "probs": {
+       "human": 0.981,
+       "ivr": 0.005,
+       "agent": 0.014
+      }
+     }
+    ]
+   },
+   {
+    "id": "eval-027",
+    "label": "ivr",
+    "difficulty": "typical",
+    "scenario": "County office phone tree with bilingual prompt, invalid-entry loops, and a closed-office dead end.",
+    "predicted": "ivr",
+    "confidence": 0.95,
+    "correct": true,
+    "time_to_detection": 30,
+    "duration": 94.5,
+    "top_features": [
+     [
+      "ivr_markers",
+      2.37
+     ],
+     [
+      "first_user_delay",
+      -1.03
+     ],
+     [
+      "ivr_rejects",
+      1.02
+     ],
+     [
+      "formulaic_rate",
+      0.43
+     ]
+    ],
+    "timeline": [
+     {
+      "t": 1,
+      "label": "unknown",
+      "conf": 0.0,
+      "probs": {
+       "human": 0.333,
+       "ivr": 0.333,
+       "agent": 0.333
+      }
+     },
+     {
+      "t": 2,
+      "label": "human",
+      "conf": 0.918,
+      "probs": {
+       "human": 0.918,
+       "ivr": 0.013,
+       "agent": 0.069
+      }
+     },
+     {
+      "t": 3,
+      "label": "human",
+      "conf": 0.918,
+      "probs": {
+       "human": 0.918,
+       "ivr": 0.013,
+       "agent": 0.069
+      }
+     },
+     {
+      "t": 4,
+      "label": "human",
+      "conf": 0.918,
+      "probs": {
+       "human": 0.918,
+       "ivr": 0.013,
+       "agent": 0.069
+      }
+     },
+     {
+      "t": 5,
+      "label": "human",
+      "conf": 0.918,
+      "probs": {
+       "human": 0.918,
+       "ivr": 0.013,
+       "agent": 0.069
+      }
+     },
+     {
+      "t": 6,
+      "label": "human",
+      "conf": 0.918,
+      "probs": {
+       "human": 0.918,
+       "ivr": 0.013,
+       "agent": 0.069
+      }
+     },
+     {
+      "t": 8,
+      "label": "human",
+      "conf": 0.918,
+      "probs": {
+       "human": 0.918,
+       "ivr": 0.013,
+       "agent": 0.069
+      }
+     },
+     {
+      "t": 10,
+      "label": "human",
+      "conf": 0.559,
+      "probs": {
+       "human": 0.559,
+       "ivr": 0.425,
+       "agent": 0.016
+      }
+     },
+     {
+      "t": 15,
+      "label": "human",
+      "conf": 0.559,
+      "probs": {
+       "human": 0.559,
+       "ivr": 0.425,
+       "agent": 0.016
+      }
+     },
+     {
+      "t": 20,
+      "label": "human",
+      "conf": 0.559,
+      "probs": {
+       "human": 0.559,
+       "ivr": 0.425,
+       "agent": 0.016
+      }
+     },
+     {
+      "t": 30,
+      "label": "ivr",
+      "conf": 0.85,
+      "probs": {
+       "human": 0.144,
+       "ivr": 0.85,
+       "agent": 0.007
+      }
+     },
+     {
+      "t": 45,
+      "label": "ivr",
+      "conf": 0.941,
+      "probs": {
+       "human": 0.054,
+       "ivr": 0.941,
+       "agent": 0.006
+      }
+     },
+     {
+      "t": 60,
+      "label": "ivr",
+      "conf": 0.949,
+      "probs": {
+       "human": 0.05,
+       "ivr": 0.949,
+       "agent": 0.001
+      }
+     },
+     {
+      "t": 94.5,
+      "label": "ivr",
+      "conf": 0.95,
+      "probs": {
+       "human": 0.049,
+       "ivr": 0.95,
+       "agent": 0.001
+      }
+     }
+    ]
+   },
+   {
+    "id": "eval-028",
+    "label": "ivr",
+    "difficulty": "typical",
+    "scenario": "Cable company tree with retention upsell, then endless hold music with a repeating 'your call is important' message.",
+    "predicted": "ivr",
+    "confidence": 0.98,
+    "correct": true,
+    "time_to_detection": 30,
+    "duration": 130.9,
+    "top_features": [
+     [
+      "ivr_markers",
+      2.37
+     ],
+     [
+      "formulaic_rate",
+      0.45
+     ],
+     [
+      "dtmf_used",
+      0.36
+     ],
+     [
+      "disclosure",
+      0.27
+     ]
+    ],
+    "timeline": [
+     {
+      "t": 1,
+      "label": "human",
+      "conf": 0.515,
+      "probs": {
+       "human": 0.515,
+       "ivr": 0.077,
+       "agent": 0.408
+      }
+     },
+     {
+      "t": 2,
+      "label": "human",
+      "conf": 0.515,
+      "probs": {
+       "human": 0.515,
+       "ivr": 0.077,
+       "agent": 0.408
+      }
+     },
+     {
+      "t": 3,
+      "label": "human",
+      "conf": 0.515,
+      "probs": {
+       "human": 0.515,
+       "ivr": 0.077,
+       "agent": 0.408
+      }
+     },
+     {
+      "t": 4,
+      "label": "human",
+      "conf": 0.515,
+      "probs": {
+       "human": 0.515,
+       "ivr": 0.077,
+       "agent": 0.408
+      }
+     },
+     {
+      "t": 5,
+      "label": "human",
+      "conf": 0.515,
+      "probs": {
+       "human": 0.515,
+       "ivr": 0.077,
+       "agent": 0.408
+      }
+     },
+     {
+      "t": 6,
+      "label": "human",
+      "conf": 0.515,
+      "probs": {
+       "human": 0.515,
+       "ivr": 0.077,
+       "agent": 0.408
+      }
+     },
+     {
+      "t": 8,
+      "label": "human",
+      "conf": 0.515,
+      "probs": {
+       "human": 0.515,
+       "ivr": 0.077,
+       "agent": 0.408
+      }
+     },
+     {
+      "t": 10,
+      "label": "ivr",
+      "conf": 0.777,
+      "probs": {
+       "human": 0.186,
+       "ivr": 0.777,
+       "agent": 0.038
+      }
+     },
+     {
+      "t": 15,
+      "label": "ivr",
+      "conf": 0.777,
+      "probs": {
+       "human": 0.186,
+       "ivr": 0.777,
+       "agent": 0.038
+      }
+     },
+     {
+      "t": 20,
+      "label": "ivr",
+      "conf": 0.777,
+      "probs": {
+       "human": 0.186,
+       "ivr": 0.777,
+       "agent": 0.038
+      }
+     },
+     {
+      "t": 30,
+      "label": "ivr",
+      "conf": 0.983,
+      "probs": {
+       "human": 0.014,
+       "ivr": 0.983,
+       "agent": 0.003
+      }
+     },
+     {
+      "t": 45,
+      "label": "ivr",
+      "conf": 0.983,
+      "probs": {
+       "human": 0.011,
+       "ivr": 0.983,
+       "agent": 0.006
+      }
+     },
+     {
+      "t": 60,
+      "label": "ivr",
+      "conf": 0.978,
+      "probs": {
+       "human": 0.018,
+       "ivr": 0.978,
+       "agent": 0.004
+      }
+     },
+     {
+      "t": 130.9,
+      "label": "ivr",
+      "conf": 0.98,
+      "probs": {
+       "human": 0.018,
+       "ivr": 0.98,
+       "agent": 0.003
+      }
+     }
+    ]
+   },
+   {
+    "id": "eval-029",
+    "label": "agent",
+    "difficulty": "hard",
+    "scenario": "Clinic voice agent with poor speech recognition (asks to repeat, mishears name and day), admits it can't change appointments within 48h, then claims the change anyway.",
+    "predicted": "agent",
+    "confidence": 0.962,
+    "correct": true,
+    "time_to_detection": 2,
+    "duration": 106.5,
+    "top_features": [
+     [
+      "disclosure",
+      1.79
+     ],
+     [
+      "ivr_markers",
+      0.74
+     ],
+     [
+      "latency_mean",
+      0.6
+     ],
+     [
+      "turn_words_mean",
+      -0.25
+     ]
+    ],
+    "timeline": [
+     {
+      "t": 1,
+      "label": "unknown",
+      "conf": 0.0,
+      "probs": {
+       "human": 0.333,
+       "ivr": 0.333,
+       "agent": 0.333
+      }
+     },
+     {
+      "t": 2,
+      "label": "agent",
+      "conf": 0.921,
+      "probs": {
+       "human": 0.078,
+       "ivr": 0.001,
+       "agent": 0.921
+      }
+     },
+     {
+      "t": 3,
+      "label": "agent",
+      "conf": 0.921,
+      "probs": {
+       "human": 0.078,
+       "ivr": 0.001,
+       "agent": 0.921
+      }
+     },
+     {
+      "t": 4,
+      "label": "agent",
+      "conf": 0.921,
+      "probs": {
+       "human": 0.078,
+       "ivr": 0.001,
+       "agent": 0.921
+      }
+     },
+     {
+      "t": 5,
+      "label": "agent",
+      "conf": 0.921,
+      "probs": {
+       "human": 0.078,
+       "ivr": 0.001,
+       "agent": 0.921
+      }
+     },
+     {
+      "t": 6,
+      "label": "agent",
+      "conf": 0.921,
+      "probs": {
+       "human": 0.078,
+       "ivr": 0.001,
+       "agent": 0.921
+      }
+     },
+     {
+      "t": 8,
+      "label": "agent",
+      "conf": 0.921,
+      "probs": {
+       "human": 0.078,
+       "ivr": 0.001,
+       "agent": 0.921
+      }
+     },
+     {
+      "t": 10,
+      "label": "agent",
+      "conf": 0.921,
+      "probs": {
+       "human": 0.078,
+       "ivr": 0.001,
+       "agent": 0.921
+      }
+     },
+     {
+      "t": 15,
+      "label": "agent",
+      "conf": 0.921,
+      "probs": {
+       "human": 0.078,
+       "ivr": 0.001,
+       "agent": 0.921
+      }
+     },
+     {
+      "t": 20,
+      "label": "agent",
+      "conf": 0.931,
+      "probs": {
+       "human": 0.067,
+       "ivr": 0.002,
+       "agent": 0.931
+      }
+     },
+     {
+      "t": 30,
+      "label": "agent",
+      "conf": 0.957,
+      "probs": {
+       "human": 0.042,
+       "ivr": 0.001,
+       "agent": 0.957
+      }
+     },
+     {
+      "t": 45,
+      "label": "agent",
+      "conf": 0.961,
+      "probs": {
+       "human": 0.038,
+       "ivr": 0.001,
+       "agent": 0.961
+      }
+     },
+     {
+      "t": 60,
+      "label": "agent",
+      "conf": 0.957,
+      "probs": {
+       "human": 0.041,
+       "ivr": 0.001,
+       "agent": 0.957
+      }
+     },
+     {
+      "t": 106.5,
+      "label": "agent",
+      "conf": 0.962,
+      "probs": {
+       "human": 0.037,
+       "ivr": 0.002,
+       "agent": 0.962
+      }
+     }
+    ]
+   },
+   {
+    "id": "eval-030",
+    "label": "agent",
+    "difficulty": "typical",
+    "scenario": "Dental clinic LLM voice assistant self-identifies as virtual, answers insurance, availability and hours questions in full sentences.",
+    "predicted": "agent",
+    "confidence": 0.997,
+    "correct": true,
+    "time_to_detection": 2,
+    "duration": 72.0,
+    "top_features": [
+     [
+      "disclosure",
+      1.79
+     ],
+     [
+      "ivr_markers",
+      0.74
+     ],
+     [
+      "latency_mean",
+      0.41
+     ],
+     [
+      "latency_regularity",
+      0.33
+     ]
+    ],
+    "timeline": [
+     {
+      "t": 1,
+      "label": "unknown",
+      "conf": 0.0,
+      "probs": {
+       "human": 0.333,
+       "ivr": 0.333,
+       "agent": 0.333
+      }
+     },
+     {
+      "t": 2,
+      "label": "agent",
+      "conf": 0.993,
+      "probs": {
+       "human": 0.005,
+       "ivr": 0.003,
+       "agent": 0.993
+      }
+     },
+     {
+      "t": 3,
+      "label": "agent",
+      "conf": 0.993,
+      "probs": {
+       "human": 0.005,
+       "ivr": 0.003,
+       "agent": 0.993
+      }
+     },
+     {
+      "t": 4,
+      "label": "agent",
+      "conf": 0.993,
+      "probs": {
+       "human": 0.005,
+       "ivr": 0.003,
+       "agent": 0.993
+      }
+     },
+     {
+      "t": 5,
+      "label": "agent",
+      "conf": 0.993,
+      "probs": {
+       "human": 0.005,
+       "ivr": 0.003,
+       "agent": 0.993
+      }
+     },
+     {
+      "t": 6,
+      "label": "agent",
+      "conf": 0.993,
+      "probs": {
+       "human": 0.005,
+       "ivr": 0.003,
+       "agent": 0.993
+      }
+     },
+     {
+      "t": 8,
+      "label": "agent",
+      "conf": 0.993,
+      "probs": {
+       "human": 0.005,
+       "ivr": 0.003,
+       "agent": 0.993
+      }
+     },
+     {
+      "t": 10,
+      "label": "agent",
+      "conf": 0.993,
+      "probs": {
+       "human": 0.005,
+       "ivr": 0.003,
+       "agent": 0.993
+      }
+     },
+     {
+      "t": 15,
+      "label": "agent",
+      "conf": 0.993,
+      "probs": {
+       "human": 0.005,
+       "ivr": 0.003,
+       "agent": 0.993
+      }
+     },
+     {
+      "t": 20,
+      "label": "agent",
+      "conf": 0.993,
+      "probs": {
+       "human": 0.005,
+       "ivr": 0.003,
+       "agent": 0.993
+      }
+     },
+     {
+      "t": 30,
+      "label": "agent",
+      "conf": 0.994,
+      "probs": {
+       "human": 0.003,
+       "ivr": 0.003,
+       "agent": 0.994
+      }
+     },
+     {
+      "t": 45,
+      "label": "agent",
+      "conf": 0.997,
+      "probs": {
+       "human": 0.001,
+       "ivr": 0.002,
+       "agent": 0.997
+      }
+     },
+     {
+      "t": 60,
+      "label": "agent",
+      "conf": 0.997,
+      "probs": {
+       "human": 0.001,
+       "ivr": 0.001,
+       "agent": 0.997
+      }
+     },
+     {
+      "t": 72.0,
+      "label": "agent",
+      "conf": 0.997,
+      "probs": {
+       "human": 0.002,
+       "ivr": 0.002,
+       "agent": 0.997
+      }
+     }
+    ]
+   },
+   {
+    "id": "eval-031",
+    "label": "agent",
+    "difficulty": "hard",
+    "scenario": "ISP voice agent is interrupted twice by the caller (barge-in), stops mid-sentence and recovers gracefully; issues confirmation number and SMS.",
+    "predicted": "agent",
+    "confidence": 0.991,
+    "correct": true,
+    "time_to_detection": 2,
+    "duration": 86.8,
+    "top_features": [
+     [
+      "disclosure",
+      1.79
+     ],
+     [
+      "ivr_markers",
+      0.74
+     ],
+     [
+      "latency_regularity",
+      0.31
+     ],
+     [
+      "formulaic_rate",
+      -0.3
+     ]
+    ],
+    "timeline": [
+     {
+      "t": 1,
+      "label": "unknown",
+      "conf": 0.0,
+      "probs": {
+       "human": 0.333,
+       "ivr": 0.333,
+       "agent": 0.333
+      }
+     },
+     {
+      "t": 2,
+      "label": "agent",
+      "conf": 0.98,
+      "probs": {
+       "human": 0.007,
+       "ivr": 0.013,
+       "agent": 0.98
+      }
+     },
+     {
+      "t": 3,
+      "label": "agent",
+      "conf": 0.98,
+      "probs": {
+       "human": 0.007,
+       "ivr": 0.013,
+       "agent": 0.98
+      }
+     },
+     {
+      "t": 4,
+      "label": "agent",
+      "conf": 0.98,
+      "probs": {
+       "human": 0.007,
+       "ivr": 0.013,
+       "agent": 0.98
+      }
+     },
+     {
+      "t": 5,
+      "label": "agent",
+      "conf": 0.98,
+      "probs": {
+       "human": 0.007,
+       "ivr": 0.013,
+       "agent": 0.98
+      }
+     },
+     {
+      "t": 6,
+      "label": "agent",
+      "conf": 0.98,
+      "probs": {
+       "human": 0.007,
+       "ivr": 0.013,
+       "agent": 0.98
+      }
+     },
+     {
+      "t": 8,
+      "label": "agent",
+      "conf": 0.98,
+      "probs": {
+       "human": 0.007,
+       "ivr": 0.013,
+       "agent": 0.98
+      }
+     },
+     {
+      "t": 10,
+      "label": "agent",
+      "conf": 0.98,
+      "probs": {
+       "human": 0.007,
+       "ivr": 0.013,
+       "agent": 0.98
+      }
+     },
+     {
+      "t": 15,
+      "label": "agent",
+      "conf": 0.98,
+      "probs": {
+       "human": 0.007,
+       "ivr": 0.013,
+       "agent": 0.98
+      }
+     },
+     {
+      "t": 20,
+      "label": "agent",
+      "conf": 0.986,
+      "probs": {
+       "human": 0.003,
+       "ivr": 0.011,
+       "agent": 0.986
+      }
+     },
+     {
+      "t": 30,
+      "label": "agent",
+      "conf": 0.986,
+      "probs": {
+       "human": 0.003,
+       "ivr": 0.011,
+       "agent": 0.986
+      }
+     },
+     {
+      "t": 45,
+      "label": "agent",
+      "conf": 0.993,
+      "probs": {
+       "human": 0.002,
+       "ivr": 0.005,
+       "agent": 0.993
+      }
+     },
+     {
+      "t": 60,
+      "label": "agent",
+      "conf": 0.993,
+      "probs": {
+       "human": 0.003,
+       "ivr": 0.005,
+       "agent": 0.993
+      }
+     },
+     {
+      "t": 86.8,
+      "label": "agent",
+      "conf": 0.991,
+      "probs": {
+       "human": 0.004,
+       "ivr": 0.005,
+       "agent": 0.991
+      }
+     }
+    ]
+   },
+   {
+    "id": "eval-032",
+    "label": "agent",
+    "difficulty": "hard",
+    "scenario": "Very low-latency, clipped voice agent (sub-half-second turn gaps) declares a gym membership cancelled and refuses any written confirmation.",
+    "predicted": "human",
+    "confidence": 0.954,
+    "correct": false,
+    "time_to_detection": 1,
+    "duration": 47.6,
+    "top_features": [
+     [
+      "first_turn_words",
+      1.19
+     ],
+     [
+      "turn_words_mean",
+      1.04
+     ],
+     [
+      "first_user_delay",
+      -0.74
+     ],
+     [
+      "overlap_rate",
+      0.58
+     ]
+    ],
+    "timeline": [
+     {
+      "t": 1,
+      "label": "human",
+      "conf": 0.843,
+      "probs": {
+       "human": 0.843,
+       "ivr": 0.041,
+       "agent": 0.116
+      }
+     },
+     {
+      "t": 2,
+      "label": "human",
+      "conf": 0.843,
+      "probs": {
+       "human": 0.843,
+       "ivr": 0.041,
+       "agent": 0.116
+      }
+     },
+     {
+      "t": 3,
+      "label": "human",
+      "conf": 0.843,
+      "probs": {
+       "human": 0.843,
+       "ivr": 0.041,
+       "agent": 0.116
+      }
+     },
+     {
+      "t": 4,
+      "label": "human",
+      "conf": 0.843,
+      "probs": {
+       "human": 0.843,
+       "ivr": 0.041,
+       "agent": 0.116
+      }
+     },
+     {
+      "t": 5,
+      "label": "human",
+      "conf": 0.843,
+      "probs": {
+       "human": 0.843,
+       "ivr": 0.041,
+       "agent": 0.116
+      }
+     },
+     {
+      "t": 6,
+      "label": "human",
+      "conf": 0.843,
+      "probs": {
+       "human": 0.843,
+       "ivr": 0.041,
+       "agent": 0.116
+      }
+     },
+     {
+      "t": 8,
+      "label": "human",
+      "conf": 0.843,
+      "probs": {
+       "human": 0.843,
+       "ivr": 0.041,
+       "agent": 0.116
+      }
+     },
+     {
+      "t": 10,
+      "label": "human",
+      "conf": 0.989,
+      "probs": {
+       "human": 0.989,
+       "ivr": 0.006,
+       "agent": 0.004
+      }
+     },
+     {
+      "t": 15,
+      "label": "human",
+      "conf": 0.989,
+      "probs": {
+       "human": 0.989,
+       "ivr": 0.006,
+       "agent": 0.004
+      }
+     },
+     {
+      "t": 20,
+      "label": "human",
+      "conf": 0.909,
+      "probs": {
+       "human": 0.909,
+       "ivr": 0.009,
+       "agent": 0.082
+      }
+     },
+     {
+      "t": 30,
+      "label": "human",
+      "conf": 0.944,
+      "probs": {
+       "human": 0.944,
+       "ivr": 0.01,
+       "agent": 0.046
+      }
+     },
+     {
+      "t": 45,
+      "label": "human",
+      "conf": 0.957,
+      "probs": {
+       "human": 0.957,
+       "ivr": 0.01,
+       "agent": 0.033
+      }
+     },
+     {
+      "t": 47.6,
+      "label": "human",
+      "conf": 0.954,
+      "probs": {
+       "human": 0.954,
+       "ivr": 0.012,
+       "agent": 0.034
+      }
+     }
+    ]
+   },
+   {
+    "id": "eval-033",
+    "label": "human",
+    "difficulty": "typical",
+    "scenario": "Solo dog groomer answers mid-groom with dryer noise and promises to text the customer later; nothing booked.",
+    "predicted": "human",
+    "confidence": 0.999,
+    "correct": true,
+    "time_to_detection": 3,
+    "duration": 51.3,
+    "top_features": [
+     [
+      "first_user_delay",
+      2.28
+     ],
+     [
+      "first_turn_words",
+      1.6
+     ],
+     [
+      "turn_words_mean",
+      0.69
+     ],
+     [
+      "latency_std",
+      0.59
+     ]
+    ],
+    "timeline": [
+     {
+      "t": 1,
+      "label": "unknown",
+      "conf": 0.0,
+      "probs": {
+       "human": 0.333,
+       "ivr": 0.333,
+       "agent": 0.333
+      }
+     },
+     {
+      "t": 2,
+      "label": "unknown",
+      "conf": 0.0,
+      "probs": {
+       "human": 0.333,
+       "ivr": 0.333,
+       "agent": 0.333
+      }
+     },
+     {
+      "t": 3,
+      "label": "human",
+      "conf": 0.999,
+      "probs": {
+       "human": 0.999,
+       "ivr": 0.0,
+       "agent": 0.001
+      }
+     },
+     {
+      "t": 4,
+      "label": "human",
+      "conf": 0.999,
+      "probs": {
+       "human": 0.999,
+       "ivr": 0.0,
+       "agent": 0.001
+      }
+     },
+     {
+      "t": 5,
+      "label": "human",
+      "conf": 0.999,
+      "probs": {
+       "human": 0.999,
+       "ivr": 0.0,
+       "agent": 0.001
+      }
+     },
+     {
+      "t": 6,
+      "label": "human",
+      "conf": 0.999,
+      "probs": {
+       "human": 0.999,
+       "ivr": 0.0,
+       "agent": 0.001
+      }
+     },
+     {
+      "t": 8,
+      "label": "human",
+      "conf": 0.999,
+      "probs": {
+       "human": 0.999,
+       "ivr": 0.0,
+       "agent": 0.001
+      }
+     },
+     {
+      "t": 10,
+      "label": "human",
+      "conf": 0.999,
+      "probs": {
+       "human": 0.999,
+       "ivr": 0.0,
+       "agent": 0.001
+      }
+     },
+     {
+      "t": 15,
+      "label": "human",
+      "conf": 0.999,
+      "probs": {
+       "human": 0.999,
+       "ivr": 0.0,
+       "agent": 0.001
+      }
+     },
+     {
+      "t": 20,
+      "label": "human",
+      "conf": 1.0,
+      "probs": {
+       "human": 1.0,
+       "ivr": 0.0,
+       "agent": 0.0
+      }
+     },
+     {
+      "t": 30,
+      "label": "human",
+      "conf": 1.0,
+      "probs": {
+       "human": 1.0,
+       "ivr": 0.0,
+       "agent": 0.0
+      }
+     },
+     {
+      "t": 45,
+      "label": "human",
+      "conf": 0.999,
+      "probs": {
+       "human": 0.999,
+       "ivr": 0.0,
+       "agent": 0.001
+      }
+     },
+     {
+      "t": 51.3,
+      "label": "human",
+      "conf": 0.999,
+      "probs": {
+       "human": 0.999,
+       "ivr": 0.0,
+       "agent": 0.001
+      }
+     }
+    ]
+   },
+   {
+    "id": "eval-034",
+    "label": "ivr",
+    "difficulty": "typical",
+    "scenario": "Restaurant after-hours IVR; ignores spoken request as invalid, voicemail box full, hangs up.",
+    "predicted": "human",
+    "confidence": 0.684,
+    "correct": false,
+    "time_to_detection": null,
+    "duration": 46.8,
+    "top_features": [
+     [
+      "first_turn_words",
+      0.86
+     ],
+     [
+      "first_user_delay",
+      0.77
+     ],
+     [
+      "disclosure",
+      0.34
+     ],
+     [
+      "turn_words_mean",
+      0.32
+     ]
+    ],
+    "timeline": [
+     {
+      "t": 1,
+      "label": "unknown",
+      "conf": 0.0,
+      "probs": {
+       "human": 0.333,
+       "ivr": 0.333,
+       "agent": 0.333
+      }
+     },
+     {
+      "t": 2,
+      "label": "human",
+      "conf": 0.926,
+      "probs": {
+       "human": 0.926,
+       "ivr": 0.006,
+       "agent": 0.068
+      }
+     },
+     {
+      "t": 3,
+      "label": "human",
+      "conf": 0.926,
+      "probs": {
+       "human": 0.926,
+       "ivr": 0.006,
+       "agent": 0.068
+      }
+     },
+     {
+      "t": 4,
+      "label": "human",
+      "conf": 0.926,
+      "probs": {
+       "human": 0.926,
+       "ivr": 0.006,
+       "agent": 0.068
+      }
+     },
+     {
+      "t": 5,
+      "label": "human",
+      "conf": 0.926,
+      "probs": {
+       "human": 0.926,
+       "ivr": 0.006,
+       "agent": 0.068
+      }
+     },
+     {
+      "t": 6,
+      "label": "human",
+      "conf": 0.926,
+      "probs": {
+       "human": 0.926,
+       "ivr": 0.006,
+       "agent": 0.068
+      }
+     },
+     {
+      "t": 8,
+      "label": "human",
+      "conf": 0.78,
+      "probs": {
+       "human": 0.78,
+       "ivr": 0.144,
+       "agent": 0.076
+      }
+     },
+     {
+      "t": 10,
+      "label": "human",
+      "conf": 0.78,
+      "probs": {
+       "human": 0.78,
+       "ivr": 0.144,
+       "agent": 0.076
+      }
+     },
+     {
+      "t": 15,
+      "label": "human",
+      "conf": 0.78,
+      "probs": {
+       "human": 0.78,
+       "ivr": 0.144,
+       "agent": 0.076
+      }
+     },
+     {
+      "t": 20,
+      "label": "human",
+      "conf": 0.78,
+      "probs": {
+       "human": 0.78,
+       "ivr": 0.144,
+       "agent": 0.076
+      }
+     },
+     {
+      "t": 30,
+      "label": "human",
+      "conf": 0.78,
+      "probs": {
+       "human": 0.78,
+       "ivr": 0.144,
+       "agent": 0.076
+      }
+     },
+     {
+      "t": 45,
+      "label": "human",
+      "conf": 0.684,
+      "probs": {
+       "human": 0.684,
+       "ivr": 0.299,
+       "agent": 0.017
+      }
+     },
+     {
+      "t": 46.8,
+      "label": "human",
+      "conf": 0.684,
+      "probs": {
+       "human": 0.684,
+       "ivr": 0.299,
+       "agent": 0.017
+      }
+     }
+    ]
+   },
+   {
+    "id": "eval-035",
+    "label": "ivr",
+    "difficulty": "hard",
+    "scenario": "Speech IVR for car-rental reservations with natural 'okay, got it' phrasing, character-by-character confirmation retry, reads a cancellation number.",
+    "predicted": "ivr",
+    "confidence": 0.654,
+    "correct": true,
+    "time_to_detection": null,
+    "duration": 103.1,
+    "top_features": [
+     [
+      "formulaic_rate",
+      0.53
+     ],
+     [
+      "ivr_rejects",
+      0.5
+     ],
+     [
+      "first_user_delay",
+      0.38
+     ],
+     [
+      "latency_std",
+      -0.36
+     ]
+    ],
+    "timeline": [
+     {
+      "t": 1,
+      "label": "agent",
+      "conf": 0.482,
+      "probs": {
+       "human": 0.1,
+       "ivr": 0.418,
+       "agent": 0.482
+      }
+     },
+     {
+      "t": 2,
+      "label": "agent",
+      "conf": 0.482,
+      "probs": {
+       "human": 0.1,
+       "ivr": 0.418,
+       "agent": 0.482
+      }
+     },
+     {
+      "t": 3,
+      "label": "agent",
+      "conf": 0.482,
+      "probs": {
+       "human": 0.1,
+       "ivr": 0.418,
+       "agent": 0.482
+      }
+     },
+     {
+      "t": 4,
+      "label": "agent",
+      "conf": 0.482,
+      "probs": {
+       "human": 0.1,
+       "ivr": 0.418,
+       "agent": 0.482
+      }
+     },
+     {
+      "t": 5,
+      "label": "agent",
+      "conf": 0.482,
+      "probs": {
+       "human": 0.1,
+       "ivr": 0.418,
+       "agent": 0.482
+      }
+     },
+     {
+      "t": 6,
+      "label": "agent",
+      "conf": 0.482,
+      "probs": {
+       "human": 0.1,
+       "ivr": 0.418,
+       "agent": 0.482
+      }
+     },
+     {
+      "t": 8,
+      "label": "agent",
+      "conf": 0.482,
+      "probs": {
+       "human": 0.1,
+       "ivr": 0.418,
+       "agent": 0.482
+      }
+     },
+     {
+      "t": 10,
+      "label": "agent",
+      "conf": 0.482,
+      "probs": {
+       "human": 0.1,
+       "ivr": 0.418,
+       "agent": 0.482
+      }
+     },
+     {
+      "t": 15,
+      "label": "agent",
+      "conf": 0.482,
+      "probs": {
+       "human": 0.1,
+       "ivr": 0.418,
+       "agent": 0.482
+      }
+     },
+     {
+      "t": 20,
+      "label": "ivr",
+      "conf": 0.596,
+      "probs": {
+       "human": 0.12,
+       "ivr": 0.596,
+       "agent": 0.284
+      }
+     },
+     {
+      "t": 30,
+      "label": "ivr",
+      "conf": 0.596,
+      "probs": {
+       "human": 0.12,
+       "ivr": 0.596,
+       "agent": 0.284
+      }
+     },
+     {
+      "t": 45,
+      "label": "ivr",
+      "conf": 0.665,
+      "probs": {
+       "human": 0.058,
+       "ivr": 0.665,
+       "agent": 0.276
+      }
+     },
+     {
+      "t": 60,
+      "label": "ivr",
+      "conf": 0.568,
+      "probs": {
+       "human": 0.058,
+       "ivr": 0.568,
+       "agent": 0.374
+      }
+     },
+     {
+      "t": 103.1,
+      "label": "ivr",
+      "conf": 0.654,
+      "probs": {
+       "human": 0.049,
+       "ivr": 0.654,
+       "agent": 0.298
+      }
+     }
+    ]
+   },
+   {
+    "id": "eval-036",
+    "label": "ivr",
+    "difficulty": "hard",
+    "scenario": "Minimal IVR that immediately says 'please hold' and then loops hold music and a queue message; bot talks into the void.",
+    "predicted": "human",
+    "confidence": 0.993,
+    "correct": false,
+    "time_to_detection": 2,
+    "duration": 142.0,
+    "top_features": [
+     [
+      "overlap_rate",
+      1.37
+     ],
+     [
+      "first_turn_words",
+      1.03
+     ],
+     [
+      "turn_words_mean",
+      0.88
+     ],
+     [
+      "first_user_delay",
+      0.43
+     ]
+    ],
+    "timeline": [
+     {
+      "t": 1,
+      "label": "unknown",
+      "conf": 0.0,
+      "probs": {
+       "human": 0.333,
+       "ivr": 0.333,
+       "agent": 0.333
+      }
+     },
+     {
+      "t": 2,
+      "label": "human",
+      "conf": 0.943,
+      "probs": {
+       "human": 0.943,
+       "ivr": 0.015,
+       "agent": 0.042
+      }
+     },
+     {
+      "t": 3,
+      "label": "human",
+      "conf": 0.943,
+      "probs": {
+       "human": 0.943,
+       "ivr": 0.015,
+       "agent": 0.042
+      }
+     },
+     {
+      "t": 4,
+      "label": "human",
+      "conf": 0.943,
+      "probs": {
+       "human": 0.943,
+       "ivr": 0.015,
+       "agent": 0.042
+      }
+     },
+     {
+      "t": 5,
+      "label": "human",
+      "conf": 0.943,
+      "probs": {
+       "human": 0.943,
+       "ivr": 0.015,
+       "agent": 0.042
+      }
+     },
+     {
+      "t": 6,
+      "label": "human",
+      "conf": 0.969,
+      "probs": {
+       "human": 0.969,
+       "ivr": 0.016,
+       "agent": 0.015
+      }
+     },
+     {
+      "t": 8,
+      "label": "human",
+      "conf": 0.969,
+      "probs": {
+       "human": 0.969,
+       "ivr": 0.016,
+       "agent": 0.015
+      }
+     },
+     {
+      "t": 10,
+      "label": "human",
+      "conf": 0.969,
+      "probs": {
+       "human": 0.969,
+       "ivr": 0.016,
+       "agent": 0.015
+      }
+     },
+     {
+      "t": 15,
+      "label": "human",
+      "conf": 0.969,
+      "probs": {
+       "human": 0.969,
+       "ivr": 0.016,
+       "agent": 0.015
+      }
+     },
+     {
+      "t": 20,
+      "label": "human",
+      "conf": 0.969,
+      "probs": {
+       "human": 0.969,
+       "ivr": 0.016,
+       "agent": 0.015
+      }
+     },
+     {
+      "t": 30,
+      "label": "human",
+      "conf": 0.997,
+      "probs": {
+       "human": 0.997,
+       "ivr": 0.002,
+       "agent": 0.001
+      }
+     },
+     {
+      "t": 45,
+      "label": "human",
+      "conf": 0.997,
+      "probs": {
+       "human": 0.997,
+       "ivr": 0.002,
+       "agent": 0.001
+      }
+     },
+     {
+      "t": 60,
+      "label": "human",
+      "conf": 0.996,
+      "probs": {
+       "human": 0.996,
+       "ivr": 0.003,
+       "agent": 0.001
+      }
+     },
+     {
+      "t": 142.0,
+      "label": "human",
+      "conf": 0.993,
+      "probs": {
+       "human": 0.993,
+       "ivr": 0.006,
+       "agent": 0.001
+      }
+     }
+    ]
+   },
+   {
+    "id": "eval-037",
+    "label": "ivr",
+    "difficulty": "hard",
+    "scenario": "Conversational speech-recognition IVR ('tell me in a few words'), misrecognizes intent, confirms by yes/no, reads claim record and texts a copy.",
+    "predicted": "ivr",
+    "confidence": 0.607,
+    "correct": true,
+    "time_to_detection": null,
+    "duration": 94.8,
+    "top_features": [
+     [
+      "formulaic_rate",
+      0.35
+     ],
+     [
+      "disclosure",
+      0.27
+     ],
+     [
+      "first_user_delay",
+      0.22
+     ],
+     [
+      "ivr_markers",
+      0.19
+     ]
+    ],
+    "timeline": [
+     {
+      "t": 1,
+      "label": "ivr",
+      "conf": 0.612,
+      "probs": {
+       "human": 0.084,
+       "ivr": 0.612,
+       "agent": 0.304
+      }
+     },
+     {
+      "t": 2,
+      "label": "ivr",
+      "conf": 0.612,
+      "probs": {
+       "human": 0.084,
+       "ivr": 0.612,
+       "agent": 0.304
+      }
+     },
+     {
+      "t": 3,
+      "label": "ivr",
+      "conf": 0.612,
+      "probs": {
+       "human": 0.084,
+       "ivr": 0.612,
+       "agent": 0.304
+      }
+     },
+     {
+      "t": 4,
+      "label": "ivr",
+      "conf": 0.612,
+      "probs": {
+       "human": 0.084,
+       "ivr": 0.612,
+       "agent": 0.304
+      }
+     },
+     {
+      "t": 5,
+      "label": "ivr",
+      "conf": 0.612,
+      "probs": {
+       "human": 0.084,
+       "ivr": 0.612,
+       "agent": 0.304
+      }
+     },
+     {
+      "t": 6,
+      "label": "ivr",
+      "conf": 0.612,
+      "probs": {
+       "human": 0.084,
+       "ivr": 0.612,
+       "agent": 0.304
+      }
+     },
+     {
+      "t": 8,
+      "label": "ivr",
+      "conf": 0.612,
+      "probs": {
+       "human": 0.084,
+       "ivr": 0.612,
+       "agent": 0.304
+      }
+     },
+     {
+      "t": 10,
+      "label": "ivr",
+      "conf": 0.612,
+      "probs": {
+       "human": 0.084,
+       "ivr": 0.612,
+       "agent": 0.304
+      }
+     },
+     {
+      "t": 15,
+      "label": "ivr",
+      "conf": 0.612,
+      "probs": {
+       "human": 0.084,
+       "ivr": 0.612,
+       "agent": 0.304
+      }
+     },
+     {
+      "t": 20,
+      "label": "ivr",
+      "conf": 0.564,
+      "probs": {
+       "human": 0.196,
+       "ivr": 0.564,
+       "agent": 0.241
+      }
+     },
+     {
+      "t": 30,
+      "label": "agent",
+      "conf": 0.463,
+      "probs": {
+       "human": 0.138,
+       "ivr": 0.4,
+       "agent": 0.463
+      }
+     },
+     {
+      "t": 45,
+      "label": "agent",
+      "conf": 0.448,
+      "probs": {
+       "human": 0.181,
+       "ivr": 0.371,
+       "agent": 0.448
+      }
+     },
+     {
+      "t": 60,
+      "label": "agent",
+      "conf": 0.47,
+      "probs": {
+       "human": 0.139,
+       "ivr": 0.391,
+       "agent": 0.47
+      }
+     },
+     {
+      "t": 94.8,
+      "label": "ivr",
+      "conf": 0.607,
+      "probs": {
+       "human": 0.098,
+       "ivr": 0.607,
+       "agent": 0.294
+      }
+     }
+    ]
+   },
+   {
+    "id": "eval-038",
+    "label": "ivr",
+    "difficulty": "typical",
+    "scenario": "Pharmacy DTMF tree; prescription number entry, system reads back ready status; bot replays the message and it repeats verbatim.",
+    "predicted": "ivr",
+    "confidence": 0.995,
+    "correct": true,
+    "time_to_detection": 1,
+    "duration": 78.9,
+    "top_features": [
+     [
+      "ivr_markers",
+      2.37
+     ],
+     [
+      "latency_std",
+      -0.91
+     ],
+     [
+      "first_turn_words",
+      0.75
+     ],
+     [
+      "first_user_delay",
+      0.53
+     ]
+    ],
+    "timeline": [
+     {
+      "t": 1,
+      "label": "ivr",
+      "conf": 0.932,
+      "probs": {
+       "human": 0.001,
+       "ivr": 0.932,
+       "agent": 0.067
+      }
+     },
+     {
+      "t": 2,
+      "label": "ivr",
+      "conf": 0.932,
+      "probs": {
+       "human": 0.001,
+       "ivr": 0.932,
+       "agent": 0.067
+      }
+     },
+     {
+      "t": 3,
+      "label": "ivr",
+      "conf": 0.932,
+      "probs": {
+       "human": 0.001,
+       "ivr": 0.932,
+       "agent": 0.067
+      }
+     },
+     {
+      "t": 4,
+      "label": "ivr",
+      "conf": 0.932,
+      "probs": {
+       "human": 0.001,
+       "ivr": 0.932,
+       "agent": 0.067
+      }
+     },
+     {
+      "t": 5,
+      "label": "ivr",
+      "conf": 0.932,
+      "probs": {
+       "human": 0.001,
+       "ivr": 0.932,
+       "agent": 0.067
+      }
+     },
+     {
+      "t": 6,
+      "label": "ivr",
+      "conf": 0.932,
+      "probs": {
+       "human": 0.001,
+       "ivr": 0.932,
+       "agent": 0.067
+      }
+     },
+     {
+      "t": 8,
+      "label": "ivr",
+      "conf": 0.932,
+      "probs": {
+       "human": 0.001,
+       "ivr": 0.932,
+       "agent": 0.067
+      }
+     },
+     {
+      "t": 10,
+      "label": "ivr",
+      "conf": 0.932,
+      "probs": {
+       "human": 0.001,
+       "ivr": 0.932,
+       "agent": 0.067
+      }
+     },
+     {
+      "t": 15,
+      "label": "ivr",
+      "conf": 0.932,
+      "probs": {
+       "human": 0.001,
+       "ivr": 0.932,
+       "agent": 0.067
+      }
+     },
+     {
+      "t": 20,
+      "label": "ivr",
+      "conf": 0.932,
+      "probs": {
+       "human": 0.001,
+       "ivr": 0.932,
+       "agent": 0.067
+      }
+     },
+     {
+      "t": 30,
+      "label": "ivr",
+      "conf": 0.994,
+      "probs": {
+       "human": 0.0,
+       "ivr": 0.994,
+       "agent": 0.006
+      }
+     },
+     {
+      "t": 45,
+      "label": "ivr",
+      "conf": 0.992,
+      "probs": {
+       "human": 0.001,
+       "ivr": 0.992,
+       "agent": 0.007
+      }
+     },
+     {
+      "t": 60,
+      "label": "ivr",
+      "conf": 0.992,
+      "probs": {
+       "human": 0.001,
+       "ivr": 0.992,
+       "agent": 0.007
+      }
+     },
+     {
+      "t": 78.9,
+      "label": "ivr",
+      "conf": 0.995,
+      "probs": {
+       "human": 0.0,
+       "ivr": 0.995,
+       "agent": 0.004
+      }
+     }
+    ]
+   },
+   {
+    "id": "eval-039",
+    "label": "human",
+    "difficulty": "hard",
+    "scenario": "Distracted motel owner with TV in background, long pauses, trailing fragments and slow speech.",
+    "predicted": "human",
+    "confidence": 0.998,
+    "correct": true,
+    "time_to_detection": 3,
+    "duration": 96.9,
+    "top_features": [
+     [
+      "first_user_delay",
+      2.61
+     ],
+     [
+      "first_turn_words",
+      1.44
+     ],
+     [
+      "latency_mean",
+      -1.41
+     ],
+     [
+      "turn_words_mean",
+      1.02
+     ]
+    ],
+    "timeline": [
+     {
+      "t": 1,
+      "label": "unknown",
+      "conf": 0.0,
+      "probs": {
+       "human": 0.333,
+       "ivr": 0.333,
+       "agent": 0.333
+      }
+     },
+     {
+      "t": 2,
+      "label": "unknown",
+      "conf": 0.0,
+      "probs": {
+       "human": 0.333,
+       "ivr": 0.333,
+       "agent": 0.333
+      }
+     },
+     {
+      "t": 3,
+      "label": "human",
+      "conf": 1.0,
+      "probs": {
+       "human": 1.0,
+       "ivr": 0.0,
+       "agent": 0.0
+      }
+     },
+     {
+      "t": 4,
+      "label": "human",
+      "conf": 1.0,
+      "probs": {
+       "human": 1.0,
+       "ivr": 0.0,
+       "agent": 0.0
+      }
+     },
+     {
+      "t": 5,
+      "label": "human",
+      "conf": 1.0,
+      "probs": {
+       "human": 1.0,
+       "ivr": 0.0,
+       "agent": 0.0
+      }
+     },
+     {
+      "t": 6,
+      "label": "human",
+      "conf": 1.0,
+      "probs": {
+       "human": 1.0,
+       "ivr": 0.0,
+       "agent": 0.0
+      }
+     },
+     {
+      "t": 8,
+      "label": "human",
+      "conf": 1.0,
+      "probs": {
+       "human": 1.0,
+       "ivr": 0.0,
+       "agent": 0.0
+      }
+     },
+     {
+      "t": 10,
+      "label": "human",
+      "conf": 1.0,
+      "probs": {
+       "human": 1.0,
+       "ivr": 0.0,
+       "agent": 0.0
+      }
+     },
+     {
+      "t": 15,
+      "label": "human",
+      "conf": 1.0,
+      "probs": {
+       "human": 1.0,
+       "ivr": 0.0,
+       "agent": 0.0
+      }
+     },
+     {
+      "t": 20,
+      "label": "human",
+      "conf": 1.0,
+      "probs": {
+       "human": 1.0,
+       "ivr": 0.0,
+       "agent": 0.0
+      }
+     },
+     {
+      "t": 30,
+      "label": "human",
+      "conf": 0.999,
+      "probs": {
+       "human": 0.999,
+       "ivr": 0.0,
+       "agent": 0.001
+      }
+     },
+     {
+      "t": 45,
+      "label": "human",
+      "conf": 0.998,
+      "probs": {
+       "human": 0.998,
+       "ivr": 0.0,
+       "agent": 0.002
+      }
+     },
+     {
+      "t": 60,
+      "label": "human",
+      "conf": 0.999,
+      "probs": {
+       "human": 0.999,
+       "ivr": 0.0,
+       "agent": 0.001
+      }
+     },
+     {
+      "t": 96.9,
+      "label": "human",
+      "conf": 0.998,
+      "probs": {
+       "human": 0.998,
+       "ivr": 0.0,
+       "agent": 0.002
+      }
+     }
+    ]
+   },
+   {
+    "id": "eval-040",
+    "label": "human",
+    "difficulty": "typical",
+    "scenario": "Silence on answer, bot says hello; a hesitant kid takes a message for an absent parent. Nothing actually cancelled with the tutor.",
+    "predicted": "human",
+    "confidence": 0.926,
+    "correct": true,
+    "time_to_detection": 4,
+    "duration": 50.1,
+    "top_features": [
+     [
+      "first_turn_words",
+      1.52
+     ],
+     [
+      "first_user_delay",
+      -1.41
+     ],
+     [
+      "turn_words_mean",
+      1.2
+     ],
+     [
+      "disfluency_rate",
+      0.66
+     ]
+    ],
+    "timeline": [
+     {
+      "t": 1,
+      "label": "unknown",
+      "conf": 0.0,
+      "probs": {
+       "human": 0.333,
+       "ivr": 0.333,
+       "agent": 0.333
+      }
+     },
+     {
+      "t": 2,
+      "label": "unknown",
+      "conf": 0.0,
+      "probs": {
+       "human": 0.333,
+       "ivr": 0.333,
+       "agent": 0.333
+      }
+     },
+     {
+      "t": 3,
+      "label": "unknown",
+      "conf": 0.0,
+      "probs": {
+       "human": 0.333,
+       "ivr": 0.333,
+       "agent": 0.333
+      }
+     },
+     {
+      "t": 4,
+      "label": "human",
+      "conf": 0.929,
+      "probs": {
+       "human": 0.929,
+       "ivr": 0.041,
+       "agent": 0.03
+      }
+     },
+     {
+      "t": 5,
+      "label": "human",
+      "conf": 0.929,
+      "probs": {
+       "human": 0.929,
+       "ivr": 0.041,
+       "agent": 0.03
+      }
+     },
+     {
+      "t": 6,
+      "label": "human",
+      "conf": 0.929,
+      "probs": {
+       "human": 0.929,
+       "ivr": 0.041,
+       "agent": 0.03
+      }
+     },
+     {
+      "t": 8,
+      "label": "human",
+      "conf": 0.929,
+      "probs": {
+       "human": 0.929,
+       "ivr": 0.041,
+       "agent": 0.03
+      }
+     },
+     {
+      "t": 10,
+      "label": "human",
+      "conf": 0.929,
+      "probs": {
+       "human": 0.929,
+       "ivr": 0.041,
+       "agent": 0.03
+      }
+     },
+     {
+      "t": 15,
+      "label": "human",
+      "conf": 0.929,
+      "probs": {
+       "human": 0.929,
+       "ivr": 0.041,
+       "agent": 0.03
+      }
+     },
+     {
+      "t": 20,
+      "label": "human",
+      "conf": 0.949,
+      "probs": {
+       "human": 0.949,
+       "ivr": 0.031,
+       "agent": 0.02
+      }
+     },
+     {
+      "t": 30,
+      "label": "human",
+      "conf": 0.973,
+      "probs": {
+       "human": 0.973,
+       "ivr": 0.016,
+       "agent": 0.011
+      }
+     },
+     {
+      "t": 45,
+      "label": "human",
+      "conf": 0.905,
+      "probs": {
+       "human": 0.905,
+       "ivr": 0.029,
+       "agent": 0.066
+      }
+     },
+     {
+      "t": 50.1,
+      "label": "human",
+      "conf": 0.926,
+      "probs": {
+       "human": 0.926,
+       "ivr": 0.026,
+       "agent": 0.048
+      }
+     }
+    ]
+   }
+  ]
+ },
+ "ablations": {
+  "only timing+interruption": {
+   "matrix": {
+    "human": {
+     "human": 13,
+     "ivr": 0,
+     "agent": 1,
+     "unknown": 0
+    },
+    "ivr": {
+     "human": 9,
+     "ivr": 2,
+     "agent": 2,
+     "unknown": 0
+    },
+    "agent": {
+     "human": 6,
+     "ivr": 0,
+     "agent": 7,
+     "unknown": 0
+    }
+   },
+   "accuracy": 0.55,
+   "macro_f1": 0.498,
+   "per_class": {
+    "human": {
+     "precision": 0.464,
+     "recall": 0.929,
+     "f1": 0.619,
+     "support": 14
+    },
+    "ivr": {
+     "precision": 1.0,
+     "recall": 0.154,
+     "f1": 0.267,
+     "support": 13
+    },
+    "agent": {
+     "precision": 0.7,
+     "recall": 0.538,
+     "f1": 0.609,
+     "support": 13
+    }
+   },
+   "n": 40,
+   "humans_treated_as_machine": 1,
+   "machines_treated_as_human": 15
+  },
+  "without timing+interruption": {
+   "matrix": {
+    "human": {
+     "human": 13,
+     "ivr": 0,
+     "agent": 1,
+     "unknown": 0
+    },
+    "ivr": {
+     "human": 1,
+     "ivr": 12,
+     "agent": 0,
+     "unknown": 0
+    },
+    "agent": {
+     "human": 3,
+     "ivr": 0,
+     "agent": 10,
+     "unknown": 0
+    }
+   },
+   "accuracy": 0.875,
+   "macro_f1": 0.877,
+   "per_class": {
+    "human": {
+     "precision": 0.765,
+     "recall": 0.929,
+     "f1": 0.839,
+     "support": 14
+    },
+    "ivr": {
+     "precision": 1.0,
+     "recall": 0.923,
+     "f1": 0.96,
+     "support": 13
+    },
+    "agent": {
+     "precision": 0.909,
+     "recall": 0.769,
+     "f1": 0.833,
+     "support": 13
+    }
+   },
+   "n": 40,
+   "humans_treated_as_machine": 1,
+   "machines_treated_as_human": 4
+  },
+  "only lexical": {
+   "matrix": {
+    "human": {
+     "human": 12,
+     "ivr": 0,
+     "agent": 2,
+     "unknown": 0
+    },
+    "ivr": {
+     "human": 2,
+     "ivr": 10,
+     "agent": 1,
+     "unknown": 0
+    },
+    "agent": {
+     "human": 2,
+     "ivr": 6,
+     "agent": 5,
+     "unknown": 0
+    }
+   },
+   "accuracy": 0.675,
+   "macro_f1": 0.655,
+   "per_class": {
+    "human": {
+     "precision": 0.75,
+     "recall": 0.857,
+     "f1": 0.8,
+     "support": 14
+    },
+    "ivr": {
+     "precision": 0.625,
+     "recall": 0.769,
+     "f1": 0.69,
+     "support": 13
+    },
+    "agent": {
+     "precision": 0.625,
+     "recall": 0.385,
+     "f1": 0.476,
+     "support": 13
+    }
+   },
+   "n": 40,
+   "humans_treated_as_machine": 2,
+   "machines_treated_as_human": 4
+  },
+  "without lexical": {
+   "matrix": {
+    "human": {
+     "human": 14,
+     "ivr": 0,
+     "agent": 0,
+     "unknown": 0
+    },
+    "ivr": {
+     "human": 4,
+     "ivr": 8,
+     "agent": 1,
+     "unknown": 0
+    },
+    "agent": {
+     "human": 4,
+     "ivr": 0,
+     "agent": 9,
+     "unknown": 0
+    }
+   },
+   "accuracy": 0.775,
+   "macro_f1": 0.774,
+   "per_class": {
+    "human": {
+     "precision": 0.636,
+     "recall": 1.0,
+     "f1": 0.778,
+     "support": 14
+    },
+    "ivr": {
+     "precision": 1.0,
+     "recall": 0.615,
+     "f1": 0.762,
+     "support": 13
+    },
+    "agent": {
+     "precision": 0.9,
+     "recall": 0.692,
+     "f1": 0.783,
+     "support": 13
+    }
+   },
+   "n": 40,
+   "humans_treated_as_machine": 0,
+   "machines_treated_as_human": 8
+  },
+  "only structural": {
+   "matrix": {
+    "human": {
+     "human": 14,
+     "ivr": 0,
+     "agent": 0,
+     "unknown": 0
+    },
+    "ivr": {
+     "human": 3,
+     "ivr": 10,
+     "agent": 0,
+     "unknown": 0
+    },
+    "agent": {
+     "human": 5,
+     "ivr": 0,
+     "agent": 8,
+     "unknown": 0
+    }
+   },
+   "accuracy": 0.8,
+   "macro_f1": 0.803,
+   "per_class": {
+    "human": {
+     "precision": 0.636,
+     "recall": 1.0,
+     "f1": 0.778,
+     "support": 14
+    },
+    "ivr": {
+     "precision": 1.0,
+     "recall": 0.769,
+     "f1": 0.87,
+     "support": 13
+    },
+    "agent": {
+     "precision": 1.0,
+     "recall": 0.615,
+     "f1": 0.762,
+     "support": 13
+    }
+   },
+   "n": 40,
+   "humans_treated_as_machine": 0,
+   "machines_treated_as_human": 8
+  },
+  "without structural": {
+   "matrix": {
+    "human": {
+     "human": 12,
+     "ivr": 0,
+     "agent": 2,
+     "unknown": 0
+    },
+    "ivr": {
+     "human": 2,
+     "ivr": 3,
+     "agent": 8,
+     "unknown": 0
+    },
+    "agent": {
+     "human": 1,
+     "ivr": 0,
+     "agent": 12,
+     "unknown": 0
+    }
+   },
+   "accuracy": 0.675,
+   "macro_f1": 0.63,
+   "per_class": {
+    "human": {
+     "precision": 0.8,
+     "recall": 0.857,
+     "f1": 0.828,
+     "support": 14
+    },
+    "ivr": {
+     "precision": 1.0,
+     "recall": 0.231,
+     "f1": 0.375,
+     "support": 13
+    },
+    "agent": {
+     "precision": 0.545,
+     "recall": 0.923,
+     "f1": 0.686,
+     "support": 13
+    }
+   },
+   "n": 40,
+   "humans_treated_as_machine": 2,
+   "machines_treated_as_human": 3
+  }
+ },
+ "attestation": {
+  "matrix": {
+   "human_attested": {
+    "human_attested": 6,
+    "system_asserted": 0,
+    "agent_asserted": 0,
+    "refused": 0,
+    "unverified": 5
+   },
+   "system_asserted": {
+    "human_attested": 1,
+    "system_asserted": 6,
+    "agent_asserted": 0,
+    "refused": 0,
+    "unverified": 1
+   },
+   "agent_asserted": {
+    "human_attested": 1,
+    "system_asserted": 0,
+    "agent_asserted": 5,
+    "refused": 0,
+    "unverified": 0
+   },
+   "refused": {
+    "human_attested": 2,
+    "system_asserted": 0,
+    "agent_asserted": 1,
+    "refused": 3,
+    "unverified": 0
+   },
+   "unverified": {
+    "human_attested": 0,
+    "system_asserted": 0,
+    "agent_asserted": 0,
+    "refused": 0,
+    "unverified": 9
+   }
+  },
+  "agreement": 0.725,
+  "n": 40,
+  "refused_expected": 6,
+  "refused_caught": 3,
+  "false_human_attested": 4,
+  "wrongly_refused": 0,
+  "naive_task_completed_true": 32,
+  "rows": [
+   {
+    "id": "eval-001",
+    "label": "agent",
+    "expected": "agent_asserted",
+    "attestation": "agent_asserted",
+    "original_task_completed": true,
+    "dialtone_task_completed": true,
+    "counterpart": "agent",
+    "counterpart_confidence": 0.769,
+    "commitment_type": "booking",
+    "artifact": "confirmation code is S T 4 8 2",
+    "reasons": [
+     "counterpart is an AI agent (behavioural detection, confidence 0.77)",
+     "agent gave a verifiable artifact (confirmation code is S T 4 8 2); re-verify through that channel before relying on it"
+    ]
+   },
+   {
+    "id": "eval-002",
+    "label": "human",
+    "expected": "human_attested",
+    "attestation": "human_attested",
+    "original_task_completed": true,
+    "dialtone_task_completed": true,
+    "counterpart": "human",
+    "counterpart_confidence": 0.964,
+    "commitment_type": "information",
+    "artifact": null,
+    "reasons": [
+     "human counterpart provided the information"
+    ]
+   },
+   {
+    "id": "eval-003",
+    "label": "human",
+    "expected": "human_attested",
+    "attestation": "unverified",
+    "original_task_completed": true,
+    "dialtone_task_completed": false,
+    "counterpart": "human",
+    "counterpart_confidence": 0.977,
+    "commitment_type": "reschedule",
+    "artifact": null,
+    "reasons": [
+     "human counterpart, but no explicit confirmation phrase found in their turns"
+    ]
+   },
+   {
+    "id": "eval-004",
+    "label": "human",
+    "expected": "human_attested",
+    "attestation": "human_attested",
+    "original_task_completed": true,
+    "dialtone_task_completed": true,
+    "counterpart": "human",
+    "counterpart_confidence": 0.998,
+    "commitment_type": "booking",
+    "artifact": null,
+    "reasons": [
+     "human counterpart confirmed: \"yep you're all set, friday seven thirty, four people.\""
+    ]
+   },
+   {
+    "id": "eval-005",
+    "label": "human",
+    "expected": "unverified",
+    "attestation": "unverified",
+    "original_task_completed": false,
+    "dialtone_task_completed": false,
+    "counterpart": "human",
+    "counterpart_confidence": 0.946,
+    "commitment_type": "cancellation",
+    "artifact": null,
+    "reasons": [
+     "calling agent did not report the task as completed"
+    ]
+   },
+   {
+    "id": "eval-006",
+    "label": "human",
+    "expected": "human_attested",
+    "attestation": "unverified",
+    "original_task_completed": true,
+    "dialtone_task_completed": false,
+    "counterpart": "agent",
+    "counterpart_confidence": 0.587,
+    "commitment_type": "refund",
+    "artifact": "case number is four four seven one",
+    "reasons": [
+     "counterpart uncertain (agent, confidence 0.59); refusing to attribute the confirmation"
+    ]
+   },
+   {
+    "id": "eval-007",
+    "label": "human",
+    "expected": "human_attested",
+    "attestation": "human_attested",
+    "original_task_completed": true,
+    "dialtone_task_completed": true,
+    "counterpart": "human",
+    "counterpart_confidence": 0.952,
+    "commitment_type": "refund",
+    "artifact": null,
+    "reasons": [
+     "human counterpart confirmed: \"okay, done. I refunded two eighteen forty back to the card ending in eight three oh one. t\""
+    ]
+   },
+   {
+    "id": "eval-008",
+    "label": "agent",
+    "expected": "refused",
+    "attestation": "agent_asserted",
+    "original_task_completed": true,
+    "dialtone_task_completed": true,
+    "counterpart": "agent",
+    "counterpart_confidence": 0.986,
+    "commitment_type": "refund",
+    "artifact": "order number to get started",
+    "reasons": [
+     "counterpart is an AI agent (behavioural detection, confidence 0.99)",
+     "agent gave a verifiable artifact (order number to get started); re-verify through that channel before relying on it"
+    ]
+   },
+   {
+    "id": "eval-009",
+    "label": "agent",
+    "expected": "refused",
+    "attestation": "refused",
+    "original_task_completed": true,
+    "dialtone_task_completed": false,
+    "counterpart": "agent",
+    "counterpart_confidence": 0.97,
+    "commitment_type": "reschedule",
+    "artifact": null,
+    "reasons": [
+     "counterpart is an AI agent (behavioural detection, confidence 0.97)",
+     "binding reschedule 'confirmed' by an AI agent with no confirmation code, written record, or human review"
+    ]
+   },
+   {
+    "id": "eval-010",
+    "label": "agent",
+    "expected": "refused",
+    "attestation": "refused",
+    "original_task_completed": true,
+    "dialtone_task_completed": false,
+    "counterpart": "agent",
+    "counterpart_confidence": 0.719,
+    "commitment_type": "cancellation",
+    "artifact": null,
+    "reasons": [
+     "counterpart is an AI agent (behavioural detection, confidence 0.72)",
+     "the agent's 'confirmation' only echoed our own proposal - two models agreeing",
+     "binding cancellation 'confirmed' by an AI agent with no confirmation code, written record, or human review"
+    ]
+   },
+   {
+    "id": "eval-011",
+    "label": "agent",
+    "expected": "refused",
+    "attestation": "human_attested",
+    "original_task_completed": true,
+    "dialtone_task_completed": true,
+    "counterpart": "human",
+    "counterpart_confidence": 0.639,
+    "commitment_type": "booking",
+    "artifact": "confirmation numbers here",
+    "reasons": [
+     "human counterpart confirmed: \"oh, we don't really do confirmation numbers here, but don't worry, Biscuit's all set in ou\""
+    ]
+   },
+   {
+    "id": "eval-012",
+    "label": "ivr",
+    "expected": "unverified",
+    "attestation": "unverified",
+    "original_task_completed": false,
+    "dialtone_task_completed": false,
+    "counterpart": "ivr",
+    "counterpart_confidence": 0.972,
+    "commitment_type": "payment",
+    "artifact": null,
+    "reasons": [
+     "calling agent did not report the task as completed"
+    ]
+   },
+   {
+    "id": "eval-013",
+    "label": "ivr",
+    "expected": "system_asserted",
+    "attestation": "system_asserted",
+    "original_task_completed": true,
+    "dialtone_task_completed": true,
+    "counterpart": "ivr",
+    "counterpart_confidence": 0.994,
+    "commitment_type": "information",
+    "artifact": null,
+    "reasons": [
+     "phone system read back information"
+    ]
+   },
+   {
+    "id": "eval-014",
+    "label": "human",
+    "expected": "human_attested",
+    "attestation": "human_attested",
+    "original_task_completed": true,
+    "dialtone_task_completed": true,
+    "counterpart": "human",
+    "counterpart_confidence": 1.0,
+    "commitment_type": "information",
+    "artifact": null,
+    "reasons": [
+     "human counterpart provided the information"
+    ]
+   },
+   {
+    "id": "eval-015",
+    "label": "agent",
+    "expected": "unverified",
+    "attestation": "unverified",
+    "original_task_completed": false,
+    "dialtone_task_completed": false,
+    "counterpart": "agent",
+    "counterpart_confidence": 0.99,
+    "commitment_type": "refund",
+    "artifact": "ticket number at this time",
+    "reasons": [
+     "calling agent did not report the task as completed"
+    ]
+   },
+   {
+    "id": "eval-016",
+    "label": "human",
+    "expected": "human_attested",
+    "attestation": "unverified",
+    "original_task_completed": true,
+    "dialtone_task_completed": false,
+    "counterpart": "human",
+    "counterpart_confidence": 0.798,
+    "commitment_type": "booking",
+    "artifact": null,
+    "reasons": [
+     "human counterpart, but no explicit confirmation phrase found in their turns"
+    ]
+   },
+   {
+    "id": "eval-017",
+    "label": "ivr",
+    "expected": "system_asserted",
+    "attestation": "system_asserted",
+    "original_task_completed": true,
+    "dialtone_task_completed": true,
+    "counterpart": "ivr",
+    "counterpart_confidence": 0.825,
+    "commitment_type": "information",
+    "artifact": null,
+    "reasons": [
+     "phone system read back information"
+    ]
+   },
+   {
+    "id": "eval-018",
+    "label": "agent",
+    "expected": "agent_asserted",
+    "attestation": "agent_asserted",
+    "original_task_completed": true,
+    "dialtone_task_completed": true,
+    "counterpart": "agent",
+    "counterpart_confidence": 0.989,
+    "commitment_type": "information",
+    "artifact": null,
+    "reasons": [
+     "counterpart is an AI agent (behavioural detection, confidence 0.99)",
+     "informational answer from an agent: usable, but not attested by a person"
+    ]
+   },
+   {
+    "id": "eval-019",
+    "label": "ivr",
+    "expected": "system_asserted",
+    "attestation": "human_attested",
+    "original_task_completed": true,
+    "dialtone_task_completed": true,
+    "counterpart": "human",
+    "counterpart_confidence": 0.957,
+    "commitment_type": "information",
+    "artifact": null,
+    "reasons": [
+     "human counterpart provided the information"
+    ]
+   },
+   {
+    "id": "eval-020",
+    "label": "ivr",
+    "expected": "system_asserted",
+    "attestation": "unverified",
+    "original_task_completed": true,
+    "dialtone_task_completed": false,
+    "counterpart": "ivr",
+    "counterpart_confidence": 0.955,
+    "commitment_type": "booking",
+    "artifact": null,
+    "reasons": [
+     "phone menu reached, but no record or reference was read back"
+    ]
+   },
+   {
+    "id": "eval-021",
+    "label": "ivr",
+    "expected": "system_asserted",
+    "attestation": "system_asserted",
+    "original_task_completed": true,
+    "dialtone_task_completed": true,
+    "counterpart": "ivr",
+    "counterpart_confidence": 0.971,
+    "commitment_type": "information",
+    "artifact": null,
+    "reasons": [
+     "phone system read back information"
+    ]
+   },
+   {
+    "id": "eval-022",
+    "label": "human",
+    "expected": "human_attested",
+    "attestation": "human_attested",
+    "original_task_completed": true,
+    "dialtone_task_completed": true,
+    "counterpart": "human",
+    "counterpart_confidence": 0.997,
+    "commitment_type": "information",
+    "artifact": null,
+    "reasons": [
+     "human counterpart provided the information"
+    ]
+   },
+   {
+    "id": "eval-023",
+    "label": "agent",
+    "expected": "agent_asserted",
+    "attestation": "human_attested",
+    "original_task_completed": true,
+    "dialtone_task_completed": true,
+    "counterpart": "human",
+    "counterpart_confidence": 0.782,
+    "commitment_type": "booking",
+    "artifact": "sent a confirmation",
+    "reasons": [
+     "human counterpart confirmed: \"yeah no, that's totally fine, that's about an hour. okay so, you're booked for Saturday th\""
+    ]
+   },
+   {
+    "id": "eval-024",
+    "label": "human",
+    "expected": "human_attested",
+    "attestation": "unverified",
+    "original_task_completed": true,
+    "dialtone_task_completed": false,
+    "counterpart": "human",
+    "counterpart_confidence": 0.987,
+    "commitment_type": "booking",
+    "artifact": null,
+    "reasons": [
+     "human counterpart, but no explicit confirmation phrase found in their turns"
+    ]
+   },
+   {
+    "id": "eval-025",
+    "label": "agent",
+    "expected": "agent_asserted",
+    "attestation": "agent_asserted",
+    "original_task_completed": true,
+    "dialtone_task_completed": true,
+    "counterpart": "agent",
+    "counterpart_confidence": 0.992,
+    "commitment_type": "information",
+    "artifact": null,
+    "reasons": [
+     "counterpart is an AI agent (behavioural detection, confidence 0.99)",
+     "informational answer from an agent: usable, but not attested by a person"
+    ]
+   },
+   {
+    "id": "eval-026",
+    "label": "human",
+    "expected": "human_attested",
+    "attestation": "human_attested",
+    "original_task_completed": true,
+    "dialtone_task_completed": true,
+    "counterpart": "human",
+    "counterpart_confidence": 0.981,
+    "commitment_type": "information",
+    "artifact": null,
+    "reasons": [
+     "human counterpart provided the information"
+    ]
+   },
+   {
+    "id": "eval-027",
+    "label": "ivr",
+    "expected": "unverified",
+    "attestation": "unverified",
+    "original_task_completed": false,
+    "dialtone_task_completed": false,
+    "counterpart": "ivr",
+    "counterpart_confidence": 0.95,
+    "commitment_type": "information",
+    "artifact": null,
+    "reasons": [
+     "calling agent did not report the task as completed"
+    ]
+   },
+   {
+    "id": "eval-028",
+    "label": "ivr",
+    "expected": "unverified",
+    "attestation": "unverified",
+    "original_task_completed": false,
+    "dialtone_task_completed": false,
+    "counterpart": "ivr",
+    "counterpart_confidence": 0.98,
+    "commitment_type": "cancellation",
+    "artifact": null,
+    "reasons": [
+     "calling agent did not report the task as completed"
+    ]
+   },
+   {
+    "id": "eval-029",
+    "label": "agent",
+    "expected": "refused",
+    "attestation": "refused",
+    "original_task_completed": true,
+    "dialtone_task_completed": false,
+    "counterpart": "agent",
+    "counterpart_confidence": 0.962,
+    "commitment_type": "reschedule",
+    "artifact": null,
+    "reasons": [
+     "counterpart is an AI agent (behavioural detection, confidence 0.96)",
+     "binding reschedule 'confirmed' by an AI agent with no confirmation code, written record, or human review"
+    ]
+   },
+   {
+    "id": "eval-030",
+    "label": "agent",
+    "expected": "agent_asserted",
+    "attestation": "agent_asserted",
+    "original_task_completed": true,
+    "dialtone_task_completed": true,
+    "counterpart": "agent",
+    "counterpart_confidence": 0.997,
+    "commitment_type": "information",
+    "artifact": null,
+    "reasons": [
+     "counterpart is an AI agent (behavioural detection, confidence 1.00)",
+     "informational answer from an agent: usable, but not attested by a person"
+    ]
+   },
+   {
+    "id": "eval-031",
+    "label": "agent",
+    "expected": "agent_asserted",
+    "attestation": "agent_asserted",
+    "original_task_completed": true,
+    "dialtone_task_completed": true,
+    "counterpart": "agent",
+    "counterpart_confidence": 0.991,
+    "commitment_type": "reschedule",
+    "artifact": "confirmation number is T K 5 5 0 8",
+    "reasons": [
+     "counterpart is an AI agent (behavioural detection, confidence 0.99)",
+     "agent gave a verifiable artifact (confirmation number is T K 5 5 0 8); re-verify through that channel before relying on it"
+    ]
+   },
+   {
+    "id": "eval-032",
+    "label": "agent",
+    "expected": "refused",
+    "attestation": "human_attested",
+    "original_task_completed": true,
+    "dialtone_task_completed": true,
+    "counterpart": "human",
+    "counterpart_confidence": 0.954,
+    "commitment_type": "cancellation",
+    "artifact": null,
+    "reasons": [
+     "human counterpart confirmed: \"No proof needed. No notice period. It's done.\""
+    ]
+   },
+   {
+    "id": "eval-033",
+    "label": "human",
+    "expected": "unverified",
+    "attestation": "unverified",
+    "original_task_completed": false,
+    "dialtone_task_completed": false,
+    "counterpart": "human",
+    "counterpart_confidence": 0.999,
+    "commitment_type": "booking",
+    "artifact": null,
+    "reasons": [
+     "calling agent did not report the task as completed"
+    ]
+   },
+   {
+    "id": "eval-034",
+    "label": "ivr",
+    "expected": "unverified",
+    "attestation": "unverified",
+    "original_task_completed": false,
+    "dialtone_task_completed": false,
+    "counterpart": "human",
+    "counterpart_confidence": 0.684,
+    "commitment_type": "booking",
+    "artifact": null,
+    "reasons": [
+     "calling agent did not report the task as completed"
+    ]
+   },
+   {
+    "id": "eval-035",
+    "label": "ivr",
+    "expected": "system_asserted",
+    "attestation": "system_asserted",
+    "original_task_completed": true,
+    "dialtone_task_completed": true,
+    "counterpart": "ivr",
+    "counterpart_confidence": 0.654,
+    "commitment_type": "cancellation",
+    "artifact": "confirmation number one character at a time",
+    "reasons": [
+     "phone system read back information (confirmation number one character at a time)"
+    ]
+   },
+   {
+    "id": "eval-036",
+    "label": "ivr",
+    "expected": "unverified",
+    "attestation": "unverified",
+    "original_task_completed": false,
+    "dialtone_task_completed": false,
+    "counterpart": "human",
+    "counterpart_confidence": 0.993,
+    "commitment_type": "refund",
+    "artifact": null,
+    "reasons": [
+     "calling agent did not report the task as completed"
+    ]
+   },
+   {
+    "id": "eval-037",
+    "label": "ivr",
+    "expected": "system_asserted",
+    "attestation": "system_asserted",
+    "original_task_completed": true,
+    "dialtone_task_completed": true,
+    "counterpart": "ivr",
+    "counterpart_confidence": 0.607,
+    "commitment_type": "information",
+    "artifact": null,
+    "reasons": [
+     "phone system read back information"
+    ]
+   },
+   {
+    "id": "eval-038",
+    "label": "ivr",
+    "expected": "system_asserted",
+    "attestation": "system_asserted",
+    "original_task_completed": true,
+    "dialtone_task_completed": true,
+    "counterpart": "ivr",
+    "counterpart_confidence": 0.995,
+    "commitment_type": "information",
+    "artifact": null,
+    "reasons": [
+     "phone system read back information"
+    ]
+   },
+   {
+    "id": "eval-039",
+    "label": "human",
+    "expected": "human_attested",
+    "attestation": "unverified",
+    "original_task_completed": true,
+    "dialtone_task_completed": false,
+    "counterpart": "human",
+    "counterpart_confidence": 0.998,
+    "commitment_type": "booking",
+    "artifact": null,
+    "reasons": [
+     "human counterpart, but no explicit confirmation phrase found in their turns"
+    ]
+   },
+   {
+    "id": "eval-040",
+    "label": "human",
+    "expected": "unverified",
+    "attestation": "unverified",
+    "original_task_completed": true,
+    "dialtone_task_completed": false,
+    "counterpart": "human",
+    "counterpart_confidence": 0.926,
+    "commitment_type": "cancellation",
+    "artifact": null,
+    "reasons": [
+     "human counterpart, but no explicit confirmation phrase found in their turns"
+    ]
+   }
+  ]
+ }
+}

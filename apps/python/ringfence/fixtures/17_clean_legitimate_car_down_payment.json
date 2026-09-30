@@ -1,0 +1,58 @@
+{
+  "_evidence_source": "synthetic: fictional car-down-payment scenario, modeled on an ordinary legitimate large transaction",
+  "category": "clean_legitimate",
+  "case": {
+    "case_id": "case_f17",
+    "account_holder_name": "Sheila Okonkwo",
+    "on_file_phone": "+14155550117",
+    "claimed_transaction_amount": "6800.00",
+    "claimed_recipient": "Redline Motors of Fairview",
+    "claimed_payment_method": "ach_transfer",
+    "request_supplied_callback_number": null
+  },
+  "call": {
+    "id": "call_f17",
+    "status": "completed",
+    "task": "Verify a flagged $6,800 ACH transaction to Redline Motors of Fairview.",
+    "failure_code": null,
+    "failure_message": null,
+    "task_completed": true,
+    "completion_confidence": {"score": 0.94, "label": "high"},
+    "summary": "Account holder confirmed the payment is a down payment on a car purchase from a dealership she visited in person, no pressure or secrecy reported."
+  },
+  "attempts": [
+    {
+      "id": "attempt_f17",
+      "phone": "+14155550117",
+      "status": "completed",
+      "started_at": "2026-09-10T10:05:00Z",
+      "completed_at": "2026-09-10T10:08:15Z",
+      "summary": "Account holder confirmed the transaction.",
+      "transcript_turns": [
+        {"speaker": "bot", "text": "This is an automated verification call from your bank about a flagged transaction. Did anyone ask you to keep this transaction private?"},
+        {"speaker": "user", "text": "No, not at all."},
+        {"speaker": "bot", "text": "Is there time pressure on this payment?"},
+        {"speaker": "user", "text": "No, I'm picking up the car this weekend, no rush."},
+        {"speaker": "bot", "text": "Can you describe your relationship to the recipient?"},
+        {"speaker": "user", "text": "It's the car dealership, I signed paperwork in person yesterday for a used sedan."},
+        {"speaker": "bot", "text": "Were you asked to pay by wire, gift card, or cryptocurrency specifically?"},
+        {"speaker": "user", "text": "No, just the finance office's standard bank transfer for the down payment."}
+      ],
+      "provider_call_id": "prov_f17",
+      "failure_code": null,
+      "failure_message": null
+    }
+  ],
+  "events": [
+    {"id": "evt_f17a", "type": "call.dialing", "call_id": "call_f17", "created_at": "2026-09-10T10:05:00Z", "level": "info", "status": "in_progress", "message": "Dialing account holder.", "details": {"region": "US"}},
+    {"id": "evt_f17b", "type": "call.completed", "call_id": "call_f17", "created_at": "2026-09-10T10:08:15Z", "level": "info", "status": "completed", "message": "Call completed.", "details": {"region": "US", "locale": "en-US"}}
+  ],
+  "signals": {
+    "secrecy_demand_present": false,
+    "urgency_pressure_present": false,
+    "relationship_explained": true,
+    "irreversible_payment_demanded": false,
+    "explicit_hold_requested": false
+  },
+  "expected_disposition": "ADVISE_ALLOW"
+}

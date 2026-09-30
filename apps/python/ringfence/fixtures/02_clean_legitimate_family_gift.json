@@ -1,0 +1,58 @@
+{
+  "_evidence_source": "synthetic: fictional family-gift scenario, modeled on an ordinary legitimate large transaction",
+  "category": "clean_legitimate",
+  "case": {
+    "case_id": "case_f02",
+    "account_holder_name": "Sam Okafor",
+    "on_file_phone": "+14155550102",
+    "claimed_transaction_amount": "3000.00",
+    "claimed_recipient": "Ada Okafor",
+    "claimed_payment_method": "wire",
+    "request_supplied_callback_number": null
+  },
+  "call": {
+    "id": "call_f02",
+    "status": "completed",
+    "task": "Verify a flagged $3,000 wire transaction to Ada Okafor.",
+    "failure_code": null,
+    "failure_message": null,
+    "task_completed": true,
+    "completion_confidence": {"score": 0.92, "label": "high"},
+    "summary": "Account holder confirmed this is a planned gift to his daughter for a car down payment."
+  },
+  "attempts": [
+    {
+      "id": "attempt_f02",
+      "phone": "+14155550102",
+      "status": "completed",
+      "started_at": "2026-09-10T10:15:00Z",
+      "completed_at": "2026-09-10T10:18:05Z",
+      "summary": "Account holder confirmed the transaction.",
+      "transcript_turns": [
+        {"speaker": "bot", "text": "This is an automated verification call from your bank about a flagged transaction. Did anyone ask you to keep this transaction private?"},
+        {"speaker": "user", "text": "No, my wife knows about it too."},
+        {"speaker": "bot", "text": "Is there time pressure on this payment?"},
+        {"speaker": "user", "text": "No, we've been planning this for a couple weeks."},
+        {"speaker": "bot", "text": "Can you describe your relationship to the recipient?"},
+        {"speaker": "user", "text": "That's my daughter, Ada."},
+        {"speaker": "bot", "text": "Were you asked to pay by wire, gift card, or cryptocurrency specifically?"},
+        {"speaker": "user", "text": "It's a regular wire, that's just how we usually send larger amounts."}
+      ],
+      "provider_call_id": "prov_f02",
+      "failure_code": null,
+      "failure_message": null
+    }
+  ],
+  "events": [
+    {"id": "evt_f02a", "type": "call.dialing", "call_id": "call_f02", "created_at": "2026-09-10T10:15:00Z", "level": "info", "status": "in_progress", "message": "Dialing account holder.", "details": {"region": "US"}},
+    {"id": "evt_f02b", "type": "call.completed", "call_id": "call_f02", "created_at": "2026-09-10T10:18:05Z", "level": "info", "status": "completed", "message": "Call completed.", "details": {"region": "US", "locale": "en-US"}}
+  ],
+  "signals": {
+    "secrecy_demand_present": false,
+    "urgency_pressure_present": false,
+    "relationship_explained": true,
+    "irreversible_payment_demanded": false,
+    "explicit_hold_requested": false
+  },
+  "expected_disposition": "ADVISE_ALLOW"
+}

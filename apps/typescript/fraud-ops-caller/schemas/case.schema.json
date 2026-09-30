@@ -1,0 +1,128 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://fraud-ops-caller.local/schemas/case.schema.json",
+  "title": "FraudOpsCase",
+  "description": "Inbound risk case for Fraud Ops Caller. Optional tarka object is passthrough only — this repo does not host ML or a consortium score.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "case_id",
+    "intent",
+    "pack_fired",
+    "reason_plain",
+    "contact",
+    "context",
+    "deep_links",
+    "policy",
+    "callback_url"
+  ],
+  "properties": {
+    "case_id": { "type": "string", "minLength": 1 },
+    "intent": {
+      "type": "string",
+      "enum": [
+        "kyc_chase",
+        "evidence_collection",
+        "collections",
+        "merchant_outreach"
+      ]
+    },
+    "pack_fired": {
+      "type": "string",
+      "enum": ["needs_kyc", "needs_evidence", "past_due", "merchant_review"]
+    },
+    "reason_plain": { "type": "string", "minLength": 1 },
+    "contact": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["name", "phone_e164", "role", "locale"],
+      "properties": {
+        "name": { "type": "string", "minLength": 1 },
+        "phone_e164": {
+          "type": "string",
+          "pattern": "^\\+[1-9][0-9]{7,14}$"
+        },
+        "role": { "type": "string", "minLength": 1 },
+        "locale": { "type": "string", "minLength": 2 }
+      }
+    },
+    "context": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "missing_docs": {
+          "type": "array",
+          "items": { "type": "string", "minLength": 1 }
+        },
+        "amount_due": { "type": "number", "minimum": 0 },
+        "currency": { "type": "string", "minLength": 3, "maxLength": 3 },
+        "days_late": { "type": "integer", "minimum": 0 },
+        "merchant_name": { "type": "string" },
+        "risk_flags": {
+          "type": "array",
+          "items": { "type": "string", "minLength": 1 }
+        }
+      }
+    },
+    "deep_links": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "upload": { "type": "string", "format": "uri" },
+        "pay": { "type": "string", "format": "uri" },
+        "portal": { "type": "string", "format": "uri" },
+        "evidence_share": { "type": "string", "format": "uri" }
+      }
+    },
+    "counterpart_case_id": { "type": "string", "minLength": 1 },
+    "safety_sensitive": { "type": "boolean" },
+    "incident_summary_plain": { "type": "string", "minLength": 1 },
+    "policy": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "attempt_n",
+        "max_attempts",
+        "quiet_hours_local",
+        "allow_ptp",
+        "allow_pay_link_sms"
+      ],
+      "properties": {
+        "attempt_n": { "type": "integer", "minimum": 0 },
+        "max_attempts": { "type": "integer", "minimum": 1 },
+        "quiet_hours_local": {
+          "type": "string",
+          "description": "Local quiet window as HH:MM-HH:MM (end may be next day).",
+          "pattern": "^[0-2][0-9]:[0-5][0-9]-[0-2][0-9]:[0-5][0-9]$"
+        },
+        "allow_ptp": { "type": "boolean" },
+        "allow_pay_link_sms": { "type": "boolean" }
+      }
+    },
+    "callback_url": { "type": "string", "format": "uri" },
+    "tarka": {
+      "type": "object",
+      "description": "Optional Tarka-shaped passthrough. Ignored by this runtime.",
+      "additionalProperties": true
+    }
+  },
+  "allOf": [
+    {
+      "if": {
+        "properties": { "intent": { "const": "evidence_collection" } }
+      },
+      "then": {
+        "required": [
+          "counterpart_case_id",
+          "safety_sensitive",
+          "incident_summary_plain"
+        ],
+        "properties": {
+          "deep_links": {
+            "required": ["evidence_share"]
+          }
+        }
+      }
+    }
+  ]
+}

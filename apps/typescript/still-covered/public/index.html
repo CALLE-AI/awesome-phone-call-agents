@@ -1,0 +1,479 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Still Covered</title>
+<link rel="icon" href="data:," />
+<style>
+  :root {
+    --bg: #0e1317; --panel: #161d23; --panel-2: #1c252c; --panel-3: #222d36; --line: #2a353f; --line-2: #35424e;
+    --text: #e9eff3; --muted: #93a4b1; --muted-2: #b6c4ce;
+    --green: #37d67a; --teal: #1fc8a9; --yellow: #f5c518; --red: #ef5350; --grey: #8b9aa4; --blue: #4aa3e8; --violet: #a970d0; --orange: #f0873d;
+    --focus: #6cc0ff;
+    font-family: -apple-system, "Segoe UI", Inter, Roboto, Helvetica, Arial, sans-serif;
+    font-size: 16px;
+  }
+  * { box-sizing: border-box; }
+  /* Must beat the author `display` rules below, or `el.hidden` silently does nothing. */
+  [hidden] { display: none !important; }
+  body { margin: 0; background: var(--bg); color: var(--text); font-size: 14px; line-height: 1.45; }
+  :focus-visible { outline: 2px solid var(--focus); outline-offset: 2px; border-radius: 4px; }
+  @media (prefers-reduced-motion: reduce) { *, *::before, *::after { animation-duration: 0.001ms !important; animation-iteration-count: 1 !important; transition-duration: 0.001ms !important; } }
+
+  /* ---------------------------------------------------------------- header */
+  header { display: flex; align-items: center; gap: 12px; padding: 10px 20px; border-bottom: 1px solid var(--line); background: var(--panel); position: sticky; top: 0; z-index: 20; flex-wrap: wrap; }
+  header h1 { font-size: 17px; margin: 0; letter-spacing: 0.2px; white-space: nowrap; }
+  header h1 .sub { font-weight: 400; }
+  .sub { color: var(--muted); font-size: 12.5px; }
+  .badge { font-size: 10.5px; padding: 3px 8px; border-radius: 999px; border: 1px solid var(--line-2); color: var(--muted); text-transform: uppercase; letter-spacing: 0.7px; white-space: nowrap; }
+  .badge.live { border-color: var(--red); color: var(--red); }
+  .badge.dry { border-color: var(--blue); color: var(--blue); }
+  .badge.ok { border-color: #2f6b45; color: var(--green); }
+  .spacer { flex: 1 1 auto; }
+  button { background: var(--panel-2); color: var(--text); border: 1px solid var(--line-2); border-radius: 8px; padding: 8px 12px; font: inherit; font-size: 13px; cursor: pointer; }
+  button:hover:not(:disabled) { border-color: var(--muted); background: var(--panel-3); }
+  button:disabled { opacity: 0.45; cursor: not-allowed; }
+  button.primary { background: #1d5183; border-color: #2f79bd; }
+  button.primary:hover:not(:disabled) { background: #24629c; }
+  button.review { background: #1c5c3b; border-color: #2f9a58; padding: 5px 11px; font-size: 12.5px; white-space: nowrap; }
+  button.review:hover:not(:disabled) { background: #237249; }
+  select { background: var(--panel-2); color: var(--text); border: 1px solid var(--line-2); border-radius: 8px; padding: 7px 9px; font: inherit; font-size: 13px; max-width: 240px; }
+
+  /* ------------------------------------------------------------------ grid */
+  main { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; padding: 14px 20px 8px; align-items: start; }
+  @media (max-width: 1080px) { main { grid-template-columns: 1fr; } }
+  section { background: var(--panel); border: 1px solid var(--line); border-radius: 12px; padding: 14px 16px; min-width: 0; }
+  section > h2 { margin: 0 0 12px; font-size: 11.5px; color: var(--muted); text-transform: uppercase; letter-spacing: 0.9px; font-weight: 600; display: flex; align-items: baseline; gap: 8px; flex-wrap: wrap; }
+  /* A subtitle inside an uppercase heading must not inherit the uppercase, or the two run together. */
+  section > h2 .sub, details.tl > summary .sub { text-transform: none; letter-spacing: 0; font-weight: 400; }
+  .wide { grid-column: 1 / -1; }
+
+  /* ------------------------------------------------------------------ hero */
+  .hero { grid-column: 1 / -1; display: grid; grid-template-columns: minmax(0, 1.05fr) minmax(0, 1fr); gap: 14px; }
+  @media (max-width: 1080px) { .hero { grid-template-columns: 1fr; } }
+  .thesis { background: linear-gradient(145deg, #241a10 0%, var(--panel) 70%); border: 1px solid #4a371c; border-left: 4px solid var(--orange); border-radius: 12px; padding: 16px 18px; }
+  .thesis .big { font-size: 42px; font-weight: 700; line-height: 1.05; letter-spacing: -1px; }
+  .thesis .lede { font-size: 14px; margin-top: 4px; }
+  .thesis .cite { color: var(--muted); font-size: 12.5px; margin-top: 8px; }
+  .thesis.idle .big { font-size: 22px; color: var(--muted-2); letter-spacing: 0; }
+  .headline { display: grid; grid-template-columns: repeat(2, 1fr); gap: 10px; }
+  .stat { background: var(--panel); border: 1px solid var(--line); border-left: 4px solid var(--line-2); border-radius: 10px; padding: 11px 13px; }
+  .stat .v { font-size: 27px; font-weight: 650; line-height: 1.1; }
+  .stat .l { font-size: 12.5px; color: var(--muted); margin-top: 1px; }
+  .stat.blue { border-left-color: var(--blue); } .stat.teal { border-left-color: var(--teal); } .stat.green { border-left-color: var(--green); } .stat.violet { border-left-color: var(--violet); }
+
+  /* secondary numbers: present, but visibly subordinate */
+  .strip { grid-column: 1 / -1; display: flex; flex-wrap: wrap; gap: 6px 22px; padding: 2px 4px 0; color: var(--muted); font-size: 12.5px; }
+  .strip b { color: var(--text); font-weight: 600; font-variant-numeric: tabular-nums; }
+
+  /* ------------------------------------------------------------------ bars */
+  .bar { display: grid; grid-template-columns: minmax(110px, 190px) 1fr 34px; gap: 10px; align-items: center; font-size: 13px; margin: 5px 0; }
+  .bar .track { background: var(--panel-2); border-radius: 6px; height: 10px; overflow: hidden; }
+  .bar .fill { height: 10px; border-radius: 6px; transition: width .35s ease; }
+  .bar .n { text-align: right; font-variant-numeric: tabular-nums; color: var(--muted-2); }
+  .subhead { margin: 16px 0 8px; font-size: 11.5px; color: var(--muted); text-transform: uppercase; letter-spacing: 0.9px; font-weight: 600; }
+  table { width: 100%; border-collapse: collapse; font-size: 13px; }
+  th, td { text-align: left; padding: 6px 6px; border-bottom: 1px solid var(--line); }
+  th { color: var(--muted); font-weight: 500; font-size: 12px; }
+  td.n, th.n { text-align: right; font-variant-numeric: tabular-nums; }
+
+  /* -------------------------------------------------------------- filtering */
+  .chips { display: flex; gap: 6px; flex-wrap: wrap; margin-bottom: 10px; }
+  .chip { background: var(--panel-2); border: 1px solid var(--line-2); color: var(--muted-2); border-radius: 999px; padding: 4px 11px; font-size: 12px; cursor: pointer; }
+  .chip:hover { border-color: var(--muted); }
+  .chip[aria-pressed="true"] { background: #1d5183; border-color: #2f79bd; color: #fff; }
+  .chip .c { opacity: .75; font-variant-numeric: tabular-nums; }
+
+  /* -------------------------------------------------------------- worklist */
+  .queue { display: flex; flex-direction: column; }
+  .wi { display: grid; grid-template-columns: 1fr auto; gap: 10px; align-items: start; padding: 10px 0; border-bottom: 1px solid var(--line); }
+  .wi:last-child { border-bottom: 0; }
+  .wi .top { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+  .wi .who { font-weight: 600; }
+  .wi .sum { color: var(--muted-2); font-size: 13px; margin-top: 2px; }
+  .wi ul { margin: 6px 0 0; padding-left: 17px; color: var(--muted); font-size: 12.5px; }
+  .wi ul li { margin: 2px 0; }
+  .tag { font-size: 10.5px; text-transform: uppercase; letter-spacing: 0.6px; padding: 2px 8px; border-radius: 999px; background: rgba(139,154,164,.18); color: var(--muted-2); white-space: nowrap; }
+  .tag.correction_call { background: rgba(239,83,80,.2); color: #ff8a85; }
+  .tag.exemption_packet { background: rgba(55,214,122,.16); color: var(--green); }
+  .tag.navigator_callback { background: rgba(245,197,24,.16); color: var(--yellow); }
+  .tag.mail_letter { background: rgba(240,135,61,.18); color: #f7ac74; }
+  .tag.report_hours { background: rgba(31,200,169,.16); color: var(--teal); }
+  .tag.operator_review { background: rgba(169,112,208,.2); color: #c9a3e4; }
+  .tag.hp { background: rgba(239,83,80,.16); color: #ff8a85; }
+
+  /* ---------------------------------------------------------------- people */
+  .people { display: grid; grid-template-columns: repeat(auto-fill, minmax(250px, 1fr)); gap: 10px; }
+  .card { background: var(--panel-2); border: 1px solid var(--line); border-left: 4px solid var(--grey); border-radius: 10px; padding: 10px 12px; text-align: left; color: inherit; font: inherit; cursor: pointer; display: block; width: 100%; }
+  .card:hover { background: var(--panel-3); border-color: var(--line-2); }
+  .card.likely_exempt { border-left-color: var(--green); } .card.likely_meets { border-left-color: var(--teal); } .card.at_risk { border-left-color: var(--red); } .card.needs_review { border-left-color: var(--yellow); } .card.cleared_by_data { border-left-color: #12a186; } .card.declined { border-left-color: #5dade2; } .card.opted_out { border-left-color: var(--grey); } .card.identity_unconfirmed, .card.unverified { border-left-color: var(--violet); } .card.not_attempted { border-left-color: var(--orange); } .card.calling { border-left-color: var(--blue); animation: pulse 1.3s infinite; } .card.awaiting { border-left-color: var(--blue); } .card.pending { border-left-color: var(--line-2); }
+  @keyframes pulse { 0% { box-shadow: 0 0 0 0 rgba(74,163,232,.4); } 100% { box-shadow: 0 0 0 9px rgba(74,163,232,0); } }
+  /* A <button> may only contain phrasing content, so the card's rows are spans made block. */
+  .card > span { display: block; }
+  .card .name { font-weight: 600; display: flex; align-items: center; gap: 6px; flex-wrap: wrap; }
+  .card .meta { font-size: 12px; color: var(--muted); margin-top: 2px; }
+  .card .why { font-size: 12.5px; margin-top: 6px; color: var(--muted-2); }
+  .card .why b { color: var(--text); }
+  .card .quote { font-size: 12.5px; color: #cfdae3; font-style: italic; margin-top: 4px; }
+  .card .flag { font-size: 12px; color: #ff8a85; margin-top: 5px; }
+  .pill { display: inline-block; font-size: 10.5px; padding: 2px 8px; border-radius: 999px; text-transform: uppercase; letter-spacing: 0.55px; background: rgba(139,154,164,.2); color: #c2ccd3; white-space: nowrap; }
+  .pill.likely_exempt { background: rgba(55,214,122,.17); color: var(--green); } .pill.likely_meets, .pill.cleared_by_data { background: rgba(31,200,169,.17); color: var(--teal); } .pill.at_risk { background: rgba(239,83,80,.2); color: #ff8a85; } .pill.needs_review { background: rgba(245,197,24,.17); color: var(--yellow); } .pill.calling, .pill.awaiting, .pill.declined { background: rgba(74,163,232,.2); color: #8ec9f2; } .pill.not_attempted { background: rgba(240,135,61,.2); color: #f7ac74; } .pill.identity_unconfirmed, .pill.unverified { background: rgba(169,112,208,.2); color: #c9a3e4; }
+
+  /* -------------------------------------------------------------- timeline */
+  details.tl { background: var(--panel); border: 1px solid var(--line); border-radius: 12px; padding: 0; }
+  details.tl > summary { padding: 13px 16px; cursor: pointer; font-size: 11.5px; color: var(--muted); text-transform: uppercase; letter-spacing: 0.9px; font-weight: 600; list-style: none; }
+  details.tl > summary::-webkit-details-marker { display: none; }
+  details.tl > summary::before { content: "\25B8"; display: inline-block; margin-right: 8px; transition: transform .15s; }
+  details.tl[open] > summary::before { transform: rotate(90deg); }
+  .timeline { max-height: 320px; overflow: auto; font-size: 12px; font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; padding: 0 16px 14px; }
+  .timeline div { padding: 3px 0; border-bottom: 1px dashed var(--line); }
+  .timeline .t { color: var(--muted); margin-right: 8px; }
+  .timeline .error { color: #ff8a85; } .timeline .warning { color: var(--yellow); }
+
+  /* ---------------------------------------------------------------- drawer */
+  .scrim { position: fixed; inset: 0; background: rgba(0,0,0,.55); z-index: 40; }
+  .drawer { position: fixed; top: 0; right: 0; bottom: 0; width: min(460px, 100%); background: var(--panel); border-left: 1px solid var(--line-2); z-index: 41; overflow: auto; padding: 18px 20px 40px; box-shadow: -18px 0 40px rgba(0,0,0,.4); }
+  .drawer h3 { margin: 0 0 2px; font-size: 19px; }
+  .drawer .close { position: absolute; top: 14px; right: 16px; }
+  .drawer dl { display: grid; grid-template-columns: auto 1fr; gap: 4px 14px; margin: 14px 0 0; font-size: 13px; }
+  .drawer dt { color: var(--muted); }
+  .drawer dd { margin: 0; }
+  .drawer .block { margin-top: 16px; }
+  .drawer .block h4 { margin: 0 0 6px; font-size: 11.5px; color: var(--muted); text-transform: uppercase; letter-spacing: 0.9px; }
+  .drawer blockquote { margin: 0 0 6px; padding: 7px 11px; background: var(--panel-2); border-left: 3px solid var(--line-2); border-radius: 0 7px 7px 0; font-style: italic; color: #cfdae3; font-size: 13px; }
+
+  /* ------------------------------------------------------------ misc/empty */
+  .empty { color: var(--muted); font-size: 13px; padding: 4px 0; }
+  .pitch { grid-column: 1 / -1; background: var(--panel); border: 1px solid var(--line); border-radius: 12px; padding: 20px 22px; }
+  .pitch h2 { margin: 0 0 8px; font-size: 17px; text-transform: none; letter-spacing: 0; color: var(--text); }
+  .pitch p { margin: 0 0 12px; color: var(--muted-2); max-width: 78ch; }
+  .pitch ol { margin: 0; padding-left: 20px; color: var(--muted-2); max-width: 78ch; }
+  .pitch li { margin: 5px 0; }
+  .pitch .hint { margin-top: 14px; color: var(--muted); font-size: 13px; }
+  .banner { grid-column: 1 / -1; background: #3a2a10; border: 1px solid #7a5a1a; color: #f5dfb0; border-radius: 10px; padding: 11px 14px; font-size: 13px; }
+  .banner code { background: rgba(0,0,0,.3); padding: 1px 6px; border-radius: 4px; }
+  footer { padding: 12px 20px 28px; color: var(--muted); font-size: 12px; max-width: 100ch; }
+  footer code { background: var(--panel-2); padding: 1px 5px; border-radius: 4px; }
+  .visually-hidden { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; }
+</style>
+</head>
+<body>
+<header>
+  <h1>Still Covered <span class="sub">Medicaid work-requirement exemption screener on CALL-E</span></h1>
+  <span class="badge" id="mode">mode</span>
+  <span class="badge" id="conn">connecting</span>
+  <div class="spacer"></div>
+  <label class="visually-hidden" for="campaign">Load a past campaign</label>
+  <select id="campaign"><option value="">Load past campaign...</option></select>
+  <label class="visually-hidden" for="registry">Enrollee list</label>
+  <select id="registry"></select>
+  <button class="primary" id="start">Start drill (dry-run)</button>
+  <button id="reportBtn">Outreach report</button>
+  <button id="lintBtn">Call-task linter</button>
+</header>
+
+<div class="sub" style="padding: 8px 20px 0;" id="headline">No campaign yet</div>
+
+<main id="main">
+  <div class="banner" id="banner" hidden></div>
+
+  <div class="pitch" id="pitch">
+    <h2>Nobody is calling to ask.</h2>
+    <p>From 1 January 2027, most adults aged 19&ndash;64 on Medicaid must show 80 hours a month of work, school,
+      volunteering or job training &mdash; or about $580 in earnings &mdash; to keep coverage. Nine categories of people are
+      exempt. When Arkansas tried this in 2018, more than 18,000 people lost coverage in seven months and employment did
+      not change: they were already working, or already exempt, and nobody asked them.</p>
+    <ol>
+      <li><b>Clear whoever the state&rsquo;s own data clears.</b> Those people are never called at all.</li>
+      <li><b>Call everyone else in their own language</b> &mdash; identity first, then whether they have even heard of the
+        rule, then only the exemption questions their record has not already answered.</li>
+      <li><b>Decide in code, not in the model.</b> Anything unclear becomes a review, never an exemption.</li>
+      <li><b>Hand every call to a human.</b> Nothing here changes anyone&rsquo;s coverage.</li>
+    </ol>
+    <div class="hint">Press <b>Start drill (dry-run)</b> above to run a campaign against the bundled fake CALL-E server.
+      No credentials, no network, no phone call.</div>
+  </div>
+
+  <div class="hero" id="hero" hidden>
+    <div class="thesis" id="thesis"></div>
+    <div class="headline" id="headlineStats"></div>
+  </div>
+  <div class="strip" id="strip" hidden></div>
+
+  <section id="foundSection" hidden>
+    <h2>What the calls found</h2>
+    <div id="found"></div>
+    <div class="subhead">By language</div>
+    <div id="langs"></div>
+  </section>
+
+  <section id="workSection" hidden>
+    <h2>Who needs a human next <span class="sub">nothing changes anyone&rsquo;s coverage until a caseworker reviews it</span></h2>
+    <div class="chips" id="workChips"></div>
+    <div class="queue" id="work"></div>
+  </section>
+
+  <section class="wide" id="peopleSection" hidden>
+    <h2>People <span class="sub">select anyone to see every reason behind their outcome</span></h2>
+    <div class="chips" id="peopleChips"></div>
+    <div class="people" id="people"></div>
+  </section>
+
+  <details class="tl wide" id="tlSection" hidden open>
+    <summary>Live timeline <span class="sub">ledger stream; phone numbers masked</span></summary>
+    <div class="timeline" id="timeline"></div>
+  </details>
+</main>
+
+<footer>Dry-run drills simulate conversations with the local fake CALL-E server. Live campaigns are started only from the
+  command line with <code>--confirm</code>, and only numbers on <code>SC_LIVE_ALLOWLIST</code> can be dialled. The agent
+  never tells anyone they are exempt; the code decides &ldquo;may qualify&rdquo; and a caseworker confirms.</footer>
+
+<div id="drawerRoot"></div>
+
+<script>
+(function () {
+  const $ = (id) => document.getElementById(id);
+  let token = new URLSearchParams(location.search).get("token") || null;
+  try { if (token) localStorage.setItem("sc_token", token); else token = localStorage.getItem("sc_token"); } catch (e) { /* storage unavailable */ }
+  const withToken = (url) => token ? url + (url.includes("?") ? "&" : "?") + "token=" + encodeURIComponent(token) : url;
+  const api = (url, opts) => fetch(withToken(url), Object.assign({ headers: Object.assign({ "content-type": "application/json" }, token ? { authorization: "Bearer " + token } : {}) }, opts || {}));
+  const esc = (s) => String(s == null ? "" : s).replace(/[&<>"]/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c]));
+  const fmtSec = (s) => s == null ? "-" : s < 90 ? s + "s" : Math.floor(s / 60) + "m " + (s % 60) + "s";
+  const LABEL = { cleared_by_data: "cleared by data", likely_exempt: "may qualify", likely_meets: "may meet rule", at_risk: "at risk", needs_review: "needs review", declined: "call later", opted_out: "opted out", identity_unconfirmed: "identity unconfirmed", unreachable: "not reached", unverified: "call unfinished", not_attempted: "not attempted", calling: "calling", awaiting: "awaiting", pending: "pending" };
+
+  // Worklist summaries are written to stand alone in the report ("Maria Gonzalez: may qualify...").
+  // The queue already shows the name as the row heading, so drop the duplicate prefix here only.
+  const dropName = (summary, name) => String(summary || "").startsWith(name + ": ") ? summary.slice(name.length + 2) : summary;
+
+  // View state lives here, not in the DOM, so an SSE re-render never loses the operator's filter.
+  let latest = null;
+  let workFilter = "todo";
+  let peopleFilter = "all";
+  let openPersonId = null;
+  const reviewing = new Set();
+
+  // ------------------------------------------------------------------ hero
+  function renderHero(state, k, answered, notScreened) {
+    $("thesis").className = answered ? "thesis" : "thesis idle";
+    $("thesis").innerHTML = answered
+      ? `<div class="big">${k.awareNo} of ${answered}</div>
+         <div class="lede">people who answered had <b>not</b> heard of the rule before this call.</div>
+         <div class="cite">In Arkansas in 2018, about a third of those subject to the requirement had never heard of it,
+           and 18,000 lost coverage in seven months (Sommers et al., NEJM 2019).</div>`
+      : `<div class="big">Awareness appears here as people answer.</div>
+         <div class="cite">The question is asked before the rule is explained &mdash; otherwise the answer means nothing.</div>`;
+    $("headlineStats").innerHTML = [
+      ["blue", k.people ?? 0, "on the outreach list"],
+      ["teal", k.cleared ?? 0, "cleared by state data, never called"],
+      ["green", k.likelyExempt ?? 0, "may qualify for an exemption"],
+      ["violet", k.workNeedsReview ?? 0, "waiting on a caseworker"],
+    ].map(([c, v, l]) => `<div class="stat ${c}"><div class="v">${v}</div><div class="l">${esc(l)}</div></div>`).join("");
+    $("strip").innerHTML = [
+      ["screened by phone", k.screened ?? 0], ["may already meet the rule", k.likelyMeets ?? 0],
+      ["at risk", k.atRisk ?? 0], ["need a navigator's review", k.needsReview ?? 0],
+      ["not screened yet", notScreened], ["CALL-E calls", k.calls ?? 0], ["time to last result", fmtSec(k.lastResultSeconds)],
+    ].map(([l, v]) => `<span>${esc(l)} <b>${esc(v)}</b></span>`).join("");
+  }
+
+  // -------------------------------------------------------------- worklist
+  function renderWork(state) {
+    const all = state.work || [];
+    const todo = all.filter((w) => w.needsHumanReview && !w.reviewedAt);
+    const high = all.filter((w) => w.highPriority);
+    const done = all.filter((w) => w.reviewedAt);
+    const sets = { todo, high, all, done };
+    const chips = [["todo", "Waiting on a caseworker", todo.length], ["high", "High priority", high.length], ["all", "Everything", all.length], ["done", "Reviewed", done.length]];
+    $("workChips").innerHTML = chips.map(([id, label, n]) =>
+      `<button class="chip" data-work-filter="${id}" aria-pressed="${workFilter === id}">${esc(label)} <span class="c">${n}</span></button>`).join("");
+    let rows = (sets[workFilter] || all).slice();
+    rows.sort((a, b) => (Number(b.highPriority) - Number(a.highPriority)) || (Number(b.kind === "correction_call") - Number(a.kind === "correction_call")) || String(a.personName).localeCompare(String(b.personName)));
+    $("work").innerHTML = rows.length === 0
+      ? `<div class="empty">${workFilter === "todo" ? "Nothing is waiting on a caseworker." : "Nothing here yet."}</div>`
+      : rows.map((w) => `<div class="wi">
+          <div>
+            <div class="top">
+              <span class="who">${esc(w.personName)}</span>
+              <span class="tag ${esc(w.kind)}">${esc(w.kind.replace(/_/g, " "))}</span>
+              ${w.highPriority ? '<span class="tag hp">high</span>' : ""}
+              ${w.checkDate ? `<span class="sub">check ${esc(w.checkDate)}</span>` : ""}
+            </div>
+            <div class="sum">${esc(dropName(w.summary, w.personName))}</div>
+            ${(w.checklist && w.checklist.length) ? `<ul>${w.checklist.map((c) => `<li>${esc(c)}</li>`).join("")}</ul>` : ""}
+          </div>
+          <div>${w.needsHumanReview
+            ? (w.reviewedAt ? `<span class="pill likely_exempt">reviewed ${esc(String(w.reviewedAt).slice(11, 16))}</span>`
+              : `<button class="review" data-review="${esc(w.id)}"${reviewing.has(w.id) ? " disabled" : ""}>${reviewing.has(w.id) ? "Saving..." : "Review"}</button>`)
+            : ""}</div>
+        </div>`).join("");
+  }
+
+  // ---------------------------------------------------------------- people
+  function renderPeople(state) {
+    const all = state.people || [];
+    const groups = [["all", "Everyone", all.length]];
+    const order = ["likely_exempt", "at_risk", "needs_review", "likely_meets", "cleared_by_data", "declined", "unreachable", "identity_unconfirmed", "not_attempted", "opted_out"];
+    for (const o of order) {
+      const n = all.filter((p) => p.status === o).length;
+      if (n > 0) groups.push([o, LABEL[o] || o, n]);
+    }
+    if (!groups.some(([id]) => id === peopleFilter)) peopleFilter = "all";
+    $("peopleChips").innerHTML = groups.map(([id, label, n]) =>
+      `<button class="chip" data-people-filter="${esc(id)}" aria-pressed="${peopleFilter === id}">${esc(label)} <span class="c">${n}</span></button>`).join("");
+    const rows = peopleFilter === "all" ? all : all.filter((p) => p.status === peopleFilter);
+    $("people").innerHTML = rows.length === 0 ? '<div class="empty">Nobody in this group.</div>' : rows.map((p) => {
+      const s = p.status || "pending";
+      return `<button class="card ${esc(s)}" data-person="${esc(p.id)}" aria-label="Details for ${esc(p.name)}">
+        <span class="name">${esc(p.name)}<span class="pill ${esc(s)}">${esc(LABEL[s] || s)}</span></span>
+        <span class="meta">${esc(p.maskedPhone)} &middot; ${esc(p.language)} &middot; check ${esc(p.checkDate || "unknown")}${p.daysToCheck != null ? ` (${p.daysToCheck} days)` : ""} &middot; calls ${p.attempts}</span>
+        ${p.exemptions && p.exemptions.length ? `<span class="why"><b>${esc(p.exemptions.join("; "))}</b></span>` : ""}
+        ${p.reasons && p.reasons.length ? `<span class="why">${esc(p.reasons[0])}</span>` : ""}
+        ${(p.evidence || []).slice(-1).map((q) => `<span class="quote">&ldquo;${esc(q)}&rdquo;</span>`).join("")}
+        ${p.correctionNeeded ? `<span class="flag">Agent said more than the answers support &mdash; correction call queued</span>` : ""}
+      </button>`;
+    }).join("");
+  }
+
+  // ---------------------------------------------------------------- drawer
+  function closeDrawer() { openPersonId = null; $("drawerRoot").innerHTML = ""; }
+  function renderDrawer() {
+    if (!openPersonId || !latest) { $("drawerRoot").innerHTML = ""; return; }
+    const p = (latest.people || []).find((x) => x.id === openPersonId);
+    if (!p) { closeDrawer(); return; }
+    const s = p.status || "pending";
+    const items = (latest.work || []).filter((w) => w.personId === p.id);
+    $("drawerRoot").innerHTML = `
+      <div class="scrim" data-close="1"></div>
+      <aside class="drawer" role="dialog" aria-modal="true" aria-label="Details for ${esc(p.name)}">
+        <button class="close" data-close="1" aria-label="Close details">Close</button>
+        <h3>${esc(p.name)}</h3>
+        <div><span class="pill ${esc(s)}">${esc(LABEL[s] || s)}</span></div>
+        <dl>
+          <dt>Phone</dt><dd>${esc(p.maskedPhone)}</dd>
+          <dt>Language</dt><dd>${esc(p.language)}</dd>
+          <dt>Coverage check</dt><dd>${esc(p.checkDate || "unknown")}${p.daysToCheck != null ? ` &middot; ${p.daysToCheck} days` : ""}</dd>
+          <dt>Call order</dt><dd>priority ${esc(p.priority)} &middot; risk score ${esc(p.priorityScore)}</dd>
+          <dt>Calls placed</dt><dd>${esc(p.attempts)}</dd>
+          <dt>Heard of the rule</dt><dd>${esc(p.awareBefore || "not established")}</dd>
+        </dl>
+        ${p.exemptions && p.exemptions.length ? `<div class="block"><h4>Answers support</h4><div>${esc(p.exemptions.join("; "))}</div></div>` : ""}
+        ${p.reasons && p.reasons.length ? `<div class="block"><h4>Why the code decided this</h4><ul style="margin:0;padding-left:18px;color:var(--muted-2)">${p.reasons.map((r) => `<li>${esc(r)}</li>`).join("")}</ul></div>` : ""}
+        ${p.correctionNeeded ? `<div class="block"><h4>Correction required</h4><div style="color:#ff8a85">The agent said &ldquo;${esc(p.agentSaid)}&rdquo;, which these answers do not support. A person calls back to correct it.</div></div>` : ""}
+        ${(p.evidence || []).length ? `<div class="block"><h4>Their own words</h4>${p.evidence.map((q) => `<blockquote>${esc(q)}</blockquote>`).join("")}</div>` : ""}
+        ${p.nextAction ? `<div class="block"><h4>Next</h4><div>${esc(p.nextAction.type)}${p.preferredCallback ? ` &middot; prefers ${esc(p.preferredCallback)}` : ""}</div><div class="sub">${esc(p.nextAction.reason || "")}</div></div>` : ""}
+        ${items.length ? `<div class="block"><h4>Worklist</h4>${items.map((w) => `<div style="margin-bottom:8px"><span class="tag ${esc(w.kind)}">${esc(w.kind.replace(/_/g, " "))}</span> <span class="sub">${w.reviewedAt ? "reviewed" : w.needsHumanReview ? "waiting on a caseworker" : "queued"}</span><div class="sub" style="margin-top:3px">${esc(w.summary)}</div></div>`).join("")}</div>` : ""}
+      </aside>`;
+    const closeBtn = document.querySelector(".drawer .close");
+    if (closeBtn) closeBtn.focus();
+  }
+
+  // ---------------------------------------------------------------- render
+  function render(state) {
+    latest = state;
+    const k = state.kpis || {};
+    const answered = (k.awareYes || 0) + (k.awareNo || 0);
+    const notScreened = (k.unreachable || 0) + (k.identityUnconfirmed || 0) + (k.unverified || 0) + (k.declined || 0) + (k.optedOut || 0) + (k.notAttempted || 0);
+    const started = Boolean(state.campaign);
+
+    $("headline").textContent = started
+      ? `${state.campaign.title} - ${state.stateName || ""} - calls on behalf of ${state.callerOrg || ""}${state.running ? " - campaign in progress" : ""}`
+      : "No campaign yet";
+    const mode = state.mode || "dry-run";
+    $("mode").textContent = mode; $("mode").className = "badge " + (mode === "live" ? "live" : "dry");
+
+    $("pitch").hidden = started;
+    for (const id of ["hero", "strip", "foundSection", "workSection", "peopleSection", "tlSection"]) $(id).hidden = !started;
+    if (!started) { $("banner").hidden = true; return; }
+
+    const failed = (state.failedWaves || []).length, pendingCalls = k.pendingCalls || 0;
+    const showBanner = !state.running && (failed > 0 || pendingCalls > 0);
+    $("banner").hidden = !showBanner;
+    if (showBanner) {
+      $("banner").innerHTML = `<b>Incomplete.</b> ${pendingCalls} call(s) still pending and ${failed} task(s) were not accepted by CALL-E.
+        Nothing is inferred about anyone who was never dialled. Recover with
+        <code>still-covered resume --campaign-id ${esc(state.campaign.id)}</code>`;
+    }
+
+    renderHero(state, k, answered, notScreened);
+
+    const outcomes = [["May qualify for an exemption", k.likelyExempt, "var(--green)"], ["May already meet the rule", k.likelyMeets, "var(--teal)"], ["At risk", k.atRisk, "var(--red)"], ["Needs a navigator's review", k.needsReview, "var(--yellow)"], ["Cleared by state data", k.cleared, "#12a186"], ["Not screened yet", notScreened, "var(--grey)"]];
+    const max = Math.max(1, ...outcomes.map((o) => o[1] || 0));
+    const ex = state.exemptionCounts || [];
+    $("found").innerHTML = outcomes.map(([l, v, c]) => `<div class="bar"><span>${esc(l)}</span><div class="track"><div class="fill" style="width:${Math.round(((v || 0) / max) * 100)}%;background:${c}"></div></div><span class="n">${v || 0}</span></div>`).join("")
+      + (ex.length ? `<div class="subhead">Exemptions found</div>` + ex.map((e) => `<div class="bar"><span>${esc(e.label)}</span><div class="track"><div class="fill" style="width:${Math.round(((e.fromCalls + e.fromData) / max) * 100)}%;background:var(--green)"></div></div><span class="n">${e.fromCalls + e.fromData}</span></div>`).join("") : "");
+
+    const langs = state.languages || [];
+    $("langs").innerHTML = langs.length
+      ? `<table><caption class="visually-hidden">Outreach by language</caption><tr><th>Language</th><th class="n">On list</th><th class="n">Screened</th><th class="n">Had not heard</th></tr>${langs.map((l) => `<tr><td>${esc(l.language)}</td><td class="n">${l.people}</td><td class="n">${l.screened}</td><td class="n">${l.notAware}</td></tr>`).join("")}</table>`
+      : '<div class="empty">No campaign yet.</div>';
+
+    renderWork(state);
+    renderPeople(state);
+    renderDrawer();
+
+    const tl = state.timeline || [];
+    $("timeline").innerHTML = tl.slice(-150).reverse().map((e) => `<div class="${esc(e.level)}"><span class="t">${esc(e.at.slice(11, 19))}</span>${esc(e.message)}</div>`).join("");
+  }
+
+  // ---------------------------------------------------------------- events
+  // One delegated listener: the panels are re-rendered on every SSE frame, so per-node handlers would leak.
+  document.addEventListener("click", async (event) => {
+    const el = event.target.closest("[data-work-filter],[data-people-filter],[data-person],[data-review],[data-close]");
+    if (!el) return;
+    if (el.dataset.workFilter) { workFilter = el.dataset.workFilter; renderWork(latest || {}); return; }
+    if (el.dataset.peopleFilter) { peopleFilter = el.dataset.peopleFilter; renderPeople(latest || {}); return; }
+    if (el.dataset.person) { openPersonId = el.dataset.person; renderDrawer(); return; }
+    if (el.dataset.close) { closeDrawer(); return; }
+    if (el.dataset.review) {
+      const id = el.dataset.review;
+      reviewing.add(id);
+      renderWork(latest || {});
+      try { await api(`/api/work/${encodeURIComponent(id)}/review`, { method: "POST" }); }
+      finally { reviewing.delete(id); if (latest) renderWork(latest); }
+    }
+  });
+  document.addEventListener("keydown", (event) => { if (event.key === "Escape" && openPersonId) closeDrawer(); });
+
+  function connect() {
+    const es = new EventSource(withToken("/api/stream"));
+    es.addEventListener("state", (e) => render(JSON.parse(e.data)));
+    // Never the word "live" here: it sits beside the mode badge, and an operator glancing at
+    // "DRY-RUN | LIVE" should not have to work out that one means the stream and one means real calls.
+    es.onopen = () => { $("conn").textContent = "connected"; $("conn").className = "badge ok"; };
+    es.onerror = () => { $("conn").textContent = "reconnecting"; $("conn").className = "badge"; };
+  }
+  async function loadLists() {
+    try {
+      const body = await (await api("/api/registries")).json();
+      $("registry").innerHTML = (body.registries || []).map((n) => `<option value="${esc(n)}">${esc(n.replace("enrollees.", "").replace(".csv", ""))} list</option>`).join("");
+      if (!body.canDrill) { $("start").disabled = true; $("start").textContent = `Drills disabled (${esc(body.drillReason || "not available here")})`; }
+    } catch (e) { /* ignore */ }
+    try {
+      const body = await (await api("/api/campaigns")).json();
+      $("campaign").innerHTML = '<option value="">Load past campaign...</option>' + (body.campaigns || []).map((c) => `<option value="${esc(c.campaignId)}">${esc(c.title || c.campaignId)} (${esc(c.updatedAt.slice(0, 16).replace("T", " "))})</option>`).join("");
+    } catch (e) { /* ignore */ }
+  }
+  $("campaign").onchange = async () => { if ($("campaign").value) { closeDrawer(); await api("/api/load", { method: "POST", body: JSON.stringify({ campaignId: $("campaign").value }) }); } };
+  $("reportBtn").onclick = () => window.open(withToken("/api/report"), "_blank");
+  $("lintBtn").onclick = () => window.open(withToken("/lint"), "_blank");
+  $("start").onclick = async () => {
+    $("start").disabled = true;
+    const original = $("start").textContent;
+    $("start").textContent = "Starting...";
+    try {
+      const r = await api("/api/run", { method: "POST", body: JSON.stringify({ registry: $("registry").value || undefined }) });
+      const body = await r.json();
+      if (!r.ok) alert(body.error || "could not start");
+      setTimeout(loadLists, 4000);
+    } finally {
+      setTimeout(() => { $("start").disabled = false; $("start").textContent = original; }, 3000);
+    }
+  };
+  api("/api/state").then((r) => r.json()).then(render).catch(() => undefined);
+  loadLists();
+  connect();
+})();
+</script>
+</body>
+</html>

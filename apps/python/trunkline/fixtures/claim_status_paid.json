@@ -1,0 +1,227 @@
+{
+  "completion_confidence": {
+    "label": "high",
+    "score": 0.91
+  },
+  "evidence": [
+    "The representative confirmed payment of one hundred forty two dollars and sixty cents on the first claim."
+  ],
+  "object": "call_task",
+  "recipients": [
+    {
+      "attempts": [
+        {
+          "attempt": 1,
+          "transcript_turns": [
+            {
+              "offset_seconds": 0,
+              "speaker": "bot",
+              "text": "Dialing Meridian Health Plan provider services."
+            },
+            {
+              "offset_seconds": 6,
+              "speaker": "user",
+              "text": "Thank you for calling Meridian Health Plan provider services. For claim status, press one. For eligibility and benefits, press two. For authorizations, press three."
+            },
+            {
+              "offset_seconds": 11,
+              "speaker": "bot",
+              "text": "Selecting one for claim status."
+            },
+            {
+              "offset_seconds": 15,
+              "speaker": "user",
+              "text": "Please enter the ten digit national provider identifier, followed by the pound key."
+            },
+            {
+              "offset_seconds": 20,
+              "speaker": "bot",
+              "text": "Entering national provider identifier 1234567893."
+            },
+            {
+              "offset_seconds": 27,
+              "speaker": "user",
+              "text": "Thank you. All of our representatives are currently assisting other providers. Your estimated wait time is twenty minutes. Please hold and your call will be answered in the order it was received."
+            },
+            {
+              "offset_seconds": 1207,
+              "speaker": "user",
+              "text": "Thanks for holding, this is Denise with Meridian provider services. Can I get your national provider identifier and the member information?"
+            },
+            {
+              "offset_seconds": 1215,
+              "speaker": "bot",
+              "text": "This is an AI assistant calling for the billing office of Lakeshore Family Medicine. This call may be recorded for accuracy. Our national provider identifier is 1234567893."
+            },
+            {
+              "offset_seconds": 1231,
+              "speaker": "user",
+              "text": "Thank you. And the member identification number and date of birth please."
+            },
+            {
+              "offset_seconds": 1240,
+              "speaker": "bot",
+              "text": "The member identification number is W884213097, date of birth March 11, 1984, patient last name Alvarez."
+            },
+            {
+              "offset_seconds": 1258,
+              "speaker": "user",
+              "text": "Let me read that back, W 8 8 4 2 1 3 0 9 7, Alvarez, date of birth March 11, 1984. I have the member. Which claim are we looking at?"
+            },
+            {
+              "offset_seconds": 1272,
+              "speaker": "bot",
+              "text": "The first claim number is C L M dash 2026 dash 0 0 4 4 1 7, date of service July twenty ninth."
+            },
+            {
+              "offset_seconds": 1286,
+              "speaker": "user",
+              "text": "Okay, that one processed and paid on August twenty first, one hundred forty two dollars and sixty cents, allowed was one seventy eight twenty five. Patient responsibility was thirty five sixty five, check was an electronic funds transfer, trace number E F T dash 5 5 9 0 1 8 3."
+            },
+            {
+              "offset_seconds": 1305,
+              "speaker": "bot",
+              "text": "Thank you. The second claim number is C L M dash 2026 dash 0 0 4 6 1 2, date of service August fourth."
+            },
+            {
+              "offset_seconds": 1320,
+              "speaker": "user",
+              "text": "Give me one moment. Okay, that claim denied, the reason on file is that the service is not covered under the current benefit plan. I would need to send you to claims research for the code on that one."
+            },
+            {
+              "offset_seconds": 1338,
+              "speaker": "bot",
+              "text": "Before we transfer, could I also ask about a third claim, C L M dash 2026 dash 0 0 4 7 3 3, date of service August nineteenth."
+            },
+            {
+              "offset_seconds": 1345,
+              "speaker": "user",
+              "text": "Sure, let me pull it. Actually I will transfer you and they can see all three. One moment please."
+            },
+            {
+              "offset_seconds": 1585,
+              "speaker": "user",
+              "text": "Claims research, this is Marcus. I have the member pulled up from Denise. What did you need?"
+            },
+            {
+              "offset_seconds": 1596,
+              "speaker": "bot",
+              "text": "Thank you Marcus. We are confirming status on three claims for this member. The second was C L M dash 2026 dash 0 0 4 6 1 2."
+            },
+            {
+              "offset_seconds": 1610,
+              "speaker": "user",
+              "text": "Right, that claim denied, the reason on file is that the service is not covered under the current benefit plan. There is no payment on that one, zero dollars."
+            },
+            {
+              "offset_seconds": 1630,
+              "speaker": "bot",
+              "text": "Understood. And the third, C L M dash 2026 dash 0 0 4 7 3 3."
+            },
+            {
+              "offset_seconds": 1645,
+              "speaker": "user",
+              "text": "Yes, that last one is still in process, it was received on September second and it is sitting in review. Nothing has been determined on it yet."
+            },
+            {
+              "offset_seconds": 1660,
+              "speaker": "bot",
+              "text": "Thank you. Could I have a reference number for this call and your first name for our records?"
+            },
+            {
+              "offset_seconds": 1672,
+              "speaker": "user",
+              "text": "Sure, the reference number is M H P dash R E F dash 8 8 4 1 7 2 0 3, and my name is Marcus."
+            },
+            {
+              "offset_seconds": 1685,
+              "speaker": "bot",
+              "text": "Thank you very much for your help. Have a good day."
+            }
+          ]
+        }
+      ],
+      "phones": [
+        "+12125550142"
+      ],
+      "region": "US",
+      "structured_result": {
+        "call_outcome": "answered",
+        "claims": [
+          {
+            "allowed_amount": "178.25",
+            "check_number": "EFT-5590183",
+            "claim_number": "CLM-2026-004417",
+            "claim_status": "paid",
+            "evidence_quote": "that one processed and paid on August twenty first, one hundred forty two dollars and sixty cents, allowed was one seventy eight twenty five",
+            "paid_amount": "142.60",
+            "paid_date": "2026-08-21",
+            "patient_responsibility": "35.65"
+          },
+          {
+            "allowed_amount": "unknown",
+            "check_number": "unknown",
+            "claim_number": "CLM-2026-004612",
+            "claim_status": "denied",
+            "evidence_quote": "that claim denied, the reason on file is that the service is not covered under the current benefit plan",
+            "paid_amount": "0.00",
+            "paid_date": "unknown",
+            "patient_responsibility": "unknown"
+          },
+          {
+            "allowed_amount": "unknown",
+            "check_number": "unknown",
+            "claim_number": "CLM-2026-004733",
+            "claim_status": "pending",
+            "evidence_quote": "that last one is still in process, it was received on September second and it is sitting in review",
+            "paid_amount": "unknown",
+            "paid_date": "unknown",
+            "patient_responsibility": "unknown"
+          }
+        ],
+        "reference_number": "MHP-REF-88417203",
+        "representative_name": "Marcus"
+      }
+    }
+  ],
+  "status": "completed",
+  "structured_result": {
+    "call_outcome": "answered",
+    "claims": [
+      {
+        "allowed_amount": "178.25",
+        "check_number": "EFT-5590183",
+        "claim_number": "CLM-2026-004417",
+        "claim_status": "paid",
+        "evidence_quote": "that one processed and paid on August twenty first, one hundred forty two dollars and sixty cents, allowed was one seventy eight twenty five",
+        "paid_amount": "142.60",
+        "paid_date": "2026-08-21",
+        "patient_responsibility": "35.65"
+      },
+      {
+        "allowed_amount": "unknown",
+        "check_number": "unknown",
+        "claim_number": "CLM-2026-004612",
+        "claim_status": "denied",
+        "evidence_quote": "that claim denied, the reason on file is that the service is not covered under the current benefit plan",
+        "paid_amount": "0.00",
+        "paid_date": "unknown",
+        "patient_responsibility": "unknown"
+      },
+      {
+        "allowed_amount": "unknown",
+        "check_number": "unknown",
+        "claim_number": "CLM-2026-004733",
+        "claim_status": "pending",
+        "evidence_quote": "that last one is still in process, it was received on September second and it is sitting in review",
+        "paid_amount": "unknown",
+        "paid_date": "unknown",
+        "patient_responsibility": "unknown"
+      }
+    ],
+    "reference_number": "MHP-REF-88417203",
+    "representative_name": "Marcus"
+  },
+  "summary": "Reached Meridian provider services after a twenty minute hold and a transfer to claims research. Three claims confirmed: one paid, one denied pending code lookup, one still in process.",
+  "task_completed": true
+}

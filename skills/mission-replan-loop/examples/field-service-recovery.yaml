@@ -1,0 +1,29 @@
+# Technician unavailable -> alternate technician. Negative evidence is still evidence.
+input:
+  mission: { objective: "Restore critical equipment before 16:00", deadline: "16:00" }
+  constraints:
+    - { key: available, operator: eq, value: true, mandatory: true }
+    - { key: arrival_time, operator: lte, value: "16:00", mandatory: true }
+  strategy: { id: strategy_01, type: assigned_technician, target: "Technician A" }
+  call_result:
+    call_id: call_204
+    target: "Technician A"
+    status: completed
+    facts: { available: false, arrival_time: null }
+  available_targets: ["Technician B"]
+
+output:
+  strategy_status: invalid
+  evidence:
+    - { fact: available, value: false, source_call: call_204, target: "Technician A",
+        confidence: high, status: validated }
+  constraint_results:
+    - { constraint: available, required: true, observed: false, status: violated }
+  replan:
+    required: true
+    reason: "Technician A confirmed they cannot attend today."
+    proposed_strategy: { type: alternate_technician, target: "Technician B" }
+  next_operation:
+    type: phone_call
+    objective: "Verify Technician B's availability and arrival time."
+    required_information: [available, arrival_time]

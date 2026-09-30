@@ -1,0 +1,685 @@
+﻿<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>BridgeCalle — Senior Voice Companion</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <style>
+    @import url('https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@600;700;800&display=swap');
+    body { font-family: 'Plus Jakarta Sans', sans-serif; background-color: #f8fafc; }
+  </style>
+</head>
+<body class="text-slate-900 min-h-screen flex flex-col justify-between p-3 sm:p-6">
+
+  <!-- Header -->
+  <header class="bg-indigo-900 text-white rounded-2xl p-4 sm:p-5 shadow-md flex items-center justify-between gap-2">
+    <div>
+      <h1 class="text-2xl sm:text-3xl font-extrabold tracking-tight">BridgeCalle</h1>
+      <p class="text-xs sm:text-sm text-indigo-200 font-medium">1-Tap Voice Companion for Seniors</p>
+    </div>
+    
+    <!-- Top Action Area: Self-Calling Number Badge + Summary & Plus Buttons -->
+    <div class="flex items-center space-x-2">
+      <!-- Compact Self Calling Phone Number Input (Password masked by default) -->
+      <div class="flex items-center bg-indigo-800/90 border border-indigo-700 rounded-2xl px-2.5 py-1 text-xs space-x-1">
+        <span class="text-indigo-200 font-bold hidden sm:inline">📞 Phone:</span>
+        <input type="password" id="self-phone-input" value="+15550100000" placeholder="+15550100000" class="bg-transparent text-white font-extrabold text-xs w-28 sm:w-32 focus:outline-none" oninput="saveSelfPhone()" onfocus="this.type='text'" onblur="this.type='password'" title="Click to edit calling number">
+      </div>
+
+      <!-- Summary Icon -->
+      <button onclick="openSummaryModal()" title="View Recent Summaries & WhatsApp Export" class="w-11 h-11 bg-indigo-800 hover:bg-indigo-700 text-white rounded-2xl transition shadow flex items-center justify-center text-xl font-bold active:scale-95 border border-indigo-700">
+        📋
+      </button>
+
+      <!-- Plus Button -->
+      <button onclick="openAddModal()" title="Add Family Member" class="w-11 h-11 bg-emerald-500 hover:bg-emerald-600 text-white rounded-2xl transition shadow-lg flex items-center justify-center text-2xl font-extrabold active:scale-95">
+        +
+      </button>
+    </div>
+  </header>
+
+  <!-- Main Interface -->
+  <main class="max-w-4xl mx-auto w-full my-4 space-y-5">
+
+    <!-- Active Call Banner -->
+    <div id="active-banner" class="hidden bg-slate-900 text-white rounded-2xl p-5 shadow-lg space-y-2 text-center">
+      <div class="flex items-center justify-center space-x-2 text-emerald-400 font-bold text-base sm:text-lg">
+        <span class="w-3 h-3 rounded-full bg-emerald-400 animate-ping"></span>
+        <span>Initiating CALL-E Phone Task...</span>
+      </div>
+      <p class="text-xs sm:text-sm text-slate-300">Target Phone: <strong id="calling-target" class="text-white">+1 *** *** 0000</strong></p>
+    </div>
+
+    <!-- Cards Dynamic Grid Container -->
+    <div id="cards-container" class="grid gap-4 sm:gap-6">
+      <!-- Dynamic Family Cards Rendered Here -->
+    </div>
+
+  </main>
+
+  <!-- Add / Edit Person Modal -->
+  <div id="edit-modal" class="hidden fixed inset-0 bg-slate-950/70 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+    <div class="bg-white rounded-3xl p-6 max-w-md w-full shadow-2xl space-y-4">
+      <div class="flex items-center justify-between border-b border-slate-100 pb-3">
+        <h3 id="modal-title" class="text-lg font-bold text-slate-900">Add Person</h3>
+        <button onclick="closeModal()" class="text-slate-400 hover:text-slate-600 font-bold text-lg px-2">✕</button>
+      </div>
+
+      <input type="hidden" id="modal-person-id">
+
+      <!-- Photo Upload -->
+      <div class="flex items-center space-x-4">
+        <div class="relative w-20 h-20 rounded-2xl overflow-hidden bg-slate-100 border-2 border-indigo-200 flex-shrink-0 flex items-center justify-center">
+          <img id="modal-photo-preview" src="data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' fill='%2394a3b8' viewBox='0 0 24 24'><path d='M12 12c2.21 0 4-1.79 4-4s-1.79-4-4-4-4 1.79-4 4 1.79 4 4 4zm0 2c-2.67 0-8 1.34-8 4v2h16v-2c0-2.66-5.33-4-8-4z'/></svg>" class="w-full h-full object-cover">
+        </div>
+        <div class="space-y-2">
+          <button onclick="document.getElementById('modal-photo-input').click()" class="bg-indigo-600 hover:bg-indigo-700 text-white text-xs font-bold px-3.5 py-2 rounded-xl transition">
+            📷 Select Photo
+          </button>
+          <input type="file" id="modal-photo-input" accept="image/*" class="hidden" onchange="handleModalPhoto(event)">
+        </div>
+      </div>
+
+      <!-- Name (Default: Human) -->
+      <div>
+        <label class="block text-xs font-bold text-slate-500 uppercase tracking-wider mb-1">Name</label>
+        <input type="text" id="modal-name-input" placeholder="e.g. Human" class="w-full bg-slate-50 border-2 border-slate-200 text-slate-900 text-base font-bold rounded-xl p-3 focus:border-indigo-600 focus:outline-none">
+      </div>
+
+      <!-- Actions -->
+      <div class="flex items-center justify-between pt-2">
+        <button id="modal-delete-btn" onclick="deleteModalPerson()" class="px-3 py-2 bg-red-50 hover:bg-red-100 text-red-600 font-bold text-xs rounded-xl transition hidden">Delete</button>
+        <div class="flex items-center space-x-2 ml-auto">
+          <button onclick="closeModal()" class="px-4 py-2 bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold text-xs rounded-xl transition">Cancel</button>
+          <button onclick="saveModalPerson()" class="px-5 py-2 bg-indigo-600 hover:bg-indigo-700 text-white font-bold text-xs rounded-xl transition shadow">Save</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Call Summaries Modal -->
+  <div id="summary-modal" class="hidden fixed inset-0 bg-slate-950/70 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+    <div class="bg-white rounded-3xl p-6 max-w-lg w-full shadow-2xl space-y-4 max-h-[85vh] flex flex-col">
+      <div class="flex items-center justify-between border-b border-slate-100 pb-3 flex-shrink-0">
+        <div class="flex items-center space-x-2">
+          <span class="text-xl">📋</span>
+          <h3 class="text-lg font-bold text-slate-900">Call Logs & WhatsApp Export</h3>
+        </div>
+        <button onclick="closeSummaryModal()" class="text-slate-400 hover:text-slate-600 font-bold text-lg px-2">✕</button>
+      </div>
+
+      <!-- Summaries List Container -->
+      <div id="summaries-list" class="space-y-4 overflow-y-auto pr-1 flex-1">
+        <!-- Rendered via DOM Nodes JS -->
+      </div>
+    </div>
+  </div>
+
+  <!-- Footer -->
+  <footer class="text-center text-xs text-slate-500 py-3">
+    BridgeCalle Voice AI — Active-Listening Companion for Seniors.
+  </footer>
+
+  <script>
+    const DEFAULT_AVATAR = "data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' fill='%2394a3b8' viewBox='0 0 24 24'><path d='M12 12c2.21 0 4-1.79 4-4s-1.79-4-4-4-4 1.79-4 4 1.79 4 4 4zm0 2c-2.67 0-8 1.34-8 4v2h16v-2c0-2.66-5.33-4-8-4z'/></svg>";
+
+    // Safety: Mask phone numbers in user interface
+    function maskPhone(phone) {
+      if (!phone) return '****';
+      const clean = String(phone).trim();
+      if (clean.length < 6) return '****';
+      const prefix = clean.slice(0, 3);
+      const suffix = clean.slice(-4);
+      return `${prefix} ***** *${suffix}`;
+    }
+
+    // Replace all E.164 phone occurrences in text with masked format
+    function maskAllPhonesInText(text) {
+      if (!text) return '';
+      return String(text).replace(/\+[1-9]\d{9,14}/g, (match) => maskPhone(match));
+    }
+
+    function isValidE164(phone) {
+      return /^\+[1-9]\d{1,14}$/.test(String(phone).trim());
+    }
+
+    const DEFAULT_CALL_LOGS = [
+      {
+        id: 'call_sample_002',
+        callNumber: 2,
+        startTime: '13 Sept 2026, 6:38 PM',
+        duration: '17s',
+        status: 'COMPLETED',
+        points: [
+          'Call connected successfully. AI greeted Human gently asking about water intake & food status.',
+          'User responded briefly and ended call after 17 seconds.'
+        ]
+      },
+      {
+        id: 'call_sample_001',
+        callNumber: 1,
+        startTime: '10 Sept 2026, 8:25 PM',
+        duration: '27s',
+        status: 'COMPLETED',
+        points: [
+          'Active listening call connected. AI asked if Human can hear clearly.',
+          'Human acknowledged with "Yes". AI held active listening presence before call ended.'
+        ]
+      }
+    ];
+
+    let selfPhone = '+15550100000';
+    let persons = [
+      {
+        id: 'p_1',
+        name: 'Human',
+        waPhone: '+15550100000',
+        photo: DEFAULT_AVATAR,
+        callLogs: DEFAULT_CALL_LOGS
+      }
+    ];
+
+    function loadData() {
+      // Clear all old unmasked local storage keys
+      ['bc_persons', 'bc_persons_v2', 'bc_persons_v3', 'bc_persons_v4', 'bc_persons_v5', 'bc_persons_v6', 'bc_persons_v7', 'bc_self_phone', 'bc_self_phone_v5', 'bc_self_phone_v6', 'bc_self_phone_v7', 'bc_self_phone_v8'].forEach(k => localStorage.removeItem(k));
+
+      const savedSelfPhone = localStorage.getItem('bc_self_phone_v9');
+      if (savedSelfPhone && isValidE164(savedSelfPhone)) {
+        selfPhone = savedSelfPhone;
+        document.getElementById('self-phone-input').value = selfPhone;
+      } else {
+        document.getElementById('self-phone-input').value = '+15550100000';
+      }
+
+      const savedPersons = localStorage.getItem('bc_persons_v9');
+      if (savedPersons) {
+        try { 
+          const parsed = JSON.parse(savedPersons);
+          if (Array.isArray(parsed) && parsed.length > 0) {
+            persons = parsed;
+          }
+        } catch(e) {}
+      } else {
+        saveData();
+      }
+
+      renderCards();
+    }
+
+    function saveSelfPhone() {
+      const val = document.getElementById('self-phone-input').value.trim();
+      if (isValidE164(val)) {
+        selfPhone = val;
+        localStorage.setItem('bc_self_phone_v9', selfPhone);
+      }
+    }
+
+    function saveData() {
+      localStorage.setItem('bc_persons_v9', JSON.stringify(persons));
+      renderCards();
+    }
+
+    function renderCards() {
+      const container = document.getElementById('cards-container');
+      container.innerHTML = '';
+
+      const count = persons.length;
+      if (count === 1) {
+        container.className = 'grid grid-cols-1 gap-4';
+      } else if (count <= 3) {
+        container.className = 'grid grid-cols-1 gap-4';
+      } else {
+        container.className = 'grid grid-cols-2 gap-4 sm:gap-6';
+      }
+
+      persons.forEach((person) => {
+        const card = document.createElement('div');
+        card.className = 'relative bg-white rounded-3xl p-6 sm:p-8 shadow-md border-2 border-slate-200 hover:border-indigo-500 transition flex flex-col items-center text-center space-y-4 group';
+
+        // Pencil Edit Button
+        const editBtn = document.createElement('button');
+        editBtn.type = 'button';
+        editBtn.title = 'Edit Person';
+        editBtn.className = 'absolute top-3 right-3 w-10 h-10 rounded-full bg-slate-100 hover:bg-indigo-100 text-slate-600 hover:text-indigo-700 flex items-center justify-center text-base transition shadow-sm z-20 cursor-pointer';
+        editBtn.textContent = '✏️';
+        editBtn.onclick = (e) => {
+          e.stopPropagation();
+          e.preventDefault();
+          openEditModal(person.id);
+        };
+
+        // Clickable Call Wrapper
+        const callArea = document.createElement('div');
+        callArea.className = 'w-full flex flex-col items-center cursor-pointer space-y-4 active:scale-95 transform transition duration-150';
+        callArea.onclick = () => triggerCallForPerson(person.id);
+
+        // Photo
+        const photoDiv = document.createElement('div');
+        photoDiv.className = 'relative w-36 h-36 sm:w-44 sm:h-44 rounded-3xl overflow-hidden bg-slate-100 border-4 border-indigo-100 flex-shrink-0 flex items-center justify-center shadow-md group-hover:border-indigo-400 transition';
+        const img = document.createElement('img');
+        img.src = person.photo || DEFAULT_AVATAR;
+        img.className = 'w-full h-full object-cover';
+        photoDiv.appendChild(img);
+
+        // Name
+        const nameH2 = document.createElement('h2');
+        nameH2.className = 'text-xl sm:text-2xl font-extrabold text-slate-900 leading-tight hover:text-indigo-600 underline decoration-indigo-300 underline-offset-4 cursor-pointer z-10';
+        nameH2.textContent = person.name || 'Human';
+        nameH2.title = 'Click name to view summary';
+        nameH2.onclick = (e) => {
+          e.stopPropagation();
+          openPersonSummary(person.id);
+        };
+
+        // Badge
+        const badge = document.createElement('span');
+        badge.className = 'inline-block bg-emerald-50 text-emerald-700 text-xs sm:text-sm font-bold px-4 py-1.5 rounded-full border border-emerald-200';
+        badge.textContent = '📞 Tap Photo or Name To Call';
+
+        callArea.appendChild(photoDiv);
+        callArea.appendChild(nameH2);
+        callArea.appendChild(badge);
+
+        card.appendChild(editBtn);
+        card.appendChild(callArea);
+
+        container.appendChild(card);
+      });
+    }
+
+    async function triggerCallForPerson(personId) {
+      const person = persons.find(p => p.id === personId) || persons[0];
+      
+      const userPhone = document.getElementById('self-phone-input').value.trim() || selfPhone;
+      
+      if (!isValidE164(userPhone)) {
+        alert('Please enter a valid E.164 phone number (e.g. +15550100000 or +919876543210) in the header input.');
+        return;
+      }
+
+      const maskedTarget = maskPhone(userPhone);
+      const banner = document.getElementById('active-banner');
+      document.getElementById('calling-target').textContent = maskedTarget;
+      banner.classList.remove('hidden');
+
+      const startTimeStr = new Date().toLocaleString([], { day: '2-digit', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit' });
+      const callNum = (person.callLogs ? person.callLogs.length : 0) + 1;
+
+      // Construct Initial Log Entry
+      const newCallLog = {
+        id: `call_${Date.now()}`,
+        callNumber: callNum,
+        startTime: startTimeStr,
+        duration: 'Preview Only',
+        status: 'DRY_RUN_PREVIEW',
+        calleTaskId: null,
+        points: [
+          'Dry-run preview mode executed (no network call placed).',
+          `Target Phone: ${maskedTarget}`,
+          'Configure CALLE_API_KEY on server for live network calls.'
+        ]
+      };
+
+      if (!person.callLogs) person.callLogs = [];
+      person.callLogs.unshift(newCallLog);
+      saveData();
+
+      try {
+        const response = await fetch('/api/calls/trigger', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            seniorName: person.name || 'Human',
+            seniorPhone: userPhone
+          })
+        });
+
+        banner.classList.add('hidden');
+
+        if (response.ok) {
+          const data = await response.json();
+          if (data.mode === 'live' && data.success) {
+            newCallLog.status = 'DISPATCHED';
+            newCallLog.duration = 'Connecting...';
+            newCallLog.calleTaskId = data.call ? data.call.calleCallId : null;
+            newCallLog.points = [
+              `Call #${callNum} task initiated at ${startTimeStr}.`,
+              `Target Phone: ${maskedTarget}`,
+              `Greeting: Gentle check-in on water & meal intake.`,
+              `AI Persona: Quiet active listener.`
+            ];
+            saveData();
+            alert(`✅ CALL-E Initiated Call #${callNum} to ${maskedTarget}! Check your phone.`);
+          } else {
+            alert(`ℹ️ Dry-run preview mode complete for ${person.name || 'Human'}.`);
+          }
+        } else {
+          const errData = await response.json().catch(() => ({}));
+          newCallLog.status = 'SUBMISSION_FAILED';
+          newCallLog.duration = '0s';
+          newCallLog.points = ['Live call task submission failed at provider.'];
+          saveData();
+          alert('Call task response: ' + (errData.message || 'Unable to initiate call task at provider.'));
+        }
+      } catch (err) {
+        newCallLog.status = 'PREVIEW_UNCONFIRMED';
+        newCallLog.duration = 'Unknown';
+        newCallLog.points = ['The preview request did not return a usable response. This interface does not request live execution.'];
+        saveData();
+        banner.classList.add('hidden');
+        alert('Preview could not be confirmed. Check the server before trying again.');
+      }
+    }
+
+    // Modal Handlers
+    function openAddModal() {
+      document.getElementById('modal-title').textContent = 'Add Person';
+      document.getElementById('modal-person-id').value = '';
+      document.getElementById('modal-name-input').value = 'Human';
+      document.getElementById('modal-photo-preview').src = DEFAULT_AVATAR;
+      document.getElementById('modal-delete-btn').classList.add('hidden');
+      document.getElementById('edit-modal').classList.remove('hidden');
+    }
+
+    function openEditModal(personId) {
+      const person = persons.find(p => p.id === personId);
+      if (!person) return;
+
+      document.getElementById('modal-title').textContent = 'Edit Person Details';
+      document.getElementById('modal-person-id').value = person.id;
+      document.getElementById('modal-name-input').value = person.name || 'Human';
+      document.getElementById('modal-photo-preview').src = person.photo || DEFAULT_AVATAR;
+      document.getElementById('modal-delete-btn').classList.remove('hidden');
+      document.getElementById('edit-modal').classList.remove('hidden');
+    }
+
+    function closeModal() {
+      document.getElementById('edit-modal').classList.add('hidden');
+    }
+
+    function handleModalPhoto(event) {
+      const file = event.target.files[0];
+      if (!file) return;
+
+      const reader = new FileReader();
+      reader.onload = function(e) {
+        document.getElementById('modal-photo-preview').src = e.target.result;
+      };
+      reader.readAsDataURL(file);
+    }
+
+    function saveModalPerson() {
+      const id = document.getElementById('modal-person-id').value;
+      const name = document.getElementById('modal-name-input').value.trim() || 'Human';
+      const photo = document.getElementById('modal-photo-preview').src;
+
+      if (id) {
+        const index = persons.findIndex(p => p.id === id);
+        if (index >= 0) {
+          persons[index] = { 
+            ...persons[index],
+            name, 
+            photo 
+          };
+        }
+      } else {
+        persons.push({
+          id: `p_${Date.now()}`,
+          name,
+          waPhone: selfPhone,
+          photo,
+          callLogs: []
+        });
+      }
+
+      saveData();
+      closeModal();
+    }
+
+    function deleteModalPerson() {
+      const id = document.getElementById('modal-person-id').value;
+      if (!id) return;
+
+      if (confirm('Are you sure you want to remove this person?')) {
+        persons = persons.filter(p => p.id !== id);
+        saveData();
+        closeModal();
+      }
+    }
+
+    // Summary Modal Functions
+    function openSummaryModal() {
+      renderSummariesList();
+      document.getElementById('summary-modal').classList.remove('hidden');
+    }
+
+    function openPersonSummary(personId) {
+      renderSummariesList(personId);
+      document.getElementById('summary-modal').classList.remove('hidden');
+    }
+
+    function closeSummaryModal() {
+      document.getElementById('summary-modal').classList.add('hidden');
+    }
+
+    function updatePersonWhatsAppNumber(personId, newWaNumber) {
+      const person = persons.find(p => p.id === personId);
+      if (person) {
+        if (isValidE164(newWaNumber.trim())) {
+          person.waPhone = newWaNumber.trim();
+          saveData();
+        } else {
+          alert('Please enter a valid E.164 phone number (e.g. +15550100000 or +919876543210).');
+        }
+      }
+    }
+
+    function shareCallLogToWhatsApp(personId, logId) {
+      const person = persons.find(p => p.id === personId);
+      if (!person) return;
+
+      const log = (person.callLogs || []).find(l => l.id === logId);
+      if (!log) return;
+
+      const inputEl = document.getElementById(`wa-input-${person.id}`);
+      const waNum = inputEl ? inputEl.value.trim() : (person.waPhone || selfPhone);
+
+      if (!isValidE164(waNum)) {
+        alert('Please enter a valid E.164 WhatsApp number (e.g. +15550100000 or +919876543210).');
+        return;
+      }
+
+      person.waPhone = waNum;
+      saveData();
+
+      const summaryContent = `Call #${log.callNumber}\nStart Time: ${log.startTime}\nDuration: ${log.duration}\nStatus: ${log.status}\n\nKey Points:\n` + 
+        (log.points || []).map(p => `• ${maskAllPhonesInText(p)}`).join('\n');
+
+      const waMessage = encodeURIComponent(`💌 BridgeCalle Call Summary for ${person.name || 'Human'}:\n\n${summaryContent}\n\nSent via BridgeCalle Voice AI.`);
+      const cleanWaNum = waNum.replace(/[^+\d]/g, '').replace('+', '');
+      const waUrl = `https://wa.me/${cleanWaNum}?text=${waMessage}`;
+
+      window.open(waUrl, '_blank');
+    }
+
+    // Strict DOM construction using textContent for 100% XSS immunity
+    function renderSummariesList(filterPersonId = null) {
+      const listEl = document.getElementById('summaries-list');
+      listEl.innerHTML = '';
+
+      const targetPersons = filterPersonId 
+        ? persons.filter(p => p.id === filterPersonId)
+        : persons;
+
+      if (targetPersons.length === 0) {
+        const emptyDiv = document.createElement('div');
+        emptyDiv.className = 'text-sm text-slate-500 text-center py-6';
+        emptyDiv.textContent = 'No records available.';
+        listEl.appendChild(emptyDiv);
+        return;
+      }
+
+      targetPersons.forEach(person => {
+        const personBox = document.createElement('div');
+        personBox.className = 'bg-slate-50 rounded-2xl p-4 border border-slate-200 space-y-3';
+
+        const logs = person.callLogs || [];
+        const currentWaNum = person.waPhone || selfPhone;
+        const maskedWaNum = maskPhone(currentWaNum);
+
+        // Header
+        const headerDiv = document.createElement('div');
+        headerDiv.className = 'flex items-center justify-between border-b border-slate-200 pb-2';
+
+        const personInfo = document.createElement('div');
+        personInfo.className = 'flex items-center space-x-2';
+
+        const avatarImg = document.createElement('img');
+        avatarImg.src = person.photo || DEFAULT_AVATAR;
+        avatarImg.className = 'w-8 h-8 rounded-full object-cover border';
+
+        const nameSpan = document.createElement('span');
+        nameSpan.className = 'font-extrabold text-slate-900 text-base';
+        nameSpan.textContent = person.name || 'Human';
+
+        personInfo.appendChild(avatarImg);
+        personInfo.appendChild(nameSpan);
+
+        const callBadge = document.createElement('span');
+        callBadge.className = 'text-xs bg-indigo-100 text-indigo-800 font-bold px-2.5 py-1 rounded-lg';
+        callBadge.textContent = `${logs.length} Call(s) Logged`;
+
+        headerDiv.appendChild(personInfo);
+        headerDiv.appendChild(callBadge);
+
+        personBox.appendChild(headerDiv);
+
+        if (logs.length === 0) {
+          const noCallDiv = document.createElement('div');
+          noCallDiv.className = 'text-sm font-bold text-slate-500 py-3 italic text-center bg-white rounded-xl border border-slate-200';
+          noCallDiv.textContent = '🚫 Not connected / Not answered';
+          personBox.appendChild(noCallDiv);
+        } else {
+          const logsContainer = document.createElement('div');
+          logsContainer.className = 'space-y-3';
+
+          logs.forEach(log => {
+            const isNotConn = log.status && (log.status.includes('NOT') || log.status.includes('FAILED') || log.status.includes('FAIL'));
+            const badgeClass = isNotConn ? 'bg-red-100 text-red-800' : 'bg-emerald-100 text-emerald-800';
+            const statusLabel = isNotConn ? 'NOT CONNECTED' : (log.status || 'COMPLETED');
+
+            const logCard = document.createElement('div');
+            logCard.className = 'bg-white p-3.5 rounded-xl border border-slate-200 space-y-2 text-xs sm:text-sm';
+
+            const logHeader = document.createElement('div');
+            logHeader.className = 'flex items-center justify-between border-b border-slate-100 pb-1.5 font-bold';
+
+            const titleWrap = document.createElement('div');
+            titleWrap.className = 'flex items-center space-x-2';
+
+            const titleSpan = document.createElement('span');
+            titleSpan.className = 'text-indigo-900';
+            titleSpan.textContent = `📞 Call #${log.callNumber}`;
+
+            const statusSpan = document.createElement('span');
+            statusSpan.className = `text-[10px] px-2 py-0.5 rounded font-extrabold uppercase ${badgeClass}`;
+            statusSpan.textContent = statusLabel;
+
+            titleWrap.appendChild(titleSpan);
+            titleWrap.appendChild(statusSpan);
+
+            const timeSpan = document.createElement('span');
+            timeSpan.className = 'text-slate-500 text-xs';
+            timeSpan.textContent = `⏱️ ${log.startTime} | ⌛ ${log.duration}`;
+
+            logHeader.appendChild(titleWrap);
+            logHeader.appendChild(timeSpan);
+
+            const pointsHeader = document.createElement('div');
+            pointsHeader.className = 'font-bold text-slate-800 text-xs uppercase tracking-wider';
+            pointsHeader.textContent = 'Summary Points:';
+
+            const ul = document.createElement('ul');
+            ul.className = 'space-y-1 text-slate-700 font-medium leading-relaxed';
+
+            const pointsArr = (log.points && log.points.length > 0) ? log.points : ['Not connected / Not answered'];
+            pointsArr.forEach(pt => {
+              const li = document.createElement('li');
+              li.className = 'flex items-start gap-1.5';
+              
+              const bullet = document.createElement('span');
+              bullet.className = 'text-indigo-600 font-bold';
+              bullet.textContent = '•';
+
+              const ptText = document.createElement('span');
+              ptText.textContent = maskAllPhonesInText(pt);
+
+              li.appendChild(bullet);
+              li.appendChild(ptText);
+              ul.appendChild(li);
+            });
+
+            logCard.appendChild(logHeader);
+            logCard.appendChild(pointsHeader);
+            logCard.appendChild(ul);
+
+            logsContainer.appendChild(logCard);
+          });
+
+          personBox.appendChild(logsContainer);
+
+          // Configurable WhatsApp Destination Input for This Person in Summary Modal
+          const waExportBox = document.createElement('div');
+          waExportBox.className = 'bg-emerald-50/80 rounded-xl p-3 border border-emerald-200 space-y-2 mt-2';
+
+          const waHeader = document.createElement('div');
+          waHeader.className = 'flex items-center justify-between';
+
+          const waLabel = document.createElement('label');
+          waLabel.className = 'block text-[11px] font-bold text-emerald-800 uppercase tracking-wider';
+          waLabel.textContent = 'Target WhatsApp Number for Summaries:';
+
+          const waBadge = document.createElement('span');
+          waBadge.className = 'text-[11px] font-extrabold text-emerald-900 bg-emerald-100 px-2 py-0.5 rounded';
+          waBadge.textContent = `Masked: ${maskedWaNum}`;
+
+          waHeader.appendChild(waLabel);
+          waHeader.appendChild(waBadge);
+
+          const waInputRow = document.createElement('div');
+          waInputRow.className = 'flex items-center space-x-2';
+
+          const waInput = document.createElement('input');
+          waInput.type = 'password';
+          waInput.id = `wa-input-${person.id}`;
+          waInput.value = currentWaNum;
+          waInput.placeholder = '+15550100000';
+          waInput.className = 'flex-1 bg-white border border-emerald-300 text-slate-900 text-xs font-bold rounded-lg p-2 focus:ring-2 focus:ring-emerald-500 focus:outline-none';
+          waInput.onfocus = function() { this.type = 'text'; };
+          waInput.onblur = function() { this.type = 'password'; };
+          waInput.onchange = (e) => updatePersonWhatsAppNumber(person.id, e.target.value);
+
+          const waBtn = document.createElement('button');
+          waBtn.className = 'bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-xs px-3.5 py-2 rounded-lg transition shadow-sm flex items-center gap-1.5 flex-shrink-0';
+          waBtn.textContent = '💬 Share Latest';
+          waBtn.onclick = () => shareCallLogToWhatsApp(person.id, logs[0] ? logs[0].id : '');
+
+          waInputRow.appendChild(waInput);
+          waInputRow.appendChild(waBtn);
+
+          waExportBox.appendChild(waHeader);
+          waExportBox.appendChild(waInputRow);
+
+          personBox.appendChild(waExportBox);
+        }
+
+        listEl.appendChild(personBox);
+      });
+    }
+
+    // Initialize
+    loadData();
+  </script>
+</body>
+</html>

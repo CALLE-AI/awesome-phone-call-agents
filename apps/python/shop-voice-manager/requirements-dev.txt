@@ -1,0 +1,3 @@
+# Everything needed to run the tests. The app itself needs nothing.
+pytest>=8.0
+jsonschema>=4.0

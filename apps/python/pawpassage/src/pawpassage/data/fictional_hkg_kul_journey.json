@@ -1,0 +1,83 @@
+{
+  "schema_version": "1.0",
+  "case_id": "PAW-DEMO-001",
+  "route_label": "HKG to KUL fictional demonstration route",
+  "animal_category": "DOG",
+  "checkpoints": [
+    {
+      "checkpoint_id": "AIRLINE_DESK",
+      "kind": "AIRLINE",
+      "contact_label": "Fictional Air Meridian live-animal desk",
+      "phone_e164": "+15550101001",
+      "region": "US",
+      "locale": "en-US",
+      "official_source_url": "https://air-meridian.example.invalid/pets",
+      "authorization_basis": "CONSENTING_TEST_RECIPIENT",
+      "authorization_note": "Fictional reserved-range contact used only by the local fake-server demonstration.",
+      "propositions": [
+        {
+          "id": "P1",
+          "statement": "The illustrated route accepts one dog through the airline's live-animal service."
+        },
+        {
+          "id": "P2",
+          "statement": "An advance service request is required before airport check-in."
+        },
+        {
+          "id": "P3",
+          "statement": "The airline publishes a separate crate-size and handling guide."
+        }
+      ]
+    },
+    {
+      "checkpoint_id": "DESTINATION_AUTHORITY",
+      "kind": "DESTINATION_AUTHORITY",
+      "contact_label": "Fictional destination animal reception desk",
+      "phone_e164": "+15550101002",
+      "region": "US",
+      "locale": "en-US",
+      "official_source_url": "https://animal-reception.example.invalid/arrival",
+      "authorization_basis": "CONSENTING_TEST_RECIPIENT",
+      "authorization_note": "Fictional reserved-range contact used only by the local fake-server demonstration.",
+      "propositions": [
+        {
+          "id": "P1",
+          "statement": "The illustrated arrival process accepts a same-day counter presentation without an appointment."
+        },
+        {
+          "id": "P2",
+          "statement": "Original transport documents must remain available for human inspection."
+        },
+        {
+          "id": "P3",
+          "statement": "The reception desk publishes its service hours in writing."
+        }
+      ]
+    },
+    {
+      "checkpoint_id": "VET_SERVICE",
+      "kind": "VETERINARY_SERVICE",
+      "contact_label": "Fictional export-document veterinary service",
+      "phone_e164": "+15550101003",
+      "region": "US",
+      "locale": "en-US",
+      "official_source_url": "https://export-vet.example.invalid/services",
+      "authorization_basis": "CONSENTING_TEST_RECIPIENT",
+      "authorization_note": "Fictional reserved-range contact used only by the local fake-server demonstration.",
+      "propositions": [
+        {
+          "id": "P1",
+          "statement": "The practice offers administrative export-document appointments for dogs."
+        },
+        {
+          "id": "P2",
+          "statement": "The service requires the customer to bring the destination's written requirements."
+        },
+        {
+          "id": "P3",
+          "statement": "The practice publishes a written checklist for the administrative appointment."
+        }
+      ]
+    }
+  ]
+}

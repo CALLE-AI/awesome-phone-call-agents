@@ -1,0 +1,12 @@
+{
+  "status": "COMPLETED",
+  "result": {
+    "post_summary": "Customer confirmed the appointment.",
+    "transcript": [
+      {"speaker": "agent", "text": "Hello, I am calling from Example Clinic about your Tuesday appointment at 10 a.m."},
+      {"speaker": "callee", "text": "Yes, Tuesday works."},
+      {"speaker": "agent", "text": "Perfect, it is confirmed. Goodbye."}
+    ]
+  },
+  "callee_phone": "+14155550139"
+}

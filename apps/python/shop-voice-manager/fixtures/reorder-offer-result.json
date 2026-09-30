@@ -1,0 +1,15 @@
+{
+  "reorder_offer_completed": true,
+  "owner_wants_to_order": true,
+  "items": [
+    {
+      "name": "Fish",
+      "quantity_needed": 2,
+      "unit": "cooler boxes",
+      "vendor_name": "Mama Sikiru",
+      "vendor_goods": ["fish"],
+      "vendor_phone_e164": "+2348111111111"
+    }
+  ],
+  "owner_notes": "Use the usual rice vendor for rice."
+}

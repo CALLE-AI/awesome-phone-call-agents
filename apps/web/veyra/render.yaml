@@ -1,0 +1,15 @@
+services:
+  - type: web
+    name: veyra-engine
+    runtime: python
+    rootDir: engine
+    buildCommand: pip install -r requirements.txt
+    startCommand: python -m uvicorn main:app --host 0.0.0.0 --port $PORT
+    healthCheckPath: /health
+    envVars:
+      - key: GEMINI_API_KEY
+        sync: false
+      - key: GEMINI_MODEL
+        value: gemini-3.6-flash
+      - key: ENGINE_SHARED_SECRET
+        sync: false

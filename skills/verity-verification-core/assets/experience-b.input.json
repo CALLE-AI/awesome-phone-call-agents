@@ -1,0 +1,12 @@
+{
+  "label": "B - caller self-corrects mid-sentence; CALL-E still says task_completed:true",
+  "intent": "reschedule",
+  "business_tz": "America/New_York",
+  "intended_value": {
+    "appointment_date": "2026-09-10",
+    "appointment_time": "15:00",
+    "timezone": "America/New_York",
+    "service_type": "haircut"
+  },
+  "expect": { "decision": "BLOCK", "reason_code_in": ["self_correction", "claim_parse_mismatch"], "ghost_booking_prevented": true }
+}

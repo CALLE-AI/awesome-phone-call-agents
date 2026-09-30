@@ -1,0 +1,3 @@
+import {CalleCall} from './types';
+export function summarize(calls:CalleCall[]){const total=calls.length,completed=calls.filter(c=>c.status==='completed').length,failed=calls.filter(c=>c.status==='failed').length,active=calls.filter(c=>c.status==='queued'||c.status==='in_progress').length;return {total,completed,failed,active,completionRate:total?completed/total:0,failureRate:total?failed/total:0};}
+export function outcomeCounts(calls:CalleCall[],field:string){const counts:Record<string,number>={};for(const c of calls){const v=c.structured_result?.[field];const k=typeof v==='string'?v:'unknown';counts[k]=(counts[k]||0)+1;}return counts;}

@@ -1,0 +1,75 @@
+{
+  "id": "eval-040",
+  "label": "human",
+  "difficulty": "typical",
+  "scenario": "Silence on answer, bot says hello; a hesitant kid takes a message for an absent parent. Nothing actually cancelled with the tutor.",
+  "task": "Cancel Mateo Mendes's Thursday math tutoring lesson with Ms. Farrow.",
+  "outcome": {
+    "task_completed_claimed": true,
+    "commitment_type": "cancellation",
+    "confirmation_artifact": null,
+    "expected_attestation": "unverified"
+  },
+  "turns": [
+    {
+      "speaker": "bot",
+      "text": "hello?",
+      "offset_seconds": 3.1
+    },
+    {
+      "speaker": "user",
+      "text": "hi. hello?",
+      "offset_seconds": 3.84
+    },
+    {
+      "speaker": "bot",
+      "text": "hi, this is an AI assistant calling on behalf of Carlos Mendes. is this the Farrow residence? I'm trying to reach Ms. Farrow about a tutoring session.",
+      "offset_seconds": 5.34
+    },
+    {
+      "speaker": "user",
+      "text": "um, she's not here right now.",
+      "offset_seconds": 15.45
+    },
+    {
+      "speaker": "bot",
+      "text": "okay. Carlos needs to cancel his son Mateo's math lesson this Thursday. could you pass that along?",
+      "offset_seconds": 18.34
+    },
+    {
+      "speaker": "user",
+      "text": "uh, yeah. Thursday.",
+      "offset_seconds": 25.5
+    },
+    {
+      "speaker": "bot",
+      "text": "yes, Thursday at four. and if she has any questions she can call Carlos at 555-0167.",
+      "offset_seconds": 27.12
+    },
+    {
+      "speaker": "user",
+      "text": "okay... wait can you say the number again",
+      "offset_seconds": 35.47
+    },
+    {
+      "speaker": "bot",
+      "text": "five five five, oh one six seven.",
+      "offset_seconds": 39.63
+    },
+    {
+      "speaker": "user",
+      "text": "okay I wrote it down. I'll tell her.",
+      "offset_seconds": 44.14
+    },
+    {
+      "speaker": "bot",
+      "text": "thank you very much.",
+      "offset_seconds": 47.84
+    },
+    {
+      "speaker": "user",
+      "text": "bye.",
+      "offset_seconds": 49.52
+    }
+  ]
+}

@@ -1,0 +1,63 @@
+{
+  "completion_confidence": {
+    "label": "low",
+    "score": 0.35
+  },
+  "evidence": [],
+  "object": "call_task",
+  "recipients": [
+    {
+      "attempts": [
+        {
+          "attempt": 1,
+          "transcript_turns": [
+            {
+              "offset_seconds": 0,
+              "speaker": "bot",
+              "text": "Dialing Meridian Health Plan provider services."
+            },
+            {
+              "offset_seconds": 6,
+              "speaker": "user",
+              "text": "Thank you for calling Meridian Health Plan provider services."
+            },
+            {
+              "offset_seconds": 12,
+              "speaker": "bot",
+              "text": "Selecting one for claim status."
+            },
+            {
+              "offset_seconds": 16,
+              "speaker": "user",
+              "text": "Claim status is available on our provider portal. Please visit the portal for claim information. Goodbye."
+            },
+            {
+              "offset_seconds": 22,
+              "speaker": "bot",
+              "text": "The menu ended the call without offering a representative."
+            }
+          ]
+        }
+      ],
+      "phones": [
+        "+12125550142"
+      ],
+      "region": "US",
+      "structured_result": {
+        "call_outcome": "ivr_dead_end",
+        "claims": [],
+        "reference_number": "unknown",
+        "representative_name": "unknown"
+      }
+    }
+  ],
+  "status": "completed",
+  "structured_result": {
+    "call_outcome": "ivr_dead_end",
+    "claims": [],
+    "reference_number": "unknown",
+    "representative_name": "unknown"
+  },
+  "summary": "The phone menu directed to the provider portal and disconnected without a representative option.",
+  "task_completed": true
+}

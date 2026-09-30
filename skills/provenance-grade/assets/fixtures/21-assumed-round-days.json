@@ -1,0 +1,23 @@
+{
+  "id": "21-assumed-round-days",
+  "category": "round-number-only",
+  "description": "Instant round number with no hedge, no lookup, no corroboration. Round shape alone, with nothing else, drops to assumed.",
+  "turns": [
+    { "speaker": "bot", "text": "Hi, QuoteDesk assistant calling about the ball valve restock.", "offset_seconds": 0 },
+    { "speaker": "user", "text": "Yes?", "offset_seconds": 5 },
+    { "speaker": "bot", "text": "How many days to restock the ball valves?", "offset_seconds": 9 },
+    { "speaker": "user", "text": "Five days.", "offset_seconds": 13 }
+  ],
+  "fields": [
+    {
+      "field": "restock_days",
+      "value": 5,
+      "expects": "duration",
+      "questionTurn": 2,
+      "answerTurns": [3],
+      "critical": true,
+      "expectedGrade": "assumed",
+      "expectSignals": ["G"]
+    }
+  ]
+}

@@ -1,0 +1,66 @@
+{
+ "id": "train-agent-012",
+ "label": "agent",
+ "source": "sim-train",
+ "meta": {
+  "task": "reschedule an appointment from Tuesday to Thursday morning",
+  "hard": false
+ },
+ "turns": [
+  {
+   "speaker": "user",
+   "text": "Hi there, I'm Aria, the virtual assistant for Brightline Internet. How may I assist you today?",
+   "offset_seconds": 0.67
+  },
+  {
+   "speaker": "bot",
+   "text": "Hi, I'm an AI assistant calling on behalf of Alex Martin. I'm calling to move Alex Martin's appointment from Tuesday to Thursday morning.",
+   "offset_seconds": 7.4
+  },
+  {
+   "speaker": "user",
+   "text": "Absolutely, I'd be happy to help. I've moved Alex Martin's appointment from Tuesday to Thursday at 10 AM. Is there anything else?",
+   "offset_seconds": 17.73
+  },
+  {
+   "speaker": "bot",
+   "text": "Can you confirm the new time?",
+   "offset_seconds": 26.8
+  },
+  {
+   "speaker": "user",
+   "text": "I'd be happy to help with that. Everything is all set on our end.",
+   "offset_seconds": 31.35
+  },
+  {
+   "speaker": "bot",
+   "text": "Is 10 AM on Thursday possible?",
+   "offset_seconds": 37.53
+  },
+  {
+   "speaker": "user",
+   "text": "I'd be happy to help with that. Everything is all set on our end.",
+   "offset_seconds": 41.75
+  },
+  {
+   "speaker": "bot",
+   "text": "Thank you, that's everything.",
+   "offset_seconds": 48.07
+  },
+  {
+   "speaker": "user",
+   "text": "Of course. One moment please. Yes, that works.",
+   "offset_seconds": 51.49
+  },
+  {
+   "speaker": "bot",
+   "text": "Thank you, that's everything.",
+   "offset_seconds": 55.33
+  },
+  {
+   "speaker": "user",
+   "text": "You're welcome! Have a wonderful day. Goodbye!",
+   "offset_seconds": 58.74
+  }
+ ]
+}

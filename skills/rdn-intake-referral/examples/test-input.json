@@ -1,0 +1,79 @@
+{
+  "task": "Synthetic RDN intake scenario. Disclose that the caller is an AI assistant, obtain consent, collect basic nutrition-intake information, summarize the information, and request confirmation. Do not provide diagnosis, treatment, or individualized medical or nutrition advice.",
+  "recipients": [
+    {
+      "phones": [
+        "+1XXXXXXXXXX"
+      ],
+      "region": "US",
+      "locale": "en-US"
+    }
+  ],
+  "result_schema": {
+    "type": "object",
+    "required": [
+      "patient_name",
+      "reason_for_support",
+      "nutrition_goals",
+      "dietary_preferences_or_restrictions",
+      "location",
+      "insurance_information",
+      "preferred_appointment_times",
+      "rdn_referral_needed",
+      "patient_confirmed_information"
+    ],
+    "properties": {
+      "patient_name": {
+        "type": "string"
+      },
+      "reason_for_support": {
+        "type": "string"
+      },
+      "nutrition_goals": {
+        "type": "array",
+        "items": {
+          "type": "string"
+        }
+      },
+      "dietary_preferences_or_restrictions": {
+        "type": "array",
+        "items": {
+          "type": "string"
+        }
+      },
+      "location": {
+        "type": "string"
+      },
+      "insurance_information": {
+        "type": "string"
+      },
+      "preferred_appointment_times": {
+        "type": "array",
+        "items": {
+          "type": "string"
+        }
+      },
+      "rdn_referral_needed": {
+        "type": "string",
+        "enum": [
+          "yes",
+          "no",
+          "unknown"
+        ]
+      },
+      "patient_confirmed_information": {
+        "type": "string",
+        "enum": [
+          "yes",
+          "no",
+          "unknown"
+        ]
+      }
+    },
+    "additionalProperties": false
+  },
+  "metadata": {
+    "workflow": "rdn-intake-referral",
+    "environment": "synthetic-fixture"
+  }
+}

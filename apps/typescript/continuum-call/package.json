@@ -1,0 +1,33 @@
+{
+  "name": "continuum-call",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "description": "Crash-resilient, evidence-verifying phone mission runtime for CALL-E",
+  "engines": {
+    "node": ">=22.13.0"
+  },
+  "scripts": {
+    "dev": "tsx src/server/http.ts",
+    "start": "npm run dev",
+    "typecheck": "tsc --noEmit -p tsconfig.json",
+    "test:dry": "tsx scripts/spike/dry-chaos.ts",
+    "test:mock": "tsx scripts/spike/mock-mission.ts",
+    "test:handoff": "tsx scripts/spike/handoff-proof.ts",
+    "test:evidence": "tsx scripts/spike/evidence-proof.ts",
+    "test:matrix": "tsx scripts/spike/failure-matrix.ts",
+    "test:tamper": "tsx scripts/spike/tamper-matrix.ts",
+    "test:hardening": "tsx scripts/spike/runtime-hardening.ts",
+    "test:http": "tsx scripts/spike/http-contract.ts",
+    "test:chaos": "tsx scripts/spike/chaos-scale.ts",
+    "test": "npm run test:dry && npm run test:mock && npm run test:handoff && npm run test:evidence && npm run test:matrix && npm run test:tamper && npm run test:hardening && npm run test:http",
+    "verify": "npm run typecheck && npm test && npm run test:chaos -- --n=10000 && npm run spike:dry",
+    "spike:dry": "tsx scripts/spike/s1-s6-dry.ts",
+    "verify:evidence": "tsx scripts/spike/verify-evidence.ts"
+  },
+  "devDependencies": {
+    "@types/node": "^24.0.0",
+    "tsx": "^4.23.5",
+    "typescript": "^5.9.2"
+  }
+}

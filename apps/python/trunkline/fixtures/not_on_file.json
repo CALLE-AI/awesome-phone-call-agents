@@ -1,0 +1,135 @@
+{
+  "completion_confidence": {
+    "label": "high",
+    "score": 0.91
+  },
+  "evidence": [],
+  "object": "call_task",
+  "recipients": [
+    {
+      "attempts": [
+        {
+          "attempt": 1,
+          "transcript_turns": [
+            {
+              "offset_seconds": 0,
+              "speaker": "bot",
+              "text": "Dialing Meridian Health Plan provider services."
+            },
+            {
+              "offset_seconds": 6,
+              "speaker": "user",
+              "text": "Thank you for calling Meridian Health Plan provider services. For claim status, press one. For eligibility and benefits, press two. For authorizations, press three."
+            },
+            {
+              "offset_seconds": 11,
+              "speaker": "bot",
+              "text": "Selecting one for claim status."
+            },
+            {
+              "offset_seconds": 15,
+              "speaker": "user",
+              "text": "Please enter the ten digit national provider identifier, followed by the pound key."
+            },
+            {
+              "offset_seconds": 20,
+              "speaker": "bot",
+              "text": "Entering national provider identifier 1234567893."
+            },
+            {
+              "offset_seconds": 27,
+              "speaker": "user",
+              "text": "Thank you. All of our representatives are currently assisting other providers. Your estimated wait time is twenty minutes. Please hold and your call will be answered in the order it was received."
+            },
+            {
+              "offset_seconds": 1110,
+              "speaker": "user",
+              "text": "Provider services, this is Hannah."
+            },
+            {
+              "offset_seconds": 1118,
+              "speaker": "bot",
+              "text": "This is an AI assistant calling for the billing office of Lakeshore Family Medicine. This call may be recorded for accuracy. Our national provider identifier is 1234567893."
+            },
+            {
+              "offset_seconds": 1132,
+              "speaker": "user",
+              "text": "Member identification number and date of birth please."
+            },
+            {
+              "offset_seconds": 1140,
+              "speaker": "bot",
+              "text": "Member identification number W884213097, date of birth March 11, 1984, last name Alvarez."
+            },
+            {
+              "offset_seconds": 1156,
+              "speaker": "user",
+              "text": "Thank you, I have the member. Which claim?"
+            },
+            {
+              "offset_seconds": 1164,
+              "speaker": "bot",
+              "text": "Claim number C L M dash 2026 dash 0 0 4 7 3 3, date of service August nineteenth."
+            },
+            {
+              "offset_seconds": 1178,
+              "speaker": "user",
+              "text": "Let me check. I am not showing that claim number anywhere in our system, we have no record of receiving it. The member is active but that claim never came in."
+            },
+            {
+              "offset_seconds": 1198,
+              "speaker": "bot",
+              "text": "Thank you. May I have a reference number and your first name?"
+            },
+            {
+              "offset_seconds": 1208,
+              "speaker": "user",
+              "text": "Reference M H P dash R E F dash 1 1 7 4 0 9 5 2, this is Hannah."
+            }
+          ]
+        }
+      ],
+      "phones": [
+        "+12125550142"
+      ],
+      "region": "US",
+      "structured_result": {
+        "call_outcome": "not_on_file",
+        "claims": [
+          {
+            "allowed_amount": "unknown",
+            "check_number": "unknown",
+            "claim_number": "CLM-2026-004733",
+            "claim_status": "not_on_file",
+            "evidence_quote": "I am not showing that claim number anywhere in our system, we have no record of receiving it",
+            "paid_amount": "unknown",
+            "paid_date": "unknown",
+            "patient_responsibility": "unknown"
+          }
+        ],
+        "reference_number": "MHP-REF-11740952",
+        "representative_name": "Hannah"
+      }
+    }
+  ],
+  "status": "completed",
+  "structured_result": {
+    "call_outcome": "not_on_file",
+    "claims": [
+      {
+        "allowed_amount": "unknown",
+        "check_number": "unknown",
+        "claim_number": "CLM-2026-004733",
+        "claim_status": "not_on_file",
+        "evidence_quote": "I am not showing that claim number anywhere in our system, we have no record of receiving it",
+        "paid_amount": "unknown",
+        "paid_date": "unknown",
+        "patient_responsibility": "unknown"
+      }
+    ],
+    "reference_number": "MHP-REF-11740952",
+    "representative_name": "Hannah"
+  },
+  "summary": "Plan has no record of receiving the claim; it needs to be resubmitted.",
+  "task_completed": true
+}

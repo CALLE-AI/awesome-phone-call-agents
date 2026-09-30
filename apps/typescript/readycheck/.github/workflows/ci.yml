@@ -1,0 +1,50 @@
+name: CI
+on:
+  push:
+    branches: [main]
+  pull_request:
+permissions:
+  contents: read
+jobs:
+  verify:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    env:
+      LIVE_CALLS_ENABLED: 'false'
+      CALLE_API_KEY: ''
+      TEST_RECIPIENTS_JSON: '[]'
+      LIVE_USER_IDS: ''
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+          cache: npm
+      - run: npm ci
+      - run: npm run verify
+      - run: npm run format:check
+      - run: npm run rehearse
+      - run: npx playwright install --with-deps chromium
+      - name: Browser workflows with an isolated store
+        env:
+          PORT: '3101'
+          APP_ORIGIN: http://127.0.0.1:3101
+          DATABASE_PATH: ./artifacts/ci.sqlite
+          TEST_BASE_URL: http://127.0.0.1:3101
+        run: |
+          mkdir -p artifacts
+          npm start > artifacts/server.log 2>&1 &
+          app_pid=$!
+          trap 'kill "$app_pid" 2>/dev/null || true' EXIT
+          for attempt in $(seq 1 30); do
+            if curl --fail --silent http://127.0.0.1:3101/api/health >/dev/null; then break; fi
+            sleep 1
+          done
+          curl --fail --silent http://127.0.0.1:3101/api/health
+          npm run test:browser
+      - uses: actions/upload-artifact@v4
+        if: failure()
+        with:
+          name: verification-failure
+          path: artifacts/
+          retention-days: 7

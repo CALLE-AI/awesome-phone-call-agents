@@ -1,0 +1,499 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>DIALTONE · switchboard</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Big+Shoulders+Display:wght@500;700;900&family=Chivo:wght@300;400;600&family=Chivo+Mono:wght@300;400;600&display=swap" rel="stylesheet">
+<style>
+:root{
+  --bg:#0b0c0a; --panel:#11130f; --panel2:#161913; --line:#262a22; --line2:#343a2e;
+  --ink:#ece7d8; --dim:#8b8778; --faint:#55544b;
+  --caller:#ece7d8; --human:#ff9f45; --agent:#6fd3ff; --ivr:#c7a6ff; --unknown:#6b6a60;
+  --ok:#43e08a; --warn:#ffc233; --bad:#ff4136;
+  --display:"Big Shoulders Display", "Arial Narrow", sans-serif;
+  --sans:"Chivo", "Helvetica Neue", sans-serif;
+  --mono:"Chivo Mono", ui-monospace, monospace;
+}
+*{box-sizing:border-box}
+html,body{margin:0;height:100%;background:var(--bg);color:var(--ink);font-family:var(--sans)}
+body{
+  background:
+    radial-gradient(1200px 600px at 50% -10%, #1b1f16 0%, transparent 60%),
+    repeating-linear-gradient(0deg, rgba(255,255,255,.012) 0 1px, transparent 1px 3px),
+    linear-gradient(var(--bg), var(--bg));
+  overflow-x:hidden;
+}
+body::after{ /* grain */
+  content:"";position:fixed;inset:0;pointer-events:none;opacity:.07;mix-blend-mode:overlay;
+  background-image:url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='160' height='160'><filter id='n'><feTurbulence type='fractalNoise' baseFrequency='.9' numOctaves='2' stitchTiles='stitch'/></filter><rect width='100%' height='100%' filter='url(%23n)'/></svg>");
+}
+.app{width:100%;max-width:1920px;margin:0 auto;padding:22px 40px 18px;min-height:100vh;display:flex;flex-direction:column;gap:14px}
+
+/* ---------- header ---------- */
+header{display:grid;grid-template-columns:auto 1fr auto;align-items:end;gap:36px;border-bottom:1px solid var(--line);padding-bottom:16px}
+.mark{font-family:var(--display);font-weight:900;font-size:74px;line-height:.8;letter-spacing:.06em;display:flex;align-items:center;gap:14px}
+.mark .dot{width:18px;height:18px;border-radius:50%;background:var(--bad);box-shadow:0 0 18px var(--bad);animation:pulse 1.4s infinite}
+@keyframes pulse{50%{opacity:.35}}
+.tag{font-family:var(--mono);font-size:14px;color:var(--dim);letter-spacing:.14em;text-transform:uppercase;line-height:1.6}
+.tag b{color:var(--ink);font-weight:600}
+.clock{font-family:var(--mono);font-size:52px;font-weight:300;letter-spacing:.02em;text-align:right;line-height:.9}
+.clock small{display:block;font-size:12px;color:var(--dim);letter-spacing:.2em;margin-bottom:6px}
+nav{display:flex;gap:6px;margin-top:10px;justify-content:flex-end}
+nav a,nav button{font-family:var(--mono);font-size:12px;letter-spacing:.14em;text-transform:uppercase;color:var(--dim);background:none;border:1px solid var(--line2);padding:6px 10px;cursor:pointer;text-decoration:none}
+nav a.on{color:var(--bg);background:var(--ink);border-color:var(--ink)}
+body.record nav{visibility:hidden}
+
+/* ---------- task strip ---------- */
+.task{display:flex;align-items:center;gap:20px;font-family:var(--mono);font-size:16px}
+.task .k{color:var(--dim);letter-spacing:.18em;font-size:12px}
+.token{border:1px dashed var(--line2);padding:6px 12px;color:var(--agent);white-space:nowrap}
+.simflag{margin-left:auto;font-size:12px;letter-spacing:.16em;color:var(--warn);border:1px solid rgba(255,194,51,.4);padding:5px 10px}
+
+/* ---------- channels ---------- */
+.board{display:grid;grid-template-columns:repeat(3,1fr);gap:18px;flex:1}
+.ch{background:linear-gradient(180deg,var(--panel2),var(--panel));border:1px solid var(--line);position:relative;display:flex;flex-direction:column;height:720px;overflow:hidden;
+    opacity:0;transform:translateY(14px);animation:rise .7s cubic-bezier(.2,.7,.2,1) forwards}
+.ch:nth-child(2){animation-delay:.12s}.ch:nth-child(3){animation-delay:.24s}
+@keyframes rise{to{opacity:1;transform:none}}
+.ch-head{display:grid;grid-template-columns:auto 1fr auto;gap:14px;align-items:center;padding:16px 18px 12px;border-bottom:1px solid var(--line)}
+.ch-num{font-family:var(--display);font-weight:700;font-size:44px;color:var(--faint);line-height:.8}
+.ch-title{font-family:var(--display);font-weight:700;font-size:30px;letter-spacing:.03em;text-transform:uppercase;line-height:1}
+.ch-desc{font-family:var(--mono);font-size:12px;color:var(--dim);margin-top:4px}
+.lamp{font-family:var(--mono);font-size:11px;letter-spacing:.18em;padding:5px 8px;border:1px solid var(--line2);color:var(--dim)}
+.lamp.live{color:var(--ok);border-color:rgba(67,224,138,.5);box-shadow:inset 0 0 12px rgba(67,224,138,.12)}
+.lamp.ended{color:var(--dim)}
+
+/* lanes */
+.lanes{padding:14px 18px 8px;position:relative}
+.lane{position:relative;height:30px;margin:4px 0 4px 96px;border-left:1px solid var(--line2);background:repeating-linear-gradient(90deg, transparent 0 calc(var(--tick) - 1px), rgba(255,255,255,.035) calc(var(--tick) - 1px) var(--tick))}
+.lane-l{position:absolute;left:-96px;top:7px;font-family:var(--mono);font-size:10px;letter-spacing:.16em;color:var(--dim);width:90px}
+.blk{position:absolute;top:5px;height:20px;border-radius:1px;min-width:2px}
+.blk.bot{background:var(--caller);opacity:.85}
+.blk.user{background:var(--cp,var(--unknown));box-shadow:0 0 12px color-mix(in srgb,var(--cp,#888) 45%,transparent)}
+.blk.gap{background:none;border-top:1px dotted var(--dim);height:0;top:15px}
+.axis{margin-left:96px;position:relative;height:14px;font-family:var(--mono);font-size:10px;color:var(--faint)}
+.axis span{position:absolute;transform:translateX(-50%)}
+.playhead{position:absolute;top:10px;bottom:18px;width:1px;background:var(--bad);box-shadow:0 0 8px var(--bad);pointer-events:none}
+.endmark{position:absolute;top:10px;bottom:18px;border-left:1px dashed var(--dim);pointer-events:none}
+
+/* detection */
+.det{padding:10px 18px 14px;border-top:1px solid var(--line);border-bottom:1px solid var(--line);display:grid;grid-template-columns:1fr auto;gap:10px 18px}
+.det h4,.mode h4,.verdict h4{margin:0;font-family:var(--mono);font-weight:400;font-size:11px;letter-spacing:.2em;color:var(--dim);text-transform:uppercase}
+.bars{grid-column:1/-1;display:grid;gap:7px}
+.bar{display:grid;grid-template-columns:62px 1fr 52px;align-items:center;gap:10px;font-family:var(--mono);font-size:13px}
+.bar .track{height:12px;background:#1d2019;position:relative;overflow:hidden}
+.bar .fill{position:absolute;inset:0 auto 0 0;width:33%;transition:width .45s cubic-bezier(.2,.7,.2,1)}
+.bar .v{text-align:right;color:var(--dim)}
+.bar.top .v{color:var(--ink)}
+.via{font-family:var(--mono);font-size:11px;letter-spacing:.14em;color:var(--dim);align-self:center}
+.via b{color:var(--agent);font-weight:600}
+.called{grid-column:1/-1;font-family:var(--display);font-weight:700;font-size:26px;letter-spacing:.04em;text-transform:uppercase;min-height:30px;color:var(--faint)}
+.called.hit{color:var(--ink)}
+.called em{font-style:normal;font-family:var(--mono);font-size:14px;font-weight:400;color:var(--dim);letter-spacing:.05em;margin-left:8px}
+
+/* mode */
+.mode{padding:10px 18px;display:grid;grid-template-columns:auto 1fr;gap:14px;align-items:center;border-bottom:1px solid var(--line)}
+.seg{display:grid;grid-template-columns:1fr 1fr;border:1px solid var(--line2)}
+.seg div{font-family:var(--mono);font-size:12px;letter-spacing:.16em;text-align:center;padding:7px 0;color:var(--faint);transition:all .3s}
+.seg .on-h{background:var(--human);color:#1a0f02}
+.seg .on-m{background:var(--agent);color:#021017}
+
+/* captions */
+.caps{flex:1;padding:12px 18px;display:flex;flex-direction:column;justify-content:flex-end;gap:10px;overflow:hidden;
+      mask-image:linear-gradient(to bottom,transparent 0,black 28%)}
+.cap{display:grid;grid-template-columns:64px 1fr;gap:10px;font-size:17px;line-height:1.35;animation:capin .35s ease-out}
+@keyframes capin{from{opacity:0;transform:translateY(6px)}}
+.cap .who{font-family:var(--mono);font-size:10px;letter-spacing:.14em;color:var(--dim);padding-top:5px}
+.cap.bot .txt{color:#cfcabb}
+.cap.user .txt{color:var(--ink)}
+.cap.user .who{color:var(--cp,var(--dim))}
+.cap .t{font-family:var(--mono);font-size:10px;color:var(--faint);margin-left:6px}
+
+/* verdict */
+.verdict{padding:10px 18px 14px;border-top:1px solid var(--line);min-height:150px;position:relative}
+.vrow{display:flex;justify-content:space-between;font-family:var(--mono);font-size:13px;color:var(--dim);margin-top:6px}
+.vrow b{color:var(--ink);font-weight:400}
+.stamp{position:absolute;right:22px;bottom:18px;font-family:var(--display);font-weight:900;font-size:40px;letter-spacing:.06em;text-transform:uppercase;
+       padding:6px 16px 4px;border:4px solid currentColor;transform:rotate(-7deg) scale(2.2);opacity:0;pointer-events:none;
+       mix-blend-mode:screen}
+.stamp.show{animation:stamp .38s cubic-bezier(.3,1.6,.5,1) forwards}
+@keyframes stamp{to{transform:rotate(-7deg) scale(1);opacity:1}}
+.stamp.human_attested{color:var(--ok)} .stamp.system_asserted{color:var(--ok)}
+.stamp.agent_asserted{color:var(--warn)} .stamp.refused{color:var(--bad)} .stamp.unverified{color:var(--dim)}
+.reason{font-family:var(--mono);font-size:12px;color:var(--dim);margin-top:12px;max-width:62%;line-height:1.5;opacity:0;transition:opacity .5s .3s}
+.reason.show{opacity:1}
+.ch.done-refused{border-color:rgba(255,65,54,.55);box-shadow:0 0 0 1px rgba(255,65,54,.25),0 0 60px -20px rgba(255,65,54,.5)}
+
+/* summary */
+.summary{display:grid;grid-template-columns:repeat(3,1fr);gap:18px;opacity:0;transform:translateY(10px);transition:all .6s}
+.summary.show{opacity:1;transform:none}
+.sum{border-top:2px solid var(--ink);padding-top:10px}
+.sum .big{font-family:var(--display);font-weight:900;font-size:46px;line-height:1}
+.sum .small{font-family:var(--mono);font-size:13px;color:var(--dim);margin-top:4px}
+
+/* ---------- eval view ---------- */
+#calls{display:flex;flex-direction:column;gap:14px;flex:1}
+#real{display:none;flex-direction:column;gap:22px}
+body.view-real #real{display:flex}
+body.view-real #calls{display:none}
+table.live{width:100%;border-collapse:collapse;font-family:var(--mono);font-size:15px}
+table.live th{font-weight:400;color:var(--dim);font-size:11px;letter-spacing:.14em;text-transform:uppercase;text-align:left;padding:8px 10px}
+table.live td{padding:13px 10px;border-top:1px solid var(--line);vertical-align:top}
+table.live td.why{color:var(--dim);font-size:12px;max-width:420px;line-height:1.45}
+.pill{display:inline-block;padding:3px 8px;border:1px solid currentColor;font-size:12px;letter-spacing:.08em;text-transform:uppercase;white-space:nowrap}
+.findings{display:grid;grid-template-columns:repeat(3,1fr);gap:18px}
+.finding .n{font-family:var(--display);font-weight:900;font-size:64px;line-height:1}
+.finding .l{font-family:var(--mono);font-size:13px;color:var(--dim);margin-top:6px;line-height:1.45}
+#eval{display:none}
+body.view-eval #eval{display:flex}
+body.view-eval #calls{display:none}
+#eval{flex-direction:column;gap:22px}
+.ev-lede{font-family:var(--display);font-weight:700;font-size:40px;text-transform:uppercase;letter-spacing:.02em;max-width:1400px;line-height:1.05}
+.ev-lede span{color:var(--warn)}
+.ev-grid{display:grid;grid-template-columns:1.15fr 1fr 1fr;gap:18px}
+.card{background:var(--panel);border:1px solid var(--line);padding:18px 20px}
+.card h3{margin:0 0 4px;font-family:var(--display);font-weight:700;font-size:26px;text-transform:uppercase;letter-spacing:.03em}
+.card .sub{font-family:var(--mono);font-size:12px;color:var(--dim);margin-bottom:14px}
+table.cm{border-collapse:collapse;font-family:var(--mono);font-size:15px;width:100%}
+table.cm th{font-weight:400;color:var(--dim);font-size:11px;letter-spacing:.14em;text-transform:uppercase;padding:6px}
+table.cm td{text-align:center;padding:14px 6px;border:1px solid var(--bg)}
+table.cm td.diag{outline:1px solid rgba(236,231,216,.4);outline-offset:-3px}
+.kpis{display:flex;gap:26px;margin-top:14px;flex-wrap:wrap}
+.kpi .n{font-family:var(--display);font-weight:900;font-size:44px;line-height:1}
+.kpi .l{font-family:var(--mono);font-size:11px;color:var(--dim);letter-spacing:.1em;text-transform:uppercase;max-width:170px}
+.hbar{display:grid;grid-template-columns:190px 1fr 56px;gap:10px;align-items:center;font-family:var(--mono);font-size:13px;margin:7px 0}
+.hbar .track{height:14px;background:#1d2019;position:relative}
+.hbar .fill{position:absolute;inset:0 auto 0 0;background:var(--ink)}
+.hbar .v{text-align:right}
+.fails{font-family:var(--mono);font-size:13px;display:grid;gap:6px;max-height:320px;overflow:auto}
+.fails div{display:grid;grid-template-columns:86px 150px 1fr;gap:10px;color:var(--dim)}
+.fails b{font-weight:400;color:var(--ink)}
+.empty{font-family:var(--mono);color:var(--dim);font-size:13px}
+</style>
+</head>
+<body>
+<div class="app">
+  <header>
+    <div>
+      <div class="mark"><span class="dot"></span>DIALTONE</div>
+    </div>
+    <div class="tag">when the other end of a <b>CALL-E</b> call is also an AI<br>detect · handshake · attest</div>
+    <div>
+      <div class="clock"><small>CALL CLOCK</small><span id="clock">00:00.0</span></div>
+      <nav>
+        <a href="?" id="nav-calls" class="on">three calls</a>
+        <a href="?view=eval" id="nav-eval">honest numbers</a>
+        <button id="replay">replay</button>
+      </nav>
+    </div>
+  </header>
+
+  <section id="calls">
+    <div class="task"><span class="k">SAME TASK →</span><span id="goal"></span><span class="k">OPENS WITH</span><span class="token" id="token"></span><span class="simflag" id="simflag" hidden>SIMULATED FIXTURES</span></div>
+    <div class="board" id="board"></div>
+    <div class="summary" id="summary"></div>
+  </section>
+
+  <section id="eval"></section>
+  <section id="real"></section>
+</div>
+
+<script>
+const $ = (s, el = document) => el.querySelector(s);
+const params = new URLSearchParams(location.search);
+const RECORD = params.has("record");
+const SPEED = parseFloat(params.get("speed") || "1");
+if (RECORD) document.body.classList.add("record");
+const COLORS = { human: "var(--human)", agent: "var(--agent)", ivr: "var(--ivr)", unknown: "var(--unknown)" };
+const LABEL = { human_attested: "human-attested", system_asserted: "system-asserted", agent_asserted: "agent-asserted", refused: "refused", unverified: "unverified" };
+const fmt = s => { const m = Math.floor(s / 60); return String(m).padStart(2, "0") + ":" + (s - m * 60).toFixed(1).padStart(4, "0"); };
+const esc = s => String(s ?? "").replace(/[&<>"]/g, c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c]));
+
+let DATA, SCALE, start = null, raf = null, finished = false;
+
+async function load() {
+  const src = params.get("src") === "real" ? "data/demo.real.json" : "data/demo.json";
+  DATA = await (await fetch(src, { cache: "no-store" })).json();
+  $("#goal").textContent = DATA.goal;
+  $("#token").textContent = "“" + DATA.token + "”";
+  $("#simflag").hidden = !DATA.calls.some(c => c.simulated);
+  SCALE = Math.ceil((Math.max(...DATA.calls.map(c => c.duration), DATA.baseline?.duration || 0) + 4) / 10) * 10;
+  renderBoard();
+  if (params.get("view") === "eval") showEval();
+  else if (params.get("view") === "real") showReal();
+  else setTimeout(play, RECORD ? 1800 : 900);
+}
+
+function renderBoard() {
+  const board = $("#board");
+  board.innerHTML = "";
+  DATA.calls.forEach((c, i) => {
+    const el = document.createElement("article");
+    el.className = "ch";
+    el.style.setProperty("--tick", `calc(100% / ${SCALE / 10})`);
+    el.innerHTML = `
+      <div class="ch-head">
+        <div class="ch-num">0${i + 1}</div>
+        <div><div class="ch-title">→ ${esc(c.title)}</div><div class="ch-desc">${esc(c.description)}</div></div>
+        <div class="lamp" data-r="lamp">DIALING</div>
+      </div>
+      <div class="lanes">
+        <div class="lane" data-r="lane-bot"><span class="lane-l">CALL-E</span></div>
+        <div class="lane" data-r="lane-user"><span class="lane-l">OTHER END</span></div>
+        <div class="axis">${Array.from({ length: SCALE / 10 + 1 }, (_, k) => `<span style="left:${(k * 10 / SCALE) * 100}%">${k * 10}s</span>`).join("")}</div>
+        <div class="playhead" data-r="ph"></div>
+      </div>
+      <div class="det">
+        <h4>counterpart detection</h4><div class="via" data-r="via">listening…</div>
+        <div class="bars">${["human", "ivr", "agent"].map(k => `
+          <div class="bar" data-k="${k}"><span style="color:${COLORS[k]}">${k.toUpperCase()}</span><div class="track"><div class="fill" style="background:${COLORS[k]}"></div></div><span class="v">33%</span></div>`).join("")}
+        </div>
+        <div class="called" data-r="called">—</div>
+      </div>
+      <div class="mode"><h4>mode</h4><div class="seg"><div data-r="mh">HUMAN</div><div data-r="mm">MACHINE</div></div></div>
+      <div class="caps" data-r="caps"></div>
+      <div class="verdict">
+        <h4>result</h4>
+        <div class="vrow"><span>duration</span><b data-r="dur">—</b></div>
+        <div class="vrow"><span>CALL-E task_completed</span><b data-r="tc">—</b></div>
+        <div class="vrow"><span>DIALTONE task_completed</span><b data-r="dtc">—</b></div>
+        <div class="reason" data-r="reason"></div>
+        <div class="stamp ${c.verdict.attestation}" data-r="stamp">${LABEL[c.verdict.attestation]}</div>
+      </div>`;
+    board.appendChild(el);
+    c._el = el;
+    c._r = k => el.querySelector(`[data-r="${k}"]`);
+    c._shown = 0;
+    c._stamped = false;
+    const x = s => (s / SCALE) * 100 + "%";
+    const endX = document.createElement("div");
+    endX.className = "endmark"; endX.hidden = true;
+    endX.style.left = `calc(96px + (100% - 132px) * ${c.duration / SCALE} + 18px)`;
+    el.querySelector(".lanes").appendChild(endX);
+    c._endmark = endX;
+    c.turns.forEach(t => {
+      const b = document.createElement("div");
+      b.className = "blk " + (t.speaker === "bot" ? "bot" : "user");
+      b.style.left = x(t.offset);
+      b.style.width = "0";
+      (t.speaker === "bot" ? c._r("lane-bot") : c._r("lane-user")).appendChild(b);
+      t._blk = b;
+    });
+  });
+}
+
+function detAt(c, t) {
+  let d = null;
+  for (const p of c.detections) if (p.t <= t) d = p;
+  return d;
+}
+
+function frame(now) {
+  if (start === null) start = now;
+  const t = ((now - start) / 1000) * SPEED;
+  $("#clock").textContent = fmt(Math.min(t, SCALE));
+  let allDone = true;
+  for (const c of DATA.calls) {
+    const ct = Math.min(t, c.duration);
+    const ended = t >= c.duration;
+    if (!ended) allDone = false;
+    const lamp = c._r("lamp");
+    lamp.textContent = ended ? `ENDED ${c.duration.toFixed(1)}s` : "CONNECTED";
+    lamp.className = "lamp " + (ended ? "ended" : "live");
+    const lanesW = c._r("lane-bot").getBoundingClientRect().width;
+    c._r("ph").style.left = `calc(96px + 18px + ${lanesW * (ct / SCALE)}px)`;
+    c._r("ph").style.display = ended ? "none" : "block";
+    c._endmark.hidden = !ended;
+    c._endmark.style.left = `calc(114px + ${lanesW * (c.duration / SCALE)}px)`;
+
+    const d = detAt(c, ct);
+    const cp = d && d.label !== "unknown" ? COLORS[d.label] : "var(--unknown)";
+    c._el.style.setProperty("--cp", cp);
+    c.turns.forEach(tt => {
+      if (tt.offset <= ct) tt._blk.style.width = ((Math.min(ct, tt.end) - tt.offset) / SCALE) * 100 + "%";
+    });
+    if (d) {
+      const top = Object.entries(d.probs).sort((a, b) => b[1] - a[1])[0][0];
+      for (const k of ["human", "ivr", "agent"]) {
+        const bar = c._el.querySelector(`.bar[data-k="${k}"]`);
+        bar.querySelector(".fill").style.width = (d.probs[k] * 100).toFixed(1) + "%";
+        bar.querySelector(".v").textContent = Math.round(d.probs[k] * 100) + "%";
+        bar.classList.toggle("top", k === top && d.label !== "unknown");
+      }
+      c._r("via").innerHTML = d.via === "protocol" ? "via <b>HANDSHAKE</b>" : d.via === "model" ? "via behaviour" : "listening…";
+      const committed = d.label !== "unknown" && d.conf >= 0.8;
+      const called = c._r("called");
+      if (committed && !c._calledAt) c._calledAt = d.t;
+      if (!committed) c._calledAt = null;
+      called.className = "called" + (committed ? " hit" : "");
+      called.style.color = committed ? COLORS[d.label] : "";
+      called.innerHTML = committed ? `${d.label}<em>${Math.round(d.conf * 100)}% · since ${c._calledAt.toFixed(1)}s</em>` : "—";
+    }
+    const machine = c.mode_switch_at != null && ct >= c.mode_switch_at;
+    c._r("mh").className = machine ? "" : "on-h";
+    c._r("mm").className = machine ? "on-m" : "";
+
+    const visible = c.turns.filter(tt => tt.offset <= ct);
+    if (visible.length !== c._shown) {
+      c._shown = visible.length;
+      c._r("caps").innerHTML = visible.slice(-5).map(tt => `
+        <div class="cap ${tt.speaker}"><div class="who">${tt.speaker === "bot" ? "CALL-E" : "OTHER"}</div><div class="txt">${esc(tt.text)}<span class="t">${tt.offset.toFixed(1)}s</span></div></div>`).join("");
+    }
+    c._r("dur").textContent = fmt(ct);
+    if (ended && !c._stamped && t >= c.duration + 0.6) {
+      c._stamped = true;
+      c._r("tc").textContent = String(c.calle_reported.task_completed);
+      const dtc = c.verdict.dialtone_task_completed;
+      c._r("dtc").innerHTML = `<span style="color:${dtc ? "var(--ok)" : "var(--bad)"}">${dtc}</span>`;
+      c._r("stamp").classList.add("show");
+      const r = c._r("reason");
+      r.textContent = c.verdict.reasons[c.verdict.reasons.length - 1];
+      r.classList.add("show");
+      if (c.verdict.attestation === "refused") c._el.classList.add("done-refused");
+    }
+  }
+  if (allDone && t > Math.max(...DATA.calls.map(c => c.duration)) + 1.6 && !finished) {
+    finished = true;
+    showSummary();
+  }
+  if (!finished || t < SCALE) raf = requestAnimationFrame(frame);
+  if (finished) window.__demoDone = true;
+}
+
+function showSummary() {
+  const [h, dt, yb] = DATA.calls;
+  const b = DATA.baseline;
+  const both = DATA.calls.filter(c => c.calle_reported.task_completed).length;
+  const kept = DATA.calls.filter(c => c.verdict.dialtone_task_completed).length;
+  const agentCalls = DATA.calls.filter(c => c.detection.label === "agent");
+  const sim = DATA.calls.some(c => c.simulated) || (b && b.simulated);
+  const tag = sim ? "scripted design · " : "";
+  const sum = $("#summary");
+  sum.innerHTML = `
+    <div class="sum"><div class="big">${agentCalls.length ? "machine found" : "—"}</div>
+      <div class="small">${tag}${dt.handshake.acknowledged ? `handshake acknowledged at ${dt.handshake.acknowledged_at.toFixed(1)}s, nonce ${dt.handshake.nonce_ok ? "matched" : "MISMATCH"}` : ""}${yb.detection.label === "agent" ? ` · uncooperative bot caught by behaviour` : ""}</div></div>
+    <div class="sum"><div class="big">${sim ? "the design" : b ? (b.duration / dt.duration).toFixed(1) + "× faster" : dt.duration.toFixed(0) + "s"}</div>
+      <div class="small">${sim ? `scripted: ${dt.duration.toFixed(0)}s with the handshake vs ${b ? b.duration.toFixed(0) : "?"}s without. On 6 live calls the handshake never landed (pickup collision), so no speed-up was measured.` : b ? `same AI line, same task: ${dt.duration.toFixed(0)}s with DIALTONE vs ${b.duration.toFixed(0)}s without` : ""}</div></div>
+    <div class="sum"><div class="big" style="color:var(--bad)">${both} said done · ${kept} kept</div>
+      <div class="small">CALL-E reported task_completed on ${both} calls. DIALTONE refused ${DATA.calls.filter(c => c.verdict.attestation === "refused").length} it could not attribute to a person or a record.</div></div>`;
+  sum.classList.add("show");
+}
+
+function play() {
+  cancelAnimationFrame(raf);
+  start = null; finished = false; window.__demoDone = false;
+  renderBoard();
+  $("#summary").classList.remove("show");
+  raf = requestAnimationFrame(frame);
+}
+
+/* ---------------- eval view ---------------- */
+async function showEval() {
+  document.body.classList.add("view-eval");
+  $("#nav-eval").classList.add("on"); $("#nav-calls").classList.remove("on");
+  const host = $("#eval");
+  let r;
+  try { r = await (await fetch("../eval/report.json", { cache: "no-store" })).json(); }
+  catch { host.innerHTML = `<div class="empty">eval/report.json not found - run <code>dialtone eval</code></div>`; return; }
+  const d = r.detection_model_only, full = d.full_call, att = r.attestation;
+  const labels = ["human", "ivr", "agent"], cols = [...labels, "unknown"];
+  const cm = (m, rows, cols, max) => `<table class="cm"><tr><th>truth ↓ / said →</th>${cols.map(c => `<th>${c.replace("_", " ")}</th>`).join("")}</tr>
+     ${rows.map(a => `<tr><th style="text-align:right">${a.replace("_", " ")}</th>${cols.map(b => {
+        const v = m[a][b], a2 = max ? v / max : 0;
+        const col = a === b ? `rgba(67,224,138,${0.12 + a2 * 0.75})` : v ? `rgba(255,65,54,${0.18 + a2 * 0.8})` : "transparent";
+        return `<td class="${a === b ? "diag" : ""}" style="background:${col}">${v}</td>`; }).join("")}</tr>`).join("")}</table>`;
+  const maxOf = (m) => Math.max(...Object.values(m).flatMap(o => Object.values(o)));
+  const real = r.real_calls || [];
+  const realOk = real.filter(c => c.label && c.detection.label === c.label).length;
+  host.innerHTML = `
+    <div class="ev-lede">First blind run on ${r.eval.n} simulated transcripts: accuracy <span>${Math.round(full.accuracy * 100)}%</span>, not 99%. Here is where it breaks.</div>
+    <div class="ev-grid">
+      <div class="card"><h3>Who picked up?</h3><div class="sub">behavioural model only · no handshake · full call · n=${full.n}</div>
+        ${cm(full.matrix, labels, cols, maxOf(full.matrix))}
+        <div class="kpis">
+          <div class="kpi"><div class="n">${full.macro_f1}</div><div class="l">macro-F1</div></div>
+          <div class="kpi"><div class="n" style="color:var(--human)">${full.humans_treated_as_machine}</div><div class="l">humans treated as machine</div></div>
+          <div class="kpi"><div class="n" style="color:var(--agent)">${full.machines_treated_as_human}</div><div class="l">machines treated as human</div></div>
+        </div></div>
+      <div class="card"><h3>How early?</h3><div class="sub">accuracy using only the first N seconds</div>
+        ${Object.entries(d.early).map(([w, e]) => `<div class="hbar"><span>first ${parseFloat(w)}s</span><div class="track"><div class="fill" style="width:${e.accuracy * 100}%"></div></div><span class="v">${Math.round(e.accuracy * 100)}%</span></div>`).join("")}
+        <div class="hbar"><span>full call</span><div class="track"><div class="fill" style="width:${full.accuracy * 100}%;background:var(--warn)"></div></div><span class="v">${Math.round(full.accuracy * 100)}%</span></div>
+        <div class="sub" style="margin-top:18px">median time to a stable call (≥80%, never flips)</div>
+        ${labels.map(k => { const v = d.time_to_detection[k]; return `<div class="hbar"><span style="color:${COLORS[k]}">${k}</span><div class="track"><div class="fill" style="width:${Math.min(100, (v.median_seconds || 0) / 30 * 100)}%;background:${COLORS[k]}"></div></div><span class="v">${v.median_seconds ?? "–"}s</span></div>`; }).join("")}
+        <div class="sub">with the DIALTONE handshake, a cooperating agent is identified the moment it acknowledges</div>
+      </div>
+      <div class="card"><h3>Which signals carry it?</h3><div class="sub">retrained with feature families removed · accuracy</div>
+        ${Object.entries(r.ablations).map(([k, v]) => `<div class="hbar"><span>${k}</span><div class="track"><div class="fill" style="width:${v.accuracy * 100}%;${k.startsWith("without") ? "background:var(--dim)" : ""}"></div></div><span class="v">${Math.round(v.accuracy * 100)}%</span></div>`).join("")}
+      </div>
+      <div class="card"><h3>Attestation gate</h3><div class="sub">set 1 · expected vs DIALTONE label · n=${att.n} · after gate fixes, not blind (blind check: second set →)</div>
+        ${cm(att.matrix, Object.keys(att.matrix), Object.keys(att.matrix), maxOf(att.matrix))}
+        <div class="kpis">
+          <div class="kpi"><div class="n" style="color:var(--bad)">${att.refused_caught}/${att.refused_expected}</div><div class="l">agent-only "confirmations" refused</div></div>
+          <div class="kpi"><div class="n">${att.false_human_attested}</div><div class="l">false human-attested</div></div>
+          <div class="kpi"><div class="n">${att.wrongly_refused}</div><div class="l">wrongly refused</div></div>
+        </div></div>
+      ${r.holdout2 ? (() => { const h = r.holdout2, f2 = h.detection_model_only.full_call, a2 = h.attestation; return `
+      <div class="card"><h3>Second blind set</h3><div class="sub">${h.n} fresh transcripts · run once · never used to change code</div>
+        ${cm(f2.matrix, labels, cols, maxOf(f2.matrix))}
+        <div class="kpis">
+          <div class="kpi"><div class="n">${Math.round(f2.accuracy * 100)}%</div><div class="l">detection (likely an easier set)</div></div>
+          <div class="kpi"><div class="n" style="color:var(--ok)">${a2.over_trusting_errors}</div><div class="l">attestation errors that raised trust</div></div>
+          <div class="kpi"><div class="n">${a2.refused_caught}/${a2.refused_expected}</div><div class="l">refusals caught</div></div>
+        </div>
+        ${(r.history || []).length ? `<div class="sub" style="margin-top:14px">${r.history.map(x => `${x.run}: set 1 attest ${x.set1_attestation_agreement}` + (x.set2_attestation_agreement != null ? ` · set 2 attest ${x.set2_attestation_agreement}, false human ${x.set2_false_human_attested}` : "")).join("<br>")}</div>` : ""}
+      </div>`; })() : ""}
+      <div class="card" style="grid-column:span ${r.holdout2 ? 1 : 2}"><h3>Where it fails</h3><div class="sub">every misclassified transcript, with the scenario that fooled it</div>
+        <div class="fails">${d.rows.filter(x => !x.correct).map(x => `<div><b>${x.id}</b><span>${x.label} → <span style="color:${COLORS[x.predicted]}">${x.predicted}</span> ${Math.round(x.confidence * 100)}%</span><span>${esc(x.scenario || "")}</span></div>`).join("") || `<div class="empty">none</div>`}</div>
+        ${real.length ? `<div class="sub" style="margin-top:16px">real calls: ${realOk}/${real.filter(c => c.label).length} counterparts correct · ${real.map(c => `${esc(c.name)}: ${c.label}→${c.detection.label} (${c.detection.via}) ${LABEL[c.verdict.attestation]}`).join(" · ")}</div>` : ""}
+      </div>
+    </div>`;
+}
+
+/* ---------------- live calls view ---------------- */
+async function showReal() {
+  document.body.classList.add("view-real");
+  $("#nav-calls").classList.remove("on");
+  const host = $("#real");
+  let r;
+  try { r = await (await fetch("../eval/report.json", { cache: "no-store" })).json(); }
+  catch { host.innerHTML = `<div class="empty">eval/report.json not found - run <code>dialtone eval</code></div>`; return; }
+  const calls = (r.real_calls || []).filter(c => c.status === "completed");
+  if (!calls.length) { host.innerHTML = `<div class="empty">no real calls yet</div>`; return; }
+  const COL = { human_attested: "var(--ok)", system_asserted: "var(--ok)", agent_asserted: "var(--warn)", refused: "var(--bad)", unverified: "var(--dim)" };
+  const spoken = calls.filter(c => c.mode === "dialtone");
+  const tokenSaid = spoken.filter(c => c.handshake.offered).length;
+  const collisions = calls.filter(c => c.pickup_collision).length;
+  const calleHuman = calls.filter(c => c.calle_reported.counterpart_type === "human" && c.label !== "human");
+  const downgraded = calls.filter(c => c.calle_reported.task_completed && !c.verdict.dialtone_task_completed).length;
+  const machinesFound = calls.filter(c => c.label !== "human" && c.detection.label === c.label).length;
+  host.innerHTML = `
+    <div class="ev-lede">${calls.length} live CALL-E calls to a voicebot line we built. <span>Here is what real telephony did.</span></div>
+    <div class="findings">
+      <div class="card finding"><div class="n" style="color:var(--bad)">${collisions}/${calls.length}</div><div class="l">calls where both AIs started talking in the first 1.5 s. The DIALTONE token was spoken in ${tokenSaid} of ${spoken.length} protocol calls: the pickup collision cut CALL-E's opening.</div></div>
+      <div class="card finding"><div class="n" style="color:var(--agent)">${machinesFound}/${calls.filter(c => c.label !== "human").length}</div><div class="l">machines identified by the behavioural detector alone, from measured timing and their own words, without the handshake.</div></div>
+      <div class="card finding"><div class="n" style="color:var(--warn)">${calleHuman.length}</div><div class="l">calls where CALL-E itself reported the voicebot as a <b>human</b>. ${downgraded} CALL-E "task completed" results were not kept by DIALTONE.</div></div>
+    </div>
+    <div class="card" style="overflow-x:auto"><table class="live">
+      <tr><th>call</th><th>line persona · task</th><th>duration</th><th>token</th><th>pickup</th><th>CALL-E said</th><th>DIALTONE detected</th><th>DIALTONE label</th><th>why</th></tr>
+      ${calls.map(c => `<tr>
+        <td>${esc(c.name)}</td>
+        <td>${esc(c.label)} · ${esc(c.mode)}${c.task_prompt_revision ? ` r${esc(c.task_prompt_revision)}` : ""}</td>
+        <td>${c.duration}s</td>
+        <td>${c.mode === "dialtone" ? (c.handshake.acknowledged ? "acked" : c.handshake.offered ? "said" : `<span style="color:var(--bad)">lost</span>`) : "—"}</td>
+        <td>${c.pickup_collision ? `<span style="color:var(--bad)">collision</span>` : "clean"}</td>
+        <td>${esc(c.calle_reported.counterpart_type || "?")} · done=${c.calle_reported.task_completed}</td>
+        <td style="color:${COLORS[c.detection.label] || "var(--dim)"}">${esc(c.detection.label)} ${Math.round(c.detection.confidence * 100)}% <span style="color:var(--dim)">${esc(c.detection.via)}</span></td>
+        <td><span class="pill" style="color:${COL[c.verdict.attestation]}">${LABEL[c.verdict.attestation]}</span></td>
+        <td class="why">${esc(c.verdict.reasons[c.verdict.reasons.length - 1])}</td></tr>`).join("")}
+    </table></div>
+    <div class="sub">Human channel: CALL-E rejected calls to France (English and French) before dialling, so the human counterpart stays simulated. Raw transcripts are not published.</div>`;
+}
+
+$("#replay").onclick = () => { if (params.get("view") === "eval") location.search = ""; else play(); };
+load();
+</script>
+</body>
+</html>

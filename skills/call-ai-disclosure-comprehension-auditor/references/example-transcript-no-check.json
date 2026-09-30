@@ -1,0 +1,14 @@
+{
+  "status": "COMPLETED",
+  "result": {
+    "post_summary": "Customer confirmed the pickup; disclosure was never checked for comprehension.",
+    "transcript": [
+      {"speaker": "agent", "text": "Hello, this is an automated assistant calling from Example Freight."},
+      {"speaker": "callee", "text": "Okay, go ahead."},
+      {"speaker": "agent", "text": "Your pallet pickup is scheduled. Does Thursday work?"},
+      {"speaker": "callee", "text": "Thursday is fine."},
+      {"speaker": "agent", "text": "Confirmed. Goodbye."}
+    ]
+  },
+  "callee_phone": "+14155550193"
+}

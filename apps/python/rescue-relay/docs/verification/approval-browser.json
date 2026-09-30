@@ -1,0 +1,21 @@
+{
+  "version": "5.3.5",
+  "passed": 11,
+  "checks": [
+    "All contacts exhausted: explains the approval blocker and offers a condition recheck, not only Add contact",
+    "The primary action is visible in a 390×844 viewport and reflows without horizontal overflow at 320–1440px",
+    "Refreshing the existing saved report makes no follow-up or callback",
+    "Opening or cancelling the keyboard-accessible dialog makes no call and restores focus",
+    "Practice requires an explicit fictional reply selection; it never silently invents confirmation",
+    "A still-pending follow-up remains conditional and does not trigger another call or approval",
+    "A rejected inquiry shows a recoverable error without creating evidence or faking success",
+    "A confirmed practice offer shows active inquiry status, preserves history and reveals Review & approve without starting work",
+    "Review & approve opens the separate plan-and-price confirmation; opening or cancelling is read-only",
+    "Only explicit plan approval starts one separate callback to Neighborhood Support; no other contacts are engaged",
+    "Live-mode display fixture removes every practice reply control and clearly discloses a real follow-up call; dialog cancelled"
+  ],
+  "javascript_errors": [],
+  "http_bridge": true,
+  "live_calls": false,
+  "external_model_inference": false
+}

@@ -1,0 +1,16 @@
+.env
+.env.*
+!.env.example
+.venv
+.git
+__pycache__
+.pytest_cache
+*.pyc
+*.db*
+*.sqlite*
+data
+artifacts
+tests
+node_modules
+demo/raw
+private-evidence

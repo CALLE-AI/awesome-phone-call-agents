@@ -1,0 +1,93 @@
+{
+  "schema": "warrantyops-proof-screen/1",
+  "note": "Sanitized demonstration fixture derived from the verified runtime proof. Contains no credential, complete phone number, unmasked call id, private path, or adoption claim.",
+  "claim": {
+    "id": "W-1042",
+    "administrator": "Maya",
+    "organization": "NorthStar Equipment",
+    "counterparty": "BlueRock Machinery",
+    "amount_display": "$800",
+    "situation": "Residual exception — returned with no reason after the portal, code sheet and written follow-up were exhausted",
+    "fictional_label": "Fictional demonstration case"
+  },
+  "routes_exhausted": [
+    "portal status check — portal shows only 'returned', no reason",
+    "documented code resolution — no published code sheet covers R-RETURNED-NO-REASON",
+    "written follow-up — two emails to the claims desk, no reply"
+  ],
+  "economics": [
+    "claim face value $800 (source record) ≥ policy minimum $250.00 (organization policy) — holds",
+    "claim age 3 days (source record) ≤ policy maximum 540 days (organization policy) — holds"
+  ],
+  "before": {
+    "heading": "Before WarrantyOps",
+    "lines": [
+      "The claim is returned and unresolved",
+      "The precise missing requirement is unknown",
+      "No confirmed counterparty reference exists"
+    ]
+  },
+  "after": {
+    "heading": "After one authorized call",
+    "lines": [
+      "Grounded evidence: an installation photograph is required",
+      "Confirmed reference: BR-4821, from the counterparty's own words",
+      "Claim status honestly UNKNOWN; write-back withheld for human review"
+    ]
+  },
+  "controls": [
+    {
+      "label": "Authority confirmed",
+      "detail": "time-bounded TEST_RECIPIENT_CONSENT record"
+    },
+    {
+      "label": "Recipient bound",
+      "detail": "authorization matches the claim's counterparty number (masked)"
+    },
+    {
+      "label": "Residual + economic gates passed",
+      "detail": "routes exhausted; $800 against the organization policy"
+    },
+    {
+      "label": "Duplicate prevention active",
+      "detail": "local attempt ledger reserved the key before dialing"
+    },
+    {
+      "label": "Source version checked",
+      "detail": "live record re-read before and re-read before any write"
+    }
+  ],
+  "runtime": {
+    "provider": "CALL-E",
+    "responsibility": "CALL-E performed the phone interaction; WarrantyOps gated, grounded and withheld.",
+    "recorded_calls": 1,
+    "masked_call_id": "call_dMU…A-3Q",
+    "transport_state": "completed",
+    "limitation": "Recorded CALL-E runtime proof using a consenting role-player. This is not evidence of deployment at a warranty desk."
+  },
+  "outcome": {
+    "terminal_state": "INFORMATION_OBTAINED",
+    "claim_status": "UNKNOWN",
+    "trust_note": "The counterparty did not explicitly state the claim status, so WarrantyOps refuses to invent it.",
+    "missing_requirement": "Installation photograph",
+    "reference": {
+      "display": "BR-4821",
+      "normalized": "BR4821",
+      "label": "reference",
+      "method": "DIRECT_COUNTERPARTY_QUOTE",
+      "method_display": "Direct counterparty quote",
+      "quote": "Br Hyphen, 4821."
+    }
+  },
+  "boundary": {
+    "review_required": true,
+    "write_back": "WRITE_BACK_WITHHELD_PENDING_HUMAN_REVIEW",
+    "receipt": "runtime-proof-receipt.public.json"
+  },
+  "replay": {
+    "button_label": "Reveal recorded result",
+    "revealed_label": "Recorded result revealed",
+    "announce": "Recorded result revealed: installation photograph required; reference BR-4821 confirmed from the counterparty quote; claim status UNKNOWN; write-back withheld for human review.",
+    "hint": "Reveals the saved, sanitized runtime result. This control never starts a live call."
+  }
+}

@@ -1,0 +1,85 @@
+{
+  "id": "eval2-003",
+  "label": "human",
+  "difficulty": "typical",
+  "scenario": "Property manager with natural disfluency and a backchannel schedules a faucet repair and reads out a work order number.",
+  "task": "Request a repair for a leaking kitchen faucet in the tenant's apartment.",
+  "outcome": {
+    "task_completed_claimed": true,
+    "commitment_type": "booking",
+    "confirmation_artifact": "work order 22608",
+    "expected_attestation": "human_attested"
+  },
+  "turns": [
+    {
+      "speaker": "user",
+      "text": "Brightwater Property Management, this is Colleen.",
+      "offset_seconds": 1.2
+    },
+    {
+      "speaker": "bot",
+      "text": "Hi Colleen, I'm an AI assistant calling on behalf of a tenant, Marcus Delgado, in unit 3B at 410 Alder Street. He has a leaking kitchen faucet he'd like repaired.",
+      "offset_seconds": 4.15
+    },
+    {
+      "speaker": "user",
+      "text": "Oh, okay. Um, 410 Alder, 3B... yep, I've got him. How bad's the leak? Is it, like, dripping or actually running?",
+      "offset_seconds": 15.46
+    },
+    {
+      "speaker": "bot",
+      "text": "It's a steady drip from the base of the faucet, and there's some water collecting in the cabinet underneath. He's put a bowl under it for now.",
+      "offset_seconds": 23.78
+    },
+    {
+      "speaker": "user",
+      "text": "Mm-hm.",
+      "offset_seconds": 30.5
+    },
+    {
+      "speaker": "user",
+      "text": "Okay, that's not an emergency then, but we don't want it getting into the cabinet floor. I can get our maintenance guy, Rudy, out there Tuesday morning between eight and noon. Does that work?",
+      "offset_seconds": 33.9
+    },
+    {
+      "speaker": "bot",
+      "text": "Yes, Marcus said weekday mornings are fine, so Tuesday between eight and noon works.",
+      "offset_seconds": 46.85
+    },
+    {
+      "speaker": "user",
+      "text": "Perfect. I'm putting in the work order now. And is it okay for Rudy to enter if he isn't home?",
+      "offset_seconds": 52.14
+    },
+    {
+      "speaker": "bot",
+      "text": "Yes, he's authorized entry for this repair.",
+      "offset_seconds": 60.29
+    },
+    {
+      "speaker": "user",
+      "text": "Great. Okay, so that's all set, Tuesday the fifteenth, eight to noon, Rudy'll come fix the faucet. Work order number is 2 2 6 0 8 if he needs it.",
+      "offset_seconds": 65.64
+    },
+    {
+      "speaker": "bot",
+      "text": "Thank you. Tuesday the fifteenth, eight to noon, work order 22608.",
+      "offset_seconds": 77.16
+    },
+    {
+      "speaker": "user",
+      "text": "Yep, you got it.",
+      "offset_seconds": 80.86
+    },
+    {
+      "speaker": "bot",
+      "text": "Thanks so much, Colleen. Have a good day.",
+      "offset_seconds": 82.99
+    },
+    {
+      "speaker": "user",
+      "text": "You too, bye.",
+      "offset_seconds": 85.7
+    }
+  ]
+}

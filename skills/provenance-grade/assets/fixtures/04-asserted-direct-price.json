@@ -1,0 +1,22 @@
+{
+  "id": "04-asserted-direct-price",
+  "category": "clean-asserted",
+  "description": "Non-round price answered immediately and plainly. Asserted: stated with confidence but nothing established it.",
+  "turns": [
+    { "speaker": "bot", "text": "Hi, QuoteDesk assistant here, checking paper stock rates.", "offset_seconds": 0 },
+    { "speaker": "user", "text": "Okay.", "offset_seconds": 5 },
+    { "speaker": "bot", "text": "What do you charge per box for the A4 paper stock?", "offset_seconds": 9 },
+    { "speaker": "user", "text": "It is 1,180 rupees per box.", "offset_seconds": 14 }
+  ],
+  "fields": [
+    {
+      "field": "unit_price",
+      "value": 1180,
+      "expects": "price",
+      "questionTurn": 2,
+      "answerTurns": [3],
+      "critical": true,
+      "expectedGrade": "asserted"
+    }
+  ]
+}

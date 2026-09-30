@@ -1,0 +1,12 @@
+{
+  "id": "second-state",
+  "state_name": "Second State",
+  "program_name": "Second State Health Assistance",
+  "caller_org": "Second State Department of Human Services",
+  "start_date": "2027-01-01",
+  "report_how": "through the MyBenefits mobile app, by post using the form the state mailed you, or in person at any county office",
+  "callback_phone": "1-800-555-0200",
+  "navigator_line": "1-800-555-0201",
+  "voicemail": "Hello, this is the Second State Department of Human Services with an important message about your health benefits. Please call us back at 1-800-555-0200. Thank you.",
+  "self_attestation_note": "This state asks for a document with most exemptions, so a navigator can help you get the right paperwork before your check date."
+}

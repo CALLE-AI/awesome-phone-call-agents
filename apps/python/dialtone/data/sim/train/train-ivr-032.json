@@ -1,0 +1,56 @@
+{
+ "id": "train-ivr-032",
+ "label": "ivr",
+ "source": "sim-train",
+ "meta": {
+  "task": "ask for a quote for a brake replacement",
+  "hard": true
+ },
+ "turns": [
+  {
+   "speaker": "user",
+   "text": "Welcome to Maple Vet Clinic. In a few words, tell me what you're calling about. You can say things like appointments, billing, or hours.",
+   "offset_seconds": 0.64
+  },
+  {
+   "speaker": "bot",
+   "text": "Representative.",
+   "offset_seconds": 10.43
+  },
+  {
+   "speaker": "user",
+   "text": "I think you said appointments. Is that right? Say yes or no.",
+   "offset_seconds": 11.49
+  },
+  {
+   "speaker": "bot",
+   "text": "Could you give me a rough quote for replacing the front brake pads on a 2018 sedan?",
+   "offset_seconds": 16.84
+  },
+  {
+   "speaker": "user",
+   "text": "Sorry, I didn't get that. You can say appointments, billing, or hours.",
+   "offset_seconds": 23.79
+  },
+  {
+   "speaker": "bot",
+   "text": "Billing, please.",
+   "offset_seconds": 29.13
+  },
+  {
+   "speaker": "user",
+   "text": "Okay, billing. Please hold while I transfer you. The current wait time is more than ten minutes.",
+   "offset_seconds": 30.54
+  },
+  {
+   "speaker": "bot",
+   "text": "Appointments.",
+   "offset_seconds": 37.74
+  },
+  {
+   "speaker": "user",
+   "text": "Okay, billing. Please hold while I transfer you. The current wait time is more than ten minutes.",
+   "offset_seconds": 38.87
+  }
+ ]
+}

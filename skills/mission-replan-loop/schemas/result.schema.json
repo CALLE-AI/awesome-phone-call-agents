@@ -1,0 +1,63 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "mission-replan-loop output",
+  "type": "object",
+  "required": ["strategy_status", "evidence", "constraint_results"],
+  "properties": {
+    "strategy_status": {"enum": ["valid", "invalid", "uncertain", "infeasible"]},
+    "evidence": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["fact", "value", "source_call", "confidence", "status"],
+        "properties": {
+          "fact": {"type": "string"},
+          "value": {},
+          "source_call": {"type": "string"},
+          "target": {"type": "string"},
+          "confidence": {"enum": ["high", "medium", "low"]},
+          "status": {"enum": ["validated", "uncertain", "conflicting", "stale", "rejected"]}
+        }
+      }
+    },
+    "constraint_results": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "properties": {
+          "constraint": {"type": "string"},
+          "required": {},
+          "observed": {},
+          "status": {"enum": ["satisfied", "violated", "uncertain", "not_evaluated"]}
+        }
+      }
+    },
+    "failure_class": {
+      "description": "Why the call did not yield evidence. `execution` means the target was never asked, and its strategy must not be invalidated.",
+      "enum": ["none", "recipient", "execution"]
+    },
+    "replan": {
+      "type": "object",
+      "properties": {
+        "required": {"type": "boolean"},
+        "trigger": {
+          "description": "Three causes, three sentences. A target that breached a constraint, one that never answered, and one a human declined are not the same event.",
+          "enum": ["constraint_violated", "call_failure", "declined_by_operator", "assumption_invalidated"]
+        },
+        "reason": {"type": "string"},
+        "previous_target": {"type": "string"},
+        "proposed_strategy": {"type": "object"}
+      }
+    },
+    "next_operation": {
+      "type": "object",
+      "properties": {
+        "type": {"enum": ["phone_call", "clarification", "verification", "retry"]},
+        "objective": {"type": "string"},
+        "required_information": {"type": "array", "items": {"type": "string"}}
+      }
+    },
+    "policy_result": {"type": "object"},
+    "escalation": {"type": "object"}
+  }
+}

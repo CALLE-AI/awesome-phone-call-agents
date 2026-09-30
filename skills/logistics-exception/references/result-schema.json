@@ -1,0 +1,58 @@
+{
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "contact_role",
+    "reached",
+    "shipment_recognized",
+    "current_status",
+    "revised_eta",
+    "can_accept",
+    "blocker",
+    "next_action",
+    "certainty"
+  ],
+  "properties": {
+    "contact_role": {
+      "type": "string",
+      "enum": ["driver", "dispatcher", "receiving_dock", "unknown"],
+      "description": "The role of the person actually reached. Use unknown if the person did not confirm their role or was the wrong person."
+    },
+    "reached": {
+      "type": "string",
+      "enum": ["yes", "no", "unknown"],
+      "description": "yes only if a live human answered and engaged about this shipment. no for voicemail, no answer, hang-up, or wrong number. unknown if unclear."
+    },
+    "shipment_recognized": {
+      "type": "string",
+      "enum": ["yes", "no", "unknown"],
+      "description": "Whether the contact recognized the shipment reference or load being discussed."
+    },
+    "current_status": {
+      "type": "string",
+      "description": "The contact's stated current situation in their own words (truck location for driver/dispatch, dock situation for receiving). Empty if not stated."
+    },
+    "revised_eta": {
+      "type": "string",
+      "description": "Driver/dispatch: the revised arrival time as an exact clock time such as '15:40' or '3:40 PM'. Receiving dock: the latest arrival time the dock can still accept the load today, or the slot offered. Leave empty for vague estimates. Never invent a time."
+    },
+    "can_accept": {
+      "type": "string",
+      "enum": ["yes", "no", "conditional", "unknown"],
+      "description": "Receiving dock only: whether the dock will accept the shipment after the promised window. conditional when limited to a cutoff or other stated condition. Other roles: unknown."
+    },
+    "blocker": {
+      "type": "string",
+      "description": "The concrete reason for the delay or the constraint preventing acceptance, in the contact's words. Empty if none was given."
+    },
+    "next_action": {
+      "type": "string",
+      "description": "What the contact said they will do next or asked us to do. Empty if nothing was agreed."
+    },
+    "certainty": {
+      "type": "string",
+      "enum": ["high", "medium", "low", "unknown"],
+      "description": "How certain the contact sounded: high for firm statements, medium for hedged estimates, low for guesses, unknown if not reached."
+    }
+  }
+}

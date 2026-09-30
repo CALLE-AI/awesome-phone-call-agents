@@ -1,0 +1,12 @@
+{
+  "extends": "../../tsconfig.base.json",
+  "compilerOptions": {
+    "rootDir": ".",
+    "outDir": "../../.build/tools/toolchain",
+    "tsBuildInfoFile": "../../.build/tools/toolchain/.tsbuildinfo",
+    "allowJs": true,
+    "checkJs": true,
+    "types": ["node", "vitest"]
+  },
+  "include": ["*.mjs", "*.ts"]
+}

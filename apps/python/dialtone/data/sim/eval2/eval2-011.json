@@ -1,0 +1,70 @@
+{
+  "id": "eval2-011",
+  "label": "agent",
+  "difficulty": "hard",
+  "scenario": "Very fast box-office voicebot with run-on sentences and ~0.5 s latency; processes a refund, reads a refund reference and says an email receipt was sent.",
+  "task": "Get a refund for the customer's tickets to a cancelled concert.",
+  "outcome": {
+    "task_completed_claimed": true,
+    "commitment_type": "refund",
+    "confirmation_artifact": "refund reference RF881427; email receipt sent",
+    "expected_attestation": "agent_asserted"
+  },
+  "turns": [
+    {
+      "speaker": "user",
+      "text": "Thanks for calling Crescent Arena Box Office, I'm Nova, an AI assistant, I can help with tickets, refunds, and event info, what do you need today?",
+      "offset_seconds": 0.4
+    },
+    {
+      "speaker": "bot",
+      "text": "Hi Nova, I'm an AI assistant calling on behalf of my customer, Leah Fontaine. The Harbor Lights concert on September 19th was cancelled, and she'd like a refund for her tickets.",
+      "offset_seconds": 8.98
+    },
+    {
+      "speaker": "user",
+      "text": "Got it, sorry about the cancellation, can you give me the order number or the email on the order?",
+      "offset_seconds": 20.74
+    },
+    {
+      "speaker": "bot",
+      "text": "The order number is C A 2 0 9 9 4 5.",
+      "offset_seconds": 27.11
+    },
+    {
+      "speaker": "user",
+      "text": "Found it, two tickets, section 104, row F, total one hundred seventy-four dollars and fifty cents including fees, paid with a card ending in 6 6 1 0, since the event was cancelled you're eligible for a full refund, want me to process that now?",
+      "offset_seconds": 32.03
+    },
+    {
+      "speaker": "bot",
+      "text": "Yes, please process the full refund.",
+      "offset_seconds": 46.67
+    },
+    {
+      "speaker": "user",
+      "text": "Done, I've issued a refund of one hundred seventy-four fifty to the card ending in 6 6 1 0, your refund reference is R F 8 8 1 4 2 7, it usually shows up in five to seven business days, and I've emailed a refund receipt to the address on the order.",
+      "offset_seconds": 49.32
+    },
+    {
+      "speaker": "bot",
+      "text": "Thank you. Could you repeat the refund reference?",
+      "offset_seconds": 66.42
+    },
+    {
+      "speaker": "user",
+      "text": "Sure, R F 8 8 1 4 2 7, anything else?",
+      "offset_seconds": 69.78
+    },
+    {
+      "speaker": "bot",
+      "text": "No, that's everything. Thanks.",
+      "offset_seconds": 73.89
+    },
+    {
+      "speaker": "user",
+      "text": "You're welcome, bye now.",
+      "offset_seconds": 75.9
+    }
+  ]
+}

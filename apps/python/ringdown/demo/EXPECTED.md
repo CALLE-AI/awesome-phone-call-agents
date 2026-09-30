@@ -330,6 +330,138 @@ exit 40
 
 ---
 
+## Scenario 7 — Asking to be called back later is not taking the incident
+
+Alice asks to be called back in ninety minutes. That is a request, not a commitment, so the
+attempt settles `not_acknowledged` and the ladder keeps its own clock: ninety minutes does not
+fit inside the time this ladder has left, so Ben rings **now** rather than in an hour and a half.
+
+What is new is that the request is no longer thrown away. The minutes and the words that carried
+them are written to the ledger, so whoever reads it afterwards can see that Alice answered and
+what she asked for.
+
+A shorter ask is honoured instead: the ladder waits and calls the same person a second time, with
+its own idempotency key and its own pair of records. That path is covered by the tests and not by
+this demo, because showing it would mean waiting ten real minutes.
+
+```text
+[1/3] primary  Alice Okafor  +1********00
+      idempotency key rd-inc-2026-08-09-0113-primary-1-fa4c8e3b3de0
+      call call_fake1  status completed  confidence 0.94 high
+      not acknowledged (callback_requested)  asked to be called back in 90 minutes,
+                                             which is a request to be called again, not a commitment to the incident
+        disposition  unclear
+        eta          absent
+        callback     "i can't right now, call me back in 90 minutes"
+
+[2/3] secondary  Ben Mensah  +1********01
+      idempotency key rd-inc-2026-08-09-0113-secondary-1-fcff0fabef7e
+      call call_fake2  status completed  confidence 0.94 high
+      acknowledged  owner Ben Mensah  eta 20 minutes
+        disposition  "yes, i am taking this incident right now"
+        owner        "yes, this is ben"
+        eta          "i can be on it in twenty minutes"
+
+verdict acknowledged  owner b.mensah  eta 20 minutes
+
+# Verification of inc-2026-08-09-0113 attempt 1 (a.okafor) on the second channel: the run reports no acknowledgement
+- [x] run for Alice Okafor reports no acknowledgement
+
+# Verification of inc-2026-08-09-0113 attempt 2 (b.mensah) on the second channel: the second channel serves the same run
+- [x] second channel returned a run for call call_fake2
+- [x] run reports call id call_fake2
+- [x] run echoes the attempt id inc-2026-08-09-0113/secondary/1 we sent
+- [x] run reached Ben Mensah at +1********01
+- [x] run status COMPLETED maps to the recorded completed
+- [x] the run finished inside the escalation window
+
+# Verification of inc-2026-08-09-0113 attempt 2 (b.mensah) on the second channel: the acknowledgement holds
+- [x] re-extracting the second channel transcript gives disposition acknowledged
+- [x] the recorded disposition span is spoken by the recipient
+- [x] the recorded owner Ben Mensah is spoken by the recipient
+- [x] the recorded ETA of 20 minutes is spoken by the recipient
+
+verified 11/11
+
+ledger 6 records  head sha256:6485…  calls placed 2
+exit 0
+```
+
+---
+
+## Scenario 8 — The engineer answers in Spanish
+
+Same ladder, same ledger, same two transports. Nothing about the escalation knows which language
+the call was in: the phrase tables carry both, and the spans are quoted in the words that were
+actually spoken, so the evidence reads back in Spanish.
+
+The gates do not soften either. Alice says *"creo que lo tomo yo, tal vez"* — a commitment with a
+condition attached — and that is not an acknowledgement in Spanish any more than *"I think I'll
+take it"* is in English, so Ben rings. Ben commits without a condition and gives a number, and the
+second channel re-derives the same verdict from the same Spanish transcript.
+
+```text
+[1/3] primary  Alice Okafor  +1********00
+      idempotency key rd-inc-2026-08-09-0113-primary-1-fa4c8e3b3de0
+      call call_fake1  status completed  confidence 0.94 high
+      not acknowledged (hedged_acknowledgement)  the words that would have taken the incident came with a condition attached,
+                                                 and a commitment with a condition is not a commitment
+        disposition  unclear
+        eta          "dame quince minutos"
+        hedged       "creo que lo tomo yo, tal vez"
+
+[2/3] secondary  Ben Mensah  +1********01
+      idempotency key rd-inc-2026-08-09-0113-secondary-1-fcff0fabef7e
+      call call_fake2  status completed  confidence 0.94 high
+      acknowledged  owner Ben Mensah  eta 20 minutes
+        disposition  "sí, lo tomo yo"
+        owner        "sí, soy ben"
+        eta          "dame veinte minutos"
+
+verdict acknowledged  owner b.mensah  eta 20 minutes
+```
+
+---
+
+## Scenario 9 — The provider ends every call before it rings
+
+This is the shape the live API produced four times out of six on 2026-08-20: an attempt that began
+and ended in the same second, nothing transcribed, reported as the recipient hanging up. The Twilio
+account that owns the destination number had no record of any of them, so nobody hung up — the call
+never reached the network.
+
+The ladder walks every rung and is exhausted without a single telephone ringing. What changes is what
+it says at the end. `zero_duration` is named for what the payload shows rather than for what it
+suggests, because a recipient who answered and hung up inside the same second would look identical
+from here; ceiling 16 carries that distinction in full.
+
+```text
+[1/3] primary  Alice Okafor  +1********00
+      idempotency key rd-inc-2026-08-09-0113-primary-1-fa4c8e3b3de0
+      call call_fake1  status failed  failure call_failed
+      not acknowledged (zero_duration)  the attempt began and ended in the same second with nothing transcribed,
+                                        which is the shape of a call that never reached the network. The provider
+                                        reports it as the recipient hanging up; from here that cannot be told apart
+
+[2/3] secondary  Ben Mensah  +1********01
+      idempotency key rd-inc-2026-08-09-0113-secondary-1-fcff0fabef7e
+      call call_fake2  status failed  failure call_failed
+      not acknowledged (zero_duration)  the attempt began and ended in the same second with nothing transcribed,
+                                        which is the shape of a call that never reached the network. The provider
+                                        reports it as the recipient hanging up; from here that cannot be told apart
+
+[3/3] incident_commander  Carla Varga  +1********02
+      idempotency key rd-inc-2026-08-09-0113-incident-commander-1-3a6a6996349d
+      call call_fake3  status failed  failure call_failed
+      not acknowledged (zero_duration)  the attempt began and ended in the same second with nothing transcribed,
+                                        which is the shape of a call that never reached the network. The provider
+                                        reports it as the recipient hanging up; from here that cannot be told apart
+
+verdict unacknowledged  3 of 3 calls ended before they could ring, the ladder is exhausted and this incident has no owner
+```
+
+---
+
 ## The ledger check the demo runs last
 
 Scenario 3 writes its ledger to `examples/ledger.example.jsonl`, and that file is committed

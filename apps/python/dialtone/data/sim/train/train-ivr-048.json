@@ -1,0 +1,36 @@
+{
+ "id": "train-ivr-048",
+ "label": "ivr",
+ "source": "sim-train",
+ "meta": {
+  "task": "reschedule an appointment from Tuesday to Thursday morning",
+  "hard": true
+ },
+ "turns": [
+  {
+   "speaker": "user",
+   "text": "Welcome to Luigi's Trattoria. In a few words, tell me what you're calling about. You can say things like appointments, billing, or hours.",
+   "offset_seconds": 0.41
+  },
+  {
+   "speaker": "bot",
+   "text": "Representative.",
+   "offset_seconds": 9.82
+  },
+  {
+   "speaker": "user",
+   "text": "Okay, billing. Please hold while I transfer you. The current wait time is more than ten minutes.",
+   "offset_seconds": 10.94
+  },
+  {
+   "speaker": "bot",
+   "text": "Representative.",
+   "offset_seconds": 18.14
+  },
+  {
+   "speaker": "user",
+   "text": "Okay, billing. Please hold while I transfer you. The current wait time is more than ten minutes.",
+   "offset_seconds": 19.17
+  }
+ ]
+}

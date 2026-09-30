@@ -1,0 +1,18 @@
+{
+  "extends": "../../tsconfig.base.json",
+  "compilerOptions": {
+    "composite": false,
+    "incremental": false,
+    "noEmit": true,
+    "rootDir": "src",
+    "types": ["node", "vitest/globals"]
+  },
+  "include": [
+    "src/live-runs/live-demo-review-cleanup.test.ts",
+    "src/composition/start-live-demo-review-runtime.test.ts",
+    "src/composition/guarded-live-smoke-runtime.test.ts",
+    "src/composition/persistent-demo-receiver.test.ts",
+    "src/composition/persistent-demo-session.test.ts",
+    "src/cli/live-smoke-preflight-runtime.test.ts"
+  ]
+}

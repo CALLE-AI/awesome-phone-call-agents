@@ -1,0 +1,85 @@
+{
+  "id": "eval2-012",
+  "label": "ivr",
+  "difficulty": "hard",
+  "scenario": "Airline phone tree drops into an endless hold loop: hold music alternating with the same verbatim reassurance message; ignores the caller's speech and DTMF.",
+  "task": "Change the customer's seat assignment on an upcoming flight.",
+  "outcome": {
+    "task_completed_claimed": false,
+    "commitment_type": "none",
+    "confirmation_artifact": null,
+    "expected_attestation": "unverified"
+  },
+  "turns": [
+    {
+      "speaker": "user",
+      "text": "Thank you for calling Aerovista Airlines. Please listen carefully, as our menu options have changed. For reservations, press 1. For flight status, press 2. For baggage, press 3. For AeroMiles, press 4.",
+      "offset_seconds": 0.5
+    },
+    {
+      "speaker": "bot",
+      "text": "[DTMF 1]",
+      "offset_seconds": 14.15
+    },
+    {
+      "speaker": "user",
+      "text": "To book a new trip, press 1. To change or cancel an existing reservation, press 2. For seat assignments, press 3.",
+      "offset_seconds": 15.44
+    },
+    {
+      "speaker": "bot",
+      "text": "[DTMF 3]",
+      "offset_seconds": 24.62
+    },
+    {
+      "speaker": "user",
+      "text": "All of our agents are currently assisting other customers. Please stay on the line and your call will be answered in the order it was received. You can also manage your seat assignment at aerovista dot com.",
+      "offset_seconds": 25.87
+    },
+    {
+      "speaker": "user",
+      "text": "[hold music]",
+      "offset_seconds": 41.27
+    },
+    {
+      "speaker": "user",
+      "text": "Thank you for your patience. Your call is important to us. Please continue to hold for the next available agent.",
+      "offset_seconds": 65.57
+    },
+    {
+      "speaker": "user",
+      "text": "[hold music]",
+      "offset_seconds": 73.87
+    },
+    {
+      "speaker": "bot",
+      "text": "Hello, is anyone there? I'm an AI assistant calling to change a seat assignment.",
+      "offset_seconds": 81.87
+    },
+    {
+      "speaker": "user",
+      "text": "Thank you for your patience. Your call is important to us. Please continue to hold for the next available agent.",
+      "offset_seconds": 100.17
+    },
+    {
+      "speaker": "user",
+      "text": "[hold music]",
+      "offset_seconds": 108.47
+    },
+    {
+      "speaker": "bot",
+      "text": "[DTMF 0]",
+      "offset_seconds": 114.47
+    },
+    {
+      "speaker": "user",
+      "text": "Thank you for your patience. Your call is important to us. Please continue to hold for the next available agent.",
+      "offset_seconds": 134.77
+    },
+    {
+      "speaker": "user",
+      "text": "[hold music]",
+      "offset_seconds": 143.07
+    }
+  ]
+}

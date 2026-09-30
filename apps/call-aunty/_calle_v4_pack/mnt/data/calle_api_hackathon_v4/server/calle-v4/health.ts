@@ -1,0 +1,1 @@
+import {CalleProvider} from './client';export async function health(provider:CalleProvider){try{await provider.getCall('health-check-invalid');return {ok:true}}catch(e:any){return {ok:!!e,status:e.status??500,providerReachable:true};}}

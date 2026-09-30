@@ -1,0 +1,55 @@
+{
+  "event": {
+    "id": "01FM7T4BYCA1RGPVV0EVXO0K0V",
+    "event_type": "incident.triggered",
+    "resource_type": "incident",
+    "occurred_at": "2026-08-09T01:13:00Z",
+    "agent": null,
+    "client": null,
+    "data": {
+      "id": "PBAZLIU",
+      "type": "incident",
+      "self": "https://api.pagerduty.com/incidents/PBAZLIU",
+      "html_url": "https://example.pagerduty.com/incidents/PBAZLIU",
+      "number": 1713,
+      "status": "triggered",
+      "incident_key": "checkout-p99-latency",
+      "created_at": "2026-08-09T01:13:00Z",
+      "title": "checkout p99 latency above 3s",
+      "service": {
+        "id": "PF9KMXH",
+        "type": "service_reference",
+        "summary": "checkout-api",
+        "self": "https://api.pagerduty.com/services/PF9KMXH",
+        "html_url": "https://example.pagerduty.com/service-directory/PF9KMXH"
+      },
+      "assignees": [
+        {
+          "id": "PRLPRWM",
+          "type": "user_reference",
+          "summary": "Alice Okafor",
+          "self": "https://api.pagerduty.com/users/PRLPRWM",
+          "html_url": "https://example.pagerduty.com/users/PRLPRWM"
+        }
+      ],
+      "escalation_policy": {
+        "id": "PUS0KTE",
+        "type": "escalation_policy_reference",
+        "summary": "checkout-api escalation",
+        "self": "https://api.pagerduty.com/escalation_policies/PUS0KTE",
+        "html_url": "https://example.pagerduty.com/escalation_policies/PUS0KTE"
+      },
+      "teams": [],
+      "priority": {
+        "id": "PRIORITY2",
+        "type": "priority_reference",
+        "summary": "P2",
+        "self": "https://api.pagerduty.com/priorities/PRIORITY2",
+        "html_url": null
+      },
+      "urgency": "high",
+      "conference_bridge": null,
+      "resolve_reason": null
+    }
+  }
+}

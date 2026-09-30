@@ -51,7 +51,7 @@ Live mode is opt-in and server-only. Copy `.env.example` into the trusted runtim
 | `SPARESCOUT_LIVE_RECIPIENT_ALLOWLIST` | Comma-separated E.164 recipients verified and approved outside the public app. |
 | `CALLE_WEBHOOK_URL` | Optional terminal webhook destination supplied to CALL-E. |
 
-The live selector stays disabled unless every trusted binding is present. A live plan must still be valid, unexpired, submitted by the authenticated operator with `approved: true`, and contain only recipients on the server allowlist.
+The live selector stays disabled unless every trusted binding is present and the selected recipient/language combination is within current provider coverage. Kenya/English remains available in the localized fixture, but CALL-E currently rejects it for live calls. A live plan must still be valid, unexpired, submitted by the authenticated operator with `approved: true`, and contain only recipients on the server allowlist.
 
 ## Real-world side effects
 

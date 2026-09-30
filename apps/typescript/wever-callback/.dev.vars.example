@@ -1,0 +1,4 @@
+# npm run setup creates a random local encryption key. Keep that key unchanged.
+CALLE_KEY_ENCRYPTION_SECRET=
+# The community preview never places a live call unless explicitly enabled here.
+CALLBACK_ALLOW_LIVE_CALLS=false

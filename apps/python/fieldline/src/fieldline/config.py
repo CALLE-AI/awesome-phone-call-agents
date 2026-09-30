@@ -44,9 +44,9 @@ def get_settings(cwd: Path | None = None) -> Settings:
     _load_dotenv(root / ".env")
 
     api_key = os.environ.get("CALLE_API_KEY", "").strip() or None
-    demo_flag = _flag("FIELDLINE_DEMO")
-    # Demo mode when explicitly requested, or when there is no API key.
-    demo = demo_flag if demo_flag is not None else api_key is None
+    # A stored API key never opts the operator into real calls. Only the
+    # explicit value "false" permits live mode; typos stay offline.
+    demo = os.environ.get("FIELDLINE_DEMO", "").strip().lower() != "false"
 
     return Settings(
         demo=demo,

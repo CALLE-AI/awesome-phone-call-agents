@@ -1,0 +1,23 @@
+{
+  "name": "@muster/testing",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "sideEffects": false,
+  "types": "./dist/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js"
+    }
+  },
+  "scripts": {
+    "build": "tsc -b"
+  },
+  "dependencies": {
+    "@muster/application": "0.0.0",
+    "@muster/contracts": "0.0.0",
+    "@muster/domain": "0.0.0",
+    "@testcontainers/postgresql": "12.0.4"
+  }
+}

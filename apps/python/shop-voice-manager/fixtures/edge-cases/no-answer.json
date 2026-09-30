@@ -1,0 +1,36 @@
+{
+  "call_id": "call_inv_20260817_noanswer",
+  "idempotency_key": "shopvoice-demo-lagos-corner-shop-inventory-2026-08-17",
+  "status": "no_answer",
+  "task_completed": false,
+  "completion_confidence": {
+    "score": 0.0,
+    "label": "none"
+  },
+  "evidence": [],
+  "structured_result": null,
+  "metadata": {
+    "shop_id": "demo-lagos-corner-shop",
+    "call_type": "inventory",
+    "call_date": "2026-08-17"
+  },
+  "recipients": [
+    {
+      "phones": [
+        "+2348000000000"
+      ],
+      "region": "NG",
+      "locale": "en",
+      "structured_result": null,
+      "attempts": [
+        {
+          "attempt": 1,
+          "status": "no_answer",
+          "started_at": "2026-08-17T07:15:00+01:00",
+          "duration_seconds": 28,
+          "transcript_turns": []
+        }
+      ]
+    }
+  ]
+}

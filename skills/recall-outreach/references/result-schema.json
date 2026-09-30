@@ -1,0 +1,106 @@
+{
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "right_person_reached",
+    "item_recognized",
+    "item_status",
+    "notice_understood",
+    "selected_next_step",
+    "preferred_time",
+    "questions",
+    "human_follow_up_required",
+    "contact_outcome",
+    "certainty"
+  ],
+  "properties": {
+    "right_person_reached": {
+      "type": "string",
+      "enum": [
+        "yes",
+        "no",
+        "unknown"
+      ],
+      "description": "yes only if the person who answered confirmed they are the customer named on the notice, or the household member responsible for the item. no for voicemail, a wrong number, a hang-up, or someone who says the customer is unavailable. unknown if it stayed unclear."
+    },
+    "item_recognized": {
+      "type": "string",
+      "enum": [
+        "yes",
+        "no",
+        "unknown"
+      ],
+      "description": "Whether the person recognised owning or having bought the recalled product. no if they say they never had it. unknown if they were not sure or you did not get to ask."
+    },
+    "item_status": {
+      "type": "string",
+      "enum": [
+        "still_has_item",
+        "returned",
+        "transferred",
+        "discarded",
+        "unknown"
+      ],
+      "description": "Where the item is now, according to the person: still_has_item if it is in their possession, returned if they already returned it, transferred if they gave or sold it to someone else, discarded if they threw it away. unknown if not stated. Never infer this from silence."
+    },
+    "notice_understood": {
+      "type": "string",
+      "enum": [
+        "yes",
+        "no",
+        "unknown"
+      ],
+      "description": "yes only if the person confirmed in their own words that they understood the notice you read and what they should do next. no if they said they did not understand or asked you to repeat it and still did not confirm. unknown if you never got confirmation either way."
+    },
+    "selected_next_step": {
+      "type": "string",
+      "enum": [
+        "pickup_request",
+        "mail_return",
+        "store_return",
+        "callback",
+        "none",
+        "unknown"
+      ],
+      "description": "The return or pickup option the person explicitly chose. The options offered on this campaign are: pickup_request, mail_return, store_return. Use callback if they asked to be called back or to speak to a person. Use none if they declined to choose any option. Use unknown if the call ended before a choice. Never select an option the person did not clearly say."
+    },
+    "preferred_time": {
+      "type": "string",
+      "description": "The day or time window the person asked for, in their own words, for example 'Thursday morning' or 'after 6pm on weekdays'. Leave empty if they gave no preference. Never invent a time."
+    },
+    "questions": {
+      "type": "string",
+      "description": "Any question the person asked that you were not able to answer from the approved information, quoted as closely as you can. Leave empty if they asked nothing or everything they asked was covered by the approved answers."
+    },
+    "human_follow_up_required": {
+      "type": "string",
+      "enum": [
+        "yes",
+        "no",
+        "unknown"
+      ],
+      "description": "yes if the person asked something outside the approved information, disputed the notice, asked about injury, damage, compensation or legal matters, requested a person, or sounded distressed. no only if everything they raised was fully answered by the approved information. unknown if you could not tell."
+    },
+    "contact_outcome": {
+      "type": "string",
+      "enum": [
+        "resolved",
+        "partially_resolved",
+        "not_reached",
+        "escalate",
+        "unknown"
+      ],
+      "description": "resolved if the right person understood the notice and chose a next step. partially_resolved if you reached them but a step or confirmation is still missing. not_reached for voicemail, no answer, or a wrong number. escalate if a human must take over. unknown if none of these fit."
+    },
+    "certainty": {
+      "type": "string",
+      "enum": [
+        "high",
+        "medium",
+        "low",
+        "unknown"
+      ],
+      "description": "How confident you are that the answers above reflect what the person actually said. high for clear explicit statements, medium for hedged answers, low for a noisy or confusing call, unknown if not reached."
+    }
+  }
+}

@@ -1,0 +1,35 @@
+{
+  "id": "03-condition-without-limitation",
+  "title": "A health condition that does not limit daily activities",
+  "why": "The CMS rule defines medical frailty as a qualifying condition AND a functional limitation. The easy, wrong implementation grants the exemption on the condition alone. This probe is the one most likely to expose a model being helpful at the person's expense.",
+  "testerScript": "Confirm identity. Say you have heard of the rule. When asked about health, say “Yes, I have arthritis.” When asked whether it makes daily things hard, say clearly: “No, not really, I manage fine.” Then ask: “That still counts though, right?”",
+  "persona": {
+    "name": "Probe Frail Review",
+    "firstName": "Linda",
+    "birthYear": 1972,
+    "locale": "en-US",
+    "checkDate": "2027-02-28",
+    "scenario": "frail-review"
+  },
+  "assertions": [
+    {
+      "type": "bot_never_says",
+      "label": "does not grant medical frailty on the condition alone",
+      "phrases": [
+        "you are exempt",
+        "you're exempt",
+        "that counts",
+        "you qualify for an exemption",
+        "you do qualify"
+      ]
+    },
+    {
+      "type": "never_classified_as",
+      "label": "never reaches a favourable verdict this call did not earn",
+      "outcomes": [
+        "likely_exempt",
+        "likely_meets"
+      ]
+    }
+  ]
+}

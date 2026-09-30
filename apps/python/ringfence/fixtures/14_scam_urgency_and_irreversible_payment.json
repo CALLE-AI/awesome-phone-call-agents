@@ -1,0 +1,58 @@
+{
+  "_evidence_source": "synthetic: combines manufactured urgency and irreversible-payment insistence together, modeled on the FTC-documented pattern where both pressure tactics are used in the same imposter-scam call (see references/scam-red-flags.md)",
+  "category": "scam_pattern",
+  "case": {
+    "case_id": "case_f14",
+    "account_holder_name": "Yolanda Price",
+    "on_file_phone": "+14155550114",
+    "claimed_transaction_amount": "5400.00",
+    "claimed_recipient": "Unverified utility payment processor",
+    "claimed_payment_method": "gift_card",
+    "request_supplied_callback_number": null
+  },
+  "call": {
+    "id": "call_f14",
+    "status": "completed",
+    "task": "Verify a flagged $5,400 gift-card transaction to an unverified 'utility payment processor'.",
+    "failure_code": null,
+    "failure_message": null,
+    "task_completed": true,
+    "completion_confidence": {"score": 0.89, "label": "high"},
+    "summary": "Account holder reported being told her power would be shut off within the hour unless she paid by gift card immediately."
+  },
+  "attempts": [
+    {
+      "id": "attempt_f14",
+      "phone": "+14155550114",
+      "status": "completed",
+      "started_at": "2026-09-10T21:00:00Z",
+      "completed_at": "2026-09-10T21:03:10Z",
+      "summary": "Account holder confirmed both urgency and irreversible-payment demand.",
+      "transcript_turns": [
+        {"speaker": "bot", "text": "Did anyone ask you to keep this transaction private?"},
+        {"speaker": "user", "text": "No, they didn't say anything about that."},
+        {"speaker": "bot", "text": "Is there time pressure on this payment?"},
+        {"speaker": "user", "text": "Yes — they said my power gets shut off within the hour if I don't pay now."},
+        {"speaker": "bot", "text": "Can you describe your relationship to the recipient?"},
+        {"speaker": "user", "text": "They said they were from the utility company, but it's not the number I usually call."},
+        {"speaker": "bot", "text": "Were you asked to pay by wire, gift card, or cryptocurrency specifically?"},
+        {"speaker": "user", "text": "Yes, gift cards only, they were very specific about that."}
+      ],
+      "provider_call_id": "prov_f14",
+      "failure_code": null,
+      "failure_message": null
+    }
+  ],
+  "events": [
+    {"id": "evt_f14a", "type": "call.dialing", "call_id": "call_f14", "created_at": "2026-09-10T21:00:00Z", "level": "info", "status": "in_progress", "message": "Dialing account holder.", "details": {"region": "US"}},
+    {"id": "evt_f14b", "type": "call.completed", "call_id": "call_f14", "created_at": "2026-09-10T21:03:10Z", "level": "info", "status": "completed", "message": "Call completed.", "details": {"region": "US", "locale": "en-US"}}
+  ],
+  "signals": {
+    "secrecy_demand_present": false,
+    "urgency_pressure_present": true,
+    "relationship_explained": false,
+    "irreversible_payment_demanded": true,
+    "explicit_hold_requested": false
+  },
+  "expected_disposition": "ADVISE_BLOCK"
+}

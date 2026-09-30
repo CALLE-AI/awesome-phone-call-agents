@@ -1,0 +1,19 @@
+{
+  "name": "calle-kol",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "engines": { "node": ">=22.18" },
+  "scripts": {
+    "demo": "node src/cli.ts demo",
+    "eval": "node src/cli.ts eval",
+    "live": "node --env-file-if-exists=.env src/cli.ts live",
+    "test": "node --test test/*.test.ts",
+    "typecheck": "tsc --noEmit",
+    "validate": "npm run typecheck && npm test && npm run eval"
+  },
+  "devDependencies": {
+    "@types/node": "^24.3.0",
+    "typescript": "^5.9.2"
+  }
+}

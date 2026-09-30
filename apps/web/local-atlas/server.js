@@ -136,7 +136,23 @@ app.get('/api/cache-test', async (req, res) => {
         : `WRONG: incr=${a} decr=${b} readBack=${back}`;
     }catch(e){ counter = 'ERROR ' + String(e.message || e); }
 
-    return res.json({ ...out, roundTripMs: ms, counter,
+    /* The other thing worth knowing from a deploy rather than a laptop: whether
+       this host can read one OSM element. Overpass cannot be reached from here
+       at all — all three mirrors refuse even a one-element query — so listing
+       verification uses the OSM API instead, and whether that answers decides
+       whether a third of the map can be called live or only simulated. */
+    let osmLookup = 'not tested';
+    try{
+      const t1 = Date.now();
+      const rr = await fetch('https://api.openstreetmap.org/api/0.6/node/643414350.json',
+        { headers: { 'User-Agent': OSM_UA }, signal: AbortSignal.timeout(8000) });
+      const t = rr.ok ? ((((await rr.json()).elements || [])[0] || {}).tags || {}) : {};
+      osmLookup = rr.ok
+        ? `OK — read one element in ${Date.now() - t1}ms (${t.name || 'unnamed'})`
+        : 'HTTP ' + rr.status;
+    }catch(e){ osmLookup = 'FAILED: ' + String(e.message || e).slice(0, 60); }
+
+    return res.json({ ...out, roundTripMs: ms, counter, osmLookup,
       verdict: j?.result === 'str:ping' ? 'OK — shared cache is live' : 'WROTE BUT READ BACK WRONG VALUE' });
   }catch(e){ res.json({ ...out, verdict: 'ERROR ' + String(e.message || e) }); }
 });
@@ -459,6 +475,7 @@ async function overpassUpstream(q){
   }
   throw new Error(last);
 }
+
 app.post('/api/overpass', express.json({ limit: '64kb' }), async (req, res) => {
   try{
     const q = String(req.body?.q || '').slice(0, 8000);
@@ -1607,36 +1624,71 @@ const calleErrStatus = e =>
    listing carries, and dials what the provider says rather than what the caller
    sent. Cached for a day: this is the same lookup the details panel already
    makes, and a business's number is not news. */
-const GOOG_PHONE_MASK = 'id,nationalPhoneNumber,internationalPhoneNumber';
-async function listedPhone(place){
+const OSM_UA = 'local-atlas/1.0 (+https://local-atlas-api.onrender.com; listing verification)';
+/* Name and address ride along with the number because they are the same fact:
+   the listing this server read back. Verifying a number against listing A and
+   then announcing and filing the answer under whatever name the request body
+   carried is the A-called-B gap raised in review, and it closes by having one
+   fetch answer both questions. The cache key changed with the shape — a warm
+   entry from the string-returning version must not be read back as a listing. */
+const GOOG_LISTING_MASK = 'id,nationalPhoneNumber,internationalPhoneNumber,displayName,formattedAddress';
+async function listedListing(place){
   const gid = String((place && place.gid) || '');
   const fsqId = String((place && place.fsqId) || '');
+  const osmId = String((place && place.osmId) || '');
   try{
-    if(gid && GOOG) return await cached('lp:g:' + gid, 86400e3, async () => {
+    /* Not Overpass — the OSM API. Roughly a third of the named OSM places this
+       app shows carry a phone (46 in rural Vermont, 359 in Manhattan), so the
+       alternative to reading them back was cutting all of them out of the
+       feature. Overpass cannot do it from here: measured from this deploy, all
+       three mirrors refuse a *one-element* query, at 429, a timeout and a
+       connection failure respectively. The rate limiting is about the address,
+       not the size of the ask.
+
+       api.openstreetmap.org is a different service — the authoritative one, in
+       fact, with Overpass derived from it — and it serves a single element by
+       id in about a hundred milliseconds. That is the right shape of request
+       anyway: one object, at the moment somebody asks a question, cached for a
+       day, rather than a search. */
+    if(/^[nwr]\d+$/.test(osmId)) return await cached('ll:o:' + osmId, 86400e3, async () => {
+      const kind = { n: 'node', w: 'way', r: 'relation' }[osmId[0]];
+      const rr = await fetch(`https://api.openstreetmap.org/api/0.6/${kind}/${osmId.slice(1)}.json`,
+        { headers: { 'User-Agent': OSM_UA }, signal: AbortSignal.timeout(8000) });
+      if(!rr.ok) throw new Error('OSM API ' + rr.status);
+      const t = (((await rr.json()).elements || [])[0] || {}).tags || {};
+      return { phone: t.phone || t['contact:phone'] || '',
+               name: t.name || '',
+               addr: [t['addr:housenumber'], t['addr:street']].filter(Boolean).join(' ') };
+    });
+    if(gid && GOOG) return await cached('ll:g:' + gid, 86400e3, async () => {
       const rr = await fetch(`${GOOG_BASE}/places/${encodeURIComponent(gid)}`,
-        { headers: { 'X-Goog-Api-Key': GOOG, 'X-Goog-FieldMask': GOOG_PHONE_MASK } });
+        { headers: { 'X-Goog-Api-Key': GOOG, 'X-Goog-FieldMask': GOOG_LISTING_MASK } });
       if(!rr.ok) throw new Error('Google Places: ' + await googErr(rr));
       const j = await rr.json();
-      return j.nationalPhoneNumber || j.internationalPhoneNumber || '';
+      return { phone: j.nationalPhoneNumber || j.internationalPhoneNumber || '',
+               name: (j.displayName && j.displayName.text) || '',
+               addr: j.formattedAddress || '' };
     });
-    if(fsqId && FSQ) return await cached('lp:f:' + fsqId, 86400e3, async () => {
-      const rr = await fetch(`${FSQ_BASE}/places/${encodeURIComponent(fsqId)}?fields=tel`,
+    if(fsqId && FSQ) return await cached('ll:f:' + fsqId, 86400e3, async () => {
+      const rr = await fetch(`${FSQ_BASE}/places/${encodeURIComponent(fsqId)}?fields=tel,name,location`,
         { headers: FSQ_HDRS() });
       if(!rr.ok) throw new Error('FSQ ' + rr.status);
-      return (await rr.json()).tel || '';
+      const j = await rr.json();
+      return { phone: j.tel || '', name: j.name || '',
+               addr: (j.location && j.location.formatted_address) || '' };
     });
   }catch(e){
     /* A lookup that fails is not a lookup that succeeded. Returning null sends
        this down the unverified path, where a live call is refused. */
-    console.warn('listedPhone failed:', String(e.message || e));
+    console.warn('listedListing failed:', String(e.message || e));
     return null;
   }
   return null;                       // no provider id: nothing to check against
 }
 
-/* Set on the server, always, so a `listedPhone` invented by a caller cannot
-   survive the spread and be mistaken for one we looked up. */
-const withListedPhone = async place => ({ ...place, listedPhone: await listedPhone(place) });
+/* Set on the server, always, and on the far side of the spread, so a `listed`
+   invented by a caller cannot survive to be mistaken for one we looked up. */
+const withListing = async place => ({ ...place, listed: await listedListing(place) });
 
 /* Every path through here can spend a CALL-E credit, so every path through
    here needs a name attached — that is the whole reason this app grew accounts.
@@ -1649,7 +1701,7 @@ app.post('/api/ask-place', express.json({ limit: '8kb' }), auth.attachUser, auth
       const { place, question, templateId, confirmed, force, isPrivate } = req.body || {};
       if(!place || !place.name || place.lat == null || place.lon == null)
         return res.status(400).json({ error: 'place {name, lat, lon, phone} required' });
-      const r = await calle.askPlace({ place: await withListedPhone(place), question, templateId,
+      const r = await calle.askPlace({ place: await withListing(place), question, templateId,
         confirmed: confirmed === true, force: force === true,
         isPrivate: isPrivate === true, uid: req.user.id,
         accessCode: req.get('x-atlas-access') || '' });
@@ -1673,7 +1725,7 @@ app.post('/api/ask-around', express.json({ limit: '16kb' }), auth.attachUser, au
         return res.status(400).json({ error: 'places[] required' });
       if(places.some(p => !p || !p.name || p.lat == null || p.lon == null))
         return res.status(400).json({ error: 'each place needs {name, lat, lon, phone}' });
-      const r = await calle.askAround({ places: await Promise.all(places.map(withListedPhone)),
+      const r = await calle.askAround({ places: await Promise.all(places.map(withListing)),
         question, templateId,
         confirmed: confirmed === true,
         uid: req.user.id, accessCode: req.get('x-atlas-access') || '' });

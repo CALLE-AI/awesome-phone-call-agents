@@ -1,0 +1,58 @@
+{
+  "_evidence_source": "synthetic: fictional tuition-payment scenario, modeled on an ordinary legitimate large transaction",
+  "category": "clean_legitimate",
+  "case": {
+    "case_id": "case_f16",
+    "account_holder_name": "Marcus Deleon",
+    "on_file_phone": "+14155550116",
+    "claimed_transaction_amount": "11400.00",
+    "claimed_recipient": "Ashcombe State University Bursar's Office",
+    "claimed_payment_method": "ach_transfer",
+    "request_supplied_callback_number": null
+  },
+  "call": {
+    "id": "call_f16",
+    "status": "completed",
+    "task": "Verify a flagged $11,400 ACH transaction to Ashcombe State University Bursar's Office.",
+    "failure_code": null,
+    "failure_message": null,
+    "task_completed": true,
+    "completion_confidence": {"score": 0.95, "label": "high"},
+    "summary": "Account holder confirmed the payment is a fall semester tuition installment for his daughter, no pressure or secrecy reported."
+  },
+  "attempts": [
+    {
+      "id": "attempt_f16",
+      "phone": "+14155550116",
+      "status": "completed",
+      "started_at": "2026-09-10T09:15:00Z",
+      "completed_at": "2026-09-10T09:18:20Z",
+      "summary": "Account holder confirmed the transaction.",
+      "transcript_turns": [
+        {"speaker": "bot", "text": "This is an automated verification call from your bank about a flagged transaction. Did anyone ask you to keep this transaction private?"},
+        {"speaker": "user", "text": "No, why would they, it's just tuition."},
+        {"speaker": "bot", "text": "Is there time pressure on this payment?"},
+        {"speaker": "user", "text": "The deadline is Friday but that's a normal school deadline, not anything unusual."},
+        {"speaker": "bot", "text": "Can you describe your relationship to the recipient?"},
+        {"speaker": "user", "text": "It's my daughter's university, I'm paying her fall semester bill directly to the bursar's office."},
+        {"speaker": "bot", "text": "Were you asked to pay by wire, gift card, or cryptocurrency specifically?"},
+        {"speaker": "user", "text": "No, it's the same ACH transfer through the school's own payment portal I use every semester."}
+      ],
+      "provider_call_id": "prov_f16",
+      "failure_code": null,
+      "failure_message": null
+    }
+  ],
+  "events": [
+    {"id": "evt_f16a", "type": "call.dialing", "call_id": "call_f16", "created_at": "2026-09-10T09:15:00Z", "level": "info", "status": "in_progress", "message": "Dialing account holder.", "details": {"region": "US"}},
+    {"id": "evt_f16b", "type": "call.completed", "call_id": "call_f16", "created_at": "2026-09-10T09:18:20Z", "level": "info", "status": "completed", "message": "Call completed.", "details": {"region": "US", "locale": "en-US"}}
+  ],
+  "signals": {
+    "secrecy_demand_present": false,
+    "urgency_pressure_present": false,
+    "relationship_explained": true,
+    "irreversible_payment_demanded": false,
+    "explicit_hold_requested": false
+  },
+  "expected_disposition": "ADVISE_ALLOW"
+}

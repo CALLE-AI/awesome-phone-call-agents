@@ -1,0 +1,945 @@
+/* ============================================================================
+ * The showcase figure.
+ *
+ * Everything here is scoped under .calle-showcase. No selector in this file can
+ * match anything outside the figure, and no custom property declared here reaches
+ * :root, so dropping this into the page cannot change a pixel of the page.
+ *
+ * Four rules govern this file and none of them is negotiable.
+ *
+ *   1. No colour is invented here. Every token below names a page token and keeps
+ *      the brand value only as a fallback, so the figure follows the page when the
+ *      page is re-cut and still stands up when it is lifted out. This block used to
+ *      hold ten hardcoded hexes, and the figure went on drawing a navy rail and a
+ *      sage panel for as long as they were there.
+ *   2. Only `transform` and `opacity` animate. Not width, height, top, left,
+ *      margin, padding, stroke-width or stroke-dashoffset. Those cost layout or a
+ *      full re-raster, and this page is measured for long tasks over ten loads.
+ *   3. The structure never animates. Cards, rules, tracks, the rail and every label
+ *      are painted once at full opacity and stay there. Ten small marks move. Stop
+ *      them and the diagram is complete, which is what makes reduced motion one
+ *      block rather than a second design.
+ *   4. Nothing here holds a geometry number that `showcase.py` also holds. The
+ *      route offsets are declared once, at the top, and `tests/test_showcase_
+ *      geometry.py` asserts they equal the values that module derives.
+ *
+ * The loop is 9s. Nine calls are spaced one second apart and each holds a line for
+ * a third of the loop, so three lines are busy at every moment. That is the
+ * concurrency cap, and it is arithmetic rather than decoration: nine marks times a
+ * one-third duty cycle is three.
+ * ========================================================================== */
+
+.calle-showcase {
+  /* ---- Colour ------------------------------------------------------------
+   *
+   * Two surfaces, four inks, two lines, one accent. The accent is amber and it
+   * appears on exactly two things: the safeguarding thread, and the ending a
+   * two-bucket pipeline files with the successes. An accent on five things is
+   * decoration; an accent on two is an argument.
+   *
+   * The brand hex kept beside each token is the value CALL-E's own site uses, and
+   * it is the fallback rather than the value, so the figure degrades to the brand
+   * rather than to nothing when it is used outside this page. */
+
+  --cs-ground: var(--paper-2, oklch(0.963 0.005 85));      /* the band under it   */
+  --cs-card: var(--card, oklch(1 0 0));                    /* the four plates     */
+  --cs-inset: var(--paper-3, oklch(0.952 0.006 85));       /* rows inside a plate */
+
+  --cs-ink: var(--ink, oklch(0.235 0.008 80));             /* titles, glyphs      */
+  --cs-ink-2: var(--ink-2, oklch(0.430 0.008 80));         /* every other word    */
+  --cs-ink-3: var(--ink-3, oklch(0.520 0.008 80));         /* strokes, never text */
+  --cs-ink-4: var(--ink-4, oklch(0.640 0.007 80));         /* the redacted bars   */
+
+  --cs-line: var(--line, oklch(0.878 0.007 85));
+  --cs-line-strong: var(--line-strong, oklch(0.800 0.009 85));
+
+  --cs-accent: var(--undetermined, oklch(0.480 0.090 78)); /* deep amber, strokes */
+  --cs-lit: var(--brand-field, oklch(0.920 0.140 97));     /* the lifted yellow   */
+
+  /* Two inks carry text and two grounds are printed on. Everything secondary is
+   * --cs-ink-2 rather than --cs-ink-3, which is not a shade preference: --ink-3 on
+   * a white card measures 3.84, and every label in here renders under 14px on a
+   * desktop column, so 4.5 is the bar. Type hierarchy is carried by size and weight
+   * instead, which is the safer instrument anyway. --cs-ink-3 and --cs-ink-4 are
+   * stroke and fill colours in this file and are never set on a <text>.
+   *
+   * tools/gates/run.mjs walks the painted runs in this figure with every other run
+   * on the page, so these are the pairs it measures rather than the pairs a comment
+   * claims. Nothing here is exempt from it. */
+
+  --cs-loop: 9s;
+
+  /* ---- The route --------------------------------------------------------
+   *
+   * Derived in showcase.py and asserted against this block by a test. A mark leaves
+   * the register at 0, crawls the queue to the line, holds the line, rides the bus
+   * bar sideways, and lands on its ending. */
+
+  --cs-x-line-in: 76px;
+  --cs-x-line-out: 276px;
+  --cs-x-bus: 310px;
+  --cs-x-end: 376px;
+  --cs-y-hop: 108px;
+
+  --cs-x-rail: 186px;
+  --cs-x-rail-in: 202px;
+  --cs-y-drop: 207px;
+
+  --cs-rest-q0: 0px;
+  --cs-rest-q1: 26px;
+  --cs-rest-q2: 52px;
+  --cs-rest-s0: 100px;
+  --cs-rest-s1: 166px;
+  --cs-rest-s2: 232px;
+  --cs-esc-rest-x: 110px;
+
+  /* How far each card stands off the ground. Derived in showcase.py, which also
+   * asserts that the deepest of them clears the legend rule and the viewBox, and
+   * asserted equal to these four by the same test that guards every offset above. */
+  --cs-lift-a: 6px;
+  --cs-lift-b: 9px;
+  --cs-lift-c: 14px;
+  --cs-lift-d: 10px;
+
+  /* The three-endings figure's route, same rule: derived in endings.py. */
+  --en-x-in: 62px;
+  --en-y-1: 54px;
+  --en-y-2: 152px;
+  --en-y-3: 250px;
+
+
+  /* One track up, one track down. Written once so nine rules can name a direction
+   * instead of repeating a sign. */
+  --cs-up: calc(-1 * var(--cs-y-hop));
+  --cs-down: var(--cs-y-hop);
+
+  display: block;
+  /* A step under the frame, because there was none. Measured 0px at 1440 in both
+   * acts that carry this figure: flush against act 02's duet and flush against act
+   * 03's eyebrow. A figure with nothing under it reads as the top of whatever
+   * follows it, which is the one thing a figure must not do. --space-6 is the step
+   * this page already uses between an object and the next argument. */
+  margin: 0 0 var(--space-6);
+  padding: clamp(0.75rem, 2vw, 1.5rem);
+  background: var(--cs-ground);
+  color: var(--cs-ink);
+
+  /* A scroll container at every width, not only where it scrolls.
+   *
+   * Under 34rem the figure stops shrinking and this box pans instead, which needs to
+   * be reachable by Tab as well as by a thumb. `tabindex=0` is on the element, and the
+   * no-script gate exempts a focusable element only when its computed overflow says it
+   * is genuinely a scroll box, reading the property rather than a class name. Declaring
+   * the overflow at one width and the tabindex at all of them is how that exemption
+   * would be claimed and not earned. So the box is what it says it is everywhere, and
+   * above 34rem the figure fits and nothing moves. */
+  overflow-x: auto;
+  min-width: 0;
+  max-width: 100%;
+}
+
+/* Reserve the box before a byte of the figure is painted. The width and height
+ * attributes give the intrinsic ratio, this restates it, and neither the SVG nor
+ * anything inside it ever changes size. The page's layout-shift budget is 0.001
+ * for everything on it, so the figure has to contribute exactly zero. */
+.calle-showcase__svg {
+  display: block;
+  width: 100%;
+  height: auto;
+  aspect-ratio: 1240 / 660;
+  overflow: visible;
+  font-family: "neue-haas-grotesk-text", "Neue Haas Grotesk Text",
+    "Helvetica Neue", Helvetica, Arial, sans-serif;
+  font-feature-settings: "kern" 1;
+  /* Figures inside the cards are read as quantities, so they are lined and tabular
+   * rather than proportional. One declaration, and 21 stops looking like prose. */
+  font-variant-numeric: lining-nums tabular-nums;
+}
+
+/* ---- The board, and the one place a 3D transform is real -----------------
+ *
+ * The four cards stand at four heights on a board turned three degrees away from the
+ * reader. The heights are drawn, in showcase.py. The turn is here, and it is declared
+ * on the `<svg>` box with the perspective on the `<figure>` around it, because that
+ * pair is the only arrangement inside this figure where a 3D transform does anything.
+ *
+ * Measured in this Chrome before a line of this was written, rather than assumed from
+ * the spec. `perspective: 600px` and `transform-style: preserve-3d` set on an SVG
+ * ancestor are read back by getComputedStyle as 600px and preserve-3d, and a child
+ * group declaring `translateZ(40px)` under them reported 786.45 x 379.10 at the same
+ * origin as the same group with no transform at all: identical to the hundredth of a
+ * pixel. The child's own computed transform-style comes back `flat` whatever its
+ * ancestors say. An SVG element does not establish a 3D rendering context, so the
+ * properties parse, inherit, inspect correctly and paint nothing.
+ *
+ * The `perspective()` transform function is a different matter: it does apply to an
+ * SVG group, and `perspective(600px) rotateY(30deg)` measured 408.80 x 456.12 against
+ * the flattened 238.24 x 379.10, which is a real projection. It is still not used here.
+ * The same probe found the reported rect and the composed matrix disagreeing about what
+ * that projection does, and the scroll-walk gate decides whether two runs of text
+ * overlap by reading rects. A depth effect the gate cannot measure correctly is worse
+ * than no depth effect, because it fails silently and it fails green.
+ *
+ * Three degrees and one, with the perspective at 1600px. The numbers are small on
+ * purpose: the near edge of the board grows about eight pixels and the far edge loses
+ * about two per cent of its vertical gaps, which is a sixth of a pixel between two
+ * stacked labels. The figure's padding is 24px at this column, so the growth is
+ * absorbed and the scroll box it sits in gains no range it did not have. A tilt of
+ * fifteen degrees would look like a screenshot of a presentation and would push the
+ * far-side labels into each other.
+ *
+ * `cs-deck` rather than `.calle-showcase`, because act 03's three-endings figure
+ * carries that class too and shares this file. It is authored at the width of its own
+ * column with no margin to grow into. */
+.cs-deck { perspective: 1600px; perspective-origin: 50% 38%; }
+
+.cs-deck > .calle-showcase__svg { transform: rotateX(1deg) rotateY(3deg); }
+
+.calle-showcase__caption {
+  max-width: 46em;
+  margin: 0.9rem 0 0;
+  font-family: "neue-haas-grotesk-text", "Neue Haas Grotesk Text",
+    "Helvetica Neue", Helvetica, Arial, sans-serif;
+  font-size: 0.9375rem;
+  line-height: 1.5;
+  color: var(--cs-ink);
+}
+
+/* ---- The type ramp ------------------------------------------------------
+ *
+ * Five sizes and three weights. This is most of the difference between a card that
+ * reads as designed and a labelled box: an eyebrow the reader skims past, a title
+ * they land on, a sublabel that qualifies it, and a micro label for the mechanics.
+ * Sizes are user units inside a 1240-wide viewBox, so on a 950px column the ramp
+ * lands at roughly 18 / 12 / 11 / 15 / 12 pixels. */
+
+.calle-showcase .cs-eyebrow,
+.calle-showcase .cs-micro,
+.calle-showcase .cs-tag,
+.calle-showcase .cs-rail-label {
+  font-size: 15px;
+  font-weight: 500;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  fill: var(--cs-ink-2);
+  color: var(--cs-ink-2);
+}
+
+.calle-showcase .cs-micro--strong,
+.calle-showcase .cs-rail-label { font-weight: 600; }
+
+.calle-showcase .cs-tag { text-anchor: end; }
+
+.calle-showcase .cs-title {
+  font-size: 24px;
+  font-weight: 600;
+  letter-spacing: -0.012em;
+  fill: var(--cs-ink);
+  color: var(--cs-ink);
+}
+
+.calle-showcase .cs-sub,
+.calle-showcase .cs-end-sub,
+.calle-showcase .cs-legend {
+  font-size: 16px;
+  font-weight: 400;
+  fill: var(--cs-ink-2);
+  color: var(--cs-ink-2);
+}
+
+.calle-showcase .cs-end-title {
+  font-size: 20px;
+  font-weight: 600;
+  letter-spacing: -0.006em;
+  fill: var(--cs-ink);
+  color: var(--cs-ink);
+}
+
+.calle-showcase .cs-wl-label {
+  font-size: 17px;
+  font-weight: 500;
+  fill: var(--cs-ink);
+  color: var(--cs-ink);
+}
+
+.calle-showcase .cs-rank {
+  font-size: 16px;
+  font-weight: 600;
+  fill: var(--cs-ink-2);
+  color: var(--cs-ink-2);
+}
+
+/* The one number in the figure, set at the size a number earns. */
+.calle-showcase .cs-figure {
+  font-size: 32px;
+  font-weight: 600;
+  letter-spacing: -0.02em;
+  fill: var(--cs-ink);
+  color: var(--cs-ink);
+}
+
+.calle-showcase .cs-figure__unit {
+  font-size: 16px;
+  font-weight: 400;
+  letter-spacing: 0;
+  fill: var(--cs-ink-2);
+  color: var(--cs-ink-2);
+}
+
+/* ---- Surfaces -----------------------------------------------------------
+ *
+ * Three levels, and every one of them is a fill and a hairline. No shadow appears
+ * in this file, and the depth added below did not put one here either. A shadow is
+ * how a flat design pretends to have hierarchy it did not build, and it is the first
+ * thing that dates a diagram. What each card has instead is a plate: its own outline,
+ * one layer down, standing a stated distance out from under it. */
+
+.calle-showcase .cs-card {
+  fill: var(--cs-card);
+  stroke: var(--cs-line);
+  stroke-width: 1.5;
+}
+
+/* The plate, and the whole of the figure's depth.
+ *
+ * It is drawn at the card's own rect and pushed out along the oblique from here, which
+ * is what gives the depth an off switch: with `transform: none` a plate is exactly
+ * covered by an opaque card and the figure is the flat drawing it was before. That is
+ * one rule for reduced motion, one for print and one for the pause control, rather
+ * than a second set of shapes for each.
+ *
+ * --cs-line-strong rather than an ink. The plate is a surface catching less light, not
+ * a mark, and three connectors cross it on their way out of a card: at 0.80 lightness
+ * a 0.52 stroke still reads across it, and at ink-3 the line would vanish into it. */
+.calle-showcase .cs-riser { fill: var(--cs-line-strong); }
+
+.calle-showcase .cs-riser--a { transform: translate(var(--cs-lift-a), var(--cs-lift-a)); }
+.calle-showcase .cs-riser--b { transform: translate(var(--cs-lift-b), var(--cs-lift-b)); }
+.calle-showcase .cs-riser--c { transform: translate(var(--cs-lift-c), var(--cs-lift-c)); }
+.calle-showcase .cs-riser--d { transform: translate(var(--cs-lift-d), var(--cs-lift-d)); }
+
+/* Four units of --ink-3, not three of --line-strong. The figure renders about 1040px
+ * wide in this column, so a stripe is three and a half pixels: at 0.8 lightness that is
+ * 1.2 against a white card and it did not read as a quiet detail, it read as nothing.
+ * --ink-4 was still too light. Quiet has to remain visible, and the stripes stay
+ * neutral so amber keeps meaning one thing: the case that does not close, and the
+ * escalation that catches it. */
+.calle-showcase .cs-stripe { fill: var(--cs-ink-3); }
+
+.calle-showcase .cs-rule {
+  stroke: var(--cs-line-strong);
+  stroke-width: 1.5;
+}
+
+.calle-showcase .cs-hair {
+  stroke: var(--cs-line);
+  stroke-width: 1;
+}
+
+/* ---- Stage one: the register -------------------------------------------- */
+
+.calle-showcase .cs-reg-mark { fill: var(--cs-ink-3); }
+.calle-showcase .cs-reg-bar { fill: var(--cs-ink-4); }
+
+/* ---- Stage two: the lines ------------------------------------------------ */
+
+.calle-showcase .cs-slot {
+  fill: var(--cs-inset);
+  stroke: var(--cs-line);
+  stroke-width: 1.5;
+}
+
+/* The line a mark rides. It runs the full width of every slot and the full length
+ * of the queue, so a mark is never travelling over nothing. */
+.calle-showcase .cs-track {
+  stroke: var(--cs-line-strong);
+  stroke-width: 1.5;
+}
+
+/* ---- The bus bar between stage two and stage three ---------------------- */
+
+.calle-showcase .cs-bus {
+  stroke: var(--cs-ink-3);
+  stroke-width: 2.5;
+  stroke-linecap: round;
+}
+
+.calle-showcase .cs-tee { fill: var(--cs-ink-3); }
+
+/* ---- Stage three: the endings ------------------------------------------- */
+
+.calle-showcase .cs-end-row,
+.calle-showcase .cs-wl-row {
+  fill: var(--cs-inset);
+  stroke: var(--cs-line);
+  stroke-width: 1.25;
+}
+
+/* The two tinted rows, and the only two. Amber at the lifted grade rather than the
+ * field grade: the field yellow is the brand's signal colour and it is right on a
+ * 30px chip, but eighty-four units of it is a highlighter stroke through a diagram
+ * and it is tiring to sit with. */
+.calle-showcase .cs-end-row--focal,
+.calle-showcase .cs-wl-row--focal {
+  fill: var(--cs-lit);
+  stroke: var(--cs-accent);
+  stroke-width: 1.5;
+}
+
+/* ---- Stage four: the worklist ------------------------------------------- */
+
+/* Nothing of its own. It is built from the shared row, glyph and type rules above,
+ * which is the point: the queue and the endings are one picture, so they are one
+ * set of parts. */
+
+/* ---- The status tag on each stage ---------------------------------------
+ *
+ * A plate with light behind it, riding the right end of the header rule. Three of the
+ * four say what the stage is holding, in ink on card white. The fourth says `1 open`
+ * and it is amber, because that is the ending a two-bucket pipeline files with the
+ * successes and this figure has exactly one thing to say. Amber on four tags would
+ * make the accent a palette.
+ *
+ * The light is a radial gradient on one ellipse, not a blur filter. A filter re-rasters
+ * its whole region every time anything inside it is touched, and this page is measured
+ * for long tasks over ten loads with a 50ms ceiling. A gradient is painted once. */
+
+.calle-showcase .cs-chip__plate {
+  fill: var(--cs-card);
+  stroke: var(--cs-line-strong);
+  stroke-width: 1.25;
+}
+
+.calle-showcase .cs-chip--lit .cs-chip__plate {
+  fill: var(--cs-lit);
+  stroke: var(--cs-accent);
+  stroke-width: 1.5;
+}
+
+/* Ink on both tags, never amber on the amber one. Two reasons, and the second is the
+ * one that decided it. --cs-accent is 0.48 lightness, which measures about 4.4 on this
+ * figure's ground, and the tag is set under 18px so the bar is 4.5. And the gate reads
+ * a run's CSS `color` against the nearest opaque HTML background, which for anything
+ * inside this SVG is the figure's own paper and never the plate the words sit on. So
+ * the ink has to clear the ground as well as the plate, and only the ink does both. */
+.calle-showcase .cs-chip__label {
+  font-size: 15px;
+  font-weight: 600;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  text-anchor: middle;
+  fill: var(--cs-ink);
+  color: var(--cs-ink);
+}
+
+.calle-showcase .cs-chip__glow { fill: url(#cs-glow-quiet); }
+
+/* The one tag that breathes. Opacity only, on the bloom only: the plate and its words
+ * hold still, so nothing a reader is trying to read changes weight, and the figure's
+ * rule that only transform and opacity animate is kept. */
+.calle-showcase .cs-chip--lit .cs-chip__glow {
+  fill: url(#cs-glow-lit);
+  animation: cs-chip-breathe var(--cs-loop) ease-in-out infinite;
+}
+
+@keyframes cs-chip-breathe {
+  0%, 100% { opacity: 0.5; }
+  50%      { opacity: 1; }
+}
+
+/* The gradient stops. Colour belongs in this file, so the stops in the markup carry a
+ * class each and no value, and the two blooms are the same three stops in two inks. */
+.calle-showcase .cs-glow--lit .cs-glow__core { stop-color: var(--cs-accent); stop-opacity: 0.40; }
+.calle-showcase .cs-glow--lit .cs-glow__mid { stop-color: var(--cs-accent); stop-opacity: 0.30; }
+.calle-showcase .cs-glow--lit .cs-glow__edge { stop-color: var(--cs-accent); stop-opacity: 0; }
+
+.calle-showcase .cs-glow--quiet .cs-glow__core { stop-color: var(--cs-ink-3); stop-opacity: 0.26; }
+.calle-showcase .cs-glow--quiet .cs-glow__mid { stop-color: var(--cs-ink-3); stop-opacity: 0.18; }
+.calle-showcase .cs-glow--quiet .cs-glow__edge { stop-color: var(--cs-ink-3); stop-opacity: 0; }
+
+/* ---- The endings, as shapes --------------------------------------------- */
+
+/* Full, half, empty, diamond. Read the shape and the ending is clear with no colour
+ * at all, which is what keeps it legible in greyscale, under every kind of colour
+ * blindness, and in a forced-colours theme.
+ *
+ * A closed call is a ring round a core; a call in progress is the bare core; a call
+ * that connected and learned nothing is the same ring half filled; no answer is the
+ * ring alone, dashed. Four states on one shape, so the key does not have to teach four
+ * unrelated marks and no two entries in it draw the same thing. */
+
+.calle-showcase .cs-glyph__core,
+.calle-showcase .cs-glyph--call { fill: var(--cs-ink); }
+
+.calle-showcase .cs-glyph__ring {
+  fill: none;
+  stroke: var(--cs-ink);
+  stroke-width: 2.5;
+}
+
+/* The one ending that does not close is the one that takes the accent. */
+.calle-showcase .cs-glyph__half { fill: var(--cs-accent); }
+.calle-showcase .cs-glyph--undetermined .cs-glyph__ring { stroke: var(--cs-accent); }
+
+.calle-showcase .cs-glyph--no-answer {
+  fill: var(--cs-card);
+  stroke: var(--cs-ink-3);
+  stroke-width: 2.5;
+  stroke-dasharray: 3.6 3.6;
+}
+
+.calle-showcase .cs-glyph--safeguarding rect {
+  fill: var(--cs-lit);
+  stroke: var(--cs-accent);
+  stroke-width: 2.5;
+}
+
+/* ---- Connectors ---------------------------------------------------------- */
+
+/* Every one of these runs on a single axis. The only corner in the figure is the
+ * quarter arc on the live rail, drawn in the markup at radius 8. */
+
+.calle-showcase .cs-feed {
+  stroke: var(--cs-ink-3);
+  stroke-width: 2;
+}
+
+.calle-showcase .cs-arrow { fill: var(--cs-ink-3); }
+
+/* ---- The safeguarding axis ----------------------------------------------- */
+
+/* Dashed where the route is merely available, solid where a case is taking it. It
+ * runs above the four stages rather than among them, because escalation is a second
+ * question about the same call and not a fourth ending. */
+.calle-showcase .cs-rail {
+  fill: none;
+  stroke: var(--cs-accent);
+  stroke-width: 2;
+  stroke-dasharray: 7 6;
+  stroke-linecap: butt;
+}
+
+.calle-showcase .cs-rail--live {
+  stroke-width: 2.5;
+  stroke-dasharray: none;
+  stroke-linejoin: round;
+}
+
+.calle-showcase .cs-stub {
+  fill: none;
+  stroke: var(--cs-accent);
+  stroke-width: 1.5;
+  stroke-dasharray: 5 5;
+}
+
+/* ---- The marks that move -------------------------------------------------- */
+
+.calle-showcase .cs-run__mark { fill: var(--cs-ink); }
+
+.calle-showcase .cs-esc__mark {
+  fill: var(--cs-lit);
+  stroke: var(--cs-accent);
+  stroke-width: 2.5;
+}
+
+.calle-showcase .cs-run__x,
+.calle-showcase .cs-run__y,
+.calle-showcase .cs-esc__x,
+.calle-showcase .cs-esc__y {
+  transform-box: view-box;
+  transform-origin: 0 0;
+}
+
+.calle-showcase .cs-run__x {
+  animation: cs-run-x var(--cs-loop) linear infinite;
+  animation-delay: var(--cs-phase);
+}
+
+.calle-showcase .cs-run__y {
+  animation: cs-run-y var(--cs-loop) ease-in-out infinite;
+  animation-delay: var(--cs-phase);
+}
+
+/* Along the route. A call crawls the queue from 4% to 34%, which is what spaces the
+ * waiting marks out instead of stacking them on one point, then holds a line from
+ * 34% to 67.3%. That is a third of the loop, and a third of the loop times nine
+ * calls is the three concurrent lines the card claims. */
+@keyframes cs-run-x {
+  0%     { transform: translateX(0);                   opacity: 0; }
+  4%     {                                             opacity: 1; }
+  34%    { transform: translateX(var(--cs-x-line-in));  }
+  67.3%  { transform: translateX(var(--cs-x-line-out)); }
+  74%    { transform: translateX(var(--cs-x-bus));      }
+  78%    { transform: translateX(var(--cs-x-bus));      }
+  88%    { transform: translateX(var(--cs-x-end));     opacity: 1; }
+  95%    { transform: translateX(var(--cs-x-end));     opacity: 0; }
+  100%   { transform: translateX(var(--cs-x-end));     opacity: 0; }
+}
+
+/* Across the route. Two steps, and both of them happen on a drawn line: down or up
+ * into a call line at 34%, then down or up the bus bar between 74% and 78%, which
+ * is the only interval where a mark moves on one axis with the other held. The
+ * offsets come from the per-call rules below, so there is one pair of keyframes
+ * rather than nine, and the properties never change value, so nothing is written
+ * per frame. They are substituted once when style is resolved. */
+@keyframes cs-run-y {
+  0%     { transform: translateY(0); }
+  30%    { transform: translateY(0); }
+  34%    { transform: translateY(var(--cs-slot-y)); }
+  74%    { transform: translateY(var(--cs-slot-y)); }
+  78%    { transform: translateY(var(--cs-lane-y)); }
+  100%   { transform: translateY(var(--cs-lane-y)); }
+}
+
+/* Which line each call takes, which ending it reaches, when it starts, and where it
+ * rests when motion is off. Calls take the lines in turn, so line one holds calls
+ * one, four and seven. Four calls end with a reason, three connect and learn
+ * nothing, two get no answer. The delays are negative so every call is already in
+ * flight on the first painted frame; the figure has no build-up, and a reader who
+ * lands mid-loop sees the same picture as one who lands at the start. */
+.calle-showcase .cs-run--1 { --cs-slot-y: var(--cs-up);   --cs-lane-y: var(--cs-up);   --cs-phase:  0s; --cs-rest-x: var(--cs-rest-q0); --cs-rest-y: 0px; }
+.calle-showcase .cs-run--2 { --cs-slot-y: 0px;            --cs-lane-y: 0px;            --cs-phase: -1s; --cs-rest-x: var(--cs-rest-q1); --cs-rest-y: 0px; }
+.calle-showcase .cs-run--3 { --cs-slot-y: var(--cs-down); --cs-lane-y: var(--cs-up);   --cs-phase: -2s; --cs-rest-x: var(--cs-rest-q2); --cs-rest-y: 0px; }
+.calle-showcase .cs-run--4 { --cs-slot-y: var(--cs-up);   --cs-lane-y: var(--cs-down); --cs-phase: -3s; --cs-rest-x: var(--cs-rest-s0); --cs-rest-y: var(--cs-slot-y); }
+.calle-showcase .cs-run--5 { --cs-slot-y: 0px;            --cs-lane-y: var(--cs-up);   --cs-phase: -4s; --cs-rest-x: var(--cs-rest-s1); --cs-rest-y: var(--cs-slot-y); }
+.calle-showcase .cs-run--6 { --cs-slot-y: var(--cs-down); --cs-lane-y: 0px;            --cs-phase: -5s; --cs-rest-x: var(--cs-rest-s2); --cs-rest-y: var(--cs-slot-y); }
+.calle-showcase .cs-run--7 { --cs-slot-y: var(--cs-up);   --cs-lane-y: var(--cs-up);   --cs-phase: -6s; --cs-rest-x: var(--cs-x-end);   --cs-rest-y: var(--cs-lane-y); }
+.calle-showcase .cs-run--8 { --cs-slot-y: 0px;            --cs-lane-y: var(--cs-down); --cs-phase: -7s; --cs-rest-x: var(--cs-x-end);   --cs-rest-y: var(--cs-lane-y); }
+.calle-showcase .cs-run--9 { --cs-slot-y: var(--cs-down); --cs-lane-y: 0px;            --cs-phase: -8s; --cs-rest-x: var(--cs-x-end);   --cs-rest-y: var(--cs-lane-y); }
+
+/* The escalation. It appears on the rail above stage three, runs the rail, turns
+ * down at the elbow and enters the head of the queue. One case a loop, because one
+ * is what makes it read as an exception rather than as a fourth outcome. */
+.calle-showcase .cs-esc__x {
+  animation: cs-esc-x var(--cs-loop) ease-in-out infinite;
+  animation-delay: -4.5s;
+}
+
+.calle-showcase .cs-esc__y {
+  animation: cs-esc-y var(--cs-loop) ease-in-out infinite;
+  animation-delay: -4.5s;
+}
+
+@keyframes cs-esc-x {
+  0%   { transform: translateX(0);                    opacity: 0; }
+  14%  { transform: translateX(0);                    opacity: 0; }
+  18%  {                                              opacity: 1; }
+  34%  { transform: translateX(0);                     }
+  56%  { transform: translateX(var(--cs-x-rail));      }
+  74%  { transform: translateX(var(--cs-x-rail));      }
+  82%  { transform: translateX(var(--cs-x-rail-in));  opacity: 1; }
+  90%  { transform: translateX(var(--cs-x-rail-in));  opacity: 0; }
+  100% { transform: translateX(var(--cs-x-rail-in));  opacity: 0; }
+}
+
+@keyframes cs-esc-y {
+  0%   { transform: translateY(0); }
+  56%  { transform: translateY(0); }
+  74%  { transform: translateY(var(--cs-y-drop)); }
+  100% { transform: translateY(var(--cs-y-drop)); }
+}
+
+/* ---- No motion ------------------------------------------------------------ */
+
+/* Every mark stops where it says the most: three calls strung along the queue, one
+ * in each of the three lines, one resting at each of the three endings, and the
+ * escalation part way along its rail. The route is drawn by where the marks are, so
+ * nothing is lost by holding still. Printing gets the same figure, and so does a
+ * reader who ticks the pause control above the figure, which is one rule in
+ * page.css pointing at these same two properties. */
+/* The board lies flat here as well, and it has to be said in this block rather than
+ * left to the page's global one. That block turns durations off. A turn and a set of
+ * offset plates are not durations: they are resting states, and a resting state that
+ * is never reset is a permanent three-degree skew on a diagram for the reader who
+ * asked for less motion. `transform: none` on the plates returns them to under their
+ * own cards, which is the flat figure, exactly. */
+@media (prefers-reduced-motion: reduce) {
+  .calle-showcase .cs-run__x,
+  .calle-showcase .cs-run__y,
+  .calle-showcase .cs-esc__x,
+  .calle-showcase .cs-esc__y {
+    animation: none;
+    opacity: 1;
+  }
+
+  .calle-showcase .cs-run__x { transform: translateX(var(--cs-rest-x)); }
+  .calle-showcase .cs-run__y { transform: translateY(var(--cs-rest-y)); }
+  .calle-showcase .cs-esc__x { transform: translateX(var(--cs-esc-rest-x)); }
+  .calle-showcase .cs-esc__y { transform: translateY(0); }
+
+  .cs-deck > .calle-showcase__svg,
+  .calle-showcase .cs-riser { transform: none; }
+  .calle-showcase .cs-chip--lit .cs-chip__glow { animation: none; opacity: 1; }
+}
+
+@media print {
+  .calle-showcase .cs-run__x,
+  .calle-showcase .cs-run__y,
+  .calle-showcase .cs-esc__x,
+  .calle-showcase .cs-esc__y {
+    animation: none;
+    opacity: 1;
+  }
+
+  .calle-showcase .cs-run__x { transform: translateX(var(--cs-rest-x)); }
+  .calle-showcase .cs-run__y { transform: translateY(var(--cs-rest-y)); }
+  .calle-showcase .cs-esc__x { transform: translateX(var(--cs-esc-rest-x)); }
+  .calle-showcase .cs-esc__y { transform: translateY(0); }
+
+  /* Print gets the flat figure too. A tilt costs a diagram its straight edges on
+   * paper, and a plate under every card is four bands of 0.80 grey a printer renders
+   * as four bands of dots for no argument at all. */
+  .cs-deck > .calle-showcase__svg,
+  .calle-showcase .cs-riser { transform: none; }
+  .calle-showcase .cs-chip--lit .cs-chip__glow { animation: none; opacity: 1; }
+}
+
+/* ---- Paused ---------------------------------------------------------------- */
+
+/* The control above the figure rests every mark, and these three rules are what make
+ * it rest the board with them. They are here rather than in page.css because they are
+ * about this figure's depth, and page.css holds the control.
+ *
+ * Ticking the box and asking for reduced motion now produce the same picture, which is
+ * the property this figure has always had and the reason it is worth keeping: the
+ * paused figure is a composed drawing rather than a loop caught mid-stride, and there
+ * is one such drawing rather than two that drift.
+ *
+ * A general sibling combinator, because the control, its label and the figure are
+ * emitted as three siblings. */
+.cs-motion:checked ~ .cs-deck > .calle-showcase__svg,
+.cs-motion:checked ~ .cs-deck .cs-riser { transform: none; }
+
+.cs-motion:checked ~ .cs-deck .cs-chip--lit .cs-chip__glow {
+  animation: none;
+  opacity: 1;
+}
+
+/* ---- Narrow viewports ------------------------------------------------------ */
+
+/* The figure keeps its shape and its box; only the type grows, because the SVG is
+ * scaling down and a 16 user-unit label stops being readable somewhere under a
+ * 700px render. Nothing here changes a rect, so nothing here can shift layout. */
+@media (max-width: 46rem) {
+  .calle-showcase .cs-title { font-size: 29px; }
+  .calle-showcase .cs-figure { font-size: 38px; }
+  .calle-showcase .cs-end-title { font-size: 24px; }
+  .calle-showcase .cs-wl-label { font-size: 21px; }
+  .calle-showcase .cs-sub,
+  .calle-showcase .cs-end-sub,
+  .calle-showcase .cs-legend,
+  .calle-showcase .cs-figure__unit { font-size: 19px; }
+  .calle-showcase .cs-eyebrow,
+  .calle-showcase .cs-micro,
+  .calle-showcase .cs-tag,
+  .calle-showcase .cs-rail-label,
+  .calle-showcase .cs-rank { font-size: 18px; }
+  /* Two units behind the eyebrow, not level with it. The tag's plate is sized in
+   * showcase.py from a 14-unit advance, so 17 is the largest this label can grow to
+   * and stay inside its own plate with the padding the layout states. */
+  .calle-showcase .cs-chip__label { font-size: 17px; }
+}
+
+/* Under about 34rem the type stops being the problem and the scale is.
+ *
+ * The figure is 1,240 user units wide and renders at whatever the column gives it. On
+ * a 390px phone that column is about 330px, so the scale is 0.27 and a 19 unit label
+ * paints at five pixels. Growing the type further is not available: four labelled
+ * cards inside 1,240 units collide somewhere above 34 units, and a diagram whose
+ * labels overlap is worse than one a reader has to pan.
+ *
+ * So the figure stops shrinking and the box scrolls. 30rem of SVG at 33 unit type is
+ * about eleven pixels, which is small and is legible, and a reader who does not pan
+ * still has the caption underneath saying the same four things in words. */
+@media (max-width: 34rem) {
+  .calle-showcase { -webkit-overflow-scrolling: touch; }
+  .calle-showcase__svg { min-width: 30rem; }
+
+  /* Flat below here, and no tags.
+   *
+   * The figure is a pan region at this width, and turning a drawing a reader is
+   * already dragging sideways makes the drag harder to follow for nothing: the tilt
+   * reads at 1040px and is invisible at 480.
+   *
+   * The tags go because there is no longer room for them. The type ramp grows to keep
+   * a 480px figure legible, and at 22 units the sublabel above the header rule runs
+   * within a few units of where the plate sits. A tag that either paints at six pixels
+   * or touches the label above it is one a phone is better off without; the plates
+   * still carry the depth, and the caption still says all four stages in words. */
+  .cs-deck > .calle-showcase__svg { transform: none; }
+  .calle-showcase .cs-chip { display: none; }
+
+  .calle-showcase .cs-title { font-size: 33px; }
+  .calle-showcase .cs-figure { font-size: 44px; }
+  .calle-showcase .cs-end-title { font-size: 28px; }
+  .calle-showcase .cs-wl-label { font-size: 24px; }
+  .calle-showcase .cs-sub,
+  .calle-showcase .cs-end-sub,
+  .calle-showcase .cs-legend,
+  .calle-showcase .cs-figure__unit { font-size: 22px; }
+  .calle-showcase .cs-eyebrow,
+  .calle-showcase .cs-micro,
+  .calle-showcase .cs-tag,
+  .calle-showcase .cs-rail-label,
+  .calle-showcase .cs-rank { font-size: 20px; }
+}
+
+/* ---- Forced colours -------------------------------------------------------- */
+
+/* A high-contrast theme replaces the palette, so the figure has to survive on its
+ * shapes. It does: full, half, empty and diamond stay distinguishable with one ink
+ * and one ground, and the fill states below are chosen to keep them that way. */
+@media (forced-colors: active) {
+  .calle-showcase .cs-reg-mark,
+  .calle-showcase .cs-reg-bar,
+  .calle-showcase .cs-stripe,
+  .calle-showcase .cs-tee,
+  .calle-showcase .cs-arrow,
+  .calle-showcase .cs-glyph__core,
+  .calle-showcase .cs-glyph--call,
+  .calle-showcase .cs-glyph__half,
+  .calle-showcase .cs-run__mark {
+    fill: CanvasText;
+  }
+
+  .calle-showcase .cs-card,
+  .calle-showcase .cs-slot,
+  .calle-showcase .cs-end-row,
+  .calle-showcase .cs-wl-row,
+  .calle-showcase .cs-glyph--no-answer,
+  .calle-showcase .cs-esc__mark,
+  .calle-showcase .cs-chip__plate {
+    fill: Canvas;
+    stroke: CanvasText;
+  }
+
+  .calle-showcase .cs-chip__label { fill: CanvasText; color: CanvasText; }
+
+  /* A high-contrast theme has two colours and a plate standing off a card cannot be
+   * drawn in them: filled with Canvas it is invisible, outlined in CanvasText it is a
+   * second rectangle behind every card, which reads as a rendering fault rather than
+   * as depth. So the depth goes and the figure falls back on what it was built to
+   * survive on, which is its shapes. The bloom goes for the same reason: a gradient
+   * is not a colour the theme can substitute. */
+  .calle-showcase .cs-riser,
+  .calle-showcase .cs-chip__glow { fill: Canvas; }
+
+  .calle-showcase .cs-rule,
+  .calle-showcase .cs-hair,
+  .calle-showcase .cs-track,
+  .calle-showcase .cs-bus,
+  .calle-showcase .cs-feed,
+  .calle-showcase .cs-rail,
+  .calle-showcase .cs-stub,
+  .calle-showcase .cs-glyph__ring {
+    stroke: CanvasText;
+  }
+}
+
+
+/* ==========================================================================
+ * The three-endings figure.
+ *
+ * It shares this whole stylesheet. Its root carries `calle-showcase` as well as
+ * `endings-fig`, so every colour, glyph, surface and type rule above applies to it
+ * unchanged and it cannot grow a second palette. Only the things that genuinely
+ * differ are below: a different aspect, a tighter block, and its own three marks.
+ *
+ * It replaced a Lottie whose still drew two grey rectangles in three hundred pixels
+ * of empty page, with the words that gave it meaning in a separate HTML list beside
+ * it. The drawing carried no content and the list carried all of it.
+ * ========================================================================== */
+
+.endings-fig {
+  padding: 0;
+  background: none;
+  /* No panning here. The figure is authored at the width of the column it sits in, so
+   * there is nothing to scroll to, and a scroll box with nothing outside it is a
+   * keyboard stop that leads nowhere. That also means dropping the tabindex the other
+   * figure carries: the no-script gate exempts a focusable element only where its
+   * computed overflow proves it is really a scroll box, and this one is not. */
+  overflow-x: visible;
+}
+
+/* And the 30rem floor with it. That floor exists so the four-stage figure pans instead of
+ * shrinking its labels to five pixels. This figure has three rows and scales down cleanly,
+ * so inheriting the floor put a 480px drawing in a 350px column on a phone and bled 110px
+ * off the side of the page. */
+@media (max-width: 34rem) {
+  .endings-fig__svg { min-width: 0; }
+}
+
+.endings-fig__svg {
+  /* No max-width. Capping it at its authored width left a quarter of the block empty on
+   * the right; the answer was to author it at the width the column actually gives. */
+  aspect-ratio: 900 / 352;
+}
+
+.endings-fig .cs-end-row { fill: var(--cs-card); }
+.endings-fig .cs-end-row--focal { fill: var(--cs-lit); }
+
+/* The three field values are the product's own vocabulary, so they are set as the
+ * literal strings a receipt carries rather than as prose. */
+.endings-fig .en-name {
+  font-size: 19px;
+  letter-spacing: 0;
+  font-family: ui-monospace, SFMono-Regular, "SF Mono", Menlo, Consolas, monospace;
+}
+
+.endings-fig .cs-end-sub { font-size: 15px; }
+.endings-fig .cs-eyebrow { font-size: 13px; }
+
+/* One mark per ending, each holding the figure for a third of the loop, so the three
+ * endings are stated in sequence rather than raced. Same two-group construction as the
+ * four-stage figure: one translates down the spine, the other turns into the card. */
+.endings-fig .en-run__x,
+.endings-fig .en-run__y {
+  transform-box: view-box;
+  transform-origin: 0 0;
+}
+
+.endings-fig .en-run__x {
+  animation: en-run-x var(--cs-loop) linear infinite;
+  animation-delay: var(--en-phase);
+}
+
+.endings-fig .en-run__y {
+  animation: en-run-y var(--cs-loop) ease-in-out infinite;
+  animation-delay: var(--en-phase);
+}
+
+@keyframes en-run-x {
+  0%     { transform: translateX(0);                 opacity: 0; }
+  3%     {                                           opacity: 1; }
+  18%    { transform: translateX(0);                  }
+  26%    { transform: translateX(var(--en-x-in));     }
+  31%    { transform: translateX(var(--en-x-in));    opacity: 1; }
+  33.3%  { transform: translateX(var(--en-x-in));    opacity: 0; }
+  100%   { transform: translateX(var(--en-x-in));    opacity: 0; }
+}
+
+@keyframes en-run-y {
+  0%     { transform: translateY(0); }
+  4%     { transform: translateY(0); }
+  18%    { transform: translateY(var(--en-y)); }
+  100%   { transform: translateY(var(--en-y)); }
+}
+
+.endings-fig .en-run--1 { --en-y: var(--en-y-1); --en-phase:  0s; }
+.endings-fig .en-run--2 { --en-y: var(--en-y-2); --en-phase: -3s; }
+.endings-fig .en-run--3 { --en-y: var(--en-y-3); --en-phase: -6s; }
+
+/* Stopped, all three rest on their own ending, which is the whole figure said at once. */
+@media (prefers-reduced-motion: reduce) {
+  .endings-fig .en-run__x,
+  .endings-fig .en-run__y { animation: none; opacity: 1; }
+  .endings-fig .en-run__x { transform: translateX(var(--en-x-in)); }
+  .endings-fig .en-run__y { transform: translateY(var(--en-y)); }
+}
+
+@media print {
+  .endings-fig .en-run__x,
+  .endings-fig .en-run__y { animation: none; opacity: 1; }
+  .endings-fig .en-run__x { transform: translateX(var(--en-x-in)); }
+  .endings-fig .en-run__y { transform: translateY(var(--en-y)); }
+}

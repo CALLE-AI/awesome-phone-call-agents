@@ -1,0 +1,413 @@
+/* ---- the first screen's two calls -----------------------------------------------------
+ *
+ * Two cards, side by side above 58rem and stacked below it. Everything here used to be
+ * one drawn instrument: both calls on a shared axis of real seconds, with an envelope,
+ * ticks, per-field commit marks and a read-head that tracked the recording. It was
+ * correct and it was unreadable at a glance, which is the only way the first screen is
+ * ever read.
+ *
+ * There is no SVG in the figure now except the two play glyphs and the loudness bars,
+ * and no element is positioned against another, so there is no width at which two labels
+ * can meet. That was not a styling problem, it was a class of problem, and this removes
+ * the class.
+ */
+
+.callscope { margin: 0 0 var(--space-4); padding: 0; }
+
+.csc-headline {
+  font-family: var(--display); font-size: var(--size-6); line-height: 1.2;
+  color: var(--ink); margin: 0 0 var(--space-3); max-width: 56ch;
+}
+
+.csc-cards { display: grid; gap: var(--space-4); }
+@media (min-width: 58rem) {
+  .csc-cards { grid-template-columns: 1fr 1fr; }
+}
+
+.csc-card {
+  --csc-p: 0;
+  display: grid; gap: var(--space-2);
+  padding: var(--space-3) var(--space-4);
+  border: 1px solid var(--line);
+  border-radius: 3px;
+  background: var(--paper);
+}
+/* The card where the two systems disagree is the argument, so it is the one with ink on
+ * its edge. One card tinted and one plain reads as "look here" without a word. */
+.csc-card--splits { border-color: var(--line-strong); }
+
+.csc-top { display: flex; align-items: center; gap: var(--space-3); }
+.csc-id {
+  font-family: var(--mono); font-size: var(--size-3); color: var(--ink);
+  font-weight: 500; letter-spacing: 0.01em;
+}
+.csc-len {
+  font-family: var(--ui); font-size: var(--size-2); color: var(--ink-3);
+  font-variant-numeric: tabular-nums;
+}
+.csc-top .csc-hear { margin-left: auto; }
+
+/* ---- the loudness row ------------------------------------------------------------------
+ * Decorative, and says one thing: there is a recording here. The played part is a rule
+ * under the bars rather than a second copy of them in another colour, because a second
+ * copy is a second set of elements to keep in step and this is one element wide. */
+.csc-wave {
+  position: relative; display: flex; align-items: flex-end; gap: 2px;
+  height: 34px; padding-bottom: 5px;
+}
+.csc-wave > span {
+  flex: 1 1 0; min-width: 0;
+  background: var(--ink); opacity: 0.18; border-radius: 1px;
+}
+.csc-played {
+  position: absolute; left: 0; bottom: 0; height: 2px;
+  width: calc(var(--csc-p) * 100%);
+  background: var(--live-mark);
+  flex: none;
+}
+.csc-card[data-csc-on] .csc-wave > span { opacity: 0.3; }
+
+.csc-said {
+  font-family: var(--ui); font-size: var(--size-3); color: var(--ink-2);
+  margin: 0; max-width: 40ch;
+}
+
+/* ---- what the call came back with ------------------------------------------------------ */
+.csc-fields { margin: 0; display: grid; gap: 6px; }
+/* Label left, value right, so four rows of different-length values still read as a column
+ * of values rather than as ragged text. `align-items` stays `baseline` and does not become
+ * `center`: the key is --size-1 and the value is larger, and centring two different type
+ * sizes on the box leaves their baselines a pixel or two apart, which is visible at this
+ * size and is the thing the eye reads as misaligned. */
+.csc-f {
+  display: flex; align-items: baseline; justify-content: space-between; gap: var(--space-3);
+  padding: 3px 0; border-top: 1px solid var(--line);
+}
+.csc-f dt {
+  font-family: var(--mono); font-size: var(--size-1); color: var(--ink-3);
+  min-width: 0; overflow-wrap: anywhere;
+}
+.csc-f dd {
+  font-family: var(--mono); font-size: var(--size-2); margin: 0 0 0 auto;
+  white-space: nowrap;
+}
+.csc-on { color: var(--ink); }
+/* An empty field is the whole point of the second card, so it is not dimmed into
+ * something a reader skips. It is set in the same weight as an answer and marked. */
+.csc-off { color: var(--ink-2); font-style: italic; }
+
+/* ---- the two verdicts ------------------------------------------------------------------- */
+.csc-verdicts {
+  list-style: none; margin: 0; padding: var(--space-3) 0 0;
+  border-top: 1px solid var(--line-strong);
+  display: grid; gap: var(--space-2);
+  margin-top: 2px;
+}
+.csc-v {
+  display: grid; gap: 2px;
+  grid-template-columns: minmax(0, 1fr) auto;
+  grid-template-areas: "who say" "note note";
+}
+.csc-v-who {
+  grid-area: who;
+  font-family: var(--ui); font-size: var(--size-1); color: var(--ink-3);
+  text-transform: uppercase; letter-spacing: 0.06em;
+}
+.csc-v-say {
+  grid-area: say; position: relative; justify-self: end;
+  font-family: var(--mono); font-size: var(--size-3); color: var(--ink);
+  font-weight: 500;
+}
+/* A rule, not `text-decoration`, so it is the same weight as every other struck word on
+ * this page and so it holds its contrast: the text under it stays at full ink. */
+/* 0.88em, and it was 0.56em.
+ *
+ * Measured rather than eyeballed. In Chrome at 14px with a 22.68px line box this font
+ * reports an ascent of 15px, a descent of 4px and an x-height of 7px, which puts the
+ * baseline 16.84px below the top of the box and the middle of the x-height at 13.34px.
+ * That is where a strike belongs, and it is where `text-decoration: line-through` draws
+ * one. The rule was centred at 8.84px, four and a half pixels high, so it crossed the
+ * tops of the lowercase letters instead of the middle of them.
+ *
+ * `top: 50%` was the obvious fix and it is the wrong one twice over: it centres on the
+ * line box rather than the x-height, which is still 2px high, and on `.filing-name` the
+ * `transform` it needs is already taken by the scaleX that animates the strike on. */
+.csc-struck::after {
+  content: ""; position: absolute; left: -0.08em; right: -0.08em; top: 0.88em;
+  height: 2px; background: var(--ink-2);
+}
+.csc-v-ours .csc-v-say { color: var(--resolved); }
+/* `--live-mark` is the it-is-happening-now colour and it is 3.44 against paper at
+ * 14px, which the contrast gate caught. `--undetermined` is the token built for this
+ * exact word, and page.css says beside it that it has to clear 4.5 as running text. */
+.csc-card--splits .csc-v-ours .csc-v-say { color: var(--undetermined); }
+.csc-v-note {
+  grid-area: note;
+  font-family: var(--ui); font-size: var(--size-2); color: var(--ink-3);
+  line-height: 1.45;
+}
+
+/* ---- the caption's disclosure ----------------------------------------------------------
+ * Everything a reader checking the figure needs, and nothing a reader meeting it does.
+ * The contrast gate opens every disclosure before it measures, so folding this hides it
+ * from a reader and from nothing else. */
+.csc-fold { margin: var(--space-4) 0 0; border-top: 1px solid var(--line); }
+.csc-fold > summary {
+  cursor: pointer; padding: var(--space-3) 0;
+  font-family: var(--ui); font-size: var(--size-2); color: var(--ink-3);
+}
+.csc-fold > summary:hover { color: var(--ink); }
+.csc-fold > figcaption {
+  padding-top: var(--space-2);
+  font-family: var(--ui); font-size: var(--size-2); line-height: 1.6;
+  color: var(--ink-3); max-width: 68ch;
+}
+
+/* ---- room for the second object ---------------------------------------------------------
+ * Measured at 1440x900 on 2026-09-10. The first screen carries the masthead, this figure
+ * and the top of the 3D board under it, and 136px of that was space around this figure
+ * rather than anything in it. */
+.act-00 { padding-top: var(--space-4); }
+.act-00 .masthead { margin-bottom: var(--space-4); }
+
+@media (prefers-reduced-motion: reduce) {
+  .csc-played { transition: none; }
+}
+
+/* The shared rule for these two glyphs keys off `data-playing` on an ancestor, which is
+ * what the duet's player sets. These buttons carry their state on themselves, in
+ * `aria-pressed`, because each one owns a different recording and there is no ancestor
+ * that is playing. Both glyphs shipped visible until this existed. */
+.csc-hear[aria-pressed="false"] .i-pause,
+.csc-hear[aria-pressed="true"] .i-play { display: none; }
+
+/* ---- the bar --------------------------------------------------------------------------
+ * The masthead was 250px of black holding a word and a sentence, and both objects a
+ * reviewer can touch started under it. One row, 64px, the same two pieces of writing and
+ * the three destinations as well.
+ *
+ * `flex-wrap` rather than a breakpoint: the three buttons drop to their own line when
+ * the wordmark and the sentence stop fitting beside them, at whatever width that is for
+ * the reader's own type size. */
+.masthead {
+  display: flex; align-items: center; gap: var(--space-3) var(--space-4);
+  flex-wrap: wrap;
+  padding: var(--space-3) var(--space-4);
+  margin-bottom: var(--space-3);
+}
+.masthead .wordmark { margin: 0; }
+.masthead .standfirst {
+  margin: 0; flex: 1 1 22rem; min-width: 0;
+  font-size: var(--size-2); line-height: 1.45;
+}
+/* Pushed to the right edge once there is a right edge to push to. The bar is a flex row of
+ * wordmark, sentence and links; the sentence stops growing at its own 30rem measure, so
+ * with two links left in the bar the last 350px of a 1216px plate was empty dark ground and
+ * the links floated in the middle of it. Below 52rem the row wraps and the links get a line
+ * of their own, where flush left is right. */
+.nav-acts { display: flex; gap: var(--space-2); flex-wrap: wrap; order: 3; }
+@media (min-width: 52rem) { .nav-acts { margin-inline-start: auto; } }
+.nav-act {
+  display: inline-block; padding: 6px 12px;
+  font-family: var(--ui); font-size: var(--size-2); line-height: 1.3;
+  border: 1px solid currentColor; border-radius: 3px;
+  text-decoration: none; white-space: nowrap;
+}
+.nav-note {
+  font-family: var(--ui); font-size: var(--size-1); color: var(--ink-3);
+  margin: 0 0 var(--space-3); max-width: 76ch;
+}
+
+/* The first screen is one screen. Measured at 1440x900 on 2026-09-10: the bar, the two
+ * calls and the whole 3D board under them, with nothing below the window that a reader
+ * has to be told about. Every value here was taken off that measurement. */
+.callscope { margin-bottom: var(--space-3); }
+.csc-verdicts { padding-top: var(--space-2); }
+
+/* ---- the playground -------------------------------------------------------------------
+ * One screen, two objects, one row of actions. Above 72rem the calls take the left and
+ * the board takes the right; below it they stack, calls first, because a phone reads in
+ * one column and the audio is the stronger of the two on a small screen.
+ *
+ * Measured at 1440x900 on 2026-09-10: bar 56, heading 34, playground 604, actions 44,
+ * with the drag hint and the fold summary inside the 604. Nothing the reader needs in
+ * the first thirty seconds is below the window. */
+.playground { display: grid; gap: var(--space-4); align-items: start; }
+@media (min-width: 72rem) {
+  .playground { grid-template-columns: minmax(0, 1fr) minmax(0, 0.92fr); }
+  /* Stacked, because a card set to half of half a page wraps every field name. */
+  .playground .csc-cards { grid-template-columns: minmax(0, 1fr); }
+}
+.play-calls, .play-board { min-width: 0; }
+
+.play-bar {
+  display: flex; flex-wrap: wrap; gap: var(--space-2);
+  margin: var(--space-3) 0 var(--space-2);
+}
+.play-act {
+  display: inline-block; padding: 8px 14px;
+  font-family: var(--ui); font-size: var(--size-2); line-height: 1.3;
+  color: var(--ink-2); text-decoration: none; white-space: nowrap;
+  border: 1px solid var(--line-strong); border-radius: 3px;
+}
+.play-act:hover { color: var(--ink); border-color: var(--ink-2); }
+/* The two that leave the page, when there is somewhere to go. */
+.play-act--lead { color: var(--paper); background: var(--ink); border-color: var(--ink); }
+.play-act--lead:hover { color: var(--paper); }
+
+/* ---- the line under the demonstration -------------------------------------------------- */
+.verify {
+  max-width: var(--measure); margin: var(--space-5) auto var(--space-3);
+  padding: var(--space-4) var(--space-4) 0;
+  border-top: 2px solid var(--ink);
+}
+.verify-lead {
+  font-family: var(--display); font-size: var(--size-5); line-height: 1.2;
+  color: var(--ink); margin: 0 0 var(--space-2);
+}
+.verify-say {
+  font-family: var(--ui); font-size: var(--size-2); line-height: 1.6;
+  color: var(--ink-3); margin: 0; max-width: 66ch;
+}
+
+/* ---- the bar's own links ---------------------------------------------------------------- */
+.nav-link {
+  font-family: var(--ui); font-size: var(--size-2); line-height: 1.3;
+  text-decoration: none; padding: 4px 2px; white-space: nowrap;
+}
+.nav-link:hover { text-decoration: underline; }
+.nav-cta {
+  padding: 6px 12px; border: 1px solid currentColor; border-radius: 3px;
+}
+
+/* ---- fitting two cards and a board into one screen -------------------------------------
+ * Measured at 1440x900. Stacked in the left column each card was 380px and the pair
+ * pushed the row of actions to 1,126px. Every value below came off that measurement.
+ *
+ * The verdict note moves under its own label rather than across the card, so the two
+ * verdicts are two rows instead of four, and the sentence naming the call goes: the
+ * three fields under it say the same thing in the platform's own words. */
+@media (min-width: 72rem) {
+  .playground .csc-said { display: none; }
+  .playground .csc-wave { height: 26px; }
+  .playground .csc-card { padding: var(--space-2) var(--space-3); }
+  .playground .csc-v {
+    grid-template-areas: "who say" "note say";
+    align-items: baseline;
+  }
+  .playground .csc-v-say { align-self: start; }
+  .playground .csc-v-note { font-size: var(--size-1); line-height: 1.4; }
+  .playground .csc-verdicts { padding-top: 6px; gap: 6px; }
+  .playground .csc-f { padding: 2px 0; }
+  /* The board takes the height the two cards leave, rather than sitting in a fixed box
+   * with the column empty under it. */
+  .playground .morning-compact .mrn-stage { height: 470px; }
+}
+/* Three lines of display type is a paragraph, not a heading, which is why this was cut to
+ * body size. Body size was too far the other way: the one sentence carrying the argument
+ * rendered at 17px in a 224px box, indistinguishable from the prose under it, on the screen
+ * that decides whether anybody reads the rest.
+ *
+ * The height this costs is bought with width rather than with the fit. The sentence was
+ * wrapping inside 224px of a 553px column, so widening the measure to the column and
+ * raising the type keeps it at two lines. Measured at 1440x900: 39px of headline became
+ * 71px, and the first screen still ends above the fold. The clamp keeps it off the fit at
+ * narrow widths, where the column is the viewport and a third line would cost a whole
+ * line box. */
+#h-00 {
+  font-size: clamp(1.0625rem, 2.05vw, 1.95rem);
+  line-height: 1.12; max-width: 30ch; margin: 0 0 var(--space-3);
+}
+/* em, never ch. `ch` is the advance width of a zero in whatever face is rendering, and
+ * page.css records the same trap costing a whole line box on this headline. 21ch resolved
+ * to 273px against the display face and put the sentence on three lines; 15em holds it on
+ * two at every width above 60rem, measured. */
+@media (min-width: 60rem) { #h-00 { max-width: 15em; } }
+
+/* The last 33px, taken from spacing rather than from anything a reader reads.
+ * Bar bottom 883 to 850 at 1440x900. */
+@media (min-width: 72rem) {
+  .playground .csc-fold { margin-top: var(--space-2); }
+  .playground .csc-fold > summary { padding: var(--space-2) 0; }
+  .playground .csc-cards { gap: var(--space-3); }
+  .act-00 { padding-top: var(--space-3); }
+  #h-00 { margin-bottom: var(--space-2); }
+  .play-bar { margin-top: var(--space-2); }
+}
+
+/* ---- the bar, sticky ------------------------------------------------------------------
+ * Above every act (they are z-index 2 and act 00 is 0 under the curtain) and below the
+ * skip link at 100, which has to be able to take focus in front of it.
+ *
+ * `--bar-h` is declared rather than measured because two other rules need it: the scroll
+ * offset every in-page anchor lands at, and the top inset the walk gate checks against.
+ * A value read back off the element at runtime would be a third source for one number. */
+/* Measured, not guessed: the bar renders at 64px with these values, and the anchors
+ * reserve 76px, which clears it with a line of air. The first version declared 4.5rem
+ * against a bar that painted at 98px and thirteen anchors landed under it. */
+:root { --bar-h: 4rem; }
+.topbar {
+  position: sticky; top: 0; z-index: 6;
+  background: var(--paper);
+  padding: var(--space-1) 0;
+}
+.topbar .masthead {
+  margin: 0 auto; max-width: 76rem;
+  padding: var(--space-2) var(--space-4);
+  gap: var(--space-2) var(--space-4);
+}
+.topbar .standfirst { font-size: var(--size-1); line-height: 1.35; }
+
+/* An anchor that lands under the bar is an anchor that went to the wrong place. Every
+ * target on this page reserves the bar's height plus a line of air. */
+/* `[id]` deliberately reaches acts too, and it ties with page.css's `.act
+ * { scroll-margin-top: 0 }` on specificity and wins on source order. That is a real
+ * conflict between two documented intentions and it is left as it was found: this value
+ * is what makes a native anchor jump clear the 74px bar, measured, and scoping it off
+ * `.act` drops three acts to 0px and under the bar. The 0.75rem is load-bearing; without
+ * it `--bar-h` alone computes 64px and does not clear. page.css's comment records the
+ * cost, which is that stopping short of an act's top edge shows the pinned first screen
+ * through the gap between acts. Clearing the bar was judged the lesser problem. */
+:target, [id] { scroll-margin-top: calc(var(--bar-h) + 0.75rem); }
+
+/* Act 00 sticks to the bottom of the window under the curtain, so what sits behind the
+ * bar while it is stuck is content the reader has already passed. Its resting offset is
+ * computed in app.js and needs no change. Below the curtain nothing is sticky but the
+ * bar, and every act scrolls under it against its own opaque ground. */
+@media (max-width: 60rem) {
+  .topbar { padding: var(--space-1) 0; }
+}
+
+/* ---- the three commands ----------------------------------------------------------------
+ * One row each, because a reader who copied the old block got three commands at once and
+ * a shell runs all three whether or not the first one worked. */
+.cmds { list-style: none; margin: var(--space-3) 0; padding: 0; display: grid; gap: 2px; }
+.cmd {
+  /* `min-width: 0`, or the row will not shrink. A grid item's minimum is its content by
+   * default, and the content here is a line of mono that does not wrap, so at 390px the
+   * row held the page open to 540 and the whole document scrolled sideways. The `<pre>`
+   * scrolls instead, which is what it is for. */
+  min-width: 0;
+  display: flex; align-items: center; gap: var(--space-3);
+  background: var(--card); border: 1px solid var(--line); border-radius: 3px;
+  padding: 2px 2px 2px var(--space-3);
+}
+.cmd-line {
+  flex: 1 1 auto; min-width: 0; margin: 0; padding: var(--space-2) 0;
+  background: none; border: 0; overflow-x: auto;
+  font-family: var(--mono); font-size: var(--size-2); color: var(--ink);
+}
+.cmd-copy {
+  flex: none; padding: 6px 12px;
+  font-family: var(--ui); font-size: var(--size-1); letter-spacing: 0.05em;
+  text-transform: uppercase; color: var(--ink-3);
+  background: none; border: 1px solid transparent; border-radius: 2px; cursor: pointer;
+}
+.cmd-copy:hover { color: var(--ink); border-color: var(--line-strong); }
+/* The word changes, not only the colour. A confirmation carried by hue alone is not one a
+ * reader who cannot separate those two hues ever receives, and this is the button whose
+ * whole job is telling somebody the command is now on their clipboard. */
+.cmd-copy[data-copied] { color: var(--resolved); }
+.cmd-w2 { display: none; }
+.cmd-copy[data-copied] .cmd-w1 { display: none; }
+.cmd-copy[data-copied] .cmd-w2 { display: inline; }

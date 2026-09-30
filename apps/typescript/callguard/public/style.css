@@ -1,0 +1,659 @@
+* {
+    box-sizing: border-box;
+}
+
+
+body {
+    margin: 0;
+    font-family:
+        Inter,
+        system-ui,
+        -apple-system,
+        BlinkMacSystemFont,
+        "Segoe UI",
+        sans-serif;
+
+    background: #f4f7fb;
+
+    color: #172033;
+}
+
+
+.header {
+    background: white;
+
+    border-bottom:
+        1px solid #e3e8f0;
+
+    padding: 22px 8%;
+}
+
+
+.brand {
+    display: flex;
+
+    align-items: center;
+
+    gap: 12px;
+}
+
+
+.logo {
+    font-size: 32px;
+}
+
+
+.brand h1 {
+    margin: 0;
+
+    font-size: 25px;
+}
+
+
+.brand p {
+    margin: 3px 0 0;
+
+    color: #65738b;
+
+    font-size: 14px;
+}
+
+
+main {
+    max-width: 1050px;
+
+    margin: auto;
+
+    padding: 60px 25px;
+}
+
+
+.hero {
+    text-align: center;
+
+    margin-bottom: 45px;
+}
+
+
+.hero h2 {
+    font-size: 42px;
+
+    line-height: 1.2;
+
+    margin-bottom: 20px;
+
+    color: #14213d;
+}
+
+
+.hero h2 span {
+    color: #273a63;
+}
+
+
+.hero p {
+    max-width: 700px;
+
+    margin: auto;
+
+    color: #61708a;
+
+    font-size: 17px;
+
+    line-height: 1.7;
+}
+
+
+.investigation-card {
+    background: white;
+
+    padding: 30px;
+
+    border-radius: 18px;
+
+    box-shadow:
+        0 10px 30px rgba(
+            20,
+            33,
+            61,
+            0.08
+        );
+
+    margin-bottom: 45px;
+}
+
+
+.investigation-card label {
+    display: block;
+
+    font-weight: 700;
+
+    margin-bottom: 10px;
+}
+
+
+.investigation-card input {
+    width: 100%;
+
+    padding: 16px;
+
+    border:
+        1px solid #cbd3df;
+
+    border-radius: 10px;
+
+    font-size: 16px;
+
+    outline: none;
+
+    margin-bottom: 16px;
+}
+
+
+.investigation-card input:focus {
+    border-color: #536b9c;
+}
+
+
+.investigation-card button {
+    width: 100%;
+
+    border: 0;
+
+    border-radius: 10px;
+
+    padding: 16px;
+
+    background: #111827;
+
+    color: white;
+
+    font-size: 16px;
+
+    font-weight: 700;
+
+    cursor: pointer;
+}
+
+
+.investigation-card button:hover {
+    background: #1f2937;
+}
+
+
+.investigation-card button:disabled {
+    opacity: 0.65;
+
+    cursor: not-allowed;
+}
+
+
+.status {
+    margin-top: 15px;
+
+    padding: 14px;
+
+    border-radius: 10px;
+
+    font-weight: 600;
+}
+
+
+.status.info {
+    background: #edf3ff;
+
+    color: #31558e;
+}
+
+
+.status.success {
+    background: #eaf8ef;
+
+    color: #287342;
+}
+
+
+.status.error {
+    background: #fff0f0;
+
+    color: #b42323;
+}
+
+
+.hidden {
+    display: none !important;
+}
+
+
+.report {
+    background: white;
+
+    padding: 32px;
+
+    border-radius: 18px;
+
+    box-shadow:
+        0 10px 30px rgba(
+            20,
+            33,
+            61,
+            0.08
+        );
+
+    margin-bottom: 55px;
+}
+
+
+.section-title {
+    display: flex;
+
+    align-items: center;
+
+    gap: 12px;
+
+    margin-bottom: 25px;
+}
+
+
+.section-title > span {
+    font-size: 28px;
+}
+
+
+.section-title h2 {
+    margin: 0;
+
+    font-size: 27px;
+}
+
+
+.section-title p {
+    margin: 4px 0 0;
+
+    color: #68768e;
+}
+
+
+.risk-card {
+    display: flex;
+
+    justify-content: space-between;
+
+    align-items: center;
+
+    padding: 24px;
+
+    border-radius: 14px;
+
+    margin-bottom: 30px;
+
+    background: #eef2f7;
+}
+
+
+.risk-card.high {
+    background: #fff0f0;
+
+    border:
+        1px solid #ffcaca;
+}
+
+
+.risk-card.medium {
+    background: #fff8e7;
+
+    border:
+        1px solid #f5dc9b;
+}
+
+
+.risk-card.low {
+    background: #edf9f1;
+
+    border:
+        1px solid #bde6c9;
+}
+
+
+.risk-label {
+    display: block;
+
+    font-size: 12px;
+
+    font-weight: 800;
+
+    color: #68768e;
+
+    margin-bottom: 5px;
+}
+
+
+.risk-card strong {
+    font-size: 28px;
+}
+
+
+.risk-score {
+    text-align: right;
+}
+
+
+.risk-score span {
+    display: block;
+
+    font-size: 13px;
+
+    color: #68768e;
+}
+
+
+.report-section {
+    margin-top: 30px;
+}
+
+
+.report-section h3,
+.signature-box h3,
+.match-card h3 {
+    margin-bottom: 12px;
+
+    font-size: 18px;
+}
+
+
+.report-section p {
+    line-height: 1.7;
+
+    color: #4d5d75;
+}
+
+
+.indicator-list {
+    display: grid;
+
+    gap: 12px;
+}
+
+
+.indicator {
+    display: flex;
+
+    gap: 12px;
+
+    padding: 14px;
+
+    border-radius: 10px;
+
+    background: #f7f9fc;
+}
+
+
+.indicator strong {
+    font-size: 14px;
+}
+
+
+.indicator p {
+    margin: 4px 0 0;
+
+    font-size: 14px;
+}
+
+
+.signature-box {
+    margin-top: 30px;
+
+    padding: 20px;
+
+    border-radius: 12px;
+
+    background: #f1f4f9;
+}
+
+
+.signature-box code {
+    display: block;
+
+    font-family:
+        "Courier New",
+        monospace;
+
+    line-height: 1.7;
+
+    word-break: break-word;
+
+    color: #273a63;
+}
+
+
+.recommendation {
+    padding: 20px;
+
+    border-radius: 12px;
+
+    background: #f5f8fc;
+}
+
+
+.transcript {
+    max-height: 400px;
+
+    overflow-y: auto;
+
+    border:
+        1px solid #e1e6ee;
+
+    border-radius: 12px;
+
+    padding: 15px;
+
+    background: #fafbfd;
+}
+
+
+.transcript-line {
+    padding: 10px 12px;
+
+    margin-bottom: 8px;
+
+    border-radius: 8px;
+
+    font-size: 14px;
+
+    line-height: 1.5;
+}
+
+
+.transcript-line.bot {
+    background: #eef2f7;
+}
+
+
+.transcript-line.caller {
+    background: #edf5ff;
+}
+
+
+.match-card {
+    margin-top: 30px;
+
+    padding: 20px;
+
+    border-radius: 12px;
+
+    background: #fff8e7;
+
+    border:
+        1px solid #efd58f;
+}
+
+
+.intelligence {
+    margin-top: 20px;
+}
+
+
+.signature-count {
+    margin-bottom: 18px;
+
+    color: #68768e;
+
+    font-size: 14px;
+}
+
+
+.signature-list {
+    display: grid;
+
+    grid-template-columns:
+        repeat(
+            auto-fit,
+            minmax(
+                300px,
+                1fr
+            )
+        );
+
+    gap: 18px;
+}
+
+
+.signature-card {
+    background: white;
+
+    border-radius: 15px;
+
+    padding: 22px;
+
+    box-shadow:
+        0 8px 25px rgba(
+            20,
+            33,
+            61,
+            0.07
+        );
+}
+
+
+.signature-header {
+    display: flex;
+
+    justify-content: space-between;
+
+    align-items: center;
+
+    color: #718096;
+
+    font-size: 13px;
+
+    margin-bottom: 15px;
+}
+
+
+.badge {
+    background: #ffe7e7;
+
+    color: #b42323;
+
+    padding: 5px 9px;
+
+    border-radius: 999px;
+
+    font-weight: 800;
+
+    font-size: 11px;
+}
+
+
+.signature-card h3 {
+    font-size: 17px;
+
+    margin: 0 0 14px;
+}
+
+
+.signature-card code {
+    display: block;
+
+    padding: 12px;
+
+    background: #f1f4f9;
+
+    border-radius: 8px;
+
+    font-size: 12px;
+
+    line-height: 1.6;
+
+    word-break: break-word;
+}
+
+
+.signature-card p {
+    color: #65738b;
+
+    font-size: 13px;
+
+    line-height: 1.6;
+
+    margin-bottom: 0;
+}
+
+
+.empty-state {
+    padding: 30px;
+
+    background: white;
+
+    border-radius: 12px;
+
+    text-align: center;
+
+    color: #68768e;
+}
+
+
+footer {
+    text-align: center;
+
+    padding: 30px;
+
+    color: #65738b;
+
+    font-size: 14px;
+}
+
+
+footer span {
+    margin: 0 5px;
+}
+
+
+@media (
+    max-width: 650px
+) {
+
+    main {
+        padding: 40px 16px;
+    }
+
+
+    .hero h2 {
+        font-size: 31px;
+    }
+
+
+    .risk-card {
+        flex-direction: column;
+
+        align-items: flex-start;
+
+        gap: 15px;
+    }
+
+
+    .risk-score {
+        text-align: left;
+    }
+
+}

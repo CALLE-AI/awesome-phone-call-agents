@@ -1,0 +1,124 @@
+{
+  "batch_reference": "BATCH-SCHOOL-2026-014",
+  "contact_reference": "CONTACT-DONOR-07",
+  "contact_masked": "+1•••5550142",
+  "contact_role": "donor coordinator",
+  "organisation_name": "Northbridge Community Supplies",
+  "represented_organisation": "Riverside Community Learning Centre",
+  "authorised_purpose": "donation_specification",
+  "authorisation_version": 2,
+  "authorisation_expires_at": "2026-10-01T17:00:00Z",
+  "recipient_organisation_authorised": true,
+  "consent_to_call": true,
+  "subjects": [
+    {
+      "subject_reference": "ITEM-SCHOOL-01",
+      "category_key": "school-supplies",
+      "allowed_attributes": {
+        "age_min": {
+          "type": "integer",
+          "unit": "years",
+          "minimum": 3,
+          "maximum": 18
+        },
+        "age_max": {
+          "type": "integer",
+          "unit": "years",
+          "minimum": 3,
+          "maximum": 18
+        }
+      }
+    },
+    {
+      "subject_reference": "BOX-SCHOOL-04",
+      "category_key": "school-supplies",
+      "allowed_attributes": {
+        "packed": {
+          "type": "boolean",
+          "unit": null
+        }
+      }
+    }
+  ],
+  "questions": [
+    {
+      "subject_reference": "ITEM-SCHOOL-01",
+      "attribute_key": "age_min",
+      "question": "What is the minimum labelled age for ITEM-SCHOOL-01?",
+      "why": "This could unlock age-compatible school kits."
+    },
+    {
+      "subject_reference": "ITEM-SCHOOL-01",
+      "attribute_key": "age_max",
+      "question": "What is the maximum labelled age for ITEM-SCHOOL-01?",
+      "why": "This could unlock age-compatible school kits."
+    },
+    {
+      "subject_reference": "BOX-SCHOOL-04",
+      "attribute_key": "packed",
+      "question": "Is BOX-SCHOOL-04 already packed in a closed box suitable for collection?",
+      "why": "The available transport offer rejects loose goods."
+    }
+  ],
+  "recipient_result_schema": {
+    "type": "object",
+    "additionalProperties": false,
+    "required": [
+      "reached_intended_contact",
+      "contact_role_confirmed",
+      "consent_continued",
+      "subject_references",
+      "attribute_updates",
+      "availability_windows",
+      "unanswered_questions"
+    ],
+    "properties": {
+      "reached_intended_contact": {
+        "type": "string",
+        "enum": ["yes", "no", "unknown"]
+      },
+      "contact_role_confirmed": {
+        "type": "string",
+        "enum": ["yes", "no", "unknown"]
+      },
+      "consent_continued": {
+        "type": "string",
+        "enum": ["yes", "no", "unknown"]
+      },
+      "subject_references": {
+        "type": "array",
+        "items": {"type": "string"}
+      },
+      "attribute_updates": {
+        "type": "array",
+        "items": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "subject_reference",
+            "attribute_key",
+            "value",
+            "unit",
+            "supporting_quote"
+          ],
+          "properties": {
+            "subject_reference": {"type": "string", "minLength": 1},
+            "attribute_key": {"type": "string", "minLength": 1},
+            "value": {"type": ["string", "number", "boolean", "null"]},
+            "unit": {"type": ["string", "null"]},
+            "supporting_quote": {"type": ["string", "null"]}
+          }
+        }
+      },
+      "availability_windows": {
+        "type": "array",
+        "items": {"type": "string"}
+      },
+      "unanswered_questions": {
+        "type": "array",
+        "items": {"type": "string"}
+      },
+      "notes": {"type": ["string", "null"]}
+    }
+  }
+}

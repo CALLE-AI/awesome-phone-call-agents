@@ -1,0 +1,456 @@
+:root {
+  --bg: #0f1420;
+  --panel: #171e2e;
+  --panel-2: #1e2740;
+  --border: #2b3654;
+  --text: #e8ecf6;
+  --muted: #9aa6c2;
+  --accent: #6ea8fe;
+  --focus: #ffd166;
+
+  /* Status colors are paired with text/icons, never color-only. */
+  --ok: #4 ade80;
+  --ok: #4ade80;
+  --warn: #fbbf24;
+  --danger: #f87171;
+  --running: #60a5fa;
+  --idle: #64748b;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+body {
+  margin: 0;
+  background: var(--bg);
+  color: var(--text);
+  font: 16px/1.5 system-ui, -apple-system, Segoe UI, Roboto, sans-serif;
+}
+
+.skip-link {
+  position: absolute;
+  left: -999px;
+  top: 0;
+  background: var(--focus);
+  color: #111;
+  padding: 0.5rem 1rem;
+  z-index: 10;
+  border-radius: 0 0 6px 0;
+}
+.skip-link:focus {
+  left: 0;
+}
+
+/* Visible focus for keyboard users everywhere. */
+:focus-visible {
+  outline: 3px solid var(--focus);
+  outline-offset: 2px;
+}
+
+header.app {
+  padding: 1rem 1.5rem;
+  border-bottom: 1px solid var(--border);
+  background: var(--panel);
+}
+header.app h1 {
+  margin: 0;
+  font-size: 1.3rem;
+}
+header.app p {
+  margin: 0.25rem 0 0;
+  color: var(--muted);
+  font-size: 0.9rem;
+}
+
+main {
+  padding: 1.5rem;
+  max-width: 1100px;
+  margin: 0 auto;
+  display: grid;
+  gap: 1.5rem;
+}
+
+.controls {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.75rem;
+  align-items: end;
+}
+.field {
+  display: flex;
+  flex-direction: column;
+  gap: 0.25rem;
+}
+.field label {
+  font-size: 0.85rem;
+  color: var(--muted);
+}
+select,
+button {
+  font: inherit;
+  padding: 0.55rem 0.8rem;
+  border-radius: 8px;
+  border: 1px solid var(--border);
+  background: var(--panel-2);
+  color: var(--text);
+}
+button.primary {
+  background: var(--accent);
+  color: #0b1220;
+  border-color: var(--accent);
+  font-weight: 600;
+  cursor: pointer;
+}
+button.primary:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.status-line {
+  color: var(--muted);
+  font-size: 0.9rem;
+}
+
+section.panel {
+  background: var(--panel);
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  padding: 1rem 1.25rem;
+}
+section.panel h2 {
+  margin: 0 0 0.75rem;
+  font-size: 1.05rem;
+}
+
+/* Node grid (live graph view) */
+.nodes {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(230px, 1fr));
+  gap: 0.75rem;
+  list-style: none;
+  padding: 0;
+  margin: 0;
+}
+.node {
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  padding: 0.75rem;
+  background: var(--panel-2);
+}
+.node .top {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 0.5rem;
+}
+.node .id {
+  font-weight: 600;
+}
+.node .goal {
+  color: var(--muted);
+  font-size: 0.82rem;
+  margin: 0.4rem 0 0;
+  max-height: 3.6em;
+  overflow: hidden;
+}
+.node .meta {
+  font-size: 0.8rem;
+  color: var(--muted);
+  margin-top: 0.4rem;
+}
+.node .dep {
+  font-size: 0.75rem;
+  color: var(--muted);
+}
+
+/* Status badge: icon + text, so it never relies on color alone. */
+.badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+  padding: 0.15rem 0.5rem;
+  border-radius: 999px;
+  font-size: 0.78rem;
+  border: 1px solid var(--border);
+  white-space: nowrap;
+}
+.badge .dot {
+  width: 0.55rem;
+  height: 0.55rem;
+  border-radius: 50%;
+  background: var(--idle);
+}
+.s-done .dot { background: var(--ok); }
+.s-running .dot { background: var(--running); }
+.s-needs_review .dot { background: var(--warn); }
+.s-needs_user .dot { background: var(--danger); }
+.s-failed .dot { background: var(--danger); }
+.s-blocked .dot,
+.s-pending .dot { background: var(--idle); }
+
+/* Triage table */
+table.triage {
+  width: 100%;
+  border-collapse: collapse;
+}
+table.triage caption {
+  text-align: left;
+  color: var(--muted);
+  padding-bottom: 0.5rem;
+}
+table.triage th,
+table.triage td {
+  text-align: left;
+  padding: 0.5rem 0.6rem;
+  border-bottom: 1px solid var(--border);
+  vertical-align: top;
+}
+table.triage thead th {
+  color: var(--muted);
+  font-size: 0.82rem;
+  text-transform: uppercase;
+  letter-spacing: 0.03em;
+}
+tr.urgency-high td:first-child {
+  border-left: 4px solid var(--danger);
+}
+.pill {
+  font-size: 0.75rem;
+  padding: 0.1rem 0.45rem;
+  border-radius: 6px;
+  border: 1px solid var(--border);
+}
+.pill-high { color: #fff; background: #7f1d1d; border-color: #b91c1c; }
+.pill-medium { color: #111; background: #fcd34d; }
+.pill-low { color: var(--text); background: var(--panel-2); }
+.pill-none { color: var(--muted); }
+
+details.transcript {
+  margin-top: 0.5rem;
+}
+details.transcript summary {
+  cursor: pointer;
+  color: var(--accent);
+  font-size: 0.82rem;
+}
+.turn {
+  font-size: 0.82rem;
+  margin: 0.2rem 0;
+}
+.turn .who {
+  color: var(--muted);
+  font-weight: 600;
+  margin-right: 0.35rem;
+}
+
+.flag {
+  color: var(--danger);
+  font-size: 0.82rem;
+  margin-top: 0.35rem;
+}
+.note {
+  color: var(--muted);
+  font-size: 0.82rem;
+}
+
+.summary-cards {
+  display: flex;
+  gap: 0.75rem;
+  flex-wrap: wrap;
+}
+.summary-cards .card {
+  background: var(--panel-2);
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  padding: 0.6rem 0.9rem;
+  min-width: 120px;
+}
+.summary-cards .card .n {
+  font-size: 1.4rem;
+  font-weight: 700;
+}
+.summary-cards .card .l {
+  color: var(--muted);
+  font-size: 0.8rem;
+}
+
+/* Visually hidden but available to screen readers. */
+.visually-hidden {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  margin: -1px;
+  padding: 0;
+  overflow: hidden;
+  clip: rect(0 0 0 0);
+  white-space: nowrap;
+  border: 0;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  * {
+    transition: none !important;
+    animation: none !important;
+  }
+}
+
+/* Approve action for human review (needs_review / needs_user -> done). */
+button.approve {
+  margin-top: 0.6rem;
+  font: inherit;
+  font-size: 0.82rem;
+  font-weight: 600;
+  padding: 0.4rem 0.7rem;
+  border-radius: 8px;
+  border: 1px solid var(--ok);
+  background: transparent;
+  color: var(--ok);
+  cursor: pointer;
+}
+button.approve:hover:not(:disabled) {
+  background: var(--ok);
+  color: #0b1220;
+}
+button.approve:disabled {
+  opacity: 0.55;
+  cursor: not-allowed;
+}
+/* In the triage table the button sits inline in the Action cell. */
+table.triage button.approve {
+  margin-top: 0;
+  white-space: nowrap;
+}
+
+/* ---- Landing header: tagline + scenario explainer cards ---- */
+header.app .tagline {
+  max-width: 70ch;
+}
+.scenario-cards {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.75rem;
+  margin-top: 0.9rem;
+}
+.scenario-card {
+  flex: 1 1 320px;
+  background: var(--panel-2);
+  border: 1px solid var(--border);
+  border-left: 4px solid var(--border);
+  border-radius: 10px;
+  padding: 0.7rem 0.9rem;
+}
+.scenario-card.selected {
+  border-left-color: var(--accent);
+}
+.scenario-card .scenario-name {
+  font-weight: 600;
+  margin-bottom: 0.2rem;
+}
+.scenario-card .scenario-desc {
+  color: var(--muted);
+  font-size: 0.85rem;
+}
+.active-desc {
+  color: var(--muted);
+  font-size: 0.85rem;
+  margin: 0.25rem 0 0.5rem;
+}
+
+/* ---- Activity feed (agent thinking out loud) ---- */
+.feed-empty {
+  color: var(--muted);
+  font-size: 0.9rem;
+  margin: 0;
+}
+ol.feed {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  max-height: 260px;
+  overflow-y: auto;
+  display: flex;
+  flex-direction: column;
+  gap: 0.15rem;
+}
+.feed-item {
+  display: grid;
+  grid-template-columns: auto auto 1fr;
+  gap: 0.5rem;
+  align-items: baseline;
+  padding: 0.35rem 0.5rem;
+  border-radius: 6px;
+  font-size: 0.9rem;
+  animation: feedIn 0.25s ease-out;
+}
+@keyframes feedIn {
+  from { opacity: 0; transform: translateY(4px); }
+  to { opacity: 1; transform: none; }
+}
+.feed-time {
+  color: var(--muted);
+  font-variant-numeric: tabular-nums;
+  font-size: 0.78rem;
+}
+.feed-icon {
+  width: 1.3rem;
+  text-align: center;
+}
+.feed-text {
+  color: var(--text);
+}
+/* Tone accents — a subtle left edge, paired with the icon (not color-only). */
+.tone-alert { background: rgba(248, 113, 113, 0.12); }
+.tone-alert .feed-text { color: #fecaca; }
+.tone-review { background: rgba(251, 191, 36, 0.1); }
+.tone-escalate { background: rgba(110, 168, 254, 0.12); }
+.tone-retry { background: rgba(110, 168, 254, 0.08); }
+.tone-approve { background: rgba(74, 222, 128, 0.1); }
+.tone-done .feed-text { color: var(--muted); }
+
+/* ---- Approve form with reviewer note ---- */
+.approve-form {
+  margin-top: 0.6rem;
+  display: flex;
+  flex-direction: column;
+  gap: 0.35rem;
+}
+.approve-label {
+  font-size: 0.78rem;
+  color: var(--muted);
+}
+.approve-note {
+  font: inherit;
+  font-size: 0.85rem;
+  padding: 0.4rem 0.55rem;
+  border-radius: 8px;
+  border: 1px solid var(--border);
+  background: var(--panel);
+  color: var(--text);
+  min-width: 12rem;
+}
+.approve-actions {
+  display: flex;
+  gap: 0.4rem;
+  flex-wrap: wrap;
+}
+button.ghost {
+  font: inherit;
+  font-size: 0.82rem;
+  padding: 0.4rem 0.7rem;
+  border-radius: 8px;
+  border: 1px solid var(--border);
+  background: transparent;
+  color: var(--muted);
+  cursor: pointer;
+}
+button.ghost:hover:not(:disabled) {
+  color: var(--text);
+}
+
+/* Reason shown at the approval gate for a proposed consequential call. */
+.approve-reason {
+  margin: 0 0 0.15rem;
+  font-size: 0.82rem;
+  color: var(--warn);
+}

@@ -16,6 +16,7 @@ Call = dict[str, Any]
 
 
 class CheckinOutcome(StrEnum):
+    REVIEW_REQUIRED = "review_required"
     SAFE = "safe"
     NEEDS_HELP = "needs_help"
     DURESS = "duress"
@@ -48,9 +49,7 @@ def _has_transcript(call: Call) -> bool:
 def classify_checkin(call: Call) -> CheckinOutcome:
     """Map a terminal CALL-E call_task dict onto a check-in outcome."""
     if call.get("status") in ("failed", "canceled"):
-        # Includes FieldLine's fail-soft synthetic result when the API is
-        # unreachable: an unplaceable call is treated as an unanswered one
-        # so the safety cascade keeps moving instead of crashing.
+        # Live transport uncertainty is intercepted by the engine before classification.
         return CheckinOutcome.NO_ANSWER
 
     result = call.get("structured_result")

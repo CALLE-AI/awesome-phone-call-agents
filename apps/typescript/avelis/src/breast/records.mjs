@@ -1,0 +1,34 @@
+import {patientConversations} from '../patient-conversations.mjs';
+// Structured-record adapter. No hospital connection or interpretation of raw reports.
+export const RECORD_TYPES={history:'Medical history',surgery:'Surgery / discharge',examination:'Pathology / tests / imaging',medication:'Medication record',followup:'Follow-up note',appointment:'Appointment plan'};
+export function seedRecords(person){const o=person.oncology;const row=(id,kind,topic,value,date)=>({id:person.id+'-'+id,kind,topic,value,event_date:date,recorded_at:'2026-09-11T12:00:00.000Z',source:{kind:'clinician_record',name:'Fictional breast clinic record',reference:person.id+'/'+id},confirmation:'recorded',supersedes:[]});return [row('history','history','Relevant history / allergies','History and allergy details not supplied in this fictional source; confirm if needed.',o.surgery_date),row('surgery','surgery','Surgery',o.surgery,o.surgery_date),row('pathology','examination','Recorded diagnosis',`${o.diagnosis}; stage ${o.stage}; ER ${o.er}, PR ${o.pr}, HER2 ${o.her2}. Recorded findings only.`,o.surgery_date),row('medication','medication','Current treatment',o.current_treatment.drug,o.current_treatment.start_date),row('followup','followup','Previously reported concerns',o.last_followup.issues.join('; '),o.last_followup.date),row('visit','appointment','Next visit',o.next_visit,'2026-09-11')];}
+export function readPatientContext(db,patientId,now){
+ const p=db.patients.find(p=>p.id===patientId);if(!p?.oncology)throw Error('Breast care patient not found.');
+ const records=structuredClone(p.clinical_records||[]);const issues=[];
+ const visible=records.filter(r=>r.recorded_at<=now);if(visible.length!==records.length)issues.push('Some records are dated after this contact and were excluded.');
+ const retired=new Set(visible.filter(r=>r.confirmation==='confirmed'&&r.source.kind==='clinician_record').flatMap(r=>r.supersedes||[]));
+ const active=visible.filter(r=>!retired.has(r.id));
+ const conflicts=[];const topics=new Set(active.map(r=>r.kind+'\u0000'+r.topic.trim().toLowerCase()));
+ for(const key of topics){const entries=active.filter(r=>r.kind+'\u0000'+r.topic.trim().toLowerCase()===key);if(new Set(entries.map(r=>r.value.trim().toLowerCase())).size>1)conflicts.push({topic:entries[0].topic,record_ids:entries.map(r=>r.id),message:'Different accounts are retained; clinician reconciliation is required.'});}
+ for(const [kind,topic,value] of [['medication','Current treatment',p.oncology.current_treatment.drug],['surgery','Surgery',p.oncology.surgery]]){const entries=active.filter(r=>r.kind===kind&&r.topic.toLowerCase()===topic.toLowerCase());if(entries.length&&!conflicts.some(c=>c.topic===topic)&&entries.some(r=>r.value!==value))conflicts.push({topic,record_ids:entries.map(r=>r.id),message:'The structured care context and source record differ. Reconcile both before contact.'});}
+ const missing=Object.keys(RECORD_TYPES).filter(k=>!active.some(r=>r.kind===k));
+ const unconfirmed=active.filter(r=>r.confirmation==='unconfirmed').map(r=>r.id);
+ if(missing.length)issues.push('Missing record categories: '+missing.map(k=>RECORD_TYPES[k]).join(', '));
+ if(conflicts.length)issues.push('Conflicting source records require review.');
+ if(unconfirmed.length)issues.push('Unconfirmed source records require clarification.');
+ const calls=patientConversations(db,patientId,{before:now,finishedOnly:true}).map(c=>({call_id:c.id,at:c.updated_at||c.created_at,verified:c.report_verified===true,summary:c.conversation_report?.care_summary||c.result?.summary||c.summary,source:c.provider==='mock'?'demo_simulation':'patient_conversation',risk:c.risk_assessment?.level||'UNKNOWN'}));
+ return {version:1,patient_id:patientId,loaded_at:now,patient_revision:p.revision||0,adapter:'local_structured_records',oncology:structuredClone(p.oncology),records:visible,active_record_ids:active.map(r=>r.id),conflicts,missing_categories:missing,unconfirmed_record_ids:unconfirmed,issues,followup_history:calls,interpretation:'Records are historical context, not current patient confirmation or newly inferred clinical conclusions.'};
+}
+export function attachPatientContext(db,task,now){const context=readPatientContext(db,task.patient_id,now);task.patient_context=context;task.oncology_context=structuredClone(context.oncology);return context;}
+export function appendPatientRecord(db,patientId,input,actor,now){
+ const p=db.patients.find(p=>p.id===patientId);if(!p?.oncology)throw Error('Patient not found.');db.audit_log ||= [];
+ const prior=db.audit_log.find(a=>a.id===input.id);if(prior){if(prior.patient_id!==patientId||prior.request!==JSON.stringify(input))throw Error('Request ID already used.');return;}
+ if(typeof input.id!=='string'||!input.id||input.id.length>80||input.revision!==(p.revision||0))throw Error('Patient changed. Refresh before saving.');
+ const r=input.record;const short=(x,n)=>typeof x==='string'&&!!x.trim()&&x.length<=n;
+ if(!r||!RECORD_TYPES[r.kind]||!short(r.topic,150)||!short(r.value,3000)||!/^\d{4}-\d{2}-\d{2}$/.test(r.event_date||'')||!Number.isFinite(Date.parse(r.event_date))||r.event_date>now.slice(0,10)||!['clinician_record','patient_report'].includes(r.source?.kind)||!short(r.source?.name,150)||!short(r.source?.reference,200)||!['recorded','confirmed','unconfirmed'].includes(r.confirmation)||r.source.kind==='patient_report'&&r.confirmation==='confirmed'||!Array.isArray(r.supersedes))throw Error('Enter the record date, source, content and confirmation state. Patient reports cannot be clinician-confirmed records.');
+ p.clinical_records ||= [];if(p.clinical_records.length>=100)throw Error('Record limit reached for this prototype.');
+ if(r.supersedes.length&&(r.confirmation!=='confirmed'||r.source.kind!=='clinician_record'||r.supersedes.some(id=>!p.clinical_records.some(x=>x.id===id&&x.kind===r.kind&&x.topic.trim().toLowerCase()===r.topic.trim().toLowerCase()))))throw Error('Only an explicitly confirmed clinician record can replace records on the same topic.');
+ p.clinical_records.push({id:input.id,kind:r.kind,topic:r.topic.trim(),value:r.value.trim(),event_date:r.event_date,recorded_at:now,source:{...r.source},confirmation:r.confirmation,supersedes:[...r.supersedes],entered_by:actor.name});p.revision=(p.revision||0)+1;
+ for(const t of db.tasks.filter(t=>t.patient_id===patientId&&!['COMPLETED','HUMAN_REVIEW','UNRESOLVED'].includes(t.status))){const c=db.calls.find(c=>c.id===t.call_id);if(c&&c.state!=='SCHEDULED')continue;if(c){c.state='FINISHED';c.status='CANCELED';c.error='Patient records changed before dialing.';delete t.call_id;}t.plan={...t.plan,status:p.auto_followup?'NEEDS_PLAN':'CONTACT_PAUSED',call_at:null,policy:'Patient records changed; refresh context before planning.'};t.revision=(t.revision||0)+1;}
+ db.audit_log.push({id:input.id,patient_id:patientId,action:'append_patient_record',reviewer:actor.name,at:now,request:JSON.stringify(input)});
+}

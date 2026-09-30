@@ -1,0 +1,144 @@
+<!doctype html>
+<html lang="en-GB">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Muster - proof-of-life attestation console</title>
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='8' fill='%234338ca'/%3E%3Ctext x='16' y='23' font-family='Helvetica,Arial,sans-serif' font-weight='700' font-size='19' fill='%23ffffff' text-anchor='middle'%3EM%3C/text%3E%3C/svg%3E">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&amp;family=IBM+Plex+Mono:wght@400;500&amp;display=swap" rel="stylesheet">
+<link rel="stylesheet" href="/app.css">
+</head>
+<body>
+
+<a class="skip-link" href="#main">Skip to content</a>
+
+<header class="topbar">
+  <div class="brand">
+    <span class="brand-mark" aria-hidden="true">M</span>
+    <span class="brand-word">Muster</span>
+  </div>
+
+  <nav class="topnav" id="topnav" aria-label="Console sections">
+    <a class="topnav-tab" href="#/register" data-view="register">Register</a>
+    <a class="topnav-tab" href="#/cases" data-view="cases">Cases<span class="nav-badge" id="cases-badge">&ndash;</span></a>
+    <a class="topnav-tab" href="#/protocol" data-view="protocol">Protocol</a>
+    <a class="topnav-tab" href="#/exposure" data-view="exposure">Exposure</a>
+    <a class="topnav-tab" href="#/adversary" data-view="adversary">Adversary</a>
+    <a class="topnav-tab" href="#/ledger" data-view="ledger">Ledger</a>
+  </nav>
+
+  <div class="topbar-right">
+    <span class="pill" id="cadence-pill" title="Interval after a CONFIRMED_LIVE attestation">Monthly cadence</span>
+
+    <button class="icon-btn" id="bell-btn" type="button" aria-label="Open cases waiting on a person">
+      <svg viewBox="0 0 20 20" aria-hidden="true" focusable="false">
+        <path d="M10 2.6a4.6 4.6 0 0 0-4.6 4.6v2.9L4 12.7h12l-1.4-2.6V7.2A4.6 4.6 0 0 0 10 2.6Z"></path>
+        <path d="M8.1 14.6a1.9 1.9 0 0 0 3.8 0"></path>
+      </svg>
+      <span class="icon-badge" id="bell-badge">&ndash;</span>
+    </button>
+
+    <div class="usermenu">
+      <button class="user-btn" id="user-btn" type="button" aria-expanded="false" aria-controls="user-pop">
+        <span class="avatar" aria-hidden="true">SO</span>
+        <span class="user-name">Scheme operations</span>
+        <svg class="chev" viewBox="0 0 20 20" aria-hidden="true" focusable="false"><path d="m5.5 8 4.5 4.5L14.5 8"></path></svg>
+      </button>
+      <div class="user-pop" id="user-pop" hidden>
+        <p class="user-pop-name">Demo operator</p>
+        <p class="user-pop-line">Read-only console. It cannot place a live call.</p>
+        <p class="user-pop-line">Every call shown here is a scripted fixture against fictional numbers.</p>
+      </div>
+    </div>
+  </div>
+</header>
+
+<div class="controlbar">
+  <div class="controlbar-left">
+    <label class="field">
+      <span class="field-label">Scheme</span>
+      <select id="scheme-select"><option>Loading</option></select>
+    </label>
+
+    <div class="stepper" role="group" aria-label="Attestation cycle">
+      <button class="stepper-btn" id="cycle-prev" type="button" aria-label="Previous cycle">&lsaquo;</button>
+      <span class="stepper-value" id="cycle-value">&mdash;</span>
+      <button class="stepper-btn" id="cycle-next" type="button" aria-label="Next cycle">&rsaquo;</button>
+    </div>
+
+    <label class="field">
+      <span class="field-label">Group by</span>
+      <select id="group-select">
+        <option value="status">Status</option>
+        <option value="reconciliation">Reconciliation</option>
+        <option value="country">Country</option>
+        <option value="next_step">Next step</option>
+      </select>
+    </label>
+  </div>
+
+  <div class="controlbar-right">
+    <button class="icon-btn ghost" id="refresh-btn" type="button" aria-label="Refresh all data">
+      <svg viewBox="0 0 20 20" aria-hidden="true" focusable="false">
+        <path d="M16.2 8.6A6.4 6.4 0 1 0 16 12"></path>
+        <path d="M16.6 4.2v4.5h-4.5"></path>
+      </svg>
+    </button>
+    <button class="btn-primary" id="run-cycle-btn" type="button">Run cycle</button>
+  </div>
+</div>
+
+<div class="fault" id="fault" role="alert" hidden></div>
+
+<main id="main">
+
+  <section class="view" id="view-register" hidden>
+    <article class="card">
+      <header class="card-head">
+        <h2 class="card-title">Exposure against cadence</h2>
+        <p class="card-sub">How long a death went unnoticed in two documented cases, against the worst case
+          under this schedule. A model of the schedule, not a measurement of any scheme.</p>
+      </header>
+      <div class="kpis" id="kpis"></div>
+      <div class="card-body" id="exposure-chart"></div>
+    </article>
+
+    <article class="card">
+      <header class="card-head card-head-row">
+        <div>
+          <h2 class="card-title">Register</h2>
+          <p class="card-sub">The enrolled roster for this cycle. Select a line to read what the call
+            established, and what it did not. Nothing on this page stops a payment.</p>
+        </div>
+        <p class="card-note" id="register-note"></p>
+      </header>
+      <div class="card-body flush" id="register-grid"></div>
+    </article>
+  </section>
+
+  <section class="view" id="view-cases" hidden></section>
+  <section class="view" id="view-protocol" hidden></section>
+  <section class="view" id="view-exposure" hidden></section>
+  <section class="view" id="view-adversary" hidden></section>
+  <section class="view" id="view-ledger" hidden></section>
+
+</main>
+
+<div class="scrim" id="scrim" hidden></div>
+
+<aside class="panel" id="panel" hidden aria-label="Attestation">
+  <div class="panel-inner" id="panel-inner"></div>
+</aside>
+
+<footer class="statusbar">
+  <ul class="status-counts" id="status-counts"></ul>
+  <p class="status-standing">Muster never stops a payment</p>
+</footer>
+
+<script src="/app.data.js"></script>
+<script src="/app.render.js"></script>
+<script src="/app.js"></script>
+</body>
+</html>

@@ -7,7 +7,7 @@ from datetime import datetime
 from pathlib import Path
 from typing import Any
 
-from .schemas import TripPlan, mask_phone
+from .schemas import TripPlan, mask_phone, scrub_text
 
 Call = dict[str, Any]
 
@@ -15,7 +15,7 @@ Call = dict[str, Any]
 @dataclass
 class CallRecord:
     at: str  # HH:MM display label
-    kind: str  # "checkin" | "escalation"
+    kind: str  # "check-in call" | "escalation call"
     party: str  # who was called
     phone: str
     call: Call
@@ -63,6 +63,9 @@ def build_incident_brief(
         add(f"### {rec.at} — {rec.kind}: {rec.party} ({mask_phone(rec.phone)})")
         add("")
         call = rec.call
+        if not demo:
+            add("Provider transcripts, summaries, extraction fields and evidence are omitted. Review them privately in CALL-E.")
+            continue
         if call.get("summary"):
             add(f"*{call['summary']}*")
             add("")
@@ -92,10 +95,10 @@ def build_incident_brief(
     add("")
     if plan.emergency_note:
         add(f"- {plan.emergency_note}")
-    add("- If the worker makes contact, have them call the FieldLine check-in line to stand the incident down.")
+    add("- If the worker makes contact, the responsible operator must independently verify their situation and decide whether to stand down.")
     add("- FieldLine never dials emergency services; a human must make that call.")
     add("")
-    return "\n".join(lines)
+    return scrub_text("\n".join(lines))
 
 
 def write_incident_brief(text: str, home: Path) -> Path:

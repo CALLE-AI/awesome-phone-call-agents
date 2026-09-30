@@ -1,0 +1,238 @@
+<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<meta name="color-scheme" content="light dark">
+<meta name="description" content="Review a CALL-E call before you act on it: transcript evidence for every structured field, latency, compliance and a verdict.">
+<title>Call Review Console</title>
+<link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;600&family=IBM+Plex+Sans:wght@400;500;600&display=swap">
+<style>
+/* ---- Shared design system: paper, ink, rule ------------------------------
+   The scene is a working desk under mixed light: a continuity binder on set,
+   a review console at a laptop late. Light is warm paper rather than white so
+   the evidence frames sit on a surface instead of glowing; dark is the same
+   world at night, not an inverted sheet. Every colour pair here was measured
+   against WCAG AA rather than eyeballed. */
+:root{
+  color-scheme:light dark;
+  --paper:#f7f6f2; --surface:#fff; --raised:#fbfaf7;
+  --ink:#14140f; --ink-2:#57534a; --ink-3:#7d786c;
+  --rule:#e2dfd6; --rule-2:#cfcbbf;
+  --bad:#9d2118; --bad-tint:#fff5f3; --bad-rule:#e9c3bd;
+  --warn:#7a5300; --warn-tint:#fdf7e7; --warn-rule:#e6d6a8;
+  --ok:#0a6b36; --ok-tint:#f0faf4; --ok-rule:#bcdcc8;
+  --focus:#1f5fd0;
+  --mat:#191712;
+  --shadow-1:0 1px 2px rgba(30,26,15,.05), 0 2px 8px -3px rgba(30,26,15,.10);
+  --r:10px; --r-sm:7px;
+  --sans:"IBM Plex Sans","Segoe UI",system-ui,-apple-system,sans-serif;
+  --mono:"IBM Plex Mono",ui-monospace,SFMono-Regular,Menlo,monospace;
+  --ease:cubic-bezier(.16,.84,.44,1);
+}
+@media (prefers-color-scheme:dark){:root{
+  --paper:#15150f; --surface:#1e1d16; --raised:#252319;
+  --ink:#f2f0e7; --ink-2:#a29c8c; --ink-3:#8b8574;
+  --rule:#33312a; --rule-2:#454236;
+  --bad:#ff9a8f; --bad-tint:#2a1512; --bad-rule:#5c2f28;
+  --warn:#e8b95c; --warn-tint:#241c0b; --warn-rule:#5a4a1e;
+  --ok:#6fce9a; --ok-tint:#0f2318; --ok-rule:#2c5540;
+  --focus:#7fb0ff;
+  --shadow-1:0 1px 2px rgba(0,0,0,.4), 0 2px 8px -3px rgba(0,0,0,.5);
+}}
+*,*::before,*::after{box-sizing:border-box}
+html{-webkit-text-size-adjust:100%}
+body{margin:0;background:var(--paper);color:var(--ink);
+  font:400 16px/1.6 var(--sans);
+  font-feature-settings:"kern" 1;
+  -webkit-font-smoothing:antialiased;text-rendering:optimizeLegibility}
+/* Numbers in this product are measurements; they must line up in a column. */
+.num,td,th,.kpi .v,.mono{font-variant-numeric:tabular-nums}
+::selection{background:color-mix(in srgb,var(--focus) 26%,transparent);color:var(--ink)}
+:root{caret-color:var(--focus)}
+:where(a,button,summary,[tabindex],textarea,input):focus-visible{
+  outline:2px solid var(--focus);outline-offset:2px;border-radius:4px}
+:focus:not(:focus-visible){outline:none}
+*{scrollbar-width:thin;scrollbar-color:var(--rule-2) transparent}
+*::-webkit-scrollbar{width:10px;height:10px}
+*::-webkit-scrollbar-thumb{background:var(--rule-2);border-radius:99px;
+  border:3px solid transparent;background-clip:content-box}
+*::-webkit-scrollbar-thumb:hover{background:var(--ink-3);background-clip:content-box}
+a{color:inherit;text-decoration-color:var(--rule-2);text-underline-offset:3px}
+a:hover{text-decoration-color:currentColor}
+h1,h2,h3{margin:0;text-wrap:balance;letter-spacing:-.015em;font-weight:600}
+h1{font-size:2.25rem;letter-spacing:-.03em;line-height:1.15}
+h2{font-size:1.375rem;letter-spacing:-.02em;line-height:1.25}
+h3{font-size:1rem;font-weight:600}
+.mono{font-family:var(--mono)}
+.muted{color:var(--ink-2)}
+.label{color:var(--ink-2);line-height:1.6;max-width:72ch}
+@media (prefers-reduced-motion:reduce){*,*::before,*::after{
+  animation-duration:.01ms !important;transition-duration:.01ms !important}}
+
+/* ---- Call Review Console ---------------------------------------------- */
+.shell{height:100dvh;display:flex;flex-direction:column;overflow:hidden}
+/* Static header, independently scrolling panes: a sticky header over a sticky
+   sidebar needs its own height as a constant, and that changes when text wraps. */
+header{padding:18px 26px 16px;border-bottom:1px solid var(--rule);display:flex;flex:none;
+  justify-content:space-between;align-items:flex-end;gap:20px;flex-wrap:wrap;background:var(--paper)}
+header .sub{color:var(--ink-2);margin:6px 0 0;max-width:66ch}
+#health{color:var(--ink-2);font-size:.75rem;font-family:var(--mono);text-align:right}
+main{display:grid;grid-template-columns:minmax(280px,360px) minmax(0,1fr);flex:1;min-height:0}
+aside{border-right:1px solid var(--rule);padding:14px 12px;overflow-y:auto;min-height:0}
+section{padding:20px 24px 64px;overflow-y:auto;min-width:0;min-height:0}
+.call{display:block;width:100%;text-align:left;font:inherit;cursor:pointer;color:inherit;
+  padding:10px 12px;border:1px solid var(--rule);border-radius:var(--r-sm);
+  background:var(--surface);margin-bottom:6px;
+  transition:border-color .15s var(--ease),box-shadow .15s var(--ease),transform .15s var(--ease)}
+.call:hover{border-color:var(--rule-2);box-shadow:var(--shadow-1)}
+.call:active{transform:translateY(1px)}
+.call[aria-current="true"]{border-color:var(--ink);box-shadow:var(--shadow-1)}
+.call .t{font-size:.75rem;color:var(--ink-2);margin-top:4px;line-height:1.45}
+.call .foot{font-size:.75rem;color:var(--ink-2);margin-top:3px;font-variant-numeric:tabular-nums}
+.v{display:inline-block;font-weight:600;padding:2px 8px;border-radius:999px;
+  border:1px solid var(--rule-2);font-size:.75rem;color:var(--ink-2);white-space:nowrap}
+.v-approve{color:var(--ok);border-color:var(--ok-rule);background:var(--ok-tint)}
+.v-needs_human{color:var(--warn);border-color:var(--warn-rule);background:var(--warn-tint)}
+.v-reject{color:var(--bad);border-color:var(--bad-rule);background:var(--bad-tint)}
+.kpis{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:8px;margin-bottom:16px}
+.kpi{background:var(--surface);border:1px solid var(--rule);border-radius:var(--r-sm);padding:10px 12px}
+.kpi .k{font-size:.75rem;text-transform:uppercase;letter-spacing:.09em;color:var(--ink-2);font-weight:500}
+.kpi .val{font-size:1.75rem;font-weight:600;letter-spacing:-.02em;margin-top:2px;line-height:1.2}
+.card{background:var(--surface);border:1px solid var(--rule);border-radius:var(--r);
+  padding:16px;margin-bottom:14px;box-shadow:var(--shadow-1)}
+.card ul{margin:8px 0 0;padding-left:20px}
+.card li{margin:3px 0}
+.tablewrap{overflow-x:auto;border:1px solid var(--rule);border-radius:var(--r-sm);margin-top:10px}
+table{border-collapse:collapse;width:100%;font-size:.75rem;background:var(--surface)}
+th,td{padding:7px 10px;text-align:left;vertical-align:top;border-bottom:1px solid var(--rule)}
+tr:last-child td,tr:last-child th{border-bottom:0}
+/* Compliance and timing are label/value rows of alternating th and td, not a
+   header row, so every th is a label -- not only the first in its row. */
+th{background:var(--raised);font-weight:600;
+  text-transform:uppercase;letter-spacing:.05em;color:var(--ink-2);white-space:nowrap}
+/* The transcript is the evidence; give it room and let the agent's turns lead. */
+.turn{display:grid;grid-template-columns:56px 92px minmax(0,1fr);gap:10px;padding:6px 0;
+  border-bottom:1px solid var(--rule);font-size:.75rem;line-height:1.55}
+.turn:last-child{border-bottom:0}
+.turn .o{color:var(--ink-2);font-family:var(--mono);font-variant-numeric:tabular-nums}
+.turn .s{color:var(--ink-2);font-weight:500}
+.turn.agent .s{color:var(--ink);font-weight:600}
+.turn.agent{background:var(--raised);margin:0 -8px;padding-left:8px;padding-right:8px;border-radius:4px}
+.turn .lat{color:var(--ink-2);font-weight:400;font-family:var(--mono)}
+.ok{color:var(--ok);font-weight:600}.bad{color:var(--bad);font-weight:600}
+.note textarea{width:100%;border:1px solid var(--rule-2);border-radius:var(--r-sm);padding:9px 10px;
+  font:inherit;background:var(--raised);color:var(--ink);resize:vertical;margin-top:8px}
+.note textarea:hover{border-color:var(--ink-3)}
+.btn{background:var(--ink);color:var(--paper);border:1px solid var(--ink);border-radius:var(--r-sm);
+  padding:8px 14px;font:inherit;font-weight:500;cursor:pointer;margin-right:8px;
+  transition:opacity .15s var(--ease),transform .15s var(--ease)}
+.btn:hover{opacity:.87}.btn:active{transform:translateY(1px)}
+.btn.ghost{background:transparent;color:var(--ink);border-color:var(--rule-2)}
+.btn.ghost:hover{border-color:var(--ink);opacity:1}
+.state{padding:18px;border:1px dashed var(--rule-2);border-radius:var(--r);
+  color:var(--ink-2);background:var(--raised)}
+.state b{color:var(--ink);display:block;margin-bottom:3px;font-weight:600}
+.skeleton{height:64px;border-radius:var(--r-sm);margin-bottom:6px;
+  background:linear-gradient(90deg,var(--rule) 25%,var(--raised) 37%,var(--rule) 63%);
+  background-size:400% 100%;animation:sweep 1.4s ease-in-out infinite}
+@keyframes sweep{from{background-position:100% 0}to{background-position:0 0}}
+/* Signing in used to be a native prompt() on load. It is a panel now. */
+#gate{position:fixed;inset:0;background:var(--paper);display:grid;place-items:center;z-index:60;padding:24px}
+/* An id selector outranks the UA's [hidden]{display:none}, so the attribute
+   alone would never hide this panel. */
+#gate[hidden]{display:none}
+#gate .box{background:var(--surface);border:1px solid var(--rule);border-radius:var(--r);
+  padding:24px;max-width:440px;width:100%;box-shadow:var(--shadow-1)}
+#gate input{width:100%;margin-top:12px;padding:10px 12px;font:inherit;font-family:var(--mono);
+  border:1px solid var(--rule-2);border-radius:var(--r-sm);background:var(--raised);color:var(--ink)}
+#gate .err{color:var(--bad);font-size:.75rem;margin:10px 0 0}
+.skip{position:absolute;left:-9999px}
+.skip:focus{left:12px;top:12px;z-index:99;background:var(--surface);color:var(--ink);
+  padding:8px 14px;border:1px solid var(--ink);border-radius:var(--r-sm)}
+@media (max-width:900px){
+  h1{font-size:1.75rem}
+  .shell{height:auto;overflow:visible}
+  main{grid-template-columns:1fr}
+  section{overflow:visible}
+  aside{border-right:0;border-bottom:1px solid var(--rule);
+    display:flex;gap:6px;overflow-x:auto;overflow-y:hidden}
+  .call{min-width:250px;margin-bottom:0;flex:none}
+  section{padding:16px 16px 48px}
+  .turn{grid-template-columns:48px 1fr;row-gap:2px}
+  .turn>span:nth-child(3){grid-column:1/-1}
+}
+</style></head><body>
+<a class="skip" href="#detail">Skip to the review</a>
+<div id="gate" hidden><div class="box"><h2>Console token</h2>
+<p class="label" style="margin:8px 0 0">The server prints one at startup (<span class="mono">CRC_CONSOLE_TOKEN</span> sets a stable one). Nothing here is served anonymously.</p>
+<label class="skip" for="tok">Console token</label>
+<input id="tok" type="password" autocomplete="off" spellcheck="false" placeholder="paste the token">
+<p class="label" id="gate-note" hidden style="margin:10px 0 0;font-size:.75rem">This is the published demo, running on fictional fixture calls. Its token is filled in for you.</p>
+<p class="err" id="gate-err" hidden></p>
+<div style="margin-top:14px"><button class="btn" id="gate-go" type="button">Open the console</button></div></div></div>
+<div class="shell">
+<header><div><h1>Call Review Console</h1><p class="sub">Review a CALL-E call before you act on it. Read-only: this console never places a call. Numbers are masked.</p></div><div id="health"></div></header>
+<main><aside id="list" aria-label="Calls"><div class="skeleton"></div><div class="skeleton"></div><div class="skeleton"></div></aside>
+<section id="detail"><div class="state"><b>Pick a call</b>Each one shows the structured result checked against the transcript, the timing derived from turn offsets, and the compliance checks.</div></section></main></div>
+<script>
+const $=s=>document.querySelector(s);const esc=s=>String(s??'').replace(/[&<>"'`]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;','`':'&#96;'}[c]));
+const TOKEN=()=>sessionStorage.getItem('crcToken')||'';
+const authed=(u,o={})=>fetch(u,{...o,headers:{...(o.headers||{}),'X-CRC-Console':TOKEN()}});
+async function load(){const hr=await authed('/api/health');if(!hr.ok)throw new Error('HTTP '+hr.status);const h=await hr.json();$('#health').textContent=`${h.calls_on_file} calls on file · live fetch ${h.live_fetch_enabled?'enabled':'off'} · LLM evidence ${h.llm?'on':'off'}`;
+ const rows=await (await authed('/api/calls')).json();
+ $('#list').innerHTML=`<button type="button" class="call" data-act="bench"><b>Benchmark</b><div class="t">every call on file: completion, evidence, latency</div></button>`+rows.map(r=>`<button type="button" class="call" data-act="call" data-id="${esc(r.id)}"><span class="v v-${esc(r.verdict)}">${esc(r.verdict.replace('_',' '))}</span> <span class="mono">${esc(r.id)}</span> <span class="muted" style="font-size:.75rem">${esc(r.source)}${r.reviewed?' · reviewed':''}</span><div class="t">${esc(r.task).slice(0,90)}</div><div class="foot">${esc(r.status)} · p50 ${r.p50??'—'}s · ${r.unsupported} unsupported</div></button>`).join('');
+ const q=new URLSearchParams(location.search);const want=q.get('call');const idx=rows.findIndex(r=>r.id===want);
+ if(q.get('view')==='benchmark') bench(); else if(idx>=0) showCall(rows[idx].id, document.querySelectorAll('.call')[idx+1], q.get('llm')==='true'); else if(rows.length) showCall(rows[0].id, document.querySelectorAll('.call')[1]);}
+async function showCall(id,el,llm){document.querySelectorAll('.call').forEach(x=>x.setAttribute('aria-current','false'));if(el)el.setAttribute('aria-current','true');
+ const d=await (await authed(`/api/calls/${encodeURIComponent(id)}${llm?'?llm=true':''}`)).json();const t=d.task,r=d.review,tm=r.timing,c=r.compliance;
+ const turns=(t.recipients||[]).flatMap(x=>(x.attempts||[]).flatMap(a=>a.transcript_turns||[]));
+ let prevCallee=null;const turnHtml=turns.map(u=>{const ag=['agent','assistant','ai','calle','bot'].includes(String(u.speaker).toLowerCase());let lat='';if(ag&&prevCallee!==null){lat=`+${(u.offset_seconds-prevCallee).toFixed(1)}s`;}if(!ag)prevCallee=u.offset_seconds;return `<div class="turn ${ag?'agent':''}"><span class="o">${Number(u.offset_seconds).toFixed(1)}s</span><span class="s">${esc(u.speaker)} <span class="lat">${lat}</span></span><span>${esc(u.text)}</span></div>`}).join('');
+ $('#detail').innerHTML=`<div class="kpis"><div class="kpi"><div class="k">verdict</div><div class="val"><span class="v v-${esc(r.verdict)}">${esc(r.verdict.replace('_',' '))}</span></div></div><div class="kpi"><div class="k">status</div><div class="val">${esc(t.status)}</div></div><div class="kpi"><div class="k">task completed</div><div class="val">${t.task_completed===null?'—':t.task_completed}</div></div><div class="kpi"><div class="k">confidence</div><div class="val">${r.completion_confidence??'—'}</div></div><div class="kpi"><div class="k">response p50 / p95</div><div class="val">${tm.response_p50_s??'—'} / ${tm.response_p95_s??'—'}s</div></div><div class="kpi"><div class="k">unsupported fields</div><div class="val ${r.unsupported_count?'bad':''}">${r.unsupported_count}</div></div></div>
+ <div class="card"><h2>Why</h2>${r.reasons.length?'<ul>'+r.reasons.map(x=>`<li>${esc(x)}</li>`).join('')+'</ul>':'<p class="muted">No issues found by the deterministic checks.</p>'}<p class="muted mono">task: ${esc(t.task)}</p><p class="muted">summary: ${esc(t.summary||'—')}</p></div>
+ <div class="card"><h2>Structured result vs. transcript</h2><div class="tablewrap"><table><tr><th>field</th><th>value</th><th>supported</th><th>how</th></tr>${r.evidence.map(e=>`<tr><td class="mono">${esc(e.field)}</td><td>${esc(JSON.stringify(e.value))}</td><td class="${e.supported===true?'ok':e.supported===false?'bad':'muted'}">${e.supported===null?'unknown':e.supported?'yes':'NO'}</td><td class="muted">${esc(e.how)}${e.turns&&e.turns.length?' · turns '+e.turns.map(esc).join(', '):''}${e.note?' · '+esc(e.note):''}</td></tr>`).join('')||'<tr><td colspan=4 class=muted>no structured result</td></tr>'}</table>${r.llm_used?'<p class="muted" style="margin:6px 0 0">Model pass applied: Gemini read the transcript and cited the supporting turns per field.</p>':'<p class="muted" style="margin:6px 0 0">Deterministic matching only. <a href="#" data-act="recheck" data-id="'+esc(t.id)+'">Re-check with the model</a> (Gemini, cites turns).</p>'}</div>
+ <div class="card"><h2>Compliance</h2><table><tr><th>AI disclosed</th><td class="${c.ai_disclosed?'ok':'bad'}">${c.ai_disclosed?'yes':'no'}${c.ai_disclosed_first_turn?' (first turn)':''}</td><th>stop requested</th><td>${c.stop_requested?'yes':'no'}</td><th>stop honored</th><td class="${c.stop_honored===false?'bad':c.stop_honored?'ok':'muted'}">${c.stop_honored===null?'—':c.stop_honored?'yes':'NO'}</td><th>sensitive readback</th><td class="${c.sensitive_readback?'bad':'ok'}">${c.sensitive_readback?'yes':'no'}</td></tr></table>
+ <h3>Timing (from transcript offsets)</h3><table><tr><th>agent turns</th><td>${tm.agent_turns}</td><th>callee turns</th><td>${tm.callee_turns}</td><th>silences &gt; 4s</th><td>${tm.silences_over_threshold} (longest ${tm.longest_silence_s}s)</td><th>overlaps</th><td>${tm.overlaps}</td><th>duration</th><td>${tm.duration_seconds}s</td></tr></table></div>
+ <div class="card"><h2>Transcript</h2>${turnHtml||'<p class="muted">no transcript</p>'}</div>
+ <div class="card note"><h2>Human disposition</h2>${d.note?`<p>${esc(d.note.verdict)} by ${esc(d.note.reviewer)} at ${esc(d.note.reviewed_at)} — ${esc(d.note.note)}</p>`:''}<textarea id="ntext" rows="2" placeholder="note for the record"></textarea><div style="margin-top:6px"><button type="button" class="btn" data-act="note" data-id="${esc(t.id)}" data-verdict="approve">Approve</button><button type="button" class="btn ghost" data-act="note" data-id="${esc(t.id)}" data-verdict="needs_human">Needs follow-up</button><button type="button" class="btn ghost" data-act="note" data-id="${esc(t.id)}" data-verdict="reject">Reject</button></div></div>`;}
+async function note(id,v){const n=$('#ntext').value;await authed(`/api/calls/${encodeURIComponent(id)}/note`,{method:'POST',headers:{'content-type':'application/json'},body:JSON.stringify({verdict:v,note:n})});showCall(id);}
+async function bench(){const b=await (await authed('/api/benchmark')).json();const a=b.aggregate;
+ $('#detail').innerHTML=`<div class="kpis"><div class="kpi"><div class="k">calls</div><div class="val">${a.calls}</div></div><div class="kpi"><div class="k">completed</div><div class="val">${a.completed}</div></div><div class="kpi"><div class="k">task completed</div><div class="val">${a.task_completed}</div></div><div class="kpi"><div class="k">approve / human / reject</div><div class="val">${a.approve} / ${a.needs_human} / ${a.reject}</div></div><div class="kpi"><div class="k">median p50 latency</div><div class="val">${a.median_p50_s??'—'}s</div></div><div class="kpi"><div class="k">unsupported claims</div><div class="val">${a.unsupported_claims}</div></div></div>
+ <p class="muted">Sources on file: ${a.sources.join(', ')}. Fixture calls are fictional and labelled; ingest real terminal snapshots via the webhook or an opt-in fetch to benchmark your own calls.</p>
+ <div class="tablewrap"><table><tr><th>call</th><th>source</th><th>status</th><th>task completed</th><th>p50</th><th>p95</th><th>silences</th><th>overlaps</th><th>unsupported</th><th>AI disclosed</th><th>verdict</th></tr>${b.rows.map(r=>`<tr><td class="mono">${esc(r.id)}</td><td>${esc(r.source)}</td><td>${esc(r.status)}</td><td>${r.task_completed}</td><td>${r.p50??'—'}</td><td>${r.p95??'—'}</td><td>${r.silences}</td><td>${r.overlaps}</td><td class="${r.unsupported?'bad':''}">${r.unsupported}</td><td>${r.ai_disclosed?'yes':'no'}</td><td><span class="v v-${esc(r.verdict)}">${esc(r.verdict.replace('_',' '))}</span></td></tr>`).join('')}</table></div>`;}
+// One delegated listener replaces the inline onclick handlers. Ids now travel
+// in data attributes, so a hostile call id can never be parsed as JavaScript.
+document.addEventListener('click',e=>{const el=e.target.closest('[data-act]');if(!el)return;
+ const act=el.dataset.act,id=el.dataset.id;
+ if(act==='bench'){bench();}
+ else if(act==='call'){showCall(id,el);}
+ else if(act==='recheck'){e.preventDefault();showCall(id,null,true);}
+ else if(act==='note'){note(id,el.dataset.verdict);}});
+
+async function openGate(msg){
+ const g=$('#gate'), e=$('#gate-err');
+ g.hidden=false; e.hidden=!msg; if(msg)e.textContent=msg;
+ // A published demo hands the visitor its own token: the server prints the
+ // real one to stdout, which nobody opening a hosted link can read.
+ try{
+  const p=await (await fetch('/api/ping')).json();
+  if(p.demo&&p.demo_token){
+   $('#tok').value=p.demo_token;
+   $('#gate-note').hidden=false;
+  }
+ }catch(_){}
+ $('#tok').focus();
+}
+async function start(){
+ if(!TOKEN()){await openGate();return}
+ try{
+  await load(); $('#gate').hidden=true;
+ }catch(err){
+  sessionStorage.removeItem('crcToken');
+  await openGate('That token was not accepted. The server prints the current one when it starts.');
+ }
+}
+$('#gate-go').addEventListener('click',()=>{
+ const t=$('#tok').value.trim(); if(!t){openGate('Paste the token first.');return}
+ sessionStorage.setItem('crcToken',t); $('#gate').hidden=true; start();
+});
+$('#tok').addEventListener('keydown',e=>{if(e.key==='Enter')$('#gate-go').click()});
+start();
+</script></body></html>

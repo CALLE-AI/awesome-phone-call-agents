@@ -1,0 +1,46 @@
+{
+ "id": "train-agent-017",
+ "label": "agent",
+ "source": "sim-train",
+ "meta": {
+  "task": "ask for a quote for a brake replacement",
+  "hard": true
+ },
+ "turns": [
+  {
+   "speaker": "user",
+   "text": "Hello and thanks for calling Bloom Florists. I'm Ava, the virtual assistant for Bloom Florists, and I can help with bookings, hours, and more. What can I do for you?",
+   "offset_seconds": 0.61
+  },
+  {
+   "speaker": "bot",
+   "text": "Hi, I'm an AI assistant calling on behalf of Casey Brown. Could you give me a rough quote for replacing the front brake pads on a 2018 sedan?",
+   "offset_seconds": 12.52
+  },
+  {
+   "speaker": "user",
+   "text": "Of course! Bloom Bloom Florists is open on Sunday from 10 AM to 4 PM. Is there anything else I can help you with?",
+   "offset_seconds": 23.76
+  },
+  {
+   "speaker": "bot",
+   "text": "Does that include labour?",
+   "offset_seconds": 33.65
+  },
+  {
+   "speaker": "user",
+   "text": "so, Of course. One moment please. Yes, that works.",
+   "offset_seconds": 35.74
+  },
+  {
+   "speaker": "bot",
+   "text": "Does that include labour?",
+   "offset_seconds": 39.99
+  },
+  {
+   "speaker": "user",
+   "text": "You're welcome! Have a wonderful day. Goodbye!",
+   "offset_seconds": 42.38
+  }
+ ]
+}

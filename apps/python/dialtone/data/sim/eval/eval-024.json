@@ -1,0 +1,75 @@
+{
+  "id": "eval-024",
+  "label": "human",
+  "difficulty": "typical",
+  "scenario": "Plumbing dispatcher looks up the job and confirms tomorrow's arrival window and diagnostic fee.",
+  "task": "Confirm the service window for Helen Marsh's water heater appointment tomorrow.",
+  "outcome": {
+    "task_completed_claimed": true,
+    "commitment_type": "booking",
+    "confirmation_artifact": null,
+    "expected_attestation": "human_attested"
+  },
+  "turns": [
+    {
+      "speaker": "user",
+      "text": "Rapid Rooter dispatch.",
+      "offset_seconds": 0.7
+    },
+    {
+      "speaker": "bot",
+      "text": "hi, I'm an AI assistant calling on behalf of Helen Marsh at forty two Orchard Lane. I'm confirming the service window for her water heater appointment tomorrow.",
+      "offset_seconds": 2.67
+    },
+    {
+      "speaker": "user",
+      "text": "Marsh... Orchard Lane... yep, here she is.",
+      "offset_seconds": 14.78
+    },
+    {
+      "speaker": "user",
+      "text": "so she's got Devon coming out, window is eight to noon.",
+      "offset_seconds": 18.27
+    },
+    {
+      "speaker": "bot",
+      "text": "eight to noon. will the technician call before arriving?",
+      "offset_seconds": 23.52
+    },
+    {
+      "speaker": "user",
+      "text": "yeah he'll call about thirty minutes out.",
+      "offset_seconds": 26.82
+    },
+    {
+      "speaker": "bot",
+      "text": "great. and is that still the flat rate of ninety five for the diagnostic?",
+      "offset_seconds": 30.32
+    },
+    {
+      "speaker": "user",
+      "text": "ninety five, and that gets waived if she goes ahead with the repair.",
+      "offset_seconds": 35.55
+    },
+    {
+      "speaker": "bot",
+      "text": "thank you. so confirmed, tomorrow between eight and noon, Devon will call thirty minutes ahead.",
+      "offset_seconds": 41.52
+    },
+    {
+      "speaker": "user",
+      "text": "that's right.",
+      "offset_seconds": 46.39
+    },
+    {
+      "speaker": "bot",
+      "text": "thanks, have a great day.",
+      "offset_seconds": 48.06
+    },
+    {
+      "speaker": "user",
+      "text": "yep you too.",
+      "offset_seconds": 49.98
+    }
+  ]
+}

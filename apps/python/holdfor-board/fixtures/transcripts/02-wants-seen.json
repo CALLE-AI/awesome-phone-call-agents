@@ -1,0 +1,81 @@
+{
+  "state": "terminal_verified",
+  "turns": [
+    {
+      "index": 0,
+      "speaker": "agent",
+      "text": "Hello, is that Margaret? This is an automated call from Fieldgate Surgery, following up on your appointment. I am not able to take questions, but the practice will read everything you tell me. If you would rather not talk now, just hang up and we will not call again."
+    },
+    {
+      "index": 1,
+      "speaker": "other",
+      "text": "Yes. Yes, hello."
+    },
+    {
+      "index": 2,
+      "speaker": "agent",
+      "text": "Thank you. Since your appointment, are you feeling better, about the same, or worse?"
+    },
+    {
+      "index": 3,
+      "speaker": "other",
+      "text": "Worse, if I'm honest. It's the mornings mostly."
+    },
+    {
+      "index": 4,
+      "speaker": "agent",
+      "text": "Thank you. Your medication was changed at that appointment. Are you managing to take it as prescribed?"
+    },
+    {
+      "index": 5,
+      "speaker": "other",
+      "text": "I'm taking it, but I'm not sure I've got the timing right. The pharmacist said one thing and the letter said another."
+    },
+    {
+      "index": 6,
+      "speaker": "agent",
+      "text": "Thank you. Is there anything you would like the practice to know?"
+    },
+    {
+      "index": 7,
+      "speaker": "other",
+      "text": "I can't get up the stairs the way I could a fortnight ago, and I'm having to stop halfway."
+    },
+    {
+      "index": 8,
+      "speaker": "agent",
+      "text": "Would you like to be seen again about this?"
+    },
+    {
+      "index": 9,
+      "speaker": "other",
+      "text": "Yes, please. Mornings are difficult though, if that can be helped."
+    },
+    {
+      "index": 10,
+      "speaker": "agent",
+      "text": "Are mornings or afternoons easier for you?"
+    },
+    {
+      "index": 11,
+      "speaker": "other",
+      "text": "Afternoons, if you can. My daughter drives me and she's at work till one."
+    },
+    {
+      "index": 12,
+      "speaker": "agent",
+      "text": "Thank you. Someone at the practice will read this today. Goodbye."
+    }
+  ],
+  "structured": {
+    "feeling": "worse",
+    "medication_ok": "unsure",
+    "wants_seen": "yes",
+    "when_easier": "afternoon",
+    "carried_words_text": "I can't get up the stairs the way I could a fortnight ago, and I'm having to stop halfway.",
+    "carried_words_turn": 7,
+    "stop_condition": false,
+    "stop_reason": null
+  },
+  "outcome": "COMPLETED"
+}

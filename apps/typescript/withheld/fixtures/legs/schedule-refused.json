@@ -1,0 +1,19 @@
+{
+  "name": "schedule-refused",
+  "description": "The callee genuinely cannot name a time. The caller does not push a third time and does not leave a number. A human decides what happens next.",
+  "status": "completed",
+  "now": "2026-09-14T10:00:00Z",
+  "turns": [
+    { "speaker": "caller", "text": "Good morning. I'm an automated assistant calling on behalf of Amina Otieno, with her permission." },
+    { "speaker": "caller", "text": "Do you need the referral letter before the appointment?" },
+    { "speaker": "callee", "text": "The doctor handles referrals himself and he's on leave. We'll get back to you." },
+    { "speaker": "caller", "text": "I'm not able to take a call back. When should I call you instead?" },
+    { "speaker": "callee", "text": "Honestly I can't say. There's no way of knowing when he'll pick up his messages." },
+    { "speaker": "caller", "text": "That's understood. Thank you for your help." }
+  ],
+  "expect": {
+    "status": "callback_refused_by_callee",
+    "next_action": "needs_human",
+    "number_disclosed": false
+  }
+}

@@ -1,0 +1,16 @@
+{
+  "status": "COMPLETED",
+  "result": {
+    "post_summary": "Customer confirmed the Thursday pickup after two clarifications.",
+    "transcript": [
+      {"speaker": "agent", "text": "Your pickup is scheduled for Thursday November 12th between 2 and 4 p.m. at the depot."},
+      {"speaker": "callee", "text": "Sorry, what?"},
+      {"speaker": "agent", "text": "I said your pickup is on Thursday November 12th."},
+      {"speaker": "callee", "text": "Is it the 12th or the 21st?"},
+      {"speaker": "agent", "text": "It is the 12th, one two."},
+      {"speaker": "callee", "text": "Got it, thank you."},
+      {"speaker": "agent", "text": "You are welcome. Goodbye."}
+    ]
+  },
+  "callee_phone": "+14155550173"
+}

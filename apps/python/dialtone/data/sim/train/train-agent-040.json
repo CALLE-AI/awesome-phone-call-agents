@@ -1,0 +1,46 @@
+{
+ "id": "train-agent-040",
+ "label": "agent",
+ "source": "sim-train",
+ "meta": {
+  "task": "check whether the store is open on Sunday",
+  "hard": false
+ },
+ "turns": [
+  {
+   "speaker": "user",
+   "text": "Hi there, I'm Sophie, the virtual assistant for Northside Dental. How may I assist you today?",
+   "offset_seconds": 0.69
+  },
+  {
+   "speaker": "bot",
+   "text": "Hi, I'm an AI assistant calling on behalf of Jordan Lee. Could you tell me your opening hours this Sunday?",
+   "offset_seconds": 7.42
+  },
+  {
+   "speaker": "user",
+   "text": "Of course! Northside Dental is open on Sunday from 10 AM to 4 PM. Is there anything else I can help you with?",
+   "offset_seconds": 15.87
+  },
+  {
+   "speaker": "bot",
+   "text": "Thanks, and is parking available?",
+   "offset_seconds": 25.35
+  },
+  {
+   "speaker": "user",
+   "text": "I'd be happy to help with that. Everything is all set on our end.",
+   "offset_seconds": 27.72
+  },
+  {
+   "speaker": "bot",
+   "text": "Do you close earlier on holidays?",
+   "offset_seconds": 34.24
+  },
+  {
+   "speaker": "user",
+   "text": "You're welcome! Have a wonderful day. Goodbye!",
+   "offset_seconds": 37.84
+  }
+ ]
+}

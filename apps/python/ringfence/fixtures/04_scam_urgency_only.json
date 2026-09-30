@@ -1,0 +1,58 @@
+{
+  "_evidence_source": "synthetic: modeled on FTC-documented manufactured-urgency imposter-scam pressure tactics (see references/scam-red-flags.md)",
+  "category": "scam_pattern",
+  "case": {
+    "case_id": "case_f04",
+    "account_holder_name": "Marcus Webb",
+    "on_file_phone": "+14155550104",
+    "claimed_transaction_amount": "2200.00",
+    "claimed_recipient": "IRS Settlement Office",
+    "claimed_payment_method": "gift_card",
+    "request_supplied_callback_number": null
+  },
+  "call": {
+    "id": "call_f04",
+    "status": "completed",
+    "task": "Verify a flagged $2,200 gift-card transaction to an 'IRS Settlement Office'.",
+    "failure_code": null,
+    "failure_message": null,
+    "task_completed": true,
+    "completion_confidence": {"score": 0.88, "label": "high"},
+    "summary": "Account holder reports being told the payment must happen immediately to avoid arrest."
+  },
+  "attempts": [
+    {
+      "id": "attempt_f04",
+      "phone": "+14155550104",
+      "status": "completed",
+      "started_at": "2026-09-10T12:30:00Z",
+      "completed_at": "2026-09-10T12:33:50Z",
+      "summary": "Account holder described urgency and irreversible payment demand.",
+      "transcript_turns": [
+        {"speaker": "bot", "text": "Did anyone ask you to keep this transaction private?"},
+        {"speaker": "user", "text": "No, they didn't say that part."},
+        {"speaker": "bot", "text": "Is there time pressure on this payment?"},
+        {"speaker": "user", "text": "Yes, they said I'd be arrested today if I didn't pay right now."},
+        {"speaker": "bot", "text": "Can you describe your relationship to the recipient?"},
+        {"speaker": "user", "text": "I don't really know them, they called saying they were from the IRS."},
+        {"speaker": "bot", "text": "Were you asked to pay by wire, gift card, or cryptocurrency specifically?"},
+        {"speaker": "user", "text": "Yes, gift cards, specifically from a pharmacy."}
+      ],
+      "provider_call_id": "prov_f04",
+      "failure_code": null,
+      "failure_message": null
+    }
+  ],
+  "events": [
+    {"id": "evt_f04a", "type": "call.dialing", "call_id": "call_f04", "created_at": "2026-09-10T12:30:00Z", "level": "info", "status": "in_progress", "message": "Dialing account holder.", "details": {"region": "US"}},
+    {"id": "evt_f04b", "type": "call.completed", "call_id": "call_f04", "created_at": "2026-09-10T12:33:50Z", "level": "info", "status": "completed", "message": "Call completed.", "details": {"region": "US", "locale": "en-US"}}
+  ],
+  "signals": {
+    "secrecy_demand_present": false,
+    "urgency_pressure_present": true,
+    "relationship_explained": false,
+    "irreversible_payment_demanded": true,
+    "explicit_hold_requested": false
+  },
+  "expected_disposition": "ADVISE_BLOCK"
+}

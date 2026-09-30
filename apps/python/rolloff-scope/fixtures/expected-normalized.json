@@ -1,0 +1,373 @@
+{
+  "app": "RolloffScope",
+  "batch_errors": [],
+  "booking_order_or_acceptance_performed": false,
+  "call_id": "call_fixture_rolloffscope_001",
+  "call_status": "completed",
+  "locked_scope": {
+    "container_size_cubic_yards": 20,
+    "delivery_window_requested": "2026-09-15 through 2026-09-17",
+    "estimated_tonnage": 2.5,
+    "placement": "private driveway with clear truck access",
+    "rental_days": 7,
+    "service_area": "Fictional Example City, California",
+    "waste_type": "non-hazardous household cleanout waste"
+  },
+  "quotes": [
+    {
+      "assumptions": [
+        "Load contains only the stated non-hazardous household cleanout waste",
+        "Container stays on the stated private driveway"
+      ],
+      "base_rental_amount": "475.00",
+      "classification": "comparable",
+      "commitment_allowed": false,
+      "contradictions": [],
+      "currency": "USD",
+      "evidence": [
+        {
+          "fields": [
+            "availability",
+            "earliest_delivery",
+            "outcome",
+            "quote_valid_until",
+            "scope_match"
+          ],
+          "statement": "The representative confirmed the requested scope, availability on September 15, and validity through September 12."
+        },
+        {
+          "fields": [
+            "base_rental_amount",
+            "currency",
+            "included_tonnage",
+            "overage_per_ton_amount",
+            "overage_status",
+            "rental_days_included"
+          ],
+          "statement": "The USD 475 base covers seven days and two tons; additional weight is USD 80 per ton."
+        },
+        {
+          "fields": [
+            "delivery_fee_amount",
+            "delivery_fee_status",
+            "pickup_fee_amount",
+            "pickup_fee_status"
+          ],
+          "statement": "Delivery and pickup are included with no separate charge."
+        },
+        {
+          "fields": [
+            "environmental_fee_amount",
+            "environmental_fee_status",
+            "fuel_fee_amount",
+            "fuel_fee_status"
+          ],
+          "statement": "A USD 25 fuel charge and USD 15 environmental charge are mandatory additions."
+        },
+        {
+          "fields": [
+            "permit_fee_amount",
+            "permit_fee_status",
+            "permit_requirement",
+            "permit_responsibility"
+          ],
+          "statement": "No permit is required for the stated private-driveway placement, so no permit fee applies."
+        },
+        {
+          "fields": [
+            "prohibited_materials",
+            "prohibited_materials_status"
+          ],
+          "statement": "Hazardous waste, batteries, and tires are prohibited."
+        },
+        {
+          "fields": [
+            "tax_amount",
+            "tax_status"
+          ],
+          "statement": "USD 60 tax is added to the quote."
+        },
+        {
+          "fields": [
+            "assumptions"
+          ],
+          "statement": "The quote assumes the stated waste type and private-driveway placement."
+        }
+      ],
+      "evidence_missing_fields": [],
+      "missing_fields": [],
+      "normalized_total": "615.00",
+      "prohibited_materials": [
+        "hazardous waste",
+        "batteries",
+        "tires"
+      ],
+      "reasons": [],
+      "recipient_status": "completed",
+      "requires_human_approval": true,
+      "vendor_id": "clear-bin",
+      "vendor_name": "Clear Bin Roll-Off"
+    },
+    {
+      "assumptions": [
+        "Load contains only the stated waste type"
+      ],
+      "base_rental_amount": "350.00",
+      "classification": "incomplete",
+      "commitment_allowed": false,
+      "contradictions": [],
+      "currency": "USD",
+      "evidence": [
+        {
+          "fields": [
+            "availability",
+            "earliest_delivery",
+            "outcome",
+            "quote_valid_until",
+            "scope_match"
+          ],
+          "statement": "The representative offered the requested container for September 15 and held the quote through September 11."
+        },
+        {
+          "fields": [
+            "base_rental_amount",
+            "currency",
+            "included_tonnage",
+            "rental_days_included"
+          ],
+          "statement": "The USD 350 base covers seven days and one ton."
+        },
+        {
+          "fields": [
+            "delivery_fee_amount",
+            "delivery_fee_status",
+            "pickup_fee_amount",
+            "pickup_fee_status"
+          ],
+          "statement": "Delivery and pickup are included."
+        },
+        {
+          "fields": [
+            "environmental_fee_amount",
+            "environmental_fee_status",
+            "fuel_fee_amount",
+            "fuel_fee_status"
+          ],
+          "statement": "Fuel is USD 30 additional and the environmental charge is USD 20 additional."
+        },
+        {
+          "fields": [
+            "permit_fee_amount",
+            "permit_fee_status",
+            "permit_requirement",
+            "permit_responsibility"
+          ],
+          "statement": "No permit or permit fee is required for the stated placement."
+        },
+        {
+          "fields": [
+            "prohibited_materials",
+            "prohibited_materials_status"
+          ],
+          "statement": "Hazardous waste and batteries are prohibited."
+        },
+        {
+          "fields": [
+            "assumptions"
+          ],
+          "statement": "The price assumes the stated household cleanout waste."
+        }
+      ],
+      "evidence_missing_fields": [],
+      "missing_fields": [
+        "overage_per_ton_amount",
+        "overage_status",
+        "tax_amount",
+        "tax_status"
+      ],
+      "normalized_total": null,
+      "prohibited_materials": [
+        "hazardous waste",
+        "batteries"
+      ],
+      "reasons": [
+        "invalid_overage_per_ton_amount",
+        "invalid_overage_status",
+        "invalid_tax_amount",
+        "missing_overage_per_ton_amount",
+        "missing_overage_status",
+        "missing_tax_amount",
+        "missing_tax_status",
+        "tax_unknown_or_invalid"
+      ],
+      "recipient_status": "completed",
+      "requires_human_approval": true,
+      "vendor_id": "value-roll",
+      "vendor_name": "Value Roll Containers"
+    },
+    {
+      "assumptions": [
+        "Load contains only the stated waste type"
+      ],
+      "base_rental_amount": "400.00",
+      "classification": "incomplete",
+      "commitment_allowed": false,
+      "contradictions": [
+        "The representative first said every mandatory fee was included, then said a USD 35 environmental fee was additional."
+      ],
+      "currency": "USD",
+      "evidence": [
+        {
+          "fields": [
+            "availability",
+            "earliest_delivery",
+            "outcome",
+            "quote_valid_until",
+            "scope_match"
+          ],
+          "statement": "The requested scope was available September 16 and the bid was valid through September 12."
+        },
+        {
+          "fields": [
+            "base_rental_amount",
+            "currency",
+            "included_tonnage",
+            "overage_per_ton_amount",
+            "overage_status",
+            "rental_days_included"
+          ],
+          "statement": "The USD 400 base covers seven days and 2.5 tons; overage is USD 70 per ton."
+        },
+        {
+          "fields": [
+            "delivery_fee_amount",
+            "delivery_fee_status",
+            "fuel_fee_amount",
+            "fuel_fee_status",
+            "pickup_fee_amount",
+            "pickup_fee_status"
+          ],
+          "statement": "Delivery, pickup, and fuel were described as included."
+        },
+        {
+          "fields": [
+            "environmental_fee_amount",
+            "environmental_fee_status"
+          ],
+          "statement": "The representative later said a USD 35 environmental fee was additional."
+        },
+        {
+          "fields": [
+            "permit_fee_amount",
+            "permit_fee_status",
+            "permit_requirement",
+            "permit_responsibility"
+          ],
+          "statement": "No permit or permit fee is required."
+        },
+        {
+          "fields": [
+            "prohibited_materials",
+            "prohibited_materials_status"
+          ],
+          "statement": "Hazardous waste is prohibited."
+        },
+        {
+          "fields": [
+            "tax_amount",
+            "tax_status"
+          ],
+          "statement": "Tax was described as included with no separate amount."
+        },
+        {
+          "fields": [
+            "assumptions"
+          ],
+          "statement": "The quote assumes the stated waste type."
+        }
+      ],
+      "evidence_missing_fields": [],
+      "missing_fields": [],
+      "normalized_total": null,
+      "prohibited_materials": [
+        "hazardous waste"
+      ],
+      "reasons": [
+        "reported_contradiction"
+      ],
+      "recipient_status": "completed",
+      "requires_human_approval": true,
+      "vendor_id": "eco-haul",
+      "vendor_name": "Eco Haul Bins"
+    },
+    {
+      "assumptions": [],
+      "base_rental_amount": null,
+      "classification": "unresolved",
+      "commitment_allowed": false,
+      "contradictions": [],
+      "currency": null,
+      "evidence": [
+        {
+          "fields": [
+            "outcome"
+          ],
+          "statement": "The call reached voicemail and no person provided a quote."
+        }
+      ],
+      "evidence_missing_fields": [],
+      "missing_fields": [
+        "assumptions",
+        "availability",
+        "base_rental_amount",
+        "contradictions",
+        "currency",
+        "delivery_fee_amount",
+        "delivery_fee_status",
+        "earliest_delivery",
+        "environmental_fee_amount",
+        "environmental_fee_status",
+        "fuel_fee_amount",
+        "fuel_fee_status",
+        "included_tonnage",
+        "overage_per_ton_amount",
+        "overage_status",
+        "permit_fee_amount",
+        "permit_fee_status",
+        "permit_requirement",
+        "permit_responsibility",
+        "pickup_fee_amount",
+        "pickup_fee_status",
+        "prohibited_materials",
+        "prohibited_materials_status",
+        "quote_valid_until",
+        "rental_days_included",
+        "scope_match",
+        "tax_amount",
+        "tax_status"
+      ],
+      "normalized_total": null,
+      "prohibited_materials": [],
+      "reasons": [
+        "outcome_voicemail"
+      ],
+      "recipient_status": "voicemail",
+      "requires_human_approval": true,
+      "vendor_id": "silent-can",
+      "vendor_name": "Silent Can Rentals"
+    }
+  ],
+  "ranked_for_human_review": [
+    {
+      "currency": "USD",
+      "normalized_total": "615.00",
+      "rank": 1,
+      "requires_human_approval": true,
+      "vendor_id": "clear-bin",
+      "vendor_name": "Clear Bin Roll-Off"
+    }
+  ],
+  "request_id": "rolloffscope-rolloff-fixture-001",
+  "schema_version": "2.0",
+  "selection_authority": "human_only"
+}

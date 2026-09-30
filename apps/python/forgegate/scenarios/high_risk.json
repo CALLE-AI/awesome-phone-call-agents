@@ -1,0 +1,7 @@
+{
+  "incident_id": "inc_001",
+  "source": "rfid+gas_sensor",
+  "signals": { "rfid_zone": "zone_3", "gas_ppm": 340, "temp_c": 41.2 },
+  "risk_score": 0.91,
+  "proposed_action": "lock zone_3 and cut power to machine_4"
+}

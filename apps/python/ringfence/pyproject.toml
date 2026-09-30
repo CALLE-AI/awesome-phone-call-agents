@@ -1,0 +1,23 @@
+[project]
+name = "ringfence"
+version = "0.1.0"
+description = "Fraud-verification calls for flagged transactions: an independent call to the account holder's on-file number, never a number supplied by the flagged request."
+requires-python = ">=3.11"
+dependencies = [
+    "calle-ai>=0.7.0",
+]
+
+[project.optional-dependencies]
+dev = ["pytest>=8.0"]
+webhook = ["fastapi>=0.110", "uvicorn>=0.29"]
+mcp = ["fastmcp>=0.2"]
+
+[project.scripts]
+ringfence = "ringfence.cli:main"
+
+[build-system]
+requires = ["setuptools>=68"]
+build-backend = "setuptools.build_meta"
+
+[tool.setuptools.packages.find]
+include = ["ringfence*"]

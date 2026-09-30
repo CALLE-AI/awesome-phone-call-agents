@@ -1,0 +1,62 @@
+{
+  "rescue_intent.py": {
+    "unchanged": true,
+    "version_only": false
+  },
+  "conversation_input.py": {
+    "unchanged": true,
+    "version_only": false
+  },
+  "call_activity.py": {
+    "unchanged": true,
+    "version_only": false
+  },
+  "callback_recovery.py": {
+    "unchanged": true,
+    "version_only": false
+  },
+  "contact_candidates.py": {
+    "unchanged": true,
+    "version_only": false
+  },
+  "goal_dialogue.py": {
+    "unchanged": true,
+    "version_only": false
+  },
+  "plan_options.py": {
+    "unchanged": true,
+    "version_only": false
+  },
+  "pricing.py": {
+    "unchanged": true,
+    "version_only": false
+  },
+  "coordinator.py": {
+    "unchanged": true,
+    "version_only": false
+  },
+  "app.py": {
+    "unchanged": false,
+    "version_only": true
+  },
+  "calling.py": {
+    "unchanged": true,
+    "version_only": false
+  },
+  "offer_followup.py": {
+    "unchanged": true,
+    "version_only": false
+  },
+  "intake.py": {
+    "unchanged": true,
+    "version_only": false
+  },
+  "goal_scope.py": {
+    "unchanged": true,
+    "version_only": false
+  },
+  "run.py": {
+    "unchanged": true,
+    "version_only": false
+  }
+}

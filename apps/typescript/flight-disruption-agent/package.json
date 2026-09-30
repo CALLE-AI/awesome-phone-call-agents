@@ -1,0 +1,30 @@
+{
+  "name": "flight-disruption-agent",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "description": "Disruption desk that prices every option across the airline, distributor, and OTA chain, calls affected passengers through CALL-E, and applies their confirmed choice after the call.",
+  "engines": {
+    "node": ">=22"
+  },
+  "scripts": {
+    "start": "node --import tsx src/server.ts",
+    "demo": "node --import tsx src/demo.ts",
+    "demo:requests": "node --import tsx src/demo-requests.ts",
+    "calle-plan": "node --import tsx src/calle-plan.ts",
+    "send-event": "node --import tsx src/send-event.ts",
+    "fake-feed": "node --import tsx src/fake-feed.ts",
+    "send-channel": "node --import tsx src/send-channel.ts",
+    "fake-channel": "node --import tsx src/fake-channel.ts",
+    "check": "tsc --noEmit",
+    "test": "node --import tsx --test test/*.test.ts"
+  },
+  "dependencies": {
+    "@call-e/calle": "0.7.0"
+  },
+  "devDependencies": {
+    "@types/node": "^22.15.0",
+    "tsx": "^4.20.0",
+    "typescript": "^5.8.0"
+  }
+}

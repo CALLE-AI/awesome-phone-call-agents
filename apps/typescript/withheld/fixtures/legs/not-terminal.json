@@ -1,0 +1,15 @@
+{
+  "name": "not-terminal",
+  "description": "CALL-E has not finished with this call. A non-terminal status gets no verdict at all, because there is nothing yet to be right or wrong about.",
+  "status": "in_progress",
+  "now": "2026-09-14T10:00:00Z",
+  "turns": [
+    { "speaker": "caller", "text": "Good morning, I'm calling on behalf of Amina Otieno." },
+    { "speaker": "callee", "text": "Tomorrow between ten and twelve would be fine." }
+  ],
+  "expect": {
+    "status": "not_terminal",
+    "next_action": "needs_human",
+    "number_disclosed": false
+  }
+}

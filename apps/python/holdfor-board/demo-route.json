@@ -1,0 +1,9 @@
+{
+  "checkin:1": "demo/margaret-checkin.json",
+  "checkin:2": "06-red-flag-mid-call.json",
+  "checkin:3": "03-cannot-hear.json",
+  "checkin:4": "05-declined.json",
+  "checkin:5": "07-red-flag-agent-missed.json",
+  "checkin:10": "01-settled.json",
+  "rebooking:1": "reception/booking-line.json"
+}

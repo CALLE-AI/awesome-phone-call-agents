@@ -1,0 +1,14 @@
+{
+  "status": "COMPLETED",
+  "result": {
+    "post_summary": "Customer re-confirmed the delivery after a date change.",
+    "transcript": [
+      {"speaker": "agent", "text": "Hello again from Example Depot. The delivery fee is still $45, and the drop-off is now on Wednesday the 16th at 2 p.m."},
+      {"speaker": "callee", "text": "Wait, last time you said the 15th."},
+      {"speaker": "agent", "text": "It is the 16th now, one six. Anything else?"},
+      {"speaker": "callee", "text": "No, that is all."},
+      {"speaker": "agent", "text": "Thank you. Goodbye."}
+    ]
+  },
+  "callee_phone": "+14155550152"
+}

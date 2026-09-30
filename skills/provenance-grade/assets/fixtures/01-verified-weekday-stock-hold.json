@@ -1,0 +1,24 @@
+{
+  "id": "01-verified-weekday-stock-hold",
+  "category": "clean-verified",
+  "description": "The demo call. Hold gap + explicit check language + unrequested stock count and warehouse name. Answer: Tuesday, graded verified.",
+  "turns": [
+    { "speaker": "bot", "text": "Hi, this is the QuoteDesk assistant calling about your pending distributor order.", "offset_seconds": 0 },
+    { "speaker": "user", "text": "Yes, tell me.", "offset_seconds": 6 },
+    { "speaker": "bot", "text": "Which day will the fifty units for order 7741 ship out?", "offset_seconds": 9 },
+    { "speaker": "user", "text": "Hold on, let me check the dispatch register.", "offset_seconds": 14 },
+    { "speaker": "user", "text": "It ships Tuesday. We are holding eleven units at the Bhiwandi warehouse for you.", "offset_seconds": 26 }
+  ],
+  "fields": [
+    {
+      "field": "delivery_day",
+      "value": "Tuesday",
+      "expects": "weekday",
+      "questionTurn": 2,
+      "answerTurns": [4],
+      "critical": true,
+      "expectedGrade": "verified",
+      "expectSignals": ["A", "B", "C"]
+    }
+  ]
+}

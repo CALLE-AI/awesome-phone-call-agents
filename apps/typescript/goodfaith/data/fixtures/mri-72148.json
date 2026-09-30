@@ -1,0 +1,147 @@
+{
+  "id": "call_mock_mri72148",
+  "status": "completed",
+  "task_completed": true,
+  "summary": "Called 4 imaging centers for a self-pay MRI lumbar spine (72148) cash price.",
+  "completion_confidence": { "score": 0.86, "label": "high" },
+  "evidence": ["4 recipients dialed", "2 all-inclusive quotes captured", "1 split-fee quote", "1 voicemail"],
+  "structured_result": { "clinics_reached": 3, "quotes_obtained": 2, "lowest_all_inclusive": 438 },
+  "metadata": { "rfq_id": "rfq_demo_72148" },
+  "created_at": "2026-09-14T08:00:00Z",
+  "completed_at": "2026-09-14T08:06:12Z",
+  "recipients": [
+    {
+      "name": "Lone Star Open MRI",
+      "phone": "+15125550142",
+      "status": "completed",
+      "summary": "Billing quoted an all-inclusive self-pay price of $438 including the radiologist read.",
+      "structured_result": {
+        "reached_billing": true,
+        "quote_given": true,
+        "cash_price": 438,
+        "currency": "USD",
+        "price_basis": "all_inclusive",
+        "includes": ["scan", "radiologist read", "images on CD"],
+        "excludes": ["contrast (not needed for 72148)"],
+        "requires_consult_first": false,
+        "estimate_valid_days": 30,
+        "earliest_appointment_days": 3,
+        "cpt_or_code_confirmed": "72148",
+        "quoted_verbatim": "For a self-pay lumbar MRI without contrast our all-inclusive cash price is four hundred and thirty-eight dollars, and that includes the radiologist reading.",
+        "outcome": "quoted"
+      },
+      "attempts": [
+        {
+          "status": "completed",
+          "started_at": "2026-09-14T08:00:10Z",
+          "ended_at": "2026-09-14T08:03:40Z",
+          "transcript_turns": [
+            { "offset_seconds": 0, "speaker": "agent", "text": "Hi, I'm an assistant helping a self-pay patient get a cash price for an MRI of the lumbar spine without contrast, code 72148. Could you tell me your all-inclusive cash price?" },
+            { "offset_seconds": 14, "speaker": "clinic", "text": "Sure, let me check. For a self-pay lumbar MRI without contrast our all-inclusive cash price is four hundred and thirty-eight dollars, and that includes the radiologist reading." },
+            { "offset_seconds": 31, "speaker": "agent", "text": "Great. Does that include the images and is there any separate reading fee?" },
+            { "offset_seconds": 38, "speaker": "clinic", "text": "No separate fee, the read is included and we give you the images on a CD. The estimate is good for thirty days." },
+            { "offset_seconds": 52, "speaker": "agent", "text": "And the earliest appointment?" },
+            { "offset_seconds": 55, "speaker": "clinic", "text": "We could do this Thursday, about three days out." }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "Capitol Imaging Partners",
+      "phone": "+15125550188",
+      "status": "completed",
+      "summary": "Quoted a facility fee only; radiologist reads separately and bills on its own.",
+      "structured_result": {
+        "reached_billing": true,
+        "quote_given": true,
+        "cash_price": 525,
+        "currency": "USD",
+        "price_basis": "facility_only",
+        "includes": ["scan facility fee"],
+        "excludes": ["radiologist professional read (billed separately)"],
+        "requires_consult_first": false,
+        "estimate_valid_days": 14,
+        "earliest_appointment_days": 5,
+        "cpt_or_code_confirmed": "72148",
+        "quoted_verbatim": "The facility fee for the scan is five hundred and twenty-five dollars, but the radiologist reads and bills separately, so that part is not included.",
+        "outcome": "quoted"
+      },
+      "attempts": [
+        {
+          "status": "completed",
+          "started_at": "2026-09-14T08:00:12Z",
+          "ended_at": "2026-09-14T08:04:02Z",
+          "transcript_turns": [
+            { "offset_seconds": 0, "speaker": "agent", "text": "Hi, I'm helping a self-pay patient. What is your all-inclusive cash price for a lumbar MRI without contrast, 72148?" },
+            { "offset_seconds": 12, "speaker": "clinic", "text": "The facility fee for the scan is five hundred and twenty-five dollars, but the radiologist reads and bills separately, so that part is not included." },
+            { "offset_seconds": 28, "speaker": "agent", "text": "Do you know roughly what the reading fee runs?" },
+            { "offset_seconds": 33, "speaker": "clinic", "text": "That's through a separate group, I can't quote it, sorry." }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "Riverside Diagnostic Center",
+      "phone": "+15125550170",
+      "status": "completed",
+      "summary": "Would not quote without an in-person consult and a physician order first.",
+      "structured_result": {
+        "reached_billing": true,
+        "quote_given": false,
+        "cash_price": null,
+        "currency": "USD",
+        "price_basis": "unknown",
+        "includes": [],
+        "excludes": [],
+        "requires_consult_first": true,
+        "estimate_valid_days": null,
+        "earliest_appointment_days": null,
+        "cpt_or_code_confirmed": null,
+        "quoted_verbatim": null,
+        "outcome": "needs_consult"
+      },
+      "attempts": [
+        {
+          "status": "completed",
+          "started_at": "2026-09-14T08:00:15Z",
+          "ended_at": "2026-09-14T08:02:20Z",
+          "transcript_turns": [
+            { "offset_seconds": 0, "speaker": "agent", "text": "Hi, I'm helping a self-pay patient get a cash estimate for a lumbar MRI, 72148. What's your all-inclusive price?" },
+            { "offset_seconds": 11, "speaker": "clinic", "text": "We can't give a price without a physician order and a consult first. You'd need to come in." }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "Hill Country MRI",
+      "phone": "+15125550199",
+      "status": "completed",
+      "summary": "Reached voicemail; no quote captured.",
+      "structured_result": {
+        "reached_billing": false,
+        "quote_given": false,
+        "cash_price": null,
+        "currency": "USD",
+        "price_basis": "unknown",
+        "includes": [],
+        "excludes": [],
+        "requires_consult_first": false,
+        "estimate_valid_days": null,
+        "earliest_appointment_days": null,
+        "cpt_or_code_confirmed": null,
+        "quoted_verbatim": null,
+        "outcome": "voicemail"
+      },
+      "attempts": [
+        {
+          "status": "completed",
+          "started_at": "2026-09-14T08:00:18Z",
+          "ended_at": "2026-09-14T08:00:48Z",
+          "transcript_turns": [
+            { "offset_seconds": 0, "speaker": "clinic", "text": "You've reached Hill Country MRI, we're closed. Please leave a message after the tone." }
+          ]
+        }
+      ]
+    }
+  ]
+}

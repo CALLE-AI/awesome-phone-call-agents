@@ -209,9 +209,7 @@ class TestScopeFilePrivacy:
 
     def test_an_ignored_scope_inside_git_is_allowed(self, tmp_path: Path) -> None:
         subprocess.run(["git", "init", "-q"], cwd=tmp_path, check=True)
-        (tmp_path / ".gitignore").write_text(
-            "redline.scope.yaml\n", encoding="utf-8"
-        )
+        (tmp_path / ".gitignore").write_text("redline.scope.yaml\n", encoding="utf-8")
         assert load_scope(write_scope(tmp_path, VALID)).targets
 
 

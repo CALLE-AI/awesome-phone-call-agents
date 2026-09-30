@@ -1,0 +1,20 @@
+{
+  "id": "18-unstated-voicemail-price",
+  "category": "voicemail",
+  "description": "Voicemail again, price field this time. Unstated.",
+  "turns": [
+    { "speaker": "bot", "text": "Good morning, QuoteDesk assistant calling about your rate card.", "offset_seconds": 0 },
+    { "speaker": "user", "text": "Namaste, you have reached Mehta Hardware. Our timings are ten to seven. Leave your name and number.", "offset_seconds": 5 }
+  ],
+  "fields": [
+    {
+      "field": "unit_price",
+      "value": null,
+      "expects": "price",
+      "questionTurn": null,
+      "answerTurns": [],
+      "critical": true,
+      "expectedGrade": "unstated"
+    }
+  ]
+}

@@ -84,17 +84,6 @@ function readString(structured: Record<string, unknown> | null, key: string): st
   return typeof value === "string" ? value.trim() : "";
 }
 
-function failureOutcome(failureCode: string | null): ErrandOutcome {
-  const code = (failureCode ?? "").toLowerCase();
-  if (code.includes("voicemail") || code.includes("machine")) {
-    return "voicemail";
-  }
-  if (code.includes("answer") || code.includes("busy") || code.includes("unreachable")) {
-    return "not_reached";
-  }
-  return "call_failed";
-}
-
 /** A call this app could not read at all. Nobody knows whether it was even made. */
 const UNREAD_NEXT_STEP =
   "CALL-E took the errand and this app could not read what happened, so nobody knows yet whether the call was made or what was said. Treat nothing as arranged. Running this same errand file again reads that same call back instead of ringing anybody, because the key is unchanged. Edit the file first and it becomes a different call, so do not edit it.";
@@ -420,9 +409,10 @@ export async function runErrand(options: RunOptions): Promise<ErrandReport> {
   } else if (reading.machineAnswered) {
     outcome = "voicemail";
   } else if (endedEarly && !reading.reachedPerson) {
-    // Nobody was on the line and the call is over, so nothing was asked. The
-    // failure code says why when there is one and the status says it otherwise.
-    outcome = failureOutcome(attempt?.failureCode ?? call.failureCode ?? call.status);
+    // The call failed or was canceled without transcript evidence of a person.
+    // failureCode is diagnostic context, not a stable outcome enum, so it cannot
+    // distinguish no answer, a busy line or voicemail here.
+    outcome = "call_failed";
   } else if (!reading.reachedPerson) {
     outcome = "not_reached";
   } else {

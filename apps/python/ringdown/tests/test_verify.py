@@ -58,6 +58,23 @@ def test_the_channel_mismatch_scenario_fails_six_of_ten_checks(serving, rest_cli
     assert "verified 6/10" in render_blocks(blocks)
 
 
+def test_the_second_channel_reads_the_owner_with_the_rule_that_recorded_it(
+    serving, rest_client, mcp_client
+):
+    server, result = settle(serving, rest_client, {ALICE.phone: scenarios.answer_ack(ALICE.name, "alice")})
+    attempt = result.attempts[0]
+    tampered = replace(
+        result,
+        attempts=(replace(attempt, extraction=replace(attempt.extraction, owner_confirmed="alicia")),),
+    )
+
+    blocks = verify_ladder(mcp_client(server), INC, tampered, wide_window())
+
+    checks = all_checks(blocks)
+    assert checks[8] == (False, "the recorded owner Alice Okafor is spoken by the recipient")
+    assert contradicted(checks) == 1
+
+
 def test_a_run_the_second_channel_cannot_see_is_unresolved_not_a_contradiction(
     serving, rest_client, mcp_client
 ):

@@ -1,0 +1,6 @@
+node_modules
+dist
+data
+artifacts
+ReadyCheck_Review_and_Build_Blueprint.md
+package-lock.json

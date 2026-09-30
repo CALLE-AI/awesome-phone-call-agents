@@ -1,0 +1,130 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "title": "LandmarkNavigationLocationConfig",
+  "description": "A reusable, building-level navigation config. One config per physical building/gate — NOT per delivery or per resident. Unit-specific details are passed at call-time, not baked in here, so one config serves every delivery to that building.",
+  "type": "object",
+  "required": ["config_id", "version", "address", "landmark", "building_description", "approach_from", "entrance_details", "escalation", "language"],
+  "properties": {
+    "config_id": {
+      "type": "string",
+      "description": "Stable slug, e.g. 'xyz-apartments-kondapur'"
+    },
+    "version": { "type": "string", "const": "1.0" },
+
+    "address": {
+      "type": "object",
+      "required": ["label", "formal_address", "city", "region_code"],
+      "properties": {
+        "label": { "type": "string", "description": "Human-friendly name, e.g. 'XYZ Apartments, Kondapur'" },
+        "formal_address": { "type": "string", "description": "Full postal address, for the record / fallback" },
+        "city": { "type": "string" },
+        "region_code": { "type": "string", "description": "CALL-E recipient region code for this address's country, e.g. 'IN', 'US'" }
+      }
+    },
+
+    "landmark": {
+      "type": "object",
+      "required": ["name"],
+      "properties": {
+        "name": { "type": "string", "description": "e.g. 'Apollo Pharmacy'" },
+        "type": { "type": "string", "description": "e.g. 'pharmacy' — helps the agent disambiguate if the driver mentions a different pharmacy nearby" },
+        "disambiguation_note": { "type": "string", "description": "Only needed if there's a same-named or similar landmark nearby that could confuse the driver, e.g. 'not the Apollo Pharmacy near the metro station'" }
+      }
+    },
+
+    "building_description": {
+      "type": "object",
+      "required": ["distinguishing_features"],
+      "properties": {
+        "distinguishing_features": {
+          "type": "array",
+          "items": { "type": "string" },
+          "description": "e.g. ['Blue and white building', 'XYZ Apartments signboard above entrance']"
+        },
+        "height_or_type": { "type": "string", "description": "e.g. 'G+4 apartment block' — optional" }
+      }
+    },
+
+    "approach_from": {
+      "type": "array",
+      "minItems": 1,
+      "description": "One entry per direction a driver might arrive from. The agent's first real question to the driver is effectively 'which of these matches where you are' — so direction_label needs to be something a driver can self-identify against, not an internal code.",
+      "items": {
+        "type": "object",
+        "required": ["direction_label", "instructions"],
+        "properties": {
+          "direction_label": { "type": "string", "description": "e.g. 'Coming from the main road / Botanical Garden side'" },
+          "instructions": { "type": "string", "description": "e.g. 'Pass Apollo Pharmacy, take the second left.'" },
+          "landmark_sequence": {
+            "type": "array",
+            "items": { "type": "string" },
+            "description": "Ordered landmarks passed on this approach, optional, helps the agent re-orient if the driver is partway through and confused"
+          }
+        }
+      }
+    },
+
+    "entrance_details": {
+      "type": "object",
+      "required": ["location", "identifying_marks"],
+      "properties": {
+        "location": { "type": "string", "description": "e.g. 'Main gate on the left'" },
+        "identifying_marks": { "type": "string", "description": "e.g. 'XYZ Apartments sign above the entrance'" },
+        "access_notes": { "type": "string", "description": "e.g. 'Security allows delivery drivers in without calling up'" }
+      }
+    },
+
+    "units": {
+      "type": "array",
+      "description": "Per-flat wayfinding for once the driver is inside the building. Optional — buildings with only one delivery point (a shop, a standalone house) can omit this entirely. Populated per-unit at config-authoring time; unit_identifier is looked up at call-time from the delivery, not passed as an arbitrary override.",
+      "items": {
+        "type": "object",
+        "required": ["unit_identifier", "in_building_directions"],
+        "properties": {
+          "unit_identifier": { "type": "string", "description": "e.g. 'Flat 302' — must match how the resident/customer identifies their own unit" },
+          "floor": { "type": "string", "description": "e.g. '3rd floor'" },
+          "in_building_directions": { "type": "string", "description": "e.g. 'Take the lift to the 3rd floor, it's the 2nd door on the left. No nameplate — look for the door with a black gate.'" },
+          "consignee_name": { "type": "string", "description": "Resident's name for this specific unit, used in the agent's spoken introduction. Per-unit because a building config is shared across many residents — falls back to address.label when omitted or when the config has no units array at all (e.g. a single-tenant shop)." }
+        }
+      }
+    },
+
+    "escalation": {
+      "type": "object",
+      "required": ["trigger_conditions", "contact"],
+      "description": "Escalation is driver-confirmed, inside the same call, and resolves entirely within that call — no automated action after the call ends. If the driver confirms they want a real call, the agent reveals the contact's phone number to the driver and instructs them to call directly, then ends the call. No webhook, no second CALL-E call, no SMS.",
+      "properties": {
+        "trigger_conditions": {
+          "type": "array",
+          "items": { "type": "string" },
+          "description": "Conditions under which the call-task instruction should OFFER escalation to the driver (not auto-trigger it), e.g. ['driver still can't locate landmark after 3 exchanges', 'driver reports landmark no longer exists']"
+        },
+        "contact": {
+          "type": "object",
+          "required": ["contact_name", "recipient_phone"],
+          "properties": {
+            "contact_name": { "type": "string", "description": "e.g. 'Sadiq' or 'the shop owner' — used when the agent tells the driver who they're calling" },
+            "recipient_phone": { "type": "string", "description": "Number the agent reads aloud to the driver on confirmed escalation. Use a real, reachable number in your own deployment — never commit a real number into a public repo; this schema file itself only ever uses reserved fictional examples like '+14155550199'." }
+          }
+        }
+      }
+    },
+
+    "language": {
+      "type": "object",
+      "required": ["locale"],
+      "properties": {
+        "locale": { "type": "string", "description": "BCP 47 locale for the call, e.g. 'en-IN', 'hi-IN', 'en-US'. Must be a locale/region combination CALL-E currently supports for outbound calls — check docs.heycall-e.com/regions before deploying to a new country." },
+        "allow_code_switch": { "type": "boolean", "default": true, "description": "Whether the driver may switch languages mid-call (e.g. Hinglish). Recommended true for any bilingual/multilingual region — don't force single-language rigidity." }
+      }
+    },
+
+    "metadata": {
+      "type": "object",
+      "properties": {
+        "created_at": { "type": "string", "format": "date-time" },
+        "last_verified_at": { "type": "string", "format": "date-time", "description": "Configs go stale — landmark pharmacies close, buildings get repainted. This field exists so a real deployment knows when to prompt a re-check." }
+      }
+    }
+  }
+}

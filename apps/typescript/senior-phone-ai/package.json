@@ -1,0 +1,44 @@
+{
+  "name": "senior-phone-ai",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "description": "Phone-native AI assistant reference app for seniors and their authorized carers.",
+  "engines": {
+    "node": ">=22.9.0"
+  },
+  "scripts": {
+    "dev": "next dev --hostname 127.0.0.1",
+    "build": "next build",
+    "start": "next start --hostname 127.0.0.1",
+    "lint": "eslint .",
+    "typecheck": "tsc --noEmit",
+    "test": "node --import tsx --test tests/*.test.ts",
+    "db:check": "node --import tsx --test tests/database.test.ts",
+    "check": "npm run lint && npm run typecheck && npm test"
+  },
+  "dependencies": {
+    "@openai/agents": "0.17.2",
+    "@supabase/ssr": "^0.12.7",
+    "@supabase/supabase-js": "^2.116.0",
+    "next": "16.3.3",
+    "openai": "7.13.0",
+    "react": "19.2.8",
+    "react-dom": "19.2.8",
+    "server-only": "0.0.1",
+    "zod": "4.6.1"
+  },
+  "devDependencies": {
+    "@electric-sql/pglite": "^0.5.8",
+    "@types/node": "26.0.0",
+    "@types/react": "19.2.14",
+    "@types/react-dom": "19.2.3",
+    "eslint": "9.39.2",
+    "eslint-config-next": "16.3.3",
+    "tsx": "4.21.0",
+    "typescript": "6.0.2"
+  },
+  "overrides": {
+    "esbuild": "0.28.1"
+  }
+}

@@ -1,0 +1,13 @@
+{
+  "_fixture": "Synthetic CALL-E call object modeled on the 2026-09-05 FS-01 miss. Not a transcript or recording; no phone number. Identifier values are the real intended/extracted pair.",
+  "id": "call_fixture_fs01",
+  "status": "completed",
+  "attempts": [{ "status": "completed" }],
+  "structured_result": {
+    "identifier": "07198SECTIST",
+    "readback_confirmed": true,
+    "identifier_evidence": "zero seven one nine eight F as in Frank… yes",
+    "unresolved_time": "Sunday morning / 5:00 PM"
+  },
+  "summary": "Recipient confirmed the reference and said Sunday 5 PM."
+}

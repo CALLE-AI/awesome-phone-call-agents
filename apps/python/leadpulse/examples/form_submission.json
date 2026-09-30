@@ -1,0 +1,10 @@
+{
+  "lead_id": "lead-0001",
+  "name": "Marcus Reed",
+  "phone": "(415) 555-0142",
+  "email": "marcus@example.com",
+  "project": "Kitchen remodel",
+  "details": "Open up the wall to the dining room, new cabinets and counters.",
+  "consent_to_call": true,
+  "source_form": "website"
+}

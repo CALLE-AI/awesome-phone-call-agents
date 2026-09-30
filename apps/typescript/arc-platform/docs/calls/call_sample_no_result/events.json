@@ -1,0 +1,36 @@
+{
+ "_note": "SYNTHETIC SAMPLE. This is not a record of a real call. The station, the people, the conversation, the identifiers and the timestamps are all invented. The number is on ITU country code +99, which is unassigned and cannot be dialled. Real archives of real calls are kept privately and are not published, because the person on the other end of a cold call did not agree to be quoted.",
+ "object": "list",
+ "data": [
+  {
+   "id": "evt_sample_0",
+   "type": "call.started",
+   "call_id": "call_sample_no_result",
+   "created_at": "2026-01-05T11:00:00Z",
+   "level": "info",
+   "status": "completed",
+   "message": "run_call started.",
+   "details": {}
+  },
+  {
+   "id": "evt_sample_1",
+   "type": "call.in_progress",
+   "call_id": "call_sample_no_result",
+   "created_at": "2026-01-05T11:00:00Z",
+   "level": "info",
+   "status": "completed",
+   "message": "dialling.",
+   "details": {}
+  },
+  {
+   "id": "evt_sample_2",
+   "type": "call.completed",
+   "call_id": "call_sample_no_result",
+   "created_at": "2026-01-05T11:00:00Z",
+   "level": "info",
+   "status": "completed",
+   "message": "finished.",
+   "details": {}
+  }
+ ]
+}

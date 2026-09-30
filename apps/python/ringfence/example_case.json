@@ -1,0 +1,9 @@
+{
+  "case_id": "case_example_001",
+  "account_holder_name": "Pat Rivera",
+  "on_file_phone": "+14155550101",
+  "claimed_transaction_amount": "4500.00",
+  "claimed_recipient": "Jordan Rivera",
+  "claimed_payment_method": "wire",
+  "request_supplied_callback_number": null
+}

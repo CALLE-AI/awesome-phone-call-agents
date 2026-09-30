@@ -1,0 +1,25 @@
+{
+  "request_id": "rolloffscope-hotline-import-20260909",
+  "scope": {
+    "container_size_cubic_yards": 20,
+    "waste_type": "non-hazardous household cleanout waste",
+    "rental_days": 7,
+    "estimated_tonnage": 2.5,
+    "placement": "Not requested in the hotline test",
+    "service_area": "No service address supplied; fictional hotline exercise",
+    "delivery_window_requested": "Not requested in the hotline test"
+  },
+  "currency": "USD",
+  "country_code": "US",
+  "locale": "en-US",
+  "live_authorized": false,
+  "call_window": null,
+  "vendors": [
+    {
+      "vendor_id": "organizer-hotline",
+      "name": "Organizer test hotline, not a commercial vendor",
+      "phone": "+14155550101",
+      "authorization_reference": "redacted-evidence-placeholder-not-callable"
+    }
+  ]
+}

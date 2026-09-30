@@ -1,0 +1,17 @@
+{
+  "status": "completed",
+  "taskCompleted": true,
+  "recipientStatus": "completed",
+  "confidenceScore": 0.88,
+  "failureCode": null,
+  "structuredResult": {
+    "organization_identity": "confirmed",
+    "change_request_status": "initiated",
+    "safe_case_code_confirmed": "yes",
+    "sensitive_data_disclosed": "yes",
+    "recipient_opt_out": "no"
+  },
+  "evidence": [
+    "Recipient began stating account 987654321 before the agent ended the call."
+  ]
+}

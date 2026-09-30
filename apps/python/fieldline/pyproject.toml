@@ -1,7 +1,7 @@
 [project]
 name = "fieldline"
 version = "0.1.0"
-description = "A lone-worker safety net that phones the field: scheduled check-in calls, silent duress detection, and an automatic escalation call cascade — built on CALL-E."
+description = "Demo-first lone-worker check-ins with authorized live calling and human review of generated safety decisions."
 readme = "README.md"
 requires-python = ">=3.12"
 license = { text = "MIT" }
@@ -13,7 +13,7 @@ dependencies = [
 
 [project.optional-dependencies]
 # Live mode: real phone calls through the CALL-E platform.
-live = ["calle-ai>=0.7.0"]
+live = ["calle-ai==0.7.0"]
 
 [dependency-groups]
 dev = ["pytest>=8.0"]

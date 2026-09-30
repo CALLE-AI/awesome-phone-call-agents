@@ -1,0 +1,41 @@
+{
+  "errand_id": "clinic-referral-0001",
+  "person": {
+    "name": "Amina Otieno",
+    "phone": "+447700900456"
+  },
+  "callee": {
+    "name": "Riverside Family Practice",
+    "phone": "+442079460321"
+  },
+  "reason": "Amina is Deaf and does not use voice calls. The practice takes appointments by phone only: there is no SMS line, the inbox is unmonitored, and the online form has been unavailable for months. This field stays local and is never sent to the provider.",
+  "goal": "Book a follow-up appointment for an existing patient, and find out whether a sign language interpreter can be arranged for the visit.",
+  "questions": [
+    {
+      "id": "q_slot",
+      "ask": "What is the earliest appointment you have with Dr Mwangi?"
+    },
+    {
+      "id": "q_interpreter",
+      "ask": "Can you arrange a sign language interpreter for the appointment?"
+    },
+    {
+      "id": "q_referral",
+      "ask": "Do you need the referral letter before the appointment?"
+    }
+  ],
+  "may_say": [
+    "the patient's name is Amina Otieno",
+    "the patient is Deaf and communicates in writing",
+    "the patient is an existing patient of Dr Mwangi",
+    "the appointment is a follow-up"
+  ],
+  "acceptable_windows": [
+    { "start": "2026-09-15T09:00:00Z", "end": "2026-09-15T12:00:00Z" },
+    { "start": "2026-09-17T13:00:00Z", "end": "2026-09-17T17:00:00Z" }
+  ],
+  "never_disclose": [
+    "any phone number for the patient",
+    "the patient's diagnosis or medication"
+  ]
+}

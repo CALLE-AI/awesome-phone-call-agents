@@ -1,0 +1,16 @@
+{
+  "name": "Urgent escalation",
+  "description": "The contact did not know the pupil was absent and does not know where they are. Reachable stops the cascade, raises an urgent task for the safeguarding lead with the words the contact actually spoke, and concludes nothing itself.",
+  "clock": "2026-09-11T10:30:00+01:00",
+  "steps": [
+    { "action": "import" },
+    { "action": "scan" },
+    { "action": "call", "case": "PF-P-1041-2026-09-11", "script": "urgent_did_not_know" }
+  ],
+  "expect": {
+    "cases": { "PF-P-1041-2026-09-11": "PF_URGENT_HUMAN" },
+    "tasks": ["safeguarding"],
+    "never_called": ["C-2090", "C-2088"],
+    "calls_placed": 1
+  }
+}

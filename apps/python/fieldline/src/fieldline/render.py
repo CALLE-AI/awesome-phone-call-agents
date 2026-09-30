@@ -12,7 +12,7 @@ from rich.rule import Rule
 from rich.table import Table
 from rich.text import Text
 
-from .schemas import TripPlan, mask_phone
+from .schemas import TripPlan, mask_phone, scrub_text
 
 Call = dict[str, Any]
 
@@ -23,6 +23,11 @@ class RichRenderer:
     def __init__(self, console: Console | None = None) -> None:
         self.console = console or Console(highlight=False)
         self._party = "Recipient"
+
+    def _print(self, value="", *args, **kwargs) -> None:
+        if isinstance(value, str):
+            value = scrub_text(value)
+        self.console.print(value, *args, **kwargs)
 
     # -- structure -----------------------------------------------------
     def banner(self, plan: TripPlan, demo: bool) -> None:
@@ -40,27 +45,27 @@ class RichRenderer:
             f"Worker    {plan.worker.name} ({plan.worker.role}) · {mask_phone(plan.worker.phone)}\n"
             f"Window    {plan.date} {plan.start}–{plan.end} · check-ins at {', '.join(plan.checkins)}\n"
             f"Ladder    " + "  →  ".join(f"{x.name} ({x.relation})" for x in plan.escalation) + "\n"
-            f"Duress    phrase armed · silent protocol"
+            f"Duress    {'fictional silent protocol' if demo else 'generated results require human review'}"
         )
-        c.print(Panel(body, box=box.ROUNDED, border_style="cyan", padding=(1, 2)))
+        self._print(Panel(scrub_text(body), box=box.ROUNDED, border_style="cyan", padding=(1, 2)))
 
     def section(self, at: str, title: str, level: str = "info") -> None:
         style = {"info": "cyan", "warn": "yellow3", "crit": "red"}.get(level, "cyan")
         label = f"[bold]{at}[/]  {title}" if at else title
-        self.console.print()
-        self.console.print(Rule(label, style=style))
+        self._print()
+        self._print(Rule(scrub_text(label), style=style))
 
     # -- calls ---------------------------------------------------------
     def dialing(self, name: str, phone: str, note: str = "") -> None:
         self._party = name
         extra = f"  [dim]{note}[/]" if note else ""
-        self.console.print(f"[cyan]📞 CALL-E dialing[/] [bold]{name}[/] [dim]{mask_phone(phone)}[/]{extra}")
+        self._print(f"[cyan]📞 CALL-E dialing[/] [bold]{name}[/] [dim]{mask_phone(phone)}[/]{extra}")
 
     def turn(self, speaker: str, text: str) -> None:
         if speaker == "bot":
-            self.console.print(f"   [cyan]agent[/] [cyan]▏[/]{text}")
+            self._print(f"   [cyan]agent[/] [cyan]▏[/]{text}")
         else:
-            self.console.print(f"   [bold]{self._party.lower()}[/] [white]▏[/][bold]{text}[/]")
+            self._print(f"   [bold]{self._party.lower()}[/] [white]▏[/][bold]{text}[/]")
 
     def call_result(self, label: str, call: Call, good: bool) -> None:
         style = "green" if good else "red"
@@ -76,14 +81,14 @@ class RichRenderer:
             lines.append(f"[dim]task_completed={call.get('task_completed')} · confidence {cc['score']:.2f} ({cc.get('label', '')})[/]")
         for ev in call.get("evidence") or []:
             lines.append(f"[dim]· {ev}[/]")
-        self.console.print(Panel("\n".join(lines), box=box.ROUNDED, border_style=style, padding=(0, 2)))
+        self._print(Panel(scrub_text("\n".join(lines)), box=box.ROUNDED, border_style=style, padding=(0, 2)))
 
     # -- notices -------------------------------------------------------
     def notice(self, text: str, level: str = "info") -> None:
-        self.console.print(f"[{_LEVEL_STYLE.get(level, 'dim')}]{text}[/]")
+        self._print(f"[{_LEVEL_STYLE.get(level, 'dim')}]{text}[/]")
 
     def duress_alert(self) -> None:
-        self.console.print(
+        self._print(
             Panel(
                 "[bold red]DURESS PHRASE DETECTED[/]\n"
                 "Call was ended normally — no reaction shown on the line.\n"
@@ -95,20 +100,20 @@ class RichRenderer:
         )
 
     def report_written(self, path: str) -> None:
-        self.console.print(f"\n[bold]Incident brief written:[/] [cyan]{path}[/]")
+        self._print(f"\n[bold]Incident brief written:[/] [cyan]{path}[/]")
 
     def closing(self, text: str, good: bool) -> None:
         style = "green" if good else "red"
-        self.console.print()
-        self.console.print(Panel(f"[bold {style}]{text}[/]", box=box.ROUNDED, border_style=style, padding=(0, 2)))
+        self._print()
+        self._print(Panel(scrub_text(f"[bold {style}]{text}[/]"), box=box.ROUNDED, border_style=style, padding=(0, 2)))
 
     def timeline(self, events: list[tuple[str, str, str]]) -> None:
         table = Table(box=box.SIMPLE, show_header=True, header_style="dim")
         table.add_column("time", style="bold", no_wrap=True)
         table.add_column("event")
         for at, label, level in events:
-            table.add_row(at, Text(label, style=_LEVEL_STYLE.get(level, "")))
-        self.console.print(table)
+            table.add_row(at, Text(scrub_text(label), style=_LEVEL_STYLE.get(level, "")))
+        self._print(table)
 
 
 class QuietRenderer(RichRenderer):

@@ -1,0 +1,80 @@
+{
+  "id": "eval2-013",
+  "label": "agent",
+  "difficulty": "typical",
+  "scenario": "Utility voicebot restates the payment-plan request, then admits it cannot finalize and a specialist will follow up; no confirmation number.",
+  "task": "Set up a three-month payment plan for the customer's overdue water bill.",
+  "outcome": {
+    "task_completed_claimed": false,
+    "commitment_type": "payment",
+    "confirmation_artifact": null,
+    "expected_attestation": "refused"
+  },
+  "turns": [
+    {
+      "speaker": "user",
+      "text": "Hi, you've reached Northfork Water Utility. I'm Sage, a virtual assistant. I can help with billing, payments, and service requests. What can I do for you?",
+      "offset_seconds": 0.7
+    },
+    {
+      "speaker": "bot",
+      "text": "Hi Sage. I'm an AI assistant calling on behalf of a customer, Rosa Whitfield. She has an overdue balance and would like to set up a payment plan, splitting it into three monthly payments.",
+      "offset_seconds": 10.97
+    },
+    {
+      "speaker": "user",
+      "text": "I understand. I can help with that. Can you provide the account number?",
+      "offset_seconds": 24.75
+    },
+    {
+      "speaker": "bot",
+      "text": "It's 6 0 3 1 1 8 4 2.",
+      "offset_seconds": 30.25
+    },
+    {
+      "speaker": "user",
+      "text": "Thank you. I see an account for Rosa Whitfield at 17 Quarry Road with a past due balance of $312.45. You'd like to split that into three monthly payments, is that right?",
+      "offset_seconds": 34.81
+    },
+    {
+      "speaker": "bot",
+      "text": "Yes, three payments of about $104.15 starting October 1st.",
+      "offset_seconds": 47.35
+    },
+    {
+      "speaker": "user",
+      "text": "Okay. I've noted your request for a three-month payment arrangement of $104.15 per month starting October 1st.",
+      "offset_seconds": 52.23
+    },
+    {
+      "speaker": "bot",
+      "text": "Great. Is the payment plan active now? Can you give me a confirmation number?",
+      "offset_seconds": 59.69
+    },
+    {
+      "speaker": "user",
+      "text": "Payment arrangements need to be reviewed and approved by our billing team, so I'm not able to finalize it on this call. A billing specialist will follow up with Rosa within three to five business days.",
+      "offset_seconds": 66.1
+    },
+    {
+      "speaker": "bot",
+      "text": "Understood. In the meantime, will the account still be subject to disconnection?",
+      "offset_seconds": 79.96
+    },
+    {
+      "speaker": "user",
+      "text": "I've added a note about your request to the account. For questions about disconnection, please speak with a billing specialist. Is there anything else I can help you with?",
+      "offset_seconds": 85.72
+    },
+    {
+      "speaker": "bot",
+      "text": "No, thank you.",
+      "offset_seconds": 96.96
+    },
+    {
+      "speaker": "user",
+      "text": "Thanks for calling Northfork Water Utility. Goodbye.",
+      "offset_seconds": 99.21
+    }
+  ]
+}

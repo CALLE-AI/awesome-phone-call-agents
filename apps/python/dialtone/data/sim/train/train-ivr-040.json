@@ -1,0 +1,36 @@
+{
+ "id": "train-ivr-040",
+ "label": "ivr",
+ "source": "sim-train",
+ "meta": {
+  "task": "ask for a quote for a brake replacement",
+  "hard": true
+ },
+ "turns": [
+  {
+   "speaker": "user",
+   "text": "Welcome to Bloom Florists. In a few words, tell me what you're calling about. You can say things like appointments, billing, or hours.",
+   "offset_seconds": 0.8
+  },
+  {
+   "speaker": "bot",
+   "text": "Billing, please.",
+   "offset_seconds": 10.22
+  },
+  {
+   "speaker": "user",
+   "text": "Sorry, I didn't get that. You can say appointments, billing, or hours.",
+   "offset_seconds": 11.7
+  },
+  {
+   "speaker": "bot",
+   "text": "Billing, please.",
+   "offset_seconds": 17.05
+  },
+  {
+   "speaker": "user",
+   "text": "Sorry, I didn't get that. You can say appointments, billing, or hours.",
+   "offset_seconds": 18.53
+  }
+ ]
+}

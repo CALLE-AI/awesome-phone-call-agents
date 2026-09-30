@@ -1,0 +1,58 @@
+{
+  "_evidence_source": "synthetic: fictional real-estate-deposit scenario, modeled on an ordinary legitimate large transaction",
+  "category": "clean_legitimate",
+  "case": {
+    "case_id": "case_f19",
+    "account_holder_name": "Priya Nataraj",
+    "on_file_phone": "+14155550119",
+    "claimed_transaction_amount": "24000.00",
+    "claimed_recipient": "Millbrook Title & Escrow Company",
+    "claimed_payment_method": "wire",
+    "request_supplied_callback_number": null
+  },
+  "call": {
+    "id": "call_f19",
+    "status": "completed",
+    "task": "Verify a flagged $24,000 wire transaction to Millbrook Title & Escrow Company.",
+    "failure_code": null,
+    "failure_message": null,
+    "task_completed": true,
+    "completion_confidence": {"score": 0.92, "label": "high"},
+    "summary": "Account holder confirmed the payment is an earnest money deposit on a home purchase, coordinated in advance with her real estate agent and the title company, no pressure or secrecy reported."
+  },
+  "attempts": [
+    {
+      "id": "attempt_f19",
+      "phone": "+14155550119",
+      "status": "completed",
+      "started_at": "2026-09-10T13:40:00Z",
+      "completed_at": "2026-09-10T13:44:05Z",
+      "summary": "Account holder confirmed the transaction.",
+      "transcript_turns": [
+        {"speaker": "bot", "text": "This is an automated verification call from your bank about a flagged transaction. Did anyone ask you to keep this transaction private?"},
+        {"speaker": "user", "text": "No, my agent and I discussed this openly with the title company."},
+        {"speaker": "bot", "text": "Is there time pressure on this payment?"},
+        {"speaker": "user", "text": "There's a closing timeline but it's been scheduled for weeks, nothing sudden."},
+        {"speaker": "bot", "text": "Can you describe your relationship to the recipient?"},
+        {"speaker": "user", "text": "It's the escrow company handling my home purchase, I confirmed their wire instructions by calling the number on their official website, not from an email."},
+        {"speaker": "bot", "text": "Were you asked to pay by wire, gift card, or cryptocurrency specifically?"},
+        {"speaker": "user", "text": "Wire, which is standard for a real estate earnest money deposit."}
+      ],
+      "provider_call_id": "prov_f19",
+      "failure_code": null,
+      "failure_message": null
+    }
+  ],
+  "events": [
+    {"id": "evt_f19a", "type": "call.dialing", "call_id": "call_f19", "created_at": "2026-09-10T13:40:00Z", "level": "info", "status": "in_progress", "message": "Dialing account holder.", "details": {"region": "US"}},
+    {"id": "evt_f19b", "type": "call.completed", "call_id": "call_f19", "created_at": "2026-09-10T13:44:05Z", "level": "info", "status": "completed", "message": "Call completed.", "details": {"region": "US", "locale": "en-US"}}
+  ],
+  "signals": {
+    "secrecy_demand_present": false,
+    "urgency_pressure_present": false,
+    "relationship_explained": true,
+    "irreversible_payment_demanded": false,
+    "explicit_hold_requested": false
+  },
+  "expected_disposition": "ADVISE_ALLOW"
+}

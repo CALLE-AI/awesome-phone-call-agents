@@ -18,7 +18,7 @@ import {
   isAuthorizedLiveOperator,
   liveRecipientAllowlist,
 } from "../lib/live-security.ts";
-import { FICTIONAL_FIXTURE_PHONES, SUPPORTED_MARKETS, supportsMarketLocale } from "../lib/markets.ts";
+import { FICTIONAL_FIXTURE_PHONES, SUPPORTED_MARKETS, supportsLiveMarketLocale, supportsMarketLocale } from "../lib/markets.ts";
 
 const request: SourcingRequest = {
   executionMode: "fixture",
@@ -58,6 +58,10 @@ test("validates global sourcing inputs and E.164 suppliers", () => {
   assert.throws(
     () => parseSourcingRequest({ ...request, executionMode: "live", recipientConsentConfirmed: true, authorizedCallWindow: "" }),
     /authorizedCallWindow is required/,
+  );
+  assert.throws(
+    () => parseSourcingRequest({ ...request, executionMode: "live", recipientConsentConfirmed: true, authorizedCallWindow: "approved demo window" }),
+    /not currently available for Kenya/i,
   );
 });
 
@@ -135,6 +139,8 @@ test("defines a valid localized configuration for every supported CALL-E market"
     for (const phone of market.fixturePhones) assert.match(phone, /^\+[1-9]\d{7,14}$/);
     assert.deepEqual(market.fixturePhones, FICTIONAL_FIXTURE_PHONES);
   }
+  assert.equal(supportsLiveMarketLocale("KE", "en-KE"), false);
+  assert.equal(supportsLiveMarketLocale("US", "en-US"), true);
 });
 
 test("builds a disclosed, information-only call task", () => {
@@ -287,6 +293,12 @@ test("uses the official SDK with schemas and an idempotency key in live mode", a
   assert.equal((body.recipients as unknown[]).length, 2);
   assert.ok(body.result_schema);
   assert.ok(body.recipient_result_schema);
+  const serializedSchemas = JSON.stringify({
+    resultSchema: body.result_schema,
+    recipientResultSchema: body.recipient_result_schema,
+  });
+  assert.doesNotMatch(serializedSchemas, /"minimum"|"maximum"|"maxItems"|"minItems"|"oneOf"|"anyOf"|"allOf"|"\$ref"/);
+  assert.doesNotMatch(serializedSchemas, /"type":\s*\[/);
 });
 
 test("polls an existing CALL-E run without starting another call", async () => {

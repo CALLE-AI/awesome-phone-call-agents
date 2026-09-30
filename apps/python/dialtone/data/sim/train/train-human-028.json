@@ -1,0 +1,76 @@
+{
+ "id": "train-human-028",
+ "label": "human",
+ "source": "sim-train",
+ "meta": {
+  "task": "book a table for two on Friday at 7 PM",
+  "hard": true
+ },
+ "turns": [
+  {
+   "speaker": "user",
+   "text": "Thank you for calling Harbor Hotel, this is Maria, how can I help you?",
+   "offset_seconds": 0.32
+  },
+  {
+   "speaker": "bot",
+   "text": "Hi, I'm an AI assistant calling on behalf of Taylor Kim. I'd like to book a table for two people this Friday at 7 PM, under the name Taylor Kim.",
+   "offset_seconds": 6.27
+  },
+  {
+   "speaker": "user",
+   "text": "Friday at seven, let me look. Yeah we have that.",
+   "offset_seconds": 17.83
+  },
+  {
+   "speaker": "user",
+   "text": "yeah",
+   "offset_seconds": 21.87
+  },
+  {
+   "speaker": "bot",
+   "text": "Could you confirm the booking under Taylor Kim?",
+   "offset_seconds": 23.3
+  },
+  {
+   "speaker": "user",
+   "text": "No, that's everything.",
+   "offset_seconds": 26.78
+  },
+  {
+   "speaker": "bot",
+   "text": "Is Friday at 7 available?",
+   "offset_seconds": 28.98
+  },
+  {
+   "speaker": "user",
+   "text": "Mm-hmm.",
+   "offset_seconds": 31.72
+  },
+  {
+   "speaker": "user",
+   "text": "okay",
+   "offset_seconds": 32.46
+  },
+  {
+   "speaker": "bot",
+   "text": "Thank you so much, that's all I needed.",
+   "offset_seconds": 33.91
+  },
+  {
+   "speaker": "user",
+   "text": "Yeah.",
+   "offset_seconds": 37.54
+  },
+  {
+   "speaker": "bot",
+   "text": "Thank you so much, that's all I needed.",
+   "offset_seconds": 39.01
+  },
+  {
+   "speaker": "user",
+   "text": "You too, bye.",
+   "offset_seconds": 42.71
+  }
+ ]
+}

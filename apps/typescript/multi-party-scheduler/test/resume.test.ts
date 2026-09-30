@@ -18,7 +18,14 @@ import { inspectLedger, resumeCoordination, ResumeError } from "../src/resume.js
 import { confirmSchema, confirmTask } from "../src/script.js";
 import type { CommitResult, LedgerEntry } from "../src/types.js";
 import { startFakeCalle, type FakeScript } from "../fake/calle-server.js";
-import { coordinationRequest, PLUMBER, SUPER, TENANT } from "./fixtures.js";
+import {
+  coordinationRequest,
+  FIXTURE_COMPLETED_AT,
+  fixtureNow,
+  PLUMBER,
+  SUPER,
+  TENANT,
+} from "./fixtures.js";
 
 function gather(phone: string): FakeScript {
   return {
@@ -69,7 +76,7 @@ async function withFake(
     fake: Awaited<ReturnType<typeof startFakeCalle>>,
   ) => Promise<void>,
 ): Promise<void> {
-  const fake = await startFakeCalle(FULL_RUN);
+  const fake = await startFakeCalle(FULL_RUN, { completedAt: FIXTURE_COMPLETED_AT });
   const port = await createSdkPort({ apiKey: "calle_test_key", baseUrl: fake.baseUrl });
   try {
     await body(port, fake);
@@ -93,6 +100,7 @@ test("a crash between the yes and the release call is finished by resume", async
           port,
           ledgerPath: path,
           pollIntervalMs: 5,
+          now: fixtureNow,
           onProgress: (line) => {
             if (line === "  tenant: confirmed.") {
               throw new Error("power cut");
@@ -106,7 +114,7 @@ test("a crash between the yes and the release call is finished by resume", async
     assert.ok(crashed.issues.some((issue) => issue.problem.includes("did not finish")));
     assert.deepEqual(phones(fake, "release"), [], "nobody has been told yet");
 
-    const resumed = await resumeCoordination({ request, port, ledgerPath: path, pollIntervalMs: 5 });
+    const resumed = await resumeCoordination({ request, port, ledgerPath: path, pollIntervalMs: 5, now: fixtureNow });
     assert.equal(resumed.outcome, "not_confirmed");
     assert.deepEqual(resumed.unreleased, []);
     assert.equal(resumed.calls_placed, 7, "5 recorded calls plus the 2 releases the run owed");
@@ -134,7 +142,7 @@ test("a confirm whose create response was lost stops the round, then resume find
       },
     };
 
-    const first = await runCoordination({ request, port: lossy, ledgerPath: path, pollIntervalMs: 5 });
+    const first = await runCoordination({ request, port: lossy, ledgerPath: path, pollIntervalMs: 5, now: fixtureNow });
     assert.equal(first.outcome, "unresolved");
     assert.deepEqual(first.unreleased, ["plumber", "tenant"], "both yeses are recorded as owed");
     assert.equal(phones(fake, "confirm").length, 3, "the superintendent was called, we just never saw it");
@@ -145,7 +153,7 @@ test("a confirm whose create response was lost stops the round, then resume find
     );
     assert.match(first.note, /may still be live/);
 
-    const resumed = await resumeCoordination({ request, port, ledgerPath: path, pollIntervalMs: 5 });
+    const resumed = await resumeCoordination({ request, port, ledgerPath: path, pollIntervalMs: 5, now: fixtureNow });
     assert.equal(resumed.outcome, "verbally_confirmed", "the lost call had said yes all along");
     assert.deepEqual(resumed.unreleased, []);
     assert.deepEqual(phones(fake, "release"), [], "so there was never anything to undo");
@@ -163,11 +171,11 @@ test("a finished run with nothing owed is left exactly as it was", async () => {
   await withFake(async (port, fake) => {
     const request = coordinationRequest();
     const path = ledgerPath();
-    const first = await runCoordination({ request, port, ledgerPath: path, pollIntervalMs: 5 });
+    const first = await runCoordination({ request, port, ledgerPath: path, pollIntervalMs: 5, now: fixtureNow });
     assert.equal(first.outcome, "verbally_confirmed");
     const before = readFileSync(path, "utf8");
 
-    const resumed = await resumeCoordination({ request, port, ledgerPath: path, pollIntervalMs: 5 });
+    const resumed = await resumeCoordination({ request, port, ledgerPath: path, pollIntervalMs: 5, now: fixtureNow });
     assert.equal(resumed.outcome, "verbally_confirmed");
     assert.equal(resumed.note, "nothing to resume");
     assert.equal(readFileSync(path, "utf8"), before, "resume writes nothing when nothing is owed");
@@ -179,12 +187,12 @@ test("resume refuses a ledger another request wrote", async () => {
   await withFake(async (port) => {
     const request = coordinationRequest();
     const path = ledgerPath();
-    await runCoordination({ request, port, ledgerPath: path, pollIntervalMs: 5 });
+    await runCoordination({ request, port, ledgerPath: path, pollIntervalMs: 5, now: fixtureNow });
     const other = coordinationRequest({
       meeting: { ...coordinationRequest().meeting, purpose: "a different job at 14 Ash Lane" },
     });
     await assert.rejects(
-      () => resumeCoordination({ request: other, port, ledgerPath: path, pollIntervalMs: 5 }),
+      () => resumeCoordination({ request: other, port, ledgerPath: path, pollIntervalMs: 5, now: fixtureNow }),
       (error: unknown) => {
         assert.ok(error instanceof ResumeError);
         assert.match(error.message, /written from a different request/);
@@ -206,11 +214,11 @@ test("resume refuses a ledger when only the request id was edited", async () => 
   await withFake(async (port, fake) => {
     const request = coordinationRequest();
     const path = ledgerPath();
-    await runCoordination({ request, port, ledgerPath: path, pollIntervalMs: 5 });
+    await runCoordination({ request, port, ledgerPath: path, pollIntervalMs: 5, now: fixtureNow });
     const placed = fake.created.length;
     const renamed = coordinationRequest({ request_id: "ash-lane-3b-leak-2" });
     await assert.rejects(
-      () => resumeCoordination({ request: renamed, port, ledgerPath: path, pollIntervalMs: 5 }),
+      () => resumeCoordination({ request: renamed, port, ledgerPath: path, pollIntervalMs: 5, now: fixtureNow }),
       (error: unknown) => {
         assert.ok(error instanceof ResumeError);
         assert.match(error.message, /written from a different request/);
@@ -245,7 +253,7 @@ test("resume re-issues the key the ledger recorded rather than deriving a new on
         return call;
       },
     };
-    const first = await runCoordination({ request, port: lossy, ledgerPath: path, pollIntervalMs: 5 });
+    const first = await runCoordination({ request, port: lossy, ledgerPath: path, pollIntervalMs: 5, now: fixtureNow });
     assert.equal(first.outcome, "unresolved");
     const lost = readEntries(path).find(
       (entry) => entry.kind === "commit" && entry.result.party_id === "superintendent",
@@ -278,7 +286,7 @@ test("resume re-issues the key the ledger recorded rather than deriving a new on
         .join("\n")}\n`,
     );
 
-    await resumeCoordination({ request, port, ledgerPath: path, pollIntervalMs: 5 });
+    await resumeCoordination({ request, port, ledgerPath: path, pollIntervalMs: 5, now: fixtureNow });
     assert.equal(fake.created.at(-1)?.idempotencyKey, recorded, "resume sent the key it read");
     const reconciled = readEntries(path).find((entry) => entry.kind === "reconcile");
     assert.ok(reconciled !== undefined && reconciled.kind === "reconcile");
@@ -294,7 +302,7 @@ test("resume re-issues the key the ledger recorded rather than deriving a new on
  * re-issuing the recorded key instead of deriving one that would have been new.
  */
 test("a recorded key re-issued with a different body stops rather than ringing again", async () => {
-  const fake = await startFakeCalle([confirmYes(PLUMBER)]);
+  const fake = await startFakeCalle([confirmYes(PLUMBER)], { completedAt: FIXTURE_COMPLETED_AT });
   const port = await createSdkPort({ apiKey: "calle_test_key", baseUrl: fake.baseUrl });
   try {
     const request = coordinationRequest();
@@ -312,6 +320,7 @@ test("a recorded key re-issued with a different body stops rather than ringing a
         schema: confirmSchema(),
         timeoutMs: 2_000,
         pollIntervalMs: 5,
+        now: fixtureNow,
         key,
       });
 
@@ -372,7 +381,7 @@ test("a crash between the create and the ledger append leaves the key resume set
     const path = ledgerPath();
     const keys: string[] = [];
     const watched = watch(port, keys);
-    const first = await runCoordination({ request, port: watched, ledgerPath: path, pollIntervalMs: 5 });
+    const first = await runCoordination({ request, port: watched, ledgerPath: path, pollIntervalMs: 5, now: fixtureNow });
     assert.equal(first.outcome, "verbally_confirmed");
     const placed = fake.created.length;
     const sent = keys.length;
@@ -408,7 +417,7 @@ test("a crash between the create and the ledger append leaves the key resume set
       JSON.stringify(crashed.issues),
     );
 
-    const resumed = await resumeCoordination({ request, port: watched, ledgerPath: path, pollIntervalMs: 5 });
+    const resumed = await resumeCoordination({ request, port: watched, ledgerPath: path, pollIntervalMs: 5, now: fixtureNow });
     assert.equal(resumed.outcome, "verbally_confirmed", "the call CALL-E already held had said yes");
     assert.equal(keys.length, sent + 1, "one create, under the key the ledger recorded");
     assert.equal(keys.at(-1), attempt.idempotency_key);
@@ -429,7 +438,7 @@ test("a crash after the accepted id was recorded settles that call without placi
     const path = ledgerPath();
     const keys: string[] = [];
     const watched = watch(port, keys);
-    await runCoordination({ request, port: watched, ledgerPath: path, pollIntervalMs: 5 });
+    await runCoordination({ request, port: watched, ledgerPath: path, pollIntervalMs: 5, now: fixtureNow });
     const placed = fake.created.length;
     const sent = keys.length;
     const key = confirmAttempt(readEntries(path), "superintendent").idempotency_key;
@@ -443,7 +452,7 @@ test("a crash after the accepted id was recorded settles that call without placi
     assert.equal(state.unsettled[0]?.call_id, accepted.call_id, "the accepted id is what resume settles against");
     assert.equal(state.unsettled[0]?.idempotency_key, key);
 
-    const resumed = await resumeCoordination({ request, port: watched, ledgerPath: path, pollIntervalMs: 5 });
+    const resumed = await resumeCoordination({ request, port: watched, ledgerPath: path, pollIntervalMs: 5, now: fixtureNow });
     assert.equal(resumed.outcome, "verbally_confirmed");
     assert.equal(keys.length, sent, "reading a call places none, so no create went out at all");
     assert.equal(fake.created.length, placed);
@@ -462,7 +471,7 @@ test("a gather call nothing settled is reported for a person, never dialled agai
   await withFake(async (port, fake) => {
     const request = coordinationRequest();
     const path = ledgerPath();
-    await runCoordination({ request, port, ledgerPath: path, pollIntervalMs: 5 });
+    await runCoordination({ request, port, ledgerPath: path, pollIntervalMs: 5, now: fixtureNow });
     const kept = cutAt(
       path,
       (entry) => entry.kind === "call_attempt" && entry.phase === "gather" && entry.party_id === "tenant",
@@ -478,6 +487,7 @@ test("a gather call nothing settled is reported for a person, never dialled agai
       port,
       ledgerPath: path,
       pollIntervalMs: 5,
+      now: fixtureNow,
       onProgress: (line) => lines.push(line),
     });
     assert.equal(resumed.outcome, "not_confirmed");
@@ -524,7 +534,7 @@ test("an unsettled call with no key and no call id is refused rather than dialle
         return call;
       },
     };
-    const first = await runCoordination({ request, port: lossy, ledgerPath: path, pollIntervalMs: 5 });
+    const first = await runCoordination({ request, port: lossy, ledgerPath: path, pollIntervalMs: 5, now: fixtureNow });
     assert.equal(first.outcome, "unresolved");
     const lost = readEntries(path).find(
       (entry) => entry.kind === "commit" && entry.result.party_id === "superintendent",
@@ -550,7 +560,7 @@ test("an unsettled call with no key and no call id is refused rather than dialle
     assert.deepEqual(state.unsettled.map((held) => `${held.phase}:${held.party_id}`), ["confirm:superintendent"]);
     assert.equal(state.unsettled[0]?.idempotency_key, null, "nothing to re-issue");
 
-    const resumed = await resumeCoordination({ request, port, ledgerPath: path, pollIntervalMs: 5 });
+    const resumed = await resumeCoordination({ request, port, ledgerPath: path, pollIntervalMs: 5, now: fixtureNow });
     assert.equal(
       phones(fake, "confirm").length,
       3,
@@ -590,12 +600,12 @@ async function withOwedRelease(
     fake: Awaited<ReturnType<typeof startFakeCalle>>;
   }) => Promise<void>,
 ): Promise<void> {
-  const fake = await startFakeCalle(MACHINE_RELEASE);
+  const fake = await startFakeCalle(MACHINE_RELEASE, { completedAt: FIXTURE_COMPLETED_AT });
   const port = await createSdkPort({ apiKey: "calle_test_key", baseUrl: fake.baseUrl });
   const request = coordinationRequest();
   const path = ledgerPath();
   try {
-    const first = await runCoordination({ request, port, ledgerPath: path, pollIntervalMs: 5 });
+    const first = await runCoordination({ request, port, ledgerPath: path, pollIntervalMs: 5, now: fixtureNow });
     assert.equal(first.outcome, "not_confirmed");
     assert.deepEqual(first.unreleased, ["plumber"], "the release call reached a machine");
     await body({ port, path, request, fake });
@@ -657,6 +667,7 @@ test("resume finishes a release nobody acknowledged instead of writing it off", 
       port,
       ledgerPath: path,
       pollIntervalMs: 5,
+      now: fixtureNow,
       retryRelease: true,
     });
     assert.notEqual(resumed.note, "nothing to resume");

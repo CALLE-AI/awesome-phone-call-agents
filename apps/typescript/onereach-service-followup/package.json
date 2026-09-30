@@ -1,0 +1,13 @@
+{
+  "name": "onereach-calle-service-example",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "engines": { "node": ">=22" },
+  "scripts": {
+    "demo": "node src/cli.mjs",
+    "test": "node --test test/*.test.mjs",
+    "webhook": "node src/webhook.mjs"
+  },
+  "dependencies": { "@call-e/calle": "0.2.2" }
+}

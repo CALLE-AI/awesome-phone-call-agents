@@ -12,7 +12,8 @@
 # half the failures come from: a boolean has nowhere to put "I don't know", so
 # an extraction model handed a hedge has to guess.
 #
-# `redline run` finds 16 failures here. `redline verify` closes all of them.
+# `redline run` finds 21 modelled failures in the bundled catalogue.
+# `redline verify` evaluates the correction without changing this file.
 
 subject:
   name: appointment-agent
@@ -72,4 +73,5 @@ scenarios: ../../scenarios
 # nothing about what it cost.
 benign: ../../benign
 
+# JSON reports are opt-in via --json; this setting does not generate them.
 output_dir: ../../.redline

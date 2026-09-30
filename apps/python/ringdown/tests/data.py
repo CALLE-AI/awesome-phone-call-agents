@@ -3,6 +3,10 @@ from __future__ import annotations
 import json
 from pathlib import Path
 
+from fake import scenarios
+from ringdown.calls import parse_turns, snapshot_from
+from ringdown.escalate import Attempt
+from ringdown.extract import extract
 from ringdown.incident import Contact, Incident, Policy, Rung
 
 EXAMPLES = Path(__file__).resolve().parent.parent / "examples"
@@ -58,3 +62,20 @@ def raw_incident(**overrides) -> dict:
         "ladder": ["primary"],
     }
     return {**fields, **overrides}
+
+
+EXTRACTION = extract(parse_turns(scenarios.answer_ack(ALICE.name, "alice").turns))
+
+
+def an_attempt(**overrides) -> Attempt:
+    fields = {
+        "rung": LADDER[0],
+        "key": "rd-inc-1-primary-1-abc123def456",
+        "attempt_id": "inc-1/primary/1",
+        "verdict": "not_acknowledged",
+        "reason": "no_answer",
+        "call_id": "call_fake1",
+        "snapshot": snapshot_from({"id": "call_fake1", "status": "failed"}),
+        "extraction": EXTRACTION,
+    }
+    return Attempt(**{**fields, **overrides})

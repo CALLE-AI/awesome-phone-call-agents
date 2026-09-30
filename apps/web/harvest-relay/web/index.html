@@ -1,0 +1,117 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="theme-color" content="#12382b">
+  <meta name="description" content="Harvest Relay turns phone-confirmed cold storage and refrigerated transport into one checkable handoff. Try the fictional, no-call CALL-E rehearsal.">
+  <title>Harvest Relay — One working handoff.</title>
+  <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 40 40'%3E%3Crect width='40' height='40' rx='8' fill='%2312382b'/%3E%3Cpath d='M9 26V12h5v8h12v-8h5v14h-5v-3H14v3z' fill='%23d7ee75'/%3E%3C/svg%3E">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;450;500;550;600;650;700&family=Instrument+Serif:ital@0;1&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="./styles.css">
+  <script type="module" src="./app.js"></script>
+</head>
+<body>
+  <a class="skip-link" href="#main">Skip to rehearsal</a>
+  <header class="site-header shell">
+    <a class="brand" href="./" aria-label="Harvest Relay home">
+      <svg class="brand-symbol" width="36" height="36" viewBox="0 0 36 36" aria-hidden="true"><rect width="36" height="36" rx="3" fill="currentColor"/><path d="M8 25V11h5v9h10v-9h5v14h-5v-2H13v2z" fill="#d7ee75"/><path d="m13 11 5 5 5-5" fill="none" stroke="#d7ee75" stroke-width="2"/></svg>
+      <span>harvest<span class="brand-light">relay</span><span class="brand-period">.</span></span>
+    </a>
+    <nav class="main-nav" aria-label="Main navigation">
+      <a href="#rehearsal">The rehearsal</a>
+      <a href="#connection">Built with CALL-E <span aria-hidden="true">↗</span></a>
+    </nav>
+    <span class="header-status"><span class="status-dot"></span> A little coordination. Less waste.</span>
+  </header>
+
+  <main id="main">
+    <section class="hero shell" aria-labelledby="hero-title">
+      <div class="hero-copy">
+        <div class="eyebrow"><span class="tiny-square"></span> COLD CHAIN, CONNECTED.</div>
+        <h1 id="hero-title"><span id="headline-quantity">900</span> kg.<br><span id="headline-outcome">One working<br><em>handoff.</em></span></h1>
+        <p class="hero-description">The cold room is down. The harvest can’t wait.<br>Turn phone-confirmed storage and transport into a plan that actually meets in the middle.</p>
+        <dl class="lot-facts" aria-label="Harvest requirements">
+          <div><dt>The harvest</dt><dd>Strawberries</dd></div>
+          <div><dt>Keep it cool</dt><dd>0–4<span class="unit">°C</span></dd></div>
+          <div><dt>Arrive before</dt><dd id="hero-deadline">15:00</dd></div>
+        </dl>
+        <div class="hero-actions">
+          <button class="button button-primary" id="run-button" type="button" disabled><span class="play-icon" aria-hidden="true"></span><span id="run-label">Loading rehearsal</span><span aria-hidden="true">↗</span></button>
+          <button class="text-button" id="skip-button" type="button" hidden>Skip to the handoff <span aria-hidden="true">→</span></button>
+          <a class="text-button" id="review-link" href="#plan" hidden>Review the plan <span aria-hidden="true">↓</span></a>
+        </div>
+        <p class="rehearsal-note"><span class="outline-dot" aria-hidden="true"></span> <span id="rehearsal-note">Synthetic rehearsal. No calls. No bookings.</span></p>
+      </div>
+
+      <div class="route-board" aria-label="Schematic of refrigerated transport and storage pairings">
+        <div class="board-heading"><span><span class="tiny-square"></span> THE HANDOFF NETWORK</span><span class="board-mode">SIMULATED</span></div>
+        <div class="board-subheading"><span>LOT–042 <span class="muted">/ Greenacre Co-op</span></span><span id="network-progress">0 / 5 responses</span></div>
+        <div class="network" id="network">
+          <svg class="network-lines" viewBox="0 0 650 350" preserveAspectRatio="none" aria-hidden="true">
+            <defs><pattern id="field-grid" width="28" height="28" patternUnits="userSpaceOnUse"><path d="M 28 0 L 0 0 0 28" fill="none" stroke="#cad1bb" stroke-width="0.55"/></pattern></defs>
+            <rect width="650" height="350" fill="url(#field-grid)" opacity="0.42"/>
+            <path class="field-contour" d="M-40 272c80-120 110 145 200 10S240 105 320 265s110 76 130-14 105-107 250 10"/>
+            <path class="field-contour" d="M-40 296c80-120 110 145 200 10S240 129 320 289s110 76 130-14 105-107 250 10"/>
+            <path class="field-contour" d="M-40 320c80-120 110 145 200 10S240 153 320 313s110 76 130-14 105-107 250 10"/>
+            <path class="route-line origin-line" id="path-origin-swift" d="M 95 177 C 170 177 156 107 235 107"/>
+            <path class="route-line origin-line" id="path-origin-local" d="M 95 177 C 170 177 156 251 235 251"/>
+            <path class="route-line" id="path-swift-orchard" d="M 310 107 C 380 107 380 58 468 58"/>
+            <path class="route-line" id="path-swift-riverside" d="M 310 107 C 380 107 385 175 468 175"/>
+            <path class="route-line" id="path-swift-hillcrest" d="M 310 107 C 385 107 380 291 468 291"/>
+            <path class="route-line" id="path-local-orchard" d="M 310 251 C 400 251 390 58 468 58"/>
+            <path class="route-line" id="path-local-riverside" d="M 310 251 C 385 251 385 175 468 175"/>
+            <path class="route-line" id="path-local-hillcrest" d="M 310 251 C 385 251 385 291 468 291"/>
+          </svg>
+          <div class="network-column-label origin-label">THE HARVEST</div><div class="network-column-label carrier-label">THE RIDE</div><div class="network-column-label storage-label">THE COLD ROOM</div>
+          <div class="origin-node"><svg width="44" height="46" viewBox="0 0 44 46" aria-hidden="true"><path d="M8 20c0-9 8-11 14-7 6-4 14-2 14 7 0 10-10 21-14 21S8 30 8 20Z" fill="#d7ee75"/><path d="m22 15-9-7 8 2 3-7 1 8 8-4-5 9" fill="none" stroke="#d7ee75" stroke-width="2" stroke-linejoin="round"/><path d="m16 22 1 2m10-3-1 2m-5 5 1 2m-7-1 1 2m12-2-1 2m-5 5v1" stroke="#12382b" stroke-width="1.5" stroke-linecap="round"/></svg><strong id="map-quantity">900 kg</strong><span>Ready at 13:00</span></div>
+          <button class="network-node carrier-node swift-node" id="node-swift" data-evidence="swift" type="button"><span class="node-type"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M3 6h11v11H3zM14 10h4l3 4v3h-7M7 17a2 2 0 1 0 0 .01M18 17a2 2 0 1 0 0 .01"/></svg> TRANSPORT</span><strong>Swift Reefer</strong><span>1,000 kg <span class="node-separator">/</span> 13:35 pickup</span><span class="node-verdict" id="verdict-swift">Awaiting rehearsal</span></button>
+          <button class="network-node carrier-node local-node" id="node-local" data-evidence="local" type="button"><span class="node-type"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M3 6h11v11H3zM14 10h4l3 4v3h-7M7 17a2 2 0 1 0 0 .01M18 17a2 2 0 1 0 0 .01"/></svg> TRANSPORT</span><strong>Local Co-op Van</strong><span>700 kg <span class="node-separator">/</span> 13:10 pickup</span><span class="node-verdict" id="verdict-local">Awaiting rehearsal</span></button>
+          <button class="network-node storage-node orchard-node" id="node-orchard" data-evidence="orchard" type="button"><span class="node-type"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M3 21V8l9-5 9 5v13H3ZM8 21V12h8v9M8 16h8"/></svg> COLD STORAGE</span><strong>Orchard</strong><span>1,200 kg <span class="node-separator">/</span> 1–3°C</span><span class="node-verdict" id="verdict-orchard">Directory says 17:00</span></button>
+          <button class="network-node storage-node riverside-node" id="node-riverside" data-evidence="riverside" type="button"><span class="node-type"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M3 21V8l9-5 9 5v13H3ZM8 21V12h8v9M8 16h8"/></svg> COLD STORAGE</span><strong>Riverside</strong><span>1,000 kg <span class="node-separator">/</span> 0–4°C</span><span class="node-verdict" id="verdict-riverside">Awaiting rehearsal</span></button>
+          <button class="network-node storage-node hillcrest-node" id="node-hillcrest" data-evidence="hillcrest" type="button"><span class="node-type"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M3 21V8l9-5 9 5v13H3ZM8 21V12h8v9M8 16h8"/></svg> COLD STORAGE</span><strong>Hillcrest</strong><span>1,500 kg <span class="node-separator">/</span> 6–10°C</span><span class="node-verdict" id="verdict-hillcrest">Awaiting rehearsal</span></button>
+        </div>
+        <div class="board-caption"><div><span class="route-key" aria-hidden="true"></span><span id="route-caption">Five confirmations. Six possible pairings.</span></div><span class="map-note">SCHEMATIC, NOT A MAP</span></div>
+        <div class="board-bottom"><span id="board-insight">A room with space is only half the answer.</span><svg width="22" height="22" viewBox="0 0 24 24" aria-hidden="true"><path d="M5 19 19 5M5 5h14v14" fill="none" stroke="currentColor" stroke-width="1.5"/></svg></div>
+      </div>
+    </section>
+
+    <section class="scenario-strip shell" aria-labelledby="scenario-title">
+      <div class="scenario-intro"><span class="eyebrow">THE BRIEF</span><h2 id="scenario-title">Change one thing.<br>See what still works.</h2></div>
+      <fieldset class="quantity-control"><legend>Harvest load</legend><div class="segmented"><label><input type="radio" name="quantity" value="900" checked><span>900 kg</span></label><label><input type="radio" name="quantity" value="650"><span>650 kg</span></label></div></fieldset>
+      <label class="deadline-control" for="deadline">Latest arrival<input type="time" id="deadline" value="15:00" required aria-describedby="deadline-description"><span class="sr-only" id="deadline-description">Recomputes every transport and storage pair. Rehearsal starts at 13:00.</span></label>
+      <label class="outage-control"><input type="checkbox" id="riverside-offline"><span class="switch-track" aria-hidden="true"></span><span>Riverside unavailable<small>Stress-test the fallback</small></span></label>
+      <button type="button" class="reset-button" id="reset-button">Reset <span aria-hidden="true">↺</span></button>
+      <p class="control-error" id="control-error" role="alert" hidden></p>
+    </section>
+
+    <section class="evidence-section shell section-space" id="rehearsal" aria-labelledby="evidence-title">
+      <div class="section-heading"><div><span class="eyebrow">01 / LISTEN BEFORE YOU PLAN</span><h2 id="evidence-title">The answer isn’t<br>in the directory.</h2></div><p>A listed closing time is not a receiving window.<br>Inspect the words behind each constraint.</p><span class="section-index" aria-hidden="true">01</span></div>
+      <div class="evidence-desk">
+        <div class="call-list" aria-label="Select a simulated call"><div class="call-list-heading"><span>5 FICTIONAL CONVERSATIONS</span><span id="call-progress-label">SCRIPT PREVIEW</span></div><div id="call-list"></div><p class="list-note">Recorded text fixtures, replayed in sequence.<br>No microphone or telephone connection.</p></div>
+        <article class="transcript-panel" aria-labelledby="transcript-title"><div class="transcript-top"><div><span class="eyebrow" id="transcript-category">COLD STORAGE / CALL 01</span><h3 id="transcript-title">Orchard Cold Store</h3></div><span class="fixture-label">SIMULATED</span></div><div class="transcript-messages" id="transcript-messages"></div><div class="evidence-finding" id="evidence-finding"><span class="finding-icon" aria-hidden="true">!</span><div><span>THE FACT THAT CHANGES THE PLAN</span><p id="finding-text">Directory said 17:00. Reception confirms 14:00.</p></div></div><div class="transcript-footer"><code id="evidence-id">fixture-storage-orchard</code><span>Source: synthetic fixture</span></div></article>
+      </div>
+    </section>
+
+    <section class="plan-section shell section-space" id="plan" aria-labelledby="plan-title">
+      <div class="section-heading"><div><span class="eyebrow">02 / CONNECT THE CONSTRAINTS</span><h2 id="plan-title">Good on their own.<br>Better checked together.</h2></div><p>Capacity. Temperature. Timing. Cost.<br>Every condition, across the whole handoff.</p><span class="section-index" aria-hidden="true">02</span></div>
+      <div class="plan-placeholder" id="plan-placeholder"><span class="placeholder-mark" aria-hidden="true">↗</span><div><h3>There’s a route through this.</h3><p>Run the rehearsal to see which of the six pairings holds up.</p></div><button type="button" class="button button-primary" id="start-secondary">Run rehearsal <span aria-hidden="true">→</span></button></div>
+      <div id="plan-content" hidden>
+        <div class="plan-layout"><article class="recommendation" id="recommendation" aria-labelledby="recommendation-title"></article><div class="pair-comparison"><div class="comparison-heading"><h3>Every pairing, explained.</h3><span id="pair-count">6 CHECKED</span></div><div id="pair-list"></div><p class="comparison-note">Full load only. Requested cooling range enforced. Unknown facts never count as confirmation.</p></div></div>
+        <div class="handoff-timeline" id="handoff-timeline"></div>
+        <div class="export-panel" id="export-panel"><div><span class="eyebrow">THE LAST STEP BELONGS TO A PERSON</span><h3>A plan to review. A handoff to confirm.</h3><p>Export includes the selected pair, every constraint, and its original simulated evidence.</p><label class="confirm-label"><input id="operator-confirm" type="checkbox"><span>I reviewed the source facts. This is a rehearsal plan, not a booking.</span></label></div><button class="button button-primary" id="download-button" type="button" disabled><svg width="19" height="19" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3v12m-5-5 5 5 5-5M4 16v5h16v-5" fill="none" stroke="currentColor" stroke-width="1.6"/></svg> Download handoff <span class="file-type">JSON</span></button></div>
+      </div>
+    </section>
+
+    <section class="connection-section" id="connection" aria-labelledby="connection-title"><div class="shell connection-inner"><div class="connection-copy"><span class="eyebrow">03 / POWERED BY CALL-E</span><h2 id="connection-title">Phone calls in.<br><em>Checkable facts</em> out.</h2><p>CALL-E asks the questions and returns structured answers. Harvest Relay connects those answers into a handoff an operator can inspect.</p><ol class="connection-steps"><li><span>01</span><div><strong>Ask for the missing details.</strong><p>Actual capacity, cooling, receiving hours, pickup and price.</p></div></li><li><span>02</span><div><strong>Keep the evidence attached.</strong><p>Every constraint stays connected to its source conversation.</p></div></li><li><span>03</span><div><strong>Leave the decision with a person.</strong><p>An available route is a proposal. It is never a silent booking.</p></div></li></ol><a class="connection-docs" href="https://docs.heycall-e.com/calls" target="_blank" rel="noreferrer">Read the CALL-E API docs <span aria-hidden="true">↗</span></a></div><div class="api-panel"><div class="api-panel-heading"><span>THE INTEGRATION, OPEN TO INSPECTION</span><span class="api-method">POST</span></div><div class="api-endpoint">api.heycall-e.com<span>/v1/calls</span></div><p class="api-description">Illustrative request · reserved fictional phone number · never sent by this page.</p><pre class="api-code" tabindex="0" aria-label="Example CALL-E API request body"><code id="api-request">Loading request preview…</code></pre><div class="api-actions"><button type="button" id="copy-request">Copy request <span aria-hidden="true">↗</span></button><button type="button" id="check-connection">Check local adapter <span aria-hidden="true">→</span></button></div><p class="api-status" id="api-status" role="status">The public rehearsal runs entirely on fixtures. The companion Node adapter keeps credentials on the server and requires a separate, explicit call action.</p></div></div></section>
+
+    <footer class="site-footer shell"><a class="brand" href="./"><span>harvest<span class="brand-light">relay</span><span class="brand-period">.</span></span></a><p>Less guessing between the farm and the cold room.</p><div><a id="source-link" href="https://github.com" target="_blank" rel="noreferrer">Source <span aria-hidden="true">↗</span></a><span>CALL-E HACKATHON / 2026</span></div></footer>
+    <p class="legal-note shell">Fictional demonstration. All providers, locations, conversations, quantities, quotes and route times are synthetic. No calls are placed or bookings made through this page. This prototype does not certify food safety or claim that food has been rescued.</p>
+  </main>
+  <div id="live-status" class="sr-only" role="status" aria-live="polite" aria-atomic="true"></div>
+  <div class="toast" id="toast" role="status" hidden></div>
+  <noscript><div class="noscript-message">This rehearsal needs JavaScript to evaluate routes. The downloadable source includes a Node CLI version.</div></noscript>
+</body>
+</html>

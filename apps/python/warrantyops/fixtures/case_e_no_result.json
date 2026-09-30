@@ -1,0 +1,73 @@
+{
+  "scenario": "case_e_no_result",
+  "description": "The call did not complete. There is no business outcome to report and nothing to write back; no transport state may be read as a claim decision.",
+  "envelope": {
+    "source_platform": "SYNTHETIC-DMS",
+    "source_claim_id": "CLM-1046",
+    "source_version": "v1",
+    "exception_status": "STALLED",
+    "submitted_at": "2026-08-11",
+    "caller_organization": "Example Equipment Dealers",
+    "account_context": "dealer account 4471",
+    "counterparty_phone_e164": "+14155550171",
+    "economic_policy_id": "standard-pursuit",
+    "claim_face_value": "1502.75",
+    "claim_currency": "USD",
+    "documented_code": "H-009",
+    "documented_reason": "Held: no movement for fourteen days",
+    "documented_next_step": null,
+    "ordinary_remedies": [
+      {
+        "channel": "portal_status_check",
+        "outcome": "portal has shown the same hold for fourteen days"
+      },
+      {
+        "channel": "documented_code_resolution",
+        "outcome": "code sheet gives no owner for hold H-009"
+      },
+      {
+        "channel": "written_follow_up",
+        "outcome": "two unanswered emails"
+      }
+    ],
+    "exhaustion_manifest": {
+      "source_version": "v1",
+      "routes": [
+        {
+          "channel": "portal_status_check",
+          "outcome": "portal has shown the same hold for fourteen days",
+          "attempted_at": "2026-08-15"
+        },
+        {
+          "channel": "documented_code_resolution",
+          "outcome": "code sheet gives no owner for hold H-009",
+          "attempted_at": "2026-08-17"
+        },
+        {
+          "channel": "written_follow_up",
+          "outcome": "two unanswered emails",
+          "attempted_at": "2026-08-25"
+        }
+      ],
+      "information_gap": "no ordinary route states why the hold has not moved or who owns it"
+    }
+  },
+  "recipient_e164": "+14155550171",
+  "transport": {
+    "state": "failed",
+    "call_id": "call_synthetic_case_e",
+    "failure_code": "synthetic_transport_failure",
+    "failure_message": "Synthetic fixture: the call did not reach a completed state."
+  },
+  "transcript_turns": [],
+  "structured_result": null,
+  "expected": {
+    "kind": "OUTCOME",
+    "terminal_state": "TRANSPORT_FAILED",
+    "claim_status": "UNKNOWN",
+    "identifier_state": null,
+    "confirmed_reference": null,
+    "provider_replays": 1,
+    "write_back": "NO_BUSINESS_RESULT"
+  }
+}

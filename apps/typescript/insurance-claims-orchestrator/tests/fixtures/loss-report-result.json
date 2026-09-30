@@ -1,0 +1,13 @@
+{
+  "_note": "FICTIONAL example — E.164 reserved test number, not a real person",
+  "phone": "+15550001234",
+  "call_id": "fixture-loss-report-001",
+  "outcome": "completed",
+  "structured_result": {
+    "outcome": "completed",
+    "incident_description": "My car was rear-ended while stopped at a red light on Route 50.",
+    "incident_date": "2026-09-10",
+    "estimated_damage": 4200,
+    "policy_number_confirmed": "POL-TEST-7890"
+  }
+}

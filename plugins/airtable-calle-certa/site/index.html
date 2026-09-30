@@ -1,0 +1,697 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Certa — employment verification, by phone</title>
+<meta name="description" content="Certa verifies employment by phone: it calls only employers the applicant consented to, never the number the applicant supplied, and returns a typed answer instead of a voicemail.">
+<style>
+:root {
+  --canvas:#fdfcfb; --surface:#f6f4f1; --raised:#ffffff; --hover:#efebe6;
+  --line:#e8e3dd; --hair:#f2eeea; --ink:#100f0e; --muted:#67615a; --faint:#9b938a;
+
+  /* Pastel wash. Only ever a background — never applied to text or controls. */
+  --wash-a:#e8ecff;  --wash-b:#ffeef0;  --wash-c:#e6f6ee;
+  --wash-d:#fff3e2;  --wash-e:#efe9fb;
+
+  --ok:#12694a; --ok-bg:#eef7f2; --ok-line:#cfe7dc;
+  --stop:#a32b21; --stop-bg:#fdf1f0; --stop-line:#f2d3d0;
+  --btn:#100f0e; --btn-fg:#fdfcfb; --btn-hov:#2d2925; --ring:rgba(16,15,14,.14);
+
+  --display:-apple-system,BlinkMacSystemFont,"SF Pro Display","Segoe UI Variable Display","Segoe UI",system-ui,sans-serif;
+  --text:-apple-system,BlinkMacSystemFont,"SF Pro Text","Segoe UI Variable Text","Segoe UI",system-ui,sans-serif;
+  --mono:"SF Mono",ui-monospace,"Cascadia Mono",Menlo,monospace;
+
+  --r-tile:20px; --r-soft:14px; --r-pill:9999px;
+  --gap:16px;
+  --t:220ms cubic-bezier(.22,1,.36,1);
+  color-scheme: light;
+}
+@media (prefers-color-scheme: dark) {
+  html:not([data-theme="light"]) {
+    --canvas:#0b0a09; --surface:#151312; --raised:#1a1816; --hover:#221f1c;
+    --line:#2b2724; --hair:#1f1c19; --ink:#faf8f6; --muted:#a9a199; --faint:#7a726a;
+    --wash-a:#141a2e; --wash-b:#2a1519; --wash-c:#0f2019; --wash-d:#2a1e0c; --wash-e:#1d1730;
+    --ok:#6ee7a8; --ok-bg:#0f2019; --ok-line:#1e3d2e;
+    --stop:#f08b83; --stop-bg:#241413; --stop-line:#452522;
+    --btn:#faf8f6; --btn-fg:#0b0a09; --btn-hov:#ffffff; --ring:rgba(250,248,246,.18);
+    color-scheme: dark;
+  }
+}
+html[data-theme="dark"] {
+  --canvas:#0b0a09; --surface:#151312; --raised:#1a1816; --hover:#221f1c;
+  --line:#2b2724; --hair:#1f1c19; --ink:#faf8f6; --muted:#a9a199; --faint:#7a726a;
+  --wash-a:#141a2e; --wash-b:#2a1519; --wash-c:#0f2019; --wash-d:#2a1e0c; --wash-e:#1d1730;
+  --ok:#6ee7a8; --ok-bg:#0f2019; --ok-line:#1e3d2e;
+  --stop:#f08b83; --stop-bg:#241413; --stop-line:#452522;
+  --btn:#faf8f6; --btn-fg:#0b0a09; --btn-hov:#ffffff; --ring:rgba(250,248,246,.18);
+  color-scheme: dark;
+}
+
+*,*::before,*::after { box-sizing:border-box; }
+html { scroll-behavior:smooth; }
+html, body { background:var(--canvas); }
+body {
+  margin:0; color:var(--ink);
+  font:400 16px/1.68 var(--text); letter-spacing:0.01em;
+  -webkit-font-smoothing:antialiased; overflow-x:hidden;
+}
+h1,h2,h3 { font-family:var(--display); font-weight:300; letter-spacing:-0.024em; margin:0; }
+a { color:inherit; }
+code { font:400 .86em var(--mono); letter-spacing:0; }
+.wrap { max-width:1120px; margin:0 auto; padding:0 26px; }
+
+/* grain: a single tiled SVG turbulence, so gradients read tactile not plastic */
+.grain::after {
+  content:""; position:absolute; inset:0; pointer-events:none; opacity:.5;
+  background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='140' height='140'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='.85' numOctaves='3'/%3E%3CfeColorMatrix type='saturate' values='0'/%3E%3C/filter%3E%3Crect width='140' height='140' filter='url(%23n)' opacity='.34'/%3E%3C/svg%3E");
+  mix-blend-mode:soft-light;
+}
+
+/* ── nav ──────────────────────────────────────────────────────────────── */
+nav { position:sticky; top:0; z-index:20; background:var(--canvas); border-bottom:1px solid var(--hair); }
+@supports (backdrop-filter: blur(1px)) {
+  nav { background:color-mix(in srgb, var(--canvas) 90%, transparent); backdrop-filter:blur(16px); }
+}
+nav .wrap { display:flex; align-items:center; gap:12px; padding-block:16px; }
+.brand { display:flex; align-items:center; gap:10px; margin-right:auto; text-decoration:none; }
+.brand svg { width:26px; height:26px; display:block; }
+.brand b { font:300 20px/1 var(--display); letter-spacing:-0.03em; }
+.navlink { font-size:14.5px; color:var(--muted); text-decoration:none; padding:9px 13px; border-radius:var(--r-pill); transition:color var(--t), background var(--t); }
+.navlink:hover { color:var(--ink); background:var(--surface); }
+
+.btn {
+  display:inline-flex; align-items:center; gap:9px;
+  font:500 15px/1 var(--text); letter-spacing:0.01em; text-decoration:none;
+  padding:14px 26px; border-radius:var(--r-pill);
+  border:1px solid var(--line); background:var(--raised); color:var(--ink);
+  cursor:pointer; transition:background var(--t), border-color var(--t), transform var(--t);
+}
+.btn:hover { background:var(--hover); border-color:var(--faint); }
+.btn:active { transform:scale(.98); }
+.btn.primary { background:var(--btn); color:var(--btn-fg); border-color:var(--btn); }
+.btn.primary:hover { background:var(--btn-hov); border-color:var(--btn-hov); }
+.btn.sm { padding:9px 16px; font-size:14px; }
+:focus-visible { outline:none; box-shadow:0 0 0 4px var(--ring); border-radius:var(--r-pill); }
+
+/* ── hero ─────────────────────────────────────────────────────────────── */
+.hero { position:relative; isolation:isolate; padding:96px 0 76px; overflow:hidden; }
+.hero .wrap { position:relative; z-index:1; }
+.aurora {
+  position:absolute; inset:-30% -10% auto -10%; height:150%; z-index:0;
+  filter:blur(90px); opacity:.85; pointer-events:none;
+}
+.aurora span { position:absolute; border-radius:50%; display:block; }
+.aurora .a { width:46vw; height:46vw; left:-6%;  top:6%;  background:var(--wash-a); }
+.aurora .b { width:38vw; height:38vw; left:34%;  top:-8%; background:var(--wash-b); }
+.aurora .c { width:34vw; height:34vw; right:-4%; top:14%; background:var(--wash-c); }
+.aurora .d { width:26vw; height:26vw; left:56%;  top:38%; background:var(--wash-d); }
+h1 { font-size:clamp(40px,6.4vw,74px); line-height:1.02; max-width:17ch; }
+.lede { font-size:clamp(17px,1.9vw,20px); color:var(--muted); margin:30px 0 0; max-width:58ch; }
+.cta { display:flex; gap:13px; flex-wrap:wrap; margin-top:40px; align-items:center; }
+.cta .note { font-size:14px; color:var(--faint); }
+
+/* ── bento ────────────────────────────────────────────────────────────── */
+.bento {
+  display:grid; gap:var(--gap); margin-top:72px;
+  grid-template-columns:repeat(6,1fr); grid-auto-rows:minmax(126px,auto);
+}
+.tile {
+  position:relative; overflow:hidden;
+  border:1px solid var(--line); border-radius:var(--r-tile);
+  background:var(--raised); padding:26px 26px 28px;
+  transition:border-color var(--t), transform var(--t);
+}
+.tile:hover { border-color:var(--faint); }
+.tile.wash { background:linear-gradient(150deg, var(--w1), var(--w2)); }
+.tile h3 { font-size:19px; margin-bottom:9px; letter-spacing:-0.018em; }
+.tile p { margin:0; color:var(--muted); font-size:14.5px; }
+.tile .kicker {
+  font:400 12.5px/1 var(--mono); letter-spacing:0.02em; color:var(--faint);
+  text-transform:uppercase; margin-bottom:16px; display:block;
+}
+.tile .stat { font:300 clamp(38px,4.6vw,58px)/1 var(--display); letter-spacing:-0.035em; }
+.tile .stat small { font:400 15px/1 var(--text); color:var(--muted); letter-spacing:0.01em; margin-left:6px; }
+
+.t-quote { grid-column:span 4; }
+.t-quote blockquote { margin:0; font:300 clamp(21px,2.5vw,28px)/1.35 var(--display); letter-spacing:-0.022em; }
+.t-quote cite { display:block; font-style:normal; font-size:13.5px; color:var(--faint); margin-top:20px; }
+.t-quote cite a { color:var(--muted); text-underline-offset:3px; }
+.t-market  { grid-column:span 2; }
+.t-consent { grid-column:span 3; }
+.t-prov    { grid-column:span 3; }
+.t-gate    { grid-column:span 2; }
+.t-refuse  { grid-column:span 2; }
+.t-audit   { grid-column:span 2; }
+
+.snippet {
+  margin:18px 0 0; padding:15px 17px; border-radius:var(--r-soft);
+  background:color-mix(in srgb, var(--canvas) 62%, transparent);
+  border:1px solid var(--hair);
+  font:400 12.5px/1.7 var(--mono); letter-spacing:0; color:var(--muted);
+  overflow-x:auto; white-space:pre;
+}
+.chipline { display:flex; gap:8px; flex-wrap:wrap; margin-top:18px; }
+.tick {
+  display:inline-flex; align-items:center; gap:7px; font-size:13px; letter-spacing:0.01em;
+  padding:6px 13px 6px 10px; border-radius:var(--r-pill);
+  border:1px solid var(--ok-line); background:var(--ok-bg); color:var(--ok);
+}
+.tick::before { content:""; width:6px; height:6px; border-radius:50%; background:currentColor; }
+.tick.no { border-color:var(--stop-line); background:var(--stop-bg); color:var(--stop); }
+
+/* ── sections ─────────────────────────────────────────────────────────── */
+section.band { padding:104px 0 0; }
+h2 { font-size:clamp(29px,3.6vw,42px); line-height:1.12; max-width:21ch; }
+.sub { color:var(--muted); margin:20px 0 0; font-size:17px; max-width:60ch; }
+
+.flow { display:grid; gap:var(--gap); grid-template-columns:repeat(3,minmax(0,1fr)); margin-top:46px; }
+.step { position:relative; overflow:hidden; border:1px solid var(--line); border-radius:var(--r-tile); background:var(--raised); padding:30px 28px 32px; }
+.step .n {
+  display:inline-grid; place-items:center; width:31px; height:31px; border-radius:50%;
+  background:var(--btn); color:var(--btn-fg); font:400 13px/1 var(--mono); margin-bottom:19px;
+}
+.step h3 { font-size:20px; margin-bottom:11px; }
+.step p { margin:0; color:var(--muted); font-size:15px; }
+.step p + p { margin-top:11px; }
+
+.rows { margin-top:44px; border-top:1px solid var(--line); }
+.rowline { display:grid; grid-template-columns:230px 1fr; gap:28px; padding:24px 0; border-bottom:1px solid var(--hair); }
+.rowline dt { font-size:15px; font-weight:500; letter-spacing:0.01em; }
+.rowline dd { margin:0; color:var(--muted); font-size:15px; }
+
+.nots { display:flex; flex-wrap:wrap; gap:10px; margin-top:34px; }
+.not { font-size:14.5px; color:var(--muted); border:1px solid var(--line); border-radius:var(--r-pill); padding:9px 18px; background:var(--raised); }
+
+footer { border-top:1px solid var(--line); padding:60px 0 88px; margin-top:104px; }
+footer .wrap { display:flex; gap:26px; flex-wrap:wrap; justify-content:space-between; align-items:baseline; }
+footer p { margin:0; font-size:14px; color:var(--faint); max-width:50ch; }
+footer a { color:var(--muted); text-underline-offset:3px; }
+footer a:hover { color:var(--ink); }
+
+@media (max-width:980px) {
+  .bento { grid-template-columns:repeat(2,1fr); }
+  .t-quote,.t-market,.t-consent,.t-prov,.t-gate,.t-refuse,.t-audit { grid-column:span 2; }
+  .flow { grid-template-columns:1fr; }
+  .rowline { grid-template-columns:1fr; gap:8px; }
+}
+.uses { display: grid; grid-template-columns: repeat(2, 1fr); gap: 18px; margin-top: 34px; }
+.use { border: 1px solid var(--hair); border-radius: 20px; padding: 26px 28px; background: var(--raised); }
+.use .kicker { display: inline-block; font: 500 11.5px/1 var(--mono); letter-spacing: .09em; text-transform: uppercase; color: var(--faint); margin-bottom: 14px; }
+.use h3 { font: 300 21px/1.25 var(--display); letter-spacing: -.019em; margin: 0 0 10px; }
+.use p { color: var(--muted); font-size: 14.5px; line-height: 1.62; margin: 0 0 10px; }
+.use .why { color: var(--ink); padding-left: 14px; border-left: 2px solid var(--line); margin-bottom: 0; }
+.uses + .note { margin-top: 26px; color: var(--faint); font-size: 14px; max-width: 68ch; }
+@media (max-width: 820px) { .uses { grid-template-columns: 1fr; } }
+/* Run simulation ---------------------------------------------------------
+   A queue turning into calls. The second row is the point of the whole
+   thing: its number came from the applicant, so it is never dialled. */
+.sim { margin-top: 38px; border: 1px solid var(--line); border-radius: var(--r-tile); background: var(--raised); overflow: hidden; box-shadow: 0 1px 2px var(--ring); }
+.sim-bar { display: flex; align-items: center; gap: 7px; padding: 13px 18px; border-bottom: 1px solid var(--hair); background: var(--surface); }
+.sim-dot { width: 9px; height: 9px; border-radius: 50%; background: var(--line); flex: none; }
+.sim-title { margin-left: 10px; font: 500 12.5px/1 var(--mono); color: var(--faint); letter-spacing: .01em; }
+.sim-cost { margin-left: auto; font: 500 12.5px/1 var(--mono); color: var(--muted); }
+
+.sim-grid { display: block; font-size: 13.5px; }
+.sim-head, .sim-row { display: grid; grid-template-columns: 84px 1.25fr 1.6fr 76px 84px 66px 108px; gap: 10px; align-items: center; padding: 13px 18px; }
+.sim-head { font: 500 11px/1 var(--mono); letter-spacing: .085em; text-transform: uppercase; color: var(--faint); border-bottom: 1px solid var(--hair); }
+.sim-row { border-bottom: 1px solid var(--hair); transition: background var(--t); }
+.sim-row:last-child { border-bottom: 0; }
+.sim-row.is-active { background: var(--wash-a); }
+.sim-row.is-blocked { background: var(--stop-bg); }
+.sim-row .id { font: 500 12px/1 var(--mono); color: var(--faint); }
+.sim-row .emp { font-weight: 500; color: var(--ink); }
+.sim-row .num { color: var(--muted); font: 400 12.5px/1.35 var(--mono); }
+.sim-row .src { display: block; font: 500 10px/1 var(--mono); letter-spacing: .07em; text-transform: uppercase; color: var(--faint); margin-bottom: 4px; font-style: normal; }
+.sim-row .num.bad { color: var(--stop); }
+.sim-row .num.bad s { text-decoration-thickness: 1.5px; }
+.sim-row .num.bad .src { color: var(--stop); }
+
+.sim-row .a { font-weight: 500; color: var(--faint); transition: color var(--t), transform var(--t); }
+.sim-row .a.set { color: var(--ink); animation: simPop .34s cubic-bezier(.22,1,.36,1); }
+@keyframes simPop { 0% { opacity: 0; transform: translateY(5px) } 100% { opacity: 1; transform: none } }
+
+.pill { display: inline-flex; align-items: center; gap: 6px; padding: 4px 11px; border-radius: var(--r-pill); border: 1px solid var(--line); background: var(--surface); color: var(--muted); font: 500 11.5px/1.5 var(--text); font-style: normal; white-space: nowrap; }
+.pill[data-s="calling"] { border-color: var(--line); color: var(--ink); }
+.pill[data-s="calling"]::before { content: ""; width: 6px; height: 6px; border-radius: 50%; background: var(--ink); animation: simPulse 1s ease-in-out infinite; }
+@keyframes simPulse { 0%,100% { opacity: .25 } 50% { opacity: 1 } }
+.pill[data-s="verified"] { background: var(--ok-bg); border-color: var(--ok-line); color: var(--ok); }
+.pill[data-s="declined"], .pill[data-s="review"] { background: var(--surface); border-color: var(--line); color: var(--muted); }
+.pill[data-s="blocked"] { background: var(--stop-bg); border-color: var(--stop-line); color: var(--stop); }
+
+.sim-call { display: flex; align-items: center; gap: 14px; padding: 15px 18px; border-top: 1px solid var(--hair); background: var(--surface); }
+.sim-wave { display: flex; align-items: center; gap: 3px; flex: none; height: 22px; }
+.sim-wave i { width: 3px; height: 5px; border-radius: 2px; background: var(--ink); opacity: .55; animation: simWave 1.1s ease-in-out infinite; }
+.sim-wave i:nth-child(2){animation-delay:.08s} .sim-wave i:nth-child(3){animation-delay:.16s}
+.sim-wave i:nth-child(4){animation-delay:.24s} .sim-wave i:nth-child(5){animation-delay:.32s}
+.sim-wave i:nth-child(6){animation-delay:.4s}  .sim-wave i:nth-child(7){animation-delay:.48s}
+@keyframes simWave { 0%,100% { height: 5px } 50% { height: 19px } }
+.sim-line { margin: 0; font-size: 13.5px; color: var(--ink); line-height: 1.5; }
+.sim-line b { font-weight: 500; color: var(--faint); font-size: 11px; letter-spacing: .07em; text-transform: uppercase; display: block; margin-bottom: 3px; font-family: var(--mono); }
+.sim-foot { margin: 0; padding: 13px 18px; border-top: 1px solid var(--hair); color: var(--faint); font-size: 12.5px; }
+
+@media (max-width: 900px) {
+  .sim-head, .sim-row { grid-template-columns: 1fr 1fr; gap: 6px 12px; }
+  .sim-head { display: none; }
+  .sim-row .id { grid-column: 1 } .sim-row .st { grid-column: 2; justify-self: end }
+  .sim-row .emp, .sim-row .num { grid-column: 1 / -1 }
+  .sim-row .a { font-size: 12.5px }
+  .sim-row .a::before { content: attr(data-c) ": "; color: var(--faint); text-transform: capitalize; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .sim-wave i, .pill[data-s="calling"]::before { animation: none }
+  .sim-row .a.set { animation: none }
+}
+
+@media (max-width: 700px) {
+  nav { gap: 14px; }
+  .navlink { font-size: 13px; white-space: nowrap; }
+  .navlink[href="#boundaries"] { display: none; }
+}
+@media (prefers-reduced-motion:reduce) {
+  html { scroll-behavior:auto; }
+  *,*::before,*::after { transition:none !important; animation:none !important; }
+  .reveal { opacity:1 !important; transform:none !important; }
+}
+</style>
+</head>
+<body>
+
+<nav>
+  <div class="wrap">
+    <a class="brand" href="#top">
+      <svg viewBox="0 0 24 24" aria-hidden="true">
+        <path d="M18.6 6.6A8.6 8.6 0 1 0 18.6 17.4" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round"/>
+        <circle cx="19" cy="12" r="2.3" fill="currentColor"/>
+      </svg>
+      <b>Certa</b>
+    </a>
+    <a class="navlink" href="#how">How it works</a>
+    <a class="navlink" href="#uses">Use cases</a>
+    <a class="navlink" href="https://vimeo.com/1226396799" target="_blank" rel="noopener">Demo</a>
+    <a class="navlink" href="#boundaries">Boundaries</a>
+    <a class="navlink" href="https://github.com/SooryaCodes/awesome-phone-call-agents/tree/feat/airtable-calle-certa/plugins/airtable-calle-certa">Source</a>
+    <button class="btn sm" id="theme">Auto</button>
+  </div>
+</nav>
+
+<header class="hero grain" id="top">
+  <div class="aurora" aria-hidden="true"><span class="a"></span><span class="b"></span><span class="c"></span><span class="d"></span></div>
+  <div class="wrap">
+    <h1 class="reveal">Employment verification that refuses the number on the form.</h1>
+    <p class="lede reveal">
+      Every mortgage needs it. When the payroll database has no record — which it
+      does for most small employers, and for every country without one — somebody
+      picks up a phone. Certa makes those calls, asks only what consent covers,
+      and writes a typed answer back into your table.
+    </p>
+    <div class="cta reveal">
+      <a class="btn primary" href="https://github.com/SooryaCodes/awesome-phone-call-agents/tree/feat/airtable-calle-certa/plugins/airtable-calle-certa" id="console-link">Get Certa</a>
+      <a class="btn" href="https://vimeo.com/1226396799" target="_blank" rel="noopener">Watch the demo</a>
+      <a class="btn" href="#how">See how it works</a>
+      <span class="note" id="cta-note">Download, then double-click. The console runs on your own machine — nothing is hosted.</span>
+    </div>
+
+    <div class="bento">
+      <article class="tile t-quote wash grain reveal" style="--w1:var(--wash-a); --w2:var(--wash-e)">
+        <span class="kicker">The gap</span>
+        <blockquote>“Takes days or weeks, and often fails entirely when the employer does not respond.”</blockquote>
+        <cite>How the industry describes the manual fallback used whenever the payroll database has no record — <a href="https://www.goodhire.com/resources/articles/the-work-number/">on The Work Number’s coverage gaps</a></cite>
+      </article>
+
+      <article class="tile t-market reveal">
+        <span class="kicker">Screening market</span>
+        <div class="stat" data-count="8">$0<small>bn — upper estimate, 2026</small></div>
+        <p style="margin-top:12px">Estimates for global employment screening run from $5.3bn to $8.0bn, heading to roughly $13.7bn by 2034. Employment verification is a core segment.</p>
+      </article>
+
+      <article class="tile t-consent wash grain reveal" style="--w1:var(--wash-c); --w2:var(--wash-a)">
+        <span class="kicker">Boundary one</span>
+        <h3>A filled-down cell is not consent</h3>
+        <p>Ticking one checkbox and dragging it down a column would authorise every row it touched. So consent is a hash of the row’s own content — a copied token was derived from a different number, and is refused.</p>
+        <pre class="snippet">sha256(request | phone | relationship
+       | spec_version | receipt_id)</pre>
+      </article>
+
+      <article class="tile t-prov wash grain reveal" style="--w1:var(--wash-b); --w2:var(--wash-d)">
+        <span class="kicker">Boundary two</span>
+        <h3>The applicant’s number is never dialled</h3>
+        <p>Fraudulent applications supply <em>working</em> numbers, with staffed call centres and directory listings. It is the one field an applicant fully controls, and the manual process calls it anyway.</p>
+        <div class="chipline">
+          <span class="tick">Independently sourced</span>
+          <span class="tick no">Written on the application</span>
+        </div>
+      </article>
+
+      <article class="tile t-gate reveal">
+        <span class="kicker">Evidence gate</span>
+        <h3>Nothing verified without contact</h3>
+        <p>A positive result requires extracted evidence that a person was actually reached — never a status field alone.</p>
+      </article>
+
+      <article class="tile t-refuse reveal">
+        <span class="kicker">Refusal</span>
+        <h3>“No” is a complete answer</h3>
+        <p>An employer declining to confirm has not failed. That outcome is terminal and never retried.</p>
+      </article>
+
+      <article class="tile t-audit wash grain reveal" style="--w1:var(--wash-e); --w2:var(--wash-c)">
+        <span class="kicker">Audit</span>
+        <h3>Hash-chained, tamper-evident</h3>
+        <p>Written and flushed to disk <em>before</em> the call it authorises can ring.</p>
+      </article>
+    </div>
+  </div>
+</header>
+
+<section class="band" id="sim">
+  <div class="wrap">
+    <h2 class="reveal">Rows become calls. Answers become columns.</h2>
+    <p class="sub reveal">A queue in Airtable, and what Certa does with it. Watch the second row: its employer number came from the applicant, so it is never dialled.</p>
+
+    <div class="sim reveal" id="sim-stage" aria-label="Animated demonstration of a verification run">
+      <div class="sim-bar">
+        <span class="sim-dot"></span><span class="sim-dot"></span><span class="sim-dot"></span>
+        <span class="sim-title">Verification Requests &middot; Ready to verify</span>
+        <span class="sim-cost" id="sim-cost">&mdash;</span>
+      </div>
+
+      <div class="sim-grid" role="table">
+        <div class="sim-head" role="row">
+          <span role="columnheader">Request</span>
+          <span role="columnheader">Employer</span>
+          <span role="columnheader">Employer number</span>
+          <span role="columnheader">Reached</span>
+          <span role="columnheader">Employed</span>
+          <span role="columnheader">Title</span>
+          <span role="columnheader">Status</span>
+        </div>
+
+        <div class="sim-row" role="row" data-row="1">
+          <span class="id">VR&#8209;0001</span>
+          <span class="emp">Kestrel Logistics</span>
+          <span class="num"><em class="src">official site</em>+44 20 •••• 4417</span>
+          <span class="a" data-c="reached">&mdash;</span>
+          <span class="a" data-c="employed">&mdash;</span>
+          <span class="a" data-c="title">&mdash;</span>
+          <span class="st"><i class="pill">Ready</i></span>
+        </div>
+
+        <div class="sim-row" role="row" data-row="2">
+          <span class="id">VR&#8209;0002</span>
+          <span class="emp">Sterling Corp</span>
+          <span class="num bad"><em class="src">from the application</em><s>+1 415 •••• 9931</s></span>
+          <span class="a" data-c="reached">&mdash;</span>
+          <span class="a" data-c="employed">&mdash;</span>
+          <span class="a" data-c="title">&mdash;</span>
+          <span class="st"><i class="pill">Ready</i></span>
+        </div>
+
+        <div class="sim-row" role="row" data-row="3">
+          <span class="id">VR&#8209;0003</span>
+          <span class="emp">Atlas Freight</span>
+          <span class="num"><em class="src">business registry</em>+61 2 •••• 7720</span>
+          <span class="a" data-c="reached">&mdash;</span>
+          <span class="a" data-c="employed">&mdash;</span>
+          <span class="a" data-c="title">&mdash;</span>
+          <span class="st"><i class="pill">Ready</i></span>
+        </div>
+      </div>
+
+      <div class="sim-call" id="sim-call" hidden>
+        <div class="sim-wave" aria-hidden="true"><i></i><i></i><i></i><i></i><i></i><i></i><i></i></div>
+        <p class="sim-line" id="sim-line"></p>
+      </div>
+
+      <p class="sim-foot" id="sim-foot">Preview first. Nothing is dialled until you confirm.</p>
+    </div>
+  </div>
+</section>
+
+<section class="band" id="how">
+  <div class="wrap">
+    <h2 class="reveal">Three steps, and none of them is a terminal.</h2>
+    <p class="sub reveal">Certa runs on the operator’s own machine and opens in their browser. The queue stays in the Airtable base they already use.</p>
+    <div class="flow">
+      <div class="step reveal">
+        <span class="n">1</span>
+        <h3>Open it</h3>
+        <p>Double-click <code>Certa.command</code> on macOS or <code>run.bat</code> on Windows. The console opens in your browser.</p>
+        <p>With no credentials it starts on sample data, so the first thing you see is the product working.</p>
+      </div>
+      <div class="step reveal">
+        <span class="n">2</span>
+        <h3>Connect your base</h3>
+        <p>Paste an Airtable token, your base, a CALL-E key and your organisation’s name. Stored in a local file only you can read.</p>
+        <p>Your answer columns become the extraction schema — a single select’s choices are the allowed answers, its description is the instruction.</p>
+      </div>
+      <div class="step reveal">
+        <span class="n">3</span>
+        <h3>Preview, then run</h3>
+        <p>You see every row in scope, every row skipped and why, how many the filter is hiding, the spend, and the <em>verbatim script</em> that will be spoken.</p>
+        <p>Results land back in your base as each call finishes.</p>
+      </div>
+    </div>
+  </div>
+</section>
+
+<section class="band" id="uses">
+  <div class="wrap">
+    <h2 class="reveal">Who actually makes these calls.</h2>
+    <p class="sub reveal">Verification of employment is not a niche. It is a step somebody performs by phone, every working day, because the answer lives with a person rather than in a database.</p>
+    <div class="uses">
+      <article class="use reveal">
+        <span class="kicker">Lending</span>
+        <h3>Before a loan closes</h3>
+        <p>An underwriter must confirm the applicant works where the application says. For large employers a payroll database answers. For everyone else &mdash; small firms, contractors, most of the world outside the US &mdash; somebody calls HR and waits.</p>
+        <p class="why">Certa runs the queue from the view the underwriter already works in, and refuses any row whose employer number came from the applicant.</p>
+      </article>
+      <article class="use reveal">
+        <span class="kicker">Tenancy</span>
+        <h3>Before a lease is signed</h3>
+        <p>A letting agent checks that a prospective tenant is employed and earning consistently enough to cover rent. The check is nearly always a phone call to an employer the applicant named.</p>
+        <p class="why">The applicant naming the employer is exactly why the number must be sourced independently. That is a boundary, not a setting.</p>
+      </article>
+      <article class="use reveal">
+        <span class="kicker">Background screening</span>
+        <h3>Before an offer is confirmed</h3>
+        <p>Screening firms verify claimed employment history for candidates. Volume is high, the questions are fixed, and the work is almost entirely hold music.</p>
+        <p class="why">Three questions, eight prohibitions, a typed answer per row, and an audit record of who was called under which consent.</p>
+      </article>
+      <article class="use reveal">
+        <span class="kicker">Immigration</span>
+        <h3>Before a filing goes out</h3>
+        <p>Employment letters get verified by phone against the employer named on the filing. A refusal to confirm is a real and acceptable outcome that has to be recorded as one.</p>
+        <p class="why">A refusal ends the call and is terminal, never retried. Redialling somebody who declined is harassment, and the code treats it that way.</p>
+      </article>
+    </div>
+    <p class="note reveal">The same shape every time: a third party who did not ask to be called, a consent that has to be provable, a short bounded set of questions, and an answer that must be typed rather than transcribed.</p>
+  </div>
+</section>
+
+<section class="band" id="boundaries">
+  <div class="wrap">
+    <h2 class="reveal">Enforced by construction, not by policy.</h2>
+    <p class="sub reveal">Types that cannot be built the wrong way, with tests that fail if that ever stops being true.</p>
+    <dl class="rows">
+      <div class="rowline reveal"><dt>Fails closed, always</dt><dd>Low confidence, a positive claim with no supporting evidence, or any internal contradiction all route to a human. No rule can promote a result.</dd></div>
+      <div class="rowline reveal"><dt>Nothing reachable from outside</dt><dd>The console binds loopback only and needs a one-off token the app generates for itself. Its run endpoint accepts a view name — never a destination — so no request can introduce a phone number.</dd></div>
+      <div class="rowline reveal"><dt>Numbers are never repaired</dt><dd>Strict E.164, with no inferred country code. A malformed number is a data problem for a person, not something to guess at.</dd></div>
+      <div class="rowline reveal"><dt>Masked everywhere</dt><dd>Last four digits only — console, logs and audit records alike. Consent tokens are stored as a prefix: enough to correlate, not enough to replay.</dd></div>
+      <div class="rowline reveal"><dt>Re-running never re-dials</dt><dd>The idempotency key binds the request, the exact number, the question set and the consent. Re-consenting after an edit correctly creates a new intent.</dd></div>
+    </dl>
+  </div>
+</section>
+
+<section class="band">
+  <div class="wrap">
+    <h2 class="reveal">What it is not.</h2>
+    <p class="sub reveal">Saying so plainly is part of the design, not a disclaimer.</p>
+    <div class="nots reveal">
+      <span class="not">Not a collections tool</span>
+      <span class="not">Not a credit decision engine</span>
+      <span class="not">Not a background check</span>
+      <span class="not">Not a salary lookup</span>
+      <span class="not">Not a replacement for a payroll database</span>
+    </div>
+  </div>
+</section>
+
+<footer>
+  <div class="wrap">
+    <p>Certa is a workflow plugin for <a href="https://github.com/CALLE-AI/awesome-phone-call-agents">awesome-phone-call-agents</a>, built on the <a href="https://docs.heycall-e.com/">CALL-E Developer API</a>. MIT licensed.</p>
+    <p>Sample numbers use ranges reserved for fiction. No real transcripts, recordings or screenshots appear anywhere in this project.</p>
+  </div>
+</footer>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/gsap/3.12.5/gsap.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/gsap/3.12.5/ScrollTrigger.min.js"></script>
+<script>
+/* theme ------------------------------------------------------------------ */
+const THEMES = ["Auto", "Light", "Dark"];
+const themeBtn = document.getElementById("theme");
+function applyTheme(next) {
+  const root = document.documentElement;
+  if (next === "Auto") root.removeAttribute("data-theme");
+  else root.setAttribute("data-theme", next.toLowerCase());
+  themeBtn.textContent = next;
+  try { localStorage.setItem("certa-theme", next); } catch (e) { /* private window */ }
+}
+themeBtn.addEventListener("click", () =>
+  applyTheme(THEMES[(THEMES.indexOf(themeBtn.textContent.trim()) + 1) % THEMES.length]));
+(() => {
+  let saved = "Auto";
+  try { saved = localStorage.getItem("certa-theme") || "Auto"; } catch (e) { /* ignore */ }
+  applyTheme(THEMES.includes(saved) ? saved : "Auto");
+})();
+
+/* When served by the running app, the primary button opens the console with
+   an authorised token. Served from a static host that injection is absent and
+   the button simply scrolls to the explanation. */
+(() => {
+  const href = (window.__CERTA__ || {}).console;
+  if (!href) return;   // static host: the button stays "Get Certa"
+  const link = document.getElementById("console-link");
+  link.href = href;
+  link.textContent = "Open the console";
+  const note = document.getElementById("cta-note");
+  if (note) note.textContent = "Certa is running on this machine. The console is loopback-only.";
+})();
+
+/* Run simulation ---------------------------------------------------------
+   Deliberately not a video: it is the real vocabulary the console uses, so
+   what a visitor sees here is what they get. Pauses when off-screen, and
+   respects reduced-motion by settling straight to the final state. */
+(() => {
+  const stage = document.getElementById("sim-stage");
+  if (!stage) return;
+  const rows = [...stage.querySelectorAll(".sim-row")];
+  const callBox = document.getElementById("sim-call");
+  const lineEl = document.getElementById("sim-line");
+  const costEl = document.getElementById("sim-cost");
+  const footEl = document.getElementById("sim-foot");
+
+  const cell = (row, key) => rows[row - 1].querySelector(`.a[data-c="${key}"]`);
+  const pill = (row) => rows[row - 1].querySelector(".pill");
+
+  function setPill(row, state, label) {
+    const p = pill(row);
+    p.dataset.s = state;
+    p.textContent = label;
+  }
+  function setCell(row, key, value) {
+    const c = cell(row, key);
+    c.textContent = value;
+    c.classList.add("set");
+  }
+  function say(who, text) {
+    callBox.hidden = false;
+    lineEl.innerHTML = `<b>${who}</b>${text}`;
+  }
+  function reset() {
+    rows.forEach((r, i) => {
+      r.classList.remove("is-active", "is-blocked");
+      r.querySelectorAll(".a").forEach((c) => { c.textContent = "—"; c.classList.remove("set"); });
+      setPill(i + 1, "", "Ready");
+    });
+    callBox.hidden = true;
+    costEl.textContent = "—";
+    footEl.textContent = "Preview first. Nothing is dialled until you confirm.";
+  }
+
+  // [delay before this step, what it does]
+  const script = [
+    [600,  () => { costEl.textContent = "2 calls · $0.10"; footEl.textContent = "Previewed. One row cannot be called — Certa says so before you spend anything."; }],
+    [900,  () => { rows[1].classList.add("is-blocked"); setPill(2, "blocked", "Never dialled"); footEl.textContent = "VR‑0002: the employer number came from the applicant. There is no code path from that column to the dialer."; }],
+    [1900, () => { rows[0].classList.add("is-active"); setPill(1, "calling", "Calling"); say("Certa", "Dialling Kestrel Logistics on a number sourced from their official site."); }],
+    [1500, () => say("Agent", "This is an automated employment verification call on behalf of Meridian Lending, regarding a candidate who has given written consent for this contact.")],
+    [2300, () => say("HR", "Yes, she works here. She’s an operations manager — started in March last year.")],
+    [1500, () => { setCell(1, "reached", "Yes"); }],
+    [280,  () => { setCell(1, "employed", "Yes"); }],
+    [280,  () => { setCell(1, "title", "Yes"); }],
+    [420,  () => { rows[0].classList.remove("is-active"); setPill(1, "verified", "Verified"); footEl.textContent = "Verified only because a person was reached and said so. That gate sits above every positive outcome."; }],
+    [1400, () => { rows[2].classList.add("is-active"); setPill(3, "calling", "Calling"); say("Certa", "Dialling Atlas Freight on a number from the business registry."); }],
+    [1800, () => say("HR", "I’m not able to confirm that over the phone. Please send the request in writing.")],
+    [1700, () => { setCell(3, "reached", "Yes"); setCell(3, "employed", "—"); }],
+    [400,  () => { rows[2].classList.remove("is-active"); setPill(3, "declined", "Declined"); callBox.hidden = true; footEl.textContent = "A refusal is a complete answer, not a failure. It is never retried — redialling someone who declined is harassment."; }],
+    [4200, () => reset()],
+  ];
+
+  const reduce = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+  if (reduce) {
+    rows[1].classList.add("is-blocked"); setPill(2, "blocked", "Never dialled");
+    ["reached", "employed", "title"].forEach((k) => setCell(1, k, "Yes"));
+    setPill(1, "verified", "Verified");
+    setCell(3, "reached", "Yes"); setPill(3, "declined", "Declined");
+    costEl.textContent = "2 calls · $0.10";
+    return;
+  }
+
+  let step = 0, timer = null, running = false;
+  function tick() {
+    const [wait, act] = script[step % script.length];
+    timer = setTimeout(() => { act(); step++; if (running) tick(); }, wait);
+  }
+  const io = new IntersectionObserver((entries) => {
+    for (const e of entries) {
+      if (e.isIntersecting && !running) { running = true; tick(); }
+      else if (!e.isIntersecting && running) { running = false; clearTimeout(timer); }
+    }
+  }, { threshold: 0 });   // a tall stage on a short viewport never reaches 0.25
+  io.observe(stage);
+})();
+
+/* motion ----------------------------------------------------------------- */
+const reduced = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+if (!reduced && window.gsap && window.ScrollTrigger) {
+  gsap.registerPlugin(ScrollTrigger);
+
+  // Hero: one orchestrated entrance rather than scattered effects.
+  const hero = gsap.timeline({ defaults: { ease: "power3.out" } })
+    .from(".hero h1", { y: 22, opacity: 0, duration: .8 })
+    .from(".hero .lede", { y: 16, opacity: 0, duration: .7 }, "-=.55")
+    .from(".hero .cta", { y: 14, opacity: 0, duration: .6 }, "-=.5")
+    .from(".bento .tile", { y: 26, opacity: 0, duration: .7, stagger: .07 }, "-=.4");
+
+  // Watchdog. A .from() tween holds its target at opacity 0 until it runs, so
+  // a throttled tab, a slow device or a background render could leave the hero
+  // blank indefinitely. Nothing meant to be read may depend on an animation
+  // completing, so force the end state if the entrance has not finished.
+  setTimeout(() => { if (hero.progress() < 1) hero.progress(1); }, 2600);
+
+  // Everything below the fold: stagger-on-enter, built top-to-bottom so an
+  // earlier trigger cannot shift the ones after it.
+  document.querySelectorAll("section.band").forEach((band) => {
+    const items = band.querySelectorAll(".reveal");
+    if (!items.length) return;
+    const tween = gsap.from(items, {
+      y: 20, opacity: 0, duration: .7, ease: "power3.out", stagger: .08,
+      scrollTrigger: { trigger: band, start: "top 78%", once: true },
+    });
+    // Same guarantee below the fold: if the trigger never fires, the section
+    // must still be readable.
+    setTimeout(() => { if (tween.progress() < 1) tween.progress(1); }, 6000);
+  });
+
+  // The market figure counts up once, when it is actually looked at.
+  const stat = document.querySelector("[data-count]");
+  if (stat) {
+    const target = parseFloat(stat.dataset.count);
+    const suffix = stat.querySelector("small").outerHTML;
+    const n = { v: 0 };
+    gsap.to(n, {
+      v: target, duration: 1.1, ease: "power2.out",
+      scrollTrigger: { trigger: stat, start: "top 88%", once: true },
+      onUpdate: () => { stat.innerHTML = "$" + n.v.toFixed(1) + suffix; },
+    });
+  }
+
+  // Aurora drifts slowly on scroll. Transform only, so it stays cheap.
+  gsap.to(".aurora", {
+    yPercent: 12, ease: "none",
+    scrollTrigger: { trigger: ".hero", start: "top top", end: "bottom top", scrub: .6 },
+  });
+}
+</script>
+</body>
+</html>

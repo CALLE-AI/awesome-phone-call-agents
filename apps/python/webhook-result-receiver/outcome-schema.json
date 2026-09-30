@@ -1,0 +1,16 @@
+{
+  "type": "object",
+  "properties": {
+    "outcome": {
+      "type": "string",
+      "enum": ["booked", "declined", "callback", "unanswered", "unknown"],
+      "description": "Use booked only for an explicitly confirmed booking, declined for an explicit refusal, callback for a request for human follow-up, and unanswered only when call evidence establishes that nobody answered. Use unknown when evidence is missing or ambiguous."
+    },
+    "outcome_evidence": {
+      "type": "string",
+      "description": "State the call evidence supporting the outcome, or explain what is missing for unknown."
+    }
+  },
+  "required": ["outcome", "outcome_evidence"],
+  "additionalProperties": false
+}

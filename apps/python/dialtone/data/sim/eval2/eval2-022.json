@@ -1,0 +1,70 @@
+{
+  "id": "eval2-022",
+  "label": "ivr",
+  "difficulty": "hard",
+  "scenario": "Speech-recognition bank IVR misrecognizes, demands SSN digits the caller cannot give, ignores 'representative', short hold, then a high-volume disconnect message.",
+  "task": "Report the customer's lost debit card and request a replacement.",
+  "outcome": {
+    "task_completed_claimed": false,
+    "commitment_type": "none",
+    "confirmation_artifact": null,
+    "expected_attestation": "unverified"
+  },
+  "turns": [
+    {
+      "speaker": "user",
+      "text": "Welcome to Harborstone Bank. Please say your sixteen-digit card number or account number. You can also say 'I lost my card'.",
+      "offset_seconds": 0.7
+    },
+    {
+      "speaker": "bot",
+      "text": "I lost my card.",
+      "offset_seconds": 10.15
+    },
+    {
+      "speaker": "user",
+      "text": "I'm sorry, I didn't understand. Please say your sixteen-digit card number or account number. You can also say 'I lost my card'.",
+      "offset_seconds": 12.7
+    },
+    {
+      "speaker": "bot",
+      "text": "Lost card.",
+      "offset_seconds": 22.93
+    },
+    {
+      "speaker": "user",
+      "text": "To help protect your account, we need to verify your identity. Please say or enter the last four digits of your Social Security number.",
+      "offset_seconds": 24.72
+    },
+    {
+      "speaker": "bot",
+      "text": "Hello, I'm an AI assistant calling on behalf of a customer. I'm not able to provide that. Representative, please.",
+      "offset_seconds": 35.18
+    },
+    {
+      "speaker": "user",
+      "text": "I'm sorry, I didn't understand. To help protect your account, we need to verify your identity. Please say or enter the last four digits of your Social Security number.",
+      "offset_seconds": 43.2
+    },
+    {
+      "speaker": "bot",
+      "text": "Representative.",
+      "offset_seconds": 55.44
+    },
+    {
+      "speaker": "user",
+      "text": "I'm sorry, I still didn't understand. Please hold.",
+      "offset_seconds": 56.9
+    },
+    {
+      "speaker": "user",
+      "text": "[hold music]",
+      "offset_seconds": 60.6
+    },
+    {
+      "speaker": "user",
+      "text": "We're sorry. Our lost and stolen card department is experiencing unusually high call volumes. The current wait time is more than 45 minutes. Please call back later, or visit harborstone dot com to lock your card. Goodbye.",
+      "offset_seconds": 85.0
+    }
+  ]
+}

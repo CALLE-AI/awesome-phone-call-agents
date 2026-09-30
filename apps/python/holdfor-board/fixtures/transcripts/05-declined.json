@@ -1,0 +1,8 @@
+{
+  "state": "terminal_verified",
+  "outcome": "DECLINED",
+  "turns": [
+    {"index": 0, "speaker": "agent", "text": "Hello, is that Derek? This is an automated call from Fieldgate Surgery."}
+  ],
+  "structured": null
+}

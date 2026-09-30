@@ -1,0 +1,23 @@
+{
+  "testCaseVersion": 1,
+  "id": "cancellation-fee-disclosure",
+  "title": "Required business disclosure: state the cancellation fee",
+  "sanitization": {
+    "manuallyReviewed": true,
+    "containsRawTranscript": false,
+    "containsRecordingUrl": false,
+    "containsRealPhoneNumber": false
+  },
+  "assertions": [
+    {
+      "id": "states-cancellation-fee",
+      "path": "mentions",
+      "contains": "cancellation fee"
+    },
+    {
+      "id": "confirms-attendance",
+      "path": "mentions",
+      "contains": "attendance confirmed"
+    }
+  ]
+}

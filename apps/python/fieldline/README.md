@@ -1,126 +1,140 @@
 # FieldLine
 
-**A lone-worker safety net that phones the field.** Scheduled check-in
-calls, a silent duress phrase, and an automatic escalation call cascade —
-one agent watching every trip plan, built on the
-[CALL-E](https://docs.heycall-e.com/) phone-call platform.
+A demo-first lone-worker check-in workflow built on [CALL-E](https://docs.heycall-e.com/).
+The offline simulation demonstrates scheduled check-ins, a silent duress phrase,
+retries, an escalation ladder and an incident brief. Live mode is an experimental,
+human-supervised calling aid, not a safety service or emergency response system.
+Do not rely on it as the only way to monitor a worker or request help.
 
-> I do marine fieldwork on the Red Sea coast. Our field-safety plan is a
-> PDF and a promise that someone will notice if we don't come back. At
-> 18:05, nobody is watching the clock. FieldLine is the thing that
-> watches the clock — and it has a phone.
+## Quickstart: no calls, accounts or keys
 
-## What it does
-
-1. **You file a trip plan** (`examples/trip.yaml`): who, where, check-in
-   times, an escalation ladder (buddy → safety officer), and a
-   pre-agreed **duress phrase**.
-2. **FieldLine calls you at each check-in.** CALL-E holds the
-   conversation and returns a structured result (`safe` /
-   `needs_assistance` / duress flag / location / plan changes).
-3. **Miss a check-in?** Retry after 5 minutes → declared OVERDUE →
-   FieldLine climbs the ladder call by call, briefing each contact with
-   accumulated facts (last confirmed contact, vehicle, what the previous
-   contact said) until a human explicitly assumes coordination.
-4. **Say the duress phrase mid-call?** The agent doesn't flinch — ends
-   the call normally — and silently escalates straight to the top rung,
-   with instructions not to call your phone back.
-5. Every incident produces a **written brief**: timeline, transcripts,
-   structured results, evidence, recommended actions.
-
-FieldLine **never auto-dials emergency services** — the last rung is
-always a human who does.
-
-## Quickstart (demo mode — no account, no keys)
-
-Requires Python ≥3.12 and [uv](https://docs.astral.sh/uv/).
+Requires Python >=3.12 and [uv](https://docs.astral.sh/uv/).
 
 ```bash
 uv sync
-uv run fieldline demo                      # golden path: safe check-in → missed → cascade
-uv run fieldline demo --scenario duress    # the silent-duress beat
-uv run fieldline report                    # re-read the latest incident brief
-uv run pytest -q                           # 32 unit tests
+uv run fieldline demo --fast
+uv run fieldline demo --scenario duress --fast
+uv run fieldline demo --scenario safe --fast
+uv run fieldline report
+uv run pytest -q
 ```
 
-Demo mode replays scripted calls with realistic transcripts (marked
-`// DEMO` in the source; all people and +1-555-01xx numbers are
-fictional). The dicts it returns follow CALL-E's real `call_task` schema
-(from the [OpenAPI spec](https://docs.heycall-e.com/openapi/calle.openapi.yaml)),
-so everything above the transport layer is exercised for real.
+Demo calls, people, transcripts and numbers are fictional. Demo mode never uses the
+network. `FIELDLINE_DEMO` defaults to true even if a key is present.
 
-## Going live (real phone calls)
+## Live setup and explicit authorization
 
 ```bash
-uv sync --extra live                # installs the calle-ai SDK
-cp .env.example .env                # put your CALLE_API_KEY inside
-# edit examples/trip.yaml → your own numbers, in E.164
-uv run fieldline checkin-now examples/trip.yaml   # ONE real test call to yourself
-uv run fieldline start examples/trip.yaml         # monitor the whole trip
-uv run fieldline end                              # cancel: stops all future calls
+uv sync --extra live
+cp .env.example .env
 ```
 
-Get a key: create an account at <https://www.heycall-e.com/> (20 free
-calls), then <https://dashboard.heycall-e.com/account/api-keys>.
+Create your own credential through the [CALL-E dashboard](https://dashboard.heycall-e.com/account/api-keys).
+Keep `CALLE_API_KEY` private in the ignored local `.env`, and set
+`FIELDLINE_DEMO=false` only when ready. Credentials can go only to
+`https://api.heycall-e.com`; other origins, URL credentials, paths, queries and
+fragments are rejected. HTTP redirects, connection retries and environment proxies
+are disabled. The SDK version is pinned to the one covered by offline transport tests.
+Never paste keys into plans, terminal commands, logs or source control.
 
-The only difference between demo and live is the transport
-(`src/fieldline/calle_client.py`): live mode calls
-`client.calls.create_and_wait(...)` from the official `calle-ai` SDK
-with the same task prompts, the same `result_schema`s, and idempotency
-keys so a retried request can never double-dial anyone. Live calls
-require typing `LIVE` at a consent gate (or `--yes`).
+Prepare a private YAML plan based on `examples/trip.yaml`. Use the intended local
+calendar date, times and consenting recipients. Every number must be ASCII E.164:
+`+`, a nonzero first digit, then a total of 8–15 digits. Never enter emergency-service
+numbers. The final contact is a person responsible for deciding any emergency action.
+
+For each operation, repeat `--authorize-phone` for each intended destination.
+The set must exactly match the worker for `checkin-now`, or the worker and all
+escalation contacts for `start`. Plan inclusion alone does not authorize a call.
+The following variables stand for numbers you have independently verified and
+whose recipients have authorized the calls; do not use the example's fictional numbers.
+
+```bash
+uv run fieldline checkin-now private-trip.yaml --authorize-phone "$WORKER_PHONE"
+uv run fieldline start private-trip.yaml \
+  --authorize-phone "$WORKER_PHONE" \
+  --authorize-phone "$BUDDY_PHONE" \
+  --authorize-phone "$COORDINATOR_PHONE"
+uv run fieldline end
+```
+
+Before calls, review the masked destination list and type `LIVE`. This confirms
+recipient consent and authorizes sending the plan, duress phrase and calling
+instructions to CALL-E. There is no `--yes` bypass. No live test call is needed to
+validate this contribution; all automated tests use fakes or in-memory HTTP.
+
+## Supported dates and scheduling
+
+- Times are local to the machine running FieldLine, without timezone conversion.
+  Confirm its clock and timezone yourself before using live mode.
+- Only same-day plans are supported: canonical `YYYY-MM-DD` and `HH:MM`, start
+  strictly before end, and unique increasing check-ins within that window.
+  Cross-midnight plans are rejected rather than rolled into another day.
+- `start` must run on the plan date, no later than the first check-in instant.
+  It may wait before the window starts. An old plan never runs on a new date.
+- `checkin-now` is allowed only within the plan's date and start/end window.
+- Date/window checks repeat immediately before every call. Retries and escalation
+  delays that exceed the end or cross midnight stop for human review. No wrapped
+  wall-clock arithmetic can authorize an immediate next-day retry.
+- Grace is 0–1440 minutes, retry interval 1–1440 minutes, and maximum retries 0–10;
+  all must be integers. Large intervals still cannot extend the plan window.
+- This local process must remain running. There is no hidden recurring scheduler,
+  background service, recovery daemon or automatic restart.
+
+## Live outcome boundaries
+
+An exception, timeout, connection error, redirect or nonterminal/unusable provider
+response leaves the outcome unknown. FieldLine stops all automatic calls immediately,
+including retries and ladder progression. It does not turn uncertainty into
+`NO_ANSWER`. The same dispatcher cannot be reused after uncertainty.
+
+Only a completed response with an explicit no-answer disposition bound to the single
+intended phone, consistent no-answer attempts, and no generated result/transcript can
+advance the configured missed-check-in path. Retries are new intended calls after a
+confirmed no-answer; they are not retries of an ambiguous submission.
+
+All other live results stop for human review. Generated `safe`, assistance, duress,
+stand-down and handoff fields cannot close monitoring, contact another person,
+resume a schedule or transfer coordination. They are not proof of recipient identity
+or safety. The full automatic safety cascade is a fictional demo only.
+
+When the CLI stops with `review_required` or `unknown_outcome` (nonzero exit), a
+responsible person must check the intended recipient and actual evidence privately
+in CALL-E, verify the worker's situation independently and choose the next action.
+There is deliberately no automatic resume/approval API. Do not rerun a plan merely
+to clear uncertainty: a submitted call may still exist, and restarting is not
+reconciliation. The local report records the stop without claiming safety or handoff.
+
+## Cancellation and privacy
+
+`fieldline end` writes a cancellation marker under `FIELDLINE_HOME` (default
+`.fieldline`). It is checked during waits and before every possible call, including
+retries and each escalation rung. Cancellation cannot recall a call already submitted,
+and a blocking provider call may finish before cancellation is observed. It does not
+cancel provider-side work. A new run refuses an existing marker: review the prior run,
+then remove the local marker yourself only when a fresh run is intended.
+
+Live transcripts, provider summaries, generated fields, evidence and exception text
+are neither printed nor copied into local incident briefs. Phone-shaped text is masked
+in displayed plan text, timeline entries and briefs as well as destination fields.
+Demo reports may contain only the fictional transcript data. Provider retention still
+applies to the data sent to CALL-E; local masking is not deletion at the provider.
+Keep private YAML plans, `.env`, and `.fieldline` out of source control and restrict
+access to them. Incident briefs remain local; FieldLine does not send them to contacts.
 
 ## Architecture
 
-```mermaid
-flowchart LR
-  Y[trip.yaml<br/>plan + ladder + duress phrase] --> E[TripEngine<br/>schedule · retries · cascade]
-  E -->|task + result_schema| D{dispatcher}
-  D -->|live| C[CALL-E API<br/>calle-ai SDK]
-  D -->|demo| S[scripted call_tasks<br/>// DEMO]
-  C --> P[protocol.py<br/>classify + decide<br/>pure state machine]
-  S --> P
-  P -->|safe| E
-  P -->|overdue / duress| L[escalation ladder<br/>buddy → safety officer]
-  L --> R[incident brief<br/>timeline · transcripts · evidence]
-```
+- `schemas.py`: plan validation, live date/window gates and phone masking
+- `calle_client.py`: scripted demo or authorized, fail-closed live SDK transport
+- `engine.py`: scheduling, cancellation, live human-review boundaries and reports
+- `protocol.py`: deterministic classification used by the fictional demo and the
+  restricted, confirmed-no-answer live path
+- `prompts.py`: check-in and escalation call instructions
+- `report.py` / `render.py`: local privacy-filtered output
+- `tests/`: offline schema, scheduling, transport, human-review and demo regressions
 
-- **CALL-E does the talking.** Each call is one `POST /v1/calls` with a
-  natural-language `task` and a JSON `result_schema`; the platform
-  plans, dials, converses, and returns `structured_result`,
-  `task_completed`, `completion_confidence`, and `evidence`.
-- **FieldLine does the policy.** `protocol.py` is a deterministic,
-  unit-tested state machine — no LLM in the loop, so safety decisions
-  are reproducible. Duress overrides a stated "safe"; an unreachable
-  API degrades to the no-answer path (fail-soft) instead of crashing
-  the safety loop.
-- **The silent-duress trick** is pure prompt + schema: the `task` tells
-  the agent to never react to the phrase, and
-  `duress_phrase_detected: boolean` rides back in the structured result.
-
-## Safety design
-
-- Consent gate before any live call; `fieldline end` cancels a trip
-  (cancellation is honored between calls).
-- Duress protocol never re-contacts the worker.
-- Emergency services are never auto-dialed; the brief tells the human
-  coordinator who to call.
-- Phone numbers are masked in all output and reports.
-
-## Repo map
-
-```
-src/fieldline/     engine, protocol (state machine), dispatchers, prompts, rendering
-examples/trip.yaml sample trip plan (fictional numbers)
-tests/             32 tests: protocol policy, dispatcher shape-conformance, full scenarios
-scripts/demo-reset one-command reset to a clean demo state
-```
-
-## AI tools used
-
-Built with AI coding assistance (Claude) during the hackathon window;
-design, review, and verification by the author. Demo transcripts are
-hand-written simulation data and marked as such.
+The original demo was built with AI coding assistance during the hackathon. Its
+fictional transcripts are hand-written simulation data. No production safety or
+live-call reliability claim is made.
 
 ## License
 

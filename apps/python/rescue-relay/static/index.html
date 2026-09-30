@@ -1,0 +1,147 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="description" content="Tell us about an animal that needs help. Rescue Relay calls trusted people, brings their help together, and keeps the rescue moving.">
+  <title>Rescue Relay · Bring the right help together</title>
+  <meta name="theme-color" content="#193f33">
+  <link rel="icon" type="image/svg+xml" href="/static/favicon.svg">
+  <link rel="stylesheet" href="/static/app.css">
+</head>
+<body>
+<a class="skip-link" href="#mainContent">Skip to main content</a>
+<svg class="icon-definitions" aria-hidden="true"><defs>
+  <symbol id="i-paw" viewBox="0 0 24 24"><ellipse cx="8" cy="6" rx="2.2" ry="3" fill="currentColor"/><ellipse cx="16" cy="6" rx="2.2" ry="3" fill="currentColor"/><ellipse cx="3.7" cy="11" rx="1.8" ry="2.5" fill="currentColor"/><ellipse cx="20.3" cy="11" rx="1.8" ry="2.5" fill="currentColor"/><path d="M12 10c-3 0-7 5-6 8 1 3 4 1 6 1s5 2 6-1c1-3-3-8-6-8Z" fill="currentColor"/></symbol>
+  <symbol id="i-plus" viewBox="0 0 24 24"><path d="M12 5v14M5 12h14"/></symbol>
+  <symbol id="i-check" viewBox="0 0 24 24"><path d="m5 12 4 4L19 6"/></symbol>
+  <symbol id="i-arrow" viewBox="0 0 24 24"><path d="M4 12h15m-6-6 6 6-6 6"/></symbol>
+  <symbol id="i-phone" viewBox="0 0 24 24"><path d="M8 3H4v3c0 8 6 14 14 14h3v-4l-5-2-2 2c-3-1-5-3-6-6l2-2-2-5Z"/></symbol>
+  <symbol id="i-people" viewBox="0 0 24 24"><circle cx="9" cy="7" r="3"/><path d="M3 21v-3a6 6 0 0 1 12 0v3M16 4a3 3 0 0 1 0 6m2 4a5 5 0 0 1 3 4v3"/></symbol>
+  <symbol id="i-plan" viewBox="0 0 24 24"><rect x="4" y="4" width="16" height="17" rx="2"/><path d="M8 3h8M8 10h8M8 15h5"/></symbol>
+  <symbol id="i-pin" viewBox="0 0 24 24"><path d="M19 10c0 5-7 11-7 11S5 15 5 10a7 7 0 1 1 14 0Z"/><circle cx="12" cy="10" r="2.5"/></symbol>
+  <symbol id="i-info" viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><path d="M12 10v7M12 6v1"/></symbol>
+  <symbol id="i-close" viewBox="0 0 24 24"><path d="m6 6 12 12M18 6 6 18"/></symbol>
+  <symbol id="i-clock" viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><path d="M12 6v6l4 2"/></symbol>
+  <symbol id="i-sound" viewBox="0 0 24 24"><path d="M11 4 6 8H3v8h3l5 4V4ZM15 8a6 6 0 0 1 0 8m3-11a10 10 0 0 1 0 14"/></symbol>
+  <symbol id="i-heart" viewBox="0 0 24 24"><path d="M12 21 3.5 12.5a5.3 5.3 0 0 1 7.5-7.5l1 1 1-1a5.3 5.3 0 0 1 7.5 7.5L12 21Z"/></symbol>
+</defs></svg>
+<aside class="sidebar">
+  <a class="brand" href="#report"><span class="brand-mark"><svg class="icon"><use href="#i-paw"/></svg></span><span>Rescue<span class="brand-light">Relay</span><small>THE RIGHT HELP. TOGETHER.</small></span></a>
+  <div class="sidebar-label">YOUR WORKSPACE</div>
+  <nav class="navigation" aria-label="Main navigation">
+    <button data-view="report" class="nav-item active"><svg class="icon"><use href="#i-plus"/></svg> Report an incident</button>
+    <button data-view="rescue" class="nav-item"><svg class="icon"><use href="#i-plan"/></svg> Rescue <span id="reportCount" class="nav-count">0</span></button>
+    <button data-view="contacts" class="nav-item"><svg class="icon"><use href="#i-people"/></svg> Trusted contacts</button>
+  </nav>
+  <div class="sidebar-note"><svg class="icon"><use href="#i-heart"/></svg><strong>You stopped to help.<br>That matters.</strong><p>You don’t have to figure out the next steps alone.</p></div>
+  <div class="sidebar-footer"><span class="tiny-dot"></span> Conversations powered by CALL-E</div>
+</aside>
+<div class="workspace">
+  <header class="topbar"><div class="breadcrumb">Your workspace <span>/</span> <strong id="pageName">Report an incident</strong></div><div class="topbar-tools"><a class="walkthrough-link" href="/static/tutorial.html" target="_blank" rel="noopener">Walkthrough <span aria-hidden="true">↗</span></a><span id="runtimeBadge" class="runtime-badge">Connecting…</span><button id="soundToggle" class="sound-toggle" aria-pressed="false" title="Toggle quiet notification sounds"><svg class="icon"><use href="#i-sound"/></svg><span id="soundLabel">Sound off</span></button><button id="openSettings" class="icon-button" aria-label="Connection details"><svg class="icon"><use href="#i-info"/></svg></button></div></header>
+  <main id="mainContent" tabindex="-1">
+    <p id="appStatus" class="sr-only" role="status" aria-live="polite" aria-atomic="true"></p>
+    <div id="connectionNotice" class="notice error" role="alert" hidden></div>
+    <div id="refreshNotice" class="notice connection-banner" role="status" hidden><div><strong>Updates are paused</strong><p id="refreshMessage"></p></div><button type="button" id="retryConnection" class="button secondary small">Try again</button></div>
+    <section id="view-report" class="view active" aria-labelledby="reportTitle">
+      <div class="page-heading"><p class="eyebrow">ONE SMALL ACT. A REAL DIFFERENCE.</p><h1 id="reportTitle">Let’s get the right help.</h1><p>Tell us what you see. Bring the right people together.</p></div>
+      <div class="report-grid">
+        <article class="card report-card"><div class="card-heading"><div><h2>What’s happening?</h2><p>A few details are all you need to get started.</p></div><span class="step-label">01 / REPORT</span></div>
+          <form id="incidentForm" class="form-body" novalidate>
+            <div class="field"><label for="summary">Describe what you see</label><textarea id="summary" aria-describedby="draftStatus" required minlength="10" maxlength="1200" rows="5" placeholder="There’s a dog beside the road. It’s limping and moves away when anyone gets close…"></textarea></div>
+            <div class="field"><label for="location">Where is the animal?</label><div class="input-icon"><svg class="icon"><use href="#i-pin"/></svg><input id="location" minlength="3" maxlength="250" placeholder="A street, nearby shop, or a clear landmark"></div></div>
+            <div class="field"><label for="expectedOutcome">What would a successful rescue mean to you?</label><textarea id="expectedOutcome" maxlength="600" rows="2" placeholder="For example: someone picks up the dog and takes it to a clinic that can receive it."></textarea><span class="hint">Not sure? Use “Talk it through”.</span></div>
+            <div class="field-row"><div class="field"><label for="animalType">Animal type <span class="optional">Optional</span></label><input id="animalType" maxlength="100" placeholder="Dog, cat, bird, or unknown"></div><div class="field"><label for="budgetAmount">Budget <span id="budgetCurrencyLabel">USD</span> <span class="optional">Optional</span></label><input id="budgetAmount" type="number" min="0" max="1000000000" step="0.01" placeholder="Leave blank for no budget limit"></div></div>
+            <div class="field"><label for="reporterName">Your name <span class="optional">Optional</span></label><input id="reporterName" maxlength="100" autocomplete="given-name" placeholder="What should we call you?"></div>
+            <section id="intakePanel" class="intake-panel" aria-labelledby="intakeTitle" hidden>
+              <div class="intake-heading"><div><h3 id="intakeTitle">Let’s understand the rescue.</h3><p class="hint">Tell us what matters. You can edit the goal before continuing.</p></div><span id="intakeEngine" class="tag" hidden>Report assistant</span></div>
+              <div id="intakeProgress" class="intake-progress" hidden><span class="assistant-dots" aria-hidden="true"><i></i><i></i><i></i></span><div><strong id="intakeProgressLabel">Reviewing your report…</strong></div></div>
+              <details id="intakeReviewDetails" class="intake-review-details" hidden><summary>Review details</summary><p id="intakeFallbackReason" class="hint intake-fallback" hidden></p></details>
+              <div id="intakeSafety" class="notice intake-safety" hidden></div>
+              <div id="intakeMessages" class="intake-messages" role="log" aria-label="Report conversation" aria-live="polite"></div>
+            <section id="intakeNextStep" class="notice intake-next-step" aria-labelledby="intakeNextStepTitle" tabindex="-1" hidden>
+              <h3 id="intakeNextStepTitle">Choose the help to continue</h3>
+              <p id="intakeNextStepText">Choose the help you need, or describe it in your own words.</p>
+              <div id="intakeChoices" class="intake-choices" role="group" aria-labelledby="intakeChoicesLabel" hidden><p id="intakeChoicesLabel" class="hint">What would help most?</p><div id="intakeChoiceButtons" class="intake-choice-buttons"></div></div>
+              <div id="intakePendingQuestions"></div>
+
+            </section>
+              <div class="field"><label for="intakeAnswer">Your reply</label><textarea id="intakeAnswer" rows="2" maxlength="1200" placeholder="Tell us what help you need, answer a question, or correct a detail…"></textarea></div>
+              <div class="intake-send"><button type="button" id="retryIntake" class="button secondary small" hidden>Retry review</button><span id="intakeStatus" class="hint" role="status"></span><button type="button" id="sendIntake" class="button secondary small">Send <svg class="icon"><use href="#i-arrow"/></svg></button></div>
+            </section>
+            <section id="intakeReady" class="notice intake-ready" aria-labelledby="intakeGoalTitle" tabindex="-1" hidden><div class="recap-heading"><h3 id="intakeGoalTitle">Your goal to confirm</h3><button id="editIntakeGoal" type="button" class="text-button">Edit goal</button></div><p id="intakeGoal" class="intake-goal-text"></p><dl class="intake-facts"><div><dt>Location</dt><dd id="intakeLocation"></dd></div><div><dt>Animal</dt><dd id="intakeAnimal"></dd></div></dl><p id="intakeConfirmationNote">Next, check availability and prices. You’ll approve your chosen plan separately.</p></section>
+            <div id="incidentError" class="notice error" role="alert" tabindex="-1" hidden></div>
+            <p id="draftStatus" class="draft-status" role="status" aria-live="polite"></p><div class="form-actions"><div class="report-tools"><button id="loadExample" type="button" class="text-button" hidden>Fill an example</button><button id="chatWithAI" type="button" class="text-button">Talk it through</button></div><button id="incidentSubmit" type="submit" class="button primary">Send <svg class="icon"><use href="#i-arrow"/></svg></button></div>
+          </form>
+        </article>
+        <aside class="report-aside">
+          <div id="demoEntry" class="demo-entry" hidden><span class="eyebrow">EXPLORE RESCUE RELAY</span><h3>A rescue, from start to safe.</h3><p>Try a ready-to-use example in the app.</p><button id="loadComparisonExample" type="button" class="button secondary" hidden>Try the demo <svg class="icon"><use href="#i-arrow"/></svg></button></div>
+          <div class="how-card"><div class="small-mark"><svg class="icon"><use href="#i-paw"/></svg></div><h2>From “what now?”<br>to people helping.</h2><ol class="how-steps"><li><span>1</span><div><strong>Describe the help you need.</strong><p>Start with what you see and the outcome you want.</p></div></li><li><span>2</span><div><strong>Find the right people.</strong><p>Compare available helpers, tasks and prices.</p></div></li><li><span>3</span><div><strong>Choose a plan. Follow through.</strong><p>Approve your choice and keep everyone updated.</p></div></li></ol></div>
+          <div class="contact-reminder"><div class="avatar-stack" aria-hidden="true"><span>♡</span><span>✓</span><span>+</span></div><div><strong id="approvedCount">Loading contacts…</strong><button class="text-button" data-go="contacts">View trusted contacts <span aria-hidden="true">↗</span></button></div></div>
+          <p class="safety-note">Stay somewhere safe. This app arranges help; it does not diagnose injuries or replace emergency services.</p>
+        </aside>
+      </div>
+    </section>
+    <section id="view-rescue" class="view" aria-labelledby="rescueTitle">
+      <div class="page-heading heading-with-action"><div><h1 id="rescueTitle">Your rescue</h1></div><button class="button secondary" data-go="report"><svg class="icon"><use href="#i-plus"/></svg> New report</button></div>
+      <details id="reportSwitcher" class="report-switcher"><summary>Switch report</summary><div class="report-switch"><label for="reportSelect">Your reports</label><select id="reportSelect"><option value="">Choose a report</option></select><button id="refreshIncidents" class="text-button">Refresh</button></div></details>
+      <div id="rescueContent"><div class="card empty-state"><span class="empty-icon"><svg class="icon"><use href="#i-plan"/></svg></span><h2>No rescue started yet</h2><p>Report what you see, or choose a saved report above.</p><button class="button primary" data-go="report">Report an incident</button></div></div>
+    </section>
+    <section id="view-contacts" class="view" aria-labelledby="contactsTitle">
+      <div class="page-heading heading-with-action"><div><p class="eyebrow">PEOPLE YOU CAN COUNT ON.</p><h1 id="contactsTitle">Your circle of help.</h1><p>Your rescue teams, clinics and nearby helpers, in one place.</p></div><button id="addContact" class="button primary"><svg class="icon"><use href="#i-plus"/></svg> Add contact</button></div>
+      <div class="list-heading"><h2>Trusted contacts <span id="contactCount" class="count-badge">0</span></h2><span class="hint">Only approved contacts receive calls.</span></div>
+      <div id="contactList" class="contact-grid"></div>
+    </section>
+  </main>
+  <footer class="page-footer"><span>Rescue Relay</span><span>A little coordination. A lot of care.</span></footer>
+</div>
+<dialog id="contactDialog" class="contact-dialog" aria-labelledby="contactFormTitle">
+  <div class="dialog-heading"><div><p class="eyebrow">TRUSTED CONTACT</p><h2 id="contactFormTitle">Add someone who can help</h2></div><button class="icon-button" data-close="contactDialog" aria-label="Close contact form"><svg class="icon"><use href="#i-close"/></svg></button></div>
+  <form id="businessForm" class="dialog-body" novalidate>
+    <div class="field-row"><div class="field"><label for="businessName">Name or organization</label><input id="businessName" required minlength="2" maxlength="120" placeholder="Local animal response team"></div><div class="field"><label for="businessPhone">Phone number</label><input id="businessPhone" type="tel" maxlength="16" placeholder="+12025550123"><span class="hint" id="phoneHint">International format, starting with +.</span></div></div>
+    <div class="field"><label for="businessDescription">A little about them <span class="optional">Optional</span></label><textarea id="businessDescription" rows="2" maxlength="600" placeholder="Local volunteers, open until 8 pm, usually work in this area…"></textarea></div>
+    <fieldset class="capability-field"><legend>What help can they offer?</legend><div id="capabilityChoices" class="capability-choices"></div><label class="sr-only" for="extraCapabilities">Other help they can offer</label><input id="extraCapabilities" maxlength="1200" placeholder="Other help, separated by commas — e.g. boat, translation"><span class="hint">Select the services this contact can provide.</span></fieldset>
+    <details id="contactReplies" class="reply-settings" hidden><summary><span>Set this contact’s replies</span><span class="hint">Try your own situations</span></summary><div class="reply-body">
+      <p class="hint">Use a persona for a dynamic conversation. A short opening can now be continued; choose Exact transcript only when you intentionally want to supply the whole conversation.</p>
+      <div class="persona-note"><strong>Practice persona · never sent to live calls</strong><p>Describe this contact’s role and how they respond. A configured model generates a new conversation for the report. Without a model, the clearly labelled backup uses the controls and simple narrative patterns.</p></div>
+      <div class="field"><label for="contactBehavior">How should this responder behave?</label><textarea id="contactBehavior" rows="4" maxlength="2400" placeholder="A friendly full-rescue team. They only rescue cats, charge USD 300 for the whole rescue, and explain their limitations when asked. They might be unavailable when called back."></textarea><span class="hint">The controls below are hard constraints. A persona can narrow the saved abilities, not add abilities you did not give this contact.</span></div>
+      <div class="field"><label for="contactAnimals">Animal types they can help <span class="optional">Comma-separated; empty means unrestricted in practice</span></label><input id="contactAnimals" maxlength="600" placeholder="cat, dog"></div>
+      <div class="field-row"><div class="field"><label for="contactQuoteStatus">Practice price</label><select id="contactQuoteStatus"><option value="free">Explicitly free of charge</option><option value="fixed">Fixed quoted amount</option><option value="estimate">Estimate, not final</option><option value="unknown">Price not yet known</option></select></div><div class="field"><label for="contactQuoteAmount">Quoted amount</label><input id="contactQuoteAmount" type="number" min="0" max="1000000000" step="0.01" placeholder="300"></div></div>
+      <div class="field-row"><div class="field"><label for="contactQuoteCurrency">Currency</label><input id="contactQuoteCurrency" pattern="[A-Z]{3}" maxlength="3" value="USD"></div><div class="field"><label for="contactQuoteScope">What is included?</label><input id="contactQuoteScope" maxlength="600" value="All tasks offered in this call"></div></div>
+      <div class="field"><label for="contactQuoteTerms">Extra fees or price conditions <span class="optional">Optional</span></label><input id="contactQuoteTerms" maxlength="600" placeholder="For example: transport only; clinic fees are extra"></div>
+      <div class="field-row"><div class="field"><label for="contactResponse">When asked for help</label><select id="contactResponse"><option value="agrees">Agrees to help</option><option value="conditional">Needs something confirmed first</option><option value="declines">Cannot help</option><option value="no_answer">Doesn’t answer</option></select></div><div class="field"><label for="contactEta">Ready in <span class="optional">Minutes</span></label><input id="contactEta" type="number" min="0" max="10080" value="18" placeholder="Leave blank if unknown"></div></div>
+      <div class="field"><label for="contactConditions">Anything they need first? <span class="optional">Optional</span></label><input id="contactConditions" maxlength="600" placeholder="For example, a supervisor must approve space at the clinic"></div>
+      <div class="field"><label for="contactTranscriptMode">How to use the inquiry reply text</label><select id="contactTranscriptMode"><option value="auto">Auto — continue a greeting, preserve a full transcript</option><option value="opening">Opening — continue this conversation</option><option value="exact">Exact transcript — do not continue</option></select></div>
+      <div class="field"><div class="label-row"><label for="contactTranscript">Inquiry opening or transcript <span class="optional">Optional</span></label><button type="button" id="fillTranscript" class="text-button">Write an example</button></div><textarea id="contactTranscript" class="transcript-input" rows="5" maxlength="16000" placeholder="Assistant: Hello, is this your rescue team?&#10;Contact: Yes, this is [contact name].&#10;Contact: I can transport the dog, but I cannot catch it."></textarea><span class="hint">Use “Assistant:” and “Contact:” for each speaker. Auto mode continues a recognized greeting such as “Who is this? What do you want?” using the persona and controls above. Select Opening for other unfinished dialogue. Exact mode never invents missing replies; a refusal always ends the conversation.</span></div>
+      <p id="exactTranscriptNotice" class="notice transcript-warning" role="status" hidden></p>
+      <div class="field"><label for="contactStartResponse">When asked to begin the rescue</label><select id="contactStartResponse"><option value="agrees">Confirms and is ready to begin</option><option value="conditional">Still needs something confirmed</option><option value="declines">Can no longer help</option><option value="no_answer">Doesn’t answer</option></select></div>
+      <div class="field"><label for="contactStartQuote">Changed price on the callback <span class="optional">Optional</span></label><input id="contactStartQuote" type="number" min="0" max="1000000000" step="0.01" placeholder="Leave blank to keep the original price"><span class="hint">A higher price must stop the start flow for review, not get silently accepted.</span></div>
+      <div class="field"><label for="contactStartTranscriptMode">How to use the callback reply text</label><select id="contactStartTranscriptMode"><option value="exact">Exact transcript — do not continue</option><option value="opening">Opening — continue this practice callback</option><option value="auto">Auto — continue a recognized greeting</option></select><span class="hint">Saved callbacks remain exact by default. A vague “yes” must not silently become start authorization.</span></div>
+      <div class="field"><label for="contactStartTranscript">Callback opening or transcript <span class="optional">Optional</span></label><textarea id="contactStartTranscript" class="transcript-input" rows="3" maxlength="16000" placeholder="Contact: Yes, this is [contact name].&#10;Contact: I’m sorry, our vehicle is no longer available."></textarea></div>
+    </div></details>
+    <label class="check-row approval"><input id="businessConsent" type="checkbox"><span><strong>Approved to receive rescue calls</strong><small>They’ve agreed to receive calls about animal rescues.</small></span></label>
+    <div id="contactError" class="notice error" role="alert" tabindex="-1" hidden></div>
+    <div class="dialog-actions"><button type="button" class="button secondary" data-close="contactDialog">Cancel</button><button id="businessSubmit" type="submit" class="button primary">Save contact</button></div>
+  </form>
+</dialog>
+<dialog id="settingsDialog" class="small-dialog" aria-labelledby="settingsTitle"><div class="dialog-heading"><h2 id="settingsTitle">Connection details</h2><button class="icon-button" data-close="settingsDialog" aria-label="Close connection details"><svg class="icon"><use href="#i-close"/></svg></button></div><div class="dialog-body"><div id="connectionDetails"></div><p class="hint">Connection settings are managed in the server’s .env file.</p><div class="sound-settings field"><label for="soundVolume">Notification volume <span id="soundVolumeValue">8%</span></label><input id="soundVolume" type="range" min="0" max="25" step="1" value="8"><span class="hint">Short, quiet tones after meaningful updates. Off by default; every sound also has a visible status. Use the toolbar sound button to enable.</span></div><button id="resetExamples" class="button secondary" hidden>Reset saved examples</button></div></dialog>
+<!-- Shared native modal: no browser alert(), confirm(), or prompt() is used. -->
+<dialog id="actionDialog" class="action-dialog" aria-labelledby="actionTitle" aria-describedby="actionDescription">
+  <form id="actionForm" novalidate>
+    <div class="action-heading"><span id="actionIcon" class="action-icon" aria-hidden="true"></span><button type="button" id="actionClose" class="icon-button" aria-label="Close this window"><svg class="icon"><use href="#i-close"/></svg></button></div>
+    <div class="action-body">
+      <p id="actionEyebrow" class="eyebrow">ONE SMALL CHECK</p>
+      <h2 id="actionTitle" tabindex="-1"></h2><p id="actionDescription" class="action-description"></p>
+      <div id="actionDetails" class="action-details" hidden></div><p id="actionContext" class="action-context" hidden></p>
+      <div id="actionNoteField" class="field" hidden><label id="actionNoteLabel" for="actionNote">Where is the animal now?</label><textarea id="actionNote" rows="3" minlength="3" maxlength="600" aria-describedby="actionNoteHint actionNoteCount" placeholder="For example: safely received at the clinic. The intake team confirmed it."></textarea><div class="field-caption"><span class="hint" id="actionNoteHint">Add a short note based on what you or a helper confirmed.</span><span id="actionNoteCount" class="hint">0 / 600</span></div></div>
+      <label id="actionCheckField" class="check-row approval" hidden><input id="actionCheck" type="checkbox"><span><strong id="actionCheckLabel">I know the animal is safe.</strong><small id="actionCheckHint">The helpers have finished, and I have confirmed where the animal is.</small></span></label>
+      <div id="actionError" class="notice error" role="alert" tabindex="-1" hidden></div>
+      <p id="actionBusy" class="hint action-busy" role="status" hidden>Saving your change…</p>
+    </div>
+    <div class="action-footer"><button type="button" id="actionCancel" class="button secondary">Go back</button><button type="submit" id="actionConfirm" class="button primary">Confirm</button></div>
+  </form>
+</dialog>
+<div class="toast" id="toast"><span id="toastMessage" role="status" aria-live="polite" aria-atomic="true"></span><button type="button" id="dismissToast" class="icon-button" aria-label="Dismiss message"><svg class="icon"><use href="#i-close"/></svg></button></div>
+<script src="/static/rescue-flow.js" defer></script>
+<script src="/static/app.js" defer></script>
+</body>
+</html>

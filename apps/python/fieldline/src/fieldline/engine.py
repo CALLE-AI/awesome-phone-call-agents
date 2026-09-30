@@ -1,19 +1,18 @@
 """Trip engine: runs the check-in schedule and the escalation cascade.
 
-The same engine drives DEMO and LIVE modes — only the dispatcher (real
-CALL-E SDK vs scripted transport) and the waiter (wall clock vs
-demo time-warp) differ.
+The shared scheduler uses a scripted demo path and a restricted live path.
+Live generated results stop for human review before any safety decision.
 """
 
 from __future__ import annotations
 
 import time
 from dataclasses import dataclass, field
-from datetime import datetime
+from datetime import datetime, timedelta
 from pathlib import Path
 from typing import Any, Protocol
 
-from .calle_client import CallDispatcher
+from .calle_client import CallDispatcher, UnknownCallOutcome
 from .prompts import checkin_task, escalation_task
 from .protocol import (
     CheckinOutcome,
@@ -25,7 +24,7 @@ from .protocol import (
 )
 from .render import RichRenderer
 from .report import CallRecord, build_incident_brief, write_incident_brief
-from .schemas import CHECKIN_RESULT_SCHEMA, ESCALATION_RESULT_SCHEMA, TripPlan, add_minutes
+from .schemas import CHECKIN_RESULT_SCHEMA, ESCALATION_RESULT_SCHEMA, TripPlan, TripPlanError, add_minutes, validate_live_window, scrub_text
 
 Call = dict[str, Any]
 
@@ -49,21 +48,41 @@ class DemoWaiter:
 
 
 class LiveWaiter:
-    """Waits on the real wall clock; a cancel file stops the trip cleanly."""
+    """Date-bound local-clock waits. Overnight and expired targets fail closed."""
 
-    def __init__(self, cancel_file: Path, poll_seconds: float = 5.0) -> None:
+    def __init__(self, cancel_file: Path, plan: TripPlan, poll_seconds: float = 5.0,
+                 now=None, sleep=None) -> None:
         self.cancel_file = cancel_file
+        self.plan = plan
         self.poll = poll_seconds
+        self.now = now or datetime.now
+        self.sleep = sleep or time.sleep
+        self._last_target: datetime | None = None
 
     def wait_until(self, hhmm: str, reason: str) -> bool:
-        hour, minute = (int(x) for x in hhmm.split(":"))
+        target = datetime.fromisoformat(f"{self.plan.date}T{hhmm}")
+        end = datetime.fromisoformat(f"{self.plan.date}T{self.plan.end}")
+        start = datetime.fromisoformat(f"{self.plan.date}T{self.plan.start}")
+        if not start <= target <= end or (self._last_target and target < self._last_target):
+            raise HumanReviewRequired("Schedule crossed its supported same-day window; monitoring stopped.")
+        self._last_target = target
         while True:
             if self.cancel_file.exists():
                 return False
-            now = datetime.now()
-            if (now.hour, now.minute) >= (hour, minute):
+            now = self.now()
+            if now.date() != target.date() or now > end:
+                raise HumanReviewRequired("Plan date/window expired; monitoring stopped.")
+            if now >= target:
                 return True
-            time.sleep(self.poll)
+            self.sleep(self.poll)
+
+
+class HumanReviewRequired(RuntimeError):
+    """Stop automation until a human independently reconciles the call."""
+
+
+class TripCanceled(RuntimeError):
+    pass
 
 
 @dataclass
@@ -97,6 +116,18 @@ class TripEngine:
 
     # -- public --------------------------------------------------------
     def run(self) -> TripResult:
+        try:
+            if not self.demo:
+                validate_live_window(self.plan)
+            return self._run()
+        except TripCanceled:
+            return self._canceled()
+        except UnknownCallOutcome:
+            return self._stop_for_review("unknown_outcome", "Call outcome unknown. Reconcile in CALL-E before any new call; no retry or escalation was made.")
+        except (HumanReviewRequired, TripPlanError):
+            return self._stop_for_review("review_required", "Human review required. Verify the intended recipient and call evidence in CALL-E; no generated safety decision was acted on.")
+
+    def _run(self) -> TripResult:
         plan, r = self.plan, self.renderer
         r.banner(plan, self.demo)
         self._log(plan.start, f"Trip opened: {plan.label}", "info")
@@ -118,7 +149,7 @@ class TripEngine:
                 r.section(at, f"ASSISTANCE REQUESTED — engaging escalation ladder for {plan.worker.name}", "crit")
                 self._log(at, "Worker requested assistance; escalation ladder engaged", "crit")
             else:
-                overdue_at = add_minutes(at, plan.grace_minutes)
+                overdue_at = self._at_offset(at, plan.grace_minutes)
                 r.section(overdue_at, f"OVERDUE — {plan.worker.name} unreachable, engaging escalation ladder", "crit")
                 self._log(overdue_at, "Worker declared OVERDUE; escalation ladder engaged", "crit")
 
@@ -133,6 +164,18 @@ class TripEngine:
         return TripResult("closed_safe", None, self.timeline, self.records)
 
     def run_single_checkin(self) -> CheckinOutcome:
+        try:
+            if not self.demo:
+                validate_live_window(self.plan, single=True)
+            return self._run_single_checkin()
+        except TripCanceled:
+            self._canceled()
+            return CheckinOutcome.REVIEW_REQUIRED
+        except (UnknownCallOutcome, HumanReviewRequired, TripPlanError):
+            self._stop_for_review("review_required", "Human review required. Reconcile the call in CALL-E before any new action; no automatic retry or escalation.")
+            return CheckinOutcome.REVIEW_REQUIRED
+
+    def _run_single_checkin(self) -> CheckinOutcome:
         """One immediate check-in call, no cascade — live-mode verification."""
         plan, r = self.plan, self.renderer
         r.banner(plan, self.demo)
@@ -157,14 +200,15 @@ class TripEngine:
             self._render_checkin(outcome, call, dial_at)
             if step.kind != "retry":
                 return outcome, step, dial_at
-            next_dial = add_minutes(dial_at, plan.retry_after_minutes)
+            next_dial = self._at_offset(dial_at, plan.retry_after_minutes)
             r.notice(f"Retrying at {next_dial} (retry interval {plan.retry_after_minutes} min)…", "warn")
             if not self.waiter.wait_until(next_dial, "retry"):
-                return outcome, NextStep("schedule_next", reason="canceled"), dial_at
+                raise TripCanceled()
             dial_at = next_dial
 
     def _place_checkin(self, at: str, dials: int, dial_at: str | None = None) -> Call:
         plan = self.plan
+        self._before_call()
         self.renderer.dialing(
             plan.worker.name, plan.worker.phone, note="" if dials == 1 else f"retry {dials - 1}"
         )
@@ -175,6 +219,7 @@ class TripEngine:
             metadata={"app": "fieldline", "kind": "checkin", "scheduled_at": at, "dial": dials},
             idempotency_key=f"fieldline-checkin-{plan.date}-{at}-{dials}",
         )
+        self._check_live_result(call, plan.worker.phone)
         self._replay_transcript_if_needed(call, plan.worker.name)
         self.records.append(
             CallRecord(dial_at or at, "check-in call", plan.worker.name, plan.worker.phone, call)
@@ -206,11 +251,14 @@ class TripEngine:
         plan, r = self.plan, self.renderer
         facts = self._initial_facts(missed_at, last_dial_at, duress, outcome)
         ladder = [plan.escalation[-1]] if duress else plan.escalation
-        base_at = add_minutes(missed_at, 3 if duress else plan.grace_minutes + 1)
+        base_at = self._at_offset(missed_at, 3 if duress else plan.grace_minutes + 1)
         informed = False
 
         for rung, contact in enumerate(ladder):
-            at_label = add_minutes(base_at, rung * 7)
+            at_label = self._at_offset(base_at, rung * 7)
+            if not self.waiter.wait_until(at_label, "escalation"):
+                raise TripCanceled()
+            self._before_call()
             r.section(
                 at_label,
                 f"escalation call {rung + 1}/{len(ladder)} — {contact.name} ({contact.relation})",
@@ -224,6 +272,7 @@ class TripEngine:
                 metadata={"app": "fieldline", "kind": "escalation", "rung": rung, "duress": duress},
                 idempotency_key=f"fieldline-esc-{plan.date}-{missed_at}-{rung}",
             )
+            self._check_live_result(call, contact.phone)
             self._replay_transcript_if_needed(call, contact.name)
             self.records.append(CallRecord(at_label, "escalation call", contact.name, contact.phone, call))
             outcome = classify_escalation(call)
@@ -250,7 +299,7 @@ class TripEngine:
 
         if not informed:
             r.notice(f"LADDER EXHAUSTED. {plan.emergency_note}", "crit")
-            self._log(add_minutes(base_at, len(ladder) * 7), "Escalation ladder exhausted — nobody reached", "crit")
+            self._log(self._at_offset(base_at, len(ladder) * 7), "Escalation ladder exhausted — nobody reached", "crit")
             return EscalationOutcome.NOT_REACHED
         return EscalationOutcome.WILL_CHECK
 
@@ -307,9 +356,54 @@ class TripEngine:
         return TripResult("canceled", None, self.timeline, self.records)
 
     # -- helpers -------------------------------------------------------
+    def _at_offset(self, hhmm: str, minutes: int) -> str:
+        if self.demo:
+            return add_minutes(hhmm, minutes)
+        target = datetime.fromisoformat(f"{self.plan.date}T{hhmm}") + timedelta(minutes=minutes)
+        end = datetime.fromisoformat(f"{self.plan.date}T{self.plan.end}")
+        if target.date().isoformat() != self.plan.date or target > end:
+            raise HumanReviewRequired("Next action exceeds the supported plan window.")
+        return target.strftime("%H:%M")
+
+    def _before_call(self) -> None:
+        if (self.home / "cancel").exists():
+            raise TripCanceled()
+        if not self.demo:
+            validate_live_window(self.plan, single=True)
+
+    def _check_live_result(self, call: Call, phone: str) -> None:
+        if self.demo:
+            return
+        # No unbound generated safety field, summary or transcript drives a
+        # live decision. Only explicit transport-level no-answer can advance.
+        recipients = call.get("recipients")
+        if call.get("status") != "completed" or not isinstance(recipients, list) or len(recipients) != 1:
+            raise UnknownCallOutcome("Call outcome requires reconciliation.")
+        recipient = recipients[0]
+        attempts = recipient.get("attempts") or []
+        if (recipient.get("phones") != [phone] or not attempts
+                or recipient.get("structured_result") is not None
+                or call.get("structured_result") is not None
+                or recipient.get("status") != "no_answer"
+                or any(a.get("phone") != phone or a.get("status") != "no_answer"
+                       or a.get("transcript_turns") for a in attempts)):
+            raise HumanReviewRequired("Generated or unbound result needs human review.")
+        # Drop provider-controlled data before logs, records, prompts or briefs.
+        call.clear()
+        call.update({"status": "completed", "recipients": [],
+                     "summary": "Confirmed no answer from the authorized destination."})
+
+    def _stop_for_review(self, status: str, message: str) -> TripResult:
+        self._log(datetime.now().strftime("%H:%M"), message, "crit")
+        brief = build_incident_brief(self.plan, self.timeline, self.records, message, self.demo)
+        path = write_incident_brief(brief, self.home)
+        self.renderer.closing(message, False)
+        self.renderer.report_written(str(path))
+        return TripResult(status, path, self.timeline, self.records)
+
     def _replay_transcript_if_needed(self, call: Call, party: str) -> None:
         """Live mode: transcript arrives with the result, render it then."""
-        if self.dispatcher.streams_transcript:
+        if not self.demo or self.dispatcher.streams_transcript:
             return
         self.renderer._party = party
         for recipient in call.get("recipients") or []:
@@ -318,4 +412,4 @@ class TripEngine:
                     self.renderer.turn(turn.get("speaker", "unknown"), turn.get("text", ""))
 
     def _log(self, at: str, label: str, level: str) -> None:
-        self.timeline.append((at, label, level))
+        self.timeline.append((at, scrub_text(label), level))

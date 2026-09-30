@@ -1,0 +1,344 @@
+.sdw-root {
+  box-sizing: border-box;
+  font-family: inherit;
+  line-height: 1.45;
+  color: var(--sdw-text, #0b1a28);
+  --sdw-bg: #ffffff;
+  --sdw-text: #0b1a28;
+  --sdw-muted: #3a4d5c;
+  --sdw-line: #c5d4de;
+  --sdw-primary: #0a5c56;
+  --sdw-primary-text: #ffffff;
+  --sdw-danger: #b42318;
+  --sdw-shadow: 0 1px 2px rgba(6, 20, 29, 0.06), 0 14px 32px rgba(6, 20, 29, 0.08);
+  --sdw-radius: 0.7rem;
+}
+
+.sdw-root *,
+.sdw-root *::before,
+.sdw-root *::after {
+  box-sizing: border-box;
+}
+
+.sdw-consent {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  z-index: 2147483000;
+  border-bottom: 1px solid var(--sdw-line);
+  background: var(--sdw-bg);
+  padding: 0.75rem 1rem;
+  font-size: 0.75rem;
+  color: var(--sdw-muted);
+}
+
+.sdw-consent-inner {
+  display: flex;
+  max-width: 64rem;
+  margin: 0 auto;
+  gap: 0.75rem;
+  flex-direction: column;
+}
+
+@media (min-width: 640px) {
+  .sdw-consent-inner {
+    flex-direction: row;
+    align-items: center;
+  }
+}
+
+.sdw-consent-copy {
+  flex: 1;
+  margin: 0;
+  line-height: 1.5;
+}
+
+.sdw-consent-copy strong {
+  color: var(--sdw-text);
+}
+
+.sdw-consent-actions {
+  display: flex;
+  flex-shrink: 0;
+  gap: 0.5rem;
+}
+
+.sdw-launcher {
+  position: fixed;
+  bottom: 1rem;
+  z-index: 2147482900;
+  width: min(calc(100% - 2rem), 22rem);
+}
+
+.sdw-launcher.sdw-right {
+  right: 1rem;
+}
+
+.sdw-launcher.sdw-left {
+  left: 1rem;
+}
+
+.sdw-card {
+  background: var(--sdw-bg);
+  border: 1px solid var(--sdw-line);
+  border-radius: var(--sdw-radius);
+  box-shadow: var(--sdw-shadow);
+  padding: 1.1rem 1.15rem 1.15rem;
+}
+
+.sdw-card h2 {
+  margin: 0;
+  font-size: 1.05rem;
+  font-weight: 600;
+  color: var(--sdw-text);
+}
+
+.sdw-card p {
+  margin: 0.35rem 0 0;
+  font-size: 0.875rem;
+  color: var(--sdw-muted);
+}
+
+.sdw-actions {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+  margin-top: 0.85rem;
+}
+
+.sdw-btn {
+  appearance: none;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.4rem;
+  min-height: 2.5rem;
+  padding: 0.45rem 0.9rem;
+  border-radius: calc(var(--sdw-radius) - 0.15rem);
+  border: 1px solid transparent;
+  font: inherit;
+  font-size: 0.875rem;
+  font-weight: 600;
+  cursor: pointer;
+  text-decoration: none;
+}
+
+.sdw-btn:disabled {
+  opacity: 0.65;
+  cursor: not-allowed;
+}
+
+.sdw-btn:focus-visible {
+  outline: 2px solid var(--sdw-primary);
+  outline-offset: 2px;
+}
+
+.sdw-btn-primary {
+  background: var(--sdw-primary);
+  color: var(--sdw-primary-text);
+}
+
+.sdw-btn-primary:hover:not(:disabled) {
+  filter: brightness(0.95);
+}
+
+.sdw-btn-ghost {
+  background: transparent;
+  color: var(--sdw-text);
+  border-color: var(--sdw-line);
+}
+
+.sdw-btn-ghost:hover:not(:disabled) {
+  background: var(--sdw-primary);
+  color: var(--sdw-primary-text);
+  border-color: var(--sdw-primary);
+}
+
+.sdw-btn-full {
+  width: 100%;
+}
+
+.sdw-dialog {
+  border: 0;
+  padding: 0;
+  max-width: 28rem;
+  width: calc(100% - 2rem);
+  margin: auto;
+  background: transparent;
+  color: var(--sdw-text, #0b1a28);
+}
+
+.sdw-dialog:not([open]) {
+  display: none;
+}
+
+.sdw-dialog::backdrop {
+  background: rgba(11, 26, 40, 0.45);
+}
+
+.sdw-dialog-panel {
+  position: relative;
+  background: var(--sdw-bg);
+  border: 1px solid var(--sdw-line);
+  border-radius: var(--sdw-radius);
+  box-shadow: var(--sdw-shadow);
+  padding: 1.25rem;
+}
+
+.sdw-dialog-close {
+  position: absolute;
+  top: 0.65rem;
+  right: 0.65rem;
+  width: 2rem;
+  height: 2rem;
+  border: 0;
+  border-radius: 999px;
+  background: transparent;
+  color: var(--sdw-muted);
+  font-size: 1.25rem;
+  line-height: 1;
+  cursor: pointer;
+}
+
+.sdw-dialog-close:hover {
+  background: color-mix(in srgb, var(--sdw-line) 60%, white);
+}
+
+.sdw-dialog-panel h2 {
+  margin: 0;
+  font-size: 1.1rem;
+  font-weight: 600;
+}
+
+.sdw-dialog-panel .sdw-lead {
+  margin: 0.4rem 0 0;
+  font-size: 0.875rem;
+  color: var(--sdw-muted);
+}
+
+.sdw-form {
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+  margin-top: 1rem;
+}
+
+.sdw-field {
+  display: flex;
+  flex-direction: column;
+  gap: 0.35rem;
+}
+
+.sdw-field label {
+  font-size: 0.8rem;
+  font-weight: 600;
+}
+
+.sdw-field label span {
+  font-weight: 400;
+  color: var(--sdw-muted);
+}
+
+.sdw-field input,
+.sdw-field select {
+  width: 100%;
+  min-height: 2.5rem;
+  padding: 0.45rem 0.7rem;
+  border: 1px solid var(--sdw-line);
+  border-radius: calc(var(--sdw-radius) - 0.2rem);
+  font: inherit;
+  font-size: 0.9rem;
+  background: var(--sdw-bg);
+  color: var(--sdw-text);
+}
+
+.sdw-field input:focus-visible,
+.sdw-field select:focus-visible {
+  outline: 2px solid var(--sdw-primary);
+  outline-offset: 1px;
+}
+
+.sdw-phone {
+  display: flex;
+  gap: 0.5rem;
+}
+
+.sdw-phone select {
+  width: 8.5rem;
+  flex-shrink: 0;
+}
+
+.sdw-error {
+  margin: 0;
+  padding: 0.7rem 0.8rem;
+  border-radius: calc(var(--sdw-radius) - 0.2rem);
+  border: 1px solid color-mix(in srgb, var(--sdw-danger) 30%, transparent);
+  background: color-mix(in srgb, var(--sdw-danger) 10%, white);
+  color: var(--sdw-danger);
+  font-size: 0.75rem;
+}
+
+.sdw-fineprint {
+  margin: 0;
+  text-align: center;
+  font-size: 0.7rem;
+  color: var(--sdw-muted);
+}
+
+.sdw-consent-check {
+  display: flex;
+  align-items: flex-start;
+  gap: 0.6rem;
+  margin: 0;
+  font-size: 0.75rem;
+  line-height: 1.45;
+  color: var(--sdw-text);
+}
+
+.sdw-consent-check input {
+  margin-top: 0.2rem;
+  flex-shrink: 0;
+}
+
+.sdw-consent-check strong {
+  font-weight: 700;
+}
+
+.sdw-thanks {
+  padding: 1.25rem 0;
+  text-align: center;
+}
+
+.sdw-thanks p {
+  margin: 0;
+}
+
+.sdw-thanks p + p {
+  margin-top: 0.25rem;
+  font-size: 0.875rem;
+  color: var(--sdw-muted);
+}
+
+.sdw-thanks .sdw-btn {
+  margin-top: 1rem;
+}
+
+.sdw-spin {
+  width: 1rem;
+  height: 1rem;
+  border: 2px solid currentColor;
+  border-right-color: transparent;
+  border-radius: 50%;
+  animation: sdw-spin 0.6s linear infinite;
+}
+
+@keyframes sdw-spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+.sdw-inline {
+  display: inline-flex;
+}

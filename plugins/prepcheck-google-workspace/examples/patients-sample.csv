@@ -1,0 +1,4 @@
+row_id,patient_name,phone_e164,region,locale,procedure,procedure_at,checkpoint,state,next_call_at,partial_cycles,no_answer_attempts,call_id,last_outcome,items_outstanding,staff_note,updated_at,prep_snapshot,readiness_delta
+P001,Alex Demo,+12025550143,US,en-US,Colonoscopy,2026-09-14T09:00:00,T72,PENDING,,0,0,,,,,,,
+P002,Sam Demo,+12025550147,US,en-US,Upper Endoscopy,2026-09-14T11:00:00,T72,PENDING,,0,0,,,,,,,
+P003,Maya Demo,+12025550162,US,en-US,Colonoscopy,2026-09-14T14:00:00,DONE,CONFIRMED,,0,0,,prepared,,,,,

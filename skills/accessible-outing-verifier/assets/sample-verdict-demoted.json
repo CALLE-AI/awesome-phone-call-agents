@@ -1,0 +1,31 @@
+{
+  "outing_id": "outing-grand-theater-001",
+  "mode": "offline_fixture",
+  "advisory": true,
+  "venue": "The Grand Theater",
+  "phone": "+1-555-***-0199",
+  "verdict": "NOT FULLY VERIFIED",
+  "timestamp": "2026-09-14T08:30:00.000Z",
+  "constraints_summary": {
+    "total": 2,
+    "passed": 1,
+    "demoted_to_unknown": 1,
+    "failed": 0
+  },
+  "findings": [
+    {
+      "constraint_id": "step_free_entrance",
+      "status": "PASSED",
+      "provenance": "supplied_digital_fixture",
+      "source": "OpenStreetMap Nominatim"
+    },
+    {
+      "constraint_id": "elevator_operational_today",
+      "raw_telephony_status": "qualified_confirmation",
+      "normalized_safety_status": "UNKNOWN",
+      "provenance": "simulated_calle_response",
+      "quote": "I think it should be working, but maintenance has not signed off yet.",
+      "policy_reason": "Strict local safety rule: qualified confirmations must never authorize safety-critical access."
+    }
+  ]
+}

@@ -1,0 +1,105 @@
+{
+  "policy_id": "us-federal-collections",
+  "policy_version": "1.0.0",
+  "jurisdiction": "US-FEDERAL",
+  "authorities": [
+    "TCPA (47 U.S.C. 227)",
+    "FDCPA (15 U.S.C. 1692)",
+    "Regulation F (12 CFR 1006)"
+  ],
+  "call_window": {
+    "start_local": "08:00",
+    "end_local": "21:00",
+    "timezone_source": "account.timezone",
+    "note": "Local time of the recipient. Never inferred from the phone number, area code, locale, or server time."
+  },
+  "disclosure_elements": [
+    {
+      "id": "caller_identity",
+      "description": "The call names the calling entity and, when acting for a creditor, who it is calling on behalf of.",
+      "patterns": ["calling on behalf of", "this is [^.]{1,60} calling"]
+    },
+    {
+      "id": "automated_voice_identity",
+      "description": "The call states that the caller is an automated or AI assistant.",
+      "patterns": ["automated assistant", "ai assistant", "automated voice", "artificial voice"]
+    },
+    {
+      "id": "debt_collection_purpose",
+      "description": "FDCPA 1692e(11) purpose disclosure: an attempt to collect a debt and information obtained will be used for that purpose.",
+      "patterns": ["attempt to collect a debt"]
+    },
+    {
+      "id": "opt_out_instruction",
+      "description": "The call tells the recipient how to stop future calls.",
+      "patterns": ["stop calling", "stop receiving these calls", "no longer be called"]
+    }
+  ],
+  "rules": [
+    {
+      "id": "R1",
+      "name": "call_window",
+      "stage": "pre_dial",
+      "block_reason": "OUTSIDE_CALL_WINDOW",
+      "requirement": "Dial only between 08:00 and 21:00 in the recipient's stored local timezone.",
+      "authority": "FDCPA 1692c(a)(1); Regulation F 12 CFR 1006.6(b)(1)(i)",
+      "temporal_form": "G(dial -> local_time_within(08:00, 21:00))"
+    },
+    {
+      "id": "R2",
+      "name": "consent_on_file",
+      "stage": "pre_dial",
+      "block_reason": "NO_CONSENT",
+      "requirement": "Dial only when prior express consent is recorded with a consent timestamp.",
+      "authority": "TCPA 47 U.S.C. 227(b)(1)(A)",
+      "temporal_form": "G(dial -> consent_on_file & consent_timestamp_present)"
+    },
+    {
+      "id": "R3",
+      "name": "not_suppressed",
+      "stage": "pre_dial",
+      "block_reason": "ON_SUPPRESSION_LIST",
+      "requirement": "Never dial a number on the opt-out or do-not-call suppression list.",
+      "authority": "TCPA 47 CFR 64.1200(d); FDCPA 1692c(c)",
+      "temporal_form": "G(suppressed(number) -> G(!dial(number)))"
+    },
+    {
+      "id": "R4",
+      "name": "disclosure_ready",
+      "stage": "pre_dial",
+      "block_reason": "MISSING_DISCLOSURE",
+      "requirement": "The rendered call script must contain every required disclosure element before the call is placed.",
+      "authority": "FDCPA 1692e(11); TCPA 47 U.S.C. 227(d)(3)(A)",
+      "temporal_form": "G(dial -> script_contains(all disclosure_elements))"
+    },
+    {
+      "id": "R5",
+      "name": "live_revocation",
+      "stage": "in_call",
+      "block_reason": "OPT_OUT",
+      "requirement": "If the recipient revokes consent during the call, end the call, record the opt-out, and suppress the number.",
+      "authority": "TCPA 47 CFR 64.1200(a)(10); Regulation F 12 CFR 1006.6(c)",
+      "temporal_form": "G(revocation_detected -> F(end_call & suppressed(number)))"
+    }
+  ],
+  "revocation_phrases": [
+    "stop calling",
+    "stop calling me",
+    "quit calling",
+    "no more calls",
+    "dont call me",
+    "dont call again",
+    "dont call this number",
+    "do not call me",
+    "do not call again",
+    "do not call this number",
+    "take me off your list",
+    "take me off the list",
+    "remove me from your list",
+    "put me on your do not call list",
+    "stop contacting me",
+    "opt out",
+    "opt me out",
+    "unsubscribe me"
+  ]
+}

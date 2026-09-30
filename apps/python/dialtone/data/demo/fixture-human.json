@@ -1,0 +1,88 @@
+{
+ "id": "fixture-human",
+ "status": "completed",
+ "task": "GOAL: Book a table for two this Friday at 7 PM under the name Jordan Lee.\n\nYou are an AI assistant calling on behalf of Jordan Lee. Follow the DIALTONE v1 calling protocol.\n\nOPENING: As soon as someone answers, say exactly: \"Hi, I'm an AI assistant calling on behalf of Jordan Lee. Dialtone one, code four seven two.\" Then pause briefly.\n\nCLASSIFY the other side within your first two exchanges:\n- It is an AUTOMATED AGENT if it replies \"Dialtone one acknowledged\", or says it is a virtual/AI/automated assistant, or answers instantly in long polished sentences.\n- It is a PHONE MENU if it lists options such as \"press 1\".\n- Otherwise treat it as a HUMAN. When unsure, treat it as a HUMAN.\n\nMACHINE MODE (the other side is an automated agent):\n- Do not repeat the disclosure, do not make small talk, do not thank repeatedly.\n- Speak in short \"field: value\" sentences, one request per sentence. Example:\n  \"Request: table booking. Party: 2. Time: Friday 7 PM. Name: Oren. Flexibility: plus or minus one hour.\"\n- Ask for exactly: the outcome, a confirmation code, and \"Human review: yes or no?\"\n- If the other agent confirms without giving a confirmation code, ask once for a code or a written confirmation.\n- Hang up as soon as those fields are answered.\n\nHUMAN MODE (the other side is a person):\n- Keep the full disclosure: you are an AI assistant calling on behalf of the customer.\n- Speak slowly and naturally, one question at a time, and let them finish.\n- If they ask what \"dialtone\" means, say it is a signal for other automated systems and they can ignore it.\n\nPHONE MENU MODE (the other side is a recorded menu / IVR):\n- Navigate the menu with keypad tones or short spoken options toward the goal; do not converse with the recording.\n- If the menu reaches a human, switch to HUMAN MODE.\n\nHONESTY: Never say something is confirmed unless the other side explicitly confirmed it. Record whether the confirmation came from a person or from an automated agent, and any confirmation code exactly as spoken.",
+ "task_completed": true,
+ "completion_confidence": {
+  "score": 0.93,
+  "label": "high"
+ },
+ "structured_result": {
+  "counterpart_type": "human",
+  "handshake_acknowledged": "no",
+  "outcome": "confirmed",
+  "confirmation_code": "",
+  "human_review": "unknown",
+  "details": "Host confirmed Friday 7 PM for two."
+ },
+ "evidence": [],
+ "_fixture": true,
+ "recipients": [
+  {
+   "phones": [
+    "+14155550100"
+   ],
+   "attempts": [
+    {
+     "transcript_turns": [
+      {
+       "speaker": "user",
+       "text": "Luigi's, this is Marco.",
+       "offset_seconds": 1.3
+      },
+      {
+       "speaker": "bot",
+       "text": "Hi, I'm an AI assistant calling on behalf of Jordan Lee. Dialtone one, code four seven two.",
+       "offset_seconds": 3.78
+      },
+      {
+       "speaker": "user",
+       "text": "Sorry, uh, dial tone what?",
+       "offset_seconds": 10.78
+      },
+      {
+       "speaker": "bot",
+       "text": "No problem, that was just a signal for automated systems, you can ignore it. I'm calling to book a table for two this Friday at 7 PM, under the name Jordan Lee.",
+       "offset_seconds": 13.83
+      },
+      {
+       "speaker": "user",
+       "text": "mm-hmm",
+       "offset_seconds": 22.88
+      },
+      {
+       "speaker": "user",
+       "text": "Friday at seven, let me, let me check the book. Hang on.",
+       "offset_seconds": 26.18
+      },
+      {
+       "speaker": "user",
+       "text": "Okay yeah, we can do seven. Two people, Jordan, right?",
+       "offset_seconds": 35.02
+      },
+      {
+       "speaker": "bot",
+       "text": "Yes, that's right, Jordan Lee, two people. Could you confirm the booking is made?",
+       "offset_seconds": 39.82
+      },
+      {
+       "speaker": "user",
+       "text": "Yep, I've got you down, Friday seven p.m., table for two.",
+       "offset_seconds": 45.41
+      },
+      {
+       "speaker": "bot",
+       "text": "Wonderful, thank you so much Marco. Have a great day.",
+       "offset_seconds": 50.48
+      },
+      {
+       "speaker": "user",
+       "text": "You too, bye.",
+       "offset_seconds": 53.98
+      }
+     ]
+    }
+   ]
+  }
+ ]
+}

@@ -1,0 +1,32 @@
+{
+  "reached_intended_contact": "yes",
+  "contact_role_confirmed": "yes",
+  "consent_continued": "yes",
+  "subject_references": ["ITEM-SCHOOL-01", "BOX-SCHOOL-04"],
+  "attribute_updates": [
+    {
+      "subject_reference": "ITEM-SCHOOL-01",
+      "attribute_key": "age_min",
+      "value": 6,
+      "unit": "years",
+      "supporting_quote": "The label says suitable from age six."
+    },
+    {
+      "subject_reference": "ITEM-SCHOOL-01",
+      "attribute_key": "age_max",
+      "value": 11,
+      "unit": "years",
+      "supporting_quote": "The upper age printed on it is eleven."
+    },
+    {
+      "subject_reference": "BOX-SCHOOL-04",
+      "attribute_key": "packed",
+      "value": true,
+      "unit": null,
+      "supporting_quote": "Yes, that batch is already sealed in a collection box."
+    }
+  ],
+  "availability_windows": ["Saturday 09:00-12:00"],
+  "unanswered_questions": [],
+  "notes": "Fixture-only example; no phone call occurred."
+}

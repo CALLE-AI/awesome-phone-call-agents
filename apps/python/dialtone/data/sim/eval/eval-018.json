@@ -1,0 +1,60 @@
+{
+  "id": "eval-018",
+  "label": "agent",
+  "difficulty": "typical",
+  "scenario": "HVAC company AI assistant discloses it is AI and answers pricing questions precisely.",
+  "task": "Get the price of a furnace tune-up (and second unit / weekend surcharge) from Summit Heating and Air.",
+  "outcome": {
+    "task_completed_claimed": true,
+    "commitment_type": "information",
+    "confirmation_artifact": null,
+    "expected_attestation": "agent_asserted"
+  },
+  "turns": [
+    {
+      "speaker": "user",
+      "text": "hi, you've reached Summit Heating and Air. I'm an AI assistant and I can answer questions or get you scheduled. what can I do for you?",
+      "offset_seconds": 1.5
+    },
+    {
+      "speaker": "bot",
+      "text": "hi, I'm also an AI assistant, calling on behalf of Frank Delgado. how much is a standard furnace tune up, and is there an extra charge for a second unit?",
+      "offset_seconds": 11.68
+    },
+    {
+      "speaker": "user",
+      "text": "a standard furnace tune up is one hundred twenty nine dollars. that includes a twenty one point inspection, a filter check, and a safety test. for a second unit at the same address, it's an additional seventy nine dollars.",
+      "offset_seconds": 23.11
+    },
+    {
+      "speaker": "bot",
+      "text": "thank you. do you service Lennox systems?",
+      "offset_seconds": 37.51
+    },
+    {
+      "speaker": "user",
+      "text": "yes, our technicians service all major brands, including Lennox, Carrier, Trane, and Rheem.",
+      "offset_seconds": 41.21
+    },
+    {
+      "speaker": "bot",
+      "text": "and is there a weekend surcharge?",
+      "offset_seconds": 46.33
+    },
+    {
+      "speaker": "user",
+      "text": "Saturday appointments have a thirty five dollar surcharge. we don't offer Sunday appointments. would you like to book a tune up?",
+      "offset_seconds": 49.95
+    },
+    {
+      "speaker": "bot",
+      "text": "not today, thanks. Frank will call back to schedule.",
+      "offset_seconds": 58.4
+    },
+    {
+      "speaker": "user",
+      "text": "sounds good. thanks for calling Summit Heating and Air.",
+      "offset_seconds": 62.66
+    }
+  ]
+}

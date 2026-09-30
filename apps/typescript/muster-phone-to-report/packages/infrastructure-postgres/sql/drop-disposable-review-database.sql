@@ -1,0 +1,1 @@
+DROP DATABASE :identifier WITH (FORCE)

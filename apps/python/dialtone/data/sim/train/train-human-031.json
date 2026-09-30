@@ -1,0 +1,46 @@
+{
+ "id": "train-human-031",
+ "label": "human",
+ "source": "sim-train",
+ "meta": {
+  "task": "request a refund for a double charge",
+  "hard": false
+ },
+ "turns": [
+  {
+   "speaker": "user",
+   "text": "Bloom Florists, this is Dev.",
+   "offset_seconds": 1.17
+  },
+  {
+   "speaker": "bot",
+   "text": "Hi, I'm an AI assistant calling on behalf of Jordan Lee. Jordan Lee was charged twice for the same order last week, and I'm calling to request a refund for the duplicate.",
+   "offset_seconds": 3.74
+  },
+  {
+   "speaker": "user",
+   "text": "Let me um, look. Yep, I've refunded the second charge.",
+   "offset_seconds": 16.65
+  },
+  {
+   "speaker": "bot",
+   "text": "How long will the refund take?",
+   "offset_seconds": 21.38
+  },
+  {
+   "speaker": "user",
+   "text": "Sure, yeah, so, confirmed.",
+   "offset_seconds": 24.0
+  },
+  {
+   "speaker": "bot",
+   "text": "Can you confirm the refund has been issued?",
+   "offset_seconds": 26.46
+  },
+  {
+   "speaker": "user",
+   "text": "Okay, bye.",
+   "offset_seconds": 30.26
+  }
+ ]
+}

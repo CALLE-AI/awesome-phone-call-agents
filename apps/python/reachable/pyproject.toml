@@ -1,0 +1,49 @@
+[project]
+name = "reachable"
+version = "0.1.0"
+description = "Keeps a school's emergency contacts reachable, and follows up unexplained absence by phone."
+readme = "README.md"
+requires-python = ">=3.11"
+dependencies = [
+    "fastapi>=0.115",
+    "uvicorn>=0.30",
+    "jinja2>=3.1",
+    "httpx>=0.27",
+    "pydantic>=2.7",
+    "python-dotenv>=1.0",
+    "python-multipart>=0.0.9",
+    # The calling window is evaluated in an IANA zone, and the zone is never
+    # inferred from a phone number. Windows ships no system zone database, so
+    # this is required rather than optional.
+    "tzdata>=2024.1",
+]
+
+[project.optional-dependencies]
+# The real CALL-E SDK. Not needed for the default test suite, the fake server,
+# or `reachable replay`, all of which run with no network and no credentials.
+live = ["calle-ai>=0.7.0"]
+
+[dependency-groups]
+dev = ["pytest>=8.0", "httpx2>=2.12.0"]
+
+[project.scripts]
+reachable = "reachable.cli:main"
+
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[tool.hatch.build.targets.wheel]
+packages = ["reachable"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+# Warnings are errors, so a deprecation in our own code fails the build. The two
+# exemptions are import-time deprecations raised inside starlette and anyio that
+# we cannot fix from here; both are matched by message, so any other warning from
+# the same libraries still fails.
+filterwarnings = [
+    "error",
+    "ignore:The anyio.abc.BlockingPortal alias is deprecated:DeprecationWarning",
+    "ignore:Using `httpx` with `starlette.testclient` is deprecated:Warning",
+]

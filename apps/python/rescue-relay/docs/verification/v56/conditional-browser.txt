@@ -1,0 +1,11 @@
+PASS: The original assessment-and-feeding goal with conditional transport is accepted as one goal
+PASS: The exact IF/ELSE correction preserves ELSE feeding without a forced menu or a saved report
+PASS: Selecting is local; Confirm goal saves the full condition and still makes no inquiry
+PASS: Find help collects offers for the whole conditional plan; future assessment is not an intake blocker
+PASS: Review & approve shows branches and price ceilings; cancellation makes no callback
+PASS: Approval accepts conditional contracts; transport and ELSE feeding remain on standby until assessment
+PASS: Branch rules, assessment controls and helper cards reflow without horizontal overflow at 320–1440px
+PASS: Opening or cancelling an assessment dialog records nothing and leaves both branches pending
+PASS: An acknowledged NO result enables feeding only, makes no call and fabricates no completed work
+PASS: The unused transport branch has no progress control; the rescue cannot close before actual help finishes
+10 browser checks passed

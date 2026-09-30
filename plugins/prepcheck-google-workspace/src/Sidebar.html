@@ -1,0 +1,496 @@
+<!DOCTYPE html>
+<html>
+<head>
+<base target="_top">
+<style>
+  :root {
+    --ink:     #17221F;
+    --muted:   #6C7D77;
+    --faint:   #97A5A0;
+    --rule:    #E4E8E6;
+    --paper:   #FFFFFF;
+    --wash:    #F4F7F6;
+    --drape:   #1F5E52;   /* surgical drape green — the one brand colour */
+    --ready:   #2E7D5B;
+    --warn:    #B07A12;
+    --alarm:   #A32E22;
+    --idle:    #B6C0BC;
+  }
+
+  * { box-sizing: border-box; }
+
+  body {
+    margin: 0;
+    font-family: -apple-system, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+    font-size: 13px;
+    line-height: 1.45;
+    color: var(--ink);
+    background: var(--paper);
+  }
+
+  .wrap { padding: 0 0 26px; }
+
+  /* ---------- clinic header ---------- */
+
+  header {
+    padding: 16px 16px 13px;
+    border-bottom: 1px solid var(--rule);
+  }
+  header .clinic {
+    margin: 0;
+    font-size: 15px;
+    font-weight: 600;
+    letter-spacing: -0.01em;
+  }
+  header .strap {
+    margin: 3px 0 0;
+    font-size: 12px;
+    color: var(--muted);
+  }
+
+  /* ---------- list ---------- */
+
+  .group { padding: 14px 16px 2px; }
+  .group h2 {
+    margin: 0 0 2px;
+    font-size: 12px;
+    font-weight: 600;
+    color: var(--muted);
+  }
+
+  .patient {
+    display: block;
+    width: 100%;
+    text-align: left;
+    font: inherit;
+    color: inherit;
+    background: none;
+    border: 0;
+    border-top: 1px solid var(--rule);
+    padding: 11px 16px 11px 13px;
+    border-left: 3px solid transparent;
+    cursor: pointer;
+  }
+  .patient:hover { background: var(--wash); }
+  .patient:focus-visible { outline: 2px solid var(--drape); outline-offset: -2px; }
+  .patient.alarm { border-left-color: var(--alarm); }
+  .patient.warn  { border-left-color: var(--warn); }
+  .patient.ready { border-left-color: var(--ready); }
+  .patient.ok    { border-left-color: var(--rule); }
+  .patient.idle  { border-left-color: var(--idle); }
+
+  .patient .top {
+    display: flex; justify-content: space-between; gap: 10px; align-items: baseline;
+  }
+  .patient .name { font-weight: 600; }
+  .patient .word { font-size: 12px; white-space: nowrap; }
+  .word.alarm { color: var(--alarm); }
+  .word.warn  { color: var(--warn); }
+  .word.ready { color: var(--ready); }
+  .word.ok, .word.idle { color: var(--muted); }
+
+  .patient .line { font-size: 12px; color: var(--muted); margin-top: 1px; }
+  .patient .holdup { font-size: 12px; color: var(--faint); margin-top: 2px; }
+
+  /* ---------- card ---------- */
+
+  .back {
+    font: inherit;
+    background: none;
+    border: 0;
+    color: var(--muted);
+    padding: 12px 16px 0;
+    cursor: pointer;
+  }
+  .back:hover { color: var(--ink); }
+
+  .card-head { padding: 6px 16px 14px; border-bottom: 1px solid var(--rule); }
+  .card-head h1 {
+    margin: 0; font-size: 18px; font-weight: 600; letter-spacing: -0.015em;
+  }
+  .card-head .when { margin: 3px 0 0; font-size: 12px; color: var(--muted); }
+
+  .verdict { padding: 15px 16px 14px; border-bottom: 1px solid var(--rule); }
+  .verdict .headline {
+    margin: 0; font-size: 16px; font-weight: 600; letter-spacing: -0.01em;
+  }
+  .verdict .headline.alarm { color: var(--alarm); }
+  .verdict .headline.warn  { color: var(--warn); }
+  .verdict .headline.ready { color: var(--ready); }
+  .verdict .because { margin: 5px 0 0; font-size: 12px; color: var(--muted); }
+
+  /* the checkpoint rail — genuinely a sequence, so it reads as one */
+  .rail { padding: 16px 16px 6px; }
+  .stage { display: flex; gap: 12px; }
+  .spine { flex: 0 0 11px; display: flex; flex-direction: column; align-items: center; }
+  .dot {
+    width: 9px; height: 9px; border-radius: 50%;
+    border: 2px solid var(--idle); background: var(--paper); margin-top: 4px;
+  }
+  .stage.past .dot { border-color: var(--ready); background: var(--ready); }
+  .stage.now  .dot { border-color: var(--drape); background: var(--drape);
+                     box-shadow: 0 0 0 3px rgba(31,94,82,.14); }
+  .thread { flex: 1; width: 2px; background: var(--rule); margin: 3px 0 0; }
+  .stage:last-child .thread { display: none; }
+
+  .stage-body { flex: 1; padding-bottom: 16px; }
+  .stage-when { font-size: 12px; color: var(--muted); }
+  .stage.now .stage-when { color: var(--drape); font-weight: 600; }
+
+  ul.steps { list-style: none; margin: 5px 0 0; padding: 0; }
+  ul.steps li { display: flex; gap: 8px; padding: 2px 0; }
+  .tick { flex: 0 0 13px; font-weight: 700; line-height: 1.4; }
+  .tick.done { color: var(--ready); }
+  .tick.outstanding { color: var(--alarm); }
+  .tick.unknown { color: var(--idle); }
+  li.is-unknown .step-label { color: var(--faint); }
+  li.is-outstanding .step-label { font-weight: 600; }
+
+  .facts { padding: 4px 16px 0; }
+  .fact {
+    display: flex; justify-content: space-between; gap: 10px;
+    font-size: 12px; color: var(--muted);
+    padding: 6px 0; border-top: 1px solid var(--rule);
+  }
+  .fact b { color: var(--ink); font-weight: 600; }
+
+  .note {
+    margin: 12px 16px 0; padding: 10px 11px;
+    background: #FBF4E4; border-radius: 3px; font-size: 12px;
+  }
+
+  .actions { display: flex; flex-direction: column; gap: 7px; padding: 16px 16px 0; }
+  button.act {
+    font: inherit; font-weight: 500;
+    padding: 10px 12px; border-radius: 3px;
+    border: 1px solid var(--rule); background: var(--paper); color: var(--ink);
+    cursor: pointer; text-align: left;
+  }
+  button.act:hover:not(:disabled) { background: var(--wash); }
+  button.act:focus-visible { outline: 2px solid var(--drape); outline-offset: 1px; }
+  button.act.primary {
+    background: var(--drape); color: #fff; border-color: var(--drape);
+  }
+  button.act.primary:hover:not(:disabled) { background: #17473E; }
+  button.act:disabled { opacity: .45; cursor: default; }
+
+  footer {
+    margin-top: 20px; padding: 12px 16px 0;
+    border-top: 1px solid var(--rule);
+    font-size: 11px; color: var(--faint);
+  }
+
+  .msg { padding: 24px 16px; color: var(--muted); }
+</style>
+</head>
+<body>
+<div id="root" class="msg">Loading…</div>
+
+<script>
+  var view = { name: 'list', rowId: null };
+
+  /* ---------- list ---------- */
+
+  function renderList(q) {
+    if (!q) return fail('No patients in this sheet yet.');
+    view = { name: 'list', rowId: null };
+
+    var groups = [
+      { key: 'attention', title: 'Needs attention' },
+      { key: 'working',   title: 'Preparation under way' },
+      { key: 'settled',   title: 'Ready for the procedure' }
+    ];
+
+    var wrap = el('div', 'wrap');
+
+    var head = el('header');
+    head.appendChild(text(el('p', 'clinic'), q.clinic));
+    head.appendChild(text(el('p', 'strap'),
+      'Procedure preparation \u00b7 ' + q.patients.length +
+      (q.patients.length === 1 ? ' patient' : ' patients')));
+    wrap.appendChild(head);
+
+    groups.forEach(function (g) {
+      var rows = q.patients.filter(function (p) { return p.bucket === g.key; });
+      if (!rows.length) return;
+      var grp = el('div', 'group');
+      grp.appendChild(text(el('h2'), g.title + ' (' + rows.length + ')'));
+      wrap.appendChild(grp);
+      rows.forEach(function (p) { wrap.appendChild(row(p)); });
+    });
+
+    wrap.appendChild(text(el('footer'),
+      'Calls placed by CALL-E' + (q.liveCalls ? '' : ' \u00b7 calling switched off')));
+
+    mount(wrap);
+  }
+
+  /** Replaces the panel contents with a node, never with a string. */
+  function mount(node) {
+    var root = document.getElementById('root');
+    root.className = '';
+    root.textContent = '';
+    root.appendChild(node);
+  }
+
+  /**
+   * Patient rows are built as DOM nodes with textContent, never as an HTML
+   * string carrying patient data. The row id travels in a data attribute and
+   * is read back by a delegated listener, so nothing a patient's name
+   * contains can become markup or script.
+   */
+  function row(p) {
+    var btn = el('button', 'patient ' + toneClass(p.tone));
+    btn.type = 'button';
+    btn.dataset.action = 'open';
+    btn.dataset.rowId = String(p.rowId);
+
+    var top = el('span', 'top');
+    top.appendChild(text(el('span', 'name'), p.name));
+    top.appendChild(text(el('span', 'word ' + toneClass(p.tone)), p.word));
+    btn.appendChild(top);
+
+    var line = p.procedure + (p.when ? ' \u00b7 ' + p.when : '');
+    btn.appendChild(text(el('div', 'line'), line));
+
+    if (p.holdup) btn.appendChild(text(el('div', 'holdup'), p.holdup));
+    return btn;
+  }
+
+  /* ---------- DOM helpers: structure from code, content from textContent ---------- */
+
+  function el(tag, cls) {
+    var n = document.createElement(tag);
+    if (cls) n.className = cls;
+    return n;
+  }
+
+  function text(node, value) {
+    node.textContent = value == null ? '' : String(value);
+    return node;
+  }
+
+  /** Tones are a closed set; never let a server string become a class name. */
+  function toneClass(tone) {
+    return ['alarm', 'warn', 'ready', 'ok', 'idle'].indexOf(tone) >= 0 ? tone : 'ok';
+  }
+
+  /* ---------- card ---------- */
+
+  function renderCard(c) {
+    if (!c) return fail('That patient is no longer in the sheet.');
+    view = { name: 'card', rowId: c.rowId };
+
+    var wrap = el('div', 'wrap');
+
+    var back = el('button', 'back');
+    back.type = 'button';
+    back.dataset.action = 'list';
+    back.textContent = '\u2190 All patients';
+    wrap.appendChild(back);
+
+    var head = el('div', 'card-head');
+    head.appendChild(text(el('h1'), c.name));
+    head.appendChild(text(el('p', 'when'),
+      c.procedure + (c.procedureAt ? ' \u00b7 ' + c.procedureAt : '')));
+    wrap.appendChild(head);
+
+    var verdict = el('div', 'verdict');
+    verdict.appendChild(text(el('p', 'headline ' + toneClass(c.tone)), headline(c)));
+    verdict.appendChild(text(el('p', 'because'), because(c)));
+    wrap.appendChild(verdict);
+
+    var rail = el('div', 'rail');
+    c.stages.forEach(function (s) { rail.appendChild(stage(s)); });
+    wrap.appendChild(rail);
+
+    var facts = el('div', 'facts');
+    if (c.nextCallAt) facts.appendChild(fact('Next call', c.nextCallAt));
+    if (c.partialCycles) {
+      facts.appendChild(fact('Follow-up calls used',
+        c.partialCycles + ' of ' + c.maxPartialCycles));
+    }
+    if (c.noAnswerAttempts) {
+      facts.appendChild(fact('Unanswered calls', String(c.noAnswerAttempts)));
+    }
+    wrap.appendChild(facts);
+
+    if (c.staffNote) wrap.appendChild(text(el('div', 'note'), c.staffNote));
+
+    var actions = el('div', 'actions');
+    var callBtn = el('button', 'act primary');
+    callBtn.type = 'button';
+    callBtn.dataset.action = 'callPatient';
+    callBtn.textContent = 'Call ' + first(c.name) + ' now';
+    actions.appendChild(callBtn);
+
+    var resetBtn = el('button', 'act');
+    resetBtn.type = 'button';
+    resetBtn.dataset.action = 'resetPatient';
+    resetBtn.textContent = 'Start this patient over';
+    actions.appendChild(resetBtn);
+    wrap.appendChild(actions);
+
+    wrap.appendChild(text(el('footer'),
+      'Calls placed by CALL-E' + (c.liveCalls ? '' : ' \u00b7 calling switched off')));
+
+    mount(wrap);
+  }
+
+  function headline(c) {
+    if (c.word === 'Needs you')     return 'Needs a person to step in';
+    if (c.word === 'Not ready')     return 'Not ready — release the slot';
+    if (c.word === 'Ready')         return 'Ready for the procedure';
+    if (c.word === 'Slipped back')  return 'A confirmed step has come undone';
+    if (c.word === 'Stalled')       return 'Preparation has stopped moving';
+    if (c.word === 'On the phone')  return 'On the phone now';
+    if (c.word === 'No answer')     return 'Could not reach them';
+    if (c.word === 'Not called yet') return 'Not called yet';
+    return 'Preparation under way';
+  }
+
+  function because(c) {
+    if (c.regressed.length) {
+      return 'Confirmed on an earlier call, now reported as not done: ' +
+             c.regressed.join(', ') + '.';
+    }
+    if (c.word === 'Stalled' || c.word === 'Needs you') {
+      return c.outstanding.length
+        ? 'Still outstanding after ' + c.partialCycles + ' follow-up ' +
+          (c.partialCycles === 1 ? 'call' : 'calls') + ': ' + c.outstanding.join(', ') + '.'
+        : 'Preparation has not moved since the previous call.';
+    }
+    if (c.word === 'Ready') return 'Every preparation step has been confirmed.';
+    if (c.word === 'Not called yet') {
+      return c.nextCallAt ? 'First call goes out ' + c.nextCallAt + '.'
+                          : 'No call scheduled yet.';
+    }
+    if (c.outstanding.length) return 'Waiting on ' + c.outstanding.join(', ') + '.';
+    return 'Waiting for the next checkpoint.';
+  }
+
+  function stage(s) {
+    var wrap = el('div', 'stage ' + positionClass(s.position));
+
+    var spine = el('div', 'spine');
+    spine.appendChild(el('span', 'dot'));
+    spine.appendChild(el('span', 'thread'));
+    wrap.appendChild(spine);
+
+    var body = el('div', 'stage-body');
+    body.appendChild(text(el('div', 'stage-when'), before(s.hoursBefore)));
+
+    var list = el('ul', 'steps');
+    s.items.forEach(function (it) { list.appendChild(step(it)); });
+    body.appendChild(list);
+
+    wrap.appendChild(body);
+    return wrap;
+  }
+
+  function positionClass(p) {
+    return ['past', 'now', 'ahead'].indexOf(p) >= 0 ? p : 'ahead';
+  }
+
+  function statusClass(st) {
+    return ['done', 'outstanding', 'unknown'].indexOf(st) >= 0 ? st : 'unknown';
+  }
+
+  function before(hours) {
+    var h = Number(hours);
+    if (!isFinite(h)) return '';
+    if (h % 24 === 0) {
+      var d = h / 24;
+      return d === 1 ? 'The day before' : d + ' days before';
+    }
+    return h + ' hours before';
+  }
+
+  function step(it) {
+    var st = statusClass(it.status);
+    var li = el('li', 'is-' + st);
+    var mark = st === 'done' ? '\u2713' : (st === 'outstanding' ? '\u2717' : '\u00b7');
+    li.appendChild(text(el('span', 'tick ' + st), mark));
+    li.appendChild(text(el('span', 'step-label'), it.label));
+    return li;
+  }
+
+  function fact(k, v) {
+    var row = el('div', 'fact');
+    row.appendChild(text(el('span'), k));
+    row.appendChild(text(el('b'), v));
+    return row;
+  }
+
+  /* ---------- plumbing ---------- */
+
+  /**
+   * One delegated listener for the whole panel. Buttons carry a data-action
+   * and, where relevant, a data-row-id; nothing is wired through markup.
+   */
+  document.addEventListener('click', function (ev) {
+    var btn = ev.target.closest ? ev.target.closest('button[data-action]') : null;
+    if (!btn) return;
+    var action = btn.dataset.action;
+
+    if (action === 'list') return loadList();
+    if (action === 'open') return open_(btn.dataset.rowId);
+    if (action === 'callPatient' || action === 'resetPatient') {
+      return act(action, btn);
+    }
+  });
+
+  function open_(rowId) {
+    if (!rowId) return;
+    busy('Opening\u2026');
+    google.script.run.withSuccessHandler(renderCard)
+      .withFailureHandler(failWith).focusRow(String(rowId));
+  }
+
+  function loadList() {
+    busy('Loading\u2026');
+    google.script.run.withSuccessHandler(renderList)
+      .withFailureHandler(failWith).getQueue();
+  }
+
+  function act(fn, btn) {
+    var all = document.querySelectorAll('button');
+    for (var i = 0; i < all.length; i++) all[i].disabled = true;
+    btn.textContent = 'Working\u2026';
+    google.script.run.withSuccessHandler(renderCard)
+      .withFailureHandler(failWith)[fn](view.rowId);
+  }
+
+  function refresh() {
+    if (view.name === 'card' && view.rowId) {
+      google.script.run.withSuccessHandler(renderCard)
+        .withFailureHandler(failWith).getPatientCard(view.rowId);
+    } else {
+      google.script.run.withSuccessHandler(renderList)
+        .withFailureHandler(failWith).getQueue();
+    }
+  }
+
+  function busy(t) {
+    var root = document.getElementById('root');
+    root.className = 'msg';
+    root.textContent = t;
+  }
+
+  function fail(t) {
+    var root = document.getElementById('root');
+    root.className = 'msg';
+    root.textContent = t;
+  }
+
+  function failWith(e) {
+    fail(e && e.message ? String(e.message) : 'Something went wrong.');
+  }
+
+  function first(n) { return String(n || '').split(' ')[0]; }
+
+  loadList();
+  window.addEventListener('focus', refresh);
+</script>
+</body>
+</html>

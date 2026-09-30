@@ -1,0 +1,90 @@
+{
+  "id": "eval-023",
+  "label": "agent",
+  "difficulty": "hard",
+  "scenario": "Dealership service voice agent deliberately inserts 'um', 'let me see', and 'mm-hmm' backchannels to sound human; issues an appointment number and SMS.",
+  "task": "Book an oil change and tire rotation Saturday morning for Melissa Grant's 2019 CR-V.",
+  "outcome": {
+    "task_completed_claimed": true,
+    "commitment_type": "booking",
+    "confirmation_artifact": "appointment number SA402; SMS confirmation sent to 555-0137",
+    "expected_attestation": "agent_asserted"
+  },
+  "turns": [
+    {
+      "speaker": "user",
+      "text": "hi, thanks for calling Riverside Honda service, this is the service scheduling assistant. um, how can I help?",
+      "offset_seconds": 1.0
+    },
+    {
+      "speaker": "bot",
+      "text": "hi, I'm an AI assistant calling on behalf of Melissa Grant. she needs an oil change and tire rotation for her twenty nineteen Honda CR-V.",
+      "offset_seconds": 8.5
+    },
+    {
+      "speaker": "user",
+      "text": "mm-hmm, okay, sure. let me see... do you happen to have the VIN or the phone number on file?",
+      "offset_seconds": 18.02
+    },
+    {
+      "speaker": "bot",
+      "text": "the phone number is 555-0137.",
+      "offset_seconds": 25.97
+    },
+    {
+      "speaker": "user",
+      "text": "okay, one sec... yeah, I've got Melissa Grant, twenty nineteen CR-V, silver. um, what day were you thinking?",
+      "offset_seconds": 31.03
+    },
+    {
+      "speaker": "bot",
+      "text": "Saturday morning if possible.",
+      "offset_seconds": 38.29
+    },
+    {
+      "speaker": "user",
+      "text": "so, Saturday... let me see. I have, uh, eight thirty or ten fifteen.",
+      "offset_seconds": 40.77
+    },
+    {
+      "speaker": "bot",
+      "text": "eight thirty, please.",
+      "offset_seconds": 46.11
+    },
+    {
+      "speaker": "user",
+      "text": "mm-hmm.",
+      "offset_seconds": 47.59
+    },
+    {
+      "speaker": "bot",
+      "text": "and she'll wait at the dealership, if that affects anything.",
+      "offset_seconds": 48.3
+    },
+    {
+      "speaker": "user",
+      "text": "yeah no, that's totally fine, that's about an hour. okay so, you're booked for Saturday the nineteenth at eight thirty for an oil change and tire rotation. I just sent a confirmation text to 555-0137 with your appointment number, which is S A 4 0 2.",
+      "offset_seconds": 52.95
+    },
+    {
+      "speaker": "bot",
+      "text": "S A 4 0 2. thank you.",
+      "offset_seconds": 71.93
+    },
+    {
+      "speaker": "user",
+      "text": "yep, you got it. um, anything else I can help with?",
+      "offset_seconds": 75.14
+    },
+    {
+      "speaker": "bot",
+      "text": "no, that's all.",
+      "offset_seconds": 79.85
+    },
+    {
+      "speaker": "user",
+      "text": "okay, awesome. see you Saturday!",
+      "offset_seconds": 81.78
+    }
+  ]
+}

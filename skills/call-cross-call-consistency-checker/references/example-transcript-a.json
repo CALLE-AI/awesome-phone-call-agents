@@ -1,0 +1,12 @@
+{
+  "status": "COMPLETED",
+  "result": {
+    "post_summary": "Customer confirmed the delivery details.",
+    "transcript": [
+      {"speaker": "agent", "text": "Hello, this is an automated assistant calling from Example Depot. Your delivery fee is $45 and the drop-off is on Tuesday the 15th at 2 p.m."},
+      {"speaker": "callee", "text": "Okay, that works."},
+      {"speaker": "agent", "text": "Great, confirmed. Goodbye."}
+    ]
+  },
+  "callee_phone": "+14155550152"
+}

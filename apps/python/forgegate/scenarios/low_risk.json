@@ -1,0 +1,7 @@
+{
+  "incident_id": "inc_002",
+  "source": "temp_sensor",
+  "signals": { "temp_c": 24.8 },
+  "risk_score": 0.12,
+  "proposed_action": "none - routine temperature fluctuation, no access anomaly"
+}
