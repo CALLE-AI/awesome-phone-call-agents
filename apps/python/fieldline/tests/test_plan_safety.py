@@ -119,3 +119,33 @@ def test_malformed_yaml_is_a_plan_error(tmp_path, content):
     path.write_text(content)
     with pytest.raises(TripPlanError):
         load_trip_plan(path)
+
+
+@pytest.mark.parametrize("number", ["+15555550100", "2025550111", "+1 (555) 555-0100", "(202) 555-0111"])
+@pytest.mark.parametrize("suffix", ["x123", "X123", " ext123", "ext.123", " EXT. 123", " extension 123", "#123", ";ext=123"])
+def test_scrubber_masks_phone_and_extension(number, suffix):
+    text = f"Contact {number}{suffix} now"
+    result = scrub_text(text)
+    assert number not in result
+    assert "123" not in result
+    assert "•••" in result
+    assert result.startswith("Contact ") and result.endswith(" now")
+
+
+def test_extension_phone_is_masked_in_banner_and_live_report(plan):
+    from dataclasses import replace
+    from io import StringIO
+    from rich.console import Console
+    from fieldline.render import RichRenderer
+    from fieldline.report import build_incident_brief
+
+    phone = "+15555550100x123"
+    plan = replace(plan, label=f"Contact {phone}", site=f"Site {phone}")
+    stream = StringIO()
+    renderer = RichRenderer(Console(file=stream, width=200, force_terminal=False))
+    renderer.banner(plan, demo=False)
+    brief = build_incident_brief(plan, [("14:00", f"Call {phone}", "info")], [], "review required", False)
+    assert "+15555550100" not in stream.getvalue()
+    assert "+15555550100" not in brief
+    assert "123" not in stream.getvalue()
+    assert "123" not in brief

@@ -243,10 +243,20 @@ def scrub_text(text: str) -> str:
         value = match.group(0)
         if re.fullmatch(r"[0-9]{4}-[0-9]{2}-[0-9]{2}", value):
             return value
-        digits = re.sub(r"[^0-9]", "", value)
-        return mask_phone(("+" if value.startswith("+") else "") + digits)
+        phone = match.group("phone")
+        digits = re.sub(r"[^0-9]", "", phone)
+        masked = mask_phone(("+" if phone.startswith("+") else "") + digits)
+        return masked + (" ext •••" if match.group("extension") else "")
 
-    return re.sub(r"\b[0-9]{4}-[0-9]{2}-[0-9]{2}\b|(?<![\w])\+?\(?[0-9](?:[ \t().-]*[0-9]){6,}\)?(?![\w])", replace, text)
+    return re.sub(
+        r"\b[0-9]{4}-[0-9]{2}-[0-9]{2}\b|"
+        r"(?<![\w])(?P<phone>\+?\(?[0-9](?:[ \t().-]*[0-9]){6,}\)?)"
+        r"(?P<extension>[ \t]*(?:extension|ext\.?|x|#|;ext=)[ \t]*[0-9]+)?"
+        r"(?![\w])",
+        replace,
+        text,
+        flags=re.IGNORECASE,
+    )
 
 
 def mask_phone(phone: str) -> str:
