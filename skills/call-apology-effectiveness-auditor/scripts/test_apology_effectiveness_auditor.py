@@ -171,6 +171,27 @@ def test_apology_detected_we_apologize():
     assert card["apology_detected"] is True
 
 
+def test_apology_detected_intensified_truly_sorry():
+    card = analyze_turns(
+        _turns(
+            ("callee", "This is unacceptable."),
+            ("agent", "I'm truly sorry. That's on us. I will send a new letter."),
+            ("callee", "Fine."),
+        )
+    )
+    assert card["verdict"] == "EFFECTIVE_APOLOGY"
+    assert "ACKNOWLEDGMENT" in card["components_present"]
+    assert "REPAIR" in card["components_present"]
+    assert "REGRET" in card["components_present"]
+    assert card["typology"] == "rote"
+
+
+def test_apology_detected_intensified_so_sorry_partial():
+    card = analyze_turns(_turns(("callee", "This is unacceptable."), ("agent", "I'm so sorry.")))
+    assert card["apology_detected"] is True
+    assert card["verdict"] == "PARTIAL_APOLOGY"
+
+
 def test_apology_only_before_grievance_not_counted():
     # The agent apologized before the grievance was raised; the window from
     # g onward has no apology, so the grievance is unaddressed.
