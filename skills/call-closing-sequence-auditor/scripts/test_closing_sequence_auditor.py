@@ -87,6 +87,17 @@ def test_load_mixed_list_skips_non_dicts():
         assert len(load_call_result(p)["turns"]) == 2
 
 
+def test_load_result_wrapped_shape():
+    # Real get_call_run shape: status top-level, transcript under result.
+    with tempfile.TemporaryDirectory() as td:
+        p = _write_result(Path(td), {"status": "COMPLETED", "result": {"transcript": _turns(("agent", "Just to confirm - your table is booked for Friday at 7 p.m. You will receive a text. Anything else?"), ("callee", "No, that is all. Bye."), ("agent", "Goodbye."))}})
+        data = load_call_result(p)
+    assert data["status"] == "COMPLETED"
+    assert data["turns"][2]["speaker"] == "agent"
+    card = analyze_turns(data["turns"])
+    assert card["verdict"] == "WELL_FORMED_CLOSING"
+
+
 def test_whitespace_transcript_unclear_empty():
     with tempfile.TemporaryDirectory() as td:
         p = _write_result(Path(td), {"status": "C", "transcript": "   "})
