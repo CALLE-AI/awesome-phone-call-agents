@@ -89,7 +89,7 @@ _GRIEVANCE_RE = re.compile(
 # An apology sentence in an agent turn, including intensified
 # ("I'm so/truly/deeply/very sorry") and uncontracted ("I am sorry") forms.
 _APOLOGY_RE = re.compile(
-    r"\b(?:i'?m (?:so|truly|deeply|very)?\s*sorry|i am (?:so|truly|deeply|very )?sorry|"
+    r"\b(?:i'?m (?:so|truly|deeply|very)?\s*sorry|i am (?:so|truly|deeply|very)?\s*sorry|"
     r"i apologize|we apologize|our apologies|my apologies|sorry about|sorry that)\b",
     re.IGNORECASE,
 )
