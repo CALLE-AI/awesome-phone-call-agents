@@ -84,9 +84,10 @@ _SENTENCE_SPLIT_RE = re.compile(r"(?<=[.!?])(?<![aApP]\.m\.)\s+(?=[A-Z])")
 SUMMARY_MARKERS = re.compile(r"\b(?:to summarize|just to confirm|to recap|recap|summarizing|so to confirm)\b", re.IGNORECASE)
 CONFIRM_VERBS = re.compile(r"\b(?:booked|confirmed|cancelled|canceled|rescheduled|reserved)\b", re.IGNORECASE)
 ARRANGEMENT_RE = re.compile(
-    r"(?:we'?ll (?:send|email|call|text|mail)|you'?ll (?:receive|get)|"
-    r"i'?ll (?:call|send|email|text) (?:you|the|it|a)|no further action|"
-    r"nothing else (?:needed|required))",
+    r"(?:(?:we'?ll|we will) (?:send|email|call|text|mail)|"
+    r"(?:you'?ll|you will) (?:receive|get)|"
+    r"(?:i'?ll|i will) (?:call|send|email|text) (?:you|the|it|a)|"
+    r"no further action|nothing else (?:needed|required))",
     re.IGNORECASE,
 )
 FAREWELL_RE = re.compile(

@@ -194,6 +194,21 @@ def test_arrangement_no_further_action():
     assert checks["arrangement_present"] is True
 
 
+def test_arrangement_we_will_send():
+    checks = _checks(("agent", "We will send the confirmation text."), ("callee", "Okay."))
+    assert checks["arrangement_present"] is True
+
+
+def test_arrangement_you_will_receive():
+    checks = _checks(("agent", "You will receive a text shortly."), ("callee", "Okay."))
+    assert checks["arrangement_present"] is True
+
+
+def test_arrangement_i_will_call_you():
+    checks = _checks(("agent", "I will call you tomorrow."), ("callee", "Okay."))
+    assert checks["arrangement_present"] is True
+
+
 def test_arrangement_negative():
     checks = _checks(("agent", "We had a lovely chat about the menu."), ("callee", "Okay."))
     assert checks["arrangement_present"] is False
