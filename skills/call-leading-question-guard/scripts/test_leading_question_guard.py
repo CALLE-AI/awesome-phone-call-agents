@@ -93,6 +93,17 @@ def test_load_missing_text_defaults_empty():
         assert load_call_result(p)["turns"] == [{"speaker": "agent", "text": ""}]
 
 
+def test_load_result_wrapped_shape():
+    # Real get_call_run shape: status top-level, transcript under result.
+    with tempfile.TemporaryDirectory() as td:
+        p = _write_result(Path(td), {"status": "COMPLETED", "result": {"transcript": _turns(("agent", "You can come Friday, right?"), ("callee", "Yes, Friday works."))}})
+        data = load_call_result(p)
+    assert data["status"] == "COMPLETED"
+    assert data["turns"][0]["speaker"] == "agent"
+    card = analyze_turns(data["turns"])
+    assert card["verdict"] == "LEADING_TAINTED"
+
+
 # ---------------------------------------------------------------- classification
 
 
