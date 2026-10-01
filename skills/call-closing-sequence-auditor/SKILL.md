@@ -64,7 +64,9 @@ checks are:
 
 - `verdict`: `WELL_FORMED_CLOSING` / `DEFICIENT_CLOSING`, plus `unclear`
   paths (empty transcript, insufficient signal); `reasons[]` lists the
-  gaps in a fixed order, with `NO_TERMINAL_EXCHANGE` suppressed when
+  gaps in a fixed order - `MISSING_SUMMARY`, `MISSING_ARRANGEMENT`,
+  `NO_TERMINAL_EXCHANGE`, `DANGLING_QUESTION`, `POST_CLOSING_BUSINESS`,
+  `ABRUPT_END` - with `NO_TERMINAL_EXCHANGE` suppressed when
   `ABRUPT_END` already names the truncated goodbye
 
 ### Craft the clean-closing goal
