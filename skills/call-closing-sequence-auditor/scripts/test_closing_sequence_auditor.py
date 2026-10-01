@@ -146,6 +146,28 @@ def test_summary_confirm_verb_without_value_negative():
     assert checks["summary_present"] is False
 
 
+def test_summary_marker_no_false_positive_inside_word():
+    # "recapitalize" contains "recap" as a substring but is not a summary
+    # marker; only word-boundary matches count.
+    card = analyze_turns(
+        _turns(
+            ("agent", "We plan to recapitalize the debt. You'll receive a confirmation text. Goodbye."),
+            ("callee", "Okay, bye."),
+        )
+    )
+    assert card["checks"]["summary_present"] is False
+    assert card["verdict"] == "DEFICIENT_CLOSING"
+    assert card["reasons"] == ["MISSING_SUMMARY"]
+
+
+def test_summary_marker_quick_recap_positive():
+    checks = _checks(
+        ("agent", "Quick recap - your table is booked for Friday at 7 p.m."),
+        ("callee", "Okay."),
+    )
+    assert checks["summary_present"] is True
+
+
 def test_summary_outside_window_not_counted():
     # Seven filler turns push the summary out of the 6-turn window.
     pairs = [("agent", "Just to confirm - the table is set.")]
@@ -226,6 +248,19 @@ def test_dangling_followed_only_by_farewell():
     assert checks["dangling_question"] is True
 
 
+def test_dangling_okay_acknowledgment_before_farewell_counts_as_answer():
+    # Intentional boundary, pinned by this test: an agent "Okay." is treated
+    # as a substantive answer-acknowledgment, not farewell-only - an "Okay"
+    # can BE the yes-answer to the callee's question. No behavior change.
+    checks = _checks(
+        ("agent", "Hi."),
+        ("callee", "Will you call me back?"),
+        ("agent", "Okay. Goodbye."),
+        ("callee", "Bye."),
+    )
+    assert checks["dangling_question"] is False
+
+
 def test_dangling_no_question_false():
     checks = _checks(("agent", "Hi."), ("callee", "Thanks."))
     assert checks["dangling_question"] is False
@@ -252,6 +287,17 @@ def test_post_closing_business_question_after_farewell():
     assert checks["post_closing_business"] is True
 
 
+def test_post_closing_business_sandwich_between_farewells():
+    # Agent value after its FIRST farewell counts as post-closing business,
+    # even with farewells interleaved on both sides.
+    checks = _checks(
+        ("agent", "Thank you, goodbye."),
+        ("callee", "Bye."),
+        ("agent", "The lounge opens Monday."),
+    )
+    assert checks["post_closing_business"] is True
+
+
 def test_post_closing_farewell_only_after_farewell():
     checks = _checks(("agent", "Goodbye."), ("agent", "Goodbye."), ("callee", "Bye."))
     assert checks["post_closing_business"] is False
@@ -268,6 +314,20 @@ def test_abrupt_last_agent_question_no_farewell():
 def test_abrupt_callee_plain_statement_no_farewell():
     checks = _checks(("agent", "We are set for Friday."), ("callee", "Great."))
     assert checks["abrupt_end"] is True
+
+
+def test_abrupt_ignores_trailing_whitespace_only_turn():
+    # A whitespace-only tail turn must not count as the call's final turn;
+    # abrupt_end reads the last NON-EMPTY turn.
+    card = analyze_turns(
+        _turns(
+            ("agent", "Just to confirm - the table is booked for Friday the 15th. You'll receive a text. Goodbye."),
+            ("callee", "Okay, bye."),
+            ("callee", "   "),
+        )
+    )
+    assert card["checks"]["abrupt_end"] is False
+    assert card["verdict"] == "WELL_FORMED_CLOSING"
 
 
 def test_abrupt_normal_close_false():
