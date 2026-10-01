@@ -575,6 +575,29 @@ def test_main_returns_int():
     assert main(["craft", "--scenario", "clean-closing"]) == 0
 
 
+def test_cli_invalid_json_exit_2():
+    with tempfile.TemporaryDirectory() as td:
+        p = Path(td) / "broken.json"
+        p.write_text("{not valid json", encoding="utf-8")
+        proc = _cli("analyze", "--transcript", str(p))
+    assert proc.returncode == 2
+    assert "ERROR" in proc.stderr
+
+
+def test_cli_json_array_exit_2():
+    with tempfile.TemporaryDirectory() as td:
+        p = Path(td) / "array.json"
+        p.write_text('[{"speaker":"agent","text":"Hi"}]', encoding="utf-8")
+        proc = _cli("analyze", "--transcript", str(p))
+    assert proc.returncode == 2
+    assert "ERROR" in proc.stderr
+
+
+def test_cli_missing_required_arg_exit_2():
+    proc = _cli("analyze")
+    assert proc.returncode == 2
+
+
 # ---------------------------------------------------------------- runner
 
 
