@@ -25,6 +25,13 @@
 - Question-form detection is English-only lexical matching; tone,
   prosody, and pressure outside the question sentence are invisible in
   text.
+- Known limitation: sentence boundaries directly after "a.m."/"p.m." are
+  not split, so a leading question that begins immediately after an
+  a.m./p.m.-terminated sentence inside the same agent turn (for example
+  "...at 9 a.m. Don't you want a refill?") can merge into the previous
+  sentence and be missed. End-anchored and mid-sentence detectors (tag,
+  presupposition, coercive) still fire on merged sentences; only a
+  sentence-initial negative interrogative in this exact shape can escape.
 
 ## Test-call policy
 
