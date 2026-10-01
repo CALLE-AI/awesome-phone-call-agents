@@ -135,6 +135,21 @@ def test_bounded_closed_should_i_is_closed():
     assert classify_question("Should I set it for Friday at 10 a.m.?") == "CLOSED"
 
 
+def test_am_pm_question_not_split_by_abbreviation_period():
+    # A question ending in "a.m. + capitalized word" must stay one sentence.
+    card = _card(("agent", "Won't you come in at 10 a.m. Friday?"))
+    assert card["questions_total"] == 1
+    assert card["questions"][0]["kind"] == "NEGATIVE_INTERROGATIVE"
+    assert card["questions"][0]["leading"] is True
+
+
+def test_am_pm_presupposition_question_not_split():
+    card = _card(("agent", "Can you still make the 9 a.m. May 3rd appointment?"))
+    assert card["questions_total"] == 1
+    assert card["questions"][0]["kind"] == "PRESUPPOSITION"
+    assert card["questions"][0]["leading"] is True
+
+
 def test_declarative_with_presupposition_word_not_question():
     card = _card(("agent", "You are still on the list."), ("callee", "Okay."))
     assert card["questions"] == []
@@ -158,6 +173,16 @@ def test_taint_affirmation_plus_value_same_turn():
     assert card["verdict"] == "LEADING_TAINTED"
     assert card["tainted_elicitation"][0]["value"] == "friday"
     assert card["tainted_elicitation"][0]["question_kind"] == "TAG"
+
+
+def test_taint_all_values_in_affirming_turn():
+    card = _card(
+        ("agent", "You are coming Friday, right?"),
+        ("callee", "Yes, Friday at 9 a.m."),
+    )
+    values = {t["value"] for t in card["tainted_elicitation"]}
+    assert values == {"friday", "0900"}
+    assert all(t["turn_index"] == 1 for t in card["tainted_elicitation"])
 
 
 def test_no_taint_affirmation_only():
@@ -195,6 +220,26 @@ def test_no_taint_after_open_question():
     )
     assert card["verdict"] == "NEUTRAL_ELICITATION"
     assert card["tainted_elicitation"] == []
+
+
+def test_taint_via_i_plus_2_window_with_agent_turn_between():
+    card = _card(
+        ("agent", "You can pick up on Friday, right?"),
+        ("agent", "Let me note that down."),
+        ("callee", "Yes, Friday works."),
+    )
+    assert card["verdict"] == "LEADING_TAINTED"
+    assert card["tainted_elicitation"][0]["value"] == "friday"
+    assert card["tainted_elicitation"][0]["turn_index"] == 2
+
+
+def test_two_questions_in_one_agent_turn_both_classified():
+    card = _card(("agent", "You are coming, right? What time should I book?"))
+    assert card["questions_total"] == 2
+    assert card["questions"][0]["kind"] == "TAG"
+    assert card["questions"][1]["kind"] == "OPEN"
+    assert card["questions"][0]["leading"] is True
+    assert card["questions"][1]["leading"] is False
 
 
 # ---------------------------------------------------------------- verdicts
@@ -254,6 +299,7 @@ def test_no_agent_turns_unclear():
 
 def test_mask_pii_masks_phone_keep_last_two():
     assert "555" not in mask_pii("number 415-555-0141")
+    assert mask_pii("415-555-0141").endswith("41")
 
 
 def test_masked_sentence_in_findings():
