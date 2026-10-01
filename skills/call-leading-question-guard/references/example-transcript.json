@@ -1,0 +1,17 @@
+{
+  "call_id": "run-lead-tainted",
+  "status": "COMPLETED",
+  "callee_phone": "+14155550141",
+  "transcript": [
+    {"speaker": "agent", "text": "Hello, this is an automated assistant calling from Example Pharmacy."},
+    {"speaker": "callee", "text": "Hello."},
+    {"speaker": "agent", "text": "You can pick up your prescription on Friday, right?"},
+    {"speaker": "callee", "text": "Yes, Friday works."},
+    {"speaker": "callee", "text": "I can come by whenever."},
+    {"speaker": "agent", "text": "Don't you want to keep the auto-refill going?"},
+    {"speaker": "callee", "text": "Yeah, sure."},
+    {"speaker": "agent", "text": "What time works best for you?"},
+    {"speaker": "callee", "text": "Around 10 a.m."},
+    {"speaker": "agent", "text": "Great, we will see you then. Thank you and goodbye."}
+  ]
+}
