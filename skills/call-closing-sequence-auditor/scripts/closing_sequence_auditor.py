@@ -81,7 +81,7 @@ _TIME_RE = re.compile(r"\b(?:at\s+)?([0-9]{1,2})(?::([0-9]{2}))?\s*(a\.?m\.?|p\.
 _SENTENCE_SPLIT_RE = re.compile(r"(?<=[.!?])(?<![aApP]\.m\.)\s+(?=[A-Z])")
 
 # Closing-window lexicons (case-insensitive).
-SUMMARY_MARKERS = re.compile(r"(?:to summarize|just to confirm|to recap|recap|summarizing|so to confirm)", re.IGNORECASE)
+SUMMARY_MARKERS = re.compile(r"\b(?:to summarize|just to confirm|to recap|recap|summarizing|so to confirm)\b", re.IGNORECASE)
 CONFIRM_VERBS = re.compile(r"\b(?:booked|confirmed|cancelled|canceled|rescheduled|reserved)\b", re.IGNORECASE)
 ARRANGEMENT_RE = re.compile(
     r"(?:we'?ll (?:send|email|call|text|mail)|you'?ll (?:receive|get)|"
@@ -196,7 +196,10 @@ def closing_checks(turns: list[dict[str, str]]) -> dict[str, bool]:
     # on a question or on a plain non-farewell turn.
     if not any(FAREWELL_RE.search(tx) for _, tx in agent_in_window):
         last_agent_text = agent_turns[-1][1] if agent_turns else ""
-        last_turn_text = str(turns[-1].get("text", "")).strip()
+        # Read the last NON-EMPTY turn, matching the filtering used for the
+        # agent/callee turn lists - a whitespace-only tail is not speech.
+        nonempty_texts = [str(t.get("text", "")).strip() for t in turns if str(t.get("text", "")).strip()]
+        last_turn_text = nonempty_texts[-1] if nonempty_texts else ""
         last_agent_asks = last_agent_text.endswith("?")
         last_turn_settled = bool(FAREWELL_RE.search(last_turn_text)) or last_turn_text.endswith("?")
         checks["abrupt_end"] = last_agent_asks or not last_turn_settled
