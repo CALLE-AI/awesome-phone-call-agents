@@ -73,10 +73,10 @@ _ORDINAL_RE = re.compile(r"\bthe ([0-9]{1,2})(?:st|nd|rd|th)\b", re.IGNORECASE)
 _AMOUNT_RE = re.compile(r"[$]([0-9][0-9 ,./-]*[0-9]|[0-9])\b|\b([0-9][0-9 ,./-]*[0-9]|[0-9])\s+(?:dollars|usd)\b", re.IGNORECASE)
 _TIME_RE = re.compile(r"\b(?:at\s+)?([0-9]{1,2})(?::([0-9]{2}))?\s*(a\.?m\.?|p\.?m\.?)\b", re.IGNORECASE)
 
-# Split on sentence enders, but not inside "a.m."/"p.m." (abbreviation
-# periods are followed by a lowercase word or comma, real sentence ends by
-# a capitalized word).
-_SENTENCE_SPLIT_RE = re.compile(r"(?<=[.!?])\s+(?=[A-Z])")
+# Split on sentence enders, but not inside "a.m."/"p.m." - abbreviation
+# periods in a.m./p.m. are excluded from split points via a fixed-width
+# lookbehind.
+_SENTENCE_SPLIT_RE = re.compile(r"(?<=[.!?])(?<![aApP]\.m\.)\s+(?=[A-Z])")
 
 # Question-form families, checked in this exact order; first match wins.
 _TAG_RE = re.compile(
@@ -214,19 +214,20 @@ def detect_taint(
             values = extract_values(text)
             if not values:
                 continue
-            value = mask_pii(values[0][1])
-            key = (value, j)
-            if key in seen:
-                continue
-            seen.add(key)
-            taints.append(
-                {
-                    "turn_index": j,
-                    "question_kind": question["kind"],
-                    "value": value,
-                    "sentence": mask_pii(text)[:160],
-                }
-            )
+            for kind, raw_value in values:
+                value = mask_pii(raw_value)
+                key = (value, j)
+                if key in seen:
+                    continue
+                seen.add(key)
+                taints.append(
+                    {
+                        "turn_index": j,
+                        "question_kind": question["kind"],
+                        "value": value,
+                        "sentence": mask_pii(text)[:160],
+                    }
+                )
     return taints
 
 
