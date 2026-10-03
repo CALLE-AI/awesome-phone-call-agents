@@ -99,7 +99,9 @@ _AI_SELF_RE = re.compile(r"\b(?:i(?:'m| am) (?:an? )?(?:ai|automated|virtual ass
 
 _YES_NO_FIRST_RE = re.compile(r"^(?:yes|yeah|yep|no|nope|correct|that'?s right|that is right|i (?:am|do|did|have|can|will)|i'?m not|i don'?t|i do not|we (?:do|don'?t|did|can|cannot|will|won'?t))\b", re.IGNORECASE)
 
-_YES_NO_ANY_RE = re.compile(r"\b(?:yes|yeah|no|nope|correct|that'?s right|i (?:am|do|did|have|can|will))\b", re.IGNORECASE)
+# Anywhere-search variant covers the full first-token list (minus the anchor)
+# so late tokens like "We do." or "We won't." still grade partially_clear.
+_YES_NO_ANY_RE = re.compile(r"\b(?:yes|yeah|yep|no|nope|correct|that'?s right|that is right|i (?:am|do|did|have|can|will)|i'?m not|i don'?t|i do not|we (?:do|don'?t|did|can|cannot|will|won'?t))\b", re.IGNORECASE)
 
 _NOT_KNOWING_RE = re.compile(r"\b(?:i don'?t (?:know|have that)|i do not (?:know|have that)|i'?m not sure|i am not sure)\b", re.IGNORECASE)
 

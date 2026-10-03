@@ -265,6 +265,43 @@ def test_yesno_late_token_partial():
     assert report["verdict"] == "PARTIAL_EVASION"
 
 
+def test_yesno_late_we_do_partial():
+    report = analyze_turns(
+        _turns(
+            ("agent", "Hello."),
+            ("callee", "Do you deliver?"),
+            ("agent", "That's a great question. We do."),
+        )
+    )
+    q = report["questions"][0]
+    assert q["grade"] == "partially_clear"
+    assert q["mechanism"] == "non_answer_ack"
+
+
+def test_yesno_late_we_wont_partial():
+    report = analyze_turns(
+        _turns(
+            ("agent", "Hello."),
+            ("callee", "Will you charge me?"),
+            ("agent", "Good question. We won't."),
+        )
+    )
+    q = report["questions"][0]
+    assert q["grade"] == "partially_clear"
+
+
+def test_yesno_late_yep_partial():
+    report = analyze_turns(
+        _turns(
+            ("agent", "Hello."),
+            ("callee", "Can you deliver?"),
+            ("agent", "Great question. Yep, we deliver."),
+        )
+    )
+    q = report["questions"][0]
+    assert q["grade"] == "partially_clear"
+
+
 def test_deflection_counterquestion():
     report = analyze_turns(
         _turns(

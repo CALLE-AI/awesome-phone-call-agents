@@ -67,7 +67,7 @@ them. Yes/no questions are CLEAR only when the yes/no token leads the
 first sentence of the first window turn; a token found later in the
 window grades PARTIALLY_CLEAR. Information (wh) questions are CLEAR on
 provenance wording, a plain not-knowing statement, or a concrete amount.
-When one callee turn asks several questions, each is graded
+When one callee turn asks several questions, each question sentence is graded
 individually: a clear answer to one never lifts an evasive answer to
 another. All lexicons match uncontracted forms too ("we will", "i am").
 
@@ -90,6 +90,10 @@ another. All lexicons match uncontracted forms too ("we will", "i am").
   sentence embedded in a longer questioning turn is still graded.
 - Amount detection reads `$<digits>` and "<digits> dollars" only;
   number-word amounts ("twenty dollars") are not parsed.
+- Social wh openers like "What's up?" are not in the repair-initiator
+  skip list and are graded like information questions.
+- Provenance matching is deliberately generous: any record-attribution
+  phrase such as "your reservation shows..." clears a wh question.
 
 ## Usage
 
