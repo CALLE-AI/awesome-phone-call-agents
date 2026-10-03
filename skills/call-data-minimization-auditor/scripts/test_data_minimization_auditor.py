@@ -238,7 +238,7 @@ def test_callee_volunteer_never_flagged():
     assert card["verdict"] == "NO_DATA_REQUESTED"
 
 
-def test_calleeprompt_word_in_agent_statement_not_question():
+def test_category_noun_without_cue_not_a_request():
     # Agent statement containing a category noun without a request cue is
     # not a request: "I have your phone number on file already."
     card = analyze_data_requests(
@@ -246,6 +246,18 @@ def test_calleeprompt_word_in_agent_statement_not_question():
         GOAL_NAME_PHONE,
     )
     assert card["requests"] == []
+
+
+def test_cue_what_is_uncontracted():
+    # The uncontracted "what is" is a request cue, not just "what's".
+    card = analyze_data_requests(
+        _turns(("agent", "What is your date of birth?"), ("callee", "March 14.")),
+        GOAL_NAME_PHONE,
+    )
+    req = card["requests"][0]
+    assert req["category"] == "date_of_birth"
+    assert req["scope"] == "out_of_scope"
+    assert card["verdict"] == "OVERCOLLECTION_DETECTED"
 
 
 # ---------------------------------------------------------------- redundancy
@@ -274,6 +286,40 @@ def test_redundant_excused_by_sorry():
             ("callee", "My name is Dana Whitfield."),
             ("agent", "Sorry, I didn't catch that, can you confirm your full name?"),
             ("callee", "Whitfield, Dana."),
+        ),
+        GOAL_NAME_PHONE,
+    )
+    assert all(not r["redundant"] for r in card["requests"])
+    assert card["verdict"] == "MINIMAL"
+
+
+def test_politeness_sorry_not_excused():
+    # Politeness sorry ("Sorry to bother you again") is not a hearing
+    # excuse; the re-ask stays redundant.
+    card = analyze_data_requests(
+        _turns(
+            ("agent", "Can I have your full name, please?"),
+            ("callee", "My name is Dana Whitfield."),
+            ("agent", "Sorry to bother you again, but can you confirm your full name?"),
+            ("callee", "Dana Whitfield."),
+        ),
+        GOAL_NAME_PHONE,
+    )
+    reask = [r for r in card["requests"] if r["redundant"]]
+    assert len(reask) == 1
+    assert reask[0]["turn_index"] == 2
+    assert card["verdict"] == "OVERCOLLECTION_DETECTED"
+
+
+def test_hearing_sorry_excused():
+    # Hearing-scoped sorry ("Sorry, I didn't catch that") still excuses
+    # a re-ask in the same turn.
+    card = analyze_data_requests(
+        _turns(
+            ("agent", "Can I have your full name, please?"),
+            ("callee", "My name is Dana Whitfield."),
+            ("agent", "Sorry, I didn't catch that. Can you tell me your full name again?"),
+            ("callee", "Dana Whitfield."),
         ),
         GOAL_NAME_PHONE,
     )
@@ -343,6 +389,66 @@ def test_echo_in_scope_still_flagged():
     assert card["verdict"] == "OVERCOLLECTION_DETECTED"
 
 
+def test_echo_high_sensitivity_flagged():
+    card = analyze_data_requests(
+        _turns(
+            ("agent", "Can you give me your card number?"),
+            ("callee", "Sure, it is 4111 1111 1111 1113."),
+            ("agent", "I have your card number as 4111 1111 1111 1113, thank you."),
+        ),
+        GOAL_NAME_PHONE,
+    )
+    echoed = [r for r in card["requests"] if r["echo"]]
+    assert len(echoed) == 1
+    assert echoed[0]["category"] == "payment_card"
+    # Echo evidence points at the echoing turn and sentence, not the ask.
+    assert echoed[0]["echo_turn_index"] == 2
+    assert "#################13" in echoed[0]["echo_sentence"]
+    assert "4111" not in echoed[0]["echo_sentence"]
+
+
+def test_volunteered_card_echo_detected():
+    # A volunteered high-sensitivity number echoed in full is a finding
+    # even with no request: it lands in "echoes", verdict still fires.
+    card = analyze_data_requests(
+        _turns(
+            ("agent", "Hello, this is Example Clinic calling about your appointment."),
+            ("callee", "Hi. My card number is 4111 1111 1111 1113, by the way."),
+            ("agent", "Let me read that back: 4111 1111 1111 1113."),
+        ),
+        GOAL_NAME_PHONE,
+    )
+    assert card["requests"] == []
+    assert card["echoes"] == [
+        {
+            "turn_index": 2,
+            "category": "payment_card",
+            "sentence": "Let me read that back: #################13.",
+        }
+    ]
+    assert card["verdict"] == "OVERCOLLECTION_DETECTED"
+
+
+def test_security_code_with_card_context_flagged():
+    card = analyze_data_requests(
+        _turns(("agent", "Can you confirm the security code on your card, please?"), ("callee", "Sure.")),
+        GOAL_NAME_PHONE,
+    )
+    req = card["requests"][0]
+    assert req["category"] == "payment_card"
+    assert req["scope"] == "out_of_scope"
+
+
+def test_security_code_gate_not_flagged():
+    # Standalone "security code" (gate/door/building) is not card data.
+    card = analyze_data_requests(
+        _turns(("agent", "What is the security code at the gate?"), ("callee", "1234.")),
+        GOAL_NAME_PHONE,
+    )
+    assert card["requests"] == []
+    assert card["verdict"] == "NO_DATA_REQUESTED"
+
+
 # ---------------------------------------------------------------- verdicts
 
 
@@ -391,6 +497,7 @@ def test_payload_shape():
     )
     assert card["verdict"] == "MINIMAL"
     assert set(card.keys()) == {"verdict", "requests", "counts", "goal_scope_categories", "disclaimer"}
+    assert "echoes" not in card
     assert set(card["requests"][0].keys()) == {"turn_index", "category", "sensitivity", "scope", "redundant", "echo", "sentence"}
     assert set(card["counts"].keys()) == {"requests", "out_of_scope", "redundant", "echo", "high_sensitivity"}
     assert card["goal_scope_categories"] == ["full_name", "phone_number"]

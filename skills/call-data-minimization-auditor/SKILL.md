@@ -43,7 +43,7 @@ offline.
 | Verdict | Meaning |
 |---|---|
 | `MINIMAL` | Every agent data request is in the goal's scope, none redundant, no full-datum echo |
-| `OVERCOLLECTION_DETECTED` | At least one request is out of scope, redundant, or an echo of a full sensitive datum |
+| `OVERCOLLECTION_DETECTED` | At least one request is out of scope, redundant, or an echo of a full sensitive datum (attached to the request or listed under `echoes`) |
 | `NO_DATA_REQUESTED` | The agent made no lexically detectable data requests (callee volunteering never counts against it) |
 | `GOAL_FILE_LACKS_FIELD_LIST` | Requests exist but the goal file names no recognizable data categories; every request is `unverifiable` |
 
@@ -59,19 +59,27 @@ offline.
 
 - **Request**: an agent sentence containing BOTH a category match (for
   example "card number", "date of birth", "where do you work") AND a
-  request cue ("tell me", "verify", "can I have", "what's", ...). A
-  category noun without a cue ("your card number is stored securely") is
-  a statement, not a request. Callee turns are never scanned - what the
-  caller volunteers is structurally never flagged.
+  request cue ("tell me", "verify", "can I have", "what's", "what is",
+  ...). A category noun without a cue ("your card number is stored
+  securely") is a statement, not a request. Callee turns are never
+  scanned - what the caller volunteers is structurally never flagged.
 - **Redundant re-ask**: a new request for a category the callee already
   provided (by answer shape, or an explicit "I already gave you"),
   unless the agent's previous turn, another sentence in the same turn as
   the re-ask, or the re-ask sentence itself shows a hearing problem
-  ("sorry", "didn't catch", "one more time", "louder").
-- **Echo-back**: an agent turn repeating a 7+-digit run after a
-  high-sensitivity number (card, bank account, SSN, passport, license)
-  was provided - the agent should confirm masked (last two digits), not
-  in full. Echo flags even when the category is in scope.
+  ("sorry, I didn't catch that", "couldn't hear", "one more time",
+  "louder"). Politeness sorry ("sorry to bother you again") does not
+  excuse a re-ask.
+- **Echo-back**: an agent turn repeating a 7+-digit run whose digit
+  content the callee already gave - whether the agent asked for it or
+  the callee volunteered it. The category is inferred from the digit-run
+  shape (4 groups of 4 or 13-19 digits = `payment_card`, 9 digits =
+  `national_id`, anything else = `unknown_number`); an unrecognized
+  shape is still reported. The agent should confirm masked (last two
+  digits), not in full. When a request entry exists the echo lands on it
+  with the echoing turn and sentence; when the number was volunteered
+  with no request, the finding is listed under a top-level `echoes` key
+  instead. Echo flags even when the category is in scope.
 
 ## Research Grounding
 
@@ -95,9 +103,18 @@ offline.
   never to automated action.
 - Category detection is lexical: paraphrases outside the lexicon ("your
   nine digits", "the code on the back") are missed; "account number" may
-  over-trigger `bank_account`.
-- The re-ask excuse is lexical ("sorry", "didn't catch"); a genuine
-  audio failure phrased differently still flags as redundant.
+  over-trigger `bank_account`. Standalone "security code" outside a
+  payment context (a gate or door code) is not treated as card data.
+- The re-ask excuse is lexical ("sorry, I didn't catch that", "couldn't
+  hear"); a genuine audio failure phrased differently still flags as
+  redundant, and politeness sorry never excuses.
+- A JSON goal object carrying none of the seven recognized keys
+  (`goal`/`task`/`objective`/`required`/`required_fields`/`needed`/
+  `fields`) yields an empty scope, so any request verdicts
+  `GOAL_FILE_LACKS_FIELD_LIST`.
+- Lowercased transcripts weaken provided-detection that relies on a
+  capitalized given name; digit-, email- and date-shape detection are
+  unaffected.
 - English-only; ASCII transcripts.
 - The skill audits the AGENT's asks, never what the callee volunteers.
 

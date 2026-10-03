@@ -112,7 +112,9 @@ python3 skills/call-data-minimization-auditor/scripts/data_minimization_auditor.
       "scope": "out_of_scope",
       "redundant": false,
       "echo": true,
-      "sentence": "One last thing, while I have you, can you read me the full card number and the security code?"
+      "sentence": "One last thing, while I have you, can you read me the full card number and the security code?",
+      "echo_turn_index": 10,
+      "echo_sentence": "I have your card number as #################12, thank you."
     }
   ],
   "counts": {
