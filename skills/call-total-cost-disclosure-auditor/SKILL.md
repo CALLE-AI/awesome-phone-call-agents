@@ -89,8 +89,8 @@ required-but-uncovered and yields `PARTIAL_DISCLOSURE`.
 - Multi-item calls may interleave disclosures; the skill does not bind
   amounts to the specific item the callee consented to.
 - Consent and elicitation lexicons are lexical and English-only;
-  uncontracted forms ("let us get you signed up") are not covered, only
-  the contracted "let's"/"I'll" patterns.
+  uncontracted forms are covered ("let us get you signed up", "I will go
+  ahead and book"), but paraphrases outside the lexicon are not.
 - Findings route to human review; this is not a legal ruling.
 
 ## Usage

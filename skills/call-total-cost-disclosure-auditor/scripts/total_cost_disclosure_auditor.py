@@ -77,25 +77,26 @@ def load_call_result(path: Path) -> dict[str, Any]:
 _SENTENCE_SPLIT_RE = re.compile(r"(?<=[.!?])(?<![aApP]\.m\.)\s+(?=[A-Z])")
 
 _COMMIT_RE = re.compile(
-    r"\b(?:would you like to (?:book|order|reserve|purchase|subscribe to|sign up for|proceed|go ahead|move forward)"
+    r"\b(?:would you like to (?:book|order|reserve|purchase|subscribe to|sign up for|proceed|go ahead|move forward"
+    r"|place (?:the |your )?(?:order|booking))"
     r"|shall i (?:book|place|confirm|reserve|complete)"
     r"|can i (?:go ahead|confirm your|complete (?:the|your))"
     r"|do you want to (?:place the order|move forward|go ahead|book)"
     r"|should i (?:confirm|complete|process)"
-    r"|let'?s get you (?:signed up|booked)"
-    r"|i'?ll go ahead and (?:book|process|place|complete)"
-    r"|we can (?:get you booked|complete (?:the|your)))\b", re.IGNORECASE)
+    r"|let(?:'?s| us) get you (?:signed up|booked)"
+    r"|i(?:'?ll| will) go ahead and (?:book|process|place|complete)"
+    r"|we (?:can|will) (?:get you booked|complete (?:the|your)))\b", re.IGNORECASE)
 
 _CONSENT_RE = re.compile(
-    r"^(?:yes|yeah|yep|sure|sounds good|please do|go ahead|that works|let'?s do it|"
-    r"i'?ll take it|book it|sign me up|do it|perfect)"
-    r"|^(?:ok|okay)[, ]+(?:book|do|go|sign|proceed|sounds)", re.IGNORECASE)
+    r"^(?:yes\b|yeah\b|yep\b|sure\b|sounds good\b|please do\b|go ahead\b|that works\b|let'?s do it\b|"
+    r"i'?ll take it\b|book it\b|sign me up\b|do it\b|perfect\b)"
+    r"|^(?:ok\b|okay\b)[, ]+(?:book|do|go|sign|proceed|sounds)", re.IGNORECASE)
 _CONSENT_NEG_RE = re.compile(r"^(?:no|nope|not yet|maybe later|let me think|i'?m not sure|hmm)\b", re.IGNORECASE)
 
 _AMOUNT_RE = re.compile(
     r"\$[0-9][0-9,]*(?:\.[0-9]{2})?"
     r"|\b[0-9][0-9,]*(?:\.[0-9]{2})?\s+(?:dollars|usd)\b"
-    r"|\btotal (?:of|comes to|is)\s+\$?[0-9]", re.IGNORECASE)
+    r"|\btotal (?:of|comes to|is)\s+\$?[0-9][0-9,]*(?:\.[0-9]{2})?", re.IGNORECASE)
 
 _RECURRING_RE = re.compile(
     r"\b(?:per (?:month|year|week|night|guest)|monthly|yearly|annual"
@@ -112,6 +113,16 @@ _FEE_NEGATED_RE = re.compile(
 
 def _norm_digits(text: str) -> str:
     return re.sub(r"[^0-9]", "", text)
+
+
+# Last digit-run (with separators/decimals) inside an amount match, so
+# "total is $45", "$45." and "45 dollars" all normalize to "45".
+_AMOUNT_TOKEN_RE = re.compile(r"[0-9][0-9,]*(?:\.[0-9]{2})?")
+
+
+def _norm_amount(text: str) -> str:
+    tokens = _AMOUNT_TOKEN_RE.findall(text)
+    return _norm_digits(tokens[-1]) if tokens else ""
 
 
 def _sentences(text: str) -> list[str]:
@@ -206,7 +217,7 @@ def analyze_turns(turns: list[dict[str, str]]) -> dict[str, Any]:
 
     # Step 4: disclosure elements.
     amount_matches = list(_AMOUNT_RE.finditer(pre_text))
-    amounts_pre_norm = {d for m in amount_matches if (d := _norm_digits(m.group(0)))}
+    amounts_pre_norm = {d for m in amount_matches if (d := _norm_amount(m.group(0)))}
     total_covered = bool(amount_matches)
     recurring_required = bool(_RECURRING_RE.search(all_agent_text))
     recurring_covered = bool(_RECURRING_RE.search(pre_text))
@@ -228,7 +239,7 @@ def analyze_turns(turns: list[dict[str, str]]) -> dict[str, Any]:
         if drip is None:
             for index, text in post_turns:
                 for sentence in _sentences(text):
-                    norms = {d for m in _AMOUNT_RE.finditer(sentence) if (d := _norm_digits(m.group(0)))}
+                    norms = {d for m in _AMOUNT_RE.finditer(sentence) if (d := _norm_amount(m.group(0)))}
                     if any(d not in amounts_pre_norm for d in norms):
                         drip = {"turn_index": index, "sentence": mask_pii(sentence)[:160], "kind": "new_amount_post_consent"}
                         break

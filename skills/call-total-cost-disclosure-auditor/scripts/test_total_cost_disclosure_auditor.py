@@ -21,6 +21,7 @@ EXAMPLE_DRIP = SKILL_DIR / "references" / "example-transcript-drip.json"
 
 sys.path.insert(0, str(SCRIPTS))
 from total_cost_disclosure_auditor import (  # noqa: E402
+    _norm_amount,
     analyze_turns,
     craft_goal,
     load_call_result,
@@ -141,6 +142,21 @@ def test_elicitation_can_i_go_ahead():
     assert payload["commitment_elicitation"]["turn_index"] == 0
 
 
+def test_elicitation_would_you_like_place_order():
+    payload = analyze_turns(_turns(("agent", "Would you like to place your order now?"), ("callee", "Yes.")))
+    assert payload["commitment_elicitation"]["turn_index"] == 0
+
+
+def test_elicitation_let_us_signed_up():
+    payload = analyze_turns(_turns(("agent", "Let us get you signed up today."), ("callee", "Sure.")))
+    assert payload["commitment_elicitation"]["turn_index"] == 0
+
+
+def test_elicitation_i_will_go_ahead():
+    payload = analyze_turns(_turns(("agent", "I will go ahead and book it, sound good?"), ("callee", "Yes.")))
+    assert payload["commitment_elicitation"]["turn_index"] == 0
+
+
 # ---------------------------------------------------------------- consent polarity
 
 
@@ -176,6 +192,18 @@ def test_no_consent_evaluates_pre_elicitation():
     )
     assert payload["consent_point"] is None
     assert payload["verdict"] == "FULL_DISCLOSURE_BEFORE_CONSENT"
+
+
+def test_consent_surely_not_consent():
+    # "Surely" must not satisfy the ^sure token: word boundary required.
+    payload = analyze_turns(_turns(("agent", "Would you like to book?"), ("callee", "Surely, no.")))
+    assert payload["consent_point"] is None
+
+
+def test_consent_yesterday_sure_not_consent():
+    # First sentence starts with "Yesterday"; not a consent opener.
+    payload = analyze_turns(_turns(("agent", "Would you like to book?"), ("callee", "Yesterday, sure, whatever.")))
+    assert payload["consent_point"] is None
 
 
 # ---------------------------------------------------------------- verdicts
@@ -323,6 +351,27 @@ def test_amount_number_only_dollars_form():
     )
     assert payload["disclosures"]["total_amount"]["covered"] is True
     assert payload["verdict"] == "FULL_DISCLOSURE_BEFORE_CONSENT"
+
+
+def test_total_phrase_amount_full_capture():
+    # Regression: "total is $45" must capture the full digit run, not "$4".
+    payload = analyze_turns(
+        _turns(
+            ("agent", "The total is $45."),
+            ("agent", "Would you like to book?"),
+            ("callee", "Yes."),
+            ("agent", "Confirmed: $45 charged."),
+        )
+    )
+    assert payload["verdict"] == "FULL_DISCLOSURE_BEFORE_CONSENT"
+    assert payload["drip_evidence"] is None
+
+
+def test_total_phrase_amounts_normalize_equal():
+    # All three surface forms of the same amount normalize to "45".
+    assert _norm_amount("$45.") == "45"
+    assert _norm_amount("45 dollars") == "45"
+    assert _norm_amount("total is $45") == "45"
 
 
 # ---------------------------------------------------------------- no commitment
