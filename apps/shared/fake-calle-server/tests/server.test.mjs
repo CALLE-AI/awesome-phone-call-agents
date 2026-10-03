@@ -213,7 +213,7 @@ test("non-completed terminal scenarios report failure codes and null results", a
   });
 });
 
-test("the no_answer scenario surfaces the documented NO ANSWER alias in events", async () => {
+test("the no_answer scenario surfaces the chosen NO ANSWER alias in events", async () => {
   await withServer(async (baseUrl) => {
     const created = await createCall(baseUrl, { metadata: { scenario: "no_answer" } });
     await waitForTerminal(baseUrl, created.body.call_id);

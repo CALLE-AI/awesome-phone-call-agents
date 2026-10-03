@@ -12,7 +12,7 @@
 //   - https://github.com/CALLE-AI/call-e-integrations README "API" section
 //   - packages/cli/docs/cli-reference.md in the same repository
 // Statuses are lowercase, matching the documented example response. The
-// documented "NO ANSWER" alias quirk is surfaced by the no_answer scenario.
+// "NO ANSWER" alias is a deliberately chosen fake no_answer test scenario.
 
 import http from "node:http";
 import { randomUUID } from "node:crypto";

@@ -1,7 +1,9 @@
 # fake-calle-server
 
-An offline fake of the CALL-E Developer API for tests and demos. Zero
-dependencies (Node built-ins only), no credentials, no real calls.
+A local fake of the CALL-E Developer API for tests and demos. Zero
+dependencies (Node built-ins only), no real credentials, no real calls.
+Omit `webhook_url` for offline operation: configuring it requests real HTTP(S)
+POSTs to that destination, so use only synthetic data and a test receiver.
 
 Many apps in this repository need to test CALL-E integrations without live
 credentials or outbound calls, and today each one bundles its own mock with
@@ -25,20 +27,21 @@ substitute for the real service):
 - `packages/cli/docs/cli-reference.md` in the same repository.
 
 Statuses are lowercase (`completed`, `no_answer`, ...), matching the documented
-example response. The documented alias quirk is preserved: the `no_answer`
+example response. A deliberately chosen alias test case is included: the `no_answer`
 scenario emits an event whose message carries the raw `NO ANSWER` form, so
 clients can test status normalization.
 
-## The gaps it reproduces on purpose
+## Deliberate test scenarios
 
-These are the documented behaviors integrations must defend against:
+These are fixture behaviors for exercising defensive integrations, not guarantees
+of current live-service behavior. The linked upstream documentation remains authoritative.
 
 - **Unsigned webhooks.** Terminal webhooks carry a `CALL-E-Event-Id` header but
   no signature. The intended pattern is to treat the webhook as a hint and
   re-fetch `GET /v1/calls/{call_id}` for authoritative state; the test suite
   exercises exactly that.
 - **At-least-once delivery.** `metadata.webhook_repeat` (1-5) sends the same
-  terminal event multiple times with distinct event ids, so dedup logic can be
+  terminal event multiple times with distinct event ids in this fake, so dedup logic can be
   tested.
 - **`ttl_seconds` bounds queryability.** After the retention window elapses,
   `GET` returns `404` with error code `expired`.
@@ -93,8 +96,11 @@ so transcript-grounding verification can be tested against them.
 ## Setup, side effects, credentials, cancellation
 
 - **Setup:** none beyond Node.js. No install, no environment variables required.
-- **Side effects:** none. Binds to `127.0.0.1` by default and never places a
-  real call. If you override `--host` you are choosing to expose it yourself.
+- **Side effects:** binds to `127.0.0.1` by default and never places a real
+  call. Supplying `webhook_url` sends real HTTP(S) POSTs (and may follow redirects)
+  carrying the synthetic payload. Use a local test receiver, or omit the URL
+  for offline operation. If you override `--host` you expose this test server
+  yourself; do not provide private data, live credentials or production webhooks.
 - **Credentials:** none. All phone numbers in examples and fixtures are
   fictional (`+1555555xxxx`).
 - **Dry-run behavior:** the server is itself the dry-run target; it exists so

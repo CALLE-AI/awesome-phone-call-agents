@@ -1,5 +1,5 @@
-// Unsigned terminal webhook delivery, faithful to the documented gaps that
-// clients must defend against: no signature header, at-least-once delivery
+// Unsigned terminal webhook delivery with deliberately chosen test scenarios:
+// no signature header, at-least-once delivery
 // (repeat mode sends the same terminal event multiple times with distinct
 // CALL-E-Event-Id values), and no ordering guarantees relative to polling.
 // Delivery failures are logged and never retried: a fake server has no queue.
