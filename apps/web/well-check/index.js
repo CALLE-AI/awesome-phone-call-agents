@@ -125,8 +125,8 @@ app.post('/api/trigger-call', async (req, res) => {
 
         res.json({ success: true, log: logEntry });
     } catch (error) {
-        console.error('Call failed:', error.message);
-        res.status(500).json({ error: error.message });
+        console.error('Call failed:', '[Provider Error Masked]');
+        res.status(500).json({ error: 'Internal server error' });
     }
 });
 

@@ -1,3 +1,8 @@
+function maskPhone(phone) {
+    if (!phone || phone.length < 5) return phone;
+    return phone.substring(0, phone.length - 4).replace(/[0-9]/g, '*') + phone.substring(phone.length - 4);
+}
+
 import { CalleClient } from "@call-e/calle";
 
 // The full schema from the implementation plan, with call_status removed from resultSchema
@@ -69,7 +74,7 @@ export async function createAndRunCall(phone) {
 
     // 2) MOCK MODE vs REAL SDK
     if (!process.env.CALLE_API_KEY) {
-        console.log(`[CALL-E MOCK] Initiating call to ${phone}... (No API key found)`);
+        console.log(`[CALL-E MOCK] Initiating call to ${maskPhone(phone)}... (No API key found)`);
         await new Promise(resolve => setTimeout(resolve, 2000));
         
         const outcomes = [
@@ -103,8 +108,8 @@ export async function createAndRunCall(phone) {
     }
 
     // 3) REAL SDK CALL
-    console.log(`[CALL-E SDK] Initiating real call to ${phone}...`);
-    console.log(`[GUARD VERIFICATION] About to dial: ${phone}. Is it in ALLOWED_TEST_NUMBERS? ${ALLOWED_TEST_NUMBERS.includes(phone)}`);
+    console.log(`[CALL-E SDK] Initiating real call to ${maskPhone(phone)}...`);
+    console.log(`[GUARD VERIFICATION] About to dial: ${maskPhone(phone)}. Is it in ALLOWED_TEST_NUMBERS? ${ALLOWED_TEST_NUMBERS.includes(phone)}`);
     const client = new CalleClient({ apiKey: process.env.CALLE_API_KEY });
     
     const task = buildPrompt(phone);
@@ -116,7 +121,7 @@ export async function createAndRunCall(phone) {
             resultSchema: checkInSchema
         });
         
-        console.log(`[CALL-E SDK] Call to ${phone} resulted in status: ${call.status}`);
+        console.log(`[CALL-E SDK] Call to ${maskPhone(phone)} resulted in status: ${call.status}`);
         
         return {
             id: call.id,
@@ -127,13 +132,13 @@ export async function createAndRunCall(phone) {
             failureMessage: call.failureMessage
         };
     } catch (error) {
-        console.error(`[CALL-E SDK] Error placing call to ${phone}:`, error.message);
+        console.error(`[CALL-E SDK] Error placing call to ${maskPhone(phone)}:`, '[Provider Error Masked]');
         return {
             status: "failed",
             structuredResult: null,
             completionConfidence: null,
             failureCode: "sdk_error",
-            failureMessage: error.message
+            failureMessage: '[Provider Error Masked]'
         };
     }
 }
