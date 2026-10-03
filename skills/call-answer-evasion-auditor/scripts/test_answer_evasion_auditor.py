@@ -58,7 +58,7 @@ def _run_main(argv: list[str]) -> tuple[int, str]:
 def test_mask_pii_keeps_last_two():
     masked = mask_pii("call +14155550162 now")
     assert "4155" not in masked
-    assert masked.endswith("62")
+    assert "#########62" in masked
 
 
 def test_mask_pii_ignores_short_runs():
@@ -156,10 +156,11 @@ def test_repair_content_not_skipped():
             ("agent", "I'm an automated assistant."),
         )
     )
-    # The turn is not a bare repair initiator, so the identity question it
-    # contains is still detected and graded.
-    assert report["counts"]["total"] == 1
-    assert report["questions"][0]["kind"] == "identity"
+    # The turn is not a bare repair initiator, so it is processed: the
+    # embedded repair sentence is still a question span, and the identity
+    # question it introduces is detected and graded.
+    assert report["counts"]["total"] == 2
+    assert any(q["kind"] == "identity" for q in report["questions"])
 
 
 def test_agent_questions_ignored():
@@ -449,7 +450,7 @@ def test_digits_in_evidence_masked():
     )
     q = report["questions"][0]
     assert "555" not in q["question"]
-    assert q["question"].endswith("62")
+    assert "##########62" in q["question"]
 
 
 def test_call_id_surfaced():

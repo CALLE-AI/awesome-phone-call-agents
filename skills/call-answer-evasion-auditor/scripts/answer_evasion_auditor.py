@@ -112,14 +112,166 @@ _DEFER_RE = re.compile(r"\b(?:we'?ll get to that|we will get to that|let'?s come
 _AMOUNT_RE = re.compile(r"\$[0-9]|[0-9]\s+dollars", re.IGNORECASE)
 
 
+def _answer_window(turns: list[dict[str, str]], question_index: int) -> list[str]:
+    """Collect the next two non-empty agent turns after the question turn."""
+    window: list[str] = []
+    for turn in turns[question_index + 1 :]:
+        speaker = str(turn.get("speaker", "")).lower().strip()
+        text = str(turn.get("text", "")).strip()
+        if speaker in CALLEE_ROLES or not text:
+            continue
+        window.append(text)
+        if len(window) == 2:
+            break
+    return window
+
+
+def _mechanism(window: str, identity: bool = False) -> str:
+    """Pick the dodge mechanism for an unanswered window, in priority order."""
+    has_counter_question = any(
+        sentence.strip().endswith("?") for sentence in _SENTENCE_SPLIT_RE.split(window)
+    )
+    if has_counter_question:
+        return "deflection"
+    if _NON_ANSWER_ACK_RE.search(window):
+        return "non_answer_ack"
+    if _DEFER_RE.search(window):
+        return "defer"
+    # Identity questions never clear via not-knowing, so their plain
+    # non-answer carries its own label.
+    return "identity_evasion" if identity else "unanswered"
+
+
+def _grade(kind: str, window_turns: list[str]) -> tuple[str, str | None]:
+    """Grade one question against its two-agent-turn answer window."""
+    if not window_turns:
+        return "evasive", "no_response"
+    window = " ".join(window_turns)
+    if kind == "identity":
+        if _AI_SELF_RE.search(window):
+            return "clear", None
+        return "evasive", _mechanism(window, identity=True)
+    if kind == "yes_no":
+        first_turn_sentences = _SENTENCE_SPLIT_RE.split(window_turns[0])
+        first_sentence = first_turn_sentences[0].strip() if first_turn_sentences else ""
+        if _YES_NO_FIRST_RE.match(first_sentence):
+            return "clear", None
+        if _YES_NO_ANY_RE.search(window):
+            # The token arrived, but not as the leading word of the reply.
+            return "partially_clear", _mechanism(window)
+        return "evasive", _mechanism(window)
+    # wh: information questions clear via provenance, plain not-knowing,
+    # or a concrete amount anywhere in the window.
+    if (
+        _PROVENANCE_RE.search(window)
+        or _NOT_KNOWING_RE.search(window)
+        or _AMOUNT_RE.search(window)
+    ):
+        return "clear", None
+    return "evasive", _mechanism(window)
+
+
 def analyze_turns(turns: list[dict[str, str]]) -> dict[str, Any]:
-    """TDD stub: implemented after the core tests are observed failing."""
-    raise NotImplementedError("core grading not implemented yet")
+    """Grade every callee direct question against the agent's answer window."""
+    questions: list[dict[str, Any]] = []
+    for index, turn in enumerate(turns):
+        speaker = str(turn.get("speaker", "")).lower().strip()
+        if speaker not in CALLEE_ROLES:
+            continue
+        text = str(turn.get("text", "")).strip()
+        if not text:
+            continue
+        normalized = " ".join(text.lower().split())
+        if normalized in REPAIR_INITIATORS:
+            continue
+        for sentence in _SENTENCE_SPLIT_RE.split(text):
+            sentence = sentence.strip()
+            if not sentence:
+                continue
+            is_question = sentence.endswith("?") or bool(_WH_START_RE.match(sentence))
+            if not is_question:
+                continue
+            if _IDENTITY_Q_RE.search(sentence):
+                kind = "identity"
+            elif _WH_START_RE.match(sentence):
+                kind = "wh"
+            else:
+                kind = "yes_no"
+            grade, mechanism = _grade(kind, _answer_window(turns, index))
+            questions.append(
+                {
+                    "turn_index": index,
+                    "question": mask_pii(sentence),
+                    "kind": kind,
+                    "grade": grade,
+                    "mechanism": mechanism,
+                }
+            )
+
+    counts = {
+        "total": len(questions),
+        "clear": sum(1 for q in questions if q["grade"] == "clear"),
+        "partially_clear": sum(1 for q in questions if q["grade"] == "partially_clear"),
+        "evasive": sum(1 for q in questions if q["grade"] == "evasive"),
+    }
+    if not questions:
+        verdict = "NO_CALLEE_QUESTIONS"
+    elif counts["evasive"]:
+        verdict = "EVASION_DETECTED"
+    elif counts["partially_clear"]:
+        verdict = "PARTIAL_EVASION"
+    else:
+        verdict = "DIRECT_ANSWERS"
+
+    return {
+        "skill": "call-answer-evasion-auditor",
+        "analysis_mode": "heuristic",
+        "verdict": verdict,
+        "questions": questions,
+        "counts": counts,
+        "disclaimer": DISCLAIMER,
+    }
+
+
+BOOKING_CANDID_GOAL = (
+    "You are placing a reservation-confirmation call for Harborview Restaurant.\n"
+    "Follow these policies in every answer:\n"
+    "1. Answer-first: answer the question asked, then continue with the rest of your script.\n"
+    "2. Canned truthful identity answer: if asked whether you are an AI, a robot, or a real person, say exactly: \"I'm an automated assistant calling about your reservation.\"\n"
+    "3. Provenance template: if asked how you got this number, say exactly: \"We got your number from your online reservation.\"\n"
+    "4. Acknowledgment never substitutes for an answer: \"great question\" is not an answer; give the fact, or say \"I don't have that information.\""
+)
+
+SUPPORT_CANDID_GOAL = (
+    "You are placing a support callback about an open support case.\n"
+    "Follow these policies in every answer:\n"
+    "1. Answer-first: answer the question asked, then continue with the rest of your callback.\n"
+    "2. Canned truthful identity answer: if asked whether you are an AI, a robot, or a real person, say exactly: \"I'm an automated assistant calling about your support case.\"\n"
+    "3. Provenance template: if asked how you got this number, say exactly: \"We got your number from your support request.\"\n"
+    "4. Acknowledgment never substitutes for an answer: \"great question\" is not an answer; give the fact, or say \"I don't have that information.\""
+)
+
+_CRAFT_CHECKLIST = [
+    "answer-first",
+    "canned truthful identity answer",
+    "provenance template",
+    "acknowledgment never substitutes for an answer",
+]
+
+CRAFT_SCENARIOS = {"booking-candid": BOOKING_CANDID_GOAL, "support-candid": SUPPORT_CANDID_GOAL}
 
 
 def craft_goal(scenario: str, language: str | None = None) -> dict[str, Any]:
-    """TDD stub: implemented after the craft tests are observed failing."""
-    raise NotImplementedError("craft not implemented yet")
+    """Emit plan_call inputs for a candid answer-first outbound call."""
+    if scenario not in CRAFT_SCENARIOS:
+        raise ValueError(f"unknown scenario: {scenario!r}; expected one of {sorted(CRAFT_SCENARIOS)}")
+    return {
+        "skill": "call-answer-evasion-auditor",
+        "scenario": scenario,
+        "language": language or "en",
+        "goal_template": CRAFT_SCENARIOS[scenario],
+        "checklist": list(_CRAFT_CHECKLIST),
+    }
 
 
 def main(argv: list[str] | None = None) -> int:
