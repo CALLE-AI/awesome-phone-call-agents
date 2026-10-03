@@ -97,11 +97,22 @@ _IDENTITY_Q_RE = re.compile(r"\b(?:robot|\bai\b|a\.i\.|artificial intelligence|a
 
 _AI_SELF_RE = re.compile(r"\b(?:i(?:'m| am) (?:an? )?(?:ai|automated|virtual assistant|artificial intelligence)|(?:an?|the) (?:ai|automated (?:assistant|system|caller)|virtual assistant)|this (?:call|is) (?:is )?(?:an? )?(?:ai|automated|recording)|not a (?:real )?(?:person|human)|ai[- ]powered|(?:yes|no)[,]?\s+(?:i(?:'m| am)|this is) (?:an? )?(?:ai|automated))\b", re.IGNORECASE)
 
-_YES_NO_FIRST_RE = re.compile(r"^(?:yes|yeah|yep|no|nope|correct|that'?s right|that is right|i (?:am|do|did|have|can|will)|i'?m not|i don'?t|i do not|we (?:do|don'?t|did|can|cannot|will|won'?t))\b", re.IGNORECASE)
+# Yes/no answer tokens. Explicit negated answer forms are listed as
+# tokens; bare verb forms carry a negative lookahead so a verb followed
+# by not/n't ("I have not been told") never matches on the bare branch.
+_YES_NO_TOKENS = (
+    r"(?:yes|yeah|yep|correct|that'?s right|that is right"
+    r"|i'?m not|i am not|i don'?t|i do not|i cannot|i won'?t|i will not"
+    r"|we don'?t|we do not|we cannot|we can'?t|we won'?t|we will not"
+    r"|nope|no"
+    r"|(?:i|we) (?:am|do|did|have|can|will)\b(?!\s+(?:not|n't)\b))"
+)
+
+_YES_NO_FIRST_RE = re.compile(r"^(?:" + _YES_NO_TOKENS + r")\b", re.IGNORECASE)
 
 # Anywhere-search variant covers the full first-token list (minus the anchor)
 # so late tokens like "We do." or "We won't." still grade partially_clear.
-_YES_NO_ANY_RE = re.compile(r"\b(?:yes|yeah|yep|no|nope|correct|that'?s right|that is right|i (?:am|do|did|have|can|will)|i'?m not|i don'?t|i do not|we (?:do|don'?t|did|can|cannot|will|won'?t))\b", re.IGNORECASE)
+_YES_NO_ANY_RE = re.compile(r"\b(?:" + _YES_NO_TOKENS + r")\b", re.IGNORECASE)
 
 _NOT_KNOWING_RE = re.compile(r"\b(?:i don'?t (?:know|have that)|i do not (?:know|have that)|i'?m not sure|i am not sure)\b", re.IGNORECASE)
 
@@ -114,13 +125,42 @@ _DEFER_RE = re.compile(r"\b(?:we'?ll get to that|we will get to that|let'?s come
 _AMOUNT_RE = re.compile(r"\$[0-9]|[0-9]\s+dollars", re.IGNORECASE)
 
 
+def _question_spans(text: str) -> list[str]:
+    """Return the gradeable question sentences of a turn.
+
+    Repair-initiator sentences (matched after lowercasing, whitespace
+    collapsing and stripping, consistently with the whole-turn set) are
+    excluded, so a bare "Sorry, what was that?" turn yields nothing.
+    """
+    spans: list[str] = []
+    for sentence in _SENTENCE_SPLIT_RE.split(text):
+        sentence = sentence.strip()
+        if not sentence:
+            continue
+        normalized = " ".join(sentence.lower().split())
+        if normalized in REPAIR_INITIATORS:
+            continue
+        if sentence.endswith("?") or _WH_START_RE.match(sentence):
+            spans.append(sentence)
+    return spans
+
+
 def _answer_window(turns: list[dict[str, str]], question_index: int) -> list[str]:
-    """Collect the next two non-empty agent turns after the question turn."""
+    """Collect the next two non-empty agent turns after the question turn.
+
+    The window stops early at a callee turn that asks a new question:
+    agent turns after it answer the new question, not this one. Blank
+    or statement-only callee turns ("Okay.") do not stop the window.
+    """
     window: list[str] = []
     for turn in turns[question_index + 1 :]:
         speaker = str(turn.get("speaker", "")).lower().strip()
         text = str(turn.get("text", "")).strip()
-        if speaker in CALLEE_ROLES or not text:
+        if not text:
+            continue
+        if speaker in CALLEE_ROLES:
+            if _question_spans(text):
+                break
             continue
         window.append(text)
         if len(window) == 2:
@@ -154,6 +194,11 @@ def _grade(kind: str, window_turns: list[str]) -> tuple[str, str | None]:
             return "clear", None
         return "evasive", _mechanism(window, identity=True)
     if kind == "yes_no":
+        # Explicit not-knowing clears any non-identity question (the
+        # wh rule extended to yes/no); hedged negations like "I am not
+        # sure" clear here, never via the token branch.
+        if _NOT_KNOWING_RE.search(window):
+            return "clear", None
         first_turn_sentences = _SENTENCE_SPLIT_RE.split(window_turns[0])
         first_sentence = first_turn_sentences[0].strip() if first_turn_sentences else ""
         if _YES_NO_FIRST_RE.match(first_sentence):
@@ -186,13 +231,7 @@ def analyze_turns(turns: list[dict[str, str]]) -> dict[str, Any]:
         normalized = " ".join(text.lower().split())
         if normalized in REPAIR_INITIATORS:
             continue
-        for sentence in _SENTENCE_SPLIT_RE.split(text):
-            sentence = sentence.strip()
-            if not sentence:
-                continue
-            is_question = sentence.endswith("?") or bool(_WH_START_RE.match(sentence))
-            if not is_question:
-                continue
+        for sentence in _question_spans(text):
             if _IDENTITY_Q_RE.search(sentence):
                 kind = "identity"
             elif _WH_START_RE.match(sentence):

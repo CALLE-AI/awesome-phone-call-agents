@@ -60,10 +60,14 @@ fallback when ASR drops the "?").
 
 ## Grading Rules
 
-The answer window is the next TWO agent turns after the question turn;
-no window at all grades EVASIVE (`no_response`). Identity questions are
+The answer window is the next TWO agent turns after the question turn,
+stopping early if the callee asks a new question; no window at all
+grades EVASIVE (`no_response`). Identity questions are
 CLEAR only on a truthful AI/self disclosure; "I don't know" never clears
-them. Yes/no questions are CLEAR only when the yes/no token leads the
+them. Explicit not-knowing ("I am not sure", "I don't know") clears any
+non-identity question; identity questions are never cleared by
+not-knowing. Yes/no questions are CLEAR only when the yes/no token
+(an explicit negative such as "I am not" or "we won't" counts) leads the
 first sentence of the first window turn; a token found later in the
 window grades PARTIALLY_CLEAR. Information (wh) questions are CLEAR on
 provenance wording, a plain not-knowing statement, or a concrete amount.
@@ -86,14 +90,19 @@ another. All lexicons match uncontracted forms too ("we will", "i am").
   catches most information questions, but yes/no questions reduced to
   statement word order may be missed.
 - Bare repair initiators ("What?", "Sorry, what was that?") are
-  delegated to `call-repair-sequence-auditor` and skipped here; a repair
-  sentence embedded in a longer questioning turn is still graded.
+  delegated to `call-repair-sequence-auditor` and skipped here, whether
+  they form the whole turn or one sentence inside a longer questioning
+  turn; the remaining question sentences in that turn are still graded.
 - Amount detection reads `$<digits>` and "<digits> dollars" only;
-  number-word amounts ("twenty dollars") are not parsed.
+  number-word amounts ("twenty dollars") are not parsed. An amount
+  anywhere in the window clears a wh question even when it does not
+  answer the question asked.
 - Social wh openers like "What's up?" are not in the repair-initiator
   skip list and are graded like information questions.
 - Provenance matching is deliberately generous: any record-attribution
   phrase such as "your reservation shows..." clears a wh question.
+- `turn_index` refers to the normalized turn list (after non-dict
+  entries are dropped), not the raw transcript array.
 
 ## Usage
 
