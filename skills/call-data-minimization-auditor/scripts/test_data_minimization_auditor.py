@@ -249,6 +249,46 @@ def test_category_noun_without_cue_not_a_request():
     assert card["requests"] == []
 
 
+def test_elliptical_question_request_detected():
+    # Regression: elliptical follow-ups ("And the best number to reach you?")
+    # carry no cue word; their trailing question mark must make them requests.
+    card = analyze_data_requests(
+        _turns(
+            ("agent", "Can I have your full name, please?"),
+            ("callee", "It's Dana Moss."),
+            ("agent", "And the best number to reach you?"),
+            ("callee", "415-555-0167."),
+        ),
+        GOAL_NAME_PHONE,
+    )
+    assert len(card["requests"]) == 2
+    elliptical = card["requests"][1]
+    assert elliptical["category"] == "phone_number"
+    assert elliptical["scope"] == "in_scope"
+    assert card["verdict"] == "MINIMAL"
+
+
+def test_elliptical_dob_question_detected():
+    card = analyze_data_requests(
+        _turns(("agent", "And your date of birth?"), ("callee", "March 14.")),
+        GOAL_NAME_PHONE,
+    )
+    assert len(card["requests"]) == 1
+    assert card["requests"][0]["category"] == "date_of_birth"
+    assert card["requests"][0]["scope"] == "out_of_scope"
+    assert card["verdict"] == "OVERCOLLECTION_DETECTED"
+
+
+def test_statement_still_not_request():
+    # Guard: a declarative sentence about a category (no cue, no question
+    # mark) is never a request.
+    card = analyze_data_requests(
+        _turns(("agent", "Your card number is stored securely."), ("callee", "Okay.")),
+        GOAL_CARD,
+    )
+    assert card["requests"] == []
+
+
 def test_cue_what_is_uncontracted():
     # The uncontracted "what is" is a request cue, not just "what's".
     card = analyze_data_requests(

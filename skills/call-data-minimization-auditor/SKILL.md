@@ -105,6 +105,9 @@ offline.
   nine digits", "the code on the back") are missed; "account number" may
   over-trigger `bank_account`. Standalone "security code" outside a
   payment context (a gate or door code) is not treated as card data.
+- Elliptical questions ("And your date of birth?") count as requests via
+  their question mark; agent rhetorical questions mentioning a category
+  ("Why would I need your card number?") can also match.
 - The re-ask excuse is lexical ("sorry, I didn't catch that", "couldn't
   hear"); a genuine audio failure phrased differently still flags as
   redundant, and politeness sorry never excuses.

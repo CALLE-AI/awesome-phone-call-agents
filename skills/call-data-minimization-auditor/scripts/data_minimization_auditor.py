@@ -229,7 +229,10 @@ def analyze_data_requests(turns: list[dict[str, str]], goal_text: str) -> dict[s
             continue
         for sentence in _SENTENCE_SPLIT_RE.split(text):
             sentence = sentence.strip()
-            if not sentence or not _REQUEST_CUE_RE.search(sentence):
+            # A sentence is a request if it carries a request cue OR is an
+            # elliptical question (ends with "?") naming a category: "And
+            # your date of birth?" has no cue word of its own.
+            if not sentence or not (_REQUEST_CUE_RE.search(sentence) or sentence.endswith("?")):
                 continue
             for category in _CATEGORY_ORDER:
                 category_hit = _CATEGORY_RES[category].search(sentence)
