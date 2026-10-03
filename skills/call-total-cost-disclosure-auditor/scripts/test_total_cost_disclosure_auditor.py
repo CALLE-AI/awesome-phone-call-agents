@@ -158,6 +158,27 @@ def test_elicitation_i_will_go_ahead():
     assert payload["commitment_elicitation"]["turn_index"] == 0
 
 
+def test_elicitation_shall_i_go_ahead_and():
+    # Regression: "go ahead and" between "shall i" and the verb is one of the
+    # most natural real-world commitment phrasings and was missed.
+    payload = analyze_turns(
+        _turns(
+            ("agent", "The total is $45 and there is a refundable $10 deposit."),
+            ("agent", "Shall I go ahead and reserve it?"),
+            ("callee", "Sure, please do."),
+        )
+    )
+    assert payload["commitment_elicitation"]["turn_index"] == 1
+    assert "Shall I go ahead and reserve" in payload["commitment_elicitation"]["snippet"]
+    assert payload["verdict"] == "FULL_DISCLOSURE_BEFORE_CONSENT"
+
+
+def test_elicitation_should_i_go_ahead_and_book():
+    payload = analyze_turns(_turns(("agent", "Should I go ahead and book it for you?"), ("callee", "Yes.")))
+    assert payload["commitment_elicitation"]["turn_index"] == 0
+    assert "Should I go ahead and book" in payload["commitment_elicitation"]["snippet"]
+
+
 # ---------------------------------------------------------------- consent polarity
 
 

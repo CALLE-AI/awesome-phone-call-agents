@@ -79,10 +79,9 @@ _SENTENCE_SPLIT_RE = re.compile(r"(?<=[.!?])(?<![aApP]\.m\.)\s+(?=[A-Z])")
 _COMMIT_RE = re.compile(
     r"\b(?:would you like to (?:book|order|reserve|purchase|subscribe to|sign up for|proceed|go ahead|move forward"
     r"|place (?:the |your )?(?:order|booking))"
-    r"|shall i (?:book|place|confirm|reserve|complete)"
+    r"|(?:shall|should) i (?:go ahead and )?(?:book|place|confirm|reserve|complete|process)"
     r"|can i (?:go ahead|confirm your|complete (?:the|your))"
     r"|do you want to (?:place the order|move forward|go ahead|book)"
-    r"|should i (?:confirm|complete|process)"
     r"|let(?:'?s| us) get you (?:signed up|booked)"
     r"|i(?:'?ll| will) go ahead and (?:book|process|place|complete)"
     r"|we (?:can|will) (?:get you booked|complete (?:the|your)))\b", re.IGNORECASE)
