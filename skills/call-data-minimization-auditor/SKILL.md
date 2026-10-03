@@ -65,8 +65,9 @@ offline.
   caller volunteers is structurally never flagged.
 - **Redundant re-ask**: a new request for a category the callee already
   provided (by answer shape, or an explicit "I already gave you"),
-  unless the agent's previous turn or the re-ask sentence itself shows a
-  hearing problem ("sorry", "didn't catch", "one more time", "louder").
+  unless the agent's previous turn, another sentence in the same turn as
+  the re-ask, or the re-ask sentence itself shows a hearing problem
+  ("sorry", "didn't catch", "one more time", "louder").
 - **Echo-back**: an agent turn repeating a 7+-digit run after a
   high-sensitivity number (card, bank account, SSN, passport, license)
   was provided - the agent should confirm masked (last two digits), not

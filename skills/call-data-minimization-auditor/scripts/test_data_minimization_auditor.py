@@ -281,6 +281,21 @@ def test_redundant_excused_by_sorry():
     assert card["verdict"] == "MINIMAL"
 
 
+def test_redundant_excused_same_turn_different_sentence():
+    # Excuse sentence elsewhere in the SAME turn as the re-ask also excuses it.
+    card = analyze_data_requests(
+        _turns(
+            ("agent", "Can I have your full name, please?"),
+            ("callee", "My name is Dana Whitfield."),
+            ("agent", "Sorry, I didn't catch that. Can you tell me your full name again?"),
+            ("callee", "Dana Whitfield."),
+        ),
+        GOAL_NAME_PHONE,
+    )
+    assert all(not r["redundant"] for r in card["requests"])
+    assert card["verdict"] == "MINIMAL"
+
+
 def test_explicit_already_gave_you_universal():
     card = analyze_data_requests(
         _turns(

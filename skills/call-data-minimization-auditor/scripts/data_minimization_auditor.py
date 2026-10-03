@@ -205,7 +205,9 @@ def analyze_data_requests(turns: list[dict[str, str]], goal_text: str) -> dict[s
                     continue
                 redundant = False
                 if category in provided:
-                    excused = bool(_RE_ASK_EXCUSE_RE.search(sentence)) or (
+                    # The excuse may sit in the re-ask sentence itself,
+                    # elsewhere in the same turn, or in the previous agent turn.
+                    excused = bool(_RE_ASK_EXCUSE_RE.search(text)) or (
                         prev_agent_text is not None and bool(_RE_ASK_EXCUSE_RE.search(prev_agent_text))
                     )
                     redundant = not excused
