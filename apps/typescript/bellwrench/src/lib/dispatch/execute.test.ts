@@ -101,9 +101,22 @@ function port(input: {
   };
 }
 
-const noDelay = { reconciliationSleep: async () => undefined };
-
 describe("executeDispatch", () => {
+  it("calls a destination only once even when selected vendor IDs differ", async () => {
+    const destinations: string[] = [];
+    const results = await executeDispatch({ ...request, vendors: [
+      request.vendors[0], { ...request.vendors[1], phone: request.vendors[0].phone },
+    ] }, port({ create: async (input) => {
+      destinations.push(input.recipient!.phone!);
+      return call("call-vendor-a");
+    } }));
+    expect(destinations).toEqual(["+14155550100"]);
+    expect(results).toHaveLength(2);
+    expect(results.find((result) => result.vendorId === "vendor-b")).toMatchObject({
+      status: "failed", callId: null, failureCode: "DUPLICATE_DESTINATION",
+    });
+  });
+
   it("preserves verified evidence when another create is definitely rejected", async () => {
     const results = await executeDispatch(
       request,
@@ -122,7 +135,6 @@ describe("executeDispatch", () => {
           });
         },
       }),
-      noDelay,
     );
 
     expect(results).toHaveLength(2);
@@ -156,7 +168,6 @@ describe("executeDispatch", () => {
               failureMessage: "raw provider message",
             }),
         }),
-        noDelay,
       );
 
       expect(result).toMatchObject({
@@ -168,7 +179,7 @@ describe("executeDispatch", () => {
     },
   );
 
-  it("returns unknown without a call ID when create reconciliation exhausts", async () => {
+  it("returns unknown without a call ID when create acceptance is ambiguous", async () => {
     const keys: string[] = [];
     const [result] = await executeDispatch(
       { ...request, vendors: [request.vendors[0]] },
@@ -178,7 +189,6 @@ describe("executeDispatch", () => {
           throw new TypeError("connection reset for +14155550100");
         },
       }),
-      noDelay,
     );
 
     expect(result).toMatchObject({
@@ -186,7 +196,7 @@ describe("executeDispatch", () => {
       callId: null,
       failureCode: "CREATE_OUTCOME_UNRESOLVED",
     });
-    expect(keys).toHaveLength(3);
+    expect(keys).toHaveLength(1);
     expect(new Set(keys).size).toBe(1);
     expect(JSON.stringify(result)).not.toContain("+14155550100");
   });
@@ -199,7 +209,6 @@ describe("executeDispatch", () => {
           throw new TypeError("polling failed with private detail");
         },
       }),
-      noDelay,
     );
 
     expect(result).toMatchObject({
@@ -224,7 +233,6 @@ describe("executeDispatch", () => {
             ],
           }),
       }),
-      noDelay,
     );
 
     expect(result).toMatchObject({

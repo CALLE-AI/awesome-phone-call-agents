@@ -4,7 +4,7 @@ import {
   CREATE_OUTCOME_UNRESOLVED,
   CreateOutcomeUnresolvedError,
   isAcceptanceAmbiguousCreateError,
-  reconcileCreateWithOriginalKey,
+  createCallOnce,
 } from "./reconciliation";
 
 describe("isAcceptanceAmbiguousCreateError", () => {
@@ -35,23 +35,17 @@ describe("isAcceptanceAmbiguousCreateError", () => {
   });
 });
 
-describe("reconcileCreateWithOriginalKey", () => {
-  it("replays an ambiguous create with only the original key", async () => {
+describe("createCallOnce", () => {
+  it("stops after an ambiguous create even when a replay would succeed", async () => {
     const keys: string[] = [];
-    const result = await reconcileCreateWithOriginalKey(
-      async (key) => {
-        keys.push(key);
-        if (keys.length === 1) {
-          throw Object.assign(new Error("timeout"), { status: 408 });
-        }
-        return { id: "call_123" };
-      },
-      "stable-key",
-      { sleep: async () => undefined },
-    );
-
-    expect(result).toEqual({ id: "call_123" });
-    expect(keys).toEqual(["stable-key", "stable-key"]);
+    await expect(createCallOnce(async (key) => {
+      keys.push(key);
+      if (keys.length === 1) throw Object.assign(new Error("timeout"), { status: 408 });
+      return { id: "call_123" };
+    }, "stable-key")).rejects.toMatchObject({
+      code: CREATE_OUTCOME_UNRESOLVED, attempts: 1,
+    });
+    expect(keys).toEqual(["stable-key"]);
   });
 
   it("does not retry a definite rejection", async () => {
@@ -60,29 +54,26 @@ describe("reconcileCreateWithOriginalKey", () => {
     });
 
     await expect(
-      reconcileCreateWithOriginalKey(create, "stable-key", {
-        sleep: async () => undefined,
-      }),
+      createCallOnce(create, "stable-key"),
     ).rejects.toThrow("invalid recipient");
     expect(create).toHaveBeenCalledTimes(1);
   });
 
-  it("exhausts three ambiguous attempts with a public unresolved code", async () => {
+  it("stops an ambiguous transport failure with a public unresolved code", async () => {
     const keys: string[] = [];
 
     await expect(
-      reconcileCreateWithOriginalKey(
+      createCallOnce(
         async (key) => {
           keys.push(key);
           throw new TypeError("connection reset");
         },
         "stable-key",
-        { sleep: async () => undefined },
       ),
     ).rejects.toMatchObject({
       code: CREATE_OUTCOME_UNRESOLVED,
-      attempts: 3,
+      attempts: 1,
     } satisfies Partial<CreateOutcomeUnresolvedError>);
-    expect(keys).toEqual(["stable-key", "stable-key", "stable-key"]);
+    expect(keys).toEqual(["stable-key"]);
   });
 });

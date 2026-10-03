@@ -12,20 +12,21 @@ export function healthResponse(
 ): Response {
   const environment =
     dependencies.environment ?? process.env.NODE_ENV ?? "development";
+  const apiKey =
+    dependencies.apiKey === undefined
+      ? process.env.CALLE_API_KEY
+      : dependencies.apiKey;
   let baseUrlValid = true;
   try {
     resolveCalleBaseUrl(
       dependencies.baseUrl ?? process.env.CALLE_BASE_URL,
       environment,
+      apiKey,
     );
   } catch {
     baseUrlValid = false;
   }
 
-  const apiKey =
-    dependencies.apiKey === undefined
-      ? process.env.CALLE_API_KEY
-      : dependencies.apiKey;
   const ready = Boolean(apiKey) && baseUrlValid;
 
   return Response.json(

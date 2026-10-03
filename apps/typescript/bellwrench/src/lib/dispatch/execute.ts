@@ -2,7 +2,7 @@ import type { CallPort } from "../calle/client";
 import {
   CREATE_OUTCOME_UNRESOLVED,
   CreateOutcomeUnresolvedError,
-  reconcileCreateWithOriginalKey,
+  createCallOnce,
 } from "../calle/reconciliation";
 import { providerIdempotencyKey } from "./identity";
 import { rankVendorResults } from "./rank";
@@ -15,10 +15,6 @@ import type {
 } from "./types";
 
 const SAFE_FAILURE_CODE = /^[A-Za-z0-9_-]{1,64}$/;
-
-interface ExecuteOptions {
-  reconciliationSleep?: (milliseconds: number) => Promise<void>;
-}
 
 function errorCode(error: unknown, fallback: string) {
   if (!(error instanceof Error)) return fallback;
@@ -78,11 +74,15 @@ function unknownResult(
 export async function executeDispatch(
   request: DispatchRequest,
   port: CallPort,
-  options: ExecuteOptions = {},
 ): Promise<VendorCallResult[]> {
   const selectedVendors = request.vendors.filter((vendor) => vendor.selected);
+  const destinations = new Set<string>();
   const calls = selectedVendors.map(
     async (vendor): Promise<VendorCallResult> => {
+      if (destinations.has(vendor.phone)) {
+        return failedResult(vendor, "DUPLICATE_DESTINATION");
+      }
+      destinations.add(vendor.phone);
       const callInput = {
         task: buildVendorCallTask(request.workOrder, vendor),
         recipient: { phone: vendor.phone },
@@ -98,11 +98,10 @@ export async function executeDispatch(
 
       let created;
       try {
-        created = await reconcileCreateWithOriginalKey(
+        created = await createCallOnce(
           (idempotencyKey) =>
             port.create(callInput, { idempotencyKey }),
           key,
-          { sleep: options.reconciliationSleep },
         );
       } catch (error) {
         if (error instanceof CreateOutcomeUnresolvedError) {

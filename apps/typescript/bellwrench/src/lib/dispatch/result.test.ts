@@ -128,6 +128,22 @@ describe("classifyTerminalCall", () => {
     ).toMatchObject({ status: "incomplete", failureCode: "RESULT_INCOMPLETE" });
   });
 
+  it.each([true, false])("masks provider phone text in verified or incomplete output (%s)", (taskCompleted) => {
+    const structuredResult = { ...validStructuredResult, constraints: ["Contact +1 (415) 555-0123 before arrival"] };
+    const input = { ...validTerminalCall, taskCompleted, structuredResult,
+      summary: "Callback +14155550123 or 415-555-0123",
+      evidence: ["Vendor confirmed at (415) 555-0123 or 14155550123"],
+      completionConfidence: { score: 0.92, label: "high +14155550123" },
+    };
+    const result = classifyTerminalCall(input);
+    expect(result.status).toBe(taskCompleted ? "verified" : "incomplete");
+    expect(result.constraints).toEqual(["Contact [phone masked] before arrival"]);
+    expect(result.summary).toBe("Callback [phone masked] or [phone masked]");
+    expect(result.evidence).toEqual(["Vendor confirmed at [phone masked] or [phone masked]"]);
+    expect(result.completionConfidence).toBe("high [phone masked]");
+    expect(input.structuredResult.constraints[0]).toContain("+1 (415) 555-0123");
+  });
+
   it("does not return unsafe failure or provider text", () => {
     const result = classifyTerminalCall({
       ...validTerminalCall,

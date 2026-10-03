@@ -39,6 +39,17 @@ describe("healthResponse", () => {
     expect(JSON.stringify(body)).not.toContain("configured-but-never-returned");
   });
 
+  it("reports not ready for a real credential on loopback", async () => {
+    const response = healthResponse({ apiKey: "must-not-leave", baseUrl: "http://127.0.0.1:4312", environment: "development", now });
+    expect(response.status).toBe(503);
+    await expect(response.json()).resolves.toMatchObject({ baseUrlValid: false });
+  });
+
+  it("permits the synthetic credential on a non-production test server", async () => {
+    const response = healthResponse({ apiKey: "bellwrench-fake-test-key", baseUrl: "http://127.0.0.1:4312", environment: "test", now });
+    expect(response.status).toBe(200);
+  });
+
   it("reports invalid configuration before a credential-bearing client exists", async () => {
     const response = healthResponse({
       apiKey: "configured-but-never-returned",

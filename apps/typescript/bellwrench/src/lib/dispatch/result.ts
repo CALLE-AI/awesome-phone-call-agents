@@ -53,10 +53,18 @@ function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === "object" && value !== null && !Array.isArray(value);
 }
 
+// Mask phone-shaped copies; keep the original provider object untouched.
+function maskPhoneText(value: string): string {
+  return value.replace(
+    /(?<![\w])(?:\+\d(?:[ ().-]*\d){7,14}|(?:\(\d{3}\)|\d{3})[ .-]\d{3}[ .-]\d{4}|\d{10,15})(?!\w)/g,
+    "[phone masked]",
+  );
+}
+
 function boundedString(value: unknown, maximum: number): string | null {
   if (typeof value !== "string") return null;
   const normalized = value.trim();
-  return normalized && normalized.length <= maximum ? normalized : null;
+  return normalized && normalized.length <= maximum ? maskPhoneText(normalized) : null;
 }
 
 function normalizeEta(value: unknown): string | null | undefined {
@@ -132,7 +140,7 @@ export function parseVendorStructuredResult(
     priceType: priceType as PriceType,
     priceAmount: normalizedPriceAmount,
     currency: normalizedCurrency,
-    constraints: [...value.constraints],
+    constraints: value.constraints.map(maskPhoneText),
   };
 }
 

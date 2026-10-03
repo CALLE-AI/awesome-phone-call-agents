@@ -29,6 +29,7 @@ export function createCallePort(
   const baseUrl = resolveCalleBaseUrl(
     options.baseUrl ?? process.env.CALLE_BASE_URL,
     options.environment ?? process.env.NODE_ENV ?? "development",
+    apiKey,
   );
   const client = new CalleClient({
     apiKey,

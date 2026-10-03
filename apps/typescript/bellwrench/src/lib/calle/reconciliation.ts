@@ -36,7 +36,7 @@ export class CreateOutcomeUnresolvedError extends Error {
 
   constructor(attempts: number, cause: unknown) {
     super(
-      "CALL-E may have accepted the call, but same-key reconciliation did not resolve the outcome.",
+      "CALL-E may have accepted the call. Automatic resubmission is disabled; review the outcome in CALL-E before another attempt.",
       { cause },
     );
     this.name = "CreateOutcomeUnresolvedError";
@@ -44,31 +44,14 @@ export class CreateOutcomeUnresolvedError extends Error {
   }
 }
 
-export async function reconcileCreateWithOriginalKey<T>(
+export async function createCallOnce<T>(
   create: (idempotencyKey: string) => Promise<T>,
   originalIdempotencyKey: string,
-  options: {
-    maxAttempts?: number;
-    sleep?: (milliseconds: number) => Promise<void>;
-  } = {},
 ): Promise<T> {
-  const maxAttempts = options.maxAttempts ?? 3;
-  const sleep =
-    options.sleep ??
-    ((milliseconds: number) =>
-      new Promise<void>((resolve) => setTimeout(resolve, milliseconds)));
-
-  for (let attempt = 1; attempt <= maxAttempts; attempt += 1) {
-    try {
-      return await create(originalIdempotencyKey);
-    } catch (error) {
-      if (!isAcceptanceAmbiguousCreateError(error)) throw error;
-      if (attempt === maxAttempts) {
-        throw new CreateOutcomeUnresolvedError(attempt, error);
-      }
-      await sleep(attempt * 400);
-    }
+  try {
+    return await create(originalIdempotencyKey);
+  } catch (error) {
+    if (!isAcceptanceAmbiguousCreateError(error)) throw error;
+    throw new CreateOutcomeUnresolvedError(1, error);
   }
-
-  throw new CreateOutcomeUnresolvedError(maxAttempts, undefined);
 }

@@ -39,7 +39,7 @@ describe("createCallePort", () => {
       requests.push(request);
       return Response.json(createdCall, { status: 201 });
     };
-    const port = createCallePort("test-key", {
+    const port = createCallePort("bellwrench-fake-test-key", {
       baseUrl: "http://127.0.0.1:4312",
       environment: "test",
       fetch: fakeFetch,
@@ -58,7 +58,7 @@ describe("createCallePort", () => {
     expect(result.id).toBe("call_test_1");
     expect(requests).toHaveLength(1);
     expect(requests[0].url).toBe("http://127.0.0.1:4312/v1/calls");
-    expect(requests[0].headers.get("authorization")).toBe("Bearer test-key");
+    expect(requests[0].headers.get("authorization")).toBe("Bearer bellwrench-fake-test-key");
     expect(requests[0].headers.get("idempotency-key")).toBe(
       "bellwrench:test:key",
     );
@@ -68,6 +68,25 @@ describe("createCallePort", () => {
       recipient_result_schema: vendorResultSchema,
       metadata: { workflow: "bellwrench_dispatch" },
     });
+  });
+
+  it("refuses a real key on loopback before invoking transport", () => {
+    let requests = 0;
+    expect(() => createCallePort("must-not-leave", {
+      baseUrl: "http://127.0.0.1:4312", environment: "development",
+      fetch: async () => { requests += 1; return Response.json(createdCall); },
+    })).toThrow(/CALLE_BASE_URL/);
+    expect(requests).toBe(0);
+  });
+
+  it.each([408, 409, 429, 500, 503])("does not hide automatic SDK create retries after HTTP %s", async (status) => {
+    let requests = 0;
+    const port = createCallePort("bellwrench-fake-test-key", {
+      baseUrl: "http://127.0.0.1:4312", environment: "test",
+      fetch: async () => { requests += 1; return Response.json({ error: { code: "unresolved", message: "Synthetic failure" } }, { status }); },
+    });
+    await expect(port.create({ task: "Test only", recipient: { phone: "+14155550100" } }, { idempotencyKey: "stable-key" })).rejects.toThrow();
+    expect(requests).toBe(1);
   });
 
   it("refuses an unsafe base URL before a client can hold the credential", () => {

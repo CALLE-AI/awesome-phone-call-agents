@@ -35,11 +35,17 @@ describe("resolveCalleBaseUrl", () => {
     "http://localhost:4312",
     "http://[::1]:4312",
   ])("accepts exact loopback HTTP outside production: %s", (value) => {
-    expect(resolveCalleBaseUrl(value, "test")).toBe(value);
+    expect(resolveCalleBaseUrl(value, "test", "bellwrench-fake-test-key")).toBe(value);
     expect(() => resolveCalleBaseUrl(value, "production")).toThrow(
       /CALLE_BASE_URL/,
     );
   });
+
+  it.each([undefined, "", "real-secret", "test-key", "bellwrench-fake-test-key-extra"])(
+    "refuses loopback HTTP without the exact fake credential: %s", (key) => {
+      expect(() => resolveCalleBaseUrl("http://127.0.0.1:4312", "test", key)).toThrow(/CALLE_BASE_URL/);
+    },
+  );
 
   it("rejects loopback lookalikes", () => {
     expect(() =>

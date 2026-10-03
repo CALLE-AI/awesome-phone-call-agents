@@ -5,7 +5,7 @@ const LOOPBACK_HOSTS = new Set(["localhost", "127.0.0.1", "[::1]"]);
 export class CalleConfigError extends Error {
   constructor() {
     super(
-      "CALLE_BASE_URL must be the exact official HTTPS origin or an exact HTTP loopback origin outside production. CALLE_API_KEY was not sent.",
+      "CALLE_BASE_URL must be the exact official HTTPS origin or an exact HTTP loopback origin outside production using the explicit fake test key. CALLE_API_KEY was not sent.",
     );
     this.name = "CalleConfigError";
   }
@@ -14,6 +14,7 @@ export class CalleConfigError extends Error {
 export function resolveCalleBaseUrl(
   value: string | undefined,
   environment: string,
+  apiKey?: string | null,
 ): string {
   let url: URL;
   try {
@@ -35,7 +36,8 @@ export function resolveCalleBaseUrl(
   if (
     environment !== "production" &&
     url.protocol === "http:" &&
-    LOOPBACK_HOSTS.has(url.hostname)
+    LOOPBACK_HOSTS.has(url.hostname) &&
+    apiKey === "bellwrench-fake-test-key"
   ) {
     return url.origin;
   }
