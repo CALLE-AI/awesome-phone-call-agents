@@ -86,11 +86,38 @@ def _mask_phone(phone: str) -> str:
     return phone[:3] + "*" * (len(phone) - 5) + phone[-2:]
 
 
-def _mask_text(text: str, max_len: int = 120) -> str:
-    """Truncates and neutralizes arbitrary text (errors, results) before
-    logging, so nothing unexpectedly leaks a phone number or transcript
-    fragment into logs."""
-    text = str(text)
+# Matches phone-number-shaped substrings embedded in arbitrary text -
+# e.g. a provider error message that echoes the dialed number back
+# ("...number +2349068072169 is in a region..."). Deliberately broad:
+# an optional leading +, then 7-15 digits, optionally separated by
+# spaces/dashes/dots/parens - this catches E.164 and most common
+# human-written phone formats a provider's error text might use.
+_PHONE_IN_TEXT_PATTERN = re.compile(
+    r"(\+?\d[\d\s\-\.\(\)]{5,}\d)"
+)
+
+
+def _redact_phones_in_text(text: str) -> str:
+    """Replaces any phone-number-shaped substring found anywhere in
+    arbitrary text with a fixed redaction marker. Used on provider error
+    messages and any other free-form text before it's printed or logged,
+    since those can echo back the actual number we sent - length
+    truncation alone does NOT remove this, the number can appear well
+    within the first N characters."""
+    def _redact(match: "re.Match[str]") -> str:
+        digits_only = re.sub(r"\D", "", match.group(0))
+        if len(digits_only) < 7:
+            return match.group(0)  # too short to be a phone number, leave it
+        return "[REDACTED_PHONE]"
+
+    return _PHONE_IN_TEXT_PATTERN.sub(_redact, text)
+
+
+def _mask_text(text: str, max_len: int = 160) -> str:
+    """Redacts any phone-number-shaped substrings, THEN truncates.
+    Order matters: truncating first could leave a partial, still-
+    identifying fragment of a number at the cut point."""
+    text = _redact_phones_in_text(str(text))
     if len(text) > max_len:
         text = text[:max_len] + "...[truncated]"
     return text

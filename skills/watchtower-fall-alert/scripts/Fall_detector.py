@@ -4,6 +4,7 @@ import sqlite3
 import time
 from contextlib import contextmanager
 from datetime import datetime, timezone
+from pathlib import Path
 from typing import Iterator, Optional
 
 import cv2
@@ -15,7 +16,22 @@ import uvicorn
 
 from calle_trigger import handle_fall_event
 
-model = YOLO("awesome-phone-call-agents/skills/watchtower-fall-alert/scripts/best.pt")
+# Resolved relative to this script's own location, not the current
+# working directory - otherwise `python fall_detector.py` only finds
+# best.pt when launched from inside scripts/, and silently resolves to
+# the wrong (or a missing) file if launched from anywhere else.
+SCRIPT_DIR = Path(__file__).resolve().parent
+MODEL_PATH = SCRIPT_DIR / "best.pt"
+
+if not MODEL_PATH.exists():
+    raise RuntimeError(
+        f"No fall-detection model found at {MODEL_PATH}. This skill "
+        f"does not bundle a pretrained model - place your own "
+        f"fine-tuned fall/non-fall YOLO weights file at "
+        f"scripts/best.pt before running. See SKILL.md -> Limitations."
+    )
+
+model = YOLO(str(MODEL_PATH))
 tracker = sv.ByteTrack()
 app = FastAPI()
 box_annotator = sv.BoxAnnotator(thickness=2)
@@ -57,7 +73,7 @@ def require_api_key(
 # module. Records every fall event and the eventual caregiver decision
 # to watchtower.db (created automatically in the working directory).
 
-DB_PATH = "watchtower.db"
+DB_PATH = str(SCRIPT_DIR / "watchtower.db")
 
 
 @contextmanager
@@ -108,8 +124,11 @@ def log_event(event: dict) -> int:
 
 
 def update_event_result(event_id: int, decision: str) -> None:
-    """Call once handle_fall_event() returns, to record the final
-    decision and mark the event as resolved."""
+    """Call once a COMPLETED, bound decision (dismiss/escalate) comes
+    back - marks the event genuinely resolved. Do not call this for an
+    ambiguous/unknown result; use mark_event_needs_review() instead, so
+    the log distinguishes a real resolution from one that still needs a
+    human to look at it."""
     now = datetime.now(timezone.utc).isoformat()
     with _db_connect() as conn:
         conn.execute(
@@ -119,6 +138,23 @@ def update_event_result(event_id: int, decision: str) -> None:
             WHERE id = ?
             """,
             (decision, now, event_id),
+        )
+
+
+def mark_event_needs_review(event_id: int) -> None:
+    """Call when the result is ambiguous ('unknown') - distinct from
+    both 'resolved' (a real dismiss/escalate happened) and 'failed' (an
+    exception was raised). This status is what keeps the detector
+    halted until an operator reviews it and calls /reset."""
+    now = datetime.now(timezone.utc).isoformat()
+    with _db_connect() as conn:
+        conn.execute(
+            """
+            UPDATE fall_events
+            SET decision = 'unknown', call_status = 'needs_review', updated_at = ?
+            WHERE id = ?
+            """,
+            (now, event_id),
         )
 
 
@@ -188,11 +224,21 @@ _last_event_time = 0.0
 # would want a proper state store instead of a module-level global.
 
 status_state = {
-    "status": "monitoring",       # monitoring | fall_detected | calling | resolved
+    "status": "monitoring",       # monitoring | fall_detected | calling | resolved | stopped_needs_review
     "last_event": None,             # last fall_detected event dict, or None
     "last_decision": None,          # "dismiss" | "escalate" | "unknown" | None
     "last_updated": datetime.now(timezone.utc).isoformat(),
 }
+
+# Set True when a call result comes back ambiguous ("unknown"). While
+# True, detection and the cooldown-based auto-reset both stop entirely -
+# see the "stopped_needs_review" handling below. This is the fix for:
+# an ambiguous result must NOT be treated as resolved, and must NOT
+# allow the detector to re-arm and dial the same persistent fall again
+# after the cooldown window passes. Clearing this requires an explicit
+# operator action (see reset_after_review() / the /reset route), not
+# the passage of time.
+_stopped_needs_review = False
 
 
 def _update_status(**kwargs):
@@ -243,7 +289,7 @@ def check_for_fall(detections: sv.Detections, class_names: dict) -> dict | None:
 
 
 def generate_frame():
-    cap = cv2.VideoCapture(0)
+    cap = cv2.VideoCapture(0)  # Change the index if you have multiple cameras
 
     # Lower capture resolution - fewer pixels to process per frame.
     # 640x480 is plenty for fall detection; drop further (e.g. 480x360)
@@ -260,12 +306,32 @@ def generate_frame():
     last_detections = None
     last_result_names = {}
 
+    global _stopped_needs_review
+
     while True:
         ret, frame = cap.read()
         if not ret:
             break
 
         frame_count += 1
+
+        # If a prior event came back ambiguous, detection is halted
+        # entirely until an operator explicitly reviews and clears it
+        # (see reset_after_review() below). This is deliberate: without
+        # this stop, a persistent unresolved fall would get re-detected
+        # after the cooldown window and dialed again, even though the
+        # first call never produced a real answer.
+        if _stopped_needs_review:
+            if detections is not None:
+                annotated_frame = box_annotator.annotate(scene=frame, detections=detections)
+            else:
+                annotated_frame = frame
+            _, buffer = cv2.imencode('.jpg', annotated_frame)
+            frame_byte = buffer.tobytes()
+            yield (b'--frame\r\n'
+                   b'Content-Type: image/jpeg\r\n\r\n' + frame_byte + b'\r\n')
+            time.sleep(0.5)
+            continue
 
         if frame_count % FRAME_SKIP == 0:
             # imgsz=320 trades some accuracy for a large speed gain vs
@@ -286,12 +352,32 @@ def generate_frame():
                 try:
                     _update_status(status="calling")
                     decision = handle_fall_event(event)
-                    _update_status(status="resolved", last_decision=decision)
-                    update_event_result(event_id, decision)
                 except Exception as exc:
                     print(f"[Watchtower] handle_fall_event failed: {exc}")
-                    _update_status(status="resolved", last_decision="unknown")
+                    decision = "unknown"
                     mark_event_failed(event_id, reason=str(exc))
+
+                if decision in ("dismiss", "escalate"):
+                    # Only a completed, bound primary result (a clear
+                    # dismiss, or an escalate that CALL-E actually
+                    # confirmed) counts as resolved. Detection re-arms
+                    # normally via the cooldown window below.
+                    _update_status(status="resolved", last_decision=decision)
+                    update_event_result(event_id, decision)
+                else:
+                    # Ambiguous/unknown: do NOT mark resolved, do NOT
+                    # allow the cooldown to re-arm detection. Stop here
+                    # and require a human to review before continuing.
+                    _update_status(
+                        status="stopped_needs_review", last_decision="unknown"
+                    )
+                    mark_event_needs_review(event_id)
+                    _stopped_needs_review = True
+                    print(
+                        "[Watchtower] STOPPED - ambiguous result requires "
+                        "manual review before monitoring resumes. Call "
+                        "POST /reset once reviewed."
+                    )
         else:
             # Reuse the last frame's detections/boxes for the skipped
             # frames so the video still shows bounding boxes on every
@@ -304,11 +390,11 @@ def generate_frame():
             annotated_frame = frame
 
         # Reset the displayed status back to "monitoring" once we're
-        # well past the last event's cooldown window. Without this, the
-        # dashboard stays stuck on "resolved" (or "calling", if the call
-        # itself failed) forever, even though the CV pipeline is still
-        # actively watching for the next fall in the background.
-        if status_state["status"] != "monitoring" and _last_event_time:
+        # well past the last event's cooldown window - but ONLY for a
+        # genuinely resolved event (dismiss/escalate). An ambiguous
+        # result (_stopped_needs_review) is handled above and never
+        # reaches this auto-reset; it requires an explicit /reset call.
+        if status_state["status"] == "resolved" and _last_event_time:
             if time.time() - _last_event_time >= EVENT_COOLDOWN_SECONDS:
                 _update_status(status="monitoring")
 
@@ -335,6 +421,20 @@ def get_status(_auth: None = Depends(require_api_key)):
 @app.get('/history')
 def get_history(limit: int = 20, _auth: None = Depends(require_api_key)):
     return get_recent_events(limit=limit)
+
+
+@app.post('/reset')
+def reset_after_review(_auth: None = Depends(require_api_key)):
+    """
+    Clears the stopped_needs_review state after a human has looked at
+    the ambiguous event and decided it's safe to resume monitoring.
+    This is the ONLY way out of that state - it never clears on its
+    own, by cooldown or otherwise, by design.
+    """
+    global _stopped_needs_review
+    _stopped_needs_review = False
+    _update_status(status="monitoring", last_decision=None)
+    return {"status": "monitoring", "message": "Detection resumed after manual review."}
 
 
 DASHBOARD_HTML = """
@@ -391,6 +491,7 @@ DASHBOARD_HTML = """
         .badge.fall_detected { background: #3a1f16; color: #fb923c; }
         .badge.calling { background: #33270f; color: #facc15; }
         .badge.resolved { background: #16233a; color: #60a5fa; }
+        .badge.stopped_needs_review { background: #3a1616; color: #f87171; }
 
         .row { margin-top: 1rem; }
         .label {
@@ -437,6 +538,7 @@ DASHBOARD_HTML = """
             fall_detected: "Fall Detected",
             calling: "Calling Caregiver",
             resolved: "Resolved",
+            stopped_needs_review: "STOPPED - Needs Review",
         };
 
         async function pollStatus() {

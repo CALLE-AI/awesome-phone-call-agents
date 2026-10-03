@@ -68,18 +68,28 @@ a real person's spoken decision, not a model's inference.
 If CALL-E cannot extract a clear `dismiss` / `escalate` decision from the
 caregiver call — due to no pickup, a bad connection, an unclear response,
 or the call itself erroring — the result is `unknown`. **Watchtower stops
-here.** It does not retry the caregiver call, and it does not
-automatically call the secondary contact.
+the entire detector**, not just that one call sequence:
+
+- The caregiver call is not retried.
+- The secondary contact is not called automatically.
+- The event is logged with `call_status = 'needs_review'` (distinct from
+  both `resolved` and `failed`), `decision = 'unknown'`.
+- Fall detection itself halts — the cooldown window that would normally
+  re-arm monitoring does not apply to this state at all, on purpose.
+- The dashboard shows `STOPPED - Needs Review` and stays there until an
+  operator explicitly calls `POST /reset` after reviewing the event.
 
 Earlier versions of this skill treated `unknown` as an automatic
-escalation. On review, that turned out to be the wrong default: an
-automated system deciding on its own to place a second phone call,
-without any human having actually said "escalate," is itself an
-unauthorized escalation — the opposite of the human-approval principle
-this skill is supposed to enforce. An ambiguous result is logged with
-`call_status = 'resolved'` and `decision = 'unknown'` and is meant to be
-followed up on by a human operator, not resolved automatically by
-placing another call.
+escalation, and separately, treated it as "resolved" for the purposes of
+the cooldown timer — meaning detection would silently resume and could
+re-detect and re-dial the *same* persistent, unresolved fall once the
+cooldown passed. Both were wrong for the same underlying reason: an
+automated system deciding on its own to place another call — whether
+immediately (auto-escalating) or later (re-arming on a timer) — without
+a human having actually resolved the situation, is itself an
+unauthorized action. The only ways out of an ambiguous result are a
+human reviewing it and explicitly resuming, or the operator restarting
+the process.
 
 ## 5. False-positive mitigation
 
@@ -137,11 +147,16 @@ whole detection pipeline.
 - Real calls require an explicit `WATCHTOWER_CONFIRM_LIVE_CALL`
   confirmation phrase set for that run. Without it, Watchtower always
   runs in dry-run mode, regardless of whether `CALLE_API_KEY` is present.
-- All FastAPI routes (`/detect`, `/status`, `/history`, `/`) require an
-  API key (`WATCHTOWER_API_KEY`), since they are reachable by anyone on
-  the same network otherwise.
-- Phone numbers, structured call results, and error text are masked
-  before being printed or logged.
+- All FastAPI routes (`/detect`, `/status`, `/history`, `/`, `/reset`)
+  require an API key (`WATCHTOWER_API_KEY`), since they are reachable by
+  anyone on the same network otherwise — including `/reset`, since it
+  changes system state (resumes monitoring) and should not be callable
+  by an unauthenticated party.
+- Phone numbers are masked (`+1***...**34`) before being printed. Error
+  and provider-response text is actively scanned and any phone-number-
+  shaped substring found anywhere within it is redacted — not just
+  truncated — since a provider error can echo the dialed number back
+  verbatim well within a truncation limit.
 
 ## 8. Data handling and retention
 

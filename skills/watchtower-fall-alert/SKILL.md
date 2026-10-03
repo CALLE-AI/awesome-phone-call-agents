@@ -54,7 +54,7 @@ Camera → YOLO fall detection → confidence + consecutive-frame + cooldown
 | File | Purpose |
 |---|---|
 | `scripts/fall_detector.py` | FastAPI app: camera capture, YOLO + ByteTrack detection, fall-event logic, SQLite logging, `/detect` (video), `/status` (JSON), `/history` (JSON), and a built-in HTML dashboard at `/`. |
-| `scripts/calle_trigger.py` | CALL-E SDK integration. Places the caregiver call with a structured `result_schema`, handles retries on transient network timeouts, and places the escalation call if needed. |
+| `scripts/calle_trigger.py` | CALL-E SDK integration. Places the caregiver call with a structured `result_schema`, validates and authorizes destination numbers, and places the escalation call only after a completed, explicit "escalate" decision. Does not retry - any error or ambiguous result stops immediately. Dry-run by default. |
 | `scripts/dashboard.py` | Optional Streamlit dashboard — a pure display layer that polls `/status` and `/history` from the FastAPI backend and embeds the live video feed. Run this instead of, or alongside, the built-in HTML dashboard. |
 
 ## Setup
@@ -63,10 +63,13 @@ Requires Python 3.10+, a webcam or camera source, a CALL-E account, and
 your own fine-tuned fall-detection YOLO model (see Limitations).
 
 ```bash
-pip install ultralytics opencv-python supervision fastapi uvicorn calle-ai
-# optional, for the Streamlit dashboard:
-pip install streamlit requests
+cd skills/watchtower-fall-alert/scripts
+pip install -r requirements.txt
 ```
+
+(`requirements.txt` includes the Streamlit dashboard's dependencies too;
+`fall_detector.py` and the built-in HTML dashboard don't need Streamlit
+installed to run, only `dashboard.py` does.)
 
 **Watchtower is safe by default: it will not place a real phone call
 unless you explicitly opt in for that run.** Just running it with no
@@ -82,9 +85,14 @@ feed and dashboard are always network-reachable while the server runs:
 export WATCHTOWER_API_KEY=$(python -c "import secrets; print(secrets.token_urlsafe(24))")
 ```
 
-Place your trained model at `scripts/best.pt`. Confirm its class names
-match `FALL_CLASS_NAME` in `fall_detector.py` (defaults to `"fall"`,
-matching a model with `{0: 'non-fall', 1: 'fall'}`).
+This skill does not bundle a fall-detection model. Place your own
+fine-tuned weights file at `scripts/best.pt` (resolved relative to
+`fall_detector.py`'s own location, regardless of which directory you
+run the command from). If it's missing, `fall_detector.py` fails
+immediately with a clear error rather than crashing deeper in the
+pipeline. Confirm your model's class names match `FALL_CLASS_NAME` in
+`fall_detector.py` (defaults to `"fall"`, matching a model with
+`{0: 'non-fall', 1: 'fall'}`).
 
 ### Going live (placing real calls)
 
@@ -124,9 +132,10 @@ streamlit run dashboard.py
 
 Watchtower is not a scheduled or recurring job — it's a long-running
 process that watches the camera feed continuously while active. There is
-no background task, cron entry, or persistent job to cancel.
+no background task, cron entry, or persistent job to cancel. There are
+two distinct ways monitoring stops:
 
-To stop monitoring, stop the running process directly:
+**Manual stop (you decide to shut it down):**
 
 ```bash
 # in the terminal running fall_detector.py:
@@ -138,6 +147,23 @@ CALL-E call is in progress when you stop the process, the call itself
 continues on CALL-E's side until it naturally completes (CALL-E calls are
 not cancelled by stopping the local script) — only the detection loop and
 video stream are affected locally.
+
+**Automatic stop (an ambiguous result halts detection for you):**
+
+If a caregiver call comes back ambiguous — unclear decision, no pickup,
+a provider error — Watchtower stops detecting new falls entirely and the
+dashboard shows `STOPPED - Needs Review`. This is intentional and is not
+a bug: it prevents the system from re-detecting the same unresolved fall
+after the cooldown window and dialing again without ever having gotten a
+real answer the first time.
+
+This state does not clear on its own. After a human has reviewed the
+event (check `/history` or the dashboard for what happened), resume
+monitoring explicitly:
+
+```bash
+curl -X POST "http://localhost:5000/reset?key=$WATCHTOWER_API_KEY"
+```
 
 ## Consent and disclosure
 
@@ -160,30 +186,47 @@ closely mirroring the human-approval pattern used in
 [`deployment-approval-call`](../deployment-approval-call/):
 
 - **CALL-E never autonomously contacts emergency services.** The only
-  actions it takes are: call the caregiver, and — if the caregiver
-  escalates or can't be reached with a clear answer — call a second human.
-  A real person always makes the actual emergency call.
-- **Ambiguous results fail toward escalation, not silence.** If CALL-E
-  can't extract a clear decision from the caregiver call (bad connection,
-  unclear response, no pickup), Watchtower treats that as `unknown` and
-  escalates to the secondary contact rather than doing nothing. Staying
-  silent on an ambiguous fall is a worse failure mode than one unnecessary
-  extra call.
-- **Consecutive-frame and cooldown logic reduce false alarms.** A single
-  flickery detection doesn't trigger a call — the fall class must be seen
-  across multiple consecutive frames above a confidence threshold, and
-  repeat events are suppressed for a cooldown window so one fall doesn't
-  spam multiple calls.
-- **Transient network failures are retried, not treated as call
-  failures.** CALL-E places the phone call first, then polls for the
-  result — a timeout during that polling step doesn't necessarily mean
-  the call itself failed. `calle_trigger.py` retries fetching the result
-  before falling back to a safe default.
-- **All example phone numbers in this skill are fictional
-  placeholders.** Real numbers are supplied via environment variables at
+  actions it takes are: call the caregiver, and — only if the caregiver
+  gives an explicit, completed "escalate" decision — call a second
+  human. A real person always makes the actual emergency call.
+- **Ambiguous results stop the system, not escalate it further.** If
+  CALL-E can't extract a clear decision (bad connection, unclear
+  response, no pickup, a provider-side error), the outcome is `unknown`
+  and Watchtower **stops**: no retry of the caregiver call, no automatic
+  call to the secondary contact, and detection itself halts rather than
+  re-arming after the cooldown. An automated system deciding on its own
+  to place a second call is itself an unauthorized escalation — the
+  opposite of the human-approval principle this skill enforces. Clearing
+  this state requires an explicit `POST /reset` after a human reviews
+  the event (see `references/safety.md` §4).
+- **Consecutive-frame and cooldown logic reduce false alarms** for
+  genuinely resolved events. A single flickery detection doesn't trigger
+  a call — the fall class must be seen across multiple consecutive
+  frames above a confidence threshold. The cooldown window only applies
+  after a `dismiss` or `escalate` outcome; an `unknown` outcome does not
+  re-arm on a timer at all (see above).
+- **No automatic retries.** CALL-E's call lifecycle involves placing the
+  call and then polling for its result; a failure in either step is
+  treated as ambiguous and handled per the point above, rather than
+  retried. Retrying risks placing a duplicate, confusing call to an
+  already-contacted caregiver.
+- **Live calls require explicit, layered opt-in.** A real call needs an
+  API key, strict E.164-validated numbers, those numbers present in an
+  authorized allowlist, AND a separate confirmation phrase set for that
+  run — not just one of these. Absent any of them, Watchtower dry-runs.
+- **All example phone numbers in this skill's docs and defaults are
+  NANP's officially reserved fictional range** (555-0100 through
+  555-0199). Real numbers are supplied via environment variables at
   deploy time, never committed.
-- **Every event is logged**, including failures, so there's an auditable
-  history of what was detected and what action was taken.
+- **All network-reachable routes require an API key.** `/detect`,
+  `/status`, `/history`, `/`, and `/reset` are otherwise open to anyone
+  on the same network.
+- **Phone numbers and provider error text are redacted before being
+  printed or logged** — not just truncated; any phone-number-shaped
+  substring is actively replaced, including inside error messages that
+  might otherwise echo a number back.
+- **Every event is logged**, including ambiguous/failed ones, so there's
+  an auditable history of what was detected and what action was taken.
 
 ## Example event flow
 
