@@ -1,3 +1,15 @@
+
+const API_KEY = "your_secret_password_here";
+
+function escapeHTML(str) {
+    if (!str) return '';
+    return String(str)
+        .replace(/&/g, '&amp;')
+        .replace(/</g, '&lt;')
+        .replace(/>/g, '&gt;')
+        .replace(/"/g, '&quot;')
+        .replace(/'/g, '&#39;');
+}
 function timeAgo(dateString) {
     if (!dateString) return "Never";
     const date = new Date(dateString);
@@ -22,9 +34,9 @@ let globalData = { contacts: [], logs: [], trend: null };
 async function fetchAllData() {
     try {
         const [contactsRes, logsRes, trendRes] = await Promise.all([
-            fetch('/api/contacts'),
-            fetch('/api/logs'),
-            fetch('/api/trend/1')
+            fetch('/api/contacts', { headers: { 'x-api-key': API_KEY } }),
+            fetch('/api/logs', { headers: { 'x-api-key': API_KEY } }),
+            fetch('/api/trend/1', { headers: { 'x-api-key': API_KEY } })
         ]);
         
         globalData.contacts = await contactsRes.json();
@@ -107,7 +119,7 @@ function renderContacts() {
                 <a href="contact.html?id=${contact.id}" class="contact-info" style="text-decoration:none; color:inherit;">
                     <img src="https://ui-avatars.com/api/?name=${encodeURIComponent(contact.name)}&background=f3f4f6&color=374151" class="contact-avatar">
                     <div>
-                        <div class="contact-name" style="text-decoration:underline transparent; transition:0.2s;" onmouseover="this.style.textDecorationColor='var(--primary)'" onmouseout="this.style.textDecorationColor='transparent'">${contact.name}</div>
+                        <div class="contact-name" style="text-decoration:underline transparent; transition:0.2s;" onmouseover="this.style.textDecorationColor='var(--primary)'" onmouseout="this.style.textDecorationColor='transparent'">${escapeHTML(contact.name)}</div>
                         <div class="contact-phone">${maskPhone(contact.phone)}</div>
                         <div class="status-text"><div class="dot ${dotClass}"></div> ${statusStr}</div>
                     </div>
@@ -143,13 +155,13 @@ function renderLogs() {
         row.innerHTML = `
             <img src="https://ui-avatars.com/api/?name=${encodeURIComponent(log.contactName)}&background=f3f4f6&color=374151" style="width:40px; border-radius:50%;">
             <div class="log-time">
-                <div style="font-weight:600; color:#111827; margin-bottom:4px;">${log.contactName}</div>
+                <div style="font-weight:600; color:#111827; margin-bottom:4px;">${escapeHTML(log.contactName)}</div>
                 ${dateStr}
             </div>
             <div class="log-badge ${level}"><span style="margin-right:4px;">${badgeIcon}</span>${level.toUpperCase()}</div>
             <div class="log-summary">
-                ${log.wellbeing_summary || `Call Status: ${log.status}`}
-                ${log.concern_reason ? `<br><span style="color:#ef4444; font-size:12px; margin-top:4px; display:inline-block;">${log.concern_reason}</span>` : ''}
+                ${escapeHTML(log.wellbeing_summary || `Call Status: ${log.status}`)}
+                ${log.concern_reason ? `<br><span style="color:#ef4444; font-size:12px; margin-top:4px; display:inline-block;">${escapeHTML(log.concern_reason)}</span>` : ''}
             </div>
         `;
         list.appendChild(row);
@@ -191,7 +203,7 @@ window.handleTriggerCall = async function(contactId) {
     try {
         const res = await fetch('/api/trigger-call', {
             method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
+            headers: { 'Content-Type': 'application/json', 'x-api-key': API_KEY },
             body: JSON.stringify({ contactId })
         });
         const data = await res.json();

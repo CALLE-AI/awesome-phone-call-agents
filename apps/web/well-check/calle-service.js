@@ -51,12 +51,20 @@ Your tone must be gentle, clear, and reassuring. Speak slowly and clearly.
 }
 
 export async function createAndRunCall(phone) {
-    // 1) TEST_MODE/ALLOWED_TEST_NUMBERS guard function
-    const TEST_MODE = process.env.TEST_MODE !== 'false'; // defaults to true if undefined
-    const ALLOWED_TEST_NUMBERS = (process.env.ALLOWED_TEST_NUMBERS || '+15550123456').split(',');
+    // 1) STRICT GUARD: Must validate E.164 format and match ALLOWED_TEST_NUMBERS
+    const e164Regex = /^\+[1-9]\d{1,14}$/;
+    if (!e164Regex.test(phone)) {
+        throw new Error(`Invalid phone number format. Must be E.164.`);
+    }
 
-    if (TEST_MODE && !ALLOWED_TEST_NUMBERS.includes(phone)) {
-        throw new Error(`TEST_MODE is enabled and phone ${phone} is not in the ALLOWED_TEST_NUMBERS list.`);
+    const TEST_MODE = process.env.TEST_MODE === 'true';
+    if (!TEST_MODE) {
+        throw new Error(`Public deployments must run in TEST_MODE=true.`);
+    }
+
+    const ALLOWED_TEST_NUMBERS = (process.env.ALLOWED_TEST_NUMBERS || '').split(',').map(n => n.trim());
+    if (!ALLOWED_TEST_NUMBERS.includes(phone)) {
+        throw new Error(`Phone number ${phone} is not explicitly listed in ALLOWED_TEST_NUMBERS.`);
     }
 
     // 2) MOCK MODE vs REAL SDK

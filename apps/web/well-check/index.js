@@ -16,6 +16,15 @@ const PORT = process.env.PORT || 3000;
 app.use(express.json());
 app.use(express.static(path.join(__dirname, 'public')));
 
+// Basic Auth for API routes
+app.use('/api', (req, res, next) => {
+    const apiKey = req.headers['x-api-key'];
+    if (!process.env.APP_API_KEY || apiKey !== process.env.APP_API_KEY) {
+        return res.status(401).json({ error: 'Unauthorized' });
+    }
+    next();
+});
+
 // API Routes
 app.get('/api/contacts', (req, res) => {
     res.json(getContacts());

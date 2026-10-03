@@ -1,3 +1,15 @@
+
+const API_KEY = "your_secret_password_here";
+
+function escapeHTML(str) {
+    if (!str) return '';
+    return String(str)
+        .replace(/&/g, '&amp;')
+        .replace(/</g, '&lt;')
+        .replace(/>/g, '&gt;')
+        .replace(/"/g, '&quot;')
+        .replace(/'/g, '&#39;');
+}
 function timeAgo(dateString) {
     if (!dateString) return "Never";
     const date = new Date(dateString);
@@ -31,7 +43,7 @@ async function fetchData() {
         const [contactsRes, logsRes, trendRes] = await Promise.all([
             fetch("/api/contacts"),
             fetch("/api/logs"),
-            fetch(`/api/trend/${contactId}`)
+            fetch(`/api/trend/${contactId}`, { headers: { 'x-api-key': API_KEY } })
         ]);
         
         const allContacts = await contactsRes.json();
@@ -51,7 +63,7 @@ function render() {
     
     // Header
     document.getElementById("contact-header").innerHTML = `
-        <h1>${contact.name}</h1>
+        <h1>${escapeHTML(contact.name)}</h1>
         <p>${maskPhone(contact.phone)} <span style="margin:0 8px; opacity:0.5;">|</span> ${contact.timezone}</p>
     `;
     
@@ -80,8 +92,8 @@ function render() {
                 <div class="log-badge ${level}">${level === 'none' ? '✅' : '⚠️'} ${level.toUpperCase()}</div>
             </div>
             <div style="margin-bottom:16px;">
-                ${lastLog.concern_reason ? `<div style="color:var(--danger); font-weight:600; margin-bottom:8px;">⚠️ ${lastLog.concern_reason}</div>` : ""}
-                ${lastLog.wellbeing_summary || `Status: ${lastLog.status}`}
+                ${lastLog.concern_reason ? `<div style="color:var(--danger); font-weight:600; margin-bottom:8px;">⚠️ ${escapeHTML(lastLog.concern_reason)}</div>` : ""}
+                ${escapeHTML(lastLog.wellbeing_summary || `Status: ${lastLog.status}`)}
             </div>
             ${checksHtml}
         `;
@@ -115,8 +127,8 @@ function render() {
                     <div style="font-weight:600;">${new Date(log.timestamp).toLocaleString()}</div>
                     <div class="log-badge ${level}">${level === 'none' ? '✅' : '⚠️'} ${level.toUpperCase()}</div>
                 </div>
-                <div>${log.wellbeing_summary || log.status}</div>
-                ${log.concern_reason ? `<div style="color:var(--danger); font-size:13px; margin-top:4px;">⚠️ ${log.concern_reason}</div>` : ""}
+                <div>${escapeHTML(log.wellbeing_summary || log.status)}</div>
+                ${log.concern_reason ? `<div style="color:var(--danger); font-size:13px; margin-top:4px;">⚠️ ${escapeHTML(log.concern_reason)}</div>` : ""}
                 ${checksStr}
             </div>
         `;
