@@ -1075,3 +1075,33 @@ button was 4.47.
 Touch targets grow to 44px under `@media (pointer: coarse)` rather than
 everywhere. A 34px icon button is comfortable with a mouse and a nuisance with a
 thumb; the guidance is about fingers, so the query asks about the pointer.
+
+## 54. The question that had no answer coming
+
+The answer budget decided when Dial stopped *waiting* on a call. Nothing decided
+when it stopped *asking*.
+
+Every poll that found a call still non-terminal queued the next poll. It could
+not reuse a dedupe key -- the key of the job doing the re-enqueue is held until
+that job ends -- so each link in the chain needed a fresh one, and a unique
+index that never sees the same key twice cannot collapse anything. One call the
+provider never resolved meant one poll row, forever.
+
+That is not a slow leak. A call abandoned on the answer budget deliberately
+keeps being polled, because it cannot be cancelled and its real result is still
+worth recording -- so every abandoned call added a permanent row to the queue.
+
+`CALL_POLL_BUDGET_MS` (twenty minutes, past every other budget in the config) is
+the bound. When it is spent Dial stops and writes down what it actually knows:
+the call becomes `needs_review` with `provider_result_unavailable`, and the
+wording says the service never reported how the call ended and that it may still
+have been in progress.
+
+Two things it deliberately does not do. It does not place another call -- the
+outcome is unknown, so ringing someone else on the strength of it would be a
+second real side effect resting on a call Dial cannot account for. And it does
+not discard a later answer: the webhook needs no polling, so a terminal snapshot
+still replaces the reconciled row.
+
+The task is closed out by comparison, which places no calls, and only once
+nothing else is still in flight.

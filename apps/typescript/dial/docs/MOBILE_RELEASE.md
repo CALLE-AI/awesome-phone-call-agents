@@ -122,8 +122,11 @@ reviewer:
       (task text).
 - [ ] Google Play data safety form: same disclosures.
 - [ ] Explain the AI calling behaviour in the store listing. Both stores ask
-      about automated calling; Dial identifies itself as an AI on every call and
-      does not do bulk or unsolicited calling, which is the relevant answer.
+      about automated calling; Dial identifies itself as an AI on every call.
+      Personal mode rings businesses on the user's own request. **Dial for
+      Business places bulk calls to a business's imported customer list**, so
+      the listing must disclose that rather than claim Dial never bulk-calls —
+      see `docs/PRIVACY.md` for the safeguards attached to it.
 
 ## Deep links
 

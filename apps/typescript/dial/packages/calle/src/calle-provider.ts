@@ -8,7 +8,8 @@ import {
   type CalleAttemptStatus,
   type TranscriptTurn,
 } from '@dial/schemas';
-import { maskPhone } from '@dial/domain';
+import { checkCalleOrigin } from '@dial/config';
+import { maskPhone, maskPhonesInText, maskPhonesInValue } from '@dial/domain';
 import { logger } from '@dial/observability';
 import {
   ProviderError,
@@ -43,6 +44,18 @@ export class CalleCallProvider implements CallProvider {
     if (!apiKey) {
       throw new Error('CalleCallProvider requires a CALL-E API key.');
     }
+    /*
+     * The key is a paid-account bearer credential, so the destination is
+     * checked here as well as at boot. `calle:verify` builds a provider
+     * straight from the environment and never runs `loadConfig`, and this is
+     * the last point before the key is attached to a request.
+     */
+    const origin = checkCalleOrigin(baseUrl);
+    if (!origin.ok) {
+      throw new Error(
+        `Refusing to send the CALL-E API key to an unapproved origin: ${origin.reason}`,
+      );
+    }
     this.client = new CalleClient({ apiKey, baseUrl });
   }
 
@@ -66,10 +79,13 @@ export class CalleCallProvider implements CallProvider {
         },
         { idempotencyKey: request.idempotencyKey },
       );
+      // Masked, not raw: a log line is a boundary like any other, and the raw
+      // number is already on the call row for anything that legitimately needs
+      // to dial or reconcile it.
       logger.info('calle call created', {
         providerRequestId: call.id,
         status: call.status,
-        phone: request.phone,
+        phone: maskPhone(request.phone),
       });
       return normalizeCall(call);
     } catch (error) {
@@ -100,10 +116,10 @@ export function normalizeCall(call: Record<string, any>): ProviderCallSnapshot {
         status: coerce<CalleAttemptStatus>(attempt.status, CALLE_ATTEMPT_STATUSES, 'queued'),
         startedAt: attempt.startedAt ?? attempt.started_at ?? null,
         completedAt: attempt.completedAt ?? attempt.completed_at ?? null,
-        summary: attempt.summary ?? null,
+        summary: maskPhonesInText(attempt.summary ?? null),
         transcript: normalizeTranscript(attempt.transcriptTurns ?? attempt.transcript_turns ?? []),
         failureCode: attempt.failureCode ?? attempt.failure_code ?? null,
-        failureMessage: attempt.failureMessage ?? attempt.failure_message ?? null,
+        failureMessage: maskPhonesInText(attempt.failureMessage ?? attempt.failure_message ?? null),
       });
     }
   }
@@ -115,17 +131,24 @@ export function normalizeCall(call: Record<string, any>): ProviderCallSnapshot {
     status: coerce<CalleCallStatus>(call['status'], CALLE_CALL_STATUSES, 'queued'),
     // null here is CALL-E telling us it could not produce a schema-valid result.
     // It is propagated as null, never softened into {}.
-    structuredResult:
-      (call['structuredResult'] ?? call['structured_result'] ?? null) as Record<string, unknown> | null,
-    summary: call['summary'] ?? null,
+    //
+    // Masked like every other provider-authored field: a schema field the model
+    // filled from a conversation can hold a number somebody read out, and this
+    // value is copied straight into API responses.
+    structuredResult: (maskPhonesInValue(
+      call['structuredResult'] ?? call['structured_result'] ?? null,
+    ) ?? null) as Record<string, unknown> | null,
+    summary: maskPhonesInText(call['summary'] ?? null),
     taskCompleted: call['taskCompleted'] ?? call['task_completed'] ?? null,
     completionConfidence: confidence
       ? { score: Number(confidence.score ?? 0), label: String(confidence.label ?? 'unknown') }
       : null,
-    evidence: Array.isArray(call['evidence']) ? call['evidence'].map(String) : [],
+    evidence: Array.isArray(call['evidence'])
+      ? call['evidence'].map(String).map((item) => maskPhonesInText(item) ?? '')
+      : [],
     attempts,
     failureCode: call['failureCode'] ?? call['failure_code'] ?? null,
-    failureMessage: call['failureMessage'] ?? call['failure_message'] ?? null,
+    failureMessage: maskPhonesInText(call['failureMessage'] ?? call['failure_message'] ?? null),
     createdAt: call['createdAt'] ?? call['created_at'] ?? new Date().toISOString(),
     completedAt: call['completedAt'] ?? call['completed_at'] ?? null,
   };
@@ -135,7 +158,10 @@ function normalizeTranscript(turns: any[]): TranscriptTurn[] {
   return turns.map((turn) => ({
     offsetSeconds: Number(turn.offsetSeconds ?? turn.offset_seconds ?? 0),
     speaker: coerce(turn.speaker, TRANSCRIPT_SPEAKERS, 'unknown'),
-    text: String(turn.text ?? ''),
+    // A number spoken on a call is masked like any other. The transcript still
+    // shows that a number was given, which is what the evidence is for; the
+    // digits themselves are not needed to read what was said.
+    text: maskPhonesInText(String(turn.text ?? '')) ?? '',
   }));
 }
 
@@ -152,7 +178,10 @@ export function toProviderError(error: unknown): ProviderError {
   const e = error as { code?: string; status?: number; message?: string; name?: string };
   const code = e?.code ?? 'provider_unavailable';
   const status = typeof e?.status === 'number' ? e.status : 502;
-  const message = e?.message ?? 'The calling provider rejected the request.';
+  // Provider errors routinely echo the request back, number included, and this
+  // message is both logged and shown. Masked here so no caller has to remember.
+  const message =
+    maskPhonesInText(e?.message ?? null) ?? 'The calling provider rejected the request.';
 
   const retryable =
     (RETRYABLE_CALLE_ERROR_CODES as readonly string[]).includes(code) ||

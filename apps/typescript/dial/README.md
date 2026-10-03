@@ -114,6 +114,10 @@ instead of spending your credit proving it.
   everything not yet dialled. CALL-E exposes no cancellation for a call already
   in flight, so Dial does not render a button claiming otherwise — it reports
   how many were already connecting and records their answers when they land.
+- When the calling service never reports how a call ended, Dial stops asking
+  after `CALL_POLL_BUDGET_MS` (default 20 minutes) and records the call as
+  unresolved rather than guessing at it. It places no further call on the
+  strength of an outcome it cannot account for.
 - Premium-rate and reserved-fiction number ranges are refused outright.
 - No caller-ID spoofing, no retry-until-answer.
 
@@ -172,12 +176,14 @@ query for phone repair near Dublin 2 returns real shops with real numbers.
 ## Placing one real call
 
 ```bash
-TEST_PROVIDER=real npm run calle:verify -- +353871234567
+TEST_PROVIDER=real npm run calle:verify -- +12025550143   # reserved-fiction number
 ```
 
 One call, to one number typed on the command line, after a five-second abort
 window. It refuses to take a number from discovery — ringing a real business has
-to be a deliberate act, not a side effect of a script.
+to be a deliberate act, not a side effect of a script. The number above is in
+the NANP range reserved for fiction, so it reaches nobody; put your own number
+there when you actually want to place one.
 
 ## What is supported
 
@@ -224,9 +230,12 @@ because eighteen of twenty shops were closed; and the brief's "ask these first"
 section came from watching calls re-confirm what three earlier calls had
 already established.
 
-Sample numbers throughout use `555 01xx` local parts within real country codes
-(`+353 1 555 0100`, `+971 55 550 1234`), and API responses mask real numbers to
-`+35***00`.
+Seeded contacts and the numbers written into this document use reserved-fiction
+ranges — NANP `555 01xx` (`+1 202 555 0143`) and the UK Ofcom drama ranges —
+and `isBlockedNumber` refuses to dial them, so an example can never ring
+anybody. A plausible-looking number is not the same thing as a safe one, which
+is why the samples are reserved rather than merely fake-looking. API responses
+mask real numbers to `+35***00`.
 
 ## What is not done
 

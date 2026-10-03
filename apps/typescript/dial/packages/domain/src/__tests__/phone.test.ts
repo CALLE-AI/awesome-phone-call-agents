@@ -3,6 +3,8 @@ import {
   normalizePhone,
   isValidE164,
   maskPhone,
+  maskPhonesInText,
+  maskPhonesInValue,
   isBlockedNumber,
   dedupeByPhone,
   businessNameKey,
@@ -52,11 +54,61 @@ describe('maskPhone', () => {
   });
 });
 
+describe('maskPhonesInText', () => {
+  it('masks a number written anywhere inside free text', () => {
+    expect(maskPhonesInText('they asked you to ring +1 415 555 0132 tomorrow')).toBe(
+      'they asked you to ring +1 ***32 tomorrow',
+    );
+    expect(maskPhonesInText('call 01 555 0132')).toBe('call 01 ***32');
+  });
+
+  it('leaves text with no number, and short runs, alone', () => {
+    expect(maskPhonesInText('no answer, try again')).toBe('no answer, try again');
+    // A price is not a phone number.
+    expect(maskPhonesInText('EUR 89.00')).toBe('EUR 89.00');
+    expect(maskPhonesInText('open 9 to 5')).toBe('open 9 to 5');
+    expect(maskPhonesInText(null)).toBeNull();
+  });
+});
+
+describe('maskPhonesInValue', () => {
+  it('walks nested structured results', () => {
+    expect(
+      maskPhonesInValue({
+        price: 'EUR 89.00',
+        callback: '+1 415 555 0132',
+        notes: ['ring 01 555 0132', 'no number here'],
+      }),
+    ).toEqual({
+      price: 'EUR 89.00',
+      callback: '+1 ***32',
+      notes: ['ring 01 ***32', 'no number here'],
+    });
+  });
+
+  it('passes non-string leaves through untouched', () => {
+    expect(maskPhonesInValue({ n: 3, ok: true, nothing: null })).toEqual({
+      n: 3,
+      ok: true,
+      nothing: null,
+    });
+  });
+});
+
 describe('isBlockedNumber', () => {
   it('blocks premium-rate and fictional ranges', () => {
     expect(isBlockedNumber('+19005550100')).toBe(true);
     expect(isBlockedNumber('+14155550100')).toBe(true); // 555-01xx fictional
     expect(isBlockedNumber('+14155551234')).toBe(false);
+  });
+
+  it('blocks the reserved-fiction ranges the seed and docs use', () => {
+    // The numbers `npm run seed` writes must not be diallable.
+    expect(isBlockedNumber('+12025550143')).toBe(true);
+    expect(isBlockedNumber('+14155550117')).toBe(true);
+    // UK Ofcom drama ranges.
+    expect(isBlockedNumber('+442079460958')).toBe(true);
+    expect(isBlockedNumber('+447700900123')).toBe(true);
   });
 });
 

@@ -110,7 +110,7 @@ export function ContactsList({ initial }: { initial: Contact[] }) {
                 id="contact-phone"
                 value={newPhone}
                 onChange={(event) => setNewPhone(event.target.value)}
-                placeholder="+971 55 550 1234"
+                placeholder="+1 202 555 0143"
                 inputMode="tel"
                 autoComplete="tel"
                 maxLength={30}

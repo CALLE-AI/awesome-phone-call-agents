@@ -213,6 +213,79 @@ describe('when a business does not answer', () => {
     expect(detail.headline).toMatch(/none answered|could not/i);
   });
 
+  it('stops polling a call the provider never resolves, and places no further call', async () => {
+    h = await createHarness({
+      provider: neverAnswers,
+      env: {
+        CALL_POLL_DELAY_MS: '60000',
+        CALL_ANSWER_TIMEOUT_MS: '30000',
+        CALL_MAX_ATTEMPTS_PER_BUSINESS: '2',
+        // Shorter than the default twenty minutes, so the budget can be reached
+        // in a test. Set below the answer budget on purpose: the poll budget is
+        // checked first, and this asserts it is the one that decides.
+        CALL_POLL_BUDGET_MS: '60000',
+        MAX_CALLS_PER_TASK: '3',
+        MAX_CALLS_UNTIL_RESULT: '3',
+        CALL_WAVE_SIZE: '1',
+      },
+      discovery: stubDiscovery({
+        candidates: [
+          candidate({
+            id: 'a',
+            name: 'First Choice',
+            phoneE164: '+35315550100',
+            distanceMeters: 100,
+          }),
+          candidate({
+            id: 'b',
+            name: 'Second Choice',
+            phoneE164: '+35315550101',
+            distanceMeters: 200,
+          }),
+          candidate({
+            id: 'c',
+            name: 'Third Choice',
+            phoneE164: '+35315550102',
+            distanceMeters: 300,
+          }),
+        ],
+      }),
+    });
+    const { token } = await signUp(h);
+    const created = await createTask(h, token, 'Find an iPhone repair shop');
+    await h.runner.drain();
+
+    // Past every budget Dial has, and the provider still has not resolved it.
+    for (let i = 0; i < 4; i += 1) {
+      await agePendingCalls(h, 61);
+      await dueNow(h);
+      await h.runner.drain();
+    }
+
+    const detail = await getTaskDetail(h, token, created.id);
+    const rows = await h.handle.db.select().from(calls).where(eq(calls.taskId, created.id));
+
+    // Planning writes a row per planned call; only one of them was ever dialled.
+    const dialled = rows.filter((row) => row.providerCallId);
+    expect(dialled).toHaveLength(1);
+    expect(dialled[0]!.businessName).toBe('First Choice');
+
+    // Written down as unresolved, not as a failure and not left in progress.
+    expect(dialled[0]!.disposition).toBe('needs_review');
+    expect(dialled[0]!.failureCode).toBe('provider_result_unavailable');
+    expect(dialled[0]!.failureMessage).toMatch(/never reported how this call ended/i);
+
+    const timeline = detail.events.map((e: any) => e.message).join(' ');
+    expect(timeline).toMatch(/never reported how this call ended/i);
+
+    /*
+     * The point of the budget: an unresolved outcome must not drive further
+     * real side effects. Two more businesses were planned and available, and
+     * neither was rung.
+     */
+    expect(timeline).not.toMatch(/trying another business/i);
+  });
+
   it('leaves a business that answers promptly completely alone', async () => {
     h = await createHarness({
       env: { CALL_ANSWER_TIMEOUT_MS: '30000', MAX_CALLS_PER_TASK: '2' },

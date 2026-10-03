@@ -135,7 +135,7 @@ export default function ContactsScreen() {
         />
         <TextInput
           style={styles.input}
-          placeholder="+971 55 550 1234"
+          placeholder="+1 202 555 0143"
           placeholderTextColor={colors.textMuted}
           value={phone}
           onChangeText={setPhone}

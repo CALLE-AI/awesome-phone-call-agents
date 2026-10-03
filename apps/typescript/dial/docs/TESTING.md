@@ -141,6 +141,8 @@ exercised are marked PASS.
 | An answered call is never cut off mid-conversation | PASS | Transcript turns and `in_progress` attempts both count as answered |
 | A phone that genuinely rings out is still abandoned | PASS | `dialing` past the budget -> `no_answer` / `answer_timeout` |
 | A late result reclaims a call Dial stopped waiting for | PASS | Terminal snapshot may overwrite an `answer_timeout` row |
+| Polling one call is bounded | PASS | `CALL_POLL_BUDGET_MS` spent -> `needs_review` / `provider_result_unavailable`; the chain stops |
+| An unresolved call places no further call | PASS | Three businesses available, one dialled, no substitution dispatched |
 | The user is not interrogated unnecessarily | PASS | `shouldAskClarification` enforces section 10 in code, not prompt wording |
 | User location works | PASS | Real Nominatim geocode of "Dublin 2" → 53.3389, -6.2527, IE; e2e |
 | Real business discovery | PASS | Live Overpass query returned **59 real Dublin businesses** |
@@ -263,8 +265,12 @@ This alone validates **everything except the phone call itself**.
 ### 2. A real phone call
 
 ```bash
-TEST_PROVIDER=real npm run calle:verify -- +353871234567
+TEST_PROVIDER=real npm run calle:verify -- +12025550143
 ```
+
+The number is reserved for fiction (and refused by `isBlockedNumber`), so this
+command is safe to paste while reading. Replace it with a number you mean to
+ring.
 
 It places **one** call to **one** number given on the command line, after a
 five-second abort window, and prints the real call id, the terminal status, the

@@ -75,6 +75,21 @@ const rawSchema = z.object({
    * to try someone else.
    */
   CALL_QUEUE_TIMEOUT_MS: int(5 * 60_000),
+  /*
+   * How long Dial will keep asking the provider about one call before it stops
+   * and writes down what it actually knows.
+   *
+   * The answer and queue budgets decide when Dial stops *waiting*; they do not
+   * decide when it stops *asking*. Nothing bounded the poll chain itself, so a
+   * call the provider never resolved was re-enqueued indefinitely -- and
+   * because each re-enqueue had to use a fresh dedupe key (the key of the job
+   * doing the re-enqueue is held until that job ends), the dedupe index could
+   * not collapse them. One stuck call meant one poll row forever.
+   *
+   * Twenty minutes is past every other budget in this file, so a call still
+   * unresolved at this point is one the provider is not going to answer for.
+   */
+  CALL_POLL_BUDGET_MS: int(20 * 60_000),
   CALL_MAX_ATTEMPTS_PER_BUSINESS: int(2),
 
   PUBLIC_WEB_URL: z.string().default('http://localhost:3000'),
@@ -82,6 +97,63 @@ const rawSchema = z.object({
 });
 
 export type CallMode = 'mock' | 'real';
+
+/**
+ * The only origins Dial will send a live CALL-E API key to.
+ *
+ * The key is a bearer credential for a paid account: wherever it is sent can
+ * spend that account's credit and read its call history. `CALLE_BASE_URL` is
+ * therefore not a free-form URL. It has to be https -- a plaintext origin puts
+ * the key on the wire for anyone in the path -- and it has to belong to CALL-E.
+ * An operator who mistypes a host, or copies one out of a tutorial, would
+ * otherwise hand the credential to whoever runs that host.
+ */
+export const APPROVED_CALLE_HOSTS = ['api.heycall-e.com'] as const;
+
+/** CALL-E's own subdomains are accepted alongside the exact API host. */
+const APPROVED_CALLE_HOST_SUFFIX = '.heycall-e.com';
+
+export interface OriginVerdict {
+  ok: boolean;
+  reason?: string;
+}
+
+/**
+ * Checks a configured CALL-E base URL against the allowlist above.
+ *
+ * Exported so the provider can enforce the same rule at the point the key is
+ * actually attached, not only at boot: `calle:verify` builds a provider
+ * directly and never passes through `loadConfig`.
+ */
+export function checkCalleOrigin(baseUrl: string): OriginVerdict {
+  let url: URL;
+  try {
+    url = new URL(baseUrl);
+  } catch {
+    return { ok: false, reason: `"${baseUrl}" is not a valid URL.` };
+  }
+
+  if (url.protocol !== 'https:') {
+    return {
+      ok: false,
+      reason: `"${baseUrl}" is not https, so the API key would be sent in clear text.`,
+    };
+  }
+
+  const host = url.hostname.toLowerCase();
+  const approved =
+    (APPROVED_CALLE_HOSTS as readonly string[]).includes(host) ||
+    host.endsWith(APPROVED_CALLE_HOST_SUFFIX);
+
+  if (!approved) {
+    return {
+      ok: false,
+      reason: `"${host}" is not an approved CALL-E origin. Approved: ${APPROVED_CALLE_HOSTS.join(', ')}.`,
+    };
+  }
+
+  return { ok: true };
+}
 
 export interface DialConfig {
   env: 'development' | 'test' | 'production';
@@ -172,6 +244,8 @@ export interface DialConfig {
     answerTimeoutMs: number;
     /** How long the provider may hold a call before dialling it. */
     queueTimeoutMs: number;
+    /** How long Dial keeps polling one call before it stops and reconciles. */
+    pollBudgetMs: number;
     /** Attempts at one business before moving on to a different one. */
     maxAttemptsPerBusiness: number;
   };
@@ -199,6 +273,17 @@ function assertCoherent(cfg: DialConfig): void {
       'TEST_PROVIDER=real requires CALLE_API_KEY. Refusing to boot: running the fake ' +
         'provider while the UI claims real calls would be a lie about real-world side effects.',
     );
+  }
+  // The key only goes to CALL-E. Checked at boot so a misconfigured origin is a
+  // refusal to start rather than a credential quietly sent somewhere else.
+  if (cfg.callMode === 'real') {
+    const origin = checkCalleOrigin(cfg.calle.baseUrl);
+    if (!origin.ok) {
+      fatal.push(
+        `CALLE_BASE_URL is not an approved CALL-E origin: ${origin.reason} ` +
+          'Refusing to boot rather than sending the API key there.',
+      );
+    }
   }
   if (cfg.llm.required && !cfg.llm.apiKey) {
     fatal.push('LLM_REQUIRED=1 but LLM_API_KEY is empty.');
@@ -267,6 +352,7 @@ export function loadConfig(source: NodeJS.ProcessEnv = process.env): DialConfig 
       pollDelayMs: raw.CALL_POLL_DELAY_MS,
       answerTimeoutMs: raw.CALL_ANSWER_TIMEOUT_MS,
       queueTimeoutMs: raw.CALL_QUEUE_TIMEOUT_MS,
+      pollBudgetMs: raw.CALL_POLL_BUDGET_MS,
       maxAttemptsPerBusiness: raw.CALL_MAX_ATTEMPTS_PER_BUSINESS,
     },
     publicWebUrl: raw.PUBLIC_WEB_URL,

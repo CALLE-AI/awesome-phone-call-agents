@@ -33,6 +33,7 @@ import {
   isBlockedNumber,
   shouldAskClarification,
   extractDialTargets,
+  maskPhonesInText,
   normalizePhone,
   primaryLanguageForCountry,
   normalizeLanguageCode,
@@ -1320,7 +1321,12 @@ async function handleDispatchError(
     callId,
     businessName,
     code,
-    providerMessage: providerError?.message ?? (error as Error)?.message ?? null,
+    // Provider text is masked here as well as in the provider layer: this
+    // branch also catches errors that never came through `toProviderError`,
+    // and a log is a boundary like any other.
+    providerMessage: maskPhonesInText(
+      providerError?.message ?? (error as Error)?.message ?? null,
+    ),
     mapped: describeCalleError(code) !== 'The call could not be completed.',
   });
   await addEvent(ctx, taskId, 'calling', `${businessName}: ${describeCalleError(code)}`);
@@ -1372,6 +1378,15 @@ export async function handlePollCall(
   const call = rows[0];
   if (!call || !call.providerCallId) return;
 
+  /*
+   * Already reconciled: Dial has stopped asking about this call.
+   *
+   * A poll job queued before that decision must not restart the chain, and
+   * must not fall through to `maybeAdvance` either -- the whole point of the
+   * budget is that an unresolved call no longer drives further calls.
+   */
+  if (call.failureCode === 'provider_result_unavailable') return;
+
   // Stop watching once the task is over and this call is no longer pending:
   // a terminal task's finished calls need no more polls, and without this the
   // per-call poll chain ran forever. A call still pending on a terminal task
@@ -1402,6 +1417,29 @@ export async function handlePollCall(
   const snapshot = await ctx.provider.get(call.providerCallId);
 
   if (!isTerminal(snapshot.status)) {
+    /*
+     * The polling budget: the one bound on asking.
+     *
+     * The budgets below decide when Dial stops *waiting* on a call. Nothing
+     * decided when it stopped *asking*, so a call the provider never resolved
+     * kept a poll job alive forever. Each re-enqueue had to use a fresh dedupe
+     * key -- the key of the job performing the re-enqueue is held until that
+     * job ends -- so the unique index could never collapse the chain.
+     *
+     * When the budget runs out the honest move is to stop and write down what
+     * is actually known, not to keep asking a question that has no answer
+     * coming. No fresh poll job is queued, and no other call is placed: the
+     * outcome is unknown, so nothing downstream may be advanced on the strength
+     * of it.
+     */
+    if (call.dispatchedAt) {
+      const elapsedMs = Date.now() - new Date(call.dispatchedAt).getTime();
+      if (elapsedMs >= ctx.config.limits.pollBudgetMs) {
+        await reconcileUnresolvedCall(ctx, payload.taskId, call, elapsedMs);
+        return;
+      }
+    }
+
     const phase = callPhase(snapshot);
 
     /*
@@ -1550,6 +1588,86 @@ export async function handlePollCall(
 }
 
 /**
+ * Stops watching a call the provider will not resolve, and records the truth.
+ *
+ * Three things happen here, and the restraint matters as much as the action:
+ *
+ *  - The row is written down as unresolved rather than left `pending` or
+ *    quietly called a failure. `needs_review` with
+ *    `provider_result_unavailable` says exactly what is known: the service
+ *    accepted the call and never reported how it ended.
+ *  - The poll chain stops. No new job is queued, so one stuck call can no
+ *    longer keep a row in the queue indefinitely.
+ *  - **No other call is placed.** The outcome is unknown, so ringing someone
+ *    else on the strength of it would be a second real side effect resting on
+ *    a call Dial cannot account for. The task is closed out by comparison,
+ *    which places no calls, and only once nothing else is still in flight.
+ *
+ * A terminal result that arrives later -- through the webhook, which needs no
+ * polling -- still replaces this row. Stopping the questions is not the same as
+ * refusing the answer.
+ */
+async function reconcileUnresolvedCall(
+  ctx: OrchestratorContext,
+  taskId: string,
+  call: { id: string; businessName: string; providerCallId: string | null },
+  elapsedMs: number,
+): Promise<void> {
+  const minutes = Math.round(elapsedMs / 60_000);
+
+  const reconciled = await ctx.db
+    .update(calls)
+    .set({
+      disposition: 'needs_review',
+      failureCode: 'provider_result_unavailable',
+      failureMessage: `The calling service never reported how this call ended after ${minutes} minutes. It may still have been in progress.`,
+      completedAt: new Date().toISOString(),
+    })
+    .where(and(eq(calls.id, call.id), eq(calls.disposition, 'pending')))
+    .returning({ id: calls.id });
+
+  incrementCounter('calls.poll_budget_exhausted');
+  logger.warn('call never reached a terminal state; stopped polling', {
+    taskId,
+    callId: call.id,
+    providerCallId: call.providerCallId,
+    minutes,
+  });
+
+  if (reconciled.length === 0) return;
+
+  await addEvent(
+    ctx,
+    taskId,
+    'collecting_results',
+    `${call.businessName}: the calling service never reported how this call ended — it may still be in progress.`,
+  );
+
+  // Close the task out honestly, but only when this was the last call in
+  // flight: another one may still answer, and its result belongs in the
+  // comparison rather than after it.
+  const others = await ctx.db
+    .select({ id: calls.id })
+    .from(calls)
+    .where(
+      and(
+        eq(calls.taskId, taskId),
+        eq(calls.disposition, 'pending'),
+        isNotNull(calls.providerCallId),
+      ),
+    );
+
+  if (others.length === 0) {
+    await enqueueJob(
+      ctx.db,
+      'task.compare',
+      { taskId },
+      { dedupeKey: `compare:${taskId}:unresolved:${call.id}` },
+    );
+  }
+}
+
+/**
  * Records a terminal call outcome. Shared by the poller and the webhook
  * receiver, so both paths produce identical rows and neither can double-apply.
  */
@@ -1597,11 +1715,20 @@ export async function applyTerminalSnapshot(
      * answer budget may still be connected, and may still come back with the
      * answer the whole task was for. Leaving the row saying "no answer" when a
      * price was quoted would be a lie Dial had the evidence to correct.
+     *
+     * `provider_result_unavailable` is included for the same reason once the
+     * polling budget has been spent: Dial stopped asking, but a webhook needs
+     * no polling, and an answer that does arrive must replace the assumption
+     * rather than be discarded because the row had already been written down.
      */
     .where(
       and(
         eq(calls.id, callId),
-        or(eq(calls.disposition, 'pending'), eq(calls.failureCode, 'answer_timeout')),
+        or(
+          eq(calls.disposition, 'pending'),
+          eq(calls.failureCode, 'answer_timeout'),
+          eq(calls.failureCode, 'provider_result_unavailable'),
+        ),
       ),
     )
     .returning({ id: calls.id, businessName: calls.businessName });
@@ -2246,8 +2373,14 @@ export async function failTask(
 ): Promise<void> {
   const message = presentableFailure(rawMessage);
   if (message !== rawMessage) {
-    // Keep the real detail where engineers can find it, out of the UI.
-    logger.error('failure message was not presentable; substituted', { taskId, code, rawMessage });
+    // Keep the real detail where engineers can find it, out of the UI -- but
+    // masked, because a substituted message is exactly the case where raw
+    // provider text (a number included) is present.
+    logger.error('failure message was not presentable; substituted', {
+      taskId,
+      code,
+      rawMessage: maskPhonesInText(rawMessage),
+    });
   }
 
   await setState(ctx, taskId, 'failed', message, {

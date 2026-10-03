@@ -6,10 +6,14 @@
  * deliberately refuses to take a number from discovery: ringing a real business
  * has to be a deliberate act, not a side effect of running a script.
  *
- *   npm run calle:verify -- --to +353871234567
- *   npm run calle:verify -- --to +353871234567 --family repair_quote
+ *   npm run calle:verify -- --to +12025550143
+ *   npm run calle:verify -- --to +12025550143 --family repair_quote
  *
  * Requires CALLE_API_KEY and TEST_PROVIDER=real. Costs credit. Rings a phone.
+ *
+ * The number in the examples is reserved for fiction, so it reaches nobody --
+ * and `isBlockedNumber` refuses it anyway, which makes it a safe thing to paste
+ * while reading. Put a number you are willing to ring there instead.
  */
 import { loadConfig } from '@dial/config';
 import { CalleCallProvider, callIdempotencyKey, isTerminal } from '@dial/calle';

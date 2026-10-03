@@ -52,9 +52,24 @@ Every call brief opens with an instruction to identify as an AI assistant
 calling on behalf of a customer, and never to claim to be a human or to be the
 customer. This is not configurable.
 
-Dial is user-requested task completion, not outbound marketing. There is no bulk
-calling, no contact-list upload, no caller-ID spoofing, and no
-retry-until-answer.
+Dial is user-requested task completion, not outbound marketing. There is no
+caller-ID spoofing and no retry-until-answer.
+
+There are two modes, and they are not the same thing:
+
+- **Personal mode** rings businesses on the user's own request, one at a time,
+  and stops once the request is answered.
+- **Dial for Business is bulk calling.** A business imports its own customer
+  list from a spreadsheet and rings those customers. It is a separate surface
+  with its own safeguards rather than a hidden mode of the first: the list is
+  the business's own, calling hours are enforced at dispatch, a do-not-call or
+  opt-out flag wins over a run already in progress, and every recipient returns
+  a structured outcome. The operator attests they are entitled to contact the
+  people on the list; Dial does not collect consent evidence.
+
+Contact import exists in both modes — a device address book in personal mode, a
+spreadsheet in business mode. Importing a list never dials it; the import is
+previewed and counted before anything is written.
 
 ## Sensitive categories
 

@@ -52,6 +52,55 @@ export function maskPhone(value: string | null | undefined): string | null {
 }
 
 /**
+ * A run of digits long enough to be a phone number, with the punctuation phone
+ * numbers are written with. Seven digits is the shortest national number in
+ * common use, so prices, times and postcodes are left alone.
+ */
+const PHONE_LIKE_RUN = /\+?\d[\d\s().\u2013-]{5,}\d/g;
+
+/**
+ * Masks every phone number inside free text.
+ *
+ * Provider responses are written by a language model reading a conversation,
+ * so a number can surface anywhere: in a summary ("they asked you to ring
+ * 01 555 0132"), inside a structured result, or in an error. The raw number
+ * already lives on the call row server-side, and none of those surfaces need
+ * it, so it is masked on the way in rather than at each render site -- one
+ * boundary that cannot be forgotten is worth more than a rule everyone has to
+ * remember.
+ */
+export function maskPhonesInText(value: string | null | undefined): string | null {
+  if (value === null || value === undefined) return null;
+  const s = String(value);
+  if (!s) return s;
+  return s.replace(PHONE_LIKE_RUN, (match) => {
+    if (match.replace(/\D/g, '').length < 7) return match;
+    const trimmed = match.trim();
+    return trimmed.length <= 4 ? '***' : `${trimmed.slice(0, 3)}***${trimmed.slice(-2)}`;
+  });
+}
+
+/**
+ * Recursively masks phone numbers in a parsed provider payload.
+ *
+ * Structured results are arbitrary JSON: the number can be a top-level string,
+ * a value inside a nested object, or an item in an array. Walking the value is
+ * the only way to cover a schema Dial did not author.
+ */
+export function maskPhonesInValue(value: unknown): unknown {
+  if (typeof value === 'string') return maskPhonesInText(value);
+  if (Array.isArray(value)) return value.map(maskPhonesInValue);
+  if (value && typeof value === 'object') {
+    const out: Record<string, unknown> = {};
+    for (const [key, item] of Object.entries(value as Record<string, unknown>)) {
+      out[key] = maskPhonesInValue(item);
+    }
+    return out;
+  }
+  return value;
+}
+
+/**
  * Premium-rate, and non-routable test ranges. Dial refuses to dial these: the
  * first bills the user by the minute, the second is reserved for fiction.
  */
@@ -59,7 +108,9 @@ const BLOCKED_PATTERNS: RegExp[] = [
   /^\+1900\d+$/, // US premium
   /^\+1976\d+$/,
   /^\+44(9|87)\d+$/, // UK premium / revenue share
-  /^\+1\d{3}555(01\d{2})$/, // NANP fictional range
+  /^\+1\d{3}555(01\d{2})$/, // NANP fictional range, 555-0100..555-0199
+  /^\+442079460\d{3}$/, // UK Ofcom drama range, 020 7946 0xxx
+  /^\+447700900\d{3}$/, // UK Ofcom drama range, 07700 900xxx
 ];
 
 export function isBlockedNumber(e164: string): boolean {

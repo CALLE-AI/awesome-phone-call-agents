@@ -40,11 +40,23 @@ async function main(): Promise<void> {
   });
   await ensureSettings(db, id);
 
-  // A couple of contacts so the direct-dial path ("call Malik") is exercisable
-  // immediately. Numbers are documentation examples, diallable by nobody real.
+  /*
+   * Two contacts so the contacts screen and the direct-dial path ("call Malik")
+   * have something to work with straight away.
+   *
+   * Both numbers are in the NANP range reserved for fiction, 555-0100 to
+   * 555-0199. That detail matters more than it looks. A seed that writes a
+   * *plausible* number -- a well-formed mobile in a real country code -- hands
+   * whoever flips TEST_PROVIDER=real next a stranger to ring, and "it looked
+   * like an example" is not a defence to the person whose phone rang.
+   *
+   * Reserved-fiction numbers are refused by `isBlockedNumber`, so the
+   * direct-dial path can be exercised right up to the refusal and no further.
+   * To place a real call, add your own number as a contact.
+   */
   const samples = [
-    { name: 'Malik at the garage', phoneE164: '+971555501234' },
-    { name: 'FixLab', phoneE164: '+353871234567' },
+    { name: 'Malik at the garage', phoneE164: '+12025550143' },
+    { name: 'FixLab', phoneE164: '+14155550117' },
   ];
   for (const sample of samples) {
     await db
