@@ -132,6 +132,55 @@ python3 skills/call-data-minimization-auditor/scripts/data_minimization_auditor.
 }
 ```
 
+## Analyze a call whose goal file lacks a field list
+
+The goal file names no required fields, so every request's scope is
+unverifiable and the verdict says so instead of guessing.
+
+```bash
+python3 skills/call-data-minimization-auditor/scripts/data_minimization_auditor.py analyze \
+  --transcript skills/call-data-minimization-auditor/references/example-transcript-unverifiable.json \
+  --goal-file skills/call-data-minimization-auditor/references/example-goal-unverifiable.txt
+```
+
+Output:
+
+```json
+{
+  "call_id": "demo-minimization-002",
+  "verdict": "GOAL_FILE_LACKS_FIELD_LIST",
+  "requests": [
+    {
+      "turn_index": 1,
+      "category": "full_name",
+      "sensitivity": "standard",
+      "scope": "unverifiable",
+      "redundant": false,
+      "echo": false,
+      "sentence": "Can I have your full name, please?"
+    },
+    {
+      "turn_index": 3,
+      "category": "date_of_birth",
+      "sensitivity": "standard",
+      "scope": "unverifiable",
+      "redundant": false,
+      "echo": false,
+      "sentence": "And can I have your date of birth to pull up the chart?"
+    }
+  ],
+  "counts": {
+    "requests": 2,
+    "out_of_scope": 0,
+    "redundant": 0,
+    "echo": 0,
+    "high_sensitivity": 0
+  },
+  "goal_scope_categories": [],
+  "disclaimer": "Heuristic lexical audit against the goal file only. The goal file is the sole ground truth for scope; a category the goal omits may still be lawful to collect, and paraphrases outside the lexicon are missed. High-sensitivity tags are advisory, not a legal determination. Findings route to review."
+}
+```
+
 ## Craft a minimal-intake goal
 
 ```bash

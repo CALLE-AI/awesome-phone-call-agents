@@ -302,7 +302,10 @@ def analyze_data_requests(turns: list[dict[str, str]], goal_text: str) -> dict[s
             "requests": len(requests),
             "out_of_scope": sum(1 for r in requests if r["scope"] == "out_of_scope"),
             "redundant": sum(1 for r in requests if r["redundant"]),
-            "echo": sum(1 for r in requests if r["echo"]),
+            # Request-attached echoes plus standalone volunteered echoes,
+            # so an OVERCOLLECTION verdict driven by volunteered data
+            # never reports counts.echo 0.
+            "echo": sum(1 for r in requests if r["echo"]) + len(echoes),
             "high_sensitivity": sum(1 for r in requests if r["sensitivity"] == "high"),
         },
         "goal_scope_categories": sorted(scope),

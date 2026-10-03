@@ -21,6 +21,7 @@ EXAMPLE_VAGUE_GOAL = SKILL_DIR / "references" / "example-goal-vague.txt"
 EXAMPLE_UNVERIFIABLE_GOAL = SKILL_DIR / "references" / "example-goal-unverifiable.txt"
 EXAMPLE_TRANSCRIPT = SKILL_DIR / "references" / "example-transcript.json"
 EXAMPLE_OVERCOLLECTION = SKILL_DIR / "references" / "example-transcript-overcollection.json"
+EXAMPLE_UNVERIFIABLE = SKILL_DIR / "references" / "example-transcript-unverifiable.json"
 
 sys.path.insert(0, str(SCRIPTS))
 from data_minimization_auditor import (  # noqa: E402
@@ -616,6 +617,38 @@ def test_overcollection_fixture_file():
     assert card["counts"]["out_of_scope"] >= 2
     assert card["counts"]["redundant"] == 1
     assert card["counts"]["echo"] == 1
+
+
+def test_volunteered_echo_counts_in_echo_total():
+    # counts.echo must count standalone volunteered echoes too, not only
+    # request-attached ones; otherwise an OVERCOLLECTION verdict can carry
+    # counts.echo 0.
+    card = analyze_data_requests(
+        _turns(
+            ("agent", "Hello, this is Example Clinic calling about your appointment."),
+            ("callee", "Hi. My card number is 4111 1111 1111 1113, by the way."),
+            ("agent", "Let me read that back: 4111 1111 1111 1113."),
+        ),
+        GOAL_NAME_PHONE,
+    )
+    assert card["counts"]["echo"] == 1
+
+
+def test_flat_unverifiable_fixture_file():
+    proc = _run_cli(
+        "analyze",
+        "--transcript",
+        str(EXAMPLE_UNVERIFIABLE),
+        "--goal-file",
+        str(EXAMPLE_UNVERIFIABLE_GOAL),
+    )
+    assert proc.returncode == 0
+    report = json.loads(proc.stdout)
+    assert report["call_id"] == "demo-minimization-002"
+    assert report["verdict"] == "GOAL_FILE_LACKS_FIELD_LIST"
+    assert len(report["requests"]) == 2
+    assert all(r["scope"] == "unverifiable" for r in report["requests"])
+    assert report["goal_scope_categories"] == []
 
 
 def test_vague_goal_fixture_files():
