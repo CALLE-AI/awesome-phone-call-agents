@@ -1,0 +1,15 @@
+{
+  "synthetic": true,
+  "note": "SYNTHETIC DEMO — NOT A REAL BOOKING. All names, flights and numbers are fictional.",
+  "passenger_name": "Santee Cooper",
+  "airline": "EuroSky Airways",
+  "booking_ref": "ABC123",
+  "flight_no": "ES421",
+  "origin": "Paris",
+  "destination": "Bengaluru",
+  "flight_status": "Cancelled",
+  "scheduled_date": "2026-09-14",
+  "airline_hotline": "+12125550100",
+  "region": "US",
+  "locale": "en-US"
+}

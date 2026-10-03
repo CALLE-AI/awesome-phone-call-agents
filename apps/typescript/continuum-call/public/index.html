@@ -1,0 +1,537 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <meta name="theme-color" content="#061011" />
+    <title>Continuum Call — Ops</title>
+    <meta
+      name="description"
+      content="Resumable phone missions. Controlled retries. Full evidence."
+    />
+    <link rel="icon" href="/favicon.svg" type="image/svg+xml" />
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link
+      href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500;600&family=Instrument+Serif:ital@0;1&family=Plus+Jakarta+Sans:ital,wght@0,400;0,500;0,600;0,700;1,500&display=swap"
+      rel="stylesheet"
+    />
+    <link rel="stylesheet" href="/styles.css" />
+  </head>
+  <body>
+    <a class="skip-link" href="#proof-panel">Skip to the recovery proof</a>
+    <div class="atmosphere" aria-hidden="true"></div>
+
+    <!-- SVG sprite -->
+    <svg xmlns="http://www.w3.org/2000/svg" class="visually-hidden" aria-hidden="true">
+      <symbol id="icon-mark" viewBox="0 0 32 32" fill="none">
+        <path d="M6 18c0-6.5 4.8-10.5 10-10.5S26 11.5 26 18" stroke="currentColor" stroke-width="2.4" stroke-linecap="round"/>
+        <path d="M10 18c0-4 2.8-6.5 6-6.5S22 14 22 18" stroke="currentColor" stroke-width="2" stroke-linecap="round" opacity="0.8"/>
+        <circle cx="16" cy="18" r="2" fill="currentColor"/>
+      </symbol>
+      <symbol id="icon-terminal" viewBox="0 0 24 24" fill="none">
+        <circle cx="12" cy="12" r="9" stroke="currentColor" stroke-width="1.6"/>
+        <path d="M8 12.5l2.4 2.4L16 9.2" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/>
+      </symbol>
+      <symbol id="icon-stuck" viewBox="0 0 24 24" fill="none">
+        <path d="M12 3.5L21 20H3L12 3.5z" stroke="currentColor" stroke-width="1.6" stroke-linejoin="round"/>
+        <path d="M12 10v4.5" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/>
+        <circle cx="12" cy="17.2" r="1" fill="currentColor"/>
+      </symbol>
+      <symbol id="icon-pending" viewBox="0 0 24 24" fill="none">
+        <circle cx="12" cy="12" r="9" stroke="currentColor" stroke-width="1.6"/>
+        <path d="M12 7.5V12l3.2 2" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/>
+      </symbol>
+      <symbol id="icon-blocked" viewBox="0 0 24 24" fill="none">
+        <circle cx="12" cy="12" r="9" stroke="currentColor" stroke-width="1.6"/>
+        <path d="M8 12h8" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/>
+      </symbol>
+      <symbol id="icon-dispatching" viewBox="0 0 24 24" fill="none">
+        <circle cx="12" cy="12" r="9" stroke="currentColor" stroke-width="1.6"/>
+        <path d="M12 7v5l3 2" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/>
+      </symbol>
+      <symbol id="icon-shield" viewBox="0 0 24 24" fill="none">
+        <path d="M12 3.5l7 3v5.2c0 4.4-2.9 7.6-7 9.3-4.1-1.7-7-4.9-7-9.3V6.5l7-3z" stroke="currentColor" stroke-width="1.6" stroke-linejoin="round"/>
+        <path d="M9.2 12.1l1.9 1.9 3.7-4" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/>
+      </symbol>
+      <symbol id="icon-chain" viewBox="0 0 24 24" fill="none">
+        <path d="M9.5 14.5l5-5" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/>
+        <path d="M10.2 16.8a3.4 3.4 0 01-4.8-4.8l2.2-2.2a3.4 3.4 0 014.8 0" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/>
+        <path d="M13.8 7.2a3.4 3.4 0 014.8 4.8l-2.2 2.2a3.4 3.4 0 01-4.8 0" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/>
+      </symbol>
+      <symbol id="icon-lock" viewBox="0 0 24 24" fill="none">
+        <rect x="5.5" y="10.5" width="13" height="9.5" rx="2" stroke="currentColor" stroke-width="1.6"/>
+        <path d="M8.5 10.5V8.2a3.5 3.5 0 017 0v2.3" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/>
+      </symbol>
+      <symbol id="icon-crash" viewBox="0 0 24 24" fill="none">
+        <path d="M12 3.2L20.5 18H3.5L12 3.2z" stroke="currentColor" stroke-width="1.6" stroke-linejoin="round"/>
+        <path d="M12 9.5v4" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/>
+        <circle cx="12" cy="16" r="1" fill="currentColor"/>
+      </symbol>
+      <symbol id="icon-reconcile" viewBox="0 0 24 24" fill="none">
+        <path d="M19 12a7 7 0 11-2.1-4.95" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/>
+        <path d="M19 5v5h-5" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/>
+      </symbol>
+      <symbol id="icon-handoff" viewBox="0 0 24 24" fill="none">
+        <circle cx="7" cy="12" r="3" stroke="currentColor" stroke-width="1.6"/>
+        <circle cx="17" cy="12" r="3" stroke="currentColor" stroke-width="1.6"/>
+        <path d="M10 12h4" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/>
+      </symbol>
+      <symbol id="icon-facts" viewBox="0 0 24 24" fill="none">
+        <path d="M7 5.5h10v13H7z" stroke="currentColor" stroke-width="1.6" stroke-linejoin="round"/>
+        <path d="M9.5 9h5M9.5 12h5M9.5 15h3.5" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/>
+      </symbol>
+      <symbol id="icon-arrow" viewBox="0 0 24 24" fill="none">
+        <path d="M5 12h12" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/>
+        <path d="M13 7l5 5-5 5" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/>
+      </symbol>
+    </svg>
+
+    <header class="site-header" id="site-header">
+      <a class="brand-lockup" href="#top">
+        <svg class="mark-symbol" aria-hidden="true"><use href="#icon-mark"></use></svg>
+        <span class="brand-name">Continuum Call</span>
+        <span class="brand-ops">Ops</span>
+      </a>
+      <div class="header-meta">
+        <span class="system-pill" id="mode-pill">
+          <span class="dot" aria-hidden="true"></span>
+          <span id="mode-line">checking safe runtime…</span>
+        </span>
+      </div>
+    </header>
+
+    <main class="shell" id="top">
+      <section class="hero" aria-label="Product hero">
+        <div class="hero-copy">
+          <p class="hero-eyebrow">Continuum Call / recovery control</p>
+          <h1 class="hero-brand">
+            Crash the runtime.
+            <em>Recover without guessing.</em>
+          </h1>
+          <p class="hero-claim">One frozen intent. Durable recovery. Inspectable evidence.</p>
+          <p class="hero-sub">
+            <strong>Mission runtime, not a one-call workflow.</strong> Run multi-intent
+            phone operations with durable dependencies, separate provider and
+            business state, cross-party facts, and operator control—even across
+            a process-isolated SQLite restart.
+          </p>
+
+          <div
+            class="runtime-disclosure"
+            id="runtime-disclosure"
+            data-runtime="checking"
+            role="status"
+            aria-live="polite"
+          >
+            <span class="runtime-label" id="runtime-label">Checking runtime</span>
+            <p id="runtime-detail">
+              Proof controls stay locked until the zero-dial environment is verified.
+            </p>
+          </div>
+
+          <div class="hero-cta">
+            <button type="button" id="btn-jury-path" class="primary hero-command" disabled>
+              <svg aria-hidden="true"><use href="#icon-crash"></use></svg>
+              <span>
+                <strong id="jury-path-label">Start the zero-dial proof</strong>
+                <small>Inject crash · keep provider runs ≤ 1</small>
+              </span>
+            </button>
+            <a class="btn ghost" href="#proof-panel">Inspect the proof console</a>
+          </div>
+          <div class="hero-facts">
+            <span class="fact-chip">
+              <svg aria-hidden="true"><use href="#icon-shield"></use></svg>
+              multi-intent dependency ledger
+            </span>
+            <span class="fact-chip">
+              <svg aria-hidden="true"><use href="#icon-reconcile"></use></svg>
+              provider state ≠ business outcome
+            </span>
+            <span class="fact-chip">
+              <svg aria-hidden="true"><use href="#icon-chain"></use></svg>
+              cross-party fact provenance
+            </span>
+          </div>
+        </div>
+
+        <aside class="hero-preview" aria-label="Recovery contract preview">
+          <div class="preview-card">
+            <div class="preview-head">
+              <div>
+                <p class="eyebrow" id="preview-template">Recovery contract</p>
+                <h2>Lost-response flight recorder</h2>
+              </div>
+              <p class="preview-meta" id="preview-meta">armed · no mission yet</p>
+            </div>
+
+            <ol class="preview-trace" id="preview-trace" aria-label="Crash recovery path">
+              <li data-preview-step="dispatch">
+                <span>01</span>
+                <div>
+                  <strong>Provider dispatch</strong>
+                  <small id="preview-dispatch">awaiting mock run</small>
+                </div>
+              </li>
+              <li class="trace-boundary" data-preview-step="crash">
+                <span>02</span>
+                <div>
+                  <strong>Response lost</strong>
+                  <small id="preview-crash">runtime memory clears</small>
+                </div>
+              </li>
+              <li data-preview-step="reconcile">
+                <span>03</span>
+                <div>
+                  <strong>Durable reconcile</strong>
+                  <small id="preview-reconcile">find existing run; never redial</small>
+                </div>
+              </li>
+            </ol>
+
+            <div class="preview-invariant" id="preview-invariant" data-state="ready">
+              <span>Invariant under test</span>
+              <strong><span id="preview-run-count">—</span> provider run for stuck intent</strong>
+            </div>
+
+            <div class="table-scroll">
+              <table class="preview-table" id="preview-ledger">
+                <thead>
+                  <tr>
+                    <th>Candidate</th>
+                    <th>State</th>
+                    <th>Runs</th>
+                  </tr>
+                </thead>
+                <tbody id="preview-body">
+                  <tr class="empty">
+                    <td colspan="3">Start the proof to populate the durable ledger</td>
+                  </tr>
+                </tbody>
+              </table>
+            </div>
+          </div>
+        </aside>
+      </section>
+
+      <section class="ops" id="ops" aria-labelledby="ops-title">
+        <div class="ops-intro">
+          <div>
+            <p class="eyebrow" id="template-line">Slot Recovery · Appointment operations</p>
+            <h2 id="ops-title">Crash → reconcile → prove</h2>
+            <p>
+              Two explicit actions expose the failure boundary. Nothing is
+              marked recovered until the second request reads durable state.
+            </p>
+          </div>
+          <p class="panel-meta" id="mission-meta">No mission yet · safe mode check in progress.</p>
+        </div>
+
+        <section
+          class="panel proof-command-panel"
+          id="proof-panel"
+          aria-labelledby="proof-title"
+          aria-busy="false"
+          tabindex="-1"
+        >
+          <div class="panel-head proof-head">
+            <div>
+              <p class="eyebrow">Primary jury proof / ≤20 seconds</p>
+              <h3 id="proof-title">Lost response. Durable reconcile. No redial.</h3>
+            </div>
+            <span class="proof-mode-chip" id="proof-mode-chip">environment check</span>
+          </div>
+
+          <div class="proof-layout">
+            <div class="proof-command-stack">
+              <div class="jury-primary">
+                <button type="button" id="btn-crash-rt" class="danger" disabled>
+                  <svg aria-hidden="true"><use href="#icon-crash"></use></svg>
+                  <span>1 · Inject runtime crash</span>
+                </button>
+                <button type="button" id="btn-reconcile" class="primary" disabled>
+                  <svg aria-hidden="true"><use href="#icon-reconcile"></use></svg>
+                  <span>2 · Reconcile from SQLite</span>
+                </button>
+              </div>
+              <p class="jury-hint" id="jury-hint" role="status" aria-live="polite">
+                Waiting for a verified zero-dial mock runtime.
+              </p>
+
+              <ol class="proof-sequence" id="proof-sequence" aria-label="Recovery proof stages">
+                <li data-stage="dispatch">
+                  <span class="stage-index">01</span>
+                  <div>
+                    <strong>Provider accepts a run</strong>
+                    <small>CALL-E adapter is mocked; no phone network.</small>
+                  </div>
+                </li>
+                <li data-stage="crash">
+                  <span class="stage-index">02</span>
+                  <div>
+                    <strong>Response is lost</strong>
+                    <small>Fault fires after create, before local persistence.</small>
+                  </div>
+                </li>
+                <li data-stage="reconcile">
+                  <span class="stage-index">03</span>
+                  <div>
+                    <strong>Fresh runtime reloads SQLite</strong>
+                    <small>Reconciler finds the existing run by idempotency key.</small>
+                  </div>
+                </li>
+                <li data-stage="verify">
+                  <span class="stage-index">04</span>
+                  <div>
+                    <strong>Evidence verifies the invariant</strong>
+                    <small>One provider run; zero unsafe unlocks; chain intact.</small>
+                  </div>
+                </li>
+              </ol>
+            </div>
+
+            <section
+              class="proof-verdict"
+              id="proof-verdict"
+              data-state="ready"
+              role="status"
+              aria-live="polite"
+              aria-atomic="true"
+              tabindex="-1"
+            >
+              <p class="verdict-kicker" id="verdict-kicker">Invariant armed</p>
+              <h4 id="verdict-title">No proof receipt yet</h4>
+              <p id="verdict-detail">
+                Inject the controlled failure. The first confirmed state should
+                expose one stuck intent and no locally known run ID.
+              </p>
+              <dl class="invariant-grid">
+                <div>
+                  <dt>Intent B</dt>
+                  <dd id="proof-intent-state">not created</dd>
+                </div>
+                <div>
+                  <dt>Provider runs</dt>
+                  <dd id="proof-provider-runs">—</dd>
+                </div>
+                <div>
+                  <dt>Live calls</dt>
+                  <dd id="proof-live-calls">0</dd>
+                </div>
+                <div>
+                  <dt>Evidence chain</dt>
+                  <dd id="proof-chain">awaiting</dd>
+                </div>
+              </dl>
+              <p class="run-receipt" id="proof-run-receipt">provider run ID · not known yet</p>
+              <a class="verdict-link" id="proof-evidence-link" href="#verify" hidden>
+                Inspect the verified Evidence Pack ↓
+              </a>
+            </section>
+          </div>
+
+          <details class="more-proofs" id="more-proofs">
+            <summary>Secondary safety proofs</summary>
+            <div class="proof-row">
+              <button type="button" id="btn-new-mission" class="ghost" disabled>
+                New Slot Recovery mission
+              </button>
+              <button type="button" id="btn-crash" class="ghost" disabled>
+                Lost-response recover
+              </button>
+              <button type="button" id="btn-ambiguous" class="ghost" disabled>
+                Ambiguous → block C
+              </button>
+              <button type="button" id="btn-handoff" class="ghost" disabled>
+                <svg aria-hidden="true"><use href="#icon-handoff"></use></svg>
+                Cross-party handoff
+              </button>
+            </div>
+          </details>
+        </section>
+
+        <section class="panel ledger-panel" id="ledger-panel" aria-labelledby="ledger-title">
+          <div class="panel-head">
+            <div>
+              <p class="eyebrow">Durable call ledger</p>
+              <h3 id="ledger-title">One row per intent. One provider run at most.</h3>
+            </div>
+            <p class="panel-meta" id="ledger-meta">Provider Runs invariant · ≤1 / intent</p>
+          </div>
+          <div class="table-scroll">
+            <table class="ledger" id="ledger" aria-describedby="ledger-meta">
+              <thead>
+                <tr>
+                  <th>Candidate</th>
+                  <th>Attempt</th>
+                  <th>State</th>
+                  <th>Outcome</th>
+                  <th>Provider Run</th>
+                  <th>Provider Runs</th>
+                </tr>
+              </thead>
+              <tbody id="ledger-body">
+                <tr class="empty">
+                  <td colspan="6">Waiting for a confirmed proof receipt</td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+        </section>
+
+        <section class="panel verify" id="verify" hidden aria-labelledby="verify-heading">
+          <div class="evidence-stamp" aria-hidden="true">INTEGRITY CHECKED</div>
+          <div class="panel-head">
+            <div>
+              <p class="eyebrow">Runtime integrity receipt</p>
+              <h3 id="verify-heading">Evidence Pack verifier</h3>
+            </div>
+            <span class="evidence-pack-type">JSON · hash chained</span>
+          </div>
+          <p class="verify-title" id="verify-title">Mission consistency verified</p>
+          <div class="badge-row" id="badge-row" aria-label="Verification badge"></div>
+          <ul class="verify-list" id="verify-list"></ul>
+          <p class="evidence-actions">
+            <a id="btn-evidence" class="download" href="/api/evidence" download>
+              Download evidence pack
+            </a>
+            <button type="button" id="btn-tamper" class="ghost" disabled>
+              Tamper copy → verify FAIL
+            </button>
+          </p>
+          <p class="mode" id="tamper-status"></p>
+          <p class="mode">
+            Application-level consistency proof; this demo chain is not externally signed or anchored.
+          </p>
+        </section>
+
+        <section class="panel" id="handoff" hidden aria-label="Cross-party handoff">
+          <div class="panel-head">
+            <div>
+              <p class="eyebrow">Feature proof</p>
+              <h3>Cross-party handoff</h3>
+            </div>
+          </div>
+          <div class="handoff-flow" id="handoff-body"></div>
+        </section>
+
+        <details class="ops-secondary" id="ops-secondary">
+          <summary>
+            <span>
+              <strong>Safety &amp; operator controls</strong>
+              <small>5 dispatch guards · pause · cancel · global stop</small>
+            </span>
+          </summary>
+          <div class="secondary-stack">
+            <section class="panel" aria-label="Dispatch safety">
+              <div class="panel-head">
+                <div>
+                  <p class="eyebrow">Safety musts</p>
+                  <h3>Dispatch guards</h3>
+                </div>
+              </div>
+              <div class="safety-strip" id="safety-strip">
+                <div class="safety-item ok">
+                  <span class="label">Consent</span>
+                  <span class="value" id="safety-consent">recorded</span>
+                </div>
+                <div class="safety-item ok">
+                  <span class="label">Timezone</span>
+                  <span class="value" id="safety-tz">Europe/Berlin</span>
+                </div>
+                <div class="safety-item ok">
+                  <span class="label">Calling hours</span>
+                  <span class="value" id="safety-hours">08:00–20:00</span>
+                </div>
+                <div class="safety-item ok">
+                  <span class="label">Allowlist</span>
+                  <span class="value" id="safety-allow">+49 mock</span>
+                </div>
+                <div class="safety-item ok">
+                  <span class="label">Max / mission</span>
+                  <span class="value" id="safety-max">8</span>
+                </div>
+              </div>
+            </section>
+
+            <section class="panel" aria-label="Operator controls">
+              <div class="panel-head">
+                <div>
+                  <p class="eyebrow">Human control plane</p>
+                  <h3>Operator kill-switch</h3>
+                </div>
+                <p class="panel-meta" id="op-status">
+                  Run a proof first · then control the mission.
+                </p>
+              </div>
+              <div class="operator-row">
+                <label class="reason-label" for="op-reason">Reason</label>
+                <input
+                  id="op-reason"
+                  type="text"
+                  placeholder="why pause / cancel…"
+                  autocomplete="off"
+                />
+              </div>
+              <div class="operator-actions">
+                <button type="button" id="btn-pause" class="ghost" disabled>Pause</button>
+                <button type="button" id="btn-resume" class="ghost" disabled>Resume</button>
+                <button type="button" id="btn-cancel" class="ghost" disabled>
+                  Cancel pending
+                </button>
+                <button type="button" id="btn-stop" class="ghost" disabled>
+                  Stop dispatches
+                </button>
+                <button type="button" id="btn-global-stop" class="ghost" disabled>
+                  Global stop
+                </button>
+              </div>
+              <p class="cancel-note" id="cancel-note">
+                <strong>Cancel semantics:</strong> planned → cancelled. In-flight →
+                mission <span class="mono">cancellation_requested</span> · intent
+                stays unsettled until reconcile.
+              </p>
+            </section>
+
+            <aside class="banner warn" id="hard-rule" hidden>
+              <h3>Confirmation hard rule</h3>
+              <p>
+                An early “yes” without the exact confirmation question is
+                <strong>unresolved</strong> · never unlocks waitlist C and never
+                claims booked.
+              </p>
+            </aside>
+
+            <aside class="banner blocked" id="block-banner" hidden>
+              <h3>blocked_needs_resolution</h3>
+              <p id="block-banner-body">
+                Ambiguous upstream blocks conflicting downstream · waitlist C stays
+                pending.
+              </p>
+            </aside>
+          </div>
+        </details>
+
+        <details class="event-disclosure" id="event-disclosure">
+          <summary>
+            <span>
+              <strong>Inspect the append-only event trail</strong>
+              <small id="event-summary">No events yet</small>
+            </span>
+          </summary>
+          <section class="panel event-panel" aria-label="Event trail">
+            <ol id="events" class="events"></ol>
+          </section>
+        </details>
+      </section>
+    </main>
+
+    <footer class="site-footer">
+      <span>Continuum Call · CALL-E hackathon · durable phone mission runtime</span>
+      <span id="footer-mode">Safety check pending · proof controls locked</span>
+    </footer>
+
+    <script src="/app.js" type="module"></script>
+  </body>
+</html>

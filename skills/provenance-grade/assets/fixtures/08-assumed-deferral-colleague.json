@@ -1,0 +1,23 @@
+{
+  "id": "08-assumed-deferral-colleague",
+  "category": "deferral",
+  "description": "Secondhand price plus explicit hand-off to a colleague. Deferral, assumed.",
+  "turns": [
+    { "speaker": "bot", "text": "Good afternoon, QuoteDesk assistant calling about the bearing set quote.", "offset_seconds": 0 },
+    { "speaker": "user", "text": "Okay, yes.", "offset_seconds": 5 },
+    { "speaker": "bot", "text": "What is your quoted price for the bearing set?", "offset_seconds": 9 },
+    { "speaker": "user", "text": "My colleague handles pricing, he told me 900 rupees, let me get back to you.", "offset_seconds": 14 }
+  ],
+  "fields": [
+    {
+      "field": "unit_price",
+      "value": 900,
+      "expects": "price",
+      "questionTurn": 2,
+      "answerTurns": [3],
+      "critical": true,
+      "expectedGrade": "assumed",
+      "expectSignals": ["E"]
+    }
+  ]
+}

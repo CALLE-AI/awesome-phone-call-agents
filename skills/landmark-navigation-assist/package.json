@@ -1,0 +1,9 @@
+{
+  "name": "landmark-navigation-assist",
+  "version": "1.0.0",
+  "description": "CALL-E skill: landmark-based last-few-hundred-metres navigation for delivery drivers",
+  "type": "module",
+  "dependencies": {
+    "zod": "^4.4.3"
+  }
+}

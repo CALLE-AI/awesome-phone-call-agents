@@ -1,0 +1,19 @@
+{
+  "schemaVersion": 1,
+  "package": "@call-e/core",
+  "version": "0.2.3",
+  "files": [
+    {
+      "path": "lib/mcp-client.js",
+      "sha256": "ac72bfe77c2453c2e735dacabe55899fdb7a95ebac361b7e12dbac98af1d03fc"
+    },
+    {
+      "path": "lib/cache.js",
+      "sha256": "dc7a209b68109542b5272c8148b11e2954ae722ce50105f29ecd324c3ca50cf1"
+    },
+    {
+      "path": "lib/constants.js",
+      "sha256": "fa46274fe5be22907f36020bbd6abc0f446a5c2aa266794214cf9aa304144b64"
+    }
+  ]
+}

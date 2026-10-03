@@ -5,8 +5,11 @@ Medicare & Medicaid Services from a survey of invoice prices paid by retail comm
 pharmacies. It is the acquisition-cost half of Sticker's headline number, and it is the
 reason that number is not self-graded: we did not author it and cannot influence it.
 
-Public, free, no API key:
-    https://data.medicaid.gov/dataset/dfa2ab14-06c2-457a-9e36-5cb6d80f8d93
+Public, free, no API key. CMS publishes one dataset per calendar year, so the id is looked
+up at run time and every row remembers which dataset it came from, so the citation link
+always points at the file the figure was read from:
+    https://data.medicaid.gov/datasets?keywords[0]=National%20Average%20Drug%20Acquisition%20Cost%20(NADAC)
+    https://www.medicaid.gov/medicaid/prescription-drugs/retail-price-survey
 
 Everything here is a read. Nothing in this module can be tuned to make a result look better.
 """
@@ -45,6 +48,9 @@ class NadacRow:
     effective_date: str
     otc: bool
     classification: str
+    # The CMS dataset this row was read from (one per calendar year). Empty only for rows
+    # built by hand in tests.
+    dataset_id: str = ""
 
     def cost_for(self, quantity: float) -> float:
         """Acquisition cost of `quantity` units, rounded to the cent."""
@@ -52,9 +58,12 @@ class NadacRow:
 
     @property
     def source_url(self) -> str:
+        """The public page of the dataset the figure came from, never a different year's."""
+        if self.dataset_id:
+            return f"https://data.medicaid.gov/dataset/{self.dataset_id}"
         return (
-            "https://data.medicaid.gov/dataset/dfa2ab14-06c2-457a-9e36-5cb6d80f8d93"
-            f"?conditions[ndc]={self.ndc}"
+            "https://data.medicaid.gov/datasets"
+            "?keywords[0]=National%20Average%20Drug%20Acquisition%20Cost%20(NADAC)"
         )
 
     def citation(self) -> str:
@@ -66,11 +75,12 @@ class NadacRow:
 
 
 @functools.lru_cache(maxsize=8)
-def _distribution_id(year: int, timeout: int = DEFAULT_TIMEOUT) -> str:
-    """Resolve the NADAC distribution id for a calendar year.
+def _dataset_ids(year: int, timeout: int = DEFAULT_TIMEOUT) -> tuple[str, str]:
+    """Resolve the NADAC (dataset id, distribution id) for a calendar year.
 
     Looked up rather than hardcoded so the tool keeps working when CMS publishes next
-    year's dataset.
+    year's dataset. The dataset id is what a person opens; the distribution id is what
+    the datastore query takes.
     """
     resp = requests.get(
         METASTORE, params={"show-reference-ids": "true"}, timeout=timeout
@@ -81,7 +91,7 @@ def _distribution_id(year: int, timeout: int = DEFAULT_TIMEOUT) -> str:
         if item.get("title") == want:
             dists = item.get("distribution") or []
             if dists:
-                return dists[0]["identifier"]
+                return item["identifier"], dists[0]["identifier"]
     raise NadacError(f"CMS publishes no NADAC dataset for {year}")
 
 
@@ -111,7 +121,7 @@ def lookup(
 
     for candidate_year in years:
         try:
-            dist_id = _distribution_id(candidate_year, timeout=timeout)
+            dataset_id, dist_id = _dataset_ids(candidate_year, timeout=timeout)
         except Exception as exc:  # dataset for that year may not exist yet
             last_error = exc
             continue
@@ -129,7 +139,7 @@ def lookup(
             timeout,
         )
         if rows:
-            return _row(_most_recent(rows))
+            return _row(_most_recent(rows), dataset_id)
 
     raise NadacError(
         f"No NADAC row starting with {description_prefix!r}. "
@@ -149,7 +159,7 @@ def _most_recent(rows: list[dict]) -> dict:
     return min(same_date, key=lambda r: float(r["nadac_per_unit"]))
 
 
-def _row(raw: dict) -> NadacRow:
+def _row(raw: dict, dataset_id: str = "") -> NadacRow:
     return NadacRow(
         ndc_description=raw["ndc_description"].strip(),
         ndc=raw["ndc"],
@@ -158,4 +168,5 @@ def _row(raw: dict) -> NadacRow:
         effective_date=raw.get("effective_date", ""),
         otc=(raw.get("otc") or "N").upper() == "Y",
         classification=raw.get("classification_for_rate_setting", ""),
+        dataset_id=dataset_id,
     )

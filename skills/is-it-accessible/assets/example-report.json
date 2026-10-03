@@ -1,0 +1,59 @@
+{
+  "dryRun": true,
+  "reports": [
+    {
+      "venue": {
+        "name": "Sample Cafe",
+        "phoneMasked": "+1555555****"
+      },
+      "profileId": "example",
+      "verdict": "suitable",
+      "findings": [
+        {
+          "needId": "step-free-entry",
+          "label": "Step-free entrance",
+          "severity": "must-have",
+          "verdict": "yes",
+          "confidence": "high",
+          "quote": "Yes, step-free entrance is fine here"
+        },
+        {
+          "needId": "accessible-toilet",
+          "label": "Accessible toilet",
+          "severity": "must-have",
+          "verdict": "yes",
+          "confidence": "high",
+          "quote": "Yes, accessible toilet is fine here"
+        },
+        {
+          "needId": "step-free-to-table",
+          "label": "Step-free inside",
+          "severity": "must-have",
+          "verdict": "yes",
+          "confidence": "high",
+          "quote": "Yes, step-free inside is fine here"
+        },
+        {
+          "needId": "accessible-parking",
+          "label": "Accessible parking",
+          "severity": "nice-to-have",
+          "verdict": "yes",
+          "confidence": "high",
+          "quote": "Yes, accessible parking is fine here"
+        },
+        {
+          "needId": "companion-free",
+          "label": "Companion or carer admitted free",
+          "severity": "nice-to-have",
+          "verdict": "yes",
+          "confidence": "high",
+          "quote": "Yes, companion or carer admitted free is fine here"
+        }
+      ],
+      "summary": "Dry-run answers for Sample Cafe (accessible).",
+      "callId": "call_dryrun_accessible",
+      "callStatus": "completed",
+      "checkedAt": "2026-08-30T09:12:50.315Z"
+    }
+  ]
+}

@@ -1,0 +1,21 @@
+{
+  "_scenario": "Consent granted BUT a severe allergy is reported. Must never auto-clear - this is the case the app exists to catch.",
+  "recipient_status": "completed",
+  "task_completed": true,
+  "completion_confidence": 0.96,
+  "summary": "Guardian consented but reported a severe reaction to a previous vaccine.",
+  "evidence": ["Guardian described swelling and difficulty breathing after a previous vaccine."],
+  "structured_result": {
+    "reached_guardian": "yes",
+    "identity_confirmed": "yes",
+    "consent": "granted",
+    "route": "school_session",
+    "prior_dose_reported": "no",
+    "prior_dose_detail": "",
+    "allergy_reported": "severe",
+    "allergy_detail": "Swelling and breathing difficulty after a vaccine two years ago; carries an adrenaline pen.",
+    "unwell_today": "no",
+    "guardian_questions": "Is this vaccine safe given that reaction?",
+    "callback_requested": "yes"
+  }
+}

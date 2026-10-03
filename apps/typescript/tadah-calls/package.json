@@ -1,0 +1,16 @@
+{
+  "name": "tadah-calls",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "description": "One human-confirmed CALL-E call about a scanned letter, with the answer returned as structured data. Dry run by default.",
+  "scripts": {
+    "test": "node --import tsx --test test/calls.test.ts",
+    "preview": "node --import tsx src/cli.ts preview examples/water-bill.json",
+    "demo": "node --import tsx src/cli.ts demo examples/water-bill.json",
+    "call": "node --import tsx src/cli.ts call"
+  },
+  "devDependencies": {
+    "tsx": "^4.20.0"
+  }
+}

@@ -1,0 +1,73 @@
+{
+  "scenario": "provider-availability",
+  "contact_id": "provider-demo-equipment",
+  "note": "Offline CALL-E-shaped response for the operator-approved supplier call.",
+  "steps": [
+    {
+      "ladder_step": 1,
+      "submit": "accepted",
+      "response": {
+        "id": "call_fx_provider_demo_equipment",
+        "object": "call_task",
+        "status": "completed",
+        "task": "Check general outage-support availability without sharing resident information.",
+        "recipients": [
+          {
+            "id": "rcp_provider_1",
+            "phones": ["+14155550181"],
+            "locale": "en-US",
+            "region": "US",
+            "status": "completed",
+            "structured_result": {
+              "availability": "yes",
+              "response_window": "Within two hours",
+              "public_instructions": "An operator may call the public support desk before 6 PM."
+            },
+            "summary": "The provider reported general outage-support availability.",
+            "attempts": [
+              {
+                "id": "att_provider_1",
+                "phone": "+14155550181",
+                "status": "completed",
+                "started_at": "2026-09-11T15:05:00Z",
+                "completed_at": "2026-09-11T15:05:40Z",
+                "transcript_turns": [
+                  {
+                    "offset_seconds": 0,
+                    "speaker": "bot",
+                    "text": "This is an automated coordination call from Northbay Power. This call may be recorded."
+                  },
+                  {
+                    "offset_seconds": 7,
+                    "speaker": "user",
+                    "text": "This is the equipment support desk."
+                  },
+                  {
+                    "offset_seconds": 12,
+                    "speaker": "bot",
+                    "text": "Can you accept a general powered-equipment outage-support referral before the outage?"
+                  },
+                  {
+                    "offset_seconds": 20,
+                    "speaker": "user",
+                    "text": "Yes. Our public support desk can respond within two hours if an operator calls before 6 PM."
+                  }
+                ]
+              }
+            ]
+          }
+        ],
+        "structured_result": null,
+        "summary": "General availability was confirmed.",
+        "task_completed": true,
+        "completion_confidence": {"score": 0.96, "label": "high"},
+        "evidence": ["General availability was confirmed."],
+        "metadata": {},
+        "failure_code": null,
+        "failure_message": null,
+        "created_at": "2026-09-11T15:05:00Z",
+        "completed_at": "2026-09-11T15:05:40Z"
+      }
+    }
+  ]
+}

@@ -12,6 +12,7 @@ from tests.data import EXAMPLES
 APP = EXAMPLES.parent
 EXPECTED = APP / "demo" / "EXPECTED.md"
 LEDGER = EXAMPLES / "ledger.example.jsonl"
+SITE_LEDGER = APP.parents[2] / "docs" / "ledger.example.jsonl"
 QUOTED = re.compile(r"```text\n(.*?)```", re.S)
 WALL_CLOCK = re.compile(r"\b\d\d:\d\d local")
 
@@ -66,4 +67,12 @@ def test_the_committed_example_ledger_is_the_one_the_demo_writes(demo_run):
     assert demo_run.written_ledger == demo_run.committed_ledger, (
         "examples/ledger.example.jsonl is not what the demo writes any more. "
         "Run python -m demo.run_local and commit the file as it comes out."
+    )
+
+
+@pytest.mark.skipif(not SITE_LEDGER.exists(), reason="docs/ stays out of the upstream checkout")
+def test_the_site_serves_the_ledger_the_demo_writes(demo_run):
+    assert SITE_LEDGER.read_bytes() == demo_run.committed_ledger, (
+        "docs/ledger.example.jsonl has drifted from examples/ledger.example.jsonl. "
+        "The site reads its own copy, so copy the file across after running the demo."
     )

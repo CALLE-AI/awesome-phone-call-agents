@@ -1,0 +1,211 @@
+{
+  "call_id": "call_inv_20260810",
+  "idempotency_key": "shopvoice-demo-lagos-corner-shop-inventory-2026-08-10",
+  "status": "completed",
+  "task_completed": true,
+  "completion_confidence": {
+    "score": 0.93,
+    "label": "high"
+  },
+  "evidence": [
+    "Owner reported Rice at about 12 bags.",
+    "Owner reported Indomie at about 15 cartons.",
+    "Owner reported Sugar at about 6 bags."
+  ],
+  "structured_result": {
+    "check_in_completed": true,
+    "products": [
+      {
+        "name": "Rice",
+        "quantity_estimate": 12,
+        "unit": "bags",
+        "running_low": false
+      },
+      {
+        "name": "Indomie",
+        "quantity_estimate": 15,
+        "unit": "cartons",
+        "running_low": false
+      },
+      {
+        "name": "Sugar",
+        "quantity_estimate": 6,
+        "unit": "bags",
+        "running_low": false
+      },
+      {
+        "name": "Cooking oil",
+        "quantity_estimate": 20,
+        "unit": "bottles",
+        "running_low": false
+      },
+      {
+        "name": "Milo",
+        "quantity_estimate": 9,
+        "unit": "tins",
+        "running_low": false
+      }
+    ],
+    "owner_notes": "Market slow yesterday but rice still moving."
+  },
+  "metadata": {
+    "shop_id": "demo-lagos-corner-shop",
+    "call_type": "inventory",
+    "call_date": "2026-08-10"
+  },
+  "recipients": [
+    {
+      "phones": [
+        "+2348000000000"
+      ],
+      "region": "NG",
+      "locale": "en",
+      "structured_result": {
+        "check_in_completed": true,
+        "products": [
+          {
+            "name": "Rice",
+            "quantity_estimate": 12,
+            "unit": "bags",
+            "running_low": false
+          },
+          {
+            "name": "Indomie",
+            "quantity_estimate": 15,
+            "unit": "cartons",
+            "running_low": false
+          },
+          {
+            "name": "Sugar",
+            "quantity_estimate": 6,
+            "unit": "bags",
+            "running_low": false
+          },
+          {
+            "name": "Cooking oil",
+            "quantity_estimate": 20,
+            "unit": "bottles",
+            "running_low": false
+          },
+          {
+            "name": "Milo",
+            "quantity_estimate": 9,
+            "unit": "tins",
+            "running_low": false
+          }
+        ],
+        "owner_notes": "Market slow yesterday but rice still moving."
+      },
+      "attempts": [
+        {
+          "attempt": 1,
+          "status": "completed",
+          "started_at": "2026-08-10T07:15:00+01:00",
+          "duration_seconds": 82,
+          "transcript_turns": [
+            {
+              "offset_seconds": 0,
+              "speaker": "bot",
+              "text": "Good morning o. How market?"
+            },
+            {
+              "offset_seconds": 3,
+              "speaker": "user",
+              "text": "Ah, we dey manage. Good morning."
+            },
+            {
+              "offset_seconds": 6,
+              "speaker": "bot",
+              "text": "I be AI assistant wey dey help you track your shop. This call fit dey recorded. You get small time?"
+            },
+            {
+              "offset_seconds": 12,
+              "speaker": "user",
+              "text": "Yes yes, talk am."
+            },
+            {
+              "offset_seconds": 14,
+              "speaker": "bot",
+              "text": "Thank you. How many bags of rice you get now?"
+            },
+            {
+              "offset_seconds": 18,
+              "speaker": "user",
+              "text": "Rice? Em... like twelve bags."
+            },
+            {
+              "offset_seconds": 22,
+              "speaker": "bot",
+              "text": "Twelve bags, I don note am. Indomie remain how many carton?"
+            },
+            {
+              "offset_seconds": 27,
+              "speaker": "user",
+              "text": "Indomie na fifteen carton."
+            },
+            {
+              "offset_seconds": 31,
+              "speaker": "bot",
+              "text": "Okay. Sugar na how many you still get?"
+            },
+            {
+              "offset_seconds": 35,
+              "speaker": "user",
+              "text": "Sugar remain six bag."
+            },
+            {
+              "offset_seconds": 39,
+              "speaker": "bot",
+              "text": "Cooking oil remain well?"
+            },
+            {
+              "offset_seconds": 42,
+              "speaker": "user",
+              "text": "Cooking oil plenty, like twenty bottle."
+            },
+            {
+              "offset_seconds": 47,
+              "speaker": "bot",
+              "text": "Milo nko?"
+            },
+            {
+              "offset_seconds": 49,
+              "speaker": "user",
+              "text": "Milo no dey move at all. Nine tin still dey there."
+            },
+            {
+              "offset_seconds": 54,
+              "speaker": "bot",
+              "text": "I hear you. Which thing don finish or almost finish?"
+            },
+            {
+              "offset_seconds": 58,
+              "speaker": "user",
+              "text": "Nothing don finish today, but indomie dey go fast."
+            },
+            {
+              "offset_seconds": 63,
+              "speaker": "bot",
+              "text": "Noted. You buy anything yesterday? From who?"
+            },
+            {
+              "offset_seconds": 67,
+              "speaker": "user",
+              "text": "No, I never buy anything this week."
+            },
+            {
+              "offset_seconds": 71,
+              "speaker": "bot",
+              "text": "Thank you. I go note am. I go call you later today make we check sales."
+            },
+            {
+              "offset_seconds": 76,
+              "speaker": "user",
+              "text": "Okay, no wahala."
+            }
+          ]
+        }
+      ]
+    }
+  ]
+}

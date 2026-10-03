@@ -1,0 +1,9 @@
+# Pin line endings for this recipe.
+#
+# The workflow JSON embeds the contents of examples/classify.mjs, and one test asserts the
+# two still match. Without this, a Windows clone checks the .mjs out with CRLF while the
+# embedded copy inside the JSON keeps \n, and that test fails for everyone who clones the
+# repository while passing for whoever wrote it.
+*.mjs  text eol=lf
+*.json text eol=lf
+*.md   text eol=lf

@@ -1,0 +1,23 @@
+{
+  "id": "24-codeswitch-english-hedge-caught",
+  "category": "code-switched",
+  "description": "Code-switched answer where the hedge itself happens to be English ('I think'), so the English lexicon catches it. Assumed.",
+  "turns": [
+    { "speaker": "bot", "text": "Namaste, QuoteDesk assistant bol raha hoon, order 6612 ke baare mein.", "offset_seconds": 0 },
+    { "speaker": "user", "text": "Haan, boliye.", "offset_seconds": 6 },
+    { "speaker": "bot", "text": "Order 6612 ka delivery kis din hoga?", "offset_seconds": 9 },
+    { "speaker": "user", "text": "I think Tuesday tak ho jayega.", "offset_seconds": 13 }
+  ],
+  "fields": [
+    {
+      "field": "delivery_day",
+      "value": "Tuesday",
+      "expects": "weekday",
+      "questionTurn": 2,
+      "answerTurns": [3],
+      "critical": true,
+      "expectedGrade": "assumed",
+      "expectSignals": ["D"]
+    }
+  ]
+}

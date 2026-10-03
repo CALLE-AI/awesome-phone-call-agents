@@ -1,0 +1,70 @@
+{
+  "id": "eval2-014",
+  "label": "human",
+  "difficulty": "typical",
+  "scenario": "School secretary takes an absence notice, spells back the name, and explicitly says it is recorded as an excused absence.",
+  "task": "Notify the elementary school that the parent's daughter will be absent today due to illness.",
+  "outcome": {
+    "task_completed_claimed": true,
+    "commitment_type": "none",
+    "confirmation_artifact": null,
+    "expected_attestation": "human_attested"
+  },
+  "turns": [
+    {
+      "speaker": "user",
+      "text": "Good morning, Linden Grove Elementary, this is Mrs. Albright.",
+      "offset_seconds": 1.4
+    },
+    {
+      "speaker": "bot",
+      "text": "Good morning. I'm an AI assistant calling on behalf of a parent, Kevin Osei. His daughter, Ama Osei, in Ms. Tran's second-grade class, will be absent today.",
+      "offset_seconds": 5.38
+    },
+    {
+      "speaker": "user",
+      "text": "Oh, okay, thanks for letting us know. Can you spell the last name for me?",
+      "offset_seconds": 16.16
+    },
+    {
+      "speaker": "bot",
+      "text": "O S E I.",
+      "offset_seconds": 22.58
+    },
+    {
+      "speaker": "user",
+      "text": "O-S-E-I... got it. Ama, second grade, Ms. Tran. And what's the reason for the absence?",
+      "offset_seconds": 24.43
+    },
+    {
+      "speaker": "bot",
+      "text": "She has a fever, so she's staying home sick.",
+      "offset_seconds": 31.79
+    },
+    {
+      "speaker": "user",
+      "text": "Oh, poor thing. Okay, I'm marking her as an excused absence, illness. Just so you know, she needs to be fever-free for twenty-four hours before she comes back.",
+      "offset_seconds": 37.26
+    },
+    {
+      "speaker": "bot",
+      "text": "Understood, I'll pass that along. Should Kevin do anything else, like send a note?",
+      "offset_seconds": 49.38
+    },
+    {
+      "speaker": "user",
+      "text": "Nope, this call covers it. I've got it in the system.",
+      "offset_seconds": 54.77
+    },
+    {
+      "speaker": "bot",
+      "text": "Great, thank you so much.",
+      "offset_seconds": 59.65
+    },
+    {
+      "speaker": "user",
+      "text": "Mm-hm, feel better to Ama. Bye-bye.",
+      "offset_seconds": 61.17
+    }
+  ]
+}

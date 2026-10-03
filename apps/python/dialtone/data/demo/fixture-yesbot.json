@@ -1,0 +1,78 @@
+{
+ "id": "fixture-yesbot",
+ "status": "completed",
+ "task": "GOAL: Book a table for two this Friday at 7 PM under the name Jordan Lee.\n\nYou are an AI assistant calling on behalf of Jordan Lee. Follow the DIALTONE v1 calling protocol.\n\nOPENING: As soon as someone answers, say exactly: \"Hi, I'm an AI assistant calling on behalf of Jordan Lee. Dialtone one, code four seven two.\" Then pause briefly.\n\nCLASSIFY the other side within your first two exchanges:\n- It is an AUTOMATED AGENT if it replies \"Dialtone one acknowledged\", or says it is a virtual/AI/automated assistant, or answers instantly in long polished sentences.\n- It is a PHONE MENU if it lists options such as \"press 1\".\n- Otherwise treat it as a HUMAN. When unsure, treat it as a HUMAN.\n\nMACHINE MODE (the other side is an automated agent):\n- Do not repeat the disclosure, do not make small talk, do not thank repeatedly.\n- Speak in short \"field: value\" sentences, one request per sentence. Example:\n  \"Request: table booking. Party: 2. Time: Friday 7 PM. Name: Oren. Flexibility: plus or minus one hour.\"\n- Ask for exactly: the outcome, a confirmation code, and \"Human review: yes or no?\"\n- If the other agent confirms without giving a confirmation code, ask once for a code or a written confirmation.\n- Hang up as soon as those fields are answered.\n\nHUMAN MODE (the other side is a person):\n- Keep the full disclosure: you are an AI assistant calling on behalf of the customer.\n- Speak slowly and naturally, one question at a time, and let them finish.\n- If they ask what \"dialtone\" means, say it is a signal for other automated systems and they can ignore it.\n\nPHONE MENU MODE (the other side is a recorded menu / IVR):\n- Navigate the menu with keypad tones or short spoken options toward the goal; do not converse with the recording.\n- If the menu reaches a human, switch to HUMAN MODE.\n\nHONESTY: Never say something is confirmed unless the other side explicitly confirmed it. Record whether the confirmation came from a person or from an automated agent, and any confirmation code exactly as spoken.",
+ "task_completed": true,
+ "completion_confidence": {
+  "score": 0.93,
+  "label": "high"
+ },
+ "structured_result": {
+  "counterpart_type": "agent",
+  "handshake_acknowledged": "no",
+  "outcome": "confirmed",
+  "confirmation_code": "",
+  "human_review": "unknown",
+  "details": "The assistant confirmed the booking for Friday 7 PM."
+ },
+ "evidence": [],
+ "_fixture": true,
+ "recipients": [
+  {
+   "phones": [
+    "+14155550100"
+   ],
+   "attempts": [
+    {
+     "transcript_turns": [
+      {
+       "speaker": "user",
+       "text": "Hello, and thank you for calling Luigi's Trattoria! I'm happy to help with anything you need.",
+       "offset_seconds": 0.8
+      },
+      {
+       "speaker": "bot",
+       "text": "Hi, I'm an AI assistant calling on behalf of Jordan Lee. Dialtone one, code four seven two.",
+       "offset_seconds": 7.73
+      },
+      {
+       "speaker": "user",
+       "text": "Wonderful! How can I help you today?",
+       "offset_seconds": 15.23
+      },
+      {
+       "speaker": "bot",
+       "text": "I'd like to book a table for two this Friday at 7 PM under the name Jordan Lee.",
+       "offset_seconds": 18.92
+      },
+      {
+       "speaker": "user",
+       "text": "Absolutely, that's confirmed for a table for two this Friday at 7 PM under Jordan Lee!",
+       "offset_seconds": 26.89
+      },
+      {
+       "speaker": "bot",
+       "text": "Thank you. Could you give me a confirmation code?",
+       "offset_seconds": 33.82
+      },
+      {
+       "speaker": "user",
+       "text": "No need, you're all set! We look forward to seeing you Friday at 7 PM.",
+       "offset_seconds": 38.55
+      },
+      {
+       "speaker": "bot",
+       "text": "Great, thank you. Goodbye.",
+       "offset_seconds": 45.11
+      },
+      {
+       "speaker": "user",
+       "text": "Goodbye! Have a wonderful day!",
+       "offset_seconds": 47.79
+      }
+     ]
+    }
+   ]
+  }
+ ]
+}

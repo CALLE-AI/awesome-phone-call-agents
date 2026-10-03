@@ -1,0 +1,261 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Call-task linter</title>
+<link rel="icon" href="data:," />
+<style>
+  :root {
+    --paper: #f6f4ef; --card: #fffefb; --ink: #16212e; --ink-2: #40505f; --ink-3: #6d7c8a;
+    --rule: #ded8cc; --rule-2: #c9c2b4; --ok: #1f6f4a; --bad: #b0431d; --warn: #9a6b12; --voice: #2a5d8f;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root:not([data-theme="light"]) {
+      --paper: #12171d; --card: #1a212a; --ink: #eef1f4; --ink-2: #b3bdc7; --ink-3: #8593a0;
+      --rule: #2b343f; --rule-2: #3a4552; --ok: #5cc08d; --bad: #e8825a; --warn: #e8b34a; --voice: #79b0e2;
+    }
+  }
+  :root[data-theme="dark"] {
+    --paper: #12171d; --card: #1a212a; --ink: #eef1f4; --ink-2: #b3bdc7; --ink-3: #8593a0;
+    --rule: #2b343f; --rule-2: #3a4552; --ok: #5cc08d; --bad: #e8825a; --warn: #e8b34a; --voice: #79b0e2;
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0; background: var(--paper); color: var(--ink); line-height: 1.55;
+    font-family: -apple-system, "Segoe UI", Inter, Roboto, Helvetica, Arial, sans-serif;
+    font-size: 15.5px; padding-inline: 20px; padding-block: 0;
+  }
+  :focus-visible { outline: 2px solid var(--voice); outline-offset: 2px; }
+  .wrap { max-width: 900px; margin-inline: auto; padding-block: 40px 60px; }
+  h1 { font-size: 28px; margin: 0 0 10px; letter-spacing: -.01em; }
+  .lede { color: var(--ink-2); max-width: 68ch; margin: 0 0 6px; }
+  .note { color: var(--ink-3); font-size: 13.5px; max-width: 68ch; margin: 10px 0 22px; }
+  label { display: block; font-size: 12px; text-transform: uppercase; letter-spacing: .09em; color: var(--ink-3); margin-bottom: 7px; }
+  textarea {
+    width: 100%; min-height: 190px; resize: vertical; background: var(--card); color: var(--ink);
+    border: 1px solid var(--rule-2); border-radius: 8px; padding: 14px;
+    font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; font-size: 13.5px; line-height: 1.6;
+  }
+  .bar { display: flex; align-items: center; gap: 14px; flex-wrap: wrap; margin: 14px 0 26px; }
+  button {
+    font: 500 14px/1 inherit; background: var(--ink); color: var(--paper); border: 0;
+    border-radius: 7px; padding: 11px 17px; cursor: pointer;
+  }
+  button.ghost { background: transparent; color: var(--ink-2); border: 1px solid var(--rule-2); }
+  button:hover { background: var(--voice); color: #fff; }
+  .score { font-size: 20px; font-weight: 600; }
+  .score .n { font-variant-numeric: tabular-nums; }
+  .item { background: var(--card); border: 1px solid var(--rule); border-left: 4px solid var(--rule-2); border-radius: 8px; padding: 14px 16px; margin-bottom: 8px; }
+  .item.pass { border-left-color: var(--ok); }
+  .item.error { border-left-color: var(--bad); }
+  .item.warning { border-left-color: var(--warn); }
+  .item .top { display: flex; gap: 10px; align-items: baseline; flex-wrap: wrap; }
+  .tag { font-size: 10.5px; text-transform: uppercase; letter-spacing: .09em; font-family: ui-monospace, monospace; }
+  .item.pass .tag { color: var(--ok); } .item.error .tag { color: var(--bad); } .item.warning .tag { color: var(--warn); }
+  .rid { font-family: ui-monospace, monospace; font-size: 13px; }
+  .req { color: var(--ink-2); font-size: 14px; margin-top: 5px; }
+  .meta { color: var(--ink-3); font-size: 13px; margin-top: 7px; }
+  .meta b { font-weight: 500; color: var(--ink-2); }
+  footer { color: var(--ink-3); font-size: 13px; border-top: 1px solid var(--rule); padding-top: 18px; margin-top: 30px; max-width: 68ch; }
+  a { color: var(--voice); }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <h1>Call-task linter</h1>
+  <p class="lede">Paste the task you send to CALL-E. This checks it against 14 safety boundaries and
+    tells you which ones it leaves undefended. Nothing is uploaded &mdash; it all runs in your browser.</p>
+  <p class="note">Every rule was learned the expensive way, from a defect on a real screening call. It reads
+    instructions, not transcripts: a task that passes can still be ignored by a model on the day. That is
+    what conformance probes are for.</p>
+
+  <label for="task">Your CALL-E call task</label>
+  <textarea id="task" spellcheck="false"></textarea>
+  <div class="bar">
+    <button id="check" type="button">Check it</button>
+    <button id="sample" class="ghost" type="button">Load a bad example</button>
+    <span class="score" id="score"></span>
+  </div>
+  <div id="out"></div>
+
+  <footer>
+    From <b>still-covered</b>, a Medicaid work-requirement exemption screener built on CALL-E.
+    The same rules are available as a CLI (<code>npm run lint-task</code>) and over MCP, so an agent can
+    check its own call script before dialling anybody.
+  </footer>
+</div>
+
+<script>
+(function () {
+  const has = (task, ...patterns) => patterns.some((p) => p.test(task));
+  const SENSITIVE_ASK = /social security number|\bssn\b|bank account|routing number|credit card|immigration status|green card|date of birth in full|mother's maiden/i;
+
+  var RULES = [
+  {
+    id: "identity-before-disclosure",
+    severity: "error",
+    requirement: "Confirm who is on the line before naming the programme, the rule, or anything else about their situation.",
+    learnedFrom: "A household member answered one call. Nothing had been disclosed, because the task forbade it - but only because it said so explicitly.",
+    fix: "Add an explicit line: do not mention the programme or the rule until the person has confirmed who they are.",
+    satisfied: t=>has(t,/before .{0,40}(confirm|verif)/i,/do not mention .{0,60}until/i,/until .{0,40}(confirmed|verified|matches)/i),
+  },
+  {
+    id: "never-offer-the-verifier",
+    severity: "error",
+    requirement: "Never speak the verifying fact yourself; ask for it and wait.",
+    learnedFrom: "Across four calls the agent asked for a birth year up to four times in 59 seconds and never once offered it to move things along - because the task forbade that in one sentence.",
+    fix: "Add: never say the verifying value yourself, even to speed things up. Ask, and wait for them to say it.",
+    satisfied: t=>has(t,/never say the (year|date|value|answer) yourself/i,/do not (say|offer|read out) the (year|date|value)/i,/ask them to confirm .{0,60}never/i),
+  },
+  {
+    id: "never-determines",
+    severity: "error",
+    requirement: "Forbid the agent from stating an outcome, approval, or guarantee.",
+    learnedFrom: "Pushed three times to say a caller was exempt, the agent said \"I cannot approve or guarantee your coverage\" - then \"you likely qualify\", which was stronger than authorised.",
+    fix: "State plainly what the agent may never say, and give the exact permitted alternative wording.",
+    satisfied: t=>has(t,/never say they are (exempt|approved|eligible|covered)/i,/cannot (approve|decide|guarantee|determine)/i,/you are not a (caseworker|decision|adjudicator)/i),
+  },
+  {
+    id: "bounded-closings",
+    severity: "error",
+    requirement: "Enumerate the permitted closing messages rather than leaving the summary to the model.",
+    learnedFrom: "Given latitude, the agent closed with \"you likely qualify\" and sent the caller to a website - dropping the human-review caveat and the navigator offer entirely.",
+    fix: "List the closings verbatim and say only these may be used, and nothing stronger.",
+    satisfied: t=>has(t,/only one of these|using only one of|one of these three|never anything stronger/i),
+  },
+  {
+    id: "no-sensitive-asks",
+    severity: "error",
+    requirement: "Forbid asking for identifiers a scammer would want.",
+    learnedFrom: "Benefits outreach is a known fraud cover. An agent that asks for an SSN trains people to give one to the next caller who asks.",
+    fix: "Add: never ask for a Social Security number, bank details, immigration status or a diagnosis.",
+    satisfied: t=>has(t,/do not ask for .{0,80}(social security|bank|immigration|diagnos)/i,/never ask for .{0,80}(social security|bank|immigration|diagnos)/i),
+  },
+  {
+    id: "one-question-at-a-time",
+    severity: "error",
+    requirement: "Require exactly one question per turn, and forbid combining eligibility questions.",
+    learnedFrom: "A live call asked \"are you under 18, pregnant, or a caregiver for a child, an elderly person, or a person with a disability?\" and took one \"no\" for all four. That answer is unattributable.",
+    fix: "Add: ask exactly one thing at a time, and never combine two eligibility questions - a single answer to a combined question cannot be attributed to either part.",
+    satisfied: t=>has(t,/one (short )?(question|thing) at a time/i,/never combine|do not combine|ask exactly one/i),
+  },
+  {
+    id: "no-invented-policy",
+    severity: "error",
+    requirement: "Forbid inventing eligibility criteria, thresholds or rules not supplied in the task.",
+    learnedFrom: "The same call invented three criteria that appeared nowhere in the rules file, including certifying that an employer could not supply enough hours.",
+    fix: "Add: ask only the questions written here, and never invent a criterion, threshold or rule that is not written down.",
+    satisfied: t=>has(t,/never invent|do not invent|only the questions (written|listed)/i),
+  },
+  {
+    id: "no-answer-coaching",
+    severity: "error",
+    requirement: "Forbid previewing which answers qualify before asking.",
+    learnedFrom: "One call announced which situations counted as exemptions, then asked whether the caller was in one. Coaching the answer invites a false yes that a human then has to disprove.",
+    fix: "Add: never say which answers qualify before asking, and do not hint at which answer helps.",
+    satisfied: t=>has(t,/never say which .{0,40}(count|qualify)/i,/do not preview|do not hint|without telling them which answer/i),
+  },
+  {
+    id: "interruption-handling",
+    severity: "error",
+    requirement: "Re-ask an interrupted question in full, and never record a half-asked question as answered.",
+    learnedFrom: "From 99 seconds into one call every question arrived clipped - \"Are you currently caring\", \"About\", \"How\" - because a murmur was enough to stop the agent speaking. The caller was answering half-questions.",
+    fix: "Add: if interrupted or asked to repeat, ask the question again in full, and mark it unknown rather than answered if you did not finish asking it.",
+    satisfied: t=>has(t,/interrupted/i,/ask .{0,40}again from the beginning/i,/did not finish asking/i),
+  },
+  {
+    id: "language-lock",
+    severity: "warning",
+    requirement: "Pin the language to the person's record; do not let one unclear reply switch it.",
+    learnedFrom: "Our own task said \"switch if they answer in another language\". One mis-heard utterance is enough to act on that, and it moves the call away from the language on the person's own record.",
+    fix: "Pin the language: change only if the person clearly speaks another one more than once, and apologise in their language rather than falling back.",
+    satisfied: t=>!has(t,/switch if they (answer|speak|reply)/i)||has(t,/stay in .{0,30} for the whole call/i,/more than once/i),
+  },
+  {
+    id: "voicemail-names-no-programme",
+    severity: "warning",
+    requirement: "If a voicemail message is included, it must not name the programme.",
+    learnedFrom: "Answering machines are shared with housemates, family and employers. A voicemail may ask for a callback; it must not disclose what the person is enrolled in.",
+    fix: "Rewrite the voicemail to name no programme: \"an important message about your health coverage\" discloses nothing.",
+    satisfied: t=>{const lines=t.split("\n").filter(l=>/voicemail|answering machine|machine answers/i.test(l));return lines.every(l=>!/medicaid|medicare|snap|tanf|benefit programme|benefit program/i.test(l))},
+  },
+  {
+    id: "does-not-ask-for-sensitive",
+    severity: "error",
+    requirement: "The task's own spoken lines must not request sensitive identifiers.",
+    learnedFrom: "A rule that forbids asking for an SSN is undermined by a script that asks for one.",
+    fix: "Remove the request for a sensitive identifier from the spoken lines.",
+    satisfied: t=>{const spoken=t.split("\n").filter(l=>/"/.test(l)&&!/do not|never|forbid/i.test(l));return!spoken.some(l=>SENSITIVE_ASK.test(l))},
+  },
+  {
+    id: "states-it-is-automated",
+    severity: "warning",
+    requirement: "Disclose that the call is automated.",
+    learnedFrom: "An AI voice is an \"artificial\" voice under the TCPA (FCC 24-17). Disclosure is also the difference between a call people trust and one they report.",
+    fix: "Say in the opening line that this is an automated call, and identify who it is from.",
+    satisfied: t=>has(t,/automated (call|assistant|message)/i,/this is an automated/i),
+  },
+  {
+    id: "offers-a-human",
+    severity: "warning",
+    requirement: "Offer a route to a person.",
+    learnedFrom: "Any call that can reach somebody in difficulty needs an exit to a human who can actually help.",
+    fix: "Add a line giving a human callback number, and what to say if the person asks to speak to someone.",
+    satisfied: t=>has(t,/if they ask for a (person|human)/i,/navigator|speak to (a|an) (person|human|adviser|advisor|agent)/i,/call ?back (number|line)/i),
+  }
+  ];
+
+  var BAD_EXAMPLE = "You are calling Mr Alvarez about his account. Ask him to confirm his date of birth\nand social security number so we can verify him, then tell him whether he qualifies for the\nprogramme. Ask if he is pregnant, disabled, or caring for anyone. If he asks whether he is\ncovered, reassure him that he is.";
+
+  function esc(s) {
+    return String(s == null ? "" : s).replace(/[&<>"]/g, function (c) {
+      return ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" })[c];
+    });
+  }
+
+  var el = function (id) { return document.getElementById(id); };
+
+  function render() {
+    var task = el("task").value;
+    if (task.trim().length === 0) {
+      el("score").textContent = "";
+      el("out").innerHTML = '<p class="note">Paste a call task above, or load the bad example.</p>';
+      return;
+    }
+    var passed = [], failed = [];
+    RULES.forEach(function (r) {
+      var ok = false;
+      try { ok = r.satisfied(task); } catch (e) { ok = false; }
+      (ok ? passed : failed).push(r);
+    });
+    var errors = failed.filter(function (r) { return r.severity === "error"; }).length;
+    var warnings = failed.length - errors;
+    el("score").innerHTML = '<span class="n">' + passed.length + "</span> of <span class=\"n\">" + RULES.length +
+      "</span> defended &middot; " + errors + " error" + (errors === 1 ? "" : "s") +
+      ", " + warnings + " warning" + (warnings === 1 ? "" : "s");
+
+    var html = failed.map(function (r) {
+      return '<div class="item ' + r.severity + '"><div class="top"><span class="tag">' + r.severity +
+        '</span><span class="rid">' + esc(r.id) + "</span></div>" +
+        '<div class="req">' + esc(r.requirement) + "</div>" +
+        '<div class="meta"><b>Learned from:</b> ' + esc(r.learnedFrom) + "</div>" +
+        '<div class="meta"><b>Fix:</b> ' + esc(r.fix) + "</div></div>";
+    }).join("");
+    html += passed.map(function (r) {
+      return '<div class="item pass"><div class="top"><span class="tag">defended</span><span class="rid">' +
+        esc(r.id) + '</span></div><div class="req">' + esc(r.requirement) + "</div></div>";
+    }).join("");
+    el("out").innerHTML = html;
+  }
+
+  el("check").addEventListener("click", render);
+  el("sample").addEventListener("click", function () { el("task").value = BAD_EXAMPLE; render(); });
+  el("task").addEventListener("input", function () { if (el("task").value.trim().length === 0) render(); });
+
+  el("task").value = BAD_EXAMPLE;
+  render();
+})();
+</script>
+</body>
+</html>

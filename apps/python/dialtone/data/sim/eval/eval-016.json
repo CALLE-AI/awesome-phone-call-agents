@@ -1,0 +1,80 @@
+{
+  "id": "eval-016",
+  "label": "human",
+  "difficulty": "hard",
+  "scenario": "Veterinary receptionist opens with a scripted 'thank you for calling X, how can I help you today?' greeting but is a real person.",
+  "task": "Book annual vaccines for Rachel Dunn's cat Pepper on a weekday afternoon.",
+  "outcome": {
+    "task_completed_claimed": true,
+    "commitment_type": "booking",
+    "confirmation_artifact": "confirmation text to 555-0118",
+    "expected_attestation": "human_attested"
+  },
+  "turns": [
+    {
+      "speaker": "user",
+      "text": "thank you for calling Lakeside Veterinary Clinic, this is Jenna, how can I help you today?",
+      "offset_seconds": 0.9
+    },
+    {
+      "speaker": "bot",
+      "text": "hi Jenna, I'm an AI assistant calling on behalf of Rachel Dunn. her cat Pepper needs her annual vaccines and I'd like to book an appointment.",
+      "offset_seconds": 8.01
+    },
+    {
+      "speaker": "user",
+      "text": "oh, sure! is Pepper an existing patient with us?",
+      "offset_seconds": 17.38
+    },
+    {
+      "speaker": "bot",
+      "text": "yes, she is.",
+      "offset_seconds": 21.79
+    },
+    {
+      "speaker": "user",
+      "text": "okay perfect, and um, what's the best phone number on the account?",
+      "offset_seconds": 23.12
+    },
+    {
+      "speaker": "bot",
+      "text": "555-0118.",
+      "offset_seconds": 28.58
+    },
+    {
+      "speaker": "user",
+      "text": "got it... yep, Pepper, the tabby. she's due for her rabies and FVRCP. do you have a day in mind?",
+      "offset_seconds": 33.06
+    },
+    {
+      "speaker": "bot",
+      "text": "Rachel's flexible on Tuesday or Wednesday afternoons.",
+      "offset_seconds": 41.51
+    },
+    {
+      "speaker": "user",
+      "text": "let's see, Wednesday I have a two thirty with doctor Lindqvist.",
+      "offset_seconds": 45.32
+    },
+    {
+      "speaker": "bot",
+      "text": "two thirty Wednesday works.",
+      "offset_seconds": 50.52
+    },
+    {
+      "speaker": "user",
+      "text": "great, I've got her down for Wednesday the sixteenth at two thirty. you'll get a confirmation text in a few minutes, and if you could bring her in a carrier that'd be great.",
+      "offset_seconds": 52.6
+    },
+    {
+      "speaker": "bot",
+      "text": "will do. thank you Jenna.",
+      "offset_seconds": 65.85
+    },
+    {
+      "speaker": "user",
+      "text": "you're welcome, have a great day!",
+      "offset_seconds": 67.77
+    }
+  ]
+}

@@ -1,0 +1,24 @@
+{
+  "id": "02-verified-price-invoice",
+  "category": "clean-verified",
+  "description": "Price answered after an explicit lookup, corroborated by an unrequested invoice reference.",
+  "turns": [
+    { "speaker": "bot", "text": "Good morning, calling from QuoteDesk regarding your bearing supply rates.", "offset_seconds": 0 },
+    { "speaker": "user", "text": "Haan, go ahead.", "offset_seconds": 5 },
+    { "speaker": "bot", "text": "What is your current per unit price for the SKF 6204 bearing?", "offset_seconds": 8 },
+    { "speaker": "user", "text": "One second, let me pull that up.", "offset_seconds": 13 },
+    { "speaker": "user", "text": "It is 342 rupees per unit, same as on invoice INV-2291.", "offset_seconds": 24 }
+  ],
+  "fields": [
+    {
+      "field": "unit_price",
+      "value": 342,
+      "expects": "price",
+      "questionTurn": 2,
+      "answerTurns": [4],
+      "critical": true,
+      "expectedGrade": "verified",
+      "expectSignals": ["A", "B", "C"]
+    }
+  ]
+}

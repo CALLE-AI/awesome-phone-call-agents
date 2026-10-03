@@ -1,0 +1,46 @@
+{
+ "id": "train-agent-041",
+ "label": "agent",
+ "source": "sim-train",
+ "meta": {
+  "task": "ask for a quote for a brake replacement",
+  "hard": true
+ },
+ "turns": [
+  {
+   "speaker": "user",
+   "text": "Hi there, I'm Nova, the virtual assistant for Maple Vet Clinic. How may I assist you today?",
+   "offset_seconds": 0.9
+  },
+  {
+   "speaker": "bot",
+   "text": "Hi, I'm an AI assistant calling on behalf of Alex Martin. Could you give me a rough quote for replacing the front brake pads on a 2018 sedan?",
+   "offset_seconds": 7.99
+  },
+  {
+   "speaker": "user",
+   "text": "Of course! Maple Vet Clinic is open on Sunday from 10 AM to 4 PM. Is there anything else I can help you with?",
+   "offset_seconds": 19.5
+  },
+  {
+   "speaker": "bot",
+   "text": "How soon could you do it?",
+   "offset_seconds": 29.81
+  },
+  {
+   "speaker": "user",
+   "text": "Great question! Let me check that for you. Yes, that's correct.",
+   "offset_seconds": 33.52
+  },
+  {
+   "speaker": "bot",
+   "text": "How soon could you do it?",
+   "offset_seconds": 38.72
+  },
+  {
+   "speaker": "user",
+   "text": "You're welcome! Have a wonderful day. Goodbye!",
+   "offset_seconds": 42.66
+  }
+ ]
+}

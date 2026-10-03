@@ -289,3 +289,24 @@ def test_poll_timeout_raises_ambiguous_call_outcome(mock_run, mock_which, mock_s
     client = RealCallEClient(poll_timeout_seconds=0, poll_interval_seconds=0)
     with pytest.raises(AmbiguousCallOutcome, match="did not reach a terminal status"):
         client.place_screening_call("+18005550187", "task text")
+
+
+@patch("pipeline.caller.time.sleep")
+@patch("pipeline.caller.shutil.which", return_value="C:/fake/calle.cmd")
+@patch("pipeline.caller.subprocess.run")
+def test_no_answer_with_a_space_is_recognized_as_terminal_not_ambiguous(mock_run, mock_which, mock_sleep):
+    # Real call, 2026-08-26: CALL-E's actual API returned status "NO ANSWER"
+    # (a space) where TERMINAL_STATUSES only listed "NO_ANSWER" (an
+    # underscore) — the poll loop never recognized it as terminal, polled
+    # for the full timeout, and raised AmbiguousCallOutcome for a call that
+    # had genuinely already resolved. A single poll response with the space
+    # variant must stop the loop immediately, not require poll_timeout_seconds
+    # to be reached.
+    run_completed = json.dumps({"run_id": "run-1", "status": "NO ANSWER", "result": {"transcript": ""}})
+    mock_run.side_effect = [_completed_proc(PLAN_READY), _completed_proc(run_completed)]
+
+    client = RealCallEClient(poll_timeout_seconds=300, poll_interval_seconds=3)
+    result = client.place_screening_call("+18005550187", "task text")
+
+    assert result.metadata.status == "NO_ANSWER"  # normalized for downstream consumers (scoring.py, screen.py)
+    mock_sleep.assert_not_called()  # resolved on the first status check, no polling wait needed

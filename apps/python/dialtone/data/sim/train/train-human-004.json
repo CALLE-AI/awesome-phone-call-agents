@@ -1,0 +1,51 @@
+{
+ "id": "train-human-004",
+ "label": "human",
+ "source": "sim-train",
+ "meta": {
+  "task": "check whether the store is open on Sunday",
+  "hard": false
+ },
+ "turns": [
+  {
+   "speaker": "user",
+   "text": "Harbor Hotel, this is Chloe.",
+   "offset_seconds": 0.7
+  },
+  {
+   "speaker": "bot",
+   "text": "Hi, I'm an AI assistant calling on behalf of Taylor Kim. Could you tell me your opening hours this Sunday?",
+   "offset_seconds": 3.19
+  },
+  {
+   "speaker": "user",
+   "text": "Sunday we're yeah, um, open ten to four.",
+   "offset_seconds": 11.32
+  },
+  {
+   "speaker": "bot",
+   "text": "Do you close earlier on holidays?",
+   "offset_seconds": 15.46
+  },
+  {
+   "speaker": "user",
+   "text": "Yeah.",
+   "offset_seconds": 18.94
+  },
+  {
+   "speaker": "user",
+   "text": "right",
+   "offset_seconds": 19.63
+  },
+  {
+   "speaker": "bot",
+   "text": "Thanks, and is parking available?",
+   "offset_seconds": 21.11
+  },
+  {
+   "speaker": "user",
+   "text": "Okay, bye.",
+   "offset_seconds": 23.89
+  }
+ ]
+}

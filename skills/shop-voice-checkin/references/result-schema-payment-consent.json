@@ -1,0 +1,49 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "result-schema-payment-consent.json",
+  "title": "Shop voice payment consent result",
+  "description": "Structured result after the owner confirms or refuses paying a vendor for a known order amount. No bank secrets.",
+  "type": "object",
+  "required": [
+    "payment_consent_completed",
+    "owner_approved_payment",
+    "order_id",
+    "amount",
+    "currency"
+  ],
+  "additionalProperties": false,
+  "properties": {
+    "payment_consent_completed": {
+      "type": "boolean",
+      "description": "True when the consent question was answered clearly."
+    },
+    "owner_approved_payment": {
+      "type": "boolean",
+      "description": "True only when the owner explicitly approved paying this exact amount."
+    },
+    "order_id": {
+      "type": "string",
+      "minLength": 1,
+      "description": "Ledger order this payment applies to."
+    },
+    "amount": {
+      "type": "number",
+      "exclusiveMinimum": 0,
+      "description": "Exact amount the owner approved or refused."
+    },
+    "currency": {
+      "type": "string",
+      "minLength": 3,
+      "maxLength": 3,
+      "description": "ISO 4217 currency code, e.g. NGN."
+    },
+    "vendor_display_name": {
+      "type": "string",
+      "description": "Spoken vendor name for audit; must match a saved vendor."
+    },
+    "owner_notes": {
+      "type": "string",
+      "description": "Optional free-text; must not contain account numbers, PINs, or OTPs."
+    }
+  }
+}

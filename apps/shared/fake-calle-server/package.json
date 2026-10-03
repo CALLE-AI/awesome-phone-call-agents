@@ -1,0 +1,15 @@
+{
+  "name": "fake-calle-server",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "description": "Offline fake of the CALL-E Developer API for tests and demos. No dependencies, no credentials, no real calls.",
+  "main": "fake-calle-server.mjs",
+  "scripts": {
+    "start": "node fake-calle-server.mjs",
+    "test": "node --test tests/server.test.mjs"
+  },
+  "engines": {
+    "node": ">=18"
+  }
+}

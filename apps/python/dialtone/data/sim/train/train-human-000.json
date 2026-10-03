@@ -1,0 +1,76 @@
+{
+ "id": "train-human-000",
+ "label": "human",
+ "source": "sim-train",
+ "meta": {
+  "task": "cancel a subscription",
+  "hard": false
+ },
+ "turns": [
+  {
+   "speaker": "user",
+   "text": "Hi, who's calling?",
+   "offset_seconds": 1.2
+  },
+  {
+   "speaker": "bot",
+   "text": "Hi, I'm an AI assistant calling on behalf of Taylor Kim. I'd like to cancel the subscription for the account under Taylor Kim.",
+   "offset_seconds": 3.43
+  },
+  {
+   "speaker": "user",
+   "text": "Okay, I can cancel that for you. It's cancelled as of today.",
+   "offset_seconds": 12.94
+  },
+  {
+   "speaker": "user",
+   "text": "mm-hmm",
+   "offset_seconds": 17.65
+  },
+  {
+   "speaker": "bot",
+   "text": "Can you confirm the cancellation is effective today?",
+   "offset_seconds": 19.32
+  },
+  {
+   "speaker": "user",
+   "text": "Yep, you're all set.",
+   "offset_seconds": 22.61
+  },
+  {
+   "speaker": "bot",
+   "text": "Will there be a final charge?",
+   "offset_seconds": 25.07
+  },
+  {
+   "speaker": "user",
+   "text": "Sure.",
+   "offset_seconds": 27.82
+  },
+  {
+   "speaker": "user",
+   "text": "okay",
+   "offset_seconds": 28.57
+  },
+  {
+   "speaker": "bot",
+   "text": "Thank you so much, that's all I needed.",
+   "offset_seconds": 30.21
+  },
+  {
+   "speaker": "user",
+   "text": "Yeah.",
+   "offset_seconds": 33.02
+  },
+  {
+   "speaker": "bot",
+   "text": "Thank you so much, that's all I needed.",
+   "offset_seconds": 33.94
+  },
+  {
+   "speaker": "user",
+   "text": "Alright, take care.",
+   "offset_seconds": 37.28
+  }
+ ]
+}

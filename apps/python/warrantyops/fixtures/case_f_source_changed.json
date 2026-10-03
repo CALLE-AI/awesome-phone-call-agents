@@ -1,0 +1,109 @@
+{
+  "scenario": "case_f_source_changed",
+  "description": "The call succeeds, but the source record moves before the reviewed write-back runs. The version re-read immediately before the mutation refuses with SOURCE_CHANGED, and no second call is placed.",
+  "envelope": {
+    "source_platform": "SYNTHETIC-DMS",
+    "source_claim_id": "CLM-1047",
+    "source_version": "v4",
+    "exception_status": "RETURNED",
+    "submitted_at": "2026-08-06",
+    "caller_organization": "Example Equipment Dealers",
+    "account_context": "dealer account 4471",
+    "counterparty_phone_e164": "+14155550135",
+    "economic_policy_id": "standard-pursuit",
+    "claim_face_value": "2890.10",
+    "claim_currency": "USD",
+    "documented_code": "R-114",
+    "documented_reason": "Returned: supporting documentation incomplete",
+    "documented_next_step": null,
+    "ordinary_remedies": [
+      {
+        "channel": "portal_status_check",
+        "outcome": "portal repeats the return code with no detail"
+      },
+      {
+        "channel": "documented_code_resolution",
+        "outcome": "code sheet does not cover this assembly"
+      },
+      {
+        "channel": "written_follow_up",
+        "outcome": "email unanswered for eight days"
+      }
+    ],
+    "exhaustion_manifest": {
+      "source_version": "v4",
+      "routes": [
+        {
+          "channel": "portal_status_check",
+          "outcome": "portal repeats the return code with no detail",
+          "attempted_at": "2026-08-20"
+        },
+        {
+          "channel": "documented_code_resolution",
+          "outcome": "code sheet does not cover this assembly",
+          "attempted_at": "2026-08-22"
+        },
+        {
+          "channel": "written_follow_up",
+          "outcome": "email unanswered for eight days",
+          "attempted_at": "2026-08-30"
+        }
+      ],
+      "information_gap": "none of the ordinary routes states what is missing from the return"
+    }
+  },
+  "recipient_e164": "+14155550135",
+  "transport": {
+    "state": "completed",
+    "call_id": "call_synthetic_case_f",
+    "failure_code": null,
+    "failure_message": null
+  },
+  "transcript_turns": [
+    {
+      "speaker": "bot",
+      "text": "I am an AI assistant calling for Example Equipment Dealers. May I ask about warranty claim CLM-1047?"
+    },
+    {
+      "speaker": "user",
+      "text": "I have it open. It is showing returned in our system. The invoice copy we hold is unreadable."
+    },
+    {
+      "speaker": "bot",
+      "text": "What do you need from us?"
+    },
+    {
+      "speaker": "user",
+      "text": "A readable copy of the installation invoice and we can rework it."
+    }
+  ],
+  "structured_result": {
+    "claim_status": "STATED_RETURNED",
+    "claim_status_evidence_quote": "It is showing returned in our system. The invoice copy we hold is unreadable.",
+    "stated_reason": "The invoice copy we hold is unreadable.",
+    "required_correction": "A readable copy of the installation invoice and we can rework it.",
+    "required_documents": [
+      "readable copy of the installation invoice"
+    ],
+    "stated_deadline": null,
+    "escalation_path": null,
+    "stated_next_action": null,
+    "reference_kind": "UNKNOWN",
+    "reference_heard": null,
+    "reference_readback_performed": false,
+    "reference_confirmed": null,
+    "reference_confirmation_quote": null
+  },
+  "source_change": {
+    "before_writeback_version": "v5"
+  },
+  "expected": {
+    "kind": "OUTCOME",
+    "terminal_state": "INFORMATION_OBTAINED",
+    "claim_status": "STATED_RETURNED",
+    "identifier_state": "ABSENT",
+    "confirmed_reference": null,
+    "provider_replays": 1,
+    "write_back": "SOURCE_CHANGED"
+  }
+}

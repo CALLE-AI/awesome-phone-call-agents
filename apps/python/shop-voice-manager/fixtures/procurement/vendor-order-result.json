@@ -1,0 +1,58 @@
+{
+  "call_id": "call-vendor-order-20260812",
+  "idempotency_key": "shopvoice-demo-lagos-corner-shop-vendor_order-restock-call-reorder-20260812",
+  "status": "completed",
+  "task_completed": true,
+  "completion_confidence": { "score": 0.88, "label": "high" },
+  "evidence": [
+    "Vendor confirmed availability of fish.",
+    "Vendor quoted 45000 for two cooler boxes.",
+    "Vendor estimated delivery around 4pm."
+  ],
+  "structured_result": {
+    "vendor_order_completed": true,
+    "available": true,
+    "items": [
+      { "name": "Fish", "quantity": 2, "unit": "cooler boxes" }
+    ],
+    "quoted_amount": 45000,
+    "eta_text": "around 4pm today"
+  },
+  "metadata": {
+    "shop_id": "demo-lagos-corner-shop",
+    "call_type": "vendor_order",
+    "call_date": "2026-08-12",
+    "order_id": "order-restock-call-reorder-20260812-vendor-demo-lagos-corner-shop-mama-sikiru"
+  },
+  "recipients": [
+    {
+      "phones": ["+2348111111111"],
+      "region": "NG",
+      "locale": "en",
+      "structured_result": {
+        "vendor_order_completed": true,
+        "available": true,
+        "items": [
+          { "name": "Fish", "quantity": 2, "unit": "cooler boxes" }
+        ],
+        "quoted_amount": 45000,
+        "eta_text": "around 4pm today"
+      },
+      "attempts": [
+        {
+          "attempt": 1,
+          "status": "completed",
+          "started_at": "2026-08-12T09:00:00+01:00",
+          "duration_seconds": 40,
+          "transcript_turns": [
+            { "offset_seconds": 0, "speaker": "bot", "text": "Good day, I be AI assistant calling on behalf of Ada Corner Shop. I wan order two cooler box of fish." },
+            { "offset_seconds": 6, "speaker": "user", "text": "Yes, we get am. E go be forty-five thousand naira." },
+            { "offset_seconds": 12, "speaker": "bot", "text": "Thank you. When e fit reach the shop?" },
+            { "offset_seconds": 16, "speaker": "user", "text": "Around 4pm today." },
+            { "offset_seconds": 20, "speaker": "bot", "text": "I don note am. Thank you very much." }
+          ]
+        }
+      ]
+    }
+  ]
+}

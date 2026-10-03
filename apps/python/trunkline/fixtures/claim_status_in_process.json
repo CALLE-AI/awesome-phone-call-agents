@@ -1,0 +1,145 @@
+{
+  "completion_confidence": {
+    "label": "high",
+    "score": 0.88
+  },
+  "evidence": [],
+  "object": "call_task",
+  "recipients": [
+    {
+      "attempts": [
+        {
+          "attempt": 1,
+          "transcript_turns": [
+            {
+              "offset_seconds": 0,
+              "speaker": "bot",
+              "text": "Dialing Meridian Health Plan provider services."
+            },
+            {
+              "offset_seconds": 6,
+              "speaker": "user",
+              "text": "Thank you for calling Meridian Health Plan provider services. For claim status, press one. For eligibility and benefits, press two. For authorizations, press three."
+            },
+            {
+              "offset_seconds": 11,
+              "speaker": "bot",
+              "text": "Selecting one for claim status."
+            },
+            {
+              "offset_seconds": 15,
+              "speaker": "user",
+              "text": "Please enter the ten digit national provider identifier, followed by the pound key."
+            },
+            {
+              "offset_seconds": 20,
+              "speaker": "bot",
+              "text": "Entering national provider identifier 1234567893."
+            },
+            {
+              "offset_seconds": 27,
+              "speaker": "user",
+              "text": "Thank you. Your estimated wait time is three minutes. Please hold."
+            },
+            {
+              "offset_seconds": 218,
+              "speaker": "user",
+              "text": "Provider services, this is Aleksandr."
+            },
+            {
+              "offset_seconds": 227,
+              "speaker": "bot",
+              "text": "This is an AI assistant calling for the billing office of Lakeshore Family Medicine. This call may be recorded for accuracy. Our national provider identifier is 1234567893."
+            },
+            {
+              "offset_seconds": 241,
+              "speaker": "user",
+              "text": "Thank you, member identification number and date of birth please."
+            },
+            {
+              "offset_seconds": 250,
+              "speaker": "bot",
+              "text": "Member identification number H551908324, date of birth November 2, 1972, last name Okafor."
+            },
+            {
+              "offset_seconds": 266,
+              "speaker": "user",
+              "text": "Thank you, H 5 5 1 9 0 8 3 2 4, Okafor. And the claim?"
+            },
+            {
+              "offset_seconds": 277,
+              "speaker": "bot",
+              "text": "Claim number C L M dash 2026 dash 0 0 4 8 1 8, date of service August twenty second."
+            },
+            {
+              "offset_seconds": 291,
+              "speaker": "user",
+              "text": "Okay, that claim is still in process, it went to medical review on September second and those normally finalize within thirty days of that date."
+            },
+            {
+              "offset_seconds": 312,
+              "speaker": "bot",
+              "text": "Thank you. Is anything needed from our office in the meantime?"
+            },
+            {
+              "offset_seconds": 321,
+              "speaker": "user",
+              "text": "No, nothing is needed from you, medical review already has the records they requested from the facility."
+            },
+            {
+              "offset_seconds": 334,
+              "speaker": "bot",
+              "text": "Understood. May I have a reference number for this call and your first name?"
+            },
+            {
+              "offset_seconds": 344,
+              "speaker": "user",
+              "text": "Reference is M H P dash R E F dash 7 7 1 0 3 3 9 2, and this is Aleksandr."
+            }
+          ]
+        }
+      ],
+      "phones": [
+        "+12125550142"
+      ],
+      "region": "US",
+      "structured_result": {
+        "call_outcome": "answered",
+        "claims": [
+          {
+            "allowed_amount": "unknown",
+            "check_number": "unknown",
+            "claim_number": "CLM-2026-004818",
+            "claim_status": "in_process",
+            "evidence_quote": "that claim is still in process, it went to medical review on September second and those normally finalize within thirty days of that date",
+            "paid_amount": "unknown",
+            "paid_date": "unknown",
+            "patient_responsibility": "unknown"
+          }
+        ],
+        "reference_number": "MHP-REF-77103392",
+        "representative_name": "Aleksandr"
+      }
+    }
+  ],
+  "status": "completed",
+  "structured_result": {
+    "call_outcome": "answered",
+    "claims": [
+      {
+        "allowed_amount": "unknown",
+        "check_number": "unknown",
+        "claim_number": "CLM-2026-004818",
+        "claim_status": "in_process",
+        "evidence_quote": "that claim is still in process, it went to medical review on September second and those normally finalize within thirty days of that date",
+        "paid_amount": "unknown",
+        "paid_date": "unknown",
+        "patient_responsibility": "unknown"
+      }
+    ],
+    "reference_number": "MHP-REF-77103392",
+    "representative_name": "Aleksandr"
+  },
+  "summary": "Claim still in medical review after a three minute hold; nothing is needed from the practice.",
+  "task_completed": true
+}

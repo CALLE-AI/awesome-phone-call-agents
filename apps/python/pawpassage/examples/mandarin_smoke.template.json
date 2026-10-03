@@ -1,0 +1,24 @@
+{
+  "schema_version": "1.0",
+  "case_id": "PAW-MANDARIN-SMOKE-001",
+  "route_label": "Synthetic checklist test; no real journey",
+  "animal_category": "OTHER_COMPANION_ANIMAL",
+  "checkpoints": [
+    {
+      "checkpoint_id": "MANDARIN_TEST",
+      "kind": "AIRLINE",
+      "contact_label": "Consenting private test participant; no real service desk",
+      "phone_e164": "<PRIVATE_AUTHORIZED_MALAYSIA_E164_NUMBER>",
+      "region": "MY",
+      "locale": "zh-CN",
+      "official_source_url": "https://example.invalid/pawpassage/synthetic-checklist",
+      "authorization_basis": "CONSENTING_TEST_RECIPIENT",
+      "authorization_note": "TEMPLATE ONLY. Replace with a private dated consent reference after written consent. No authorization is asserted by this template.",
+      "propositions": [
+        {"id": "P1", "statement": "This fictional checklist contains exactly three checks."},
+        {"id": "P2", "statement": "This test requires a booking or payment."},
+        {"id": "P3", "statement": "Every result will be reviewed by a human after the test."}
+      ]
+    }
+  ]
+}

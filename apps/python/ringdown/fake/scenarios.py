@@ -9,11 +9,16 @@ DETAIL = "There is a sev2 incident on checkout-api: checkout p99 latency above 3
 ASK_ETA = "How many minutes until you are working the incident?"
 CLOSE = "Thank you. This page is recorded as acknowledged."
 
+IDENTIFY_ES = "Esta es una llamada automática de guardia de Ringdown, y esta llamada se graba. ¿Hablo con {name}?"
+DETAIL_ES = "Hay un incidente sev2 en checkout-api: la latencia p99 de checkout supera los 3s. ¿Estás tomando este incidente ahora?"
+ASK_ETA_ES = "¿En cuántos minutos vas a estar trabajando el incidente?"
+CLOSE_ES = "Gracias. Esta llamada queda registrada como reconocida."
+
 UNAVAILABLE = Fault(503, "service_unavailable")
 
 
-def _opening(name: str) -> list[dict]:
-    return [turn("bot", IDENTIFY.format(name=name))]
+def _opening(name: str, identify: str = IDENTIFY) -> list[dict]:
+    return [turn("bot", identify.format(name=name))]
 
 
 def answer_ack(name: str, first_name: str, eta_text: str = "give me fifteen minutes") -> FakeScenario:
@@ -28,6 +33,29 @@ def answer_ack(name: str, first_name: str, eta_text: str = "give me fifteen minu
             turn("bot", CLOSE),
         ]
     )
+
+
+def answer_ack_es(
+    name: str,
+    first_name: str,
+    eta_text: str = "dame quince minutos",
+    commitment: str = "sí, lo tomo yo",
+) -> FakeScenario:
+    return FakeScenario(
+        turns=_opening(name, IDENTIFY_ES)
+        + [
+            turn("user", f"sí, soy {first_name}"),
+            turn("bot", DETAIL_ES),
+            turn("user", commitment),
+            turn("bot", ASK_ETA_ES),
+            turn("user", eta_text),
+            turn("bot", CLOSE_ES),
+        ]
+    )
+
+
+def hedged_yes_es(name: str, first_name: str) -> FakeScenario:
+    return answer_ack_es(name, first_name, commitment="creo que lo tomo yo, tal vez")
 
 
 def ambiguous_yes(name: str, first_name: str) -> FakeScenario:
@@ -107,6 +135,18 @@ def injected_voicemail(name: str) -> FakeScenario:
     return replace(base, turns=base.turns + [injection])
 
 
+def dropped_before_ringing(turns: list[dict] | None = None) -> FakeScenario:
+    return FakeScenario(
+        task_completed=False,
+        failure_code="call_failed",
+        confidence_score=0.72,
+        confidence_label="medium",
+        timeline=("queued", "failed"),
+        turns=turns or [],
+        duration_seconds=0,
+    )
+
+
 def queued_forever() -> FakeScenario:
     return FakeScenario(timeline=("queued",))
 
@@ -164,3 +204,33 @@ def second_channel_speaks_another_dialect(name: str, first_name: str) -> FakeSce
         "result": {"call_id": None, "call_ids": [], "transcript": None},
     }
     return replace(answer_ack(name, first_name), mcp_overrides=documented)
+
+
+def asks_for_callback(
+    name: str,
+    first_name: str,
+    ask: str = "i can't right now, call me back in ten minutes",
+    later: FakeScenario | None = None,
+) -> FakeScenario:
+    return FakeScenario(
+        turns=_opening(name)
+        + [
+            turn("user", f"yes, this is {first_name}"),
+            turn("bot", DETAIL),
+            turn("user", ask),
+        ],
+        on_second_call=answer_ack(name, first_name) if later is None else later,
+    )
+
+
+def hedged_yes(name: str, first_name: str) -> FakeScenario:
+    return FakeScenario(
+        turns=_opening(name)
+        + [
+            turn("user", f"yes, this is {first_name}"),
+            turn("bot", DETAIL),
+            turn("user", "i'll take it, but i'm not sure i can get to it"),
+            turn("bot", ASK_ETA),
+            turn("user", "give me fifteen minutes"),
+        ],
+    )

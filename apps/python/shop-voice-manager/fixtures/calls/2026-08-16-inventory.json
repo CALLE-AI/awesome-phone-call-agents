@@ -1,0 +1,172 @@
+{
+  "call_id": "call_inv_20260816",
+  "idempotency_key": "shopvoice-demo-lagos-corner-shop-inventory-2026-08-16",
+  "status": "completed",
+  "task_completed": true,
+  "completion_confidence": {
+    "score": 0.86,
+    "label": "high"
+  },
+  "evidence": [
+    "Owner reported Rice at about 7 bags.",
+    "Owner reported Indomie at about 4 cartons.",
+    "Owner reported Sugar at about 2 bags.",
+    "Owner said Indomie and Sugar are running low."
+  ],
+  "structured_result": {
+    "check_in_completed": true,
+    "products": [
+      {
+        "name": "Rice",
+        "quantity_estimate": 7,
+        "unit": "bags",
+        "running_low": false
+      },
+      {
+        "name": "Indomie",
+        "quantity_estimate": 4,
+        "unit": "cartons",
+        "running_low": true
+      },
+      {
+        "name": "Sugar",
+        "quantity_estimate": 2,
+        "unit": "bags",
+        "running_low": true
+      },
+      {
+        "name": "Cooking oil",
+        "quantity_estimate": 14,
+        "unit": "bottles",
+        "running_low": false
+      },
+      {
+        "name": "Milo",
+        "quantity_estimate": 9,
+        "unit": "tins",
+        "running_low": false
+      }
+    ],
+    "owner_notes": "Sunday, I open small time only after church."
+  },
+  "metadata": {
+    "shop_id": "demo-lagos-corner-shop",
+    "call_type": "inventory",
+    "call_date": "2026-08-16"
+  },
+  "recipients": [
+    {
+      "phones": [
+        "+2348000000000"
+      ],
+      "region": "NG",
+      "locale": "en",
+      "structured_result": {
+        "check_in_completed": true,
+        "products": [
+          {
+            "name": "Rice",
+            "quantity_estimate": 7,
+            "unit": "bags",
+            "running_low": false
+          },
+          {
+            "name": "Indomie",
+            "quantity_estimate": 4,
+            "unit": "cartons",
+            "running_low": true
+          },
+          {
+            "name": "Sugar",
+            "quantity_estimate": 2,
+            "unit": "bags",
+            "running_low": true
+          },
+          {
+            "name": "Cooking oil",
+            "quantity_estimate": 14,
+            "unit": "bottles",
+            "running_low": false
+          },
+          {
+            "name": "Milo",
+            "quantity_estimate": 9,
+            "unit": "tins",
+            "running_low": false
+          }
+        ],
+        "owner_notes": "Sunday, I open small time only after church."
+      },
+      "attempts": [
+        {
+          "attempt": 1,
+          "status": "completed",
+          "started_at": "2026-08-16T07:15:00+01:00",
+          "duration_seconds": 45,
+          "transcript_turns": [
+            {
+              "offset_seconds": 0,
+              "speaker": "bot",
+              "text": "Good morning o. How market?"
+            },
+            {
+              "offset_seconds": 3,
+              "speaker": "user",
+              "text": "We dey o."
+            },
+            {
+              "offset_seconds": 5,
+              "speaker": "bot",
+              "text": "I be AI assistant wey dey help you track your shop. This call fit dey recorded."
+            },
+            {
+              "offset_seconds": 11,
+              "speaker": "bot",
+              "text": "How many bags of rice you get now?"
+            },
+            {
+              "offset_seconds": 14,
+              "speaker": "user",
+              "text": "Rice na like 7 bag."
+            },
+            {
+              "offset_seconds": 18,
+              "speaker": "bot",
+              "text": "Indomie remain how many carton?"
+            },
+            {
+              "offset_seconds": 21,
+              "speaker": "user",
+              "text": "About 4."
+            },
+            {
+              "offset_seconds": 24,
+              "speaker": "bot",
+              "text": "Sugar na how many you still get?"
+            },
+            {
+              "offset_seconds": 27,
+              "speaker": "user",
+              "text": "Sugar remain 2 bag."
+            },
+            {
+              "offset_seconds": 31,
+              "speaker": "bot",
+              "text": "Which thing don finish or almost finish?"
+            },
+            {
+              "offset_seconds": 35,
+              "speaker": "user",
+              "text": "Na indomie and sugar dey worry me."
+            },
+            {
+              "offset_seconds": 39,
+              "speaker": "bot",
+              "text": "Thank you. I go note am."
+            }
+          ]
+        }
+      ]
+    }
+  ]
+}

@@ -117,12 +117,12 @@ $ redline doctor --online   # asks CALL-E to confirm the key. Read-only.
 ```
 
 `doctor` exists because the alternative way to find out your key is wrong is to
-place a call, which costs five credits and rings somebody's phone. It has no
+place a call, which may incur variable charges and rings somebody's phone. It has no
 code path to the live transport, and a test enforces that.
 
 ### Before a real call
 
-One call costs five credits and makes somebody's phone ring, so reaching that
+One call may incur variable charges and makes somebody's phone ring, so reaching that
 path takes four separate deliberate acts and none of them is a default:
 
 ```console

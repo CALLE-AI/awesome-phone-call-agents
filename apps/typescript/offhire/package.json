@@ -1,0 +1,26 @@
+{
+  "name": "offhire-calle-reference",
+  "version": "1.0.0",
+  "private": true,
+  "type": "module",
+  "description": "Evidence-based equipment off-rent verification with a no-call default",
+  "engines": {
+    "node": ">=22.13.0"
+  },
+  "scripts": {
+    "demo": "tsx src/cli.ts demo",
+    "cli": "tsx src/cli.ts",
+    "test": "tsx --test test/*.test.ts",
+    "typecheck": "tsc --noEmit"
+  },
+  "dependencies": {
+    "@call-e/calle": "0.7.0",
+    "zod": "3.25.76"
+  },
+  "devDependencies": {
+    "@types/node": "22.19.19",
+    "tsx": "4.20.6",
+    "typescript": "5.9.3"
+  },
+  "license": "MIT"
+}

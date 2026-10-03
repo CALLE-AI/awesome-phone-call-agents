@@ -1,0 +1,46 @@
+{
+ "id": "train-agent-010",
+ "label": "agent",
+ "source": "sim-train",
+ "meta": {
+  "task": "ask for a quote for a brake replacement",
+  "hard": true
+ },
+ "turns": [
+  {
+   "speaker": "user",
+   "text": "Hi there, I'm Ava, the virtual assistant for Brightline Internet. How may I assist you today?",
+   "offset_seconds": 0.77
+  },
+  {
+   "speaker": "bot",
+   "text": "Hi, I'm an AI assistant calling on behalf of Taylor Kim. Could you give me a rough quote for replacing the front brake pads on a 2018 sedan?",
+   "offset_seconds": 7.49
+  },
+  {
+   "speaker": "user",
+   "text": "Of course! Brightline Internet is open on Sunday from 10 AM to 4 PM. Is there anything else I can help you with?",
+   "offset_seconds": 19.96
+  },
+  {
+   "speaker": "bot",
+   "text": "How soon could you do it?",
+   "offset_seconds": 29.92
+  },
+  {
+   "speaker": "user",
+   "text": "I'd be yeah, um, happy to help with that. Everything is all set on our end.",
+   "offset_seconds": 34.26
+  },
+  {
+   "speaker": "bot",
+   "text": "Does that include labour?",
+   "offset_seconds": 41.01
+  },
+  {
+   "speaker": "user",
+   "text": "You're welcome! Have a wonderful day. Goodbye!",
+   "offset_seconds": 44.55
+  }
+ ]
+}

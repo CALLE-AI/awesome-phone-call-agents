@@ -1,0 +1,22 @@
+{
+  "name": "calle-conversact",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "description": "Consent-first conversational commerce reference for CALL-E.",
+  "scripts": {
+    "test": "node --import tsx --test test/*.test.ts",
+    "typecheck": "tsc --noEmit",
+    "preview": "tsx src/index.ts preview",
+    "simulate": "tsx src/index.ts simulate",
+    "live": "tsx src/index.ts live"
+  },
+  "dependencies": {
+    "@call-e/calle": "0.7.0"
+  },
+  "devDependencies": {
+    "@types/node": "^22.20.1",
+    "tsx": "^4.20.0",
+    "typescript": "^5.8.0"
+  }
+}

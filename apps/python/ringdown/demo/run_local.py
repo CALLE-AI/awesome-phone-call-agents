@@ -119,6 +119,40 @@ SCENARIOS: list[tuple[str, str, Scenarios]] = [
         "The placing channel reports a clean acknowledgement. The second channel does not.",
         {ALICE: scenarios.channel_mismatch("Alice Okafor", "alice")},
     ),
+    (
+        "Scenario 7 - Asking to be called back later is not taking the incident",
+        "Alice asks for more minutes than this ladder has left, so Ben rings now and the "
+        "request is recorded with the words that made it. A shorter ask is called back "
+        "instead; the demo cannot show that one, because it would have to wait.",
+        {
+            ALICE: scenarios.asks_for_callback(
+                "Alice Okafor", "alice", "i can't right now, call me back in 90 minutes"
+            ),
+            BEN: scenarios.answer_ack("Ben Mensah", "ben", "i can be on it in twenty minutes"),
+        },
+    ),
+    (
+        "Scenario 8 - The engineer answers in Spanish",
+        "Same ladder, same ledger, same two transports. The commitment, the name and the "
+        "minutes are quoted in the words they were spoken in. A hedge in Spanish is still "
+        "not an acknowledgement, so Alice's 'creo que lo tomo yo' hands the incident to Ben.",
+        {
+            ALICE: scenarios.hedged_yes_es("Alice Okafor", "alice"),
+            BEN: scenarios.answer_ack_es("Ben Mensah", "ben", "dame veinte minutos"),
+        },
+    ),
+    (
+        "Scenario 9 - The provider ends every call before it rings",
+        "Four of the six calls placed against the live API on 2026-08-20 ended in the second "
+        "they started, with nothing transcribed, reported as the recipient hanging up. The "
+        "carrier that owns the destination number had no record of any of them. This is that "
+        "shape: the ladder is exhausted without a single telephone ringing, and it says so.",
+        {
+            ALICE: scenarios.dropped_before_ringing(),
+            BEN: scenarios.dropped_before_ringing(),
+            CARLA: scenarios.dropped_before_ringing(),
+        },
+    ),
 ]
 
 

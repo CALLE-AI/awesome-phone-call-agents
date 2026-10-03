@@ -1,0 +1,21 @@
+{
+  "handoff_id": "DEMO-001",
+  "subject": "synthetic warranty case handoff",
+  "sender": {
+    "name": "Example Sender",
+    "phone": "+12125550101",
+    "region": "US",
+    "locale": "en-US",
+    "authorized": false,
+    "authorization_basis": ""
+  },
+  "receiver": {
+    "name": "Example Receiver",
+    "phone": "+12125550102",
+    "region": "US",
+    "locale": "en-US",
+    "authorized": false,
+    "authorization_basis": ""
+  },
+  "max_calls": 2
+}

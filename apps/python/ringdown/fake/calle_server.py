@@ -53,6 +53,8 @@ class FakeScenario:
     turns: list[dict[str, Any]] = field(default_factory=list)
     faults: dict[str, list[Fault]] = field(default_factory=dict)
     mcp_overrides: dict[str, Any] | None = field(default_factory=dict)
+    on_second_call: "FakeScenario | None" = None
+    duration_seconds: int = 43
 
 
 @dataclass
@@ -77,10 +79,20 @@ class CallRecord:
         return self.status not in ("queued", "in_progress")
 
     @property
+    def started_at(self) -> str | None:
+        if not self.settled:
+            return None
+        return stamp(self.ended_at - timedelta(seconds=self.scenario.duration_seconds))
+
+    @property
+    def ended_at(self) -> datetime:
+        return self.created_at + timedelta(seconds=self.reads)
+
+    @property
     def completed_at(self) -> str | None:
         if not self.settled:
             return None
-        return stamp(self.created_at + timedelta(seconds=self.reads))
+        return stamp(self.ended_at)
 
     @property
     def mcp_status(self) -> str:
@@ -96,6 +108,12 @@ def recipient_of(payload: dict[str, Any]) -> str:
 
 def stamp(moment: datetime) -> str:
     return moment.strftime("%Y-%m-%dT%H:%M:%SZ")
+
+
+def scenario_for(scenario: FakeScenario, payload: dict[str, Any]) -> FakeScenario:
+    attempt = payload.get("metadata", {}).get("ringdown_attempt_id", "")
+    later = scenario.on_second_call
+    return later if later is not None and str(attempt).endswith("/2") else scenario
 
 
 class FakeCalle:
@@ -132,7 +150,7 @@ class FakeCalle:
             record = CallRecord(
                 id=f"call_fake{len(self.calls) + 1}",
                 payload=payload,
-                scenario=self.scenarios[phone],
+                scenario=scenario_for(self.scenarios[phone], payload),
                 created_at=datetime.now(UTC),
             )
             self.calls[record.id] = record
@@ -170,6 +188,8 @@ class FakeCalle:
                     "attempts": [
                         {
                             "phone": phone,
+                            "started_at": record.started_at,
+                            "completed_at": record.completed_at,
                             "transcript_turns": scenario.turns if settled else [],
                         }
                     ],

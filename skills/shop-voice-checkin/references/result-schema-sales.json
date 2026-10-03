@@ -1,0 +1,43 @@
+{
+  "type": "object",
+  "required": ["sales_day_completed", "estimated_revenue"],
+  "properties": {
+    "sales_day_completed": {
+      "type": "boolean",
+      "description": "True when the shop owner completed the evening sales recap."
+    },
+    "estimated_revenue": {
+      "type": "number",
+      "description": "Approximate total sales for the day in shop currency."
+    },
+    "currency": {
+      "type": "string",
+      "description": "ISO-like currency code spoken or configured for the shop, e.g. NGN or INR."
+    },
+    "top_sellers": {
+      "type": "array",
+      "items": { "type": "string" },
+      "description": "Products that sold well today, as named by the owner."
+    },
+    "procurement_spend": {
+      "type": "number",
+      "description": "Approximate amount spent restocking today, if mentioned."
+    },
+    "procurement_items": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "properties": {
+          "name": { "type": "string" },
+          "amount": { "type": "number" },
+          "supplier": { "type": "string" }
+        }
+      },
+      "description": "Items purchased for the shop today, if mentioned."
+    },
+    "owner_notes": {
+      "type": "string",
+      "description": "Optional free-text notes about how business went today."
+    }
+  }
+}

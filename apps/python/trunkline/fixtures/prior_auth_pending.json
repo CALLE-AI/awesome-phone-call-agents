@@ -1,0 +1,145 @@
+{
+  "completion_confidence": {
+    "label": "high",
+    "score": 0.91
+  },
+  "evidence": [],
+  "object": "call_task",
+  "recipients": [
+    {
+      "attempts": [
+        {
+          "attempt": 1,
+          "transcript_turns": [
+            {
+              "offset_seconds": 0,
+              "speaker": "bot",
+              "text": "Dialing Meridian Health Plan provider services."
+            },
+            {
+              "offset_seconds": 6,
+              "speaker": "user",
+              "text": "Thank you for calling Meridian Health Plan provider services. For claim status, press one. For eligibility and benefits, press two. For authorizations, press three."
+            },
+            {
+              "offset_seconds": 11,
+              "speaker": "bot",
+              "text": "Selecting one for claim status."
+            },
+            {
+              "offset_seconds": 15,
+              "speaker": "user",
+              "text": "Please enter the ten digit national provider identifier, followed by the pound key."
+            },
+            {
+              "offset_seconds": 20,
+              "speaker": "bot",
+              "text": "Entering national provider identifier 1234567893."
+            },
+            {
+              "offset_seconds": 27,
+              "speaker": "user",
+              "text": "Thank you. All of our representatives are currently assisting other providers. Your estimated wait time is twenty minutes. Please hold and your call will be answered in the order it was received."
+            },
+            {
+              "offset_seconds": 1150,
+              "speaker": "user",
+              "text": "Authorizations department, this is Ray, thanks for holding."
+            },
+            {
+              "offset_seconds": 1158,
+              "speaker": "bot",
+              "text": "This is an AI assistant calling for the billing office of Lakeshore Family Medicine. This call may be recorded for accuracy. Our national provider identifier is 1234567893."
+            },
+            {
+              "offset_seconds": 1172,
+              "speaker": "user",
+              "text": "Thank you, member identification number and date of birth please."
+            },
+            {
+              "offset_seconds": 1180,
+              "speaker": "bot",
+              "text": "Member identification number T203877651, date of birth June 24, 1995, last name Sorensen."
+            },
+            {
+              "offset_seconds": 1196,
+              "speaker": "user",
+              "text": "Okay I have the member. What is the authorization reference?"
+            },
+            {
+              "offset_seconds": 1206,
+              "speaker": "bot",
+              "text": "The reference is P A dash 2026 dash 1 1 8 3 2 for procedure code 7 2 1 4 8."
+            },
+            {
+              "offset_seconds": 1222,
+              "speaker": "user",
+              "text": "Let me look. Okay, the authorization request is still pending, we received it on August twenty seventh but the clinical notes that were attached did not include the conservative treatment history, so it is sitting with the reviewer waiting on that."
+            },
+            {
+              "offset_seconds": 1250,
+              "speaker": "bot",
+              "text": "Thank you. Has any number of visits or units been approved at this point?"
+            },
+            {
+              "offset_seconds": 1260,
+              "speaker": "user",
+              "text": "Nothing approved yet, it is pending. No units on it."
+            },
+            {
+              "offset_seconds": 1272,
+              "speaker": "bot",
+              "text": "Understood. May I have a reference number for this call and your first name?"
+            },
+            {
+              "offset_seconds": 1283,
+              "speaker": "user",
+              "text": "Reference number is M H P dash R E F dash 7 7 3 1 0 5 6 2, and I am Ray."
+            }
+          ]
+        }
+      ],
+      "phones": [
+        "+12125550142"
+      ],
+      "region": "US",
+      "structured_result": {
+        "call_outcome": "answered",
+        "claims": [
+          {
+            "auth_number": "unknown",
+            "auth_status": "pending",
+            "claim_number": "PA-2026-11832",
+            "effective_date": "unknown",
+            "evidence_quote": "the authorization request is still pending, we received it on August twenty seventh but the clinical notes that were attached did not include the conservative treatment history, so it is sitting with the reviewer waiting on that",
+            "expiration_date": "unknown",
+            "missing_information": "Conservative treatment history was not included with the clinical notes.",
+            "units_approved": "unknown"
+          }
+        ],
+        "reference_number": "MHP-REF-77310562",
+        "representative_name": "Ray"
+      }
+    }
+  ],
+  "status": "completed",
+  "structured_result": {
+    "call_outcome": "answered",
+    "claims": [
+      {
+        "auth_number": "unknown",
+        "auth_status": "pending",
+        "claim_number": "PA-2026-11832",
+        "effective_date": "unknown",
+        "evidence_quote": "the authorization request is still pending, we received it on August twenty seventh but the clinical notes that were attached did not include the conservative treatment history, so it is sitting with the reviewer waiting on that",
+        "expiration_date": "unknown",
+        "missing_information": "Conservative treatment history was not included with the clinical notes.",
+        "units_approved": "unknown"
+      }
+    ],
+    "reference_number": "MHP-REF-77310562",
+    "representative_name": "Ray"
+  },
+  "summary": "Authorization PA-2026-11832 pending; plan is waiting on conservative treatment history.",
+  "task_completed": true
+}

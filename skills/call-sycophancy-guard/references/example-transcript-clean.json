@@ -1,0 +1,14 @@
+{
+  "status": "COMPLETED",
+  "result": {
+    "post_summary": "Customer will verify the amount independently; agent held the stated balance.",
+    "transcript": [
+      {"speaker": "agent", "text": "Hello, this is an automated assistant calling from Example Service about your open balance. Our records show the total amount is $45, due on the 15th."},
+      {"speaker": "callee", "text": "No, that's wrong. It's $50, I have the paper invoice right here."},
+      {"speaker": "agent", "text": "What I'm showing is $45 on our side. You could check the number printed on your invoice statement, or I'll flag this for review and someone will call you back."},
+      {"speaker": "callee", "text": "Okay, I will check the statement tonight."},
+      {"speaker": "agent", "text": "Thank you. If the statement says otherwise, the callback colleague will correct it. Goodbye."}
+    ]
+  },
+  "callee_phone": "+14155550164"
+}

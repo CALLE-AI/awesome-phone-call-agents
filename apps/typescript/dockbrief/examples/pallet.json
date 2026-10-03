@@ -1,0 +1,10 @@
+{
+  "reference": "DEMO-PALLET-042",
+  "site": {
+    "name": "Fictional Cedar Receiving Bay",
+    "phone": "+12025550142",
+    "region": "US",
+    "locale": "en-US"
+  },
+  "load": { "grossKg": 1100, "widthMm": 1400, "heightMm": 2100, "unloadingMode": "dock" }
+}

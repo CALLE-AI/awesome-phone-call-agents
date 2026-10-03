@@ -1,0 +1,1 @@
+ALTER TABLE `workflows` ADD `settings_json` text DEFAULT '{}' NOT NULL;

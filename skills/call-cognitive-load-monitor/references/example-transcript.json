@@ -1,0 +1,12 @@
+[
+  {"role": "agent",  "text": "Good morning. I am calling regarding the indemnification clause pursuant to sub-clause 4(b)(ii) of your service agreement."},
+  {"role": "callee", "text": "I'm sorry, could you say that again? I'm not sure I follow."},
+  {"role": "agent",  "text": "Of course. The notwithstanding provision hereinafter referred to in article 7 stipulates your liability."},
+  {"role": "callee", "text": "I'm confused. What does that mean exactly? I don't understand the legal language."},
+  {"role": "agent",  "text": "Pursuant to the aforementioned terms, pursuant to clause 6(c)(iii), you agree to indemnify and hold harmless."},
+  {"role": "callee", "text": "Wait, what exactly does 'indemnify' mean? I think — maybe — I guess I understand but I'm really not sure."},
+  {"role": "agent",  "text": "This is the amortisation schedule subject to the notwithstanding provisions of sub-clause 8(a)(iv)."},
+  {"role": "callee", "text": "I'm still confused. Could you explain that in plain language? I don't understand any of this at all."},
+  {"role": "agent",  "text": "Do you consent to these terms?"},
+  {"role": "callee", "text": "I... I think so? I'm not sure. Yes, I suppose."}
+]

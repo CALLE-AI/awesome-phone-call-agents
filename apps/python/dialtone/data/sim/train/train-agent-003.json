@@ -1,0 +1,66 @@
+{
+ "id": "train-agent-003",
+ "label": "agent",
+ "source": "sim-train",
+ "meta": {
+  "task": "book a table for two on Friday at 7 PM",
+  "hard": true
+ },
+ "turns": [
+  {
+   "speaker": "user",
+   "text": "Thank you for calling Northside Dental! I'm Aria, the virtual assistant for Northside Dental. How can I help you today?",
+   "offset_seconds": 1.04
+  },
+  {
+   "speaker": "bot",
+   "text": "Hi, I'm an AI assistant calling on behalf of Jordan Lee. I'd like to book a table for two people this Friday at 7 PM, under the name Jordan Lee.",
+   "offset_seconds": 9.25
+  },
+  {
+   "speaker": "user",
+   "text": "Certainly! Just to to confirm, you'd like a table for two this Friday at 7 PM under the name Jordan Lee. I've gone ahead and booked that for you.",
+   "offset_seconds": 21.13
+  },
+  {
+   "speaker": "bot",
+   "text": "Is Friday at 7 available?",
+   "offset_seconds": 33.06
+  },
+  {
+   "speaker": "user",
+   "text": "I understand. Someone from our team will follow up to confirm the details.",
+   "offset_seconds": 35.86
+  },
+  {
+   "speaker": "bot",
+   "text": "Could you confirm the booking under Jordan Lee?",
+   "offset_seconds": 41.77
+  },
+  {
+   "speaker": "user",
+   "text": "Of course. One moment please. Yes, that works.",
+   "offset_seconds": 45.39
+  },
+  {
+   "speaker": "bot",
+   "text": "Thank you, that's everything.",
+   "offset_seconds": 49.35
+  },
+  {
+   "speaker": "user",
+   "text": "I understand. Someone from our team will follow up to confirm the details.",
+   "offset_seconds": 51.51
+  },
+  {
+   "speaker": "bot",
+   "text": "Thank you, that's everything.",
+   "offset_seconds": 56.83
+  },
+  {
+   "speaker": "user",
+   "text": "You're welcome! Have a wonderful day. Goodbye!",
+   "offset_seconds": 59.16
+  }
+ ]
+}

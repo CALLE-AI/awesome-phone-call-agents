@@ -1,0 +1,56 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "result-schema-onboarding.json",
+  "title": "Shop voice onboarding result",
+  "description": "Structured result of a new-shop onboarding call. Fields are collected explicitly; none are inferred.",
+  "type": "object",
+  "required": [
+    "onboarding_completed", "display_name", "phone", "region", "locale",
+    "consent_to_store", "consent_to_future_calls", "typical_products"
+  ],
+  "additionalProperties": false,
+  "properties": {
+    "onboarding_completed": {
+      "type": "boolean",
+      "description": "True when the profile was collected and read back to the owner."
+    },
+    "display_name": { "type": "string", "minLength": 1 },
+    "phone": {
+      "type": "string",
+      "pattern": "^\\+[1-9][0-9]{7,14}$",
+      "description": "E.164, confirmed by read-back. Never guessed."
+    },
+    "region": { "type": "string", "minLength": 2 },
+    "locale": { "type": "string", "minLength": 2 },
+    "currency": { "type": "string", "minLength": 3, "maxLength": 3 },
+    "language_style": { "type": "string" },
+    "timezone": { "type": "string" },
+    "consent_to_store": {
+      "type": "boolean",
+      "description": "Owner consented to storing this profile."
+    },
+    "consent_to_future_calls": {
+      "type": "boolean",
+      "description": "Owner consented to future check-in calls."
+    },
+    "typical_products": {
+      "type": "array",
+      "minItems": 1,
+      "maxItems": 5,
+      "items": {
+        "type": "object",
+        "required": ["name", "unit"],
+        "additionalProperties": false,
+        "properties": {
+          "name": { "type": "string", "minLength": 1 },
+          "unit": { "type": "string", "minLength": 1 },
+          "reference_cost": { "type": "number", "exclusiveMinimum": 0 }
+        }
+      }
+    },
+    "preferred_supplier_nickname": {
+      "type": "string",
+      "description": "Optional. Full vendor capture happens later via reorder_offer, not here."
+    }
+  }
+}

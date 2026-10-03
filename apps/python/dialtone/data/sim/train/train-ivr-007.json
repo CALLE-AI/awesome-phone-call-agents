@@ -1,0 +1,46 @@
+{
+ "id": "train-ivr-007",
+ "label": "ivr",
+ "source": "sim-train",
+ "meta": {
+  "task": "request a refund for a double charge",
+  "hard": false
+ },
+ "turns": [
+  {
+   "speaker": "user",
+   "text": "Thank you for calling Summit Fitness. Your call is important to us. Please listen carefully, as our menu options have changed. For hours and directions, press 1. For appointments, press 2. For billing, press 3. To repeat these options, press 9.",
+   "offset_seconds": 0.69
+  },
+  {
+   "speaker": "bot",
+   "text": "[DTMF 2]",
+   "offset_seconds": 17.54
+  },
+  {
+   "speaker": "user",
+   "text": "Our hours are Monday through Friday, 9 AM to 6 PM. To return to the main menu, press star.",
+   "offset_seconds": 18.37
+  },
+  {
+   "speaker": "bot",
+   "text": "Taylor Kim was charged twice for the same order last week, and I'm calling to request a refund for the duplicate.",
+   "offset_seconds": 26.47
+  },
+  {
+   "speaker": "user",
+   "text": "Our hours are Monday through Friday, 9 AM to 6 PM. To return to the main menu, press star.",
+   "offset_seconds": 34.96
+  },
+  {
+   "speaker": "bot",
+   "text": "[DTMF 1]",
+   "offset_seconds": 43.15
+  },
+  {
+   "speaker": "user",
+   "text": "Our hours are Monday through Friday, 9 AM to 6 PM. To return to the main menu, press star.",
+   "offset_seconds": 43.98
+  }
+ ]
+}

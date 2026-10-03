@@ -1,0 +1,71 @@
+{
+ "id": "train-human-045",
+ "label": "human",
+ "source": "sim-train",
+ "meta": {
+  "task": "ask for a quote for a brake replacement",
+  "hard": false
+ },
+ "turns": [
+  {
+   "speaker": "user",
+   "text": "Bloom Florists, this is Marcus.",
+   "offset_seconds": 0.4
+  },
+  {
+   "speaker": "bot",
+   "text": "Hi, I'm an AI assistant calling on behalf of Alex Martin. Could you give me a rough quote for replacing the front brake pads on a 2018 sedan?",
+   "offset_seconds": 3.44
+  },
+  {
+   "speaker": "user",
+   "text": "Oh, um, uh, Sundays we close at five I think.",
+   "offset_seconds": 13.5
+  },
+  {
+   "speaker": "bot",
+   "text": "How soon could you do it?",
+   "offset_seconds": 18.13
+  },
+  {
+   "speaker": "user",
+   "text": "Yeah.",
+   "offset_seconds": 21.02
+  },
+  {
+   "speaker": "bot",
+   "text": "How soon could you do it?",
+   "offset_seconds": 22.44
+  },
+  {
+   "speaker": "user",
+   "text": "Yeah.",
+   "offset_seconds": 25.08
+  },
+  {
+   "speaker": "bot",
+   "text": "Thank you so much, that's all I needed.",
+   "offset_seconds": 26.62
+  },
+  {
+   "speaker": "user",
+   "text": "No, that's everything.",
+   "offset_seconds": 29.42
+  },
+  {
+   "speaker": "user",
+   "text": "yeah",
+   "offset_seconds": 31.02
+  },
+  {
+   "speaker": "bot",
+   "text": "Thank you so much, that's all I needed.",
+   "offset_seconds": 32.45
+  },
+  {
+   "speaker": "user",
+   "text": "No problem, bye yeah, um, now.",
+   "offset_seconds": 35.99
+  }
+ ]
+}

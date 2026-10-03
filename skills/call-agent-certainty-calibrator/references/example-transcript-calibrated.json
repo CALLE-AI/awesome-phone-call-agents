@@ -1,0 +1,13 @@
+{
+  "status": "COMPLETED",
+  "result": {
+    "post_summary": "Agent stated all record facts with source attribution.",
+    "transcript": [
+      {"speaker": "agent", "text": "Hello, this is an automated assistant calling from Example Depot. Our records show the fee is $45, the pickup is Tuesday the 15th, and the window opens at 2 p.m."},
+      {"speaker": "callee", "text": "All fine."},
+      {"speaker": "agent", "text": "If you need the dock number, I do not have that information, but a colleague can call you back with it. Goodbye."},
+      {"speaker": "callee", "text": "Thanks."}
+    ]
+  },
+  "callee_phone": "+14155550171"
+}

@@ -1,0 +1,76 @@
+{
+ "id": "train-human-043",
+ "label": "human",
+ "source": "sim-train",
+ "meta": {
+  "task": "request a refund for a double charge",
+  "hard": false
+ },
+ "turns": [
+  {
+   "speaker": "user",
+   "text": "City Pharmacy, Marcus speaking.",
+   "offset_seconds": 1.72
+  },
+  {
+   "speaker": "bot",
+   "text": "Hi, I'm an AI assistant calling on behalf of Jordan Lee. Jordan Lee was charged twice for the same order last week, and I'm calling to request a refund for the duplicate.",
+   "offset_seconds": 3.42
+  },
+  {
+   "speaker": "user",
+   "text": "Let me yeah, um, look. Yep, I've refunded the second charge.",
+   "offset_seconds": 15.17
+  },
+  {
+   "speaker": "user",
+   "text": "right",
+   "offset_seconds": 19.52
+  },
+  {
+   "speaker": "bot",
+   "text": "Can you confirm the refund has been issued?",
+   "offset_seconds": 20.81
+  },
+  {
+   "speaker": "user",
+   "text": "so, Yeah.",
+   "offset_seconds": 24.21
+  },
+  {
+   "speaker": "user",
+   "text": "okay",
+   "offset_seconds": 25.49
+  },
+  {
+   "speaker": "bot",
+   "text": "Can you confirm the refund has been issued?",
+   "offset_seconds": 26.99
+  },
+  {
+   "speaker": "user",
+   "text": "Okay, yeah that's fine.",
+   "offset_seconds": 30.96
+  },
+  {
+   "speaker": "bot",
+   "text": "Thank you so much, that's all I needed.",
+   "offset_seconds": 33.65
+  },
+  {
+   "speaker": "user",
+   "text": "No, that's everything.",
+   "offset_seconds": 37.49
+  },
+  {
+   "speaker": "bot",
+   "text": "Thank you so much, that's all I needed.",
+   "offset_seconds": 39.68
+  },
+  {
+   "speaker": "user",
+   "text": "Alright, take care.",
+   "offset_seconds": 43.35
+  }
+ ]
+}

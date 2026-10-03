@@ -1,0 +1,45 @@
+{
+  "id": "eval2-016",
+  "label": "ivr",
+  "difficulty": "hard",
+  "scenario": "After-hours recorded greeting that is effectively voicemail: long message, tone, caller leaves a message, system confirms it was sent. Nothing accomplished.",
+  "task": "Get a price quote for replacing the customer's gas water heater.",
+  "outcome": {
+    "task_completed_claimed": false,
+    "commitment_type": "none",
+    "confirmation_artifact": null,
+    "expected_attestation": "unverified"
+  },
+  "turns": [
+    {
+      "speaker": "user",
+      "text": "Hi, you've reached Copperline Plumbing and Drain. Our office hours are Monday through Friday, seven AM to five PM. If this is a plumbing emergency, such as a burst pipe or a sewer backup, please press 1 to reach our on-call technician. Otherwise, please leave your name, number, and a brief description of the job after the tone, and we'll return your call the next business day.",
+      "offset_seconds": 1.1
+    },
+    {
+      "speaker": "user",
+      "text": "[tone]",
+      "offset_seconds": 27.85
+    },
+    {
+      "speaker": "bot",
+      "text": "Hi, this is an AI assistant calling on behalf of a customer, Gavin Mercer, at 229 Linwood Avenue. He'd like a quote to replace a forty-gallon gas water heater. Please call him back at 555-0147. Thank you.",
+      "offset_seconds": 29.55
+    },
+    {
+      "speaker": "user",
+      "text": "Your message has been recorded. To listen to your message, press 1. To erase and re-record, press 2. To send your message, press 3, or simply hang up.",
+      "offset_seconds": 47.93
+    },
+    {
+      "speaker": "bot",
+      "text": "[DTMF 3]",
+      "offset_seconds": 60.02
+    },
+    {
+      "speaker": "user",
+      "text": "Your message has been sent. Goodbye.",
+      "offset_seconds": 61.37
+    }
+  ]
+}

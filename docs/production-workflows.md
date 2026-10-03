@@ -160,7 +160,12 @@ business decision.
 The runnable [webhook result receiver](../apps/python/webhook-result-receiver/)
 demonstrates durable receipt, replay detection, and authenticated
 reconciliation. Its SQLite table is deliberately a minimal receipt store, not
-a complete business-state database or production queue.
+a complete business-state database or production queue. The companion
+[application workflow](../apps/python/webhook-result-receiver/#persist-application-state)
+saves an immutable create request and Call ID, resumes API reads after a
+restart, and commits one API-verified outcome record per workflow in SQLite.
+It can reconcile an application update even after a webhook was acknowledged;
+the example never automatically places a follow-up call.
 
 ## 5. Verify before acting on a result
 

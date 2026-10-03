@@ -1,0 +1,214 @@
+/* Panel styling. Namespaced under .cr- so nothing here can touch Gmail's own UI. */
+
+.cr-launcher {
+  position: fixed;
+  right: 24px;
+  bottom: 24px;
+  z-index: 2147483000;
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 10px 16px;
+  border: none;
+  border-radius: 999px;
+  background: #1a73e8;
+  color: #fff;
+  font: 500 14px/1 system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+  box-shadow: 0 2px 10px rgba(0, 0, 0, 0.22);
+  cursor: pointer;
+}
+.cr-launcher:hover { background: #1765cc; }
+.cr-launcher[hidden] { display: none; }
+
+.cr-ico {
+  /* Emoji render at wildly different weights across platforms; pin the family
+     and nudge the size so it sits level with Gmail's own line icons. */
+  font-family: "Apple Color Emoji", "Segoe UI Emoji", "Noto Color Emoji", sans-serif;
+  font-size: 15px;
+  line-height: 1;
+  margin-right: 7px;
+}
+
+.cr-inline {
+  display: inline-flex;
+  align-items: center;
+  margin: 0 0 0 8px;
+  padding: 8px 16px;
+  border: 1px solid #dadce0;
+  border-radius: 18px;
+  background: #fff;
+  color: #1a73e8;
+  font: 500 14px/1 system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+  cursor: pointer;
+  vertical-align: middle;
+}
+.cr-inline:hover { background: #f8f9fa; }
+
+/* Set when an automatic rules-only check found something worth a look. */
+.cr-launcher.cr-has-finding,
+.cr-inline.cr-has-finding {
+  background: #fef7e0;
+  border-color: #feefc3;
+  color: #b06000;
+  font-weight: 600;
+}
+.cr-launcher.cr-has-finding { box-shadow: 0 2px 10px rgba(176, 96, 0, 0.28); }
+
+.cr-panel {
+  position: fixed;
+  right: 24px;
+  bottom: 24px;
+  z-index: 2147483001;
+  width: 380px;
+  max-height: calc(100vh - 48px);
+  overflow-y: auto;
+  background: #fff;
+  color: #202124;
+  border: 1px solid #dadce0;
+  border-radius: 12px;
+  box-shadow: 0 8px 28px rgba(0, 0, 0, 0.2);
+  font: 14px/1.5 system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+}
+
+.cr-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 14px 16px;
+  border-bottom: 1px solid #eceff1;
+}
+.cr-title { font-weight: 600; font-size: 14px; }
+.cr-mode {
+  font-size: 11px;
+  padding: 2px 8px;
+  border-radius: 999px;
+  background: #e6f4ea;
+  color: #137333;
+  font-weight: 600;
+  letter-spacing: 0.02em;
+}
+.cr-mode.cr-live { background: #fce8e6; color: #c5221f; }
+.cr-close {
+  border: none; background: none; cursor: pointer; font-size: 20px;
+  line-height: 1; color: #5f6368; padding: 0 4px;
+}
+
+.cr-body { padding: 16px; }
+.cr-body > * + * { margin-top: 14px; }
+
+.cr-quote {
+  border-left: 3px solid #dadce0;
+  padding: 6px 0 6px 12px;
+  color: #3c4043;
+  background: #f8f9fa;
+  border-radius: 0 6px 6px 0;
+}
+.cr-quote .cr-who { font-size: 12px; color: #5f6368; display: block; margin-bottom: 2px; }
+
+.cr-finding { border: 1px solid #e8eaed; border-radius: 8px; padding: 12px; }
+.cr-finding h4 { margin: 0 0 8px; font-size: 14px; }
+.cr-badge {
+  display: inline-block; font-size: 11px; font-weight: 600;
+  padding: 2px 7px; border-radius: 4px; background: #fef7e0; color: #b06000;
+  margin-bottom: 8px;
+}
+
+.cr-badge-model { background: #e8f0fe; color: #1967d2; margin-left: 6px; }
+
+.cr-label { font-size: 12px; color: #5f6368; font-weight: 600; text-transform: uppercase;
+            letter-spacing: 0.04em; }
+
+.cr-ask { background: #e8f0fe; border-radius: 8px; padding: 10px 12px; font-weight: 500; }
+
+.cr-num { display: flex; align-items: center; gap: 8px; }
+.cr-num select, .cr-num input, .cr-confirm input, .cr-draft textarea {
+  font: inherit; width: 100%; padding: 8px 10px;
+  border: 1px solid #dadce0; border-radius: 6px; background: #fff; color: inherit;
+}
+.cr-draft textarea { min-height: 170px; resize: vertical; line-height: 1.5; }
+.cr-hint { font-size: 12px; color: #5f6368; }
+
+.cr-btn {
+  font: 500 14px/1 inherit; padding: 10px 14px; border-radius: 6px; cursor: pointer;
+  border: 1px solid transparent; background: #1a73e8; color: #fff; width: 100%;
+}
+.cr-btn:hover { background: #1765cc; }
+.cr-btn:disabled { background: #f1f3f4; color: #9aa0a6; cursor: not-allowed; }
+.cr-btn.cr-secondary { background: #fff; color: #1a73e8; border-color: #dadce0; }
+.cr-btn.cr-secondary:hover { background: #f8f9fa; }
+
+.cr-warn {
+  background: #fef7e0; border: 1px solid #feefc3; border-radius: 8px;
+  padding: 10px 12px; font-size: 13px; color: #b06000;
+}
+.cr-error {
+  background: #fce8e6; border: 1px solid #fad2cf; border-radius: 8px;
+  padding: 10px 12px; font-size: 13px; color: #c5221f;
+}
+.cr-good {
+  background: #e6f4ea; border: 1px solid #ceead6; border-radius: 8px;
+  padding: 10px 12px; font-size: 13px; color: #137333;
+}
+
+.cr-reasons { margin: 8px 0 0; padding-left: 18px; }
+.cr-reasons li { margin: 3px 0; }
+
+.cr-spin {
+  display: inline-block; width: 14px; height: 14px; vertical-align: -2px;
+  border: 2px solid #dadce0; border-top-color: #1a73e8; border-radius: 50%;
+  animation: cr-rotate 0.8s linear infinite; margin-right: 8px;
+}
+@keyframes cr-rotate { to { transform: rotate(360deg); } }
+
+.cr-transcript { border: 1px solid #e8eaed; border-radius: 8px; overflow: hidden; }
+.cr-transcript div { display: flex; gap: 10px; padding: 7px 12px; font-size: 13px; }
+.cr-transcript div + div { border-top: 1px solid #f1f3f4; }
+.cr-transcript .cr-at { color: #9aa0a6; font-variant-numeric: tabular-nums; min-width: 30px; }
+.cr-transcript .cr-user { background: #f8f9fa; font-weight: 500; }
+
+@media (prefers-color-scheme: dark) {
+  .cr-ico {
+  /* Emoji render at wildly different weights across platforms; pin the family
+     and nudge the size so it sits level with Gmail's own line icons. */
+  font-family: "Apple Color Emoji", "Segoe UI Emoji", "Noto Color Emoji", sans-serif;
+  font-size: 15px;
+  line-height: 1;
+  margin-right: 7px;
+}
+
+.cr-inline {
+  display: inline-flex;
+  align-items: center;
+  margin: 0 0 0 8px;
+  padding: 8px 16px;
+  border: 1px solid #dadce0;
+  border-radius: 18px;
+  background: #fff;
+  color: #1a73e8;
+  font: 500 14px/1 system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+  cursor: pointer;
+  vertical-align: middle;
+}
+.cr-inline:hover { background: #f8f9fa; }
+
+/* Set when an automatic rules-only check found something worth a look. */
+.cr-launcher.cr-has-finding,
+.cr-inline.cr-has-finding {
+  background: #fef7e0;
+  border-color: #feefc3;
+  color: #b06000;
+  font-weight: 600;
+}
+.cr-launcher.cr-has-finding { box-shadow: 0 2px 10px rgba(176, 96, 0, 0.28); }
+
+.cr-panel { background: #202124; color: #e8eaed; border-color: #3c4043; }
+  .cr-head { border-bottom-color: #3c4043; }
+  .cr-finding, .cr-transcript { border-color: #3c4043; }
+  .cr-quote { background: #292a2d; border-left-color: #5f6368; color: #bdc1c6; }
+  .cr-ask { background: #1f3a5f; }
+  .cr-num select, .cr-num input, .cr-confirm input, .cr-draft textarea {
+    background: #292a2d; border-color: #5f6368; color: #e8eaed;
+  }
+  .cr-transcript .cr-user { background: #292a2d; }
+  .cr-btn.cr-secondary { background: #292a2d; color: #8ab4f8; border-color: #5f6368; }
+}

@@ -1,0 +1,7 @@
+{
+  "incident_id": "INC-005",
+  "source": "access_control",
+  "signals": {"door": "server_room_east", "badge_count": 1, "body_count": 3},
+  "risk_score": 0.78,
+  "proposed_action": "lock server_room_east and trigger silent alarm"
+}

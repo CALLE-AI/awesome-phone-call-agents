@@ -1,0 +1,52 @@
+{
+  "call_id": "call-order-status-20260812",
+  "idempotency_key": "shopvoice-demo-lagos-corner-shop-order_status-restock-call-reorder-20260812",
+  "status": "completed",
+  "task_completed": true,
+  "completion_confidence": { "score": 0.92, "label": "high" },
+  "evidence": [
+    "Owner told the fish order was placed with Mama Sikiru.",
+    "Owner told delivery is expected around 4pm."
+  ],
+  "structured_result": {
+    "status_callback_completed": true,
+    "order_id": "order-restock-call-reorder-20260812-vendor-demo-lagos-corner-shop-mama-sikiru",
+    "status_reported": "placed",
+    "eta_text": "around 4pm today",
+    "amount_confirmed": 45000
+  },
+  "metadata": {
+    "shop_id": "demo-lagos-corner-shop",
+    "call_type": "order_status",
+    "call_date": "2026-08-12",
+    "order_id": "order-restock-call-reorder-20260812-vendor-demo-lagos-corner-shop-mama-sikiru"
+  },
+  "recipients": [
+    {
+      "phones": ["+2348000000000"],
+      "region": "NG",
+      "locale": "en",
+      "structured_result": {
+        "status_callback_completed": true,
+        "order_id": "order-restock-call-reorder-20260812-vendor-demo-lagos-corner-shop-mama-sikiru",
+        "status_reported": "placed",
+        "eta_text": "around 4pm today",
+        "amount_confirmed": 45000
+      },
+      "attempts": [
+        {
+          "attempt": 1,
+          "status": "completed",
+          "started_at": "2026-08-12T09:10:00+01:00",
+          "duration_seconds": 25,
+          "transcript_turns": [
+            { "offset_seconds": 0, "speaker": "bot", "text": "I be AI assistant with update for your fish order." },
+            { "offset_seconds": 4, "speaker": "user", "text": "Okay, wetin she talk?" },
+            { "offset_seconds": 7, "speaker": "bot", "text": "I don place the fish order with Mama Sikiru. She say e go reach you around 4pm, for forty-five thousand naira." },
+            { "offset_seconds": 16, "speaker": "user", "text": "Okay, thank you." }
+          ]
+        }
+      ]
+    }
+  ]
+}

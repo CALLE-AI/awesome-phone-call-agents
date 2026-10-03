@@ -1,0 +1,277 @@
+{
+  "id": "DLECalleFixture01",
+  "name": "DineLine CALL-E - Two Agent Fixture Round Trip",
+  "nodes": [
+    {
+      "id": "ManualTrigger",
+      "name": "Manual Trigger",
+      "type": "n8n-nodes-base.manualTrigger",
+      "typeVersion": 1,
+      "position": [
+        -1248,
+        0
+      ],
+      "parameters": {}
+    },
+    {
+      "id": "CreateCALLEIntakeFixture",
+      "name": "Create CALL-E Intake Fixture",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        -992,
+        0
+      ],
+      "parameters": {
+        "jsCode": "return [{ json: {\n  request: {\n    phone: '+12025550109',\n    sessionId: 'fixture-intake-' + String($execution.id),\n    explicitConsent: true\n  },\n  source: {\n    n8nExecutionId: String($execution.id),\n    sourceCallId: 'fixture-plan-' + String($execution.id),\n    toolCallId: null\n  },\n  scenario: 'complete'\n} }];"
+      }
+    },
+    {
+      "id": "PreviewIntakeFixture",
+      "name": "Preview Intake Fixture",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        -736,
+        0
+      ],
+      "retryOnFail": false,
+      "maxTries": 1,
+      "parameters": {
+        "method": "POST",
+        "url": "http://127.0.0.1:4173/api/intake/preview",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ $json.request }}",
+        "options": {
+          "timeout": 10000
+        }
+      }
+    },
+    {
+      "id": "BindIntakeFixture",
+      "name": "Bind Intake Fixture",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        -480,
+        0
+      ],
+      "parameters": {
+        "jsCode": "const source = $('Create CALL-E Intake Fixture').first().json;\nconst preview = $json.preview;\nreturn [{ json: {\n  request: source.request,\n  approvedRequestId: preview.requestId,\n  correlationId: preview.correlationId,\n  source: source.source,\n  scenario: source.scenario\n} }];"
+      }
+    },
+    {
+      "id": "DispatchIntakeFixture",
+      "name": "Dispatch Intake Fixture",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        -224,
+        0
+      ],
+      "retryOnFail": false,
+      "maxTries": 1,
+      "parameters": {
+        "method": "POST",
+        "url": "http://127.0.0.1:4173/api/n8n/intake/dispatch",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ $json }}",
+        "options": {
+          "timeout": 150000
+        }
+      }
+    },
+    {
+      "id": "CreateFixtureBooking",
+      "name": "Create Fixture Booking",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        32,
+        0
+      ],
+      "parameters": {
+        "jsCode": "const intake = $json;\nif (!intake.planningResult?.usableForSearch) throw new Error('Fixture intake was not usable for search.');\nconst preferences = intake.planningResult.preferences;\nreturn [{ json: {\n  intake,\n  draft: {\n    restaurant: {\n      name: 'Harbor Test Kitchen',\n      address: '100 Example Avenue, New York, NY',\n      phone: '+12025550143'\n    },\n    reservation: {\n      date: preferences.date,\n      time: preferences.time,\n      timeZone: preferences.timeZone || 'America/New_York',\n      partySize: preferences.partySize,\n      guestName: 'Demo Guest',\n      specialRequests: (preferences.atmosphere || '') + ' Fixture execution ' + String($execution.id)\n    },\n    policy: { acceptAlternativeTime: false, leaveVoicemail: false, discloseAiCaller: true }\n  },\n  source: {\n    n8nExecutionId: String($execution.id),\n    sourceCallId: 'fixture-plan-' + String($execution.id),\n    toolCallId: null\n  },\n  scenario: 'confirmed'\n} }];"
+      }
+    },
+    {
+      "id": "PreviewFixtureContract",
+      "name": "Preview Fixture Contract",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        288,
+        0
+      ],
+      "retryOnFail": false,
+      "maxTries": 1,
+      "parameters": {
+        "method": "POST",
+        "url": "http://127.0.0.1:4173/api/preview",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ $json.draft }}",
+        "options": {
+          "timeout": 10000
+        }
+      }
+    },
+    {
+      "id": "BindFixtureBooking",
+      "name": "Bind Fixture Booking",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        544,
+        0
+      ],
+      "parameters": {
+        "jsCode": "const source = $('Create Fixture Booking').first().json;\nconst preview = $json.preview;\nreturn [{ json: {\n  draft: source.draft,\n  approvedContractId: preview.contractId,\n  correlationId: preview.correlationId,\n  explicitApproval: true,\n  source: source.source,\n  scenario: source.scenario\n} }];"
+      }
+    },
+    {
+      "id": "DispatchBookingFixture",
+      "name": "Dispatch Booking Fixture",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        800,
+        0
+      ],
+      "retryOnFail": false,
+      "maxTries": 1,
+      "parameters": {
+        "method": "POST",
+        "url": "http://127.0.0.1:4173/api/n8n/dispatch",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ $json }}",
+        "options": {
+          "timeout": 150000
+        }
+      }
+    },
+    {
+      "id": "AssertTwoAgentRoundTrip",
+      "name": "Assert Two Agent Round Trip",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1056,
+        0
+      ],
+      "parameters": {
+        "jsCode": "const intakeSent = $('Bind Intake Fixture').first().json;\nconst intake = $('Dispatch Intake Fixture').first().json;\nconst bookingSent = $('Bind Fixture Booking').first().json;\nconst booking = $json;\nif (intake.requestId !== intakeSent.approvedRequestId) throw new Error('Intake request fingerprint changed in n8n.');\nif (intake.correlationId !== intakeSent.correlationId) throw new Error('Intake correlation ID changed in n8n.');\nif (intake.state !== 'completed') throw new Error('Fixture intake did not complete.');\nif (intake.planningResult.status !== 'preferences_ready') throw new Error('Fixture preferences were not ready.');\nif (!intake.provider.callId) throw new Error('Fixture intake provider ID is missing.');\nif (booking.contractId !== bookingSent.approvedContractId) throw new Error('Booking fingerprint changed in n8n.');\nif (booking.correlationId !== bookingSent.correlationId) throw new Error('Booking correlation ID changed in n8n.');\nif (booking.state !== 'completed') throw new Error('Fixture booking did not complete.');\nif (booking.bookingResult.status !== 'booked') throw new Error('Fixture result was not booked.');\nif (!booking.provider.callId) throw new Error('Fixture booking provider ID is missing.');\nif (intake.retryPolicy.automaticRetryAllowed !== false) throw new Error('Intake automatic retry must remain disabled.');\nif (booking.retryPolicy.automaticRetryAllowed !== false) throw new Error('Booking automatic retry must remain disabled.');\nreturn [{ json: {\n  verification: 'passed',\n  agents: 2,\n  intakeRequestId: intake.requestId,\n  intakeCorrelationId: intake.correlationId,\n  intakeProviderCallId: intake.provider.callId,\n  bookingContractId: booking.contractId,\n  bookingCorrelationId: booking.correlationId,\n  bookingProviderCallId: booking.provider.callId,\n  intakeJournalState: intake.state,\n  bookingJournalState: booking.state,\n  bookingStatus: booking.bookingResult.status,\n  automaticRetryAllowed: false\n} }];"
+      }
+    }
+  ],
+  "pinData": {},
+  "connections": {
+    "Manual Trigger": {
+      "main": [
+        [
+          {
+            "node": "Create CALL-E Intake Fixture",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Create CALL-E Intake Fixture": {
+      "main": [
+        [
+          {
+            "node": "Preview Intake Fixture",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Preview Intake Fixture": {
+      "main": [
+        [
+          {
+            "node": "Bind Intake Fixture",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Bind Intake Fixture": {
+      "main": [
+        [
+          {
+            "node": "Dispatch Intake Fixture",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Dispatch Intake Fixture": {
+      "main": [
+        [
+          {
+            "node": "Create Fixture Booking",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Create Fixture Booking": {
+      "main": [
+        [
+          {
+            "node": "Preview Fixture Contract",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Preview Fixture Contract": {
+      "main": [
+        [
+          {
+            "node": "Bind Fixture Booking",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Bind Fixture Booking": {
+      "main": [
+        [
+          {
+            "node": "Dispatch Booking Fixture",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Dispatch Booking Fixture": {
+      "main": [
+        [
+          {
+            "node": "Assert Two Agent Round Trip",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "active": false,
+  "settings": {
+    "executionOrder": "v1"
+  },
+  "tags": []
+}

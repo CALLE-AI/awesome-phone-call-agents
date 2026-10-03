@@ -1,0 +1,2113 @@
+.caseFile {
+  --cf-ink: var(--sw-ink);
+  --cf-muted: var(--sw-muted);
+  --cf-line: var(--sw-line);
+  --cf-paper: #fff;
+  --cf-bg: var(--sw-canvas);
+  min-height: 100vh;
+  background: var(--cf-bg);
+  color: var(--cf-ink);
+  font-family: "Avenir Next", "Inter", Arial, sans-serif;
+  font-size: 16px;
+  line-height: 1.55;
+}
+.caseFile * {
+  box-sizing: border-box;
+}
+.caseFile button,
+.caseFile input,
+.caseFile select,
+.caseFile textarea {
+  font: inherit;
+}
+.caseFile button {
+  cursor: pointer;
+}
+.caseFile button:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+.caseFile a {
+  color: var(--sw-violet-deep);
+  text-underline-offset: 4px;
+}
+.caseFile h1,
+.caseFile h2,
+.caseFile h3,
+.caseFile h4,
+.caseFile p {
+  margin: 0 0 14px;
+}
+.caseFile h1,
+.caseFile h2 {
+  font-family: "Avenir Next", "Inter", Arial, sans-serif;
+  font-weight: 750;
+  letter-spacing: -0.045em;
+}
+.caseFile h1 {
+  font-size: 44px;
+  line-height: 1.15;
+}
+.caseFile h2 {
+  font-size: 30px;
+  line-height: 1.2;
+}
+.caseFile h3 {
+  font-size: 19px;
+  line-height: 1.35;
+}
+.caseFile blockquote {
+  margin: 14px 0;
+  padding-left: 18px;
+  border-left: 3px solid #c7baf6;
+  color: #514960;
+}
+.caseFile ul {
+  padding-left: 22px;
+}
+.caseFile li {
+  margin: 10px 0;
+}
+.caseFile :focus-visible {
+  outline: 3px solid var(--sw-violet);
+  outline-offset: 4px;
+}
+.cfHeader {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 20px;
+  padding: 18px 4vw;
+  background: #fff;
+  border-bottom: 1px solid var(--cf-line);
+}
+.cfBrand {
+  border: 0;
+  background: none;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  color: var(--cf-ink);
+  font-weight: bold !important;
+  font-size: 19px !important;
+}
+.cfBrand span {
+  display: grid;
+  place-items: center;
+  width: 36px;
+  height: 36px;
+  background: var(--sw-violet);
+  color: #fff;
+  border-radius: 50%;
+  font-size: 12px;
+}
+.cfHeaderRight {
+  display: flex;
+  align-items: center;
+  gap: 24px;
+  font-size: 14px;
+}
+.cfHeaderRight label {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+.cfHeaderRight select {
+  border: 1px solid var(--cf-line);
+  padding: 7px;
+  background: white;
+  border-radius: 5px;
+}
+.cfSynthetic {
+  color: #3e4625;
+  background: #effbc8;
+  padding: 5px 10px;
+  border: 1px solid #d8ef92;
+  border-radius: 3px;
+}
+.cfMain {
+  max-width: 1440px;
+  margin: auto;
+  padding: 24px 4vw;
+}
+.cfCaseHeading {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 30px;
+  margin-bottom: 24px;
+}
+.cfCaseHeading p:last-child {
+  color: var(--cf-muted);
+  margin: 0;
+}
+.cfEyebrow {
+  font-size: 12px !important;
+  font-weight: bold;
+  letter-spacing: 0.12em;
+  line-height: 1.5;
+  text-transform: uppercase;
+  color: var(--sw-muted);
+  margin-bottom: 10px !important;
+}
+.cfCaseState {
+  display: flex;
+  flex-direction: column;
+  min-width: 180px;
+  border-left: 2px solid var(--sw-violet);
+  padding-left: 18px;
+  font-size: 14px;
+}
+.cfCaseState strong {
+  text-transform: capitalize;
+  margin: 4px 0;
+  font-size: 18px;
+}
+.cfCaseState small {
+  color: var(--cf-muted);
+}
+.cfSteps {
+  display: flex;
+  border-top: 1px solid var(--cf-line);
+  border-bottom: 1px solid var(--cf-line);
+  gap: 0;
+  margin-bottom: 24px;
+}
+.cfSteps button {
+  flex: 1;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  background: none;
+  border: 0;
+  border-bottom: 3px solid transparent;
+  padding: 16px 10px;
+  text-align: left;
+  color: var(--sw-muted);
+  font-size: 14px;
+}
+.cfSteps button span {
+  font-size: 12px;
+  border: 1px solid #c8c1dc;
+  border-radius: 50%;
+  width: 23px;
+  height: 23px;
+  display: grid;
+  place-items: center;
+  flex-shrink: 0;
+}
+.cfSteps [aria-current] {
+  border-bottom-color: var(--sw-violet);
+  background: #eee8ff;
+  color: var(--sw-ink);
+  font-weight: bold;
+}
+.cfSteps [aria-current] span {
+  background: var(--sw-violet);
+  color: white;
+  border-color: var(--sw-violet);
+}
+.cfSectionHeading {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  gap: 20px;
+  margin-bottom: 14px;
+}
+.cfSectionHeading p:last-child {
+  max-width: 750px;
+  color: var(--cf-muted);
+}
+.cfSectionHeading a {
+  font-size: 14px;
+  white-space: nowrap;
+  margin-top: 26px;
+}
+.cfRecordsLayout {
+  display: grid;
+  grid-template-columns: minmax(0, 1.55fr) minmax(280px, 0.75fr);
+  gap: 40px;
+}
+.cfDocuments {
+  min-width: 0;
+}
+.cfDocumentTabs {
+  display: flex;
+  gap: 4px;
+  flex-wrap: wrap;
+}
+.cfDocumentTabs button {
+  background: #eeeaf7;
+  color: #655b7c;
+  border: 1px solid var(--cf-line);
+  padding: 10px 13px;
+  font-size: 14px;
+}
+.cfDocumentTabs [aria-selected="true"] {
+  background: white;
+  border-bottom-color: white;
+  color: var(--sw-ink);
+  font-weight: bold;
+}
+.cfDocumentMeta {
+  background: white;
+  border: 1px solid var(--cf-line);
+  border-bottom: 0;
+  padding: 10px 22px;
+  display: flex;
+  flex-direction: column;
+  font-size: 13px;
+  color: var(--sw-muted);
+}
+.cfDocumentMeta strong {
+  font-size: 16px;
+  color: var(--cf-ink);
+}
+.cfDocumentFrame {
+  display: block;
+  width: 100%;
+  height: 480px;
+  border: 1px solid var(--cf-line);
+  background: #fff;
+  box-shadow: 0 8px 20px #28174310;
+}
+.cfSmall {
+  font-size: 13px !important;
+  color: var(--cf-muted);
+  line-height: 1.55;
+  margin-top: 12px !important;
+}
+.cfGap {
+  padding: 8px 0;
+}
+.cfGap h2 {
+  font-size: 32px;
+  margin-bottom: 24px;
+}
+.cfSourceQuote {
+  display: block;
+  background: transparent;
+  border: 0;
+  border-bottom: 1px solid var(--cf-line);
+  color: var(--cf-ink);
+  text-align: left;
+  padding: 0 0 18px;
+  margin-bottom: 18px;
+  width: 100%;
+}
+.cfSourceQuote small {
+  display: block;
+  font-size: 12px;
+  color: var(--cf-muted);
+  margin-bottom: 8px;
+}
+.cfSourceQuote q {
+  font-family: "Avenir Next", "Inter", Arial, sans-serif;
+  font-size: 21px;
+}
+.cfQuestion {
+  padding: 20px;
+  background: #eae5f5;
+  margin: 24px 0;
+}
+.cfQuestion span {
+  display: block;
+  font-size: 12px;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  margin-bottom: 8px;
+}
+.cfQuestion strong {
+  font-size: 18px;
+}
+.cfPrimary,
+.cfSecondary,
+.cfActions button,
+.cfNotice button {
+  border: 1px solid var(--sw-violet-deep);
+  border-radius: 5px;
+  padding: 11px 17px;
+  font-weight: bold !important;
+  font-size: 14px !important;
+  line-height: 1.4;
+}
+.cfPrimary {
+  background: var(--sw-violet-deep);
+  color: #fff;
+}
+.cfSecondary,
+.cfActions button {
+  background: #fff;
+  color: var(--sw-violet-deep);
+}
+.cfTextButton,
+.cfCitation {
+  background: none;
+  border: 0;
+  color: var(--sw-violet-deep);
+  text-decoration: underline;
+  text-underline-offset: 3px;
+  padding: 7px 0;
+  font-size: 14px !important;
+  text-align: left;
+}
+.cfNotice {
+  padding: 15px 18px;
+  background: #ede7ff;
+  border: 1px solid #d5c9f4;
+  margin-bottom: 20px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 20px;
+  font-size: 14px;
+}
+.cfNotice button {
+  background: white;
+  white-space: nowrap;
+}
+.cfError {
+  background: #fff0e9;
+  border-color: #e3b69f;
+  color: #7c3821;
+}
+.cfRehearsal {
+  background: #fff6d9;
+  border-color: #daca96;
+  color: #705421;
+}
+.cfPeopleLayout,
+.cfFollowupLayout {
+  display: grid;
+  grid-template-columns: minmax(260px, 0.8fr) minmax(0, 1.3fr);
+  gap: 36px;
+}
+.cfPerson {
+  padding: 22px;
+  background: white;
+  border: 1px solid var(--cf-line);
+  margin-bottom: 16px;
+}
+.cfPerson.selected {
+  border-left: 4px solid var(--sw-violet);
+}
+.cfPerson blockquote {
+  font-size: 14px;
+}
+.cfPerson button {
+  display: block;
+  margin-top: 10px;
+}
+.cfStatus {
+  display: inline-block;
+  background: #f1ecff;
+  color: #625873;
+  font-size: 13px;
+  padding: 5px 9px;
+  border-radius: 3px;
+}
+.cfContactForm,
+.cfTaskForm {
+  background: #fff;
+  padding: 26px;
+  border: 1px solid var(--cf-line);
+}
+.cfField {
+  display: flex;
+  flex-direction: column;
+  gap: 7px;
+  font-size: 14px;
+  font-weight: bold;
+  margin: 16px 0;
+  max-width: 100%;
+}
+.cfField input,
+.cfField select,
+.cfField textarea {
+  background: #fff;
+  border: 1px solid #c5bbd9;
+  padding: 10px 12px;
+  border-radius: 4px;
+  width: 100%;
+  color: var(--sw-ink);
+  font-weight: 400;
+  min-height: 43px;
+}
+.cfField textarea {
+  min-height: 90px;
+  resize: vertical;
+}
+.cfField input:disabled,
+.cfField textarea:disabled,
+.cfField select:disabled {
+  background: #f4f1fa;
+}
+.cfFieldPair {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 18px;
+}
+.cfPhoneSection {
+  border-top: 1px solid var(--cf-line);
+  border-bottom: 1px solid var(--cf-line);
+  margin: 24px 0;
+  padding: 18px 0;
+}
+.cfCheck {
+  display: flex;
+  align-items: flex-start;
+  gap: 12px;
+  font-size: 14px;
+  margin: 15px 0;
+}
+.cfCheck input {
+  width: 18px;
+  height: 18px;
+  flex-shrink: 0;
+  accent-color: var(--sw-violet-deep);
+  margin-top: 3px;
+}
+.cfNextBox,
+.cfEmpty {
+  padding: 24px;
+  background: #eee9f8;
+  margin: 20px 0;
+}
+.cfBriefLayout {
+  display: grid;
+  grid-template-columns: minmax(0, 1.7fr) minmax(280px, 0.8fr);
+  gap: 36px;
+}
+.cfBriefSummary {
+  background: #fff;
+  padding: 24px;
+  border: 1px solid var(--cf-line);
+}
+.cfBranchList {
+  list-style: decimal;
+  padding-left: 32px;
+  margin: 28px 0;
+}
+.cfBranchList li {
+  padding-left: 8px;
+  margin: 0 0 22px;
+}
+.cfBranchList li::marker {
+  font-family: "Avenir Next", "Inter", Arial, sans-serif;
+  font-size: 22px;
+  color: #726788;
+}
+.cfBranchList p {
+  color: var(--sw-muted);
+}
+.cfApproval {
+  align-self: start;
+  background: #eae5f4;
+  padding: 26px;
+  position: sticky;
+  top: 20px;
+}
+.cfApproval .cfPrimary {
+  width: 100%;
+}
+.cfDetails {
+  margin: 22px 0;
+  border-top: 1px solid var(--cf-line);
+  padding-top: 15px;
+}
+.cfDetails summary {
+  cursor: pointer;
+  font-weight: bold;
+  font-size: 14px;
+}
+.cfDetails pre {
+  font:
+    14px/1.6 Arial,
+    sans-serif;
+  white-space: pre-wrap;
+  background: white;
+  padding: 18px;
+}
+.cfDetails article {
+  margin: 20px 0;
+}
+.cfCallProgress {
+  padding: 22px;
+  border: 1px solid var(--cf-line);
+  background: white;
+  margin: 22px 0;
+}
+.cfCallProgress strong {
+  text-transform: capitalize;
+}
+.cfRunSelect {
+  max-width: 560px;
+}
+.cfEvidenceSummary {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 20px;
+  margin: 20px 0;
+  padding: 20px;
+  background: #eae5f4;
+}
+.cfEvidenceSummary div {
+  display: flex;
+  flex-direction: column;
+}
+.cfEvidenceSummary span {
+  font-size: 12px;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  margin-bottom: 5px;
+}
+.cfEvidenceSummary strong {
+  font-size: 18px;
+  text-transform: capitalize;
+}
+.cfComparison {
+  display: grid;
+  grid-template-columns: 1fr 1.5fr;
+  gap: 30px;
+  margin: 28px 0;
+}
+.cfComparison article {
+  background: #fff;
+  border-top: 3px solid #c5b8e3;
+  padding: 24px;
+}
+.cfComparison blockquote {
+  font:
+    24px/1.45 Georgia,
+    serif;
+}
+.cfComparison li {
+  font-size: 16px;
+}
+.cfInlineStatus {
+  font-size: 12px;
+  color: #665774;
+  display: block;
+}
+.cfFindings {
+  border: 1px solid var(--cf-line);
+  padding: 24px;
+  margin: 24px 0;
+  background: #fcfbff;
+}
+.cfReviewLayout {
+  display: grid;
+  grid-template-columns: 1fr 1.1fr;
+  gap: 30px;
+  align-items: start;
+}
+.cfTranscript {
+  background: white;
+  padding: 24px;
+  border: 1px solid var(--cf-line);
+  max-height: 700px;
+  overflow: auto;
+}
+.cfTurn {
+  padding: 14px;
+  background: #f5f2fc;
+  margin-bottom: 12px;
+  border: 2px solid transparent;
+  scroll-margin: 24px;
+}
+.cfTurn > div {
+  display: flex;
+  justify-content: space-between;
+  font-size: 12px;
+  gap: 15px;
+}
+.cfTurn p {
+  font-size: 15px;
+  margin: 8px 0 0;
+}
+.cfTurn.highlighted {
+  border-color: var(--sw-violet);
+  background: #e8dcff;
+}
+.cfStatement {
+  background: white;
+  border: 1px solid var(--cf-line);
+  padding: 22px;
+  margin-bottom: 18px;
+}
+.cfStatementMeta {
+  display: flex;
+  justify-content: space-between;
+  font-size: 12px;
+  color: var(--sw-muted);
+  margin-bottom: 14px;
+}
+.cfFact {
+  font-family: "Avenir Next", "Inter", Arial, sans-serif;
+  font-size: 21px;
+  line-height: 1.5;
+}
+.cfStatement blockquote {
+  font-size: 15px;
+}
+.cfActions {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+  margin-top: 18px;
+}
+.cfActions button {
+  font-weight: 400 !important;
+  padding: 8px 12px;
+}
+.cfUnverified {
+  display: block;
+  font-size: 13px;
+  color: #865b22;
+}
+.cfDisposition {
+  margin-top: 34px;
+  background: #fff;
+  padding: 28px;
+  border: 1px solid var(--cf-line);
+  max-width: 900px;
+}
+.cfDisposition .cfField {
+  max-width: 750px;
+}
+.cfDisposition textarea {
+  min-height: 120px;
+}
+.cfTask {
+  padding: 22px;
+  background: white;
+  border: 1px solid var(--cf-line);
+  margin: 16px 0;
+}
+.cfTask h4 {
+  margin-top: 10px;
+}
+.cfFollowupLayout h3 {
+  margin-top: 20px;
+}
+.cfFollowupLayout form h3 {
+  margin-top: 0;
+}
+.cfFooter {
+  display: flex;
+  justify-content: space-between;
+  gap: 20px;
+  margin-top: 48px;
+  padding: 20px 0 0;
+  border-top: 1px solid var(--cf-line);
+  font-size: 12px;
+  color: var(--sw-muted);
+}
+@media (max-width: 900px) {
+  .cfRecordsLayout,
+  .cfPeopleLayout,
+  .cfBriefLayout,
+  .cfFollowupLayout {
+    grid-template-columns: 1fr;
+  }
+  .cfGap {
+    border-top: 1px solid var(--cf-line);
+    padding-top: 24px;
+  }
+  .cfSteps {
+    overflow-x: auto;
+  }
+  .cfSteps button {
+    min-width: 150px;
+  }
+  .cfReviewLayout {
+    grid-template-columns: 1fr;
+  }
+  .cfApproval {
+    position: static;
+  }
+  .cfDocumentFrame {
+    height: 580px;
+  }
+  .cfSectionHeading {
+    flex-wrap: wrap;
+  }
+  .cfMain {
+    padding: 24px;
+  }
+  .cfComparison {
+    grid-template-columns: 1fr;
+  }
+  .cfCaseHeading {
+    align-items: flex-start;
+  }
+  .cfEvidenceSummary {
+    grid-template-columns: 1fr;
+  }
+}
+@media (max-width: 560px) {
+  .cfHeader {
+    padding: 16px;
+    align-items: flex-start;
+  }
+  .cfHeaderRight {
+    gap: 8px;
+    flex-direction: column;
+    align-items: flex-end;
+  }
+  .cfSynthetic {
+    font-size: 11px;
+  }
+  .cfHeaderRight label {
+    font-size: 12px;
+  }
+  .cfBrand {
+    font-size: 17px !important;
+  }
+  .cfMain {
+    padding: 20px 16px;
+  }
+  .cfCaseHeading {
+    flex-direction: column;
+    gap: 18px;
+  }
+  .caseFile h1 {
+    font-size: 34px;
+  }
+  .caseFile h2 {
+    font-size: 27px;
+  }
+  .cfCaseState {
+    flex-direction: row;
+    align-items: center;
+    flex-wrap: wrap;
+    gap: 10px;
+    font-size: 12px;
+  }
+  .cfCaseState strong {
+    font-size: 14px;
+  }
+  .cfFieldPair {
+    grid-template-columns: 1fr;
+    gap: 0;
+  }
+  .cfContactForm,
+  .cfTaskForm,
+  .cfDisposition {
+    padding: 20px;
+  }
+  .cfFooter {
+    flex-direction: column;
+  }
+  .cfNotice {
+    align-items: flex-start;
+    flex-wrap: wrap;
+  }
+  .cfDocumentFrame {
+    height: 560px;
+  }
+}
+
+/* Reactions acknowledge user actions. They never stand in for call or review status. */
+.caseFile button,
+.caseFile a,
+.caseFile summary {
+  -webkit-tap-highlight-color: transparent;
+}
+.caseFile button,
+.caseFile summary {
+  transition:
+    background-color 0.18s ease,
+    color 0.18s ease,
+    box-shadow 0.18s ease,
+    border-color 0.18s ease,
+    transform 0.18s cubic-bezier(0.2, 0.8, 0.2, 1);
+}
+.caseFile button:not(:disabled):active {
+  transform: translateY(2px) scale(0.975);
+}
+.caseFile button:disabled {
+  opacity: 0.46;
+}
+.caseFile :focus-visible {
+  outline: 3px solid var(--sw-violet);
+  outline-offset: 4px;
+}
+.cfHeader {
+  padding: 16px 4vw;
+  background: var(--sw-ink);
+  color: white;
+  border: 0;
+}
+.cfBrand {
+  color: white;
+  font-size: 21px !important;
+  letter-spacing: -0.7px;
+}
+.cfBrand > span {
+  background: var(--sw-lime);
+  color: var(--sw-ink);
+  border-radius: 12px;
+  transform: rotate(-8deg);
+  font-size: 13px;
+  font-weight: 850;
+  transition: transform 0.35s cubic-bezier(0.3, 1.5, 0.5, 1);
+}
+.cfBrand:hover > span {
+  transform: rotate(8deg) scale(1.07);
+}
+.cfBrandTag {
+  margin-left: 8px;
+  font-size: 10px;
+  font-weight: 500;
+  letter-spacing: 1.8px;
+  color: #b5adcd;
+}
+.cfSynthetic {
+  border-radius: 99px;
+  background: #393344;
+  border-color: #575061;
+  color: #e5dff2;
+  font-size: 12px;
+}
+.cfHeaderRight select {
+  background: #fff;
+  color: var(--sw-ink);
+  border-radius: 10px;
+  padding: 8px 12px;
+}
+.cfHeaderRight label {
+  color: #d5cfe2;
+}
+.cfMain {
+  max-width: 1510px;
+  padding-top: 25px;
+}
+.cfCaseHeading {
+  align-items: center;
+  gap: 24px;
+  margin-bottom: 22px;
+}
+.cfCaseHeading h1 {
+  margin-bottom: 8px;
+}
+.cfCaseHeading .cfEyebrow {
+  color: var(--sw-violet-deep);
+  font-weight: 750;
+}
+.cfCaseHeading p:last-child {
+  font-size: 15px;
+}
+.cfCaseSummary {
+  display: flex;
+  align-items: center;
+  gap: 28px;
+}
+.cfQuickFacts {
+  display: flex;
+  gap: 8px;
+}
+.cfQuickFacts button {
+  border: 1px solid var(--sw-line);
+  background: white;
+  padding: 10px 12px;
+  min-width: 94px;
+  border-radius: 14px;
+  font-size: 12px;
+  color: var(--sw-muted);
+  text-align: left;
+  box-shadow: 0 3px 0 #ece6f7;
+}
+.cfQuickFacts strong {
+  display: block;
+  font-size: 23px;
+  letter-spacing: -0.9px;
+  color: var(--sw-ink);
+  line-height: 1.2;
+}
+.cfQuickFacts button > span {
+  margin-left: 6px;
+  color: var(--sw-violet);
+  display: inline-block;
+  transition: transform 0.2s ease;
+}
+.cfQuickFacts button:hover {
+  border-color: var(--sw-violet);
+  transform: translateY(-3px);
+  box-shadow: 0 6px 0 #e3daf8;
+}
+.cfQuickFacts button:hover > span {
+  transform: translate(2px, -2px);
+}
+.cfCaseState {
+  border-left: 0;
+  padding-left: 0;
+  max-width: 200px;
+}
+.cfCaseState > span {
+  color: var(--sw-muted);
+  font-size: 12px;
+}
+.cfCaseState strong {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  font-size: 15px;
+}
+.cfCaseState strong::before {
+  content: "";
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: #ad77eb;
+  flex: 0 0 7px;
+}
+.cfSteps {
+  padding: 5px;
+  border: 1px solid var(--sw-line);
+  border-radius: 16px;
+  background: #eae5f5;
+  gap: 5px;
+  margin-bottom: 26px;
+}
+.cfSteps button {
+  border: 0;
+  border-radius: 11px;
+  padding: 12px;
+  gap: 9px;
+  position: relative;
+  color: #706780;
+}
+.cfSteps button > b {
+  font-weight: 600;
+}
+.cfSteps button > i {
+  margin-left: auto;
+  font-style: normal;
+  opacity: 0;
+  transform: translate(-4px, 4px);
+  transition:
+    opacity 0.2s,
+    transform 0.2s;
+}
+.cfSteps button:hover {
+  color: var(--sw-violet-deep);
+  background: #ffffff80;
+}
+.cfSteps button:hover > i,
+.cfSteps [aria-current] > i {
+  opacity: 1;
+  transform: none;
+}
+.cfSteps button > span {
+  border: 0;
+  border-radius: 8px;
+  background: #dcd4ee;
+  color: #756588;
+  font-size: 12px;
+}
+.cfSteps [aria-current] {
+  background: var(--sw-violet);
+  color: white;
+  box-shadow: 0 4px 12px #6c4cff36;
+  animation: cfTabIn 0.25s ease-out;
+}
+.cfSteps [aria-current]:hover {
+  background: var(--sw-violet-deep);
+  color: white;
+}
+.cfSteps [aria-current] > span {
+  background: var(--sw-lime);
+  color: var(--sw-ink);
+}
+.cfMain > section {
+  animation: cfPageIn 0.38s cubic-bezier(0.2, 0.8, 0.2, 1) both;
+}
+.cfSectionHeading h2 {
+  font-size: 27px;
+  letter-spacing: -0.85px;
+  scroll-margin-top: 20px;
+}
+.cfEyebrow {
+  font-size: 11px !important;
+  letter-spacing: 1.5px;
+}
+.cfSectionHeading a,
+.cfTextButton {
+  font-weight: 650;
+}
+.cfRecordsLayout {
+  gap: 28px;
+  grid-template-columns: minmax(0, 1.65fr) minmax(300px, 0.85fr);
+}
+.cfDocuments {
+  min-width: 0;
+}
+.cfDocumentTabs {
+  flex-wrap: nowrap;
+  gap: 7px;
+  margin-bottom: 12px;
+}
+.cfDocumentTabs button {
+  flex: 1;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  background: white;
+  font-size: 12px;
+  border-radius: 11px;
+  border: 1px solid var(--sw-line);
+  padding: 10px 12px;
+  text-align: left;
+}
+.cfDocumentTabs button:hover {
+  border-color: #a88df4;
+  transform: translateY(-2px);
+}
+.cfDocIndex {
+  font-size: 10px;
+  letter-spacing: 0.4px;
+  font-weight: 700;
+  color: #9688ac;
+}
+.cfDocumentTabs [aria-selected="true"] {
+  background: #f0eaff;
+  border-color: var(--sw-violet);
+  color: var(--sw-violet-deep);
+  box-shadow: 0 3px 0 #ded2ff;
+}
+.cfDocumentTabs [aria-selected="true"] .cfDocIndex {
+  color: var(--sw-violet);
+}
+.cfDocumentMeta {
+  border-radius: 14px 14px 0 0;
+  padding: 12px 18px;
+  animation: cfPaperIn 0.25s ease-out;
+  background: #fff;
+  font-size: 12px;
+}
+.cfDocumentMeta strong {
+  font-size: 15px;
+}
+.cfDocumentFrame {
+  border-radius: 0 0 14px 14px;
+  box-shadow: 0 12px 32px #29174c09;
+}
+.cfDocuments > .cfSmall {
+  padding: 0 8px;
+  font-size: 12px !important;
+  margin-top: 11px;
+}
+.cfGap {
+  padding: 24px;
+  border: 1px solid #ddd2f1;
+  background: #ede5fb;
+  border-radius: 20px;
+}
+.cfGap > h2 {
+  font-size: 29px;
+  font-weight: 720;
+  line-height: 1.13;
+  letter-spacing: -1px;
+}
+.cfGap > p {
+  font-size: 14px;
+}
+.cfSourceQuote {
+  background: #fff;
+  padding: 14px 15px;
+  margin: 12px 0;
+  border: 1px solid #e0d8ee;
+  border-radius: 12px;
+  box-shadow: 0 3px 0 #e3d8f4;
+}
+.cfSourceQuote:hover {
+  border-color: var(--sw-violet);
+  box-shadow: 0 7px 0 #dfd2f6;
+  transform: translateY(-3px) rotate(-0.4deg);
+}
+.cfSourceQuote small {
+  color: #746581;
+  font-size: 11px;
+}
+.cfSourceQuote q {
+  font-family: "Avenir Next", Arial, sans-serif;
+  font-size: 20px;
+  font-weight: 600;
+  letter-spacing: -0.5px;
+}
+.cfQuestion {
+  background: var(--sw-ink);
+  color: #fff;
+  border-radius: 12px;
+  padding: 18px;
+  border: 0;
+  margin: 18px 0;
+}
+.cfQuestion > span {
+  color: var(--sw-lime);
+  font-size: 11px;
+}
+.cfQuestion > strong {
+  font-size: 16px;
+}
+.cfPrimary {
+  background: var(--sw-violet);
+  color: white;
+  border-color: var(--sw-violet);
+  border-radius: 11px;
+  box-shadow: 0 4px 0 #482bb2;
+  font-weight: 700;
+  padding: 12px 17px;
+}
+.cfPrimary:not(:disabled):hover {
+  background: #7658ff;
+  border-color: #7658ff;
+  box-shadow:
+    0 7px 0 #482bb2,
+    0 10px 24px #6c4cff20;
+  transform: translateY(-3px);
+}
+.cfPrimary:not(:disabled):active {
+  box-shadow: 0 1px 0 #482bb2;
+  transform: translateY(3px);
+}
+.cfSecondary,
+.cfActions button,
+.cfNotice button {
+  border-radius: 10px;
+  background: white;
+  border-color: #cabce5;
+  color: var(--sw-violet-deep);
+}
+.cfSecondary:not(:disabled):hover,
+.cfActions button:not(:disabled):hover {
+  background: #f0e9ff;
+  border-color: var(--sw-violet);
+  transform: translateY(-2px);
+  box-shadow: 0 4px 12px #24124412;
+}
+.cfNotice {
+  border-radius: 12px;
+  font-size: 14px;
+}
+.cfRehearsal {
+  background: #fff6d9;
+  border-color: #eadb9f;
+}
+.cfError {
+  animation: cfErrorNudge 0.35s ease-out;
+}
+.cfPerson,
+.cfContactForm,
+.cfTaskForm,
+.cfStatement,
+.cfTask,
+.cfDisposition,
+.cfApproval {
+  border-radius: 17px;
+  box-shadow: 0 6px 18px #29174c06;
+}
+.cfPerson {
+  transition:
+    border-color 0.2s,
+    box-shadow 0.2s,
+    transform 0.2s;
+}
+.cfPerson:hover {
+  border-color: #af98e5;
+  box-shadow: 0 9px 20px #29174c0c;
+}
+.cfPerson.selected {
+  border-color: var(--sw-violet);
+  box-shadow: 0 0 0 3px #6c4cff16;
+}
+.cfStatus {
+  border-radius: 7px;
+  background: #eee6ff;
+  color: #6642a7;
+  font-size: 12px;
+}
+.cfField input,
+.cfField textarea,
+.cfField select {
+  border-radius: 10px;
+  transition:
+    border-color 0.18s,
+    box-shadow 0.18s,
+    background-color 0.18s;
+}
+.cfField input:focus,
+.cfField textarea:focus,
+.cfField select:focus {
+  border-color: var(--sw-violet);
+  outline: none;
+  box-shadow: 0 0 0 4px #6c4cff14;
+  background: #fff;
+}
+.cfCheck {
+  padding: 11px 12px;
+  border: 1px solid #e1d9ee;
+  border-radius: 10px;
+  background: #faf8ff;
+  transition:
+    background-color 0.2s,
+    border-color 0.2s;
+}
+.cfCheck:has(input:checked) {
+  background: #eee6ff;
+  border-color: #ad94f7;
+}
+.cfCheck input {
+  accent-color: var(--sw-violet);
+  width: 19px;
+  height: 19px;
+  flex-shrink: 0;
+}
+.cfCheck input:checked {
+  animation: cfCheckIn 0.23s ease-out;
+}
+.cfBrief li {
+  border-radius: 13px;
+}
+.cfEvidenceSummary {
+  border-radius: 15px;
+  overflow: hidden;
+}
+.cfComparison article {
+  border-radius: 16px;
+}
+.cfComparison article:last-child {
+  background: #ede6ff;
+}
+.cfFindings {
+  border-radius: 16px;
+}
+.cfInlineStatus {
+  border-radius: 5px;
+  padding: 2px 6px;
+  font-size: 10px;
+}
+.cfTurn {
+  border-radius: 12px;
+}
+.cfTurn.highlighted {
+  background: #eee3ff;
+  border-color: var(--sw-violet);
+  animation: cfQuoteFocus 1.1s ease-out;
+  box-shadow: 0 0 0 3px #6c4cff18;
+}
+.cfCitation {
+  border-radius: 8px;
+  padding: 7px 10px;
+  background: #eee7ff;
+  color: var(--sw-violet-deep);
+}
+.cfCitation:hover {
+  background: var(--sw-violet);
+  color: white;
+  transform: translateY(-2px);
+}
+.cfFact {
+  font-family: "Avenir Next", Arial, sans-serif;
+  font-size: 20px;
+  font-weight: 650;
+  letter-spacing: -0.35px;
+}
+.cfDecisionBadge {
+  display: inline-block;
+  border-radius: 99px;
+  padding: 4px 9px;
+  background: #ede7f5;
+  color: #62556f;
+  animation: cfCheckIn 0.32s ease-out;
+}
+.cfStatement[data-review="accepted"] {
+  border-color: #a9c655;
+}
+.cfStatement[data-review="accepted"] .cfDecisionBadge {
+  color: #364b08;
+  background: #e7f6bb;
+}
+.cfStatement[data-review="rejected"] .cfDecisionBadge {
+  color: #a63345;
+  background: #fce2e7;
+}
+.cfStatement[data-review="follow_up"] .cfDecisionBadge {
+  color: #8e6200;
+  background: #fff0bf;
+}
+.cfTask[data-state="completed"] {
+  border-color: #bbd576;
+}
+.cfTask[data-state="completed"] .cfStatus {
+  background: #e7f6bb;
+  color: #364b08;
+}
+.cfDetails {
+  border-radius: 12px;
+}
+.cfDetails summary {
+  padding: 10px 0;
+  cursor: pointer;
+  color: var(--sw-violet-deep);
+}
+.cfDetails[open] > :not(summary) {
+  animation: cfPageIn 0.25s ease-out;
+}
+.cfToast {
+  position: fixed;
+  z-index: 80;
+  right: 24px;
+  bottom: 24px;
+  max-width: 460px;
+  display: flex;
+  align-items: center;
+  gap: 13px;
+  background: var(--sw-ink);
+  color: #fff;
+  padding: 16px 16px 16px 18px;
+  border-radius: 16px;
+  box-shadow: 0 14px 40px #19172a35;
+  font-size: 14px;
+  animation: cfToastIn 0.35s cubic-bezier(0.25, 1.4, 0.5, 1);
+}
+.cfToastCheck {
+  display: grid;
+  place-items: center;
+  width: 31px;
+  height: 31px;
+  border-radius: 9px;
+  background: var(--sw-lime);
+  color: var(--sw-ink);
+  font-weight: 800;
+  flex-shrink: 0;
+}
+.cfToast button {
+  background: #393346;
+  color: #fff;
+  border: 0;
+  border-radius: 8px;
+  padding: 3px 10px;
+  font-size: 21px;
+}
+.cfSaving {
+  position: fixed;
+  z-index: 85;
+  bottom: 24px;
+  left: 24px;
+  display: flex;
+  gap: 9px;
+  align-items: center;
+  background: #fff;
+  color: var(--sw-ink);
+  border: 1px solid var(--sw-line);
+  border-radius: 99px;
+  padding: 12px 18px;
+  box-shadow: 0 6px 25px #27134319;
+  font-size: 13px;
+}
+.cfSpinner {
+  width: 14px;
+  height: 14px;
+  border: 2px solid #dfd5f7;
+  border-top-color: var(--sw-violet);
+  border-radius: 50%;
+  animation: cfSpin 0.75s linear infinite;
+}
+.cfClickReactions {
+  position: fixed;
+  inset: 0;
+  pointer-events: none;
+  z-index: 100;
+  overflow: hidden;
+}
+.cfClickPulse {
+  position: absolute;
+  width: 18px;
+  height: 18px;
+  margin: -9px 0 0 -9px;
+  border-radius: 50%;
+  border: 2px solid var(--sw-violet);
+  background: #d8f95a66;
+  animation: cfClickRipple 0.5s ease-out forwards;
+}
+@keyframes cfClickRipple {
+  0% {
+    opacity: 0.8;
+    transform: scale(0.2);
+  }
+  100% {
+    opacity: 0;
+    transform: scale(3.2);
+  }
+}
+@keyframes cfPageIn {
+  from {
+    opacity: 0.25;
+    transform: translateY(12px);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+@keyframes cfPaperIn {
+  from {
+    opacity: 0.4;
+    transform: translateX(7px);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+@keyframes cfTabIn {
+  from {
+    transform: scale(0.97);
+  }
+  to {
+    transform: scale(1);
+  }
+}
+@keyframes cfCheckIn {
+  0% {
+    transform: scale(0.8);
+  }
+  65% {
+    transform: scale(1.1);
+  }
+  100% {
+    transform: scale(1);
+  }
+}
+@keyframes cfQuoteFocus {
+  0%,
+  35% {
+    box-shadow: 0 0 0 6px #6c4cff33;
+  }
+  100% {
+    box-shadow: 0 0 0 3px #6c4cff18;
+  }
+}
+@keyframes cfToastIn {
+  from {
+    opacity: 0;
+    transform: translateY(14px) scale(0.97);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+@keyframes cfErrorNudge {
+  0%,
+  100% {
+    transform: translateX(0);
+  }
+  25% {
+    transform: translateX(-5px);
+  }
+  65% {
+    transform: translateX(4px);
+  }
+}
+@keyframes cfSpin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+@media (max-width: 1180px) {
+  .cfBrandTag {
+    display: none;
+  }
+  .cfCaseSummary {
+    gap: 16px;
+  }
+  .cfQuickFacts {
+    gap: 5px;
+  }
+  .cfQuickFacts button {
+    min-width: 78px;
+    padding: 8px;
+  }
+  .cfSteps button {
+    font-size: 12px;
+    padding: 11px 9px;
+  }
+  .cfSteps button > i {
+    display: none;
+  }
+}
+@media (max-width: 900px) {
+  .cfRecordsLayout {
+    grid-template-columns: 1fr;
+  }
+  .cfCaseSummary {
+    align-items: flex-end;
+  }
+  .cfQuickFacts {
+    display: none;
+  }
+  .cfSteps {
+    overflow-x: auto;
+  }
+  .cfSteps button {
+    min-width: 150px;
+  }
+  .cfGap {
+    border: 1px solid #ddd2f1;
+    padding: 22px;
+  }
+}
+@media (max-width: 560px) {
+  .cfHeader {
+    padding: 14px 18px;
+    align-items: flex-start;
+    gap: 12px;
+  }
+  .cfBrand {
+    font-size: 19px !important;
+  }
+  .cfHeaderRight {
+    gap: 6px;
+    align-items: flex-end;
+  }
+  .cfHeaderRight label {
+    font-size: 11px;
+  }
+  .cfSynthetic {
+    font-size: 10px;
+    padding: 3px 7px;
+  }
+  .cfCaseHeading h1 {
+    font-size: 34px;
+  }
+  .cfCaseSummary {
+    width: 100%;
+  }
+  .cfCaseState {
+    flex-direction: row;
+    align-items: center;
+    max-width: none;
+    width: 100%;
+    gap: 10px;
+    flex-wrap: wrap;
+  }
+  .cfCaseState strong {
+    font-size: 13px;
+    margin: 0;
+  }
+  .cfCaseState small {
+    margin-left: auto;
+    font-size: 10px;
+  }
+  .cfCaseState > span {
+    display: none;
+  }
+  .cfMain {
+    padding: 22px 18px;
+  }
+  .cfDocumentTabs {
+    gap: 4px;
+  }
+  .cfDocumentTabs button {
+    font-size: 11px;
+    padding: 9px 7px;
+  }
+  .cfDocIndex {
+    display: none;
+  }
+  .cfToast {
+    left: 14px;
+    right: 14px;
+    bottom: 14px;
+    max-width: none;
+    font-size: 13px;
+  }
+  .cfSaving {
+    bottom: 95px;
+    left: 14px;
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .caseFile *,
+  .caseFile *::before,
+  .caseFile *::after {
+    animation: none !important;
+    transition: none !important;
+    scroll-behavior: auto !important;
+  }
+  .cfClickReactions {
+    display: none;
+  }
+}
+.cfSceneLauncher {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 0;
+  overflow: hidden;
+  width: 100%;
+  border: 1px solid #d4c4ef;
+  border-radius: 12px;
+  background: #fff;
+  text-align: left;
+  color: var(--sw-ink);
+  margin: 18px 0;
+}
+.cfSceneLauncher > img {
+  width: 90px;
+  height: 88px;
+  object-fit: cover;
+  object-position: 65% 50%;
+  transition: transform 0.35s ease;
+}
+.cfSceneLauncher > span {
+  position: relative;
+  padding: 10px 24px 10px 0;
+}
+.cfSceneLauncher small {
+  font-size: 9px;
+  letter-spacing: 1px;
+  color: var(--sw-violet-deep);
+  display: block;
+}
+.cfSceneLauncher strong {
+  font-size: 14px;
+  display: block;
+  line-height: 1.35;
+  margin-top: 4px;
+}
+.cfSceneLauncher i {
+  position: absolute;
+  right: 6px;
+  top: 30%;
+  font-style: normal;
+  font-size: 22px;
+  color: var(--sw-violet);
+}
+.cfSceneLauncher:hover {
+  transform: translateY(-3px);
+  box-shadow: 0 7px 18px #6c4cff18;
+}
+.cfSceneLauncher:hover > img {
+  transform: scale(1.06);
+}
+.cfSceneDialog {
+  margin: auto;
+  width: min(1120px, calc(100% - 32px));
+  max-height: calc(100dvh - 40px);
+  overflow: auto;
+  border: 0;
+  padding: 24px;
+  border-radius: 22px;
+  color: var(--sw-ink);
+  background: white;
+  box-shadow: 0 24px 120px #18102766;
+}
+.cfSceneDialog::backdrop {
+  background: #19172a99;
+  backdrop-filter: blur(5px);
+}
+.cfSceneDialog[open] {
+  animation: cfToastIn 0.3s ease-out;
+}
+.cfSceneHeading {
+  display: flex;
+  justify-content: space-between;
+  gap: 16px;
+  align-items: flex-start;
+}
+.cfSceneHeading h2 {
+  font-size: 25px;
+  margin-bottom: 18px;
+}
+.cfSceneHeading form button {
+  border: 0;
+  background: #eee8fa;
+  color: var(--sw-violet-deep);
+  width: 34px;
+  height: 34px;
+  border-radius: 10px;
+  font-size: 22px;
+}
+.cfSceneBody {
+  display: grid;
+  grid-template-columns: 1.5fr 1fr;
+  gap: 22px;
+  align-items: center;
+}
+.cfSceneImage {
+  position: relative;
+  border-radius: 15px;
+  overflow: hidden;
+}
+.cfSceneImage > img {
+  width: 100%;
+  height: auto;
+  display: block;
+}
+.cfHotspot {
+  position: absolute;
+  width: 36px;
+  height: 36px;
+  border-radius: 50%;
+  border: 3px solid #fff;
+  background: var(--sw-violet);
+  color: white;
+  font-weight: 800 !important;
+  box-shadow:
+    0 0 0 7px #6c4cff30,
+    0 4px 14px #1f113b55;
+}
+.cfHotspot[aria-pressed="true"] {
+  background: var(--sw-lime);
+  color: var(--sw-ink);
+  box-shadow:
+    0 0 0 7px #d8f95a44,
+    0 4px 14px #1f113b55;
+}
+.cfFrontSpot {
+  left: 45%;
+  top: 58%;
+}
+.cfRearSpot {
+  left: 77%;
+  top: 46%;
+}
+.cfSceneTabs {
+  display: flex;
+  gap: 8px;
+  padding: 0 0 16px;
+  flex-wrap: wrap;
+}
+.cfSceneTabs button {
+  border-radius: 99px;
+  border: 1px solid #ddd1f1;
+  background: #f8f5ff;
+  padding: 8px 13px;
+  font-size: 13px;
+  color: #756588;
+}
+.cfSceneTabs [aria-pressed="true"] {
+  background: var(--sw-violet);
+  border-color: var(--sw-violet);
+  color: white;
+}
+.cfSceneAnswer {
+  background: #f2edfc;
+  border-radius: 13px;
+  padding: 16px 18px;
+  animation: cfPageIn 0.25s ease;
+}
+.cfSceneAnswer > strong {
+  font-size: 17px;
+}
+.cfSceneAnswer > p {
+  margin: 7px 0 0;
+  font-size: 14px;
+  color: var(--sw-muted);
+}
+.cfSceneDisclaimer {
+  font-size: 11px;
+  color: var(--sw-muted);
+  margin: 14px 0 0 !important;
+}
+@media (max-width: 760px) {
+  .cfSceneBody {
+    grid-template-columns: 1fr;
+    gap: 16px;
+  }
+}
+@media (max-width: 560px) {
+  .cfSceneDialog {
+    padding: 17px;
+  }
+  .cfSceneHeading h2 {
+    font-size: 21px;
+  }
+  .cfSceneTabs {
+    gap: 5px;
+  }
+  .cfSceneTabs button {
+    font-size: 11px;
+    padding: 7px 10px;
+  }
+  .cfHotspot {
+    width: 29px;
+    height: 29px;
+    font-size: 11px !important;
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .cfSceneDialog[open],
+  .cfSceneAnswer {
+    animation: none;
+  }
+}
+
+.cfYearBoard {
+  padding: 18px 22px;
+  margin-bottom: 22px;
+  border-radius: 16px;
+  background: #211a35;
+  color: white;
+}
+.cfYearBoard > div:first-child {
+  display: flex;
+  justify-content: space-between;
+  gap: 18px;
+  margin-bottom: 14px;
+}
+.cfYearBoard > div:first-child > span {
+  color: #c4bcd6;
+  font-size: 14px;
+}
+.cfYearGrid {
+  display: grid;
+  grid-template-columns: repeat(8, minmax(0, 1fr));
+  gap: 9px;
+}
+.cfYearGrid button {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  min-height: 60px;
+  padding: 8px;
+  border: 1px solid #534965;
+  border-radius: 10px;
+  background: #332a47;
+  color: #eee8f7;
+  transition:
+    transform 0.18s,
+    background 0.18s;
+}
+.cfYearGrid button:hover {
+  transform: translateY(-3px);
+  background: #493b60;
+}
+.cfYearGrid button:active {
+  transform: scale(0.96);
+}
+.cfYearGrid button strong {
+  font-size: 17px;
+}
+.cfYearGrid button span {
+  font-size: 12px;
+}
+.cfYearGrid button.covered {
+  background: var(--sw-lime);
+  color: #293107;
+  border-color: var(--sw-lime);
+  animation: cfCoveragePop 0.35s ease-out;
+}
+.cfYearBoard > p {
+  margin: 14px 0 0;
+  font-size: 14px;
+  color: #ddd5eb;
+}
+.cfContactSource {
+  margin: 12px 0;
+  font-size: 14px;
+}
+.cfContactSource summary {
+  color: var(--sw-violet-deep);
+  cursor: pointer;
+  padding: 4px 0;
+}
+.cfCallBadge {
+  display: inline-block;
+  margin: 4px 0 4px 8px;
+  font-size: 13px;
+  color: var(--sw-muted);
+}
+.cfCoverageReview {
+  padding: 26px;
+  margin: 24px 0;
+  background: #f0eaff;
+  border: 1px solid #d4c5fa;
+  border-radius: 14px;
+}
+.cfCoverageReview h3 {
+  font-size: 24px;
+  letter-spacing: -0.025em;
+}
+.cfCoverageReview > p {
+  color: var(--sw-muted);
+}
+.cfYearChoices {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin: 16px 0;
+}
+.cfYearActions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  margin: 16px 0;
+}
+.cfYearInterpretation {
+  padding: 16px;
+  background: #fff;
+  border: 1px solid #ccbbea;
+  border-radius: 10px;
+}
+.cfYearChoices label {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 10px 12px;
+  border: 1px solid #ccbbea;
+  background: white;
+  border-radius: 8px;
+  cursor: pointer;
+}
+.cfYearChoices label:has(input:checked) {
+  background: var(--sw-lime);
+  border-color: #aec945;
+}
+.cfYearChoices label:has(input:disabled) {
+  opacity: 0.6;
+  cursor: default;
+}
+.cfYearChoices input {
+  accent-color: var(--sw-violet);
+}
+.cfNextCall {
+  border-radius: 16px;
+  background: #eee8ff;
+  border: 1px solid #d6cafa;
+  padding: 26px;
+  margin-bottom: 24px;
+}
+.cfNextCall h3 {
+  font-size: 34px;
+  letter-spacing: -0.04em;
+}
+.cfNextCall h4 {
+  margin-top: 20px;
+  font-size: 21px;
+}
+.cfSelfConsent {
+  background: #eff8d5;
+  padding: 14px !important;
+  border-radius: 10px;
+}
+.cfDisposition > summary {
+  cursor: pointer;
+  font-weight: 700;
+  font-size: 18px;
+  padding-bottom: 14px;
+}
+@keyframes cfCoveragePop {
+  0% {
+    transform: scale(0.95);
+  }
+  65% {
+    transform: scale(1.03);
+  }
+  100% {
+    transform: scale(1);
+  }
+}
+@media (max-width: 750px) {
+  .cfYearBoard {
+    padding: 16px;
+  }
+  .cfYearBoard > div:first-child {
+    flex-direction: column;
+    gap: 5px;
+  }
+  .cfYearGrid {
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+  }
+  .cfCoverageReview,
+  .cfNextCall {
+    padding: 20px;
+  }
+  .cfYearChoices {
+    display: grid;
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+  }
+  .cfYearChoices label {
+    padding: 8px;
+    font-size: 14px;
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .cfYearGrid button {
+    animation: none !important;
+    transition: none;
+  }
+}
+
+/* Rehearsals use a deliberate confirmation without interrupting the case flow. */
+.cfRestartButton {
+  border: 1px solid currentColor;
+  border-radius: 999px;
+  padding: 0.6rem 0.9rem;
+  font: inherit;
+  font-size: 0.875rem;
+  font-weight: 700;
+  background: transparent;
+  color: inherit;
+  cursor: pointer;
+}
+.cfRestartButton:hover:not(:disabled) {
+  background: #e6ff60;
+  color: #17231c;
+  transform: translateY(-2px);
+}
+.cfResetDialog {
+  width: min(34rem, calc(100vw - 2rem));
+  border: 1px solid #294438;
+  border-radius: 1.5rem;
+  padding: 2rem;
+  color: #182c23;
+  background: #fff;
+  box-shadow: 0 2rem 6rem #10251c55;
+}
+.cfResetDialog::backdrop {
+  background: #10251cb3;
+  backdrop-filter: blur(5px);
+}
+.cfResetDialog h2 {
+  margin: 0.5rem 0 1rem;
+  font-size: 1.75rem;
+}
+.cfResetDialog p {
+  line-height: 1.6;
+}
+.cfResetActions {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  gap: 0.75rem;
+  margin-top: 1.5rem;
+}
+.cfResetDialog[open] {
+  animation: cfPageIn 220ms ease-out both;
+}
+.cfHistorySelect {
+  max-width: 42rem;
+  margin: 1.5rem 0;
+}
+.cfHistorySummary {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 1rem;
+  margin: 1.5rem 0;
+}
+.cfHistorySummary span {
+  padding: 0.75rem 1rem;
+  border-radius: 1rem;
+  background: #eaf0e9;
+}
+@media (prefers-reduced-motion: reduce) {
+  .cfResetDialog[open] {
+    animation: none;
+  }
+}

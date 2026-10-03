@@ -38,8 +38,10 @@ application remains the source of truth for business intent and state,
 persisted idempotency keys and call IDs, retry coordination, state transitions,
 and audit history. A production application should commit its business intent
 and stable idempotency key before submitting the call, then record the call ID
-and creation outcome. This demo derives and sends a stable idempotency key, but
-does not persist it.
+and creation outcome. `create_call.py` derives and sends a stable idempotency
+key without persisting it.
+The [application workflow example](#persist-application-state) below adds a
+separate database for the saved request, Call ID and application outcome.
 
 An unverified webhook is a wake-up signal, not business authority. This demo's
 SQLite `events` table is only a minimal receipt and deduplication store; it is
@@ -92,6 +94,199 @@ uv run python receiver.py --database .tmp/fixture-replays.sqlite3 --replay fixtu
 These commands do not access the network and cannot create a call. Delete
 `.tmp/fixture-replays.sqlite3` after inspection if it is no longer useful.
 
+### Offline application outcomes
+
+The three fixtures above exercise receiver delivery and storage. The following
+five synthetic fixtures exercise application decisions. They use the same
+webhook envelope and the fields needed by this demo; they are not captured
+service responses or complete API response examples.
+
+| Fixture | Result | Suggested application handling |
+| --- | --- | --- |
+| `call-booked.json` | `booked` | Record the reported booking; verify its details before acting. |
+| `call-declined.json` | `declined` | Record the refusal; do not automatically call again. |
+| `call-callback.json` | `callback` | Queue for human follow-up; do not automatically place a call. |
+| `call-unanswered.json` | `unanswered` | Leave unresolved and review contact policy before any new attempt. |
+| `call-unknown.json` | `null` | Keep the outcome unknown and review the evidence. |
+
+[outcome-schema.json](outcome-schema.json) is an example caller-defined
+`result_schema` shared by these cases. It requires `outcome` and
+`outcome_evidence`, with an explicit `unknown` choice when evidence is
+insufficient. It describes the offline examples; `create_call.py` continues
+to use its own human-callback schema.
+
+These outcome names are application choices, not CALL-E lifecycle statuses or
+event types. All five fixtures have `status: completed`; that status alone
+does not prove that anyone answered or a booking succeeded. The unanswered
+fixture explicitly supplies synthetic no-answer evidence and a matching
+extracted result. A null result, missing transcript, or generic failure must
+not be converted to `unanswered`. See the public
+[Calls result contract](https://docs.heycall-e.com/calls#task-completion) and
+[webhook contract](https://docs.heycall-e.com/webhooks).
+
+Run both the receiver replay and the application decision for every case:
+
+```bash
+for outcome in booked declined callback unanswered unknown; do
+  uv run python receiver.py --database .tmp/outcomes.sqlite3 --replay "fixtures/call-$outcome.json"
+  uv run python outcomes.py "fixtures/call-$outcome.json"
+done
+```
+
+For example, the callback decision prints:
+
+```json
+{"outcome": "callback", "next_action": "Queue for human follow-up; do not place a call automatically."}
+```
+
+Repeating the loop returns `duplicate: true` for existing receiver receipts.
+`outcomes.py` only prints advice: it does not read credentials, contact the
+network, book anything, update application state, or create calls. A failed or
+canceled call, null result, unrecognized value, or missing evidence produces
+`unknown`. The receiver database still stores only its documented receipt fields. The
+optional application workflow below persists outcomes in a separate table.
+
+In a live application, pass the API-verified call snapshot to
+`application_outcome`, not the unsigned webhook body. Its field checks do not
+authenticate a result or prove the evidence is true. Review the supporting
+call evidence before acting, and handle durable business-state updates in
+your application. Delete `.tmp/outcomes.sqlite3` to reset the offline receipts.
+
+## Persist application state
+
+[workflow.py](workflow.py) adds a local application record around the existing
+request builder and outcome interpreter. It uses a separate SQLite database:
+
+```text
+business event -> reserve request and key -> explicit submit -> save Call ID
+  -> resume with an authenticated Calls API read -> apply outcome once
+  -> show the next action for a person to review
+```
+
+It does not require a webhook or a running HTTP server. Run `resume` after a
+notification or an application restart. If you use the receiver above, a
+verified receipt can wake your host to run `resume` for the saved workflow.
+The receipt and business record are separate: accepting a notification does
+not mean the business update finished. `resume` can recover that gap even
+when delivery was already acknowledged, and never trusts the notification
+body as the business result.
+
+### Reserve, preview and submit
+
+Use the setup below and an authorized destination. Put the complete task in a
+UTF-8 file outside the checkout, including your sender identity and the
+recipient's authorized purpose. This example reuses [outcome-schema.json](outcome-schema.json),
+so choose a task whose outcome fits those five values. Use a unique workflow
+ID for this business event. Reusing an existing ID refuses to replace its
+saved request.
+
+Set `WORKFLOW_DB` to a private SQLite path outside the checkout, `TASK_FILE`
+to that task file, `AUTHORIZED_PHONE` to the approved E.164 destination, and
+`WINDOW_START` / `WINDOW_END` to ISO timestamps with explicit UTC offsets.
+Choose the window according to the recipient's local time and permission.
+For a live integration check, use the
+[official US English test hotline](https://discord.com/channels/1493880186826133504/1495622983253889054/1546414916515401788).
+It is a test recipient, not a simulated business booking.
+
+```bash
+uv run python workflow.py reserve --database "$WORKFLOW_DB" \
+  --workflow-id follow-up-001 --phone "$AUTHORIZED_PHONE" \
+  --task-file "$TASK_FILE" --not-before "$WINDOW_START" --not-after "$WINDOW_END"
+uv run python workflow.py submit --database "$WORKFLOW_DB" --workflow-id follow-up-001
+```
+
+These commands only save and preview the intent. They do not read credentials,
+resolve network addresses or call CALL-E. The preview masks the phone number.
+The saved request contains the original task, destination, schema, metadata
+and idempotency key; subsequent submissions use that saved content. An
+optional `--webhook-url` on `reserve` uses the same public HTTPS validation as
+`create_call.py`. Omit it for the polling workflow shown here.
+
+After reviewing the task, recipient and time window, set `CALLE_API_KEY` for
+the intended project. Live commands use the production Developer API through
+the pinned SDK. This command can create a real billed call:
+
+```bash
+uv run python workflow.py submit --database "$WORKFLOW_DB" \
+  --workflow-id follow-up-001 --execute --confirm-authorized-recipient
+```
+
+Submission is allowed only within the saved window. The window gates the
+create request; it does not schedule a call, guarantee when a queued call
+starts, or hang up a call at the end of the window. No timer or recurring job
+is installed. A host scheduler must decide when to invoke the command.
+
+### Resume after a restart or notification
+
+Use the same database and API project:
+
+```bash
+uv run python workflow.py resume --database "$WORKFLOW_DB" --workflow-id follow-up-001
+uv run python workflow.py show --database "$WORKFLOW_DB" --workflow-id follow-up-001
+```
+
+Each `resume` invocation makes at most one authenticated call read and never
+submits a call. While the call is queued or running, the business record stays
+`pending`. Run it again later or when a notification arrives. Before applying
+a terminal result, it verifies the Call ID, workflow metadata and exact saved
+destination, then uses `application_outcome` to validate the result fields.
+Missing or invalid result evidence stays unknown.
+
+| Outcome | Saved business state |
+| --- | --- |
+| `booked` | `reported_booked` |
+| `declined` | `reported_declined` |
+| `callback` | `needs_follow_up` |
+| `unanswered` or `unknown` | `needs_review` |
+
+A single SQLite transaction saves the outcome, business state and `applied_at`
+while changing the workflow from `accepted` to `applied`. Repeating `resume`
+returns that saved decision without applying it again. A failed database
+update leaves the record available for another `resume`; it does not require
+another call. These states record reported results for review: the example
+does not book an appointment, update an external system or automatically place
+a follow-up call. Review the underlying call evidence before acting. Correcting
+an already applied decision is an application/operator responsibility.
+
+If submission loses its response, the durable state is `submission_unknown`.
+The command stops. Inspect that state before explicitly recovering with the
+same saved request and key:
+
+```bash
+uv run python workflow.py submit --database "$WORKFLOW_DB" \
+  --workflow-id follow-up-001 --execute --confirm-authorized-recipient --recover-unknown
+```
+
+This can recover an accepted call or submit it if the earlier attempt never
+arrived. It is still restricted to the saved calling window. Do not change
+the request, API project or workflow ID to get around an uncertain outcome.
+An API error also stops without replacing the key; inspect the actual error
+and follow the [Calls recovery guide](https://docs.heycall-e.com/calls#idempotency).
+If a Call ID is already saved, `submit` returns it without another create
+request; use `resume` to retrieve its result.
+
+### Cancellation and private storage
+
+Before submission, cancel the local reservation with:
+
+```bash
+uv run python workflow.py cancel --database "$WORKFLOW_DB" --workflow-id follow-up-001
+```
+
+Cancellation is refused after submission may have begun. Stopping a process,
+closing the receiver or deleting a database does not cancel an accepted call.
+Keep uncertain and accepted records for reconciliation. No automatic retries,
+follow-up calls or external business actions are performed.
+
+The `workflows` table stores the complete private request (including the phone
+number and task), window, Call ID, workflow state, outcome, business state and
+application time. It does not store the API key, transcript or raw result.
+New files use owner-only permissions on Unix; protect the directory and backups
+with your OS's access controls, including Windows permissions. Keep this
+application database separate from disposable fixture databases. Do not delete
+or edit it to retry a live operation. This is a local reference workflow, not
+a production queue or an authentication layer for a public service.
+
 ## Run the receiver
 
 The server listens on loopback by default. Its live server mode requires
@@ -138,8 +333,9 @@ uv run python create_call.py \
 ```
 
 `--execute` and `--confirm-authorized-recipient` are both required. This is the
-only command path that can create a billable CALL-E call; it creates at most
-one call for the authorized recipient. The call task records only `yes`, `no`,
+original creation command; it creates at most one call for the authorized
+recipient. The application workflow also has an explicitly enabled submit
+command. Both can create billable calls. The call task records only `yes`, `no`,
 or `unknown` for a human follow-up. It does not make payments, arrange
 shipping, modify profiles, or perform another business action.
 

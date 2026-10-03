@@ -1,8 +1,7 @@
 """A local stand-in for the CALL-E API, wired in underneath the real transport.
 
-Twenty free calls do not survive iterating on the wording of a pharmacy question, and
-nobody should be dialling a real counter to exercise a report layout. So the default path
-runs here.
+Prompt and report-layout iteration should not spend calling credits or dial a real
+pharmacy counter. So the default path runs here.
 
 This is an `httpx.MockTransport` rather than a fake `CalleTransport`, which matters: the
 real client still builds the request, pins the origin, sends the idempotency header, polls

@@ -1,0 +1,13 @@
+contact_id,first_name,phone_e164,alt_phone_e164,locale,tz,service_address_short
+pc-001,Maria,+14155550101,,en-US,America/Los_Angeles,1200 block of Elm St
+pc-002,James,+14155550102,,en-US,America/Los_Angeles,400 block of Oak Ave
+pc-003,Robert,+14155550103,+14155550153,en-US,America/Los_Angeles,88 block of Pine Ct
+pc-004,Anita,+14155550104,,en-US,America/Los_Angeles,2100 block of Cedar Ln
+pc-005,Frank,+14155550105,+14155550155,en-US,America/Los_Angeles,17 block of Birch Way
+pc-006,Dolores,+14155550106,,en-US,America/Los_Angeles,950 block of Maple Dr
+pc-007,Henry,+14155550107,,en-US,America/Los_Angeles,31 block of Spruce St
+pc-008,Grace,+14155550108,+14155550158,en-US,America/Los_Angeles,760 block of Alder Rd
+pc-009,Walter,+14155550109,,en-US,America/Los_Angeles,540 block of Willow St
+pc-010,Priya,+14155550110,,en-US,America/Los_Angeles,2 block of Juniper Pl
+pc-011,Colin,+14155550111,,en-US,America/Los_Angeles,1450 block of Laurel Ave
+pc-012,Tuan,+14155550112,,vi-VN,America/Los_Angeles,300 block of Fir St

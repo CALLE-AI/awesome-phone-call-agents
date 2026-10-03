@@ -1,0 +1,5 @@
+node_modules/
+.state/
+*.private.json
+.env
+*.log

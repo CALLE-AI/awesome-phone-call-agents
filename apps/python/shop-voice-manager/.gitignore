@@ -1,0 +1,23 @@
+__pycache__/
+*.py[cod]
+.pytest_cache/
+.venv/
+*.db
+.env
+
+# Rendered weekly summaries (summarize.py --format html)
+*.html
+!web/static/index.html
+
+# Live call inputs: a real phone number and a consent record. Keep them out of
+# the repo entirely; the convention is documented in README.md.
+my-live-request.json
+*-live-request.json
+
+# Checkpoints record that a call was placed. Local, per-operator, and never
+# committed. Do not delete them either: they are what stops a rerun dialling
+# a second time.
+.call-state/
+
+# Raw CALL-E responses saved by the web console (transcripts, phone numbers).
+call-results/

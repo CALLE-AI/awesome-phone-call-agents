@@ -1,0 +1,56 @@
+{
+ "id": "train-agent-028",
+ "label": "agent",
+ "source": "sim-train",
+ "meta": {
+  "task": "check whether the store is open on Sunday",
+  "hard": true
+ },
+ "turns": [
+  {
+   "speaker": "user",
+   "text": "Thank you for calling Maple Vet Clinic! This is Ava at Maple Vet Clinic. How can I help you today?",
+   "offset_seconds": 0.89
+  },
+  {
+   "speaker": "bot",
+   "text": "Hi, I'm an AI assistant calling on behalf of Taylor Kim. Could you tell me your opening hours this Sunday?",
+   "offset_seconds": 9.1
+  },
+  {
+   "speaker": "user",
+   "text": "Of course! Maple Vet Clinic is open on Sunday from 10 AM to 4 PM. Is there anything else I can help you with?",
+   "offset_seconds": 17.98
+  },
+  {
+   "speaker": "bot",
+   "text": "Thanks, and is parking available?",
+   "offset_seconds": 27.98
+  },
+  {
+   "speaker": "user",
+   "text": "I'd be happy to help with that. Everything is all set on our end.",
+   "offset_seconds": 31.16
+  },
+  {
+   "speaker": "bot",
+   "text": "Thanks, and is parking available?",
+   "offset_seconds": 37.42
+  },
+  {
+   "speaker": "user",
+   "text": "I understand. Someone from our team will follow up to confirm the details.",
+   "offset_seconds": 40.05
+  },
+  {
+   "speaker": "bot",
+   "text": "Thank you, that's everything.",
+   "offset_seconds": 45.72
+  },
+  {
+   "speaker": "user",
+   "text": "You're welcome! Have a wonderful day. Goodbye!",
+   "offset_seconds": 48.26
+  }
+ ]
+}

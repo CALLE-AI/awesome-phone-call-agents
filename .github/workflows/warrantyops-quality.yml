@@ -1,0 +1,114 @@
+# WarrantyOps quality gates (architecture gate F8).
+#
+# Two jobs over the full OS × Python matrix:
+#
+#   judge  — the offline judge path: suite, repository validator,
+#            byte-identical proof screen, scenarios, git diff --check.
+#            The whole-repository hygiene audit is an owner-side tool that
+#            lives outside this repository by design (a check that ships in
+#            the thing it checks is not much of a check); its machine-
+#            checkable in-repo half runs inside the suite
+#            (tests/test_repo_hygiene.py), and the full external sweep runs
+#            owner-side before merge.
+#   check  — the release gate: everything above plus generated-docs
+#            byte-identity, the 95% branch-coverage floor, the hypothesis
+#            presence guard, mypy --strict, ruff, and pip-audit (network).
+#
+# Pinned toolchain (P13: the judge environment uses the same pins as the
+# audit file): installed explicitly so every matrix cell runs the exact
+# audited versions rather than letting the pyproject floors float.
+
+name: WarrantyOps quality
+
+on:
+  pull_request:
+    paths:
+      - ".gitattributes"
+      - "apps/python/warrantyops/**"
+      - "scripts/validate_repository.py"
+      - ".github/workflows/warrantyops-quality.yml"
+  push:
+    branches:
+      - main
+      - feat/warranty-recovery-scaffold
+    paths:
+      - ".gitattributes"
+      - "apps/python/warrantyops/**"
+      - "scripts/validate_repository.py"
+      - ".github/workflows/warrantyops-quality.yml"
+
+defaults:
+  run:
+    shell: bash
+
+jobs:
+  judge:
+    name: judge (${{ matrix.os }}, py${{ matrix.python }})
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 15
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, macos-latest, windows-latest]
+        python: ["3.9", "3.11", "3.12", "3.13"]
+    defaults:
+      run:
+        shell: bash
+        working-directory: apps/python/warrantyops
+    steps:
+      - name: Preserve repository line endings
+        shell: bash
+        working-directory: ${{ github.workspace }}
+        run: git config --global core.autocrlf false
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: ${{ matrix.python }}
+      - name: Install GNU make (Windows)
+        if: runner.os == 'Windows'
+        shell: pwsh
+        run: choco install -y make
+      - name: Install the pinned toolchain and the package
+        run: |
+          python -m pip install --upgrade pip
+          python -m pip install pytest==8.4.2 hypothesis==6.141.1 \
+            mypy==1.14.1 ruff==0.9.4 coverage==7.6.1 pip-audit==2.7.3
+          python -m pip install --no-deps .
+      - name: Offline judge path
+        run: make PYTHON=python quality scenarios diff-check
+
+  check:
+    name: check (${{ matrix.os }}, py${{ matrix.python }})
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 20
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, macos-latest, windows-latest]
+        python: ["3.9", "3.11", "3.12", "3.13"]
+    defaults:
+      run:
+        shell: bash
+        working-directory: apps/python/warrantyops
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: ${{ matrix.python }}
+      - name: Install GNU make (Windows)
+        if: runner.os == 'Windows'
+        shell: pwsh
+        run: choco install -y make
+      - name: Install the pinned toolchain and the package
+        run: |
+          python -m pip install --upgrade pip
+          python -m pip install pytest==8.4.2 hypothesis==6.141.1 \
+            mypy==1.14.1 ruff==0.9.4 coverage==7.6.1 pip-audit==2.7.3
+          python -m pip install --no-deps .
+      - name: Release gate (static + coverage + docs + pip-audit)
+        run: make PYTHON=python check
+      # Cassette replay joins this job when cassettes exist (F6): the guard
+      # keeps the step green until Phase 4 lands them with the target.
+      - name: Available-cassette replay
+        if: ${{ hashFiles('apps/python/warrantyops/cassettes/**') != '' }}
+        run: make PYTHON=python cassette-replay

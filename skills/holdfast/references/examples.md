@@ -3,26 +3,28 @@
 All numbers below are fictional reserved samples (`+1-202-555-01xx`). Replace
 with the real user-supplied E.164 number in live runs.
 
-## Example 1: Airline baggage claim status
+## Example 1: Sam's parts-order status
 
 User request:
 
-> Call Example Airlines at +1-202-555-0123 and find out the status of my
-> baggage claim, reference number AB12CD3. Don't agree to any compensation
-> offer; just collect it and report back.
+> I run a three-person repair shop. Call Example Parts at +1-202-555-0123
+> about order PX-204. Confirm whether it shipped, when it arrives, and whether
+> anything is backordered. Do not change the order or accept a paid upgrade.
 
 Intake payload:
 
 ```json
 {
-  "goal": "Get the current status of baggage claim AB12CD3.",
+  "goal": "Confirm whether parts order PX-204 has shipped, when it will arrive, and whether any item is backordered.",
   "callee": "+12025550123",
-  "context": {"claim_reference": "AB12CD3", "passenger_name": "<user name>"},
-  "success_criteria": ["claim_status", "next_step", "reference_confirmed"],
+  "user_name": "Sam",
+  "company": "example-parts-distributor",
+  "context": {"order_reference": "PX-204", "business_name": "Sam's Auto Repair"},
+  "success_criteria": ["shipping_status", "estimated_arrival", "backorder_status", "tracking_number"],
   "authorization_scope": {
-    "may_provide": ["claim_reference", "passenger_name"],
-    "may_confirm": ["flight details read back by the agent"],
-    "must_not": ["accept compensation", "change delivery address", "close the claim"]
+    "may_provide": ["order_reference", "business_name"],
+    "may_confirm": ["the existing order details read back by the representative"],
+    "must_not": ["change or cancel the order", "accept a paid upgrade or substitute", "make a payment"]
   }
 }
 ```
@@ -31,31 +33,35 @@ Dry-run preview shown to the user:
 
 ```text
 Plan preview (no call yet)
-- Callee: +1******0123 (Example Airlines)
-- Goal: status of baggage claim AB12CD3
-- Disclosure: "Hi, this is an AI assistant calling on behalf of <user name>."
+- Callee: +1******0123 (Example Parts)
+- Goal: shipping, arrival, and backorder status for order PX-204
+- Disclosure: "Hi, this is an AI assistant calling on behalf of Sam."
 - Known map: none yet; exploratory navigation
-- Scope: may provide claim reference and name; must not accept offers
-- Cost: 1 call credit
+- Scope: status only; no order change, paid upgrade, or payment
+- Cost: subject to CALL-E's current credits and pricing; the local preview does not show the exact balance
 Confirm to place the call.
 ```
 
-After the call, `scripts/verify_result.py` marks `claim_status` verified
-because the transcript contains "your claim is active and under review", and
-`estimated_delivery` unverified because no transcript turn supports it. The
-report says `partially verified`. `scripts/map_update.py` records:
+The packaged controlled result demonstrates HoldFast's one visible reversal:
+CALL-E says `COMPLETED`, but the task is not automatically proven. The receipt
+marks shipping, Tuesday arrival, and backorder status `PROVEN` with transcript
+anchors; an unsupported tracking number stays `NOT PROVEN`. This fixture did
+not place a real call. `scripts/map_update.py` can propose:
 
 ```json
 {
+  "goal": "Confirm whether parts order PX-204 has shipped, when it will arrive, and whether any item is backordered.",
   "observed_path": [
-    {"prompt": "main menu", "choice": "2", "meaning": "existing claim"},
-    {"prompt": "claim menu", "choice": "1", "meaning": "claim status"},
-    {"prompt": "speak to an agent", "choice": "0", "meaning": "human", "authorized": true}
+    {"prompt_summary": "orders menu", "keypress": "1", "meaning": "existing order"}
   ],
-  "hold_seconds": 210,
+  "hold_seconds": 90,
   "reached": "human"
 }
 ```
+
+The stored route starts with `human_reviewed: false`. It cannot enter a later
+call until a human reviews it, the goal still matches exactly, and the
+observation is no more than 30 days old. No speed improvement is claimed.
 
 ## Example 2: Gym membership cancellation
 
@@ -85,7 +91,8 @@ Key behavior: the line is fully automated. The agent enters the reference
 digits via DTMF when prompted, receives a spoken status, and extracts
 `refill_status: ready` and `pickup_by`. No human conversation occurs, so no
 disclosure line is needed; the AI-disclosure rule applies to human pick-ups.
-Verification confirms both fields against the transcript.
+Verification can confirm the status; a pickup date carrying an unstated year
+remains supportive rather than proven.
 
 ## Example 4: Failed navigation (fail closed)
 
@@ -116,14 +123,43 @@ operator fallback or call during staffed hours.
 ## Using the scripts
 
 ```bash
-# 3. Map lookup before the call
+# Map lookup before a call
 python3 scripts/map_lookup.py --number "+12025550123"
-python3 scripts/map_lookup.py --company "example-airlines"
+python3 scripts/map_lookup.py --company "example-parts-distributor"
 
-# 5. Verification after the call (result JSON from the CLI status output)
+# Verification after a call (result JSON from the CLI status output)
 python3 scripts/verify_result.py --result call-result.json
 
-# 7. Map contribution after the call
+# Map contribution after a call; the resulting route remains unreviewed
 python3 scripts/map_update.py --maps-dir references/ivr-maps \
-  --company example-airlines --observation observation.json
+  --company example-parts-distributor --observation observation.json
 ```
+
+## Offline acceptance (no CALL-E account needed)
+
+The `tests/` directory runs the whole safe path without credentials:
+
+```bash
+# from the repository root — one command, three suites, zero credentials
+python3 -m unittest skills.holdfast.scripts.test_run_task skills.holdfast.tests.test_holdfast skills.holdfast.tests.test_verifier_redteam
+
+# screenshot-ready saved-result walkthrough; explicit no-call mode
+python3 skills/holdfast/scripts/run_task.py \
+  --task skills/holdfast/tests/fixtures/judge-parts-task.json \
+  --inspect-result skills/holdfast/tests/fixtures/judge-parts-result.json
+```
+
+All suites isolate the global dialing ledger to a temp file, so the command
+is hermetic: it works from an empty HOME, leaves no state behind, and needs
+no CALL-E credentials. Fixtures cover a complete task, a successful
+recorded-line call, the illustrative parts-order receipt, a no-keypress call,
+a balance-failure start, and a result whose fields contradict its transcript.
+The suites install a fake `calle` and assert on its invocation log: no
+confirmation means zero calls, an in-flight task is never re-dialed (the
+ledger is keyed on the task, not the output directory), a finished task
+re-dials only behind an explicit `--retry`, concurrently confirmed runs
+produce exactly one provider start, and corrupt or ambiguous state fails
+closed without dialing. The frozen red-team suite
+(`tests/test_verifier_redteam.py`) pins adversarial cases that must never come
+back verified, plus positive cases so the verifier cannot pass by abstaining
+on everything.

@@ -1,0 +1,23 @@
+contact_id,pupil_id,contact_order,contact_name,relationship,phone_e164,language,is_emergency_contact,do_not_call
+C-2089,P-1041,1,Daniel Fry,Uncle,+447700900377,English,Y,N
+C-2090,P-1041,2,Martin Dunn,Grandfather,+447700900218,English,Y,N
+C-2088,P-1041,3,Janet Okoro,Mother,+447700900142,English,Y,N
+C-2301,P-1177,1,Paul Adeyemi,Father,+447700900455,English,Y,N
+C-2302,P-1177,2,Ruth Adeyemi,Mother,+447700900456,English,Y,N
+C-2401,P-1203,1,Grace Okafor,Mother,+447700900501,English,Y,N
+C-2402,P-1203,2,Ken Okafor,Father,+447700900502,English,Y,N
+C-2110,P-1015,1,Sinead Kelleher,Mother,+447700900161,English,Y,N
+C-2111,P-1015,2,Brendan Kelleher,Father,+447700900162,English,Y,N
+C-2120,P-1022,1,Annika Lindqvist,Mother,+447700900171,Swedish,Y,N
+C-2121,P-1022,2,Erik Lindqvist,Father,+447700900172,English,Y,N
+C-2130,P-1058,1,Meera Raman,Mother,+447700900181,English,Y,N
+C-2131,P-1058,2,Vikram Raman,Father,07700900182,English,Y,N
+C-2140,P-1064,1,Helen Whitfield,Mother,+447700900191,English,Y,N
+C-2150,P-1090,1,Kwame Boateng,Father,+447700900201,English,Y,N
+C-2151,P-1090,2,Abena Boateng,Mother,+447700900202,English,Y,N
+C-2160,P-1102,1,Sana Hussain,Mother,+447700900211,English,Y,N
+C-2170,P-1118,1,Ciara Donnelly,Mother,+447700900221,English,Y,N
+C-2171,P-1118,2,Mark Donnelly,Father,+447700900222,English,N,N
+C-2180,P-1140,1,Ana Pereira,Mother,+447700900231,English,Y,N
+C-2190,P-1165,1,Fiona Marsden,Mother,+447700900241,English,Y,N
+C-2191,P-1165,2,Iain Marsden,Father,+447700900242,English,Y,Y

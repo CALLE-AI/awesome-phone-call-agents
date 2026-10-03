@@ -1,7 +1,7 @@
 """Check the credential setup without spending anything.
 
 The command this backs exists because of a specific, expensive mistake: finding
-out your API key is wrong by placing a call. On CALL-E that costs five credits
+out your API key is wrong by placing a call. On CALL-E that may incur variable charges
 and rings somebody's phone, and you learn nothing you could not have learned
 for free.
 
@@ -360,7 +360,7 @@ def _check_budget() -> Check:
     return Check(
         name="call budget",
         status=CheckStatus.WARN,
-        detail=f"up to {budget} real call(s) permitted, at 5 credits each",
+        detail=f"up to {budget} real call(s) permitted; usage-based charges apply",
         remedy=(
             "Each live run still needs --budget and --recipient on the command "
             "line, and confirms before every single call."

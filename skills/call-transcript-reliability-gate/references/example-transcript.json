@@ -1,0 +1,16 @@
+{
+  "status": "COMPLETED",
+  "result": {
+    "post_summary": "Customer confirmed moving the delivery to the 15th.",
+    "transcript": [
+      {"speaker": "agent", "text": "Hello, this is an automated assistant calling from Example Pharmacy about your delivery scheduled for Monday the 8th."},
+      {"speaker": "callee", "text": "Yes, I got the message."},
+      {"speaker": "agent", "text": "Would you like to move the delivery to Tuesday the 15th instead?"},
+      {"speaker": "callee", "text": "The 15th? Yeah that's fine yeah that's fine yeah that's fine go ahead."},
+      {"speaker": "agent", "text": "Just to confirm, the delivery moves to Tuesday the 15th, and the order number is 4 5 9 1 2. Can you read that back to me?"},
+      {"speaker": "callee", "text": "Four five nine one two. Got it."},
+      {"speaker": "agent", "text": "Thank you. You will get a confirmation text. Goodbye."}
+    ]
+  },
+  "callee_phone": "+14155550142"
+}

@@ -1,0 +1,20 @@
+{
+  "id": "19-unstated-ivr-eta",
+  "category": "ivr",
+  "description": "The call hit an IVR menu and never reached a person. Unstated.",
+  "turns": [
+    { "speaker": "bot", "text": "Hi, this is the QuoteDesk assistant calling about your delivery timeline.", "offset_seconds": 0 },
+    { "speaker": "user", "text": "Welcome to Mehta Distributors. Press 1 for sales. Press 2 for accounts. Press 9 to repeat this menu.", "offset_seconds": 5 }
+  ],
+  "fields": [
+    {
+      "field": "eta_days",
+      "value": null,
+      "expects": "duration",
+      "questionTurn": null,
+      "answerTurns": [],
+      "critical": true,
+      "expectedGrade": "unstated"
+    }
+  ]
+}

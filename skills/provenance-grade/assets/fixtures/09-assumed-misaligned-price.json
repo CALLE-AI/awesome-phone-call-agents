@@ -1,0 +1,23 @@
+{
+  "id": "09-assumed-misaligned-price",
+  "category": "misaligned",
+  "description": "Asked for a price, answered with a delivery day. The answer turn contains no price entity, so the field is assumed.",
+  "turns": [
+    { "speaker": "bot", "text": "Hi, QuoteDesk assistant here about the gasket kit quote.", "offset_seconds": 0 },
+    { "speaker": "user", "text": "Yes, go on.", "offset_seconds": 5 },
+    { "speaker": "bot", "text": "What is the per unit price on the gasket kit?", "offset_seconds": 9 },
+    { "speaker": "user", "text": "We can ship it Tuesday itself.", "offset_seconds": 14 }
+  ],
+  "fields": [
+    {
+      "field": "unit_price",
+      "value": null,
+      "expects": "price",
+      "questionTurn": 2,
+      "answerTurns": [3],
+      "critical": true,
+      "expectedGrade": "assumed",
+      "expectSignals": ["H"]
+    }
+  ]
+}

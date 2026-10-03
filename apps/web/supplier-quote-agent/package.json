@@ -1,0 +1,41 @@
+{
+  "name": "call-e-supplier-quote-agent",
+  "version": "0.1.0",
+  "description": "AI agent that calls suppliers to request quotes, parses responses, and surfaces results in a live dashboard",
+  "main": "src/server.js",
+  "scripts": {
+    "start": "node src/server.js",
+    "start:real": "node --env-file=.env src/server.js",
+    "test": "jest --passWithNoTests",
+    "lint": "eslint src/ tests/ --ext .js,.jsx --fix",
+    "lint:check": "eslint src/ tests/ --ext .js,.jsx",
+    "dev": "node src/server.js"
+  },
+  "keywords": [
+    "call-e",
+    "agent",
+    "procurement",
+    "quotes"
+  ],
+  "author": "Chetan Gupta",
+  "license": "MIT",
+  "dependencies": {
+    "express": "^4.18.2",
+    "react": "^18.2.0",
+    "react-dom": "^18.2.0"
+  },
+  "devDependencies": {
+    "@babel/core": "^7.22.0",
+    "@babel/preset-env": "^7.22.0",
+    "@babel/preset-react": "^7.22.0",
+    "@testing-library/jest-dom": "^5.16.5",
+    "@testing-library/react": "^13.4.0",
+    "babel-jest": "^29.5.0",
+    "eslint": "^8.42.0",
+    "eslint-plugin-react": "^7.32.0",
+    "jest": "^29.5.0"
+  },
+  "engines": {
+    "node": ">=20.0.0"
+  }
+}

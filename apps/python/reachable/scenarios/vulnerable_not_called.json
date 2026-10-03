@@ -1,0 +1,16 @@
+{
+  "name": "Vulnerable pupil not called",
+  "description": "Dylan has the same absence pattern as Ivy but is flagged vulnerable. No call is placed, ever. The case goes straight to a named member of staff with the school's own notes attached, and the refusal is stored with its reason.",
+  "clock": "2026-09-11T10:30:00+01:00",
+  "steps": [
+    { "action": "import" },
+    { "action": "scan" }
+  ],
+  "expect": {
+    "cases": { "PF-P-1203-2026-09-10": "PF_NOT_CALLED" },
+    "decisions": ["PUPIL_VULNERABLE"],
+    "tasks": ["vulnerable_pupil"],
+    "never_called": ["C-2401", "C-2402"],
+    "calls_placed": 0
+  }
+}

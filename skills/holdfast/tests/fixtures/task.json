@@ -1,0 +1,16 @@
+{
+  "goal": "Get the current status of baggage claim AB12CD3.",
+  "callee": "+12025550123",
+  "user_name": "Alex Example",
+  "company": "example-airlines",
+  "context": {"claim_reference": "AB12CD3"},
+  "success_criteria": ["claim_status", "next_step", "reference_confirmed"],
+  "authorization_scope": {
+    "may_provide": ["claim_reference", "passenger_name"],
+    "may_confirm": ["flight details read back by the agent"],
+    "must_not": ["accept compensation", "change delivery address", "close the claim"]
+  },
+  "line_type": "recorded",
+  "language": "English",
+  "region": "US"
+}

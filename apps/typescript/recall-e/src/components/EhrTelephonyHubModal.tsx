@@ -1,0 +1,283 @@
+import React, { useState } from 'react';
+import {
+  Database,
+  ShieldCheck,
+  PhoneCall,
+  Radio,
+  Clock,
+  CheckCircle2,
+  FileText
+} from 'lucide-react';
+import { HipaaAuditRecord } from '../types';
+import { ModalShell } from './ui/ModalShell';
+
+interface EhrTelephonyHubModalProps {
+  isOpen: boolean;
+  onClose: () => void;
+  auditLogs: HipaaAuditRecord[];
+}
+
+export const EhrTelephonyHubModal: React.FC<EhrTelephonyHubModalProps> = ({
+  isOpen,
+  onClose,
+  auditLogs,
+}) => {
+  const [activeTab, setActiveTab] = useState<'ehr' | 'telephony' | 'hipaa'>('ehr');
+  const [syncingNow, setSyncingNow] = useState(false);
+  const [syncSuccessMessage, setSyncSuccessMessage] = useState(false);
+
+  if (!isOpen) return null;
+
+  const handleTriggerManualSync = () => {
+    setSyncingNow(true);
+    setTimeout(() => {
+      setSyncingNow(false);
+      setSyncSuccessMessage(true);
+      setTimeout(() => setSyncSuccessMessage(false), 2000);
+    }, 1200);
+  };
+
+  return (
+    <ModalShell
+      onClose={onClose}
+      maxWidthClassName="max-w-3xl"
+      icon={<Database className="w-5 h-5" />}
+      iconClassName="bg-teal-500/20 border-teal-400/40 text-teal-300"
+      title="Facility EHR & Telephony Hub"
+      titleBadge={
+        <span className="text-xs bg-emerald-900/80 text-emerald-300 border border-emerald-700/60 px-2 py-0.5 rounded-full font-mono flex items-center gap-1">
+          <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse" />
+          Live Production Gateway
+        </span>
+      }
+      subtitle="PointClickCare FHIR Connectors • VoIP ATA Bedside Telephony • HIPAA Compliance"
+      subheader={
+        <div className="bg-slate-100/90 border-b border-slate-200 px-5 py-2 flex items-center gap-2 text-xs font-semibold text-slate-600 shrink-0">
+          <button
+            onClick={() => setActiveTab('ehr')}
+            className={`px-3 py-1.5 rounded-lg transition cursor-pointer flex items-center gap-1.5 ${
+              activeTab === 'ehr' ? 'bg-white text-teal-800 shadow-2xs font-bold' : 'hover:text-slate-900'
+            }`}
+          >
+            <FileText className="w-3.5 h-3.5" />
+            <span>PointClickCare & MatrixCare</span>
+          </button>
+
+          <button
+            onClick={() => setActiveTab('telephony')}
+            className={`px-3 py-1.5 rounded-lg transition cursor-pointer flex items-center gap-1.5 ${
+              activeTab === 'telephony' ? 'bg-white text-teal-800 shadow-2xs font-bold' : 'hover:text-slate-900'
+            }`}
+          >
+            <PhoneCall className="w-3.5 h-3.5" />
+            <span>VoIP ATA & Bedside Lines</span>
+          </button>
+
+          <button
+            onClick={() => setActiveTab('hipaa')}
+            className={`px-3 py-1.5 rounded-lg transition cursor-pointer flex items-center gap-1.5 ${
+              activeTab === 'hipaa' ? 'bg-white text-teal-800 shadow-2xs font-bold' : 'hover:text-slate-900'
+            }`}
+          >
+            <ShieldCheck className="w-3.5 h-3.5" />
+            <span>HIPAA Purge & Audit Log</span>
+          </button>
+        </div>
+      }
+      bodyClassName="p-5 text-xs text-slate-700 space-y-4"
+      footer={
+        <>
+          <div className="flex items-center gap-1">
+            <ShieldCheck className="w-3.5 h-3.5 text-teal-600" />
+            <span>HIPAA BAA Active • SOC 2 Type II Certified Infrastructure</span>
+          </div>
+          <button
+            onClick={onClose}
+            className="px-4 py-1.5 rounded-lg bg-slate-800 hover:bg-slate-900 text-white font-semibold text-xs transition cursor-pointer"
+          >
+            Done
+          </button>
+        </>
+      }
+    >
+          {/* 1. EHR TAB */}
+          {activeTab === 'ehr' && (
+            <div className="space-y-4">
+              <div className="bg-emerald-50/70 border border-emerald-200 p-3.5 rounded-xl flex items-center justify-between">
+                <div>
+                  <div className="font-bold text-emerald-900 flex items-center gap-1.5">
+                    <CheckCircle2 className="w-4 h-4 text-emerald-600" />
+                    <span>PointClickCare FHIR Endpoint: Connected</span>
+                  </div>
+                  <div className="text-[11px] text-emerald-800 mt-0.5">
+                    Tenant ID: PCC-CA-MEADOWOOD-77 • Last Synced: 2 mins ago (Zero failures)
+                  </div>
+                </div>
+
+                <button
+                  onClick={handleTriggerManualSync}
+                  disabled={syncingNow}
+                  className="bg-emerald-700 hover:bg-emerald-800 text-white font-bold px-3 py-1.5 rounded-lg transition cursor-pointer disabled:opacity-50"
+                >
+                  {syncingNow ? 'Pushing FHIR Batch...' : syncSuccessMessage ? 'Sync Complete!' : 'Sync Now'}
+                </button>
+              </div>
+
+              {/* Sample EHR Clinical Note Auto-Generated by CALL-E */}
+              <div className="border border-slate-200 rounded-xl overflow-hidden">
+                <div className="bg-slate-50 px-4 py-2.5 border-b border-slate-200 flex items-center justify-between">
+                  <span className="font-bold text-slate-800 text-xs">
+                    Sample Automated EHR Progress Note (PCC Activities Log)
+                  </span>
+                  <span className="text-[11px] font-mono text-slate-500">
+                    HL7 FHIR DocumentReference v4.0.1
+                  </span>
+                </div>
+
+                <div className="p-4 bg-white font-mono text-[11px] text-slate-800 leading-relaxed space-y-2">
+                  <div className="text-slate-500">
+                    // Automated clinical entry generated upon call termination
+                  </div>
+                  <div>
+                    <strong>MRN:</strong> PCC-88219 (Rosa Mendez, Rm 104)
+                  </div>
+                  <div>
+                    <strong>ACTIVITY TYPE:</strong> 1-on-1 Validation Reminiscence Telephony
+                  </div>
+                  <div>
+                    <strong>OBSERVATION:</strong> Resident participated in 6.4-min structured Spanish reminiscence call regarding Panadería La Esperanza. High alertness (8.8/10), positive affect, zero agitation or reality disputation. Calmed and engaged. Appetite and fluid intake encouraged.
+                  </div>
+                  <div>
+                    <strong>VALIDATION CODE:</strong> VAL-REMIN-004 (Childhood Culinary Identity Anchor)
+                  </div>
+                  <div>
+                    <strong>FOLLOW-UP:</strong> Routine monitoring; no acute nursing intervention required.
+                  </div>
+                </div>
+              </div>
+
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 text-slate-600">
+                <div className="p-3 bg-slate-50 rounded-xl border border-slate-200">
+                  <h5 className="font-bold text-slate-900 mb-1">MatrixCare Bridge</h5>
+                  <p className="text-[11px] leading-relaxed">
+                    Supports HL7 v2 ADT/ORM interfaces for facilities utilizing MatrixCare Assisted Living edition.
+                  </p>
+                </div>
+                <div className="p-3 bg-slate-50 rounded-xl border border-slate-200">
+                  <h5 className="font-bold text-slate-900 mb-1">Nursing Pager Push</h5>
+                  <p className="text-[11px] leading-relaxed">
+                    Flagged calls trigger automatic HL7 alerts to Vocera communication badges within &lt;3 seconds.
+                  </p>
+                </div>
+              </div>
+            </div>
+          )}
+
+          {/* 2. TELEPHONY TAB */}
+          {activeTab === 'telephony' && (
+            <div className="space-y-4">
+              <div className="bg-slate-900 text-white p-4 rounded-xl space-y-2">
+                <div className="flex items-center justify-between">
+                  <span className="font-bold text-sm text-teal-300 flex items-center gap-1.5">
+                    <Radio className="w-4 h-4 text-teal-400" />
+                    Grandstream HT818 8-Port VoIP ATA Gateway
+                  </span>
+                  <span className="text-xs bg-teal-900 text-teal-200 px-2 py-0.5 rounded font-mono">
+                    SIP Port 5060 OK
+                  </span>
+                </div>
+                <p className="text-xs text-slate-300 leading-relaxed">
+                  Converts standard RJ11 2-wire analog bedside landline handsets into secure SIP VoIP lines. Residents simply lift their authentic retro handset when it rings.
+                </p>
+              </div>
+
+              <div className="border border-slate-200 rounded-xl divide-y divide-slate-100">
+                <div className="p-3 flex items-center justify-between">
+                  <div>
+                    <div className="font-bold text-slate-800">Ring Cadence Guardrail</div>
+                    <div className="text-[11px] text-slate-500">Maximum 4 rings (18 seconds) before auto-disconnect</div>
+                  </div>
+                  <span className="font-mono font-bold text-xs text-teal-800 bg-teal-50 px-2.5 py-1 rounded">
+                    Active (Prevents Distress)
+                  </span>
+                </div>
+
+                <div className="p-3 flex items-center justify-between">
+                  <div>
+                    <div className="font-bold text-slate-800">Unanswered Call Protocol</div>
+                    <div className="text-[11px] text-slate-500">Auto-schedules soft retry in 25 mins; notifies CNA if 2nd attempt missed</div>
+                  </div>
+                  <span className="font-mono font-bold text-xs text-slate-700 bg-slate-100 px-2.5 py-1 rounded">
+                    Enabled
+                  </span>
+                </div>
+
+                <div className="p-3 flex items-center justify-between">
+                  <div>
+                    <div className="font-bold text-slate-800">Handset Lift Detection</div>
+                    <div className="text-[11px] text-slate-500">Instant greeting latency upon off-hook detection (&lt;320ms)</div>
+                  </div>
+                  <span className="font-mono font-bold text-xs text-emerald-800 bg-emerald-50 px-2.5 py-1 rounded">
+                    Optimal
+                  </span>
+                </div>
+              </div>
+            </div>
+          )}
+
+          {/* 3. HIPAA & AUDIT LOG TAB */}
+          {activeTab === 'hipaa' && (
+            <div className="space-y-4">
+              <div className="bg-amber-50/70 border border-amber-200 p-3.5 rounded-xl">
+                <div className="flex items-center gap-2 font-bold text-amber-900 text-xs">
+                  <Clock className="w-4 h-4 text-amber-700 shrink-0" />
+                  <span>7-Day Encrypted Audio Auto-Purge Policy (HIPAA Mandated)</span>
+                </div>
+                <p className="text-[11px] text-amber-800 mt-1 leading-relaxed">
+                  Raw WAV audio files are stored in AES-256 encrypted storage and permanently destroyed after 7 days. Only de-identified clinical summaries and sentiment metrics remain in the EHR permanent chart.
+                </p>
+                <div className="mt-2 text-[11px] text-amber-900 font-semibold flex items-center gap-1">
+                  <span>Next scheduled purge: Tonight at 11:59 PM (12 audio files scheduled for destruction)</span>
+                </div>
+              </div>
+
+              {/* Immutable Audit Log Table */}
+              <div>
+                <h5 className="font-bold text-slate-900 text-xs mb-2">
+                  Immutable HIPAA Access & System Audit Log
+                </h5>
+                <div className="border border-slate-200 rounded-xl overflow-hidden">
+                  <table className="w-full text-left text-xs">
+                    <thead className="bg-slate-50 text-slate-500 text-[10px] uppercase font-bold border-b border-slate-200">
+                      <tr>
+                        <th className="p-2.5">Timestamp</th>
+                        <th className="p-2.5">User / Service</th>
+                        <th className="p-2.5">Action</th>
+                        <th className="p-2.5">Target Resident</th>
+                        <th className="p-2.5">Details</th>
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-slate-100 text-[11px]">
+                      {auditLogs.map((log) => (
+                        <tr key={log.id} className="hover:bg-slate-50/80">
+                          <td className="p-2.5 font-mono text-slate-500 whitespace-nowrap">{log.timestamp}</td>
+                          <td className="p-2.5 font-semibold text-slate-800">{log.staffName}</td>
+                          <td className="p-2.5">
+                            <span className="bg-slate-100 text-slate-700 px-1.5 py-0.5 rounded text-[10px] font-medium">
+                              {log.action}
+                            </span>
+                          </td>
+                          <td className="p-2.5 text-slate-700">{log.residentName}</td>
+                          <td className="p-2.5 text-slate-500 max-w-xs truncate">{log.details}</td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              </div>
+            </div>
+          )}
+
+    </ModalShell>
+  );
+};

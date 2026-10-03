@@ -1,0 +1,132 @@
+{
+  "scenario": "case_d_corrected_reference",
+  "description": "The case reference is stated once and misheard. The read-back catches it: the first value fails, and only the corrected value the representative confirmed survives as the confirmed reference.",
+  "envelope": {
+    "source_platform": "SYNTHETIC-DMS",
+    "source_claim_id": "CLM-1045",
+    "source_version": "v5",
+    "exception_status": "REJECTED",
+    "submitted_at": "2026-08-20",
+    "caller_organization": "Example Equipment Dealers",
+    "account_context": "dealer account 4471",
+    "counterparty_phone_e164": "+12025550163",
+    "economic_policy_id": "standard-pursuit",
+    "claim_face_value": "3115.00",
+    "claim_currency": "USD",
+    "documented_code": "R-114",
+    "documented_reason": "Rejected: serial number mismatch",
+    "documented_next_step": null,
+    "ordinary_remedies": [
+      {
+        "channel": "portal_status_check",
+        "outcome": "portal shows the mismatch code but not which serial to use"
+      },
+      {
+        "channel": "documented_code_resolution",
+        "outcome": "code sheet does not say which of the two serials is authoritative"
+      },
+      {
+        "channel": "written_follow_up",
+        "outcome": "email asked which serial to correct; no reply after six days"
+      }
+    ],
+    "exhaustion_manifest": {
+      "source_version": "v5",
+      "routes": [
+        {
+          "channel": "portal_status_check",
+          "outcome": "portal shows the mismatch code but not which serial to use",
+          "attempted_at": "2026-08-21"
+        },
+        {
+          "channel": "documented_code_resolution",
+          "outcome": "code sheet does not say which of the two serials is authoritative",
+          "attempted_at": "2026-08-23"
+        },
+        {
+          "channel": "written_follow_up",
+          "outcome": "email asked which serial to correct; no reply after six days",
+          "attempted_at": "2026-08-31"
+        }
+      ],
+      "information_gap": "no ordinary route states which of the two serial numbers is authoritative"
+    }
+  },
+  "recipient_e164": "+12025550163",
+  "transport": {
+    "state": "completed",
+    "call_id": "call_synthetic_case_d",
+    "failure_code": null,
+    "failure_message": null
+  },
+  "transcript_turns": [
+    {
+      "speaker": "bot",
+      "text": "I am an AI assistant calling for Example Equipment Dealers. May I ask about warranty claim CLM-1045?"
+    },
+    {
+      "speaker": "user",
+      "text": "Go ahead. Which account?"
+    },
+    {
+      "speaker": "bot",
+      "text": "Dealer account 4471."
+    },
+    {
+      "speaker": "user",
+      "text": "It is rejected. The serial on the claim does not match the unit history."
+    },
+    {
+      "speaker": "bot",
+      "text": "What do we need to do?"
+    },
+    {
+      "speaker": "user",
+      "text": "Correct the serial and resubmit. Your case reference is four eight one seven one."
+    },
+    {
+      "speaker": "bot",
+      "text": "Just to confirm, that is case four eight one one seven, correct?"
+    },
+    {
+      "speaker": "user",
+      "text": "No, that last digit is an eight. Four eight one seven eight, that is correct."
+    },
+    {
+      "speaker": "bot",
+      "text": "Understood. Anything else?"
+    },
+    {
+      "speaker": "user",
+      "text": "That is everything."
+    }
+  ],
+  "structured_result": {
+    "claim_status": "STATED_REJECTED",
+    "claim_status_evidence_quote": "It is rejected. The serial on the claim does not match the unit history.",
+    "stated_reason": "The serial on the claim does not match the unit history.",
+    "required_correction": "Correct the serial and resubmit.",
+    "required_documents": [],
+    "stated_deadline": null,
+    "escalation_path": null,
+    "stated_next_action": null,
+    "reference_kind": "CASE",
+    "reference_heard": "case four eight one seven one",
+    "reference_readback_performed": true,
+    "reference_confirmed": "case four eight one seven eight",
+    "reference_confirmation_quote": "No, that last digit is an eight. Four eight one seven eight, that is correct."
+  },
+  "expected": {
+    "kind": "OUTCOME",
+    "terminal_state": "INFORMATION_OBTAINED",
+    "claim_status": "STATED_REJECTED",
+    "identifier_state": "CONFIRMED_IDENTIFIER",
+    "confirmed_reference": {
+      "value": "CASE48178",
+      "kind": "CASE",
+      "corrected": true
+    },
+    "provider_replays": 1,
+    "write_back": "RECEIPT"
+  }
+}

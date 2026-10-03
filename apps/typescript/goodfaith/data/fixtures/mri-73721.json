@@ -1,0 +1,147 @@
+{
+  "id": "call_mock_mri73721",
+  "status": "completed",
+  "task_completed": true,
+  "summary": "Called 4 imaging centers for a self-pay MRI knee (73721) cash price.",
+  "completion_confidence": { "score": 0.85, "label": "high" },
+  "evidence": ["4 recipients dialed", "2 all-inclusive quotes captured", "1 split-fee quote", "1 voicemail"],
+  "structured_result": { "clinics_reached": 3, "quotes_obtained": 2, "lowest_all_inclusive": 465 },
+  "metadata": { "rfq_id": "rfq_demo_73721" },
+  "created_at": "2026-09-14T08:00:00Z",
+  "completed_at": "2026-09-14T08:06:25Z",
+  "recipients": [
+    {
+      "name": "Alamo Sports Imaging",
+      "phone": "+12105550129",
+      "status": "completed",
+      "summary": "Billing quoted an all-inclusive self-pay price of $465 including the radiologist read.",
+      "structured_result": {
+        "reached_billing": true,
+        "quote_given": true,
+        "cash_price": 465,
+        "currency": "USD",
+        "price_basis": "all_inclusive",
+        "includes": ["scan", "radiologist read", "images on CD"],
+        "excludes": ["contrast (not needed for 73721)"],
+        "requires_consult_first": false,
+        "estimate_valid_days": 30,
+        "earliest_appointment_days": 2,
+        "cpt_or_code_confirmed": "73721",
+        "quoted_verbatim": "For a self-pay knee MRI without contrast our all-inclusive cash price is four hundred and sixty-five dollars, and that includes the radiologist reading.",
+        "outcome": "quoted"
+      },
+      "attempts": [
+        {
+          "status": "completed",
+          "started_at": "2026-09-14T08:00:10Z",
+          "ended_at": "2026-09-14T08:03:45Z",
+          "transcript_turns": [
+            { "offset_seconds": 0, "speaker": "agent", "text": "Hi, I'm an assistant helping a self-pay patient get a cash price for an MRI of the knee without contrast, code 73721. Could you tell me your all-inclusive cash price?" },
+            { "offset_seconds": 15, "speaker": "clinic", "text": "Sure, let me check. For a self-pay knee MRI without contrast our all-inclusive cash price is four hundred and sixty-five dollars, and that includes the radiologist reading." },
+            { "offset_seconds": 33, "speaker": "agent", "text": "Great. Does that include the images and is there any separate reading fee?" },
+            { "offset_seconds": 40, "speaker": "clinic", "text": "No separate fee, the read is included and we give you the images on a CD. The estimate is good for thirty days." },
+            { "offset_seconds": 54, "speaker": "agent", "text": "And the earliest appointment?" },
+            { "offset_seconds": 57, "speaker": "clinic", "text": "We could fit you in this week, about two days out." }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "River Walk Orthopedic Imaging",
+      "phone": "+12105550176",
+      "status": "completed",
+      "summary": "Quoted a facility fee only; radiologist reads separately and bills on its own.",
+      "structured_result": {
+        "reached_billing": true,
+        "quote_given": true,
+        "cash_price": 499,
+        "currency": "USD",
+        "price_basis": "facility_only",
+        "includes": ["scan facility fee"],
+        "excludes": ["radiologist professional read (billed separately)"],
+        "requires_consult_first": false,
+        "estimate_valid_days": 14,
+        "earliest_appointment_days": 3,
+        "cpt_or_code_confirmed": "73721",
+        "quoted_verbatim": "The facility fee for the scan is four hundred and ninety-nine dollars, but the radiologist reads and bills separately, so that part is not included.",
+        "outcome": "quoted"
+      },
+      "attempts": [
+        {
+          "status": "completed",
+          "started_at": "2026-09-14T08:00:12Z",
+          "ended_at": "2026-09-14T08:04:05Z",
+          "transcript_turns": [
+            { "offset_seconds": 0, "speaker": "agent", "text": "Hi, I'm helping a self-pay patient. What is your all-inclusive cash price for a knee MRI without contrast, 73721?" },
+            { "offset_seconds": 13, "speaker": "clinic", "text": "The facility fee for the scan is four hundred and ninety-nine dollars, but the radiologist reads and bills separately, so that part is not included." },
+            { "offset_seconds": 29, "speaker": "agent", "text": "Do you know roughly what the reading fee runs?" },
+            { "offset_seconds": 34, "speaker": "clinic", "text": "That's through a separate group, I can't quote it, sorry." }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "Mission Trails Diagnostic",
+      "phone": "+12105550148",
+      "status": "completed",
+      "summary": "Would not quote without an in-person consult and a physician order first.",
+      "structured_result": {
+        "reached_billing": true,
+        "quote_given": false,
+        "cash_price": null,
+        "currency": "USD",
+        "price_basis": "unknown",
+        "includes": [],
+        "excludes": [],
+        "requires_consult_first": true,
+        "estimate_valid_days": null,
+        "earliest_appointment_days": null,
+        "cpt_or_code_confirmed": null,
+        "quoted_verbatim": null,
+        "outcome": "needs_consult"
+      },
+      "attempts": [
+        {
+          "status": "completed",
+          "started_at": "2026-09-14T08:00:15Z",
+          "ended_at": "2026-09-14T08:02:25Z",
+          "transcript_turns": [
+            { "offset_seconds": 0, "speaker": "agent", "text": "Hi, I'm helping a self-pay patient get a cash estimate for a knee MRI, 73721. What's your all-inclusive price?" },
+            { "offset_seconds": 12, "speaker": "clinic", "text": "We can't give a price without a physician order and a consult first. You'd need to come in." }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "Stone Oak Open MRI",
+      "phone": "+12105550193",
+      "status": "completed",
+      "summary": "Reached voicemail; no quote captured.",
+      "structured_result": {
+        "reached_billing": false,
+        "quote_given": false,
+        "cash_price": null,
+        "currency": "USD",
+        "price_basis": "unknown",
+        "includes": [],
+        "excludes": [],
+        "requires_consult_first": false,
+        "estimate_valid_days": null,
+        "earliest_appointment_days": null,
+        "cpt_or_code_confirmed": null,
+        "quoted_verbatim": null,
+        "outcome": "voicemail"
+      },
+      "attempts": [
+        {
+          "status": "completed",
+          "started_at": "2026-09-14T08:00:18Z",
+          "ended_at": "2026-09-14T08:00:49Z",
+          "transcript_turns": [
+            { "offset_seconds": 0, "speaker": "clinic", "text": "You've reached Stone Oak Open MRI, we're closed. Please leave a message after the tone." }
+          ]
+        }
+      ]
+    }
+  ]
+}

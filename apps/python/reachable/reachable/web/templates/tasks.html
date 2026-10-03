@@ -1,0 +1,43 @@
+{% extends "base.html" %}
+{% block title %}Staff tasks &middot; Reachable{% endblock %}
+{% block body %}
+
+<h1>Staff tasks</h1>
+<p class="muted">Everything Reachable handed to a person, rather than acting on itself.</p>
+
+{% if urgent %}
+<h2>Urgent</h2>
+{% for t in urgent %}
+<div class="panel urgent">
+  <strong>{{ names.get(t['pupil_id'], t['pupil_id']) }}</strong>
+  <span class="pill stop">{{ t['kind'] }}</span>
+  <p style="margin:6px 0">{{ t['detail'] }}</p>
+  <form method="post" action="/tasks/{{ t['task_id'] }}/handled" class="inline">
+    <button class="secondary" type="submit">Mark handled</button>
+  </form>
+</div>
+{% endfor %}
+{% endif %}
+
+<h2>Everything else</h2>
+<div class="panel">
+  <table>
+    <tr><th>Pupil</th><th>Kind</th><th>Detail</th><th></th></tr>
+    {% for t in ordinary %}
+    <tr>
+      <td>{{ names.get(t['pupil_id'], t['pupil_id']) }}</td>
+      <td class="mono">{{ t['kind'] }}</td>
+      <td>{{ t['detail'] }}</td>
+      <td>
+        <form method="post" action="/tasks/{{ t['task_id'] }}/handled" class="inline">
+          <button class="secondary" type="submit">Handled</button>
+        </form>
+      </td>
+    </tr>
+    {% else %}
+    <tr><td colspan="4" class="muted">Nothing outstanding.</td></tr>
+    {% endfor %}
+  </table>
+</div>
+
+{% endblock %}

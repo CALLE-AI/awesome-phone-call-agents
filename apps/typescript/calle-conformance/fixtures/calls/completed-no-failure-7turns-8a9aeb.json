@@ -1,0 +1,91 @@
+{
+  "id": "call_2c3b831d8b8a9aeb",
+  "object": "call_task",
+  "status": "completed",
+  "task": "Speak only the following three sentences, in this order, word for word. One: \"This is an automated call from an AI assistant.\" Two: \"Can you hear me clearly?\" Three: \"Thank you. Goodbye.\" Wait for an answer after the second sentence. Whatever the answer is, accept it. Say nothing else at all. Do not introduce yourself further, do not explain why you are calling, do not offer help, and do not add any sentence that is not one of the three above.",
+  "recipients": [
+    {
+      "id": "rcp_5f1be849ecccae6a",
+      "phones": [
+        "+12025550142"
+      ],
+      "locale": "en-US",
+      "region": "US",
+      "status": "completed",
+      "structuredResult": {
+        "heard_clearly": "yes"
+      },
+      "summary": "The call completed successfully. The recipient confirmed they could hear the automated AI assistant clearly.",
+      "attempts": [
+        {
+          "id": "att_6be132d54a016960",
+          "phone": "+12025550142",
+          "status": "completed",
+          "startedAt": "2026-03-04T14:00:48.174000Z",
+          "completedAt": "2026-03-04T14:01:06.733000Z",
+          "summary": "The call completed successfully. The recipient confirmed they could hear the automated AI assistant clearly.",
+          "transcriptTurns": [
+            {
+              "offset_seconds": 0,
+              "speaker": "bot",
+              "text": "This is an automated call from an AI assistant."
+            },
+            {
+              "offset_seconds": 2,
+              "speaker": "user",
+              "text": "Thanks for calling. How can I help you today?"
+            },
+            {
+              "offset_seconds": 3,
+              "speaker": "bot",
+              "text": "Can you hear me clearly?"
+            },
+            {
+              "offset_seconds": 11,
+              "speaker": "user",
+              "text": "Yes. I can hear you clearly. Can I help?"
+            },
+            {
+              "offset_seconds": 11,
+              "speaker": "bot",
+              "text": "Thank you."
+            },
+            {
+              "offset_seconds": 12,
+              "speaker": "bot",
+              "text": "Goodbye."
+            },
+            {
+              "offset_seconds": 17,
+              "speaker": "user",
+              "text": "Goodbye."
+            }
+          ],
+          "providerCallId": "3be32e10dd9832ce0717949db01c37ad",
+          "failureCode": null,
+          "failureMessage": null
+        }
+      ]
+    }
+  ],
+  "structuredResult": null,
+  "summary": "The call completed successfully. The recipient confirmed they could hear the automated AI assistant clearly.",
+  "taskCompleted": true,
+  "completionConfidence": {
+    "score": 0.95,
+    "label": "high"
+  },
+  "evidence": [
+    "A live recipient answered the call.",
+    "The required hearing-check question was asked.",
+    "The recipient answered yes, confirming they could hear clearly."
+  ],
+  "metadata": {
+    "run": "corpus",
+    "probe": "compliance"
+  },
+  "failureCode": null,
+  "failureMessage": null,
+  "createdAt": "2026-03-04T14:00:00.000000Z",
+  "completedAt": "2026-03-04T14:01:17.635000Z"
+}

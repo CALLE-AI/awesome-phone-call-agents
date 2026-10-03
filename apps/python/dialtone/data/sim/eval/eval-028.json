@@ -1,0 +1,70 @@
+{
+  "id": "eval-028",
+  "label": "ivr",
+  "difficulty": "typical",
+  "scenario": "Cable company tree with retention upsell, then endless hold music with a repeating 'your call is important' message.",
+  "task": "Cancel Maria Lopez's cable TV subscription.",
+  "outcome": {
+    "task_completed_claimed": false,
+    "commitment_type": "cancellation",
+    "confirmation_artifact": null,
+    "expected_attestation": "unverified"
+  },
+  "turns": [
+    {
+      "speaker": "user",
+      "text": "thank you for calling Vista Cable. this call may be monitored or recorded for quality purposes.",
+      "offset_seconds": 0.8
+    },
+    {
+      "speaker": "user",
+      "text": "for billing, press 1. for technical support, press 2. to upgrade your service, press 3. to cancel your service, press 4.",
+      "offset_seconds": 9.07
+    },
+    {
+      "speaker": "bot",
+      "text": "[DTMF 4]",
+      "offset_seconds": 20.4
+    },
+    {
+      "speaker": "user",
+      "text": "we're sorry to see you go. before you cancel, did you know you may qualify for our loyalty discount? to hear about special offers, press 1. to continue with cancellation, press 2.",
+      "offset_seconds": 21.55
+    },
+    {
+      "speaker": "bot",
+      "text": "[DTMF 2]",
+      "offset_seconds": 37.41
+    },
+    {
+      "speaker": "user",
+      "text": "please hold while we transfer you to a retention specialist. current wait times are longer than usual.",
+      "offset_seconds": 38.53
+    },
+    {
+      "speaker": "user",
+      "text": "[hold music]",
+      "offset_seconds": 46.96
+    },
+    {
+      "speaker": "user",
+      "text": "your call is important to us. please stay on the line and the next available representative will be with you shortly.",
+      "offset_seconds": 78.16
+    },
+    {
+      "speaker": "user",
+      "text": "[hold music]",
+      "offset_seconds": 88.21
+    },
+    {
+      "speaker": "user",
+      "text": "your call is important to us. please stay on the line and the next available representative will be with you shortly.",
+      "offset_seconds": 119.91
+    },
+    {
+      "speaker": "user",
+      "text": "[hold music]",
+      "offset_seconds": 129.96
+    }
+  ]
+}

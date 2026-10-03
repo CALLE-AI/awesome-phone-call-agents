@@ -230,10 +230,11 @@ not the operator's location.
 - **Call duration cap: 20 minutes.** CALL-E caps a call at 20 minutes (per CALL-E's PM
   in Discord, 2026-07-27). Very long disputes or complex arrangements may be cut off; the
   agent is scripted to close gracefully well within that window.
-- **Concurrency limit: 1 by default.** CALL-E allows 1 concurrent call on the default
-  number, or up to 10 with your own SIP trunk or a purchased number (per CALL-E's PM in
-  Discord, 2026-07-27). Rate limits are not publicly documented — for a large invoice
-  batch, space calls across time and check current limits before building a batch scheduler.
+- **Concurrency.** The [current FAQ](https://www.heycall-e.com/) lists 1 simultaneous
+  call on shared numbers, up to 10 on purchased numbers, and no CALL-E-imposed
+  concurrent call limit for SIP. Carrier capacity and account controls still apply.
+  Concurrency is distinct from call initiation rate; check effective limits before
+  running a large batch.
 - **Credit budget.** Free-tier CALL-E accounts have a limited call allowance. Treat
   every call as expensive during development; use dry-run mode to validate the full
   execution path before spending credits.

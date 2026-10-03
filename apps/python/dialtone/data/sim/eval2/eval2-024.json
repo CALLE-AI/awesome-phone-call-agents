@@ -1,0 +1,95 @@
+{
+  "id": "eval2-024",
+  "label": "human",
+  "difficulty": "hard",
+  "scenario": "Chatty theater box-office human interrupts the disclosure ('you're a what?'), overlaps repeatedly, pauses while processing, and confirms the refund verbally.",
+  "task": "Get a refund for the customer's two tickets to a Saturday matinee she can no longer attend.",
+  "outcome": {
+    "task_completed_claimed": true,
+    "commitment_type": "refund",
+    "confirmation_artifact": null,
+    "expected_attestation": "human_attested"
+  },
+  "turns": [
+    {
+      "speaker": "user",
+      "text": "Box office!",
+      "offset_seconds": 0.3
+    },
+    {
+      "speaker": "bot",
+      "text": "Hi, I'm an AI assistant calling on behalf of a customer, Sofia Marchetti, about her tickets for—",
+      "offset_seconds": 1.71
+    },
+    {
+      "speaker": "user",
+      "text": "Sorry, you're a what?",
+      "offset_seconds": 7.09
+    },
+    {
+      "speaker": "bot",
+      "text": "An AI assistant. I'm calling for Sofia Marchetti about her tickets for the Saturday matinee of The Lantern Keeper.",
+      "offset_seconds": 9.24
+    },
+    {
+      "speaker": "user",
+      "text": "Oh! Huh, okay. Wild. Yeah, the Saturday matinee, what about 'em?",
+      "offset_seconds": 16.35
+    },
+    {
+      "speaker": "bot",
+      "text": "She can't attend anymore and would like to know if she can get a refund for her two tickets.",
+      "offset_seconds": 20.62
+    },
+    {
+      "speaker": "user",
+      "text": "Mm, so, technically our policy's exchange only, but—",
+      "offset_seconds": 28.13
+    },
+    {
+      "speaker": "bot",
+      "text": "Understood.",
+      "offset_seconds": 30.3
+    },
+    {
+      "speaker": "user",
+      "text": "—but hang on, if it's more than forty-eight hours out, which it is, I can do it. Let me find her. Marchetti, M-A-R...",
+      "offset_seconds": 30.5
+    },
+    {
+      "speaker": "bot",
+      "text": "C-H-E-T-T-I.",
+      "offset_seconds": 39.47
+    },
+    {
+      "speaker": "user",
+      "text": "Yep, got her. Two seats, row G. Okay, so that's fifty-two dollars back to her card. I'm doing it right now.",
+      "offset_seconds": 41.75
+    },
+    {
+      "speaker": "user",
+      "text": "Okay... okay, done. Refund's gone through, fifty-two dollars. It'll show up in like five to seven days.",
+      "offset_seconds": 53.88
+    },
+    {
+      "speaker": "bot",
+      "text": "Thank you. So the two tickets are cancelled and fifty-two dollars is refunded to her card?",
+      "offset_seconds": 60.5
+    },
+    {
+      "speaker": "user",
+      "text": "Yep, yep. Both cancelled, fifty-two back.",
+      "offset_seconds": 66.08
+    },
+    {
+      "speaker": "bot",
+      "text": "Great, thanks so much for your help.",
+      "offset_seconds": 69.28
+    },
+    {
+      "speaker": "user",
+      "text": "No worries. Tell her we hope she makes the next one!",
+      "offset_seconds": 71.93
+    }
+  ]
+}

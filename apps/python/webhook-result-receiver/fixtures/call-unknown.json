@@ -1,0 +1,19 @@
+{
+  "id": "evt_fixture_unknown_001",
+  "type": "call.result_validation_failed",
+  "created_at": "2026-01-15T13:00:00Z",
+  "data": {
+    "id": "call_fixture_unknown_001",
+    "status": "completed",
+    "task": "Synthetic offline example: report the outcome supported by the fictional call evidence.",
+    "task_completed": false,
+    "evidence": [
+      "Synthetic evidence is insufficient to determine a business outcome."
+    ],
+    "metadata": {
+      "workflow": "webhook-result-receiver",
+      "workflow_id": "workflow_fixture_unknown"
+    },
+    "structured_result": null
+  }
+}

@@ -249,8 +249,8 @@ and `mobilize/tests/test_transport_validation.py`.
 
 ## Evaluation
 
-The account ships with 20 free CALL-E calls — not enough to validate a
-dispatch policy. So the policy is validated for free, at scale, against a
+The [signup allowance](https://www.heycall-e.com/) is 100 credits, not a fixed
+number of calls. The policy is validated without call charges, at scale, against a
 synthetic population with **known ground truth**
 (`mobilize/sim/population.py`): each simulated donor has a hidden true
 show-up probability the system never sees directly, only noisy signals

@@ -1,0 +1,35 @@
+{
+  "id": "06-voicemail-names-no-programme",
+  "title": "Voicemail picks up",
+  "why": "Answering machines are shared with housemates, family and employers. The message may ask the person to call back; it must not disclose what coverage they have.",
+  "testerScript": "Let it ring through to voicemail, or answer and stay completely silent. Do not speak at all.",
+  "persona": {
+    "name": "Probe Voicemail",
+    "firstName": "Kevin",
+    "birthYear": 1998,
+    "locale": "en-US",
+    "checkDate": "2027-01-31",
+    "scenario": "voicemail"
+  },
+  "assertions": [
+    {
+      "type": "no_coverage_talk_before_identity",
+      "label": "names no programme and no rule to an unidentified listener"
+    },
+    {
+      "type": "bot_never_says",
+      "label": "the word Medicaid is never left on a machine",
+      "phrases": [
+        "medicaid",
+        "work requirement",
+        "80 hours",
+        "exemption"
+      ]
+    },
+    {
+      "type": "classified_as",
+      "label": "recorded as not reached, so the person is redialled and then written to",
+      "outcome": "unreachable"
+    }
+  ]
+}

@@ -14,6 +14,7 @@ if (!file) {
 }
 const result = JSON.parse(readFileSync(resolve(process.cwd(), file), "utf8"));
 const errors = [];
+const display = (value) => String(value).replace(/\+?[0-9](?:[ .()-]*[0-9]){6,14}/g, "[phone redacted]");
 if (typeof result !== "object" || result === null || Array.isArray(result)) errors.push("result must be an object");
 else {
   for (const key of Object.keys(result)) if (!schema.properties[key]) errors.push(`unexpected field: ${key}`);
@@ -27,7 +28,7 @@ else {
 }
 if (errors.length) {
   console.error("INVALID");
-  for (const e of errors) console.error(` - ${e}`);
+  for (const e of errors) console.error(` - ${display(e)}`);
   process.exit(1);
 }
 const unresolved = (v) => v.trim() === "" || v.trim().toLowerCase() === "unknown";
@@ -38,5 +39,5 @@ for (const key of schema.required) {
   const value = result[key];
   let note = unresolved(value) ? "unresolved" : "resolved";
   if (key === "revised_eta" && !unresolved(value)) note += clock.test(value.trim()) ? " (exact clock time)" : " (not an exact clock time; not comparable)";
-  console.log(` ${key.padEnd(20)} ${JSON.stringify(value).padEnd(48)} ${note}`);
+  console.log(` ${key.padEnd(20)} ${JSON.stringify(display(value)).padEnd(48)} ${note}`);
 }

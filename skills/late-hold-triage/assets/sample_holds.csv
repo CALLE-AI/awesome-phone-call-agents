@@ -1,0 +1,4 @@
+guest_name,phone,slot_start,hold_until,business_name,context,region,locale
+Jordan Hale,+12025550147,2026-09-12T19:00:00-04:00,2026-09-12T19:20:00-04:00,Harbour Window,"table for two at the window",US,en-US
+Sam Okonkwo,+14155550188,2026-09-12T19:00:00-04:00,2026-09-12T19:15:00-04:00,Harbour Window,"booth for four near the bar",US,en-US
+Riley Chen,+16175550101,2026-09-12T18:45:00-04:00,2026-09-12T19:25:00-04:00,Harbour Window,"counter seat for one",US,en-US

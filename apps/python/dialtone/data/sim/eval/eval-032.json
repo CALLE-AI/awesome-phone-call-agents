@@ -1,0 +1,90 @@
+{
+  "id": "eval-032",
+  "label": "agent",
+  "difficulty": "hard",
+  "scenario": "Very low-latency, clipped voice agent (sub-half-second turn gaps) declares a gym membership cancelled and refuses any written confirmation.",
+  "task": "Cancel Derek Lawson's Pulse Fitness membership because he's moving.",
+  "outcome": {
+    "task_completed_claimed": true,
+    "commitment_type": "cancellation",
+    "confirmation_artifact": null,
+    "expected_attestation": "refused"
+  },
+  "turns": [
+    {
+      "speaker": "user",
+      "text": "Pulse Fitness, how can I help?",
+      "offset_seconds": 0.4
+    },
+    {
+      "speaker": "bot",
+      "text": "hi, I'm an AI assistant calling on behalf of member Derek Lawson. he'd like to cancel his membership.",
+      "offset_seconds": 3.0
+    },
+    {
+      "speaker": "user",
+      "text": "Sure. Member number or phone?",
+      "offset_seconds": 9.56
+    },
+    {
+      "speaker": "bot",
+      "text": "phone number 555-0159.",
+      "offset_seconds": 12.02
+    },
+    {
+      "speaker": "user",
+      "text": "Got it. Derek Lawson, Premium plan. Reason for cancelling?",
+      "offset_seconds": 15.34
+    },
+    {
+      "speaker": "bot",
+      "text": "he's moving out of state.",
+      "offset_seconds": 18.76
+    },
+    {
+      "speaker": "user",
+      "text": "Understood. Your membership is cancelled. You won't be billed again.",
+      "offset_seconds": 20.75
+    },
+    {
+      "speaker": "bot",
+      "text": "does he need to provide proof of the move, or give thirty days notice?",
+      "offset_seconds": 24.53
+    },
+    {
+      "speaker": "user",
+      "text": "No proof needed. No notice period. It's done.",
+      "offset_seconds": 29.62
+    },
+    {
+      "speaker": "bot",
+      "text": "can you email a written confirmation or give me a cancellation number?",
+      "offset_seconds": 32.95
+    },
+    {
+      "speaker": "user",
+      "text": "Not necessary. The cancellation is effective immediately.",
+      "offset_seconds": 37.29
+    },
+    {
+      "speaker": "bot",
+      "text": "okay. so no further charges after today?",
+      "offset_seconds": 40.25
+    },
+    {
+      "speaker": "user",
+      "text": "Correct. No further charges after today.",
+      "offset_seconds": 43.04
+    },
+    {
+      "speaker": "bot",
+      "text": "thank you.",
+      "offset_seconds": 45.58
+    },
+    {
+      "speaker": "user",
+      "text": "Anytime. Bye.",
+      "offset_seconds": 46.67
+    }
+  ]
+}

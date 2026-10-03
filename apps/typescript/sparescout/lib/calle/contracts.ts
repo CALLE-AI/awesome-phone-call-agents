@@ -1,5 +1,5 @@
 import type { Call, CallStatus, JsonObject } from "@call-e/calle";
-import { getSupportedMarket, supportsMarketLocale } from "../markets.ts";
+import { getSupportedMarket, supportsLiveMarketLocale, supportsMarketLocale } from "../markets.ts";
 
 export type SourcingSupplier = {
   id: string;
@@ -119,6 +119,9 @@ export function parseSourcingRequest(value: unknown): SourcingRequest {
   if (!supportsMarketLocale(countryCode, locale)) {
     throw new Error(`${locale} is not a supported CALL-E language for ${market.countryName}.`);
   }
+  if (isLive && !supportsLiveMarketLocale(countryCode, locale)) {
+    throw new Error(`Live CALL-E calling is not currently available for ${market.countryName} in this language. Use the clearly labeled no-call demo or choose a supported recipient region.`);
+  }
 
   if (!Array.isArray(input.suppliers) || input.suppliers.length < 1 || input.suppliers.length > 10) {
     throw new Error("Choose between 1 and 10 suppliers.");
@@ -194,9 +197,9 @@ export function buildAggregateResultSchema(): JsonObject {
     additionalProperties: false,
     required: ["suppliers_contacted", "quotes_received", "compatible_quotes"],
     properties: {
-      suppliers_contacted: { type: "integer", minimum: 0 },
-      quotes_received: { type: "integer", minimum: 0 },
-      compatible_quotes: { type: "integer", minimum: 0 },
+      suppliers_contacted: { type: "integer", description: "Number of suppliers the call task attempted to contact." },
+      quotes_received: { type: "integer", description: "Number of suppliers that provided a usable quote." },
+      compatible_quotes: { type: "integer", description: "Number of quotes whose fitment was explicitly confirmed." },
     },
   };
 }
@@ -220,18 +223,18 @@ export function buildRecipientResultSchema(currency: string): JsonObject {
       "notes",
     ],
     properties: {
-      part_found: { type: "boolean" },
-      compatibility: { type: "string", enum: ["confirmed", "rejected", "unknown"] },
-      brand: { type: "string" },
+      part_found: { type: "boolean", description: "True only when the supplier explicitly confirms the requested part is available." },
+      compatibility: { type: "string", enum: ["confirmed", "rejected", "unknown"], description: "Fitment against the exact vehicle and reference supplied by the buyer." },
+      brand: { type: "string", description: "Exact brand stated by the supplier, or unknown." },
       condition: { type: "string", enum: ["new", "used", "remanufactured", "unknown"] },
-      price_amount: { type: "number", minimum: 0 },
+      price_amount: { type: "number", description: "Quoted non-negative price." },
       currency: { type: "string", enum: [currency] },
-      available_quantity: { type: "integer", minimum: 0 },
+      available_quantity: { type: "integer", description: "Non-negative quantity explicitly stated by the supplier." },
       delivery_available: { type: "string", enum: ["yes", "no", "unknown"] },
-      delivery_eta: { type: "string" },
-      reservation_possible: { type: "string", enum: ["yes", "no", "unknown"] },
-      evidence: { type: "array", items: { type: "string" }, maxItems: 8 },
-      notes: { type: "string" },
+      delivery_eta: { type: "string", description: "Delivery timing stated by the supplier, or unknown." },
+      reservation_possible: { type: "string", enum: ["yes", "no", "unknown"], description: "Whether a separate later confirmation could reserve the item; this call must not reserve it." },
+      evidence: { type: "array", items: { type: "string" }, description: "Short statements from the call supporting fitment, price and stock." },
+      notes: { type: "string", description: "Other relevant supplier details, or an empty string." },
     },
   };
 }
@@ -264,8 +267,8 @@ export function normalizeCall(call: Call, suppliers: SourcingSupplier[]): Sourci
     summary: call.summary,
     evidence: call.evidence,
     quotes: call.recipients.map((recipient, index) => ({
-      supplierId: suppliers[index]?.id ?? recipient.id,
-      supplierName: suppliers[index]?.name ?? `Supplier ${index + 1}`,
+      supplierId: suppliers.find((supplier) => recipient.phones.includes(supplier.phone))?.id ?? recipient.id,
+      supplierName: suppliers.find((supplier) => recipient.phones.includes(supplier.phone))?.name ?? `Unmatched supplier ${index + 1}`,
       status: recipient.status,
       result: recipient.structuredResult,
       summary: recipient.summary,

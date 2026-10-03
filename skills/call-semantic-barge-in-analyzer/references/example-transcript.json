@@ -1,0 +1,17 @@
+{
+  "status": "COMPLETED",
+  "result": {
+    "post_summary": "Lab results explained; summary sent to the patient's phone.",
+    "transcript": [
+      {"speaker": "agent", "text": "Hello, this is an automated assistant from Example Clinic about your lab results."},
+      {"speaker": "callee", "text": "Mm-hmm."},
+      {"speaker": "agent", "text": "Your results came back normal, and the doctor reviewed them yesterday."},
+      {"speaker": "callee", "text": "Right, okay."},
+      {"speaker": "agent", "text": "No follow-up is needed. Would you like the summary sent to your phone?"},
+      {"speaker": "callee", "text": "Yes, please."},
+      {"speaker": "agent", "text": "Done. You will receive it today. Goodbye."},
+      {"speaker": "callee", "text": "Great, thanks."}
+    ]
+  },
+  "callee_phone": "+14155550188"
+}

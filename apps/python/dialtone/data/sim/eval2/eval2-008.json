@@ -1,0 +1,70 @@
+{
+  "id": "eval2-008",
+  "label": "agent",
+  "difficulty": "typical",
+  "scenario": "Pharmacy LLM voice agent discloses AI status and answers policy/hours questions about prescription transfers; purely informational.",
+  "task": "Find out how to transfer a prescription to the pharmacy and its Saturday counter hours.",
+  "outcome": {
+    "task_completed_claimed": true,
+    "commitment_type": "information",
+    "confirmation_artifact": null,
+    "expected_attestation": "agent_asserted"
+  },
+  "turns": [
+    {
+      "speaker": "user",
+      "text": "Hello, you've reached Cedar Point Pharmacy. I'm an AI assistant and this call may be recorded. Are you calling about a prescription, store hours, or something else?",
+      "offset_seconds": 0.8
+    },
+    {
+      "speaker": "bot",
+      "text": "Hi, I'm also an AI assistant, calling on behalf of a customer, Walter Pennick. I have a question about transferring a prescription from another pharmacy.",
+      "offset_seconds": 11.42
+    },
+    {
+      "speaker": "user",
+      "text": "Sure, I can help with general questions about prescription transfers. What would you like to know?",
+      "offset_seconds": 21.98
+    },
+    {
+      "speaker": "bot",
+      "text": "Can you transfer a prescription for a maintenance medication from Greenline Pharmacy, and how long does it usually take?",
+      "offset_seconds": 28.58
+    },
+    {
+      "speaker": "user",
+      "text": "Yes. We can transfer most non-controlled prescriptions from any pharmacy. Once we receive the prescription details, transfers usually take about one business day. Controlled substances, like certain pain or ADHD medications, can't be transferred and would need a new prescription from the doctor.",
+      "offset_seconds": 36.82
+    },
+    {
+      "speaker": "bot",
+      "text": "Thanks. It's a blood pressure medication, so it's not controlled. What does he need to provide?",
+      "offset_seconds": 53.09
+    },
+    {
+      "speaker": "user",
+      "text": "He'll need the name and phone number of the current pharmacy, the prescription number, and his date of birth. He can give those at the counter or in the Cedar Point app.",
+      "offset_seconds": 60.16
+    },
+    {
+      "speaker": "bot",
+      "text": "And what are your pharmacy counter hours on Saturday?",
+      "offset_seconds": 72.48
+    },
+    {
+      "speaker": "user",
+      "text": "On Saturdays, the pharmacy counter is open from 9 AM to 5 PM. It's closed for lunch from 1:30 to 2 PM.",
+      "offset_seconds": 77.22
+    },
+    {
+      "speaker": "bot",
+      "text": "Perfect, that's all I needed. Thank you.",
+      "offset_seconds": 86.27
+    },
+    {
+      "speaker": "user",
+      "text": "You're welcome. Thanks for calling Cedar Point Pharmacy.",
+      "offset_seconds": 90.16
+    }
+  ]
+}
