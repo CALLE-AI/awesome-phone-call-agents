@@ -109,7 +109,60 @@ The total itself was disclosed correctly, which makes the drip stand out:
 fees were never mentioned before consent, and the first fee sentence lands
 one turn after "Yes, go ahead."
 
-## Example 3: craft the transparent-offer goal
+## Example 3: the recurring term surfacing only after consent (PARTIAL_DISCLOSURE)
+
+Fixture: `references/example-transcript-partial.json` - the $45 total is
+stated before the sign-up question, but "per month" first appears after
+consent, so recurring terms were required yet never disclosed up front.
+
+Command:
+
+```bash
+python3 skills/call-total-cost-disclosure-auditor/scripts/total_cost_disclosure_auditor.py analyze \
+  --transcript skills/call-total-cost-disclosure-auditor/references/example-transcript-partial.json
+```
+
+Output:
+
+```json
+{
+  "call_id": "demo-cost-002",
+  "verdict": "PARTIAL_DISCLOSURE",
+  "commitment_elicitation": {
+    "turn_index": 2,
+    "snippet": "Would you like to proceed today?"
+  },
+  "consent_point": 3,
+  "disclosures": {
+    "total_amount": {
+      "covered": true
+    },
+    "recurring": {
+      "required": true,
+      "covered": false
+    },
+    "fees_restrictions": {
+      "required": false,
+      "covered": false
+    }
+  },
+  "drip_evidence": null,
+  "reason": "mentioned in the call but not before consent: recurring terms",
+  "counts": {
+    "agent_turns": 3,
+    "amounts_pre_consent": 1,
+    "fee_mentions_total": 0
+  },
+  "disclaimer": "Presence-and-timing audit only. The skill cannot verify a stated amount is the true or complete price, only that a total was spoken before consent; multi-item calls may interleave disclosures; digits-and-'dollars' lexicon only (no number words, no non-USD currencies in v1). Findings route to review."
+}
+```
+
+It is not drip pricing: the post-consent "$45 per month" repeats the
+already-disclosed amount, so no NEW money term appears after consent. The
+finding is timing only - the charge's recurring nature surfaced after the
+callee had already said yes.
+
+## Example 4: craft the transparent-offer goal
 
 Command:
 

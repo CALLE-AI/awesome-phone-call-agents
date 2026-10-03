@@ -1,0 +1,12 @@
+{
+  "call_id": "demo-cost-002",
+  "status": "COMPLETED",
+  "callee_phone": "+14155550174",
+  "transcript": [
+    {"speaker": "agent", "text": "Hello, this is Example Gym calling about the trial session you visited. The total comes to $45."},
+    {"speaker": "callee", "text": "Okay."},
+    {"speaker": "agent", "text": "Would you like to proceed today?"},
+    {"speaker": "callee", "text": "Sure, let's do it."},
+    {"speaker": "agent", "text": "Great, welcome aboard. It is billed $45 per month."}
+  ]
+}

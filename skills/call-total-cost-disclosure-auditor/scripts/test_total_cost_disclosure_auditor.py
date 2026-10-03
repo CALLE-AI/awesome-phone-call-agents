@@ -18,6 +18,7 @@ SCRIPTS = Path(__file__).resolve().parent
 SKILL_DIR = SCRIPTS.parent
 EXAMPLE_FLAT = SKILL_DIR / "references" / "example-transcript.json"
 EXAMPLE_DRIP = SKILL_DIR / "references" / "example-transcript-drip.json"
+EXAMPLE_PARTIAL = SKILL_DIR / "references" / "example-transcript-partial.json"
 
 sys.path.insert(0, str(SCRIPTS))
 from total_cost_disclosure_auditor import (  # noqa: E402
@@ -475,6 +476,17 @@ def test_drip_fixture_file():
     card = json.loads(proc.stdout)
     assert card["verdict"] == "DRIP_PRICING_DETECTED"
     assert card["drip_evidence"]["kind"] == "fee_first_mentioned_post_consent"
+
+
+def test_flat_partial_fixture_file():
+    proc = _run_cli("analyze", "--transcript", str(EXAMPLE_PARTIAL))
+    assert proc.returncode == 0, proc.stderr
+    card = json.loads(proc.stdout)
+    assert card["call_id"] == "demo-cost-002"
+    assert card["verdict"] == "PARTIAL_DISCLOSURE"
+    assert card["disclosures"]["recurring"] == {"required": True, "covered": False}
+    assert card["drip_evidence"] is None
+    assert "recurring terms" in card["reason"]
 
 
 def test_string_transcript_no_commit():

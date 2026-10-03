@@ -91,6 +91,16 @@ required-but-uncovered and yields `PARTIAL_DISCLOSURE`.
 - Consent and elicitation lexicons are lexical and English-only;
   uncontracted forms are covered ("let us get you signed up", "I will go
   ahead and book"), but paraphrases outside the lexicon are not.
+- `_norm_amount` strips separators when comparing amounts, so "$45.50" and
+  "4550 dollars" normalize identically; decimal-vs-separator collisions
+  are an accepted ambiguity of the drip comparison.
+- When no consent point is found, the call falls back to pre-elicitation
+  grading and drip detection does not run; a drip-shaped call can card as
+  COMMITMENT_WITHOUT_AMOUNT rather than DRIP_PRICING_DETECTED.
+- ANY new amount after consent triggers drip detection, including
+  legitimate new line items or later offers in the same call.
+- counts.amounts_pre_consent counts regex mentions, not distinct amounts;
+  a repeated "$45" spoken twice before consent counts as 2.
 - Findings route to human review; this is not a legal ruling.
 
 ## Usage
