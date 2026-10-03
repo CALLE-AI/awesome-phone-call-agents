@@ -18,6 +18,7 @@ from pathlib import Path
 SCRIPTS = Path(__file__).resolve().parent
 SKILL_DIR = SCRIPTS.parent
 EXAMPLE_DIRECT = SKILL_DIR / "references" / "example-transcript.json"
+EXAMPLE_PARTIAL = SKILL_DIR / "references" / "example-transcript-partial.json"
 
 sys.path.insert(0, str(SCRIPTS))
 from answer_evasion_auditor import (  # noqa: E402
@@ -663,6 +664,16 @@ def test_flat_fixture_file():
     assert report["call_id"] == "demo-evasion-001"
     assert report["verdict"] == "DIRECT_ANSWERS"
     assert report["counts"] == {"total": 3, "clear": 3, "partially_clear": 0, "evasive": 0}
+
+
+def test_flat_partial_fixture_file():
+    code, out = _run_main(["analyze", "--transcript", str(EXAMPLE_PARTIAL)])
+    assert code == 0
+    report = json.loads(out)
+    assert report["call_id"] == "demo-evasion-003"
+    assert report["verdict"] == "PARTIAL_EVASION"
+    assert report["counts"] == {"total": 2, "clear": 1, "partially_clear": 1, "evasive": 0}
+    assert report["questions"][0]["mechanism"] == "non_answer_ack"
 
 
 def test_string_transcript_single_agent_turn():

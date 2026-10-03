@@ -110,6 +110,49 @@ Output:
 }
 ```
 
+## analyze on example-transcript-partial.json
+
+Command:
+
+```bash
+python3 skills/call-answer-evasion-auditor/scripts/answer_evasion_auditor.py analyze \
+  --transcript skills/call-answer-evasion-auditor/references/example-transcript-partial.json
+```
+
+Output:
+
+```json
+{
+  "call_id": "demo-evasion-003",
+  "skill": "call-answer-evasion-auditor",
+  "analysis_mode": "heuristic",
+  "verdict": "PARTIAL_EVASION",
+  "questions": [
+    {
+      "turn_index": 1,
+      "question": "Do you offer weekend delivery?",
+      "kind": "yes_no",
+      "grade": "partially_clear",
+      "mechanism": "non_answer_ack"
+    },
+    {
+      "turn_index": 3,
+      "question": "How much is the weekend fee?",
+      "kind": "wh",
+      "grade": "clear",
+      "mechanism": null
+    }
+  ],
+  "counts": {
+    "total": 2,
+    "clear": 1,
+    "partially_clear": 1,
+    "evasive": 0
+  },
+  "disclaimer": "Heuristic text-only grading of agent answers. An EVASIVE grade is evidence of wording, not of intent to deceive; the agent may lack the information, which counts as CLEAR only when stated plainly ('I don't have that information'). Findings route to review, never to auto-invalidation of the call."
+}
+```
+
 ## craft booking-candid
 
 Command:
