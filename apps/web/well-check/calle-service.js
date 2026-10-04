@@ -123,16 +123,10 @@ export async function createAndRunCall(phone) {
         
         console.log(`[CALL-E SDK] Call to ${maskPhone(phone)} resulted in status: ${call.status}`);
         
-        let safeResult = call.taskCompleted ? call.structuredResult : null;
-        if (safeResult) {
-            safeResult.wellbeing_summary = '[Health Details Redacted]';
-            if (safeResult.concern_reason) safeResult.concern_reason = '[Health Details Redacted]';
-        }
-
         return {
             id: call.id,
             status: call.status,
-            structuredResult: safeResult,
+            structuredResult: call.taskCompleted ? call.structuredResult : null,
             completionConfidence: call.completionConfidence,
             failureCode: call.failureCode,
             failureMessage: call.failureMessage
