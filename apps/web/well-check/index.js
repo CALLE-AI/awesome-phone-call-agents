@@ -120,7 +120,8 @@ app.post('/api/trigger-call', async (req, res) => {
         
         // Mocking the alert system
         if (logEntry.concern_level === 'high') {
-            console.error(`\n[ALERT] High concern for ${contact.name}: ${logEntry.concern_reason}\n`);
+            const safeName = contact.name.replace(/./g, '*');
+            console.error(`\n[ALERT] High concern for ${safeName}: [Health Details Redacted]\n`);
         }
 
         res.json({ success: true, log: logEntry });

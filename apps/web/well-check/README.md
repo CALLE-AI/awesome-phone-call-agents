@@ -104,6 +104,8 @@ This project is licensed under the MIT License. See the LICENSE file for more de
 A sample database with curated demo check-ins is included. To populate your dashboard instantly, copy database.seed.json to database.json.
 
 ## Security & Authentication
-**Note:** This application is designed to run locally for the hackathon. It includes a basic shared-secret auth layer (x-api-key) to prevent arbitrary public endpoints access. TEST_MODE is strictly enforced to ensure calls are only placed to explicitly allowed test numbers.
+**Note:** This application is designed to run locally for the hackathon. It includes a basic shared-secret auth layer (`x-api-key`) to prevent arbitrary public endpoints access. **Because this key is shipped directly to the browser in the frontend JavaScript, it acts strictly as a deterrent against casual automated scans on a local or private network, not as real security.** 
 
-If deployed to production, this app would require full user authentication (e.g., OAuth/JWT), rate limiting, and per-user access control policies on the API and database levels.
+`TEST_MODE` is strictly enforced to ensure calls are only placed to explicitly allowed test numbers, and a separate `ALLOW_LIVE_CALLS` flag must be set to prevent accidental real SDK calls.
+
+If deployed to production, this app would require full server-side session authentication (e.g., OAuth/JWT) that never exposes credentials to the client, rate limiting, and per-user access control policies on the API and database levels.

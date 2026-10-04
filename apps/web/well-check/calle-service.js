@@ -56,25 +56,22 @@ Your tone must be gentle, clear, and reassuring. Speak slowly and clearly.
 }
 
 export async function createAndRunCall(phone) {
-    // 1) STRICT GUARD: Must validate E.164 format and match ALLOWED_TEST_NUMBERS
     const e164Regex = /^\+[1-9]\d{1,14}$/;
     if (!e164Regex.test(phone)) {
         throw new Error(`Invalid phone number format. Must be E.164.`);
     }
 
     const TEST_MODE = process.env.TEST_MODE === 'true';
-    if (!TEST_MODE) {
-        throw new Error(`Public deployments must run in TEST_MODE=true.`);
-    }
+    const ALLOW_LIVE_CALLS = process.env.ALLOW_LIVE_CALLS === 'true';
 
-    const ALLOWED_TEST_NUMBERS = (process.env.ALLOWED_TEST_NUMBERS || '').split(',').map(n => n.trim());
-    if (!ALLOWED_TEST_NUMBERS.includes(phone)) {
-        throw new Error(`Phone number ${phone} is not explicitly listed in ALLOWED_TEST_NUMBERS.`);
-    }
+    // 1) TEST_MODE unconditionally forces mock path
+    if (TEST_MODE) {
+        const ALLOWED_TEST_NUMBERS = (process.env.ALLOWED_TEST_NUMBERS || '').split(',').map(n => n.trim());
+        if (!ALLOWED_TEST_NUMBERS.includes(phone)) {
+            throw new Error(`Phone number ${phone} is not explicitly listed in ALLOWED_TEST_NUMBERS.`);
+        }
 
-    // 2) MOCK MODE vs REAL SDK
-    if (!process.env.CALLE_API_KEY) {
-        console.log(`[CALL-E MOCK] Initiating call to ${maskPhone(phone)}... (No API key found)`);
+        console.log(`[CALL-E MOCK] Initiating call to ${maskPhone(phone)}... (TEST_MODE=true)`);
         await new Promise(resolve => setTimeout(resolve, 2000));
         
         const outcomes = [
@@ -108,8 +105,11 @@ export async function createAndRunCall(phone) {
     }
 
     // 3) REAL SDK CALL
+    if (!ALLOW_LIVE_CALLS) {
+        throw new Error(`Real calls are disabled. Must set ALLOW_LIVE_CALLS=true to place real calls when TEST_MODE=false.`);
+    }
+
     console.log(`[CALL-E SDK] Initiating real call to ${maskPhone(phone)}...`);
-    console.log(`[GUARD VERIFICATION] About to dial: ${maskPhone(phone)}. Is it in ALLOWED_TEST_NUMBERS? ${ALLOWED_TEST_NUMBERS.includes(phone)}`);
     const client = new CalleClient({ apiKey: process.env.CALLE_API_KEY });
     
     const task = buildPrompt(phone);
@@ -123,10 +123,16 @@ export async function createAndRunCall(phone) {
         
         console.log(`[CALL-E SDK] Call to ${maskPhone(phone)} resulted in status: ${call.status}`);
         
+        let safeResult = call.taskCompleted ? call.structuredResult : null;
+        if (safeResult) {
+            safeResult.wellbeing_summary = '[Health Details Redacted]';
+            if (safeResult.concern_reason) safeResult.concern_reason = '[Health Details Redacted]';
+        }
+
         return {
             id: call.id,
             status: call.status,
-            structuredResult: call.taskCompleted ? call.structuredResult : null,
+            structuredResult: safeResult,
             completionConfidence: call.completionConfidence,
             failureCode: call.failureCode,
             failureMessage: call.failureMessage

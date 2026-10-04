@@ -40,17 +40,24 @@ async function fetchData() {
     if (!contactId) return document.getElementById("contact-header").innerHTML = "<h1>Contact not found</h1>";
 
     try {
+        const headers = { 'x-api-key': API_KEY };
         const [contactsRes, logsRes, trendRes] = await Promise.all([
-            fetch("/api/contacts"),
-            fetch("/api/logs"),
-            fetch(`/api/trend/${contactId}`, { headers: { 'x-api-key': API_KEY } })
+            fetch("/api/contacts", { headers }),
+            fetch("/api/logs", { headers }),
+            fetch(`/api/trend/${contactId}`, { headers })
         ]);
         
         const allContacts = await contactsRes.json();
-        contact = allContacts.find(c => c.id === contactId);
         const allLogs = await logsRes.json();
-        logs = allLogs.filter(l => l.contactId === contactId);
         trend = await trendRes.json();
+        
+        if (allContacts.error) {
+            document.getElementById("contact-header").innerHTML = "<h1>Error: " + escapeHTML(allContacts.error) + "</h1>";
+            return;
+        }
+
+        contact = allContacts.find(c => c.id === contactId);
+        logs = allLogs.filter(l => l.contactId === contactId);
         
         render();
     } catch (e) {
