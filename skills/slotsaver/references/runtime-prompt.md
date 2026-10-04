@@ -82,15 +82,28 @@ must not be folded into it:
   flag it NEEDS-ATTENTION for a human to reconcile (listen to the
   recording/notes, call back personally, or explicitly confirm the
   real outcome).
-- A real appointment or waitlist state change (CONFIRMED, slot freed,
-  slot backfilled) is only ever finalized on a `structured_result` that
-  both parses against the schema *and* reflects a confirmed identity
-  per the prompt above — never on an ambiguous or malformed one.
-- Mock-only scope: the reference implementation's tests exercise this
-  stop-and-flag behavior against a scripted mock caller. The
-  reconciliation step itself — a human reviewing a NEEDS-ATTENTION
-  call and deciding the real outcome — is a manual action outside this
-  skill, not something it automates against real CALL-E responses.
+- Even a clean, schema-valid result is only a **proposed** outcome. A
+  schema match plus the model's own claim that it confirmed the
+  recipient's identity is not enough to change a real appointment or
+  waitlist record. A real state change (CONFIRMED, slot freed, slot
+  backfilled) needs both:
+  1. **Recipient evidence**: CALL-E's call record shows the call
+     connected to the exact number on file for that appointment or
+     waitlist entry. A model-written `notes` field doesn't count as
+     evidence on its own.
+  2. **Human confirmation**: an operator reviews the proposed outcome
+     against that evidence (and the call's notes or recording, where
+     available) and explicitly approves it before the clinic's real
+     schedule is written.
+  Until both happen, the outcome stays a pending proposal and the real
+  record doesn't change.
+- **Mock-only scope:** in this skill and its reference implementation,
+  state changes are applied automatically only to fictional demo data
+  (a scripted mock caller and a demo board). It isn't connected to any
+  real clinic schedule, and nothing here writes a real appointment
+  change without the human confirmation step above. Every
+  "mark CONFIRMED / free the slot / slot filled" effect in
+  `examples.md` is a mock-only illustration of the proposed outcome.
 
 ## Why the wording is this specific
 

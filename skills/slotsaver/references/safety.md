@@ -24,7 +24,7 @@
 - The CALL-E API key and any auth token used to trigger a run are read
   from server-side environment/secret storage only; neither is ever sent
   to, or readable from, any browser-facing page or API response.
-- Any status page shows masked phone numbers (e.g. `+9182••••404`) and
+- Any status page shows masked phone numbers (e.g. `+1555••••567`) and
   opaque integer IDs — never a full phone number or an internal token.
 - Endpoints that can place a real call or start a real run are gated by a
   server-side token check using a constant-time comparison, to avoid
@@ -58,9 +58,15 @@
   Both are flagged NEEDS-ATTENTION and require a human to reconcile the
   real outcome before any appointment/waitlist record changes on the
   strength of that call.
-- A real appointment or waitlist state change is only finalized on a
-  `structured_result` that both parses against the schema and reflects a
-  confirmed recipient identity per `references/runtime-prompt.md`.
+- A schema-valid result plus model-reported identity is **not**
+  sufficient authorization. Every call outcome is a proposal. A real
+  appointment or waitlist record only changes after (1) recipient
+  evidence from CALL-E's call record shows the call connected to the
+  number on file, and (2) a human operator explicitly approves the
+  proposed outcome. See `references/runtime-prompt.md`.
+- Automatic state changes in this skill and its reference
+  implementation are **mock-only**: they apply to fictional demo data
+  and a demo board, never to a real clinic schedule.
 - See `references/runtime-prompt.md` and `references/examples.md` for
   the exact prompt wording and example payloads.
 

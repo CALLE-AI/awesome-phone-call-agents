@@ -124,7 +124,12 @@ or:
 
 (no `outcome` key present, even though `status` says `completed`).
 
-## 5. One evening run, end to end (sample sequence)
+## 5. One evening run, end to end (sample sequence, mock-only)
+
+**Mock-only.** The "Effect" column shows the *proposed* change on
+fictional demo data. Against a real clinic schedule, each effect stays
+pending until recipient evidence and a human operator approve it (see
+`references/runtime-prompt.md`).
 
 | Step | Action | Outcome | Effect |
 |------|--------|---------|--------|

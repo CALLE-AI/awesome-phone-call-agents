@@ -54,6 +54,14 @@ Mandatory fields — do not infer any of these from unrelated context:
    still-needs-attention count (no-answer and wrong-person/malformed
    cases both count here, and should be distinguishable in the report).
 
+**Outcomes are proposals, not authorization.** The "mark / free / fill"
+effects above apply automatically only to mock, fictional demo data. A
+real appointment or waitlist record changes only after recipient
+evidence (CALL-E's call record shows the call connected to the number
+on file) and an explicit human operator approval. A schema-valid result
+plus the model's own identity claim is never enough. See
+`references/runtime-prompt.md`.
+
 See `references/runtime-prompt.md` for the exact `task` prompt templates
 and the full "Handling results that aren't a clean match" rule, and
 `references/examples.md` for full request/response payloads, including
