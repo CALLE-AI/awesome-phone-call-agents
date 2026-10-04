@@ -236,28 +236,43 @@ def call_caregiver(event: FallEvent) -> Decision:
     structured_result = call.get("structured_result") or {}
     decision = structured_result.get("decision", "unknown")
 
-    print(f"[Watchtower] Caregiver call status: {status}")
+    print(f"[Watchtower] Caregiver call status: {_mask_text(status)}")
     print(f"[Watchtower] Task completed: {task_completed}")
-    print(f"[Watchtower] Decision: {decision}")
+    print(f"[Watchtower] Decision: {_mask_text(decision)}")
 
-    if not task_completed or decision not in ("dismiss", "escalate"):
+    # task_completed=True alone is NOT sufficient - a provider can mark
+    # a task "completed" while the call's own status is still
+    # non-terminal (in_progress, queued, etc.), or vice versa. Both must
+    # independently confirm a genuinely finished call before the
+    # decision is trusted for anything - including escalation.
+    is_terminal_status = status in ("completed",)
+
+    if not (is_terminal_status and task_completed and decision in ("dismiss", "escalate")):
         print(
-            "[Watchtower] Result is ambiguous (incomplete task or unclear "
-            "decision). STOPPING - not retrying, not auto-escalating. "
-            "This requires manual operator review."
+            f"[Watchtower] Result is ambiguous (status={_mask_text(status)}, "
+            f"task_completed={task_completed}, decision={_mask_text(decision)}). "
+            f"STOPPING - not retrying, not auto-escalating. This requires "
+            f"manual operator review."
         )
         return "unknown"
 
     return decision  # type: ignore[return-value]
 
 
-def call_secondary_contact_for_escalation(event: FallEvent) -> None:
+def call_secondary_contact_for_escalation(event: FallEvent) -> bool:
     """
     Places a call to a human secondary contact. Only ever called when a
-    caregiver has EXPLICITLY said "escalate" during a completed call -
-    never automatically for an ambiguous/unknown result (see
-    handle_fall_event()). Still never contacts emergency services
+    caregiver has EXPLICITLY said "escalate" during a completed,
+    terminal call - never automatically for an ambiguous/unknown result
+    (see handle_fall_event()). Still never contacts emergency services
     directly - a real person always makes that call themselves.
+
+    Returns True only if the escalation call itself also completed on a
+    terminal status. An ambiguous or failed escalation call is just as
+    unresolved as an ambiguous primary call, and must be surfaced the
+    same way - the caller propagates a False return as an overall
+    'unknown' outcome so the detector stays halted rather than assuming
+    the escalation succeeded just because it was attempted.
     """
     task = (
         f"Call {SECONDARY_CONTACT_PHONE}. Identify yourself as Watchtower, "
@@ -272,16 +287,29 @@ def call_secondary_contact_for_escalation(event: FallEvent) -> None:
     if not is_live_run():
         print("[Watchtower] DRY RUN (default) - no real escalation call placed.")
         print(f"  Would call: {_mask_phone(SECONDARY_CONTACT_PHONE)}")
-        return
+        return True  # dry run always "succeeds" as a simulation
 
     try:
         _validate_destination(SECONDARY_CONTACT_PHONE, "WATCHTOWER_SECONDARY_PHONE")
         client = _client()
         call = client.calls.create_and_wait(task=task)
-        print(f"[Watchtower] Escalation call status: {call.get('status', 'unknown')}")
+        status = call.get("status", "unknown")
+        task_completed = call.get("task_completed", False)
+        print(f"[Watchtower] Escalation call status: {_mask_text(status)}")
+        print(f"[Watchtower] Escalation task completed: {task_completed}")
+
+        if status == "completed" and task_completed:
+            return True
+
+        print(
+            "[Watchtower] Escalation call result is ambiguous - STOPPING. "
+            "This requires manual operator follow-up."
+        )
+        return False
     except Exception as exc:
         print(f"[Watchtower] Escalation call failed: {_mask_text(exc)}")
         print("[Watchtower] STOPPING - this requires manual operator follow-up.")
+        return False
 
 
 def handle_fall_event(event_dict: dict) -> Decision:
@@ -310,7 +338,19 @@ def handle_fall_event(event_dict: dict) -> Decision:
 
     if decision == "escalate":
         print("[Watchtower] Caregiver escalated. Calling secondary contact...")
-        call_secondary_contact_for_escalation(event)
+        escalation_confirmed = call_secondary_contact_for_escalation(event)
+        if not escalation_confirmed:
+            # The primary call was a clean "escalate", but the
+            # escalation call itself didn't terminate cleanly. The
+            # overall event is NOT resolved - propagate "unknown" so
+            # fall_detector.py halts detection and logs this as
+            # needs_review, exactly as it would for an ambiguous
+            # primary result.
+            print(
+                "[Watchtower] Escalation did not complete cleanly - "
+                "treating the overall event as unresolved."
+            )
+            return "unknown"
     elif decision == "dismiss":
         print("[Watchtower] Caregiver dismissed as false alarm. No further action.")
     else:

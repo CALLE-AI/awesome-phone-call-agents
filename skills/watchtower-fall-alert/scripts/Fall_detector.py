@@ -14,7 +14,7 @@ from fastapi import FastAPI, Header, HTTPException, Query, Depends
 from fastapi.responses import StreamingResponse, HTMLResponse
 import uvicorn
 
-from calle_trigger import handle_fall_event
+from calle_trigger import handle_fall_event, _mask_text
 
 # Resolved relative to this script's own location, not the current
 # working directory - otherwise `python fall_detector.py` only finds
@@ -26,9 +26,11 @@ MODEL_PATH = SCRIPT_DIR / "best.pt"
 if not MODEL_PATH.exists():
     raise RuntimeError(
         f"No fall-detection model found at {MODEL_PATH}. This skill "
-        f"does not bundle a pretrained model - place your own "
-        f"fine-tuned fall/non-fall YOLO weights file at "
-        f"scripts/best.pt before running. See SKILL.md -> Limitations."
+        f"ships with a reference model at scripts/best.pt - if it's "
+        f"missing, your checkout may be incomplete (shallow clone, "
+        f"Git LFS not pulled, etc.). Restore it from the repository, "
+        f"or place your own fine-tuned fall/non-fall YOLO weights file "
+        f"there instead. See SKILL.md -> Limitations."
     )
 
 model = YOLO(str(MODEL_PATH))
@@ -289,7 +291,7 @@ def check_for_fall(detections: sv.Detections, class_names: dict) -> dict | None:
 
 
 def generate_frame():
-    cap = cv2.VideoCapture(0)  # Change the index if you have multiple cameras
+    cap = cv2.VideoCapture(0)
 
     # Lower capture resolution - fewer pixels to process per frame.
     # 640x480 is plenty for fall detection; drop further (e.g. 480x360)
@@ -353,9 +355,11 @@ def generate_frame():
                     _update_status(status="calling")
                     decision = handle_fall_event(event)
                 except Exception as exc:
-                    print(f"[Watchtower] handle_fall_event failed: {exc}")
+                    print(f"[Watchtower] handle_fall_event failed: {_mask_text(exc)}")
                     decision = "unknown"
-                    mark_event_failed(event_id, reason=str(exc))
+                    # Masked before storage, not just before printing -
+                    # this value is readable back out via /history.
+                    mark_event_failed(event_id, reason=_mask_text(exc))
 
                 if decision in ("dismiss", "escalate"):
                     # Only a completed, bound primary result (a clear

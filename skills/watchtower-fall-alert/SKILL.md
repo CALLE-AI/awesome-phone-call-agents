@@ -85,14 +85,18 @@ feed and dashboard are always network-reachable while the server runs:
 export WATCHTOWER_API_KEY=$(python -c "import secrets; print(secrets.token_urlsafe(24))")
 ```
 
-This skill does not bundle a fall-detection model. Place your own
-fine-tuned weights file at `scripts/best.pt` (resolved relative to
-`fall_detector.py`'s own location, regardless of which directory you
-run the command from). If it's missing, `fall_detector.py` fails
-immediately with a clear error rather than crashing deeper in the
-pipeline. Confirm your model's class names match `FALL_CLASS_NAME` in
-`fall_detector.py` (defaults to `"fall"`, matching a model with
-`{0: 'non-fall', 1: 'fall'}`).
+This skill ships with a reference fall-detection model at
+`scripts/best.pt` (resolved relative to `fall_detector.py`'s own
+location, regardless of which directory you run the command from) so
+it's runnable out of the box. It is a reference/example model, not a
+production-grade one — for real deployment, replace it with your own
+model fine-tuned on fall/non-fall data representative of your actual
+camera angle, lighting, and environment. If `scripts/best.pt` is ever
+missing (e.g. a shallow clone, LFS not pulled, or your own replacement
+not yet added), `fall_detector.py` fails immediately with a clear error
+rather than crashing deeper in the pipeline. Confirm your model's class
+names match `FALL_CLASS_NAME` in `fall_detector.py` (defaults to
+`"fall"`, matching a model with `{0: 'non-fall', 1: 'fall'}`).
 
 ### Going live (placing real calls)
 
@@ -245,14 +249,16 @@ Escalation call status: completed
 
 ## Limitations
 
-- This skill does not include a fall/non-fall classification model. It
-  expects a YOLO-format weights file at `scripts/best.pt` fine-tuned on
-  fall/non-fall data, with class names matching `FALL_CLASS_NAME` in
-  `fall_detector.py`. Generic pretrained YOLO checkpoints (e.g.
-  `yolov8n.pt`) are trained for general object detection, not fall
-  classification, and will not work as a drop-in substitute without
-  fine-tuning on fall-specific data — or adapting the detection logic to
-  a pose-based approach instead.
+- The bundled `scripts/best.pt` is a reference/example fall-detection
+  model, not validated for production or clinical use. It should be
+  treated as a starting point to confirm the pipeline works, not as a
+  reliable detector for a real deployment — replace it with your own
+  model fine-tuned on fall/non-fall data representative of your actual
+  camera angle, lighting, and environment before relying on this for a
+  real person. Generic pretrained YOLO checkpoints (e.g. `yolov8n.pt`)
+  are trained for general object detection, not fall classification,
+  and are not a substitute either without fine-tuning — or adapting the
+  detection logic to a pose-based approach instead.
 - Single-camera, single-resident design. Multi-room or multi-person
   support would need per-camera process instances and person-tracking
   across cameras, which this skill does not implement.
