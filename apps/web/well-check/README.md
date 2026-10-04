@@ -109,3 +109,6 @@ A sample database with curated demo check-ins is included. To populate your dash
 `TEST_MODE` is strictly enforced to ensure calls are only placed to explicitly allowed test numbers, and a separate `ALLOW_LIVE_CALLS` flag must be set to prevent accidental real SDK calls.
 
 If deployed to production, this app would require full server-side session authentication (e.g., OAuth/JWT) that never exposes credentials to the client, rate limiting, and per-user access control policies on the API and database levels.
+
+### Known Limitations
+- **Accepted-call & Unknown-outcome limitations:** The system relies on CALL-E's outcome reporting. If a call is accepted by voicemail but not clearly flagged by the provider, or if the call drops in an unknown state, it defaults to a 'high' concern level for safety to ensure a human follows up.
