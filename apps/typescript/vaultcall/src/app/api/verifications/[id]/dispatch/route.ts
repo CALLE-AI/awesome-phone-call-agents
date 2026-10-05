@@ -1,6 +1,12 @@
 import { NextResponse } from 'next/server';
 import { dispatchVerificationCall } from '@/lib/calle-runner';
-import { isValidAsciiE164, isAuthorizedLiveRecipient, maskPhoneNumbersInText, sanitizeRecordForDisplay } from '@/lib/phone-utils';
+import {
+  isValidAsciiE164,
+  isAuthorizedLiveRecipient,
+  maskPhoneNumbersInText,
+  sanitizeRecordForDisplay,
+  isAuthorizedSecret,
+} from '@/lib/phone-utils';
 import { store } from '@/lib/store';
 
 export async function POST(
@@ -15,15 +21,11 @@ export async function POST(
     }
 
     if (body.useLiveCalle) {
-      const requiredSecret = process.env.VAULTCALL_DISPATCH_SECRET;
-      if (requiredSecret) {
-        const authHeader = req.headers.get('authorization') || req.headers.get('x-vaultcall-secret');
-        if (authHeader !== `Bearer ${requiredSecret}` && authHeader !== requiredSecret) {
-          return NextResponse.json(
-            { error: 'Unauthorized: Missing or invalid dispatch authorization secret.' },
-            { status: 401 }
-          );
-        }
+      if (!isAuthorizedSecret(req)) {
+        return NextResponse.json(
+          { error: 'Unauthorized: Live carrier dispatch requires configured VAULTCALL_DISPATCH_SECRET and valid authorization credentials.' },
+          { status: 401 }
+        );
       }
 
       const targetPhone = (body.targetPhoneOverride || existing.vendor.verifiedPbxPhone || '').trim();

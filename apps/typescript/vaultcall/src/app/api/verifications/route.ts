@@ -1,10 +1,29 @@
 import { NextResponse } from 'next/server';
 import { store } from '@/lib/store';
-import { sanitizeRecordForDisplay } from '@/lib/phone-utils';
+import { sanitizeRecordForDisplay, isAuthorizedSecret, isLocalRequest } from '@/lib/phone-utils';
+import { SEEDED_RECORD_IDS } from '@/fixtures/seed-data';
 
-export async function GET() {
-  const rawVerifications = store.listVerifications();
+export async function GET(req: Request) {
+  const isAuth = isAuthorizedSecret(req);
+  const isLocal = isLocalRequest(req);
+
+  // If remote and unauthenticated, reject
+  if (!isAuth && !isLocal) {
+    return NextResponse.json(
+      { error: 'Unauthorized: Remote access to verification records requires authentication.' },
+      { status: 401, headers: { 'WWW-Authenticate': 'Basic realm="VaultCall"' } }
+    );
+  }
+
+  let rawVerifications = store.listVerifications();
   const killSwitch = store.getKillSwitch();
+
+  // If unauthenticated, restrict scope strictly to synthetic benchmark records
+  if (!isAuth) {
+    rawVerifications = rawVerifications.filter(
+      (v) => v.isSynthetic || SEEDED_RECORD_IDS.has(v.id)
+    );
+  }
 
   const stats = {
     totalExposureUsd: rawVerifications.reduce((acc, v) => acc + v.request.totalExposureAmountUsd, 0),
@@ -28,6 +47,16 @@ export async function GET() {
 
 export async function POST(req: Request) {
   try {
+    const isAuth = isAuthorizedSecret(req);
+    const isLocal = isLocalRequest(req);
+
+    if (!isAuth && !isLocal) {
+      return NextResponse.json(
+        { error: 'Unauthorized: Privileged mutation requires authentication.' },
+        { status: 401, headers: { 'WWW-Authenticate': 'Basic realm="VaultCall"' } }
+      );
+    }
+
     const body = await req.json();
     if (body.action === 'reset_seed') {
       store.seed();

@@ -104,6 +104,7 @@ export interface VoiceVerificationCertificate {
 
 export interface VerificationRecord {
   id: string;
+  isSynthetic?: boolean;
   vendor: VendorProfile;
   request: BankModificationRequest;
   airgapResult: AirgapGateResult;

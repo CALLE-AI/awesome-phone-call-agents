@@ -198,6 +198,93 @@ export function sanitizeRecordForDisplay<T extends Record<string, any>>(record: 
       verificationRule: field.verificationRule ? maskPhoneNumbersInText(field.verificationRule) : field.verificationRule,
     }));
   }
+  if (clone.extraction?.direct_quote_reason) {
+    clone.extraction.direct_quote_reason = maskPhoneNumbersInText(clone.extraction.direct_quote_reason);
+  }
+  if (Array.isArray(clone.certificate?.evidenceAnchorQuotes)) {
+    clone.certificate.evidenceAnchorQuotes = clone.certificate.evidenceAnchorQuotes.map((q: string) =>
+      maskPhoneNumbersInText(q)
+    );
+  }
 
   return clone;
 }
+
+/**
+ * Canonical alias for sanitizeRecordForDisplay to satisfy security audit conventions.
+ */
+export const sanitizeVerificationRecord = sanitizeRecordForDisplay;
+
+/**
+ * Validates whether an incoming HTTP request carries valid authorization for privileged operations.
+ * Fails closed: if VAULTCALL_DISPATCH_SECRET is not configured, returns false immediately.
+ * Supports Bearer tokens, Basic authentication (with secret as password or username), and x-vaultcall-secret header.
+ */
+export function isAuthorizedSecret(req: Request): boolean {
+  const secret = (process.env.VAULTCALL_DISPATCH_SECRET || '').trim();
+  if (!secret) return false;
+
+  const authHeader = req.headers.get('authorization') || '';
+  const customHeader = req.headers.get('x-vaultcall-secret') || '';
+
+  if (customHeader && customHeader === secret) return true;
+  if (authHeader === `Bearer ${secret}` || authHeader === secret) return true;
+
+  if (authHeader.startsWith('Basic ')) {
+    try {
+      const b64 = authHeader.slice(6).trim();
+      const decoded = Buffer.from(b64, 'base64').toString('utf-8');
+      const [user, pass] = decoded.includes(':') ? decoded.split(':') : ['', decoded];
+      if (pass === secret || user === secret) return true;
+    } catch {
+      // ignore malformed base64
+    }
+  }
+
+  return false;
+}
+
+/**
+ * Checks if a request originates strictly from the local host loopback interface.
+ * Validates Host header and ensures any proxy forwarding headers (x-forwarded-for, x-real-ip)
+ * only reflect loopback addresses (127.0.0.1, ::1, localhost).
+ */
+export function isLocalRequest(req: Request): boolean {
+  const xForwardedFor = req.headers.get('x-forwarded-for') || '';
+  const xRealIp = req.headers.get('x-real-ip') || '';
+
+  if (xRealIp) {
+    const ip = xRealIp.trim().replace(/^\[|\]$/g, '');
+    if (ip !== '127.0.0.1' && ip !== '::1' && ip !== 'localhost') {
+      return false;
+    }
+  }
+
+  if (xForwardedFor) {
+    const clientIp = xForwardedFor.split(',')[0].trim().replace(/^\[|\]$/g, '');
+    if (clientIp !== '127.0.0.1' && clientIp !== '::1' && clientIp !== 'localhost') {
+      return false;
+    }
+  }
+
+  let hostname = '';
+  const host = (req.headers.get('host') || '').trim();
+  if (host) {
+    const ipv6Match = host.match(/^\[([^\]]+)\](?::\d+)?$/);
+    if (ipv6Match) {
+      hostname = ipv6Match[1].toLowerCase();
+    } else {
+      hostname = host.split(':')[0].toLowerCase();
+    }
+  } else if (req.url) {
+    try {
+      const parsed = new URL(req.url);
+      hostname = parsed.hostname.toLowerCase().replace(/^\[|\]$/g, '');
+    } catch {
+      // ignore parse failure
+    }
+  }
+
+  return hostname === 'localhost' || hostname === '127.0.0.1' || hostname === '::1';
+}
+

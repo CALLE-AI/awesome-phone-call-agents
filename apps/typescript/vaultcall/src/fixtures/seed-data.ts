@@ -3,6 +3,7 @@ import { VerificationRecord } from '../lib/types';
 export const SEEDED_VERIFICATIONS: VerificationRecord[] = [
   {
     id: 'VER-CYBER-8821',
+    isSynthetic: true,
     vendor: {
       id: 'VEND-001',
       name: 'CyberShield Technologies Inc.',
@@ -159,6 +160,7 @@ export const SEEDED_VERIFICATIONS: VerificationRecord[] = [
   },
   {
     id: 'VER-APEX-9942',
+    isSynthetic: true,
     vendor: {
       id: 'VEND-002',
       name: 'Apex Global Logistics LLC',
@@ -307,6 +309,7 @@ export const SEEDED_VERIFICATIONS: VerificationRecord[] = [
   },
   {
     id: 'VER-MERID-5510',
+    isSynthetic: true,
     vendor: {
       id: 'VEND-003',
       name: 'Meridian Health Partners',
@@ -407,3 +410,5 @@ export const SEEDED_VERIFICATIONS: VerificationRecord[] = [
     ],
   },
 ];
+
+export const SEEDED_RECORD_IDS = new Set(SEEDED_VERIFICATIONS.map((v) => v.id));

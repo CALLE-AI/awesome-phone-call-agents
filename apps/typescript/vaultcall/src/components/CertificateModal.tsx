@@ -3,7 +3,7 @@
 import React from 'react';
 import { VoiceVerificationCertificate } from '@/lib/types';
 import { ShieldCheck, ShieldAlert, Award, Hash, CheckCircle, X, Download } from 'lucide-react';
-import { maskPhoneNumber } from '@/lib/phone-utils';
+import { maskPhoneNumber, maskPhoneNumbersInText } from '@/lib/phone-utils';
 
 interface CertificateModalProps {
   certificate: VoiceVerificationCertificate;
@@ -132,7 +132,7 @@ export const CertificateModal: React.FC<CertificateModalProps> = ({
                   key={i}
                   className="p-2 rounded bg-slate-900/80 border border-slate-800 font-mono text-[11px] text-slate-300"
                 >
-                  {q}
+                  {maskPhoneNumbersInText(q)}
                 </div>
               ))}
             </div>

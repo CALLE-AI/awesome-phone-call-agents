@@ -7,7 +7,7 @@ import {
   VendorProfile
 } from './types';
 import { generateCertificateFingerprint } from './idempotency';
-import { maskPhoneNumber } from './phone-utils';
+import { maskPhoneNumber, maskPhoneNumbersInText } from './phone-utils';
 
 export interface EvidenceReconciliationResult {
   disposition: VerificationDisposition;
@@ -145,7 +145,11 @@ export function reconcileTranscriptEvidence(
     field: 'verbal_bank_change_status',
     claimedValue: extraction.verbal_bank_change_status,
     supported: statusSupported,
-    transcriptQuote: statusTurn?.text || extraction.direct_quote_reason,
+    transcriptQuote: statusTurn?.text
+      ? maskPhoneNumbersInText(statusTurn.text)
+      : extraction.direct_quote_reason
+      ? maskPhoneNumbersInText(extraction.direct_quote_reason)
+      : undefined,
     turnIndex: statusTurn?.index,
     verificationRule: 'Status determination must be grounded in explicit callee assent/denial utterance.',
   });
@@ -206,7 +210,7 @@ export function reconcileTranscriptEvidence(
       targetDialNumber: maskPhoneNumber(targetDialNumber),
       evidenceAnchorQuotes: evidenceFields
         .filter((f) => f.supported && f.transcriptQuote)
-        .map((f) => `[${f.field}] "${f.transcriptQuote}"`),
+        .map((f) => maskPhoneNumbersInText(`[${f.field}] "${f.transcriptQuote}"`)),
       erpReleaseToken:
         finalDisposition === 'CONFIRMED_VALID'
           ? `SIM-ERP-REL-${Math.random().toString(36).substring(2, 10).toUpperCase()}`

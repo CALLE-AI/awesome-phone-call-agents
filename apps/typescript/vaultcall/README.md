@@ -2,9 +2,9 @@
 
 Autonomous out-of-band BEC wire defense. **No verbal treasury verification, no wire release.**
 
-VaultCall is an enterprise treasury verification console powered by CALL-E. When a vendor bank modification arrives (via invoice email or portal), VaultCall halts ERP payment release, resolves the vendor's pre-established corporate PBX line (strictly stripping any phone number found in the incoming email), and deploys CALL-E to conduct a spoken challenge-response with the authorized corporate financial officer.
+VaultCall is an enterprise treasury verification console powered by CALL-E (demo simulation). When a vendor bank modification arrives (via invoice email or portal), VaultCall simulates an advisory hold on ERP payment release, resolves the vendor's pre-established corporate PBX line (strictly stripping any phone number found in the incoming email), and deploys CALL-E to conduct a spoken challenge-response with the authorized corporate financial officer.
 
-Verbatim callee utterances are cross-examined against Tax EIN credentials. Unsupported model claims strike through. Valid confirmations mint a cryptographically signed **Certificate of Voice Verification** generating advisory ERP release tokens; fraudulent rejections trigger an emergency account freeze.
+Verbatim callee utterances are cross-examined against Tax EIN credentials. Unsupported model claims strike through. Valid confirmations mint a SHA-256 audit-fingerprinted **Certificate of Voice Verification** (demo simulation) generating simulated advisory ERP release tokens; fraudulent rejections trigger a simulated emergency fraud freeze for human treasury escalation.
 
 Provider: **CALL-E** (`@call-e/calle` 0.7 / API). Host: local Next.js. English repository-facing UI and errors. Default path is fixture replay. Live calling is opt-in.
 
@@ -28,20 +28,20 @@ Open [http://localhost:3000](http://localhost:3000). Three seeded benchmark audi
 
 | Vendor | Scenario | What to inspect |
 | --- | --- | --- |
-| **CyberShield Tech** | **Clean Wire Approval ($240,000)** | CFO Sarah Chen verbally validates Tax ID `4891` and authorizes J.P. Morgan account change. Click **Certificate** to view the cryptographically stamped advisory Wire Release token. |
-| **Apex Global Logistics** | **Active BEC Fraud Intercepted ($785,000)** | Attacker spoofed email with burner phone `+1 (305) ***-0144`. Airgap gate intercepts and blocks burner phone; dials PBX Controller Michael Vance. Controller screams fraud! Emergency fraud freeze engaged. |
+| **CyberShield Tech** | **Clean Wire Approval ($240,000)** | CFO Sarah Chen verbally validates Tax ID `4891` and authorizes J.P. Morgan account change. Click **Certificate** to view the SHA-256 fingerprinted advisory Wire Release token (demo simulation). |
+| **Apex Global Logistics** | **Active BEC Fraud Intercepted ($785,000)** | Attacker spoofed email with burner phone `+1 (305) ***-0144`. Airgap gate intercepts and blocks burner phone; dials PBX Controller Michael Vance. Controller screams fraud! Simulated emergency fraud freeze engaged for controller review. |
 | **Meridian Health** | **Gatekeeper / Voicemail Hold ($125,000)** | Receptionist answers stating officer is out of office. Fails closed to **GATEKEEPER HOLD**; never assumes approval from voicemail or unconfirmed calls. |
 
 ### Three Dedicated Views for Judges & Evaluators:
 - 🌟 **Product Showcase (`/showcase` tab)**: Executive narrative explaining the $55B BEC wire fraud problem, 4-step continuous defense workflow, and real-time trust metrics.
 - 📱 **Live Phone Lab (`/studio` tab)**: Interactive handset simulator with animated audio waveforms, live VOIP status, real-time speech simulation, and one-click benchmark presets.
-- 🏛️ **Treasury Console (`/console` tab)**: Enterprise audit queue with real-time risk filters, evidence-linked strikethrough inspector, and cryptographically signed Certificates of Voice Verification.
+- 🏛️ **Treasury Console (`/console` tab)**: Enterprise audit queue with real-time risk filters, evidence-linked strikethrough inspector, and SHA-256 audit-fingerprinted Certificates of Voice Verification (demo simulation).
 
 ### Fast Walkthrough Steps:
 1. Switch to **📱 Live Phone Lab**: Select **Apex Global Logistics** ($785,000 BEC attack) and press **Play** on the phone simulator to watch CALL-E catch fraud in real time.
-2. Switch to **🏛️ Treasury Console**: Open **CyberShield Tech** and click **View Certificate** to inspect the SHA-256 cryptographic audit receipt with advisory release tokens.
+2. Switch to **🏛️ Treasury Console**: Open **CyberShield Tech** and click **View Certificate** to inspect the SHA-256 audit receipt fingerprint with simulated advisory release tokens.
 3. Test the **Airgap Scope Matrix**: In the audit modal, see the attacker's fake burner phone `+1 (305) ***-0144` flagged as `STRIPPED BY AIRGAP`.
-4. Hit the **Emergency Kill Switch** in the global header to see immediate system-wide dialing lockdown.
+4. Hit the **Emergency Kill Switch** in the global header to lock down outbound application-boundary dispatches and prevent simulated release token generation (in-flight connected telecom audio cannot be revoked mid-call over telephony protocols).
 
 ## Offline checks
 
@@ -80,11 +80,11 @@ All phone-bearing provider, transcript, error, certificate, audit, and CLI displ
 ### 4. Fail-Closed Unknown State
 Failed or ambiguous live carrier calls (network timeouts, carrier drops, or silence) remain in `GATEKEEPER_HOLD` with `status: UNKNOWN_NO_RECORD`. VaultCall refuses to invent callee speech or generate successful fixture certificates for incomplete live carrier attempts.
 
-### 5. Accepted-Call Cancellation Limits
-Once an outbound telephone call is answered on the PSTN and carrier signaling connects, in-flight carrier audio cannot be revoked mid-call over telephony protocols. The emergency kill switch operates at the application boundary: it halts outbound queues, rejects webhooks, and immediately prevents simulated ERP release token generation.
+### 5. Accepted-Call Cancellation Limits & Kill Switch Scope
+Once an outbound telephone call is answered on the PSTN and carrier signaling connects, in-flight carrier audio cannot be revoked mid-call over telephony protocols. The emergency kill switch operates strictly at the application boundary: it rejects new dispatch requests and blocks subsequent simulated release token generation, but does not provide immediate revocation or cancellation of telephony audio frames already in-flight across carrier networks.
 
 ### 6. Advisory / Simulated Control Scope
-VaultCall is an advisory pre-execution defense architecture. Generated ERP release tokens and compliance references represent simulated internal control proofs designed for human controller review. VaultCall does not directly initiate or execute automated banking wire movements.
+VaultCall is a demo simulation of an advisory pre-execution defense architecture. All ERP payment holds, fraud freezes, and generated release tokens are simulated internal control proofs designed for human controller review. No real ERP integrations, live banking wire executions, production treasury mutations, or automated telecom cancellation infrastructure are implemented or guaranteed.
 
 ---
 
@@ -102,4 +102,4 @@ VaultCall is an advisory pre-execution defense architecture. Generated ERP relea
 2. **Airgap Policy Gate**: Resolves official corporate PBX from hardened registry. If the incoming invoice/email signature included a phone number, it is logged as `disallowed` and strictly discarded.
 3. **Challenge Token Compilation**: Generates a NATO challenge token (e.g. `Echo-Sierra-482`) and compiles single-purpose English CALL-E prompt and JSON schema.
 4. **Evidence-Linked Scorer**: Every field returned by the extraction model must be grounded in literal callee turns. If the callee does not confirm their Tax ID or states uncertainty, the field is struck through and routes to human treasury escalation.
-5. **Irrevocable Certificate**: Minted with SHA-256 fingerprint upon valid authorization.
+5. **Audit-Fingerprinted Certificate**: Minted with SHA-256 audit fingerprint upon valid authorization (demo simulation).

@@ -249,11 +249,11 @@ async function executeSimulatedRun(
   record.status = recon.disposition;
   record.certificate = recon.certificate;
   record.auditNotes.push(...recon.auditNotes);
+  record.isSynthetic = true;
   record.updatedAt = new Date().toISOString();
   record.callDurationSeconds = Math.round(
     transcript[transcript.length - 1].timestampOffsetMs / 1000 + 4
   );
-
   store.saveVerification(record);
   return record;
 }
@@ -462,6 +462,7 @@ OBJECTIVE AND CONVERSATIONAL RULES:
   );
   record.auditNotes.push(...recon.auditNotes);
   record.updatedAt = new Date().toISOString();
+  record.isSynthetic = false;
 
   store.saveVerification(record);
   return record;

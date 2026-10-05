@@ -7,6 +7,9 @@ import {
   validateApprovedHttpsOrigin,
   maskPhoneNumbersInText,
   sanitizeRecordForDisplay,
+  sanitizeVerificationRecord,
+  isAuthorizedSecret,
+  isLocalRequest,
 } from '../src/lib/phone-utils';
 
 describe('Phone and Transport Security Utilities', () => {
@@ -143,8 +146,8 @@ describe('Phone and Transport Security Utilities', () => {
     });
   });
 
-  describe('sanitizeRecordForDisplay', () => {
-    it('masks phone numbers across all record fields, certificates, and audit notes', () => {
+  describe('sanitizeRecordForDisplay and sanitizeVerificationRecord', () => {
+    it('masks phone numbers across all record fields, extraction quotes, certificates, and audit notes', () => {
       const mockRecord: any = {
         vendor: {
           verifiedPbxPhone: '+14155550199',
@@ -158,6 +161,13 @@ describe('Phone and Transport Security Utilities', () => {
         },
         certificate: {
           targetDialNumber: '+14155550199',
+          evidenceAnchorQuotes: [
+            '[verbal_bank_change_status] "Yes, you can call us at +14155550199 to confirm."',
+            '[officer_identity] "Sarah speaking from +12025550143."',
+          ],
+        },
+        extraction: {
+          direct_quote_reason: 'Call back at +14155550199 was requested by caller claiming +13055550144.',
         },
         transcript: [
           { speaker: 'agent', text: 'Calling +14155550199 for verification.' },
@@ -177,6 +187,103 @@ describe('Phone and Transport Security Utilities', () => {
       expect(sanitized.transcript[0].text).not.toContain('+14155550199');
       expect(sanitized.auditNotes[0]).toContain('+1 (415) ***-0199');
       expect(sanitized.auditNotes[0]).not.toContain('+14155550199');
+
+      // Assert direct_quote_reason is sanitized
+      expect(sanitized.extraction.direct_quote_reason).toContain('+1 (415) ***-0199');
+      expect(sanitized.extraction.direct_quote_reason).toContain('+1 (305) ***-0144');
+      expect(sanitized.extraction.direct_quote_reason).not.toContain('+14155550199');
+      expect(sanitized.extraction.direct_quote_reason).not.toContain('+13055550144');
+
+      // Assert evidenceAnchorQuotes are sanitized
+      expect(sanitized.certificate.evidenceAnchorQuotes[0]).toContain('+1 (415) ***-0199');
+      expect(sanitized.certificate.evidenceAnchorQuotes[0]).not.toContain('+14155550199');
+      expect(sanitized.certificate.evidenceAnchorQuotes[1]).toContain('+1 (202) ***-0143');
+      expect(sanitized.certificate.evidenceAnchorQuotes[1]).not.toContain('+12025550143');
+
+      // Assert sanitizeVerificationRecord alias produces identical sanitized output
+      const aliasSanitized = sanitizeVerificationRecord(mockRecord);
+      expect(aliasSanitized).toEqual(sanitized);
+    });
+  });
+
+  describe('isAuthorizedSecret', () => {
+    it('fails closed when VAULTCALL_DISPATCH_SECRET is unset or empty', () => {
+      delete process.env.VAULTCALL_DISPATCH_SECRET;
+      const req = new Request('http://localhost/api/test', {
+        headers: { authorization: 'Bearer supersecret' },
+      });
+      expect(isAuthorizedSecret(req)).toBe(false);
+    });
+
+    it('authorizes Bearer token matching VAULTCALL_DISPATCH_SECRET', () => {
+      process.env.VAULTCALL_DISPATCH_SECRET = 'secret-token-123';
+      const req = new Request('http://localhost/api/test', {
+        headers: { authorization: 'Bearer secret-token-123' },
+      });
+      expect(isAuthorizedSecret(req)).toBe(true);
+    });
+
+    it('authorizes Basic auth credentials matching secret', () => {
+      process.env.VAULTCALL_DISPATCH_SECRET = 'secret-token-123';
+      const basicToken = Buffer.from('admin:secret-token-123').toString('base64');
+      const req = new Request('http://localhost/api/test', {
+        headers: { authorization: `Basic ${basicToken}` },
+      });
+      expect(isAuthorizedSecret(req)).toBe(true);
+    });
+
+    it('authorizes x-vaultcall-secret custom header', () => {
+      process.env.VAULTCALL_DISPATCH_SECRET = 'secret-token-123';
+      const req = new Request('http://localhost/api/test', {
+        headers: { 'x-vaultcall-secret': 'secret-token-123' },
+      });
+      expect(isAuthorizedSecret(req)).toBe(true);
+    });
+
+    it('rejects invalid or mismatched authorization', () => {
+      process.env.VAULTCALL_DISPATCH_SECRET = 'secret-token-123';
+      const req = new Request('http://localhost/api/test', {
+        headers: { authorization: 'Bearer wrong-secret' },
+      });
+      expect(isAuthorizedSecret(req)).toBe(false);
+    });
+  });
+
+  describe('isLocalRequest', () => {
+    it('accepts localhost, 127.0.0.1, and [::1] host headers', () => {
+      expect(isLocalRequest(new Request('http://localhost:3000/api/test'))).toBe(true);
+      expect(isLocalRequest(new Request('http://127.0.0.1:3000/api/test'))).toBe(true);
+      expect(isLocalRequest(new Request('http://[::1]:3000/api/test'))).toBe(true);
+      expect(isLocalRequest(new Request('http://internal/api/test', { headers: { host: 'localhost:3000' } }))).toBe(true);
+      expect(isLocalRequest(new Request('http://internal/api/test', { headers: { host: '127.0.0.1:3000' } }))).toBe(true);
+      expect(isLocalRequest(new Request('http://internal/api/test', { headers: { host: '[::1]:3000' } }))).toBe(true);
+    });
+
+    it('rejects external hostnames', () => {
+      const req = new Request('https://api.vaultcall.internal/api/test', {
+        headers: { host: 'api.vaultcall.internal' },
+      });
+      expect(isLocalRequest(req)).toBe(false);
+    });
+
+    it('rejects requests forwarded from non-local proxies', () => {
+      const req = new Request('http://localhost:3000/api/test', {
+        headers: {
+          host: 'localhost:3000',
+          'x-forwarded-for': '203.0.113.195, 127.0.0.1',
+        },
+      });
+      expect(isLocalRequest(req)).toBe(false);
+    });
+
+    it('rejects requests with remote x-real-ip', () => {
+      const req = new Request('http://localhost:3000/api/test', {
+        headers: {
+          host: 'localhost:3000',
+          'x-real-ip': '198.51.100.4',
+        },
+      });
+      expect(isLocalRequest(req)).toBe(false);
     });
   });
 });
