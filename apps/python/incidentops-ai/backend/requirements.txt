@@ -1,0 +1,11 @@
+fastapi
+uvicorn
+pydantic
+pydantic-settings
+python-dotenv
+SQLAlchemy
+requests
+pandas
+streamlit
+google-genai
+calle-ai
