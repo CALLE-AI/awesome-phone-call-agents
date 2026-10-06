@@ -1,0 +1,20 @@
+{
+  "call_id": "demo-minimization-001",
+  "status": "COMPLETED",
+  "transcript": [
+    {"speaker": "agent", "text": "Hello, this is an automated assistant calling from Example Clinic about your follow-up. Can I have your full name, please?"},
+    {"speaker": "callee", "text": "My name is Dana Whitfield."},
+    {"speaker": "agent", "text": "Great. And what's the best number to reach you?"},
+    {"speaker": "callee", "text": "You can reach me at 415-555-0167."},
+    {"speaker": "agent", "text": "Thanks. Before we finish, can you verify your date of birth?"},
+    {"speaker": "callee", "text": "It's March 14."},
+    {"speaker": "agent", "text": "And can you confirm your full name again, Dana?"},
+    {"speaker": "callee", "text": "Dana Whitfield, like I said."},
+    {"speaker": "agent", "text": "One last thing, while I have you, can you read me the full card number and the security code?"},
+    {"speaker": "callee", "text": "Sure, it is 4111 1111 1111 1112."},
+    {"speaker": "agent", "text": "I have your card number as 4111 1111 1111 1112, thank you."},
+    {"speaker": "callee", "text": "Okay."},
+    {"speaker": "agent", "text": "Thank you, Dana. Your appointment is set. Goodbye."}
+  ],
+  "callee_phone": "+14155550167"
+}

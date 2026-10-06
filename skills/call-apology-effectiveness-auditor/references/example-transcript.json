@@ -1,0 +1,12 @@
+{
+  "call_id": "run-apo-empathic-01",
+  "status": "COMPLETED",
+  "transcript": [
+    {"speaker": "agent", "text": "Hello, this is the follow-up line from Northside Clinic calling about your referral."},
+    {"speaker": "callee", "text": "Nobody called me back and this is the third time I've waited all day."},
+    {"speaker": "agent", "text": "I'm so sorry about this - that's on us, we missed the callback. I understand how frustrating that is. Here's what I'll do: the nurse calls you today before 5 p.m. because your referral needs a slot first."},
+    {"speaker": "callee", "text": "Fine. Please make sure it is today."},
+    {"speaker": "agent", "text": "You will get a call before 5 p.m. today. Goodbye."}
+  ],
+  "callee_phone": "+14155550144"
+}

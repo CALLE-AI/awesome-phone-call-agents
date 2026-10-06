@@ -1,0 +1,14 @@
+{
+  "call_id": "demo-minimization-001",
+  "status": "COMPLETED",
+  "transcript": [
+    {"speaker": "agent", "text": "Hello, this is an automated assistant calling from Example Clinic about your follow-up appointment. Can I have your full name, please?"},
+    {"speaker": "callee", "text": "My name is Dana Whitfield."},
+    {"speaker": "agent", "text": "Thank you, Dana. And what's the best number to reach you?"},
+    {"speaker": "callee", "text": "You can reach me at 415-555-0167."},
+    {"speaker": "agent", "text": "Thanks, ending in 67, got it. Your appointment is Thursday at 10 a.m. See you then."},
+    {"speaker": "callee", "text": "Great, thank you."},
+    {"speaker": "agent", "text": "Thank you. Goodbye."}
+  ],
+  "callee_phone": "+14155550167"
+}

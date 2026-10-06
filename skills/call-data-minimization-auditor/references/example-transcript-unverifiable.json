@@ -1,0 +1,15 @@
+{
+  "call_id": "demo-minimization-002",
+  "status": "COMPLETED",
+  "transcript": [
+    {"speaker": "agent", "text": "Hello, this is an automated assistant calling from Example Clinic about your follow-up visit."},
+    {"speaker": "agent", "text": "Can I have your full name, please?"},
+    {"speaker": "callee", "text": "My name is Dana Whitfield."},
+    {"speaker": "agent", "text": "Thank you, Dana. And can I have your date of birth to pull up the chart?"},
+    {"speaker": "callee", "text": "It's March 4, 1989."},
+    {"speaker": "agent", "text": "Got it. Your visit is Thursday at 10 a.m. See you then."},
+    {"speaker": "callee", "text": "Great, thank you."},
+    {"speaker": "agent", "text": "Thank you. Goodbye."}
+  ],
+  "callee_phone": "+14155550167"
+}

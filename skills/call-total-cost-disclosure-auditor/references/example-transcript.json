@@ -1,0 +1,12 @@
+{
+  "call_id": "demo-cost-001",
+  "status": "COMPLETED",
+  "callee_phone": "+14155550174",
+  "transcript": [
+    {"speaker": "agent", "text": "Hello, this is Example Bistro about your Friday reservation. Large parties require a $20 per guest deposit, fully refundable, with cancellation up to 24 hours before your seating."},
+    {"speaker": "callee", "text": "Got it."},
+    {"speaker": "agent", "text": "Shall I reserve it for you?"},
+    {"speaker": "callee", "text": "Sure, please do."},
+    {"speaker": "agent", "text": "You are all set for Friday at 7 p.m. Thank you and goodbye."}
+  ]
+}
