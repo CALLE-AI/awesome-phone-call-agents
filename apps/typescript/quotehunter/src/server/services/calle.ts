@@ -283,8 +283,8 @@ Compliance & Safety:
           console.log(`🛑 [CALL-E Live] Call processing aborted for ${vendor.name}`);
           onVendorUpdate(vendor.id, {
             status: 'failed',
-            providerNotes: 'Call stopped by user.',
-            transcriptSummary: 'Call was canceled by user.',
+            providerNotes: 'Call stop requested by user (carrier-level disconnect unconfirmed).',
+            transcriptSummary: 'Call cancellation requested (unconfirmed). No observed conversation recorded.',
           });
           return;
         }
@@ -741,9 +741,14 @@ Compliance & Safety:
       durationSeconds = isDeclined ? 6 : 75;
     }
 
+    const isSyntheticDuration = durationSeconds === (isDeclined ? 6 : 75) && !(
+      rawCall.recipients?.[0]?.attempts?.[0]?.duration_seconds ||
+      (call.created_at && call.completed_at)
+    );
+
     const mins = Math.floor(durationSeconds / 60);
     const secs = durationSeconds % 60;
-    const durationFormatted = `${mins}m ${secs < 10 ? '0' : ''}${secs}s`;
+    const durationFormatted = `${mins}m ${secs < 10 ? '0' : ''}${secs}s${isSyntheticDuration ? ' (synthetic estimate)' : ''}`;
 
     // 3. Transcript & Turn-by-Turn Extraction
     const rawTranscript = call.transcript || 

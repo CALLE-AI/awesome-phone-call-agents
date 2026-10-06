@@ -1391,7 +1391,7 @@ function openConversationModal(vendorName) {
             <p class="text-sm font-semibold text-gray-800">No Spoken Conversation Recorded</p>
             <p class="text-xs text-gray-400 mt-1 max-w-sm">
               ${r.status === 'failed' || (r.summary && r.summary.includes('stopped'))
-          ? 'This call was canceled before a conversation took place.'
+          ? 'Cancellation was requested but carrier-level disconnect is unconfirmed.'
           : 'The call was unanswered or declined by the provider.'}
             </p>
           </div>
