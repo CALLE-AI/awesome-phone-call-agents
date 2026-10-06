@@ -92,24 +92,43 @@ anything. A live call happens only with the explicit `--live` flag.
   never stored, never logged.
 - `QUOTEDESK_PHONE_D1..D4` — E.164 numbers for the (fictional) distributors.
   Real phone numbers are never stored in fixtures, code, or the ledger; live
-  mode reads them from these variables and refuses to start if any is missing
-  or malformed — fail-closed *before* any call is created, never mid-wave.
-- All output (logs, previews, ledger, dashboard) shows masked numbers only.
+  mode reads them from these variables and refuses to start if any is
+  missing, malformed (including a zero-leading country code such as `+0…`),
+  or a duplicate of another distributor's number — fail-closed *before* any
+  call is created, never mid-wave.
+- Distributor numbers are shown masked. Free text from calls and the
+  provider (transcript spans, part numbers, quote notes, error messages) is
+  redacted for display — console output, the dashboard and the customer
+  draft mask phone-number-like digit runs and email addresses
+  (`src/redact.ts`). The raw evidence in `data/ledger.jsonl` and
+  `data/rows-*.json` is kept unmodified and is private: do not share `data/`.
+  Redaction is pattern-based and can miss unusual formats; review a display
+  copy before forwarding it.
 
 ## Real-world side effects
 
-`run --live` creates **one** CALL-E call task with all four distributors as
-recipients (the idiomatic multi-recipient use: one `recipient_result_schema`
+`run --live --attest-recipient-authorization` creates **one** CALL-E call
+task with all four distributors as recipients (the idiomatic multi-recipient use: one `recipient_result_schema`
 per-distributor extraction plus one cross-call `result_schema` rollup).
 Each recipient receives a real phone call. The first line of every call
 script discloses that the caller is an AI assistant calling on behalf of the
-company. Calls are B2B to business lines under existing trading
-relationships: no consumer cold-calling, no TCPA/DNC consumer-consent
-exposure.
+company.
+
+**Recipient authorization is the operator's responsibility.** Live mode
+refuses to start without `--attest-recipient-authorization`, by which the
+operator confirms every configured number is a business line that has agreed
+to receive automated AI calls from them. QuoteDesk does not verify that
+attestation, does not check DNC registries, and does not determine whether a
+call is lawful in the recipient's jurisdiction. The intended use is B2B calls
+to distributors under existing trading relationships; that intent reduces but
+does not eliminate consent, recording-disclosure, or telemarketing-rule
+obligations, which the operator must check for their market.
 
 The generated customer quote is a **text draft only**. QuoteDesk sends no
-email and exposes no send path; margin approval and the send button are
-human.
+email and exposes no send path. It does **not** enforce or record a human
+approval step: margin review, checking the quoted figures against the call,
+and the decision to send are left to the operator, and nothing stops a
+draft being sent unreviewed.
 
 ## Cancellation
 
@@ -117,14 +136,23 @@ human.
 runs to completion. QuoteDesk therefore dispatches exactly one controlled
 wave per RFQ and never over-dispatches, because an unwanted call cannot be
 recalled. The idempotency key is derived from `(rfqId + distributor set)` —
-not from the attempt — so re-running the command cannot double-dial. To stop
-future runs, simply do not run `run --live` again; there are no recurring
-jobs or schedulers in this app.
+not from the attempt — so an immediate retry of the same command reuses the
+same key and should be deduplicated by CALL-E. That protection is **bounded**:
+it lasts only as long as CALL-E retains the key, and a different `--rfq` id
+or a changed distributor list produces a new key and new calls. Check the
+ledger for an existing `call_created` entry before re-running `run --live`.
+To stop future runs, simply do not run `run --live` again; there are no
+recurring jobs or schedulers in this app.
 
 ## Reconciliation and ambiguous outcomes
 
 - The returned call id is appended to the ledger **immediately** on response.
   There is no list-calls endpoint; a lost id is unrecoverable.
+- **Unknown outcome.** If the create request errors or times out, the call
+  may or may not have been placed, and QuoteDesk has no id to reconcile. Do
+  not re-run with a different RFQ id to "try again"; re-running the identical
+  command within CALL-E's idempotency window is the only safe retry, and
+  otherwise treat the distributors as possibly called.
 - A recipient with `structuredResult: null` (voicemail, garbled, nothing
   extractable) is reconciled as an empty quote and graded `unverified` — a
   state to resolve by a human follow-up, **not** an error to retry blindly.
@@ -132,6 +160,12 @@ jobs or schedulers in this app.
   never branched on.
 - `completion_confidence` measures confidence in *task completion*, not in
   answer quality — it is recorded but plays no part in the identity verdict.
+- **Evidence limits.** Field values, evidence spans and `confirmed` /
+  `heard_once` / `unstated` labels are produced by CALL-E's extraction, not
+  re-checked by QuoteDesk against the transcript. A verdict is only as good
+  as that extraction: a misheard or mislabelled field can still produce a
+  wrong `verified_match`. Treat verdicts as a screen that removes known-bad
+  quotes, not as proof, and spot-check the transcript before sending.
 
 ## Live verification
 

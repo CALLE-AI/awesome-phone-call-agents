@@ -4,7 +4,9 @@
 //  - dry-run is the DEFAULT everywhere; `run --live` is the only path that
 //    creates a real CALL-E call, and it requires CALLE_API_KEY plus one
 //    E.164 number per distributor in the environment
-//  - all phone numbers in output are masked
+//  - `run --live` also requires --attest-recipient-authorization
+//  - all phone numbers in output are masked; provider/call free text is
+//    redacted for display (src/redact.ts), raw evidence stays in data/
 //  - the customer quote is generated, never sent
 
 import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs';
@@ -19,6 +21,7 @@ import { draftCustomerQuote } from './quote/draft.js';
 import { appendEntry, readLedger, verifyLedger } from './ledger/append.js';
 import { buildScorecard } from './ledger/scorecard.js';
 import { renderDashboard } from './render/dashboard.js';
+import { redact } from './redact.js';
 import type { Distributor, MarketConfig, QuoteRow, RequestedSpec } from './types.js';
 
 const ROOT = process.cwd();
@@ -94,7 +97,7 @@ function cmdPreview(): void {
   console.log(`\nIdempotency-Key: ${plan.idempotencyKey}  (derived from rfqId + distributor set)`);
   console.log(`Region: ${plan.region}\n`);
   console.log('Task text:\n');
-  console.log(plan.task.split('. ').map((s) => '  ' + s).join('.\n'));
+  console.log(redact(plan.task).split('. ').map((s) => '  ' + s).join('.\n'));
   console.log('\nRecipient result schema fields:', Object.keys((plan.recipientResultSchema as { properties: object }).properties).join(', '));
 }
 
@@ -110,6 +113,12 @@ async function cmdRun(): Promise<void> {
   let call: CallPayload;
 
   if (has('--live')) {
+    if (!has('--attest-recipient-authorization')) {
+      console.error(
+        'Live mode requires --attest-recipient-authorization: you confirm every distributor number is a business line that has agreed to receive automated AI calls from you. No call was created.',
+      );
+      process.exit(1);
+    }
     const apiKey = process.env.CALLE_API_KEY;
     if (!apiKey) {
       console.error('Live mode requires CALLE_API_KEY. No call was created.');
@@ -176,8 +185,8 @@ async function cmdRun(): Promise<void> {
   const names = new Map(loadDistributors().map((d) => [d.id, d.name]));
   for (const row of rows.slice().sort((a, b) => (a.quoted.unit_price ?? Infinity) - (b.quoted.unit_price ?? Infinity))) {
     const price = row.quoted.unit_price !== undefined ? formatMoney(row.quoted.unit_price, market) : '(no price)';
-    console.log(`  ${row.distributorId}  ${String(names.get(row.distributorId)).padEnd(32)} ${price.padStart(12)}  ${row.verdict.toUpperCase()}${row.mismatchedFields.length ? ` [${row.mismatchedFields.join(', ')}]` : ''}`);
-    if (row.humanReviewReason) console.log(`      → ${row.humanReviewReason}`);
+    console.log(redact(`  ${row.distributorId}  ${String(names.get(row.distributorId)).padEnd(32)} ${price.padStart(12)}  ${row.verdict.toUpperCase()}${row.mismatchedFields.length ? ` [${row.mismatchedFields.join(', ')}]` : ''}`));
+    if (row.humanReviewReason) console.log(`      → ${redact(row.humanReviewReason)}`);
   }
   const eligible = rows.filter((r) => r.eligibleForQuote);
   console.log(`\n${eligible.length}/${rows.length} quotes eligible for the customer quote.`);
@@ -195,7 +204,8 @@ function cmdQuote(): void {
     process.exit(1);
   }
   const rows = JSON.parse(readFileSync(rowsPath, 'utf8')) as QuoteRow[];
-  const draft = draftCustomerQuote(spec, rows, market, COMPANY);
+  // The draft is a display copy for a human; raw evidence stays in rows-*.json.
+  const draft = redact(draftCustomerQuote(spec, rows, market, COMPANY));
 
   writeFileSync(join(DATA_DIR, `draft-${rfqId}.txt`), draft);
   appendEntry(LEDGER, 'quote_drafted', { rfqId, eligible: rows.filter((r) => r.eligibleForQuote).length });
@@ -274,27 +284,36 @@ function requireRfq(): string {
 }
 
 const command = process.argv[2];
-switch (command) {
-  case 'intake': cmdIntake(); break;
-  case 'preview': cmdPreview(); break;
-  case 'run': await cmdRun(); break;
-  case 'quote': cmdQuote(); break;
-  case 'scorecard': cmdScorecard(); break;
-  case 'dashboard': cmdDashboard(); break;
-  case 'verify-ledger': cmdVerifyLedger(); break;
-  default:
-    console.log(`QuoteDesk — RFQ inbox to verified customer quote.
+try {
+  switch (command) {
+    case 'intake': cmdIntake(); break;
+    case 'preview': cmdPreview(); break;
+    case 'run': await cmdRun(); break;
+    case 'quote': cmdQuote(); break;
+    case 'scorecard': cmdScorecard(); break;
+    case 'dashboard': cmdDashboard(); break;
+    case 'verify-ledger': cmdVerifyLedger(); break;
+    default:
+      console.log(`QuoteDesk — RFQ inbox to verified customer quote.
 
 Usage:
   quotedesk intake --email <file> [--rfq <id>]   parse customer email + product URL
   quotedesk preview --rfq <id>                   show the call plan (no call)
-  quotedesk run --rfq <id> [--live]              dry-run on fixtures (default) or live CALL-E dispatch
+  quotedesk run --rfq <id> [--live --attest-recipient-authorization]
+                                                 dry-run on fixtures (default) or live CALL-E dispatch
   quotedesk quote --rfq <id>                     margin + draft customer quote (never sent)
   quotedesk scorecard                            per-distributor reliability from the ledger
   quotedesk dashboard --rfq <id>                 render static HTML dashboard
   quotedesk verify-ledger                        check the hash chain
 
-Dry-run is the default. Live calls require --live, CALLE_API_KEY, and one
+Dry-run is the default. Live calls require --live,
+--attest-recipient-authorization, CALLE_API_KEY, and one distinct
 QUOTEDESK_PHONE_D* E.164 number per distributor in the environment.`);
-    if (command !== undefined && command !== 'help' && command !== '--help') process.exit(1);
+      if (command !== undefined && command !== 'help' && command !== '--help') process.exit(1);
+  }
+} catch (err) {
+  // Provider/SDK errors can echo request bodies (numbers, transcript text):
+  // show a redacted copy only.
+  console.error(`Error: ${redact(err instanceof Error ? err.message : String(err))}`);
+  process.exit(1);
 }

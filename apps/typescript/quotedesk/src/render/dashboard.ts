@@ -1,9 +1,11 @@
 // JSON -> one static HTML file. No framework, no external assets: the file
-// opens from disk and screenshots cleanly. All phone numbers arrive masked.
+// opens from disk and screenshots cleanly. All phone numbers arrive masked,
+// and every interpolated string is redacted for display by esc().
 
 import type { ScorecardRow } from '../ledger/scorecard.js';
 import type { MarketConfig, QuoteRow, RequestedSpec } from '../types.js';
 import { formatMoney } from '../quote/margin.js';
+import { redact } from '../redact.js';
 
 const VERDICT_BADGE: Record<string, { label: string; bg: string; fg: string }> = {
   verified_match: { label: 'VERIFIED MATCH', bg: '#dcfce7', fg: '#166534' },
@@ -105,7 +107,7 @@ export function renderDashboard(input: {
 }
 
 function esc(s: string): string {
-  return s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
+  return redact(s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
 }
 
 function shorten(s?: string): string {

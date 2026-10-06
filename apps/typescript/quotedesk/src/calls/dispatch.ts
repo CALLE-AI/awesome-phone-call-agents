@@ -4,8 +4,11 @@
 //
 // Safety posture:
 //  - dry-run is the DEFAULT; live dispatch requires the explicit --live flag
+//  - live dispatch requires an explicit operator attestation that every
+//    recipient has authorized this call (checked in the CLI, before any work)
 //  - the idempotency key derives from (rfqId + distributor ids), never from
-//    the attempt, so a retried command cannot double-dial
+//    the attempt, so a retried command reuses the same key. Protection is
+//    bounded by CALL-E's idempotency retention window; it is not permanent.
 //  - CALL-E exposes no client cancellation: a created call runs to
 //    completion. We dispatch exactly one wave and never over-dispatch.
 //  - the returned call id is persisted to the ledger IMMEDIATELY: there is
@@ -49,23 +52,32 @@ export function buildDispatchPlan(
 }
 
 /** Resolve a distributor's real E.164 number from the environment.
- * Numbers are never stored in fixtures or code. Fail-closed: a missing
- * variable aborts BEFORE any call is created, never mid-wave. */
+ * Numbers are never stored in fixtures or code. Fail-closed: a missing,
+ * malformed (incl. zero-leading country code) or duplicate number aborts
+ * BEFORE any call is created, never mid-wave. */
 export function resolvePhones(distributors: Distributor[]): Map<string, string> {
   const resolved = new Map<string, string>();
   const missing: string[] = [];
+  const seen = new Map<string, string>();
+  const duplicates: string[] = [];
   for (const d of distributors) {
     const value = process.env[d.phoneEnv];
-    if (!value || !/^\+\d{8,15}$/.test(value)) {
+    if (!value || !/^\+[1-9]\d{7,14}$/.test(value)) {
       missing.push(`${d.id} (${d.phoneEnv})`);
-    } else {
-      resolved.set(d.id, value);
+      continue;
     }
+    const first = seen.get(value);
+    if (first) duplicates.push(`${d.id} duplicates ${first}`);
+    else seen.set(value, d.id);
+    resolved.set(d.id, value);
   }
   if (missing.length > 0) {
     throw new Error(
       `Live mode needs an E.164 number in the environment for every distributor. Missing or invalid: ${missing.join(', ')}. No call was created.`,
     );
+  }
+  if (duplicates.length > 0) {
+    throw new Error(`Duplicate destination numbers: ${duplicates.join(', ')}. No call was created.`);
   }
   return resolved;
 }

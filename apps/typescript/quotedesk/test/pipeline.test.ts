@@ -10,6 +10,8 @@ import { buildDispatchPlan, dispatchLive, idempotencyKey, resolvePhones } from '
 import { reconcile, type CallPayload } from '../src/calls/reconcile.js';
 import { priceQuote } from '../src/quote/margin.js';
 import { draftCustomerQuote } from '../src/quote/draft.js';
+import { redact } from '../src/redact.js';
+import { renderDashboard } from '../src/render/dashboard.js';
 import type { Distributor, MarketConfig, QuoteRow } from '../src/types.js';
 
 const ROOT = join(__dirname, '..');
@@ -113,6 +115,22 @@ describe('dispatch safety', () => {
     expect(() => resolvePhones(distributors)).toThrow(/No call was created/);
   });
 
+  it('rejects zero-leading country codes and duplicate destinations before any call', () => {
+    const env = { ...process.env };
+    try {
+      distributors.forEach((d, i) => (process.env[d.phoneEnv] = `+9198765432${10 + i}`));
+      expect(resolvePhones(distributors).size).toBe(4);
+
+      process.env[distributors[0].phoneEnv] = '+0198765432';
+      expect(() => resolvePhones(distributors)).toThrow(/D1.*No call was created/);
+
+      process.env[distributors[0].phoneEnv] = process.env[distributors[1].phoneEnv];
+      expect(() => resolvePhones(distributors)).toThrow(/Duplicate.*D2 duplicates D1.*No call was created/);
+    } finally {
+      process.env = env;
+    }
+  });
+
   it('persists the call id immediately via the onCallCreated hook', async () => {
     const plan = buildDispatchPlan(
       { rfqId: 'RFQ-1', family: 'X', quantity: 1, rawEmail: '' },
@@ -148,5 +166,38 @@ describe('dispatch safety', () => {
       readFileSync(join(ROOT, 'fixtures', 'responses', 'call-result.json'), 'utf8'),
     ) as CallPayload;
     expect(() => reconcile(call, ['D1', 'D2'])).toThrow(/refusing to guess/i);
+  });
+});
+
+describe('display redaction', () => {
+  it('masks phone numbers and emails but keeps prices and part numbers readable', () => {
+    expect(redact('call me on +91 98765 43210 or 022-2345-6789')).toBe('call me on [number redacted] or [number redacted]');
+    expect(redact('mail sales@meridian.example')).toBe('mail [email redacted]');
+    expect(redact('price 425000, part NH.QSQSI.001, 1,25,000')).toBe('price 425000, part NH.QSQSI.001, 1,25,000');
+    expect(redact('RFQ-2026-0914 needed by 2026-09-30 or 30/09/2026')).toBe('RFQ-2026-0914 needed by 2026-09-30 or 30/09/2026');
+    expect(redact('+91 98*** **412')).toBe('+91 98*** **412'); // already masked
+  });
+
+  it('redacts provider free text on the dashboard without touching the stored row', () => {
+    const row = {
+      distributorId: 'D1',
+      verdict: 'unverified',
+      mismatchedFields: [],
+      softMismatchedFields: [],
+      quoted: { distributorId: 'D1', price_quote: 'call back on 9876543210' },
+      eligibleForQuote: false,
+      humanReviewReason: 'ask for raj@example.com',
+    } as unknown as QuoteRow;
+    const html = renderDashboard({
+      spec: { rfqId: 'R', family: 'X', quantity: 1, rawEmail: '' },
+      rows: [row],
+      distributorNames: new Map(),
+      distributorMasked: new Map(),
+      scorecard: [],
+      market,
+      draftEmail: 'reach me at +919876543210',
+    });
+    expect(html).not.toMatch(/9876543210|raj@example\.com/);
+    expect(row.quoted.price_quote).toBe('call back on 9876543210'); // evidence unchanged
   });
 });
