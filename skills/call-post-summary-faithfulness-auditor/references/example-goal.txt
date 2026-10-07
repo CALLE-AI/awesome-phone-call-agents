@@ -1,0 +1,5 @@
+GOAL: Confirm a restaurant reservation for a party of 4 on Wednesday October 14 at 2 p.m.. FACTS: party of 4; Wednesday October 14; 2 p.m.; $20 deposit.
+SUMMARY DISCIPLINE: end the call by restating ONLY what was spoken aloud
+- repeat numbers exactly as digit words (four, not 4-5)
+- never introduce a value, date, name, or promise the other party did not say
+- state the outcome word (CONFIRMED) exactly once in the final summary
