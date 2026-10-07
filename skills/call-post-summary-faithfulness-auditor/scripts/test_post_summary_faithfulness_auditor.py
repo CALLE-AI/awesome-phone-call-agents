@@ -1,0 +1,250 @@
+#!/usr/bin/env python3
+"""Tests for call-post-summary-faithfulness-auditor (pytest + standalone runner)."""
+
+from __future__ import annotations
+
+import json
+import subprocess
+import sys
+from pathlib import Path
+
+import post_summary_faithfulness_auditor as mod
+
+HERE = Path(__file__).resolve().parent
+
+
+def _turn(spk, txt):
+    return {"speaker": spk, "text": txt}
+
+
+# ---------------------------------------------------------------------------
+# Task 1: claim decomposition
+# ---------------------------------------------------------------------------
+
+def test_masked_spans_never_anchor():
+    claims = mod.decompose_claims("Guest at +1 (415) 555-0196 confirmed.")
+    assert all(c["kind"] != "numeric" or "555" not in c["text"] for c in claims)
+
+
+def test_numeric_claim_dollars():
+    claims = mod.decompose_claims("A deposit of $45 was collected.")
+    assert any(c["kind"] == "numeric" and c["value"] == "45" for c in claims)
+
+
+def test_dollars_word_folding():
+    claims = mod.decompose_claims("The total came to 45 dollars.")
+    assert any(c["kind"] == "numeric" and c["value"] == "45" for c in claims)
+
+
+def test_spelled_number_is_non_checkable():
+    claims = mod.decompose_claims("Party of four confirmed.")
+    assert any(c["kind"] == "non_checkable_spelled" for c in claims)
+
+
+def test_outcome_claim_detected():
+    claims = mod.decompose_claims("The guest confirmed the reservation.")
+    assert any(c["kind"] == "outcome" for c in claims)
+
+
+def test_action_claim_detected():
+    claims = mod.decompose_claims("A confirmation will be emailed.")
+    assert any(c["kind"] == "action" for c in claims)
+
+
+def test_opinion_non_checkable():
+    claims = mod.decompose_claims("The customer was pleased and cooperative.")
+    assert claims and all(c["kind"] == "non_checkable_opinion" for c in claims)
+
+
+# ---------------------------------------------------------------------------
+# Task 2: anchoring + verdict engine
+# ---------------------------------------------------------------------------
+
+def _turns(*pairs):
+    return [{"speaker": a, "text": b} for a, b in pairs]
+
+
+def test_supported_numeric_anchor():
+    claims = mod.decompose_claims("Deposit of $45 collected.")
+    res = mod.anchor_claims(claims, _turns(("agent", "There is a $45 deposit."), ("callee", "Okay.")))
+    assert res[0]["grade"] == "SUPPORTED"
+
+
+def test_unsupported_when_absent():
+    claims = mod.decompose_claims("Deposit of $45 collected.")
+    res = mod.anchor_claims(claims, _turns(("agent", "Thanks, all set."), ("callee", "Great.")))
+    assert res[0]["grade"] == "UNSUPPORTED"
+
+
+def test_different_value_is_not_contradiction():
+    claims = mod.decompose_claims("Deposit of $45 collected.")
+    res = mod.anchor_claims(claims, _turns(("agent", "The total is $54, deposit $20."), ("callee", "Fine.")))
+    assert res[0]["grade"] == "UNSUPPORTED"
+
+
+def test_outcome_contradiction_positive_vs_decline():
+    claims = mod.decompose_claims("The guest confirmed the booking.")
+    turns = _turns(("agent", "So that is confirmed?"), ("callee", "Actually no, I can't make it, cancel it."))
+    res = mod.anchor_claims(claims, turns)
+    assert res[0]["grade"] == "CONTRADICTED"
+
+
+def test_verdict_priority():
+    turns = _turns(("agent", "Confirmed?"), ("callee", "No, cancel it."))
+    v = mod.analyze(turns, "Guest confirmed. Total was $45.")
+    assert v["verdict"] == "CONTRADICTED_CLAIMS"
+
+
+def test_faithful_verdict():
+    turns = _turns(("agent", "Party of 4 on Wednesday October 14 at 2 p.m., confirmed?"),
+                   ("callee", "Yes, confirmed, see you then."))
+    v = mod.analyze(turns, "Party of 4 confirmed for Wednesday, October 14 at 2 p.m.")
+    assert v["verdict"] == "FAITHFUL"
+
+
+def test_no_checkable_claims_empty_summary():
+    v = mod.analyze(_turns(("agent", "Hello?")), "")
+    assert v["verdict"] == "NO_CHECKABLE_CLAIMS" and v["reason"] == "summary_missing"
+
+
+def test_coverage_gap_advisory():
+    turns = _turns(("agent", "Confirmed for October 14?"), ("callee", "Yes, confirmed."))
+    v = mod.analyze(turns, "The call ended politely.")
+    assert v["coverage_gaps"] == ["outcome"]
+
+
+# ---------------------------------------------------------------------------
+# Task 3: CLI analyze + craft
+# ---------------------------------------------------------------------------
+
+def _run(args):
+    return subprocess.run(
+        [sys.executable, str(HERE / "post_summary_faithfulness_auditor.py"), *args],
+        capture_output=True, text=True,
+    )
+
+
+def _tmp_dir() -> Path:
+    d = HERE / ".tmp-s1"
+    d.mkdir(exist_ok=True)
+    return d
+
+
+def _tmp_wrapped():
+    p = _tmp_dir() / "wrapped.json"
+    p.write_text(json.dumps({
+        "call_id": "cli-wrapped-001", "status": "COMPLETED",
+        "result": {
+            "post_summary": "Guest confirmed party of 4 for October 14.",
+            "transcript": [
+                {"speaker": "agent", "text": "Party of 4 on October 14, confirmed?"},
+                {"speaker": "callee", "text": "Yes, confirmed."},
+            ],
+        },
+    }), encoding="utf-8")
+    return p
+
+
+def test_cli_wrapped_shape_real_get_call_run():
+    p = _run(["analyze", "--call-result", str(_tmp_wrapped())])
+    assert p.returncode == 0, p.stderr
+    card = json.loads(p.stdout)
+    assert card["verdict"] == "FAITHFUL" and "disclaimer" in card and card["call_id"] == "cli-wrapped-001"
+
+
+def test_cli_exit2_invalid_json():
+    bad = _tmp_dir() / "bad.json"
+    bad.write_text("{oops", encoding="utf-8")
+    assert _run(["analyze", "--call-result", str(bad)]).returncode == 2
+
+
+def test_cli_exit2_json_array():
+    arr = _tmp_dir() / "arr.json"
+    arr.write_text("[]", encoding="utf-8")
+    assert _run(["analyze", "--call-result", str(arr)]).returncode == 2
+
+
+def test_cli_exit2_missing_arg():
+    assert _run(["analyze"]).returncode == 2
+
+
+def test_cli_flat_shape():
+    p = _tmp_dir() / "flat.json"
+    p.write_text(json.dumps({
+        "call_id": "cli-flat-001", "status": "COMPLETED",
+        "post_summary": "Guest confirmed party of 4 for October 14.",
+        "transcript": [
+            {"speaker": "agent", "text": "Party of 4 on October 14, confirmed?"},
+            {"speaker": "callee", "text": "Yes, confirmed."},
+        ],
+    }), encoding="utf-8")
+    r = _run(["analyze", "--call-result", str(p)])
+    assert r.returncode == 0 and json.loads(r.stdout)["verdict"] == "FAITHFUL"
+
+
+def test_cli_craft_contains_policy():
+    p = _run(["craft", "--task", "confirm the reservation", "--facts", "party of 4, October 14, 2 p.m."])
+    assert p.returncode == 0 and "only what was spoken" in p.stdout.lower()
+
+
+# ---------------------------------------------------------------------------
+# Task 4: fixtures
+# ---------------------------------------------------------------------------
+
+_REFS = HERE.parent / "references"
+
+
+def _analyze_fixture(name):
+    return _run(["analyze", "--call-result", str(_REFS / name)])
+
+
+def test_fixture_faithful():
+    r = _analyze_fixture("example-call-result.json")
+    assert r.returncode == 0, r.stderr
+    card = json.loads(r.stdout)
+    assert card["verdict"] == "FAITHFUL" and card["call_id"] == "demo-faithful-001"
+
+
+def test_fixture_unsupported():
+    r = _analyze_fixture("example-call-result-unsupported.json")
+    assert r.returncode == 0, r.stderr
+    card = json.loads(r.stdout)
+    assert card["verdict"] == "UNSUPPORTED_CLAIMS"
+    unsupported = [c for c in card["claims"] if c["grade"] == "UNSUPPORTED"]
+    assert len(unsupported) >= 2
+
+
+def test_fixture_contradicted():
+    r = _analyze_fixture("example-call-result-contradicted.json")
+    assert r.returncode == 0, r.stderr
+    card = json.loads(r.stdout)
+    assert card["verdict"] == "CONTRADICTED_CLAIMS" and card["call_id"] == "demo-faithful-003"
+
+
+def test_fixture_flat_shape():
+    r = _analyze_fixture("example-call-result-flat.json")
+    assert r.returncode == 0, r.stderr
+    card = json.loads(r.stdout)
+    assert card["verdict"] == "FAITHFUL" and card["call_id"] == "demo-faithful-001"
+
+
+# ---------------------------------------------------------------------------
+# Standalone runner (must stay LAST)
+# ---------------------------------------------------------------------------
+
+def _run_all() -> int:
+    failures = 0
+    tests = [(k, v) for k, v in globals().items() if k.startswith("test_") and callable(v)]
+    for name, fn in tests:
+        try:
+            fn()
+            print(f"PASS {name}")
+        except Exception as exc:
+            failures += 1
+            print(f"FAIL {name}: {exc}")
+    print(f"{len(tests) - failures}/{len(tests)} tests passed")
+    return 1 if failures else 0
+
+
+if __name__ == "__main__":
+    sys.exit(_run_all())
