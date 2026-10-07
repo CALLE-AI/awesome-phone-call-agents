@@ -263,6 +263,75 @@ def test_cli_craft_contains_policy():
     assert p.returncode == 0 and "only what was spoken" in p.stdout.lower()
 
 
+def test_cli_craft_empty_task_exit2():
+    r = _run(["craft", "--task", "   ", "--facts", "x"])
+    assert r.returncode == 2
+    assert "task must not be empty" in r.stderr
+
+
+# ---------------------------------------------------------------------------
+# Edge behaviors: transcript shapes and opinion-only summaries
+# ---------------------------------------------------------------------------
+
+def test_transcript_as_plain_string():
+    # A raw string transcript normalizes to a single agent turn.
+    p = _tmp_dir() / "str-transcript.json"
+    p.write_text(json.dumps({
+        "call_id": "cli-str-001", "status": "COMPLETED",
+        "post_summary": "Confirmed for October 14.",
+        "transcript": "Agent: confirmed for October 14",
+    }), encoding="utf-8")
+    r = _run(["analyze", "--call-result", str(p)])
+    assert r.returncode == 0, r.stderr
+    card = json.loads(r.stdout)
+    assert card["verdict"] == "FAITHFUL" and card["call_id"] == "cli-str-001"
+
+
+def test_transcript_null():
+    # A null transcript means zero turns; date claims grade UNSUPPORTED with
+    # the kind_absent reason instead of crashing.
+    p = _tmp_dir() / "null-transcript.json"
+    p.write_text(json.dumps({
+        "call_id": "cli-null-001", "status": "COMPLETED",
+        "post_summary": "Confirmed for October 14.",
+        "transcript": None,
+    }), encoding="utf-8")
+    r = _run(["analyze", "--call-result", str(p)])
+    assert r.returncode == 0, r.stderr
+    card = json.loads(r.stdout)
+    assert card["verdict"] == "UNSUPPORTED_CLAIMS"
+    date_claims = [c for c in card["claims"] if c["kind"] == "date_time"]
+    assert date_claims and all(
+        c["grade"] == "UNSUPPORTED" and c.get("reason") == "kind_absent_from_transcript"
+        for c in date_claims
+    )
+
+
+def test_transcript_mixed_list_skips_non_dicts():
+    # Non-dict items in the transcript list are skipped, not fatal.
+    p = _tmp_dir() / "mixed-transcript.json"
+    p.write_text(json.dumps({
+        "call_id": "cli-mixed-001", "status": "COMPLETED",
+        "post_summary": "Confirmed for October 14.",
+        "transcript": [
+            "Agent: plain string turn, not a dict",
+            {"speaker": "agent", "text": "Confirmed for October 14?"},
+            {"speaker": "callee", "text": "Yes, confirmed."},
+        ],
+    }), encoding="utf-8")
+    r = _run(["analyze", "--call-result", str(p)])
+    assert r.returncode == 0, r.stderr
+    card = json.loads(r.stdout)
+    assert card["verdict"] == "FAITHFUL" and card["call_id"] == "cli-mixed-001"
+
+
+def test_opinion_only_reason():
+    # A summary with zero checkable claims routes NO_CHECKABLE_CLAIMS with
+    # reason opinion_only.
+    v = mod.analyze(_turns(("agent", "Thanks for your time.")), "The customer seemed satisfied and was polite throughout.")
+    assert v["verdict"] == "NO_CHECKABLE_CLAIMS" and v["reason"] == "opinion_only"
+
+
 # ---------------------------------------------------------------------------
 # Task 4: fixtures
 # ---------------------------------------------------------------------------
@@ -350,7 +419,15 @@ def test_fixture_flat_shape():
     r = _analyze_fixture("example-call-result-flat.json")
     assert r.returncode == 0, r.stderr
     card = json.loads(r.stdout)
-    assert card["verdict"] == "FAITHFUL" and card["call_id"] == "demo-faithful-001"
+    assert card["verdict"] == "FAITHFUL" and card["call_id"] == "demo-faithful-004"
+
+
+def test_fixture_no_checkable():
+    r = _analyze_fixture("example-call-result-no-checkable.json")
+    assert r.returncode == 0, r.stderr
+    card = json.loads(r.stdout)
+    assert card["verdict"] == "NO_CHECKABLE_CLAIMS" and card["reason"] == "opinion_only"
+    assert card["call_id"] == "demo-faithful-005"
 
 
 # ---------------------------------------------------------------------------

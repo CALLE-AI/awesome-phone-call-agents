@@ -27,6 +27,11 @@
   certificate that the summary is complete or that the call went well;
   the `coverage_gaps` field exists precisely because a faithful summary
   can still omit an outcome the transcript contains.
+- Two heuristic relaxations can grade a claim SUPPORTED from an
+  acknowledgment token instead of a literal restatement: outcome claims
+  from an affirmative ack in a LATE callee turn, and action claims from
+  an ack token ("okay", "sure", "will do", ...) in ANY turn. These mirror
+  how real callees confirm; they are heuristics, not entailment.
 
 ## Data handling
 

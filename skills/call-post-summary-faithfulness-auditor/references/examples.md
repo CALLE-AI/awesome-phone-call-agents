@@ -192,6 +192,119 @@ python3 scripts/post_summary_faithfulness_auditor.py analyze \
 }
 ```
 
+## FLAT SHAPE (unwrapped)
+
+Some call records carry `post_summary` and `transcript` at the top level
+instead of nested under `result`. The loader accepts both shapes.
+
+```bash
+python3 scripts/post_summary_faithfulness_auditor.py analyze \
+  --call-result references/example-call-result-flat.json
+```
+
+```json
+{
+  "call_id": "demo-faithful-004",
+  "verdict": "FAITHFUL",
+  "claims": [
+    {
+      "text": "Guest confirmed party of 4 for Wednesday, October 14 at 2 p.m.",
+      "kind": "outcome",
+      "value": "confirm",
+      "grade": "SUPPORTED",
+      "turn_index": 0
+    },
+    {
+      "text": "Guest confirmed party of 4 for Wednesday, October 14 at 2 p.m.",
+      "kind": "numeric",
+      "value": "4",
+      "grade": "SUPPORTED",
+      "turn_index": 2
+    },
+    {
+      "text": "Guest confirmed party of 4 for Wednesday, October 14 at 2 p.m.",
+      "kind": "date_time",
+      "value": "oct 14",
+      "grade": "SUPPORTED",
+      "turn_index": 2
+    },
+    {
+      "text": "Guest confirmed party of 4 for Wednesday, October 14 at 2 p.m.",
+      "kind": "date_time",
+      "value": "wednesday",
+      "grade": "SUPPORTED",
+      "turn_index": 2
+    },
+    {
+      "text": "Guest confirmed party of 4 for Wednesday, October 14 at 2 p.m.",
+      "kind": "date_time",
+      "value": "14:00",
+      "grade": "SUPPORTED",
+      "turn_index": 2
+    },
+    {
+      "text": "A $20 deposit holds the table and the confirmation will be emailed.",
+      "kind": "numeric",
+      "value": "20",
+      "grade": "SUPPORTED",
+      "turn_index": 4
+    },
+    {
+      "text": "A $20 deposit holds the table and the confirmation will be emailed.",
+      "kind": "action",
+      "value": "email",
+      "grade": "SUPPORTED",
+      "turn_index": 4
+    }
+  ],
+  "counts": {
+    "checkable": 7,
+    "supported": 7,
+    "unsupported": 0,
+    "contradicted": 0
+  },
+  "coverage_gaps": [],
+  "disclaimer": "Heuristic lexical anchoring, not semantic entailment. UNSUPPORTED means the claim value was not found verbatim in any transcript turn; it is not proof the claim is false. CONTRADICTED flags conflict with late callee speech under a fixed polarity rule. Route every finding to human verification against the call record."
+}
+```
+
+## NO_CHECKABLE_CLAIMS (opinion_only)
+
+An opinion-only summary has nothing machine-checkable to anchor, so the
+card routes on `reason: opinion_only` instead of guessing an outcome.
+
+```bash
+python3 scripts/post_summary_faithfulness_auditor.py analyze \
+  --call-result references/example-call-result-no-checkable.json
+```
+
+```json
+{
+  "call_id": "demo-faithful-005",
+  "verdict": "NO_CHECKABLE_CLAIMS",
+  "reason": "opinion_only",
+  "claims": [
+    {
+      "text": "The customer seemed satisfied and was polite throughout.",
+      "kind": "non_checkable_opinion",
+      "value": "",
+      "grade": "NON_CHECKABLE",
+      "turn_index": null
+    }
+  ],
+  "counts": {
+    "checkable": 0,
+    "supported": 0,
+    "unsupported": 0,
+    "contradicted": 0
+  },
+  "coverage_gaps": [
+    "outcome"
+  ],
+  "disclaimer": "Heuristic lexical anchoring, not semantic entailment. UNSUPPORTED means the claim value was not found verbatim in any transcript turn; it is not proof the claim is false. CONTRADICTED flags conflict with late callee speech under a fixed polarity rule. Route every finding to human verification against the call record."
+}
+```
+
 ## Craft - the faithful-summary goal
 
 ```bash

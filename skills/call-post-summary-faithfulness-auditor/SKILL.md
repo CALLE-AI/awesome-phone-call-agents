@@ -108,6 +108,11 @@ exactly once - so the summary this skill later audits starts faithful.
   unambiguous affirmative ack ("yes", "yep", "perfect", "lock it in",
   "we'll take it", ...) with no negative token in that turn - it mirrors
   how real callees confirm, but it is a heuristic, not entailment
+- heuristic action-ack relaxation: an action claim can grade SUPPORTED
+  from an acknowledgment token ("okay", "ok", "sure", "will do", ...)
+  found in ANY turn, not only late callee turns - a deliberate relaxation
+  that keeps polite callees from sinking faithful summaries, but it is a
+  heuristic, not entailment
 
 ## Testing
 

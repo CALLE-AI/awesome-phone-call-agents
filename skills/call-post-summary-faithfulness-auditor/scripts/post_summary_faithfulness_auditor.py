@@ -496,6 +496,9 @@ def main(argv: list[str] | None = None) -> int:
     args = parser.parse_args(argv)
 
     try:
+        if args.command == "craft" and not args.task.strip():
+            sys.stderr.write("task must not be empty\n")
+            return 2
         if args.command == "analyze":
             record = load_call_result(Path(args.call_result))
             card = analyze(record["turns"], record["post_summary"], call_id=record["call_id"])
