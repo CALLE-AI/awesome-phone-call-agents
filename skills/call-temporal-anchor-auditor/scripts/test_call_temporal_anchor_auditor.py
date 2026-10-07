@@ -529,6 +529,49 @@ def _write_tmp(payload, name: str = "in.json") -> Path:
     return p
 
 
+def test_cli_fixture_full_anchored():
+    proc = _run("analyze", "--call-result", str(EXAMPLE_FULL), "--called-at", CALLED_AT)
+    assert proc.returncode == 0, proc.stderr
+    card = json.loads(proc.stdout)
+    assert card["call_id"] == "demo-temporal-001"
+    assert card["verdict"] == "FULLY_ANCHORED"
+
+
+def test_cli_fixture_conflict():
+    proc = _run("analyze", "--call-result", str(EXAMPLE_CONFLICT), "--called-at", CALLED_AT)
+    assert proc.returncode == 0, proc.stderr
+    card = json.loads(proc.stdout)
+    assert card["call_id"] == "demo-temporal-002"
+    assert card["verdict"] == "INTERNAL_DATE_CONFLICT"
+
+
+def test_cli_fixture_relative():
+    proc = _run("analyze", "--call-result", str(EXAMPLE_RELATIVE), "--called-at", CALLED_AT)
+    assert proc.returncode == 0, proc.stderr
+    card = json.loads(proc.stdout)
+    assert card["call_id"] == "demo-temporal-003"
+    assert card["verdict"] == "RELATIVE_ONLY_COMMITMENTS"
+
+
+def test_cli_fixture_relative_without_called_at_notes():
+    proc = _run("analyze", "--call-result", str(EXAMPLE_RELATIVE))
+    assert proc.returncode == 0, proc.stderr
+    card = json.loads(proc.stdout)
+    unresolved = [e for e in card["expressions"] if e["class"] == "unresolvable_without_call_time"]
+    assert unresolved
+    assert card["called_at_echo"] is None
+    assert any("skipped" in n for n in card["notes"])
+
+
+def test_cli_transcript_bare_list_path():
+    p = _write_tmp(_turns(("agent", "Pickup on Thursday at 2 p.m.")))
+    proc = _run("analyze", "--transcript", str(p), "--called-at", CALLED_AT)
+    assert proc.returncode == 0, proc.stderr
+    card = json.loads(proc.stdout)
+    assert card["verdict"] == "FULLY_ANCHORED"
+    assert "call_id" not in card
+
+
 def test_cli_bad_json_exit2():
     d = _mktemp()
     p = d / "bad.json"
