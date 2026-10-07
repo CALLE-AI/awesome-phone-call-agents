@@ -148,7 +148,7 @@ def test_parse_called_at_invalid_raises():
 
 
 def test_mask_pii_keeps_last_two():
-    assert mask_pii("call 5551234567 now") == "call ########67 now"
+    assert mask_pii("call 4155550198 now") == "call ########98 now"
 
 
 def test_mask_pii_short_runs_untouched():
