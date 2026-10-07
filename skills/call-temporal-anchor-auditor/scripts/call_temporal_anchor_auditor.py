@@ -114,6 +114,8 @@ _MONTH_DAY_RE = re.compile(
 )
 _SLASH_DATE_RE = re.compile(r"\b([0-9]{1,2})/([0-9]{1,2})\b")
 _WEEKDAY_RE = re.compile(r"\b(?:monday|tuesday|wednesday|thursday|friday|saturday|sunday)\b", re.IGNORECASE)
+# Connectives allowed between an adjacent weekday and date ("Wednesday or the 14th of October").
+_DATE_CONNECTIVE_RE = re.compile(r"\b(?:or|the|of)\b", re.IGNORECASE)
 _NEXT_THIS_WEEKDAY_RE = re.compile(
     r"\b(next|this)\s+(monday|tuesday|wednesday|thursday|friday|saturday|sunday)\b", re.IGNORECASE
 )
@@ -464,6 +466,26 @@ def _collect_agent_turn(text: str, turn_index: int, called_at: datetime | None) 
     return exprs
 
 
+def _weekday_date_gap(
+    text: str, wd_span: tuple[int, int], date_span: tuple[int, int]
+) -> int | None:
+    """Gap length when a weekday mention is close enough to pair with a date.
+
+    Close enough means the intervening text is at most 20 characters and
+    contains nothing but commas, whitespace, and the connectives or/the/of.
+    Otherwise None. This keeps multi-slot sentences ("Wednesday, October 14
+    or Friday, October 16") from pairing every weekday with every date.
+    """
+    start = min(wd_span[1], date_span[1])
+    end = max(wd_span[0], date_span[0])
+    gap = text[start:end]
+    if len(gap) > 20:
+        return None
+    if _DATE_CONNECTIVE_RE.sub("", gap).strip(" ,") == "":
+        return len(gap)
+    return None
+
+
 def find_conflicts(
     turns: list[dict[str, Any]],
     expressions: list[dict[str, Any]],
@@ -492,56 +514,62 @@ def find_conflicts(
             agent_texts[index] = text
 
     conflicts: list[dict[str, Any]] = []
-    # (a) weekday+date pair in the same turn vs the calendar of the call year.
+    # (a) weekday+date pair in the same turn vs the calendar of the call year,
+    #     with proximity pairing so a weekday is only checked against a date it
+    #     is actually adjacent to.
     # (b) same date stated with different weekdays across turns.
-    weekdays_by_date: dict[str, set[str]] = {}
+    weekdays_by_date: dict[str, set[tuple[int, str]]] = {}
     for index, text in agent_texts.items():
-        weekdays_in_turn = [m.group(0).lower() for m in _WEEKDAY_RE.finditer(text)]
+        weekday_spans = [(m.group(0).lower(), m.span()) for m in _WEEKDAY_RE.finditer(text)]
+        date_matches: list[tuple[str, tuple[int, int]]] = []
         for m in _MONTH_DAY_RE.finditer(text):
             month = _month_num(m.group(1) or m.group(4))
             day = int(m.group(2) or m.group(3))
             resolved = _resolve_month_day(month, day, called_at)
-            if not resolved:
-                continue
-            for wd in weekdays_in_turn:
-                actual = _WEEKDAY_NAMES[datetime.fromisoformat(resolved).weekday()]
-                if wd != actual:
-                    conflicts.append(
-                        {
-                            "type": "INTERNAL_DATE_CONFLICT",
-                            "turn_index": index,
-                            "stated_weekday": wd,
-                            "date": resolved,
-                            "actual_weekday": actual,
-                            "text": mask_pii(text)[:160],
-                        }
-                    )
-                weekdays_by_date.setdefault(resolved, set()).add(wd)
+            if resolved:
+                date_matches.append((resolved, m.span()))
         for m in _SLASH_DATE_RE.finditer(text):
             resolved = _resolve_month_day(int(m.group(1)), int(m.group(2)), called_at)
-            if not resolved:
+            if resolved:
+                date_matches.append((resolved, m.span()))
+        adjacent: list[tuple[int, str, str]] = []
+        for resolved, date_span in date_matches:
+            for wd, wd_span in weekday_spans:
+                gap_len = _weekday_date_gap(text, wd_span, date_span)
+                if gap_len is not None:
+                    adjacent.append((gap_len, wd, resolved))
+        # Proximity pairing: a weekday conflicts only with its nearest
+        # adjacent date, not with every date in the turn.
+        nearest: dict[str, int] = {}
+        for gap_len, wd, _ in adjacent:
+            nearest[wd] = min(nearest.get(wd, gap_len), gap_len)
+        for gap_len, wd, resolved in adjacent:
+            if gap_len != nearest[wd]:
                 continue
-            for wd in weekdays_in_turn:
-                actual = _WEEKDAY_NAMES[datetime.fromisoformat(resolved).weekday()]
-                if wd != actual:
-                    conflicts.append(
-                        {
-                            "type": "INTERNAL_DATE_CONFLICT",
-                            "turn_index": index,
-                            "stated_weekday": wd,
-                            "date": resolved,
-                            "actual_weekday": actual,
-                            "text": mask_pii(text)[:160],
-                        }
-                    )
-                weekdays_by_date.setdefault(resolved, set()).add(wd)
-    for date_value, stated in weekdays_by_date.items():
-        if len(stated) > 1:
+            actual = _WEEKDAY_NAMES[datetime.fromisoformat(resolved).weekday()]
+            if wd != actual:
+                conflicts.append(
+                    {
+                        "type": "INTERNAL_DATE_CONFLICT",
+                        "turn_index": index,
+                        "stated_weekday": wd,
+                        "date": resolved,
+                        "actual_weekday": actual,
+                        "text": mask_pii(text)[:160],
+                    }
+                )
+            weekdays_by_date.setdefault(resolved, set()).add((index, wd))
+    for date_value, pairs in weekdays_by_date.items():
+        stated = sorted({wd for _, wd in pairs})
+        turn_positions = {turn for turn, _ in pairs}
+        # Cross-turn only: a same-turn weekday disagreement for one date is
+        # already covered by (a)'s proximity-checked pairs.
+        if len(stated) > 1 and len(turn_positions) > 1:
             conflicts.append(
                 {
                     "type": "INTERNAL_DATE_CONFLICT",
                     "turn_index": None,
-                    "stated_weekdays": sorted(stated),
+                    "stated_weekdays": stated,
                     "date": date_value,
                     "text": None,
                 }

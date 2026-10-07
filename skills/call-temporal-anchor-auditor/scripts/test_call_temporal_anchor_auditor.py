@@ -366,6 +366,37 @@ def test_cross_turn_weekday_disagreement_conflict():
     assert any(c["type"] == "INTERNAL_DATE_CONFLICT" for c in conflicts)
 
 
+def test_multi_slot_single_turn_no_false_conflict():
+    # 2026-10-14 is a Wednesday and 2026-10-16 is a Friday; each weekday sits
+    # adjacent to its own date, so the cross-product must not fire.
+    from call_temporal_anchor_auditor import analyze_call
+
+    turns = _turns(("agent", "We can do Wednesday, October 14 or Friday, October 16."))
+    card = analyze_call(turns, WEDNESDAY, CALLED_AT)
+    assert card["conflicts"] == []
+    assert card["verdict"] != "INTERNAL_DATE_CONFLICT"
+
+
+def test_true_same_turn_conflict_still_fires():
+    # 2026-10-14 is a Wednesday; agent said Tuesday right next to the date.
+    turns = _turns(("agent", "Let me confirm Tuesday, October 14 at 2 p.m."))
+    exprs = collect_expressions(turns, WEDNESDAY)[0]
+    conflicts, _ = find_conflicts(turns, exprs, WEDNESDAY)
+    assert len(conflicts) == 1
+    assert conflicts[0]["type"] == "INTERNAL_DATE_CONFLICT"
+    assert conflicts[0]["stated_weekday"] == "tuesday"
+
+
+def test_proximity_boundary_far_weekday_not_paired():
+    # Monday is far from the date, so it must not be paired with it.
+    turns = _turns(
+        ("agent", "We are closed Mondays. Your table will be ready on Wednesday, October 14.")
+    )
+    exprs = collect_expressions(turns, WEDNESDAY)[0]
+    conflicts, _ = find_conflicts(turns, exprs, WEDNESDAY)
+    assert conflicts == []
+
+
 def test_clock_restatement_meridiem_drift_conflict():
     turns = _turns(
         ("agent", "See you at 2 p.m. on October 14."),
