@@ -399,6 +399,202 @@ def test_24h_and_12h_same_time_no_conflict():
     assert conflicts == []
 
 
+# ---------------------------------------------------------------- analysis (Task 12)
+
+
+def test_fully_anchored_end_to_end():
+    from call_temporal_anchor_auditor import analyze_call
+
+    turns = _turns(
+        ("agent", "Your pickup is scheduled for Wednesday, October 14 at 2 p.m."),
+        ("callee", "Got it, Wednesday the 14th at 2 p.m. works."),
+        ("agent", "To restate: Wednesday, October 14 at 2 p.m. We will see you then."),
+    )
+    card = analyze_call(turns, WEDNESDAY, CALLED_AT)
+    assert card["verdict"] == "FULLY_ANCHORED"
+    assert card["commitment_findings"] == []
+    assert card["conflicts"] == []
+
+
+def test_relative_only_commitment_finding():
+    from call_temporal_anchor_auditor import analyze_call
+
+    turns = _turns(("agent", "Can I confirm? We will see you tomorrow evening."))
+    card = analyze_call(turns, WEDNESDAY, CALLED_AT)
+    assert card["verdict"] == "RELATIVE_ONLY_COMMITMENTS"
+    assert len(card["commitment_findings"]) == 1
+    f = card["commitment_findings"][0]
+    assert f["turn_index"] == 0
+    assert "tomorrow" in f["expression"]
+
+
+def test_conflict_beats_relative_only():
+    from call_temporal_anchor_auditor import analyze_call
+
+    turns = _turns(("agent", "It is Tuesday, October 14 at 2. Please be home."))
+    card = analyze_call(turns, WEDNESDAY, CALLED_AT)
+    assert card["conflicts"], "expected a date conflict"
+    assert card["verdict"] == "INTERNAL_DATE_CONFLICT"
+
+
+def test_relative_only_beats_ambiguous():
+    from call_temporal_anchor_auditor import analyze_call
+
+    turns = _turns(
+        ("agent", "We will see you tomorrow evening."),
+        ("callee", "Okay."),
+        ("agent", "And I will call you back next week."),
+    )
+    card = analyze_call(turns, WEDNESDAY, CALLED_AT)
+    assert card["verdict"] == "RELATIVE_ONLY_COMMITMENTS"
+
+
+def test_no_time_references():
+    from call_temporal_anchor_auditor import analyze_call
+
+    turns = _turns(("agent", "Hello, this is the survey assistant. Goodbye."), ("callee", "Fine."))
+    card = analyze_call(turns, WEDNESDAY, CALLED_AT)
+    assert card["verdict"] == "NO_TIME_REFERENCES"
+
+
+def test_ambiguous_without_commitment_findings():
+    from call_temporal_anchor_auditor import analyze_call
+
+    turns = _turns(("agent", "The office is closed next Friday."))
+    card = analyze_call(turns, WEDNESDAY, CALLED_AT)
+    assert card["verdict"] == "AMBIGUOUS_TIME_REFERENCES"
+
+
+def test_no_time_references_when_only_callee_mentions():
+    from call_temporal_anchor_auditor import analyze_call
+
+    turns = _turns(("agent", "Understood, thank you."), ("callee", "Can we do Tuesday?"))
+    card = analyze_call(turns, WEDNESDAY, CALLED_AT)
+    assert card["verdict"] == "NO_TIME_REFERENCES"
+    assert card["callee_time_mentions"] == 1
+
+
+def test_output_contract_fields():
+    from call_temporal_anchor_auditor import analyze_call
+
+    card = analyze_call(_turns(("agent", "See you tomorrow.")), WEDNESDAY, CALLED_AT)
+    for key in (
+        "verdict",
+        "called_at_echo",
+        "expressions",
+        "commitment_findings",
+        "callee_time_mentions",
+        "conflicts",
+        "counts",
+        "disclaimer",
+    ):
+        assert key in card
+    assert card["called_at_echo"] == CALLED_AT
+
+
+def test_disclaimer_present_and_hedged():
+    from call_temporal_anchor_auditor import analyze_call
+
+    card = analyze_call(_turns(("agent", "See you tomorrow.")), WEDNESDAY, CALLED_AT)
+    assert "heuristic" in card["disclaimer"].lower()
+
+
+# ---------------------------------------------------------------- craft
+
+
+def test_craft_template_contents():
+    text = craft_template("Confirm the repair window", "2026-10-14", "2 p.m.")
+    assert text.startswith("GOAL: Confirm the repair window")
+    assert 'example: "Wednesday, October 14, at 2 p.m."' in text
+    assert text.rstrip().endswith("SLOT: 2026-10-14 at 2 p.m.")
+    assert "TIME DISCIPLINE:" in text
+    assert 'never use bare "next <weekday>"' in text
+
+
+# ---------------------------------------------------------------- CLI
+
+
+def _run(*args: str) -> subprocess.CompletedProcess:
+    return subprocess.run(
+        [sys.executable, str(SCRIPTS / "call_temporal_anchor_auditor.py"), *args],
+        capture_output=True,
+        text=True,
+    )
+
+
+def _write_tmp(payload, name: str = "in.json") -> Path:
+    d = _mktemp()
+    p = d / name
+    p.write_text(json.dumps(payload), encoding="utf-8")
+    return p
+
+
+def test_cli_bad_json_exit2():
+    d = _mktemp()
+    p = d / "bad.json"
+    p.write_text("{not json", encoding="utf-8")
+    proc = _run("analyze", "--call-result", str(p))
+    assert proc.returncode == 2
+    assert proc.stderr.strip()
+
+
+def test_cli_call_result_array_exit2():
+    p = _write_tmp([{"speaker": "agent", "text": "hi"}])
+    proc = _run("analyze", "--call-result", str(p))
+    assert proc.returncode == 2
+
+
+def test_cli_transcript_non_array_exit2():
+    p = _write_tmp({"transcript": []})
+    proc = _run("analyze", "--transcript", str(p))
+    assert proc.returncode == 2
+
+
+def test_cli_neither_flag_exit2():
+    proc = _run("analyze")
+    assert proc.returncode == 2
+
+
+def test_cli_both_flags_exit2():
+    p1 = _write_tmp({"result": {"transcript": []}})
+    p2 = _write_tmp(_turns(("agent", "hi")), "t.json")
+    proc = _run("analyze", "--call-result", str(p1), "--transcript", str(p2))
+    assert proc.returncode == 2
+
+
+def test_cli_bad_iso_exit2():
+    p = _write_tmp({"result": {"transcript": _turns(("agent", "hi"))}})
+    proc = _run("analyze", "--call-result", str(p), "--called-at", "tomorrow-ish")
+    assert proc.returncode == 2
+
+
+def test_cli_nonexistent_file_exit2():
+    proc = _run("analyze", "--call-result", "Z:/nope/missing.json")
+    assert proc.returncode == 2
+    assert "not found" in proc.stderr
+
+
+def test_cli_craft_exit0():
+    proc = _run("craft", "--task", "Confirm the pickup", "--date", "2026-10-14", "--time", "2 p.m.")
+    assert proc.returncode == 0
+    assert proc.stdout.startswith("GOAL: Confirm the pickup")
+    assert proc.stdout.rstrip().endswith("SLOT: 2026-10-14 at 2 p.m.")
+
+
+def test_cli_craft_empty_task_exit2():
+    proc = _run("craft", "--task", "   ", "--date", "2026-10-14", "--time", "2 p.m.")
+    assert proc.returncode == 2
+
+
+def test_cli_craft_missing_date_exit2():
+    proc = _run("craft", "--task", "Confirm the pickup", "--time", "2 p.m.")
+    assert proc.returncode == 2
+
+
+def test_main_returns_int():
+    assert main(["craft", "--task", "x", "--date", "2026-10-14", "--time", "2 p.m."]) == 0
+
+
 # ---------------------------------------------------------------- runner
 
 
