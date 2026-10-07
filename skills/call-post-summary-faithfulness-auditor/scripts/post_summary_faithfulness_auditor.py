@@ -109,7 +109,7 @@ def _clock_value(hour: str, minute: str | None, meridiem: str | None) -> str:
     return f"{h:02d}:{mm}"
 _OUTCOME_RE = re.compile(
     r"\b(?:confirm(?:ed|s)?|cancel(?:led|s)?|declin(?:ed|es)?|reschedul(?:ed|es)?|"
-    r"accept(?:ed|s)?|book(?:ed|s)?|no.?answer|voicemail|call(?:ed|s)? back)\b",
+    r"accept(?:ed|s)?|book(?:ed|s)?|no.?answer|voicemail|call\w*\s+(?:us\s+)?back)\b",
     re.IGNORECASE,
 )
 _ACTION_RE = re.compile(
@@ -118,11 +118,13 @@ _ACTION_RE = re.compile(
     re.IGNORECASE,
 )
 # "party of N" is a prefix pattern: the digit FOLLOWS the phrase, so it is
-# matched as its own alternative rather than a unit suffix.
+# matched as its own alternative rather than a unit suffix. The (?<![0-9#])
+# guard keeps the unmasked tail of a masked PII run ("######78") from leaking
+# in as a numeric claim.
 _NUM_CONTEXT_RE = re.compile(
     r"[$]([0-9][0-9 ,./-]*[0-9]|[0-9])\b"
-    r"|\bparty\s+of\s+([0-9][0-9 ,./-]*[0-9]|[0-9])\b"
-    r"|\b([0-9][0-9 ,./-]*[0-9]|[0-9])\s+"
+    r"|\bparty\s+of\s+(?<![0-9#])([0-9][0-9 ,./-]*[0-9]|[0-9])\b"
+    r"|\b(?<![0-9#])([0-9][0-9 ,./-]*[0-9]|[0-9])\s+"
     r"(?:dollars|usd|guests?|people|minutes?|hours?|days?|seats?|items?|percent|%)\b",
     re.IGNORECASE,
 )
@@ -285,6 +287,8 @@ def _to_24h(m: re.Match[str]) -> str:
 def fold_turn(text: str) -> str:
     """Normalize turn text for lexical anchoring (case, meridiem, months)."""
     folded = mask_pii(text).casefold()
+    # "call us back" folds to "call back" so the outcome stem aligns.
+    folded = re.sub(r"\bcall\w*\s+us\s+back", "call back", folded)
     # "2 p.m." / "2pm" -> "14:00"; bare "14:00" passes through unchanged below.
     folded = re.sub(r"\b([0-9]{1,2})(?::([0-9]{2}))?\s*([ap])\.?m\.?", _to_24h, folded)
     # Zero-pad bare 24h hours ("9:30" -> "09:30") to match claim values.
@@ -314,9 +318,17 @@ def fold_turn(text: str) -> str:
 
 _NEG_RE = re.compile(r"\b(?:can'?t make it|cancel|decline|not coming|no[,.]?\s*(?:thanks|thank you))\b", re.IGNORECASE)
 _POS_OUTCOME_RE = re.compile(
-    r"\b(?:confirm\w*|accept\w*|book\w*|reschedul\w*|call(?:ed|s)?\s+back)\b", re.IGNORECASE
+    r"\b(?:confirm\w*|accept\w*|book\w*|reschedul\w*|call\w*\s+(?:us\s+)?back)\b", re.IGNORECASE
 )
 _ACK_RE = re.compile(r"\b(?:okay|ok|sounds good|will do|alright|sure)\b", re.IGNORECASE)
+# Unambiguous affirmative acks for the outcome heuristic anchor (F9): a
+# positive outcome claim with no literal stem in the transcript may still be
+# SUPPORTED when a LATE callee turn affirms without any negative token.
+_OUTCOME_ACK_RE = re.compile(
+    r"\b(?:yes|yeah|yep|yup|okay|ok|sure|alright|sounds good|will do|"
+    r"lock it in|we'?ll take it|perfect|confirmed)\b",
+    re.IGNORECASE,
+)
 _CHECKABLE_KINDS = {"outcome", "numeric", "date_time", "action"}
 
 # Per-kind lexical presence: can the KIND appear in the transcript at all?
@@ -367,7 +379,8 @@ def anchor_claims(claims: list[dict[str, Any]], turns: list[dict[str, str]]) -> 
                         if re.search(rf"(?<![0-9a-z]){pat}(?![0-9])", f)), None)
             grade, turn_index = ("SUPPORTED", hit) if hit is not None else ("UNSUPPORTED", None)
         elif kind == "outcome":
-            stem_pattern = "\\b" + re.escape(value).replace(" ", "\\s+") + "\\w*"
+            # re.escape turns spaces into "\\ ", so replace the escaped form.
+            stem_pattern = "\\b" + re.escape(value).replace("\\ ", "\\s+") + "\\w*"
             stem_re = re.compile(stem_pattern, re.IGNORECASE)
             if claim.get("direction") == "positive":
                 neg_hits = [(i, f) for i, f in late_callee if _NEG_RE.search(f)]
@@ -381,9 +394,19 @@ def anchor_claims(claims: list[dict[str, Any]], turns: list[dict[str, str]]) -> 
                     grade, contradicted_by = "CONTRADICTED", pos_hits[0][0]
             if grade != "CONTRADICTED":
                 hit = next((i for i, f in enumerate(folded) if stem_re.search(f)), None)
+                if hit is None and claim.get("direction") == "positive":
+                    # Heuristic anchor: an unambiguous late-callee affirmative
+                    # ack (no negative token in that turn) supports a positive
+                    # outcome claim even without the literal outcome verb.
+                    ack_hits = [
+                        (i, f) for i, f in late_callee
+                        if _OUTCOME_ACK_RE.search(f) and not _NEG_RE.search(f)
+                    ]
+                    if ack_hits:
+                        hit = ack_hits[0][0]
                 grade, turn_index = ("SUPPORTED", hit) if hit is not None else ("UNSUPPORTED", None)
         elif kind == "action":
-            root_pattern = "\\b" + re.escape(value).replace(" ", "\\s+") + "\\w*"
+            root_pattern = "\\b" + re.escape(value).replace("\\ ", "\\s+") + "\\w*"
             root_re = re.compile(root_pattern, re.IGNORECASE)
             hit = next((i for i, f in enumerate(folded)
                         if root_re.search(f) or _ACK_RE.search(f)), None)

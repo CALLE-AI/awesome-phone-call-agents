@@ -3,9 +3,12 @@
 
 from __future__ import annotations
 
+import atexit
 import json
+import shutil
 import subprocess
 import sys
+import tempfile
 from pathlib import Path
 
 import post_summary_faithfulness_auditor as mod
@@ -190,10 +193,17 @@ def _run(args):
     )
 
 
+_TMP: Path | None = None
+
+
 def _tmp_dir() -> Path:
-    d = HERE / ".tmp-s1"
-    d.mkdir(exist_ok=True)
-    return d
+    # System temp, outside the repo; removed at process exit so the working
+    # tree stays clean after a full run.
+    global _TMP
+    if _TMP is None:
+        _TMP = Path(tempfile.mkdtemp(prefix="psfa-tests-"))
+        atexit.register(shutil.rmtree, _TMP, ignore_errors=True)
+    return _TMP
 
 
 def _tmp_wrapped():
@@ -262,6 +272,55 @@ _REFS = HERE.parent / "references"
 
 def _analyze_fixture(name):
     return _run(["analyze", "--call-result", str(_REFS / name)])
+
+
+def test_decimal_amount_anchors_turn_decimal():
+    claims = mod.decompose_claims("Paid $45.50.")
+    res = mod.anchor_claims(claims, _turns(("agent", "You paid 45.50 dollars."), ("callee", "Ok.")))
+    assert res[0]["grade"] == "SUPPORTED"
+
+
+def test_decimal_amount_anchors_plain_run():
+    claims = mod.decompose_claims("Total 45.50 dollars.")
+    res = mod.anchor_claims(claims, _turns(("agent", "The total is 45.50."), ("callee", "Ok.")))
+    assert res[0]["grade"] == "SUPPORTED"
+
+
+def test_mask_tail_no_numeric_leak():
+    claims = mod.decompose_claims(mod.mask_pii("Reference 123456 78 minutes were logged."))
+    assert not any(c["kind"] == "numeric" and c["value"] == "78" for c in claims)
+
+
+def test_call_us_back_outcome_anchor():
+    claims = mod.decompose_claims("Agent will call back tomorrow.")
+    res = mod.anchor_claims(
+        claims, _turns(("agent", "We will follow up."), ("callee", "She said she would call us back."))
+    )
+    c = [x for x in res if x["kind"] == "outcome"][0]
+    assert c["grade"] == "SUPPORTED"
+
+
+def test_contradiction_records_turn():
+    claims = mod.decompose_claims("The guest confirmed the booking.")
+    turns = _turns(
+        ("agent", "So that is confirmed?"),
+        ("callee", "Hi."),
+        ("callee", "Actually no, I can't make it, cancel it."),
+    )
+    res = mod.anchor_claims(claims, turns)
+    assert res[0]["grade"] == "CONTRADICTED" and res[0]["contradicted_by_turn"] == 2
+
+
+def test_outcome_affirmative_ack_support():
+    claims = mod.decompose_claims("Customer accepted.")
+    turns = _turns(
+        ("agent", "Thanks for staying with us."),
+        ("callee", "Hi."),
+        ("callee", "Yep, lock it in."),
+    )
+    res = mod.anchor_claims(claims, turns)
+    c = [x for x in res if x["kind"] == "outcome"][0]
+    assert c["grade"] == "SUPPORTED" and c["turn_index"] == 2
 
 
 def test_fixture_faithful():

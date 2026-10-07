@@ -47,7 +47,7 @@ python3 scripts/post_summary_faithfulness_auditor.py analyze \
     {
       "text": "Guest confirmed party of 4 for Wednesday, October 14 at 2 p.m.",
       "kind": "date_time",
-      "value": "2pm",
+      "value": "14:00",
       "grade": "SUPPORTED",
       "turn_index": 2
     },
@@ -120,7 +120,7 @@ python3 scripts/post_summary_faithfulness_auditor.py analyze \
     {
       "text": "Guest confirmed party of 4 for Wednesday, October 14 at 2 p.m.",
       "kind": "date_time",
-      "value": "2pm",
+      "value": "14:00",
       "grade": "SUPPORTED",
       "turn_index": 2
     },
@@ -177,7 +177,8 @@ python3 scripts/post_summary_faithfulness_auditor.py analyze \
       "kind": "outcome",
       "value": "confirm",
       "grade": "CONTRADICTED",
-      "turn_index": null
+      "turn_index": null,
+      "contradicted_by_turn": 3
     }
   ],
   "counts": {

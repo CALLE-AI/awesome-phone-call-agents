@@ -103,6 +103,11 @@ exactly once - so the summary this skill later audits starts faithful.
   order, ISO dates and relative dates ("next Friday") are out of scope
 - contraction and negation edge cases ("can't" vs "cannot") may slip past
   the polarity regexes in rare phrasings
+- heuristic anchor: a positive outcome claim with no literal outcome verb
+  in the transcript may read SUPPORTED when a LATE callee turn carries an
+  unambiguous affirmative ack ("yes", "yep", "perfect", "lock it in",
+  "we'll take it", ...) with no negative token in that turn - it mirrors
+  how real callees confirm, but it is a heuristic, not entailment
 
 ## Testing
 
