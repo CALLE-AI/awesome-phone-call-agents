@@ -83,17 +83,29 @@ _TRANSFER_INTENT_RE = re.compile(
     r"\b(?:can|could) i (?:speak|talk) (?:to|with)\b|\bget me\b|\bgive me\b|\bi need to speak (?:to|with)\b", re.IGNORECASE)
 _HUMAN_ROLE_RE = re.compile(
     r"\b(?:real person|real human|actual person|actual human|live person|live agent|"
-    r"human(?: being| agent| representative)?|someone real|a person\b|person instead|"
+    r"human(?: being| agent| representative)?|someone real|somebody real|a person\b|person instead|"
     r"representative|customer service|manager|supervisor|your boss|someone in charge)\b", re.IGNORECASE)
 _IDENTITY_PROBE_RE = re.compile(
     r"\b(?:are|is) (?:you|this) (?:an? |the )?(?:robot|ai|a machine|a real person|human|automated|a recording|a computer)\b", re.IGNORECASE)
+# Honest callback promises ("a real person will call you back") are refused
+# via a negative lookahead right after the human noun: future markers and
+# third-person verbs never constitute a present-tense self-reference.
+_FALSE_HUMAN_FUTURE_GUARD = r"(?!\s+(?:will|'ll|would|won't|can|could|handles?|is going to|follows? up|has))"
 _FALSE_HUMAN_RE = re.compile(
-    r"\b(?:i am|i'm|this is|you'?re speaking (?:with|to))\b[^.!?]{0,40}\b(?:real person|real human|human being|a person|human)\b|"
-    r"\bi am human\b|\bnot a (?:machine|robot|computer|recording|bot)\b|\byes,? i am (?:a )?(?:real )?(?:person|human)\b", re.IGNORECASE)
-_BARE_ROLE_RE = re.compile(r"^\s*(?:manager|supervisor|representative|human agent|real person)\s*[.!?]?\s*$", re.IGNORECASE)
+    r"\b(?:i am|i'm|this is|you'?re speaking (?:with|to))\b[^.!?]{0,40}\b(?:real person|real human|human being|a person|human)\b"
+    + _FALSE_HUMAN_FUTURE_GUARD + r"|"
+    r"\ba real (?:person|human)(?:'s| is) (?:talking|speaking) (?:to|with) you\b"
+    + _FALSE_HUMAN_FUTURE_GUARD + r"|"
+    r"\bi am human\b|\bnot a (?:machine|robot|computer|recording|bot)\b|\byes,? i am (?:a )?(?:real )?(?:person|human)\b",
+    re.IGNORECASE)
+# A bare role may carry a trailing politeness/urgency tail ("Manager, please.").
+_BARE_ROLE_RE = re.compile(
+    r"^\s*(?:manager|supervisor|representative|human agent|real person)"
+    r"(?:,?\s*(?:please|now|thanks|thank you))?\s*[.!?]?\s*$", re.IGNORECASE)
 _HONOR_ACK_RE = re.compile(r"\b(?:of course|certainly|absolutely|i understand|no problem|sure thing|i can do that)\b", re.IGNORECASE)
 _HONOR_TRANSFER_RE = re.compile(
-    r"\b(?:connect|transfer|put you through|pass you|stay on the line|one moment while i|hold (?:on|the line))\b", re.IGNORECASE)
+    r"\b(?:connect(?:ing)?|transfer(?:ring)?|put(?:ting)? you through|get(?:ting)? you over to|"
+    r"pass you|stay on the line|one moment while i|hold (?:on|the line))\b", re.IGNORECASE)
 _HONOR_ALTERNATIVE_RE = re.compile(
     r"\b(?:no ?one else (?:is )?available|don'?t have (?:a|another) (?:human|person|representative|manager) available|"
     r"have (?:a|someone|our) (?:person|human|representative|manager) call you back|"

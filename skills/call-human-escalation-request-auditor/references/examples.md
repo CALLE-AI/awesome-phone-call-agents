@@ -48,9 +48,9 @@ Output:
 
 ## DEFLECTED
 
-The callee demands the manager; the agent answers with a business
-counter-question instead of acknowledging. Fixture:
-`references/example-transcript-deflected.json`.
+The callee demands the manager; the agent claims a transfer ("connecting
+you now") then continues with business content instead of transferring.
+Fixture: `references/example-transcript-deflected.json`.
 
 Command:
 
@@ -72,7 +72,7 @@ Output:
       "request_excerpt": "I want to talk to your manager about the charge.",
       "grade": "DEFLECTED",
       "response_excerpt": "Sure, connecting you now... Now, does the Tuesday delivery window work for you?",
-      "reason": "answered the request with a business counter-question"
+      "reason": "claimed a transfer then continued with business content"
     }
   ],
   "delegated_identity_probes": [],
