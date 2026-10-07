@@ -107,6 +107,72 @@ def test_no_checkable_claims_empty_summary():
     assert v["verdict"] == "NO_CHECKABLE_CLAIMS" and v["reason"] == "summary_missing"
 
 
+def test_date_prefix_no_false_support():
+    claims = mod.decompose_claims("Booked for October 1.")
+    res = mod.anchor_claims(claims, _turns(("agent", "October 14 works."), ("callee", "Great.")))
+    c = [x for x in res if x["kind"] == "date_time" and x["value"] == "oct 1"][0]
+    assert c["grade"] == "UNSUPPORTED"
+
+
+def test_time_substring_no_false_support():
+    claims = mod.decompose_claims("Reservation at 2 p.m.")
+    res = mod.anchor_claims(claims, _turns(("agent", "Meet at 12 p.m."), ("callee", "Ok.")))
+    c = [x for x in res if x["kind"] == "date_time"][0]
+    assert c["grade"] == "UNSUPPORTED"
+
+
+def test_day_first_date_claim_and_anchor():
+    claims = mod.decompose_claims("Reservation for 14 October.")
+    assert any(x["kind"] == "date_time" and x["value"] == "oct 14" for x in claims)
+    res = mod.anchor_claims(claims, _turns(("agent", "We have October 14."), ("callee", "Great.")))
+    assert [x for x in res if x["value"] == "oct 14"][0]["grade"] == "SUPPORTED"
+
+
+def test_month_first_anchors_day_first_turn():
+    claims = mod.decompose_claims("Reservation for October 14.")
+    res = mod.anchor_claims(claims, _turns(("agent", "Sure, 14 October works."), ("callee", "Great.")))
+    assert [x for x in res if x["value"] == "oct 14"][0]["grade"] == "SUPPORTED"
+
+
+def test_slash_date_claim_and_anchor():
+    claims = mod.decompose_claims("Booked for 10/14.")
+    assert any(x["kind"] == "date_time" and x["value"] == "oct 14" for x in claims)
+    res = mod.anchor_claims(claims, _turns(("agent", "That is October 14."), ("callee", "Ok.")))
+    assert [x for x in res if x["value"] == "oct 14"][0]["grade"] == "SUPPORTED"
+
+
+def test_24h_clock_folds_to_meridiem_turn():
+    claims = mod.decompose_claims("Reservation at 14:00.")
+    assert any(x["kind"] == "date_time" and x["value"] == "14:00" for x in claims)
+    res = mod.anchor_claims(claims, _turns(("agent", "We meet at 2 p.m."), ("callee", "Ok.")))
+    assert [x for x in res if x["value"] == "14:00"][0]["grade"] == "SUPPORTED"
+
+
+def test_12h_clock_anchors_24h_turn():
+    claims = mod.decompose_claims("Reservation at 2 p.m.")
+    res = mod.anchor_claims(claims, _turns(("agent", "Meet at 14:00."), ("callee", "Ok.")))
+    assert [x for x in res if x["kind"] == "date_time"][0]["grade"] == "SUPPORTED"
+
+
+def test_masked_only_sentence_non_checkable_masked():
+    claims = mod.decompose_claims(mod.mask_pii("Customer reached at 415-555-0196."))
+    assert any(c["kind"] == "non_checkable_masked" for c in claims)
+
+
+def test_kind_absent_reason():
+    claims = mod.decompose_claims("Fee is $75.")
+    res = mod.anchor_claims(claims, _turns(("agent", "Thanks for your patience."), ("callee", "Appreciated.")))
+    c = res[0]
+    assert c["grade"] == "UNSUPPORTED" and c.get("reason") == "kind_absent_from_transcript"
+
+
+def test_kind_present_no_absent_reason():
+    claims = mod.decompose_claims("Fee is $75.")
+    res = mod.anchor_claims(claims, _turns(("agent", "It was $70 total."), ("callee", "Fine.")))
+    c = res[0]
+    assert c["grade"] == "UNSUPPORTED" and "reason" not in c
+
+
 def test_coverage_gap_advisory():
     turns = _turns(("agent", "Confirmed for October 14?"), ("callee", "Yes, confirmed."))
     v = mod.analyze(turns, "The call ended politely.")

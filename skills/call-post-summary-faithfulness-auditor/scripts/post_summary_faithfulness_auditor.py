@@ -83,11 +83,30 @@ _SENTENCE_SPLIT_RE = re.compile(r"(?<=[.!?])\s+(?=[A-Z])")
 _MONTHS = "january|february|march|april|may|june|july|august|september|october|november|december"
 _MONTH_DAY_RE = re.compile(
     rf"\b({_MONTHS})\s+([0-9]{{1,2}})(?:st|nd|rd|th)?\b"
-    rf"|\b(?:the\s+)?([0-9]{{1,2}})(?:st|nd|rd|th)\s+of\s+({_MONTHS})\b",
+    rf"|\b(?:the\s+)?([0-9]{{1,2}})(?:st|nd|rd|th)\s+of\s+({_MONTHS})\b"
+    rf"|\b([0-9]{{1,2}})(?:st|nd|rd|th)?\s+({_MONTHS})\b",
     re.IGNORECASE,
 )
+# Numeric dates ("10/14") are read as US month/day order; documented limitation.
+_SLASH_DATE_RE = re.compile(r"\b([0-9]{1,2})/([0-9]{1,2})\b")
 _WEEKDAY_RE = re.compile(r"\b(?:monday|tuesday|wednesday|thursday|friday|saturday|sunday)\b", re.IGNORECASE)
-_CLOCK_RE = re.compile(r"\b(?:at\s+)?([0-9]{1,2})(?::([0-9]{2}))?\s*(a\.?m\.?|p\.?m\.?)\b", re.IGNORECASE)
+# Meridiem optional: a bare HH:MM is a 24-hour clock; a bare hour with neither
+# minutes nor meridiem is NOT a clock (avoids claiming "party of 4" as a time).
+_CLOCK_RE = re.compile(r"\b(?:at\s+)?([0-9]{1,2})(?::([0-9]{2}))?\s*(a\.?m\.?|p\.?m\.?)?\b", re.IGNORECASE)
+_MONTH_ABBRS = ["jan", "feb", "mar", "apr", "may", "jun", "jul", "aug", "sep", "oct", "nov", "dec"]
+
+
+def _clock_value(hour: str, minute: str | None, meridiem: str | None) -> str:
+    """Canonical 24h clock string: "2 p.m." and "14:00" both become "14:00"."""
+    h = int(hour)
+    mm = minute or "00"
+    if meridiem:
+        mer = re.sub(r"\.", "", meridiem).lower()
+        if mer.startswith("p") and h != 12:
+            h += 12
+        elif mer.startswith("a") and h == 12:
+            h = 0
+    return f"{h:02d}:{mm}"
 _OUTCOME_RE = re.compile(
     r"\b(?:confirm(?:ed|s)?|cancel(?:led|s)?|declin(?:ed|es)?|reschedul(?:ed|es)?|"
     r"accept(?:ed|s)?|book(?:ed|s)?|no.?answer|voicemail|call(?:ed|s)? back)\b",
@@ -199,22 +218,30 @@ def decompose_claims(masked_summary: str) -> list[dict[str, Any]]:
 
         date_m = _MONTH_DAY_RE.search(sentence)
         if date_m:
-            month = (date_m.group(1) or date_m.group(4))[:3].lower()
-            day = date_m.group(2) or date_m.group(3)
+            month = (date_m.group(1) or date_m.group(4) or date_m.group(6))[:3].lower()
+            day = date_m.group(2) or date_m.group(3) or date_m.group(5)
             claims.append(_claim(sentence, "date_time", f"{month} {day}"))
             found = True
+
+        slash_m = _SLASH_DATE_RE.search(sentence)
+        if slash_m:
+            month_n, day_n = int(slash_m.group(1)), int(slash_m.group(2))
+            if 1 <= month_n <= 12 and 1 <= day_n <= 31:
+                claims.append(_claim(sentence, "date_time", f"{_MONTH_ABBRS[month_n - 1]} {day_n}"))
+                found = True
 
         weekday_m = _WEEKDAY_RE.search(sentence)
         if weekday_m:
             claims.append(_claim(sentence, "date_time", weekday_m.group(0).lower()))
             found = True
 
-        clock_m = _CLOCK_RE.search(sentence)
+        # A clock match only counts when it has minutes or a meridiem; the
+        # leftmost candidate otherwise wins the scan, so filter candidates.
+        clock_m = next(
+            (m for m in _CLOCK_RE.finditer(sentence) if m.group(3) or m.group(2)), None
+        )
         if clock_m:
-            meridiem = re.sub(r"\.", "", clock_m.group(3)).lower()
-            minute = clock_m.group(2)
-            value = clock_m.group(1) + (f":{minute}" if minute else "") + meridiem
-            claims.append(_claim(sentence, "date_time", value))
+            claims.append(_claim(sentence, "date_time", _clock_value(clock_m.group(1), clock_m.group(2), clock_m.group(3))))
             found = True
 
         action_m = _ACTION_RE.search(sentence)
@@ -230,7 +257,11 @@ def decompose_claims(masked_summary: str) -> list[dict[str, Any]]:
             found = True
 
         if not found:
-            claims.append(_claim(sentence, "non_checkable_opinion", ""))
+            if "#" in sentence:
+                # The only (unmaskable) content is a masked PII span.
+                claims.append(_claim(sentence, "non_checkable_masked", ""))
+            else:
+                claims.append(_claim(sentence, "non_checkable_opinion", ""))
     return claims
 
 
@@ -241,16 +272,43 @@ def decompose_claims(masked_summary: str) -> list[dict[str, Any]]:
 _MONTH_FOLD = {m[:3]: m for m in _MONTHS.split("|")}
 
 
+def _to_24h(m: re.Match[str]) -> str:
+    h = int(m.group(1))
+    mm = m.group(2) or "00"
+    if m.group(3) == "p" and h != 12:
+        h += 12
+    elif m.group(3) == "a" and h == 12:
+        h = 0
+    return f"{h:02d}:{mm}"
+
+
 def fold_turn(text: str) -> str:
     """Normalize turn text for lexical anchoring (case, meridiem, months)."""
     folded = mask_pii(text).casefold()
-    # "2 p.m." -> "2pm" so summary and transcript folds align.
-    folded = re.sub(r"([0-9])\s*(a|p)\.?m\.?", r"\1\2m", folded)
+    # "2 p.m." / "2pm" -> "14:00"; bare "14:00" passes through unchanged below.
+    folded = re.sub(r"\b([0-9]{1,2})(?::([0-9]{2}))?\s*([ap])\.?m\.?", _to_24h, folded)
+    # Zero-pad bare 24h hours ("9:30" -> "09:30") to match claim values.
+    folded = re.sub(r"\b([0-9]{1,2}):([0-9]{2})\b", lambda m: f"{int(m.group(1)):02d}:{m.group(2)}", folded)
     # Fold full month names to their 3-letter form ("october 14" -> "oct 14").
     for short, full in _MONTH_FOLD.items():
         folded = re.sub(rf"\b{full}\b", short, folded)
-    # Strip commas inside digit runs ("1,200" -> "1200").
-    folded = re.sub(r"([0-9]),([0-9])", r"\1\2", folded)
+    # Reorder day-first dates ("14 oct" -> "oct 14") so both orders align.
+    folded = re.sub(
+        rf"\b([0-9]{{1,2}})\s+({'|'.join(_MONTH_ABBRS)})\b",
+        r"\2 \1",
+        folded,
+    )
+    # Numeric dates fold to month-day ("10/14" -> "oct 14"), US month-first.
+    def _slash_to_monthday(m: re.Match[str]) -> str:
+        month_n, day_n = int(m.group(1)), int(m.group(2))
+        if 1 <= month_n <= 12 and 1 <= day_n <= 31:
+            return f"{_MONTH_ABBRS[month_n - 1]} {day_n}"
+        return m.group(0)
+
+    folded = re.sub(r"\b([0-9]{1,2})/([0-9]{1,2})\b", _slash_to_monthday, folded)
+    # Strip commas and decimal points inside digit runs ("1,200" -> "1200",
+    # "45.50" -> "4550") so numeric claims and turns fold to the same digits.
+    folded = re.sub(r"([0-9])[,.]([0-9])", r"\1\2", folded)
     return folded
 
 
@@ -260,6 +318,18 @@ _POS_OUTCOME_RE = re.compile(
 )
 _ACK_RE = re.compile(r"\b(?:okay|ok|sounds good|will do|alright|sure)\b", re.IGNORECASE)
 _CHECKABLE_KINDS = {"outcome", "numeric", "date_time", "action"}
+
+# Per-kind lexical presence: can the KIND appear in the transcript at all?
+# Used to annotate UNSUPPORTED claims whose kind is wholly absent.
+_KIND_PRESENCE_RES = {
+    "numeric": re.compile(r"[0-9]"),
+    "date_time": re.compile(
+        r"[0-9]|jan|feb|mar|apr|may|jun|jul|aug|sep|oct|nov|dec|"
+        r"monday|tuesday|wednesday|thursday|friday|saturday|sunday"
+    ),
+    "action": re.compile(r"\b(?:send|email|mail|call back|confirm|arrange|book)\w*"),
+    "outcome": _OUTCOME_RE,
+}
 
 
 def _final_third_start(turn_count: int) -> int:
@@ -271,33 +341,45 @@ def anchor_claims(claims: list[dict[str, Any]], turns: list[dict[str, str]]) -> 
     folded = [fold_turn(t.get("text", "")) for t in turns]
     speakers = [str(t.get("speaker", "unknown")).lower() for t in turns]
     late_callee = [
-        folded[i] for i in range(_final_third_start(len(turns)), len(turns))
+        (i, folded[i]) for i in range(_final_third_start(len(turns)), len(turns))
         if speakers[i] in CALLEE_ROLES
     ]
+    kind_present = {
+        kind: any(rx.search(f) for f in folded) for kind, rx in _KIND_PRESENCE_RES.items()
+    }
 
     results: list[dict[str, Any]] = []
     for claim in claims:
         kind = claim["kind"]
         value = claim["value"]
         grade, turn_index = "NON_CHECKABLE", None
+        contradicted_by = None
 
         if kind == "numeric":
             hit = next((i for i, f in enumerate(folded)
                         if re.search(rf"(?<![0-9]){re.escape(value)}(?![0-9])", f)), None)
             grade, turn_index = ("SUPPORTED", hit) if hit is not None else ("UNSUPPORTED", None)
         elif kind == "date_time":
-            hit = next((i for i, f in enumerate(folded) if value in f), None)
+            # Boundary-guarded so "oct 1" cannot anchor inside "oct 14" and
+            # "14:00" cannot anchor inside a longer digit or letter run.
+            pat = re.escape(value).replace(r"\ ", r"\s+")
+            hit = next((i for i, f in enumerate(folded)
+                        if re.search(rf"(?<![0-9a-z]){pat}(?![0-9])", f)), None)
             grade, turn_index = ("SUPPORTED", hit) if hit is not None else ("UNSUPPORTED", None)
         elif kind == "outcome":
             stem_pattern = "\\b" + re.escape(value).replace(" ", "\\s+") + "\\w*"
             stem_re = re.compile(stem_pattern, re.IGNORECASE)
-            if claim.get("direction") == "positive" and any(_NEG_RE.search(f) for f in late_callee):
-                grade = "CONTRADICTED"
+            if claim.get("direction") == "positive":
+                neg_hits = [(i, f) for i, f in late_callee if _NEG_RE.search(f)]
+                if neg_hits:
+                    grade, contradicted_by = "CONTRADICTED", neg_hits[0][0]
             elif claim.get("direction") == "negative" and late_callee and not any(
-                _NEG_RE.search(f) for f in late_callee
-            ) and any(_POS_OUTCOME_RE.search(f) for f in late_callee):
-                grade = "CONTRADICTED"
-            else:
+                _NEG_RE.search(f) for _, f in late_callee
+            ):
+                pos_hits = [(i, f) for i, f in late_callee if _POS_OUTCOME_RE.search(f)]
+                if pos_hits:
+                    grade, contradicted_by = "CONTRADICTED", pos_hits[0][0]
+            if grade != "CONTRADICTED":
                 hit = next((i for i, f in enumerate(folded) if stem_re.search(f)), None)
                 grade, turn_index = ("SUPPORTED", hit) if hit is not None else ("UNSUPPORTED", None)
         elif kind == "action":
@@ -307,13 +389,18 @@ def anchor_claims(claims: list[dict[str, Any]], turns: list[dict[str, str]]) -> 
                         if root_re.search(f) or _ACK_RE.search(f)), None)
             grade, turn_index = ("SUPPORTED", hit) if hit is not None else ("UNSUPPORTED", None)
 
-        results.append({
+        result = {
             "text": claim["text"],
             "kind": kind,
             "value": value,
             "grade": grade,
             "turn_index": turn_index,
-        })
+        }
+        if grade == "CONTRADICTED" and contradicted_by is not None:
+            result["contradicted_by_turn"] = contradicted_by
+        if grade == "UNSUPPORTED" and kind in _CHECKABLE_KINDS and not kind_present[kind]:
+            result["reason"] = "kind_absent_from_transcript"
+        results.append(result)
     return results
 
 

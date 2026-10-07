@@ -57,14 +57,22 @@ Three deterministic stages, offline, no LLM:
 2. **Decompose.** Each summary sentence becomes atomic claims by kind -
    `outcome` (confirm/cancel/decline/reschedule/... with a polarity),
    `numeric` ($X, party of N, unit-suffixed counts), `date_time`
-   (month-day, weekday, clock times with normalized meridiem), `action`
-   (will send/email/call back/...), plus explicitly `non_checkable`
-   notes for spelled numbers and pure-opinion sentences.
-3. **Anchor.** Each claim is folded (case, meridiem, month names, digit
-   commas) and searched across all turns. Outcome claims additionally
-   check polarity against callee negatives in the final third of the
-   call. Numerics never contradict - two different values can legitimately
-   coexist in a call, so a value either anchors or reads UNSUPPORTED.
+   (month-day in either order, numeric MM/DD, weekday, and clock times
+   in 12h or 24h form, all canonicalized to month-day and 24h strings),
+   `action` (will send/email/call back/...), plus explicitly
+   `non_checkable` notes for spelled numbers, masked-only sentences,
+   and pure-opinion sentences.
+3. **Anchor.** Each claim is folded (case, meridiem to 24h, month names,
+   day order, digit commas and decimals) and searched across all turns
+   with boundary guards so substrings cannot false-anchor ("oct 1" does
+   not match "oct 14", "14:00" does not match "2:14:00"). Outcome claims
+   additionally check polarity against callee negatives in the final
+   third of the call; CONTRADICTED claims record the firing turn in
+   `contradicted_by_turn`, and UNSUPPORTED claims whose kind has no
+   lexical presence anywhere in the transcript carry
+   `reason: kind_absent_from_transcript`. Numerics never contradict -
+   two different values can legitimately coexist in a call, so a value
+   either anchors or reads UNSUPPORTED.
 
 The card reports per-claim grades, per-grade counts, an overall verdict,
 a `coverage_gaps` list (the transcript contains an outcome word the
@@ -90,8 +98,9 @@ exactly once - so the summary this skill later audits starts faithful.
 - paraphrase misses: "half past two" will not anchor a "2 p.m." claim
 - UNSUPPORTED is not proof of falsehood; the value may exist in audio
   nuance the transcript renders differently
-- date formats are month-day, weekday, and clock forms only; ISO dates
-  and relative dates ("next Friday") are out of scope
+- date formats are month-day (either order), numeric MM/DD, weekday, and
+  clock forms (12h and 24h); numeric dates are read as US month/day
+  order, ISO dates and relative dates ("next Friday") are out of scope
 - contraction and negation edge cases ("can't" vs "cannot") may slip past
   the polarity regexes in rare phrasings
 
