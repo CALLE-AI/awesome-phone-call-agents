@@ -21,6 +21,7 @@ SKILL_DIR = SCRIPTS.parent
 EXAMPLE_HONORED = SKILL_DIR / "references" / "example-transcript.json"
 EXAMPLE_DEFLECTED = SKILL_DIR / "references" / "example-transcript-deflected.json"
 EXAMPLE_FALSE_CLAIM = SKILL_DIR / "references" / "example-transcript-false-claim.json"
+EXAMPLE_IGNORED = SKILL_DIR / "references" / "example-transcript-ignored.json"
 SCRIPT = SCRIPTS / "human_escalation_request_auditor.py"
 
 # Scratch files must never land inside the repo: use a tempdir outside it
@@ -320,6 +321,19 @@ def test_window_boundary_three_fillers_ignored():
     assert ev["response_excerpt"] == "Filler one."
 
 
+def test_request_as_last_turn_not_deflected_by_prior_greeting():
+    # The callee's request is the LAST turn; the prior agent greeting must
+    # not leak into the response window as the graded response.
+    turns = _turns(
+        ("agent", "Hi, this is Acme about your delivery order - is now a good time?"),
+        ("callee", "let me talk to a real person"),
+    )
+    card = analyze_turns(turns)
+    ev = card["requests"][0]
+    assert ev["grade"] == "IGNORED", ev
+    assert ev["response_excerpt"] != "Hi, this is Acme about your delivery order - is now a good time?"
+
+
 def test_repeated_unhonored_request():
     turns = _turns(
         ("agent", "Hello, this is Example Bistro about your delivery."),
@@ -385,6 +399,15 @@ def test_cli_false_claim_fixture():
     assert payload["delegated_identity_probes"], "probe expected on false-claim fixture"
 
 
+def test_cli_ignored_fixture():
+    proc = _run_cli("analyze", "--call-result", str(EXAMPLE_IGNORED))
+    assert proc.returncode == 0, proc.stderr
+    payload = json.loads(proc.stdout)
+    assert payload["verdict"] == "IGNORED"
+    assert payload["call_id"] == "demo-escalation-004"
+    assert payload["repeated_unhonored_request"] == 2
+
+
 def test_cli_invalid_json_exit_2():
     path = _TMP / "bad.json"
     path.write_text("{not json", encoding="utf-8")
@@ -442,6 +465,13 @@ def test_cli_craft_business_context():
     proc = _run_cli("craft", "--task", "confirm a reservation", "--business-context", "Example Bistro")
     assert proc.returncode == 0, proc.stderr
     assert "BUSINESS: Example Bistro" in proc.stdout
+
+
+def test_craft_no_trailing_spaces():
+    for task, context in (("confirm a reservation", ""), ("confirm a reservation", "Example Bistro")):
+        output = craft_goal_text(task, business_context=context)
+        for line in output.split("\n"):
+            assert not line.endswith(" "), repr(line)
 
 
 def test_cli_craft_empty_task_exit_2():

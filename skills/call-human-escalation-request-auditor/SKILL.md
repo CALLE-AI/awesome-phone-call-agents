@@ -129,6 +129,10 @@ transfer path actually exists. Paste it as the goal for your next call.
   clean; the lexicons match demand vocabulary, not sentiment
 - an empty response window (no agent turns after the request) grades
   `IGNORED` with an empty excerpt
+- multiple requests inside a single callee turn count as one request;
+  `repeated_unhonored_request` counts requests across turns
+- a plain-string transcript is treated as a single agent turn, so callee
+  requests cannot be detected in that form (use structured transcripts)
 
 ## Testing
 
