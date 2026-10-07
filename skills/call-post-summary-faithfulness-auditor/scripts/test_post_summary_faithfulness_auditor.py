@@ -332,6 +332,25 @@ def test_opinion_only_reason():
     assert v["verdict"] == "NO_CHECKABLE_CLAIMS" and v["reason"] == "opinion_only"
 
 
+def test_action_claim_indirect_call_back():
+    claims = mod.decompose_claims("A manager will call the customer back.")
+    assert any(c["kind"] == "action" and c["value"] == "call back" for c in claims)
+
+
+def test_action_anchor_indirect_call_back():
+    claims = mod.decompose_claims("A manager will call the customer back.")
+    turns = _turns(("agent", "No problem. I'll have a manager call you back."), ("callee", "Thanks."))
+    res = mod.anchor_claims(claims, turns)
+    c = [x for x in res if x["kind"] == "action"][0]
+    assert c["grade"] == "SUPPORTED"
+
+
+def test_action_indirect_call_back_unsupported_when_absent():
+    claims = mod.decompose_claims("A manager will call the customer back.")
+    res = mod.anchor_claims(claims, _turns(("agent", "Thanks, all set."), ("callee", "Great.")))
+    assert [x for x in res if x["kind"] == "action"][0]["grade"] == "UNSUPPORTED"
+
+
 # ---------------------------------------------------------------------------
 # Task 4: fixtures
 # ---------------------------------------------------------------------------

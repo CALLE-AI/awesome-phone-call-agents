@@ -114,6 +114,7 @@ _OUTCOME_RE = re.compile(
 )
 _ACTION_RE = re.compile(
     r"\b(?:will\s+(?:send|email|call\s+back|confirm|arrange|mail)|"
+    r"will\s+call\b[^.!?]{0,30}\bback\b|"
     r"has\s+been\s+booked|will\s+be\s+(?:emailed|sent|mailed))\b",
     re.IGNORECASE,
 )
@@ -182,6 +183,10 @@ def _action_root(matched: str) -> str:
     # Strip passive/aux wrappers and common past-tense suffixes to a root.
     phrase = re.sub(r"^(?:will\s+be\s+|will\s+|has\s+been\s+)", "", phrase)
     phrase = re.sub(r"(?:ed|s)$", "", phrase)
+    # Indirect callback phrasing ("call the customer back") still roots to
+    # "call back" — the intervening object words carry no action meaning.
+    if re.fullmatch(r"call\w*(?:\s+\w+){0,3}\s+back", phrase):
+        return "call back"
     for root in sorted(_ACTION_ROOTS, key=len, reverse=True):
         if phrase.startswith(root) or phrase.endswith(root):
             return root
@@ -287,8 +292,9 @@ def _to_24h(m: re.Match[str]) -> str:
 def fold_turn(text: str) -> str:
     """Normalize turn text for lexical anchoring (case, meridiem, months)."""
     folded = mask_pii(text).casefold()
-    # "call us back" folds to "call back" so the outcome stem aligns.
-    folded = re.sub(r"\bcall\w*\s+us\s+back", "call back", folded)
+    # "call us/you/them/the customer back" folds to "call back" so the
+    # outcome and action stems align regardless of the intervening object.
+    folded = re.sub(r"\bcall\w*\s+(?:us|you|them|him|her|the\s+\w+)\s+back", "call back", folded)
     # "2 p.m." / "2pm" -> "14:00"; bare "14:00" passes through unchanged below.
     folded = re.sub(r"\b([0-9]{1,2})(?::([0-9]{2}))?\s*([ap])\.?m\.?", _to_24h, folded)
     # Zero-pad bare 24h hours ("9:30" -> "09:30") to match claim values.
