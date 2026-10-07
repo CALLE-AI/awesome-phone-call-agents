@@ -499,6 +499,111 @@ def test_disclaimer_present_and_hedged():
     assert "heuristic" in card["disclaimer"].lower()
 
 
+# ---------------------------------------------------------------- review fixes (F1-F5)
+
+
+def test_colon_clock_no_meridiem_hour12_ambiguous():
+    exprs = collect_expressions(_turns(("agent", "Pickup is at 2:30.")), WEDNESDAY)[0]
+    amb = _by_class(exprs, "clock_ambiguous")
+    assert len(amb) == 1
+    assert amb[0]["reason"] == "12-hour clock without meridiem"
+    assert not _by_class(exprs, "clock_absolute")
+
+
+def test_colon_clock_24h_absolute():
+    exprs = collect_expressions(_turns(("agent", "Pickup is at 14:30.")), WEDNESDAY)[0]
+    abs_clk = _by_class(exprs, "clock_absolute")
+    assert len(abs_clk) == 1
+    assert abs_clk[0]["value"] == "14:30"
+
+
+def test_no_meridiem_colon_cannot_fully_anchor():
+    from call_temporal_anchor_auditor import analyze_call
+
+    turns = _turns(
+        ("agent", "We can book you October 14."),
+        ("callee", "Sure."),
+        ("agent", "Pickup is at 2:30."),
+    )
+    card = analyze_call(turns, WEDNESDAY, CALLED_AT)
+    assert card["verdict"] != "FULLY_ANCHORED"
+
+
+def test_a_week_from_today_offsets_and_suppresses_bare_today():
+    exprs = collect_expressions(_turns(("agent", "Let us talk a week from today.")), WEDNESDAY)[0]
+    resolved = _by_class(exprs, "relative_resolved")
+    assert len(resolved) == 1
+    assert resolved[0]["value"] == "2026-10-14"
+    assert not any(e["text"].lower() == "today" for e in exprs)
+
+
+def test_three_days_from_today():
+    exprs = collect_expressions(_turns(("agent", "Check back 3 days from today.")), WEDNESDAY)[0]
+    resolved = _by_class(exprs, "relative_resolved")
+    assert len(resolved) == 1
+    assert resolved[0]["value"] == "2026-10-10"
+
+
+def test_bare_ordinal_day_resolves_with_called_at():
+    exprs = collect_expressions(_turns(("agent", "See you the 14th at 2 p.m.")), WEDNESDAY)[0]
+    absd = _by_class(exprs, "absolute_date")
+    assert len(absd) == 1
+    assert absd[0]["value"] == "oct 14"
+    assert absd[0]["resolved_date"] == "2026-10-14"
+
+
+def test_bare_ordinal_day_fully_anchored():
+    from call_temporal_anchor_auditor import analyze_call
+
+    card = analyze_call(_turns(("agent", "See you the 14th at 2 p.m.")), WEDNESDAY, CALLED_AT)
+    assert card["verdict"] == "FULLY_ANCHORED"
+
+
+def test_bare_ordinal_day_without_called_at_unresolvable():
+    exprs = collect_expressions(_turns(("agent", "See you the 14th at 2 p.m.")), None)[0]
+    bare = [e for e in exprs if e["text"].lower() == "the 14th"]
+    assert len(bare) == 1
+    assert bare[0]["class"] == "unresolvable_without_call_time"
+
+
+def test_bare_day_32_invalid_date():
+    exprs = collect_expressions(_turns(("agent", "See you the 32nd at 2 p.m.")), WEDNESDAY)[0]
+    inv = _by_class(exprs, "invalid_date")
+    assert len(inv) == 1
+    assert inv[0]["reason"] == "date does not exist in 2026"
+
+
+def test_feb29_non_leap_invalid_date_not_fully_anchored():
+    from call_temporal_anchor_auditor import analyze_call
+
+    card = analyze_call(
+        _turns(("agent", "See you February 29 at 3 p.m.")), WEDNESDAY, CALLED_AT
+    )
+    assert card["verdict"] != "FULLY_ANCHORED"
+    inv = [e for e in card["expressions"] if e["class"] == "invalid_date"]
+    assert len(inv) == 1
+    assert inv[0]["reason"] == "date does not exist in 2026"
+
+
+def test_feb29_leap_year_resolves():
+    leap = parse_called_at("2028-01-05T09:00:00-07:00")
+    exprs = collect_expressions(_turns(("agent", "See you February 29 at 3 p.m.")), leap)[0]
+    absd = _by_class(exprs, "absolute_date")
+    assert len(absd) == 1
+    assert absd[0]["resolved_date"] == "2028-02-29"
+
+
+def test_ordinal_preceded_weekday_ambiguous():
+    exprs = collect_expressions(
+        _turns(("agent", "How does the first Friday of next month sound?")), WEDNESDAY
+    )[0]
+    fri = [e for e in exprs if e["text"].lower() == "friday"]
+    assert len(fri) == 1
+    assert fri[0]["class"] == "ambiguous"
+    assert fri[0]["reason"] == "complex ordinal weekday expression"
+    assert not _by_class(exprs, "relative_derived")
+
+
 # ---------------------------------------------------------------- craft
 
 

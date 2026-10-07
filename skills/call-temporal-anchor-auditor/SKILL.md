@@ -61,16 +61,24 @@ audited; callee time mentions are counted but never graded.
 
 Collection classes:
 
-- `absolute_date`: "October 14", "the 14th of October", "10/14" (US MM/DD)
+- `absolute_date`: "October 14", "the 14th of October", "10/14" (US MM/DD),
+  and bare ordinal days ("the 14th") whose month is inferred from the call
+  timestamp
 - `clock_absolute`: clock times with meridiem ("at 2 p.m."), canonicalized
-  to 24h values; meridiem-less "at 2" is `clock_ambiguous`
+  to 24h values; meridiem-less forms are `clock_ambiguous` - "at 2" and
+  colon times at or below 12 ("at 2:30") could be morning or afternoon,
+  while 13-23 colon times ("14:30") are true 24-hour clocks
+- `invalid_date`: a calendar date that does not exist in the call year
+  ("February 29" in 2026) - never satisfies anchoring
 - `band`: day-part phrases ("in the evening", "tomorrow morning", "at noon")
   - vague on their own, no clock inside
 - `relative_resolved` / `relative_derived`: "tomorrow", "in two weeks",
-  bare weekdays - resolved only with `--called-at`; a bare weekday resolves
-  to the next strictly future occurrence and is never guessed for
-  "next/this <weekday>", which is flagged `ambiguous` (dialect-dependent)
-- `unresolvable_without_call_time`: relatives seen with no `--called-at`
+  "a week from today", bare weekdays - resolved only with `--called-at`; a
+  bare weekday resolves to the next strictly future occurrence and is never
+  guessed for "next/this <weekday>", which is flagged `ambiguous`
+  (dialect-dependent)
+- `unresolvable_without_call_time`: relatives and bare ordinal days seen
+  with no `--called-at`
 
 Resolution rules worth knowing:
 
@@ -126,6 +134,11 @@ read back once. See `references/example-goal.txt` for a realistic result.
 - "this/next week" and "this/next weekend" classify as `ambiguous` with
   reason "week-range reference without a concrete day" even when
   `--called-at` is given; a week range never resolves to a day.
+- A weekday preceded by an ordinal or frequency word ("first Friday",
+  "every Tuesday", "last Monday") classifies as `ambiguous` with reason
+  "complex ordinal weekday expression"; the "nth weekday of a month"
+  computation is dialect- and calendar-dependent, so it is flagged, never
+  resolved.
 - Commitment anchoring is call-level: an anchor anywhere in the call
   satisfies every commitment turn, so a locally vague restatement of an
   already-anchored slot will not flag.
@@ -136,7 +149,7 @@ read back once. See `references/example-goal.txt` for a realistic result.
 python3 -m pytest skills/call-temporal-anchor-auditor -q
 ```
 
-69 tests cover the collector, resolver, conflict rules, commitment
+81 tests cover the collector, resolver, conflict rules, commitment
 findings, verdict priority, CLI battery, craft mode, and the shipped
 fixtures. `references/examples.md` shows byte-real runs against them.
 

@@ -14,6 +14,7 @@ Runs offline, deterministic, no LLM, no network. Input errors exit 2.
 from __future__ import annotations
 
 import argparse
+import calendar
 import json
 import re
 import sys
@@ -117,12 +118,17 @@ _NEXT_THIS_WEEKDAY_RE = re.compile(
     r"\b(next|this)\s+(monday|tuesday|wednesday|thursday|friday|saturday|sunday)\b", re.IGNORECASE
 )
 _CLOCK_RE = re.compile(r"\b(?:at\s+)?([0-9]{1,2})(?::([0-9]{2}))?\s*(a\.?m\.?|p\.?m\.?)?\b")
+_BARE_DAY_RE = re.compile(r"\bthe\s+([0-9]{1,2})(?:st|nd|rd|th)\b(?!\s+of\b)", re.IGNORECASE)
+_ORDINAL_PRECEDENCE_RE = re.compile(
+    r"\b(?:first|second|third|fourth|last|every)\s+$", re.IGNORECASE
+)
 _BAND_RE = re.compile(
     r"\b(?:in the (?:morning|afternoon|evening)|at noon|at midnight|tomorrow (?:morning|afternoon|evening))\b",
     re.IGNORECASE,
 )
 _RELATIVE_DAYS_RE = re.compile(
-    r"\b(?:today|tonight|tomorrow|day after tomorrow|this weekend|next weekend|"
+    r"\b(?:(?:(?:a|one|two|[0-9]+)\s+)?(?:day|week)s?\s+from\s+today|"
+    r"today|tonight|tomorrow|day after tomorrow|this weekend|next weekend|"
     r"this week|next week|next month|in (?:a |one |two |[0-9]+ )?(?:day|week)s?)\b",
     re.IGNORECASE,
 )
@@ -137,6 +143,7 @@ _AMBIGUOUS_CLASSES = {
     "ambiguous",
     "band",
     "clock_ambiguous",
+    "invalid_date",
     "unresolvable_without_call_time",
 }
 
@@ -188,6 +195,12 @@ def _next_month_date(today) -> str:
     return datetime(year, month, day).date().isoformat()
 
 
+def _parse_quantity(text: str | None) -> int:
+    qty_text = (text or "1").strip()
+    qty = {"a": 1, "one": 1, "two": 2}.get(qty_text, None)
+    return qty if qty is not None else int(qty_text)
+
+
 def _resolve_relative_phrase(phrase: str, called_at: datetime) -> str | None:
     """Deterministic resolution for resolvable relative phrases; None otherwise."""
     low = phrase.lower()
@@ -198,12 +211,14 @@ def _resolve_relative_phrase(phrase: str, called_at: datetime) -> str | None:
         return (today + timedelta(days=1)).isoformat()
     if low == "day after tomorrow":
         return (today + timedelta(days=2)).isoformat()
+    m = re.fullmatch(r"(?:(a|one|two|[0-9]+)\s+)?(day|week)s?\s+from\s+today", low)
+    if m:
+        qty = _parse_quantity(m.group(1))
+        days = qty if m.group(2) == "day" else qty * 7
+        return (today + timedelta(days=days)).isoformat()
     m = re.fullmatch(r"in (a |one |two |[0-9]+ )?(day|week)s?", low)
     if m:
-        qty_text = (m.group(1) or "1 ").strip()
-        qty = {"a": 1, "one": 1, "two": 2}.get(qty_text, None)
-        if qty is None:
-            qty = int(qty_text)
+        qty = _parse_quantity(m.group(1))
         days = qty if m.group(2) == "day" else qty * 7
         return (today + timedelta(days=days)).isoformat()
     if low == "next month":
@@ -242,7 +257,22 @@ def _collect_clock(text: str, turn_index: int) -> list[dict[str, Any]]:
                 hour += 12
             if not is_pm and hour == 12:
                 hour = 0
-        exprs.append(_make_expr(turn_index, matched.strip(), "clock_absolute", value=f"{hour:02d}:{minute:02d}"))
+            exprs.append(_make_expr(turn_index, matched.strip(), "clock_absolute", value=f"{hour:02d}:{minute:02d}"))
+        elif hour <= 12:
+            # A colon time at or below 12 with no meridiem is 12-hour
+            # ambiguous ("2:30" could be morning or afternoon); 13-23 is a
+            # true 24-hour clock and stays absolute.
+            exprs.append(
+                _make_expr(
+                    turn_index,
+                    matched.strip(),
+                    "clock_ambiguous",
+                    value=hour_text,
+                    reason="12-hour clock without meridiem",
+                )
+            )
+        else:
+            exprs.append(_make_expr(turn_index, matched.strip(), "clock_absolute", value=f"{hour:02d}:{minute:02d}"))
     return exprs
 
 
@@ -290,8 +320,10 @@ def _count_time_mentions(text: str) -> int:
 def _collect_agent_turn(text: str, turn_index: int, called_at: datetime | None) -> list[dict[str, Any]]:
     exprs: list[dict[str, Any]] = []
 
-    # Calendar dates first: month-day (both word orders) and MM/DD slash dates.
-    date_spans: list[tuple[int, int, int, int]] = []  # (start, end, month, day)
+    # Calendar dates first: month-day (both word orders), MM/DD slash dates,
+    # and bare ordinal days ("the 14th") whose month is inferred from the
+    # call timestamp.
+    date_spans: list[tuple[int, int, int | None, int]] = []  # (start, end, month, day)
     for m in _MONTH_DAY_RE.finditer(text):
         if m.group(1):
             month, day, start, end = _month_num(m.group(1)), int(m.group(2)), m.start(), m.end()
@@ -305,12 +337,60 @@ def _collect_agent_turn(text: str, turn_index: int, called_at: datetime | None) 
         month, day = int(m.group(1)), int(m.group(2))
         if 1 <= month <= 12 and 1 <= day <= 31:
             date_spans.append((m.start(), m.end(), month, day))
+    for m in _BARE_DAY_RE.finditer(text):
+        date_spans.append((m.start(), m.end(), None, int(m.group(1))))
     for start, end, month, day in date_spans:
-        extra: dict[str, Any] = {"value": _canonical_date(month, day)}
+        if month is None:
+            # Bare day-of-month: the month can only be inferred from the
+            # call timestamp, and impossible days must not silently anchor.
+            if called_at is None:
+                exprs.append(_make_expr(turn_index, text[start:end], "unresolvable_without_call_time"))
+                continue
+            if day < 1 or day > calendar.monthrange(called_at.year, called_at.month)[1]:
+                exprs.append(
+                    _make_expr(
+                        turn_index,
+                        text[start:end],
+                        "invalid_date",
+                        reason=f"date does not exist in {called_at.year}",
+                    )
+                )
+                continue
+            resolved = f"{called_at.year:04d}-{called_at.month:02d}-{day:02d}"
+            exprs.append(
+                _make_expr(
+                    turn_index,
+                    text[start:end],
+                    "absolute_date",
+                    value=_canonical_date(called_at.month, day),
+                    resolved_date=resolved,
+                )
+            )
+            continue
         resolved = _resolve_month_day(month, day, called_at)
         if resolved:
-            extra["resolved_date"] = resolved
-        exprs.append(_make_expr(turn_index, text[start:end], "absolute_date", **extra))
+            exprs.append(
+                _make_expr(
+                    turn_index,
+                    text[start:end],
+                    "absolute_date",
+                    value=_canonical_date(month, day),
+                    resolved_date=resolved,
+                )
+            )
+        elif called_at is not None:
+            # With a call timestamp, a non-resolving month-day is an
+            # impossible calendar date (e.g. February 29 in 2026).
+            exprs.append(
+                _make_expr(
+                    turn_index,
+                    text[start:end],
+                    "invalid_date",
+                    reason=f"date does not exist in {called_at.year}",
+                )
+            )
+        else:
+            exprs.append(_make_expr(turn_index, text[start:end], "absolute_date", value=_canonical_date(month, day)))
 
     # "next/this <weekday>" is dialect-dependent: flagged, never guessed.
     next_this_spans = [(m.start(), m.end()) for m in _NEXT_THIS_WEEKDAY_RE.finditer(text)]
@@ -329,6 +409,19 @@ def _collect_agent_turn(text: str, turn_index: int, called_at: datetime | None) 
             for ds, de, _, _ in date_spans
         )
         if absorbed:
+            continue
+        # "first Friday", "every Tuesday", "last Monday" and friends are
+        # ordinal/recursive constructions; resolving the weekday alone would
+        # guess a date the speaker never stated.
+        if _ORDINAL_PRECEDENCE_RE.search(text[max(0, start - 15):start]):
+            exprs.append(
+                _make_expr(
+                    turn_index,
+                    m.group(0),
+                    "ambiguous",
+                    reason="complex ordinal weekday expression",
+                )
+            )
             continue
         name = m.group(0).lower()
         weekday_index = _WEEKDAY_NAMES.index(name)
