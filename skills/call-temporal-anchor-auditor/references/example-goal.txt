@@ -1,0 +1,7 @@
+GOAL: confirm the catering pickup with Lucio's Kitchen for Wednesday, October 14
+TIME DISCIPLINE: state every commitment as weekday + calendar date + clock time + meridiem
+- example: "Wednesday, October 14, at 2 p.m."
+- read the full anchor back once and only once
+- never use bare "next <weekday>" or "tomorrow" without the calendar date
+- if the person proposes a time, confirm it back with both date and clock time
+SLOT: Wednesday, October 14 at 2 p.m.
