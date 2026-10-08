@@ -1,0 +1,14 @@
+{
+  "call_id": "demo-escalation-001",
+  "status": "COMPLETED",
+  "to": "+14155550197",
+  "result": {
+    "transcript": [
+      {"speaker": "agent", "text": "Hello, this is the Example Bistro scheduling assistant. I am an AI assistant calling to confirm a dinner reservation."},
+      {"speaker": "callee", "text": "Wait, I would rather talk to a real person about this."},
+      {"speaker": "agent", "text": "Of course - let me transfer you to our scheduling team, please stay on the line."},
+      {"speaker": "callee", "text": "Thank you."},
+      {"speaker": "agent", "text": "You are all set. Thank you and goodbye."}
+    ]
+  }
+}
