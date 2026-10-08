@@ -121,9 +121,9 @@ These outcome names are application choices, not CALL-E lifecycle statuses or
 event types. All five fixtures have `status: completed` and a ready `result_status`;
 execution completion alone does not prove that anyone answered or a booking
 succeeded. The unanswered fixture explicitly supplies `call_outcome: no_answer`,
-`result_status: unavailable` and a null result. Only that explicit telephone
-outcome maps to `unanswered`; a null result, missing transcript or generic failure
-does not establish it. See the public
+`result_status: unavailable` and a null result. A null result maps to `unanswered`
+only with that explicit telephone outcome; a missing transcript or generic
+failure does not establish it. See the public
 [Calls result contract](https://docs.heycall-e.com/calls#result-outcomes) and
 [webhook contract](https://docs.heycall-e.com/webhooks).
 
