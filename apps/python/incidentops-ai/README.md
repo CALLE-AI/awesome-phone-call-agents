@@ -148,7 +148,7 @@ For each incident, the system:
 5. generates a dynamic incident-response runbook;
 6. decides whether voice escalation is required;
 7. creates a goal-driven CALL-E task for P1 incidents;
-8. places one authorized live call or runs in Safe Demo Mode;
+8. runs in Safe Demo Mode, or returns APPROVAL_REQUIRED for a separate authorized live escalation;
 9. interprets acknowledgement conservatively from returned outcome evidence;
 10. records the complete incident and escalation result;
 11. displays the workflow in an operator-focused dashboard.
@@ -676,12 +676,33 @@ git diff --cached --check
 
 Live Mode creates a real-world phone side effect.
 
+The dashboard and `POST /incident/analyze` never place a real call. Turning off
+Safe Demo Mode only requests analysis; a P1 result returns `APPROVAL_REQUIRED`.
+Live dispatch is a separate local operator API workflow. Configure the backend's
+`ONCALL_PHONE` with an owned or explicitly authorized ASCII E.164 destination,
+set `INCIDENTOPS_API_TOKEN` privately, and deliberately enable
+`CALLE_LIVE_CALLS_ENABLED=true`. Keep the backend on loopback; this demo does not
+provide authorization for exposing incident history to remote users.
+
+For each individual call, review the destination and incident first, then send
+`POST /incident/escalate` with `X-IncidentOps-Token: <your private operator token>`
+and JSON of this shape (illustrative only; this request places a real call when
+live mode and provider credentials are configured):
+
+```json
+{"incident":"Fictional service incident; replace after operator review","severity":"critical","approved":true}
+```
+
+Do not send the token to a remote or untrusted origin. `approved` defaults to
+false; analysis and toggling a dashboard option are not per-run call approval.
+The dashboard does not currently submit this authenticated escalation request.
+
 Use it only when all conditions are true:
 
 - the destination number belongs to you or an authorized recipient;
 - the recipient expects the test;
 - `CALLE_LIVE_CALLS_ENABLED=true` was set intentionally;
-- Safe Demo Mode was deliberately disabled;
+- this individual `/incident/escalate` request was deliberately approved;
 - you understand that the call may consume CALL-E credits.
 
 The voice objective explicitly prohibits requesting:

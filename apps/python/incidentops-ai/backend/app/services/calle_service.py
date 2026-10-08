@@ -164,9 +164,9 @@ def _validate_phone(phone: str) -> str:
 
     digits = clean_phone[1:]
 
-    if not digits.isdigit():
+    if not re.fullmatch(r"[1-9][0-9]*", digits):
         raise ValueError(
-            "The phone number contains unsupported characters."
+            "The phone number must use ASCII digits and a nonzero country code."
         )
 
     if not 8 <= len(digits) <= 15:
