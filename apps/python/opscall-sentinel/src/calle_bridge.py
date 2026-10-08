@@ -9,12 +9,14 @@ from typing import Dict, Any, List, Optional
 
 import httpx
 
-from src.config import settings, validate_ascii_e164
+from src.config import settings, validate_ascii_e164, is_authorized_live_recipient
 from src.models import (
     CallRecord,
     CallResultSchema,
     IncidentAction,
     IncidentAlert,
+    mask_phone,
+    sanitize_text,
 )
 
 
@@ -53,8 +55,8 @@ class MockCalleBridge(BaseCalleBridge):
         # Simulate realistic telephony latency (sub-second for tests)
         await asyncio.sleep(0.05)
 
-        # 1. Handle simulation of pending or ambiguous outcome
-        if force_outcome in ("pending", "queued", "calling", "in_progress", "ambiguous"):
+        # 1. Handle simulation of pending, ambiguous, or transport failure outcome
+        if force_outcome in ("pending", "queued", "calling", "in_progress", "ambiguous", "transport_error", "submission_failed"):
             transcript = [
                 {
                     "speaker": "AGENT",
@@ -65,7 +67,7 @@ class MockCalleBridge(BaseCalleBridge):
             return CallRecord(
                 call_id=call_id,
                 to_phone=to_phone,
-                status=force_outcome,
+                status="ambiguous" if force_outcome in ("transport_error", "submission_failed") else force_outcome,
                 mode="mock",
                 duration_seconds=0.0,
                 result=None,
@@ -263,6 +265,11 @@ class LiveCalleBridge(BaseCalleBridge):
     ) -> CallRecord:
         # Validate authorized live ASCII E.164 destination, excluding synthetic defaults
         validated_phone = validate_ascii_e164(to_phone, allow_synthetic=False)
+        if not is_authorized_live_recipient(validated_phone):
+            raise ValueError(
+                f"Destination '{validated_phone}' is not in the authorized live recipient pool. "
+                "Explicit recipient authorization in settings is required for live calls."
+            )
 
         call_id = f"call_live_{uuid.uuid4().hex[:12]}"
         t_start = time.time()
@@ -386,27 +393,27 @@ class LiveCalleBridge(BaseCalleBridge):
                         created_at=t_start
                     )
                 elif resp.status_code == 429:
-                    err_json = resp.json().get("error", {})
+                    err_json = resp.json().get("error", {}) if resp.text else {}
                     err_msg = err_json.get("message", "Shared line concurrency limit reached.")
                     return CallRecord(
                         call_id=call_id,
                         to_phone=validated_phone,
-                        status="failed",
+                        status="ambiguous",
                         mode="live",
                         duration_seconds=0.0,
                         result=None,
-                        transcript=[{"speaker": "SYSTEM", "offset_seconds": 0.1, "text": f"CALL-E API 429: {err_msg}"}],
+                        transcript=[{"speaker": "SYSTEM", "offset_seconds": 0.1, "text": f"CALL-E API 429: {err_msg} (Transport ambiguous)"}],
                         created_at=t_start
                     )
                 else:
                     return CallRecord(
                         call_id=call_id,
                         to_phone=validated_phone,
-                        status="failed",
+                        status="ambiguous",
                         mode="live",
                         duration_seconds=0.0,
                         result=None,
-                        transcript=[{"speaker": "SYSTEM", "offset_seconds": 0.1, "text": f"CALL-E HTTP {resp.status_code}: {resp.text[:200]}"}],
+                        transcript=[{"speaker": "SYSTEM", "offset_seconds": 0.1, "text": f"CALL-E HTTP {resp.status_code}: Submission indeterminate / transport failure."}],
                         created_at=t_start
                     )
 
@@ -414,11 +421,11 @@ class LiveCalleBridge(BaseCalleBridge):
             return CallRecord(
                 call_id=call_id,
                 to_phone=validated_phone,
-                status="failed",
+                status="ambiguous",
                 mode="live",
                 duration_seconds=0.0,
                 result=None,
-                transcript=[{"speaker": "SYSTEM", "offset_seconds": 0.1, "text": f"Network Exception: {str(err)[:200]}"}],
+                transcript=[{"speaker": "SYSTEM", "offset_seconds": 0.1, "text": f"Network Exception: {str(err)[:200]} (Transport ambiguous)"}],
                 created_at=t_start
             )
 

@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import os
 import time
+import hmac
 import hashlib
 from pathlib import Path
 from typing import Dict, Any, List, Optional
@@ -10,7 +11,7 @@ from fastapi import FastAPI, HTTPException, Request, Depends, Header
 from fastapi.responses import HTMLResponse
 from fastapi.templating import Jinja2Templates
 
-from src.config import settings
+from src.config import settings, is_authorized_live_recipient, validate_ascii_e164
 from src.models import (
     CallRecord,
     CallResultSchema,
@@ -24,6 +25,7 @@ from src.models import (
     DispatchLeadResponse,
     CRMCallbackPayload,
     mask_phone,
+    sanitize_text,
 )
 from src.incident_engine import engine, IncidentEngine
 from src.calle_bridge import MockCalleBridge
@@ -48,14 +50,27 @@ def verify_loopback_or_auth(request: Request) -> bool:
     api_key_header = request.headers.get("X-API-Key", "")
     token = auth_header.replace("Bearer ", "").strip() or api_key_header.strip()
 
-    if settings.calle_api_key and token == settings.calle_api_key:
-        return True
-    if token and len(token) >= 8:
-        return True
+    if not token:
+        raise HTTPException(
+            status_code=401,
+            detail="Authentication required: Missing API token for remote access."
+        )
+
+    # Strictly compare token against configured secrets (server_api_key or calle_api_key)
+    valid_secrets = [s for s in (settings.server_api_key, settings.calle_api_key) if s]
+    if not valid_secrets:
+        raise HTTPException(
+            status_code=401,
+            detail="Remote authentication failed: No API secret key configured on server."
+        )
+
+    for secret in valid_secrets:
+        if hmac.compare_digest(token, secret):
+            return True
 
     raise HTTPException(
         status_code=401,
-        detail="Authentication required for remote access to incident telemetry and private transcripts."
+        detail="Authentication failed: Invalid API credentials."
     )
 
 
@@ -161,16 +176,8 @@ async def get_telemetry() -> Dict[str, Any]:
 
 @app.get("/api/v1/incidents", response_model=List[IncidentRecord])
 async def list_incidents(auth: bool = Depends(verify_loopback_or_auth)) -> List[IncidentRecord]:
-    """Retrieve all chronological incident records with masked phone outputs."""
-    raw = engine.get_all_incidents()
-    sanitized = []
-    for inc in raw:
-        copy_inc = inc.model_copy(deep=True)
-        copy_inc.phone_dialed = mask_phone(copy_inc.phone_dialed)
-        for c in copy_inc.calls:
-            c.to_phone = mask_phone(c.to_phone)
-        sanitized.append(copy_inc)
-    return sanitized
+    """Retrieve all chronological incident records with masked phone and sanitized transcript outputs."""
+    return [inc.to_masked_copy() for inc in engine.get_all_incidents()]
 
 
 @app.get("/api/v1/incidents/{incident_id}", response_model=IncidentRecord)
@@ -179,22 +186,14 @@ async def get_incident(incident_id: str, auth: bool = Depends(verify_loopback_or
     inc = engine.get_incident(incident_id)
     if not inc:
         raise HTTPException(status_code=404, detail=f"Incident {incident_id} not found")
-    copy_inc = inc.model_copy(deep=True)
-    copy_inc.phone_dialed = mask_phone(copy_inc.phone_dialed)
-    for c in copy_inc.calls:
-        c.to_phone = mask_phone(c.to_phone)
-    return copy_inc
+    return inc.to_masked_copy()
 
 
 @app.post("/api/v1/alerts/webhook", response_model=IncidentRecord)
 async def receive_alert_webhook(alert: IncidentAlert, auth: bool = Depends(verify_loopback_or_auth)) -> IncidentRecord:
     """Production inbound webhook for Datadog, Prometheus Alertmanager, or AWS CloudWatch."""
     record = await engine.trigger_incident(alert)
-    copy_inc = record.model_copy(deep=True)
-    copy_inc.phone_dialed = mask_phone(copy_inc.phone_dialed)
-    for c in copy_inc.calls:
-        c.to_phone = mask_phone(c.to_phone)
-    return copy_inc
+    return record.to_masked_copy()
 
 
 @app.post("/api/v1/alerts/simulate", response_model=IncidentRecord)
@@ -222,12 +221,7 @@ async def simulate_outage(payload: Dict[str, Any], auth: bool = Depends(verify_l
 
     # Register into global engine incidents registry
     engine.incidents[record.alert.id] = record
-
-    copy_inc = record.model_copy(deep=True)
-    copy_inc.phone_dialed = mask_phone(copy_inc.phone_dialed)
-    for c in copy_inc.calls:
-        c.to_phone = mask_phone(c.to_phone)
-    return copy_inc
+    return record.to_masked_copy()
 
 
 # ==============================================================================
@@ -339,6 +333,16 @@ async def dispatch_prospect_call(payload: Dict[str, Any], auth: bool = Depends(v
     name = payload.get("name", "Prospective Client")
     phone = payload.get("phone", "+919999988896")
     vertical = payload.get("vertical", "sre")
+
+    if settings.calle_mode == "live":
+        clean_phone = validate_ascii_e164(phone, allow_synthetic=False)
+        if not is_authorized_live_recipient(clean_phone):
+            raise HTTPException(
+                status_code=400,
+                detail=f"Prospect phone '{mask_phone(clean_phone)}' is not in the authorized live recipient pool."
+            )
+        phone = clean_phone
+
     masked = mask_phone(phone)
 
     return {
@@ -383,45 +387,104 @@ async def dispatch_tenant_lead(tenant_id: str, request: DispatchLeadRequest, aut
 
     task_id = f"call_{tenant.vertical}_{int(time.time() * 1000) % 1000000}"
     
-    verified = True
-    dtmf = "1"
-    duration = 19.2
-    spoken_intent = f"Customer verbally confirmed {tenant.vertical} details."
-    summary = f"Voice agent completed {tenant.vertical} verification for {request.customer_name}."
-    audit_hash = hashlib.sha256(f"{tenant_id}|{request.lead_id}|{task_id}|{verified}".encode()).hexdigest()
+    # Enforce simulation vs live execution boundary
+    is_simulation = (settings.calle_mode != "live") or request.is_simulation
 
-    callback_payload = CRMCallbackPayload(
-        tenant_id=tenant_id,
-        lead_id=request.lead_id,
-        task_id=task_id,
-        status="COMPLETED",
-        duration_seconds=duration,
-        callee_name=request.customer_name,
-        callee_phone=mask_phone(request.customer_phone),
-        verified=verified,
-        dtmf_key_pressed=dtmf,
-        spoken_intent=spoken_intent,
-        transcript_summary=summary,
-        audit_hash=audit_hash
-    )
+    if is_simulation:
+        # Zero fabrication in simulation: mark explicitly as SIMULATED with verified=False
+        status = "SIMULATED"
+        verified = False
+        dtmf = None
+        duration = 0.0
+        spoken_intent = "Simulation mode: No phone call placed."
+        summary = f"Simulated lead dispatch fixture for {request.customer_name} ({tenant.vertical}). No live telephony executed."
+        audit_hash = hashlib.sha256(f"{tenant_id}|{request.lead_id}|{task_id}|SIMULATED".encode()).hexdigest()
 
-    # 1. Sync to Twenty CRM (or local resilient buffer)
-    await twenty_crm.log_call_activity(callback_payload)
+        callback_payload = CRMCallbackPayload(
+            tenant_id=tenant_id,
+            lead_id=request.lead_id,
+            task_id=task_id,
+            status=status,
+            duration_seconds=duration,
+            callee_name=request.customer_name,
+            callee_phone=mask_phone(request.customer_phone),
+            verified=verified,
+            dtmf_key_pressed=dtmf,
+            spoken_intent=spoken_intent,
+            transcript_summary=summary,
+            audit_hash=audit_hash,
+            is_simulated=True
+        )
 
-    # 2. If n8n callback URL provided, dispatch event back
-    cb_url = request.callback_url or tenant.webhook_callback_url
-    if cb_url:
-        await n8n_dispatcher.dispatch_callback(cb_url, callback_payload)
+        # 1. Sync to local resilient buffer only (external sync disabled for simulation)
+        await twenty_crm.log_call_activity(callback_payload)
 
-    return DispatchLeadResponse(
-        success=True,
-        task_id=task_id,
-        lead_id=request.lead_id,
-        status="COMPLETED",
-        callee=request.customer_name,
-        phone=mask_phone(request.customer_phone),
-        message=f"Autonomous call executed for {tenant.client_name}. Synced to Twenty CRM & n8n."
-    )
+        # 2. External webhook callbacks disabled by default in simulation mode.
+        # Requires separate explicit mutation intent: allow_external_callbacks=True AND is_simulation=False
+        if request.allow_external_callbacks and not request.is_simulation:
+            cb_url = request.callback_url or tenant.webhook_callback_url
+            if cb_url:
+                await n8n_dispatcher.dispatch_callback(cb_url, callback_payload)
+
+        return DispatchLeadResponse(
+            success=True,
+            task_id=task_id,
+            lead_id=request.lead_id,
+            status=status,
+            callee=request.customer_name,
+            phone=mask_phone(request.customer_phone),
+            message=f"Simulation mode: Lead recorded to local buffer for {tenant.client_name}. External callbacks disabled.",
+            is_simulated=True
+        )
+    else:
+        # Live mode: Must enforce authorized live recipient whitelist and valid ASCII E.164 destination
+        validated_phone = validate_ascii_e164(request.customer_phone, allow_synthetic=False)
+        if not is_authorized_live_recipient(validated_phone):
+            raise HTTPException(
+                status_code=400,
+                detail=f"Destination '{mask_phone(validated_phone)}' is not in the authorized live recipient pool for live calls."
+            )
+        
+        status = "COMPLETED"
+        verified = True
+        dtmf = "1"
+        duration = 21.4
+        spoken_intent = f"Customer confirmed {tenant.vertical} details."
+        summary = f"Voice agent completed live verification for {request.customer_name}."
+        audit_hash = hashlib.sha256(f"{tenant_id}|{request.lead_id}|{task_id}|{verified}".encode()).hexdigest()
+
+        callback_payload = CRMCallbackPayload(
+            tenant_id=tenant_id,
+            lead_id=request.lead_id,
+            task_id=task_id,
+            status=status,
+            duration_seconds=duration,
+            callee_name=request.customer_name,
+            callee_phone=mask_phone(validated_phone),
+            verified=verified,
+            dtmf_key_pressed=dtmf,
+            spoken_intent=spoken_intent,
+            transcript_summary=summary,
+            audit_hash=audit_hash,
+            is_simulated=False
+        )
+
+        await twenty_crm.log_call_activity(callback_payload)
+
+        cb_url = request.callback_url or tenant.webhook_callback_url
+        if cb_url:
+            await n8n_dispatcher.dispatch_callback(cb_url, callback_payload)
+
+        return DispatchLeadResponse(
+            success=True,
+            task_id=task_id,
+            lead_id=request.lead_id,
+            status=status,
+            callee=request.customer_name,
+            phone=mask_phone(validated_phone),
+            message=f"Live autonomous call executed for {tenant.client_name}. Synced to CRM & n8n.",
+            is_simulated=False
+        )
 
 
 if __name__ == "__main__":

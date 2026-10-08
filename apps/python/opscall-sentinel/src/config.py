@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import re
 from pathlib import Path
+from typing import Optional, List
 from pydantic import field_validator, model_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
@@ -32,11 +33,13 @@ def validate_ascii_e164(phone: str, allow_synthetic: bool = True) -> str:
 
 class Settings(BaseSettings):
     calle_api_key: str = ""
+    server_api_key: str = ""  # Configured secret for remote API authentication
     calle_mode: str = "mock"  # "mock" (offline zero-credit fixture) or "live" (real phone call)
     calle_base_url: str = "https://api.heycall-e.com/v1"
     
     primary_oncall_phone: str = "+15555550100"
     secondary_oncall_phone: str = "+15555550101"
+    authorized_live_recipients: list[str] = []  # Whitelisted live recipient destinations
     oncall_security_pin: str = "4829"
     
     host: str = "127.0.0.1"
@@ -64,3 +67,22 @@ class Settings(BaseSettings):
 
 
 settings = Settings()
+
+
+def is_authorized_live_recipient(phone: str, cfg: Optional[Settings] = None) -> bool:
+    """Validate that destination phone is in the explicit authorized live recipient list."""
+    current_cfg = cfg or settings
+    clean_phone = validate_ascii_e164(phone, allow_synthetic=False)
+    
+    # Authorized pool includes configured primary/secondary on-call numbers and explicit whitelist
+    authorized_pool = set()
+    for candidate in [current_cfg.primary_oncall_phone, current_cfg.secondary_oncall_phone] + current_cfg.authorized_live_recipients:
+        if not candidate:
+            continue
+        try:
+            authorized_pool.add(validate_ascii_e164(candidate, allow_synthetic=True))
+        except ValueError:
+            pass
+            
+    return clean_phone in authorized_pool
+

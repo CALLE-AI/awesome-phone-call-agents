@@ -25,7 +25,13 @@ ROOT = Path(__file__).resolve().parent
 sys.path.insert(0, str(ROOT))
 
 from src.config import settings
-from src.models import IncidentAlert, IncidentSeverity, IncidentAction
+from src.models import (
+    IncidentAlert,
+    IncidentSeverity,
+    IncidentAction,
+    mask_phone,
+    sanitize_text,
+)
 from src.incident_engine import IncidentEngine
 from src.calle_bridge import MockCalleBridge, LiveCalleBridge
 
@@ -53,15 +59,16 @@ async def run_cli_dispatch(
     record = await engine.trigger_incident(alert, force_action=force_action)
 
     latest_call = record.calls[-1]
+    masked_call = latest_call.to_masked_copy()
     print("\n CALL CONVERSATION TRANSCRIPT:")
-    for turn in latest_call.transcript:
+    for turn in masked_call.transcript:
         role = turn.get("speaker", "unknown").upper()
         print(f"  [{role}]: {turn.get('text', '')}")
 
     print("\n" + "=" * 60)
     print(" STRUCTURED EXTRACTED VERDICT (JSON Schema Enforced):")
-    if latest_call.result:
-        print(json.dumps(latest_call.result.model_dump(), indent=2))
+    if masked_call.result:
+        print(json.dumps(masked_call.result.model_dump(), indent=2))
     print(f"Final Incident State: {record.state.value}")
     print(f"Escalation Level    : {record.escalation_level}")
     print(f"SHA-256 Audit Seal  : {record.audit_hash}")
@@ -77,14 +84,14 @@ async def run_demo_escalation(alert: IncidentAlert):
     print(f"Service       : {alert.service}")
     print(f"Severity      : {alert.severity.value}")
     print(f"Cluster       : {alert.cluster}")
-    print(f"Description   : {alert.description}")
+    print(f"Description   : {sanitize_text(alert.description)}")
     print(f"Initial State : UNASSIGNED (No Human Accountable)")
     print("-" * 70)
 
     engine = IncidentEngine(bridge=MockCalleBridge())
 
     print("\n[STAGE 1: Primary On-Call Dispatch]")
-    print(f"  -> Dialing Primary SRE (+91 ***** ***896) via CALL-E Voice Gateway...")
+    print(f"  -> Dialing Primary SRE ({mask_phone(settings.primary_oncall_phone)}) via CALL-E Voice Gateway...")
     print(f"  -> State: CALLING_PRIMARY")
     await asyncio.sleep(0.4)
     print(f"  [!] Ringing for 18 seconds... No response from Primary SRE.")
@@ -92,22 +99,23 @@ async def run_demo_escalation(alert: IncidentAlert):
 
     print("\n[STAGE 2: Autonomous Multi-Tier Escalation]")
     print(f"  -> State Transition: ESCALATING (Triggering Tier-2 Ladder)")
-    print(f"  -> Dialing Secondary Lead: Elena Rostova ({settings.secondary_oncall_phone})...")
+    print(f"  -> Dialing Secondary Lead: Elena Rostova ({mask_phone(settings.secondary_oncall_phone)})...")
     print(f"  -> State: CALLING_SECONDARY")
     await asyncio.sleep(0.4)
 
     record = await engine.trigger_incident(alert, primary_outcome="no_answer")
 
     secondary_call = record.calls[-1]
+    masked_secondary = secondary_call.to_masked_copy()
     print(f"\n[STAGE 3: Secondary Telephony Audio Stream]")
-    for turn in secondary_call.transcript:
+    for turn in masked_secondary.transcript:
         role = turn.get("speaker", "unknown").upper()
         print(f"  [{role}]: {turn.get('text', '')}")
 
     print("-" * 70)
     print(" RESULT SCHEMA CONTRACT (Type-Safe Extracted JSON):")
-    if secondary_call.result:
-        print(json.dumps(secondary_call.result.model_dump(), indent=2))
+    if masked_secondary.result:
+        print(json.dumps(masked_secondary.result.model_dump(), indent=2))
 
     print("-" * 70)
     print(f"Final State         : {record.state.value}")
@@ -115,7 +123,7 @@ async def run_demo_escalation(alert: IncidentAlert):
     print(f"Escalation Level    : {record.escalation_level}")
     print(f"State Machine Steps : {len(record.state_history)} transitions recorded")
     for s in record.state_history:
-        print(f"   [{s['state']}]: {s['detail']}")
+        print(f"   [{s['state']}]: {sanitize_text(s.get('detail', ''))}")
     print(f"SHA-256 Integrity   : {record.audit_hash}")
     print("=" * 70)
 

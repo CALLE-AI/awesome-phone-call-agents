@@ -91,8 +91,8 @@ class IncidentEngine:
         )
         record.calls.append(primary_call)
 
-        # Step 2: Safety Gate - Check if Primary Call is Pending / Ambiguous
-        if primary_call.status in ("pending", "queued", "calling", "in_progress", "ambiguous"):
+        # Step 2: Safety Gate - Check if Primary Call is Pending / Ambiguous / Transport Failure
+        if primary_call.status in ("pending", "queued", "calling", "in_progress", "ambiguous", "transport_error", "submission_failed"):
             record.transition_to(
                 IncidentState.PRIMARY_PENDING,
                 f"Primary call dispatch status is '{primary_call.status}'. Halting escalation cascade pending definitive outcome."
@@ -146,16 +146,16 @@ class IncidentEngine:
                 IncidentState.PRIMARY_UNAVAILABLE,
                 "Primary engineer explicitly requested escalation to secondary"
             )
-        elif primary_call.status in ("no_answer", "failed", "busy", "timeout", "unreachable"):
+        elif primary_call.status in ("no_answer", "busy", "timeout", "unreachable"):
             record.transition_to(
                 IncidentState.PRIMARY_UNAVAILABLE,
-                f"Primary engineer unreachable (carrier status: {primary_call.status})"
+                f"Primary engineer verified unreachable via carrier (carrier status: {primary_call.status})"
             )
         else:
-            # Ambiguous non-terminal state - stop escalation rather than making blind calls
+            # Transport failure, ambiguous, or unconfirmed failure - halt escalation cascade rather than dialing secondary blindly
             record.transition_to(
                 IncidentState.PRIMARY_PENDING,
-                f"Ambiguous primary response received (status: {primary_call.status}). Halting secondary dispatch."
+                f"Indeterminate primary outcome (status: {primary_call.status}). Halting secondary dispatch."
             )
             return record
 

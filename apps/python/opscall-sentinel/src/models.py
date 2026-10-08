@@ -1,10 +1,11 @@
 from __future__ import annotations
 
+import re
 import time
 import hashlib
 from enum import Enum
 from typing import Optional, List, Dict, Any
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, field_validator
 
 
 def mask_phone(phone: Optional[str]) -> str:
@@ -12,14 +13,32 @@ def mask_phone(phone: Optional[str]) -> str:
     if not phone or not isinstance(phone, str):
         return "••••••••"
     clean = phone.strip()
-    if len(clean) <= 5:
+    digits = re.sub(r"\D", "", clean)
+    if len(digits) < 5:
         return "••••••••"
     if clean.startswith("+"):
         prefix = clean[:3]
-        suffix = clean[-3:]
+        suffix = digits[-3:]
         return f"{prefix} •••• •••{suffix}"
-    suffix = clean[-3:]
+    suffix = digits[-3:]
     return f"•••• •••{suffix}"
+
+
+def sanitize_text(text: Optional[str]) -> str:
+    """Mask nested phone numbers within unstructured text, transcripts, notes, errors, and summaries."""
+    if not text or not isinstance(text, str):
+        return text or ""
+    # Pattern matching international and formatted ASCII phone numbers
+    pattern = r"(\+[1-9]\d{0,3}[-.\s]?(?:\(\d{1,4}\)|\d{1,4})[-.\s]?\d{2,4}[-.\s]?\d{3,4}|\+[1-9]\d{6,14})"
+
+    def _replacer(m: re.Match) -> str:
+        raw_val = m.group(0)
+        digits = re.sub(r"\D", "", raw_val)
+        if len(digits) >= 7:
+            return mask_phone(raw_val)
+        return raw_val
+
+    return re.sub(pattern, _replacer, text)
 
 
 class IncidentSeverity(str, Enum):
@@ -100,6 +119,28 @@ class CallRecord(BaseModel):
     transcript: List[Dict[str, Any]] = Field(default_factory=list)
     created_at: float = Field(default_factory=time.time)
 
+    def to_masked_copy(self) -> CallRecord:
+        """Return a deep copy with all nested phone numbers and unstructured text sanitized."""
+        copy_rec = self.model_copy(deep=True)
+        copy_rec.to_phone = mask_phone(copy_rec.to_phone)
+        if copy_rec.result:
+            copy_rec.result.callee_name = sanitize_text(copy_rec.result.callee_name)
+            copy_rec.result.transcript_summary = sanitize_text(copy_rec.result.transcript_summary)
+            copy_rec.result.notes = sanitize_text(copy_rec.result.notes)
+            copy_rec.result.reason = sanitize_text(copy_rec.result.reason)
+        copy_rec.transcript = [
+            {
+                **turn,
+                "text": sanitize_text(str(turn.get("text", "")))
+            }
+            for turn in copy_rec.transcript
+        ]
+        return copy_rec
+
+    def to_safe_dict(self) -> Dict[str, Any]:
+        """Return serialized call record with all nested phone numbers and notes masked."""
+        return self.to_masked_copy().model_dump()
+
 
 class IncidentRecord(BaseModel):
     alert: IncidentAlert
@@ -134,6 +175,26 @@ class IncidentRecord(BaseModel):
     def phone_dialed_masked(self) -> str:
         return mask_phone(self.phone_dialed)
 
+    def to_masked_copy(self) -> IncidentRecord:
+        """Return deep copy with all nested phones, state logs, errors, and transcripts masked."""
+        copy_rec = self.model_copy(deep=True)
+        copy_rec.phone_dialed = mask_phone(copy_rec.phone_dialed)
+        copy_rec.alert.title = sanitize_text(copy_rec.alert.title)
+        copy_rec.alert.description = sanitize_text(copy_rec.alert.description)
+        copy_rec.state_history = [
+            {
+                **entry,
+                "detail": sanitize_text(str(entry.get("detail", "")))
+            }
+            for entry in copy_rec.state_history
+        ]
+        copy_rec.calls = [c.to_masked_copy() for c in copy_rec.calls]
+        return copy_rec
+
+    def to_safe_dict(self) -> Dict[str, Any]:
+        """Return serialized incident record with all nested phone numbers masked across transcripts & state logs."""
+        return self.to_masked_copy().model_dump()
+
 
 # ==============================================================================
 # Multi-Tenant & Open-Source CRM (Twenty CRM / n8n) Integration Schemas
@@ -150,6 +211,32 @@ class TenantConfig(BaseModel):
     crm_endpoint: Optional[str] = None
     created_at: float = Field(default_factory=time.time)
 
+    @field_validator("crm_endpoint")
+    @classmethod
+    def validate_crm_endpoint_origin(cls, v: Optional[str]) -> Optional[str]:
+        if not v:
+            return v
+        is_loopback = any(v.startswith(h) for h in ("http://localhost", "http://127.0.0.1", "http://[::1]"))
+        if not v.startswith("https://") and not is_loopback:
+            raise ValueError(
+                f"CRM endpoint '{v}' must use an approved HTTPS origin or local loopback. "
+                "Plain remote HTTP is prohibited."
+            )
+        return v
+
+    @field_validator("webhook_callback_url")
+    @classmethod
+    def validate_webhook_origin(cls, v: Optional[str]) -> Optional[str]:
+        if not v:
+            return v
+        is_loopback = any(v.startswith(h) for h in ("http://localhost", "http://127.0.0.1", "http://[::1]", "http://n8n.internal"))
+        if not v.startswith("https://") and not is_loopback:
+            raise ValueError(
+                f"Webhook callback URL '{v}' must use an approved HTTPS origin or local loopback. "
+                "Plain remote HTTP is prohibited."
+            )
+        return v
+
 
 class DispatchLeadRequest(BaseModel):
     """Incoming dispatch request from n8n or external CRM."""
@@ -159,6 +246,8 @@ class DispatchLeadRequest(BaseModel):
     customer_phone: str
     context: Dict[str, Any] = Field(default_factory=dict)
     callback_url: Optional[str] = None  # Overrides tenant webhook if specified
+    allow_external_callbacks: bool = False  # Disabled by default during simulation to prevent accidental mutation
+    is_simulation: bool = True  # Explicit intent required for live mutation
 
 
 class DispatchLeadResponse(BaseModel):
@@ -170,6 +259,7 @@ class DispatchLeadResponse(BaseModel):
     callee: str
     phone: str
     message: str
+    is_simulated: bool = False
 
 
 class CRMCallbackPayload(BaseModel):
@@ -177,7 +267,7 @@ class CRMCallbackPayload(BaseModel):
     tenant_id: str
     lead_id: str
     task_id: str
-    status: str  # "COMPLETED", "FAILED", "NO_ANSWER"
+    status: str  # "SIMULATED", "COMPLETED", "FAILED", "NO_ANSWER"
     duration_seconds: float
     callee_name: str
     callee_phone: str
@@ -186,4 +276,5 @@ class CRMCallbackPayload(BaseModel):
     spoken_intent: str = ""
     transcript_summary: str = ""
     audit_hash: str
+    is_simulated: bool = False
     timestamp: float = Field(default_factory=time.time)

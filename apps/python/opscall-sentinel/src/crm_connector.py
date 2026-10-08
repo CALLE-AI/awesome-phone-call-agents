@@ -89,22 +89,33 @@ class TwentyCRMConnector:
     """
 
     def __init__(self, base_url: Optional[str] = None, api_key: Optional[str] = None):
-        self.base_url = base_url or os.getenv("TWENTY_CRM_URL", "http://localhost:3000/rest")
-        self.api_key = api_key or os.getenv("TWENTY_CRM_API_KEY", "")
+        self.base_url = (base_url or os.getenv("TWENTY_CRM_URL", "http://localhost:3000/rest")).strip()
+        self.api_key = (api_key or os.getenv("TWENTY_CRM_API_KEY", "")).strip()
+        self._validate_credentials_origin()
+
+    def _validate_credentials_origin(self):
+        """Restrict provider credentials to approved HTTPS origins; plain HTTP is forbidden."""
+        if not self.base_url:
+            return
+        is_loopback = any(self.base_url.startswith(h) for h in ("http://localhost", "http://127.0.0.1", "http://[::1]"))
+        if self.api_key and not self.base_url.startswith("https://") and not is_loopback:
+            raise ValueError(
+                f"CRM provider credentials cannot be transmitted over plain HTTP ({self.base_url}). "
+                "Approved HTTPS origin is required."
+            )
 
     async def log_call_activity(self, payload: CRMCallbackPayload) -> Dict[str, Any]:
         """
         Record completed phone call, DTMF response, and audit hash into Twenty CRM.
         Falls back to resilient local JSON audit trail if remote server is unreachable.
         """
-        headers = {
-            "Content-Type": "application/json",
-            "Authorization": f"Bearer {self.api_key}" if self.api_key else ""
-        }
+        self._validate_credentials_origin()
+
         activity_record = {
-            "title": f"Voice Call: {payload.callee_name} ({payload.status})",
+            "title": f"{'Simulated' if payload.is_simulated else 'Voice Call'}: {payload.callee_name} ({payload.status})",
             "body": (
-                f"Outcome: {'VERIFIED' if payload.verified else 'UNVERIFIED'}\n"
+                f"Outcome: {payload.status}\n"
+                f"Verified: {payload.verified}\n"
                 f"DTMF Key: {payload.dtmf_key_pressed or 'None'}\n"
                 f"Spoken Intent: {payload.spoken_intent}\n"
                 f"Summary: {payload.transcript_summary}\n"
@@ -112,11 +123,23 @@ class TwentyCRMConnector:
                 f"Duration: {payload.duration_seconds}s"
             ),
             "phone": payload.callee_phone,
-            "timestamp": payload.timestamp
+            "timestamp": payload.timestamp,
+            "is_simulated": payload.is_simulated
         }
 
-        # If Twenty CRM is configured and live
-        if self.api_key and self.base_url.startswith("http"):
+        # Simulation safety gate: Never transmit simulated results to external CRM
+        if payload.is_simulated:
+            logger.info("Simulated call activity recorded to local audit buffer (external sync disabled).")
+            return {"synced": False, "provider": "local_buffer", "simulated": True, "data": activity_record}
+
+        # If Twenty CRM is configured and live with valid origin
+        is_loopback = any(self.base_url.startswith(h) for h in ("http://localhost", "http://127.0.0.1", "http://[::1]"))
+        is_https = self.base_url.startswith("https://")
+        if self.api_key and (is_https or is_loopback):
+            headers = {
+                "Content-Type": "application/json",
+                "Authorization": f"Bearer {self.api_key}"
+            }
             try:
                 async with httpx.AsyncClient(timeout=3.0) as client:
                     resp = await client.post(f"{self.base_url}/activities", json=activity_record, headers=headers)
@@ -126,7 +149,7 @@ class TwentyCRMConnector:
             except Exception as e:
                 logger.warning("Could not reach Twenty CRM directly, logged to local audit buffer: %s", e)
 
-        return {"synced": True, "provider": "local_buffer", "data": activity_record}
+        return {"synced": False, "provider": "local_buffer", "data": activity_record}
 
 
 class N8nWebhookDispatcher:
@@ -137,6 +160,17 @@ class N8nWebhookDispatcher:
         """Post structured call results back to the initiating n8n workflow."""
         if not callback_url:
             return False
+
+        # Simulation safety gate: Do not transmit simulated payloads to external webhook unless explicit
+        if payload.is_simulated:
+            logger.info("Skipping external n8n callback for simulated payload (simulation external callbacks disabled).")
+            return False
+
+        is_loopback = any(callback_url.startswith(h) for h in ("http://localhost", "http://127.0.0.1", "http://[::1]", "http://n8n.internal"))
+        if not callback_url.startswith("https://") and not is_loopback:
+            logger.warning("Rejected n8n callback to non-HTTPS remote URL: %s", callback_url)
+            return False
+
         try:
             async with httpx.AsyncClient(timeout=4.0) as client:
                 res = await client.post(callback_url, json=payload.model_dump())

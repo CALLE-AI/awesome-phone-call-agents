@@ -26,16 +26,16 @@ Traditional automated robocalls fail because:
 
 **OpsCall Sentinel** replaces slow human call trees with an autonomous AI incident ownership and escalation engine powered by **CALL-E**:
 
-- 📞 **Rapid Outbound Telephony:** Dispatches outbound API requests within 2 seconds of alert ingress over global PSTN carrier networks (subject to local carrier line establishment delays).
-- 🔐 **4-Digit Voice PIN Gate:** Demands verbal or keypad entry of the engineer's assigned security PIN (e.g., PIN `4829`) for triage identity verification.
+- 📞 **Outbound Telephony Dispatch:** Dispatches outbound API requests over global PSTN carrier networks in live mode (or executes deterministically via local zero-credit mock fixtures). Real carrier connect latency typically requires 5–15s due to carrier signaling, mobile tower routing, and subscriber ringing (sub-second in local demo fixtures).
+- 🔐 **4-Digit Conversational PIN Gate:** Demands verbal or keypad entry of the engineer's assigned security PIN (e.g., PIN `4829`) to distinguish on-call engineers from voicemail false-acknowledgments. Operates as an application-level triage filter, not hardware cryptographic MFA.
 - 🎛️ **Dual-Modality Triage (DTMF + Voice):**
   - **Press 1 / Say "Acknowledge"**: Takes incident ownership and extracts verbal resolution ETA in minutes.
   - **Press 2 / Say "Escalate"**: Cascades to the Secondary SRE lead.
-  - **Press 3 / Say "Rollback"**: Triggers webhook to deployment rollback runbooks.
-- 🔄 **Autonomous Multi-Tier Escalation:** Escalates from Primary to Secondary on-call if primary is confirmed unavailable (`CALLING_PRIMARY` -> `PRIMARY_UNAVAILABLE` -> `ESCALATING` -> `CALLING_SECONDARY` -> `OWNERSHIP_ESTABLISHED`). Halts in `PRIMARY_PENDING` if primary status is pending or ambiguous.
+  - **Press 3 / Say "Rollback"**: Records a state transition to `RESOLVED` and dispatches structured notification payloads intended for CI/CD runbooks (local demo executes state machine transition without performing unauthenticated bare-metal server mutations).
+- 🔄 **Autonomous Multi-Tier Escalation:** Escalates from Primary to Secondary on-call if primary is verified unreachable via carrier (`no_answer`, `busy`, `unreachable`) or explicitly requests escalation (`CALLING_PRIMARY` -> `PRIMARY_UNAVAILABLE` -> `ESCALATING` -> `CALLING_SECONDARY` -> `OWNERSHIP_ESTABLISHED`). Halts cascade in `PRIMARY_PENDING` on pending, ambiguous, or transport failure outcomes.
 - 📋 **Type-Safe `result_schema` Contract:** CALL-E extracts structured JSON with callee verification, decision verdict, DTMF key pressed, and spoken ETA.
 - 🔒 **SHA-256 Audit Seal:** Computes deterministic cryptographic hash chains over incident state transitions for audit trails.
-- 💻 **Real-Time Telemetry Dashboard:** Dark-mode web console showing state progression ladders, verified owner badges, audio dialog streams, and forensic transcripts.
+- 💻 **Real-Time Telemetry Dashboard:** Dark-mode web console showing state progression ladders, verified owner badges, audio dialog streams, and forensic transcripts with nested phone masking.
 
 ---
 
@@ -65,6 +65,7 @@ Edit `.env` (optional for offline testing):
 ```env
 # Get from https://dashboard.heycall-e.com/ -> API keys
 CALLE_API_KEY=your_key_here
+SERVER_API_KEY=your_server_secret_key  # Secret for remote authenticated requests
 CALLE_MODE=mock  # Change to "live" when ready to place real calls!
 PRIMARY_ONCALL_PHONE=+15555550100
 SECONDARY_ONCALL_PHONE=+15555550101
@@ -113,11 +114,11 @@ All tests pass offline with zero network calls and zero credit consumption.
 
 > [!IMPORTANT]
 > **Operational Scope & Telephony Safety Boundaries:**
-> - **Simulation vs. Live Execution:** By default, `CALLE_MODE=mock` executes an offline simulation harness for evaluation, continuous integration, and judge replay with zero telephony network spend. When switching to `CALLE_MODE=live`, calls are strictly placed through approved HTTPS endpoints (`https://api.heycall-e.com`) to authorized ASCII E.164 phone numbers (synthetic test patterns like `555-0100..0199` are rejected in live mode).
-> - **Primary Dispatch & Ambiguous State Handling:** If a primary dispatch returns an ambiguous, queued, or pending status, the engine enters `PRIMARY_PENDING` and **halts** escalation. The system strictly never fabricates completed or PIN-verified ownership from missing or unconfirmed carrier results. Secondary escalation only triggers upon unambiguous, verified non-response (e.g. timeout, busy, line rejected) or explicit refusal.
-> - **Automated Rollback Boundaries:** The "Rollback" trigger dispatches a structured webhook to internal CI/CD systems (e.g., ArgoCD / GitHub Actions runbooks). In high-stakes production environments, rollback execution must be governed by downstream staging gates and rate limits; OpsCall Sentinel does not perform direct unauthenticated binary swaps on bare-metal servers.
-> - **Forensic PIN Authentication Scope:** The 4-digit voice/DTMF PIN gate provides first-line identity screening against voicemail pickup and unauthorized answering. It does not replace enterprise multi-factor hardware security tokens (FIDO2/WebAuthn) for privileged root access.
-> - **Telephony Carrier Timing & Limits:** Outbound dialing timing (typically 2–8 seconds) is governed by PSTN carrier interconnects, cellular tower handover, and local regulatory DND windows. Cancellation requests sent while a carrier line is actively ringing or connecting are subject to carrier teardown latency.
+> - **Simulation Mode & Zero External Mutating Callbacks:** In simulation/mock mode (`CALLE_MODE=mock`), call results are explicitly marked `status="SIMULATED"` with `verified=False`. External webhook, CRM, and n8n mutations are strictly disabled by default; simulated events are persisted solely to a resilient local audit buffer. External callbacks require separate explicit mutation intent (`allow_external_callbacks=True` and `is_simulation=False`). When switching to `CALLE_MODE=live`, calls are strictly placed through approved HTTPS endpoints (`https://api.heycall-e.com`) to authorized ASCII E.164 phone numbers (synthetic test patterns like `555-0100..0199` are rejected in live mode).
+> - **Transport/Submission Indeterminacy & Halting Cascade:** If a primary dispatch experiences transport or submission failures (HTTP 429 concurrency limit, 5xx server error, or connection exception), or returns pending/queued/ambiguous status, the engine enters `PRIMARY_PENDING` and **halts** escalation. The system never converts transport failures into assumed engineer unreachability or dials secondary tiers automatically. Secondary escalation only triggers upon carrier-verified non-response (e.g. timeout, busy, line rejected) or explicit verbal refusal.
+> - **Automated Rollback Boundaries:** The "Rollback" trigger in this demo/local codebase records a state transition to `RESOLVED` and dispatches structured event data. In enterprise production environments, rollbacks must be routed to authenticated CI/CD orchestrators (e.g., ArgoCD, GitHub Actions runbooks) governed by downstream staging gates; OpsCall Sentinel does not perform direct unauthenticated binary swaps on bare-metal servers.
+> - **Forensic PIN Authentication Scope:** The 4-digit voice/DTMF PIN gate provides first-line identity screening against voicemail pickup and accidental keypad taps. It operates as a conversational triage filter and does not replace enterprise multi-factor hardware security tokens (FIDO2/WebAuthn) for privileged root access.
+> - **Telephony Carrier Timing & Cancellation Limits:** PSTN outbound dialing typically requires 5–15 seconds for carrier trunk establishment, cellular tower handover, and subscriber handset ringing. Cancellation requests sent while a carrier line is actively ringing halt local state machine progression, but in-flight carrier calls remain subject to cellular network teardown latency and cannot guarantee instantaneous zero-delay line termination.
 
 ---
 
