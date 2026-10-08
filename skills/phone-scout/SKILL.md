@@ -37,11 +37,11 @@ The user rarely gives every detail upfront. **Never guess or assume missing
 information.** Ask follow-up questions until you have enough to build a
 well-scoped research plan. Ask the user for any missing fields below.
 
-### First-run setup (once per user, saves to memory)
+### First-run setup (host-dependent preferences)
 
-On every task, check memory for these three keys. If any are missing, ask
-the user ONE question at a time (don't dump a form). Save answers to memory
-immediately — they persist across sessions:
+On every task, check the current request or consented host memory for these
+three keys. If any are missing, ask the user one question at a time. This CLI
+does not implement persistent memory; ask again when the host has not retained it:
 
 | Memory key | Question if missing | Why |
 |---|---|---|
@@ -49,9 +49,9 @@ immediately — they persist across sessions:
 | `home_city` | "Which city are you in? (or where do you search most?)" | Becomes the default when you don't mention a city |
 | `timezone` | "What timezone are you in? e.g. Africa/Johannesburg, America/New_York" | Log timestamps match your local time |
 
-Once saved, the agent loads them from memory and they behave as if
+The host must explicitly pass preferences through CLI arguments or exported
 `PHONE_SCOUT_CURRENCY` / `PHONE_SCOUT_DEFAULT_LOCATION` / `PHONE_SCOUT_TZ`
-env vars were set. The env vars take precedence if both exist.
+variables. The scripts do not automatically read host memory or create sessions.
 
 ### Mandatory fields before discovery
 
@@ -123,8 +123,8 @@ The agent MUST:
    constraints**: tonight, any time, no dietary filter, wider location, no
    budget cap — and tell them what you defaulted so they can tighten it next
    time.
-4. If the user provides **identity details on the fly** (name, callback
-   number), save them to memory for future sessions.
+4. Use identity details only for the approved request. Retaining them for later
+   sessions requires user consent and host-managed storage, outside this CLI.
 
 ## Error handling & recovery
 
@@ -347,22 +347,12 @@ Once KYC is complete and a dedicated number is purchased at
 https://dashboard.heycall-e.com/account/numbers/buy (unlocks up to 10 concurrent calls),
 switch to parallel delegation:
 
-```python
-# Spawn sub-agents for each candidate (platform-specific delegation API):
-  {
-    "goal": f"Research {candidates[i].name} at {candidates[i].phone}",
-    "context": (
-      f"PY="python3"  # use venv python if calle-ai installed there
-SCOUT="scripts/phone_scout.py"  # adjust to ./scripts/phone_scout.py or full path
-$PY $SCOUT call-one --candidate-id \"{candidates[i].id}\" "
-      f"--phone \"{candidates[i].phone}\" --name \"{candidates[i].name}\" "
-      f"--research-questions ... --context \"...\" --pretty\n"
-      "Return JSON as-is. Research only — no booking."
-    ),
-  }
-  for i in range(len(candidates))
-])
-```
+Use the host's documented task API, not a Python API from this skill. Give each
+task one approved candidate, its authorized destination, research questions,
+and the selected interpreter plus the full path to `scripts/phone_scout.py`.
+Ask it to execute the approved `call-one` command and return masked JSON to the
+parent. Credentials must be inherited privately, never included in task text.
+This is an orchestration recipe, not executable host-independent delegation code.
 
 Bounded by `min(len(candidates), account_concurrency)` at a time.
 
@@ -465,6 +455,6 @@ export GOOGLE_PLACES_API_KEY="..."
 - `scripts/phone_scout.py` — main research orchestrator
   - `search` — full pipeline (discover → call → verify → rank)
   - `call-one` — research ONE business (used by sub-agents)
-  - `verify` — re-run constraint verification on a session or results file
-  - `rank` — re-rank a session or results file
-- `scripts/web_search.py` — keyless business discovery (Google Places if API key set, else OSM Overpass). Auto-detects `GOOGLE_PLACES_API_KEY` from `.env`.
+  - `verify` — re-run constraint verification on an explicit `--results-file`
+  - `rank` — re-rank an explicit `--results-file`; no stored-session lookup
+- `scripts/web_search.py` — keyless business discovery (Google Places if an API key is exported, else OSM Overpass). Export `GOOGLE_PLACES_API_KEY` explicitly; do not assume a host environment file is loaded.

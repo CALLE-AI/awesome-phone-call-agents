@@ -15,12 +15,12 @@ CALL-E is a goal-driven AI voice agent, not a rigid script bot. You give it a na
 This skill wraps the calle-ai Python SDK and orchestrates booking calls: gather parameters → show plan → confirm → dial → poll → result.
 
 Install calle-ai in a Python 3.9+ venv.
-Always run the scripts with that interpreter:
+Run the following commands from `skills/call-e-booking/`, using that interpreter:
 
 ```bash
 PY="python3"  # or ./venv/bin/python3 if using venv
 BOOK="scripts/calle_booking.py"
-SLOTS="./calendar_slots.py"
+SLOTS="scripts/calendar_slots.py"
 GAPI="<your-calendar-tool>"
 ```
 
@@ -52,19 +52,19 @@ structured input, but `--task` is the simplest path for any booking type.
 
 When the user says "book a table at [restaurant] for [N] at [time]," the agent:
 
-1. **Gather** any missing details — the business phone number, the user's name, callback number, email, and any special requests. Load identity from the user's Hermes memory (name, email, location) and `.env` (caller phone number).
+1. **Gather** any missing details — the business phone number, the user's name, callback number, email, and any special requests. A host may supply consented memory, but the scripts do not implement memory. Pass identity explicitly through CLI arguments and export required environment variables before launch.
 2. **Plan** — run `calle_booking.py plan ...` to build and preview the exact task + recipient + result schema. This is a dry-run with NO network call. Show it to the user.
 3. **Confirm** — wait for explicit user approval. Never dial without it.
 4. **Book** — run `calle_booking.py book --confirm ...`. This calls `calls.create()` then `calls.wait_for_result()` — the explicit split preserves the `call_id` so a timeout doesn't lose the reference (recover with `status --call-id <id>`). Polls every 5s (default) until terminal. Returns machine-readable JSON with `structured_result`, `attempts` (summary + transcript per attempt), and `completion_confidence`.
 5. **Calendar** — if `structured_result.booked` is `true`, create a Google Calendar event via the `google-workspace` skill (`gws` CLI: `$PY $GAPI calendar create ...`). The result's `date`/`time` are **business-local**, not user-local: resolve the business timezone from the phone's area code (or add a `timezone` field to the result schema) and pass that offset — Google then renders it in the user's timezone automatically.
-6. **Deliver** — summarize the confirmation (or failure) and deliver to the user. If triggered from Telegram, reply auto-routes back there. For background/cron bookings, set `deliver` to Telegram.
+6. **Deliver** — summarize the confirmation (or failure) and deliver to the user. The CLI writes to stdout; gateway delivery and background notifications depend on the host and are not implemented by these scripts.
 
 ## Manual usage (debugging)
 
 ```bash
 PY="python3"  # or ./venv/bin/python3 if using venv
-SCRIPT="./calle_booking.py"
-SLOTS="./calendar_slots.py"
+SCRIPT="scripts/calle_booking.py"
+SLOTS="scripts/calendar_slots.py"
 
 # Dry-run: preview without dialing
 $PY $SCRIPT plan --kind restaurant --phone "+14155551234" \
@@ -170,6 +170,13 @@ and the generic booking template adapts to whatever `--kind` you pass.
 - **Google Calendar**: the `google-workspace` skill must be fully OAuth-authenticated (missing `google_token.json` or `google_client_secret.json` = blocked).
 - **Telegram**: Hermes gateway must have the Telegram channel wired.
 
+The scripts do not automatically read an environment file. Export
+`CALLE_API_KEY` in the process environment before a live run. If you choose to
+keep exports in a private local file, source only that trusted file yourself;
+do not commit it. `BOOKING_PHONE` is an operator convenience: pass its value
+explicitly with `--caller-phone`. Calendar and messaging integrations above
+are optional host integrations, not prerequisites for the offline `plan` path.
+
 ## Safety rules
 
 1. **Never dial without explicit user confirmation.** `calle_booking.py book` requires `--confirm`. The plan must be shown and approved first.
@@ -179,7 +186,10 @@ and the generic booking template adapts to whatever `--kind` you pass.
 
 ## Identity
 
-The user's name, email, and location should live in agent memory. Their caller-number (callback number given to the business) goes in `your environment file` as `BOOKING_PHONE`. These are loaded by the skill during the gather phase — the skill should never hardcode PII in its body.
+Gather the user's identity for the current request. A host may offer consented
+memory, but persistence is host-dependent; this CLI provides no identity store.
+Pass the callback number explicitly with `--caller-phone`. Do not hardcode or
+commit personal information in the skill.
 
 ## Calendar availability (variant A: book within free windows)
 
@@ -241,8 +251,8 @@ Conversation pattern:
 1. **User** — "book a table for 2 tonight at Kettle Steak" (or "book me a GP
    appointment").
 2. **Agent gathers** missing details: business phone number, date/time, party
-   size / reason, special requests. Loads identity from memory (name, email,
-   location) and `.env` (`BOOKING_PHONE`). If the user says "when I'm free",
+   size / reason, special requests. Ask for identity, or use consented host
+   context and explicitly exported settings. If the user says "when I'm free",
    compute windows: `$PY $SLOTS --source google --days N`.
 3. **Agent previews** the plan (`$PY $BOOK plan ...`) and shows the user the
    exact task + the number that will be dialed.
@@ -256,8 +266,8 @@ Notes:
 
 - The confirmation gate is **text-based and surface-agnostic** — a plain "YES"
   works on every gateway, no buttons required.
-- On Telegram/gateway, the reply auto-routes to the triggering chat. On the
-  terminal/desktop, it prints in the session.
+- The CLI prints to stdout. Returning that output to a Telegram/gateway chat
+  requires the host's delivery configuration; no routing guarantee is made here.
 - For a long call, use `--no-wait` + `status --call-id` (or a cron poller) so
   the conversation isn't blocked for minutes.
 
@@ -270,36 +280,18 @@ the dial (and calendar write) and reports back.
 
 Single booking:
 
-```
-# Spawn a sub-agent (platform-specific delegation API):
-  goal="Place the CALL-E booking and return the structured result.",
-  context=(
-    "Run this command and return the JSON `structured_result` (booked, date, "
-    "time, party_size, restaurant_name, confirmation_number):\n\n"
-    "PY=./venv/bin/python3\n"
-    "BOOK=./calle_booking.py\n"
-    "$PY $BOOK book --confirm --kind restaurant --phone \"+1...\" "
-    "--name \"Thethela Faltein\" --party-size 2 --caller-phone \"+27...\" "
-    "--email \"...\" --pretty\n\n"
-    "The script auto-loads CALLE_API_KEY from your environment file.\n"
-    "If booked=true, also create the Google Calendar event:\n"
-    "$PY <calendar-tool> "
-    "calendar create --summary \"Reservation at <name>\" --start <iso> "
-    "--end <iso> --location <name>\n\n"
-    "Return a one-line summary: place, date, time, confirmation number."
-  ),
-)
-```
+Use the host's documented delegation API to pass a plain-language task:
+run the already approved `book --confirm` command from this skill directory
+with the selected Python interpreter and `scripts/calle_booking.py`; inherit
+the explicitly exported private environment, then return the masked JSON
+output to the parent. Include all approved arguments and do not put credentials
+in the task text. Calendar writes require their own user-authorized host tool.
 
 Parallel bookings (up to 3 concurrent by default):
 
-```
-# Spawn sub-agents (platform-specific):
-  {"goal": "Book a table at <venue A>", "context": "<full command for venue A>"},
-  {"goal": "Book a table at <venue B>", "context": "<full command for venue B>"},
-  {"goal": "Book a table at <venue C>", "context": "<full command for venue C>"},
-])
-```
+Create one host task per separately approved booking only when the operator
+actually wants all bookings and the provider account permits that concurrency.
+There is no portable `delegate_task` API implemented by this skill.
 
 Rules:
 
@@ -400,7 +392,7 @@ retry with bumped parameters and a fresh idempotency key.
 - **`datetime.fromisoformat` requires seconds** — `"18:30"` raises `Invalid isoformat string`; normalize `HH:MM` → `HH:MM:00` before parsing (the `--free-slots` shorthand pads this automatically).
 - **Apple Calendar via `osascript` is TCC-gated** — on modern macOS, AppleScript automation to Calendar returns "Application isn't running" until the terminal has Automation permission (System Settings → Privacy & Security → Automation). `calendar_slots.py` handles this by degrading to "no events" (all free) with a stderr warning. `~/Library/Calendars/` may be empty for Google-only users.
 
-- **`environment auto-load in background processes** — `calle_booking.py` uses `_load_dotenv()` to read `your environment file` at startup, so `CALLE_API_KEY` and `BOOKING_PHONE` are available even when the shell didn't source it first. Some runtimes don't inherit parent exports — this ensures the key is available. Never remove this call.
+- **Background environment** — there is no `_load_dotenv()` in this script. Ensure the host passes exported `CALLE_API_KEY` to a live child process and supply `--caller-phone` explicitly. If the host does not inherit exports, configure its private environment before launching; never copy credentials into a prompt or log.
 - **Timeout ≠ call failure** — if `book` exits with "Timed out waiting for call", the call was *created* successfully (it has a `call_id`) but never reached a terminal state. Reasons include: unsupported destination region, voicemail, or no answer. The script prints the `call_id` on timeout — run `$PY $BOOK status --call-id <id>` to inspect the actual state. The explicit `create()` + `wait_for_result()` split (instead of the old `create_and_wait` one-shot) ensures `call_id` always survives a timeout.
 
 ## References
