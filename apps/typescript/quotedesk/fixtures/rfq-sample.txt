@@ -1,0 +1,15 @@
+From: Rohan Deshpande <procurement@velocity-systems.example>
+Subject: Requirement - gaming laptops for corporate order
+
+Hi,
+
+We have a confirmed requirement for 12 units of the Acer Predator Helios 16 AI,
+the RTX 5080 configuration with 32GB RAM and 2TB SSD. This is the exact model:
+
+https://www.acer.com/in-en/predator/laptops/helios/predator-helios-16-ai-ph16-74
+
+We need delivery within 2 weeks, before 2026-09-28. Please share your best price.
+
+Regards,
+Rohan Deshpande
+Velocity Systems LLP

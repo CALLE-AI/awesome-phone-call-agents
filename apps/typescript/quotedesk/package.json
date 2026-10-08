@@ -1,0 +1,25 @@
+{
+  "name": "quotedesk",
+  "version": "0.1.0",
+  "private": true,
+  "description": "RFQ-to-quote desk for trading businesses: inbound RFQ email + product URL to parallel disclosed distributor calls, configuration identity verification, and a human-approved customer quote draft.",
+  "type": "module",
+  "engines": {
+    "node": ">=20"
+  },
+  "scripts": {
+    "build": "tsc -p tsconfig.json",
+    "test": "vitest run",
+    "quotedesk": "node dist/index.js",
+    "demo": "npm run build && node dist/index.js intake --email fixtures/rfq-sample.txt && node dist/index.js run --rfq RFQ-2026-0914 && node dist/index.js quote --rfq RFQ-2026-0914 && node dist/index.js scorecard && node dist/index.js dashboard --rfq RFQ-2026-0914 && node dist/index.js verify-ledger"
+  },
+  "dependencies": {
+    "@call-e/calle": "^0.7.0",
+    "zod": "^3.23.8"
+  },
+  "devDependencies": {
+    "@types/node": "^22.5.0",
+    "typescript": "^5.6.2",
+    "vitest": "^2.1.1"
+  }
+}

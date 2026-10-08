@@ -1,0 +1,13 @@
+{
+  "market": "IN",
+  "currency": "INR",
+  "currencySymbol": "₹",
+  "distributorCurrency": "INR",
+  "fxRate": 1,
+  "customsDutyPct": 0,
+  "igstPct": 18,
+  "freightPerUnit": 800,
+  "forexBufferPct": 0.5,
+  "marginPct": 8,
+  "whyPhone": "Portal price is never the real price: special bid, deal registration, allocation on constrained SKUs, volume asks, and honest backorder ETAs are all phone conversations. The sub-distributor tier Indian trading houses actually buy from has no portal at all."
+}
