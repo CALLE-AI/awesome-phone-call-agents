@@ -6,17 +6,19 @@
     "id": "call_fixture_booked_001",
     "status": "completed",
     "task": "Synthetic offline example: report the outcome supported by the fictional call evidence.",
-    "task_completed": true,
-    "evidence": [
-      "Synthetic evidence: the fictional business explicitly confirmed the requested booking."
-    ],
     "metadata": {
       "workflow": "webhook-result-receiver",
       "workflow_id": "workflow_fixture_booked"
     },
-    "structured_result": {
+    "object": "call",
+    "phone": "+12025550123",
+    "result": {
       "outcome": "booked",
       "outcome_evidence": "Synthetic evidence: the fictional business explicitly confirmed the requested booking."
-    }
+    },
+    "result_status": "available",
+    "call_outcome": "completed",
+    "error": null,
+    "transcript": []
   }
 }

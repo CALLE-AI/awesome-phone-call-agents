@@ -29,7 +29,7 @@ def test_all_outcomes_replay_offline_and_keep_delivery_separate(
     for case in CASES:
         path = APP / "fixtures" / f"call-{case}.json"
         event = json.loads(path.read_text())
-        result = event["data"]["structured_result"]
+        result = event["data"]["result"]
         if result is not None:
             assert set(result) == set(schema["required"])
             assert all(isinstance(value, str) for value in result.values())
@@ -62,7 +62,7 @@ def test_missing_or_invalid_evidence_never_becomes_a_business_answer():
     valid = {"outcome": "booked", "outcome_evidence": "Synthetic confirmation."}
     for status in ("queued", "in_progress", "failed", "canceled"):
         assert (
-            outcomes.application_outcome({"status": status, "structured_result": valid})
+            outcomes.application_outcome({"object": "call", "status": status, "result_status": "available", "result": valid})
             == "unknown"
         )
     for result in (
@@ -80,7 +80,7 @@ def test_missing_or_invalid_evidence_never_becomes_a_business_answer():
     ):
         assert (
             outcomes.application_outcome(
-                {"status": "completed", "structured_result": result}
+                {"object": "call", "status": "completed", "result_status": "available", "result": result}
             )
             == "unknown"
         )

@@ -22,8 +22,20 @@ ACTIONS = {
 
 def application_outcome(call: dict) -> str:
     """Interpret this demo's result schema after API verification in live use."""
-    result = call.get("structured_result")
-    if call.get("status") != "completed" or not isinstance(result, dict):
+    if (
+        call.get("object") != "call"
+        or call.get("status") != "completed"
+        or call.get("error") is not None
+    ):
+        return "unknown"
+    result = call.get("result")
+    if (
+        call.get("call_outcome") == "no_answer"
+        and call.get("result_status") == "unavailable"
+        and result is None
+    ):
+        return "unanswered"
+    if call.get("result_status") != "available" or not isinstance(result, dict):
         return "unknown"
     if set(result) != {"outcome", "outcome_evidence"}:
         return "unknown"
