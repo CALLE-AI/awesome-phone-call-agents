@@ -214,7 +214,7 @@ export const LivePhoneCallModal: React.FC<LivePhoneCallModalProps> = ({
 
             <div className="pt-2 border-t border-slate-800/80 text-[10px] text-amber-300/80 leading-relaxed font-mono">
               <span className="font-bold uppercase tracking-wider block text-amber-400">Accepted-Call Cancellation Limits:</span>
-              Once an outbound call is answered by the callee and carrier signaling connects, in-flight carrier audio cannot be revoked mid-call over the telecom network. Engaging the Kill Switch locks downstream ERP dispatch and simulated release token generation immediately.
+              The Kill Switch rejects new dispatch requests. This demo does not cancel an accepted provider call; an in-flight run may finish and publish its simulated certificate or token. No real ERP or financial mutation is performed.
             </div>
           </div>
 

@@ -81,7 +81,7 @@ All phone-bearing provider, transcript, error, certificate, audit, and CLI displ
 Failed or ambiguous live carrier calls (network timeouts, carrier drops, or silence) remain in `GATEKEEPER_HOLD` with `status: UNKNOWN_NO_RECORD`. VaultCall refuses to invent callee speech or generate successful fixture certificates for incomplete live carrier attempts.
 
 ### 5. Accepted-Call Cancellation Limits & Kill Switch Scope
-Once an outbound telephone call is answered on the PSTN and carrier signaling connects, in-flight carrier audio cannot be revoked mid-call over telephony protocols. The emergency kill switch operates strictly at the application boundary: it rejects new dispatch requests and blocks subsequent simulated release token generation, but does not provide immediate revocation or cancellation of telephony audio frames already in-flight across carrier networks.
+This demo does not implement provider-side cancellation of an accepted call. The emergency kill switch rejects new dispatch requests, but an already-running call may finish and publish its simulated certificate or release token. It does not revoke those in-flight results, stop carrier audio, or perform a real ERP or financial mutation.
 
 ### 6. Advisory / Simulated Control Scope
 VaultCall is a demo simulation of an advisory pre-execution defense architecture. All ERP payment holds, fraud freezes, and generated release tokens are simulated internal control proofs designed for human controller review. No real ERP integrations, live banking wire executions, production treasury mutations, or automated telecom cancellation infrastructure are implemented or guaranteed.

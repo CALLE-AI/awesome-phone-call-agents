@@ -117,7 +117,7 @@ export const CertificateModal: React.FC<CertificateModalProps> = ({
               • <strong>Simulated Proofs:</strong> VaultCall generates evidence-linked reference tokens for upstream corporate ERP/treasury review. This system does not initiate or execute automated wire fund transfers.
             </p>
             <p>
-              • <strong>Carrier Cancellation Limits:</strong> Once an outbound telecom call is answered on the PSTN, in-flight carrier audio cannot be revoked mid-call. Engaging the Kill Switch locks downstream application dispatch and simulated token issuance immediately.
+              • <strong>Cancellation Limits:</strong> The Kill Switch rejects new dispatch requests. This demo does not cancel an accepted provider call; an in-flight run may finish and publish its simulated certificate or token. No real ERP or financial mutation is performed.
             </p>
           </div>
 
