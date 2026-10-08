@@ -138,6 +138,8 @@ def submit(database, workflow_id, client, *, recover_unknown=False):
                 "Outside the saved calling window. Do not replace an uncertain call."
             )
         request = json.loads(row["request_json"])
+        if "phone" not in request:
+            raise WorkflowError("Legacy saved request; use its original SDK and API.")
         webhook = request.get("webhook_url")
         if webhook and not is_public_https_webhook_url(
             webhook, resolver=default_resolver
@@ -185,21 +187,20 @@ def resume(database, workflow_id, client):
         raise WorkflowError(
             "No saved Call ID. Inspect the submission state; resume never creates calls."
         )
-    snapshot = client.calls.get(row["call_id"])
     request = json.loads(row["request_json"])
+    if "phone" not in request:
+        raise WorkflowError("Legacy saved request; use its original SDK and API.")
+    snapshot = client.calls.get(row["call_id"])
     if not isinstance(snapshot, dict):
         raise TypeError("Invalid call response.")
     metadata = snapshot.get("metadata")
-    recipients = snapshot.get("recipients")
     if (
-        snapshot.get("id") != row["call_id"]
+        snapshot.get("object") != "call"
+        or snapshot.get("id") != row["call_id"]
         or not isinstance(metadata, dict)
         or metadata.get("workflow") != request["metadata"]["workflow"]
         or metadata.get("workflow_id") != workflow_id
-        or not isinstance(recipients, list)
-        or len(recipients) != 1
-        or not isinstance(recipients[0], dict)
-        or recipients[0].get("phones") != [request["recipient"]["phone"]]
+        or snapshot.get("phone") != request["phone"]
     ):
         raise WorkflowError(
             "Call ID, workflow or destination does not match the saved intent."
@@ -207,7 +208,10 @@ def resume(database, workflow_id, client):
     status = snapshot.get("status")
     if status not in CALL_STATUSES:
         raise WorkflowError("Unknown call status; no business update made.")
-    if status in {"queued", "in_progress"}:
+    result_status = snapshot.get("result_status")
+    if result_status not in {"pending", "available", "unavailable", "not_applicable"}:
+        raise WorkflowError("Unknown result status; no business update made.")
+    if status in {"queued", "in_progress"} or result_status == "pending":
         return row
     outcome = application_outcome(snapshot)
     with connect(database) as connection:
@@ -306,9 +310,10 @@ def main(argv=None):
             result = summary(row)
             if args.action == "submit":
                 result["preview"] = True
-                result["phone"] = mask_phone(
-                    json.loads(row["request_json"])["recipient"]["phone"]
-                )
+                request = json.loads(row["request_json"])
+                if "phone" not in request:
+                    raise WorkflowError("Legacy saved request; use its original SDK and API.")
+                result["phone"] = mask_phone(request["phone"])
         else:
             if args.action == "submit" and not args.confirm_authorized_recipient:
                 parser.error("--execute requires --confirm-authorized-recipient.")

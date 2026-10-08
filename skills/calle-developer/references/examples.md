@@ -7,11 +7,13 @@ the application or load unrelated source files.
 | --- | --- |
 | Minimal TypeScript or Python SDK usage | [Integrations SDK quickstart](https://github.com/CALLE-AI/call-e-integrations/blob/main/README.md#sdk) and [SDK guide](https://docs.heycall-e.com/sdks.md) |
 | Python SDK inputs versus HTTP serialization | [Calls request builder](https://github.com/CALLE-AI/server-sdk-python/blob/main/src/calle/calls.py); use the installed version's source when it differs from main |
-| Runnable create, save, resume and error handling | [Calls quickstart](https://docs.heycall-e.com/quickstart.md) and its [Python example](https://github.com/CALLE-AI/calle-docs/blob/main/examples/calls.py) |
+| Runnable create, save, resume and error handling | [Calls quickstart](https://docs.heycall-e.com/quickstart.md) and its [Python example](https://github.com/CALLE-AI/calle-docs/blob/main/examples/v2/calls.py) |
 | Receive and verify terminal results | [Webhook receiver](https://github.com/CALLE-AI/awesome-phone-call-agents/tree/main/apps/python/webhook-result-receiver) |
 | Save intent, recover after restart and update application state | The receiver's [workflow.py](https://github.com/CALLE-AI/awesome-phone-call-agents/blob/main/apps/python/webhook-result-receiver/workflow.py), [dependency manifest](https://github.com/CALLE-AI/awesome-phone-call-agents/blob/main/apps/python/webhook-result-receiver/pyproject.toml) and [production workflow guide](https://github.com/CALLE-AI/awesome-phone-call-agents/blob/main/docs/production-workflows.md) |
 
-Read each example's setup and pinned dependencies. An example's tested package
+The runnable Calls examples and webhook receiver use Calls V2 and Python SDK
+1.0.1. Read each example's setup and pinned dependencies. An example's tested
+package
 version is not a promise that it is the latest release. Do not apply the SDK
 guide's version to a different example: read that example's dependency manifest
 or say its version was not checked. Preserve its documented
@@ -28,8 +30,8 @@ source reads and output, not just whether it says it followed the skill.
    and uses `oneOf` in its result schema. Explain the changes using current
    sources; do not run a call."
    Check that it distinguishes HTTP from SDK compatibility inputs, checks the
-   installed SDK version, reads the Calls/OpenAPI contract and supported schema
-   rules, and does not claim an unrun request was tested.
+   installed SDK version, rejects removed recipient aliases for Calls V2, reads
+   the Calls/OpenAPI contract and supported schema rules, and does not claim an unrun request was tested.
 2. **Restart recovery:** "Our Python worker lost the create response, and another
    worker saved a Call ID but crashed before updating the order. Show how to
    recover both cases using an existing example. Do not dial."

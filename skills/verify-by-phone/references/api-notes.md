@@ -1,53 +1,44 @@
 # CALL-E API Notes For Verification Workflows
 
-Empirically observed behaviors this skill relies on, recorded from live testing in July 2026. Where the observed API differs from documentation, the observation is stated plainly so the skill keeps working.
+This skill uses published `calle-ai==1.0.1` and the [Calls V2 contract](https://docs.heycall-e.com/api-reference/calls). See the [migration guide](https://docs.heycall-e.com/migration) when adapting an existing V1 integration.
 
-## Terminal payload shape (observed live)
+## Request and response
 
-`GET /v1/calls/{id}` returns a snake_case `call_task` object. The fields that matter for verification:
+`POST /v2/calls` takes one E.164 `phone`, `task`, a required `Idempotency-Key`, and a closed, flat `result_schema`. The schema supports scalar fields; nested objects, arrays and nullable fields are unsupported. The script supplies three string fields for organization confirmation, accepting-new-patients status and plan participation. Optional region and locale are omitted so the service can infer them. Keep them omitted on retries.
+
+A `202` response means durable acceptance. It does not prove the phone connected or that the directory information was verified. Save the response's API `id` for `GET /v2/calls/{id}`; `call_id` is a separate telephone identifier for Billing and can be null.
+
+The fields used by this workflow are:
 
 ```text
-status                        queued | completed | failed | canceled
-task_completed                boolean, whether the stated goal was achieved
-completion_confidence         {score: float, label: string}
-evidence                      list of short claim strings about the call
-summary                       human-readable outcome summary
-recipients[].attempts[].transcript_turns[]
-                              {offset_seconds, speaker: bot|user, text}
-recipients[].structured_result   null unless a result schema was applied
+status          queued | in_progress | completed | failed | canceled
+call_outcome    completed | no_answer | busy | declined | null
+result_status   pending | available | unavailable | not_applicable
+result          schema-valid object, or null
+transcript[]    {offset_seconds: integer|null, speaker: bot|user|unknown, text: string}
+error           technical error object, or null
 ```
 
-`transcript_turns` is the extraction surface: per-turn speaker labels with second offsets, which is what makes span grounding and audio-synchronized highlighting possible.
+Poll only while `result_status` is `pending`. Execution may already be `completed` while the result is still pending. `unavailable` means no schema-valid business result was produced; `not_applicable` covers cancellation and technical execution failure. No-answer, busy and declined calls need not have a technical error.
 
-## Result schema parameters (observed rejection)
+`extract_answer.py` uses the top-level `transcript`, independently of `result`. Provider-extracted fields are not evidence for its span-grounded verdict. Empty transcripts produce explicit abstentions. A V2 transcript containing an `unknown` speaker makes the entire call abstain: the extractor cannot attribute that turn to the respondent. The original payload and turn order are retained unchanged. Previously saved V1 payloads with `recipients[].attempts[].transcript_turns` remain readable, so old evidence does not require another call.
 
-As of late July 2026 the live API rejects both `result_schema` and `recipient_result_schema` on `POST /v1/calls` with "... is not supported", even though the Python SDK exposes both parameters. This skill therefore never depends on provider-side structured results: extraction happens client-side from the transcript, which also keeps every answer span-grounded. If the schema parameters start working, note that `summary` is a reserved field name inside `recipient_result_schema` and will be rejected; use `notes`.
+## Idempotency and local state
 
-## Idempotency
+Each logical call needs one immutable request and one stable key. Replaying the same request and key returns the original API Call ID and its current saved state without preparing or dialing again. Changing the request with the same key produces `409 idempotency_conflict`. A `creation_in_progress` conflict means back off and replay the unchanged request with the original key; do not generate a new one.
 
-`Idempotency-Key` on call creation is honored: resubmitting with the same key returns the same call instead of dialing twice.
+`place_verify_call.py` initially derives a key from the organization, phone, claims and UTC date, or accepts `--idempotency-key`. Before sending, it saves that key and the full request in the `--state` file (default `verify-call.json`, mode 0600). After acceptance it saves the API `id` there too. Subsequent runs reuse the saved key, even across the date boundary, and reject input that differs from the saved request.
 
-`place_verify_call.py` derives its key from the verification itself, `sha256(org, phone, claims, UTC date)`, rather than generating a random one per run. This matters because the natural recovery from a lost response is to run the same command again, and with a random key that dials a real office a second time. A derived key makes the obvious recovery the safe one.
-
-The key is scoped to a single UTC day on purpose. A key derived from the parameters alone would be permanent, so re-verifying the same listing next month would silently return last month's answer, and for this tool a stale cached result is a worse failure than a duplicate call.
-
-Two consequences worth knowing:
-
-- The key is printed **before** the request is sent, not after it succeeds. A key first disclosed in the success response is useless in the exact situation it exists for.
-- A call placed at 23:59 UTC and retried at 00:01 derives a different key. Pass `--idempotency-key <printed key>` to retry with the exact key regardless of the boundary. The failure message prints that flag with the key already filled in.
+After a timeout or uncertain response, retain the state file and retry with the same arguments. A known Call ID can instead be polled directly. For an intentionally new call, use a new state path and fresh `--idempotency-key` after resolving any uncertain prior acceptance; the default key deduplicates identical same-day requests. Both state and result files contain the unmasked phone number; delete them when the verification is recorded and retry recovery is no longer needed.
 
 ## Webhooks
 
-The platform changelog dated 2026-07-29 ("Terminal webhook delivery") states that call tasks with `webhook_url` now send terminal event notifications, retried on non-2xx responses, carrying a `CALL-E-Event-Id` header for deduplication. Current deliveries are UNSIGNED: no webhook secret, no `CALL-E-Timestamp`, no `CALL-E-Signature`, and the SDK's `verify`/`unwrap` helpers are deprecated as of 0.6.0 ("current CALL-E webhooks are unsigned... must not be used to parse current deliveries").
+Current CALL-E webhooks are unsigned. Treat a delivery as an untrusted wake-up signal, then fetch `GET /v2/calls/{id}` with your API key before processing a result. The SDK's legacy signature helpers do not authenticate current deliveries. See the [webhook guide](https://docs.heycall-e.com/webhooks).
 
-The security consequence is direct: an unsigned delivery proves nothing about its sender. Treat any webhook receiver as a public, untrusted-input boundary and never write call results from a webhook body. Use the delivery only as a wake-up signal: read the call id, fetch `GET /v1/calls/{call_id}` with your API key, and act on that authoritative snapshot. The platform docs recommend exactly this re-fetch before any sensitive side effect. Polling that endpoint remains the authoritative terminal path either way.
+This skill polls instead of running a receiver. Terminal notifications follow result readiness, including unavailable results.
 
-History, because older notes and examples still describe the signed scheme: during our integration window (verified 2026-07-25 with a public tunnel on a completed call) `webhook_url` was accepted silently and nothing was delivered; delivery went live with the 2026-07-29 change. Earlier SDK versions shipped an HMAC-SHA256 verifier over `timestamp + "." + raw_body` that checked the signature but not timestamp freshness, so a legacy integration still running its own compatible signing layer must enforce a replay window over the exact raw bytes itself.
+## Cancellation and billing
 
-## Billing behaviors relevant to verification runs
+Calls V2 exposes cancellation before provider submission through `client.calls.cancel(id)`. Once submission starts, cancellation returns `409 call_cannot_cancel`; it does not hang up an active call. Stopping local polling does not cancel the call. See [Cancel Call](https://docs.heycall-e.com/api-reference/calls).
 
-As of September 22, 2026, the [pricing FAQ](https://www.heycall-e.com/) describes a Call Fee plus a Success Fee, with call usage measured in 10-second increments. No-answer calls and failed routes may still incur preparation or pre-connection Call Fees. The Success Fee applies only when the task's defined business goal is achieved; voicemail incurs it only when successfully leaving a message is the defined goal. Check [Dashboard billing](https://dashboard.heycall-e.com/account/billing) for actual charges rather than estimating savings from unanswered calls or confidence labels.
-
-## Capabilities to not assume
-
-No call cancellation, no inbound answering, no mid-call developer tool use, no real-time transcript streaming. DTMF phone-tree navigation exists platform-side but is not yet generally available; do not build verification flows that require reliable IVR traversal.
+Use [Dashboard Billing](https://dashboard.heycall-e.com/account/billing) for actual charges. Execution completion, confidence labels and result availability are not billing receipts.

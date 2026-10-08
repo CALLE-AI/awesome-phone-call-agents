@@ -1,6 +1,6 @@
 # Examples
 
-All phone numbers below are reserved fictional numbers. Every example except the live-call step runs with no credentials and no network.
+Literal phone numbers below are fictional and must not be dialed. Calibration, extraction, reconciliation and dry runs work offline. Creating and polling a real call require `calle-ai==1.0.1` and `CALLE_API_KEY`.
 
 ## Example 1: dry run, then a live verification call
 
@@ -15,10 +15,20 @@ python3 scripts/place_verify_call.py \
 Prints the full disclosure-first task text and the masked recipient, dials nothing. When the task reads right:
 
 ```bash
-export CALLE_API_KEY=your-key
-python3 scripts/place_verify_call.py ... --live
+python3 -m pip install calle-ai==1.0.1
+# Set CALLE_API_KEY privately. VERIFY_ORG and VERIFY_PHONE must name the
+# published organizational line the operator has specifically authorized.
+python3 scripts/place_verify_call.py \
+  --org "$VERIFY_ORG" --phone "$VERIFY_PHONE" \
+  --claim-accepting-new-patients yes --claim-plan "Example Health PPO" \
+  --state verify-call.json --live
+# Replace call_abc123 with the API id printed by creation.
 python3 scripts/poll_result.py --call-id call_abc123 --out result.json
 ```
+
+Creation saves the request and key before sending. For a retry, use the same state file and unchanged arguments; a timeout may still mean the call was accepted. Poll the saved API `id` instead of creating another call when it is known. Polling waits for `result_status` to leave `pending`, even after `status` becomes `completed`.
+
+Use a new `--state` path and fresh `--idempotency-key` for each intentionally new call; identical same-day requests otherwise share the derived key. State and result files contain unmasked phone numbers and must stay private.
 
 ## Example 2: extraction with a supporting span
 

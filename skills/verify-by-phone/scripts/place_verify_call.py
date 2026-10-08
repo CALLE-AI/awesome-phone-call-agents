@@ -3,19 +3,41 @@
 
 Dry run prints the exact task text and a masked recipient, dials nothing, and
 needs no credentials. Pass --live (with CALLE_API_KEY set) to actually dial.
-Exactly one call per live invocation; there is no batch mode on purpose.
+At most one new call per live invocation; retries reuse the saved request.
 """
 
 from __future__ import annotations
 
 import argparse
 import hashlib
+import json
 import os
 import re
 import sys
 from datetime import datetime, timezone
 
-E164 = re.compile(r"^\+[1-9]\d{6,14}$")
+from poll_result import write_payload
+
+E164 = re.compile(r"\+[1-9][0-9]{7,14}")
+RESULT_SCHEMA = {
+    "type": "object",
+    "additionalProperties": False,
+    "properties": {
+        "organization_confirmation": {
+            "type": "string",
+            "description": "Respondent's confirmation or denial of the named organization, or unknown.",
+        },
+        "accepting_new_patients": {
+            "type": "string",
+            "description": "yes, no, or unknown; unknown if not asked or not clearly answered.",
+        },
+        "accepts_plan": {
+            "type": "string",
+            "description": "yes, no, or unknown for the named plan; unknown if not asked or answered.",
+        },
+    },
+    "required": ["organization_confirmation", "accepting_new_patients", "accepts_plan"],
+}
 
 
 # Must stay byte-identical to CALL_CONDUCT in backend/app/runs.py. This file is
@@ -87,30 +109,32 @@ def utc_day() -> str:
 def default_idempotency_key(
     org: str, phone: str, accepting: str | None, plan: str | None, day: str
 ) -> str:
-    """Derive the key from the verification itself, scoped to one UTC day.
-
-    A random key per invocation is the dangerous default for a tool that dials
-    real phone numbers. If the create request times out, the operator does not
-    know whether the call was placed, and the obvious recovery, running the
-    same command again, generates a NEW key and dials a real office a second
-    time. Deriving the key from the request makes the obvious recovery the safe
-    one: an identical re-run collides with the original and the platform
-    returns the first call instead of placing another.
-
-    The day scope is deliberate. A key derived from the parameters alone would
-    be permanent, so re-verifying the same listing next month would silently
-    return last month's answer. For a tool whose entire claim is that it never
-    presents an unestablished answer as established, a stale cached result is a
-    worse failure than a duplicate call. The retry hazard lasts minutes; a
-    legitimate re-verification comes days or months later, so a UTC-day
-    boundary separates them.
-
-    It is not airtight: a call placed at 23:59 UTC and retried at 00:01 gets a
-    different key. That is why the key is printed BEFORE the request and why
-    --idempotency-key exists, so a retry can always reuse the exact key.
-    """
+    """Derive an initial key; saved --state takes precedence on every retry."""
+    # ponytail: daily deduplication; pass a fresh --idempotency-key for a same-day repeat.
     material = "\x00".join([org.strip().lower(), phone.strip(), accepting or "", plan or "", day])
     return "verify-" + hashlib.sha256(material.encode("utf-8")).hexdigest()[:24]
+
+
+def prepare_state(path: str, request: dict, key: str, explicit_key: str | None) -> dict:
+    """Persist the original input before sending; an existing file is a retry."""
+    try:
+        fd = os.open(path, os.O_WRONLY | os.O_CREAT | os.O_EXCL, 0o600)
+    except FileExistsError:
+        os.chmod(path, 0o600)
+        with open(path, encoding="utf-8") as handle:
+            state = json.load(handle)
+        saved_key = state["idempotency_key"]
+        if not isinstance(saved_key, str) or not 1 <= len(saved_key.strip()) <= 255:
+            raise ValueError("saved idempotency key is invalid")
+        if state["request"] != request or (
+            explicit_key is not None and state["idempotency_key"] != explicit_key
+        ):
+            raise ValueError("state belongs to different input; use a different --state for a new call")
+        return state
+    state = {"idempotency_key": key, "request": request}
+    with os.fdopen(fd, "w", encoding="utf-8") as handle:
+        json.dump(state, handle, indent=2)
+    return state
 
 
 def main() -> None:
@@ -121,6 +145,10 @@ def main() -> None:
     parser.add_argument("--claim-plan", default=None, help="Insurance plan name to verify")
     parser.add_argument("--live", action="store_true", help="Actually place the call")
     parser.add_argument(
+        "--state", default="verify-call.json",
+        help="Private saved request and Call ID. Reuse for retries; new calls need a new path and key.",
+    )
+    parser.add_argument(
         "--idempotency-key",
         default=None,
         help=(
@@ -130,8 +158,10 @@ def main() -> None:
     )
     args = parser.parse_args()
 
-    if not E164.match(args.phone):
+    if not E164.fullmatch(args.phone):
         sys.exit("ERROR: --phone must be E.164, for example +15550101234")
+    if args.idempotency_key is not None and not 1 <= len(args.idempotency_key.strip()) <= 255:
+        sys.exit("ERROR: --idempotency-key must contain 1-255 characters after trimming.")
 
     # Refuse a call that cannot produce a result. With neither claim supplied
     # the task used to fall back to asking "whether the published listing
@@ -156,10 +186,25 @@ def main() -> None:
         args.claim_plan,
         utc_day(),
     )
+    request = {
+        "task": task,
+        "phone": args.phone,
+        "result_schema": RESULT_SCHEMA,
+        "metadata": {"skill": "verify-by-phone", "org": args.org},
+    }
+    if args.live:
+        try:
+            state = prepare_state(args.state, request, idempotency_key, args.idempotency_key)
+        except (OSError, ValueError, KeyError, TypeError) as exc:
+            sys.exit(
+                f"ERROR: cannot prepare {args.state}: {exc}\n"
+                "If this is a retry, keep the original state and key; do not delete them to retry."
+            )
+        idempotency_key = state["idempotency_key"]
     print(f"recipient: {mask(args.phone)}")
     # Printed BEFORE the request on purpose. If the create call times out, the
     # operator still has the key and can retry without risking a second dial.
-    print(f"idempotency key: {idempotency_key}")
+    print(f"idempotency key: {idempotency_key}", flush=True)
     print(f"task:\n{task}\n")
 
     if not args.live:
@@ -172,16 +217,11 @@ def main() -> None:
     try:
         from calle import CalleClient
     except ImportError:
-        sys.exit("ERROR: pip install calle-ai (the package installs as module 'calle').")
+        sys.exit("ERROR: pip install calle-ai==1.0.1 (the package installs as module 'calle').")
 
     try:
         with CalleClient(api_key=api_key) as client:
-            created = client.calls.create(
-                task=task,
-                recipient={"phone": args.phone},
-                metadata={"skill": "verify-by-phone", "org": args.org},
-                idempotency_key=idempotency_key,
-            )
+            created = client.calls.create(**state["request"], idempotency_key=idempotency_key)
     except Exception as exc:
         # Deliberately broad: any failure at all leaves the call's fate unknown,
         # and a narrower catch would let some of them escape as a traceback with
@@ -190,13 +230,18 @@ def main() -> None:
         # and placed the call before the response was lost. Re-running blind
         # would dial a real office twice, so spell out the safe recovery.
         sys.exit(
-            f"ERROR: the create request failed: {exc}\n"
+            f"ERROR: the create request failed: {str(exc).replace(args.phone, mask(args.phone))}\n"
             "The call MAY ALREADY HAVE BEEN PLACED. Do not re-run this command blind.\n"
-            "Retry with the same key, which cannot place a second call:\n"
-            f"  --idempotency-key {idempotency_key}"
+            "Retry with the same --state, unchanged input, and the original key:\n"
+            f"  --state {args.state} --idempotency-key {idempotency_key}"
         )
-    print(f"call created: id={created.get('id')} status={created.get('status')}")
-    print("next: python3 scripts/poll_result.py --call-id", created.get("id"))
+    if not isinstance(created.get("id"), str) or not created["id"]:
+        sys.exit("ERROR: response has no Call ID. Keep --state and retry unchanged; acceptance is uncertain.")
+    print(f"call accepted: id={created['id']} status={created.get('status')}", flush=True)
+    state["id"] = created["id"]
+    write_payload(state, args.state)
+    print(f"saved request and API Call ID to {args.state} (mode 0600)")
+    print("next: python3 scripts/poll_result.py --call-id", created["id"])
 
 
 if __name__ == "__main__":

@@ -6,17 +6,16 @@
     "id": "call_fixture_unanswered_001",
     "status": "completed",
     "task": "Synthetic offline example: report the outcome supported by the fictional call evidence.",
-    "task_completed": false,
-    "evidence": [
-      "Synthetic call evidence: ringing ended without an answer."
-    ],
     "metadata": {
       "workflow": "webhook-result-receiver",
       "workflow_id": "workflow_fixture_unanswered"
     },
-    "structured_result": {
-      "outcome": "unanswered",
-      "outcome_evidence": "Synthetic call evidence: ringing ended without an answer."
-    }
+    "object": "call",
+    "phone": "+12025550123",
+    "result": null,
+    "result_status": "unavailable",
+    "call_outcome": "no_answer",
+    "error": null,
+    "transcript": []
   }
 }

@@ -1,0 +1,23 @@
+{
+  "id": "evt_fixture_canceled_001",
+  "type": "call.canceled",
+  "created_at": "2026-01-15T11:00:00Z",
+  "data": {
+    "id": "call_fixture_canceled_001",
+    "status": "canceled",
+    "created_at": "2026-01-15T10:59:00Z",
+    "completed_at": "2026-01-15T11:00:00Z",
+    "task": "Synthetic privacy task canceled before dialing.",
+    "transcript": [],
+    "metadata": {
+      "workflow": "webhook-result-receiver",
+      "workflow_id": "workflow_fixture_canceled"
+    },
+    "object": "call",
+    "phone": "+12025550123",
+    "result": null,
+    "result_status": "not_applicable",
+    "call_outcome": null,
+    "error": null
+  }
+}
