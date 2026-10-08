@@ -323,8 +323,8 @@ Ask the provider these four questions, one at a time, and wait for a clear answe
         {
             idempotencyKey:
                 `vaxconnect-availability-${Date.now()}-${Math.random()
-    .toString(36)
-    .slice(2)}`,
+                    .toString(36)
+                    .slice(2)}`,
         }
     );
 }
@@ -615,13 +615,13 @@ export async function POST(
                 liveResult.available,
 
                 price:
-                liveResult.price,
+                    maskSensitiveText(liveResult.price),
 
                 appointment_required:
-                liveResult.appointment_required,
+                    maskSensitiveText(liveResult.appointment_required),
 
                 earliest_availability:
-                liveResult.earliest_availability,
+                    maskSensitiveText(liveResult.earliest_availability),
 
                 source:
                     "CALL-E VERIFIED" as const,
