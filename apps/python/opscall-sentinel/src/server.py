@@ -378,113 +378,58 @@ async def register_tenant(config: TenantConfig, auth: bool = Depends(verify_loop
 @app.post("/api/v1/tenants/{tenant_id}/dispatch", response_model=DispatchLeadResponse)
 async def dispatch_tenant_lead(tenant_id: str, request: DispatchLeadRequest, auth: bool = Depends(verify_loopback_or_auth)) -> DispatchLeadResponse:
     """
-    Unified entry point for n8n workflows, Twenty CRM webhooks, or lead gen forms.
-    Triggers an autonomous voice call customized for the specific tenant and client.
+    Unified entry point for tenant lead flows and workflow fixtures.
+    In this demo environment, tenant lead dispatch is strictly simulation-only with external mutations disabled.
     """
     tenant = tenant_registry.get_tenant(tenant_id)
     if not tenant:
         raise HTTPException(status_code=404, detail=f"Tenant '{tenant_id}' not found")
 
+    # Disable unfinished live branch: prohibit fabricating execution or mutating external systems without bridge
+    if not request.is_simulation:
+        raise HTTPException(
+            status_code=501,
+            detail="Live tenant lead dispatch is disabled in this demo environment. Tenant lead dispatch is simulation-only with external mutations disabled."
+        )
+
     task_id = f"call_{tenant.vertical}_{int(time.time() * 1000) % 1000000}"
-    
-    # Enforce simulation vs live execution boundary
-    is_simulation = (settings.calle_mode != "live") or request.is_simulation
+    status = "SIMULATED"
+    verified = False
+    duration = 0.0
+    spoken_intent = "Simulation mode: No phone call placed."
+    summary = f"Simulated lead dispatch fixture for {request.customer_name} ({tenant.vertical}). No live telephony executed."
+    audit_hash = hashlib.sha256(f"{tenant_id}|{request.lead_id}|{task_id}|SIMULATED".encode()).hexdigest()
 
-    if is_simulation:
-        # Zero fabrication in simulation: mark explicitly as SIMULATED with verified=False
-        status = "SIMULATED"
-        verified = False
-        dtmf = None
-        duration = 0.0
-        spoken_intent = "Simulation mode: No phone call placed."
-        summary = f"Simulated lead dispatch fixture for {request.customer_name} ({tenant.vertical}). No live telephony executed."
-        audit_hash = hashlib.sha256(f"{tenant_id}|{request.lead_id}|{task_id}|SIMULATED".encode()).hexdigest()
+    callback_payload = CRMCallbackPayload(
+        tenant_id=tenant_id,
+        lead_id=request.lead_id,
+        task_id=task_id,
+        status=status,
+        duration_seconds=duration,
+        callee_name=request.customer_name,
+        callee_phone=mask_phone(request.customer_phone),
+        verified=verified,
+        dtmf_key_pressed=None,
+        spoken_intent=spoken_intent,
+        transcript_summary=summary,
+        audit_hash=audit_hash,
+        is_simulated=True
+    )
 
-        callback_payload = CRMCallbackPayload(
-            tenant_id=tenant_id,
-            lead_id=request.lead_id,
-            task_id=task_id,
-            status=status,
-            duration_seconds=duration,
-            callee_name=request.customer_name,
-            callee_phone=mask_phone(request.customer_phone),
-            verified=verified,
-            dtmf_key_pressed=dtmf,
-            spoken_intent=spoken_intent,
-            transcript_summary=summary,
-            audit_hash=audit_hash,
-            is_simulated=True
-        )
+    # 1. Sync to local resilient buffer only (external sync disabled for simulation)
+    await twenty_crm.log_call_activity(callback_payload)
 
-        # 1. Sync to local resilient buffer only (external sync disabled for simulation)
-        await twenty_crm.log_call_activity(callback_payload)
-
-        # 2. External webhook callbacks disabled by default in simulation mode.
-        # Requires separate explicit mutation intent: allow_external_callbacks=True AND is_simulation=False
-        if request.allow_external_callbacks and not request.is_simulation:
-            cb_url = request.callback_url or tenant.webhook_callback_url
-            if cb_url:
-                await n8n_dispatcher.dispatch_callback(cb_url, callback_payload)
-
-        return DispatchLeadResponse(
-            success=True,
-            task_id=task_id,
-            lead_id=request.lead_id,
-            status=status,
-            callee=request.customer_name,
-            phone=mask_phone(request.customer_phone),
-            message=f"Simulation mode: Lead recorded to local buffer for {tenant.client_name}. External callbacks disabled.",
-            is_simulated=True
-        )
-    else:
-        # Live mode: Must enforce authorized live recipient whitelist and valid ASCII E.164 destination
-        validated_phone = validate_ascii_e164(request.customer_phone, allow_synthetic=False)
-        if not is_authorized_live_recipient(validated_phone):
-            raise HTTPException(
-                status_code=400,
-                detail=f"Destination '{mask_phone(validated_phone)}' is not in the authorized live recipient pool for live calls."
-            )
-        
-        status = "COMPLETED"
-        verified = True
-        dtmf = "1"
-        duration = 21.4
-        spoken_intent = f"Customer confirmed {tenant.vertical} details."
-        summary = f"Voice agent completed live verification for {request.customer_name}."
-        audit_hash = hashlib.sha256(f"{tenant_id}|{request.lead_id}|{task_id}|{verified}".encode()).hexdigest()
-
-        callback_payload = CRMCallbackPayload(
-            tenant_id=tenant_id,
-            lead_id=request.lead_id,
-            task_id=task_id,
-            status=status,
-            duration_seconds=duration,
-            callee_name=request.customer_name,
-            callee_phone=mask_phone(validated_phone),
-            verified=verified,
-            dtmf_key_pressed=dtmf,
-            spoken_intent=spoken_intent,
-            transcript_summary=summary,
-            audit_hash=audit_hash,
-            is_simulated=False
-        )
-
-        await twenty_crm.log_call_activity(callback_payload)
-
-        cb_url = request.callback_url or tenant.webhook_callback_url
-        if cb_url:
-            await n8n_dispatcher.dispatch_callback(cb_url, callback_payload)
-
-        return DispatchLeadResponse(
-            success=True,
-            task_id=task_id,
-            lead_id=request.lead_id,
-            status=status,
-            callee=request.customer_name,
-            phone=mask_phone(validated_phone),
-            message=f"Live autonomous call executed for {tenant.client_name}. Synced to CRM & n8n.",
-            is_simulated=False
-        )
+    # 2. External webhook mutations are strictly disabled for simulation mode
+    return DispatchLeadResponse(
+        success=True,
+        task_id=task_id,
+        lead_id=request.lead_id,
+        status=status,
+        callee=request.customer_name,
+        phone=mask_phone(request.customer_phone),
+        message=f"Simulation mode: Lead recorded to local buffer for {tenant.client_name}. External callbacks disabled.",
+        is_simulated=True
+    )
 
 
 if __name__ == "__main__":

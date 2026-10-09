@@ -1,0 +1,157 @@
+{
+  "name": "OpsCall Sentinel — Twenty CRM & Autonomous Voice Pipeline",
+  "nodes": [
+    {
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "inbound-lead-trigger",
+        "responseMode": "onReceived",
+        "options": {}
+      },
+      "id": "1",
+      "name": "1. Inbound Lead Trigger (Webhook)",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2,
+      "position": [
+        200,
+        300
+      ],
+      "webhookId": "opscall-inbound-lead"
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "=http://localhost:8000/api/v1/tenants/{{ $json.body.tenant_id || 'tenant-ecom-urbanstride' }}/dispatch",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={\n  \"tenant_id\": \"{{ $json.body.tenant_id || 'tenant-ecom-urbanstride' }}\",\n  \"customer_name\": \"{{ $json.body.name || 'Priya Sharma' }}\",\n  \"customer_phone\": \"{{ $json.body.phone || '+919876543210' }}\",\n  \"context\": {\n    \"item\": \"{{ $json.body.item || 'Premium Order' }}\",\n    \"amount\": {{ $json.body.amount || 2499 }}\n  },\n  \"callback_url\": \"http://localhost:5678/webhook/call-feedback-receiver\"\n}",
+        "options": {
+          "timeout": 10000
+        }
+      },
+      "id": "2",
+      "name": "2. Dispatch Voice Agent (OpsCall)",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        450,
+        300
+      ]
+    },
+    {
+      "parameters": {
+        "dataType": "boolean",
+        "value1": "={{ $json.success }}",
+        "rules": {
+          "rules": [
+            {
+              "value2": true
+            }
+          ]
+        }
+      },
+      "id": "3",
+      "name": "3. Check Verification Status",
+      "type": "n8n-nodes-base.switch",
+      "typeVersion": 3,
+      "position": [
+        700,
+        300
+      ]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "=http://localhost:3000/rest/activities",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Authorization",
+              "value": "Bearer {{ $env.TWENTY_CRM_API_KEY }}"
+            },
+            {
+              "name": "Content-Type",
+              "value": "application/json"
+            }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={\n  \"title\": \"Voice Call Verified: {{ $json.callee }}\",\n  \"body\": \"Status: VERIFIED\\nPhone: {{ $json.phone }}\\nTask: {{ $json.task_id }}\",\n  \"phone\": \"{{ $json.phone }}\"\n}",
+        "options": {}
+      },
+      "id": "4",
+      "name": "4. Sync Call Record to Twenty CRM",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        950,
+        220
+      ]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://api.telegram.org/bot<TOKEN>/sendMessage",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={\n  \"chat_id\": \"@alerts_channel\",\n  \"text\": \"⚠️ UNVERIFIED CALL: {{ $json.callee }} ({{ $json.phone }}) did not verify. Order held.\"\n}",
+        "options": {}
+      },
+      "id": "5",
+      "name": "5. Alert Team on Slack / Telegram",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        950,
+        400
+      ]
+    }
+  ],
+  "connections": {
+    "1. Inbound Lead Trigger (Webhook)": {
+      "main": [
+        [
+          {
+            "node": "2. Dispatch Voice Agent (OpsCall)",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "2. Dispatch Voice Agent (OpsCall)": {
+      "main": [
+        [
+          {
+            "node": "3. Check Verification Status",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "3. Check Verification Status": {
+      "main": [
+        [
+          {
+            "node": "4. Sync Call Record to Twenty CRM",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "5. Alert Team on Slack / Telegram",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "settings": {
+    "executionOrder": "v1"
+  }
+}

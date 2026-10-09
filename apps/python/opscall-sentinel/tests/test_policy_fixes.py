@@ -163,23 +163,31 @@ def test_explicit_recipient_authorization_enforced():
     from src.config import is_authorized_live_recipient, settings
     from src.calle_bridge import LiveCalleBridge
 
-    # Configured on-call phone is authorized
-    assert is_authorized_live_recipient(settings.primary_oncall_phone) is True
+    orig_recipients = list(settings.authorized_live_recipients)
+    try:
+        settings.authorized_live_recipients = ["+14155552671"]
+        # Explicitly whitelisted destination is authorized
+        assert is_authorized_live_recipient("+14155552671") is True
 
-    # Random number not in whitelist is unauthorized
-    assert is_authorized_live_recipient("+919800011111") is False
+        # Synthetic number is safely rejected for live routing
+        assert is_authorized_live_recipient("+15555550100") is False
 
-    # LiveCalleBridge dispatch to unauthorized number raises ValueError
-    live_bridge = LiveCalleBridge(api_key="mock_key", base_url="https://api.heycall-e.com/v1")
-    alert = IncidentAlert(
-        service="db-service",
-        severity=IncidentSeverity.P0_CRITICAL,
-        title="DB crash",
-        description="DB outage",
-        cluster="prod"
-    )
-    with pytest.raises(ValueError, match="not in the authorized live recipient pool"):
-        asyncio.run(live_bridge.dispatch_incident_call(alert, to_phone="+919800011111"))
+        # Random number not in whitelist is unauthorized
+        assert is_authorized_live_recipient("+919800011111") is False
+
+        # LiveCalleBridge dispatch to unauthorized number raises ValueError
+        live_bridge = LiveCalleBridge(api_key="mock_key", base_url="https://api.heycall-e.com/v1")
+        alert = IncidentAlert(
+            service="db-service",
+            severity=IncidentSeverity.P0_CRITICAL,
+            title="DB crash",
+            description="DB outage",
+            cluster="prod"
+        )
+        with pytest.raises(ValueError, match="not in the authorized live recipient pool"):
+            asyncio.run(live_bridge.dispatch_incident_call(alert, to_phone="+919800011111"))
+    finally:
+        settings.authorized_live_recipients = orig_recipients
 
 
 @pytest.mark.asyncio
@@ -207,22 +215,39 @@ async def test_transport_failure_kept_ambiguous_and_halts_cascade():
 
 def test_crm_credentials_origin_restriction_no_plain_http():
     """
-    Requirement 3: Restrict provider credentials to an approved HTTPS origin;
-    the new CRM credential path must not permit plain HTTP.
+    Requirement 3 / Must Fix 1: Restrict provider credentials to an approved HTTPS origin;
+    reject loopback startswith bypasses (e.g. http://localhost.example.invalid) and
+    restrict CALL-E credentials to approved HTTPS origins.
     """
-    from src.crm_connector import TwentyCRMConnector
+    from src.crm_connector import TwentyCRMConnector, N8nWebhookDispatcher
+    from src.calle_bridge import LiveCalleBridge
+    from src.models import CRMCallbackPayload
 
     # Plain remote HTTP with credentials must raise ValueError
     with pytest.raises(ValueError, match="CRM provider credentials cannot be transmitted over plain HTTP"):
         TwentyCRMConnector(base_url="http://remote-crm.corp.internal/rest", api_key="secret_token_abc")
 
+    # Startswith loopback bypass (e.g. localhost.example.invalid) must be rejected
+    with pytest.raises(ValueError, match="CRM provider credentials cannot be transmitted over plain HTTP"):
+        TwentyCRMConnector(base_url="http://localhost.example.invalid/rest", api_key="secret_token_abc")
+
     # Approved HTTPS origin with credentials must succeed
     crm_https = TwentyCRMConnector(base_url="https://crm.corp.internal/rest", api_key="secret_token_abc")
     assert crm_https.base_url == "https://crm.corp.internal/rest"
 
-    # Local loopback with credentials allowed for testing
+    # Strict local loopback with credentials allowed for testing
     crm_local = TwentyCRMConnector(base_url="http://localhost:3000/rest", api_key="secret_token_abc")
     assert crm_local.base_url == "http://localhost:3000/rest"
+
+    # Restrict CALL-E credentials to approved HTTPS origins
+    with pytest.raises(ValueError, match="CALL-E credentials restricted to approved HTTPS origins"):
+        LiveCalleBridge(base_url="https://evil.attacker.com/v1", api_key="live_secret_key_123")
+
+    with pytest.raises(ValueError, match="Restricted to approved HTTPS"):
+        LiveCalleBridge(base_url="http://api.heycall-e.com/v1", api_key="live_secret_key_123")
+
+    live_calle = LiveCalleBridge(base_url="https://api.heycall-e.com/v1", api_key="live_secret_key_123")
+    assert "api.heycall-e.com" in live_calle.base_url
 
 
 def test_nested_text_masking_in_state_and_transcripts():
@@ -272,8 +297,8 @@ def test_nested_text_masking_in_state_and_transcripts():
 @pytest.mark.asyncio
 async def test_tenant_dispatch_simulation_safeguard():
     """
-    Requirement 6: Tenant dispatch simulation must not fabricate COMPLETED/verified=True,
-    and external callbacks must remain disabled by default.
+    Requirement 6 / Must Fix 2: Tenant dispatch simulation must not fabricate COMPLETED/verified=True,
+    unfinished live branch must be disabled (HTTP 501), and external callbacks must remain disabled.
     """
     transport = ASGITransport(app=app)
     async with AsyncClient(transport=transport, base_url="http://test") as ac:
@@ -292,3 +317,28 @@ async def test_tenant_dispatch_simulation_safeguard():
         assert data["status"] == "SIMULATED"
         assert data["is_simulated"] is True
         assert "Simulation mode" in data["message"]
+
+        # Simulation with allow_external_callbacks=True must still be safe and simulated
+        req_payload_cb = {
+            "tenant_id": "tenant-ecom-urbanstride",
+            "customer_name": "Test Customer 2",
+            "customer_phone": "+91 98201 44512",
+            "is_simulation": True,
+            "allow_external_callbacks": True
+        }
+        res_cb = await ac.post("/api/v1/tenants/tenant-ecom-urbanstride/dispatch", json=req_payload_cb)
+        assert res_cb.status_code == 200
+        data_cb = res_cb.json()
+        assert data_cb["status"] == "SIMULATED"
+        assert data_cb["is_simulated"] is True
+
+        # Attempting un-simulated live dispatch must return 501 (disabled live branch)
+        req_payload_live = {
+            "tenant_id": "tenant-ecom-urbanstride",
+            "customer_name": "Test Live",
+            "customer_phone": "+91 98201 44512",
+            "is_simulation": False
+        }
+        res_live = await ac.post("/api/v1/tenants/tenant-ecom-urbanstride/dispatch", json=req_payload_live)
+        assert res_live.status_code == 501
+        assert "Live tenant lead dispatch is disabled" in res_live.json()["detail"]

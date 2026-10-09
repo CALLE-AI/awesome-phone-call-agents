@@ -5,6 +5,7 @@ import time
 import hashlib
 from enum import Enum
 from typing import Optional, List, Dict, Any
+from urllib.parse import urlparse
 from pydantic import BaseModel, Field, field_validator
 
 
@@ -217,8 +218,11 @@ class TenantConfig(BaseModel):
     def validate_crm_endpoint_origin(cls, v: Optional[str]) -> Optional[str]:
         if not v:
             return v
-        is_loopback = any(v.startswith(h) for h in ("http://localhost", "http://127.0.0.1", "http://[::1]"))
-        if not v.startswith("https://") and not is_loopback:
+        parsed = urlparse(v)
+        scheme = (parsed.scheme or "").lower()
+        host = (parsed.hostname or "").lower().strip("[]")
+        is_loopback = host in ("localhost", "127.0.0.1", "::1")
+        if scheme != "https" and not (scheme == "http" and is_loopback):
             raise ValueError(
                 f"CRM endpoint '{v}' must use an approved HTTPS origin or local loopback. "
                 "Plain remote HTTP is prohibited."
@@ -230,8 +234,11 @@ class TenantConfig(BaseModel):
     def validate_webhook_origin(cls, v: Optional[str]) -> Optional[str]:
         if not v:
             return v
-        is_loopback = any(v.startswith(h) for h in ("http://localhost", "http://127.0.0.1", "http://[::1]", "http://n8n.internal"))
-        if not v.startswith("https://") and not is_loopback:
+        parsed = urlparse(v)
+        scheme = (parsed.scheme or "").lower()
+        host = (parsed.hostname or "").lower().strip("[]")
+        is_loopback = host in ("localhost", "127.0.0.1", "::1", "n8n.internal")
+        if scheme != "https" and not (scheme == "http" and is_loopback):
             raise ValueError(
                 f"Webhook callback URL '{v}' must use an approved HTTPS origin or local loopback. "
                 "Plain remote HTTP is prohibited."

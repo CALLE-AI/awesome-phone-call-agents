@@ -6,6 +6,7 @@ import json
 import time
 import uuid
 from typing import Dict, Any, List, Optional
+from urllib.parse import urlparse
 
 import httpx
 
@@ -249,9 +250,24 @@ class LiveCalleBridge(BaseCalleBridge):
 
     def __init__(self, api_key: Optional[str] = None, base_url: Optional[str] = None):
         self.api_key = api_key or settings.calle_api_key
-        raw_url = base_url or settings.calle_base_url
-        if not raw_url.startswith("https://"):
+        raw_url = (base_url or settings.calle_base_url).strip()
+        parsed = urlparse(raw_url)
+        scheme = (parsed.scheme or "").lower()
+        host = (parsed.hostname or "").lower().strip("[]")
+        
+        if scheme != "https":
             raise ValueError(f"Restricted to approved HTTPS: Base URL '{raw_url}' is not secure.")
+            
+        is_approved_host = (
+            host in ("api.heycall-e.com", "heycall-e.com")
+            or host.endswith(".heycall-e.com")
+            or host in ("localhost", "127.0.0.1", "::1")
+        )
+        if self.api_key and not is_approved_host:
+            raise ValueError(
+                "CALL-E credentials restricted to approved HTTPS origins (api.heycall-e.com). "
+                f"Host '{host}' is not approved."
+            )
         self.base_url = raw_url.rstrip("/").removesuffix("/v1")
 
     async def dispatch_incident_call(

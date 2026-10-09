@@ -3,6 +3,7 @@ from __future__ import annotations
 import re
 from pathlib import Path
 from typing import Optional, List
+from urllib.parse import urlparse
 from pydantic import field_validator, model_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
@@ -54,8 +55,20 @@ class Settings(BaseSettings):
     @field_validator("calle_base_url")
     @classmethod
     def validate_https_base_url(cls, v: str) -> str:
-        if not v or not v.startswith("https://"):
+        if not v:
+            raise ValueError("CALLE base URL cannot be empty.")
+        parsed = urlparse(v)
+        scheme = (parsed.scheme or "").lower()
+        host = (parsed.hostname or "").lower().strip("[]")
+        if scheme != "https":
             raise ValueError(f"CALLE base URL must use approved HTTPS protocol, received: {v}")
+        is_approved = (
+            host in ("api.heycall-e.com", "heycall-e.com")
+            or host.endswith(".heycall-e.com")
+            or host in ("localhost", "127.0.0.1", "::1")
+        )
+        if not is_approved:
+            raise ValueError(f"CALLE base URL host '{host}' is not an approved CALL-E origin (api.heycall-e.com).")
         return v
 
     @model_validator(mode="after")
@@ -72,7 +85,10 @@ settings = Settings()
 def is_authorized_live_recipient(phone: str, cfg: Optional[Settings] = None) -> bool:
     """Validate that destination phone is in the explicit authorized live recipient list."""
     current_cfg = cfg or settings
-    clean_phone = validate_ascii_e164(phone, allow_synthetic=False)
+    try:
+        clean_phone = validate_ascii_e164(phone, allow_synthetic=False)
+    except ValueError:
+        return False
     
     # Authorized pool includes configured primary/secondary on-call numbers and explicit whitelist
     authorized_pool = set()
@@ -85,3 +101,4 @@ def is_authorized_live_recipient(phone: str, cfg: Optional[Settings] = None) -> 
             pass
             
     return clean_phone in authorized_pool
+

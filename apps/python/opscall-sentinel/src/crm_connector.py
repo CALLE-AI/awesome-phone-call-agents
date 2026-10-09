@@ -10,6 +10,7 @@ import time
 import hashlib
 import logging
 from typing import Dict, Any, Optional, List
+from urllib.parse import urlparse
 import httpx
 
 from src.models import (
@@ -94,14 +95,17 @@ class TwentyCRMConnector:
         self._validate_credentials_origin()
 
     def _validate_credentials_origin(self):
-        """Restrict provider credentials to approved HTTPS origins; plain HTTP is forbidden."""
+        """Restrict provider credentials to approved HTTPS origins; plain HTTP is forbidden except loopback."""
         if not self.base_url:
             return
-        is_loopback = any(self.base_url.startswith(h) for h in ("http://localhost", "http://127.0.0.1", "http://[::1]"))
-        if self.api_key and not self.base_url.startswith("https://") and not is_loopback:
+        parsed = urlparse(self.base_url)
+        scheme = (parsed.scheme or "").lower()
+        host = (parsed.hostname or "").lower().strip("[]")
+        is_loopback = host in ("localhost", "127.0.0.1", "::1")
+        if self.api_key and scheme != "https" and not (scheme == "http" and is_loopback):
             raise ValueError(
-                f"CRM provider credentials cannot be transmitted over plain HTTP ({self.base_url}). "
-                "Approved HTTPS origin is required."
+                f"CRM provider credentials cannot be transmitted over plain HTTP or unapproved origin ({self.base_url}). "
+                "Approved HTTPS origin (or local loopback) is required."
             )
 
     async def log_call_activity(self, payload: CRMCallbackPayload) -> Dict[str, Any]:
@@ -133,8 +137,11 @@ class TwentyCRMConnector:
             return {"synced": False, "provider": "local_buffer", "simulated": True, "data": activity_record}
 
         # If Twenty CRM is configured and live with valid origin
-        is_loopback = any(self.base_url.startswith(h) for h in ("http://localhost", "http://127.0.0.1", "http://[::1]"))
-        is_https = self.base_url.startswith("https://")
+        parsed = urlparse(self.base_url)
+        scheme = (parsed.scheme or "").lower()
+        host = (parsed.hostname or "").lower().strip("[]")
+        is_loopback = host in ("localhost", "127.0.0.1", "::1")
+        is_https = scheme == "https"
         if self.api_key and (is_https or is_loopback):
             headers = {
                 "Content-Type": "application/json",
@@ -166,8 +173,11 @@ class N8nWebhookDispatcher:
             logger.info("Skipping external n8n callback for simulated payload (simulation external callbacks disabled).")
             return False
 
-        is_loopback = any(callback_url.startswith(h) for h in ("http://localhost", "http://127.0.0.1", "http://[::1]", "http://n8n.internal"))
-        if not callback_url.startswith("https://") and not is_loopback:
+        parsed = urlparse(callback_url)
+        scheme = (parsed.scheme or "").lower()
+        host = (parsed.hostname or "").lower().strip("[]")
+        is_loopback = host in ("localhost", "127.0.0.1", "::1", "n8n.internal")
+        if scheme != "https" and not (scheme == "http" and is_loopback):
             logger.warning("Rejected n8n callback to non-HTTPS remote URL: %s", callback_url)
             return False
 
