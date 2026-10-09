@@ -119,6 +119,48 @@ python3 scripts/correction_propagation_auditor.py analyze --call-result referenc
 }
 ```
 
+## CORRECTIONS_UNCONFIRMED - corrected value carried but never confirmed
+
+```bash
+python3 scripts/correction_propagation_auditor.py analyze --call-result references/example-call-result-unconfirmed.json
+```
+
+```json
+{
+  "skill": "call-correction-propagation-auditor",
+  "call_id": "demo-correct-004",
+  "verdict": "CORRECTIONS_UNCONFIRMED",
+  "counts": {
+    "correction_events": 1,
+    "chains": 1,
+    "stale": 0,
+    "unconfirmed": 1
+  },
+  "corrections": [
+    {
+      "turn_index": 0,
+      "marker": "meant",
+      "old_value": "19:00",
+      "new_value": "19:30",
+      "kind": "clock",
+      "chain_index": 0,
+      "confirmed": false
+    }
+  ],
+  "summary_checks": [
+    {
+      "chain_index": 0,
+      "final_value": "19:30",
+      "final_in_summary": true,
+      "stale_values_in_summary": [],
+      "outcome": "propagated"
+    }
+  ],
+  "advisories": [],
+  "disclaimer": "Heuristic self-correction detection, not semantic repair analysis. A detected correction chain is lexical evidence the agent restated a value; STALE_VALUE_IN_SUMMARY means the superseded surface form appears in the summary while the corrected one does not. Callee revisions are provenance-grade's object; callee-initiated repair is call-repair-sequence-auditor's object. Route every finding to human review against the call record."
+}
+```
+
 ## craft
 
 ```bash

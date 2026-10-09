@@ -560,6 +560,15 @@ def test_fixture_none():
     assert card["verdict"] == "NO_SELF_CORRECTIONS"
 
 
+def test_fixture_unconfirmed():
+    proc = _run_cli(["analyze", "--call-result", str(_REFERENCES / "example-call-result-unconfirmed.json")])
+    assert proc.returncode == 0, proc.stderr
+    card = json.loads(proc.stdout)
+    assert card["call_id"] == "demo-correct-004"
+    assert card["verdict"] == "CORRECTIONS_UNCONFIRMED"
+    assert card["corrections"][0]["confirmed"] is False
+
+
 def test_fixture_goal_matches_craft_template():
     goal = (_REFERENCES / "example-goal.txt").read_text(encoding="utf-8")
     assert goal == mod.craft_template()
