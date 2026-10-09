@@ -109,7 +109,7 @@ carries corrections forward instead of stale values.
 - English correction lexicons only; corrections phrased outside the
   marker list go undetected
 - spelled-out numbers ("four", "twelve") are not correctable values;
-  this is documented and counted as skipped, not silently graded
+  this is documented as not graded; never guessed, not silently graded
 - masked digit runs (phones, long numbers) are never correctable by
   design
 - proximity resolution picks the nearest preceding same-kind value, so

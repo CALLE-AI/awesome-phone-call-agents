@@ -414,7 +414,7 @@ def test_guard_other_correction_not_agent_self_correction():
 
 def test_guard_masked_phone_values_skipped():
     card = mod.analyze(
-        [_turn("agent", "I have +14155550151. Sorry, I meant +14155550152.")],
+        [_turn("agent", "I have +14155550151. Sorry, I meant +14155550153.")],
         "Number on file.",
     )
     assert card["verdict"] == "NO_SELF_CORRECTIONS"

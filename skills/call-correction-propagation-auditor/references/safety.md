@@ -44,7 +44,7 @@
 - English correction lexicons only; corrections phrased outside the
   marker list go undetected.
 - Spelled-out numbers ("four", "twelve") are not correctable values;
-  documented and counted as skipped, not silently graded.
+  documented as not graded; never guessed, not silently graded.
 - Masked digit runs (phones, long numbers) are never correctable by
   design.
 - Proximity resolution picks the nearest preceding same-kind value, so
