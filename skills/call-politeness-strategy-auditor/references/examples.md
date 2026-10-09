@@ -159,6 +159,31 @@ python3 scripts/politeness_strategy_auditor.py analyze \
 }
 ```
 
+## NO_AGENT_REQUESTS - informational call, nothing to grade
+
+```bash
+python3 scripts/politeness_strategy_auditor.py analyze \
+  --call-result references/example-call-result-no-requests.json
+```
+
+```json
+{
+  "skill": "call-politeness-strategy-auditor",
+  "call_id": "demo-polite-004",
+  "verdict": "NO_AGENT_REQUESTS",
+  "counts": {
+    "requests": 0,
+    "bald": 0,
+    "question_requests": 0,
+    "condescension_flags": 0
+  },
+  "requests": [],
+  "advisories": [],
+  "post_summary_present": true,
+  "disclaimer": "Form audit, never content: a polite request for out-of-scope data still fails call-data-minimization-auditor, and politeness grading never sanitizes what is asked. Lexical strategy markers, not a cultural or sincerity judgment. Route findings to human review."
+}
+```
+
 ## craft
 
 ```bash

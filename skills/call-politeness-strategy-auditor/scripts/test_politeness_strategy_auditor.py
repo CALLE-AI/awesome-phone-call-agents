@@ -432,6 +432,7 @@ def test_fixture_files_grade_as_promised():
         ("example-call-result.json", "COURTEOUS"),
         ("example-call-result-bald.json", "BALD_REQUESTS_DETECTED"),
         ("example-call-result-mixed.json", "MIXED"),
+        ("example-call-result-no-requests.json", "NO_AGENT_REQUESTS"),
     ]:
         rec = load_call_result(FIX / name)
         card = analyze(rec["turns"], rec["post_summary"], call_id=rec["call_id"])
