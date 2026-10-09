@@ -377,6 +377,16 @@ def test_fixture_not_mi_end_to_end():
     assert card["change_talk_markers"] == 0
 
 
+def test_fixture_partial_end_to_end():
+    r = _analyze_fixture("example-call-result-partial.json")
+    assert r.returncode == 0, r.stderr
+    card = json.loads(r.stdout)
+    assert card["verdict"] == "PARTIALLY_ADHERENT" and card["call_id"] == "demo-mi-004"
+    assert card["counts"]["reflections"] == 0
+    assert card["counts"]["closed_questions"] > card["counts"]["open_questions"]
+    assert card["advisories"] == []
+
+
 def test_goal_fixture_matches_craft_output():
     goal = (REFERENCES / "example-goal.txt").read_text(encoding="utf-8")
     assert goal == mod.craft_template()

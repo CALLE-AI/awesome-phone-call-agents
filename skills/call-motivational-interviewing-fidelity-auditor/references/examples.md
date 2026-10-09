@@ -110,6 +110,40 @@ python3 scripts/motivational_interviewing_fidelity_auditor.py analyze \
 }
 ```
 
+## PARTIALLY_ADHERENT - closed-heavy questioning, zero reflections
+
+```bash
+python3 scripts/motivational_interviewing_fidelity_auditor.py analyze \
+  --call-result references/example-call-result-partial.json
+```
+
+```json
+{
+  "skill": "call-motivational-interviewing-fidelity-auditor",
+  "call_id": "demo-mi-004",
+  "verdict": "PARTIALLY_ADHERENT",
+  "counts": {
+    "sentences": 9,
+    "reflections": 0,
+    "open_questions": 0,
+    "closed_questions": 4,
+    "affirmations": 0,
+    "advice_with_permission": 0,
+    "advice_without_permission": 0,
+    "confront": 0,
+    "warn": 0,
+    "information_statements": 5
+  },
+  "ratios": {
+    "reflections_per_question": 0.0,
+    "open_question_share": 0.0
+  },
+  "change_talk_markers": 1,
+  "advisories": [],
+  "disclaimer": "Heuristic lexical coding inspired by the MITI 4.2.1 instrument; not certified MI coding, not a clinical judgment, not a quality label for any person, and not authorization to act. Counts and ratios are the product; the verdict is a coarse summary."
+}
+```
+
 ## craft
 
 ```bash
