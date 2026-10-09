@@ -217,6 +217,165 @@ def test_callee_ack_outside_window_unconfirmed():
 
 
 # ---------------------------------------------------------------------------
+# Guard tests: false-positive suppression
+# ---------------------------------------------------------------------------
+
+def test_guard_question_sentence_skipped():
+    card = mod.analyze([_turn("agent", "What I mean is, are you free on Friday?")], "Follow-up needed.")
+    assert card["verdict"] == "NO_SELF_CORRECTIONS"
+
+
+def test_guard_actually_positive_news():
+    card = mod.analyze([_turn("agent", "Actually, great news! Your table is ready.")], "Table ready.")
+    assert card["verdict"] == "NO_SELF_CORRECTIONS"
+
+
+def test_guard_bare_sorry_not_a_correction():
+    card = mod.analyze([_turn("agent", "Sorry about the wait. Your table for 4 is ready.")], "Table ready.")
+    assert card["verdict"] == "NO_SELF_CORRECTIONS"
+
+
+def test_guard_questioned_correction_skipped():
+    card = mod.analyze([_turn("agent", "You said the 4th, did you mean the 5th?")], "Follow-up needed.")
+    assert card["verdict"] == "NO_SELF_CORRECTIONS"
+
+
+def test_guard_callee_self_correction_ignored():
+    turns = [
+        _turn("agent", "Your table is set for Tuesday."),
+        _turn("callee", "Wait, sorry, I said Tuesday; I meant Thursday."),
+    ]
+    card = mod.analyze(turns, "Reservation confirmed for Tuesday.")
+    assert card["verdict"] == "NO_SELF_CORRECTIONS"
+
+
+def test_guard_other_correction_not_agent_self_correction():
+    turns = [
+        _turn("agent", "So that's Tuesday."),
+        _turn("callee", "No, Thursday."),
+        _turn("agent", "Thursday, my apologies for the confusion."),
+    ]
+    card = mod.analyze(turns, "Booked for Thursday.")
+    assert card["verdict"] == "NO_SELF_CORRECTIONS"
+
+
+def test_guard_masked_phone_values_skipped():
+    card = mod.analyze(
+        [_turn("agent", "I have +14155550151. Sorry, I meant +14155550152.")],
+        "Number on file.",
+    )
+    assert card["verdict"] == "NO_SELF_CORRECTIONS"
+
+
+def test_no_turns_reason_transcript_missing():
+    card = mod.analyze([], "Reservation confirmed for Thursday.")
+    assert card["verdict"] == "NO_SELF_CORRECTIONS"
+    assert card["reason"] == "transcript_missing"
+
+
+def test_empty_summary_advisory_summary_missing():
+    turns = [
+        _turn("agent", "Your table is set for Tuesday. Sorry, I said Tuesday; I meant Thursday."),
+        _turn("callee", "Thursday works."),
+        _turn("agent", "Great, see you Thursday."),
+    ]
+    card = mod.analyze(turns, "")
+    assert card["verdict"] == "PROPAGATED"
+    assert "summary_missing" in card["advisories"]
+    assert card["summary_checks"] == []
+
+
+def test_date_forms_october_ordinal():
+    turns = [
+        _turn("agent", "Your slot is October 14th. Sorry, I meant October 15th."),
+        _turn("callee", "The 15th, yes."),
+        _turn("agent", "Done."),
+    ]
+    card = mod.analyze(turns, "Booked for Oct 15.")
+    assert card["verdict"] == "PROPAGATED"
+    assert card["corrections"][0]["old_value"] == "oct-14"
+    assert card["corrections"][0]["new_value"] == "oct-15"
+
+
+def test_slash_date_and_clock():
+    turns = [
+        _turn("agent", "That's 10/14 at 2 p.m. Correction: 10/15 at 9 a.m."),
+        _turn("callee", "Okay, October 15 at 9 a.m. works for us."),
+        _turn("agent", "Great, see you then."),
+    ]
+    card = mod.analyze(turns, "Rescheduled to 10/15 09:00.")
+    assert card["verdict"] == "PROPAGATED"
+    assert card["corrections"][0]["old_value"] == "oct-14"
+
+
+def test_boundary_oct_14_not_in_oct_140():
+    turns = [
+        _turn("agent", "You're booked for oct 1. Sorry, I meant oct 14."),
+        _turn("callee", "The 14th, yes."),
+        _turn("agent", "Right."),
+    ]
+    card = mod.analyze(turns, "Booked for oct 140.")
+    assert card["summary_checks"][0]["outcome"] == "unreported"
+    assert card["verdict"] == "PROPAGATED"
+    assert any(a.startswith("unreported_chain") for a in card["advisories"])
+
+
+# ---------------------------------------------------------------------------
+# Extras: split safety, adjacency, craft, CLI real shape
+# ---------------------------------------------------------------------------
+
+def test_am_pm_safe_sentence_split_survives():
+    turns = [
+        _turn("agent", "Your appointment is at 2:30 p.m. Sorry, I meant 3 p.m."),
+        _turn("callee", "3 p.m. confirmed."),
+        _turn("agent", "See you at 3 p.m."),
+    ]
+    card = mod.analyze(turns, "Appointment at 15:00.")
+    corr = card["corrections"]
+    assert corr and corr[0]["kind"] == "clock"
+    assert corr[0]["old_value"] == "14:30" and corr[0]["new_value"] == "15:00"
+    assert card["verdict"] == "PROPAGATED"
+
+
+def test_consecutive_agent_turns_proximity():
+    turns = [
+        _turn("agent", "The total comes to $54."),
+        _turn("agent", "Actually, it's $45 with the discount."),
+        _turn("callee", "Got it, $45."),
+    ]
+    card = mod.analyze(turns, "Charged $45.")
+    assert card["corrections"][0]["old_value"] == "$54"
+    assert card["verdict"] == "PROPAGATED"
+
+
+def test_craft_template_contains_restate():
+    proc = _run_cli(["craft"])
+    assert proc.returncode == 0
+    assert "re-state the corrected value" in proc.stdout
+    assert "never a value you superseded" in proc.stdout
+
+
+def test_cli_wrapped_real_shape_stale():
+    p = _write_json("wrapped-stale.json", {
+        "call_id": "cli-corr-001", "status": "COMPLETED",
+        "result": {
+            "post_summary": "Booked for Tuesday.",
+            "transcript": [
+                {"speaker": "agent", "text": "We reserved Tuesday. Sorry, I meant Thursday."},
+                {"speaker": "callee", "text": "Thursday, yes."},
+                {"speaker": "agent", "text": "Thursday confirmed."},
+            ],
+        },
+    })
+    proc = _run_cli(["analyze", "--call-result", str(p)])
+    assert proc.returncode == 0, proc.stderr
+    card = json.loads(proc.stdout)
+    assert card["verdict"] == "STALE_VALUE_IN_SUMMARY"
+    assert card["call_id"] == "cli-corr-001"
+    assert card["skill"] == "call-correction-propagation-auditor"
+
+
+# ---------------------------------------------------------------------------
 # Shared helpers
 # ---------------------------------------------------------------------------
 
