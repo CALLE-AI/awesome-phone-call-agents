@@ -736,15 +736,12 @@ Compliance & Safety:
       }
     }
 
+    let isSyntheticDuration = false;
     if (durationSeconds <= 0) {
       // Advisory fallback: no provider-reported duration available
       durationSeconds = isDeclined ? 6 : 75;
+      isSyntheticDuration = true;
     }
-
-    const isSyntheticDuration = durationSeconds === (isDeclined ? 6 : 75) && !(
-      rawCall.recipients?.[0]?.attempts?.[0]?.duration_seconds ||
-      (call.created_at && call.completed_at)
-    );
 
     const mins = Math.floor(durationSeconds / 60);
     const secs = durationSeconds % 60;
@@ -827,29 +824,29 @@ Compliance & Safety:
       if (quotes.length === 1) {
         // Only one single quote provided: use it for price/primary quote
         priceQuote = quotes[0];
-        timelineQuote = availability ? `Availability discussed: ${availability}.` : `Availability discussed during call.`;
-        termsQuote = 'Standard service terms discussed on call.';
+        timelineQuote = availability ? `[Synthetic reconstruction] Availability discussed: ${availability}.` : `[Synthetic reconstruction] Availability discussed during call.`;
+        termsQuote = '[Synthetic reconstruction] Standard service terms discussed on call.';
       } else if (quotes.length >= 2) {
         // Find timeline quote (starts, days, dates)
         timelineQuote = quotes.find(q => (q.toLowerCase().includes('start') || q.toLowerCase().includes('day') || q.toLowerCase().includes('august') || q.toLowerCase().includes('week') || q.toLowerCase().includes('timeline')) && !q.includes('$') && !q.includes('₹')) || quotes[0];
         
         // Find price quote (cost, $, ₹, labour, labor)
-        priceQuote = quotes.find(q => q !== timelineQuote && (q.includes('$') || q.includes('₹') || q.toLowerCase().includes('cost') || q.toLowerCase().includes('labour') || q.toLowerCase().includes('price'))) || quotes[1] || (priceEstimate ? `It will cost ${priceEstimate} total.` : null);
+        priceQuote = quotes.find(q => q !== timelineQuote && (q.includes('$') || q.includes('₹') || q.toLowerCase().includes('cost') || q.toLowerCase().includes('labour') || q.toLowerCase().includes('price'))) || quotes[1] || (priceEstimate ? `[Synthetic reconstruction] It will cost ${priceEstimate} total.` : null);
 
         // Find terms quote (material, discount, warranty, extra, hidden)
-        termsQuote = quotes.find(q => q !== timelineQuote && q !== priceQuote && (q.toLowerCase().includes('discount') || q.toLowerCase().includes('material') || q.toLowerCase().includes('warranty') || q.toLowerCase().includes('hidden') || q.toLowerCase().includes('extra'))) || quotes[2] || 'Standard service terms discussed on call.';
+        termsQuote = quotes.find(q => q !== timelineQuote && q !== priceQuote && (q.toLowerCase().includes('discount') || q.toLowerCase().includes('material') || q.toLowerCase().includes('warranty') || q.toLowerCase().includes('hidden') || q.toLowerCase().includes('extra'))) || quotes[2] || '[Synthetic reconstruction] Standard service terms discussed on call.';
       }
 
-      if (!timelineQuote) timelineQuote = availability ? `Availability discussed: ${availability}.` : `Availability discussed during call.`;
-      if (!priceQuote) priceQuote = priceEstimate ? `Estimated price: ${priceEstimate}.` : `Price estimate was not specified during call.`;
-      if (!termsQuote) termsQuote = 'Standard service terms discussed on call.';
+      if (!timelineQuote) timelineQuote = availability ? `[Synthetic reconstruction] Availability discussed: ${availability}.` : `[Synthetic reconstruction] Availability discussed during call.`;
+      if (!priceQuote) priceQuote = priceEstimate ? `[Synthetic reconstruction] Estimated price: ${priceEstimate}.` : `[Synthetic reconstruction] Price estimate was not specified during call.`;
+      if (!termsQuote) termsQuote = '[Synthetic reconstruction] Standard service terms discussed on call.';
 
       // Deduplication safeguard: if any two quotes are identical, provide clean natural phrasing
       if (priceQuote === timelineQuote) {
-        timelineQuote = availability ? `Availability discussed: ${availability}.` : `Availability discussed during call.`;
+        timelineQuote = availability ? `[Synthetic reconstruction] Availability discussed: ${availability}.` : `[Synthetic reconstruction] Availability discussed during call.`;
       }
       if (termsQuote === priceQuote || termsQuote === timelineQuote) {
-        termsQuote = 'Standard service terms discussed on call.';
+        termsQuote = '[Synthetic reconstruction] Standard service terms discussed on call.';
       }
 
       const synthesized: Array<{ role: 'agent' | 'user'; text: string }> = [

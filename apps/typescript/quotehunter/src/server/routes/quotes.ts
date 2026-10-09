@@ -162,6 +162,10 @@ function sanitizeJobForResponse(job: any) {
       providerNotes: v.providerNotes ? maskSensitiveText(v.providerNotes) : v.providerNotes,
       transcriptSummary: v.transcriptSummary ? maskSensitiveText(v.transcriptSummary) : v.transcriptSummary,
       evidenceSnippet: v.evidenceSnippet ? maskSensitiveText(v.evidenceSnippet) : v.evidenceSnippet,
+      turns: Array.isArray(v.turns) ? v.turns.map((t: any) => ({
+        ...t,
+        text: t.text ? maskSensitiveText(t.text) : t.text,
+      })) : v.turns,
     }));
   }
   return sanitized;
