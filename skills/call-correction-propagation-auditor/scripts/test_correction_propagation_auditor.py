@@ -376,6 +376,43 @@ def test_cli_wrapped_real_shape_stale():
 
 
 # ---------------------------------------------------------------------------
+# Reference fixtures (hand-traced against the CLI)
+# ---------------------------------------------------------------------------
+
+_REFERENCES = HERE.parent / "references"
+
+
+def test_fixture_propagated():
+    proc = _run_cli(["analyze", "--call-result", str(_REFERENCES / "example-call-result.json")])
+    assert proc.returncode == 0, proc.stderr
+    card = json.loads(proc.stdout)
+    assert card["call_id"] == "demo-correct-001"
+    assert card["verdict"] == "PROPAGATED"
+    assert card["counts"]["correction_events"] == 1
+
+
+def test_fixture_stale():
+    proc = _run_cli(["analyze", "--call-result", str(_REFERENCES / "example-call-result-stale.json")])
+    assert proc.returncode == 0, proc.stderr
+    card = json.loads(proc.stdout)
+    assert card["call_id"] == "demo-correct-002"
+    assert card["verdict"] == "STALE_VALUE_IN_SUMMARY"
+
+
+def test_fixture_none():
+    proc = _run_cli(["analyze", "--call-result", str(_REFERENCES / "example-call-result-none.json")])
+    assert proc.returncode == 0, proc.stderr
+    card = json.loads(proc.stdout)
+    assert card["call_id"] == "demo-correct-003"
+    assert card["verdict"] == "NO_SELF_CORRECTIONS"
+
+
+def test_fixture_goal_matches_craft_template():
+    goal = (_REFERENCES / "example-goal.txt").read_text(encoding="utf-8")
+    assert goal == mod.craft_template()
+
+
+# ---------------------------------------------------------------------------
 # Shared helpers
 # ---------------------------------------------------------------------------
 
