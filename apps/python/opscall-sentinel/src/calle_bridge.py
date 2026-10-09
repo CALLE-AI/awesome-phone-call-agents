@@ -267,7 +267,7 @@ class LiveCalleBridge(BaseCalleBridge):
         validated_phone = validate_ascii_e164(to_phone, allow_synthetic=False)
         if not is_authorized_live_recipient(validated_phone):
             raise ValueError(
-                f"Destination '{validated_phone}' is not in the authorized live recipient pool. "
+                "Destination is not in the authorized live recipient pool. "
                 "Explicit recipient authorization in settings is required for live calls."
             )
 

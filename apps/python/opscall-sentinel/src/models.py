@@ -128,6 +128,7 @@ class CallRecord(BaseModel):
             copy_rec.result.transcript_summary = sanitize_text(copy_rec.result.transcript_summary)
             copy_rec.result.notes = sanitize_text(copy_rec.result.notes)
             copy_rec.result.reason = sanitize_text(copy_rec.result.reason)
+            copy_rec.result.outcome = sanitize_text(copy_rec.result.outcome)
         copy_rec.transcript = [
             {
                 **turn,

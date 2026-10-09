@@ -106,7 +106,7 @@ Click **"Simulate Auto Escalation"** or **"Simulate Primary Ack"** to see live i
 pytest tests/ -v
 ```
 
-All tests pass offline with zero network calls and zero credit consumption.
+Tests are intended to run offline without network calls or credit consumption. Known test limitation: `test_explicit_recipient_authorization_enforced` expects the default synthetic on-call number to be authorized for live calling, although the live safety guard correctly rejects it. Do not disable that guard to satisfy the test.
 
 ---
 
@@ -118,7 +118,7 @@ All tests pass offline with zero network calls and zero credit consumption.
 > - **Transport/Submission Indeterminacy & Halting Cascade:** If a primary dispatch experiences transport or submission failures (HTTP 429 concurrency limit, 5xx server error, or connection exception), or returns pending/queued/ambiguous status, the engine enters `PRIMARY_PENDING` and **halts** escalation. The system never converts transport failures into assumed engineer unreachability or dials secondary tiers automatically. Secondary escalation only triggers upon carrier-verified non-response (e.g. timeout, busy, line rejected) or explicit verbal refusal.
 > - **Automated Rollback Boundaries:** The "Rollback" trigger in this demo/local codebase records a state transition to `RESOLVED` and dispatches structured event data. In enterprise production environments, rollbacks must be routed to authenticated CI/CD orchestrators (e.g., ArgoCD, GitHub Actions runbooks) governed by downstream staging gates; OpsCall Sentinel does not perform direct unauthenticated binary swaps on bare-metal servers.
 > - **Forensic PIN Authentication Scope:** The 4-digit voice/DTMF PIN gate provides first-line identity screening against voicemail pickup and accidental keypad taps. It operates as a conversational triage filter and does not replace enterprise multi-factor hardware security tokens (FIDO2/WebAuthn) for privileged root access.
-> - **Telephony Carrier Timing & Cancellation Limits:** PSTN outbound dialing typically requires 5–15 seconds for carrier trunk establishment, cellular tower handover, and subscriber handset ringing. Cancellation requests sent while a carrier line is actively ringing halt local state machine progression, but in-flight carrier calls remain subject to cellular network teardown latency and cannot guarantee instantaneous zero-delay line termination.
+> - **Cancellation Limits:** This demo does not implement cancellation of accepted provider calls or an incident-cancellation endpoint. Stopping the local process does not recall an in-flight call. Reconcile its outcome with the provider before attempting another call; carrier timing and termination are not guaranteed by this demo.
 
 ---
 
@@ -159,4 +159,3 @@ All tests pass offline with zero network calls and zero credit consumption.
 ## License
 
 MIT License. Designed for the CALL-E Hackathon 2026.
-

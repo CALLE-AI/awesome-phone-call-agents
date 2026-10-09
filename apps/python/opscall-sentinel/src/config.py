@@ -16,17 +16,17 @@ def validate_ascii_e164(phone: str, allow_synthetic: bool = True) -> str:
     
     clean_phone = phone.strip()
     if not clean_phone.isascii():
-        raise ValueError(f"Phone destination '{clean_phone}' contains non-ASCII characters.")
+        raise ValueError("Phone destination contains non-ASCII characters.")
     
     # Strict E.164: + followed by 7 to 15 digits
     pattern = r"^\+[1-9]\d{6,14}$"
     if not re.match(pattern, clean_phone):
-        raise ValueError(f"Destination '{clean_phone}' is not a valid ASCII E.164 phone number.")
+        raise ValueError("Destination is not a valid ASCII E.164 phone number.")
     
     # Check synthetic default patterns (e.g. 555-0100..0199 or repeated zeros)
     is_synthetic = bool(re.search(r"55501\d{2}$|0000000|1234567", clean_phone))
     if is_synthetic and not allow_synthetic:
-        raise ValueError(f"Synthetic default destination '{clean_phone}' is not authorized for live PSTN routing.")
+        raise ValueError("Synthetic default destination is not authorized for live PSTN routing.")
     
     return clean_phone
 
@@ -85,4 +85,3 @@ def is_authorized_live_recipient(phone: str, cfg: Optional[Settings] = None) -> 
             pass
             
     return clean_phone in authorized_pool
-

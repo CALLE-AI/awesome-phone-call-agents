@@ -48,7 +48,7 @@ async def run_cli_dispatch(
     print(f"Service       : {alert.service}")
     print(f"Severity      : {alert.severity.value}")
     print(f"Cluster       : {alert.cluster}")
-    print(f"Description   : {alert.description}")
+    print(f"Description   : {sanitize_text(alert.description)}")
     print(f"Execution Mode: {'LIVE (CALL-E Outbound)' if is_live else 'MOCK (Zero-Credit Fixture)'}")
     print("-" * 60)
 
