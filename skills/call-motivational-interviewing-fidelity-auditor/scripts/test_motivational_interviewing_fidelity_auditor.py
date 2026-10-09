@@ -383,6 +383,110 @@ def test_goal_fixture_matches_craft_output():
 
 
 # ---------------------------------------------------------------------------
+# Adversarial review: reflection / advice / confront / warn / permission /
+# change-talk lexicon coverage
+# ---------------------------------------------------------------------------
+
+def _counts_for(agent_text):
+    return mod.analyze(
+        _turns(("agent", agent_text), ("callee", "I want to stop skipping it.")),
+        call_id="mi-advrev",
+    )["counts"]
+
+
+def test_reflection_bare_and_past_sound_stems():
+    assert _counts_for("Sounds like you're ready.")["reflections"] == 1
+    assert _counts_for("It sounded like you were unsure.")["reflections"] == 1
+
+
+def test_reflection_that_sounds_like_a_plan_stays_out():
+    # "That ..." must not match the optional-it sound/seem stem (^-anchored).
+    assert _counts_for("That sounds like a plan.")["reflections"] == 0
+
+
+def test_reflection_what_i_hear_is_and_im_hearing_that():
+    assert _counts_for("What I hear is you're torn.")["reflections"] == 1
+    assert _counts_for("I'm hearing that you're stuck.")["reflections"] == 1
+
+
+def test_reflection_uncontracted_you_are_forms():
+    assert _counts_for("So, you are feeling stuck.")["reflections"] == 1
+    assert _counts_for("You are saying that it's hard.")["reflections"] == 1
+
+
+def test_advice_contracted_and_uncontracted_recommend_suggest():
+    assert _counts_for("I'd recommend a pill box.")["advice_without_permission"] == 1
+    assert _counts_for("I would suggest alarms.")["advice_without_permission"] == 1
+
+
+def test_advice_you_oughta():
+    assert _counts_for("You oughta refill today.")["advice_without_permission"] == 1
+
+
+def test_advice_it_would_be_best_to():
+    assert _counts_for("It would be best to set an alarm.")["advice_without_permission"] == 1
+
+
+def test_advice_make_sure_imperative():
+    assert _counts_for("Make sure to take it with food.")["advice_without_permission"] == 1
+
+
+def test_confront_keep_avoiding_and_plain_excuse():
+    card = mod.analyze(
+        _turns(("agent", "You keep avoiding this. That's an excuse."),
+               ("callee", "I want to stop skipping it.")),
+        call_id="mi-conf2",
+    )
+    assert card["counts"]["confront"] == 2
+    assert card["verdict"] == "NON_ADHERENT"
+
+
+def test_warn_if_you_keep():
+    counts = _counts_for("If you keep skipping, you will run out.")
+    # Conditional warning wins over the confront "you keep ..." stem here.
+    assert counts["warn"] == 1 and counts["confront"] == 0
+
+
+def test_warn_without_clause():
+    assert _counts_for("Without a refill you'll run out.")["warn"] == 1
+
+
+def test_warn_without_control_without_loss_verb():
+    # "pay" is not a loss verb, so no warn even with the without-clause shape.
+    assert _counts_for("Without the discount you'd pay more.")["warn"] == 0
+
+
+def test_permission_is_it_okay_if_i():
+    counts = _counts_for("Is it okay if I share a tip? I recommend alarms.")
+    assert counts["advice_with_permission"] == 1
+    assert counts["advice_without_permission"] == 0
+
+
+def test_permission_let_me_offer_a_suggestion():
+    counts = _counts_for("Let me offer a suggestion. I recommend alarms.")
+    assert counts["advice_with_permission"] == 1
+    assert counts["advice_without_permission"] == 0
+
+
+def test_permission_might_i_suggest():
+    counts = _counts_for("Might I suggest alarms?")
+    assert counts["advice_with_permission"] == 1
+    assert counts["advice_without_permission"] == 0
+
+
+def test_change_talk_extended_stems_flip_gate():
+    base = _turns(("agent", "It sounds like you're torn."))
+    for phrase in (
+        "I've been trying to take it more often.",
+        "I'm trying my best with the mornings.",
+        "Maybe I should quit skipping.",
+        "I kinda want to refill on time.",
+    ):
+        card = mod.analyze(base + _turns(("callee", phrase)), call_id="mi-ct")
+        assert card["verdict"] != "NOT_MI_CALL", phrase
+
+
+# ---------------------------------------------------------------------------
 # Standalone runner (must stay LAST)
 # ---------------------------------------------------------------------------
 

@@ -17,6 +17,13 @@ Documented trap (kept deterministic on purpose): "How about a phone
 reminder?" is effectively a closed offer, but the wh-initial rule
 classifies any sentence starting with "how" as an open question. We do not
 special-case it; counts are the product, the verdict is a coarse summary.
+Similarly, "Could you tell me about your week?" grades closed under the
+deterministic auxiliary-initial rule even though it invites an open
+answer; documented, not special-cased.
+
+Limitation: a string-form transcript becomes a single agent turn, so
+callee change talk is never present and the verdict is NOT_MI_CALL;
+supply real turn lists.
 
 Runs offline, deterministic, no LLM, no network. Input errors exit 2.
 """
@@ -114,32 +121,42 @@ def is_agent_turn(turn: dict[str, str]) -> bool:
 # ---------------------------------------------------------------------------
 
 _REFLECTION_RE = re.compile(
-    r"^(?:so[,.]?\s+)?(?:it\s+sounds\s+like|it\s+seems\s+like|what\s+i'?m\s+hearing\s+is|"
-    r"so\s+you'?re|you'?re\s+feeling|you'?re\s+saying\s+that|you\s+mentioned\s+that|"
-    r"i\s+hear\s+you\s+saying)\b", re.IGNORECASE)
+    r"^(?:so[,.]?\s+)?(?:(?:it\s+)?(?:sounds?|sounded|seems?|seemed)\s+like|"
+    r"what\s+i(?:\s+hear|'?m\s+hearing)\s+(?:is|that)|i'?m\s+hearing\s+(?:that\s+)?|"
+    r"so\s+you(?:'re|\s+are)|you(?:'re|\s+are)\s+feeling|you(?:'re|\s+are)\s+saying\s+that|"
+    r"you\s+mentioned\s+that|i\s+hear\s+you\s+saying)\b", re.IGNORECASE)
 _AFFIRM_RE = re.compile(
     r"\b(?:you\s+did\s+a\s+(?:great|good|wonderful)\s+job|that\s+takes\s+(?:real\s+|a\s+lot\s+of\s+)?effort|"
     r"you'?ve\s+been\s+(?:really\s+|very\s+)?consistent|you\s+should\s+be\s+proud|that'?s\s+impressive|"
     r"good\s+work|well\s+done|that'?s\s+no\s+small\s+thing|you'?ve\s+come\s+a\s+long\s+way)\b", re.IGNORECASE)
 _PERMISSION_RE = re.compile(
     r"\b(?:would\s+you\s+mind\s+if\s+i|may\s+i\s+offer|with\s+your\s+permission|can\s+i\s+share|"
-    r"would\s+it\s+be\s+(?:okay|all\s+right|alright)\s+if\s+i|if\s+you\s+don'?t\s+mind,?\s*i)\b", re.IGNORECASE)
+    r"would\s+it\s+be\s+(?:okay|ok|all\s+right|alright)\s+if\s+i|is\s+it\s+(?:okay|ok|all\s+right|alright)\s+if\s+i|"
+    r"let\s+me\s+(?:offer|share)\s+(?:a|some|one)\s+(?:suggestion|thoughts?|tips?|idea)|"
+    r"might\s+i\s+(?:suggest|offer|share)|if\s+you\s+don'?t\s+mind,?\s*i)\b", re.IGNORECASE)
 _ADVICE_RE = re.compile(
-    r"\b(?:i\s+(?:would\s+)?recommend|i\s+suggest|you\s+(?:should|need\s+to|must|ought\s+to)(?!\s+be\s+(?:proud|able))|"
-    r"you(?:'ll|\s+will|\s+would|'d)\s+better|the\s+best\s+thing\s+(?:is|to\s+do\s+is|to)|"
-    r"what\s+i\s+would\s+do\s+is|you(?:'ll|\s+will)\s+need\s+to|consider\s+(?:setting|taking|using|calling|asking))\b", re.IGNORECASE)
+    r"\b(?:i(?:'d|\s+would)?\s+(?:recommend|suggest)|you\s+(?:should|need\s+to|must|ought(?:a|\s+to))(?!\s+be\s+(?:proud|able))|"
+    r"you(?:'ll|\s+will|\s+would|'d)\s+better|the\s+best\s+thing\s+(?:is|to\s+do\s+is|to|would\s+be)|"
+    r"it\s+(?:would|'d)\s+be\s+best\s+to|what\s+i\s+would\s+do\s+is|you(?:'ll|\s+will)\s+need\s+to|"
+    r"make\s+sure\s+(?:to|you)|consider\s+(?:setting|taking|using|calling|asking))\b", re.IGNORECASE)
 _CONFRONT_RE = re.compile(
-    r"\b(?:you(?:'re|\s+are)\s+just\s+making\s+excuses|that'?s\s+just\s+an\s+excuse|you\s+have\s+to\s+admit|"
+    r"\b(?:you(?:'re|\s+are)\s+just\s+making\s+excuses|that'?s\s+(?:just\s+)?an\s+excuse|you\s+have\s+to\s+admit|"
     r"you\s+clearly\s+(?:don'?t|do\s+not)\s+(?:want|care)|you(?:'re|\s+are)\s+not\s+(?:really\s+)?trying|"
-    r"stop\s+(?:lying|arguing)|you(?:'re|\s+are)\s+in\s+denial)\b", re.IGNORECASE)
-_WARN_IF_RE = re.compile(r"\bif\s+you\s+(?:don'?t|do\s+not)\b", re.IGNORECASE)
+    # "if you keep ..." is the conditional-warn shape, not confrontation.
+    r"(?<!if\s)you\s+keep\s+(?:avoiding|dodging|skipping)|stop\s+(?:lying|arguing)|"
+    r"you(?:'re|\s+are)\s+in\s+denial)\b", re.IGNORECASE)
+_WARN_IF_RE = re.compile(r"\bif\s+you\s+(?:don'?t|do\s+not|keep|continue\s+to)\b", re.IGNORECASE)
+_WARN_WITHOUT_RE = re.compile(
+    r"\bwithout\s+(?:a|an|your|the)\b[^.!?]{0,40}?\byou(?:'ll|\s+will)\b", re.IGNORECASE)
 _LOSS_RE = re.compile(r"\b(?:run\s+out|lose|losing|miss(?:ing)?|cancel(?:l(?:ed|ing))?)\b", re.IGNORECASE)
 _OPEN_Q_RE = re.compile(r"^(?:what|how|why|when|where|who|tell\s+me\s+about|walk\s+me\s+through)\b", re.IGNORECASE)
 _CLOSED_Q_RE = re.compile(r"^(?:do|does|did|is|are|was|were|can|could|would|will|won't|have|has|had|should|shall|may|might)\b", re.IGNORECASE)
 _CHANGE_TALK_RE = re.compile(
     r"\b(?:i\s+(?:want|wanna|need)\s+to\s+(?:quit|stop|start|cut|take|get|exercise|eat|drink|walk|refill|schedule|come\s+in|reduce|use)|"
     r"i'?m\s+trying\s+to|i\s+(?:will|'ll)\s+(?:start|try|cut|call|take|quit|stop)|i\s+should\s+probably|"
-    r"i'?d\s+like\s+to|i'?m\s+hoping\s+to|part\s+of\s+me|on\s+the\s+other\s+hand|torn\s+about)\b", re.IGNORECASE)
+    r"i'?d\s+like\s+to|i'?m\s+hoping\s+to|part\s+of\s+me|on\s+the\s+other\s+hand|torn\s+about|"
+    r"i'?ve\s+been\s+trying\s+to|trying\s+my\s+best|maybe\s+i\s+should\s+(?:quit|stop|cut|refill|take)|"
+    r"i\s+(?:kinda|kind\s+of|sorta)\s+want\s+to)\b", re.IGNORECASE)
 
 
 # ---------------------------------------------------------------------------
@@ -149,12 +166,12 @@ _CHANGE_TALK_RE = re.compile(
 def classify_turn(text: str) -> list[dict[str, str]]:
     """Classify each sentence of one (already masked) turn.
 
-    Priority: reflection -> affirmation -> confront -> warn (conditional +
-    loss in the same sentence) -> advice (permission must START earlier in
-    the same turn than the advice sentence) -> question (open/closed by
-    sentence-initial word; declarative questions count as closed) ->
-    information statement. A '?' sentence that matched reflection stays a
-    reflection (precedence).
+    Priority: reflection -> affirmation -> confront -> warn (conditional if/
+    without-clause + loss in the same sentence) -> advice (permission must
+    start at or before the advice sentence within the same turn) ->
+    question (open/closed by sentence-initial word; declarative questions
+    count as closed) -> information statement. A '?' sentence that matched
+    reflection stays a reflection (precedence).
     """
     labeled: list[dict[str, str]] = []
     for offset, sentence in _sentence_spans(text):
@@ -165,11 +182,11 @@ def classify_turn(text: str) -> list[dict[str, str]]:
             label = "affirmation"
         elif _CONFRONT_RE.search(stripped):
             label = "confront"
-        elif _WARN_IF_RE.search(stripped) and _LOSS_RE.search(stripped):
+        elif (_WARN_IF_RE.search(stripped) or _WARN_WITHOUT_RE.search(stripped)) and _LOSS_RE.search(stripped):
             label = "warn"
         elif _ADVICE_RE.search(stripped):
             permission_before = any(
-                m.start() < offset for m in _PERMISSION_RE.finditer(text)
+                m.start() <= offset for m in _PERMISSION_RE.finditer(text)
             )
             label = "advice_with_permission" if permission_before else "advice_without_permission"
         elif stripped.endswith("?"):
