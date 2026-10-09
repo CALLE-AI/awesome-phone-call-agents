@@ -496,6 +496,23 @@ def test_reflection_you_have_been_uncontracted():
     assert counts["reflections"] == 1
 
 
+def test_typographic_apostrophes_normalized():
+    # Real CALL-E ASR emits U+2019; reflection "So you're feeling...", advice
+    # "I'd recommend", and permission must still fire.
+    turns = _turns(
+        ("agent", "So you\u2019re feeling stuck about the refill."),
+        ("callee", "I want to stop skipping it."),
+        ("agent", "What would help?"),
+        ("callee", "Not sure."),
+        ("agent", "Would you mind if I shared a tip? I\u2019d recommend pairing it with coffee."),
+        ("callee", "Could work."),
+    )
+    card = mod.analyze(turns, call_id="mi-apostrophe")
+    assert card["counts"]["reflections"] == 1, card["counts"]
+    assert card["counts"]["advice_with_permission"] == 1, card["counts"]
+    assert card["verdict"] == "MI_ADHERENT", card["verdict"]
+
+
 # ---------------------------------------------------------------------------
 # Standalone runner (must stay LAST)
 # ---------------------------------------------------------------------------

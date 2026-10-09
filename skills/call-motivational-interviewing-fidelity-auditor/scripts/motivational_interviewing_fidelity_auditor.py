@@ -48,6 +48,23 @@ DISCLAIMER = (
 
 _DIGIT_RUN_RE = re.compile(r"[0-9](?:[ ,./-][0-9]|[0-9])*")
 
+# Real CALL-E transcription emits typographic apostrophes and quotes; the
+# lexicons in this file are written with ASCII quotes. Normalize one-char-
+# to-one-char (offset-preserving) before any matching, mirroring the
+# convention in skills/verify-by-phone/scripts/extract_answer.py.
+_TYPOGRAPHIC = str.maketrans(
+    {
+        "\u2018": "'",
+        "\u2019": "'",
+        "\u201c": '"',
+        "\u201d": '"',
+    }
+)
+
+
+def normalize_input(text: str) -> str:
+    return text.translate(_TYPOGRAPHIC)
+
 
 def _mask_match(m: re.Match[str]) -> str:
     run = m.group(0)
@@ -249,7 +266,7 @@ def analyze(turns: list[dict[str, str]], call_id: str | None = None) -> dict[str
     agent_turns = 0
     change_talk_markers = 0
     for turn in turns:
-        masked = mask_pii(str(turn.get("text", "")))
+        masked = mask_pii(normalize_input(str(turn.get("text", ""))))
         if is_agent_turn(turn):
             agent_turns += 1
             for labeled in classify_turn(masked):
