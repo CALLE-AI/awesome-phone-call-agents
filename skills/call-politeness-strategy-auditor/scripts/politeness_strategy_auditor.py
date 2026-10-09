@@ -123,7 +123,8 @@ _SELF_DIRECTED_RE = re.compile(
 # Implicit request forms - all structurally redressed, never BALD.
 _INDIRECT_FORM_RE = re.compile(
     r"^(?:if\s+you\s+(?:would|could)\b|i\s+was\s+wondering\s+if\b|would\s+you\s+mind\b|"
-    r"might\s+i\s+ask\b|i'?m\s+afraid\b)",
+    r"might\s+i\s+ask\b|i'?m\s+afraid\b|i'?d\s+like\s+you\s+to\b|"
+    r"sorry\s+to\s+(?:trouble|bother|ask)\b|forgive\s+(?:me|the)\b|my\s+apologies\b)",
     re.IGNORECASE,
 )
 # Vocative openers ("Mr. Nguyen, please confirm...") - stripped before the

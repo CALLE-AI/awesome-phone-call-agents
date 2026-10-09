@@ -264,6 +264,27 @@ def test_im_afraid_implicit_request():
     assert "apologize" in card["requests"][0]["strategies"]
 
 
+def test_id_like_you_to_implicit_request():
+    turns = _turns(
+        ("agent", "I'd like you to spell your last name."),
+        ("callee", "N-G."),
+    )
+    card = analyze(turns, "")
+    assert card["counts"]["requests"] == 1
+    assert card["requests"][0]["grade"] == "SOFTENED"
+
+
+def test_sorry_to_trouble_spliced_request():
+    turns = _turns(
+        ("agent", "Sorry to trouble you - spell your last name."),
+        ("callee", "Fine."),
+    )
+    card = analyze(turns, "")
+    assert card["counts"]["requests"] == 1
+    assert card["requests"][0]["grade"] == "SOFTENED"
+    assert "apologize" in card["requests"][0]["strategies"]
+
+
 def test_transitional_self_directed_only_hold_line_request():
     turns = _turns(
         ("agent", "Hold on. Let me check the system. One moment. I'll be right back. Please hold the line."),
