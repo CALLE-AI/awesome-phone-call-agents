@@ -274,6 +274,16 @@ def test_id_like_you_to_implicit_request():
     assert card["requests"][0]["grade"] == "SOFTENED"
 
 
+def test_whenever_youre_ready_deference():
+    turns = _turns(
+        ("agent", "Confirm your street address, whenever you're ready."),
+        ("callee", "88 Lake Road."),
+    )
+    card = analyze(turns, "")
+    assert card["requests"][0]["grade"] == "SOFTENED"
+    assert "deference" in card["requests"][0]["strategies"]
+
+
 def test_sorry_to_trouble_spliced_request():
     turns = _turns(
         ("agent", "Sorry to trouble you - spell your last name."),

@@ -152,7 +152,7 @@ _SOFTENERS: dict[str, re.Pattern[str]] = {
     ),
     "deference": re.compile(
         r"\bif\s+you\s+(?:would|could)\b|\bwhen\s+you\s+(?:have|get)\s+a\s+(?:moment|second)\b|"
-        r"\bno\s+rush\b|\bat\s+your\s+convenience\b|\bwhenever\s+works\s+for\s+you\b",
+        r"\bno\s+rush\b|\bat\s+your\s+convenience\b|\bwhenever\s+works\s+for\s+you\b|\bwhenever\s+you(?:'re|\s+are)\s+ready\b",
         re.IGNORECASE,
     ),
     "counterfactual": re.compile(r"\bcould\s+you\s+possibly\b|\bwould\s+you\s+mind\b", re.IGNORECASE),
