@@ -40,6 +40,23 @@ DISCLAIMER = (
 
 _DIGIT_RUN_RE = re.compile(r"[0-9](?:[ ,./-][0-9]|[0-9])*")
 
+# Real CALL-E transcription emits typographic apostrophes and quotes; the
+# lexicons in this file are written with ASCII quotes. Normalize one-char-
+# to-one-char (offset-preserving) before any matching, mirroring the
+# convention in skills/verify-by-phone/scripts/extract_answer.py.
+_TYPOGRAPHIC = str.maketrans(
+    {
+        "\u2018": "'",
+        "\u2019": "'",
+        "\u201c": '"',
+        "\u201d": '"',
+    }
+)
+
+
+def normalize_input(text: str) -> str:
+    return text.translate(_TYPOGRAPHIC)
+
 
 def _mask_match(m: re.Match[str]) -> str:
     run = m.group(0)
@@ -452,7 +469,7 @@ def _value_pattern(kind: str, value: str) -> str:
 
 def check_propagation(chains: list[dict[str, Any]], post_summary: str) -> list[dict[str, Any]]:
     """Check each chain's final (and superseded) values against the folded summary."""
-    folded = fold_text(mask_pii(post_summary or ""))
+    folded = fold_text(mask_pii(normalize_input(post_summary or "")))
     checks = []
     for i, ch in enumerate(chains):
         final_in = re.search(_value_pattern(ch["kind"], ch["final"]), folded) is not None
@@ -505,7 +522,10 @@ def chain_confirmed(
 def analyze(turns: list[dict[str, str]], post_summary: str, call_id: str | None = None) -> dict[str, Any]:
     """Audit agent self-corrections and their propagation into post_summary."""
     masked_turns = [
-        {"speaker": t.get("speaker", "unknown"), "text": mask_pii(str(t.get("text", "")))}
+        {
+            "speaker": t.get("speaker", "unknown"),
+            "text": mask_pii(normalize_input(str(t.get("text", "")))),
+        }
         for t in turns
     ]
     events = detect_corrections(masked_turns)

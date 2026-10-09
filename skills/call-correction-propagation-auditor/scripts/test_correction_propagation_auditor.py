@@ -597,6 +597,20 @@ def _run_cli(argv: list[str]) -> subprocess.CompletedProcess:
     )
 
 
+def test_typographic_apostrophes_normalized():
+    # Real CALL-E ASR emits U+2019; marker and ack must still fire.
+    turns = [
+        {"speaker": "agent", "text": "Your pickup is Tuesday. Sorry, that\u2019s incorrect - it\u2019s Thursday."},
+        {"speaker": "callee", "text": "Thursday, that\u2019s right."},
+        {"speaker": "agent", "text": "Anything else?"},
+    ]
+    card = mod.analyze(turns, "Pickup Tuesday.")
+    assert card["verdict"] == "STALE_VALUE_IN_SUMMARY", card
+    ev = card["corrections"][0]
+    assert ev["old_value"] == "tuesday" and ev["new_value"] == "thursday"
+    assert ev["confirmed"] is True
+
+
 def _run_all():
     failures = 0
     tests = [(k, v) for k, v in globals().items() if k.startswith("test_") and callable(v)]
