@@ -139,6 +139,128 @@ def test_card_shape_fields():
 
 
 # ---------------------------------------------------------------------------
+# Classifier behavior: MI_ADHERENT / advice / permission / guards
+# ---------------------------------------------------------------------------
+
+MI_DIALOGUE = _turns(
+    ("agent", "It sounds like you're torn about the new dose."),
+    ("callee", "Yeah, I want to stop skipping it."),
+    ("agent", "So you're taking it every morning now?"),
+    ("callee", "Most days."),
+    ("agent", "What I'm hearing is you'd like to be more consistent."),
+    ("callee", "Exactly."),
+    ("agent", "How could I help with that?"),
+)
+
+
+def test_mi_adherent_dialogue():
+    card = mod.analyze(MI_DIALOGUE, call_id="mi-001")
+    assert card["verdict"] == "MI_ADHERENT"
+    assert card["counts"]["reflections"] == 3
+    assert card["counts"]["open_questions"] >= card["counts"]["closed_questions"]
+    assert card["counts"]["advice_without_permission"] == 0
+
+
+def test_advice_x3_without_permission_is_non_adherent():
+    turns = _turns(
+        ("agent", "Hello, this is your refill assistant."),
+        ("callee", "Oh, okay."),
+        ("agent", "You should set a daily alarm so you stop skipping doses."),
+        ("callee", "I do forget a lot."),
+        ("agent", "You need to take it with food every morning."),
+        ("callee", "I want to take it regularly, honestly."),
+        ("agent", "You must refill before Friday or the prescription lapses."),
+        ("callee", "That's a lot to think about."),
+    )
+    card = mod.analyze(turns, call_id="mi-adv")
+    assert card["verdict"] == "NON_ADHERENT"
+    assert card["counts"]["advice_without_permission"] == 3
+    assert card["counts"]["advice_with_permission"] == 0
+
+
+def test_permission_softens_advice():
+    turns = _turns(
+        ("agent", "It sounds like you're working hard on this."),
+        ("callee", "I want to stop skipping it."),
+        ("agent", "What have you tried so far?"),
+        ("callee", "Alarms, mostly."),
+        ("agent", "Would you mind if I shared what other patients try? I recommend a pill organizer."),
+    )
+    card = mod.analyze(turns, call_id="mi-perm")
+    assert card["counts"]["advice_with_permission"] == 1
+    assert card["counts"]["advice_without_permission"] == 0
+    assert card["verdict"] == "MI_ADHERENT"
+
+
+def test_permission_is_same_turn_only():
+    turns = _turns(
+        ("agent", "Would you mind if I shared an idea?"),
+        ("callee", "Sure."),
+        ("agent", "I recommend a pill organizer. You should try it for a week."),
+    )
+    card = mod.analyze(turns, call_id="mi-perm2")
+    assert card["counts"]["advice_with_permission"] == 0
+    assert card["counts"]["advice_without_permission"] >= 1
+
+
+def test_affirmation_guard_over_advice():
+    card = mod.analyze(_turns(("agent", "You should be proud of keeping up your walks.")),
+                       call_id="mi-aff")
+    assert card["counts"]["affirmations"] == 1
+    assert card["counts"]["advice_without_permission"] == 0
+
+
+def test_open_vs_closed_question_starters():
+    labels = {s["text"]: s["label"] for t in (
+        "What gets in the way of the morning dose?",
+        "Do you keep it by the coffee maker?",
+        "How about a phone reminder?",
+    ) for s in mod.classify_turn(t)}
+    assert labels["What gets in the way of the morning dose?"] == "open_question"
+    assert labels["Do you keep it by the coffee maker?"] == "closed_question"
+    # Documented trap: wh-initial rule classifies "How about ...?" as open
+    # even though it is effectively a closed offer; kept deterministic.
+    assert labels["How about a phone reminder?"] == "open_question"
+
+
+def test_uncontracted_advice_forms():
+    text = "You will need to bring your insurance card. I would recommend arriving early."
+    labels = [s["label"] for s in mod.classify_turn(text)]
+    assert labels.count("advice_without_permission") >= 1
+    assert all(lbl == "advice_without_permission" for lbl in labels)
+
+
+def test_agent_future_need_is_not_advice():
+    card = mod.analyze(_turns(("agent", "I'm afraid I'll need the code.")),
+                       call_id="mi-fut")
+    assert card["counts"]["advice_without_permission"] == 0
+
+
+# ---------------------------------------------------------------------------
+# Craft template
+# ---------------------------------------------------------------------------
+
+def test_craft_default_prints_oars_body():
+    body = mod.craft_template()
+    assert "OARS" in body
+    assert "Would you mind if I shared" in body
+    assert "ROLL WITH RESISTANCE" in body
+
+
+def test_cli_craft_default():
+    r = _run(["craft"])
+    assert r.returncode == 0, r.stderr
+    assert "Would you mind if I shared" in r.stdout
+
+
+def test_cli_craft_language_passthrough_prefix():
+    r = _run(["craft", "--language", "vi-VN"])
+    assert r.returncode == 0, r.stderr
+    assert r.stdout.splitlines()[0] == "[vi-VN] Translate and apply the same MI structure below."
+    assert "Would you mind if I shared" in r.stdout
+
+
+# ---------------------------------------------------------------------------
 # Standalone runner (must stay LAST)
 # ---------------------------------------------------------------------------
 
