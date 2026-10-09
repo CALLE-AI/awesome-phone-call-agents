@@ -94,6 +94,129 @@ def test_cli_missing_call_result_exits_2():
 
 
 # ---------------------------------------------------------------------------
+# Core: detection, chains, propagation, confirmation
+# ---------------------------------------------------------------------------
+
+def test_explicit_sorry_i_said_weekday_propagated():
+    turns = [
+        _turn("agent", "Your table is set for Tuesday. Sorry, I said Tuesday; I meant Thursday."),
+        _turn("callee", "Thursday works."),
+        _turn("agent", "Great, see you Thursday."),
+    ]
+    card = mod.analyze(turns, "Reservation confirmed for Thursday.")
+    assert card["verdict"] == "PROPAGATED"
+    corr = card["corrections"][0]
+    assert corr["old_value"] == "tuesday" and corr["new_value"] == "thursday"
+    assert corr["kind"] == "weekday" and corr["confirmed"] is True
+
+
+def test_not_x_but_y_money_propagated():
+    turns = [
+        _turn("agent", "The deposit is not $20, but $45 total."),
+        _turn("callee", "Yes, $45 is fine."),
+        _turn("agent", "Perfect, $45 it is."),
+    ]
+    card = mod.analyze(turns, "Deposit of $45 collected.")
+    assert card["verdict"] == "PROPAGATED"
+    corr = card["corrections"][0]
+    assert corr["marker"] == "not_x_but_y" and corr["kind"] == "money"
+    assert corr["old_value"] == "$20" and corr["new_value"] == "$45"
+
+
+def test_proximity_old_from_previous_agent_turn():
+    turns = [
+        _turn("agent", "The total comes to $54."),
+        _turn("callee", "Wow, okay."),
+        _turn("agent", "Actually, it's $45 with the discount."),
+        _turn("callee", "Got it, $45."),
+        _turn("agent", "Thanks!"),
+    ]
+    card = mod.analyze(turns, "Charged $45.")
+    assert card["verdict"] == "PROPAGATED"
+    assert card["corrections"][0]["old_value"] == "$54"
+
+
+def test_chain_extends_twice_same_chain():
+    turns = [
+        _turn("agent", "Your pickup is Tuesday. Sorry, I meant Thursday."),
+        _turn("callee", "Okay, Thursday."),
+        _turn("agent", "Actually, correction: Friday at 2 p.m. works better."),
+        _turn("callee", "Friday is perfect."),
+        _turn("agent", "Great, Friday at 2 p.m. then."),
+    ]
+    card = mod.analyze(turns, "Pickup Friday at 14:00.")
+    assert card["verdict"] == "PROPAGATED"
+    assert any(c["final_value"] == "friday" for c in card["summary_checks"])
+    assert all(c["outcome"] != "stale" for c in card["summary_checks"])
+
+
+def test_stale_value_in_summary():
+    turns = [
+        _turn("agent", "We reserved Tuesday. Sorry, I meant Thursday."),
+        _turn("callee", "Thursday, yes."),
+        _turn("agent", "Thursday confirmed."),
+    ]
+    card = mod.analyze(turns, "Table booked for Tuesday.")
+    assert card["verdict"] == "STALE_VALUE_IN_SUMMARY"
+    assert card["summary_checks"][0]["outcome"] == "stale"
+
+
+def test_ambiguous_outcome_both_values_in_summary():
+    turns = [
+        _turn("agent", "We reserved Tuesday. Sorry, I meant Thursday."),
+        _turn("callee", "Thursday, yes."),
+        _turn("agent", "Thursday confirmed."),
+    ]
+    card = mod.analyze(turns, "Booked for Tuesday, corrected to Thursday.")
+    assert card["summary_checks"][0]["outcome"] == "ambiguous"
+
+
+def test_unreported_chain_advisory():
+    turns = [
+        _turn("agent", "We reserved Tuesday. Sorry, I meant Thursday."),
+        _turn("callee", "Thursday, yes."),
+        _turn("agent", "Thursday confirmed."),
+    ]
+    card = mod.analyze(turns, "Reservation confirmed.")
+    assert card["verdict"] == "PROPAGATED"
+    assert any(a.startswith("unreported_chain") for a in card["advisories"])
+
+
+def test_unconfirmed_correction_verdict():
+    turns = [
+        _turn("agent", "Tuesday. Sorry, I meant Thursday."),
+        _turn("callee", "Hmm, okay."),
+        _turn("agent", "Anything else?"),
+    ]
+    card = mod.analyze(turns, "Booked for Thursday.")
+    assert card["verdict"] == "CORRECTIONS_UNCONFIRMED"
+    assert card["counts"]["unconfirmed"] == 1
+
+
+def test_agent_restate_later_confirms():
+    turns = [
+        _turn("agent", "Your pickup is Tuesday. Sorry, I meant Thursday."),
+        _turn("callee", "Mmhmm."),
+        _turn("agent", "One more thing - your pickup is Thursday at 9 a.m."),
+    ]
+    card = mod.analyze(turns, "Thursday 09:00 pickup.")
+    assert card["verdict"] == "PROPAGATED"
+    assert card["corrections"][0]["confirmed"] is True
+
+
+def test_callee_ack_outside_window_unconfirmed():
+    turns = [
+        _turn("agent", "Your pickup is scheduled for Tuesday."),
+        _turn("agent", "Sorry, I meant Thursday."),
+        _turn("callee", "Hmm."),
+        _turn("agent", "Also, parking is free."),
+        _turn("callee", "Thursday, right, got it."),
+    ]
+    card = mod.analyze(turns, "Pickup on Thursday.")
+    assert card["verdict"] == "CORRECTIONS_UNCONFIRMED"
+
+
+# ---------------------------------------------------------------------------
 # Shared helpers
 # ---------------------------------------------------------------------------
 
