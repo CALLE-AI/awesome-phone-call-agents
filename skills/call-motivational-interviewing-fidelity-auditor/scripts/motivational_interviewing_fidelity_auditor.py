@@ -123,7 +123,7 @@ def is_agent_turn(turn: dict[str, str]) -> bool:
 _REFLECTION_RE = re.compile(
     r"^(?:so[,.]?\s+)?(?:(?:it\s+)?(?:sounds?|sounded|seems?|seemed)\s+like|"
     r"what\s+i(?:\s+hear|'?m\s+hearing)\s+(?:is|that)|i'?m\s+hearing\s+(?:that\s+)?|"
-    r"so\s+you(?:'re|\s+are)|you(?:'re|\s+are)\s+feeling|you(?:'re|\s+are)\s+saying\s+that|"
+    r"so\s+you(?:'re|\s+are|'ve|\s+have)|you(?:'re|\s+are|'ve|\s+have)\s+been|you(?:'re|\s+are)\s+feeling|you(?:'re|\s+are)\s+saying\s+that|"
     r"you\s+mentioned\s+that|i\s+hear\s+you\s+saying)\b", re.IGNORECASE)
 _AFFIRM_RE = re.compile(
     r"\b(?:you\s+did\s+a\s+(?:great|good|wonderful)\s+job|that\s+takes\s+(?:real\s+|a\s+lot\s+of\s+)?effort|"

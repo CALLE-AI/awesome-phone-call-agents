@@ -486,6 +486,16 @@ def test_change_talk_extended_stems_flip_gate():
         assert card["verdict"] != "NOT_MI_CALL", phrase
 
 
+def test_reflection_youve_been_stem():
+    counts = _counts_for("So you've been trying most days, and mornings are where it slips.")
+    assert counts["reflections"] == 1
+
+
+def test_reflection_you_have_been_uncontracted():
+    counts = _counts_for("So you have been taking it most days.")
+    assert counts["reflections"] == 1
+
+
 # ---------------------------------------------------------------------------
 # Standalone runner (must stay LAST)
 # ---------------------------------------------------------------------------
