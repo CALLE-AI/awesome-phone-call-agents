@@ -1,0 +1,23 @@
+{
+  "call_id": "demo-mi-001",
+  "status": "COMPLETED",
+  "to": "+14155550165",
+  "result": {
+    "post_summary": "Refill reminder delivered. Patient wants to stop skipping the evening dose and is open to a text reminder at the number on file.",
+    "transcript": [
+      {"speaker": "agent", "text": "Hi, this is your pharmacy's automated refill assistant. How have things been going with your medication?"},
+      {"speaker": "callee", "text": "Honestly, I keep missing the evening dose."},
+      {"speaker": "agent", "text": "It sounds like the evening dose is the tricky one."},
+      {"speaker": "callee", "text": "Yeah, exactly."},
+      {"speaker": "agent", "text": "What makes the evenings harder than the mornings?"},
+      {"speaker": "callee", "text": "I want to stop skipping it, but my schedule is chaotic."},
+      {"speaker": "agent", "text": "You've been really consistent with the morning dose, and that takes real effort."},
+      {"speaker": "callee", "text": "Thank you, mornings are fine."},
+      {"speaker": "agent", "text": "I have your mobile as +14155550165 for the refill reminder. Is that still the best number?"},
+      {"speaker": "callee", "text": "Yes, that's the right one."},
+      {"speaker": "agent", "text": "How could I help make the evenings easier?"},
+      {"speaker": "callee", "text": "Maybe a reminder text."},
+      {"speaker": "agent", "text": "So you're open to a text reminder. I'll set that up, and you can opt out anytime."}
+    ]
+  }
+}

@@ -261,6 +261,128 @@ def test_cli_craft_language_passthrough_prefix():
 
 
 # ---------------------------------------------------------------------------
+# Edges, guards, abstention, fixtures
+# ---------------------------------------------------------------------------
+
+def test_confront_and_warn_is_non_adherent():
+    turns = _turns(
+        ("agent", "You're just making excuses about the refill. If you don't refill it, you'll run out."),
+        ("callee", "I want to stop skipping it."),
+    )
+    card = mod.analyze(turns, call_id="mi-cw")
+    assert card["counts"]["confront"] == 1
+    assert card["counts"]["warn"] == 1
+    assert card["verdict"] == "NON_ADHERENT"
+
+
+def test_plain_reservation_is_not_mi_call():
+    turns = _turns(
+        ("agent", "Hi, this is the dental office confirming your appointment on Thursday."),
+        ("callee", "Yes, that's correct."),
+        ("agent", "We'll text a reminder to +14155550165."),
+        ("callee", "Great, see you then."),
+    )
+    assert mod.analyze(turns, call_id="mi-res")["verdict"] == "NOT_MI_CALL"
+
+
+def test_not_mi_overrides_advice_without_change_talk():
+    turns = _turns(
+        ("agent", "You should arrive ten minutes early to complete paperwork."),
+        ("callee", "Okay, I'll do that."),
+    )
+    card = mod.analyze(turns, call_id="mi-ovr")
+    assert card["counts"]["advice_without_permission"] == 1
+    assert card["verdict"] == "NOT_MI_CALL"
+
+
+def test_catch_all_partial_adherence():
+    turns = _turns(
+        ("agent", "Would you like to cut down on skipping?"),
+        ("callee", "I want to stop skipping it."),
+        ("agent", "Would a reminder call help?"),
+        ("callee", "Maybe."),
+        ("agent", "Okay, we'll set that up."),
+    )
+    card = mod.analyze(turns, call_id="mi-part")
+    assert card["counts"]["reflections"] == 0
+    assert card["counts"]["open_questions"] < card["counts"]["closed_questions"]
+    assert card["verdict"] == "PARTIALLY_ADHERENT"
+
+
+def test_low_sample_advisory_under_six_agent_turns():
+    turns = _turns(
+        ("agent", "How is the medication going?"),
+        ("callee", "I want to stop skipping it."),
+        ("agent", "It sounds like you want to be more consistent."),
+    )
+    card = mod.analyze(turns, call_id="mi-low")
+    assert "low_sample" in card["advisories"]
+
+
+def test_no_low_sample_advisory_at_six_agent_turns():
+    turns = MI_DIALOGUE + _turns(
+        ("callee", "Thanks."),
+        ("agent", "Thanks for your time."),
+        ("agent", "Take care."),
+    )
+    assert "low_sample" not in mod.analyze(turns, call_id="mi-full")["advisories"]
+
+
+def test_am_split_safety():
+    # "a.m." must not terminate a sentence, but a later plain boundary still
+    # splits, so the open question is detected rather than glued forever.
+    glued = mod.classify_turn("Let's lock in 9 a.m. What makes mornings hard for you?")
+    assert len(glued) == 1 and glued[0]["label"] == "closed_question"
+    split = mod.classify_turn("Let's lock in 9 a.m. Just one more thing. What makes mornings hard?")
+    labels = [s["label"] for s in split]
+    assert "open_question" in labels
+
+
+def test_masked_phone_never_affects_classification():
+    card = mod.analyze(_turns(
+        ("agent", "I'll text the refill reminder to +14155550165. What works best for you?"),
+        ("callee", "I want to stop skipping it."),
+    ), call_id="mi-mask")
+    assert card["counts"]["open_questions"] == 1
+    assert card["counts"]["advice_without_permission"] == 0
+
+
+def _analyze_fixture(name):
+    return _run(["analyze", "--call-result", str(REFERENCES / name)])
+
+
+def test_fixture_mi_adherent_end_to_end():
+    r = _analyze_fixture("example-call-result.json")
+    assert r.returncode == 0, r.stderr
+    card = json.loads(r.stdout)
+    assert card["verdict"] == "MI_ADHERENT" and card["call_id"] == "demo-mi-001"
+    assert card["counts"]["advice_without_permission"] == 0
+    assert card["counts"]["open_questions"] >= card["counts"]["closed_questions"]
+
+
+def test_fixture_non_adherent_end_to_end():
+    r = _analyze_fixture("example-call-result-nonadherent.json")
+    assert r.returncode == 0, r.stderr
+    card = json.loads(r.stdout)
+    assert card["verdict"] == "NON_ADHERENT" and card["call_id"] == "demo-mi-002"
+    assert card["counts"]["advice_without_permission"] >= 3
+    assert card["change_talk_markers"] >= 1
+
+
+def test_fixture_not_mi_end_to_end():
+    r = _analyze_fixture("example-call-result-not-mi.json")
+    assert r.returncode == 0, r.stderr
+    card = json.loads(r.stdout)
+    assert card["verdict"] == "NOT_MI_CALL" and card["call_id"] == "demo-mi-003"
+    assert card["change_talk_markers"] == 0
+
+
+def test_goal_fixture_matches_craft_output():
+    goal = (REFERENCES / "example-goal.txt").read_text(encoding="utf-8")
+    assert goal == mod.craft_template()
+
+
+# ---------------------------------------------------------------------------
 # Standalone runner (must stay LAST)
 # ---------------------------------------------------------------------------
 

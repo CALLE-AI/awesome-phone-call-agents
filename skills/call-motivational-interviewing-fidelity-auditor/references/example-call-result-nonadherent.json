@@ -1,0 +1,20 @@
+{
+  "call_id": "demo-mi-002",
+  "status": "COMPLETED",
+  "to": "+14155550165",
+  "result": {
+    "post_summary": "Refill reminder delivered with direct instructions. Patient expressed willingness to take the medication regularly.",
+    "transcript": [
+      {"speaker": "agent", "text": "Hello, this is your pharmacy refill assistant calling about your blood pressure medication."},
+      {"speaker": "callee", "text": "Oh, okay."},
+      {"speaker": "agent", "text": "You should set a daily alarm so you stop skipping doses."},
+      {"speaker": "callee", "text": "I do forget a lot."},
+      {"speaker": "agent", "text": "You need to take it with food every morning."},
+      {"speaker": "callee", "text": "I want to take it regularly, honestly."},
+      {"speaker": "agent", "text": "You must refill before Friday or the prescription lapses."},
+      {"speaker": "callee", "text": "That's a lot to think about."},
+      {"speaker": "agent", "text": "I'll text the refill confirmation to +14155550165."},
+      {"speaker": "callee", "text": "Fine, thanks."}
+    ]
+  }
+}

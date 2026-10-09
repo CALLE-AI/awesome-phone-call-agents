@@ -1,0 +1,16 @@
+{
+  "call_id": "demo-mi-003",
+  "status": "COMPLETED",
+  "to": "+14155550165",
+  "result": {
+    "post_summary": "Dental appointment confirmed for Thursday at 3 p.m.; reminder text requested.",
+    "transcript": [
+      {"speaker": "agent", "text": "Hi, this is the dental office confirming your appointment on Thursday at 3 p.m."},
+      {"speaker": "callee", "text": "Yes, that's correct."},
+      {"speaker": "agent", "text": "You should arrive ten minutes early to complete paperwork."},
+      {"speaker": "callee", "text": "Okay, I'll do that."},
+      {"speaker": "agent", "text": "We'll text a reminder to +14155550165."},
+      {"speaker": "callee", "text": "Great, see you then."}
+    ]
+  }
+}
