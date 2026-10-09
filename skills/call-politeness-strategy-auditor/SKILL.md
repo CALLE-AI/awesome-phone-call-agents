@@ -56,10 +56,12 @@ Deterministic, offline, no LLM:
    every turn and the post_summary before analysis, keeping the last two
    characters. Masked digits never affect classification.
 2. **Detect request sentences** in agent turns only: imperatives
-   (verb-initial: give/spell/repeat/confirm/...), questions (sentence ends
-   "?"), and implicit redressed forms ("If you would...", "I was wondering
-   if...", "Would you mind...", "Might I ask...", "I'm afraid...",
-   "I'd like you to...", "Sorry to trouble you...", "My apologies...").
+   (verb-initial: give/spell/repeat/confirm/read/write down/enter/press/
+   bring/hand/state/list/say/tell/provide, plus "hold the line"), questions
+   (sentence ends "?"), and implicit redressed forms ("If you would...",
+   "I was wondering if...", "Would you mind...", "Might I ask...",
+   "I'm afraid...", "I'd like you to...", "Sorry to trouble you...",
+   "Forgive me/the...", "My apologies...").
    Transitional waits ("Hold on", "One moment", "Bear with me",
    "Give me a second") and agent-self-directed sentences ("Let me check",
    "I'll be right back") are not requests. "Say, ..." / "Tell me, ..."
