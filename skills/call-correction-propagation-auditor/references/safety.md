@@ -50,6 +50,8 @@
 - Proximity resolution picks the nearest preceding same-kind value, so
   disjunctive lists ("Tuesday or Wednesday") may bind the wrong
   superseded value.
+- Corrections packed with multiple value pairs in one sentence may
+  undercount (each marker binds one old/new pair).
 - Weekday possessives and plurals ("Tuesday's") are treated as different
   tokens by the boundary rule and will not match a plain "Tuesday".
 - Agent corrections prompted by the callee ("No, Thursday") are

@@ -115,6 +115,9 @@ carries corrections forward instead of stale values.
 - proximity resolution picks the nearest preceding same-kind value, so
   disjunctive lists ("Tuesday or Wednesday") may bind the wrong
   superseded value
+- corrections packed with multiple value pairs in one sentence ("it's the
+  21st, not the 16th, and 2 bags, not 3") may undercount - each marker
+  binds one old/new pair
 - weekday possessives and plurals ("Tuesday's") are treated as different
   tokens by the boundary rule and will not match a plain "Tuesday"
 - agent corrections prompted by the CALLEE ("No, Thursday") are
