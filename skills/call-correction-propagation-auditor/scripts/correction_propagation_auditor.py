@@ -349,8 +349,23 @@ def _build_event(
                 if old is None:
                     old = _proximity_value(turn_values, turns, turn_index, sent_start + m.start(), new["kind"], new["value"])
     elif name == "scratch":
-        # The new value may sit in the remainder of the same sentence.
-        new = _first_value_after(turn_values, sent_start + m.end())
+        # A value in the marker sentence ("Scratch the Tuesday part") is the
+        # value being REMOVED (old); the new value must come later in the turn.
+        # With no in-sentence value ("Scratch that"), the marker stays pending
+        # and the new value is the first one after the marker.
+        in_sentence = [
+            v for v in turn_values
+            if sent_start + m.end() <= v["start"] < sent_end
+        ]
+        if in_sentence:
+            old = in_sentence[0]
+            new = _first_value_after(turn_values, sent_end)
+            if new is None:
+                # No replacement value exists; cannot determine it
+                # deterministically, so no event fires (conservative).
+                return None
+        else:
+            new = _first_value_after(turn_values, sent_start + m.end())
     else:  # meant alone / correction / let_me_correct / incorrect / should_be / my_mistake / actually_its
         new = _first_value_after(turn_values, sent_start + m.end())
 

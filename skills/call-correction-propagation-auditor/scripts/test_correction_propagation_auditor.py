@@ -300,9 +300,11 @@ def test_actually_the_total_is_value():
     assert corr["old_value"] == "$54" and corr["new_value"] == "$45"
 
 
-def test_scratch_accepts_same_sentence_new_value():
+def test_scratch_pending_new_value_in_next_sentence():
+    # "Scratch that" with no value in the marker sentence stays pending;
+    # the new value is the first one after the marker sentence.
     turns = [
-        _turn("agent", "You're booked for Tuesday. Scratch that, Thursday works better."),
+        _turn("agent", "You're booked for Tuesday. Scratch that. Thursday works better."),
         _turn("callee", "Thursday then."),
         _turn("agent", "Great."),
     ]
@@ -311,6 +313,35 @@ def test_scratch_accepts_same_sentence_new_value():
     corr = card["corrections"][0]
     assert corr["marker"] == "scratch"
     assert corr["old_value"] == "tuesday" and corr["new_value"] == "thursday"
+
+
+def test_scratch_in_sentence_value_is_superseded_old():
+    # "Scratch the Tuesday part" names the value being REMOVED, not the new one.
+    turns = [
+        _turn("agent", "Tuesday works? Great. Actually, scratch the Tuesday part. Let's do Friday instead."),
+        _turn("callee", "Friday, yes."),
+        _turn("agent", "Friday it is."),
+    ]
+    card = mod.analyze(turns, "Booked for Tuesday.")
+    assert card["verdict"] == "STALE_VALUE_IN_SUMMARY"
+    corr = card["corrections"][0]
+    assert corr["marker"] == "scratch"
+    assert corr["old_value"] == "tuesday" and corr["new_value"] == "friday"
+    check = card["summary_checks"][0]
+    assert check["outcome"] == "stale" and "tuesday" in check["stale_values_in_summary"]
+
+
+def test_scratch_in_sentence_value_without_later_new_value_no_event():
+    # Conservative: with no value later in the turn, the replacement cannot be
+    # determined deterministically, so no correction event fires.
+    turns = [
+        _turn("agent", "You're booked for Tuesday. Scratch the Tuesday part."),
+        _turn("callee", "Okay."),
+        _turn("agent", "Great."),
+    ]
+    card = mod.analyze(turns, "Booked for Tuesday.")
+    assert card["verdict"] == "NO_SELF_CORRECTIONS"
+    assert card["corrections"] == []
 
 
 def test_weekday_possessive_in_summary_not_matched():
