@@ -358,6 +358,19 @@ def test_tell_me_bald_and_please_softened():
     assert card["requests"][1]["grade"] == "SOFTENED"
 
 
+def test_typographic_apostrophes_normalized():
+    # Real CALL-E ASR emits U+2019; "I'm afraid ..." must still classify as
+    # an implicit redressed request (caught by isolated probe pre-fix).
+    turns = _turns(
+        ("agent", "I\u2019m afraid I\u2019ll still need your membership number."),
+        ("callee", "Okay."),
+    )
+    card = analyze(turns, "")
+    assert card["counts"]["requests"] == 1
+    assert card["requests"][0]["grade"] == "SOFTENED"
+    assert "apologize" in card["requests"][0]["strategies"]
+
+
 def test_masked_digits_do_not_break_classification():
     turns = _turns(
         ("agent", "Confirm the number +14155550179, please."),
