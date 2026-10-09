@@ -12,6 +12,10 @@ Heuristic twin-mode skill:
            agent re-states, confirms, and consistently uses corrected values
 
 Runs offline, deterministic, no LLM, no network. Input errors exit 2.
+
+Limitations: proximity resolution picks the nearest preceding same-kind
+value; disjunctive lists ("Tuesday or Wednesday") may bind the wrong
+superseded value.
 """
 
 from __future__ import annotations
@@ -115,7 +119,7 @@ _MONTH_DAY_RE = re.compile(
     rf"|\b(?:the\s+)?([0-9]{{1,2}})(?:st|nd|rd|th)\s+of\s+({_MONTHS})\b"
     rf"|\b([0-9]{{1,2}})(?:st|nd|rd|th)?\s+({_MONTHS})\b", re.IGNORECASE)
 _SLASH_DATE_RE = re.compile(r"\b([0-9]{1,2})/([0-9]{1,2})\b")
-_WEEKDAY_RE = re.compile(r"\b(?:monday|tuesday|wednesday|thursday|friday|saturday|sunday)\b", re.IGNORECASE)
+_WEEKDAY_RE = re.compile(r"\b(?:monday|tuesday|wednesday|thursday|friday|saturday|sunday)(?![a-z'])", re.IGNORECASE)
 _CLOCK_RE = re.compile(r"\b(?:at\s+)?([0-9]{1,2})(?::([0-9]{2}))?\s*(a\.?m\.?|p\.?m\.?)?\b(?![0-9])", re.IGNORECASE)
 _MONEY_RE = re.compile(r"[$]([0-9][0-9 ,.]*[0-9]|[0-9])\b|\b([0-9][0-9 ,.]*[0-9]|[0-9])\s+(?:dollars|usd)\b", re.IGNORECASE)
 _COUNT_RE = re.compile(r"\b([0-9][0-9 ,]*[0-9]|[0-9])\s+(?:guests?|people|persons?|minutes?|hours?|days?|seats?|items?|pills?|tablets?|refills?|bags?|boxes?)\b", re.IGNORECASE)
@@ -215,17 +219,22 @@ def extract_values(text: str) -> list[dict[str, Any]]:
 
 _MARKERS = [
     ("not_x_but_y", re.compile(r"\bnot\s+(?P<old>[^,.;!?]{1,40}?)\s*,?\s*(?:but\s+(?:it'?s\s+)?|it'?s\s+|\u2014|-)\s*", re.IGNORECASE)),
+    ("y_not_x", re.compile(r"\b(?:it'?s|that'?s|i\s+meant)\s+(?P<new>[^,.;!?]{1,40}?)\s+not\s+(?P<old>[^,.;!?]{1,40})", re.IGNORECASE)),
     ("sorry_i_said", re.compile(r"\bsorry[,.]?\s+i\s+said\b|\bi\s+missaid\b", re.IGNORECASE)),
     ("meant", re.compile(r"\bi\s+meant\b(?!\s+(?:that|to\s+say\s+that)\b)", re.IGNORECASE)),
     ("correction", re.compile(r"\bcorrection\s*[:,-]?\s*", re.IGNORECASE)),
+    ("let_me_correct", re.compile(r"\blet\s+me\s+correct\s+that\s*[:,-]?\s*", re.IGNORECASE)),
+    ("incorrect", re.compile(r"\b(?:that'?s|that\s+is)\s+incorrect[,.]?\s*(?:it'?s\s+)?", re.IGNORECASE)),
     ("should_be", re.compile(r"\b(?:that|it)\s+should\s+be\s+", re.IGNORECASE)),
-    ("my_mistake", re.compile(r"\bmy\s+mistake\b|\bi\s+misspoke\b|\bmy\s+apologies[,.]?\s*it'?s\s+", re.IGNORECASE)),
-    ("actually_its", re.compile(r"\bactually[,.]?\s+it'?s\s+", re.IGNORECASE)),
+    ("my_mistake", re.compile(r"\bmy\s+mistake\b|\bi\s+(?:have\s+)?misspok(?:e|en)\b|\bmy\s+apologies[,.]?\s*it'?s\s+", re.IGNORECASE)),
+    ("actually_its", re.compile(r"\bactually[,.]?\s+(?:(?:it|that)'?s|the\s+[a-z]+\s+is)\s+", re.IGNORECASE)),
     ("scratch", re.compile(r"\bscratch\s+(?:that|the)\b", re.IGNORECASE)),
 ]
 
 _ACK_RE = re.compile(
-    r"\b(?:yes|yep|yeah|that'?s (?:right|correct)|correct|sounds good|perfect|exactly|great)\b",
+    r"\b(?:ok(?:ay)?|sure|alright|absolutely|yes|yep|yeah|"
+    r"that'?s (?:right|correct)|correct|that works|works for me|"
+    r"sounds good|perfect|exactly|great)\b",
     re.IGNORECASE,
 )
 
@@ -278,6 +287,19 @@ def _proximity_value(
     return None
 
 
+def _bare_number_value(text: str, new: dict[str, Any]) -> dict[str, Any] | None:
+    """Same-kind value for a lone number old-group ("it's 2 guests not 4")."""
+    mm = re.match(r"^\s*\$?\s*([0-9][0-9 ,]*[0-9]|[0-9])\s*$", text, re.IGNORECASE)
+    if not mm:
+        return None
+    digits = re.sub(r"[ ,]", "", mm.group(1))
+    if new["kind"] == "count":
+        return {"kind": "count", "value": digits, "raw": text.strip(), "start": 0}
+    if new["kind"] == "money":
+        return {"kind": "money", "value": "$" + digits, "raw": text.strip(), "start": 0}
+    return None
+
+
 def _build_event(
     name: str,
     m: re.Match[str],
@@ -296,24 +318,47 @@ def _build_event(
         old_vals = extract_values(m.group("old"))
         old = old_vals[0] if old_vals else None
         new = _first_value_after(turn_values, sent_start + m.end())
+    elif name == "y_not_x":
+        new_vals = extract_values(m.group("new"))
+        new = new_vals[0] if new_vals else None
+        old_vals = extract_values(m.group("old"))
+        if old_vals:
+            old = old_vals[0]
+        elif new is not None:
+            old = _bare_number_value(m.group("old"), new)
     elif name == "sorry_i_said":
-        old = _first_value_after(turn_values, sent_start + m.end())
         meant_m = next(rx for n, rx in _MARKERS if n == "meant").search(sent)
-        if old is not None and meant_m:
+        if meant_m is None:
+            old = _first_value_after(turn_values, sent_start + m.end())
+            if old is not None:
+                new = _proximity_value(turn_values, turns, turn_index, sent_start + m.start(), old["kind"], old["value"])
+        else:
             new = _first_value_after(turn_values, sent_start + meant_m.end())
-        elif old is not None:
-            prox = _proximity_value(turn_values, turns, turn_index, sent_start + m.start(), old["kind"], old["value"])
-            new = prox
+            if new is not None:
+                # Old candidates live between the marker and "meant"; a
+                # candidate identical to the new value ("I missaid the date;
+                # I meant Thursday") means the real old value must come from
+                # proximity instead.
+                region_end = sent_start + meant_m.start()
+                old = next(
+                    (v for v in turn_values
+                     if sent_start + m.end() <= v["start"] < region_end
+                     and v["kind"] == new["kind"] and v["value"] != new["value"]),
+                    None,
+                )
+                if old is None:
+                    old = _proximity_value(turn_values, turns, turn_index, sent_start + m.start(), new["kind"], new["value"])
     elif name == "scratch":
-        new = _first_value_after(turn_values, sent_end)
-    else:  # meant alone / correction / should_be / my_mistake / actually_its
+        # The new value may sit in the remainder of the same sentence.
+        new = _first_value_after(turn_values, sent_start + m.end())
+    else:  # meant alone / correction / let_me_correct / incorrect / should_be / my_mistake / actually_its
         new = _first_value_after(turn_values, sent_start + m.end())
 
     if new is None:
         return None
-    if old is None and name != "not_x_but_y":
+    if old is None and name not in ("not_x_but_y", "y_not_x"):
         old = _proximity_value(turn_values, turns, turn_index, sent_start + m.start(), new["kind"], new["value"])
-    if name == "not_x_but_y" and (old is None or new is None):
+    if name in ("not_x_but_y", "y_not_x") and (old is None or new is None):
         return None
     return {
         "turn_index": turn_index,
@@ -385,7 +430,8 @@ def _value_pattern(kind: str, value: str) -> str:
     if kind == "clock":
         return rf"(?<![0-9:]){esc}(?![0-9:])"
     if kind == "weekday":
-        return rf"\b{esc}\b"
+        # "Tuesday's" is a different token: no match after ' or a letter.
+        return rf"\b{esc}(?![a-z'])"
     return rf"(?<![0-9]){esc}(?![0-9])"
 
 

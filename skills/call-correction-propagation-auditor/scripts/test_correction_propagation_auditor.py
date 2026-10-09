@@ -185,7 +185,7 @@ def test_unreported_chain_advisory():
 def test_unconfirmed_correction_verdict():
     turns = [
         _turn("agent", "Tuesday. Sorry, I meant Thursday."),
-        _turn("callee", "Hmm, okay."),
+        _turn("callee", "Hmm, let me check."),
         _turn("agent", "Anything else?"),
     ]
     card = mod.analyze(turns, "Booked for Thursday.")
@@ -214,6 +214,128 @@ def test_callee_ack_outside_window_unconfirmed():
     ]
     card = mod.analyze(turns, "Pickup on Thursday.")
     assert card["verdict"] == "CORRECTIONS_UNCONFIRMED"
+
+
+# ---------------------------------------------------------------------------
+# Adversarial review: missaid fallback, y-not-x, marker recall, boundaries
+# ---------------------------------------------------------------------------
+
+def test_missaid_old_falls_back_to_proximity_not_new_value():
+    # BLOCKER 1: naive old-candidate search picks "thursday" (== new), so a
+    # stale "Tuesday" summary would pass as PROPAGATED.
+    turns = [
+        _turn("agent", "Tuesday. I missaid the date; I meant Thursday."),
+        _turn("callee", "Thursday, yes."),
+        _turn("agent", "Great."),
+    ]
+    card = mod.analyze(turns, "Booked for Tuesday.")
+    assert card["verdict"] == "STALE_VALUE_IN_SUMMARY"
+    corr = card["corrections"][0]
+    assert corr["old_value"] == "tuesday" and corr["new_value"] == "thursday"
+
+
+def test_y_not_x_reversed_order_stale():
+    # BLOCKER 2: "it's X not Y" carries both values in reversed order.
+    turns = [
+        _turn("agent", "Party of 4. Sorry, correction, it's 2 guests not 4."),
+        _turn("callee", "Got it, 2."),
+        _turn("agent", "Yes."),
+    ]
+    card = mod.analyze(turns, "Party of 4 confirmed.")
+    assert card["verdict"] == "STALE_VALUE_IN_SUMMARY"
+    corr = card["corrections"][0]
+    assert corr["marker"] == "y_not_x" and corr["kind"] == "count"
+    assert corr["old_value"] == "4" and corr["new_value"] == "2"
+
+
+def test_i_have_misspoken_marker():
+    turns = [
+        _turn("agent", "The fee is $20. I have misspoken; the correct total is $45."),
+        _turn("callee", "Yes, $45."),
+        _turn("agent", "Great."),
+    ]
+    card = mod.analyze(turns, "Fee is $45.")
+    assert card["verdict"] == "PROPAGATED"
+    corr = card["corrections"][0]
+    assert corr["marker"] == "my_mistake"
+    assert corr["old_value"] == "$20" and corr["new_value"] == "$45"
+
+
+def test_thats_incorrect_marker():
+    turns = [
+        _turn("agent", "Your delivery is on Tuesday. That's incorrect, it's Friday."),
+        _turn("callee", "Friday, got it."),
+        _turn("agent", "Friday it is."),
+    ]
+    card = mod.analyze(turns, "Delivery on Friday.")
+    assert card["verdict"] == "PROPAGATED"
+    corr = card["corrections"][0]
+    assert corr["marker"] == "incorrect"
+    assert corr["old_value"] == "tuesday" and corr["new_value"] == "friday"
+
+
+def test_let_me_correct_that_marker():
+    turns = [
+        _turn("agent", "Your appointment is at 6 p.m. Let me correct that: 7 p.m."),
+        _turn("callee", "7 p.m. works."),
+        _turn("agent", "Great."),
+    ]
+    card = mod.analyze(turns, "Appointment at 19:00.")
+    assert card["verdict"] == "PROPAGATED"
+    corr = card["corrections"][0]
+    assert corr["marker"] == "let_me_correct"
+    assert corr["old_value"] == "18:00" and corr["new_value"] == "19:00"
+
+
+def test_actually_the_total_is_value():
+    turns = [
+        _turn("agent", "You owe $54. Actually the total is $45 with the discount."),
+        _turn("callee", "Got it, $45."),
+        _turn("agent", "Thanks."),
+    ]
+    card = mod.analyze(turns, "Charged $45.")
+    assert card["verdict"] == "PROPAGATED"
+    corr = card["corrections"][0]
+    assert corr["marker"] == "actually_its"
+    assert corr["old_value"] == "$54" and corr["new_value"] == "$45"
+
+
+def test_scratch_accepts_same_sentence_new_value():
+    turns = [
+        _turn("agent", "You're booked for Tuesday. Scratch that, Thursday works better."),
+        _turn("callee", "Thursday then."),
+        _turn("agent", "Great."),
+    ]
+    card = mod.analyze(turns, "Booked for Thursday.")
+    assert card["verdict"] == "PROPAGATED"
+    corr = card["corrections"][0]
+    assert corr["marker"] == "scratch"
+    assert corr["old_value"] == "tuesday" and corr["new_value"] == "thursday"
+
+
+def test_weekday_possessive_in_summary_not_matched():
+    # Boundary rule: a weekday followed by ' or a letter is a different token
+    # ("Tuesday's") and never matches a superseded/final weekday value.
+    turns = [
+        _turn("agent", "We reserved Tuesday. Sorry, I said Tuesday; I meant Thursday."),
+        _turn("callee", "Thursday, yes."),
+        _turn("agent", "Thursday confirmed."),
+    ]
+    card = mod.analyze(turns, "Tuesday's booking stands.")
+    assert card["summary_checks"][0]["outcome"] == "unreported"
+    assert card["verdict"] == "PROPAGATED"
+    assert any(a.startswith("unreported_chain: thursday") for a in card["advisories"])
+
+
+def test_ack_okay_confirms_chain():
+    turns = [
+        _turn("agent", "Your pickup is Tuesday. Sorry, I meant Thursday."),
+        _turn("callee", "Okay."),
+        _turn("agent", "Great."),
+    ]
+    card = mod.analyze(turns, "Pickup Thursday.")
+    assert card["corrections"][0]["confirmed"] is True
+    assert card["verdict"] == "PROPAGATED"
 
 
 # ---------------------------------------------------------------------------
