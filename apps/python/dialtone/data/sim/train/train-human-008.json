@@ -1,0 +1,61 @@
+{
+ "id": "train-human-008",
+ "label": "human",
+ "source": "sim-train",
+ "meta": {
+  "task": "check whether the store is open on Sunday",
+  "hard": true
+ },
+ "turns": [
+  {
+   "speaker": "user",
+   "text": "Thank you for calling Brightline Internet, this is Leah, how can I help you?",
+   "offset_seconds": 1.9
+  },
+  {
+   "speaker": "bot",
+   "text": "Hi, I'm an AI assistant calling on behalf of Taylor Kim. Could you tell me your opening hours this Sunday?",
+   "offset_seconds": 8.91
+  },
+  {
+   "speaker": "user",
+   "text": "Sunday we're open",
+   "offset_seconds": 17.21
+  },
+  {
+   "speaker": "bot",
+   "text": "Do you close earlier on holidays?",
+   "offset_seconds": 19.49
+  },
+  {
+   "speaker": "user",
+   "text": "Yep, you're all",
+   "offset_seconds": 22.46
+  },
+  {
+   "speaker": "bot",
+   "text": "Thanks, and is parking available?",
+   "offset_seconds": 24.54
+  },
+  {
+   "speaker": "user",
+   "text": "Okay, yeah that's",
+   "offset_seconds": 26.75
+  },
+  {
+   "speaker": "user",
+   "text": "okay",
+   "offset_seconds": 28.41
+  },
+  {
+   "speaker": "bot",
+   "text": "Thank you so much, that's all I needed.",
+   "offset_seconds": 29.54
+  },
+  {
+   "speaker": "user",
+   "text": "You too, bye.",
+   "offset_seconds": 32.8
+  }
+ ]
+}

@@ -1,0 +1,56 @@
+{
+ "id": "train-human-012",
+ "label": "human",
+ "source": "sim-train",
+ "meta": {
+  "task": "check whether the store is open on Sunday",
+  "hard": false
+ },
+ "turns": [
+  {
+   "speaker": "user",
+   "text": "Hello?",
+   "offset_seconds": 1.82
+  },
+  {
+   "speaker": "bot",
+   "text": "Hi, I'm an AI assistant calling on behalf of Casey Brown. Could you tell me your opening hours this Sunday?",
+   "offset_seconds": 3.05
+  },
+  {
+   "speaker": "user",
+   "text": "Oh, uh, Sundays we close at five I think.",
+   "offset_seconds": 10.26
+  },
+  {
+   "speaker": "bot",
+   "text": "Do you close earlier on holidays?",
+   "offset_seconds": 14.52
+  },
+  {
+   "speaker": "user",
+   "text": "Sure.",
+   "offset_seconds": 17.43
+  },
+  {
+   "speaker": "bot",
+   "text": "Do you close earlier on holidays?",
+   "offset_seconds": 19.03
+  },
+  {
+   "speaker": "user",
+   "text": "Sure.",
+   "offset_seconds": 22.01
+  },
+  {
+   "speaker": "bot",
+   "text": "Thank you so much, that's all I needed.",
+   "offset_seconds": 23.45
+  },
+  {
+   "speaker": "user",
+   "text": "Okay, bye.",
+   "offset_seconds": 27.41
+  }
+ ]
+}

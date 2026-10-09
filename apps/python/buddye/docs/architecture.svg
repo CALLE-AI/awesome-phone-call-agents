@@ -1,0 +1,238 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1260 980" role="img" aria-labelledby="bda-title bda-desc" font-family="system-ui, -apple-system, 'Segoe UI', Helvetica, Arial, sans-serif">
+<title id="bda-title">BuddyE architecture</title>
+<desc id="bda-desc">A hazard and a roster are triaged worst-first, each neighbour's call contract is compiled and passed through consent, allowlist and budget gates to CALL-E. Results are validated locally, unknown fields go to an LLM understanding pass, and decide() returns one of five outcomes; no answer, failed and unreadable calls flow into decide() rather than being skipped. Anything not SAFE opens an escalation ladder that ends at a prepared handoff packet only a named human can release, and an incident whose dispatch is filtered by code, ranked by a model, re-validated by code, committed automatically for community resources and held as PROPOSED for EMS, fire and police until a named human authorises it. A FastAPI and SQLite backend streams events over SSE to a React console.</desc>
+<defs>
+<marker id="bda-arrow" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+<path d="M0,0 L10,5 L0,10 z" fill="#5d5f66"/>
+</marker>
+<marker id="bda-arrow-red" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+<path d="M0,0 L10,5 L0,10 z" fill="#b3261e"/>
+</marker>
+<marker id="bda-arrow-light" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+<path d="M0,0 L10,5 L0,10 z" fill="#8a8b91"/>
+</marker>
+</defs>
+
+<rect x="0" y="0" width="1260" height="980" fill="#f4f4f1"/>
+
+<!-- header -->
+<text x="40" y="44" font-size="22" font-weight="700" fill="#17181c">BuddyE architecture</text>
+<text x="40" y="68" font-size="13" fill="#5d5f66">Rules decide. Models only rank or write. Nothing reaches an emergency service without a named human.</text>
+
+<!-- ============ 1 · SWEEP ============ -->
+<text x="40" y="102" font-family="ui-monospace, SFMono-Regular, Menlo, monospace" font-size="10.5" letter-spacing="1.5" fill="#8a8b91">1 · SWEEP — EVERY NEIGHBOUR, WORST FIRST, TO THE END OF THE LIST</text>
+
+<!-- row 1 -->
+<rect x="40" y="116" width="204" height="96" rx="8" fill="#ffffff" stroke="#d9d9d4"/>
+<text x="52" y="140" font-size="13" font-weight="600" fill="#17181c">Hazard + roster</text>
+<text x="52" y="160" font-size="11.5" fill="#5d5f66">heat · outage · flood · smoke</text>
+<text x="52" y="176" font-size="11.5" fill="#5d5f66">neighbours + consent flags</text>
+<text x="52" y="198" font-family="ui-monospace, SFMono-Regular, Menlo, monospace" font-size="9.5" fill="#8a8b91">domain/hazards.py</text>
+
+<rect x="284" y="116" width="204" height="96" rx="8" fill="#ffffff" stroke="#d9d9d4"/>
+<text x="296" y="140" font-size="13" font-weight="600" fill="#17181c">Hazard-conditioned triage</text>
+<text x="296" y="160" font-size="11.5" fill="#5d5f66">score, band, time-to-harm</text>
+<text x="296" y="176" font-size="11.5" fill="#5d5f66">a reason per point · no model</text>
+<text x="296" y="198" font-family="ui-monospace, SFMono-Regular, Menlo, monospace" font-size="9.5" fill="#8a8b91">domain/risk.py</text>
+
+<rect x="528" y="116" width="204" height="96" rx="8" fill="#ffffff" stroke="#d9d9d4"/>
+<text x="540" y="140" font-size="13" font-weight="600" fill="#17181c">Call contract compiler</text>
+<text x="540" y="160" font-size="11.5" fill="#5d5f66">hazard facts → required fields</text>
+<text x="540" y="176" font-size="11.5" fill="#5d5f66">spoken task + result_schema</text>
+<text x="540" y="198" font-family="ui-monospace, SFMono-Regular, Menlo, monospace" font-size="9.5" fill="#8a8b91">calls/contract.py</text>
+
+<rect x="772" y="116" width="204" height="96" rx="8" fill="#ffffff" stroke="#d9d9d4"/>
+<text x="784" y="140" font-size="13" font-weight="600" fill="#17181c">Dial gates, at the row</text>
+<text x="784" y="160" font-size="11.5" fill="#5d5f66">consent · allowlist · budget</text>
+<text x="784" y="176" font-size="11.5" fill="#5d5f66">idempotency key before dial</text>
+<text x="784" y="198" font-family="ui-monospace, SFMono-Regular, Menlo, monospace" font-size="9.5" fill="#8a8b91">calls/budget.py</text>
+
+<rect x="1016" y="116" width="204" height="96" rx="8" fill="#e7edf8" stroke="#2b4c8c" stroke-width="1.5" stroke-dasharray="6 4"/>
+<text x="1028" y="140" font-size="13" font-weight="700" fill="#1f3a6e">CALL-E phone call</text>
+<text x="1028" y="160" font-size="11.5" fill="#2b4c8c">calle-ai SDK · CLI / MCP</text>
+<text x="1028" y="176" font-size="11.5" fill="#2b4c8c">mock provider by default</text>
+<text x="1028" y="198" font-family="ui-monospace, SFMono-Regular, Menlo, monospace" font-size="9.5" fill="#5d6f96">calls/calle_sdk · mcp · mock</text>
+
+<line x1="244" y1="164" x2="282" y2="164" stroke="#5d5f66" stroke-width="1.4" marker-end="url(#bda-arrow)"/>
+<line x1="488" y1="164" x2="526" y2="164" stroke="#5d5f66" stroke-width="1.4" marker-end="url(#bda-arrow)"/>
+<line x1="732" y1="164" x2="770" y2="164" stroke="#5d5f66" stroke-width="1.4" marker-end="url(#bda-arrow)"/>
+<line x1="976" y1="164" x2="1014" y2="164" stroke="#5d5f66" stroke-width="1.4" marker-end="url(#bda-arrow)"/>
+<text x="264" y="156" text-anchor="middle" font-size="9.5" fill="#8a8b91">order</text>
+<text x="508" y="156" text-anchor="middle" font-size="9.5" fill="#8a8b91">each</text>
+<text x="752" y="156" text-anchor="middle" font-size="9.5" fill="#8a8b91">task</text>
+<text x="996" y="156" text-anchor="middle" font-size="9.5" fill="#8a8b91">dial</text>
+
+<!-- row 2 (flows right to left) -->
+<rect x="40" y="268" width="204" height="96" rx="8" fill="#fafaf8" stroke="#e3e3df"/>
+<rect x="52" y="281" width="22" height="12" rx="3" fill="#ffffff" stroke="#d9d9d4"/>
+<text x="82" y="291" font-size="11" fill="#5d5f66">code · deterministic</text>
+<rect x="52" y="301" width="22" height="12" rx="3" fill="#f1eefa" stroke="#8b7cc8"/>
+<text x="82" y="311" font-size="11" fill="#5d5f66">model · proposes only</text>
+<rect x="52" y="321" width="22" height="12" rx="3" fill="#e7edf8" stroke="#2b4c8c" stroke-dasharray="4 2"/>
+<text x="82" y="331" font-size="11" fill="#5d5f66">external service</text>
+<rect x="52" y="341" width="22" height="12" rx="3" fill="#fdeceb" stroke="#b3261e" stroke-width="1.5"/>
+<text x="82" y="351" font-size="11" fill="#5d5f66">named human required</text>
+
+<rect x="284" y="268" width="204" height="96" rx="8" fill="#ffffff" stroke="#d9d9d4"/>
+<text x="296" y="292" font-size="13" font-weight="600" fill="#17181c">Sweep summary</text>
+<text x="296" y="312" font-size="11.5" fill="#5d5f66">an outcome for every person</text>
+<text x="296" y="328" font-size="11.5" fill="#5d5f66">unaccounted: named + reason</text>
+<text x="296" y="350" font-family="ui-monospace, SFMono-Regular, Menlo, monospace" font-size="9.5" fill="#8a8b91">orchestrator/sweep.py</text>
+
+<rect x="528" y="268" width="204" height="96" rx="8" fill="#ffffff" stroke="#17181c" stroke-width="1.5"/>
+<text x="540" y="292" font-size="13" font-weight="700" fill="#17181c">decide()</text>
+<text x="540" y="312" font-size="11.5" fill="#5d5f66">5 outcomes · pure · no model</text>
+<text x="540" y="328" font-size="11.5" fill="#5d5f66">UNREACHABLE outranks URGENT</text>
+<text x="540" y="350" font-family="ui-monospace, SFMono-Regular, Menlo, monospace" font-size="9.5" fill="#8a8b91">orchestrator/decide.py</text>
+
+<rect x="772" y="268" width="204" height="96" rx="8" fill="#f1eefa" stroke="#8b7cc8"/>
+<text x="784" y="292" font-size="13" font-weight="600" fill="#3f3470">Understanding pass</text>
+<text x="784" y="312" font-size="11.5" fill="#5b4f86">only unknown / invalid fields</text>
+<text x="784" y="328" font-size="11.5" fill="#5b4f86">never overturns CALL-E</text>
+<text x="784" y="350" font-family="ui-monospace, SFMono-Regular, Menlo, monospace" font-size="9.5" fill="#8a80ad">reconcile_glm.py · GLM / Claude</text>
+
+<rect x="1016" y="268" width="204" height="96" rx="8" fill="#ffffff" stroke="#d9d9d4"/>
+<text x="1028" y="292" font-size="13" font-weight="600" fill="#17181c">Validate result locally</text>
+<text x="1028" y="312" font-size="11.5" fill="#5d5f66">jsonschema vs schema sent</text>
+<text x="1028" y="328" font-size="11.5" fill="#5d5f66">transcript + quotes kept</text>
+<text x="1028" y="350" font-family="ui-monospace, SFMono-Regular, Menlo, monospace" font-size="9.5" fill="#8a8b91">orchestrator/runner.py</text>
+
+<line x1="1118" y1="212" x2="1118" y2="266" stroke="#5d5f66" stroke-width="1.4" marker-end="url(#bda-arrow)"/>
+<text x="1126" y="244" font-size="9.5" fill="#8a8b91">structured_result</text>
+<line x1="1016" y1="316" x2="978" y2="316" stroke="#5d5f66" stroke-width="1.4" marker-end="url(#bda-arrow)"/>
+<text x="996" y="308" text-anchor="middle" font-size="9.5" fill="#8a8b91">gaps</text>
+<line x1="772" y1="316" x2="734" y2="316" stroke="#5d5f66" stroke-width="1.4" marker-end="url(#bda-arrow)"/>
+<text x="752" y="308" text-anchor="middle" font-size="9.5" fill="#8a8b91">fields</text>
+<line x1="528" y1="316" x2="490" y2="316" stroke="#5d5f66" stroke-width="1.4" marker-end="url(#bda-arrow)"/>
+<text x="508" y="308" text-anchor="middle" font-size="9.5" fill="#8a8b91">record</text>
+
+<!-- silence is a finding -->
+<path d="M1220,164 H1242 V392 H662 V366" fill="none" stroke="#b3261e" stroke-width="1.8" stroke-dasharray="7 4" marker-end="url(#bda-arrow-red)"/>
+<text x="1232" y="384" text-anchor="end" font-size="11.5" font-weight="600" fill="#b3261e">no answer · failed · unreadable → an input to decide(), never skipped</text>
+
+<!-- not SAFE -->
+<path d="M590,364 V410 H142 V448" fill="none" stroke="#17181c" stroke-width="1.6" marker-end="url(#bda-arrow)"/>
+<text x="580" y="404" text-anchor="end" font-size="11.5" font-weight="600" fill="#17181c">not SAFE</text>
+
+<!-- ============ 2 · ESCALATE AND SEND ============ -->
+<text x="284" y="440" font-family="ui-monospace, SFMono-Regular, Menlo, monospace" font-size="10.5" letter-spacing="1.5" fill="#8a8b91">2 · ESCALATE AND SEND</text>
+
+<!-- ladder -->
+<rect x="40" y="450" width="204" height="90" rx="8" fill="#ffffff" stroke="#d9d9d4"/>
+<text x="52" y="474" font-size="13" font-weight="600" fill="#17181c">Escalation ladder</text>
+<text x="52" y="494" font-size="11.5" fill="#5d5f66">one ladder per person</text>
+<text x="52" y="510" font-size="11.5" fill="#5d5f66">skipped rungs recorded</text>
+<text x="52" y="530" font-family="ui-monospace, SFMono-Regular, Menlo, monospace" font-size="9.5" fill="#8a8b91">orchestrator/escalate.py</text>
+
+<rect x="284" y="450" width="204" height="90" rx="8" fill="#ffffff" stroke="#d9d9d4"/>
+<text x="296" y="474" font-size="13" font-weight="600" fill="#17181c">① Emergency contact</text>
+<text x="296" y="494" font-size="11.5" fill="#5d5f66">BuddyE may call them</text>
+<text x="296" y="510" font-size="11.5" fill="#5d5f66">never implies help is coming</text>
+
+<rect x="528" y="450" width="204" height="90" rx="8" fill="#ffffff" stroke="#d9d9d4"/>
+<text x="540" y="474" font-size="13" font-weight="600" fill="#17181c">② Block captain</text>
+<text x="540" y="494" font-size="11.5" fill="#5d5f66">BuddyE notifies the</text>
+<text x="540" y="510" font-size="11.5" fill="#5d5f66">volunteer running the sweep</text>
+
+<rect x="772" y="450" width="204" height="90" rx="8" fill="#ffffff" stroke="#d9d9d4"/>
+<text x="784" y="474" font-size="13" font-weight="600" fill="#17181c">③ Responder handoff</text>
+<text x="784" y="494" font-size="11.5" fill="#5d5f66">packet prepared, not sent</text>
+<text x="784" y="510" font-size="11.5" fill="#5d5f66">address · need · last words</text>
+<text x="784" y="530" font-family="ui-monospace, SFMono-Regular, Menlo, monospace" font-size="9.5" fill="#8a8b91">released_at = null</text>
+
+<rect x="1016" y="450" width="204" height="90" rx="8" fill="#fdeceb" stroke="#b3261e" stroke-width="2"/>
+<text x="1028" y="474" font-size="13" font-weight="700" fill="#8c1d18">Named human releases</text>
+<text x="1028" y="494" font-size="11.5" fill="#8c1d18">"system", "bot" refused</text>
+<text x="1028" y="510" font-size="11.5" fill="#8c1d18">only then is anyone told</text>
+<text x="1028" y="530" font-family="ui-monospace, SFMono-Regular, Menlo, monospace" font-size="9.5" fill="#a8554f">escalate.release()</text>
+
+<line x1="244" y1="495" x2="282" y2="495" stroke="#5d5f66" stroke-width="1.4" marker-end="url(#bda-arrow)"/>
+<line x1="488" y1="495" x2="526" y2="495" stroke="#5d5f66" stroke-width="1.4" marker-end="url(#bda-arrow)"/>
+<line x1="732" y1="495" x2="770" y2="495" stroke="#5d5f66" stroke-width="1.4" marker-end="url(#bda-arrow)"/>
+<line x1="976" y1="495" x2="1014" y2="495" stroke="#b3261e" stroke-width="1.8" stroke-dasharray="5 3" marker-end="url(#bda-arrow-red)"/>
+<text x="264" y="487" text-anchor="middle" font-size="9.5" fill="#8a8b91">call</text>
+<text x="508" y="487" text-anchor="middle" font-size="9.5" fill="#8a8b91">notify</text>
+<text x="752" y="487" text-anchor="middle" font-size="9.5" fill="#8a8b91">worst</text>
+<text x="996" y="487" text-anchor="middle" font-size="9.5" fill="#b3261e">stop</text>
+
+<!-- dispatch -->
+<line x1="142" y1="540" x2="142" y2="598" stroke="#5d5f66" stroke-width="1.4" marker-end="url(#bda-arrow)"/>
+<text x="150" y="574" font-size="9.5" fill="#8a8b91">reconciler, idempotent</text>
+
+<rect x="40" y="600" width="204" height="96" rx="8" fill="#ffffff" stroke="#d9d9d4"/>
+<text x="52" y="624" font-size="13" font-weight="600" fill="#17181c">Incident per escalation</text>
+<text x="52" y="644" font-size="11.5" fill="#5d5f66">address + needs + reasons</text>
+<text x="52" y="660" font-size="11.5" fill="#5d5f66">priority 1 (life safety) – 5</text>
+<text x="52" y="682" font-family="ui-monospace, SFMono-Regular, Menlo, monospace" font-size="9.5" fill="#8a8b91">orchestrator/incidents.py</text>
+
+<rect x="284" y="600" width="204" height="96" rx="8" fill="#ffffff" stroke="#d9d9d4"/>
+<text x="296" y="624" font-size="13" font-weight="600" fill="#17181c">Eligibility filter</text>
+<text x="296" y="644" font-size="11.5" fill="#5d5f66">free · capable · in range</text>
+<text x="296" y="660" font-size="11.5" fill="#5d5f66">agency only if justified</text>
+<text x="296" y="682" font-family="ui-monospace, SFMono-Regular, Menlo, monospace" font-size="9.5" fill="#8a8b91">domain/fleet.py · geo.py</text>
+
+<rect x="528" y="600" width="204" height="96" rx="8" fill="#f1eefa" stroke="#8b7cc8"/>
+<text x="540" y="624" font-size="13" font-weight="600" fill="#3f3470">Dispatch agent</text>
+<text x="540" y="644" font-size="11.5" fill="#5b4f86">ranks legal candidates only</text>
+<text x="540" y="660" font-size="11.5" fill="#5b4f86">writes a one-sentence why</text>
+<text x="540" y="682" font-family="ui-monospace, SFMono-Regular, Menlo, monospace" font-size="9.5" fill="#8a80ad">agents/dispatch_agent.py</text>
+
+<rect x="772" y="600" width="204" height="96" rx="8" fill="#ffffff" stroke="#d9d9d4"/>
+<text x="784" y="624" font-size="13" font-weight="600" fill="#17181c">validate_choice()</text>
+<text x="784" y="644" font-size="11.5" fill="#5d5f66">re-checked against live rows</text>
+<text x="784" y="660" font-size="11.5" fill="#5d5f66">fallback: deterministic pick</text>
+<text x="784" y="682" font-family="ui-monospace, SFMono-Regular, Menlo, monospace" font-size="9.5" fill="#8a8b91">orchestrator/dispatch.py</text>
+
+<line x1="244" y1="648" x2="282" y2="648" stroke="#5d5f66" stroke-width="1.4" marker-end="url(#bda-arrow)"/>
+<line x1="488" y1="648" x2="526" y2="648" stroke="#5d5f66" stroke-width="1.4" marker-end="url(#bda-arrow)"/>
+<line x1="732" y1="648" x2="770" y2="648" stroke="#5d5f66" stroke-width="1.4" marker-end="url(#bda-arrow)"/>
+<text x="264" y="640" text-anchor="middle" font-size="9.5" fill="#8a8b91">units</text>
+<text x="508" y="640" text-anchor="middle" font-size="9.5" fill="#8a8b91">legal</text>
+<text x="752" y="640" text-anchor="middle" font-size="9.5" fill="#8a8b91">pick</text>
+
+<rect x="1016" y="572" width="204" height="60" rx="8" fill="#dff0e5" stroke="#2f8a5b" stroke-width="1.5"/>
+<text x="1028" y="596" font-size="13" font-weight="700" fill="#1f5a3b">Community → COMMITTED</text>
+<text x="1028" y="616" font-size="11.5" fill="#1f5a3b">water · ride · power · nurse</text>
+
+<rect x="1016" y="648" width="204" height="68" rx="8" fill="#fff7dc" stroke="#9a6a12" stroke-width="1.5"/>
+<text x="1028" y="672" font-size="13" font-weight="700" fill="#6f4c0c">Agency → PROPOSED</text>
+<text x="1028" y="692" font-size="11.5" fill="#6f4c0c">EMS · fire · police welfare</text>
+<text x="1028" y="708" font-size="11.5" fill="#6f4c0c">routed, timed, nobody asked</text>
+
+<path d="M976,636 L1014,604" fill="none" stroke="#2f8a5b" stroke-width="1.6" marker-end="url(#bda-arrow)"/>
+<path d="M976,660 L1014,680" fill="none" stroke="#9a6a12" stroke-width="1.6" marker-end="url(#bda-arrow)"/>
+
+<rect x="1016" y="744" width="204" height="60" rx="8" fill="#fdeceb" stroke="#b3261e" stroke-width="2"/>
+<text x="1028" y="768" font-size="13" font-weight="700" fill="#8c1d18">Named human authorises</text>
+<text x="1028" y="788" font-size="11.5" fill="#8c1d18">or declines, with a reason</text>
+<line x1="1118" y1="716" x2="1118" y2="742" stroke="#b3261e" stroke-width="1.8" stroke-dasharray="5 3" marker-end="url(#bda-arrow-red)"/>
+
+<text x="40" y="740" font-size="11.5" fill="#5d5f66">A model outage degrades the prose, never the dispatch: every agent call falls back to the deterministic answer</text>
+<text x="40" y="758" font-size="11.5" fill="#5d5f66">and is logged as an OperatorAction. Documentation and correspondence agents draft ICS-214 / ICS-213 / sitreps</text>
+<text x="40" y="776" font-size="11.5" fill="#5d5f66">and family messages the same way: drafted, never signed or sent by software.</text>
+
+<!-- ============ 3 · PLATFORM ============ -->
+<text x="40" y="840" font-family="ui-monospace, SFMono-Regular, Menlo, monospace" font-size="10.5" letter-spacing="1.5" fill="#8a8b91">3 · PLATFORM</text>
+
+<rect x="40" y="852" width="360" height="80" rx="8" fill="#16181d"/>
+<text x="56" y="878" font-size="13" font-weight="700" fill="#ffffff">FastAPI · SQLModel · SQLite</text>
+<text x="56" y="898" font-size="11.5" fill="#c9ccd4">all state in the DB · restart re-attaches</text>
+<text x="56" y="916" font-size="11.5" fill="#c9ccd4">loops: movement sim · incident sync · status</text>
+
+<rect x="450" y="852" width="360" height="80" rx="8" fill="#16181d"/>
+<text x="466" y="878" font-size="13" font-weight="700" fill="#ffffff">Event bus → Server-Sent Events</text>
+<text x="466" y="898" font-family="ui-monospace, SFMono-Regular, Menlo, monospace" font-size="10.5" fill="#c9ccd4">/api/stream/hazards/{id}</text>
+<text x="466" y="916" font-size="11.5" fill="#c9ccd4">replays from since_event_id</text>
+
+<rect x="860" y="852" width="360" height="80" rx="8" fill="#16181d"/>
+<text x="876" y="878" font-size="13" font-weight="700" fill="#ffffff">React console · Tailwind · Leaflet</text>
+<text x="876" y="898" font-size="11.5" fill="#c9ccd4">sweep board · case page · incidents</text>
+<text x="876" y="916" font-size="11.5" fill="#c9ccd4">approvals queue · live fleet map (OSM)</text>
+
+<line x1="400" y1="892" x2="448" y2="892" stroke="#8a8b91" stroke-width="1.4" marker-end="url(#bda-arrow-light)"/>
+<text x="424" y="884" text-anchor="middle" font-size="9.5" fill="#8a8b91">events</text>
+<line x1="810" y1="892" x2="858" y2="892" stroke="#8a8b91" stroke-width="1.4" marker-end="url(#bda-arrow-light)"/>
+<text x="834" y="884" text-anchor="middle" font-size="9.5" fill="#8a8b91">live</text>
+
+<text x="40" y="960" font-size="11.5" fill="#5d5f66">Default is no-call: CALL_PROVIDER=mock, empty dial allowlist, hard call budget. Emergency services contacted by software: 0.</text>
+</svg>

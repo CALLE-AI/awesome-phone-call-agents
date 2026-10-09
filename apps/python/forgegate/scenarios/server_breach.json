@@ -1,0 +1,7 @@
+{
+  "incident_id": "INC-003",
+  "source": "ids_alert",
+  "signals": {"src_ip": "10.0.5.42", "dst_port": 22, "attempts": 847},
+  "risk_score": 0.88,
+  "proposed_action": "isolate host 10.0.5.42 and revoke SSH keys"
+}

@@ -1,0 +1,66 @@
+{
+ "id": "train-agent-018",
+ "label": "agent",
+ "source": "sim-train",
+ "meta": {
+  "task": "request a refund for a double charge",
+  "hard": true
+ },
+ "turns": [
+  {
+   "speaker": "user",
+   "text": "Thank you for calling Brightline Internet! This is Ava at Brightline Internet. How can I help you today?",
+   "offset_seconds": 0.54
+  },
+  {
+   "speaker": "bot",
+   "text": "Hi, I'm an AI assistant calling on behalf of Jordan Lee. Jordan Lee was charged twice for the same order last week, and I'm calling to request a refund for the duplicate.",
+   "offset_seconds": 8.0
+  },
+  {
+   "speaker": "user",
+   "text": "I'm sorry about the double charge. I've submitted a refund request for the duplicate payment. It should be processed within five to seven business days.",
+   "offset_seconds": 20.58
+  },
+  {
+   "speaker": "bot",
+   "text": "How long will the refund take?",
+   "offset_seconds": 30.69
+  },
+  {
+   "speaker": "user",
+   "text": "Absolutely, that's confirmed. Is there anything else I can help you with today?",
+   "offset_seconds": 33.97
+  },
+  {
+   "speaker": "bot",
+   "text": "Can you confirm the refund has been issued?",
+   "offset_seconds": 40.21
+  },
+  {
+   "speaker": "user",
+   "text": "Certainly. You're all set. Thank you for calling, and have a wonderful day!",
+   "offset_seconds": 44.4
+  },
+  {
+   "speaker": "bot",
+   "text": "Thank you, that's everything.",
+   "offset_seconds": 50.23
+  },
+  {
+   "speaker": "user",
+   "text": "Absolutely, that's confirmed. Is there anything else I can help you with today?",
+   "offset_seconds": 52.98
+  },
+  {
+   "speaker": "bot",
+   "text": "Thank you, that's everything.",
+   "offset_seconds": 59.33
+  },
+  {
+   "speaker": "user",
+   "text": "You're welcome! Have a wonderful day. Goodbye!",
+   "offset_seconds": 61.75
+  }
+ ]
+}

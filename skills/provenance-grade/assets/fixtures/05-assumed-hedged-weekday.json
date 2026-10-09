@@ -1,0 +1,23 @@
+{
+  "id": "05-assumed-hedged-weekday",
+  "category": "hedged-assumed",
+  "description": "The demo counterpart to fixture 01. Same answer, Tuesday — but hedged and instant. Graded assumed.",
+  "turns": [
+    { "speaker": "bot", "text": "Hi, this is the QuoteDesk assistant calling about your pending distributor order.", "offset_seconds": 0 },
+    { "speaker": "user", "text": "Haan, yes.", "offset_seconds": 6 },
+    { "speaker": "bot", "text": "Which day will the fifty units for order 7741 ship out?", "offset_seconds": 9 },
+    { "speaker": "user", "text": "Should be Tuesday.", "offset_seconds": 14 }
+  ],
+  "fields": [
+    {
+      "field": "delivery_day",
+      "value": "Tuesday",
+      "expects": "weekday",
+      "questionTurn": 2,
+      "answerTurns": [3],
+      "critical": true,
+      "expectedGrade": "assumed",
+      "expectSignals": ["D"]
+    }
+  ]
+}

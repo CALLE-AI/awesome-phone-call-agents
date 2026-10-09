@@ -1,0 +1,32 @@
+{
+  "_comment": "The patient raised something clinical. The agent acknowledges, does not engage, and ends the call. flag_for_staff stops the workflow: PrepCheck holds the patient for staff review and places no further calls, whatever prep_status said. Note that the free-text fields are left empty here on purpose — the instruction is not to record what a patient says about their health, and the code truncates and strips free text before it reaches a log, but the schema cannot make that impossible.",
+  "_matching": "Replace REPLACE_WITH_call_id_FROM_SHEET with the value in the row's call_id column after placing a dry-run call. A result that cannot be matched to the call in flight is held for review rather than applied.",
+  "call_id": "REPLACE_WITH_call_id_FROM_SHEET",
+  "status": "completed",
+  "task_completed": true,
+  "completion_confidence": {
+    "score": 0.7,
+    "label": "medium"
+  },
+  "metadata": {
+    "row_id": "P001",
+    "checkpoint": "T24",
+    "source": "prepcheck"
+  },
+  "recipients": [
+    {
+      "structured_result": {
+        "prep_status": "unclear",
+        "items_completed": [],
+        "items_outstanding": [
+          "started the clear liquid diet"
+        ],
+        "outstanding_plan": "",
+        "wants_reschedule": "unknown",
+        "flag_for_staff": true,
+        "identity_verified": true,
+        "asked_to_stop": false
+      }
+    }
+  ]
+}

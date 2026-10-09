@@ -1,0 +1,21 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <!-- Top-level Main Application Menu for CALL-E -->
+    <menuitem id="menu_calle_root"
+              name="CALL-E"
+              groups="base.group_system"
+              web_icon="call_e,static/description/icon.png"
+              sequence="50"/>
+
+    <menuitem id="menu_calle_calls"
+              name="Calls"
+              parent="menu_calle_root"
+              action="action_calle_call"
+              sequence="10"/>
+
+    <menuitem id="menu_calle_settings"
+              name="Settings"
+              parent="menu_calle_root"
+              action="action_calle_config_settings"
+              sequence="20"/>
+</odoo>

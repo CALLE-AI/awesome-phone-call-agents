@@ -1,0 +1,14 @@
+{
+  "_fixture_source": "CALL-E webhook documentation. This is a contract fixture, not a captured provider delivery.",
+  "headers": {
+    "call-e-event-id": "evt_documented_completed"
+  },
+  "body": {
+    "id": "evt_documented_completed",
+    "type": "call.completed",
+    "created_at": "2026-09-13T12:00:00.000Z",
+    "data": {
+      "id": "call_documented_completed"
+    }
+  }
+}

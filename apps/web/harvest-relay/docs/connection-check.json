@@ -1,0 +1,9 @@
+{
+  "mode": "read-only",
+  "dialed": false,
+  "connected": true,
+  "goal_count": 0,
+  "checked_at": "2026-09-14T14:18:04.239Z",
+  "endpoint": "https://api.heycall-e.com/v1/goals?limit=1",
+  "completed_phone_calls_claimed": 0
+}

@@ -1,0 +1,56 @@
+{
+ "id": "train-ivr-022",
+ "label": "ivr",
+ "source": "sim-train",
+ "meta": {
+  "task": "reschedule an appointment from Tuesday to Thursday morning",
+  "hard": false
+ },
+ "turns": [
+  {
+   "speaker": "user",
+   "text": "Thank you for calling Northside Dental. Your call is important to us. Please listen carefully, as our menu options have changed. For hours and directions, press 1. For appointments, press 2. For billing, press 3. To repeat these options, press 9.",
+   "offset_seconds": 0.25
+  },
+  {
+   "speaker": "bot",
+   "text": "[DTMF 1]",
+   "offset_seconds": 16.44
+  },
+  {
+   "speaker": "user",
+   "text": "Please hold while we connect you to the next available representative. Your call may be recorded for quality purposes.",
+   "offset_seconds": 17.35
+  },
+  {
+   "speaker": "bot",
+   "text": "[DTMF 1]",
+   "offset_seconds": 25.39
+  },
+  {
+   "speaker": "user",
+   "text": "Please hold while we connect you to the next available representative. Your call may be recorded for quality purposes.",
+   "offset_seconds": 26.18
+  },
+  {
+   "speaker": "bot",
+   "text": "[DTMF 1]",
+   "offset_seconds": 34.58
+  },
+  {
+   "speaker": "user",
+   "text": "Our hours are Monday through Friday, 9 AM to 6 PM. To return to the main menu, press star.",
+   "offset_seconds": 35.49
+  },
+  {
+   "speaker": "bot",
+   "text": "I'm calling to move Jordan Lee's appointment from Tuesday to Thursday morning.",
+   "offset_seconds": 43.78
+  },
+  {
+   "speaker": "user",
+   "text": "Please enter your account number, followed by the pound key.",
+   "offset_seconds": 48.9
+  }
+ ]
+}

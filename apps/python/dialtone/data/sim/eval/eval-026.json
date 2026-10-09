@@ -1,0 +1,70 @@
+{
+  "id": "eval-026",
+  "label": "human",
+  "difficulty": "typical",
+  "scenario": "Mechanic gives a spoken price range for brake work with hedges and slang.",
+  "task": "Get a quote for front brake pads and rotors on a 2017 Toyota Camry.",
+  "outcome": {
+    "task_completed_claimed": true,
+    "commitment_type": "information",
+    "confirmation_artifact": null,
+    "expected_attestation": "human_attested"
+  },
+  "turns": [
+    {
+      "speaker": "user",
+      "text": "Precision Auto, Luis speaking.",
+      "offset_seconds": 0.8
+    },
+    {
+      "speaker": "bot",
+      "text": "hi Luis. I'm an AI assistant calling on behalf of Jordan Pike. could I get a rough quote to replace the front brake pads and rotors on a twenty seventeen Toyota Camry?",
+      "offset_seconds": 3.1
+    },
+    {
+      "speaker": "user",
+      "text": "front pads and rotors, seventeen Camry... yeah so, OEM or aftermarket?",
+      "offset_seconds": 14.63
+    },
+    {
+      "speaker": "bot",
+      "text": "whichever you'd normally recommend.",
+      "offset_seconds": 19.94
+    },
+    {
+      "speaker": "user",
+      "text": "we usually do the Akebono pads and, uh, the rotors, parts is about one sixty, labor's about an hour and a half. so you're looking at like, two eighty to three twenty out the door.",
+      "offset_seconds": 23.22
+    },
+    {
+      "speaker": "bot",
+      "text": "got it, two eighty to three twenty including tax?",
+      "offset_seconds": 37.14
+    },
+    {
+      "speaker": "user",
+      "text": "yeah that's with tax. if the calipers are seized it's more but I wouldn't worry about that on a seventeen.",
+      "offset_seconds": 40.54
+    },
+    {
+      "speaker": "bot",
+      "text": "makes sense. and how soon could you fit it in?",
+      "offset_seconds": 48.97
+    },
+    {
+      "speaker": "user",
+      "text": "I got tomorrow afternoon, or wednesday whenever.",
+      "offset_seconds": 52.82
+    },
+    {
+      "speaker": "bot",
+      "text": "thank you, I'll pass that along to Jordan and he'll call back to book.",
+      "offset_seconds": 56.29
+    },
+    {
+      "speaker": "user",
+      "text": "sounds good man.",
+      "offset_seconds": 61.02
+    }
+  ]
+}

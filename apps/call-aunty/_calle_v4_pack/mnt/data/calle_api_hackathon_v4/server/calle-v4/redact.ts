@@ -1,0 +1,2 @@
+const patterns=[/\b\d{16}\b/g,/\b\d{3}-\d{2}-\d{4}\b/g,/\b\d{6}\b/g];export function redact(text:string){let out=text;for(const p of patterns)out=out.replace(p,'[REDACTED]');return out;}
+export function safeMetadata(m:Record<string,string>){const out:Record<string,string>={};for(const [k,v] of Object.entries(m)){if(/token|secret|password|authorization|api[-_]?key/i.test(k))out[k]='[REDACTED]';else out[k]=redact(v);}return out;}

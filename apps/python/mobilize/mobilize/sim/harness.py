@@ -2,7 +2,7 @@
 comparing the calibrated wave-dispatch policy against naive baselines, using
 the simulator's known ground truth (`_true_showup`) as the scoring oracle.
 
-This is what makes an honest claim possible on a 20-free-call budget: the
+This is what makes an honest claim possible without spending live-call credits: the
 policy is validated here, at zero cost, before a single real call is placed.
 """
 

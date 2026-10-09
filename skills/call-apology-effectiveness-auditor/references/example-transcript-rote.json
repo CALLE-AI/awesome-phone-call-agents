@@ -1,0 +1,12 @@
+{
+  "call_id": "run-apo-rote-01",
+  "status": "COMPLETED",
+  "transcript": [
+    {"speaker": "agent", "text": "Hello, this is Northside Clinic calling to confirm your follow-up appointment."},
+    {"speaker": "callee", "text": "I never received the referral letter, I'm not happy about this."},
+    {"speaker": "agent", "text": "I'm sorry about that. Let me check the scheduling notes. Your appointment is Friday at 3 p.m. with Dr. Adams."},
+    {"speaker": "callee", "text": "Okay then."},
+    {"speaker": "agent", "text": "Great, we will see you Friday. Goodbye."}
+  ],
+  "callee_phone": "+14155550144"
+}

@@ -1,0 +1,56 @@
+{
+ "id": "train-ivr-054",
+ "label": "ivr",
+ "source": "sim-train",
+ "meta": {
+  "task": "check whether the store is open on Sunday",
+  "hard": false
+ },
+ "turns": [
+  {
+   "speaker": "user",
+   "text": "Thank you for calling City Pharmacy. Your call is important to us. Please listen carefully, as our menu options have changed. For hours and directions, press 1. For appointments, press 2. For billing, press 3. To repeat these options, press 9.",
+   "offset_seconds": 0.57
+  },
+  {
+   "speaker": "bot",
+   "text": "Could you tell me your opening hours this Sunday?",
+   "offset_seconds": 17.05
+  },
+  {
+   "speaker": "user",
+   "text": "Our hours are Monday through Friday, 9 AM to 6 PM. To return to the main menu, press star.",
+   "offset_seconds": 20.99
+  },
+  {
+   "speaker": "bot",
+   "text": "[DTMF 3]",
+   "offset_seconds": 29.06
+  },
+  {
+   "speaker": "user",
+   "text": "Sorry, I didn't get that. Thank you for calling City Pharmacy. Your call is important to us. Please listen carefully, as our menu options have changed. For hours and directions, press 1. For appointments, press 2. For billing, press 3. To repeat these options, press 9.",
+   "offset_seconds": 29.87
+  },
+  {
+   "speaker": "bot",
+   "text": "[DTMF 3]",
+   "offset_seconds": 47.96
+  },
+  {
+   "speaker": "user",
+   "text": "Please hold while we connect you to the next available representative. Your call may be recorded for quality purposes.",
+   "offset_seconds": 48.78
+  },
+  {
+   "speaker": "bot",
+   "text": "Could you tell me your opening hours this Sunday?",
+   "offset_seconds": 57.36
+  },
+  {
+   "speaker": "user",
+   "text": "Please hold while we connect you to the next available representative. Your call may be recorded for quality purposes.",
+   "offset_seconds": 61.38
+  }
+ ]
+}

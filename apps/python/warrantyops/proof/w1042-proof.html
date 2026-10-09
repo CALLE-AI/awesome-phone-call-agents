@@ -1,0 +1,115 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>WarrantyOps — Claim Exception Proof — W-1042</title>
+<style>
+  :root{
+    --ink:#0f172a; --muted:#55627a; --line:#e2e8f0; --paper:#f6f8fb; --card:#ffffff;
+    --control:#1d4ed8; --control-soft:#e8effd;
+    --runtime:#6d28d9; --runtime-soft:#f1eafd;
+    --boundary:#b45309; --boundary-soft:#fdf3e3;
+    --unknown:#3f4c66; --unknown-line:#94a3b8;
+    --good:#166534; --good-soft:#ecfdf3;
+  }
+  *{box-sizing:border-box}
+  body{margin:0;font:15px/1.45 -apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Helvetica,Arial,sans-serif;
+       color:var(--ink);background:var(--paper)}
+  .wrap{max-width:1180px;margin:0 auto;padding:20px 24px 28px}
+  header{display:flex;flex-wrap:wrap;gap:10px;align-items:center;justify-content:space-between;margin-bottom:14px}
+  .brand{display:flex;align-items:baseline;gap:10px;font-weight:650}
+  .brand small{color:var(--muted);font-weight:450}
+  .claimbar{display:flex;flex-wrap:wrap;gap:8px 18px;align-items:center;background:var(--card);
+            border:1px solid var(--line);border-radius:10px;padding:10px 14px;margin-bottom:14px}
+  .claimbar .who{font-weight:650}
+  .claimbar .muted{color:var(--muted)}
+  .muted{color:var(--muted)}
+  .pill{display:inline-flex;align-items:center;gap:6px;border-radius:999px;padding:2px 10px;font-size:12.5px;font-weight:600}
+  .pill.recorded{background:var(--runtime-soft);color:var(--runtime)}
+  .pill.synthetic{background:var(--good-soft);color:var(--good)}
+  .pill.fictional{background:#eef1f6;color:var(--muted);border:1px dashed var(--unknown-line)}
+  .pill.boundary{background:var(--boundary-soft);color:var(--boundary)}
+  .claim-tag{display:inline-flex;gap:8px;align-items:baseline;border:1px solid var(--line);
+             background:var(--card);border-radius:10px;padding:5px 12px}
+  .claim-tag-label{font-size:12px;letter-spacing:.06em;text-transform:uppercase;color:var(--muted)}
+  .duo{display:grid;grid-template-columns:1fr 1fr;gap:14px;margin-bottom:14px}
+  .card{background:var(--card);border:1px solid var(--line);border-radius:12px;padding:14px 16px;min-width:0}
+  .card h2{margin:0 0 8px;font-size:13px;letter-spacing:.08em;text-transform:uppercase;color:var(--muted)}
+  .before ul,.after ul{margin:0;padding-left:18px}
+  .before li,.after li{margin:4px 0}
+  .result{display:grid;gap:10px}
+  .kv{display:flex;flex-wrap:wrap;gap:6px 10px;align-items:baseline}
+  .kv .k{font-size:12px;letter-spacing:.06em;text-transform:uppercase;color:var(--muted);min-width:150px}
+  .kv .v{font-weight:620}
+  .kv .pill{margin-left:4px}
+  .rownote{width:100%;color:var(--muted);font-size:13px;max-width:52ch}
+  .quote{border-left:3px solid var(--runtime);background:var(--runtime-soft);border-radius:0 8px 8px 0;
+         padding:6px 10px;font-size:13.5px;margin-top:2px;width:100%}
+  .unknown-pill{display:inline-flex;align-items:center;gap:8px;border:2px dashed var(--unknown-line);
+                color:var(--unknown);border-radius:10px;padding:3px 10px;font-weight:700;letter-spacing:.04em}
+  ul.checks{list-style:none;margin:0;padding:0}
+  ul.checks li{display:flex;gap:8px;align-items:flex-start;margin:7px 0}
+  ul.checks .tick{color:var(--control);font-weight:800}
+  ul.checks .sub{display:block;color:var(--muted);font-size:12.5px}
+  .trio{display:grid;grid-template-columns:1fr 1fr 1fr;gap:14px}
+  .trio .card h2 .dot{display:inline-block;width:9px;height:9px;border-radius:50%;margin-right:6px}
+  .dot.control{background:var(--control)} .dot.runtime{background:var(--runtime)} .dot.boundary{background:var(--boundary)}
+  .boundary-line{display:flex;gap:8px;align-items:flex-start;margin:7px 0}
+  .boundary-line .mark{color:var(--boundary);font-weight:800}
+  .limitation{margin-top:10px;background:var(--boundary-soft);border:1px solid #ecd9b0;color:#7c4a03;
+              border-radius:9px;padding:8px 10px;font-size:13px}
+  .decision{display:grid;gap:10px}
+  .decision .why{color:var(--muted);font-size:13.5px;max-width:64ch}
+  button{font:inherit;font-weight:650;color:#fff;background:var(--control);border:0;border-radius:10px;
+         padding:10px 16px;cursor:pointer}
+  button:focus-visible{outline:3px solid var(--control);outline-offset:2px}
+  button.refuse{background:#9f1239}
+  button.return{background:var(--unknown)}
+  button[disabled]{background:#9db4e8;cursor:default}
+  .decisionrow{display:flex;flex-wrap:wrap;gap:10px}
+  .decisionmeta{color:var(--muted);font-size:13px}
+  .transcript-link{font-size:13.5px}
+  .mono{font-family:ui-monospace,SFMono-Regular,Menlo,monospace;font-size:13px}
+  footer{display:flex;flex-wrap:wrap;gap:8px 16px;align-items:center;justify-content:space-between;
+         margin-top:14px;color:var(--muted);font-size:12.5px}
+  .sr{position:absolute;width:1px;height:1px;overflow:hidden;clip:rect(0 0 0 0)}
+  @media (max-width:900px){ .duo,.trio{grid-template-columns:1fr} .kv .k{min-width:0} }
+  @media (prefers-reduced-motion:reduce){ *{transition:none!important;animation:none!important} }
+</style>
+</head>
+<body>
+<div class="wrap" id="top">
+<header><div class="brand">WarrantyOps <small>claim exception review</small></div><span class="claim-tag"><span class="claim-tag-label">Claim</span><strong>W-1042 — NorthStar Equipment</strong></span></header>
+<div class="claimbar"><span class="who">Maya · NorthStar Equipment</span><span>Claim <strong>W-1042</strong> · <strong>$800</strong></span><span>Counterparty: <strong>BlueRock Machinery</strong></span><span class="muted">Residual exception — returned with no reason after the portal, code sheet and written follow-up were exhausted</span><span class="pill fictional">Fictional case data</span><span class="pill recorded">Recorded CALL-E result</span></div>
+<div class="duo"><section class="card before" aria-labelledby="before-h"><h2 id="before-h">Before</h2><ul><li>The claim is returned and unresolved</li><li>The precise missing requirement is unknown</li><li>No confirmed counterparty reference exists</li></ul></section>
+<section class="card after" id="after-card" data-state="locked" aria-labelledby="after-h"><h2 id="after-h">Result of the call</h2><div class="locked" id="after-locked"><div class="why">Reveals the saved, sanitized runtime result. This control never starts a live call.</div><button id="reveal" type="button">Reveal recorded result</button></div><div id="after-result" hidden><div class="result"><div class="kv"><span class="k">Transport</span><span class="v">completed</span><span class="pill recorded">Recorded CALL-E result</span></div><div class="kv"><span class="k">Stated status</span><span class="v">not provided on the call → UNKNOWN</span><span class="pill recorded">Recorded CALL-E result</span><span class="rownote">The counterparty did not explicitly state the claim status, so WarrantyOps refuses to invent it.</span></div><div class="kv"><span class="k">Missing requirement</span><span class="v">Installation photograph</span><span class="pill recorded">Recorded CALL-E result</span></div><div class="kv"><span class="k">Confirmed reference</span><span class="v">BR-4821</span><span class="pill recorded">Recorded CALL-E result</span><span class="rownote">Direct counterparty quote</span><span class="quote">&ldquo;Br Hyphen, 4821.&rdquo; <span class="muted">— verbatim counterparty quote</span></span></div><div class="kv"><span class="k">Terminal state</span><span class="v">INFORMATION_OBTAINED</span><span class="pill recorded">Recorded CALL-E result</span></div></div></div></section>
+</div>
+<div class="trio"><section class="card" aria-labelledby="gates-h"><h2 id="gates-h">Deterministic gates</h2><div class="boundary-line"><span class="tick">✓</span><span>Digital routes exhausted <span class="pill fictional">Fictional case data</span><ul class="checks"><li>portal status check — portal shows only &#x27;returned&#x27;, no reason</li><li>documented code resolution — no published code sheet covers R-RETURNED-NO-REASON</li><li>written follow-up — two emails to the claims desk, no reply</li></ul></span></div><div class="boundary-line"><span class="tick">✓</span><span>Economic gate — supplied arithmetic <span class="pill fictional">Fictional case data</span><ul class="checks"><li>claim face value $800 (source record) ≥ policy minimum $250.00 (organization policy) — holds</li><li>claim age 3 days (source record) ≤ policy maximum 540 days (organization policy) — holds</li></ul></span></div></section>
+<section class="card" aria-labelledby="controls-h"><h2 id="controls-h"><span class="dot control"></span>Controls the run passed</h2><ul class="checks"><li><span class="tick">✓</span><span>Authority confirmed<span class="sub">time-bounded TEST_RECIPIENT_CONSENT record</span></span></li><li><span class="tick">✓</span><span>Recipient bound<span class="sub">authorization matches the claim&#x27;s counterparty number (masked)</span></span></li><li><span class="tick">✓</span><span>Residual + economic gates passed<span class="sub">routes exhausted; $800 against the organization policy</span></span></li><li><span class="tick">✓</span><span>Duplicate prevention active<span class="sub">local attempt ledger reserved the key before dialing</span></span></li><li><span class="tick">✓</span><span>Source version checked<span class="sub">live record re-read before and re-read before any write</span></span></li></ul></section>
+<section class="card" aria-labelledby="runtime-h"><h2 id="runtime-h"><span class="dot runtime"></span>Runtime record</h2><ul class="checks"><li><span class="tick">▸</span><span>Runtime marker: <span class="pill recorded">Recorded CALL-E result</span></span></li><li><span class="tick">▸</span><span>Provider CALL-E performed the phone interaction</span></li><li><span class="tick">▸</span><span>Recorded calls: 1</span></li><li><span class="tick">▸</span><span>Call id (masked): call_dMU…A-3Q</span></li><li><span class="tick">▸</span><span>Exactly one call per claim version</span></li></ul><div class="limitation">Recorded CALL-E runtime proof using a consenting role-player. This is not evidence of deployment at a warranty desk.</div></section>
+</div>
+<div class="duo"><section class="card" aria-labelledby="boundary-h"><h2 id="boundary-h"><span class="dot boundary"></span>Human &amp; evidence boundary</h2><div class="boundary-line"><span class="mark">◂</span><span>Private transcript: not published on this page</span></div><div class="boundary-line"><span class="mark">◂</span><span>System will not write until a named human approves</span></div><div class="boundary-line"><span class="mark">◂</span><span>Write-back: WRITE_BACK_WITHHELD_PENDING_HUMAN_REVIEW</span></div></section>
+</div>
+<footer><span>Evidence classes: Recorded CALL-E result · Synthetic scenario · Fictional case data — one per field · public receipt: <a href="runtime-proof-receipt.public.json">runtime-proof-receipt.public.json</a></span><span>static sanitized instance · no network · no live call can be triggered from this page</span></footer>
+<div class="sr" role="status" aria-live="polite" id="announcer"></div>
+</div>
+<script type="application/json" id="reveal-data">{"announce": "Recorded result revealed: installation photograph required; reference BR-4821 confirmed from the counterparty quote; claim status UNKNOWN; write-back withheld for human review.", "revealed_label": "Recorded result revealed"}</script>
+<script>
+(function () {
+  "use strict";
+  var button = document.getElementById("reveal");
+  if (!button) { return; }
+  var data = JSON.parse(document.getElementById("reveal-data").textContent);
+  button.addEventListener("click", function () {
+    document.getElementById("after-locked").hidden = true;
+    document.getElementById("after-result").hidden = false;
+    document.getElementById("after-card").dataset.state = "revealed";
+    button.disabled = true;
+    button.textContent = data.revealed_label || "Recorded result revealed";
+    document.getElementById("announcer").textContent = data.announce || "";
+  });
+})();
+</script>
+</body>
+</html>

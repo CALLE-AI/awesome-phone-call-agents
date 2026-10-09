@@ -1,0 +1,16 @@
+{
+  "call_id": "run-lead-neutral",
+  "status": "COMPLETED",
+  "callee_phone": "+14155550141",
+  "transcript": [
+    {"speaker": "agent", "text": "Hello, this is an automated assistant calling from Example Pharmacy."},
+    {"speaker": "callee", "text": "Hello."},
+    {"speaker": "agent", "text": "What day works best for pickup?"},
+    {"speaker": "callee", "text": "Friday is easiest for me."},
+    {"speaker": "agent", "text": "What time of day?"},
+    {"speaker": "callee", "text": "Around 10 a.m. would be ideal."},
+    {"speaker": "agent", "text": "Should I set it for Friday at 10 a.m.?"},
+    {"speaker": "callee", "text": "Yes, that is perfect."},
+    {"speaker": "agent", "text": "Done. Thank you and goodbye."}
+  ]
+}

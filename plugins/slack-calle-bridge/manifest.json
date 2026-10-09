@@ -1,0 +1,15 @@
+{
+  "name": "slack-calle-bridge",
+  "platform": "Slack",
+  "runtime": "Python 3.11+ standard library",
+  "entrypoint": "bridge.py",
+  "trigger": "Slack slash command",
+  "actions": ["preview", "run one CALL-E outbound call"],
+  "credentials": ["SLACK_SIGNING_SECRET", "CALLE_API_KEY"],
+  "default_mode": "preview",
+  "side_effects": [
+    "run mode may place exactly one real phone call",
+    "terminal results may be posted to a Slack response URL"
+  ],
+  "disable": "Stop the bridge and remove or disable the Slack slash command."
+}

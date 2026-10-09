@@ -1,0 +1,75 @@
+{
+  "id": "eval-027",
+  "label": "ivr",
+  "difficulty": "typical",
+  "scenario": "County office phone tree with bilingual prompt, invalid-entry loops, and a closed-office dead end.",
+  "task": "Ask whether Daniel Fischer's building permit application was received.",
+  "outcome": {
+    "task_completed_claimed": false,
+    "commitment_type": "information",
+    "confirmation_artifact": null,
+    "expected_attestation": "unverified"
+  },
+  "turns": [
+    {
+      "speaker": "user",
+      "text": "thank you for calling the Marlow County Permits Office. para español, oprima dos.",
+      "offset_seconds": 1.5
+    },
+    {
+      "speaker": "user",
+      "text": "if you know your party's extension, you may dial it at any time. for building permits, press 1. for zoning, press 2. for property records, press 3. for all other departments, press 0.",
+      "offset_seconds": 8.71
+    },
+    {
+      "speaker": "bot",
+      "text": "[DTMF 1]",
+      "offset_seconds": 25.59
+    },
+    {
+      "speaker": "user",
+      "text": "building permits. to schedule an inspection, press 1. for inspection results, press 2. for permit fees, press 3. to return to the previous menu, press star.",
+      "offset_seconds": 26.76
+    },
+    {
+      "speaker": "bot",
+      "text": "[DTMF 0]",
+      "offset_seconds": 40.59
+    },
+    {
+      "speaker": "user",
+      "text": "invalid entry. to schedule an inspection, press 1. for inspection results, press 2. for permit fees, press 3. to return to the previous menu, press star.",
+      "offset_seconds": 41.75
+    },
+    {
+      "speaker": "bot",
+      "text": "I'm calling to check the status of a permit application.",
+      "offset_seconds": 55.69
+    },
+    {
+      "speaker": "user",
+      "text": "invalid entry. to schedule an inspection, press 1. for inspection results, press 2. for permit fees, press 3. to return to the previous menu, press star.",
+      "offset_seconds": 59.86
+    },
+    {
+      "speaker": "bot",
+      "text": "[DTMF *]",
+      "offset_seconds": 73.91
+    },
+    {
+      "speaker": "user",
+      "text": "for building permits, press 1. for zoning, press 2. for property records, press 3. for all other departments, press 0.",
+      "offset_seconds": 75.07
+    },
+    {
+      "speaker": "bot",
+      "text": "[DTMF 0]",
+      "offset_seconds": 85.8
+    },
+    {
+      "speaker": "user",
+      "text": "all of our staff are currently assisting other callers. the office is closed on fridays. please call again later. goodbye.",
+      "offset_seconds": 86.91
+    }
+  ]
+}

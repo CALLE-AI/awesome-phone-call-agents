@@ -1,0 +1,361 @@
+<!doctype html>
+<html lang="en-GB">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Reachable — demo</title>
+<style>
+  :root{
+    --ink:#1f2430; --ink-soft:#5b6478; --line:#e6e2da;
+    --paper:#faf7f2; --card:#ffffff;
+    --brand:#3f6ae0; --brand-soft:#eaf0ff;
+    --warm:#f0a24b; --warm-soft:#fff3e4;
+    --good:#2f9e6b; --good-soft:#e6f5ee;
+    --stop:#d4544c; --stop-soft:#fdecea;
+    --shadow:0 1px 2px rgba(31,36,48,.05), 0 8px 24px rgba(31,36,48,.06);
+    --radius:20px;
+  }
+  *{box-sizing:border-box}
+  body{
+    margin:0; background:var(--paper); color:var(--ink);
+    font:17px/1.65 ui-rounded,"SF Pro Rounded","Segoe UI",Inter,system-ui,sans-serif;
+    -webkit-font-smoothing:antialiased;
+  }
+  .wrap{max-width:1060px; margin:0 auto; padding:28px 20px 80px}
+
+  header{display:flex; align-items:center; gap:14px; flex-wrap:wrap; margin-bottom:6px}
+  .logo{
+    width:46px; height:46px; border-radius:15px; background:var(--brand);
+    display:grid; place-items:center; font-size:23px; flex:none;
+  }
+  h1{font-size:27px; margin:0; letter-spacing:-.02em; font-weight:650}
+  .sub{color:var(--ink-soft); font-size:15px; margin:2px 0 0}
+  .mode{
+    margin-left:auto; font-size:13px; font-weight:700; letter-spacing:.08em;
+    padding:8px 15px; border-radius:999px; white-space:nowrap;
+  }
+  .mode.live{background:var(--stop-soft); color:var(--stop); box-shadow:0 0 0 2px rgba(212,84,76,.18)}
+  .mode.fake{background:var(--warm-soft); color:#a86a1d}
+  .mode.dry{background:var(--brand-soft); color:var(--brand)}
+
+  .note{
+    margin:22px 0 26px; background:var(--card); border:1px solid var(--line);
+    border-radius:var(--radius); padding:16px 20px; box-shadow:var(--shadow);
+    color:var(--ink-soft); font-size:15.5px;
+  }
+  .note b{color:var(--ink); font-weight:650}
+
+  h2{font-size:15px; letter-spacing:.06em; text-transform:uppercase;
+     color:var(--ink-soft); font-weight:700; margin:34px 0 14px}
+
+  .people{display:grid; gap:14px; grid-template-columns:repeat(auto-fill,minmax(320px,1fr))}
+  .person{
+    background:var(--card); border:1px solid var(--line); border-radius:var(--radius);
+    padding:20px; box-shadow:var(--shadow); display:flex; flex-direction:column; gap:14px;
+  }
+  .person-top{display:flex; align-items:flex-start; gap:14px}
+  .avatar{
+    width:48px; height:48px; border-radius:16px; flex:none; display:grid;
+    place-items:center; font-size:19px; font-weight:700; color:#fff; background:var(--brand);
+  }
+  .avatar.o2{background:#7b5cd6}
+  .avatar.o3{background:var(--warm)}
+  .who{min-width:0; flex:1}
+  .name{font-weight:650; font-size:19px; letter-spacing:-.01em}
+  .rel{color:var(--ink-soft); font-size:14.5px}
+  .num{font-variant-numeric:tabular-nums; color:var(--ink-soft); font-size:14.5px; margin-top:2px}
+  .chip{
+    display:inline-block; font-size:13px; font-weight:650; padding:5px 11px;
+    border-radius:999px; background:#f1efe9; color:var(--ink-soft);
+  }
+  .chip.good{background:var(--good-soft); color:var(--good)}
+  .chip.stop{background:var(--stop-soft); color:var(--stop)}
+  .chip.warm{background:var(--warm-soft); color:#a86a1d}
+  .why{font-size:14.5px; color:var(--ink-soft)}
+
+  button{font:inherit; cursor:pointer; border:0; border-radius:14px; transition:.15s}
+  .call{
+    background:var(--brand); color:#fff; font-weight:650; font-size:17px;
+    padding:14px 18px; width:100%; display:flex; align-items:center;
+    justify-content:center; gap:9px;
+  }
+  .call:hover{filter:brightness(1.07)}
+  .call:disabled{background:#e8e5de; color:#a7a296; cursor:not-allowed}
+  .ghost{background:#f1efe9; color:var(--ink-soft); font-weight:600; padding:11px 15px; font-size:15px}
+  .ghost:hover{background:#e8e5de}
+
+  .confirm{background:var(--brand-soft); border-radius:16px; padding:15px; display:grid; gap:10px}
+  .confirm p{margin:0; font-size:14.5px; color:#31447f}
+  .confirm input{
+    font:inherit; padding:12px 14px; border-radius:12px; border:2px solid #cfdcff;
+    background:#fff; width:100%;
+  }
+  .confirm input:focus{outline:0; border-color:var(--brand)}
+  .confirm .row{display:flex; gap:9px}
+  .confirm .row button{flex:1}
+
+  dialog{
+    border:0; border-radius:26px; padding:0; width:min(640px,94vw); background:var(--card);
+    box-shadow:0 24px 70px rgba(31,36,48,.28);
+  }
+  dialog::backdrop{background:rgba(31,36,48,.42)}
+  .sheet{padding:30px}
+  .sheet-head{display:flex; align-items:center; gap:15px; margin-bottom:6px}
+
+  .ring{width:56px; height:56px; border-radius:50%; background:var(--brand-soft);
+        display:grid; place-items:center; font-size:25px; flex:none; position:relative}
+  .ring.pulse::after{
+    content:""; position:absolute; inset:0; border-radius:50%;
+    border:3px solid var(--brand); animation:pulse 1.5s ease-out infinite;
+  }
+  @keyframes pulse{0%{transform:scale(1);opacity:.75} 100%{transform:scale(1.65);opacity:0}}
+  .ring.done{background:var(--good-soft)}
+  .ring.bad{background:var(--stop-soft)}
+
+  .sheet h3{margin:0; font-size:21px; letter-spacing:-.01em}
+  .sheet .status{color:var(--ink-soft); font-size:15px; margin:2px 0 0}
+
+  .bar{height:6px; border-radius:999px; background:#eeebe4; overflow:hidden; margin:20px 0 4px}
+  .bar span{display:block; height:100%; width:35%; border-radius:999px; background:var(--brand);
+            animation:slide 1.5s ease-in-out infinite}
+  @keyframes slide{0%{margin-left:-35%} 100%{margin-left:100%}}
+
+  .transcript{margin-top:22px; display:grid; gap:11px; max-height:46vh; overflow-y:auto; padding-right:4px}
+  .turn{display:flex; gap:10px; align-items:flex-end; animation:rise .32s ease both}
+  @keyframes rise{from{opacity:0; transform:translateY(8px)} to{opacity:1; transform:none}}
+  .turn.them{flex-direction:row-reverse}
+  .bubble{max-width:78%; padding:12px 16px; border-radius:20px; font-size:16px; line-height:1.55}
+  .turn.us .bubble{background:var(--brand-soft); color:#22315c; border-bottom-left-radius:7px}
+  .turn.them .bubble{background:#f1efe9; color:var(--ink); border-bottom-right-radius:7px}
+  .tag{font-size:11px; font-weight:700; letter-spacing:.04em; color:var(--ink-soft);
+       text-transform:uppercase; flex:none; width:62px; text-align:center; padding-bottom:9px;
+       overflow:hidden; text-overflow:ellipsis}
+
+  .facts{display:flex; flex-wrap:wrap; gap:8px; margin-top:20px}
+  .empty{color:var(--ink-soft); font-size:15px; text-align:center; padding:26px 0}
+  .sheet-foot{display:flex; gap:10px; margin-top:24px}
+  .sheet-foot button{flex:1}
+  .err{background:var(--stop-soft); color:var(--stop); border-radius:14px; padding:13px 16px;
+       font-size:15px; margin-top:18px}
+  @media (max-width:520px){ .wrap{padding:20px 14px 60px} h1{font-size:23px} .sheet{padding:22px} }
+</style>
+</head>
+<body>
+<div class="wrap">
+
+  <header>
+    <div class="logo">📞</div>
+    <div>
+      <h1>Reachable</h1>
+      <p class="sub">{{ school_name }}</p>
+    </div>
+    <div class="mode {{ mode_class }}">{{ mode }}</div>
+  </header>
+
+  <div class="note">
+    {% if mode == "LIVE" %}
+      <b>Live mode.</b> Reachable will ring a real telephone. It needs the pupil's
+      first name typed in before each call, and it says it is not a person as soon
+      as somebody answers.
+    {% elif mode == "FAKE" %}
+      <b>Fake mode.</b> Calls go to the fake CALL-E server that ships with the app.
+      Nothing rings, and no credential is used.
+    {% else %}
+      <b>Dry run.</b> Nothing will be dialled. You can see exactly what would be said.
+    {% endif %}
+  </div>
+
+  <h2>Ready to call</h2>
+  {% if people %}
+    <div class="people">
+    {% for p in people %}
+      <article class="person" data-case="{{ p.case_id }}" data-pupil="{{ p.pupil_first_name }}" data-contact="{{ p.first_name }}">
+        <div class="person-top">
+          <div class="avatar o{{ p.contact_order }}">{{ p.initials }}</div>
+          <div class="who">
+            <div class="name">{{ p.contact_name }}</div>
+            <div class="rel">{{ p.relationship }} &middot; contact {{ p.contact_order }}</div>
+            <div class="num">{{ p.masked }}</div>
+          </div>
+        </div>
+        <div><span class="chip {{ p.tone }}">{{ p.kind }}</span></div>
+        <div class="why">{{ p.why }}</div>
+        <button class="call" data-act="start">
+          <span>📞</span><span>Ask Reachable to ring {{ p.first_name }}</span>
+        </button>
+        <div class="confirm" hidden>
+          <p>
+            Reachable will ring {{ p.first_name }} and say straight away that it is
+            not a person. Type <b>{{ p.pupil_first_name }}</b> to allow it.
+          </p>
+          <input type="text" autocomplete="off" spellcheck="false"
+                 placeholder="{{ p.pupil_first_name }}" aria-label="Confirm with the pupil's first name">
+          <div class="row">
+            <button class="ghost" data-act="cancel">Cancel</button>
+            <button class="call" data-act="go" style="width:auto">Let it call</button>
+          </div>
+        </div>
+      </article>
+    {% endfor %}
+    </div>
+  {% else %}
+    <div class="note">Nothing is waiting to be called. Run an import and a register scan first.</div>
+  {% endif %}
+</div>
+
+<dialog id="sheet">
+  <div class="sheet">
+    <div class="sheet-head">
+      <div class="ring pulse" id="ring">📞</div>
+      <div>
+        <h3 id="sheet-title">Reachable is calling</h3>
+        <p class="status" id="sheet-status">Dialling now.</p>
+      </div>
+    </div>
+    <div class="bar" id="bar"><span></span></div>
+    <div id="err"></div>
+    <div class="transcript" id="transcript"></div>
+    <div class="facts" id="facts"></div>
+    <div class="sheet-foot">
+      <button class="ghost" id="close" hidden>Close</button>
+    </div>
+  </div>
+</dialog>
+
+<script>
+const $ = (s, r) => (r || document).querySelector(s);
+const sheet = $("#sheet"), ring = $("#ring"), bar = $("#bar");
+const title = $("#sheet-title"), statusLine = $("#sheet-status");
+const transcript = $("#transcript"), facts = $("#facts"), errBox = $("#err");
+const closeBtn = $("#close");
+let timer = null;
+let drawn = 0;
+let contactName = "them";
+
+closeBtn.addEventListener("click", function () {
+  clearInterval(timer);
+  sheet.close();
+  location.reload();
+});
+
+document.addEventListener("click", function (e) {
+  const act = e.target.closest("[data-act]");
+  if (!act) return;
+  const card = act.closest(".person");
+  const confirmBox = $(".confirm", card);
+
+  if (act.dataset.act === "start") {
+    confirmBox.hidden = false;
+    $(".call", card).disabled = true;
+    $("input", confirmBox).focus();
+  }
+  if (act.dataset.act === "cancel") {
+    confirmBox.hidden = true;
+    $(".call", card).disabled = false;
+    $("input", confirmBox).value = "";
+  }
+  if (act.dataset.act === "go") {
+    place(card, $("input", confirmBox).value);
+  }
+});
+
+function reset() {
+  transcript.innerHTML = "";
+  facts.innerHTML = "";
+  errBox.innerHTML = "";
+  closeBtn.hidden = true;
+  bar.hidden = false;
+  drawn = 0;
+  ring.className = "ring pulse";
+  ring.textContent = "📞";
+  title.textContent = "Reachable is calling";
+  statusLine.textContent = "Dialling now.";
+}
+
+async function place(card, confirmText) {
+  reset();
+  sheet.showModal();
+  let data;
+  try {
+    const res = await fetch("/demo/call", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ case_id: card.dataset.case, confirm: confirmText })
+    });
+    data = await res.json();
+  } catch (err) {
+    return fail("Could not reach the app.");
+  }
+
+  if (!data.placed) return fail(data.reason || "The call was not placed.");
+  contactName = card.dataset.contact || "them";
+  statusLine.textContent =
+    "Ringing " + contactName + ". This can take up to a minute.";
+  timer = setInterval(function () { poll(data.attempt_id); }, 2500);
+  poll(data.attempt_id);
+}
+
+function fail(message) {
+  bar.hidden = true;
+  ring.className = "ring bad";
+  ring.textContent = "✋";
+  title.textContent = "Not called";
+  statusLine.textContent = "Reachable refused this call.";
+  errBox.innerHTML = '<div class="err">' + escapeHtml(message) + "</div>";
+  closeBtn.hidden = false;
+}
+
+async function poll(attemptId) {
+  let s;
+  try {
+    s = await (await fetch("/demo/attempt/" + attemptId)).json();
+  } catch (err) {
+    return;
+  }
+
+  if (s.turns && s.turns.length) render(s.turns);
+  if (!s.finished) {
+    statusLine.textContent = s.status_text;
+    return;
+  }
+
+  clearInterval(timer);
+  bar.hidden = true;
+  closeBtn.hidden = false;
+  ring.className = "ring " + (s.good ? "done" : "bad");
+  ring.textContent = s.good ? "✓" : "!";
+  title.textContent = s.headline;
+  statusLine.textContent = s.status_text;
+  if (!s.turns || !s.turns.length) {
+    transcript.innerHTML = '<p class="empty">No conversation was recorded for this call.</p>';
+  }
+  facts.innerHTML = (s.facts || [])
+    .map(function (f) {
+      return '<span class="chip ' + f.tone + '">' + escapeHtml(f.text) + "</span>";
+    })
+    .join("");
+}
+
+function render(turns) {
+  if (turns.length <= drawn) return;
+  turns.slice(drawn).forEach(function (t) {
+    const row = document.createElement("div");
+    row.className = "turn " + (t.speaker === "user" ? "them" : "us");
+    const label = t.speaker === "user" ? contactName : "Reachable";
+    row.innerHTML =
+      '<span class="tag">' + escapeHtml(label) +
+      '</span><div class="bubble">' + escapeHtml(t.text) + "</div>";
+    transcript.appendChild(row);
+  });
+  drawn = turns.length;
+  transcript.scrollTop = transcript.scrollHeight;
+}
+
+function escapeHtml(value) {
+  return String(value == null ? "" : value).replace(/[&<>"']/g, function (c) {
+    return { "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c];
+  });
+}
+</script>
+</body>
+</html>

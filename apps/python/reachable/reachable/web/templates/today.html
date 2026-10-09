@@ -1,0 +1,60 @@
+{% extends "base.html" %}
+{% block body %}
+
+<h1>Today</h1>
+<p class="muted">{{ school_name }} &middot; {{ today }}</p>
+
+<div class="counters">
+  {% for key, value in counters.items() %}
+  <div class="counter">
+    <div class="n">{{ value }}</div>
+    <div class="k">{{ key.replace('_', ' ') }}</div>
+  </div>
+  {% endfor %}
+</div>
+<p class="muted" style="font-size:13px">
+  Counts of what happened. Reachable never concludes a child is safe, and there is no
+  outcome that means it.
+</p>
+
+{% if urgent_cases %}
+<h2>Needs a person now</h2>
+{% for case in urgent_cases %}
+<div class="panel urgent">
+  <strong><a href="/cases/{{ case['case_id'] }}">{{ names[case['pupil_id']] }}</a></strong>
+  <span class="pill stop">{{ case['state'] }}</span>
+  <div class="muted" style="font-size:13px">
+    Contact may not know about the absence, or does not know where the pupil is.
+    Call the family back now.
+  </div>
+</div>
+{% endfor %}
+{% endif %}
+
+<h2>Pattern cases</h2>
+{% for state, cases in grouped.items() %}
+<div class="panel">
+  <strong class="mono">{{ state }}</strong>
+  <span class="pill">{{ cases|length }}</span>
+  <table style="margin-top:8px">
+    <tr><th>Pupil</th><th>Trigger sessions</th><th>Code N deadline</th><th>Cascade</th></tr>
+    {% for case in cases %}
+    <tr>
+      <td><a href="/cases/{{ case['case_id'] }}">{{ names[case['pupil_id']] }}</a></td>
+      <td class="muted">{{ detail(case)['sessions'] }}</td>
+      <td class="mono">{{ detail(case)['code_n_deadline'] or '—' }}</td>
+      <td class="mono muted">
+        {{ ('contact ' ~ (case['cascade_index'] + 1)) if case['contact_id'] else '—' }}
+      </td>
+    </tr>
+    {% endfor %}
+  </table>
+</div>
+{% else %}
+<div class="panel muted">
+  No pattern cases. Import a register and run a scan from the
+  <a href="/import">Import</a> page.
+</div>
+{% endfor %}
+
+{% endblock %}

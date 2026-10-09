@@ -1,0 +1,485 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta
+      name="description"
+      content="Tell DineLine what you want for dinner, choose a restaurant, and let Agent Jake make the reservation call."
+    />
+    <title>DineLine CALL-E Edition</title>
+    <link rel="stylesheet" href="/styles.css" />
+    <script src="/app.js" defer></script>
+  </head>
+  <body>
+    <div class="page-atmosphere" aria-hidden="true"></div>
+
+    <header class="site-header">
+      <a class="brand" href="#top" aria-label="DineLine CALL-E Edition home">
+        <span class="brand-mark" aria-hidden="true">
+          <span></span><span></span><span></span>
+        </span>
+        <span class="brand-copy">
+          <span class="brand-owner">CyberWolf AI Systems</span>
+          <strong>DineLine <em>CALL-E Edition</em></strong>
+        </span>
+      </a>
+
+      <div class="header-status">
+        <span class="status-orbit" aria-hidden="true"></span>
+        <span>
+          <small>Runtime</small>
+          <strong id="mode-label">Checking...</strong>
+        </span>
+      </div>
+    </header>
+
+    <main id="top">
+      <section class="hero reveal">
+        <div class="hero-copy">
+          <p class="eyebrow"><span>01</span> Two CALL-E agents, each with one clear job</p>
+          <h1>Pick the restaurant.<br /><mark>We make the call.</mark></h1>
+          <p class="hero-summary">
+            Ask DineLine to call you and describe the dinner you have in mind. The first
+            agent turns that conversation into five Google Places options. You choose and
+            approve one. Then Agent Jake calls the restaurant and brings the answer back.
+          </p>
+        </div>
+
+        <div class="hero-proof" aria-label="How DineLine works">
+          <div class="proof-card">
+            <span class="proof-number">01</span>
+            <strong>DineLine calls you</strong>
+            <p>Talk naturally about the kind of dinner you want instead of filling out a long form.</p>
+          </div>
+          <div class="proof-card">
+            <span class="proof-number">02</span>
+            <strong>Choose from five places</strong>
+            <p>n8n sends the request to Google Places and returns five options for you to review.</p>
+          </div>
+          <div class="proof-card proof-card-accent">
+            <span class="proof-number">03</span>
+            <strong>Agent Jake makes the call</strong>
+            <p>After you approve the exact details, the second CALL-E agent calls the restaurant.</p>
+          </div>
+        </div>
+      </section>
+
+      <section class="closure-rail reveal" aria-label="How DineLine makes a reservation">
+        <div class="rail-label">How it works</div>
+        <ol>
+          <li class="is-active"><span>Plan</span><small>DineLine calls you</small></li>
+          <li><span>Choose</span><small>Pick a place</small></li>
+          <li><span>Check</span><small>Review details</small></li>
+          <li><span>Call</span><small>Agent Jake calls</small></li>
+          <li><span>Confirm</span><small>Check the answer</small></li>
+          <li><span>Report</span><small>You get the result</small></li>
+        </ol>
+      </section>
+
+      <section class="demo-shell reveal" aria-labelledby="workspace-title">
+        <div class="section-heading">
+          <div>
+            <p class="eyebrow"><span>02</span> Try the two-agent demo</p>
+            <h2 id="workspace-title">Start with a short dinner-planning call</h2>
+          </div>
+          <div class="demo-safety">
+            <span aria-hidden="true">DEMO</span>
+            <p><strong id="demo-mode-title">Sample mode</strong><small id="demo-mode-detail">Nothing on this screen places a real call.</small></p>
+          </div>
+        </div>
+
+        <section class="intake-panel" aria-labelledby="intake-title">
+          <div class="intake-copy">
+            <span class="agent-role">CALL-E Agent 1</span>
+            <h3 id="intake-title">Have the DineLine Concierge call you</h3>
+            <p>
+              Tell it what sounds good, where you want to eat, and what kind of room you
+              want. It gathers the practical details without pretending it already knows
+              the right restaurant.
+            </p>
+            <div class="intake-boundary">
+              <strong>This agent only plans.</strong>
+              <span>It cannot choose a restaurant or make a reservation.</span>
+            </div>
+          </div>
+
+          <form id="intake-form" class="intake-form" novalidate>
+            <label>
+              <span>Your phone number</span>
+              <input
+                id="diner-phone"
+                name="dinerPhone"
+                type="tel"
+                value="+12025550109"
+                pattern="^\+[1-9]\d{7,14}$"
+                autocomplete="tel"
+                required
+              />
+              <small>Use international format, such as +12025550109.</small>
+            </label>
+
+            <label class="intake-consent">
+              <input id="intake-consent" type="checkbox" />
+              <span>
+                <strong>Yes, DineLine may call this number once.</strong>
+                <small id="intake-consent-copy">Sample mode uses a simulated CALL-E result.</small>
+              </span>
+            </label>
+
+            <button class="intake-action" id="intake-button" type="submit" disabled>
+              <span class="call-action-icon" aria-hidden="true"></span>
+              <span><small id="intake-button-kicker">Safe sample</small><strong id="intake-button-label">Run planning-call demo</strong></span>
+              <span class="button-arrow" aria-hidden="true">&#8594;</span>
+            </button>
+
+            <button class="text-action" id="sample-request-button" type="button">
+              Skip the call and use the sample request
+            </button>
+          </form>
+
+          <div id="intake-result" class="intake-result" hidden aria-live="polite">
+            <div class="intake-result-head">
+              <span class="intake-check" aria-hidden="true">&#10003;</span>
+              <div>
+                <small>What the DineLine Concierge heard</small>
+                <strong id="intake-result-title">Dinner request ready</strong>
+              </div>
+              <span id="intake-confidence">96%</span>
+            </div>
+            <div id="intake-preference-chips" class="preference-chips"></div>
+            <p id="intake-result-summary"></p>
+            <ul id="intake-evidence" class="intake-evidence"></ul>
+            <button class="text-action reconcile-action" id="intake-reconcile-button" type="button" hidden>
+              Check this accepted call
+            </button>
+          </div>
+        </section>
+
+        <div id="workspace-grid" class="workspace-grid" hidden>
+          <aside class="panel discovery-panel" aria-labelledby="discovery-title">
+            <div class="panel-kicker">Restaurant choices</div>
+            <div class="panel-title-row">
+              <div>
+                <h3 id="discovery-title">Here are five places that fit</h3>
+                <p>Sample results for this local demo.</p>
+              </div>
+              <span id="result-count" class="result-count">5 results</span>
+            </div>
+
+            <div class="query-strip" aria-label="Sample restaurant request">
+              <span class="query-icon" aria-hidden="true"></span>
+              <div>
+                <strong id="query-title">Italian dinner in Manhattan</strong>
+                <small id="query-detail">Quiet enough to talk · Friday · 2 people</small>
+              </div>
+            </div>
+
+            <div id="restaurant-list" class="restaurant-list"></div>
+
+            <div class="source-note">
+              <span aria-hidden="true">i</span>
+              <p>
+                The integration workflow gets its choices from Google Places. This local proof
+                uses fictional results with reserved numbers, so no real business is contacted.
+              </p>
+            </div>
+          </aside>
+
+          <section class="panel booking-panel" aria-labelledby="booking-title">
+            <div class="panel-kicker">Your choice</div>
+            <div class="selected-restaurant">
+              <div class="selected-monogram" id="selected-monogram">SH</div>
+              <div>
+                <small>Selected restaurant</small>
+                <h3 id="booking-title">Santoro House</h3>
+                <p id="selected-address">28 Bedford Street, New York, NY</p>
+              </div>
+              <span class="selected-check" aria-label="Selected">Selected</span>
+            </div>
+
+            <form id="booking-form" novalidate>
+              <div class="form-grid">
+                <label>
+                  <span>Date</span>
+                  <input id="reservation-date" name="date" type="date" required />
+                </label>
+                <label>
+                  <span>Time</span>
+                  <input id="reservation-time" name="time" type="time" value="19:30" required />
+                </label>
+                <label>
+                  <span>Party size</span>
+                  <select id="party-size" name="partySize">
+                    <option value="1">1 guest</option>
+                    <option value="2" selected>2 guests</option>
+                    <option value="3">3 guests</option>
+                    <option value="4">4 guests</option>
+                    <option value="5">5 guests</option>
+                    <option value="6">6 guests</option>
+                    <option value="7">7 guests</option>
+                    <option value="8">8 guests</option>
+                    <option value="9">9 guests</option>
+                    <option value="10">10 guests</option>
+                    <option value="11">11 guests</option>
+                    <option value="12">12 guests</option>
+                    <option value="13">13 guests</option>
+                    <option value="14">14 guests</option>
+                    <option value="15">15 guests</option>
+                    <option value="16">16 guests</option>
+                    <option value="17">17 guests</option>
+                    <option value="18">18 guests</option>
+                    <option value="19">19 guests</option>
+                    <option value="20">20 guests</option>
+                  </select>
+                </label>
+                <label>
+                  <span>Guest name</span>
+                  <input
+                    id="guest-name"
+                    name="guestName"
+                    type="text"
+                    value="Demo Guest"
+                    maxlength="100"
+                    required
+                  />
+                </label>
+              </div>
+
+              <label class="wide-field">
+                <span>Special request <small>Optional</small></span>
+                <input
+                  id="special-requests"
+                  name="specialRequests"
+                  type="text"
+                  placeholder="For example: a quiet table away from the bar"
+                  maxlength="500"
+                />
+              </label>
+
+              <label class="wide-field controlled-destination" id="controlled-destination-field" hidden>
+                <span>Controlled test line <small>Real CALL-E mode only</small></span>
+                <input
+                  id="controlled-destination"
+                  name="controlledDestination"
+                  type="tel"
+                  inputmode="tel"
+                  autocomplete="off"
+                  pattern="\+[1-9][0-9]{7,14}"
+                  placeholder="For example: +12025550123"
+                  title="Use an E.164 phone number beginning with + and the country code"
+                />
+                <small class="field-help">
+                  Use a number you own or are authorized to call. The server allowlist still has final say.
+                </small>
+              </label>
+
+              <div class="policy-strip">
+                <div><span class="policy-dot"></span><strong>Agent Jake says it is AI</strong></div>
+                <div><span class="policy-dot"></span><strong>No different time booked</strong></div>
+                <div><span class="policy-dot"></span><strong>No voicemail left</strong></div>
+              </div>
+
+              <button class="primary-action" id="review-button" type="submit">
+                <span>Check reservation details</span>
+                <span class="button-arrow" aria-hidden="true">&#8594;</span>
+              </button>
+            </form>
+          </section>
+
+          <aside class="panel control-panel" aria-labelledby="control-title">
+            <div class="panel-kicker">Keeps you posted</div>
+            <h3 id="control-title">What is happening</h3>
+            <p class="control-intro">
+              See what Agent Jake is doing after you approve the reservation details.
+            </p>
+
+            <ol class="execution-steps" id="execution-steps">
+              <li class="is-current" data-stage="draft">
+                <span class="step-node">1</span>
+                <div><strong>Your request</strong><small>You can still change anything</small></div>
+              </li>
+              <li data-stage="approved">
+                <span class="step-node">2</span>
+                <div><strong>You approved it</strong><small>The details are now locked</small></div>
+              </li>
+              <li data-stage="dialing">
+                <span class="step-node">3</span>
+                <div><strong>Calling</strong><small>Agent Jake contacts the restaurant</small></div>
+              </li>
+              <li data-stage="verifying">
+                <span class="step-node">4</span>
+                <div><strong>Checking the answer</strong><small>Does it match what you asked for?</small></div>
+              </li>
+              <li data-stage="returned">
+                <span class="step-node">5</span>
+                <div><strong>Done</strong><small>DineLine gives you the result</small></div>
+              </li>
+            </ol>
+
+            <label class="scenario-control" id="scenario-control">
+              <span>Choose a demo outcome</span>
+              <select id="scenario-select">
+                <option value="confirmed">Reservation confirmed</option>
+                <option value="unavailable">Requested time unavailable</option>
+                <option value="alternative">Alternative offered, not booked</option>
+                <option value="voicemail">Voicemail, no message left</option>
+                <option value="contradiction">Answer does not match the request</option>
+                <option value="timeout">Provider timeout</option>
+              </select>
+              <small>For this demo only. It does not change your reservation.</small>
+            </label>
+
+            <div class="control-status" aria-live="polite">
+              <span id="status-indicator" class="status-indicator"></span>
+              <div><small>Current state</small><strong id="status-copy">Ready for review</strong></div>
+            </div>
+          </aside>
+        </div>
+      </section>
+
+      <section id="contract-section" class="contract-section" hidden aria-labelledby="contract-title">
+        <div class="contract-topline">
+          <div>
+            <p class="eyebrow"><span>03</span> Check before the call</p>
+            <h2 id="contract-title">Are these reservation details right?</h2>
+          </div>
+          <span class="contract-state">Ready to review</span>
+        </div>
+
+        <div class="contract-layout">
+          <div class="contract-card">
+            <div class="contract-header">
+              <div>
+                <small>What Agent Jake will ask for</small>
+                <strong id="contract-restaurant">Santoro House</strong>
+              </div>
+              <span id="contract-id-short">ID pending</span>
+            </div>
+
+            <dl class="contract-details">
+              <div><dt>Guest</dt><dd id="contract-guest">Demo Guest</dd></div>
+              <div><dt>Party</dt><dd id="contract-party">2 guests</dd></div>
+              <div><dt>Date</dt><dd id="contract-date">Pending</dd></div>
+              <div><dt>Time</dt><dd id="contract-time">7:30 PM ET</dd></div>
+              <div><dt>Destination</dt><dd id="contract-phone">Masked</dd></div>
+              <div><dt>Special request</dt><dd id="contract-request">None</dd></div>
+            </dl>
+
+            <div class="contract-code">
+              <span>Request ID</span>
+              <code id="contract-fingerprint">Pending</code>
+            </div>
+          </div>
+
+          <div class="approval-card">
+            <span class="approval-icon" aria-hidden="true">&#10003;</span>
+            <h3>Nothing happens until you say yes.</h3>
+            <p>
+              Agent Jake will say it is an AI assistant and ask only for the details shown here.
+              It will not book a different time, leave voicemail, or call again if the answer is unclear.
+            </p>
+
+            <label class="approval-check">
+              <input id="approval-checkbox" type="checkbox" />
+              <span>
+                <strong>Yes, these details are right.</strong>
+                <small id="approval-mode-copy">The simulated call can now run.</small>
+              </span>
+            </label>
+
+            <button class="call-action" id="execute-button" type="button" disabled>
+              <span class="call-action-icon" aria-hidden="true"></span>
+              <span><small id="execute-button-kicker">Simulated on this screen</small><strong id="execute-button-label">Run Agent Jake demo call</strong></span>
+              <span class="button-arrow" aria-hidden="true">&#8594;</span>
+            </button>
+
+            <button class="text-action" id="edit-button" type="button">Change reservation details</button>
+          </div>
+        </div>
+      </section>
+
+      <section id="result-section" class="result-section" hidden aria-labelledby="result-title">
+        <div class="result-glow" aria-hidden="true"></div>
+        <div class="result-heading">
+          <p class="eyebrow"><span>04</span> Agent Jake reported back</p>
+          <span id="result-badge" class="result-badge">Verified</span>
+        </div>
+
+        <div class="result-layout">
+          <div class="result-main">
+            <span id="result-symbol" class="result-symbol" aria-hidden="true">&#10003;</span>
+            <p id="result-overline">The restaurant confirmed your request</p>
+            <h2 id="result-title">Your table is booked.</h2>
+            <p id="result-summary">Agent Jake brought the restaurant's answer back to DineLine.</p>
+
+            <div class="result-facts">
+              <div><small>How sure?</small><strong id="result-confidence">97%</strong></div>
+              <div><small>Confirmation code</small><strong id="result-confirmation">FIXTURE-42</strong></div>
+              <div><small>Call ID</small><strong id="result-provider">fixture-1</strong></div>
+            </div>
+          </div>
+
+          <div class="evidence-card">
+            <div class="evidence-header">
+              <div><small>What came back</small><h3>What the restaurant said</h3></div>
+              <span id="review-state">No review needed</span>
+            </div>
+            <ul id="evidence-list" class="evidence-list"></ul>
+            <div class="evidence-footer">
+              <span>Your request</span><span class="evidence-link"></span><span>Restaurant answer</span>
+            </div>
+          </div>
+        </div>
+
+        <div class="result-actions">
+          <button id="booking-reconcile-button" class="secondary-action" type="button" hidden>
+            Check this accepted call
+          </button>
+          <button id="duplicate-button" class="secondary-action" type="button">
+            Try the same call again
+          </button>
+          <button id="fresh-button" class="text-action" type="button">Start over</button>
+        </div>
+      </section>
+
+      <section class="architecture-section reveal" aria-labelledby="architecture-title">
+        <div class="architecture-copy">
+          <p class="eyebrow"><span>05</span> What happens behind the screen</p>
+          <h2 id="architecture-title">DineLine finds the place. Agent Jake makes the call.</h2>
+          <p>
+            The DineLine Concierge is the first CALL-E agent. It calls you, listens to the
+            dinner you have in mind, and returns a structured request. n8n searches Google
+            Places and gives you five choices. After you choose and approve one, Agent Jake is
+            the second CALL-E agent: it calls the restaurant and returns a result that DineLine
+            checks against the exact request you approved.
+          </p>
+        </div>
+
+        <div class="architecture-map" aria-label="How the two DineLine agents work together">
+          <div class="map-node human-node"><small>You</small><strong>Request a call</strong></div>
+          <span class="map-arrow" aria-hidden="true">&#8594;</span>
+          <div class="map-node dine-node"><small>CALL-E Agent 1</small><strong>Hear preferences</strong></div>
+          <span class="map-arrow" aria-hidden="true">&#8594;</span>
+          <div class="map-node verify-node"><small>n8n + Google</small><strong>Find five places</strong></div>
+          <span class="map-arrow" aria-hidden="true">&#8594;</span>
+          <div class="map-node human-node"><small>You</small><strong>Choose + approve</strong></div>
+          <span class="map-arrow" aria-hidden="true">&#8594;</span>
+          <div class="map-node calle-node"><small>CALL-E Agent 2</small><strong>Call restaurant</strong></div>
+          <span class="map-arrow" aria-hidden="true">&#8594;</span>
+          <div class="map-node verify-node"><small>DineLine</small><strong>Verify + report</strong></div>
+        </div>
+      </section>
+    </main>
+
+    <footer>
+      <div>
+        <strong>DineLine CALL-E Edition</strong>
+        <span>One CALL-E agent hears the request. Another makes the restaurant call.</span>
+      </div>
+      <span id="footer-runtime-copy">Local demo · No real calls · 2026</span>
+    </footer>
+
+    <div id="toast" class="toast" role="status" aria-live="polite" aria-atomic="true"></div>
+  </body>
+</html>

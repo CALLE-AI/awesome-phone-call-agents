@@ -1,0 +1,111 @@
+{
+  "call_id": "call-inventory-lowstock-20260809",
+  "idempotency_key": "shopvoice-demo-lagos-corner-shop-inventory-2026-08-09",
+  "status": "completed",
+  "task_completed": true,
+  "completion_confidence": {
+    "score": 0.91,
+    "label": "high"
+  },
+  "evidence": [
+    "Owner reported Fish almost finished.",
+    "Owner reported Rice down to one bag.",
+    "Owner said Indomie and Sugar still fine."
+  ],
+  "structured_result": {
+    "check_in_completed": true,
+    "products": [
+      {
+        "name": "Fish",
+        "quantity_estimate": 0.5,
+        "unit": "cooler box",
+        "running_low": true,
+        "supplier_mentioned": "Mama Sikiru"
+      },
+      {
+        "name": "Rice",
+        "quantity_estimate": 1,
+        "unit": "bags",
+        "running_low": true
+      },
+      {
+        "name": "Indomie",
+        "quantity_estimate": 11,
+        "unit": "cartons",
+        "running_low": false
+      },
+      {
+        "name": "Sugar",
+        "quantity_estimate": 5,
+        "unit": "bags",
+        "running_low": false
+      }
+    ],
+    "owner_notes": "Fish and rice go finish before weekend if I no restock."
+  },
+  "metadata": {
+    "shop_id": "demo-lagos-corner-shop",
+    "call_type": "inventory",
+    "call_date": "2026-08-09"
+  },
+  "recipients": [
+    {
+      "phones": ["+2348000000000"],
+      "region": "NG",
+      "locale": "en",
+      "structured_result": {
+        "check_in_completed": true,
+        "products": [
+          {
+            "name": "Fish",
+            "quantity_estimate": 0.5,
+            "unit": "cooler box",
+            "running_low": true,
+            "supplier_mentioned": "Mama Sikiru"
+          },
+          {
+            "name": "Rice",
+            "quantity_estimate": 1,
+            "unit": "bags",
+            "running_low": true
+          },
+          {
+            "name": "Indomie",
+            "quantity_estimate": 11,
+            "unit": "cartons",
+            "running_low": false
+          },
+          {
+            "name": "Sugar",
+            "quantity_estimate": 5,
+            "unit": "bags",
+            "running_low": false
+          }
+        ],
+        "owner_notes": "Fish and rice go finish before weekend if I no restock."
+      },
+      "attempts": [
+        {
+          "attempt": 1,
+          "status": "completed",
+          "started_at": "2026-08-09T07:10:00+01:00",
+          "duration_seconds": 61,
+          "transcript_turns": [
+            { "offset_seconds": 0, "speaker": "bot", "text": "Good morning o. I be AI assistant wey dey help you track your shop. How market dey?" },
+            { "offset_seconds": 5, "speaker": "user", "text": "Morning. Market dey ok small small." },
+            { "offset_seconds": 9, "speaker": "bot", "text": "How the fish dey remain?" },
+            { "offset_seconds": 12, "speaker": "user", "text": "Fish don almost finish. Na half cooler box remain." },
+            { "offset_seconds": 18, "speaker": "bot", "text": "I don note am. Who you dey buy fish from?" },
+            { "offset_seconds": 22, "speaker": "user", "text": "Na Mama Sikiru I dey buy from." },
+            { "offset_seconds": 26, "speaker": "bot", "text": "Noted. Rice nko?" },
+            { "offset_seconds": 29, "speaker": "user", "text": "Rice remain just one bag." },
+            { "offset_seconds": 34, "speaker": "bot", "text": "Indomie and sugar dey fine?" },
+            { "offset_seconds": 37, "speaker": "user", "text": "Yes, dem still dey ok — eleven carton indomie, five bag sugar." },
+            { "offset_seconds": 44, "speaker": "bot", "text": "Thank you. Fish and rice go finish before weekend if you no restock — I go call you back to ask if you wan order." },
+            { "offset_seconds": 53, "speaker": "user", "text": "Ok, no wahala." }
+          ]
+        }
+      ]
+    }
+  ]
+}

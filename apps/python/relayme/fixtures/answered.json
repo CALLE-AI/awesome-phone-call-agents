@@ -1,0 +1,19 @@
+{
+  "task_id": "relayme-demo-0001",
+  "mock_transcript": [
+    {"speaker": "agent", "text": "Hi, this is an AI assistant calling on behalf of someone who can't use the phone directly. I have one quick question. Is this Maple Street Pharmacy?"},
+    {"speaker": "callee", "text": "Yes, this is Maple Street Pharmacy, how can I help?"},
+    {"speaker": "agent", "text": "Thank you. Is the prescription under the name Jordan Rivera ready for pickup?"},
+    {"speaker": "callee", "text": "Let me check... yes, it's ready. It'll be at the pickup counter."},
+    {"speaker": "agent", "text": "Roughly what time today can they collect it?"},
+    {"speaker": "callee", "text": "Any time before we close at 8 PM."},
+    {"speaker": "agent", "text": "Thank you very much, that's all I needed. Have a good day."}
+  ],
+  "structured_result": {
+    "answer": "Yes. The prescription for Jordan Rivera is ready for pickup at the pickup counter, any time before the pharmacy closes at 8 PM today.",
+    "outcome": "answered",
+    "transcript_summary": "Reached Maple Street Pharmacy. Confirmed the prescription is ready at the pickup counter, collectable any time before 8 PM close.",
+    "follow_up_needed": false,
+    "disclosed_ai": true
+  }
+}

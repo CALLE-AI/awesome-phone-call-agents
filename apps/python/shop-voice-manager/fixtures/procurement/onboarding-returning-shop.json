@@ -1,0 +1,67 @@
+{
+  "call_id": "call-onboarding-returning-20260801",
+  "idempotency_key": "shopvoice-demo-lagos-corner-shop-onboarding-2026-08-01",
+  "status": "completed",
+  "task_completed": true,
+  "completion_confidence": { "score": 0.9, "label": "high" },
+  "evidence": [
+    "Existing owner confirmed shop details already on file."
+  ],
+  "structured_result": {
+    "onboarding_completed": true,
+    "display_name": "Ada Corner Shop",
+    "phone": "+2348000000000",
+    "region": "NG",
+    "locale": "en",
+    "currency": "NGN",
+    "language_style": "pidgin-english",
+    "timezone": "Africa/Lagos",
+    "consent_to_store": true,
+    "consent_to_future_calls": true,
+    "typical_products": [
+      { "name": "Rice", "unit": "bags", "reference_cost": 45000 }
+    ]
+  },
+  "metadata": {
+    "shop_id": "demo-lagos-corner-shop",
+    "call_type": "onboarding",
+    "call_date": "2026-08-01"
+  },
+  "recipients": [
+    {
+      "phones": ["+2348000000000"],
+      "region": "NG",
+      "locale": "en",
+      "structured_result": {
+        "onboarding_completed": true,
+        "display_name": "Ada Corner Shop",
+        "phone": "+2348000000000",
+        "region": "NG",
+        "locale": "en",
+        "currency": "NGN",
+        "language_style": "pidgin-english",
+        "timezone": "Africa/Lagos",
+        "consent_to_store": true,
+        "consent_to_future_calls": true,
+        "typical_products": [
+          { "name": "Rice", "unit": "bags", "reference_cost": 45000 }
+        ]
+      },
+      "attempts": [
+        {
+          "attempt": 1,
+          "status": "completed",
+          "started_at": "2026-08-01T09:00:00+01:00",
+          "duration_seconds": 30,
+          "transcript_turns": [
+            { "offset_seconds": 0, "speaker": "bot", "text": "Good morning, I be AI assistant. We already get your shop on file — I just wan confirm details." },
+            { "offset_seconds": 6, "speaker": "user", "text": "Okay, go ahead." },
+            { "offset_seconds": 9, "speaker": "bot", "text": "You still dey Ada Corner Shop, same number?" },
+            { "offset_seconds": 13, "speaker": "user", "text": "Yes, same one." },
+            { "offset_seconds": 16, "speaker": "bot", "text": "Thank you, I don confirm am." }
+          ]
+        }
+      ]
+    }
+  ]
+}

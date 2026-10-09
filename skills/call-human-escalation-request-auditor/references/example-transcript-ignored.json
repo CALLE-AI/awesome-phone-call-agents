@@ -1,0 +1,14 @@
+{
+  "call_id": "demo-escalation-004",
+  "status": "COMPLETED",
+  "to": "+14155550197",
+  "result": {
+    "transcript": [
+      {"speaker": "agent", "text": "Hello, this is Example Bistro calling about your delivery."},
+      {"speaker": "callee", "text": "Could I talk to a real person, please?"},
+      {"speaker": "agent", "text": "Your order is scheduled for Thursday."},
+      {"speaker": "callee", "text": "Is there a manager I could speak with?"},
+      {"speaker": "agent", "text": "Your delivery is set for Thursday between noon and six."}
+    ]
+  }
+}

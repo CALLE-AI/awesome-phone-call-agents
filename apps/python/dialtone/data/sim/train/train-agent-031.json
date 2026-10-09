@@ -1,0 +1,46 @@
+{
+ "id": "train-agent-031",
+ "label": "agent",
+ "source": "sim-train",
+ "meta": {
+  "task": "cancel a subscription",
+  "hard": false
+ },
+ "turns": [
+  {
+   "speaker": "user",
+   "text": "Thank you for calling Luigi's Trattoria! I'm Nova, the virtual assistant for Luigi's Trattoria. How can I help you today?",
+   "offset_seconds": 0.87
+  },
+  {
+   "speaker": "bot",
+   "text": "Hi, I'm an AI assistant calling on behalf of Casey Brown. I'd like to cancel the subscription for the account under Casey Brown.",
+   "offset_seconds": 9.08
+  },
+  {
+   "speaker": "user",
+   "text": "I understand. I've processed the cancellation for the account under Casey Brown, effective today. Is there anything else I can help with?",
+   "offset_seconds": 19.21
+  },
+  {
+   "speaker": "bot",
+   "text": "Can you confirm the cancellation is effective today?",
+   "offset_seconds": 28.27
+  },
+  {
+   "speaker": "user",
+   "text": "Of course. One moment please. Yes, that works.",
+   "offset_seconds": 32.82
+  },
+  {
+   "speaker": "bot",
+   "text": "Will there be a final charge?",
+   "offset_seconds": 36.75
+  },
+  {
+   "speaker": "user",
+   "text": "You're welcome! Have a wonderful day. Goodbye!",
+   "offset_seconds": 40.57
+  }
+ ]
+}

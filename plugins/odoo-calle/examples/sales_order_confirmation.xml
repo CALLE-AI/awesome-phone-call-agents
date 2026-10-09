@@ -1,0 +1,44 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <data noupdate="1">
+        <!-- CALL-E Server Action: Sales Order Phone Verification -->
+        <record id="action_calle_sales_order_verification" model="ir.actions.server">
+            <field name="name">CALL-E: Sales Order Verification</field>
+            <field name="model_id" ref="sale.model_sale_order"/>
+            <field name="state">calle_call</field>
+            <field name="calle_phone_field_chain">partner_id.phone</field>
+        </record>
+
+        <!-- Call Section 1: Order Confirmation Request -->
+        <record id="section_so_confirmation_intro" model="calle.section">
+            <field name="server_action_id" ref="action_calle_sales_order_verification"/>
+            <field name="section_text">Hello {{ record.partner_id.name }}, we are calling from store customer service to confirm sales order {{ record.name }} totaling {{ record.amount_total }} {{ record.currency_id.name }}. Would you like us to proceed with shipment?</field>
+        </record>
+
+        <!-- Response Choice A: Confirmed -->
+        <record id="response_so_confirmed" model="calle.section.response">
+            <field name="section_id" ref="section_so_confirmation_intro"/>
+            <field name="name">Confirmed</field>
+            <field name="action_code">record.message_post(body="Order confirmed by customer via CALL-E phone call. Proceeding to delivery.")
+            </field>
+        </record>
+
+        <!-- Response Choice B: Cancel Order (Advisory request logged for review) -->
+        <record id="response_so_cancelled" model="calle.section.response">
+            <field name="section_id" ref="section_so_confirmation_intro"/>
+            <field name="name">Cancel order</field>
+            <field name="action_code">record.message_post(body="CALL-E Advisory: Customer requested order cancellation during phone call. Manual review required before cancellation.")
+record.activity_schedule('mail.mail_activity_data_todo', summary="Review customer cancellation request from CALL-E call")
+            </field>
+        </record>
+
+        <!-- CALL-E Automation Rule: Trigger on Sale Order Creation -->
+        <record id="rule_calle_sales_order_verification" model="base.automation">
+            <field name="name">CALL-E: Sales Order Verification Automation Rule</field>
+            <field name="model_id" ref="sale.model_sale_order"/>
+            <field name="trigger">on_create</field>
+            <field name="action_server_ids" eval="[(4, ref('action_calle_sales_order_verification'))]"/>
+            <field name="active" eval="True"/>
+        </record>
+    </data>
+</odoo>

@@ -21,7 +21,7 @@ from ringdown.calle import (
     _snapshot,
     assert_trusted_url,
 )
-from ringdown.script import attempt_id, call_payload, idempotency_key
+from ringdown.script import attempt_id, call_payload
 from tests.data import ALICE, LADDER
 
 KEY = "rd-test-1"
@@ -50,6 +50,14 @@ def test_a_plain_http_host_that_is_not_loopback_never_receives_a_credential():
 def test_an_unknown_https_host_is_refused_and_there_is_no_flag_that_permits_it():
     with pytest.raises(UntrustedHost, match="refusing to send a credential"):
         assert_trusted_url("https://calle.example.com", LIVE_BASE_URL)
+
+
+def test_a_url_carrying_a_password_is_refused_without_printing_it():
+    with pytest.raises(UntrustedHost) as raised:
+        assert_trusted_url("ftp://operator:hunter2@calle.example.com", LIVE_BASE_URL)
+
+    assert "hunter2" not in str(raised.value)
+    assert "operator" not in str(raised.value)
 
 
 def test_each_channel_accepts_its_own_live_url_and_loopback():
@@ -108,7 +116,8 @@ def test_a_created_call_is_read_back_from_the_placing_channel(incident):
 
 
 def test_a_malformed_call_payload_is_an_unreadable_response_not_a_crash():
-    for body in ([], {"recipients": 5}, {"completion_confidence": "high"}):
+    unplaceable = {"recipients": [{"attempts": [{"transcript_turns": [{"speaker": "human"}]}]}]}
+    for body in ([], {"recipients": 5}, {"completion_confidence": "high"}, unplaceable):
         with pytest.raises(CalleError) as raised:
             _snapshot(body)
         assert raised.value.code == "unreadable_response"

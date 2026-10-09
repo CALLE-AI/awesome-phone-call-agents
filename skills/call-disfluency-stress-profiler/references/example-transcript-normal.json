@@ -1,0 +1,8 @@
+{"status": "COMPLETED", "call_id": "run-disfluency-002", "transcript": [
+  {"speaker": "agent", "text": "Good afternoon. I am calling to confirm your delivery scheduled for Friday between 2 and 4 p.m."},
+  {"speaker": "callee", "text": "Yes, that works perfectly. I will be home all afternoon."},
+  {"speaker": "agent", "text": "Excellent. The driver will call 30 minutes before arrival. Is your address still on file?"},
+  {"speaker": "callee", "text": "Yes, same address. No changes."},
+  {"speaker": "agent", "text": "Perfect. You are all set. Thank you for confirming."},
+  {"speaker": "callee", "text": "Great. Thank you very much."}
+]}

@@ -1,0 +1,2 @@
+import {CalleProvider} from './client';import {CallRepository} from './repository';
+export async function reconcileOpenCalls(provider:CalleProvider,repo:CallRepository,ids:string[]){const results=[];for(const id of ids){try{const remote=await provider.getCall(id);await repo.putCall(remote);results.push({id,status:remote.status,ok:true});}catch(error){results.push({id,ok:false,error:String(error)});}}return results;}

@@ -134,9 +134,7 @@ class LiveTransport:
             self.ledger.record_wet("calls.create", detail=scenario_id)
         except WetOperationRefusedError as error:
             raise BudgetExceededError(
-                f"{error} Each call costs "
-                f"{self.ledger.credits_spent // max(self.calls_placed, 1) or 5} "
-                "credits and rings a real telephone."
+                f"{error} Each call may incur charges and rings a real telephone."
             ) from error
 
     # --- Running -----------------------------------------------------------

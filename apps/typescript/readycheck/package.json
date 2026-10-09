@@ -1,0 +1,47 @@
+{
+  "name": "readycheck",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "engines": {
+    "node": ">=22.13.0"
+  },
+  "scripts": {
+    "dev": "node --watch-path=server --watch-path=src/domain --import tsx server/index.ts",
+    "build": "tsc --noEmit && vite build",
+    "start": "NODE_ENV=production node --import tsx server/index.ts",
+    "typecheck": "tsc --noEmit",
+    "test": "node --import tsx --test tests/*.test.ts",
+    "evaluate": "node --import tsx scripts/evaluate.ts",
+    "live:check": "node --import tsx scripts/live-check.ts",
+    "verify": "npm run typecheck && npm test && npm run evaluate && vite build",
+    "test:browser": "playwright test",
+    "format": "prettier --write src server tests scripts docs package.json tsconfig.json vite.config.ts playwright.config.ts README.md render.yaml .github/workflows/ci.yml",
+    "format:check": "prettier --check src server tests scripts docs package.json tsconfig.json vite.config.ts playwright.config.ts README.md render.yaml .github/workflows/ci.yml",
+    "rehearse": "node --import tsx scripts/rehearse.ts"
+  },
+  "dependencies": {
+    "@fontsource/dm-sans": "^5.3.0",
+    "@fontsource/instrument-serif": "^5.3.0",
+    "@js-temporal/polyfill": "^0.5.1",
+    "express": "^5.1.0",
+    "lucide-react": "^0.468.0",
+    "react": "^19.1.0",
+    "react-dom": "^19.1.0",
+    "zod": "^4.0.0"
+  },
+  "devDependencies": {
+    "@playwright/test": "^1.63.0",
+    "@types/express": "^5.0.0",
+    "@types/node": "^25.0.0",
+    "@types/react": "^19.1.0",
+    "@types/react-dom": "^19.1.0",
+    "@vitejs/plugin-react": "^5.0.0",
+    "agent-browser": "^0.37.1",
+    "prettier": "^3.9.6",
+    "tsx": "^4.20.0",
+    "typescript": "^5.9.0",
+    "vite": "^7.1.0"
+  },
+  "license": "MIT"
+}

@@ -1,0 +1,27 @@
+{
+  "id": "13-verified-readback-complied-price",
+  "category": "readback-complied",
+  "description": "The full verified path for a critical price: lookup gap, check language, warehouse corroboration, and the value repeated back after the bot's read-back request.",
+  "turns": [
+    { "speaker": "bot", "text": "Hi, QuoteDesk assistant calling to finalise the rate on your order.", "offset_seconds": 0 },
+    { "speaker": "user", "text": "Yes, tell me.", "offset_seconds": 5 },
+    { "speaker": "bot", "text": "What is the final per unit rate for order 5 5 2 0?", "offset_seconds": 9 },
+    { "speaker": "user", "text": "One second, let me check.", "offset_seconds": 14 },
+    { "speaker": "user", "text": "It is 4,500 rupees per unit, stock is at the Taloja godown.", "offset_seconds": 25 },
+    { "speaker": "bot", "text": "Just to confirm, that is 4,500 rupees per unit, correct?", "offset_seconds": 31 },
+    { "speaker": "user", "text": "Yes, 4,500 rupees per unit, correct.", "offset_seconds": 36 }
+  ],
+  "fields": [
+    {
+      "field": "unit_price",
+      "value": 4500,
+      "expects": "price",
+      "questionTurn": 2,
+      "answerTurns": [4],
+      "readbackRequested": true,
+      "critical": true,
+      "expectedGrade": "verified",
+      "expectSignals": ["A", "B", "C", "F"]
+    }
+  ]
+}

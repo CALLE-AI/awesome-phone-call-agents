@@ -1,0 +1,666 @@
+{
+  "version": "UI-02",
+  "sourceCommit": "c57d64f675606302fd0e42e26c3353d17cc0bf8c",
+  "sourceTree": "dc49fa7662b7a6bfced499e6f089ad2ce2d47419",
+  "builtAt": "2026-09-14T05:46:29.493719+00:00",
+  "realCallEvidence": "ABSENT",
+  "publication": "NOT_AUTHORIZED_AT_PREPARATION",
+  "scope": "PUBLIC_SOURCE_WITH_DISABLED_CALLE_RUNTIME",
+  "files": {
+    ".gitignore": {
+      "origin": ".gitignore",
+      "gitObjectSha256": "3a38d80c52c7e81b512513b2c621a9e7b281126308394d7e7e7ff41ec1a9b330",
+      "bytes": 541,
+      "sha256": "3a38d80c52c7e81b512513b2c621a9e7b281126308394d7e7e7ff41ec1a9b330"
+    },
+    "docs/public/calle-runtime-pins.json": {
+      "origin": "docs/public/calle-runtime-pins.json",
+      "gitObjectSha256": "e4f12badd63c27b058833a72df3c629a1b5cb0688be3a76d8f5e17ee9daa7b77",
+      "bytes": 480,
+      "sha256": "e4f12badd63c27b058833a72df3c629a1b5cb0688be3a76d8f5e17ee9daa7b77"
+    },
+    "docs/public/licenses.md": {
+      "origin": "docs/public/licenses.md",
+      "gitObjectSha256": "0c3b053e3960bee4133e2395667a17459e6e77921d9391d85df7ed2507be986f",
+      "bytes": 1854,
+      "sha256": "e9013f672e1b9aa9cac3f5f360a2d37388a947127888bb3dc9afa1eb3932c97e",
+      "transformation": "Local MIT publication proposal: license metadata and accompanying documentation only."
+    },
+    "docs/public/private-integration.md": {
+      "origin": "docs/public/private-integration.md",
+      "gitObjectSha256": "4a659fd9b7aad5a7a18887d5ce124ef1340f1c714f613fd74a0bc221e5bb4280",
+      "bytes": 5269,
+      "sha256": "f34e7b434f6a62fd14d3c41ffeecc6e49aa097b4c6d5ef32a3491b12db1f3ddc",
+      "transformation": "Distinguish completed schema observation and local operator preparation from missing phone execution."
+    },
+    "docs/public/replay-format.md": {
+      "origin": "docs/public/replay-format.md",
+      "gitObjectSha256": "eea308ec85c789e713fcc4cf8c5fdb8702c9489f426458e8354ded86f9a0bff6",
+      "bytes": 2385,
+      "sha256": "eea308ec85c789e713fcc4cf8c5fdb8702c9489f426458e8354ded86f9a0bff6"
+    },
+    "docs/submission/callops-license-inventory-20260908.json": {
+      "origin": "docs/submission/callops-license-inventory-20260908.json",
+      "gitObjectSha256": "89f441a6d23053e31f91f4efb4cefb9c0de8d141dd83e0bc73b4793596275e06",
+      "bytes": 40579,
+      "sha256": "89f441a6d23053e31f91f4efb4cefb9c0de8d141dd83e0bc73b4793596275e06"
+    },
+    "eslint.config.js": {
+      "origin": "eslint.config.js",
+      "gitObjectSha256": "339856a0306012314a75f986b0648a76addfc9fecd935c578a22835950346006",
+      "bytes": 725,
+      "sha256": "339856a0306012314a75f986b0648a76addfc9fecd935c578a22835950346006"
+    },
+    "index.html": {
+      "origin": "index.html",
+      "gitObjectSha256": "ede850dce45981461703ab9912f254e89eedc7047eb6e0a8b27445ab84564f71",
+      "bytes": 568,
+      "sha256": "ede850dce45981461703ab9912f254e89eedc7047eb6e0a8b27445ab84564f71"
+    },
+    "package-lock.json": {
+      "origin": "package-lock.json",
+      "gitObjectSha256": "aa5e9876a7dfd7744c17c155c0faff49965a8c5aa3d53a99379457d63800dadc",
+      "bytes": 84569,
+      "sha256": "aa0f1166f59af9b5f13613f3e7a8e3c55bcc6f987c862dcf8161663cca1744de",
+      "transformation": "Local MIT publication proposal: license metadata and accompanying documentation only."
+    },
+    "package.json": {
+      "origin": "package.json",
+      "gitObjectSha256": "9ee119a1ddcf39e038537d0f453d3243984c47cd92ae645b731c93c658b59d2d",
+      "transformation": "Local MIT publication proposal: license metadata and accompanying documentation only.",
+      "bytes": 1007,
+      "sha256": "b66f77de55951974fcd7d9f44e55cb80af39f86e87c00039603be9c19bb4993e"
+    },
+    "public/THIRD_PARTY_NOTICES.txt": {
+      "origin": "public/THIRD_PARTY_NOTICES.txt",
+      "gitObjectSha256": "9923a3d7c90c429a6fbf919a9e0c05be15173ce699c7794f013440bfd0cfda4a",
+      "bytes": 1428,
+      "sha256": "9923a3d7c90c429a6fbf919a9e0c05be15173ce699c7794f013440bfd0cfda4a"
+    },
+    "public/favicon.svg": {
+      "origin": "public/favicon.svg",
+      "gitObjectSha256": "962d4c385517272854eca35c6e18fe857d1caba6b02ed7986f8cd323f42ace69",
+      "bytes": 237,
+      "sha256": "962d4c385517272854eca35c6e18fe857d1caba6b02ed7986f8cd323f42ace69"
+    },
+    "replay.html": {
+      "origin": "replay.html",
+      "gitObjectSha256": "f05c488c41b0c0957f3cb9e1f24a78a7e519431d013b1c537980d24c9de0d277",
+      "bytes": 550,
+      "sha256": "f05c488c41b0c0957f3cb9e1f24a78a7e519431d013b1c537980d24c9de0d277"
+    },
+    "scripts/replay-browser-qa.js": {
+      "origin": "scripts/replay-browser-qa.js",
+      "gitObjectSha256": "ec978c30f781793ca9108517f0d0170a39a8894b5f0174aeefa193cb3b9a2ff7",
+      "bytes": 4730,
+      "sha256": "ec978c30f781793ca9108517f0d0170a39a8894b5f0174aeefa193cb3b9a2ff7"
+    },
+    "scripts/workshop-browser-qa.js": {
+      "origin": "scripts/workshop-browser-qa.js",
+      "gitObjectSha256": "8350e64014a661cb30ed62286dc5c1da4fb9642f3c258ce205eea7949a476005",
+      "bytes": 9172,
+      "sha256": "8350e64014a661cb30ed62286dc5c1da4fb9642f3c258ce205eea7949a476005"
+    },
+    "src/adapters/file-calle-run-checkpoint-store.ts": {
+      "origin": "src/adapters/file-calle-run-checkpoint-store.ts",
+      "gitObjectSha256": "2288a87a2a0d7a05b2c7e6668f6eced02c04f6005f5cbcccff10ec3bc3f6847b",
+      "bytes": 6295,
+      "sha256": "2288a87a2a0d7a05b2c7e6668f6eced02c04f6005f5cbcccff10ec3bc3f6847b"
+    },
+    "src/adapters/fixed-calle-mcp-transport.ts": {
+      "origin": "src/adapters/fixed-calle-mcp-transport.ts",
+      "gitObjectSha256": "dacef82f8dfeca3771010e82343a7dbee3a1b9b02f6931a9ab208195d5fcdc69",
+      "bytes": 12450,
+      "sha256": "dacef82f8dfeca3771010e82343a7dbee3a1b9b02f6931a9ab208195d5fcdc69"
+    },
+    "src/adapters/in-memory-calle-run-checkpoint-store.ts": {
+      "origin": "src/adapters/in-memory-calle-run-checkpoint-store.ts",
+      "gitObjectSha256": "06bd8240f8472005c781420ee5ca62439205570d106d7ce3aecf2e2a3c768a97",
+      "bytes": 1055,
+      "sha256": "06bd8240f8472005c781420ee5ca62439205570d106d7ce3aecf2e2a3c768a97"
+    },
+    "src/adapters/in-memory-repository.ts": {
+      "origin": "src/adapters/in-memory-repository.ts",
+      "gitObjectSha256": "91e1913d859ea58cb2943a29327977ae4fa7a9a67e5e356ac7241a8b94d77143",
+      "bytes": 658,
+      "sha256": "91e1913d859ea58cb2943a29327977ae4fa7a9a67e5e356ac7241a8b94d77143"
+    },
+    "src/adapters/local-storage-repository.ts": {
+      "origin": "src/adapters/local-storage-repository.ts",
+      "gitObjectSha256": "6cb10d5e0e6824d92a5a47815cfe365fb18676befcee18c57c205af63c17d2b9",
+      "bytes": 2083,
+      "sha256": "6cb10d5e0e6824d92a5a47815cfe365fb18676befcee18c57c205af63c17d2b9"
+    },
+    "src/adapters/mock-call-provider.ts": {
+      "origin": "src/adapters/mock-call-provider.ts",
+      "gitObjectSha256": "2e872faec5f2db9c533d6bdd0df3f9bf750259019756c6c25d53c5729197d300",
+      "bytes": 6194,
+      "sha256": "2e872faec5f2db9c533d6bdd0df3f9bf750259019756c6c25d53c5729197d300"
+    },
+    "src/adapters/rule-based-outcome-extractor.ts": {
+      "origin": "src/adapters/rule-based-outcome-extractor.ts",
+      "gitObjectSha256": "11f7a20059a2ddac7c05614afd27279a82566668b4ee0fea67a9646d6d90d7aa",
+      "bytes": 2950,
+      "sha256": "11f7a20059a2ddac7c05614afd27279a82566668b4ee0fea67a9646d6d90d7aa"
+    },
+    "src/adapters/workshop-mock-call-provider.ts": {
+      "origin": "src/adapters/workshop-mock-call-provider.ts",
+      "gitObjectSha256": "f48e7e285cb82d35b7392e21aa9bb96e22cf5887285ad0ff65c1cd8ec686e6ed",
+      "bytes": 4355,
+      "sha256": "f48e7e285cb82d35b7392e21aa9bb96e22cf5887285ad0ff65c1cd8ec686e6ed"
+    },
+    "src/adapters/workshop-outcome-extractor.ts": {
+      "origin": "src/adapters/workshop-outcome-extractor.ts",
+      "gitObjectSha256": "8f87806004befcb3b1de82b9938bf5954ba21c76663cd074dc52cf92738f31b9",
+      "bytes": 1885,
+      "sha256": "8f87806004befcb3b1de82b9938bf5954ba21c76663cd074dc52cf92738f31b9"
+    },
+    "src/application/callops-service.ts": {
+      "origin": "src/application/callops-service.ts",
+      "gitObjectSha256": "fd7bf2d3c584519a4b8dbf7a8d46d7e5873c68ffb48df1e58c52ecec9473a440",
+      "bytes": 16324,
+      "sha256": "fd7bf2d3c584519a4b8dbf7a8d46d7e5873c68ffb48df1e58c52ecec9473a440"
+    },
+    "src/domain/canonical.ts": {
+      "origin": "src/domain/canonical.ts",
+      "gitObjectSha256": "4524289e72d14b9acfb5369d2b095f8081ca2368f6e1796653c2205411846ae7",
+      "bytes": 1428,
+      "sha256": "4524289e72d14b9acfb5369d2b095f8081ca2368f6e1796653c2205411846ae7"
+    },
+    "src/domain/errors.ts": {
+      "origin": "src/domain/errors.ts",
+      "gitObjectSha256": "52eaf6bfcd0dd73efaa6cddda08e3637a591f9ea5f5036e888ab421574b79b6b",
+      "bytes": 1160,
+      "sha256": "52eaf6bfcd0dd73efaa6cddda08e3637a591f9ea5f5036e888ab421574b79b6b"
+    },
+    "src/domain/mock-snapshot.ts": {
+      "origin": "src/domain/mock-snapshot.ts",
+      "gitObjectSha256": "a61703dd4982da08f5b8c20d5be4ea7525afa78515d31c4d193edf722df12a5f",
+      "bytes": 5957,
+      "sha256": "a61703dd4982da08f5b8c20d5be4ea7525afa78515d31c4d193edf722df12a5f"
+    },
+    "src/domain/models.ts": {
+      "origin": "src/domain/models.ts",
+      "gitObjectSha256": "caf10124e01960db10c841f810ae24967521f694570ddfbe630c1e73fb4bbddb",
+      "bytes": 3679,
+      "sha256": "caf10124e01960db10c841f810ae24967521f694570ddfbe630c1e73fb4bbddb"
+    },
+    "src/domain/state-machine.ts": {
+      "origin": "src/domain/state-machine.ts",
+      "gitObjectSha256": "f30d1b8281566ac1297c879e9e4727ff543714a610c263b0cea5e3100fa660a9",
+      "bytes": 1190,
+      "sha256": "f30d1b8281566ac1297c879e9e4727ff543714a610c263b0cea5e3100fa660a9"
+    },
+    "src/domain/synthetic-data.ts": {
+      "origin": "src/domain/synthetic-data.ts",
+      "gitObjectSha256": "0d66ec0920a6389ca6cd41f1b36d6ef7cbd8f71468d2e5a5118816652dca90e8",
+      "bytes": 2861,
+      "sha256": "0d66ec0920a6389ca6cd41f1b36d6ef7cbd8f71468d2e5a5118816652dca90e8"
+    },
+    "src/domain/workshop-outcome.ts": {
+      "origin": "src/domain/workshop-outcome.ts",
+      "gitObjectSha256": "a752cd8750ed8f0200ed029dbd994fe394679d94623695d7e8d7e20afc36710d",
+      "bytes": 10607,
+      "sha256": "a752cd8750ed8f0200ed029dbd994fe394679d94623695d7e8d7e20afc36710d"
+    },
+    "src/domain/workshop-replay.ts": {
+      "origin": "src/domain/workshop-replay.ts",
+      "gitObjectSha256": "5f65536fc07ab7b7909fc98dc140ada164adc6aa95d846fce15ba63c06d7ffc2",
+      "bytes": 5090,
+      "sha256": "5f65536fc07ab7b7909fc98dc140ada164adc6aa95d846fce15ba63c06d7ffc2"
+    },
+    "src/fixtures/demo.ts": {
+      "origin": "src/fixtures/demo.ts",
+      "gitObjectSha256": "8bdd1278c17a83044e98ed4fb6ba33123ad792c7e63b09a86fc7cb7c7512f79c",
+      "bytes": 980,
+      "sha256": "8bdd1278c17a83044e98ed4fb6ba33123ad792c7e63b09a86fc7cb7c7512f79c"
+    },
+    "src/fixtures/workshop-replay-catalog.ts": {
+      "origin": "src/fixtures/workshop-replay-catalog.ts",
+      "gitObjectSha256": "981ba5ca901808a2d6fdaab6c72861baffa48db077a6ec4a1da45318b5161f9a",
+      "bytes": 194,
+      "sha256": "981ba5ca901808a2d6fdaab6c72861baffa48db077a6ec4a1da45318b5161f9a"
+    },
+    "src/fixtures/workshop-replay.json": {
+      "origin": "src/fixtures/workshop-replay.json",
+      "gitObjectSha256": "5f0c5a2059ebb4b58da36c50e2f5865e7b07b4a894da4f0d070f39e17beb45aa",
+      "bytes": 2107,
+      "sha256": "5f0c5a2059ebb4b58da36c50e2f5865e7b07b4a894da4f0d070f39e17beb45aa"
+    },
+    "src/fixtures/workshop.ts": {
+      "origin": "src/fixtures/workshop.ts",
+      "gitObjectSha256": "51049636d0a64bfd7713495dd1bc72fc6d31dfadfbf14237b9da38fdd2da2c3f",
+      "bytes": 3051,
+      "sha256": "51049636d0a64bfd7713495dd1bc72fc6d31dfadfbf14237b9da38fdd2da2c3f"
+    },
+    "src/integrations/calle-live-adapter.ts": {
+      "origin": "src/integrations/calle-live-adapter.ts",
+      "gitObjectSha256": "99c8fe60076bb98f32527769af8ba2fe9002b67b7853584611ff84af37eaaa33",
+      "bytes": 26005,
+      "sha256": "99c8fe60076bb98f32527769af8ba2fe9002b67b7853584611ff84af37eaaa33"
+    },
+    "src/integrations/calle-live-auth-boundary.ts": {
+      "origin": "src/integrations/calle-live-auth-boundary.ts",
+      "gitObjectSha256": "4fcd9b7601df41473c7d3f5d3262c02522ee5e5feddef9d4a1bfbef3187d6d12",
+      "bytes": 4048,
+      "sha256": "4fcd9b7601df41473c7d3f5d3262c02522ee5e5feddef9d4a1bfbef3187d6d12"
+    },
+    "src/integrations/calle-live-capability-vault.ts": {
+      "origin": "src/integrations/calle-live-capability-vault.ts",
+      "gitObjectSha256": "64f87fc78a1961df53668ed22a03cd640c1736f0a35d38f962343831cf8e604c",
+      "bytes": 2577,
+      "sha256": "64f87fc78a1961df53668ed22a03cd640c1736f0a35d38f962343831cf8e604c"
+    },
+    "src/integrations/calle-live-errors.ts": {
+      "origin": "src/integrations/calle-live-errors.ts",
+      "gitObjectSha256": "20840fee73a2237880c084b6f3e9aefc3cfb706947711003f7457f3eb85793c4",
+      "bytes": 684,
+      "sha256": "20840fee73a2237880c084b6f3e9aefc3cfb706947711003f7457f3eb85793c4"
+    },
+    "src/integrations/calle-live-evidence.ts": {
+      "origin": "src/integrations/calle-live-evidence.ts",
+      "gitObjectSha256": "8e131c511afea16b1839447c923d2145e7ac402bed49a61da01154c005920009",
+      "bytes": 1653,
+      "sha256": "8e131c511afea16b1839447c923d2145e7ac402bed49a61da01154c005920009"
+    },
+    "src/integrations/calle-live-response-contracts.ts": {
+      "origin": "src/integrations/calle-live-response-contracts.ts",
+      "gitObjectSha256": "9c19093fc93e8baceef9b3b83cff6afaeae2875aacb9134d0cb857520824d8a7",
+      "bytes": 16757,
+      "sha256": "9c19093fc93e8baceef9b3b83cff6afaeae2875aacb9134d0cb857520824d8a7"
+    },
+    "src/integrations/calle-live-state-machine.ts": {
+      "origin": "src/integrations/calle-live-state-machine.ts",
+      "gitObjectSha256": "2ff5ac987923bee20f69cd6d975dba40373643e010033258a53b9bc8b24bcc74",
+      "bytes": 1645,
+      "sha256": "2ff5ac987923bee20f69cd6d975dba40373643e010033258a53b9bc8b24bcc74"
+    },
+    "src/integrations/calle-live-transport-policy.ts": {
+      "origin": "src/integrations/calle-live-transport-policy.ts",
+      "gitObjectSha256": "77f7d6d6df2bd358b1a39a03ca7a217278f1bd338a9a2ef3ab98de6f688417d9",
+      "bytes": 2993,
+      "sha256": "77f7d6d6df2bd358b1a39a03ca7a217278f1bd338a9a2ef3ab98de6f688417d9"
+    },
+    "src/integrations/calle-live-types.ts": {
+      "origin": "src/integrations/calle-live-types.ts",
+      "gitObjectSha256": "3a9b99eaa3e1ea8e663d8daf7b46d2f065896a170dd94c1eb256b1d5f8703725",
+      "bytes": 5400,
+      "sha256": "3a9b99eaa3e1ea8e663d8daf7b46d2f065896a170dd94c1eb256b1d5f8703725"
+    },
+    "src/integrations/calle-plan-only.ts": {
+      "origin": "src/integrations/calle-plan-only.ts",
+      "gitObjectSha256": "f051bde6240533b3411aa3bef742c95733b177f3a470466f8812fa0f15554ae0",
+      "bytes": 4830,
+      "sha256": "f051bde6240533b3411aa3bef742c95733b177f3a470466f8812fa0f15554ae0"
+    },
+    "src/integrations/calle-plan-response-types.ts": {
+      "origin": "src/integrations/calle-plan-response-types.ts",
+      "gitObjectSha256": "864702c037c529b1839a36d143781192bac16203ac0eb5fb286c3a2d949c82a8",
+      "bytes": 1950,
+      "sha256": "864702c037c529b1839a36d143781192bac16203ac0eb5fb286c3a2d949c82a8"
+    },
+    "src/integrations/calle-plan-response.ts": {
+      "origin": "src/integrations/calle-plan-response.ts",
+      "gitObjectSha256": "de64ea2a538ebd1a50fd65f765c685ddcfb7d6ea8dd2fc8e2aacbfc5a790968f",
+      "bytes": 418,
+      "sha256": "de64ea2a538ebd1a50fd65f765c685ddcfb7d6ea8dd2fc8e2aacbfc5a790968f"
+    },
+    "src/integrations/calle-run-checkpoint.ts": {
+      "origin": "src/integrations/calle-run-checkpoint.ts",
+      "gitObjectSha256": "67271b8cc77b9e8056b48cff0d654ea2c3d9ac8aaa1ae0532729b358d5d2c7e0",
+      "bytes": 5015,
+      "sha256": "67271b8cc77b9e8056b48cff0d654ea2c3d9ac8aaa1ae0532729b358d5d2c7e0"
+    },
+    "src/main.ts": {
+      "origin": "src/main.ts",
+      "gitObjectSha256": "4caa9694db609f78ed719d12cd1b87cf1730b2215ae1b7992565815f739f3bbf",
+      "bytes": 20634,
+      "sha256": "4caa9694db609f78ed719d12cd1b87cf1730b2215ae1b7992565815f739f3bbf"
+    },
+    "src/ports/call-provider.ts": {
+      "origin": "src/ports/call-provider.ts",
+      "gitObjectSha256": "89bb225e19eeeffe3059fce7e7949d3d588e990e6556a461b3c1eba6e7ed55a4",
+      "bytes": 1026,
+      "sha256": "89bb225e19eeeffe3059fce7e7949d3d588e990e6556a461b3c1eba6e7ed55a4"
+    },
+    "src/ports/case-repository.ts": {
+      "origin": "src/ports/case-repository.ts",
+      "gitObjectSha256": "211d338b561933b13eeebfd58416ce0c9382774a71fe4a5ee1ae989bbfa606da",
+      "bytes": 206,
+      "sha256": "211d338b561933b13eeebfd58416ce0c9382774a71fe4a5ee1ae989bbfa606da"
+    },
+    "src/ports/clock.ts": {
+      "origin": "src/ports/clock.ts",
+      "gitObjectSha256": "b5603c47afeb5aed328742275370a8de8efed76d0fef980a826e13d59bdd1c09",
+      "bytes": 157,
+      "sha256": "b5603c47afeb5aed328742275370a8de8efed76d0fef980a826e13d59bdd1c09"
+    },
+    "src/ports/outcome-extractor.ts": {
+      "origin": "src/ports/outcome-extractor.ts",
+      "gitObjectSha256": "d4fc072605daadc304db6dd2bf3e0b38c9939e7c038e84137eddc75701b56ec6",
+      "bytes": 239,
+      "sha256": "d4fc072605daadc304db6dd2bf3e0b38c9939e7c038e84137eddc75701b56ec6"
+    },
+    "src/replay.css": {
+      "origin": "src/replay.css",
+      "gitObjectSha256": "0b9f52afed902e5dfd38e75876ce43a2a1a4dcec02d767b5a73d58bd2ed8f839",
+      "bytes": 809,
+      "sha256": "0b9f52afed902e5dfd38e75876ce43a2a1a4dcec02d767b5a73d58bd2ed8f839"
+    },
+    "src/replay.ts": {
+      "origin": "src/replay.ts",
+      "gitObjectSha256": "ed89e8b7cf1e308b658f04892d2f41da31856dfe119933648bd92246b76d2d74",
+      "bytes": 7675,
+      "sha256": "ed89e8b7cf1e308b658f04892d2f41da31856dfe119933648bd92246b76d2d74"
+    },
+    "src/styles.css": {
+      "origin": "src/styles.css",
+      "gitObjectSha256": "b7fcddedbd4c38f8eeb58dad6847700342d8900402e3cd87fb099d3646d70416",
+      "bytes": 3883,
+      "sha256": "b7fcddedbd4c38f8eeb58dad6847700342d8900402e3cd87fb099d3646d70416"
+    },
+    "src/workshop-layout.css": {
+      "origin": "src/workshop-layout.css",
+      "gitObjectSha256": "e02a53267fda6ea11a929cc538af2cb63e4fff24788db1961aee3967815c6449",
+      "bytes": 14469,
+      "sha256": "e02a53267fda6ea11a929cc538af2cb63e4fff24788db1961aee3967815c6449"
+    },
+    "tests/approval-gate.test.ts": {
+      "origin": "tests/approval-gate.test.ts",
+      "gitObjectSha256": "d821f44a982bffc484552a7f348a7447e47b99ba0633a5353ebe0a5d88f0d9fd",
+      "bytes": 3068,
+      "sha256": "d821f44a982bffc484552a7f348a7447e47b99ba0633a5353ebe0a5d88f0d9fd"
+    },
+    "tests/audit-and-architecture.test.ts": {
+      "origin": "tests/audit-and-architecture.test.ts",
+      "gitObjectSha256": "a9edd135b811b95dc34864206e9d249621db19e0f98ff30d049c12ad973ec66c",
+      "bytes": 3087,
+      "sha256": "a9edd135b811b95dc34864206e9d249621db19e0f98ff30d049c12ad973ec66c"
+    },
+    "tests/calle-durable-checkpoint.test.ts": {
+      "origin": "tests/calle-durable-checkpoint.test.ts",
+      "gitObjectSha256": "0e4a5b88c47e5e2423e0428afa44cb46b7baea317de2fad88bb0b9f34166c983",
+      "bytes": 7259,
+      "sha256": "0e4a5b88c47e5e2423e0428afa44cb46b7baea317de2fad88bb0b9f34166c983"
+    },
+    "tests/calle-evidence-dates.test.ts": {
+      "origin": "tests/calle-evidence-dates.test.ts",
+      "gitObjectSha256": "52120c2284d621a64e6b778a0473b7daa7759b5ac227cbae280d6dcc6b5c6571",
+      "bytes": 1578,
+      "sha256": "52120c2284d621a64e6b778a0473b7daa7759b5ac227cbae280d6dcc6b5c6571"
+    },
+    "tests/calle-guarded-core.test.ts": {
+      "origin": "tests/calle-guarded-core.test.ts",
+      "gitObjectSha256": "ae608451515cef0c05fe7eccfac977853735b9eadb59bc27e8455a0720c6f59f",
+      "bytes": 35457,
+      "sha256": "ae608451515cef0c05fe7eccfac977853735b9eadb59bc27e8455a0720c6f59f"
+    },
+    "tests/calle-live-adapter.test.ts": {
+      "origin": "tests/calle-live-adapter.test.ts",
+      "gitObjectSha256": "c0ea8b9fe6e6322667add099e58ab55a4d33ffdae26559379ce05ac3af4e725e",
+      "bytes": 27901,
+      "sha256": "c0ea8b9fe6e6322667add099e58ab55a4d33ffdae26559379ce05ac3af4e725e"
+    },
+    "tests/calle-live-transport.test.ts": {
+      "origin": "tests/calle-live-transport.test.ts",
+      "gitObjectSha256": "369511d247046f934e2aa1a711ec5c1ef829c17ef016bd66d357720d71c6ce52",
+      "bytes": 18596,
+      "sha256": "369511d247046f934e2aa1a711ec5c1ef829c17ef016bd66d357720d71c6ce52"
+    },
+    "tests/fixtures/calle-plan-responses.ts": {
+      "origin": "tests/fixtures/calle-plan-responses.ts",
+      "gitObjectSha256": "35bcd5fe67e147d47d0f675adc626f8f12137ef31d878108bfc5a0027903b822",
+      "bytes": 6260,
+      "sha256": "35bcd5fe67e147d47d0f675adc626f8f12137ef31d878108bfc5a0027903b822"
+    },
+    "tests/helpers.ts": {
+      "origin": "tests/helpers.ts",
+      "gitObjectSha256": "02609529fd21c24c42b63edb90639d1ffe75482a8c9f9da2041907da3f834301",
+      "bytes": 2115,
+      "sha256": "02609529fd21c24c42b63edb90639d1ffe75482a8c9f9da2041907da3f834301"
+    },
+    "tests/local-session.test.ts": {
+      "origin": "tests/local-session.test.ts",
+      "gitObjectSha256": "475b5775ae200ecfd2b845c612ba67aca3569d7f7ce69627beb39594418f038d",
+      "bytes": 7232,
+      "sha256": "475b5775ae200ecfd2b845c612ba67aca3569d7f7ce69627beb39594418f038d"
+    },
+    "tests/mock-scenarios.test.ts": {
+      "origin": "tests/mock-scenarios.test.ts",
+      "gitObjectSha256": "03f91674d8c32ba4dda4ea4047d00a93c6234d38180b5662a0a23a093054f225",
+      "bytes": 3337,
+      "sha256": "03f91674d8c32ba4dda4ea4047d00a93c6234d38180b5662a0a23a093054f225"
+    },
+    "tests/smoke.test.ts": {
+      "origin": "tests/smoke.test.ts",
+      "gitObjectSha256": "ae8a2f955df894ba19f8481145585d6144a91b70a86888b93ed383a6a623cc8d",
+      "bytes": 1316,
+      "sha256": "ae8a2f955df894ba19f8481145585d6144a91b70a86888b93ed383a6a623cc8d"
+    },
+    "tests/synthetic-data.test.ts": {
+      "origin": "tests/synthetic-data.test.ts",
+      "gitObjectSha256": "3900cb90042b4557803542e428661102ec8b77513df246eea01f8b5fd6c2f28c",
+      "bytes": 1846,
+      "sha256": "3900cb90042b4557803542e428661102ec8b77513df246eea01f8b5fd6c2f28c"
+    },
+    "tests/workshop-outcome.test.ts": {
+      "origin": "tests/workshop-outcome.test.ts",
+      "gitObjectSha256": "77b24589c241afe8b9e4c42ed2b5f46d28ccf00cccda274744dd31a2234cb295",
+      "bytes": 6906,
+      "sha256": "77b24589c241afe8b9e4c42ed2b5f46d28ccf00cccda274744dd31a2234cb295"
+    },
+    "tests/workshop-replay.test.ts": {
+      "origin": "tests/workshop-replay.test.ts",
+      "gitObjectSha256": "14b782d4b99e4d50b817dd1525d999ea1358ae41e13861784637df0e120865b3",
+      "bytes": 4842,
+      "sha256": "14b782d4b99e4d50b817dd1525d999ea1358ae41e13861784637df0e120865b3"
+    },
+    "tests/workshop-session.test.ts": {
+      "origin": "tests/workshop-session.test.ts",
+      "gitObjectSha256": "b8803ef87c4d17419cd93880473b13bf0de0f6a56fbeb2194f61131b06332e45",
+      "bytes": 4547,
+      "sha256": "b8803ef87c4d17419cd93880473b13bf0de0f6a56fbeb2194f61131b06332e45"
+    },
+    "tools/calle-cli/guarded-calle-core.d.mts": {
+      "origin": "tools/calle-cli/guarded-calle-core.d.mts",
+      "gitObjectSha256": "effd329e905f6e04fdaa5c921c06685ba73f707c58ebac4ad4ef4bd521cc86fa",
+      "bytes": 871,
+      "sha256": "effd329e905f6e04fdaa5c921c06685ba73f707c58ebac4ad4ef4bd521cc86fa"
+    },
+    "tools/calle-cli/guarded-calle-core.mjs": {
+      "origin": "tools/calle-cli/guarded-calle-core.mjs",
+      "gitObjectSha256": "4cdaa0d06a36740b6cfa00baf76b69d2d0e09ccf1cf394d1fbe622574532562d",
+      "bytes": 6027,
+      "sha256": "4cdaa0d06a36740b6cfa00baf76b69d2d0e09ccf1cf394d1fbe622574532562d"
+    },
+    "tools/calle-cli/guarded-mcp-fetch.d.mts": {
+      "origin": "tools/calle-cli/guarded-mcp-fetch.d.mts",
+      "gitObjectSha256": "e48e6c20fbfdadecb7be18854e01cdce2f24b1108584741301b68c46d2dd7376",
+      "bytes": 1127,
+      "sha256": "e48e6c20fbfdadecb7be18854e01cdce2f24b1108584741301b68c46d2dd7376"
+    },
+    "tools/calle-cli/guarded-mcp-fetch.mjs": {
+      "origin": "tools/calle-cli/guarded-mcp-fetch.mjs",
+      "gitObjectSha256": "06253f7e8b29d3d51cd7d44fc640ed8cb0c4d79780fb4191f6783f595f379c54",
+      "bytes": 12253,
+      "sha256": "06253f7e8b29d3d51cd7d44fc640ed8cb0c4d79780fb4191f6783f595f379c54"
+    },
+    "tools/calle-cli/package-lock.json": {
+      "origin": "tools/calle-cli/package-lock.json",
+      "gitObjectSha256": "028bb8bbb30dcd5e800bc783ef5e25e47a98b11034dc95b587daf7aee25f7822",
+      "bytes": 1180,
+      "sha256": "522258b434fcd8a5aef0ec1530187a7f485e05ad59934af9bbc6f75e742049e5",
+      "transformation": "Local MIT publication proposal: license metadata and accompanying documentation only."
+    },
+    "tools/calle-cli/package.json": {
+      "origin": "tools/calle-cli/package.json",
+      "gitObjectSha256": "2528f7d64cab1b2eb53ee9009b530a8ddeb8c5dcb69e0c1fbfdc06622e156b4a",
+      "bytes": 316,
+      "sha256": "c7398fdf1ae29cfbc35958c42d629ffe24694afd3ac971d68ee647b9510815ae",
+      "transformation": "Local MIT publication proposal: license metadata and accompanying documentation only."
+    },
+    "tools/calle-cli/plan-response-observer.d.mts": {
+      "origin": "tools/calle-cli/plan-response-observer.d.mts",
+      "gitObjectSha256": "e856d66f87f2103227e138b99af67afbdccd5e349014e175da56f9fcbd6f2f29",
+      "bytes": 441,
+      "sha256": "e856d66f87f2103227e138b99af67afbdccd5e349014e175da56f9fcbd6f2f29"
+    },
+    "tools/calle-cli/plan-response-observer.mjs": {
+      "origin": "tools/calle-cli/plan-response-observer.mjs",
+      "gitObjectSha256": "499f51fcb839f744434007567fdc58360d770bea68e5232a43fb5195a5ed5481",
+      "bytes": 12508,
+      "sha256": "499f51fcb839f744434007567fdc58360d770bea68e5232a43fb5195a5ed5481"
+    },
+    "tsconfig.json": {
+      "origin": "tsconfig.json",
+      "gitObjectSha256": "9f5f35f04372e08a6d6cab7e2a821e772d38280fb465a932c102877cce942087",
+      "bytes": 651,
+      "sha256": "9f5f35f04372e08a6d6cab7e2a821e772d38280fb465a932c102877cce942087"
+    },
+    "vite.config.ts": {
+      "origin": "vite.config.ts",
+      "gitObjectSha256": "cce1075e88c52fa522ed7068b42a0bdebb7ccac71684c012d5572862c10bad60",
+      "bytes": 776,
+      "sha256": "cce1075e88c52fa522ed7068b42a0bdebb7ccac71684c012d5572862c10bad60"
+    },
+    "vitest.config.ts": {
+      "origin": "vitest.config.ts",
+      "gitObjectSha256": "160b6fda9353bbb14828e1416bc358b5c819b792a6782a5adf1e3b7b0f977e93",
+      "bytes": 204,
+      "sha256": "160b6fda9353bbb14828e1416bc358b5c819b792a6782a5adf1e3b7b0f977e93"
+    },
+    "README.md": {
+      "origin": "docs/submission/callops-public-source-readme.md",
+      "bytes": 5356,
+      "sha256": "47ebc52207b1fa7584ab6ad05ed248c2be21da666262b8934b5fbb8c62d4c2c6",
+      "transformation": "Local MIT publication proposal: license metadata and accompanying documentation only."
+    },
+    ".gitattributes": {
+      "origin": "GENERATED",
+      "transformation": "Preserve exact replay bytes on checkout.",
+      "bytes": 47,
+      "sha256": "a5bb39c580e338daef0471da5b2bb62214e1dd0c51c2188210d9023d2fd9c865"
+    },
+    "LICENSE": {
+      "origin": "Local MIT license proposal supplied for owner review",
+      "bytes": 1077,
+      "sha256": "71337b096bc7e28fc93679f2b27dc9bc9fabceb37e524d750562d1fee76aa14e"
+    }
+  },
+  "excluded": [
+    "Personal auth/bootstrap and historical approval artifacts",
+    "Credentials and protected caches",
+    "node_modules",
+    "Raw real recordings",
+    "Private or personal account details"
+  ],
+  "documentationRefresh": {
+    "date": "2026-09-14",
+    "changes": {
+      "README.md": {
+        "before": {
+          "bytes": 4974,
+          "sha256": "17146399d566101c9fc7210372e047054eb9c89f0f33c40b083d39e642d3dde9"
+        },
+        "reason": "Refresh observed service/schema status and current standalone qualification without claiming a real call.",
+        "after": {
+          "bytes": 5271,
+          "sha256": "effedc6a0187b1a8fda134c0c5ac4d99acc737e87bfceb329dababee75dfe571"
+        }
+      },
+      "docs/public/private-integration.md": {
+        "before": {
+          "bytes": 5116,
+          "sha256": "4a659fd9b7aad5a7a18887d5ce124ef1340f1c714f613fd74a0bc221e5bb4280"
+        },
+        "reason": "Distinguish completed schema observation and local operator preparation from missing phone execution.",
+        "after": {
+          "bytes": 5269,
+          "sha256": "f34e7b434f6a62fd14d3c41ffeecc6e49aa097b4c6d5ef32a3491b12db1f3ddc"
+        }
+      }
+    },
+    "codeSourceUnchanged": true
+  },
+  "standaloneQualification": {
+    "date": "2026-09-14",
+    "testsPassed": 214,
+    "testsSkipped": 0,
+    "typecheck": "PASS",
+    "lint": "PASS",
+    "build": "PASS",
+    "install": "OFFLINE_IGNORE_SCRIPTS",
+    "realServiceRequests": 0
+  },
+  "mitProposalPreparation": {
+    "preparedAt": "2026-09-14T09:19:02.230651+00:00",
+    "scope": "LOCAL_PROPOSAL_REQUIRING_OWNER_LICENSE_AND_PUBLICATION_APPROVAL",
+    "changes": {
+      "README.md": {
+        "before": {
+          "bytes": 5271,
+          "sha256": "effedc6a0187b1a8fda134c0c5ac4d99acc737e87bfceb329dababee75dfe571"
+        },
+        "after": {
+          "bytes": 5356,
+          "sha256": "47ebc52207b1fa7584ab6ad05ed248c2be21da666262b8934b5fbb8c62d4c2c6"
+        }
+      },
+      "docs/public/licenses.md": {
+        "before": {
+          "bytes": 1992,
+          "sha256": "0c3b053e3960bee4133e2395667a17459e6e77921d9391d85df7ed2507be986f"
+        },
+        "after": {
+          "bytes": 1854,
+          "sha256": "e9013f672e1b9aa9cac3f5f360a2d37388a947127888bb3dc9afa1eb3932c97e"
+        }
+      },
+      "package-lock.json": {
+        "before": {
+          "bytes": 84545,
+          "sha256": "aa5e9876a7dfd7744c17c155c0faff49965a8c5aa3d53a99379457d63800dadc"
+        },
+        "after": {
+          "bytes": 84569,
+          "sha256": "aa0f1166f59af9b5f13613f3e7a8e3c55bcc6f987c862dcf8161663cca1744de"
+        }
+      },
+      "package.json": {
+        "before": {
+          "bytes": 1014,
+          "sha256": "4b479e84465f557a7ef4680d386dcb799f78ee7b74767f8148645fb5abdbb6e5"
+        },
+        "after": {
+          "bytes": 1007,
+          "sha256": "b66f77de55951974fcd7d9f44e55cb80af39f86e87c00039603be9c19bb4993e"
+        }
+      },
+      "tools/calle-cli/package-lock.json": {
+        "before": {
+          "bytes": 1187,
+          "sha256": "028bb8bbb30dcd5e800bc783ef5e25e47a98b11034dc95b587daf7aee25f7822"
+        },
+        "after": {
+          "bytes": 1180,
+          "sha256": "522258b434fcd8a5aef0ec1530187a7f485e05ad59934af9bbc6f75e742049e5"
+        }
+      },
+      "tools/calle-cli/package.json": {
+        "before": {
+          "bytes": 323,
+          "sha256": "2528f7d64cab1b2eb53ee9009b530a8ddeb8c5dcb69e0c1fbfdc06622e156b4a"
+        },
+        "after": {
+          "bytes": 316,
+          "sha256": "c7398fdf1ae29cfbc35958c42d629ffe24694afd3ac971d68ee647b9510815ae"
+        }
+      }
+    },
+    "codeAndTestsUnchanged": true,
+    "dependencyGraphUnchanged": true,
+    "additionalFile": "LICENSE",
+    "qualificationBasis": "The unchanged code and dependency graph passed 214 standalone tests, type checking, lint and build on September 14. No runtime test rerun was needed for these license/documentation edits.",
+    "licenseFormatting": "Same proposed MIT text, normalized LF and one final newline."
+  }
+}

@@ -1,0 +1,1483 @@
+{
+  "schemaVersion": 1,
+  "scope": "LOCKFILE_AND_INSTALLED_PACKAGE_METADATA_ONLY",
+  "lockSha256": {
+    "package-lock.json": "d9d1f07aeb482f1c63a0c309d3a75e41831c65298e77f1487abc61ed81aacb50",
+    "tools/calle-cli/package-lock.json": "028bb8bbb30dcd5e800bc783ef5e25e47a98b11034dc95b587daf7aee25f7822"
+  },
+  "entries": [
+    {
+      "group": "public-build-toolchain",
+      "path": "node_modules/@emnapi/core",
+      "name": "@emnapi/core",
+      "version": "2.0.0-alpha.3",
+      "declaredLicense": "MIT",
+      "installed": true,
+      "optional": true
+    },
+    {
+      "group": "public-build-toolchain",
+      "path": "node_modules/@emnapi/runtime",
+      "name": "@emnapi/runtime",
+      "version": "2.0.0-alpha.3",
+      "declaredLicense": "MIT",
+      "installed": true,
+      "optional": true
+    },
+    {
+      "group": "public-build-toolchain",
+      "path": "node_modules/@emnapi/wasi-threads",
+      "name": "@emnapi/wasi-threads",
+      "version": "2.0.1",
+      "declaredLicense": "MIT",
+      "installed": true,
+      "optional": true
+    },
+    {
+      "group": "public-build-toolchain",
+      "path": "node_modules/@eslint-community/eslint-utils",
+      "name": "@eslint-community/eslint-utils",
+      "version": "4.10.1",
+      "declaredLicense": "MIT",
+      "installed": true,
+      "optional": false
+    },
+    {
+      "group": "public-build-toolchain",
+      "path": "node_modules/@eslint-community/eslint-utils/node_modules/eslint-visitor-keys",
+      "name": "eslint-visitor-keys",
+      "version": "3.4.3",
+      "declaredLicense": "Apache-2.0",
+      "installed": true,
+      "optional": false
+    },
+    {
+      "group": "public-build-toolchain",
+      "path": "node_modules/@eslint-community/regexpp",
+      "name": "@eslint-community/regexpp",
+      "version": "4.12.2",
+      "declaredLicense": "MIT",
+      "installed": true,
+      "optional": false
+    },
+    {
+      "group": "public-build-toolchain",
+      "path": "node_modules/@eslint/config-array",
+      "name": "@eslint/config-array",
+      "version": "0.23.5",
+      "declaredLicense": "Apache-2.0",
+      "installed": true,
+      "optional": false
+    },
+    {
+      "group": "public-build-toolchain",
+      "path": "node_modules/@eslint/config-helpers",
+      "name": "@eslint/config-helpers",
+      "version": "0.7.0",
+      "declaredLicense": "Apache-2.0",
+      "installed": true,
+      "optional": false
+    },
+    {
+      "group": "public-build-toolchain",
+      "path": "node_modules/@eslint/core",
+      "name": "@eslint/core",
+      "version": "1.2.1",
+      "declaredLicense": "Apache-2.0",
+      "installed": true,
+      "optional": false
+    },
+    {
+      "group": "public-build-toolchain",
+      "path": "node_modules/@eslint/js",
+      "name": "@eslint/js",
+      "version": "10.0.1",
+      "declaredLicense": "MIT",
+      "installed": true,
+      "optional": false
+    },
+    {
+      "group": "public-build-toolchain",
+      "path": "node_modules/@eslint/object-schema",
+      "name": "@eslint/object-schema",
+      "version": "3.0.5",
+      "declaredLicense": "Apache-2.0",
+      "installed": true,
+      "optional": false
+    },
+    {
+      "group": "public-build-toolchain",
+      "path": "node_modules/@eslint/plugin-kit",
+      "name": "@eslint/plugin-kit",
+      "version": "0.7.2",
+      "declaredLicense": "Apache-2.0",
+      "installed": true,
+      "optional": false
+    },
+    {
+      "group": "public-build-toolchain",
+      "path": "node_modules/@humanfs/core",
+      "name": "@humanfs/core",
+      "version": "0.19.2",
+      "declaredLicense": "Apache-2.0",
+      "installed": true,
+      "optional": false
+    },
+    {
+      "group": "public-build-toolchain",
+      "path": "node_modules/@humanfs/node",
+      "name": "@humanfs/node",
+      "version": "0.16.8",
+      "declaredLicense": "Apache-2.0",
+      "installed": true,
+      "optional": false
+    },
+    {
+      "group": "public-build-toolchain",
+      "path": "node_modules/@humanfs/types",
+      "name": "@humanfs/types",
+      "version": "0.15.0",
+      "declaredLicense": "Apache-2.0",
+      "installed": true,
+      "optional": false
+    },
+    {
+      "group": "public-build-toolchain",
+      "path": "node_modules/@humanwhocodes/module-importer",
+      "name": "@humanwhocodes/module-importer",
+      "version": "1.0.1",
+      "declaredLicense": "Apache-2.0",
+      "installed": true,
+      "optional": false
+    },
+    {
+      "group": "public-build-toolchain",
+      "path": "node_modules/@humanwhocodes/retry",
+      "name": "@humanwhocodes/retry",
+      "version": "0.4.3",
+      "declaredLicense": "Apache-2.0",
+      "installed": true,
+      "optional": false
+    },
+    {
+      "group": "public-build-toolchain",
+      "path": "node_modules/@jridgewell/sourcemap-codec",
+      "name": "@jridgewell/sourcemap-codec",
+      "version": "1.5.5",
+      "declaredLicense": "MIT",
+      "installed": true,
+      "optional": false
+    },
+    {
+      "group": "public-build-toolchain",
+      "path": "node_modules/@napi-rs/wasm-runtime",
+      "name": "@napi-rs/wasm-runtime",
+      "version": "1.2.2",
+      "declaredLicense": "MIT",
+      "installed": true,
+      "optional": true
+    },
+    {
+      "group": "public-build-toolchain",
+      "path": "node_modules/@oxc-project/types",
+      "name": "@oxc-project/types",
+      "version": "0.142.0",
+      "declaredLicense": "MIT",
+      "installed": true,
+      "optional": false
+    },
+    {
+      "group": "public-build-toolchain",
+      "path": "node_modules/@rolldown/binding-android-arm64",
+      "name": "@rolldown/binding-android-arm64",
+      "version": "1.2.1",
+      "declaredLicense": "MIT",
+      "installed": false,
+      "optional": true
+    },
+    {
+      "group": "public-build-toolchain",
+      "path": "node_modules/@rolldown/binding-darwin-arm64",
+      "name": "@rolldown/binding-darwin-arm64",
+      "version": "1.2.1",
+      "declaredLicense": "MIT",
+      "installed": false,
+      "optional": true
+    },
+    {
+      "group": "public-build-toolchain",
+      "path": "node_modules/@rolldown/binding-darwin-x64",
+      "name": "@rolldown/binding-darwin-x64",
+      "version": "1.2.1",
+      "declaredLicense": "MIT",
+      "installed": false,
+      "optional": true
+    },
+    {
+      "group": "public-build-toolchain",
+      "path": "node_modules/@rolldown/binding-freebsd-x64",
+      "name": "@rolldown/binding-freebsd-x64",
+      "version": "1.2.1",
+      "declaredLicense": "MIT",
+      "installed": false,
+      "optional": true
+    },
+    {
+      "group": "public-build-toolchain",
+      "path": "node_modules/@rolldown/binding-linux-arm-gnueabihf",
+      "name": "@rolldown/binding-linux-arm-gnueabihf",
+      "version": "1.2.1",
+      "declaredLicense": "MIT",
+      "installed": false,
+      "optional": true
+    },
+    {
+      "group": "public-build-toolchain",
+      "path": "node_modules/@rolldown/binding-linux-arm64-gnu",
+      "name": "@rolldown/binding-linux-arm64-gnu",
+      "version": "1.2.1",
+      "declaredLicense": "MIT",
+      "installed": false,
+      "optional": true
+    },
+    {
+      "group": "public-build-toolchain",
+      "path": "node_modules/@rolldown/binding-linux-arm64-musl",
+      "name": "@rolldown/binding-linux-arm64-musl",
+      "version": "1.2.1",
+      "declaredLicense": "MIT",
+      "installed": false,
+      "optional": true
+    },
+    {
+      "group": "public-build-toolchain",
+      "path": "node_modules/@rolldown/binding-linux-ppc64-gnu",
+      "name": "@rolldown/binding-linux-ppc64-gnu",
+      "version": "1.2.1",
+      "declaredLicense": "MIT",
+      "installed": false,
+      "optional": true
+    },
+    {
+      "group": "public-build-toolchain",
+      "path": "node_modules/@rolldown/binding-linux-s390x-gnu",
+      "name": "@rolldown/binding-linux-s390x-gnu",
+      "version": "1.2.1",
+      "declaredLicense": "MIT",
+      "installed": false,
+      "optional": true
+    },
+    {
+      "group": "public-build-toolchain",
+      "path": "node_modules/@rolldown/binding-linux-x64-gnu",
+      "name": "@rolldown/binding-linux-x64-gnu",
+      "version": "1.2.1",
+      "declaredLicense": "MIT",
+      "installed": false,
+      "optional": true
+    },
+    {
+      "group": "public-build-toolchain",
+      "path": "node_modules/@rolldown/binding-linux-x64-musl",
+      "name": "@rolldown/binding-linux-x64-musl",
+      "version": "1.2.1",
+      "declaredLicense": "MIT",
+      "installed": false,
+      "optional": true
+    },
+    {
+      "group": "public-build-toolchain",
+      "path": "node_modules/@rolldown/binding-openharmony-arm64",
+      "name": "@rolldown/binding-openharmony-arm64",
+      "version": "1.2.1",
+      "declaredLicense": "MIT",
+      "installed": false,
+      "optional": true
+    },
+    {
+      "group": "public-build-toolchain",
+      "path": "node_modules/@rolldown/binding-wasm32-wasi",
+      "name": "@rolldown/binding-wasm32-wasi",
+      "version": "1.2.1",
+      "declaredLicense": "MIT",
+      "installed": true,
+      "optional": true
+    },
+    {
+      "group": "public-build-toolchain",
+      "path": "node_modules/@rolldown/binding-win32-arm64-msvc",
+      "name": "@rolldown/binding-win32-arm64-msvc",
+      "version": "1.2.1",
+      "declaredLicense": "MIT",
+      "installed": false,
+      "optional": true
+    },
+    {
+      "group": "public-build-toolchain",
+      "path": "node_modules/@rolldown/binding-win32-x64-msvc",
+      "name": "@rolldown/binding-win32-x64-msvc",
+      "version": "1.2.1",
+      "declaredLicense": "MIT",
+      "installed": true,
+      "optional": true
+    },
+    {
+      "group": "public-build-toolchain",
+      "path": "node_modules/@rolldown/pluginutils",
+      "name": "@rolldown/pluginutils",
+      "version": "1.0.1",
+      "declaredLicense": "MIT",
+      "installed": true,
+      "optional": false
+    },
+    {
+      "group": "public-build-toolchain",
+      "path": "node_modules/@standard-schema/spec",
+      "name": "@standard-schema/spec",
+      "version": "1.1.0",
+      "declaredLicense": "MIT",
+      "installed": true,
+      "optional": false
+    },
+    {
+      "group": "public-build-toolchain",
+      "path": "node_modules/@tybys/wasm-util",
+      "name": "@tybys/wasm-util",
+      "version": "0.10.3",
+      "declaredLicense": "MIT",
+      "installed": true,
+      "optional": true
+    },
+    {
+      "group": "public-build-toolchain",
+      "path": "node_modules/@types/chai",
+      "name": "@types/chai",
+      "version": "5.2.3",
+      "declaredLicense": "MIT",
+      "installed": true,
+      "optional": false
+    },
+    {
+      "group": "public-build-toolchain",
+      "path": "node_modules/@types/deep-eql",
+      "name": "@types/deep-eql",
+      "version": "4.0.2",
+      "declaredLicense": "MIT",
+      "installed": true,
+      "optional": false
+    },
+    {
+      "group": "public-build-toolchain",
+      "path": "node_modules/@types/esrecurse",
+      "name": "@types/esrecurse",
+      "version": "4.3.1",
+      "declaredLicense": "MIT",
+      "installed": true,
+      "optional": false
+    },
+    {
+      "group": "public-build-toolchain",
+      "path": "node_modules/@types/estree",
+      "name": "@types/estree",
+      "version": "1.0.9",
+      "declaredLicense": "MIT",
+      "installed": true,
+      "optional": false
+    },
+    {
+      "group": "public-build-toolchain",
+      "path": "node_modules/@types/json-schema",
+      "name": "@types/json-schema",
+      "version": "7.0.15",
+      "declaredLicense": "MIT",
+      "installed": true,
+      "optional": false
+    },
+    {
+      "group": "public-build-toolchain",
+      "path": "node_modules/@types/node",
+      "name": "@types/node",
+      "version": "22.20.1",
+      "declaredLicense": "MIT",
+      "installed": true,
+      "optional": false
+    },
+    {
+      "group": "public-build-toolchain",
+      "path": "node_modules/@typescript-eslint/eslint-plugin",
+      "name": "@typescript-eslint/eslint-plugin",
+      "version": "8.65.0",
+      "declaredLicense": "MIT",
+      "installed": true,
+      "optional": false
+    },
+    {
+      "group": "public-build-toolchain",
+      "path": "node_modules/@typescript-eslint/eslint-plugin/node_modules/ignore",
+      "name": "ignore",
+      "version": "7.0.6",
+      "declaredLicense": "MIT",
+      "installed": true,
+      "optional": false
+    },
+    {
+      "group": "public-build-toolchain",
+      "path": "node_modules/@typescript-eslint/parser",
+      "name": "@typescript-eslint/parser",
+      "version": "8.65.0",
+      "declaredLicense": "MIT",
+      "installed": true,
+      "optional": false
+    },
+    {
+      "group": "public-build-toolchain",
+      "path": "node_modules/@typescript-eslint/project-service",
+      "name": "@typescript-eslint/project-service",
+      "version": "8.65.0",
+      "declaredLicense": "MIT",
+      "installed": true,
+      "optional": false
+    },
+    {
+      "group": "public-build-toolchain",
+      "path": "node_modules/@typescript-eslint/scope-manager",
+      "name": "@typescript-eslint/scope-manager",
+      "version": "8.65.0",
+      "declaredLicense": "MIT",
+      "installed": true,
+      "optional": false
+    },
+    {
+      "group": "public-build-toolchain",
+      "path": "node_modules/@typescript-eslint/tsconfig-utils",
+      "name": "@typescript-eslint/tsconfig-utils",
+      "version": "8.65.0",
+      "declaredLicense": "MIT",
+      "installed": true,
+      "optional": false
+    },
+    {
+      "group": "public-build-toolchain",
+      "path": "node_modules/@typescript-eslint/type-utils",
+      "name": "@typescript-eslint/type-utils",
+      "version": "8.65.0",
+      "declaredLicense": "MIT",
+      "installed": true,
+      "optional": false
+    },
+    {
+      "group": "public-build-toolchain",
+      "path": "node_modules/@typescript-eslint/types",
+      "name": "@typescript-eslint/types",
+      "version": "8.65.0",
+      "declaredLicense": "MIT",
+      "installed": true,
+      "optional": false
+    },
+    {
+      "group": "public-build-toolchain",
+      "path": "node_modules/@typescript-eslint/typescript-estree",
+      "name": "@typescript-eslint/typescript-estree",
+      "version": "8.65.0",
+      "declaredLicense": "MIT",
+      "installed": true,
+      "optional": false
+    },
+    {
+      "group": "public-build-toolchain",
+      "path": "node_modules/@typescript-eslint/utils",
+      "name": "@typescript-eslint/utils",
+      "version": "8.65.0",
+      "declaredLicense": "MIT",
+      "installed": true,
+      "optional": false
+    },
+    {
+      "group": "public-build-toolchain",
+      "path": "node_modules/@typescript-eslint/visitor-keys",
+      "name": "@typescript-eslint/visitor-keys",
+      "version": "8.65.0",
+      "declaredLicense": "MIT",
+      "installed": true,
+      "optional": false
+    },
+    {
+      "group": "public-build-toolchain",
+      "path": "node_modules/@vitest/expect",
+      "name": "@vitest/expect",
+      "version": "4.1.10",
+      "declaredLicense": "MIT",
+      "installed": true,
+      "optional": false
+    },
+    {
+      "group": "public-build-toolchain",
+      "path": "node_modules/@vitest/mocker",
+      "name": "@vitest/mocker",
+      "version": "4.1.10",
+      "declaredLicense": "MIT",
+      "installed": true,
+      "optional": false
+    },
+    {
+      "group": "public-build-toolchain",
+      "path": "node_modules/@vitest/pretty-format",
+      "name": "@vitest/pretty-format",
+      "version": "4.1.10",
+      "declaredLicense": "MIT",
+      "installed": true,
+      "optional": false
+    },
+    {
+      "group": "public-build-toolchain",
+      "path": "node_modules/@vitest/runner",
+      "name": "@vitest/runner",
+      "version": "4.1.10",
+      "declaredLicense": "MIT",
+      "installed": true,
+      "optional": false
+    },
+    {
+      "group": "public-build-toolchain",
+      "path": "node_modules/@vitest/snapshot",
+      "name": "@vitest/snapshot",
+      "version": "4.1.10",
+      "declaredLicense": "MIT",
+      "installed": true,
+      "optional": false
+    },
+    {
+      "group": "public-build-toolchain",
+      "path": "node_modules/@vitest/spy",
+      "name": "@vitest/spy",
+      "version": "4.1.10",
+      "declaredLicense": "MIT",
+      "installed": true,
+      "optional": false
+    },
+    {
+      "group": "public-build-toolchain",
+      "path": "node_modules/@vitest/utils",
+      "name": "@vitest/utils",
+      "version": "4.1.10",
+      "declaredLicense": "MIT",
+      "installed": true,
+      "optional": false
+    },
+    {
+      "group": "public-build-toolchain",
+      "path": "node_modules/acorn",
+      "name": "acorn",
+      "version": "8.18.0",
+      "declaredLicense": "MIT",
+      "installed": true,
+      "optional": false
+    },
+    {
+      "group": "public-build-toolchain",
+      "path": "node_modules/acorn-jsx",
+      "name": "acorn-jsx",
+      "version": "5.3.2",
+      "declaredLicense": "MIT",
+      "installed": true,
+      "optional": false
+    },
+    {
+      "group": "public-build-toolchain",
+      "path": "node_modules/ajv",
+      "name": "ajv",
+      "version": "6.15.0",
+      "declaredLicense": "MIT",
+      "installed": true,
+      "optional": false
+    },
+    {
+      "group": "public-build-toolchain",
+      "path": "node_modules/assertion-error",
+      "name": "assertion-error",
+      "version": "2.0.1",
+      "declaredLicense": "MIT",
+      "installed": true,
+      "optional": false
+    },
+    {
+      "group": "public-build-toolchain",
+      "path": "node_modules/balanced-match",
+      "name": "balanced-match",
+      "version": "4.0.4",
+      "declaredLicense": "MIT",
+      "installed": true,
+      "optional": false
+    },
+    {
+      "group": "public-build-toolchain",
+      "path": "node_modules/brace-expansion",
+      "name": "brace-expansion",
+      "version": "5.0.9",
+      "declaredLicense": "MIT",
+      "installed": true,
+      "optional": false
+    },
+    {
+      "group": "public-build-toolchain",
+      "path": "node_modules/chai",
+      "name": "chai",
+      "version": "6.2.2",
+      "declaredLicense": "MIT",
+      "installed": true,
+      "optional": false
+    },
+    {
+      "group": "public-build-toolchain",
+      "path": "node_modules/convert-source-map",
+      "name": "convert-source-map",
+      "version": "2.0.0",
+      "declaredLicense": "MIT",
+      "installed": true,
+      "optional": false
+    },
+    {
+      "group": "public-build-toolchain",
+      "path": "node_modules/cross-spawn",
+      "name": "cross-spawn",
+      "version": "7.0.6",
+      "declaredLicense": "MIT",
+      "installed": true,
+      "optional": false
+    },
+    {
+      "group": "public-build-toolchain",
+      "path": "node_modules/debug",
+      "name": "debug",
+      "version": "4.4.3",
+      "declaredLicense": "MIT",
+      "installed": true,
+      "optional": false
+    },
+    {
+      "group": "public-build-toolchain",
+      "path": "node_modules/deep-is",
+      "name": "deep-is",
+      "version": "0.1.4",
+      "declaredLicense": "MIT",
+      "installed": true,
+      "optional": false
+    },
+    {
+      "group": "public-build-toolchain",
+      "path": "node_modules/detect-libc",
+      "name": "detect-libc",
+      "version": "2.1.2",
+      "declaredLicense": "Apache-2.0",
+      "installed": true,
+      "optional": false
+    },
+    {
+      "group": "public-build-toolchain",
+      "path": "node_modules/es-module-lexer",
+      "name": "es-module-lexer",
+      "version": "2.3.1",
+      "declaredLicense": "MIT",
+      "installed": true,
+      "optional": false
+    },
+    {
+      "group": "public-build-toolchain",
+      "path": "node_modules/escape-string-regexp",
+      "name": "escape-string-regexp",
+      "version": "4.0.0",
+      "declaredLicense": "MIT",
+      "installed": true,
+      "optional": false
+    },
+    {
+      "group": "public-build-toolchain",
+      "path": "node_modules/eslint",
+      "name": "eslint",
+      "version": "10.8.0",
+      "declaredLicense": "MIT",
+      "installed": true,
+      "optional": false
+    },
+    {
+      "group": "public-build-toolchain",
+      "path": "node_modules/eslint-scope",
+      "name": "eslint-scope",
+      "version": "9.1.2",
+      "declaredLicense": "BSD-2-Clause",
+      "installed": true,
+      "optional": false
+    },
+    {
+      "group": "public-build-toolchain",
+      "path": "node_modules/eslint-visitor-keys",
+      "name": "eslint-visitor-keys",
+      "version": "5.0.1",
+      "declaredLicense": "Apache-2.0",
+      "installed": true,
+      "optional": false
+    },
+    {
+      "group": "public-build-toolchain",
+      "path": "node_modules/espree",
+      "name": "espree",
+      "version": "11.2.0",
+      "declaredLicense": "BSD-2-Clause",
+      "installed": true,
+      "optional": false
+    },
+    {
+      "group": "public-build-toolchain",
+      "path": "node_modules/esquery",
+      "name": "esquery",
+      "version": "1.7.0",
+      "declaredLicense": "BSD-3-Clause",
+      "installed": true,
+      "optional": false
+    },
+    {
+      "group": "public-build-toolchain",
+      "path": "node_modules/esrecurse",
+      "name": "esrecurse",
+      "version": "4.3.0",
+      "declaredLicense": "BSD-2-Clause",
+      "installed": true,
+      "optional": false
+    },
+    {
+      "group": "public-build-toolchain",
+      "path": "node_modules/estraverse",
+      "name": "estraverse",
+      "version": "5.3.0",
+      "declaredLicense": "BSD-2-Clause",
+      "installed": true,
+      "optional": false
+    },
+    {
+      "group": "public-build-toolchain",
+      "path": "node_modules/estree-walker",
+      "name": "estree-walker",
+      "version": "3.0.3",
+      "declaredLicense": "MIT",
+      "installed": true,
+      "optional": false
+    },
+    {
+      "group": "public-build-toolchain",
+      "path": "node_modules/esutils",
+      "name": "esutils",
+      "version": "2.0.3",
+      "declaredLicense": "BSD-2-Clause",
+      "installed": true,
+      "optional": false
+    },
+    {
+      "group": "public-build-toolchain",
+      "path": "node_modules/expect-type",
+      "name": "expect-type",
+      "version": "1.4.0",
+      "declaredLicense": "Apache-2.0",
+      "installed": true,
+      "optional": false
+    },
+    {
+      "group": "public-build-toolchain",
+      "path": "node_modules/fast-deep-equal",
+      "name": "fast-deep-equal",
+      "version": "3.1.3",
+      "declaredLicense": "MIT",
+      "installed": true,
+      "optional": false
+    },
+    {
+      "group": "public-build-toolchain",
+      "path": "node_modules/fast-json-stable-stringify",
+      "name": "fast-json-stable-stringify",
+      "version": "2.1.0",
+      "declaredLicense": "MIT",
+      "installed": true,
+      "optional": false
+    },
+    {
+      "group": "public-build-toolchain",
+      "path": "node_modules/fast-levenshtein",
+      "name": "fast-levenshtein",
+      "version": "2.0.6",
+      "declaredLicense": "MIT",
+      "installed": true,
+      "optional": false
+    },
+    {
+      "group": "public-build-toolchain",
+      "path": "node_modules/fdir",
+      "name": "fdir",
+      "version": "6.5.0",
+      "declaredLicense": "MIT",
+      "installed": true,
+      "optional": false
+    },
+    {
+      "group": "public-build-toolchain",
+      "path": "node_modules/file-entry-cache",
+      "name": "file-entry-cache",
+      "version": "8.0.0",
+      "declaredLicense": "MIT",
+      "installed": true,
+      "optional": false
+    },
+    {
+      "group": "public-build-toolchain",
+      "path": "node_modules/find-up",
+      "name": "find-up",
+      "version": "5.0.0",
+      "declaredLicense": "MIT",
+      "installed": true,
+      "optional": false
+    },
+    {
+      "group": "public-build-toolchain",
+      "path": "node_modules/flat-cache",
+      "name": "flat-cache",
+      "version": "4.0.1",
+      "declaredLicense": "MIT",
+      "installed": true,
+      "optional": false
+    },
+    {
+      "group": "public-build-toolchain",
+      "path": "node_modules/flatted",
+      "name": "flatted",
+      "version": "3.4.4",
+      "declaredLicense": "ISC",
+      "installed": true,
+      "optional": false
+    },
+    {
+      "group": "public-build-toolchain",
+      "path": "node_modules/fsevents",
+      "name": "fsevents",
+      "version": "2.3.3",
+      "declaredLicense": "MIT",
+      "installed": false,
+      "optional": true
+    },
+    {
+      "group": "public-build-toolchain",
+      "path": "node_modules/glob-parent",
+      "name": "glob-parent",
+      "version": "6.0.2",
+      "declaredLicense": "ISC",
+      "installed": true,
+      "optional": false
+    },
+    {
+      "group": "public-build-toolchain",
+      "path": "node_modules/ignore",
+      "name": "ignore",
+      "version": "5.3.2",
+      "declaredLicense": "MIT",
+      "installed": true,
+      "optional": false
+    },
+    {
+      "group": "public-build-toolchain",
+      "path": "node_modules/imurmurhash",
+      "name": "imurmurhash",
+      "version": "0.1.4",
+      "declaredLicense": "MIT",
+      "installed": true,
+      "optional": false
+    },
+    {
+      "group": "public-build-toolchain",
+      "path": "node_modules/is-extglob",
+      "name": "is-extglob",
+      "version": "2.1.1",
+      "declaredLicense": "MIT",
+      "installed": true,
+      "optional": false
+    },
+    {
+      "group": "public-build-toolchain",
+      "path": "node_modules/is-glob",
+      "name": "is-glob",
+      "version": "4.0.3",
+      "declaredLicense": "MIT",
+      "installed": true,
+      "optional": false
+    },
+    {
+      "group": "public-build-toolchain",
+      "path": "node_modules/isexe",
+      "name": "isexe",
+      "version": "2.0.0",
+      "declaredLicense": "ISC",
+      "installed": true,
+      "optional": false
+    },
+    {
+      "group": "public-build-toolchain",
+      "path": "node_modules/json-buffer",
+      "name": "json-buffer",
+      "version": "3.0.1",
+      "declaredLicense": "MIT",
+      "installed": true,
+      "optional": false
+    },
+    {
+      "group": "public-build-toolchain",
+      "path": "node_modules/json-schema-traverse",
+      "name": "json-schema-traverse",
+      "version": "0.4.1",
+      "declaredLicense": "MIT",
+      "installed": true,
+      "optional": false
+    },
+    {
+      "group": "public-build-toolchain",
+      "path": "node_modules/json-stable-stringify-without-jsonify",
+      "name": "json-stable-stringify-without-jsonify",
+      "version": "1.0.1",
+      "declaredLicense": "MIT",
+      "installed": true,
+      "optional": false
+    },
+    {
+      "group": "public-build-toolchain",
+      "path": "node_modules/keyv",
+      "name": "keyv",
+      "version": "4.5.4",
+      "declaredLicense": "MIT",
+      "installed": true,
+      "optional": false
+    },
+    {
+      "group": "public-build-toolchain",
+      "path": "node_modules/levn",
+      "name": "levn",
+      "version": "0.4.1",
+      "declaredLicense": "MIT",
+      "installed": true,
+      "optional": false
+    },
+    {
+      "group": "public-build-toolchain",
+      "path": "node_modules/lightningcss",
+      "name": "lightningcss",
+      "version": "1.33.0",
+      "declaredLicense": "MPL-2.0",
+      "installed": true,
+      "optional": false
+    },
+    {
+      "group": "public-build-toolchain",
+      "path": "node_modules/lightningcss-android-arm64",
+      "name": "lightningcss-android-arm64",
+      "version": "1.33.0",
+      "declaredLicense": "MPL-2.0",
+      "installed": false,
+      "optional": true
+    },
+    {
+      "group": "public-build-toolchain",
+      "path": "node_modules/lightningcss-darwin-arm64",
+      "name": "lightningcss-darwin-arm64",
+      "version": "1.33.0",
+      "declaredLicense": "MPL-2.0",
+      "installed": false,
+      "optional": true
+    },
+    {
+      "group": "public-build-toolchain",
+      "path": "node_modules/lightningcss-darwin-x64",
+      "name": "lightningcss-darwin-x64",
+      "version": "1.33.0",
+      "declaredLicense": "MPL-2.0",
+      "installed": false,
+      "optional": true
+    },
+    {
+      "group": "public-build-toolchain",
+      "path": "node_modules/lightningcss-freebsd-x64",
+      "name": "lightningcss-freebsd-x64",
+      "version": "1.33.0",
+      "declaredLicense": "MPL-2.0",
+      "installed": false,
+      "optional": true
+    },
+    {
+      "group": "public-build-toolchain",
+      "path": "node_modules/lightningcss-linux-arm-gnueabihf",
+      "name": "lightningcss-linux-arm-gnueabihf",
+      "version": "1.33.0",
+      "declaredLicense": "MPL-2.0",
+      "installed": false,
+      "optional": true
+    },
+    {
+      "group": "public-build-toolchain",
+      "path": "node_modules/lightningcss-linux-arm64-gnu",
+      "name": "lightningcss-linux-arm64-gnu",
+      "version": "1.33.0",
+      "declaredLicense": "MPL-2.0",
+      "installed": false,
+      "optional": true
+    },
+    {
+      "group": "public-build-toolchain",
+      "path": "node_modules/lightningcss-linux-arm64-musl",
+      "name": "lightningcss-linux-arm64-musl",
+      "version": "1.33.0",
+      "declaredLicense": "MPL-2.0",
+      "installed": false,
+      "optional": true
+    },
+    {
+      "group": "public-build-toolchain",
+      "path": "node_modules/lightningcss-linux-x64-gnu",
+      "name": "lightningcss-linux-x64-gnu",
+      "version": "1.33.0",
+      "declaredLicense": "MPL-2.0",
+      "installed": false,
+      "optional": true
+    },
+    {
+      "group": "public-build-toolchain",
+      "path": "node_modules/lightningcss-linux-x64-musl",
+      "name": "lightningcss-linux-x64-musl",
+      "version": "1.33.0",
+      "declaredLicense": "MPL-2.0",
+      "installed": false,
+      "optional": true
+    },
+    {
+      "group": "public-build-toolchain",
+      "path": "node_modules/lightningcss-win32-arm64-msvc",
+      "name": "lightningcss-win32-arm64-msvc",
+      "version": "1.33.0",
+      "declaredLicense": "MPL-2.0",
+      "installed": false,
+      "optional": true
+    },
+    {
+      "group": "public-build-toolchain",
+      "path": "node_modules/lightningcss-win32-x64-msvc",
+      "name": "lightningcss-win32-x64-msvc",
+      "version": "1.33.0",
+      "declaredLicense": "MPL-2.0",
+      "installed": true,
+      "optional": true
+    },
+    {
+      "group": "public-build-toolchain",
+      "path": "node_modules/locate-path",
+      "name": "locate-path",
+      "version": "6.0.0",
+      "declaredLicense": "MIT",
+      "installed": true,
+      "optional": false
+    },
+    {
+      "group": "public-build-toolchain",
+      "path": "node_modules/magic-string",
+      "name": "magic-string",
+      "version": "0.30.21",
+      "declaredLicense": "MIT",
+      "installed": true,
+      "optional": false
+    },
+    {
+      "group": "public-build-toolchain",
+      "path": "node_modules/minimatch",
+      "name": "minimatch",
+      "version": "10.2.6",
+      "declaredLicense": "BlueOak-1.0.0",
+      "installed": true,
+      "optional": false
+    },
+    {
+      "group": "public-build-toolchain",
+      "path": "node_modules/ms",
+      "name": "ms",
+      "version": "2.1.3",
+      "declaredLicense": "MIT",
+      "installed": true,
+      "optional": false
+    },
+    {
+      "group": "public-build-toolchain",
+      "path": "node_modules/nanoid",
+      "name": "nanoid",
+      "version": "3.3.16",
+      "declaredLicense": "MIT",
+      "installed": true,
+      "optional": false
+    },
+    {
+      "group": "public-build-toolchain",
+      "path": "node_modules/natural-compare",
+      "name": "natural-compare",
+      "version": "1.4.0",
+      "declaredLicense": "MIT",
+      "installed": true,
+      "optional": false
+    },
+    {
+      "group": "public-build-toolchain",
+      "path": "node_modules/obug",
+      "name": "obug",
+      "version": "2.1.4",
+      "declaredLicense": "MIT",
+      "installed": true,
+      "optional": false
+    },
+    {
+      "group": "public-build-toolchain",
+      "path": "node_modules/optionator",
+      "name": "optionator",
+      "version": "0.9.4",
+      "declaredLicense": "MIT",
+      "installed": true,
+      "optional": false
+    },
+    {
+      "group": "public-build-toolchain",
+      "path": "node_modules/p-limit",
+      "name": "p-limit",
+      "version": "3.1.0",
+      "declaredLicense": "MIT",
+      "installed": true,
+      "optional": false
+    },
+    {
+      "group": "public-build-toolchain",
+      "path": "node_modules/p-locate",
+      "name": "p-locate",
+      "version": "5.0.0",
+      "declaredLicense": "MIT",
+      "installed": true,
+      "optional": false
+    },
+    {
+      "group": "public-build-toolchain",
+      "path": "node_modules/path-exists",
+      "name": "path-exists",
+      "version": "4.0.0",
+      "declaredLicense": "MIT",
+      "installed": true,
+      "optional": false
+    },
+    {
+      "group": "public-build-toolchain",
+      "path": "node_modules/path-key",
+      "name": "path-key",
+      "version": "3.1.1",
+      "declaredLicense": "MIT",
+      "installed": true,
+      "optional": false
+    },
+    {
+      "group": "public-build-toolchain",
+      "path": "node_modules/pathe",
+      "name": "pathe",
+      "version": "2.0.3",
+      "declaredLicense": "MIT",
+      "installed": true,
+      "optional": false
+    },
+    {
+      "group": "public-build-toolchain",
+      "path": "node_modules/picocolors",
+      "name": "picocolors",
+      "version": "1.1.1",
+      "declaredLicense": "ISC",
+      "installed": true,
+      "optional": false
+    },
+    {
+      "group": "public-build-toolchain",
+      "path": "node_modules/picomatch",
+      "name": "picomatch",
+      "version": "4.0.5",
+      "declaredLicense": "MIT",
+      "installed": true,
+      "optional": false
+    },
+    {
+      "group": "public-build-toolchain",
+      "path": "node_modules/postcss",
+      "name": "postcss",
+      "version": "8.5.25",
+      "declaredLicense": "MIT",
+      "installed": true,
+      "optional": false
+    },
+    {
+      "group": "public-build-toolchain",
+      "path": "node_modules/prelude-ls",
+      "name": "prelude-ls",
+      "version": "1.2.1",
+      "declaredLicense": "MIT",
+      "installed": true,
+      "optional": false
+    },
+    {
+      "group": "public-build-toolchain",
+      "path": "node_modules/punycode",
+      "name": "punycode",
+      "version": "2.3.1",
+      "declaredLicense": "MIT",
+      "installed": true,
+      "optional": false
+    },
+    {
+      "group": "public-build-toolchain",
+      "path": "node_modules/rolldown",
+      "name": "rolldown",
+      "version": "1.2.1",
+      "declaredLicense": "MIT",
+      "installed": true,
+      "optional": false
+    },
+    {
+      "group": "public-build-toolchain",
+      "path": "node_modules/semver",
+      "name": "semver",
+      "version": "7.8.5",
+      "declaredLicense": "ISC",
+      "installed": true,
+      "optional": false
+    },
+    {
+      "group": "public-build-toolchain",
+      "path": "node_modules/shebang-command",
+      "name": "shebang-command",
+      "version": "2.0.0",
+      "declaredLicense": "MIT",
+      "installed": true,
+      "optional": false
+    },
+    {
+      "group": "public-build-toolchain",
+      "path": "node_modules/shebang-regex",
+      "name": "shebang-regex",
+      "version": "3.0.0",
+      "declaredLicense": "MIT",
+      "installed": true,
+      "optional": false
+    },
+    {
+      "group": "public-build-toolchain",
+      "path": "node_modules/siginfo",
+      "name": "siginfo",
+      "version": "2.0.0",
+      "declaredLicense": "ISC",
+      "installed": true,
+      "optional": false
+    },
+    {
+      "group": "public-build-toolchain",
+      "path": "node_modules/source-map-js",
+      "name": "source-map-js",
+      "version": "1.2.1",
+      "declaredLicense": "BSD-3-Clause",
+      "installed": true,
+      "optional": false
+    },
+    {
+      "group": "public-build-toolchain",
+      "path": "node_modules/stackback",
+      "name": "stackback",
+      "version": "0.0.2",
+      "declaredLicense": "MIT",
+      "installed": true,
+      "optional": false
+    },
+    {
+      "group": "public-build-toolchain",
+      "path": "node_modules/std-env",
+      "name": "std-env",
+      "version": "4.2.0",
+      "declaredLicense": "MIT",
+      "installed": true,
+      "optional": false
+    },
+    {
+      "group": "public-build-toolchain",
+      "path": "node_modules/tinybench",
+      "name": "tinybench",
+      "version": "2.9.0",
+      "declaredLicense": "MIT",
+      "installed": true,
+      "optional": false
+    },
+    {
+      "group": "public-build-toolchain",
+      "path": "node_modules/tinyexec",
+      "name": "tinyexec",
+      "version": "1.3.0",
+      "declaredLicense": "MIT",
+      "installed": true,
+      "optional": false
+    },
+    {
+      "group": "public-build-toolchain",
+      "path": "node_modules/tinyglobby",
+      "name": "tinyglobby",
+      "version": "0.2.17",
+      "declaredLicense": "MIT",
+      "installed": true,
+      "optional": false
+    },
+    {
+      "group": "public-build-toolchain",
+      "path": "node_modules/tinyrainbow",
+      "name": "tinyrainbow",
+      "version": "3.1.1",
+      "declaredLicense": "MIT",
+      "installed": true,
+      "optional": false
+    },
+    {
+      "group": "public-build-toolchain",
+      "path": "node_modules/ts-api-utils",
+      "name": "ts-api-utils",
+      "version": "2.5.0",
+      "declaredLicense": "MIT",
+      "installed": true,
+      "optional": false
+    },
+    {
+      "group": "public-build-toolchain",
+      "path": "node_modules/tslib",
+      "name": "tslib",
+      "version": "2.8.1",
+      "declaredLicense": "0BSD",
+      "installed": true,
+      "optional": true
+    },
+    {
+      "group": "public-build-toolchain",
+      "path": "node_modules/type-check",
+      "name": "type-check",
+      "version": "0.4.0",
+      "declaredLicense": "MIT",
+      "installed": true,
+      "optional": false
+    },
+    {
+      "group": "public-build-toolchain",
+      "path": "node_modules/typescript",
+      "name": "typescript",
+      "version": "5.9.3",
+      "declaredLicense": "Apache-2.0",
+      "installed": true,
+      "optional": false
+    },
+    {
+      "group": "public-build-toolchain",
+      "path": "node_modules/typescript-eslint",
+      "name": "typescript-eslint",
+      "version": "8.65.0",
+      "declaredLicense": "MIT",
+      "installed": true,
+      "optional": false
+    },
+    {
+      "group": "public-build-toolchain",
+      "path": "node_modules/undici-types",
+      "name": "undici-types",
+      "version": "6.21.0",
+      "declaredLicense": "MIT",
+      "installed": true,
+      "optional": false
+    },
+    {
+      "group": "public-build-toolchain",
+      "path": "node_modules/uri-js",
+      "name": "uri-js",
+      "version": "4.4.1",
+      "declaredLicense": "BSD-2-Clause",
+      "installed": true,
+      "optional": false
+    },
+    {
+      "group": "public-build-toolchain",
+      "path": "node_modules/vite",
+      "name": "vite",
+      "version": "8.2.0",
+      "declaredLicense": "MIT",
+      "installed": true,
+      "optional": false
+    },
+    {
+      "group": "public-build-toolchain",
+      "path": "node_modules/vitest",
+      "name": "vitest",
+      "version": "4.1.10",
+      "declaredLicense": "MIT",
+      "installed": true,
+      "optional": false
+    },
+    {
+      "group": "public-build-toolchain",
+      "path": "node_modules/which",
+      "name": "which",
+      "version": "2.0.2",
+      "declaredLicense": "ISC",
+      "installed": true,
+      "optional": false
+    },
+    {
+      "group": "public-build-toolchain",
+      "path": "node_modules/why-is-node-running",
+      "name": "why-is-node-running",
+      "version": "2.3.0",
+      "declaredLicense": "MIT",
+      "installed": true,
+      "optional": false
+    },
+    {
+      "group": "public-build-toolchain",
+      "path": "node_modules/word-wrap",
+      "name": "word-wrap",
+      "version": "1.2.5",
+      "declaredLicense": "MIT",
+      "installed": true,
+      "optional": false
+    },
+    {
+      "group": "public-build-toolchain",
+      "path": "node_modules/yocto-queue",
+      "name": "yocto-queue",
+      "version": "0.1.0",
+      "declaredLicense": "MIT",
+      "installed": true,
+      "optional": false
+    },
+    {
+      "group": "private-integration-toolchain",
+      "path": "tools/calle-cli/node_modules/@call-e/cli",
+      "name": "@call-e/cli",
+      "version": "0.3.7",
+      "declaredLicense": "MIT",
+      "installed": true,
+      "optional": false
+    },
+    {
+      "group": "private-integration-toolchain",
+      "path": "tools/calle-cli/node_modules/@call-e/core",
+      "name": "@call-e/core",
+      "version": "0.2.3",
+      "declaredLicense": "MIT",
+      "installed": true,
+      "optional": false
+    }
+  ],
+  "limits": [
+    "Declared metadata is not a legal rights attestation.",
+    "Optional platform packages absent locally are inventoried from the lockfile.",
+    "No node_modules or provider distribution is included in the static archive.",
+    "CallOps outbound licensing and rights declarations remain pending publication approval."
+  ]
+}

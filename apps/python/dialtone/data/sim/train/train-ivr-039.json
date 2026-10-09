@@ -1,0 +1,56 @@
+{
+ "id": "train-ivr-039",
+ "label": "ivr",
+ "source": "sim-train",
+ "meta": {
+  "task": "book a table for two on Friday at 7 PM",
+  "hard": false
+ },
+ "turns": [
+  {
+   "speaker": "user",
+   "text": "Thank you for calling City Pharmacy. Your call is important to us. Please listen carefully, as our menu options have changed. For hours and directions, press 1. For appointments, press 2. For billing, press 3. To repeat these options, press 9.",
+   "offset_seconds": 0.31
+  },
+  {
+   "speaker": "bot",
+   "text": "[DTMF 2]",
+   "offset_seconds": 16.66
+  },
+  {
+   "speaker": "user",
+   "text": "Sorry, I didn't get that. Thank you for calling City Pharmacy. Your call is important to us. Please listen carefully, as our menu options have changed. For hours and directions, press 1. For appointments, press 2. For billing, press 3. To repeat these options, press 9.",
+   "offset_seconds": 17.4
+  },
+  {
+   "speaker": "bot",
+   "text": "[DTMF 3]",
+   "offset_seconds": 35.53
+  },
+  {
+   "speaker": "user",
+   "text": "Please hold while we connect you to the next available representative. Your call may be recorded for quality purposes.",
+   "offset_seconds": 36.34
+  },
+  {
+   "speaker": "bot",
+   "text": "I'd like to book a table for two people this Friday at 7 PM, under the name Alex Martin.",
+   "offset_seconds": 44.74
+  },
+  {
+   "speaker": "user",
+   "text": "Please hold while we connect you to the next available representative. Your call may be recorded for quality purposes.",
+   "offset_seconds": 52.41
+  },
+  {
+   "speaker": "bot",
+   "text": "[DTMF 2]",
+   "offset_seconds": 61.17
+  },
+  {
+   "speaker": "user",
+   "text": "Please hold while we connect you to the next available representative. Your call may be recorded for quality purposes.",
+   "offset_seconds": 61.88
+  }
+ ]
+}

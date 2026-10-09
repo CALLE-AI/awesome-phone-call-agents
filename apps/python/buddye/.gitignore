@@ -1,0 +1,16 @@
+# Local run artefacts from ./demo.sh — never commit a database or a log with call data in it.
+*.db
+*.db-shm
+*.db-wal
+demo-*.log
+.DS_Store
+# Secrets live in the host's environment (Render dashboard), never in the repo.
+.env
+.env.*
+!.env.example
+
+# Vercel project link (local)
+.vercel
+
+# TypeScript incremental build state
+*.tsbuildinfo

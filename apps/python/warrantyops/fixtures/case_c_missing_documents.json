@@ -1,0 +1,123 @@
+{
+  "scenario": "case_c_missing_documents",
+  "description": "The desk cannot state a status and no status may be invented, but they name the documents that would move the claim. Status stays UNKNOWN; the documents are the actionable result.",
+  "envelope": {
+    "source_platform": "SYNTHETIC-DMS",
+    "source_claim_id": "CLM-1044",
+    "source_version": "v2",
+    "exception_status": "UNPAID",
+    "submitted_at": "2026-07-18",
+    "caller_organization": "Example Equipment Dealers",
+    "account_context": "dealer account 4471",
+    "counterparty_phone_e164": "+14155550127",
+    "economic_policy_id": "standard-pursuit",
+    "claim_face_value": "726.40",
+    "claim_currency": "USD",
+    "documented_code": "P-031",
+    "documented_reason": "Payment hold pending review",
+    "documented_next_step": null,
+    "ordinary_remedies": [
+      {
+        "channel": "portal_status_check",
+        "outcome": "portal repeats hold code P-031 with no reviewer named"
+      },
+      {
+        "channel": "documented_code_resolution",
+        "outcome": "code sheet lists P-031 as a generic review hold"
+      },
+      {
+        "channel": "written_follow_up",
+        "outcome": "follow-up email unanswered for eleven days"
+      }
+    ],
+    "exhaustion_manifest": {
+      "source_version": "v2",
+      "routes": [
+        {
+          "channel": "portal_status_check",
+          "outcome": "portal repeats hold code P-031 with no reviewer named",
+          "attempted_at": "2026-08-17"
+        },
+        {
+          "channel": "documented_code_resolution",
+          "outcome": "code sheet lists P-031 as a generic review hold",
+          "attempted_at": "2026-08-19"
+        },
+        {
+          "channel": "written_follow_up",
+          "outcome": "follow-up email unanswered for eleven days",
+          "attempted_at": "2026-08-28"
+        }
+      ],
+      "information_gap": "no ordinary route names the reviewer or states which document the hold waits on"
+    }
+  },
+  "recipient_e164": "+14155550127",
+  "transport": {
+    "state": "completed",
+    "call_id": "call_synthetic_case_c",
+    "failure_code": null,
+    "failure_message": null
+  },
+  "transcript_turns": [
+    {
+      "speaker": "bot",
+      "text": "I am an AI assistant calling for Example Equipment Dealers. May I ask about warranty claim CLM-1044?"
+    },
+    {
+      "speaker": "user",
+      "text": "One moment. Which account?"
+    },
+    {
+      "speaker": "bot",
+      "text": "Dealer account 4471."
+    },
+    {
+      "speaker": "user",
+      "text": "I cannot see this claim in the payment queue. It may be sitting in document review."
+    },
+    {
+      "speaker": "bot",
+      "text": "What would move it forward?"
+    },
+    {
+      "speaker": "user",
+      "text": "Send a copy of the installation invoice and a photograph of the data plate, then it can go to review."
+    },
+    {
+      "speaker": "bot",
+      "text": "Is there a deadline?"
+    },
+    {
+      "speaker": "user",
+      "text": "Thirty days from the return date, but you will want it in sooner."
+    }
+  ],
+  "structured_result": {
+    "claim_status": "UNKNOWN",
+    "claim_status_evidence_quote": null,
+    "stated_reason": null,
+    "required_correction": null,
+    "required_documents": [
+      "copy of the installation invoice",
+      "photograph of the data plate"
+    ],
+    "stated_deadline": "Thirty days from the return date",
+    "escalation_path": null,
+    "stated_next_action": null,
+    "reference_kind": "UNKNOWN",
+    "reference_heard": null,
+    "reference_readback_performed": false,
+    "reference_confirmed": null,
+    "reference_confirmation_quote": null
+  },
+  "expected": {
+    "kind": "OUTCOME",
+    "terminal_state": "ACTION_REQUIRED",
+    "claim_status": "UNKNOWN",
+    "identifier_state": "ABSENT",
+    "confirmed_reference": null,
+    "provider_replays": 1,
+    "write_back": "RECEIPT"
+  }
+}

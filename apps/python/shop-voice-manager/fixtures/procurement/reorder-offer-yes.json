@@ -1,0 +1,71 @@
+{
+  "call_id": "call-reorder-20260812",
+  "idempotency_key": "shopvoice-demo-lagos-corner-shop-reorder_offer-2026-08-12",
+  "status": "completed",
+  "task_completed": true,
+  "completion_confidence": { "score": 0.9, "label": "high" },
+  "evidence": [
+    "Owner said fish and rice were finishing.",
+    "Owner said yes to placing an order.",
+    "Owner named Mama Sikiru for the fish."
+  ],
+  "structured_result": {
+    "reorder_offer_completed": true,
+    "owner_wants_to_order": true,
+    "items": [
+      {
+        "name": "Fish",
+        "quantity_needed": 2,
+        "unit": "cooler boxes",
+        "vendor_name": "Mama Sikiru",
+        "vendor_goods": ["fish"],
+        "vendor_phone_e164": "+2348111111111"
+      }
+    ],
+    "owner_notes": "Use the usual rice vendor for rice."
+  },
+  "metadata": {
+    "shop_id": "demo-lagos-corner-shop",
+    "call_type": "reorder_offer",
+    "call_date": "2026-08-12"
+  },
+  "recipients": [
+    {
+      "phones": ["+2348000000000"],
+      "region": "NG",
+      "locale": "en",
+      "structured_result": {
+        "reorder_offer_completed": true,
+        "owner_wants_to_order": true,
+        "items": [
+          {
+            "name": "Fish",
+            "quantity_needed": 2,
+            "unit": "cooler boxes",
+            "vendor_name": "Mama Sikiru",
+            "vendor_goods": ["fish"],
+            "vendor_phone_e164": "+2348111111111"
+          }
+        ],
+        "owner_notes": "Use the usual rice vendor for rice."
+      },
+      "attempts": [
+        {
+          "attempt": 1,
+          "status": "completed",
+          "started_at": "2026-08-12T07:20:00+01:00",
+          "duration_seconds": 58,
+          "transcript_turns": [
+            { "offset_seconds": 0, "speaker": "bot", "text": "I be AI assistant wey dey help your shop. Fish and rice dey finish — you want make I place order?" },
+            { "offset_seconds": 5, "speaker": "user", "text": "Yes, call Mama Sikiru for the fish, two cooler box." },
+            { "offset_seconds": 11, "speaker": "bot", "text": "Noted. Na she sell only fish?" },
+            { "offset_seconds": 15, "speaker": "user", "text": "Yes, na fish she dey sell. Her number na 08111111111." },
+            { "offset_seconds": 22, "speaker": "bot", "text": "For rice, make I use the same man from last week?" },
+            { "offset_seconds": 26, "speaker": "user", "text": "Yes, same man." },
+            { "offset_seconds": 30, "speaker": "bot", "text": "I don note everything. Thank you." }
+          ]
+        }
+      ]
+    }
+  ]
+}

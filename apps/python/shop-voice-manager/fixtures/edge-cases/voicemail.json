@@ -1,0 +1,44 @@
+{
+  "call_id": "call_sal_20260817_voicemail",
+  "idempotency_key": "shopvoice-demo-lagos-corner-shop-sales-2026-08-17",
+  "status": "voicemail",
+  "task_completed": false,
+  "completion_confidence": {
+    "score": 0.0,
+    "label": "none"
+  },
+  "evidence": [
+    "Call reached a voicemail greeting; no owner response captured."
+  ],
+  "structured_result": null,
+  "metadata": {
+    "shop_id": "demo-lagos-corner-shop",
+    "call_type": "sales",
+    "call_date": "2026-08-17"
+  },
+  "recipients": [
+    {
+      "phones": [
+        "+2348000000000"
+      ],
+      "region": "NG",
+      "locale": "en",
+      "structured_result": null,
+      "attempts": [
+        {
+          "attempt": 1,
+          "status": "voicemail",
+          "started_at": "2026-08-17T19:30:00+01:00",
+          "duration_seconds": 19,
+          "transcript_turns": [
+            {
+              "offset_seconds": 0,
+              "speaker": "bot",
+              "text": "Good evening. How business today?"
+            }
+          ]
+        }
+      ]
+    }
+  ]
+}

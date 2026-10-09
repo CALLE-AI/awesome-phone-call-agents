@@ -1,0 +1,56 @@
+{
+ "id": "train-agent-023",
+ "label": "agent",
+ "source": "sim-train",
+ "meta": {
+  "task": "book a table for two on Friday at 7 PM",
+  "hard": false
+ },
+ "turns": [
+  {
+   "speaker": "user",
+   "text": "Hi there, I'm Max, the virtual assistant for Cedar Hair Studio. How may I assist you today?",
+   "offset_seconds": 0.62
+  },
+  {
+   "speaker": "bot",
+   "text": "Hi, I'm an AI assistant calling on behalf of Alex Martin. I'd like to book a table for two people this Friday at 7 PM, under the name Alex Martin.",
+   "offset_seconds": 7.71
+  },
+  {
+   "speaker": "user",
+   "text": "Certainly! Just to confirm, you'd like a table for two this Friday at 7 PM under the name Alex Martin. I've gone ahead and booked that for you.",
+   "offset_seconds": 19.85
+  },
+  {
+   "speaker": "bot",
+   "text": "Is Friday at 7 available?",
+   "offset_seconds": 31.5
+  },
+  {
+   "speaker": "user",
+   "text": "Absolutely, that's confirmed. Is there anything else I can help you with today?",
+   "offset_seconds": 33.96
+  },
+  {
+   "speaker": "bot",
+   "text": "Is Friday at 7 available?",
+   "offset_seconds": 39.69
+  },
+  {
+   "speaker": "user",
+   "text": "I'd be happy to help with that. Everything is all set on our end.",
+   "offset_seconds": 42.42
+  },
+  {
+   "speaker": "bot",
+   "text": "Thank you, that's everything.",
+   "offset_seconds": 48.57
+  },
+  {
+   "speaker": "user",
+   "text": "You're welcome! Have a wonderful day. Goodbye!",
+   "offset_seconds": 50.88
+  }
+ ]
+}

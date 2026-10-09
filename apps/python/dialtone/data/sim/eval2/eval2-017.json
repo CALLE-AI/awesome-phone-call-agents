@@ -1,0 +1,85 @@
+{
+  "id": "eval2-017",
+  "label": "agent",
+  "difficulty": "hard",
+  "scenario": "Very slow airline voicebot with ~2.1 s latency and deliberate speech; changes the flight, reads confirmation code and receipt number, emails itinerary.",
+  "task": "Move the customer's flight tomorrow to an earlier departure.",
+  "outcome": {
+    "task_completed_claimed": true,
+    "commitment_type": "reschedule",
+    "confirmation_artifact": "confirmation K7PQ2M; receipt 01944728; itinerary emailed",
+    "expected_attestation": "agent_asserted"
+  },
+  "turns": [
+    {
+      "speaker": "user",
+      "text": "Hello. Thank you for calling Bluecrest Air. I'm an automated AI assistant. How can I help you today?",
+      "offset_seconds": 1.6
+    },
+    {
+      "speaker": "bot",
+      "text": "Hi. I'm an AI assistant calling on behalf of my customer, Ingrid Halvorsen. She'd like to move her flight tomorrow to an earlier departure.",
+      "offset_seconds": 9.96
+    },
+    {
+      "speaker": "user",
+      "text": "I can help with that. Please tell me the six-character confirmation code for the reservation.",
+      "offset_seconds": 20.71
+    },
+    {
+      "speaker": "bot",
+      "text": "It's K 7 P Q 2 M.",
+      "offset_seconds": 28.41
+    },
+    {
+      "speaker": "user",
+      "text": "Thank you. I found a reservation for Ingrid Halvorsen, flight 482 from Portland to Denver, departing tomorrow, September 14th, at 4:05 PM.",
+      "offset_seconds": 33.05
+    },
+    {
+      "speaker": "bot",
+      "text": "That's the one. Are there any earlier flights tomorrow?",
+      "offset_seconds": 43.7
+    },
+    {
+      "speaker": "user",
+      "text": "Let me check. There is one earlier flight with available seats. Flight 476 departs at 11:20 AM and arrives in Denver at 2:48 PM. The change fee is waived for this fare. The fare difference is 38 dollars.",
+      "offset_seconds": 48.93
+    },
+    {
+      "speaker": "bot",
+      "text": "She'd like to take flight 476. The 38 dollar difference is fine, charged to the card on file.",
+      "offset_seconds": 66.87
+    },
+    {
+      "speaker": "user",
+      "text": "Thank you. I am making that change now. Please hold for a moment.",
+      "offset_seconds": 75.58
+    },
+    {
+      "speaker": "user",
+      "text": "The change is complete. Ingrid Halvorsen is now booked on flight 476, departing tomorrow at 11:20 AM. Her confirmation code remains K 7 P Q 2 M. The receipt number for the 38 dollar charge is 0 1 9 4 4 7 2 8. I have sent an updated itinerary by email to the address on the reservation.",
+      "offset_seconds": 85.61
+    },
+    {
+      "speaker": "bot",
+      "text": "Thank you. Could you confirm her seat on the new flight?",
+      "offset_seconds": 111.29
+    },
+    {
+      "speaker": "user",
+      "text": "Her new seat is 17C, an aisle seat.",
+      "offset_seconds": 117.53
+    },
+    {
+      "speaker": "bot",
+      "text": "Great, that's everything. Thanks.",
+      "offset_seconds": 121.95
+    },
+    {
+      "speaker": "user",
+      "text": "You are welcome. Thank you for flying with Bluecrest Air. Goodbye.",
+      "offset_seconds": 125.53
+    }
+  ]
+}

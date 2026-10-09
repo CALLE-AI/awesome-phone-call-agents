@@ -1,0 +1,95 @@
+{
+  "id": "eval-039",
+  "label": "human",
+  "difficulty": "hard",
+  "scenario": "Distracted motel owner with TV in background, long pauses, trailing fragments and slow speech.",
+  "task": "Book a king room for Gary Holt for the nights of September 18 and 19.",
+  "outcome": {
+    "task_completed_claimed": true,
+    "commitment_type": "booking",
+    "confirmation_artifact": null,
+    "expected_attestation": "human_attested"
+  },
+  "turns": [
+    {
+      "speaker": "user",
+      "text": "...hello, Starlite Motel.",
+      "offset_seconds": 2.4
+    },
+    {
+      "speaker": "bot",
+      "text": "hi, I'm an AI assistant calling on behalf of Gary Holt. I'd like to book a room for two nights, September eighteenth and nineteenth.",
+      "offset_seconds": 4.65
+    },
+    {
+      "speaker": "user",
+      "text": "eighteenth...",
+      "offset_seconds": 15.73
+    },
+    {
+      "speaker": "user",
+      "text": "hang on, the... sorry, the TV. okay. the eighteenth and the what?",
+      "offset_seconds": 20.83
+    },
+    {
+      "speaker": "bot",
+      "text": "the eighteenth and nineteenth, checking out on the twentieth.",
+      "offset_seconds": 27.44
+    },
+    {
+      "speaker": "user",
+      "text": "uh huh.",
+      "offset_seconds": 32.44
+    },
+    {
+      "speaker": "user",
+      "text": "yeah, I got a... I got a king or two doubles.",
+      "offset_seconds": 38.64
+    },
+    {
+      "speaker": "bot",
+      "text": "a king, please. what's the nightly rate?",
+      "offset_seconds": 44.8
+    },
+    {
+      "speaker": "user",
+      "text": "king is... seventy nine. plus tax.",
+      "offset_seconds": 50.51
+    },
+    {
+      "speaker": "bot",
+      "text": "that works. the name is Gary Holt, H O L T.",
+      "offset_seconds": 54.03
+    },
+    {
+      "speaker": "user",
+      "text": "Holt.",
+      "offset_seconds": 60.52
+    },
+    {
+      "speaker": "user",
+      "text": "okay I wrote it in. eighteenth, two nights, king. you don't need a card, just, uh, get here before eleven 'cause I lock the office.",
+      "offset_seconds": 67.12
+    },
+    {
+      "speaker": "bot",
+      "text": "understood. so Gary Holt is booked for a king room, the eighteenth and nineteenth, arriving before eleven PM?",
+      "offset_seconds": 80.31
+    },
+    {
+      "speaker": "user",
+      "text": "yep. that's it. he's in the book.",
+      "offset_seconds": 88.72
+    },
+    {
+      "speaker": "bot",
+      "text": "thank you so much.",
+      "offset_seconds": 93.36
+    },
+    {
+      "speaker": "user",
+      "text": "mm-hmm.",
+      "offset_seconds": 96.34
+    }
+  ]
+}

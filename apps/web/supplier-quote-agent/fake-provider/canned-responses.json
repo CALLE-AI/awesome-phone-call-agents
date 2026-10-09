@@ -1,0 +1,17 @@
+{
+  "default": {
+    "outcome": "quoted",
+    "summary": "Supplier answered and provided pricing, lead time, and payment terms.",
+    "next_action": "review_quote"
+  },
+  "no_answer": {
+    "outcome": "no_answer",
+    "summary": "The call was not answered after several rings.",
+    "next_action": "retry_call"
+  },
+  "voicemail": {
+    "outcome": "voicemail",
+    "summary": "Reached voicemail; left the plan brief as a message with a callback number.",
+    "next_action": "await_callback"
+  }
+}

@@ -1,0 +1,4 @@
+Name,Phone,Timezone,Rule Pack,Consent Given,Consent Date,Suppressed,Status,Reasons,Call Outcome,Audit Hash
+Jordan Blake,+15550101,America/Chicago,us-tcpa-collections,TRUE,2026-01-15,FALSE,,,,
+Priya Nair,+15550102,America/New_York,us-tcpa-collections,FALSE,,FALSE,,,,
+Dana Ferreira,+15550106,America/New_York,appointment-reminder,FALSE,,FALSE,,,,

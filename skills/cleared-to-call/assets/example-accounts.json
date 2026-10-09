@@ -1,0 +1,83 @@
+{
+  "batch_id": "demo-batch-001",
+  "note": "Fictional accounts. Every number is in the reserved 555-01xx fictional range and belongs to nobody.",
+  "accounts": [
+    {
+      "account_id": "A-1001",
+      "display_name": "J. Doe",
+      "phone_e164": "+15550101234",
+      "timezone": "America/New_York",
+      "amount_due": 220.00,
+      "currency": "USD",
+      "consent_on_file": true,
+      "consent_timestamp": "2026-01-15T10:00:00Z",
+      "creditor_name": "Northbridge Lending"
+    },
+    {
+      "account_id": "A-1002",
+      "display_name": "R. Alvarez",
+      "phone_e164": "+15550101235",
+      "timezone": "America/Los_Angeles",
+      "amount_due": 87.50,
+      "currency": "USD",
+      "consent_on_file": true,
+      "consent_timestamp": "2026-02-02T17:30:00Z",
+      "creditor_name": "Northbridge Lending"
+    },
+    {
+      "account_id": "A-1003",
+      "display_name": "M. Chen",
+      "phone_e164": "+15550101236",
+      "timezone": "America/Chicago",
+      "amount_due": 415.00,
+      "currency": "USD",
+      "consent_on_file": false,
+      "consent_timestamp": null,
+      "creditor_name": "Northbridge Lending"
+    },
+    {
+      "account_id": "A-1004",
+      "display_name": "T. Okafor",
+      "phone_e164": "+15550101237",
+      "timezone": "America/New_York",
+      "amount_due": 1290.00,
+      "currency": "USD",
+      "consent_on_file": true,
+      "consent_timestamp": "2025-11-20T09:15:00Z",
+      "creditor_name": "Northbridge Lending"
+    },
+    {
+      "account_id": "A-1005",
+      "display_name": "S. Patel",
+      "phone_e164": "+15550101238",
+      "timezone": "America/New_York",
+      "amount_due": 64.20,
+      "currency": "USD",
+      "consent_on_file": true,
+      "consent_timestamp": "2026-03-08T14:45:00Z",
+      "creditor_name": "Northbridge Lending"
+    },
+    {
+      "account_id": "A-1006",
+      "display_name": "K. Novak",
+      "phone_e164": "+15550101239",
+      "timezone": "America/New_York",
+      "amount_due": 152.75,
+      "currency": "USD",
+      "consent_on_file": true,
+      "consent_timestamp": "2026-04-01T11:05:00Z",
+      "creditor_name": "Northbridge Lending"
+    },
+    {
+      "account_id": "A-1007",
+      "display_name": "D. Whitfield",
+      "phone_e164": "+15550101240",
+      "timezone": "America/New_York",
+      "amount_due": 730.00,
+      "currency": "USD",
+      "consent_on_file": true,
+      "consent_timestamp": "2026-02-19T16:20:00Z",
+      "creditor_name": "Northbridge Lending"
+    }
+  ]
+}

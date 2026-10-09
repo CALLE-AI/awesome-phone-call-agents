@@ -1,0 +1,67 @@
+{
+  "id": "call_fixture",
+  "object": "call_task",
+  "status": "completed",
+  "task": "Call about the email thread and ask which option was meant.",
+  "task_completed": false,
+  "completion_confidence": {
+    "score": 0.88,
+    "label": "high"
+  },
+  "evidence": [
+    "The call reached a voicemail greeting.",
+    "No person spoke during the call.",
+    "The assistant ended the call without leaving details."
+  ],
+  "structured_result": {
+    "resolved": "unknown",
+    "answered_by": "voicemail",
+    "chosen_option": "",
+    "evidence_quote": ""
+  },
+  "failure_code": null,
+  "failure_message": null,
+  "metadata": {
+    "app": "conversation-clarify"
+  },
+  "created_at": "2026-09-13T10:00:00Z",
+  "completed_at": "2026-09-13T10:02:00Z",
+  "recipients": [
+    {
+      "id": "rcp_fixture",
+      "phones": [
+        "+15550100142"
+      ],
+      "region": "US",
+      "locale": "en-US",
+      "status": "completed",
+      "structured_result": null,
+      "summary": "Fixture recipient summary.",
+      "attempts": [
+        {
+          "id": "att_fixture",
+          "phone": "+15550100142",
+          "status": "completed",
+          "started_at": "2026-09-13T10:00:30Z",
+          "completed_at": "2026-09-13T10:01:40Z",
+          "summary": null,
+          "provider_call_id": "00000000000000000000000000000000",
+          "failure_code": null,
+          "failure_message": null,
+          "transcript_turns": [
+            {
+              "offset_seconds": 0,
+              "speaker": "bot",
+              "text": "Hi, I'm an AI assistant calling on behalf of Charles Miller."
+            },
+            {
+              "offset_seconds": 5,
+              "speaker": "user",
+              "text": "You have reached the voicemail of Alex Doe. Please leave a message after the tone."
+            }
+          ]
+        }
+      ]
+    }
+  ]
+}

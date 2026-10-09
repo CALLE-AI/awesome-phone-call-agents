@@ -1,0 +1,33 @@
+# Carrier cannot meet the warehouse cutoff -> alternative carrier.
+input:
+  mission:
+    objective: "Protect Shipment #4821's departure"
+    deadline: "17:30"
+  constraints:
+    - { key: pickup_time, operator: lte, value: "17:30", mandatory: true }
+    - { key: capacity_ok, operator: eq, value: true, mandatory: true }
+  strategy: { id: strategy_01, type: replacement_carrier, target: "Carrier B" }
+  call_result:
+    call_id: call_021
+    target: "Carrier B"
+    status: completed
+    facts: { available: true, capacity_ok: true, pickup_time: "18:00" }
+  available_targets: ["Carrier C", "Carrier D"]
+  excluded_targets: ["Carrier A", "Carrier B"]
+
+output:
+  strategy_status: invalid
+  evidence:
+    - { fact: pickup_time, value: "18:00", source_call: call_021, target: "Carrier B",
+        confidence: high, status: validated }
+  constraint_results:
+    - { constraint: pickup_time, required: "17:30", observed: "18:00", status: violated }
+  replan:
+    required: true
+    reason: "Carrier B cannot collect before the warehouse cutoff."
+    previous_target: "Carrier B"
+    proposed_strategy: { type: alternative_target, target: "Carrier C" }
+  next_operation:
+    type: phone_call
+    objective: "Verify whether Carrier C satisfies the recovery constraints."
+    required_information: [available, pickup_time, capacity_ok]

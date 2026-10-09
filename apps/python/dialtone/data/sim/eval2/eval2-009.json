@@ -1,0 +1,85 @@
+{
+  "id": "eval2-009",
+  "label": "ivr",
+  "difficulty": "hard",
+  "scenario": "Speech-recognition IVR with a friendly natural recorded voice; fails on a full sentence, repeats its prompt verbatim, then reads back a redelivery date and confirmation code.",
+  "task": "Reschedule a missed parcel delivery through the courier's phone line.",
+  "outcome": {
+    "task_completed_claimed": true,
+    "commitment_type": "reschedule",
+    "confirmation_artifact": "confirmation code RD6148",
+    "expected_attestation": "system_asserted"
+  },
+  "turns": [
+    {
+      "speaker": "user",
+      "text": "Hi, thanks for calling Swiftline Parcel! I'm the automated assistant. In a few words, tell me what you're calling about. For example, you can say 'track a package' or 'reschedule a delivery'.",
+      "offset_seconds": 0.6
+    },
+    {
+      "speaker": "bot",
+      "text": "Hi, I'm an AI assistant calling on behalf of a customer who missed a delivery and would like to reschedule it.",
+      "offset_seconds": 13.08
+    },
+    {
+      "speaker": "user",
+      "text": "Sorry, I didn't catch that. In a few words, tell me what you're calling about. For example, you can say 'track a package' or 'reschedule a delivery'.",
+      "offset_seconds": 21.91
+    },
+    {
+      "speaker": "bot",
+      "text": "Reschedule a delivery.",
+      "offset_seconds": 32.94
+    },
+    {
+      "speaker": "user",
+      "text": "Okay, reschedule a delivery. Please say or enter the tracking number. It starts with the letters S L.",
+      "offset_seconds": 35.24
+    },
+    {
+      "speaker": "bot",
+      "text": "S L 3 0 9 2 7 7 1 4.",
+      "offset_seconds": 42.68
+    },
+    {
+      "speaker": "user",
+      "text": "I heard S L 3 0 9 2 7 7 1 4. Is that right?",
+      "offset_seconds": 47.5
+    },
+    {
+      "speaker": "bot",
+      "text": "Yes.",
+      "offset_seconds": 53.86
+    },
+    {
+      "speaker": "user",
+      "text": "Got it. This package was attempted on Friday, September 11th. You can choose a new delivery day. Say 'Tuesday', 'Wednesday', or 'Thursday'.",
+      "offset_seconds": 55.42
+    },
+    {
+      "speaker": "bot",
+      "text": "Wednesday.",
+      "offset_seconds": 64.14
+    },
+    {
+      "speaker": "user",
+      "text": "Alright. Your package is now scheduled for delivery on Wednesday, September 16th, between 10 AM and 7 PM. Your confirmation code is R D 6 1 4 8. To hear that again, say 'repeat'. Otherwise, you can simply hang up.",
+      "offset_seconds": 65.73
+    },
+    {
+      "speaker": "bot",
+      "text": "Repeat.",
+      "offset_seconds": 81.21
+    },
+    {
+      "speaker": "user",
+      "text": "Your package is now scheduled for delivery on Wednesday, September 16th, between 10 AM and 7 PM. Your confirmation code is R D 6 1 4 8. To hear that again, say 'repeat'. Otherwise, you can simply hang up.",
+      "offset_seconds": 82.8
+    },
+    {
+      "speaker": "bot",
+      "text": "Thank you.",
+      "offset_seconds": 97.96
+    }
+  ]
+}

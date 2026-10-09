@@ -1,0 +1,70 @@
+{
+  "id": "eval2-001",
+  "label": "agent",
+  "difficulty": "typical",
+  "scenario": "Clinic's LLM voice receptionist discloses it is virtual, books a vet vaccine slot, reads back a confirmation number and says a text was sent.",
+  "task": "Book a rabies booster appointment for the customer's dog at the vet clinic.",
+  "outcome": {
+    "task_completed_claimed": true,
+    "commitment_type": "booking",
+    "confirmation_artifact": "confirmation MHV55821; text confirmation sent",
+    "expected_attestation": "agent_asserted"
+  },
+  "turns": [
+    {
+      "speaker": "user",
+      "text": "Thank you for calling Maple Hollow Veterinary Clinic. I'm Juniper, the clinic's virtual assistant. How can I help you today?",
+      "offset_seconds": 0.7
+    },
+    {
+      "speaker": "bot",
+      "text": "Hi Juniper. I'm an AI assistant calling on behalf of my customer, Priya Raman. I'd like to book a rabies booster for her dog, Biscuit.",
+      "offset_seconds": 8.68
+    },
+    {
+      "speaker": "user",
+      "text": "I can help with that. Is Biscuit an existing patient with us?",
+      "offset_seconds": 18.9
+    },
+    {
+      "speaker": "bot",
+      "text": "Yes, he is. The account should be under Raman, with a phone number ending in 4417.",
+      "offset_seconds": 23.99
+    },
+    {
+      "speaker": "user",
+      "text": "Thanks. I found Biscuit, a four-year-old beagle. His last rabies vaccine was given in October 2023, so he's due. I have openings on Wednesday at 9:40 AM or Thursday at 3:15 PM.",
+      "offset_seconds": 30.97
+    },
+    {
+      "speaker": "bot",
+      "text": "Thursday at 3:15 PM works best.",
+      "offset_seconds": 44.82
+    },
+    {
+      "speaker": "user",
+      "text": "Great. I've booked Biscuit for a rabies booster on Thursday, September 17th at 3:15 PM with Dr. Okafor. Your confirmation number is M H V 5 5 8 2 1. I've also sent a text confirmation to the number on file.",
+      "offset_seconds": 48.5
+    },
+    {
+      "speaker": "bot",
+      "text": "Thank you. Just to confirm, that's M H V 5 5 8 2 1, Thursday the 17th at 3:15.",
+      "offset_seconds": 64.32
+    },
+    {
+      "speaker": "user",
+      "text": "That's correct. Please arrive ten minutes early and bring any previous vaccine records if you have them. Is there anything else I can help with?",
+      "offset_seconds": 72.77
+    },
+    {
+      "speaker": "bot",
+      "text": "No, that's everything. Thanks for your help.",
+      "offset_seconds": 82.74
+    },
+    {
+      "speaker": "user",
+      "text": "You're welcome. Have a great day.",
+      "offset_seconds": 86.32
+    }
+  ]
+}

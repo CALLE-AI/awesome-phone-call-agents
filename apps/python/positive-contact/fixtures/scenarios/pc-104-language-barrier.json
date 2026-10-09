@@ -1,0 +1,84 @@
+{
+  "scenario": "language-barrier",
+  "contact_id": "pc-104",
+  "note": "Scripted CALL-E responses for the language-barrier path.",
+  "steps": [
+    {
+      "ladder_step": 1,
+      "submit": "accepted",
+      "response": {
+        "id": "call_fx_pc-104_1",
+        "object": "call_task",
+        "status": "completed",
+        "task": "This is an automated safety notification from Northbay Power about a possible Public Safety Power Shutoff. This call may be recorded. Confirm the customer heard the notice.",
+        "recipients": [
+          {
+            "id": "rcp_1",
+            "phones": [
+              "+14155550124"
+            ],
+            "locale": "en-US",
+            "region": "US",
+            "status": "completed",
+            "structured_result": {
+              "contact_type": "language_barrier",
+              "acknowledged": "unknown",
+              "spoke_with": "unknown",
+              "needs_assistance": "unknown",
+              "callback_window": "",
+              "preferred_language": "German",
+              "notify_alternate_contact": "unknown",
+              "notes_for_human": "Could not understand the call. Bilingual callback needed."
+            },
+            "summary": "The person who answered could not understand the language of the call.",
+            "attempts": [
+              {
+                "id": "att_1",
+                "phone": "+14155550124",
+                "status": "completed",
+                "started_at": "2026-09-11T15:00:05Z",
+                "completed_at": "2026-09-11T15:01:12Z",
+                "summary": "The person who answered could not understand the language of the call.",
+                "transcript_turns": [
+                  {
+                    "offset_seconds": 0,
+                    "speaker": "bot",
+                    "text": "This is an automated safety notification from Northbay Power about a possible Public Safety Power Shutoff. This call may be recorded. Am I speaking with Nadia or someone in the household?"
+                  },
+                  {
+                    "offset_seconds": 7,
+                    "speaker": "user",
+                    "text": "Hallo? Ich verstehe leider kein Englisch."
+                  },
+                  {
+                    "offset_seconds": 14,
+                    "speaker": "bot",
+                    "text": "Thank you. A colleague who speaks your language will call you back."
+                  }
+                ],
+                "provider_call_id": "provider_call_fx_pc-104_1",
+                "failure_code": null,
+                "failure_message": null
+              }
+            ]
+          }
+        ],
+        "structured_result": null,
+        "summary": "The person who answered could not understand the language of the call.",
+        "task_completed": false,
+        "completion_confidence": {
+          "score": 0.8,
+          "label": "high"
+        },
+        "evidence": [
+          "The person who answered could not understand the language of the call."
+        ],
+        "metadata": {},
+        "failure_code": null,
+        "failure_message": null,
+        "created_at": "2026-09-11T15:00:00Z",
+        "completed_at": "2026-09-11T15:01:12Z"
+      }
+    }
+  ]
+}

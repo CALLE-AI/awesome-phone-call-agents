@@ -1,0 +1,31 @@
+{
+  "mode": "dry-run",
+  "spend_calls": 0,
+  "matrix": [
+    {
+      "call_id": 0,
+      "state": "active",
+      "aggression": 1,
+      "offer": 0.0
+    },
+    {
+      "call_id": 1,
+      "state": "active",
+      "aggression": 0,
+      "offer": 0.0
+    },
+    {
+      "call_id": 2,
+      "state": "active",
+      "aggression": 0,
+      "offer": 0.0
+    }
+  ],
+  "result": {
+    "call_id": 0,
+    "interested": "unknown",
+    "callback_window": "unscheduled",
+    "opt_out": "no",
+    "transcript": "reached voicemail; left neutral 20-second message"
+  }
+}

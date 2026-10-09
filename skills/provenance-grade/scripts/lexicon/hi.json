@@ -1,0 +1,40 @@
+{
+  "language": "hi",
+  "validated": false,
+  "_note": "UNVALIDATED. Romanised Hindi terms drafted, never evaluated against labelled Hindi or code-switched calls. Do not trust grades produced with this lexicon until it has its own fixture set. See references/limitations.md.",
+  "check": [
+    "ek minute",
+    "ruko",
+    "rukiye",
+    "check karta hoon",
+    "check karti hoon",
+    "dekh ke batata hoon",
+    "dekh ke batati hoon"
+  ],
+  "hedge": [
+    "shayad",
+    "lagta hai",
+    "lagbhag",
+    "karib",
+    "aas paas",
+    "ho sakta hai",
+    "andaza hai"
+  ],
+  "deferral": [
+    "baad mein batata hoon",
+    "baad mein batati hoon",
+    "confirm karke batata hoon",
+    "sahab se poochna padega",
+    "dekhna padega"
+  ],
+  "correction": [
+    "nahi nahi",
+    "matlab",
+    "sorry matlab",
+    "galat bola"
+  ],
+  "readback_request": [
+    "confirm karna hai",
+    "aapne kaha"
+  ]
+}

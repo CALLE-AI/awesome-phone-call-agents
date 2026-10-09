@@ -1005,7 +1005,9 @@ provider errors, structured results, summaries, or transcripts.
 
 ### 8.4 Budget Management
 
-Given the 20 free call limit per account, and the ability to request more:
+New CALL-E users receive 100 free credits (US$1); this is a credit balance, not a fixed number of calls. See the [current pricing FAQ](https://www.heycall-e.com/) and [Dashboard billing](https://dashboard.heycall-e.com/account/billing) for actual charges.
+
+For development:
 
 - Use CALL-E test/sandbox modes if available during development
 - Reserve a minimum of 3 to 5 real calls specifically for the final demo recording
@@ -1129,7 +1131,7 @@ that introduces it.
 | ---- | ------ | ---------- |
 | No cancel operation exists once a call is created. A bad or malformed task dispatched to many contacts cannot be aborted mid-flight. | High. Burns limited call credits and places real, wrong phone calls that cannot be recalled. | Test every task change against a single contact first. Dispatch in small waves rather than the full contact list at once, especially before the final demo recording. |
 | `structured_result` can be null when CALL-E cannot extract a schema-valid answer from the call. | Medium. Crashes or blank states in the results dashboard, on camera. | Treat null as a normal, expected state in both the Supabase write path and the UI. Render it as "no result extracted". Covered in sections 4.8, 8.3 and 9. |
-| 20 free call credits per account, and real calls cost credits to test. | Medium. Running out mid-build, or during the demo recording. | Mock CALL-E responses during UI work. Reserve 3 to 5 real calls for the recording. Request more credits early (section 8.4). |
+| 100 signup credits per account; real calls have variable credit costs. | Medium. Running out mid-build, or during the demo recording. | Mock CALL-E responses during UI work. Reserve 3 to 5 real calls for the recording. Request more credits early (section 8.4). |
 | The generator can emit an outcome schema using unsupported JSON Schema features. | Medium. CALL-E rejects the request, or silently nulls the result, and it surfaces at demo time. | State the supported subset explicitly in the generator system prompt, and enforce it in `web/lib/validation.ts` before dispatch (sections 4.5, 5.3). |
 
 ---

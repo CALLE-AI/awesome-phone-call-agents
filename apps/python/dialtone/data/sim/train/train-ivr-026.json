@@ -1,0 +1,36 @@
+{
+ "id": "train-ivr-026",
+ "label": "ivr",
+ "source": "sim-train",
+ "meta": {
+  "task": "cancel a subscription",
+  "hard": false
+ },
+ "turns": [
+  {
+   "speaker": "user",
+   "text": "Thank you for calling Luigi's Trattoria. Your call is important to us. Please listen carefully, as our menu options have changed. For hours and directions, press 1. For appointments, press 2. For billing, press 3. To repeat these options, press 9.",
+   "offset_seconds": 0.53
+  },
+  {
+   "speaker": "bot",
+   "text": "[DTMF 2]",
+   "offset_seconds": 17.36
+  },
+  {
+   "speaker": "user",
+   "text": "Sorry, I didn't get that. Thank you for calling Luigi's Trattoria. Your call is important to us. Please listen carefully, as our menu options have changed. For hours and directions, press 1. For appointments, press 2. For billing, press 3. To repeat these options, press 9.",
+   "offset_seconds": 18.16
+  },
+  {
+   "speaker": "bot",
+   "text": "[DTMF 3]",
+   "offset_seconds": 36.22
+  },
+  {
+   "speaker": "user",
+   "text": "Sorry, I didn't get that. Thank you for calling Luigi's Trattoria. Your call is important to us. Please listen carefully, as our menu options have changed. For hours and directions, press 1. For appointments, press 2. For billing, press 3. To repeat these options, press 9.",
+   "offset_seconds": 37.1
+  }
+ ]
+}

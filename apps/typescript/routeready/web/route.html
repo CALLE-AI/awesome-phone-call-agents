@@ -1,0 +1,146 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover, maximum-scale=1" />
+    <meta name="theme-color" content="#0e1014" />
+    <title>RouteReady · Your route</title>
+    <link rel="icon" href="/favicon.svg" type="image/svg+xml" />
+    <meta name="description" content="RouteReady phones each customer through CALL-E shortly before the rider arrives, and re-orders the stops around what they say." />
+    <link rel="stylesheet" href="/splash.css" />
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;700;800&display=swap" rel="stylesheet" />
+    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" crossorigin="" />
+    <link rel="stylesheet" href="/app.css" />
+    <link rel="stylesheet" href="/route.css" />
+  </head>
+  <body>
+    <script src="/splash.js"></script>
+    <!-- ---------- setup ---------- -->
+    <main class="setup" id="setup" hidden>
+      <header class="setup-hero">
+        <div class="mark">ROUTE<br />READY</div>
+        <h1>Your route, real calls.</h1>
+        <p>Add your stops and start riding. RouteReady phones each customer through your CALL-E account shortly before you arrive, and re-orders the stops around what they say.</p>
+        <a class="link" href="/app">Or watch the scripted demo day →</a>
+      </header>
+
+      <p class="banner" id="banner" hidden></p>
+
+      <section class="card">
+        <h2><span>1</span> Your CALL-E API key</h2>
+        <input id="api-key" type="password" autocomplete="off" spellcheck="false" placeholder="Paste your CALL-E API key" />
+        <p class="help">
+          Used only for this route: kept in the server's memory, never saved, logged or shown, and discarded when the route ends.
+          <a href="https://github.com/CALLE-AI/call-e-integrations" target="_blank" rel="noopener">How to get a key</a>
+        </p>
+      </section>
+
+      <section class="card">
+        <h2><span>2</span> Stops and rider</h2>
+        <p class="help">Tap the map to add a stop (up to <b id="max-stops">5</b>). Drag the pins to adjust them, and drag 🛵 to where the rider starts.</p>
+        <form class="search" id="search">
+          <input id="search-text" placeholder="Search for a place or address" />
+          <button type="submit">Find</button>
+          <button type="button" id="locate" title="Go to my location">📍</button>
+        </form>
+        <div id="setup-map"></div>
+        <ol class="stop-forms" id="stop-forms"></ol>
+        <p class="help" id="no-stops">No stops yet. Tap the map to add the first one.</p>
+      </section>
+
+      <section class="card">
+        <h2><span>3</span> Calls</h2>
+        <div class="grid">
+          <label>Shop name<input id="merchant" value="RouteReady Demo Shop" maxlength="40" /></label>
+          <label>Call language<input id="language" value="English" maxlength="24" /></label>
+          <label>
+            Call a customer when the rider is
+            <select id="call-ahead">
+              <option value="3">3 min away</option>
+              <option value="5">5 min away</option>
+              <option value="10" selected>10 min away</option>
+              <option value="15">15 min away</option>
+              <option value="20">20 min away</option>
+            </select>
+          </label>
+          <label>
+            Rider's average speed
+            <select id="speed">
+              <option value="12">12 km/h, bicycle</option>
+              <option value="20" selected>20 km/h, city</option>
+              <option value="30">30 km/h</option>
+              <option value="45">45 km/h</option>
+            </select>
+          </label>
+        </div>
+        <label class="check"><input type="checkbox" id="test-call" checked /><span>Tell each person this is a test call and no parcel is coming</span></label>
+        <p class="help">Arrival times are estimated from road-adjusted distance and this speed. CALL-E currently places calls to US, Singapore and Australia numbers.</p>
+      </section>
+
+      <section class="card">
+        <h2><span>4</span> Rider location</h2>
+        <div class="seg" id="source">
+          <button type="button" data-source="drag" class="active">Drag on the map</button>
+          <button type="button" data-source="gps">My phone's GPS</button>
+        </div>
+        <p class="help" id="source-help"></p>
+      </section>
+
+      <label class="check consent"><input type="checkbox" id="consent" /><span id="consent-text"></span></label>
+      <div class="repeat" id="repeat" hidden>
+        <p><b>Already called today:</b> <span id="repeat-numbers"></span>. Each customer is called at most once a day.</p>
+        <label class="check"><input type="checkbox" id="repeat-ok" /><span id="repeat-text"></span></label>
+      </div>
+      <p class="error" id="setup-error"></p>
+      <button class="cta" id="go" type="button"><span>Start the route</span><span>→</span></button>
+      <p class="help center">Each customer is called at most once, one call at a time, and never redialled.</p>
+    </main>
+
+    <!-- ---------- riding ---------- -->
+    <div id="ride" hidden>
+      <header class="topbar">
+        <div class="story">
+          <strong id="story-title">Connecting…</strong>
+          <span id="story-detail"></span>
+        </div>
+        <button class="icon-btn" id="end" type="button" title="End route" aria-label="End route">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round"><path d="M6 6l12 12M18 6 6 18" /></svg>
+        </button>
+      </header>
+
+      <div class="toast" id="toast" role="status"></div>
+
+      <section class="screen active" id="screen-route">
+        <div id="map"></div>
+        <div class="sheet" id="route-sheet"></div>
+      </section>
+      <section class="screen scroll" id="screen-stops"></section>
+      <section class="screen scroll" id="screen-calls"></section>
+      <section class="screen scroll" id="screen-log"></section>
+
+      <nav class="tabbar" id="tabbar">
+        <button type="button" data-tab="route" class="active">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 20 3 17V4l6 3 6-3 6 3v13l-6 3-6-3Z" /><path d="M9 7v13M15 4v13" /></svg>
+          <span class="label">Route</span>
+        </button>
+        <button type="button" data-tab="stops">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M8 6h13M8 12h13M8 18h13M3 6h.01M3 12h.01M3 18h.01" /></svg>
+          <span class="label">Stops</span>
+        </button>
+        <button type="button" data-tab="calls">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M22 16.9v3a2 2 0 0 1-2.2 2 19.8 19.8 0 0 1-8.6-3.1 19.5 19.5 0 0 1-6-6A19.8 19.8 0 0 1 2.1 4.2 2 2 0 0 1 4.1 2h3a2 2 0 0 1 2 1.7c.1 1 .4 1.9.7 2.8a2 2 0 0 1-.5 2.1L8.1 9.9a16 16 0 0 0 6 6l1.3-1.3a2 2 0 0 1 2.1-.4c.9.3 1.8.6 2.8.7a2 2 0 0 1 1.7 2Z" /></svg>
+          <span class="label">Calls</span>
+        </button>
+        <button type="button" data-tab="log">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 20V10M10 20V4M16 20v-7M22 20H2" /></svg>
+          <span class="label">Today</span>
+        </button>
+      </nav>
+    </div>
+
+    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js" crossorigin=""></script>
+    <script type="module" src="/route.js"></script>
+  </body>
+</html>

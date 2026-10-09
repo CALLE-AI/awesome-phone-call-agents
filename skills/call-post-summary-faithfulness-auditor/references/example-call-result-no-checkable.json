@@ -1,0 +1,14 @@
+{
+  "call_id": "demo-faithful-005",
+  "status": "COMPLETED",
+  "to": "+14155550196",
+  "post_summary": "The customer seemed satisfied and was polite throughout.",
+  "transcript": [
+    {"speaker": "agent", "text": "Hello, this is an automated assistant calling to confirm your reservation for this week."},
+    {"speaker": "callee", "text": "I see."},
+    {"speaker": "agent", "text": "Would you like me to check your booking details now?"},
+    {"speaker": "callee", "text": "Hmm."},
+    {"speaker": "agent", "text": "I can call back at a better time if that works for you."},
+    {"speaker": "callee", "text": "Okay then."}
+  ]
+}

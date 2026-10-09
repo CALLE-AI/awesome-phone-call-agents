@@ -1,0 +1,30 @@
+@import "tailwindcss";
+
+:root {
+  --app-bg: #F9FAFB;
+  --card-bg: #FFFFFF;
+  --user-msg-bg: #F3F4F6;
+  --primary-text: #111827;
+  --secondary-text: #6B7280;
+  --primary-action: #000000;
+  --warning-color: #EAB308;
+  --success-color: #15803D;
+}
+
+@theme inline {
+  --color-app-bg: var(--app-bg);
+  --color-card-bg: var(--card-bg);
+  --color-user-msg-bg: var(--user-msg-bg);
+  --color-primary-text: var(--primary-text);
+  --color-secondary-text: var(--secondary-text);
+  --color-primary-action: var(--primary-action);
+  --color-warning: var(--warning-color);
+  --color-success: var(--success-color);
+  --font-sans: var(--font-inter);
+}
+
+body {
+  background: var(--app-bg);
+  color: var(--primary-text);
+  font-family: var(--font-inter), Arial, Helvetica, sans-serif;
+}

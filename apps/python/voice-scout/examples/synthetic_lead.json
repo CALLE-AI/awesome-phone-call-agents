@@ -1,0 +1,10 @@
+{
+  "id": "demo-business-001",
+  "business_name": "Northside Bicycle Repair",
+  "industry": "Bicycle repair",
+  "phone": "+15550000000",
+  "lead_source": "synthetic_demo",
+  "known_company_size": "small",
+  "known_workflow": "Phone calls and web inquiries are handled by the owner",
+  "known_pain_points": "Missed calls during repair appointments"
+}

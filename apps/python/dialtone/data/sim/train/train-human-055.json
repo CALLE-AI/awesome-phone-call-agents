@@ -1,0 +1,71 @@
+{
+ "id": "train-human-055",
+ "label": "human",
+ "source": "sim-train",
+ "meta": {
+  "task": "reschedule an appointment from Tuesday to Thursday morning",
+  "hard": true
+ },
+ "turns": [
+  {
+   "speaker": "user",
+   "text": "Thank you for calling Cedar Hair Studio, this is Priya, how can I help you?",
+   "offset_seconds": 1.59
+  },
+  {
+   "speaker": "bot",
+   "text": "Hi, I'm an AI assistant calling on behalf of Jordan Lee. I'm calling to move Jordan Lee's appointment from Tuesday to Thursday morning.",
+   "offset_seconds": 7.78
+  },
+  {
+   "speaker": "user",
+   "text": "Tuesday to Thursday,",
+   "offset_seconds": 15.89
+  },
+  {
+   "speaker": "bot",
+   "text": "Is 10 AM on Thursday possible?",
+   "offset_seconds": 17.69
+  },
+  {
+   "speaker": "user",
+   "text": "Uh, five to",
+   "offset_seconds": 20.25
+  },
+  {
+   "speaker": "bot",
+   "text": "Is 10 AM on Thursday possible?",
+   "offset_seconds": 22.18
+  },
+  {
+   "speaker": "user",
+   "text": "Yeah.",
+   "offset_seconds": 25.24
+  },
+  {
+   "speaker": "bot",
+   "text": "Thank you so much, that's all I needed.",
+   "offset_seconds": 26.71
+  },
+  {
+   "speaker": "user",
+   "text": "Yep, you're all",
+   "offset_seconds": 30.0
+  },
+  {
+   "speaker": "user",
+   "text": "right",
+   "offset_seconds": 31.57
+  },
+  {
+   "speaker": "bot",
+   "text": "Thank you so much, that's all I needed.",
+   "offset_seconds": 32.86
+  },
+  {
+   "speaker": "user",
+   "text": "Alright, take care.",
+   "offset_seconds": 36.6
+  }
+ ]
+}

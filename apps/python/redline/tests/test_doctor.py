@@ -2,7 +2,7 @@
 
 Two properties carry this file. The credential must never appear in full in any
 output, and `doctor` must have no path to placing a call -- the whole reason it
-exists is that finding out your key is wrong by dialling costs five credits and
+exists is that finding out your key is wrong by dialling may incur variable charges and
 rings somebody's phone.
 
 Every key here is fabricated.
@@ -299,7 +299,7 @@ class TestDiagnostics:
         diagnosis = run_diagnostics(start=project)
         check = next(c for c in diagnosis.checks if c.name == "call budget")
         assert check.status is CheckStatus.WARN
-        assert "5 credits" in check.detail
+        assert "charges" in check.detail
 
     def test_nothing_touches_the_network_by_default(self, project: Path) -> None:
         write_env(project, f"REDLINE_CALLE_API_KEY={FAKE_KEY}\n")

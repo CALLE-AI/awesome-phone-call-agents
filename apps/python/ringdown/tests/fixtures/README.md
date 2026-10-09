@@ -30,14 +30,19 @@ Read `unobserved` before trusting a fixture. The evidence is partial and the gap
 
 ## What the live provider settled, and what it broke
 
-On 2026-08-20 three calls were placed against the live provider from a US Twilio number that
-bridges to the on-call engineer's phone, which is how ceiling 14 was worked around. Two over
+The paragraphs below are about the *shape* the provider answered with, which is all these fixtures
+carry. Every value in the committed files was rewritten; no transcript, recording, phone number or
+identifier from a real call is stored anywhere in this repository.
+
+On 2026-08-20 six calls were placed against the live provider from a US Twilio number that
+bridges to the on-call engineer's phone, which is how ceiling 14 was worked around. Five over
 REST, one over MCP. They settled four things the fake could only assume:
 
 - **`metadata` comes back exactly as sent**, and each attempt carries a `provider_call_id`. The
   attempt identity check can pass against the real API.
-- **The idempotency key works.** Both REST creates timed out without saying whether a call
-  existed; both replays returned the existing call rather than placing a second one.
+- **The idempotency key works.** All five REST creates timed out without saying whether a call
+  existed; all five replays returned the existing call rather than placing a second one, and
+  nobody was dialled twice.
 - **`get_call_run` takes `run_id` and rejects `call_id`** with a validation error delivered
   inside an HTTP 200. Ringdown had been sending `call_id`.
 - **No identifier a REST-placed call exposes resolves to a run.** Not the call id, not
@@ -54,3 +59,7 @@ That is exactly the failure this directory exists to catch — the client and th
 written from one reading of the docs, so the mistake landed in both and the tests could not see
 it. The fake still mirrors the wrong shape. Making it faithful changes what the ten checks can
 prove, which is a decision, not a patch.
+
+Both halves of this are written up at length in the app README: what the live calls broke is
+[ceiling 12](../../README.md#known-ceilings), and what it means that almost everything else here
+was confirmed by the server that produced it is ceiling 15.

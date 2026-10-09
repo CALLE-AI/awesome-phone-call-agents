@@ -1,0 +1,9 @@
+node_modules
+.git
+.env
+.env.local
+data
+tmp
+.deslop
+coverage
+npm-debug.log*

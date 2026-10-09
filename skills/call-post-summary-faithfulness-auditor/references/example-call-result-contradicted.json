@@ -1,0 +1,14 @@
+{
+  "call_id": "demo-faithful-003",
+  "status": "COMPLETED",
+  "to": "+14155550196",
+  "result": {
+    "post_summary": "The guest confirmed and the booking stands.",
+    "transcript": [
+      {"speaker": "agent", "text": "Hello, this is an automated assistant calling from the restaurant about your reservation."},
+      {"speaker": "callee", "text": "Hi, yes, hello."},
+      {"speaker": "agent", "text": "Shall I keep the table for Wednesday, October 14?"},
+      {"speaker": "callee", "text": "Actually, no, I can't make it, cancel it please."}
+    ]
+  }
+}

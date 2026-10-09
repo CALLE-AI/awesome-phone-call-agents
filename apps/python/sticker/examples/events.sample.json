@@ -1,0 +1,100 @@
+{
+ "data": [
+  {
+   "type": "call.in_progress",
+   "created_at": "2026-09-09T18:46:07Z",
+   "level": "info",
+   "status": "completed",
+   "message": "run_call started.",
+   "details": {}
+  },
+  {
+   "type": "call.in_progress",
+   "created_at": "2026-09-09T18:46:10Z",
+   "level": "info",
+   "status": "completed",
+   "message": "calling task status=calling",
+   "details": {}
+  },
+  {
+   "type": "call.in_progress",
+   "created_at": "2026-09-09T18:46:15Z",
+   "level": "info",
+   "status": "completed",
+   "message": "Call connected.",
+   "details": {}
+  },
+  {
+   "type": "call.in_progress",
+   "created_at": "2026-09-09T18:46:16.800000Z",
+   "level": "info",
+   "status": "completed",
+   "message": "Bot is speaking: Hello?",
+   "details": {}
+  },
+  {
+   "type": "call.in_progress",
+   "created_at": "2026-09-09T18:46:17.100000Z",
+   "level": "info",
+   "status": "completed",
+   "message": "Callee speech detected.",
+   "details": {}
+  },
+  {
+   "type": "call.in_progress",
+   "created_at": "2026-09-09T18:46:17.700000Z",
+   "level": "info",
+   "status": "completed",
+   "message": "Bot is speaking: Hi, I'm an AI assistant doing a price check.",
+   "details": {}
+  },
+  {
+   "type": "call.in_progress",
+   "created_at": "2026-09-09T18:46:18.900000Z",
+   "level": "info",
+   "status": "completed",
+   "message": "Callee speech detected.",
+   "details": {}
+  },
+  {
+   "type": "call.in_progress",
+   "created_at": "2026-09-09T18:46:21.300000Z",
+   "level": "info",
+   "status": "completed",
+   "message": "Bot is speaking: What's your cash price for 30 metformin 500 milligram tablets, no insurance?",
+   "details": {}
+  },
+  {
+   "type": "call.in_progress",
+   "created_at": "2026-09-09T18:46:22.500000Z",
+   "level": "info",
+   "status": "completed",
+   "message": "Callee speech detected.",
+   "details": {}
+  },
+  {
+   "type": "call.in_progress",
+   "created_at": "2026-09-09T18:46:22.800000Z",
+   "level": "info",
+   "status": "completed",
+   "message": "Bot is speaking: Okay.",
+   "details": {}
+  },
+  {
+   "type": "call.in_progress",
+   "created_at": "2026-09-09T18:46:26.600000Z",
+   "level": "info",
+   "status": "completed",
+   "message": "Bot is speaking: Thank you, goodbye.",
+   "details": {}
+  },
+  {
+   "type": "call.in_progress",
+   "created_at": "2026-09-09T18:46:29.400000Z",
+   "level": "info",
+   "status": "completed",
+   "message": "Call ended.",
+   "details": {}
+  }
+ ]
+}

@@ -1,0 +1,95 @@
+[project]
+name = "warrantyops"
+version = "1.0.0"
+description = "Place one authorized, disclosed CALL-E call for a stalled warranty claim exception and return the counterparty-stated reason and next action, gated by human review before any write-back."
+readme = "README.md"
+requires-python = ">=3.9"
+license = { text = "MIT" }
+dependencies = []
+
+[project.optional-dependencies]
+# The live CALL-E adapter imports the SDK lazily and only at call time, so
+# the pure core above keeps running on Python 3.9. The SDK itself requires
+# Python 3.11+ (calle-ai 0.7.0: requires-python ">=3.11"); installing this
+# extra on an older interpreter fails loudly rather than silently skipping.
+# Pinned to the exact version the adapter was verified against in source.
+live = ["calle-ai==0.7.0"]
+# The static-quality toolchain (F7). Pinned so `make static` fails the same
+# way on every machine and in CI; hypothesis powers the property suites.
+dev = [
+    "pytest>=8.0",
+    "hypothesis==6.141.1",
+    "mypy==1.14.1",
+    "ruff==0.9.4",
+    "coverage==7.6.1",
+    "pip-audit==2.7.3",
+]
+
+[project.scripts]
+warrantyops = "warrantyops.cli:main"
+
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[tool.hatch.build.targets.wheel]
+packages = ["warrantyops"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+addopts = "-q"
+
+[tool.mypy]
+# F7: the kernel is strict. The CALL-E SDK stays outside type checking on
+# purpose — it is an isolated optional extra that the kernel must not
+# require, and it ships no stubs; the adapter's own seam tests carry the
+# contract instead.
+strict = true
+python_version = "3.9"
+
+[[tool.mypy.overrides]]
+# "calle" covers the bare `import calle` presence probe; "calle.*" covers
+# `from calle import CalleClient` and any submodule the SDK pulls in.
+module = ["calle", "calle.*"]
+ignore_missing_imports = true
+
+[tool.ruff]
+line-length = 100
+target-version = "py39"
+
+[tool.ruff.lint]
+select = ["E", "F", "W", "I", "N", "UP", "B", "A", "C4", "SIM", "RUF"]
+ignore = [
+  # Python 3.9 target: PEP 604 `X | Y` unions only exist from 3.10 at
+  # runtime, and the codebase uses Optional[X] in evaluated positions
+  # (dataclass fields without a future-annotations host, aliases), so the
+  # rewrite stays off. PEP 585 builtins (dict[str, x]) are runtime-safe on
+  # 3.9 and therefore enforced (UP006).
+  "UP007",
+  # Exception names carry domain meaning by suffix — Unavailable, Required,
+  # Violation, Refused, Incomplete read as states, and the vocabulary is
+  # already public across tests, docs and the runbook. An "Error" suffix
+  # would rename that vocabulary for no behavioural gain.
+  "N818",
+]
+
+[tool.ruff.lint.per-file-ignores]
+# The property suite must import hypothesis first and bail out with a skip
+# when it is absent; the imports that follow are the pattern's point.
+"tests/test_hypothesis_properties.py" = ["E402"]
+# The proof screen, the shared renderer, and the adversarial page are
+# rendered artifacts: their long lines are template bytes (CSS rules, HTML
+# fragments) whose exact output the tests and --verify-* flags assert, and
+# wrapping them would change the artifact, not the style.
+"warrantyops/proof_screen.py" = ["E501"]
+"warrantyops/review_screen.py" = ["E501"]
+"warrantyops/adversarial.py" = ["E501"]
+
+[tool.coverage.run]
+branch = true
+source = ["warrantyops"]
+
+[tool.coverage.report]
+# F7 floor: 95% line coverage with branch measurement on.
+fail_under = 95
+show_missing = true

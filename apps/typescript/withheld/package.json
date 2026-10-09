@@ -1,0 +1,32 @@
+{
+  "name": "withheld",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Converts every inbound callback obligation into a scheduled outbound call, so a person who cannot answer a phone never has to.",
+  "license": "MIT",
+  "type": "module",
+  "scripts": {
+    "dev": "next dev",
+    "build": "next build",
+    "start": "next start",
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "typecheck": "tsc --noEmit",
+    "withheld": "tsx scripts/withheld.ts"
+  },
+  "dependencies": {
+    "@call-e/calle": "^0.7.0",
+    "next": "^16.3.5",
+    "react": "19.2.0",
+    "react-dom": "19.2.0",
+    "zod": "3.25.76"
+  },
+  "devDependencies": {
+    "@types/node": "22.18.1",
+    "@types/react": "19.2.2",
+    "@types/react-dom": "19.2.1",
+    "tsx": "^4.23.13",
+    "typescript": "5.9.2",
+    "vitest": "3.2.4"
+  }
+}

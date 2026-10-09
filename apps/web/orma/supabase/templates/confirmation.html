@@ -1,0 +1,9 @@
+<h2>Welcome to Orma</h2>
+
+<p>Tap the link below to confirm your email and sign in. It works once and expires soon.</p>
+
+<p><a href="{{ .SiteURL }}/login/callback?token_hash={{ .TokenHash }}&type=email">Confirm and sign in</a></p>
+
+<p>Or enter this code on the sign-in page: {{ .Token }}</p>
+
+<p>If you did not sign up for Orma, ignore this email.</p>

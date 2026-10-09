@@ -1,0 +1,24 @@
+{
+  "lead_id": "LEAD-2026-0042",
+  "campaign_id": "Q3-2026-website-callbacks",
+  "lead_source": "website_callback_form",
+  "to_phone_e164": "+15550101234",
+  "consent": true,
+  "authorized_reason": "Lead submitted the website callback form and checked the box authorizing one qualification call.",
+  "company_name": "Northwind Analytics",
+  "product_offer": "Annual analytics platform subscription",
+  "lead_first_name": "Fictional Avery",
+  "timezone": "America/New_York",
+  "locale": "en-US",
+  "language": "English",
+  "region": "US",
+  "qualification_fields": [
+    "needs",
+    "budget_range",
+    "timeline",
+    "is_decision_maker",
+    "interest_level",
+    "callback_requested"
+  ],
+  "notes": "Requested a call between 09:00 and 17:00 Eastern on weekdays."
+}

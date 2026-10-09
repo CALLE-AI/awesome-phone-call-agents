@@ -157,21 +157,38 @@ provides and the application verifies an authentication mechanism. Reconcile
 the notification against an authenticated call read before trusting it for a
 business decision.
 
+Calls V2 webhooks have `data.object: "call"` and arrive after result processing
+finishes. Keep a separate legacy receiver for outstanding `call_task` deliveries;
+the event type alone cannot distinguish those payloads.
+
 The runnable [webhook result receiver](../apps/python/webhook-result-receiver/)
-demonstrates durable receipt, replay detection, and authenticated
-reconciliation. Its SQLite table is deliberately a minimal receipt store, not
-a complete business-state database or production queue.
+demonstrates Calls V2 with SDK 1.0.1, durable receipt, replay detection, and
+authenticated reconciliation. Its SQLite table is deliberately a minimal
+receipt store, not
+a complete business-state database or production queue. The companion
+[application workflow](../apps/python/webhook-result-receiver/#persist-application-state)
+saves an immutable create request and Call ID, resumes API reads after a
+restart, and commits one API-verified outcome record per workflow in SQLite.
+It can reconcile an application update even after a webhook was acknowledged;
+the example never automatically places a follow-up call.
 
 ## 5. Verify before acting on a result
 
-A terminal status is necessary but not sufficient for a consequential action.
+For Calls V2, wait until `result_status` is no longer `pending`, even after
+`status` becomes `completed`. Inspect `call_outcome`, `result` and `error`
+separately; a final unavailable result can have both `result` and `error` null.
+Read the conversation from the top-level `transcript`.
+
+A ready result and terminal status are necessary but not sufficient for a
+consequential action.
 Before a result crosses the business-action boundary, verify that:
 
 - the returned call ID is the call bound to the reserved intent;
 - the workflow and schema versions are the expected versions;
 - the returned destination matches the exact approved destination inside the
   protected application boundary;
-- the status is terminal and allowed by the workflow policy;
+- the status is terminal, `result_status` is ready, and the telephone outcome
+  is allowed by the workflow policy;
 - every action-driving structured field passes local schema and bounds checks;
 - action-driving fields agree with recipient-side evidence or transcript when
   those sources are available; and
@@ -246,6 +263,11 @@ between every network side effect and durable write, then prove that restart
 does not place a duplicate call or apply a business transition twice.
 
 ## Existing reference implementations
+
+The webhook receiver below uses Calls V2. Domain-specific community apps retain
+their own pinned dependencies and provider contracts; check those before reusing
+them with SDK 1.x. The [migration guide](https://docs.heycall-e.com/migration)
+explains the breaking request and result changes.
 
 | Reference | Demonstrates | Boundary |
 | --- | --- | --- |

@@ -1,0 +1,12 @@
+{
+  "name": "no-answer",
+  "description": "Nobody picked up. A no-answer is a disposition, not a finding: no verdict, no window, no privacy report.",
+  "status": "no_answer",
+  "now": "2026-09-14T10:00:00Z",
+  "turns": [],
+  "expect": {
+    "status": "no_answer",
+    "next_action": "needs_human",
+    "number_disclosed": false
+  }
+}

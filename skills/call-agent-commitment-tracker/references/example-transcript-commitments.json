@@ -1,0 +1,9 @@
+{"status": "COMPLETED", "call_id": "run-commit-001", "transcript": [
+  {"speaker": "agent", "text": "Hello, I am calling from Sunrise Health to confirm your appointment. We have you scheduled for Tuesday at 2 p.m."},
+  {"speaker": "callee", "text": "Yes, but I never received the confirmation email you mentioned last time."},
+  {"speaker": "agent", "text": "I apologize for that. I will send you a confirmation email within the next 30 minutes with all the details."},
+  {"speaker": "callee", "text": "And what about the referral form?"},
+  {"speaker": "agent", "text": "I will have our records team send the referral form to your provider by end of day today. If there are any issues, someone will call you back within 24 hours."},
+  {"speaker": "callee", "text": "Okay, that sounds good. Thank you."},
+  {"speaker": "agent", "text": "You are welcome. We will also send a reminder text message tomorrow morning. Have a great day."}
+]}

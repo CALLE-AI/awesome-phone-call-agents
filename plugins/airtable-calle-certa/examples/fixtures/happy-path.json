@@ -1,0 +1,103 @@
+{
+  "calls": {
+    "VR-1041": {
+      "create": {
+        "id": "call_1041",
+        "status": "queued"
+      },
+      "poll": [
+        {
+          "status": "in_progress"
+        },
+        {
+          "id": "call_1041",
+          "status": "completed",
+          "task_completed": true,
+          "completion_confidence": {
+            "score": 0.94,
+            "label": "high"
+          },
+          "evidence": [
+            "The HR coordinator confirmed current employment, job title and start month."
+          ],
+          "recipients": [
+            {
+              "structured_result": {
+                "reached_employer": "yes",
+                "employment_confirmed": "yes",
+                "title_matches": "yes",
+                "declined_to_answer": "no"
+              }
+            }
+          ]
+        }
+      ]
+    },
+    "VR-1042": {
+      "create": {
+        "id": "call_1042",
+        "status": "queued"
+      },
+      "poll": [
+        {
+          "status": "in_progress"
+        },
+        {
+          "id": "call_1042",
+          "status": "completed",
+          "task_completed": true,
+          "completion_confidence": {
+            "score": 0.94,
+            "label": "high"
+          },
+          "evidence": [
+            "HR confirmed employment but named the role as Logistics Coordinator."
+          ],
+          "recipients": [
+            {
+              "structured_result": {
+                "reached_employer": "yes",
+                "employment_confirmed": "yes",
+                "title_matches": "no",
+                "declined_to_answer": "no"
+              }
+            }
+          ]
+        }
+      ]
+    },
+    "VR-1043": {
+      "create": {
+        "id": "call_1043",
+        "status": "queued"
+      },
+      "poll": [
+        {
+          "status": "in_progress"
+        },
+        {
+          "id": "call_1043",
+          "status": "completed",
+          "task_completed": true,
+          "completion_confidence": {
+            "score": 0.94,
+            "label": "high"
+          },
+          "evidence": [
+            "The automated menu did not route to a person before the call ended."
+          ],
+          "recipients": [
+            {
+              "structured_result": {
+                "reached_employer": "no",
+                "employment_confirmed": "unknown",
+                "title_matches": "unknown",
+                "declined_to_answer": "no"
+              }
+            }
+          ]
+        }
+      ]
+    }
+  }
+}

@@ -1,0 +1,45 @@
+.page {
+  width: min(1120px, calc(100% - 40px));
+  margin-inline: auto;
+  padding-bottom: 64px;
+}
+
+.page nav { padding-inline: 0; }
+.page h1 { font-size: clamp(2.2rem, 5vw, 4rem); max-width: 850px; margin-bottom: 20px; }
+.page h2 { font-size: 1.8rem; }
+.page h3 { font-size: 1.2rem; }
+.page p { line-height: 1.6; }
+.page p:empty { display: none; }
+.page fieldset { min-width: 0; padding: 24px; border: 1px solid #c6cec3; border-radius: 16px; }
+.page legend { font-weight: 700; padding-inline: 8px; }
+.page input:not([type="checkbox"]), .page select {
+  display: block;
+  width: 100%;
+  min-width: 0;
+  margin-top: 6px;
+  padding: 10px 12px;
+  border: 1px solid #8c9b8b;
+  border-radius: 6px;
+  background: #fffef9;
+  color: #183729;
+  font: inherit;
+}
+.page input[type="checkbox"] { accent-color: #28523c; width: 18px; height: 18px; vertical-align: middle; }
+.page button {
+  padding: 11px 18px;
+  border: 1px solid #28523c;
+  border-radius: 8px;
+  background: #28523c;
+  color: white;
+  font: inherit;
+  cursor: pointer;
+}
+.page button:disabled { opacity: 0.5; cursor: default; }
+.page section { min-width: 0; overflow-wrap: anywhere; }
+.page input:focus-visible, .page button:focus-visible, .page select:focus-visible {
+  outline: 3px solid #a57425;
+  outline-offset: 3px;
+}
+@media (max-width: 480px) {
+  .page fieldset { padding: 14px; }
+}

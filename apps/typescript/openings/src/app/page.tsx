@@ -19,7 +19,7 @@ export default async function HomePage() {
       <section className="grid gap-4 sm:grid-cols-3">
         <Stat label="Directories with errors" value="65%" detail="of verified listings (AJMC, 2025)" />
         <Stat label="Listed providers with any opening" value="14.9%" detail="when a real person calls (AJMC, 2025)" />
-        <Stat label="Per verified call" value="$0.05" detail="vs. hours of a human dialing" />
+        <Stat label="Call pricing" value="Usage-based" detail="See CALL-E Dashboard billing for actual charges" />
       </section>
 
       <StartWatchForm />

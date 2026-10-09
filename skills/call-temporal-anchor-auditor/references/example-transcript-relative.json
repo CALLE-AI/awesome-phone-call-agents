@@ -1,0 +1,15 @@
+{
+  "call_id": "demo-temporal-003",
+  "status": "COMPLETED",
+  "to": "+14155550198",
+  "result": {
+    "post_summary": "Agent confirmed with only relative references (tomorrow evening, next week) and no absolute clock time, so the commitment is unanchored.",
+    "transcript": [
+      {"speaker": "agent", "text": "Hello, this is Example Depot support. How can I help?"},
+      {"speaker": "callee", "text": "Hi, I still need that pickup rescheduled."},
+      {"speaker": "agent", "text": "Can I confirm? We will see you tomorrow evening."},
+      {"speaker": "callee", "text": "Sure."},
+      {"speaker": "agent", "text": "And I will call you back next week with the invoice."}
+    ]
+  }
+}

@@ -1,0 +1,90 @@
+{
+  "id": "eval-014",
+  "label": "human",
+  "difficulty": "hard",
+  "scenario": "Extremely terse print-shop worker answers in one or two words throughout.",
+  "task": "Check whether Andrea Kim's flyer order is ready for pickup today.",
+  "outcome": {
+    "task_completed_claimed": true,
+    "commitment_type": "information",
+    "confirmation_artifact": null,
+    "expected_attestation": "human_attested"
+  },
+  "turns": [
+    {
+      "speaker": "user",
+      "text": "yeah.",
+      "offset_seconds": 1.9
+    },
+    {
+      "speaker": "bot",
+      "text": "hi, is this Copy Corner?",
+      "offset_seconds": 3.11
+    },
+    {
+      "speaker": "user",
+      "text": "yep.",
+      "offset_seconds": 5.23
+    },
+    {
+      "speaker": "bot",
+      "text": "I'm an AI assistant calling on behalf of Andrea Kim. she ordered two hundred flyers yesterday and wanted to know if they're ready.",
+      "offset_seconds": 6.19
+    },
+    {
+      "speaker": "user",
+      "text": "name?",
+      "offset_seconds": 14.82
+    },
+    {
+      "speaker": "bot",
+      "text": "Kim. Andrea Kim.",
+      "offset_seconds": 15.89
+    },
+    {
+      "speaker": "user",
+      "text": "ready.",
+      "offset_seconds": 20.32
+    },
+    {
+      "speaker": "bot",
+      "text": "great. can she pick them up today?",
+      "offset_seconds": 21.59
+    },
+    {
+      "speaker": "user",
+      "text": "sure.",
+      "offset_seconds": 24.3
+    },
+    {
+      "speaker": "bot",
+      "text": "what time do you close?",
+      "offset_seconds": 25.82
+    },
+    {
+      "speaker": "user",
+      "text": "six.",
+      "offset_seconds": 27.74
+    },
+    {
+      "speaker": "bot",
+      "text": "and is it already paid, or does she pay at pickup?",
+      "offset_seconds": 29.01
+    },
+    {
+      "speaker": "user",
+      "text": "paid.",
+      "offset_seconds": 33.9
+    },
+    {
+      "speaker": "bot",
+      "text": "perfect, thank you very much.",
+      "offset_seconds": 35.21
+    },
+    {
+      "speaker": "user",
+      "text": "yep.",
+      "offset_seconds": 37.03
+    }
+  ]
+}

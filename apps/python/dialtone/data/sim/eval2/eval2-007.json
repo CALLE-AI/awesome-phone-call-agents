@@ -1,0 +1,75 @@
+{
+  "id": "eval2-007",
+  "label": "human",
+  "difficulty": "hard",
+  "scenario": "Terse depot worker answering with one-word replies and a long typing pause; reschedules redelivery with no reference given.",
+  "task": "Reschedule a missed parcel delivery for the customer.",
+  "outcome": {
+    "task_completed_claimed": true,
+    "commitment_type": "reschedule",
+    "confirmation_artifact": null,
+    "expected_attestation": "human_attested"
+  },
+  "turns": [
+    {
+      "speaker": "user",
+      "text": "Depot.",
+      "offset_seconds": 1.8
+    },
+    {
+      "speaker": "bot",
+      "text": "Hi, I'm an AI assistant calling on behalf of my customer, Hannah Liu. She missed a delivery yesterday and would like to reschedule it. The tracking number is Q X 4 4 0 9 1 7 7 3.",
+      "offset_seconds": 3.11
+    },
+    {
+      "speaker": "user",
+      "text": "Say that again.",
+      "offset_seconds": 17.83
+    },
+    {
+      "speaker": "bot",
+      "text": "Q X 4 4 0 9 1 7 7 3.",
+      "offset_seconds": 19.86
+    },
+    {
+      "speaker": "user",
+      "text": "Yeah.",
+      "offset_seconds": 23.9
+    },
+    {
+      "speaker": "user",
+      "text": "Thursday or Saturday.",
+      "offset_seconds": 28.88
+    },
+    {
+      "speaker": "bot",
+      "text": "Thursday, please.",
+      "offset_seconds": 30.59
+    },
+    {
+      "speaker": "user",
+      "text": "Thursday. Done.",
+      "offset_seconds": 33.02
+    },
+    {
+      "speaker": "bot",
+      "text": "Thank you. Is there a time window for Thursday?",
+      "offset_seconds": 34.52
+    },
+    {
+      "speaker": "user",
+      "text": "Nine to six.",
+      "offset_seconds": 38.09
+    },
+    {
+      "speaker": "bot",
+      "text": "Okay, Thursday between nine and six. Thanks for your help.",
+      "offset_seconds": 39.86
+    },
+    {
+      "speaker": "user",
+      "text": "Yep.",
+      "offset_seconds": 43.1
+    }
+  ]
+}

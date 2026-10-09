@@ -1,0 +1,17 @@
+person_id,name,first_name,phone,locale,region,birth_year,check_date,known_exempt,known_compliant,known_snap_tanf,known_pregnant,known_veteran_disability,known_tribal,known_foster_youth,has_online_account,mail_returned,prior_procedural_loss,do_not_call,consent,consent_source,notes,scenario
+e001,Maria Gonzalez,Maria,+14155550301,es-US,US,1986,2027-01-31,,,no,,,,,no,no,yes,,yes,application,Lives with her mother,exempt-caregiver
+e002,James Carter,James,+14155550302,en-US,US,1979,2027-02-28,,,,,,,,yes,no,no,,yes,application,,meets-hours
+e003,Aisha Mohammed,Aisha,+14155550303,en-US,US,1995,2027-01-31,,,,,,,,no,yes,no,,yes,application,,exempt-pregnant
+e004,Robert Lee,Robert,+14155550304,en-US,US,1968,2027-03-31,,,,,,,,no,no,no,,yes,application,,exempt-frail
+e005,Luis Ramirez,Luis,+14155550305,es-US,US,1990,2027-01-31,,,no,,,,,no,no,yes,,yes,application,,at-risk
+e006,Linda Brooks,Linda,+14155550306,en-US,US,1972,2027-02-28,,,,,,,,yes,no,no,,yes,application,,frail-review
+e007,Kevin Nguyen,Kevin,+14155550307,en-US,US,1998,2027-01-31,,,,,,,,no,yes,no,,yes,application,,unreachable
+e008,Patricia Wilson,Patricia,+14155550308,en-US,US,1964,2027-04-30,,,,,,,,yes,no,no,,yes,application,,declined
+e009,Daniel Kim,Daniel,+14155550309,en-US,US,1985,2027-02-28,,,yes,,,,,yes,no,no,,yes,application,SNAP work rules met per state data,
+e010,Grace Thompson,Grace,+14155550310,en-US,US,1993,2027-01-31,,yes,,,,,,yes,no,no,,yes,application,Wage data shows the hours are met,
+e011,Ahmed Hassan,Ahmed,+14155550311,en-US,US,1988,2027-02-28,,,,,,,,no,no,yes,,yes,application,,overclaim
+e012,Sandra Martinez,Sandra,+14155550312,es-US,US,1983,2027-01-31,,,,,,,,no,no,no,,yes,application,,opt-out
+e013,Thomas Brown,Thomas,+14155550313,en-US,US,1976,2027-03-31,,,,,,,,no,no,no,,yes,application,,wrong-person
+e014,No Consent Person,Nia,+14155550314,en-US,US,1990,2027-01-31,,,,,,,,no,no,no,,no,,Never gave a phone number for coverage calls,
+e015,Duplicate Phone,Dup,+14155550301,en-US,US,1990,2027-01-31,,,,,,,,no,no,no,,yes,application,Same phone as e001,
+e016,Previously Opted Out,Olga,+14155550316,en-US,US,1970,2027-01-31,,,,,,,,no,no,no,yes,yes,application,Asked not to be called in a prior campaign,

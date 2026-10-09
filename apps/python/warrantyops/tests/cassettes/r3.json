@@ -1,0 +1,48 @@
+{
+  "schema": 1,
+  "row": "R3",
+  "evidence_class": "Recorded CALL-E result",
+  "call": {
+    "masked_call_identifier": "call_synthetic_scrubbed_c83b339194e7",
+    "calls_created": 1,
+    "calls_retried": 0,
+    "transport": "completed",
+    "person_reached": true,
+    "claim_status": "UNKNOWN",
+    "transcript_turns": 18,
+    "write_back": "WITHHELD_PENDING_HUMAN_REVIEW",
+    "task_completed": false,
+    "status": "completed",
+    "locale": "en-IN",
+    "region": "IN",
+    "recipient_masked": "+91\u202696"
+  },
+  "transcript_turns": [
+    {"offset_seconds": 0, "speaker": "bot", "text": "[non-scripted utterance replaced by the scrubber]"},
+    {"offset_seconds": 0, "speaker": "bot", "text": "[non-scripted utterance replaced by the scrubber]"},
+    {"offset_seconds": 0, "speaker": "bot", "text": "[non-scripted utterance replaced by the scrubber]"},
+    {"offset_seconds": 9, "speaker": "user", "text": "[non-scripted utterance replaced by the scrubber]"},
+    {"offset_seconds": 9, "speaker": "bot", "text": "[non-scripted utterance replaced by the scrubber]"},
+    {"offset_seconds": 9, "speaker": "bot", "text": "[non-scripted utterance replaced by the scrubber]"},
+    {"offset_seconds": 12, "speaker": "user", "text": "[non-scripted utterance replaced by the scrubber]"},
+    {"offset_seconds": 14, "speaker": "bot", "text": "[non-scripted utterance replaced by the scrubber]"},
+    {"offset_seconds": 14, "speaker": "bot", "text": "[non-scripted utterance replaced by the scrubber]"},
+    {"offset_seconds": 16, "speaker": "user", "text": "[non-scripted utterance replaced by the scrubber]"},
+    {"offset_seconds": 28, "speaker": "user", "text": "[non-scripted utterance replaced by the scrubber]"},
+    {"offset_seconds": 30, "speaker": "bot", "text": "[non-scripted utterance replaced by the scrubber]"},
+    {"offset_seconds": 30, "speaker": "bot", "text": "[non-scripted utterance replaced by the scrubber]"},
+    {"offset_seconds": 36, "speaker": "bot", "text": "[non-scripted utterance replaced by the scrubber]"},
+    {"offset_seconds": 36, "speaker": "bot", "text": "[non-scripted utterance replaced by the scrubber]"},
+    {"offset_seconds": 38, "speaker": "user", "text": "[non-scripted utterance replaced by the scrubber]"},
+    {"offset_seconds": 44, "speaker": "bot", "text": "[non-scripted utterance replaced by the scrubber]"},
+    {"offset_seconds": 46, "speaker": "bot", "text": "[non-scripted utterance replaced by the scrubber]"}
+  ],
+  "summary": "The first call did not complete: someone answered briefly, but the conversation did not produce the claim status or next steps.",
+  "structured_result": {
+    "claim_status": "UNKNOWN",
+    "reference_kind": "UNKNOWN",
+    "reference_readback_performed": false,
+    "required_documents": []
+  },
+  "sanitized": true
+}

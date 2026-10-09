@@ -1,0 +1,56 @@
+{
+ "id": "train-agent-008",
+ "label": "agent",
+ "source": "sim-train",
+ "meta": {
+  "task": "book a table for two on Friday at 7 PM",
+  "hard": true
+ },
+ "turns": [
+  {
+   "speaker": "user",
+   "text": "Hello and thanks for calling Summit Fitness. This is Ava at Summit Fitness, and I can help with bookings, hours, and more. What can I do for you?",
+   "offset_seconds": 0.56
+  },
+  {
+   "speaker": "bot",
+   "text": "Hi, I'm an AI assistant calling on behalf of Taylor Kim. I'd like to book a table for two people this Friday at 7 PM, under the name Taylor Kim.",
+   "offset_seconds": 11.73
+  },
+  {
+   "speaker": "user",
+   "text": "Certainly! Just to confirm, you'd like a table for two this Friday at 7 PM under the name Taylor Kim. I've gone ahead and booked that for you.",
+   "offset_seconds": 23.95
+  },
+  {
+   "speaker": "bot",
+   "text": "Is Friday at 7 available?",
+   "offset_seconds": 35.64
+  },
+  {
+   "speaker": "user",
+   "text": "Certainly. You're all set. Thank you for calling, and have a wonderful day!",
+   "offset_seconds": 38.91
+  },
+  {
+   "speaker": "bot",
+   "text": "Is Friday at 7 available?",
+   "offset_seconds": 44.61
+  },
+  {
+   "speaker": "user",
+   "text": "Absolutely, that's confirmed. Is there anything else I can help you with today?",
+   "offset_seconds": 47.71
+  },
+  {
+   "speaker": "bot",
+   "text": "Thank you, that's everything.",
+   "offset_seconds": 53.39
+  },
+  {
+   "speaker": "user",
+   "text": "You're welcome! Have a wonderful day. Goodbye!",
+   "offset_seconds": 56.32
+  }
+ ]
+}

@@ -1,0 +1,48 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "CalleAccessibilityExtractionSchema",
+  "type": "object",
+  "required": [
+    "venue_contacted",
+    "call_status",
+    "findings",
+    "raw_transcript_quote"
+  ],
+  "properties": {
+    "venue_contacted": {
+      "type": "string",
+      "description": "Name or identifier of the contacted business"
+    },
+    "call_status": {
+      "type": "string",
+      "enum": ["completed", "busy", "no_answer", "refused", "transferred"],
+      "description": "Telephony connection status"
+    },
+    "findings": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["constraint_id", "status", "qualification"],
+        "properties": {
+          "constraint_id": {
+            "type": "string",
+            "description": "Constraint identifier (e.g. elevator_operational)"
+          },
+          "status": {
+            "type": "string",
+            "enum": ["confirmed", "qualified_confirmation", "refuted", "unknown"],
+            "description": "Direct assessment of staff verbal response"
+          },
+          "qualification": {
+            "type": "string",
+            "description": "Hedging or conditional notes if status is qualified_confirmation"
+          }
+        }
+      }
+    },
+    "raw_transcript_quote": {
+      "type": "string",
+      "description": "Verbatim quote from venue staff confirming or qualifying the status"
+    }
+  }
+}

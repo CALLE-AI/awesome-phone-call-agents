@@ -1,0 +1,21 @@
+{
+  "_scenario": "Voicemail. No guardian reached, so nothing is recorded and the office retries. Never treated as consent.",
+  "recipient_status": "completed",
+  "task_completed": false,
+  "completion_confidence": 0.2,
+  "summary": "Call reached voicemail. No message left about the student.",
+  "evidence": [],
+  "structured_result": {
+    "reached_guardian": "no",
+    "identity_confirmed": "unknown",
+    "consent": "unknown",
+    "route": "undecided",
+    "prior_dose_reported": "unsure",
+    "prior_dose_detail": "",
+    "allergy_reported": "unsure",
+    "allergy_detail": "",
+    "unwell_today": "unsure",
+    "guardian_questions": "",
+    "callback_requested": "no"
+  }
+}

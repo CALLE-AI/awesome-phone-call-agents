@@ -1,0 +1,28 @@
+{
+  "name": "Contact check sweep",
+  "description": "A termly sweep of the emergency contact list. One contact verifies cleanly, one turns out to be a stranger who now holds the number, and one needs a language the UK line cannot serve so it is never dialled at all.",
+  "clock": "2026-09-11T10:30:00+01:00",
+  "steps": [
+    { "action": "import" },
+    { "action": "contact_check" },
+    { "action": "call", "case": "CC-2026-autumn-C-2088", "script": "clean_identity" },
+    { "action": "call", "case": "CC-2026-autumn-C-2089", "script": "wrong_person" },
+    { "action": "call", "case": "CC-2026-autumn-C-2090", "script": "clean_identity" }
+  ],
+  "expect": {
+    "cases": {
+      "CC-2026-autumn-C-2088": "CC_VERIFIED",
+      "CC-2026-autumn-C-2089": "CC_WRONG_PERSON",
+      "CC-2026-autumn-C-2120": "CC_NOT_CALLED"
+    },
+    "contact_health": {
+      "C-2088": "verified",
+      "C-2089": "wrong_person",
+      "C-2120": "language_unsupported"
+    },
+    "decisions": ["LANGUAGE_NOT_SUPPORTED"],
+    "tasks": ["language"],
+    "never_called": ["C-2120", "C-2131"],
+    "calls_placed": 3
+  }
+}

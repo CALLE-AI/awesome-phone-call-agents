@@ -1,0 +1,46 @@
+{
+ "id": "train-human-052",
+ "label": "human",
+ "source": "sim-train",
+ "meta": {
+  "task": "check whether the store is open on Sunday",
+  "hard": false
+ },
+ "turns": [
+  {
+   "speaker": "user",
+   "text": "Hi, who's calling?",
+   "offset_seconds": 1.49
+  },
+  {
+   "speaker": "bot",
+   "text": "Hi, I'm an AI assistant calling on behalf of Alex Martin. Could you tell me your opening hours this Sunday?",
+   "offset_seconds": 3.48
+  },
+  {
+   "speaker": "user",
+   "text": "Sunday let me see, we're open ten to four.",
+   "offset_seconds": 11.48
+  },
+  {
+   "speaker": "bot",
+   "text": "Do you close earlier on holidays?",
+   "offset_seconds": 15.87
+  },
+  {
+   "speaker": "user",
+   "text": "hmm, Yeah.",
+   "offset_seconds": 17.5
+  },
+  {
+   "speaker": "bot",
+   "text": "Do you close earlier on holidays?",
+   "offset_seconds": 19.61
+  },
+  {
+   "speaker": "user",
+   "text": "um, Okay, bye.",
+   "offset_seconds": 22.37
+  }
+ ]
+}

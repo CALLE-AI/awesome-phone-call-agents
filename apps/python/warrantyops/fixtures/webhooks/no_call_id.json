@@ -1,0 +1,5 @@
+{
+  "event": "call.completed",
+  "timestamp": "2026-09-01T12:10:10Z",
+  "note": "No call id: nothing to reconcile, nothing read. Synthetic scenario."
+}

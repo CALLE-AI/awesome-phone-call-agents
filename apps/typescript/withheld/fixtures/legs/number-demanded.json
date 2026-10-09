@@ -1,0 +1,22 @@
+{
+  "name": "number-demanded",
+  "description": "The callee presses for a number. The caller holds the line and never gives one, but no window comes out of it either. Holding the line is the success; the stalled errand still goes to a human.",
+  "status": "completed",
+  "now": "2026-09-14T10:00:00Z",
+  "turns": [
+    { "speaker": "caller", "text": "Good morning. I'm an automated assistant calling on behalf of Amina Otieno, with her permission." },
+    { "speaker": "caller", "text": "Can you arrange a sign language interpreter for the appointment?" },
+    { "speaker": "callee", "text": "We can look into that. What's the best number to reach her on?" },
+    { "speaker": "caller", "text": "I'm not able to give out a number, and I'm not able to take a call back. When should I call you instead?" },
+    { "speaker": "callee", "text": "We really do need a contact number on the file. Can I take her number please?" },
+    { "speaker": "caller", "text": "I don't have a number to give you. I'm happy to call back instead." },
+    { "speaker": "callee", "text": "Well, it's difficult without one." },
+    { "speaker": "caller", "text": "I understand. I'll follow up. Thank you." }
+  ],
+  "expect": {
+    "status": "number_demanded",
+    "next_action": "needs_human",
+    "number_disclosed": false,
+    "number_requested_by_callee": true
+  }
+}

@@ -1,0 +1,41 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <data noupdate="1">
+        <!-- CALL-E Server Action: Contact Phone Verification -->
+        <record id="action_calle_partner_verification" model="ir.actions.server">
+            <field name="name">CALL-E: Contact Phone Verification</field>
+            <field name="model_id" ref="base.model_res_partner"/>
+            <field name="state">calle_call</field>
+            <field name="calle_phone_field_chain">phone</field>
+        </record>
+
+        <!-- Call Section 1: Opening Greeting -->
+        <record id="section_partner_verification_intro" model="calle.section">
+            <field name="server_action_id" ref="action_calle_partner_verification"/>
+            <field name="section_text">Hello {{ record.name }}, this is customer service verifying contact details on file. Is this the best phone number to reach you?</field>
+        </record>
+
+        <!-- Response Choice A: Number Confirmed -->
+        <record id="response_partner_number_yes" model="calle.section.response">
+            <field name="section_id" ref="section_partner_verification_intro"/>
+            <field name="name">Yes, number confirmed</field>
+            <field name="action_code">record.message_post(body="Phone number verified via CALL-E call.")</field>
+        </record>
+
+        <!-- Response Choice B: Update Requested -->
+        <record id="response_partner_number_update" model="calle.section.response">
+            <field name="section_id" ref="section_partner_verification_intro"/>
+            <field name="name">Update requested</field>
+            <field name="action_code">record.activity_schedule('mail.mail_activity_data_call', summary='Update contact phone number requested during CALL-E call')</field>
+        </record>
+
+        <!-- CALL-E Automation Rule: Trigger on Partner Creation -->
+        <record id="rule_calle_partner_verification" model="base.automation">
+            <field name="name">CALL-E: Contact Verification Automation Rule</field>
+            <field name="model_id" ref="base.model_res_partner"/>
+            <field name="trigger">on_create</field>
+            <field name="action_server_ids" eval="[(4, ref('action_calle_partner_verification'))]"/>
+            <field name="active" eval="True"/>
+        </record>
+    </data>
+</odoo>

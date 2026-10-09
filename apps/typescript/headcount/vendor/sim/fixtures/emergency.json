@@ -1,0 +1,34 @@
+{
+  "id": "emergency",
+  "status": "completed",
+  "task_completed": false,
+  "completion_confidence": { "score": 0.88, "label": "high" },
+  "disposition": "answered_confirmed",
+  "evidence": [
+    "The recipient reported a medical emergency.",
+    "Someone in the household is trapped.",
+    "The agent flagged the call for a human responder and ended the call."
+  ],
+  "structured_result": {
+    "dialed_count": 1,
+    "reached_count": 1,
+    "unreached_count": 0,
+    "critical_count": 1
+  },
+  "recipient_structured_result": {
+    "safety_status": "medical_emergency",
+    "evacuation": "trapped",
+    "has_power": "no",
+    "has_water": "unknown",
+    "medication": "unknown",
+    "household": "partial",
+    "needs_human": "yes"
+  },
+  "transcript_turns": [
+    { "offset_seconds": 0, "speaker": "bot", "text": "This is an automated AI assistant from Sonoma County Emergency Management. This is a safety and needs check, not an emergency service." },
+    { "offset_seconds": 8, "speaker": "user", "text": "We need help. My dad can't breathe and the back door is blocked." },
+    { "offset_seconds": 14, "speaker": "bot", "text": "I am flagging this for a human responder right now." },
+    { "offset_seconds": 18, "speaker": "user", "text": "Please hurry." },
+    { "offset_seconds": 20, "speaker": "bot", "text": "A human responder will take this from here. I am ending this automated check now." }
+  ]
+}

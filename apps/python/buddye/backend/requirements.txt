@@ -1,0 +1,12 @@
+fastapi
+uvicorn[standard]
+sqlmodel
+pydantic-settings
+python-dotenv
+httpx
+jsonschema
+openai
+calle-ai
+pytest
+pytest-asyncio
+sse-starlette

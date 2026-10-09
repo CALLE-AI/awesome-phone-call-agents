@@ -17,6 +17,8 @@ uv sync --dev --extra gemini
 
 Only Gemini is currently registered as a selectable `--llm-provider` (see [`pipeline/llm_providers.py`](pipeline/llm_providers.py)) — an Anthropic implementation exists in the same file but isn't wired in yet, since it hasn't been exercised against a real API call the way the Gemini path has. Adding another provider, or re-enabling Anthropic once it's verified, is one function plus one registry entry.
 
+If you're using an AI coding agent (Claude Code, Codex, etc.) to set this up and test it, point it at [`AGENTS.md`](AGENTS.md) — it has the exact commands to install and exercise the app with zero credentials.
+
 ## Try it without any credentials
 
 `screen.py --demo` runs the full pipeline against four canned sample transcripts with a mock CALL-E client — no account, no API key, nothing is dialed:
@@ -33,7 +35,7 @@ uv run python screen.py --demo legit           # a cooperative, verifiable calle
 `screen.py` is the real entry point. Preview is the default — it parses an email, runs prechecks, and prints the number it would dial and the exact task CALL-E would receive:
 
 ```bash
-uv run python screen.py --email samples/suspicious_email.txt --sender-domain secure-alerts-billing.com
+uv run python screen.py --email samples/suspicious_email.txt
 ```
 
 ## Placing one real call
@@ -66,7 +68,6 @@ The example below points at `samples/suspicious_email.txt`, so `+18005550187` is
 export GEMINI_API_KEY="<your key>"
 uv run python screen.py \
   --email samples/suspicious_email.txt \
-  --sender-domain secure-alerts-billing.com \
   --live --confirm \
   --to-phone "+18005550187" \
   --allow-number "+18005550187" \

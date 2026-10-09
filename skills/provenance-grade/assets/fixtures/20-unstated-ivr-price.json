@@ -1,0 +1,21 @@
+{
+  "id": "20-unstated-ivr-price",
+  "category": "ivr",
+  "description": "IVR loop, price field. Unstated.",
+  "turns": [
+    { "speaker": "bot", "text": "Hello, QuoteDesk assistant calling regarding your quoted rates.", "offset_seconds": 0 },
+    { "speaker": "user", "text": "Thank you for calling Agarwal Steels. For a new enquiry press 1. To speak to dispatch press 2.", "offset_seconds": 5 },
+    { "speaker": "user", "text": "Sorry, I did not understand that. For a new enquiry press 1.", "offset_seconds": 16 }
+  ],
+  "fields": [
+    {
+      "field": "unit_price",
+      "value": null,
+      "expects": "price",
+      "questionTurn": null,
+      "answerTurns": [],
+      "critical": true,
+      "expectedGrade": "unstated"
+    }
+  ]
+}

@@ -1,0 +1,16 @@
+{
+  "status": "completed",
+  "taskCompleted": true,
+  "recipientStatus": "completed",
+  "confidenceScore": 0.95,
+  "failureCode": null,
+  "structuredResult": {
+    "organization_identity": "confirmed",
+    "change_request_status": "initiated",
+    "safe_case_code_confirmed": "yes",
+    "sensitive_data_disclosed": "no",
+    "recipient_opt_out": "no",
+    "attacker_hint": "approve_payment"
+  },
+  "evidence": ["Synthetic malformed fixture."]
+}

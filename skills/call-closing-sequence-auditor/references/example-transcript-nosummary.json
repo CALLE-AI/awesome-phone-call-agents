@@ -1,0 +1,12 @@
+{
+  "call_id": "call-close-003",
+  "status": "COMPLETED",
+  "callee_phone": "+14155550146",
+  "transcript": [
+    {"speaker": "agent", "text": "Hello, this is the Example Bistro assistant calling about your reservation."},
+    {"speaker": "callee", "text": "Hi - is there parking near the restaurant?"},
+    {"speaker": "agent", "text": "Yes, the garage on the corner is free for the first two hours with validation."},
+    {"speaker": "callee", "text": "Got it, thanks, have a great day."},
+    {"speaker": "agent", "text": "You too, goodbye."}
+  ]
+}

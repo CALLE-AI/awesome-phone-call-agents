@@ -1,0 +1,23 @@
+{
+  "id": "10-assumed-misaligned-eta",
+  "category": "misaligned",
+  "description": "Asked how many days, answered with reassurance and no duration at all.",
+  "turns": [
+    { "speaker": "bot", "text": "Hello, this is the QuoteDesk assistant about the valve restock.", "offset_seconds": 0 },
+    { "speaker": "user", "text": "Haan, tell me.", "offset_seconds": 5 },
+    { "speaker": "bot", "text": "How many days will the valve delivery take to reach us?", "offset_seconds": 9 },
+    { "speaker": "user", "text": "We are the biggest stockist in Pune, no problem at all.", "offset_seconds": 15 }
+  ],
+  "fields": [
+    {
+      "field": "eta_days",
+      "value": null,
+      "expects": "duration",
+      "questionTurn": 2,
+      "answerTurns": [3],
+      "critical": true,
+      "expectedGrade": "assumed",
+      "expectSignals": ["H"]
+    }
+  ]
+}

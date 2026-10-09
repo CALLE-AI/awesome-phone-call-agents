@@ -1,0 +1,78 @@
+{
+  "completion_confidence": {
+    "label": "low",
+    "score": 0.42
+  },
+  "evidence": [],
+  "object": "call_task",
+  "recipients": [
+    {
+      "attempts": [
+        {
+          "attempt": 1,
+          "transcript_turns": [
+            {
+              "offset_seconds": 0,
+              "speaker": "bot",
+              "text": "Dialing Meridian Health Plan provider services."
+            },
+            {
+              "offset_seconds": 6,
+              "speaker": "user",
+              "text": "Thank you for calling Meridian Health Plan provider services. For claim status, press one. For eligibility and benefits, press two. For authorizations, press three."
+            },
+            {
+              "offset_seconds": 11,
+              "speaker": "bot",
+              "text": "Selecting one for claim status."
+            },
+            {
+              "offset_seconds": 15,
+              "speaker": "user",
+              "text": "Please enter the ten digit national provider identifier, followed by the pound key."
+            },
+            {
+              "offset_seconds": 20,
+              "speaker": "bot",
+              "text": "Entering national provider identifier 1234567893."
+            },
+            {
+              "offset_seconds": 27,
+              "speaker": "user",
+              "text": "Thank you. All of our representatives are currently assisting other providers. Your estimated wait time is twenty minutes. Please hold and your call will be answered in the order it was received."
+            },
+            {
+              "offset_seconds": 1520,
+              "speaker": "user",
+              "text": "We are still experiencing higher than normal call volume. Please continue to hold."
+            },
+            {
+              "offset_seconds": 1560,
+              "speaker": "bot",
+              "text": "Total hold time has passed the twenty five minute limit for this call. Ending the call."
+            }
+          ]
+        }
+      ],
+      "phones": [
+        "+12125550142"
+      ],
+      "region": "US",
+      "structured_result": {
+        "call_outcome": "hold_timeout",
+        "claims": [],
+        "reference_number": "unknown",
+        "representative_name": "unknown"
+      }
+    }
+  ],
+  "status": "completed",
+  "structured_result": {
+    "call_outcome": "hold_timeout",
+    "claims": [],
+    "reference_number": "unknown",
+    "representative_name": "unknown"
+  },
+  "summary": "Abandoned after the hold limit was reached without reaching a representative.",
+  "task_completed": true
+}

@@ -1,0 +1,64 @@
+{
+  "title": "InsuranceClaimsOrchestratorSchemas",
+  "definitions": {
+    "LossReportResult": {
+      "type": "object",
+      "required": ["outcome", "incident_description", "incident_date", "estimated_damage", "policy_number_confirmed"],
+      "properties": {
+        "outcome": {
+          "type": "string",
+          "enum": ["completed", "voicemail", "no_answer", "refused", "unclear"]
+        },
+        "incident_description": {
+          "type": ["string", "null"],
+          "description": "Claimant's own words describing the incident, verbatim where possible"
+        },
+        "incident_date": {
+          "type": ["string", "null"],
+          "description": "ISO 8601 date string or null if not provided"
+        },
+        "estimated_damage": {
+          "type": ["number", "null"],
+          "description": "Dollar value or null if claimant declined or was unclear"
+        },
+        "policy_number_confirmed": {
+          "type": ["string", "null"],
+          "description": "Policy number as spoken by claimant, or null if not provided"
+        }
+      },
+      "additionalProperties": false
+    },
+    "CoverageVerifyResult": {
+      "type": "object",
+      "required": ["outcome", "policy_active", "coverage_verified", "prior_claims_12mo", "adjuster_notified"],
+      "properties": {
+        "outcome": {
+          "type": "string",
+          "enum": ["completed", "voicemail", "no_answer", "refused", "unclear"]
+        },
+        "policy_active": {
+          "type": ["boolean", "null"],
+          "description": "True if claimant confirmed policy is active. Null if not established."
+        },
+        "coverage_verified": {
+          "type": "string",
+          "enum": ["yes", "no", "unknown"],
+          "description": "Whether the relevant coverage type was confirmed. Never guess — use unknown."
+        },
+        "prior_claims_12mo": {
+          "type": ["boolean", "null"],
+          "description": "True if claimant confirmed prior claims in 12 months. Null if not asked or declined."
+        },
+        "adjuster_notified": {
+          "type": "boolean",
+          "description": "True if CALL-E informed claimant an adjuster will follow up."
+        },
+        "claimant_questions": {
+          "type": ["string", "null"],
+          "description": "Verbatim any questions the claimant asked that CALL-E could not answer."
+        }
+      },
+      "additionalProperties": false
+    }
+  }
+}

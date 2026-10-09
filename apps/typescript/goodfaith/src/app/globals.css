@@ -1,0 +1,67 @@
+/* File: src/app/globals.css */
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+:root {
+  color-scheme: dark;
+}
+
+@layer base {
+  body {
+    background-image: radial-gradient(120% 80% at 50% -10%, #17130f 0%, #0c0a08 55%);
+    background-attachment: fixed;
+  }
+  /* Tabular, lining figures for prices so columns and comparisons line up. */
+  .tnum {
+    font-variant-numeric: tabular-nums lining-nums;
+    letter-spacing: -0.01em;
+  }
+  ::selection {
+    background: rgba(224, 150, 78, 0.28);
+  }
+  /* Consistent, visible keyboard focus everywhere. */
+  :where(a, button, input, select, textarea, summary, [tabindex]):focus-visible {
+    outline: none;
+    box-shadow: 0 0 0 2px #0c0a08, 0 0 0 4px rgba(224, 150, 78, 0.7);
+    border-radius: 0.375rem;
+  }
+}
+
+@layer components {
+  .card {
+    @apply bg-ink-900/90 border border-ink-700 rounded-xl shadow-card;
+  }
+  .badge {
+    @apply inline-flex items-center gap-1.5 rounded-full px-2.5 py-1 text-xs font-medium tracking-wide;
+  }
+  .field {
+    @apply w-full bg-ink-850 border border-ink-700 rounded-lg px-3 py-2.5 text-paper-100
+           placeholder:text-paper-500 transition-colors
+           hover:border-ink-600 focus:border-accent/70;
+  }
+  .btn-primary {
+    @apply inline-flex items-center justify-center gap-2 rounded-lg bg-accent px-4 py-3
+           font-semibold text-ink-950 transition-colors
+           hover:bg-accent-soft active:bg-accent-dim
+           disabled:cursor-not-allowed disabled:opacity-50;
+  }
+  .btn-ghost {
+    @apply inline-flex items-center justify-center gap-2 rounded-lg border border-ink-600
+           px-3 py-2.5 text-paper-200 transition-colors
+           hover:border-accent/60 hover:text-paper-100;
+  }
+  .link {
+    @apply text-accent underline-offset-4 transition-colors hover:text-accent-soft hover:underline;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.001ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.001ms !important;
+  }
+}

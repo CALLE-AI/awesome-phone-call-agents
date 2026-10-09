@@ -1,0 +1,50 @@
+{
+  "id": "eval-034",
+  "label": "ivr",
+  "difficulty": "typical",
+  "scenario": "Restaurant after-hours IVR; ignores spoken request as invalid, voicemail box full, hangs up.",
+  "task": "Book a table for two tonight at Lucca Trattoria.",
+  "outcome": {
+    "task_completed_claimed": false,
+    "commitment_type": "booking",
+    "confirmation_artifact": null,
+    "expected_attestation": "unverified"
+  },
+  "turns": [
+    {
+      "speaker": "user",
+      "text": "thank you for calling Lucca Trattoria. we are currently closed.",
+      "offset_seconds": 1.3
+    },
+    {
+      "speaker": "user",
+      "text": "our hours are tuesday through sunday, five P M to ten P M. for reservations, please visit our website or call back during business hours. to hear our address, press 1. to leave a message, press 2.",
+      "offset_seconds": 6.95
+    },
+    {
+      "speaker": "bot",
+      "text": "hi, I'm an AI assistant calling to book a table for two tonight.",
+      "offset_seconds": 25.59
+    },
+    {
+      "speaker": "user",
+      "text": "sorry, that is not a valid option.",
+      "offset_seconds": 30.76
+    },
+    {
+      "speaker": "user",
+      "text": "to hear our address, press 1. to leave a message, press 2.",
+      "offset_seconds": 34.54
+    },
+    {
+      "speaker": "bot",
+      "text": "[DTMF 2]",
+      "offset_seconds": 41.04
+    },
+    {
+      "speaker": "user",
+      "text": "the mailbox is full and cannot accept messages at this time. goodbye.",
+      "offset_seconds": 42.17
+    }
+  ]
+}

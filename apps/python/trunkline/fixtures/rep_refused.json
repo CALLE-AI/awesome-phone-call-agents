@@ -1,0 +1,93 @@
+{
+  "completion_confidence": {
+    "label": "medium",
+    "score": 0.61
+  },
+  "evidence": [],
+  "object": "call_task",
+  "recipients": [
+    {
+      "attempts": [
+        {
+          "attempt": 1,
+          "transcript_turns": [
+            {
+              "offset_seconds": 0,
+              "speaker": "bot",
+              "text": "Dialing Meridian Health Plan provider services."
+            },
+            {
+              "offset_seconds": 6,
+              "speaker": "user",
+              "text": "Thank you for calling Meridian Health Plan provider services. For claim status, press one. For eligibility and benefits, press two. For authorizations, press three."
+            },
+            {
+              "offset_seconds": 11,
+              "speaker": "bot",
+              "text": "Selecting one for claim status."
+            },
+            {
+              "offset_seconds": 15,
+              "speaker": "user",
+              "text": "Please enter the ten digit national provider identifier, followed by the pound key."
+            },
+            {
+              "offset_seconds": 20,
+              "speaker": "bot",
+              "text": "Entering national provider identifier 1234567893."
+            },
+            {
+              "offset_seconds": 27,
+              "speaker": "user",
+              "text": "Thank you. All of our representatives are currently assisting other providers. Your estimated wait time is twenty minutes. Please hold and your call will be answered in the order it was received."
+            },
+            {
+              "offset_seconds": 1140,
+              "speaker": "user",
+              "text": "Provider services, this is Alan."
+            },
+            {
+              "offset_seconds": 1148,
+              "speaker": "bot",
+              "text": "This is an AI assistant calling for the billing office of Lakeshore Family Medicine. This call may be recorded for accuracy. Our national provider identifier is 1234567893."
+            },
+            {
+              "offset_seconds": 1162,
+              "speaker": "user",
+              "text": "I am sorry, I am not able to release claim detail without the full tax identification number on file for the billing provider. I can only verify with the full tax identification number."
+            },
+            {
+              "offset_seconds": 1180,
+              "speaker": "bot",
+              "text": "Understood. I am not able to provide that on this call. The billing office will follow up. Could I have a reference number and your first name?"
+            },
+            {
+              "offset_seconds": 1194,
+              "speaker": "user",
+              "text": "Reference M H P dash R E F dash 3 3 8 8 1 0 2 7, this is Alan."
+            }
+          ]
+        }
+      ],
+      "phones": [
+        "+12125550142"
+      ],
+      "region": "US",
+      "structured_result": {
+        "call_outcome": "rep_refused",
+        "claims": [],
+        "reference_number": "MHP-REF-33881027",
+        "representative_name": "Alan"
+      }
+    }
+  ],
+  "status": "completed",
+  "structured_result": {
+    "call_outcome": "rep_refused",
+    "claims": [],
+    "reference_number": "MHP-REF-33881027",
+    "representative_name": "Alan"
+  },
+  "summary": "Representative required the full tax identification number, which this workflow does not disclose. Ended without claim detail.",
+  "task_completed": true
+}

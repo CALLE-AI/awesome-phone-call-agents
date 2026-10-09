@@ -1,0 +1,1 @@
+ALTER TABLE `emails` ADD `classification_failed` integer DEFAULT false NOT NULL;

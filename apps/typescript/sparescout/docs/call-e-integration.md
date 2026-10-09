@@ -22,7 +22,7 @@ The task must:
 - reject substitute-part acceptance; and
 - prohibit reservation, ordering, purchase, payment, or any commitment.
 
-Strict JSON schemas define the aggregate counts and every supplier result.
+Strict JSON schemas define the aggregate counts and every supplier result. They stay within CALL-E's documented supported subset: simple types, properties, required fields, enums, simple array items, descriptions, and `additionalProperties: false`.
 
 ### 3. Authenticate, authorize, save, and sign the plan
 

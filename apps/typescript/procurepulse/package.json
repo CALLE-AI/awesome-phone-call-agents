@@ -1,0 +1,22 @@
+{
+  "name": "procurepulse-calle-example",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "description": "Urgent supplier quote race over CALL-E: identical questions to authorized suppliers, strict per-recipient results, unit-aware ranking, and human-gated approval and hold calls. Preview and fake-server paths by default.",
+  "engines": {
+    "node": ">=20"
+  },
+  "scripts": {
+    "preview": "tsx src/cli.ts preview",
+    "demo": "tsx src/cli.ts demo",
+    "check": "tsx src/cli.ts check",
+    "test": "tsx --test test/*.test.ts",
+    "typecheck": "tsc --noEmit"
+  },
+  "devDependencies": {
+    "@types/node": "22.19.19",
+    "tsx": "4.23.13",
+    "typescript": "5.9.3"
+  }
+}

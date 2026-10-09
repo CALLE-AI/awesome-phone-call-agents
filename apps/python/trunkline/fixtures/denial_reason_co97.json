@@ -1,0 +1,157 @@
+{
+  "completion_confidence": {
+    "label": "high",
+    "score": 0.91
+  },
+  "evidence": [],
+  "object": "call_task",
+  "recipients": [
+    {
+      "attempts": [
+        {
+          "attempt": 1,
+          "transcript_turns": [
+            {
+              "offset_seconds": 0,
+              "speaker": "bot",
+              "text": "Dialing Meridian Health Plan provider services."
+            },
+            {
+              "offset_seconds": 6,
+              "speaker": "user",
+              "text": "Thank you for calling Meridian Health Plan provider services. For claim status, press one. For eligibility and benefits, press two. For authorizations, press three."
+            },
+            {
+              "offset_seconds": 11,
+              "speaker": "bot",
+              "text": "Selecting one for claim status."
+            },
+            {
+              "offset_seconds": 15,
+              "speaker": "user",
+              "text": "Please enter the ten digit national provider identifier, followed by the pound key."
+            },
+            {
+              "offset_seconds": 20,
+              "speaker": "bot",
+              "text": "Entering national provider identifier 1234567893."
+            },
+            {
+              "offset_seconds": 27,
+              "speaker": "user",
+              "text": "Thank you. All of our representatives are currently assisting other providers. Your estimated wait time is twenty minutes. Please hold and your call will be answered in the order it was received."
+            },
+            {
+              "offset_seconds": 1198,
+              "speaker": "user",
+              "text": "Thank you for holding, claims research, this is Priya."
+            },
+            {
+              "offset_seconds": 1206,
+              "speaker": "bot",
+              "text": "This is an AI assistant calling for the billing office of Lakeshore Family Medicine. This call may be recorded for accuracy. Our national provider identifier is 1234567893."
+            },
+            {
+              "offset_seconds": 1219,
+              "speaker": "user",
+              "text": "Thank you, and the member identification number and date of birth."
+            },
+            {
+              "offset_seconds": 1228,
+              "speaker": "bot",
+              "text": "Member identification number W884213097, date of birth March 11, 1984, last name Alvarez."
+            },
+            {
+              "offset_seconds": 1244,
+              "speaker": "user",
+              "text": "Got it, W 8 8 4 2 1 3 0 9 7, Alvarez. Which claim?"
+            },
+            {
+              "offset_seconds": 1256,
+              "speaker": "bot",
+              "text": "Claim number C L M dash 2026 dash 0 0 4 6 1 2, date of service August fourth."
+            },
+            {
+              "offset_seconds": 1270,
+              "speaker": "user",
+              "text": "Okay, it denied under C O ninety seven, that is the benefit for this service is included in the payment for another service that was already adjudicated. The remark code with it is N 1 3 0."
+            },
+            {
+              "offset_seconds": 1290,
+              "speaker": "bot",
+              "text": "Thank you. Can that denial be appealed, and by when?"
+            },
+            {
+              "offset_seconds": 1302,
+              "speaker": "user",
+              "text": "Yes it can, you have one hundred eighty days from the remittance date to appeal, that would be February eighteenth, and appeals go to the provider appeals unit at the Springfield address on the remittance."
+            },
+            {
+              "offset_seconds": 1330,
+              "speaker": "bot",
+              "text": "Would a corrected claim be accepted instead of a formal appeal?"
+            },
+            {
+              "offset_seconds": 1340,
+              "speaker": "user",
+              "text": "Not for a ninety seven, that one has to go through appeals with the documentation."
+            },
+            {
+              "offset_seconds": 1352,
+              "speaker": "bot",
+              "text": "Understood, thank you. May I have a reference number for this call and your first name?"
+            },
+            {
+              "offset_seconds": 1363,
+              "speaker": "user",
+              "text": "Reference is M H P dash R E F dash 9 9 2 0 4 4 1 8, and this is Priya."
+            }
+          ]
+        }
+      ],
+      "phones": [
+        "+12125550142"
+      ],
+      "region": "US",
+      "structured_result": {
+        "call_outcome": "answered",
+        "claims": [
+          {
+            "appeal_deadline": "2027-02-18",
+            "appeal_method": "Provider appeals unit at the Springfield address printed on the remittance advice.",
+            "appealable": "yes",
+            "carc_code": "CO-97",
+            "claim_number": "CLM-2026-004612",
+            "corrected_claim_accepted": "no",
+            "denial_reason_text": "The benefit for this service is included in the payment for another service already adjudicated.",
+            "evidence_quote": "it denied under C O ninety seven, that is the benefit for this service is included in the payment for another service that was already adjudicated",
+            "rarc_code": "N130"
+          }
+        ],
+        "reference_number": "MHP-REF-99204418",
+        "representative_name": "Priya"
+      }
+    }
+  ],
+  "status": "completed",
+  "structured_result": {
+    "call_outcome": "answered",
+    "claims": [
+      {
+        "appeal_deadline": "2027-02-18",
+        "appeal_method": "Provider appeals unit at the Springfield address printed on the remittance advice.",
+        "appealable": "yes",
+        "carc_code": "CO-97",
+        "claim_number": "CLM-2026-004612",
+        "corrected_claim_accepted": "no",
+        "denial_reason_text": "The benefit for this service is included in the payment for another service already adjudicated.",
+        "evidence_quote": "it denied under C O ninety seven, that is the benefit for this service is included in the payment for another service that was already adjudicated",
+        "rarc_code": "N130"
+      }
+    ],
+    "reference_number": "MHP-REF-99204418",
+    "representative_name": "Priya"
+  },
+  "summary": "Denial reason confirmed as CO-97 with remark N130, appealable to 2027-02-18.",
+  "task_completed": true
+}

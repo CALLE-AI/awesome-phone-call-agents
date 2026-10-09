@@ -1,0 +1,50 @@
+{
+  "id": "eval2-020",
+  "label": "ivr",
+  "difficulty": "typical",
+  "scenario": "City permit office recorded info tree: office hours and fence-permit document requirements, repeated verbatim on request.",
+  "task": "Find the permit office's walk-in hours and what documents are needed for a fence permit.",
+  "outcome": {
+    "task_completed_claimed": true,
+    "commitment_type": "information",
+    "confirmation_artifact": null,
+    "expected_attestation": "system_asserted"
+  },
+  "turns": [
+    {
+      "speaker": "user",
+      "text": "You have reached the City of Easton Department of Permits and Inspections. If you know your party's extension, you may dial it at any time. For building permits, press 1. For inspection scheduling, press 2. For zoning questions, press 3. For office hours and location, press 4.",
+      "offset_seconds": 0.5
+    },
+    {
+      "speaker": "bot",
+      "text": "[DTMF 4]",
+      "offset_seconds": 20.18
+    },
+    {
+      "speaker": "user",
+      "text": "The permit center is located at 300 Civic Plaza, second floor, room 214. Walk-in hours are Monday through Thursday, 8 AM to 4 PM, and Friday, 8 AM to noon. The office is closed on weekends and city holidays. To hear information about required documents for a fence or deck permit, press 1. To repeat this message, press 9. To return to the main menu, press star.",
+      "offset_seconds": 21.44
+    },
+    {
+      "speaker": "bot",
+      "text": "[DTMF 1]",
+      "offset_seconds": 49.45
+    },
+    {
+      "speaker": "user",
+      "text": "Residential fence and deck permit applications require a completed application form, a site plan showing property lines and the proposed structure, and a copy of your property deed or tax bill. The application fee for a fence permit is 75 dollars. The fee for a deck permit is 150 dollars. Applications may also be submitted online. To repeat this message, press 9. To return to the main menu, press star.",
+      "offset_seconds": 50.77
+    },
+    {
+      "speaker": "bot",
+      "text": "[DTMF 9]",
+      "offset_seconds": 79.63
+    },
+    {
+      "speaker": "user",
+      "text": "Residential fence and deck permit applications require a completed application form, a site plan showing property lines and the proposed structure, and a copy of your property deed or tax bill. The application fee for a fence permit is 75 dollars. The fee for a deck permit is 150 dollars. Applications may also be submitted online. To repeat this message, press 9. To return to the main menu, press star.",
+      "offset_seconds": 80.95
+    }
+  ]
+}

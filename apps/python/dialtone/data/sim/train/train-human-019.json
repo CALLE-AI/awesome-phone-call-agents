@@ -1,0 +1,56 @@
+{
+ "id": "train-human-019",
+ "label": "human",
+ "source": "sim-train",
+ "meta": {
+  "task": "book a table for two on Friday at 7 PM",
+  "hard": false
+ },
+ "turns": [
+  {
+   "speaker": "user",
+   "text": "Northside Dental, this is Kenji.",
+   "offset_seconds": 0.76
+  },
+  {
+   "speaker": "bot",
+   "text": "Hi, I'm an AI assistant calling on behalf of Alex Martin. I'd like to book a table for two people this Friday at 7 PM, under the name Alex Martin.",
+   "offset_seconds": 6.11
+  },
+  {
+   "speaker": "user",
+   "text": "Friday at at seven, let me look. Yeah we have that.",
+   "offset_seconds": 16.59
+  },
+  {
+   "speaker": "bot",
+   "text": "Could you confirm the booking under Alex Martin?",
+   "offset_seconds": 21.93
+  },
+  {
+   "speaker": "user",
+   "text": "Mm-hmm.",
+   "offset_seconds": 25.31
+  },
+  {
+   "speaker": "bot",
+   "text": "Could you confirm the booking under Alex Martin?",
+   "offset_seconds": 26.58
+  },
+  {
+   "speaker": "user",
+   "text": "Yep, uh, you're all set.",
+   "offset_seconds": 30.0
+  },
+  {
+   "speaker": "bot",
+   "text": "Thank you so much, that's all I needed.",
+   "offset_seconds": 32.92
+  },
+  {
+   "speaker": "user",
+   "text": "No problem, bye uh, now.",
+   "offset_seconds": 36.89
+  }
+ ]
+}

@@ -1,0 +1,19 @@
+{
+  "status": "completed",
+  "task_completed": true,
+  "recipient_masked": "+1555***2834",
+  "completion_confidence": {
+    "score": 0.88,
+    "label": "high"
+  },
+  "evidence": [
+    "Patient requested reschedule to Friday morning."
+  ],
+  "structured_result": {
+    "will_attend": "reschedule",
+    "preferred_reschedule_time": "Friday at 9:00 AM",
+    "cancellation_reason": null,
+    "special_instructions_acknowledged": false
+  },
+  "dry_run": true
+}

@@ -1,0 +1,21 @@
+{
+  "_scenario": "Clear, final refusal. Recorded and respected without argument or re-asking.",
+  "recipient_status": "completed",
+  "task_completed": true,
+  "completion_confidence": 0.93,
+  "summary": "Guardian declined the immunisation.",
+  "evidence": ["Guardian said they do not want the vaccine given at school or elsewhere."],
+  "structured_result": {
+    "reached_guardian": "yes",
+    "identity_confirmed": "yes",
+    "consent": "declined",
+    "route": "decline",
+    "prior_dose_reported": "no",
+    "prior_dose_detail": "",
+    "allergy_reported": "none",
+    "allergy_detail": "",
+    "unwell_today": "no",
+    "guardian_questions": "",
+    "callback_requested": "no"
+  }
+}

@@ -1,0 +1,57 @@
+{
+  "id": "call_fictional0001",
+  "status": "completed",
+  "created_at": "2026-09-11T14:43:27Z",
+  "completed_at": "2026-09-11T14:44:43Z",
+  "metadata": { "app": "leadpulse", "lead_id": "lead-0001" },
+  "summary": "Marcus wants a kitchen remodel that opens the wall to the dining room, budget around $40-50k, starting in about six weeks. He decides with his wife and asked for a booking link.",
+  "task_completed": true,
+  "completion_confidence": { "score": 0.94, "label": "high" },
+  "evidence": [
+    "Lead said the budget is \"somewhere around forty to fifty thousand\".",
+    "Lead wants to start \"in about six weeks, before the holidays\".",
+    "Lead agreed to receive a booking link by text message."
+  ],
+  "structured_result": {
+    "reached_lead": "yes",
+    "interest_level": "strong",
+    "project_summary": "Kitchen remodel: open the wall to the dining room, new cabinets and counters.",
+    "budget_range": "around $40-50k",
+    "budget_clarity": "specific",
+    "timeline": "start in about six weeks, before the holidays",
+    "timeline_urgency": "one_to_three_months",
+    "decision_maker": "shared",
+    "sentiment": "positive",
+    "wants_booking_link": "yes",
+    "lead_notes": "Strong intent for a kitchen remodel with a clear $40-50k budget and a six-week start. Decides with his wife - book an in-home estimate with both present."
+  },
+  "recipients": [
+    {
+      "phones": ["+14155550142"],
+      "attempts": [
+        {
+          "started_at": "2026-09-11T14:43:37Z",
+          "completed_at": "2026-09-11T14:44:43Z",
+          "transcript_turns": [
+            { "speaker": "bot", "text": "Hi, is this Marcus?" },
+            { "speaker": "user", "text": "Yeah, this is Marcus." },
+            { "speaker": "bot", "text": "Hi Marcus! This is Riley, the virtual assistant for Acme Renovations. You just asked for a quote on our website. Do you have two minutes?" },
+            { "speaker": "user", "text": "Oh, wow. That was fast. Yeah, sure, go ahead." },
+            { "speaker": "bot", "text": "Great. So I see it's a kitchen remodel, and you'd like to open up the wall to the dining room. Is that right?" },
+            { "speaker": "user", "text": "Yep, that's the plan. New cabinets, new counters, and we want it a lot more open." },
+            { "speaker": "bot", "text": "Love that. Do you have a rough budget in mind for the project?" },
+            { "speaker": "user", "text": "Hmm, we're thinking somewhere around forty to fifty thousand." },
+            { "speaker": "bot", "text": "That's really helpful. And when would you ideally like to get started?" },
+            { "speaker": "user", "text": "Hopefully in about six weeks. Before the holidays, if we can." },
+            { "speaker": "bot", "text": "Got it. And is it just you making the decision, or is someone else involved?" },
+            { "speaker": "user", "text": "My wife and I will decide together." },
+            { "speaker": "bot", "text": "Perfect. Would it help if I texted you a link to book a free in-home estimate, so you can both pick a time?" },
+            { "speaker": "user", "text": "Yeah, that'd be great, actually." },
+            { "speaker": "bot", "text": "Done. You'll have it in a moment. Thanks so much, Marcus. Talk soon!" },
+            { "speaker": "user", "text": "Thanks, Riley. Bye." }
+          ]
+        }
+      ]
+    }
+  ]
+}

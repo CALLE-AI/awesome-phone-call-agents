@@ -1,0 +1,53 @@
+{
+  "id": "call_jDAvO3ThAO5Fa2kBPCmV6A",
+  "object": "call_task",
+  "status": "failed",
+  "task": "This is an authorised Orma fixture probe. If anyone answers, identify this as a test call, end immediately, and collect no information.",
+  "recipients": [
+    {
+      "id": "rcp_d8ccfb9be0fe6d18",
+      "phones": [
+        "+XXXXXXXXXXXX"
+      ],
+      "locale": null,
+      "region": null,
+      "status": "failed",
+      "structured_result": null,
+      "summary": "The call attempt did not connect; nobody answered. Because the fixture probe explicitly instructed us to report that outcome if the call could not be completed, no follow-up is needed.",
+      "attempts": [
+        {
+          "id": "att_1fe65c06c33772d2",
+          "phone": "+XXXXXXXXXXXX",
+          "status": "failed",
+          "started_at": "2026-09-11T13:21:39Z",
+          "completed_at": "2026-09-11T13:21:39Z",
+          "summary": "The call attempt did not connect; nobody answered. Because the fixture probe explicitly instructed us to report that outcome if the call could not be completed, no follow-up is needed.",
+          "transcript_turns": [],
+          "provider_call_id": "2fb9d10cf56546e0ac13086ff538f606",
+          "failure_code": "408",
+          "failure_message": null
+        }
+      ]
+    }
+  ],
+  "structured_result": null,
+  "summary": "The call attempt did not connect; nobody answered. Because the fixture probe explicitly instructed us to report that outcome if the call could not be completed, no follow-up is needed.",
+  "task_completed": true,
+  "completion_confidence": {
+    "score": 0.9,
+    "label": "high"
+  },
+  "evidence": [
+    "The call status was reported as no answer.",
+    "There was no transcript or callee speech from the attempt.",
+    "The call duration was 0 seconds."
+  ],
+  "metadata": {
+    "purpose": "bounded failed-terminal fixture probe",
+    "orma_task": "T1.4"
+  },
+  "failure_code": "call_failed",
+  "failure_message": "calling task status=NO ANSWER (Hangup by: bot)",
+  "created_at": "2026-09-11T13:20:57.488383Z",
+  "completed_at": "2026-09-11T13:24:02.913040Z"
+}

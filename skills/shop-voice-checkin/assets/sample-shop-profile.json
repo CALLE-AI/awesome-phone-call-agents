@@ -1,0 +1,19 @@
+{
+  "shop_id": "demo-lagos-corner-shop",
+  "display_name": "Ada Corner Shop",
+  "phone": "+2348000000000",
+  "region": "NG",
+  "locale": "en",
+  "currency": "NGN",
+  "timezone": "Africa/Lagos",
+  "recipient_consented": true,
+  "language_style": "pidgin-english",
+  "typical_products": [
+    { "name": "Rice", "unit": "bags" },
+    { "name": "Indomie", "unit": "cartons" },
+    { "name": "Sugar", "unit": "bags" },
+    { "name": "Cooking oil", "unit": "bottles" },
+    { "name": "Milo", "unit": "tins" }
+  ],
+  "notes": "Fictional masked profile for preview and tests. Do not use a real phone number in git."
+}

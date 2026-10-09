@@ -1,0 +1,30 @@
+# The dependency set `make static` audits with pip-audit (gate F7), with its
+# full transitive closure resolved by pip-audit itself.
+#
+# It mirrors [project.optional-dependencies].dev in pyproject.toml; the
+# duplicate exists because a requirements file is the scoping unit pip-audit
+# accepts, while pyproject also carries the project metadata. Keep the two in
+# sync when a pin moves.
+#
+# pytest is pinned to the newest release the locked Python 3.9 floor accepts.
+# PYSEC-2026-1845 (predictable /tmp/pytest-of-{user} directories; local
+# denial of service or privilege gain) is fixed only in pytest 9.0.3, which
+# requires Python >= 3.10 — unreachable while the kernel stays 3.9-compatible.
+# It is accepted for this dev-only, never-shipped dependency via
+# --ignore-vuln in the Makefile's static target and recorded in
+# docs/known-limitations.md.
+#
+# Two deliberate exclusions:
+#   - pip-audit itself: the auditor's own runtime tree (requests, urllib3,
+#     filelock, msgpack) is machine infrastructure for running the gate, not
+#     a dependency of anything WarrantyOps ships or develops with. Auditing
+#     the auditor is circular; the environment-level triage of those packages
+#     lives in docs/known-limitations.md.
+#   - the live extra (calle-ai==0.7.0): the audited environment is SDK-free
+#     by gate F7; the isolated extra is pinned and disclosed separately in
+#     pyproject.toml and SECURITY.md.
+pytest==8.4.2
+hypothesis==6.141.1
+mypy==1.14.1
+ruff==0.9.4
+coverage==7.6.1

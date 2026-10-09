@@ -1,0 +1,66 @@
+{
+ "id": "train-agent-002",
+ "label": "agent",
+ "source": "sim-train",
+ "meta": {
+  "task": "check whether the store is open on Sunday",
+  "hard": true
+ },
+ "turns": [
+  {
+   "speaker": "user",
+   "text": "Hi there, this is Max at Northside Dental. How may I assist you today?",
+   "offset_seconds": 0.46
+  },
+  {
+   "speaker": "bot",
+   "text": "Hi, I'm an AI assistant calling on behalf of Casey Brown. Could you tell me your opening hours this Sunday?",
+   "offset_seconds": 6.45
+  },
+  {
+   "speaker": "user",
+   "text": "Of course! Northside Dental is open on Sunday from 10 AM to 4 PM. Is there anything else I can help you with?",
+   "offset_seconds": 15.4
+  },
+  {
+   "speaker": "bot",
+   "text": "Do you close earlier on holidays?",
+   "offset_seconds": 24.78
+  },
+  {
+   "speaker": "user",
+   "text": "Great question! Let um, me check that for you. Yes, that's correct.",
+   "offset_seconds": 28.39
+  },
+  {
+   "speaker": "bot",
+   "text": "Do you close earlier on holidays?",
+   "offset_seconds": 33.86
+  },
+  {
+   "speaker": "user",
+   "text": "Certainly. You're all set. Thank you for calling, and have a wonderful day!",
+   "offset_seconds": 37.45
+  },
+  {
+   "speaker": "bot",
+   "text": "Thank you, that's everything.",
+   "offset_seconds": 43.43
+  },
+  {
+   "speaker": "user",
+   "text": "Great question! let me see, Let me check that for you. Yes, that's correct.",
+   "offset_seconds": 46.12
+  },
+  {
+   "speaker": "bot",
+   "text": "Thank you, that's everything.",
+   "offset_seconds": 52.56
+  },
+  {
+   "speaker": "user",
+   "text": "You're welcome! Have a wonderful day. Goodbye!",
+   "offset_seconds": 55.25
+  }
+ ]
+}

@@ -1,0 +1,30 @@
+{
+  "_comment": "The patient asked not to be called again. asked_to_stop ends the workflow for this patient immediately — no callback, no retry, no further checkpoint. The opt-out is handled in code rather than left to whoever reads the sheet next.",
+  "_matching": "Replace REPLACE_WITH_call_id_FROM_SHEET with the value in the row's call_id column after placing a dry-run call. A result that cannot be matched to the call in flight is held for review rather than applied.",
+  "call_id": "REPLACE_WITH_call_id_FROM_SHEET",
+  "status": "completed",
+  "task_completed": true,
+  "completion_confidence": {
+    "score": 0.9,
+    "label": "high"
+  },
+  "metadata": {
+    "row_id": "P001",
+    "checkpoint": "T72",
+    "source": "prepcheck"
+  },
+  "recipients": [
+    {
+      "structured_result": {
+        "prep_status": "unclear",
+        "items_completed": [],
+        "items_outstanding": [],
+        "outstanding_plan": "",
+        "wants_reschedule": "unknown",
+        "asked_to_stop": true,
+        "flag_for_staff": false,
+        "identity_verified": true
+      }
+    }
+  ]
+}

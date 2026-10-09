@@ -1,0 +1,212 @@
+div[name="calle_section_ids"],
+.o_field_widget[name="calle_section_ids"],
+.o_field_one2many:has(.calle-sections-container) {
+    width: 100% !important;
+    display: block !important;
+    max-width: 100% !important;
+    flex: 1 1 100% !important;
+}
+
+.calle-sections-container {
+    width: 100% !important;
+    box-sizing: border-box;
+    padding: 0.5rem 0;
+
+    .calle-sections-list {
+        width: 100%;
+    }
+
+    .calle-section-card {
+        width: 100%;
+        background-color: var(--o-view-background, #ffffff);
+        border: 1px solid var(--o-border-color, #dee2e6);
+        border-radius: 6px;
+        padding: 1.25rem;
+        margin-bottom: 1.25rem;
+        box-shadow: 0 1px 3px rgba(0, 0, 0, 0.05);
+        color: var(--o-main-text-color, #212529);
+
+        .calle-card-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: flex-start;
+            margin-bottom: 1rem;
+
+            .calle-text-group {
+                flex-grow: 1;
+                margin-right: 1.25rem;
+
+                .calle-textarea {
+                    background-color: var(--o-input-background, #ffffff);
+                    border: 1px solid var(--o-input-border-color, #ced4da);
+                    color: var(--o-main-text-color, #212529);
+                    border-radius: 4px;
+                    min-height: 58px;
+                    font-family: inherit;
+                    font-size: 0.95rem;
+
+                    &:focus {
+                        border-color: #714b67;
+                        box-shadow: 0 0 0 0.2rem rgba(113, 75, 103, 0.15);
+                    }
+                }
+            }
+
+            .calle-header-actions {
+                display: flex;
+                align-items: flex-start;
+                gap: 0.75rem;
+
+                .calle-condition-group {
+                    min-width: 200px;
+
+                    .calle-condition-label {
+                        color: #198754;
+                        font-weight: 700;
+                        font-size: 0.75rem;
+                        display: block;
+                        margin-bottom: 0.25rem;
+                        text-transform: uppercase;
+                        letter-spacing: 0.5px;
+                    }
+
+                    .calle-select {
+                        background-color: var(--o-input-background, #ffffff);
+                        border: 1px solid var(--o-input-border-color, #ced4da);
+                        color: var(--o-main-text-color, #212529);
+                        border-radius: 4px;
+                        font-size: 0.85rem;
+
+                        &:focus {
+                            border-color: #714b67;
+                            box-shadow: 0 0 0 0.2rem rgba(113, 75, 103, 0.15);
+                        }
+                    }
+                }
+
+                .calle-btn-delete {
+                    color: #dc3545;
+                    border: 1px solid #f8d7da;
+                    background-color: rgba(220, 53, 69, 0.05);
+                    border-radius: 4px;
+                    padding: 0.4rem 0.65rem;
+                    transition: all 0.2s ease;
+
+                    &:hover {
+                        background-color: #dc3545;
+                        color: #ffffff;
+                        border-color: #dc3545;
+                    }
+                }
+            }
+        }
+
+        .calle-label {
+            font-size: 0.75rem;
+            font-weight: 700;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+            color: #6c757d;
+            display: block;
+            margin-bottom: 0.4rem;
+        }
+
+        .calle-responses-wrapper {
+            display: flex;
+            align-items: stretch;
+            margin-top: 0.75rem;
+            padding-left: 0.25rem;
+            width: 100%;
+
+            .calle-responses-line {
+                width: 3px;
+                background-color: #714b67;
+                border-radius: 2px;
+                margin-right: 1rem;
+                opacity: 0.4;
+            }
+
+            .calle-responses-content {
+                flex-grow: 1;
+                width: 100%;
+
+                .calle-responses-list {
+                    width: 100%;
+
+                    .calle-response-row {
+                        width: 100%;
+                        background-color: var(--o-view-background, #ffffff);
+                        border: 1px solid var(--o-border-color, #dee2e6);
+                        border-radius: 6px;
+                        transition: border-color 0.2s ease;
+
+                        &:hover {
+                            border-color: #714b67;
+                        }
+                    }
+                }
+
+                .calle-btn-add-response {
+                    color: #714b67;
+                    font-weight: 600;
+                    font-size: 0.85rem;
+
+                    &:hover {
+                        color: #593b52;
+                        text-decoration: underline;
+                    }
+                }
+
+                .calle-code-editor-box {
+                    .ace_editor {
+                        height: 100% !important;
+                        min-height: 140px !important;
+                        pointer-events: auto !important;
+                    }
+
+                    .calle-code-tabs {
+                        .nav-link {
+                            color: var(--o-main-text-color, #212529);
+                            font-size: 0.9rem;
+                            border-radius: 4px 4px 0 0;
+
+                            &.active {
+                                color: #714b67 !important;
+                                border-bottom-color: #714b67 !important;
+                                background-color: var(--o-view-background, #ffffff) !important;
+                            }
+                        }
+                    }
+                }
+
+                .calle-inline-input-group {
+                    .calle-inline-input {
+                        width: 220px;
+                        background-color: #ffffff;
+                        border: 1px solid #ced4da;
+                        color: #212529;
+                    }
+                }
+            }
+        }
+    }
+
+    .calle-add-section-card {
+        width: 100%;
+        border: 2px dashed #ced4da;
+        background-color: #f8f9fa;
+        border-radius: 6px;
+        padding: 0.85rem;
+        text-align: center;
+        font-weight: 600;
+        color: #6c757d;
+        cursor: pointer;
+        transition: all 0.2s ease;
+
+        &:hover {
+            background-color: #e9ecef;
+            border-color: #714b67;
+            color: #714b67;
+        }
+    }
+}

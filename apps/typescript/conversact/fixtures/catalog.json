@@ -1,0 +1,7 @@
+[
+  { "id": "coffee-small", "name": "Small Coffee", "description": "Fresh brewed coffee", "priceMinor": 350, "currency": "USD", "active": true, "stock": 20 },
+  { "id": "sandwich-cheese", "name": "Cheese Sandwich", "description": "Toasted cheese sandwich", "priceMinor": 650, "currency": "USD", "active": true, "stock": 8 },
+  { "id": "water-500", "name": "Bottled Water 500ml", "priceMinor": 150, "currency": "USD", "active": true, "stock": 30 },
+  { "id": "fruit-box", "name": "Fruit Box", "priceMinor": 550, "currency": "USD", "active": false, "stock": 4 },
+  { "id": "snack-pack", "name": "Snack Pack", "priceMinor": 425, "currency": "USD", "active": true, "stock": 2 }
+]
