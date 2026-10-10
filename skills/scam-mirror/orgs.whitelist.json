@@ -1,0 +1,40 @@
+{
+  "version": 1,
+  "orgs": [
+    {
+      "name": "Example Bank",
+      "aliases": ["example bank", "examplebank", "bank"],
+      "regions": {
+        "US": "+1 800 555 0100"
+      }
+    },
+    {
+      "name": "City Public Security Bureau",
+      "aliases": ["city public security bureau", "police", "public security"],
+      "regions": {
+        "US": "+1 800 555 0101"
+      }
+    },
+    {
+      "name": "Example Express Courier",
+      "aliases": ["example express courier", "courier", "express delivery"],
+      "regions": {
+        "US": "+1 800 555 0102"
+      }
+    },
+    {
+      "name": "Example Telecom Operator",
+      "aliases": ["example telecom operator", "telecom", "carrier"],
+      "regions": {
+        "US": "+1 800 555 0103"
+      }
+    },
+    {
+      "name": "Example Platform Support",
+      "aliases": ["example platform support", "platform support", "customer service"],
+      "regions": {
+        "US": "+1 800 555 0104"
+      }
+    }
+  ]
+}

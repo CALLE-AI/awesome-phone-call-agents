@@ -1,0 +1,64 @@
+{
+  "case_id": "SM-20260914102241-d5ef7f",
+  "suspect_number": "+1 555 010 0100",
+  "claimed_org": "Example Bank",
+  "verdict": "likely_scam",
+  "confidence": 0.83,
+  "signals": [
+    "asked for a one-time passcode or verification code",
+    "demanded secrecy from family or authorities",
+    "detected 2 high-risk request(s)"
+  ],
+  "official_fly": {
+    "number_called": "+1 800 555 0100",
+    "reached": true,
+    "summary": "The official line confirmed Example Bank does not operate an 'account frozen' callback flow and has no matching case for this number.",
+    "content_hash": "a6df287fbb9c06b1126aef39c7bd3bd658adee9385113f4356c2f898428e3ab4"
+  },
+  "suspect_fly": {
+    "number_called": "+1 555 010 0100",
+    "reached": true,
+    "summary": "The caller claimed to be Example Bank fraud desk, asked for the one-time passcode, and told the user to keep it secret from family.",
+    "red_flags": [
+      "asks_for_otp",
+      "demands_secrecy"
+    ],
+    "content_hash": "891a35b209708b64b432ac9795f35e5fa5551f84f66bb5ee4f1a5a337c740dbc"
+  },
+  "attestation": {
+    "timestamp": "2026-09-14T10:22:41Z",
+    "verdict_hash": "ea9fe93100ce69379f926e9d1521fb127dbe43d6539c940002fba249e18d702b",
+    "note": "Suspect line used high-risk requests; treat as a scam and do not comply."
+  },
+  "flies": [
+    {
+      "id": "A",
+      "generation": 1,
+      "ttl_hours": 1,
+      "persona_id": "giant-fiber",
+      "persona": {
+        "cell_type": "DNp01",
+        "hemibrain_type": "Giant Fiber",
+        "body_id": 10001,
+        "vfb_id": "VFB_jrmc30my",
+        "superclass": "descending_neuron",
+        "dataset": "male-cns:v1.0",
+    "license": "CC-BY"
+      }
+    },
+    {
+      "id": "B",
+      "generation": 1,
+      "ttl_hours": 1,
+      "persona_id": "da1-olfactory-pn",
+      "persona": {
+        "cell_type": "DA1_lPN",
+        "body_id": 10075,
+        "vfb_id": "VFB_jrmc37gy",
+        "class": "ALPN",
+        "dataset": "male-cns:v1.0",
+    "license": "CC-BY"
+      }
+    }
+  ]
+}

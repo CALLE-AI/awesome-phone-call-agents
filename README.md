@@ -120,6 +120,7 @@ Avoid: `- [call-reminder](skills/call-reminder/) - A great tool for calling peop
 This project is an awesome list for AI-agent phone-call workflows. Add resources only when they directly help agents package, schedule, execute, or safely operate phone-call tasks.
 
 ### Skills
+- [scam-mirror](skills/scam-mirror/) - Dispatches two short-lived CALL-E flies (published official line + suspect line) and returns a trust verdict with evidence hashes, grounded in real Drosophila connectome neuron personas.
 
 - [`call-transcript-reliability-gate`](skills/call-transcript-reliability-gate/) - Offline experimental transcript auditor that grades CALL-E results RELIABLE/SUSPECT/UNUSABLE from text-visible ASR-hallucination symptoms (loops, boilerplate phantoms, harm categories) and crafts ASR-risk-aware goals; not proof of hallucination, an accuracy certificate, or authorization to act.
 - [`calle-developer`](skills/calle-developer/) - Build application integrations with the CALL-E API and SDKs using current contracts, existing examples, restart recovery and verified results.

@@ -1,0 +1,44 @@
+{
+  "version": 1,
+  "dataset": "male-cns:v1.0",
+  "source": "FlyEM (HHMI Janelia), University of Cambridge, MRC LMB, Google Research",
+  "license": "CC-BY",
+  "citation": "Sexual dimorphism in the complete Drosophila male central nervous system connectome (2026)",
+  "url": "https://male-cns.janelia.org/download/",
+  "personas": [
+    {
+      "persona_id": "giant-fiber",
+      "role": "official_verifier",
+      "cell_type": "DNp01",
+      "hemibrain_type": "Giant Fiber",
+      "body_id": 10001,
+      "instance": "DNp01(GF)_R",
+      "soma_side": "R",
+      "superclass": "descending_neuron",
+      "vfb_id": "VFB_jrmc30my",
+      "metaphor": "Escape command neuron: if the official line denies the flow, drop the call immediately."
+    },
+    {
+      "persona_id": "da1-olfactory-pn",
+      "role": "suspect_probe",
+      "cell_type": "DA1_lPN",
+      "body_id": 10075,
+      "instance": "DA1_lPN_L",
+      "soma_side": "L",
+      "class": "ALPN",
+      "vfb_id": "VFB_jrmc37gy",
+      "metaphor": "Pheromone-detecting projection neuron: sniffs out the scam's script."
+    },
+    {
+      "persona_id": "mbon11-avoidance",
+      "role": "memory",
+      "cell_type": "MBON11",
+      "body_id": 10704,
+      "instance": "MBON11(y1pedc>a/B)_L",
+      "soma_side": "L",
+      "class": "MBON",
+      "vfb_id": "VFB_jrmc209w",
+      "metaphor": "Mushroom-body output neuron: learned avoidance of the scam pattern."
+    }
+  ]
+}
