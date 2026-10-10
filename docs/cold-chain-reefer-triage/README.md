@@ -1,10 +1,38 @@
 # Cold Chain Reefer Triage Agent — Long-Form Guide
 
-## Executive Overview
+## Overview
+
+Advisory voice-telephony triage agent skill for refrigerated freight logistics, powered by the **CALL-E Python SDK (`calle-ai`)** and **Pydantic V2**.
 
 Refrigerated freight transportation ("reefer" logistics) involves carrying high-value, temperature-sensitive cargo (biologics, pharmaceuticals, fresh produce, frozen meat) where maintaining strict thermal setpoints is critical. A single trailer temperature excursion can result in $30,000 to $250,000+ in cargo write-offs, cross-contamination, or FDA / FSMA compliance violations.
 
-The **Cold Chain Reefer Triage Agent** is an advisory, standalone voice-telephony skill powered by the **CALL-E Python SDK (`calle-ai`)**. It provides an automated, standardized voice interrogation workflow to contact commercial truck drivers during in-transit temperature excursions.
+The **Cold Chain Reefer Triage Agent** provides an automated, standardized voice interrogation workflow to contact commercial truck drivers during in-transit temperature excursions.
+
+---
+
+## Highlights
+
+- **No-Call Default**: Safe dry-run simulation mode is active by default; outbound calls require explicit authorization (`--live` or `live=True`).
+- **E.164 & HTTPS Validation**: Validates phone numbers strictly and enforces encrypted HTTPS endpoints.
+- **Privacy Masking**: Automatically masks driver destination phone numbers across logs (`+1303***0147`).
+- **Advisory Scope**: Extracts structured mechanical checks, cargo condition, and FMCSA HOS drive time for human dispatch review.
+- **Zero-Redial**: Enforces exactly one call attempt; dropped or busy calls route to human dispatch rather than looping.
+
+---
+
+## Quickstart
+
+```bash
+# 1. Install dependencies
+pip install calle-ai pydantic
+
+# 2. Run in dry-run mode (no credentials needed)
+python scripts/run_triage.py --phone +13035550147
+
+# 3. Run with live authorization
+export CALLE_API_KEY="your-calle-key"
+python scripts/run_triage.py --phone +13035550147 --live
+```
 
 ---
 
