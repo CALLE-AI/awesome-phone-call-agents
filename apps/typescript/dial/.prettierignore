@@ -1,0 +1,8 @@
+dist
+.next
+node_modules
+.expo
+.pgdata
+android
+ios
+scratch
