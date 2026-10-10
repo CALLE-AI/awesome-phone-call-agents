@@ -1,22 +1,27 @@
 ---
 name: cold-chain-reefer-triage
-description: Autonomous voice telephony triage agent for refrigerated transport temperature excursions. Calls commercial truck drivers, executes a standardized mechanical and cargo physical checklist, assesses HOS availability, and captures structured remediation intent.
+description: Advisory voice telephony triage agent skill for refrigerated freight temperature excursions. Interrogates drivers on physical reefer status and HOS availability with safe no-call default execution.
 license: MIT
+metadata:
+  tier: experimental
+  author: piyushxlabs
 ---
 
 # Cold Chain Reefer Triage Agent
 
-A production-grade, autonomous voice-telephony triage primitive powered by the **CALL-E Python SDK (`calle-ai`)**.
+An **advisory, experimental community agent skill** for voice-telephony triage powered by the **CALL-E Python SDK (`calle-ai`)**.
 
-This skill enables logistics platforms, telematics hubs, and autonomous fleet management systems to instantly contact commercial truck drivers when reefer trailer temperature excursions occur, gather verified on-site evidence, and record structured driver remediation decisions.
+> **Notice:** This skill is an experimental reference implementation for automated voice checklists. Output recommendations are advisory and do not replace fleet manager oversight or FMCSA regulatory compliance.
 
-## Features
+When IoT sensors in a refrigerated trailer report a temperature excursion, this agent contacts the commercial driver, confirms they are safely stopped, executes a standardized mechanical checklist, assesses FMCSA Hours of Service (HOS) availability, and extracts structured remediation intent into an actionable JSON payload.
 
-- **Automated Physical Checklist**: Guides drivers through checking return air bulkhead clearance, evaporator coil icing, reefer fuel levels, and unit controller alarm codes.
-- **Safety First**: Confirms the vehicle is safely pulled over in a designated truck parking or rest area before initiating questions.
-- **Structured Schema Extraction**: Enforces strict JSON Schema validation on call outcome, returning typed fields for downstream compliance and routing decisions.
-- **Hours of Service (HOS) Verification**: Extracts driver-reported available drive time under FMCSA 49 CFR Part 395 rules.
-- **Emergency Escalation**: Detects accidents, fires, or medical emergencies on call and triggers immediate operator intervention.
+## Core Operational Principles
+
+1. **No-Call Default**: Dry-run simulation mode is active by default (`live=False`). Placing real outbound phone calls requires explicit authorization (`--live` or `live=True`).
+2. **Strict E.164 Validation**: Every destination phone number must strictly satisfy international E.164 format. Emergency numbers (911, 112, etc.) are rejected before payload creation.
+3. **Transport Security**: Requires secure HTTPS endpoints (`https://`) for CALL-E API communications.
+4. **Privacy & Masking**: Destination phone numbers are automatically masked in console outputs and trace logs (e.g. `+1303***0147`).
+5. **Zero-Redial Policy**: Exactly one outbound call attempt is made. Dropped or unanswered calls yield structured failure states for human dispatcher review rather than automated redialing.
 
 ## Requirements
 
@@ -26,7 +31,7 @@ pip install calle-ai pydantic
 
 ## Structured Output Schema
 
-The skill enforces the following Pydantic V2 schema:
+The skill enforces the following Pydantic V2 schema (`CallETriageStructuredResult`):
 
 ```python
 from typing import Literal, Optional
@@ -48,50 +53,32 @@ class CallETriageStructuredResult(BaseModel):
         ..., description="Whether condensation/sweating is visible on cargo"
     )
     driver_reported_alarm_code: Optional[str] = Field(
-        default=None, description="Alarms displayed on reefer microprocessor"
+        default=None, description="Alarms displayed on reefer microprocessor (e.g. 'ALARM 18')"
     )
     driver_hos_minutes_remaining: int = Field(
-        ..., description="Driver-reported remaining driving hours in minutes"
+        ..., description="Driver-reported remaining driving hours in minutes under FMCSA Part 395"
     )
     selected_option: Literal[
         "DIVERT_TO_COLD_HUB",
         "CONTINUE_MONITORED",
         "ROADSIDE_SERVICE",
         "DRIVER_REFUSED"
-    ] = Field(..., description="Action agreed upon with driver")
+    ] = Field(..., description="Remediation preference agreed upon with driver")
     emergency_reported: bool = Field(
-        ..., description="Whether driver reported an active accident or hazard"
+        ..., description="Whether driver reported an active physical accident or hazard"
     )
-
-class CallETriageOutput(BaseModel):
-    model_config = ConfigDict(extra="ignore")
-
-    call_id: Optional[str] = None
-    status: str = Field(..., description="CALL-E call status: completed, busy, no_answer, failed")
-    task_completed: bool = Field(default=False)
-    completion_confidence: float = Field(default=0.0, ge=0.0, le=1.0)
-    structured_result: Optional[CallETriageStructuredResult] = None
-    evidence: dict = Field(default_factory=dict)
-    error: Optional[str] = None
 ```
 
-## Usage Example
+## Usage
+
+### 1. Default Dry-Run / Preview (No network calls)
 
 ```python
-import os
-from calle import CalleClient
 from triage import initiate_reefer_triage
 
-# Initialize CALL-E Client
-client = CalleClient(
-    api_key=os.environ["CALLE_API_KEY"],
-    base_url=os.environ.get("CALLE_BASE_URL", "https://api.heycall-e.com")
-)
-
-# Initiate autonomous driver triage call
-triage_result = initiate_reefer_triage(
-    client=client,
-    driver_phone="+12065550198",
+# Runs safely without credentials
+result = initiate_reefer_triage(
+    driver_phone="+13035550147",
     driver_name="Marcus Vance",
     truck_id="TRK-902",
     trailer_id="TRL-8841",
@@ -99,16 +86,60 @@ triage_result = initiate_reefer_triage(
     setpoint_temp_f=34.0,
     nearest_cold_hub_name="Lincoln Cold Logistics",
     nearest_cold_hub_eta_minutes=18,
+    commodity_type="Produce",
 )
 
-print(f"Call Status: {triage_result.status}")
-if triage_result.structured_result:
-    print(f"Action Agreed: {triage_result.structured_result.selected_option}")
-    print(f"HOS Remaining: {triage_result.structured_result.driver_hos_minutes_remaining} min")
+print(f"Status: {result.status}")
+print(f"Structured Result: {result.structured_result.model_dump()}")
 ```
 
-## Telephony Invocation Rules
+### 2. Authorized Live Outbound Call
 
-1. **Phone Prefixing**: Invocations must prepend the recipient's phone number into the task string (`task = f"Call {driver_phone} and {task}"`).
-2. **Zero-Redial Policy**: Never automatically re-dial a dropped, busy, or unanswered call; escalate immediately to a human supervisor.
-3. **Prompt Injection Resistance**: All external inputs are treated as untrusted data and sanitized prior to task prompt interpolation.
+```python
+import os
+from calle import CalleClient
+from triage import initiate_reefer_triage, validate_calle_base_url
+
+client = CalleClient(
+    api_key=os.environ["CALLE_API_KEY"],
+    base_url=validate_calle_base_url(os.environ.get("CALLE_BASE_URL")),
+)
+
+result = initiate_reefer_triage(
+    driver_phone="+13035550147",
+    driver_name="Marcus Vance",
+    truck_id="TRK-902",
+    trailer_id="TRL-8841",
+    current_temp_f=39.5,
+    setpoint_temp_f=34.0,
+    nearest_cold_hub_name="Lincoln Cold Logistics",
+    nearest_cold_hub_eta_minutes=18,
+    commodity_type="Biologics",
+    client=client,
+    live=True,  # Explicit authorization required
+)
+```
+
+### 3. CLI Runner
+
+```bash
+# Dry-run execution
+python scripts/run_triage.py --phone +13035550147
+
+# Live authorized call
+export CALLE_API_KEY="your-api-key"
+python scripts/run_triage.py --phone +13035550147 --live
+```
+
+## Operational Limits & Failure Modes
+
+- **Accepted-Call vs. Unverified-Driver Boundary**: Telephony confirms self-attestation only. If driver responses are ambiguous or identity cannot be confirmed, confidence is discounted and the incident is escalated to a human dispatcher.
+- **Network Drops & Timeouts (SIP 408)**: If the call encounters network disconnects, timeouts, or rings out unanswered, the call terminates with `status="failed"`. Under the Zero-Redial policy, no automated redials are initiated.
+- **Advisory Authority Only**: Structured decisions (`selected_option`) are advisory recommendations. Mutating real-world fleet actions (route rerouting, dock booking, roadside service dispatch) requires verification and approval by a licensed fleet manager.
+
+## Reference Documentation
+
+- [Safety Reference](references/safety.md) — E.164 rules, emergency exclusion, transport security, and privacy masking.
+- [Operational Limits](references/operational-limits.md) — Detailed failure modes, SIP timeout behaviors, and human-in-the-loop gates.
+- [Usage Examples](references/examples.md) — Detailed Python SDK and CLI invocation examples.
+- [Result Schema](references/result-schema.json) — Full JSON schema definition.

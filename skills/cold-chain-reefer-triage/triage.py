@@ -1,21 +1,86 @@
 """
 Cold Chain Reefer Triage Agent — Standalone Telephony Skill
 ==========================================================
-A standalone voice-telephony triage primitive powered by the CALL-E Python SDK (`calle-ai`).
+An advisory voice-telephony triage primitive powered by the CALL-E Python SDK (`calle-ai`).
 
 This module has zero backend or framework dependencies (no FastAPI, LangGraph, or Langfuse)
 and is designed for direct submission to `CALLE-AI/awesome-phone-call-agents`.
+
+Operational Safety Guarantees:
+1. No-Call Default: Dry-run simulation is active by default (`live=False`). Real outbound calls
+   require explicit authorization (`live=True` or `--live` / `--authorize-live-call`).
+2. Strict E.164 Enforcement: Rejects invalid or emergency numbers before any request creation.
+3. Transport Security: Enforces HTTPS-only base URLs for CALL-E API endpoints.
+4. Privacy & Masking: Automatically masks destination phone numbers in logs and output displays.
+5. Advisory Scope: Outputs structured recommendations only; does not mutate real-world fleet state.
 """
 
+import copy
 import logging
+import re
+import urllib.parse
 from typing import Any, Dict, Literal, Optional, Union
 from pydantic import BaseModel, ConfigDict, Field
 
 logger = logging.getLogger("cold_chain_reefer_triage")
 
+# Strict E.164 regex: '+' followed by 1 to 14 digits (2 to 15 chars total)
+E164_PATTERN = re.compile(r"^\+[1-9]\d{1,14}$")
+EMERGENCY_SHORTCODES = {"911", "112", "999", "000", "110", "119"}
+
 
 # ==============================================================================
-# 1. Pydantic V2 Output Schemas
+# 1. Validation & Privacy Helpers
+# ==============================================================================
+
+def mask_phone(phone: Optional[str]) -> str:
+    """Mask phone number for safe logging (e.g. +13035550147 -> +1303***0147)."""
+    if not phone:
+        return ""
+    clean = phone.strip()
+    if len(clean) >= 8:
+        return f"{clean[:5]}***{clean[-4:]}"
+    elif len(clean) >= 4:
+        return f"{clean[:2]}***{clean[-2:]}"
+    return "***"
+
+
+def validate_e164_phone(phone: Optional[str]) -> bool:
+    """Validate that phone number strictly satisfies E.164 format and is not an emergency shortcode."""
+    if not phone or not isinstance(phone, str):
+        return False
+    clean = phone.strip()
+    if not E164_PATTERN.match(clean):
+        return False
+    # Reject emergency numbers embedded in country codes (e.g. +1911)
+    digits = clean.lstrip("+")
+    for code in EMERGENCY_SHORTCODES:
+        if digits == code or digits.endswith(code) and len(digits) <= 5:
+            return False
+    return True
+
+
+def validate_calle_base_url(url: Optional[str]) -> str:
+    """Validate that CALL-E API base URL enforces secure HTTPS protocol."""
+    target_url = url or "https://api.heycall-e.com"
+    parsed = urllib.parse.urlparse(target_url)
+    if parsed.scheme.lower() != "https":
+        raise ValueError(
+            f"Insecure CALLE_BASE_URL '{target_url}': Only secure 'https://' URLs are permitted."
+        )
+    return target_url
+
+
+def sanitize_error_message(error_msg: str) -> str:
+    """Sanitize raw error messages to avoid leaking API tokens or sensitive headers."""
+    # Strip potential Bearer tokens or secret keys
+    sanitized = re.sub(r"(Bearer\s+)[A-Za-z0-9_\-\.]{8,}", r"\1[REDACTED]", error_msg)
+    sanitized = re.sub(r"(api[_-]?key\s*[:=]\s*)[A-Za-z0-9_\-\.]{8,}", r"\1[REDACTED]", sanitized, flags=re.IGNORECASE)
+    return sanitized
+
+
+# ==============================================================================
+# 2. Pydantic V2 Output Schemas
 # ==============================================================================
 
 class CallETriageStructuredResult(BaseModel):
@@ -83,7 +148,7 @@ class CallETriageOutput(BaseModel):
     )
     status: str = Field(
         ...,
-        description="Call outcome status: completed, busy, no_answer, failed, or unknown",
+        description="Call outcome status: completed, busy, no_answer, failed, simulated, or unknown",
     )
     task_completed: bool = Field(
         default=False,
@@ -101,22 +166,20 @@ class CallETriageOutput(BaseModel):
     )
     evidence: Dict[str, Any] = Field(
         default_factory=dict,
-        description="Raw evidence dictionary containing transcript or call recording references",
+        description="Evidence dictionary containing transcript, recording references, or simulation metadata",
     )
     error: Optional[str] = Field(
         default=None,
-        description="Error message if the call failed or structured extraction threw an exception",
+        description="Sanitized error message if the call failed or validation threw an exception",
     )
 
 
 # ==============================================================================
-# 2. Standalone Telephony Execution Primitive
+# 3. Standalone Telephony Execution Primitive
 # ==============================================================================
 
 def sanitize_json_schema_for_calle(schema: Dict[str, Any]) -> Dict[str, Any]:
     """Sanitize a JSON Schema dictionary for CALL-E compatibility."""
-    import copy
-
     clean = copy.deepcopy(schema)
     props = clean.get("properties", {})
     for name, prop in props.items():
@@ -134,7 +197,6 @@ def sanitize_json_schema_for_calle(schema: Dict[str, Any]) -> Dict[str, Any]:
 
 
 def initiate_reefer_triage(
-    client: Any,
     driver_phone: str,
     driver_name: str,
     truck_id: str,
@@ -145,16 +207,92 @@ def initiate_reefer_triage(
     nearest_cold_hub_eta_minutes: int,
     commodity_type: str = "Produce",
     allowed_temp_range_str: str = "33°F to 36°F",
+    client: Optional[Any] = None,
+    live: bool = False,
 ) -> CallETriageOutput:
     """
-    Initiates an autonomous CALL-E voice triage call to a commercial truck driver.
+    Initiates reefer voice triage with safe no-call default execution.
 
     Invocation Rules:
-    1. Prepend phone number in task string: `Call {driver_phone} and {task}`.
-    2. Enforce Zero-Redial: Exactly 1 outbound call. If call fails, returns status for ops escalation.
-    3. Defensively parses `completion_confidence` (accepts float or `{"score": float, "label": str}`).
+    1. No-Call Default: If live=False (default), runs in dry-run mode and returns a validated simulation
+       payload without placing any outbound network calls or consuming telephony credits.
+    2. Strict E.164 Validation: Rejects invalid or emergency phone numbers before any call dispatch.
+    3. HTTPS Base URL: Validates that CALL-E client target URL enforces secure HTTPS.
+    4. Destination Masking: All phone logging uses masked format (e.g. +1303***0147).
+    5. Zero-Redial: Exactly 1 call attempt if live=True. Does not redial on drops/refusals.
     """
-    # Build explicit prompt instructions for CALL-E voice agent
+    masked = mask_phone(driver_phone)
+
+    # 1. Enforce strict E.164 validation
+    if not validate_e164_phone(driver_phone):
+        logger.warning("[Validation Error] Rejected non-E.164 or emergency destination: %s", masked)
+        return CallETriageOutput(
+            call_id=None,
+            status="failed",
+            task_completed=False,
+            completion_confidence=0.0,
+            structured_result=None,
+            evidence={},
+            error=f"Invalid E.164 phone format or prohibited emergency number for destination: {masked}",
+        )
+
+    # 2. Default Dry-Run / Simulated Mode (No network calls)
+    if not live:
+        logger.info("[DRY-RUN: No live call placed] Simulating autonomous reefer triage for %s", masked)
+        simulated_structured = CallETriageStructuredResult(
+            driver_verified_safe_location=True,
+            reefer_engine_running=True,
+            air_bulkhead_obstructed=False,
+            cargo_sweating_detected=False,
+            driver_reported_alarm_code="ALARM 18 - HIGH ENGINE TEMP",
+            driver_hos_minutes_remaining=45,
+            selected_option="DIVERT_TO_COLD_HUB",
+            emergency_reported=False,
+        )
+        return CallETriageOutput(
+            call_id="sim-dryrun-reefer-triage-001",
+            status="completed",
+            task_completed=True,
+            completion_confidence=0.95,
+            structured_result=simulated_structured,
+            evidence={
+                "simulation": True,
+                "note": "[DRY-RUN: No live call placed] Explicit authorization flag (--live / live=True) required for network call.",
+                "target_destination_masked": masked,
+                "truck_id": truck_id,
+                "trailer_id": trailer_id,
+            },
+            error=None,
+        )
+
+    # 3. Live Authorized Call Execution
+    if client is None:
+        return CallETriageOutput(
+            call_id=None,
+            status="failed",
+            task_completed=False,
+            completion_confidence=0.0,
+            structured_result=None,
+            evidence={},
+            error="Live call authorized but no initialized CalleClient was provided.",
+        )
+
+    # Validate HTTPS base URL
+    base_url = getattr(client, "base_url", None)
+    try:
+        validate_calle_base_url(base_url)
+    except ValueError as val_err:
+        return CallETriageOutput(
+            call_id=None,
+            status="failed",
+            task_completed=False,
+            completion_confidence=0.0,
+            structured_result=None,
+            evidence={},
+            error=sanitize_error_message(str(val_err)),
+        )
+
+    # Build prompt instructions for CALL-E voice agent
     task_prompt = (
         f"Call {driver_phone} and speak with commercial driver {driver_name} regarding a critical reefer temperature excursion on truck {truck_id}, trailer {trailer_id}.\n\n"
         f"ALERT CONTEXT:\n"
@@ -185,21 +323,19 @@ def initiate_reefer_triage(
         clean_schema = sanitize_json_schema_for_calle(
             CallETriageStructuredResult.model_json_schema()
         )
-        # Call CALL-E SDK
-        logger.info(f"[CALL-E Dispatch] Target phone number: {driver_phone}")
+
+        logger.info("[CALL-E Dispatch] Live authorized call dispatched to %s", masked)
         call_response = client.calls.create_and_wait(
             task=task_prompt,
             recipient=recipient_data,
             recipient_result_schema=clean_schema,
         )
 
-        # Helper to extract attributes from dict or object safely
         def get_field(obj: Any, key: str, default: Any = None) -> Any:
             if isinstance(obj, dict):
                 return obj.get(key, default)
             return getattr(obj, key, default)
 
-        # Extract call attributes safely supporting both dict and object responses
         call_id = get_field(call_response, "id") or get_field(call_response, "call_id")
         raw_status = str(get_field(call_response, "status", "failed")).lower()
 
@@ -248,7 +384,8 @@ def initiate_reefer_triage(
         )
 
     except Exception as exc:
-        logger.error(f"CALL-E reefer triage failed: {exc}", exc_info=True)
+        sanitized_err = sanitize_error_message(str(exc))
+        logger.error("[CALL-E Failure] Triage call to %s failed: %s", masked, sanitized_err)
         return CallETriageOutput(
             call_id=None,
             status="failed",
@@ -256,5 +393,5 @@ def initiate_reefer_triage(
             completion_confidence=0.0,
             structured_result=None,
             evidence={},
-            error=str(exc),
+            error=sanitized_err,
         )
