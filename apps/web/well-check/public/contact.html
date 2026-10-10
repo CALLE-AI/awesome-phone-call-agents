@@ -1,0 +1,83 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>WellCheck - Contact Detail</title>
+    <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+    <aside class="sidebar">
+        <div class="logo-container">
+            <div class="logo">
+                <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="#312e81" stroke-width="2"><path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"></path></svg>
+                <span class="logo-text">WellCheck</span>
+            </div>
+            <button onclick="toggleSidebar()" class="menu-btn">☰</button>
+        </div>
+        <div class="nav-item active">
+            <a href="index.html" style="text-decoration:none; color:inherit; display:flex; align-items:center; width:100%;"><span class="nav-icon">🏠</span><span class="nav-text">Home</span></a>
+        </div>
+        
+        <div class="sidebar-footer">
+            <img src="assets/hero-home.png" alt="Mascot" style="width: 80%; margin-bottom: 16px; opacity: 0.8;" onerror="this.style.display='none'">
+            <p style="font-weight: 600; color: #111;">A daily phone call that makes sure they're okay.</p>
+            <p style="margin-top: 12px; font-size: 10px; opacity: 0.6;">WellCheck is a supplementary tool to help you stay informed. It does not provide medical advice or diagnosis.</p>
+        </div>
+    </aside>
+
+    <main class="main">
+        <div class="topbar">
+            <a href="index.html" style="margin-right:auto; color:var(--text-muted); font-weight:600; text-decoration:none;">&larr; Back to Home</a>
+            <div style="cursor:pointer; font-size: 18px;">??</div>
+            <div class="avatar-circle">A</div>
+        </div>
+
+        <header class="hero">
+            <div id="contact-header">
+                <h1>Loading...</h1>
+            </div>
+            <img src="assets/hero-contact-detail.png" alt="Hero Illustration" class="hero-img" onerror="this.style.display='none'">
+        </header>
+
+        <div class="tabs">
+            <div class="tab active" onclick="switchTab('overview')" id="tab-btn-overview">Overview</div>
+            <div class="tab" onclick="switchTab('history')" id="tab-btn-history">Check-in History</div>
+            <div class="tab" onclick="switchTab('trends')" id="tab-btn-trends">Trends</div>
+            <div class="tab" onclick="switchTab('notes')" id="tab-btn-notes">Notes</div>
+        </div>
+
+        <div class="tab-content active" id="tab-overview">
+            <div class="detail-grid">
+                <div class="card" style="align-self: start;">
+                    <h2 style="font-size:18px; margin-bottom: 16px;">Latest Check-in</h2>
+                    <div id="latest-log-content">Loading...</div>
+                </div>
+                <div class="card" style="background:#fafafa; align-self: start;">
+                    <h2 style="font-size:18px; margin-bottom: 16px;">Quick Stats</h2>
+                    <div id="quick-stats-content">Loading...</div>
+                </div>
+            </div>
+        </div>
+        
+        <div class="tab-content" id="tab-history">
+            <div id="full-history-list">Loading...</div>
+        </div>
+        
+        <div class="tab-content" id="tab-trends">
+            <div class="card">
+                <h2 style="font-size:18px; margin-bottom: 16px;">Recent Pattern</h2>
+                <div id="trends-content">Loading...</div>
+            </div>
+        </div>
+        
+        <div class="tab-content" id="tab-notes">
+            <div class="card">
+                <p style="color:var(--text-muted)">Notes feature coming soon.</p>
+            </div>
+        </div>
+    </main>
+
+    <script src="contact.js"></script>
+</body>
+</html>

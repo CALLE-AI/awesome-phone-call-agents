@@ -1,0 +1,92 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>WellCheck</title>
+    <link rel="stylesheet" href="styles.css">
+    <style>
+        .view-section { display: none; }
+        .view-section.active { display: block; }
+    </style>
+</head>
+<body>
+    <aside class="sidebar">
+        <div class="logo-container">
+            <div class="logo">
+                <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="#312e81" stroke-width="2"><path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"></path></svg>
+                <span class="logo-text">WellCheck</span>
+            </div>
+            <button onclick="toggleSidebar()" class="menu-btn">☰</button>
+        </div>
+        <div class="nav-item active" id="nav-home" onclick="switchView('home')">
+            <span class="nav-icon">🏠</span><span class="nav-text">Home</span>
+        </div>
+        
+        <div class="sidebar-footer">
+            <img src="assets/hero-home.png" alt="Mascot" style="width: 80%; margin-bottom: 16px; opacity: 0.8;" onerror="this.style.display='none'">
+            <p style="font-weight: 600; color: #111;">A daily phone call that makes sure they're okay.</p>
+            <p style="margin-top: 12px; font-size: 10px; opacity: 0.6;">WellCheck is a supplementary tool to help you stay informed. It does not provide medical advice or diagnosis.</p>
+        </div>
+    </aside>
+
+    <main class="main">
+        <div class="topbar">
+            <div style="cursor:pointer; font-size: 18px;">🔔</div>
+            <div class="avatar-circle">A</div>
+        </div>
+
+        <div id="view-home" class="view-section active">
+            <header class="hero">
+                <div style="z-index: 2; position: relative; max-width: 400px;">
+                    <h1 style="font-size: 40px; line-height: 1.1; margin-bottom: 12px;">Good morning</h1>
+                    <p id="hero-subtitle" style="font-size: 16px; color: var(--text-muted); margin-bottom: 24px; line-height: 1.5;">Loading status...</p>
+                </div>
+            </header>
+
+            <section class="contacts-grid" id="contacts-grid">
+                <!-- Rendered via JS -->
+            </section>
+
+            <div class="bottom-row">
+                <div class="card">
+                    <div class="section-header">
+                        <h2>Recent Check-ins</h2>
+                        <a href="#" onclick="switchView('checkins'); return false;">View all &rarr;</a>
+                    </div>
+                    <div id="logs-list">
+                        <!-- Rendered via JS -->
+                    </div>
+                </div>
+
+                <div class="card" style="background: #fafafa;">
+                    <div class="section-header">
+                        <h2>Recent Pattern <span style="font-size:13px; color:var(--text-muted); font-weight:normal;">(Last 5 check-ins)</span></h2>
+                    </div>
+                    <div id="trend-content">
+                        <!-- Rendered via JS -->
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div id="view-people" class="view-section">
+            <h2 style="font-size:24px; margin-bottom:24px;">People</h2>
+            <section class="contacts-grid" id="people-grid">
+                <!-- Rendered via JS -->
+            </section>
+        </div>
+
+        <div id="view-checkins" class="view-section">
+            <h2 style="font-size:24px; margin-bottom:24px;">All Check-ins</h2>
+            <div class="card">
+                <div id="all-logs-list">
+                    <!-- Rendered via JS -->
+                </div>
+            </div>
+        </div>
+    </main>
+
+    <script src="app.js"></script>
+</body>
+</html>
