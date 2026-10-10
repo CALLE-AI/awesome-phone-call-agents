@@ -1,0 +1,13 @@
+[
+  {
+    "contact_name": "Sample Customer",
+    "phone_number": "+*******0000",
+    "call_goal": "Follow up with the customer about their recent inquiry. Ask whether they are still interested, understand their needs, and determine the appropriate next action.",
+    "status": "completed",
+    "outcome": "Customer confirmed interest and requested a callback next week.",
+    "notes": "Customer is evaluating two vendors; price is the key factor.",
+    "next_action": "Send a pricing summary email and schedule a follow-up call.",
+    "callback_at": "2026-09-21T10:00:00",
+    "call_id": null
+  }
+]
