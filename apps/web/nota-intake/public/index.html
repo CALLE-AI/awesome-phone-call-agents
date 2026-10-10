@@ -1,0 +1,221 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Nota.Lawyer — Request a consultation</title>
+<link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,600;9..144,700&family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+<style>
+  :root{--ink:#12213f;--ink2:#3b4863;--muted:#6b7590;--paper:#f7f3ec;--card:#fffdf9;--line:#e6dfd2;--brass:#b8862b;--brass2:#8f6717;--teal:#0b7a75;--teal2:#095e5a;--ok:#1f7a4d;--err:#b3261e;--shadow:0 10px 30px rgba(18,33,63,.08)}
+  *{box-sizing:border-box}html{scroll-behavior:smooth}
+  body{margin:0;font:16px/1.55 Inter,system-ui,sans-serif;color:var(--ink);background:var(--paper)}
+  .wrap{max-width:760px;margin:0 auto;padding:0 20px 60px}
+  /* top bar */
+  .bar{display:flex;justify-content:space-between;align-items:center;padding:22px 0}
+  .brand{font:700 22px/1 Fraunces,serif;letter-spacing:.2px}.brand span{color:var(--brass)}
+  .lang{display:flex;gap:6px;background:#fff;border:1px solid var(--line);border-radius:999px;padding:4px}
+  .lang button{background:none;border:0;border-radius:999px;padding:7px 14px;cursor:pointer;font:600 14px Inter,sans-serif;color:var(--ink2)}
+  .lang button.on{background:var(--ink);color:#fff}
+  /* hero */
+  .hero{padding:26px 0 18px}
+  h1{font:700 clamp(34px,5vw,50px)/1.08 Fraunces,serif;margin:0 0 14px;letter-spacing:-.01em}
+  h1 em{font-style:normal;color:var(--brass2)}
+  .lead{font-size:18px;color:var(--ink2);margin:0 0 22px;max-width:620px}
+  .how{display:grid;grid-template-columns:repeat(3,1fr);gap:12px;margin:0 0 8px}
+  .how div{background:var(--card);border:1px solid var(--line);border-radius:14px;padding:14px 16px;font-size:14px;color:var(--ink2)}
+  .how b{display:block;font-size:15px;color:var(--ink);margin-bottom:4px}
+  .how i{display:inline-grid;place-items:center;width:26px;height:26px;border-radius:50%;background:var(--brass);color:#fff;font:700 13px Inter,sans-serif;font-style:normal;margin-right:8px;vertical-align:-6px}
+  @media(max-width:640px){.how{grid-template-columns:1fr}}
+  /* form */
+  .card{background:var(--card);border:1px solid var(--line);border-radius:20px;padding:28px;box-shadow:var(--shadow);margin-top:14px}
+  .step{padding:8px 0 22px;border-bottom:1px dashed var(--line);margin-bottom:22px}.step:last-of-type{border:0;margin-bottom:0}
+  .step h2{display:flex;align-items:center;gap:12px;font:700 22px/1.2 Fraunces,serif;margin:0 0 6px}
+  .step h2 i{display:inline-grid;place-items:center;width:32px;height:32px;border-radius:50%;background:var(--ink);color:#fff;font:700 15px Inter,sans-serif;font-style:normal;flex:none}
+  .step p.help{margin:0 0 14px;color:var(--muted);font-size:15px}
+  .types{display:grid;grid-template-columns:repeat(2,1fr);gap:10px}
+  @media(max-width:560px){.types{grid-template-columns:1fr}}
+  .type{display:flex;gap:12px;align-items:flex-start;text-align:left;background:#fff;border:2px solid var(--line);border-radius:14px;padding:14px;cursor:pointer;font:inherit;color:var(--ink);transition:.15s}
+  .type:hover{border-color:#cdb98f}.type.on{border-color:var(--brass);background:#fff8e8;box-shadow:0 0 0 3px #f1e3bf}
+  .type .ic{font-size:26px;line-height:1;margin-top:2px}.type b{display:block;font-size:16px}.type small{display:block;color:var(--muted);font-size:13px;margin-top:2px;line-height:1.35}
+  label{display:block;font-weight:600;margin:16px 0 6px}
+  .hint{color:var(--muted);font-size:13.5px;margin-top:6px}
+  input,select,textarea{width:100%;padding:12px 13px;border:1.5px solid var(--line);border-radius:10px;font:inherit;background:#fff;color:var(--ink)}
+  input:focus,select:focus,textarea:focus{outline:0;border-color:var(--teal);box-shadow:0 0 0 3px #d4ebe9}
+  textarea{min-height:88px;resize:vertical}
+  .row{display:grid;grid-template-columns:170px 1fr;gap:10px}@media(max-width:480px){.row{grid-template-columns:1fr}}
+  .field.bad input,.field.bad select{border-color:var(--err)}.field .err{display:none;color:var(--err);font-size:13.5px;margin-top:6px;font-weight:500}.field.bad .err{display:block}
+  .langbox{background:#f3f7f7;border:1px solid #d4e6e4;border-radius:12px;padding:12px 14px;margin-top:8px;font-size:14px;color:var(--ink2)}
+  .consent{display:flex;gap:12px;align-items:flex-start;margin-top:18px;background:#fbf7ee;border:1px solid #efe4c8;border-radius:12px;padding:14px;font-size:14.5px;line-height:1.45}
+  .consent input{width:22px;height:22px;margin-top:2px;flex:none;accent-color:var(--teal)}
+  button.go{margin-top:20px;width:100%;padding:17px;border:0;border-radius:12px;background:var(--teal);color:#fff;font:700 18px Inter,sans-serif;cursor:pointer;box-shadow:0 8px 20px rgba(11,122,117,.25)}
+  button.go:hover{background:var(--teal2)}button.go[disabled]{opacity:.6;cursor:wait;box-shadow:none}
+  .under{text-align:center;color:var(--muted);font-size:13.5px;margin-top:10px}
+  .msg{margin-top:16px;padding:14px 16px;border-radius:12px;display:none;font-weight:500}.msg.err{display:block;background:#fbe9e7;color:var(--err)}
+  /* success */
+  .done{display:none;background:var(--card);border:1px solid var(--line);border-radius:20px;padding:30px;box-shadow:var(--shadow);margin-top:14px}
+  .done.show{display:block}.done h2{font:700 30px/1.15 Fraunces,serif;margin:0 0 8px}.done .big{font-size:18px;color:var(--ink2);margin:0 0 18px}
+  .ring{display:flex;align-items:center;gap:14px;background:#e8f4f3;border:1px solid #c9e3e0;border-radius:14px;padding:16px;margin-bottom:20px}
+  .ring .ph{font-size:34px;animation:ring 1.2s ease-in-out infinite}@keyframes ring{0%,100%{transform:rotate(0)}20%{transform:rotate(-14deg)}40%{transform:rotate(12deg)}60%{transform:rotate(-8deg)}80%{transform:rotate(6deg)}}
+  .done h3{font:700 16px Inter,sans-serif;margin:16px 0 8px;color:var(--ink2);text-transform:uppercase;letter-spacing:.04em}
+  .done ul{margin:0;padding:0;list-style:none}.done li{padding:8px 0 8px 32px;position:relative;border-top:1px solid var(--line)}.done li:before{content:"✓";position:absolute;left:6px;color:var(--ok);font-weight:700}
+  .done .note{margin-top:18px;font-size:14px;color:var(--muted)}
+  footer{margin-top:22px;color:var(--muted);font-size:13.5px;text-align:center}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <div class="bar">
+    <div class="brand">Nota<span>.</span>Lawyer</div>
+    <div class="lang"><button data-l="en" class="on">English</button><button data-l="es">Español</button><button data-l="id">Bahasa</button></div>
+  </div>
+
+  <section class="hero">
+    <h1 data-i="h1"></h1>
+    <p class="lead" data-i="lead"></p>
+    <div class="how">
+      <div><b><i>1</i><span data-i="how1"></span></b><span data-i="how1b"></span></div>
+      <div><b><i>2</i><span data-i="how2"></span></b><span data-i="how2b"></span></div>
+      <div><b><i>3</i><span data-i="how3"></span></b><span data-i="how3b"></span></div>
+    </div>
+  </section>
+
+  <form id="f" class="card" novalidate>
+    <div class="step">
+      <h2><i>1</i><span data-i="s1"></span></h2>
+      <p class="help" data-i="s1help"></p>
+      <div class="types" id="types"></div>
+      <div class="field" id="f_type"><div class="err" data-i="e_type"></div></div>
+    </div>
+
+    <div class="step">
+      <h2><i>2</i><span data-i="s2"></span></h2>
+      <p class="help" data-i="s2help"></p>
+      <div class="field" id="f_name">
+        <label data-i="name"></label>
+        <input name="name" autocomplete="name" data-ph="name_ph">
+        <div class="hint" data-i="name_hint"></div><div class="err" data-i="e_name"></div>
+      </div>
+      <div class="field" id="f_phone">
+        <label data-i="phone"></label>
+        <div class="row"><select name="cc" id="cc"></select><input name="num" inputmode="tel" autocomplete="tel-national" data-ph="phone_ph"></div>
+        <div class="hint" data-i="phone_hint"></div><div class="err" data-i="e_phone"></div>
+      </div>
+      <div class="langbox"><b data-i="ilang"></b>: <span id="langlist"></span><br><span id="langnote"></span></div>
+      <div class="field" id="f_locale" style="margin-top:10px"><label data-i="ilang_pick" style="margin-top:8px"></label><select name="locale" id="locale"></select></div>
+      <div class="field" id="f_email">
+        <label data-i="email"></label>
+        <input name="email" type="email" autocomplete="email" placeholder="name@example.com">
+        <div class="hint" data-i="email_hint"></div><div class="err" data-i="e_email"></div>
+      </div>
+    </div>
+
+    <div class="step">
+      <h2><i>3</i><span data-i="s3"></span></h2>
+      <p class="help" data-i="s3help"></p>
+      <textarea name="matter" maxlength="500" id="matter"></textarea>
+      <div class="hint" data-i="matter_hint"></div>
+      <label class="consent field" id="f_consent"><input type="checkbox" name="consent"><span data-i="consent"></span></label>
+      <div class="field" id="f_consent2"><div class="err" data-i="e_consent"></div></div>
+      <button class="go" type="submit" data-i="go"></button>
+      <div class="under" data-i="under"></div>
+      <div class="msg" id="msg"></div>
+    </div>
+  </form>
+
+  <section class="done" id="done">
+    <h2 data-i="d_title"></h2>
+    <p class="big" id="d_phone"></p>
+    <div class="ring"><div class="ph">📞</div><div data-i="d_ring"></div></div>
+    <h3 data-i="d_h_call"></h3>
+    <ul><li data-i="d_c1"></li><li data-i="d_c2"></li><li data-i="d_c3"></li><li data-i="d_c4"></li></ul>
+    <h3 data-i="d_h_after"></h3>
+    <ul><li data-i="d_a1"></li><li data-i="d_a2"></li></ul>
+    <p class="note" data-i="d_note"></p>
+  </section>
+
+  <footer data-i="foot"></footer>
+</div>
+<script>
+// UI strings live in /i18n.json (English, Spanish, Bahasa Indonesia); loaded before first render.
+let I18N = { en: {}, es: {}, id: {} };
+
+let REGIONS = {"1":{"region":"US","country":"United States","line":"Local","locales":[["en-US","English"],["id","Bahasa Indonesia"]]}};
+let MATTERS = {};
+let CC = [], LOCALES = {}, lang = (["es","id"].find(l => (navigator.language||"en").toLowerCase().startsWith(l))) || "en", chosenType = "";
+const $ = s => document.querySelector(s);
+const cc = $("#cc"), loc = $("#locale"), msg = $("#msg"), typesEl = $("#types");
+const flag = r => String.fromCodePoint(...[...r].map(c => 0x1F1E6 + c.charCodeAt(0) - 65));
+function t(k, vars={}) { return String(I18N[lang][k] ?? k).replace(/{(\w+)}/g, (_,x)=>vars[x]??""); }
+function buildCountries() {
+  CC = Object.entries(REGIONS).map(([v, r]) => [v, `${flag(r.region)} +${v} ${r.region}`, r.country, r.line])
+    .sort((a, b) => (a[3] === b[3] ? a[2].localeCompare(b[2]) : a[3] === "Local" ? -1 : 1));
+  LOCALES = Object.fromEntries(Object.entries(REGIONS).map(([v, r]) => [v, r.locales]));
+  const cur = cc.value; cc.innerHTML = ""; CC.forEach(([v,label]) => cc.add(new Option(label, v))); cc.value = CC.some(c=>c[0]===cur) ? cur : "1";
+}
+function renderTypes() {
+  typesEl.innerHTML = "";
+  for (const [id, m] of Object.entries(MATTERS)) {
+    const b = document.createElement("button"); b.type = "button"; b.className = "type" + (id===chosenType?" on":""); b.dataset.id = id;
+    b.innerHTML = `<span class="ic">${m.icon}</span><span><b>${m.label[lang]||m.label.en}</b><small>${m.blurb[lang]||m.blurb.en}</small></span>`;
+    b.onclick = () => { chosenType = id; renderTypes(); $("#f_type").classList.remove("bad"); $("#matter").placeholder = t("matter_ph")[id] || ""; };
+    typesEl.appendChild(b);
+  }
+  $("#matter").placeholder = chosenType ? (I18N[lang].matter_ph[chosenType] || "") : "";
+}
+function render() {
+  document.documentElement.lang = lang;
+  document.querySelectorAll("[data-i]").forEach(el => { const v = I18N[lang][el.dataset.i]; if (typeof v === "string") { el.dataset.i==="h1" ? el.innerHTML = v : el.textContent = v; } });
+  document.querySelectorAll("[data-ph]").forEach(el => el.placeholder = t(el.dataset.ph));
+  document.querySelectorAll(".lang button").forEach(b => b.classList.toggle("on", b.dataset.l===lang));
+  const opts = LOCALES[cc.value]||[]; const cur = loc.value; loc.innerHTML = "";
+  opts.forEach(([v,l]) => loc.add(new Option(l, v)));
+  const pref = opts.find(o=>o[0].startsWith(lang)) || opts.find(o=>o[0].startsWith("en"));
+  loc.value = opts.some(o=>o[0]===cur) ? cur : (pref||opts[0])[0];
+  $("#langlist").textContent = opts.map(o=>o[1]).join(" · ");
+  let note = t("langnote_ok");
+  if (lang==="es" && !opts.some(o=>o[0].startsWith("es"))) note = t("langnote_es");
+  else if (lang==="id" && cc.value==="1") note = t("langnote_id");
+  $("#langnote").textContent = note;
+  renderTypes();
+}
+document.querySelectorAll(".lang button").forEach(b => b.onclick = () => { lang = b.dataset.l; render(); });
+cc.onchange = render;
+fetch("/i18n.json").then(r => r.json()).then(j => { I18N = j; buildCountries(); render(); });
+fetch("/regions.json").then(r => r.json()).then(j => { REGIONS = j; buildCountries(); render(); }).catch(() => {});
+fetch("/api/matters").then(r => r.json()).then(j => { MATTERS = j.matters; renderTypes(); }).catch(() => {
+  MATTERS = {other:{icon:"💬",label:{en:"Something else"},blurb:{en:"Tell us on the call."}}}; renderTypes(); });
+
+function bad(id, on) { const f = document.getElementById(id); f.classList.toggle("bad", on); return on; }
+$("#f").onsubmit = async e => {
+  e.preventDefault(); const f = e.target; msg.className = "msg";
+  const digits = f.num.value.replace(/\D/g,""); const phone = "+" + cc.value + digits;
+  let problems = 0;
+  problems += bad("f_type", !chosenType);
+  problems += bad("f_name", !/^\p{L}[\p{L}\s'.-]{1,}$/u.test(f.name.value.trim()));
+  problems += bad("f_phone", digits.length < 6);
+  problems += bad("f_email", !!f.email.value.trim() && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(f.email.value.trim()));
+  problems += bad("f_consent2", !f.consent.checked);
+  if (problems) { document.querySelector(".field.bad").scrollIntoView({behavior:"smooth", block:"center"}); return; }
+  const btn = f.querySelector("button.go"); btn.disabled = true;
+  try {
+    const r = await fetch("/api/intake", {method:"POST", headers:{"content-type":"application/json"},
+      body: JSON.stringify({name:f.name.value.trim(), phone, email:f.email.value.trim(), lang, locale:loc.value, matter_type:chosenType, matter:f.matter.value.trim(), consent:true,
+                     access_code: new URLSearchParams(location.search).get("code") || undefined})});
+    const j = await r.json();
+    if (!r.ok) throw new Error(j.message || j.error || r.status);
+    showDone(phone);
+  } catch (err) { msg.className = "msg err"; msg.textContent = t("err", {m: err.message}); }
+  btn.disabled = false;
+};
+function showDone(phone) {
+  const topic = (MATTERS[chosenType]?.label?.[lang] || MATTERS[chosenType]?.label?.en || "").toLowerCase();
+  $("#f").style.display = "none"; document.querySelector(".hero").style.display = "none";
+  const d = $("#done"); d.classList.add("show");
+  $("#d_phone").textContent = t("d_phone", {phone});
+  d.querySelector("[data-i=d_c2]").textContent = t("d_c2", {topic});
+  window.scrollTo({top:0, behavior:"smooth"});
+}
+</script>
+</body>
+</html>

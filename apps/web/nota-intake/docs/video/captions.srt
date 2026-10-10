@@ -1,0 +1,135 @@
+1
+00:00:00,400 --> 00:00:03,434
+Small law firms lose clients in the intake form.
+
+2
+00:00:03,484 --> 00:00:07,545
+Older clients, people at work, anyone reading a second language.
+
+3
+00:00:07,595 --> 00:00:08,894
+They don't finish it.
+
+4
+00:00:08,944 --> 00:00:13,070
+So we made the form three steps, and let the phone do the intake.
+
+5
+00:00:13,920 --> 00:00:15,546
+This is Not-a-Lawyer Intake.
+
+6
+00:00:15,596 --> 00:00:16,923
+Step one: pick a topic.
+
+7
+00:00:16,973 --> 00:00:19,317
+Real estate, a will, a trust, a lawsuit.
+
+8
+00:00:19,367 --> 00:00:26,081
+That choice plans the call: a lawsuit intake asks who the other side is and what deadline is on the court papers;
+
+9
+00:00:26,131 --> 00:00:28,954
+a will intake asks about family and an executor.
+
+10
+00:00:29,004 --> 00:00:30,630
+Step two: leave your number.
+
+11
+00:00:30,680 --> 00:00:39,070
+The interview language follows the phone's country, straight from CALL-E's region table, and the page says plainly what your number supports.
+
+12
+00:00:40,360 --> 00:00:49,670
+Submit, and the page tells you exactly what happens next: your phone rings in about a minute, what the assistant will ask, and what the firm does afterward.
+
+13
+00:00:52,720 --> 00:00:57,442
+This is the real lawsuit call, recorded on the client's phone, abridged.
+
+14
+00:00:57,492 --> 00:00:59,364
+Not legal advice comes first.
+
+15
+00:00:59,414 --> 00:01:03,076
+Then the matter: the form said court papers had arrived;
+
+16
+00:01:03,126 --> 00:01:08,643
+the client says no lawsuit yet, so the assistant records him as the one bringing it.
+
+17
+00:01:08,693 --> 00:01:10,830
+Then the email, letter by letter.
+
+18
+00:01:46,200 --> 00:01:50,013
+Thirty seconds after the call, the staff console has this.
+
+19
+00:01:50,063 --> 00:01:57,405
+Summary, the other parties for the conflict check, urgency, consent, transcript, and CALL-E's confidence score.
+
+20
+00:01:57,455 --> 00:02:04,597
+Each topic gets its own column of fields, and a date picker places a reminder call in the client's language.
+
+21
+00:02:04,647 --> 00:02:11,190
+Staff can also start an intake call from the desk, for a walk-in or a voicemail, and watch it land.
+
+22
+00:02:12,040 --> 00:02:14,296
+Same number, different language.
+
+23
+00:02:14,346 --> 00:02:18,907
+This is the Bahasa Indonesia call, also real, also on a US line.
+
+24
+00:02:18,957 --> 00:02:23,590
+Adding a language is one row in a JSON file and one script block.
+
+25
+00:02:24,440 --> 00:02:26,065
+One limit, stated plainly.
+
+26
+00:02:26,115 --> 00:02:29,028
+CALL-E does not carry Spanish on US lines yet.
+
+27
+00:02:29,078 --> 00:02:32,635
+We tried the locale, the task text, and the MCP planner;
+
+28
+00:02:32,685 --> 00:02:34,825
+all three declined before dialing.
+
+29
+00:02:34,875 --> 00:02:37,401
+The Spanish script is written and wired.
+
+30
+00:02:37,451 --> 00:02:41,910
+Until it's enabled, those callers go to a human, and the form says so.
+
+31
+00:02:42,760 --> 00:02:43,369
+No servers.
+
+32
+00:02:43,419 --> 00:02:51,876
+Cloudflare Pages, a few Functions, KV, and the CALL-E API: a task and a result schema planned per matter type, webhooks, and idempotency keys.
+
+33
+00:02:51,926 --> 00:02:54,393
+Repo and live link are in the description.
+
+34
+00:02:54,443 --> 00:02:56,070
+This is Not-a-Lawyer Intake.

@@ -1,0 +1,14 @@
+name = "nota-intake"
+pages_build_output_dir = "./public"
+compatibility_date = "2026-06-01"
+compatibility_flags = ["nodejs_compat"]
+
+# Create with: npx wrangler kv namespace create INTAKES   (then paste the id here)
+[[kv_namespaces]]
+binding = "INTAKES"
+id = "11862678fb264e8994d79f4c01c67851"
+
+[vars]
+FIRM_NAME = "Nota.Lawyer"
+# Secrets (set with `npx wrangler pages secret put NAME`; locally in .dev.vars):
+#   CALLE_API_KEY, CALLE_BASE_URL, REVIEW_TOKEN, WEBHOOK_SECRET
