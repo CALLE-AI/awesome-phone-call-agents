@@ -249,6 +249,7 @@ This project is an awesome list for AI-agent phone-call workflows. Add resources
 - [`conversation-clarify`](skills/conversation-clarify/) - Detects a written reply that agrees without saying which option, or commits without saying when, then settles it with one bounded disclosed CALL-E phone call and writes the answer back into the thread bound to the recipient's own words, or refuses to answer at all.
 ### Apps
 
+- [QuoteHunter](apps/typescript/quotehunter/) - Autonomous voice agent swarm that dials service providers in parallel via CALL-E, negotiates quotes with schema extraction, and generates executive deal dossiers for human closing. [Live Demo](https://call-e-your-code-is-calling.onrender.com)
 - [FieldLine](apps/python/fieldline/) - Demo-first lone-worker check-ins with authorized live destinations, terminal uncertainty stops, and human review of generated safety decisions.
 - [Gimme Updates](apps/typescript/gimme-updates/) - Daily phone call that reads a user's important emails aloud and captures spoken reminders/follow-ups, built for blind and elderly users who can't navigate a screen-based inbox.
 - [GoodFaith](apps/typescript/goodfaith/) - Calls imaging clinics for self-pay Good Faith Estimate cash prices, enforces price comparability on the call, and returns a confidence-gated, transcript-evidenced landed-cost comparison that refuses to rank any price it cannot trace to a real quoted sentence; mock-first no-call default.

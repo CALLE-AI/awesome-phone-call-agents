@@ -1,0 +1,16 @@
+services:
+  - type: web
+    name: quotehunter
+    runtime: node
+    plan: free
+    buildCommand: npm install --include=dev && npm run build
+    startCommand: npm start
+    healthCheckPath: /api/status
+    envVars:
+      - key: NODE_ENV
+        value: production
+      - key: CALLE_API_KEY
+        sync: false
+      - key: PORT
+        value: 3000
+
