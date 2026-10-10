@@ -1,7 +1,6 @@
 import { NextResponse } from 'next/server';
 import { store } from '@/lib/store';
-import { sanitizeRecordForDisplay, isAuthorizedSecret, isLocalRequest } from '@/lib/phone-utils';
-import { SEEDED_RECORD_IDS } from '@/fixtures/seed-data';
+import { sanitizeRecordForDisplay, isAuthorizedSecret } from '@/lib/phone-utils';
 
 export async function GET(
   req: Request,
@@ -16,21 +15,16 @@ export async function GET(
   }
 
   const isAuth = isAuthorizedSecret(req);
-  const isLocal = isLocalRequest(req);
 
-  // If remote and unauthenticated, reject
-  if (!isAuth && !isLocal) {
-    return NextResponse.json(
-      { error: 'Unauthorized: Remote access to verification records requires authentication.' },
-      { status: 401, headers: { 'WWW-Authenticate': 'Basic realm="VaultCall"' } }
-    );
-  }
+  // A record is strictly synthetic ONLY if its isSynthetic flag is true.
+  // Live runs reusing seeded IDs or non-synthetic records are private records.
+  const isSynthetic = record.isSynthetic === true;
 
-  // If unauthenticated, access is restricted strictly to synthetic benchmark records
-  const isSynthetic = record.isSynthetic || SEEDED_RECORD_IDS.has(record.id);
-  if (!isAuth && !isSynthetic) {
+  // Actual private records strictly require authentication.
+  // Remotely spoofable Host or proxy headers cannot grant access to private records.
+  if (!isSynthetic && !isAuth) {
     return NextResponse.json(
-      { error: 'Unauthorized: Access to non-synthetic verification records requires authentication.' },
+      { error: 'Unauthorized: Access to private verification records requires authentication.' },
       { status: 401, headers: { 'WWW-Authenticate': 'Basic realm="VaultCall"' } }
     );
   }
@@ -39,3 +33,4 @@ export async function GET(
     record: sanitizeRecordForDisplay(record),
   });
 }
+

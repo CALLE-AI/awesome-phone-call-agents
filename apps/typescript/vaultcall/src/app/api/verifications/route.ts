@@ -1,28 +1,17 @@
 import { NextResponse } from 'next/server';
 import { store } from '@/lib/store';
 import { sanitizeRecordForDisplay, isAuthorizedSecret, isLocalRequest } from '@/lib/phone-utils';
-import { SEEDED_RECORD_IDS } from '@/fixtures/seed-data';
 
 export async function GET(req: Request) {
   const isAuth = isAuthorizedSecret(req);
-  const isLocal = isLocalRequest(req);
-
-  // If remote and unauthenticated, reject
-  if (!isAuth && !isLocal) {
-    return NextResponse.json(
-      { error: 'Unauthorized: Remote access to verification records requires authentication.' },
-      { status: 401, headers: { 'WWW-Authenticate': 'Basic realm="VaultCall"' } }
-    );
-  }
 
   let rawVerifications = store.listVerifications();
   const killSwitch = store.getKillSwitch();
 
-  // If unauthenticated, restrict scope strictly to synthetic benchmark records
+  // If unauthenticated, access is strictly scoped to genuine synthetic benchmark records.
+  // Private/live records (isSynthetic !== true) are excluded, preventing leakage even if a live run reused a seeded ID.
   if (!isAuth) {
-    rawVerifications = rawVerifications.filter(
-      (v) => v.isSynthetic || SEEDED_RECORD_IDS.has(v.id)
-    );
+    rawVerifications = rawVerifications.filter((v) => v.isSynthetic === true);
   }
 
   const stats = {
