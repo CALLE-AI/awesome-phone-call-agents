@@ -1,3 +1,4 @@
+﻿# Inherited from CALLE-AI/awesome-phone-call-agents
 .DS_Store
 .env
 .env.*
@@ -37,3 +38,16 @@ video/
 .coverage
 released
 skills/ground-truth-gate/assets/live-claim.json
+
+# AfterHold-specific
+apps/typescript/afterhold-api/data/*.db
+apps/typescript/afterhold-api/data/*.db-journal
+apps/typescript/afterhold-api/*.log
+apps/typescript/afterhold-api/.env
+apps/typescript/afterhold-api/.env.*
+!apps/typescript/afterhold-api/.env.example
+apps/typescript/afterhold-api/node_modules/
+apps/typescript/afterhold-api/dist/
+
+# OS noise
+Thumbs.db
