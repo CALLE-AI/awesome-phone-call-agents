@@ -1,0 +1,37 @@
+[
+  {
+    "status": "paid",
+    "promised_date": null,
+    "note": "Client said the invoice was paid via bank transfer two days ago and confirmed the amount."
+  },
+  {
+    "status": "promised",
+    "promised_date": "2026-09-15",
+    "note": "Client apologized for the delay, said accounting runs payments on the 15th, and confirmed this invoice is queued."
+  },
+  {
+    "status": "promised",
+    "promised_date": "2026-09-10",
+    "note": "Client's assistant said the invoice is approved and payment is scheduled for Thursday."
+  },
+  {
+    "status": "voicemail",
+    "promised_date": null,
+    "note": "Reached voicemail. Left a short message with the invoice number and a callback ask."
+  },
+  {
+    "status": "no_answer",
+    "promised_date": null,
+    "note": "Call rang out with no answer and no voicemail box configured."
+  },
+  {
+    "status": "disputed",
+    "promised_date": null,
+    "note": "Client said the invoiced hours don't match what was agreed and wants to review the scope before paying."
+  },
+  {
+    "status": "declined",
+    "promised_date": null,
+    "note": "Client asked not to be called about this and preferred to handle it over email."
+  }
+]
