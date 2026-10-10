@@ -1,0 +1,327 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>LeadQualify // CALL-E AI Sales Copilot</title>
+
+    <!-- Premium Google Fonts: Plus Jakarta Sans & JetBrains Mono -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link
+        href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;700&family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap"
+        rel="stylesheet">
+
+    <!-- FontAwesome 6 Icons -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+
+    <!-- Stylesheet -->
+    <link rel="stylesheet" href="/static/styles.css">
+</head>
+
+<body>
+    <!-- Ambient glowing motion elements -->
+    <div class="ambient-glow glow-1"></div>
+    <div class="ambient-glow glow-2"></div>
+    <div class="ambient-glow glow-3"></div>
+
+    <div class="app-container">
+        <!-- Sidebar Navigation -->
+        <aside class="sidebar">
+            <div class="brand">
+                <div class="logo-icon">
+                    <i class="fa-solid fa-headset"></i>
+                </div>
+                <div class="brand-text">
+                    <h2>LeadQualify</h2>
+                    <span>CALL-E Voice Copilot</span>
+                </div>
+            </div>
+
+            <nav class="sidebar-nav">
+                <a href="#" class="active"><i class="fa-solid fa-chart-line"></i> Dashboard</a>
+                <a href="#" onclick="openSimulateModal()"><i class="fa-solid fa-user-plus"></i> Dispatch Call</a>
+                <a href="https://dashboard.heycall-e.com" target="_blank"><i class="fa-solid fa-external-link"></i>
+                    CALL-E Portal</a>
+            </nav>
+
+            <div class="mode-badge" id="modeBadge">
+                <i class="fa-solid fa-triangle-exclamation"></i> Mock Mode Active
+            </div>
+        </aside>
+
+        <!-- Main Workspace -->
+        <main class="main-content">
+            <!-- Header Bar -->
+            <header class="content-header">
+                <div class="header-title">
+                    <h1>Sales Agent Copilot</h1>
+                    <p>Real-time AI voice qualification, automated BANT extraction, and live handoffs.</p>
+                </div>
+
+                <div class="header-actions">
+                    <button class="btn btn-primary" onclick="openSimulateModal()">
+                        <i class="fa-solid fa-paper-plane"></i> New Lead Submission
+                    </button>
+                    <button class="btn btn-secondary" onclick="fetchLeads()">
+                        <i class="fa-solid fa-rotate"></i> Refresh
+                    </button>
+                </div>
+            </header>
+
+            <!-- Metrics Grid -->
+            <section class="metrics-grid">
+                <div class="metric-card">
+                    <div class="metric-icon bg-purple-glow"><i class="fa-solid fa-users"></i></div>
+                    <div class="metric-info">
+                        <h3>Total Prospects</h3>
+                        <p id="totalLeadsCount">0</p>
+                    </div>
+                </div>
+
+                <div class="metric-card">
+                    <div class="metric-icon bg-green-glow"><i class="fa-solid fa-user-check"></i></div>
+                    <div class="metric-info">
+                        <h3>Human Handoffs</h3>
+                        <p id="qualifiedLeadsCount">0</p>
+                    </div>
+                </div>
+
+                <div class="metric-card">
+                    <div class="metric-icon bg-amber-glow"><i class="fa-solid fa-phone-volume"></i></div>
+                    <div class="metric-info">
+                        <h3>Active Dialing</h3>
+                        <p id="activeCallsCount">0</p>
+                    </div>
+                </div>
+
+                <div class="metric-card">
+                    <div class="metric-icon bg-cyan-glow"><i class="fa-solid fa-bolt"></i></div>
+                    <div class="metric-info">
+                        <h3>Qualification Rate</h3>
+                        <p id="conversionRate">0%</p>
+                    </div>
+                </div>
+            </section>
+
+            <!-- Split Panel Workspace -->
+            <div class="dashboard-layout">
+                <!-- Queue Panel -->
+                <section class="panel leads-panel">
+                    <div class="panel-header">
+                        <h2><i class="fa-solid fa-list-check"></i> Inbound Lead Queue</h2>
+                        <div style="display: flex; gap: 0.5rem; align-items: center;">
+                            <span class="badge" id="leadsQueueCount">0 Leads</span>
+                            <button class="btn btn-secondary" style="padding: 0.35rem 0.65rem; font-size: 0.75rem;" onclick="clearAllLeads()" title="Clear all leads from queue">
+                                <i class="fa-solid fa-trash-can"></i> Clear Queue
+                            </button>
+                        </div>
+                    </div>
+
+                    <!-- Search and Status Filters -->
+                    <div class="controls-bar">
+                        <div class="search-box">
+                            <i class="fa-solid fa-magnifying-glass"></i>
+                            <input type="text" id="searchInput" placeholder="Search by name, company, or phone number..." oninput="filterLeads()">
+                        </div>
+
+                        <div class="filter-tabs">
+                            <button class="filter-tab active" data-filter="all" onclick="setFilter('all')">All Leads</button>
+                            <button class="filter-tab" data-filter="qualified" onclick="setFilter('qualified')">🔥 Qualified</button>
+                            <button class="filter-tab" data-filter="active" onclick="setFilter('active')">⚡ Active Calls</button>
+                            <button class="filter-tab" data-filter="completed" onclick="setFilter('completed')">✓ Completed</button>
+                        </div>
+                    </div>
+
+                    <!-- Queue Table -->
+                    <div class="table-container">
+                        <table class="leads-table">
+                            <thead>
+                                <tr>
+                                    <th>Lead Info</th>
+                                    <th>Phone</th>
+                                    <th>Interest</th>
+                                    <th>Status</th>
+                                    <th>BANT</th>
+                                    <th>Actions</th>
+                                </tr>
+                            </thead>
+                            <tbody id="leadsTableBody">
+                                <tr>
+                                    <td colspan="6" class="text-center py-5 text-muted">
+                                        <i class="fa-solid fa-spinner fa-spin me-2"></i> Initializing database...
+                                    </td>
+                                </tr>
+                            </tbody>
+                        </table>
+                    </div>
+                </section>
+
+                <!-- Lead Intelligence & BANT Scorecard Panel -->
+                <section class="panel details-panel" id="detailsPanel">
+                    <div class="panel-placeholder" id="panelPlaceholder">
+                        <i class="fa-solid fa-address-card"></i>
+                        <h3>Select a Prospect</h3>
+                        <p>Click any lead in the queue to view real-time voice transcripts, AI qualification notes, and BANT metrics.</p>
+                    </div>
+
+                    <div class="panel-content hidden" id="panelContent">
+                        <!-- Lead Header -->
+                        <div class="lead-detail-header">
+                            <div>
+                                <h2 id="detailLeadName">Taylor Swift</h2>
+                                <span class="lead-company" id="detailLeadCompany">Swift Enterprises</span>
+                            </div>
+                            <div style="display: flex; gap: 0.5rem; align-items: center; flex-wrap: wrap;">
+                                <span class="badge" id="detailHandoffBadge">Handoff Recommended</span>
+                                <button class="btn btn-accent" style="padding: 0.4rem 0.75rem; font-size: 0.78rem;" onclick="redialCurrentLead()" title="Redial Outbound Agent Call">
+                                    <i class="fa-solid fa-phone-flip"></i> Redial Call
+                                </button>
+                                <button class="btn btn-secondary" style="padding: 0.4rem 0.75rem; font-size: 0.78rem;" onclick="copyCrmSummary()" title="Copy CRM Summary">
+                                    <i class="fa-solid fa-copy"></i> Export CRM
+                                </button>
+                            </div>
+                        </div>
+
+                        <!-- Live Audio Visualizer Widget (Shown during active calls) -->
+                        <div class="audio-visualizer-container hidden" id="audioVisualizerWidget">
+                            <div class="audio-visualizer-info">
+                                <i class="fa-solid fa-microphone-lines fa-beat"></i>
+                                <span id="visualizerStatusText">Live Call Stream Active...</span>
+                            </div>
+                            <div class="audio-wave-bars">
+                                <div class="wave-bar"></div>
+                                <div class="wave-bar"></div>
+                                <div class="wave-bar"></div>
+                                <div class="wave-bar"></div>
+                                <div class="wave-bar"></div>
+                            </div>
+                        </div>
+
+                        <!-- BANT Scorecard Grid Matrix -->
+                        <div class="scorecard-grid">
+                            <div class="scorecard-item">
+                                <span class="score-label"><i class="fa-solid fa-wallet"></i> Budget Status</span>
+                                <span class="score-value" id="detailBudget">Approved</span>
+                            </div>
+                            <div class="scorecard-item">
+                                <span class="score-label"><i class="fa-solid fa-clock"></i> Timeline</span>
+                                <span class="score-value" id="detailTimeline">Immediate</span>
+                            </div>
+                            <div class="scorecard-item">
+                                <span class="score-label"><i class="fa-solid fa-fire"></i> Interest Level</span>
+                                <span class="score-value" id="detailInterest">High</span>
+                            </div>
+                            <div class="scorecard-item">
+                                <span class="score-label"><i class="fa-solid fa-phone"></i> Call Status</span>
+                                <span class="score-value" id="detailStatus">Completed</span>
+                            </div>
+                        </div>
+
+                        <!-- Pain Point Section -->
+                        <div class="detail-section">
+                            <h3><i class="fa-solid fa-bullseye"></i> Primary Need / Pain Point</h3>
+                            <div class="notes-box accent-border">
+                                <p id="detailPainPoint">Summary loading...</p>
+                            </div>
+                        </div>
+
+                        <!-- AI Qualification Notes -->
+                        <div class="detail-section">
+                            <h3><i class="fa-solid fa-brain"></i> AI Qualification Notes</h3>
+                            <div class="notes-box">
+                                <p id="detailNotes">Notes loading...</p>
+                            </div>
+                        </div>
+
+                        <!-- Live Transcript -->
+                        <div class="detail-section flex-grow">
+                            <h3><i class="fa-solid fa-comments"></i> Conversation Transcript</h3>
+                            <div class="transcript-container" id="detailTranscript">
+                                <!-- Styled Chat Turns -->
+                            </div>
+                        </div>
+                    </div>
+                </section>
+            </div>
+        </main>
+    </div>
+
+    <!-- Lead Submission Modal -->
+    <div class="modal-overlay" id="simulateModal">
+        <div class="modal-card">
+            <div class="modal-header">
+                <h2><i class="fa-solid fa-paper-plane"></i> Dispatch Outbound Agent</h2>
+                <button class="modal-close" onclick="closeSimulateModal()"><i class="fa-solid fa-xmark"></i></button>
+            </div>
+
+            <!-- Quick Demo Presets -->
+            <div class="form-group">
+                <label><i class="fa-solid fa-wand-magic-sparkles"></i> Quick Demo Presets</label>
+                <div class="preset-pills">
+                    <button type="button" class="preset-pill" onclick="fillPresetLead('hot')">🔥 Hot Enterprise Prospect</button>
+                    <button type="button" class="preset-pill" onclick="fillPresetLead('urgent')">⚡ Immediate Buyer</button>
+                    <button type="button" class="preset-pill" onclick="fillPresetLead('casual')">❄️ Casual Inquiry</button>
+                </div>
+            </div>
+
+            <form id="leadForm" onsubmit="submitLead(event)">
+                <div class="form-group">
+                    <label for="leadName"><i class="fa-solid fa-user"></i> Prospect Name</label>
+                    <input type="text" id="leadName" required placeholder="e.g. Alex Rivera">
+                </div>
+
+                <div class="form-group">
+                    <label for="leadPhone"><i class="fa-solid fa-phone"></i> Phone Number (E.164 Standard)</label>
+                    <input type="tel" id="leadPhone" required placeholder="e.g. +15550199">
+                    <small class="form-help">Must start with country code. E.g. +12025550143 or +923001234567</small>
+                </div>
+
+                <div class="form-group">
+                    <label for="leadCompany"><i class="fa-solid fa-building"></i> Company Name</label>
+                    <input type="text" id="leadCompany" placeholder="e.g. Apex Global Systems">
+                </div>
+
+                <div class="form-group">
+                    <label for="leadProduct"><i class="fa-solid fa-box-open"></i> Product / Service of Interest</label>
+                    <select id="leadProduct">
+                        <option value="Enterprise CRM Integration">Enterprise CRM Integration</option>
+                        <option value="AI Voice Agent Automation">AI Voice Agent Automation</option>
+                        <option value="Cloud Infrastructure Optimization">Cloud Infrastructure Optimization</option>
+                        <option value="Custom API Consulting">Custom API Consulting</option>
+                    </select>
+                </div>
+
+                <div class="modal-actions">
+                    <button type="button" class="btn btn-secondary" onclick="closeSimulateModal()">Cancel</button>
+                    <button type="submit" class="btn btn-primary">
+                        <i class="fa-solid fa-headset"></i> Initiate Agent Call
+                    </button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <!-- Active Call Ringing Toast -->
+    <div class="call-notification hidden" id="callNotification">
+        <div class="call-notification-avatar">
+            <i class="fa-solid fa-headset"></i>
+        </div>
+        <div class="call-notification-body">
+            <h4>CALL-E Outbound Dialing...</h4>
+            <p id="notificationDetails">Dialing prospect...</p>
+        </div>
+    </div>
+
+    <!-- Toast Notification Banner -->
+    <div class="toast-notification" id="toastNotification">
+        <i class="fa-solid fa-circle-check"></i> <span id="toastMessage">Action completed!</span>
+    </div>
+
+    <!-- Javascript -->
+    <script src="/static/app.js"></script>
+</body>
+
+</html>
+The above content shows the entire, complete file contents of the requested file.
