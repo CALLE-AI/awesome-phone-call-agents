@@ -8,6 +8,7 @@ import { authRoutes } from './routes/auth.js';
 import { missionRoutes } from './routes/missions.js';
 import { numberRoutes } from './routes/numbers.js';
 import { tickAllLive } from './workers/missionWorker.js';
+import { dispatchDueScheduled } from './services/dispatch.js';
 
 declare module 'fastify' {
   interface FastifyInstance {
@@ -52,6 +53,7 @@ export async function buildServer() {
   // Background sweeper — drives live missions forward.
   const sweeper = setInterval(() => {
     tickAllLive().catch((e) => app.log.error({ err: e }, 'tickAllLive failed'));
+    dispatchDueScheduled().catch((e) => app.log.error({ err: e }, 'dispatchDueScheduled failed'));
   }, 5000);
   app.addHook('onClose', async () => clearInterval(sweeper));
 

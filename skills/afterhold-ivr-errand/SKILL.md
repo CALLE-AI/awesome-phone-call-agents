@@ -1,12 +1,6 @@
 ---
 name: afterhold-ivr-errand
-description: |
-  Run a real outbound CALL-E call on behalf of a user, capture the conversation, and
-  return a structured brief. AfterHold owns the safety layer, the workspace, and the
-  mission state machine; CALL-E owns the call and the conversation runtime. This skill
-  is a portable workflow: given an authorized E.164 number, a natural-language goal,
-  a language, a schedule, and a result schema, build a CALL-E task, run it (or dry-run),
-  poll status, and persist the brief.
+description: Run one outbound CALL-E call (mock by default, live only with explicit confirmation) on behalf of a user, capture the conversation, and return a structured brief. AfterHold owns the safety layer, the workspace, and the mission state machine; CALL-E owns the call and the conversation runtime. This skill is a portable workflow: given an authorized E.164 number, a natural-language goal, a language, a schedule, and a result schema, build a CALL-E task, run it (or dry-run), poll status, and persist the brief.
 ---
 
 # afterhold-ivr-errand
@@ -68,40 +62,57 @@ still returns — do not retry without surfacing the failure to the user.
 
 ## Side effects
 
-- One outbound CALL-E call (or a queued job for `schedule_at`).
+- One outbound CALL-E call. In the default mock mode no call is placed. A mission with a future
+  `schedule_at` is stored as `scheduled` and dialed by the server at that time, not now.
 - The destination receives a phone call from CALL-E's voice runtime on behalf of the user.
 - The AfterHold server stores the mission, all events, and the resulting brief.
 - The CALL-E free tier is 20 calls per new account. The server enforces a 5-call-per-hour rate limit per user.
 
 ## Cancellation
 
-The user can cancel a live mission at any time:
+The user can cancel a mission:
 
 ```
 POST /v1/missions/:id/cancel
 ```
 
-The mission is recorded as `canceled` regardless of whether CALL-E has finished — this is a hard
-requirement, not best-effort. If CALL-E cannot be yanked mid-call, the cancel records the user's
-intent and stops the local worker.
+What cancel does, and does not do:
+
+- A mission that has not been sent to CALL-E yet (`draft`, `previewed`, `scheduled`) is canceled and
+  will never be dialed.
+- A mission whose call CALL-E has already accepted is marked `canceled` locally and AfterHold stops
+  tracking it. **This does not recall the call.** It may still ring, connect and complete. The response
+  says `call_recalled: false`. Use the CALL-E dashboard if you need to stop an in-flight call.
+- A mission in `submission_unknown` is canceled locally the same way; check the CALL-E dashboard to see
+  whether the call exists.
 
 ## Credentials
 
 AfterHold API requires:
 
-- `AFTERHOLD_API_BASE` — the base URL (e.g. `http://localhost:8787` in dev, `https://api.afterhold.app` in prod).
+- `AFTERHOLD_API_BASE` — base URL. Defaults to `http://127.0.0.1:8787`. A non-local server must be
+  `https` and must also be approved with `AFTERHOLD_ALLOW_ORIGIN=<same origin>`. Credentials are never
+  sent to any other origin and redirects are refused.
 - `AFTERHOLD_JWT` — bearer token. Get one by calling `POST /v1/auth/login` with the user's email + password.
-- `AFTERHOLD_API_KEY` is **never** used by callers. It lives only on the AfterHold server.
+- `CALLE_API_KEY` is **never** used by callers. It lives only on the AfterHold server, which only sends
+  it to `https://api.heycall-e.com` or `https://test-api.heycall-e.com`.
 
 If `AFTERHOLD_API_BASE` or `AFTERHOLD_JWT` is missing, **stop and tell the user** rather than guessing.
 
-## Dry-run
+## Dry-run (the default)
 
-For local development or video demos, run the server with `CALLE_MOCK=1`. The mock adapter walks
-the same phase timeline (`queued → planning → dialing → in_conversation → wrapping → completed`) with
-a believable transcript and a courier-style brief, without burning a real CALL-E call. Default is
-real mode (`CALLE_MOCK=0`); flip to `1` when you don't have a CALL-E account yet, or when you want to
-record the demo video. See [references/server.md](references/server.md).
+The server runs in **mock mode by default** (`CALLE_MOCK=1`). The mock adapter walks the same phase
+timeline (`queued → planning → dialing → in_conversation → wrapping → completed`) with a believable
+transcript and a courier-style brief. No call is placed and no CALL-E key is needed. All sample numbers
+are fictional `555-01xx` numbers.
+
+```bash
+cd apps/typescript/afterhold-api && npm install && npm run dev     # mock mode, 127.0.0.1 only
+node skills/afterhold-ivr-errand/scripts/dry-run.mjs               # in another terminal
+```
+
+`dry-run.mjs` only talks to a loopback server and exits before sending anything if `/health` does not
+report `mock: true`. See [references/server.md](references/server.md).
 
 ## Workflow
 
@@ -123,7 +134,7 @@ Authorization: Bearer $AFTERHOLD_JWT
 Content-Type: application/json
 
 {
-  "e164": "+914400001122",
+  "e164": "+12025550143",
   "display_name": "BlueDart Chennai Hub",
   "goal": "Check if AWB 8821 is out for delivery today. If delayed, get the rider contact and reschedule for tomorrow morning.",
   "language": "en-IN",
@@ -150,15 +161,26 @@ POST /v1/missions/{id}/start
 
 Gates the server runs:
 
+0. Live mode only: the request body must be `{"confirm_live": true}` and the mission must have a
+   `region` (ISO 3166-1 alpha-2, never inferred). Otherwise `400`.
 1. `CALLE_ENABLED` env is `1`. If `0`, return `503`.
 2. User has granted explicit consent. If not, return `412`.
-3. `e164` is on the user's allowlist (skipped under `CALLE_MOCK=1`).
-4. If `schedule_at` is null and we're inside quiet hours, return `429`.
+3. `e164` is on the user's allowlist (skipped under `CALLE_MOCK=1`). Otherwise `403`.
+4. The actual dial time is outside quiet hours. Otherwise `429`.
 5. Rate limit: ≤5 starts per user per hour. Otherwise `429`.
 
-If all gates pass, server creates the call via CALL-E (`POST /v1/calls`) and a background worker
-polls `GET /v1/calls/{id}` every `POLL_INTERVAL_SEC` (8s by default; 1.5s under `CALLE_MOCK=1`).
-First poll waits `POLL_FIRST_DELAY_SEC` (60s in real, 0 in mock).
+**Scheduling.** `schedule_at` must be in the future (past values are `400`) and is checked against
+quiet hours at that time. Starting such a mission stores it as `scheduled`; it is not dialed now. The
+server's sweeper dials it when due and re-runs every gate at that moment, so a schedule cannot be used
+to get around quiet hours, a revoked consent, or the kill switch.
+
+If all gates pass, the server atomically claims the mission and creates the call via CALL-E
+(`POST /v1/calls`), then a background worker polls `GET /v1/calls/{id}` every `POLL_INTERVAL_SEC`
+(8s by default; 1.5s under `CALLE_MOCK=1`). First poll waits `POLL_FIRST_DELAY_SEC` (60s live, 0 mock).
+
+**Unknown creation.** If the create request times out, drops, or returns 5xx, the call may exist. The
+mission becomes `submission_unknown`: it is never auto-retried or replaced, and `/retry` returns `409`
+until you check the CALL-E dashboard and reconcile it.
 
 ### Step 4 — Stream events
 
@@ -182,12 +204,12 @@ When the mission reaches a terminal state, `GET /v1/missions/{id}` returns `brie
   "ended_at": 1736500020000,
   "brief": {
     "outcome": "resolved",
-    "summary_for_user": "BlueDart confirmed AWB 8821 is out for delivery, expected by 4 PM today. Rider is +91 98765 43210.",
+    "summary_for_user": "BlueDart confirmed AWB 8821 is out for delivery, expected by 4 PM today. Rider is +1 202 555 0199.",
     "facts": {
       "tracking_number": "AWB 8821",
       "status": "Out for delivery",
       "expected_time": "4 PM today",
-      "rider_contact": "+91 98765 43210"
+      "rider_contact": "+1 202 555 0199"
     },
     "next_step": "Track from 3:30 PM onward. The rider will call if anything slips.",
     "callee_role": "dispatcher",
@@ -206,14 +228,18 @@ When the mission reaches a terminal state, `GET /v1/missions/{id}` returns `brie
 | No answer / busy | `failed` | `unavailable` |
 | User cancel | `canceled` | — |
 | API 4xx on create | `failed` | `failed` |
+| Create timed out / 5xx (call may exist) | `submission_unknown` | — (reconcile first) |
 | Ambiguous transcript | `completed` | `needs_human` (do not invent facts) |
+
+Phone-like numbers are masked (last 4 digits kept) in every response body: goals, task strings,
+events, briefs and errors. The destination is always returned as a redacted E.164.
 
 Evidence `quote` strings must be spans from the actual transcript. If you cannot point at a span,
 leave the fact empty — do not hallucinate.
 
 ## Example task strings
 
-See [references/examples/](references/examples/) for full worked examples:
+See [examples/](examples/) for full worked examples:
 
 - `courier.json` — BlueDart package tracking
 - `clinic.json` — appointment reschedule
@@ -233,134 +259,60 @@ See [references/examples/](references/examples/) for full worked examples:
 ## Local development
 
 ```bash
-# 1. Boot the API
+# 1. Boot the API (mock mode, loopback only; an ephemeral JWT secret is generated)
 cd apps/typescript/afterhold-api
-cp .env.example .env  # CALLE_MOCK=1 by default
+cp .env.example .env
 npm install
-npm run dev            # http://localhost:8787
+npm run dev            # http://127.0.0.1:8787
 
-# 2. Issue a dev JWT
-TOKEN=$(curl -s -X POST http://localhost:8787/v1/auth/register \
+# 2. Register a dev user and get a JWT (choose your own password)
+TOKEN=$(curl -s -X POST http://127.0.0.1:8787/v1/auth/register \
   -H 'Content-Type: application/json' \
-  -d '{"email":"dev@local","password":"dev12345","name":"Dev"}' | jq -r .access_token)
+  -d '{"email":"dev@example.com","password":"<choose-a-password>","name":"Dev"}' | jq -r .access_token)
 
-# 3. Allowlist a number + grant consent
-curl -X POST http://localhost:8787/v1/auth/consent \
+# 3. Grant consent and allowlist a fictional number
+curl -X POST http://127.0.0.1:8787/v1/auth/consent \
   -H "Authorization: Bearer $TOKEN" -H 'Content-Type: application/json' \
   -d '{"version":"v1","granted":true}'
-curl -X POST http://localhost:8787/v1/numbers \
+curl -X POST http://127.0.0.1:8787/v1/numbers \
   -H "Authorization: Bearer $TOKEN" -H 'Content-Type: application/json' \
-  -d '{"e164":"+914400001122","label":"BlueDart"}'
+  -d '{"e164":"+12025550143","label":"Courier hub"}'
 
-# 4. Start a mission
-MID=$(curl -s -X POST http://localhost:8787/v1/missions \
+# 4. Create, preview, start
+MID=$(curl -s -X POST http://127.0.0.1:8787/v1/missions \
   -H "Authorization: Bearer $TOKEN" -H 'Content-Type: application/json' \
-  -d '{"e164":"+914400001122","display_name":"BlueDart","goal":"Check if AWB 8821 is out for delivery today.","archetype":"courier"}' | jq -r .id)
-curl -X POST http://localhost:8787/v1/missions/$MID/preview -H "Authorization: Bearer $TOKEN"
-curl -X POST http://localhost:8787/v1/missions/$MID/start   -H "Authorization: Bearer $TOKEN"
+  -d '{"e164":"+12025550143","display_name":"Courier hub","goal":"Check if AWB 8821 is out for delivery today.","archetype":"courier","region":"US"}' | jq -r .id)
+curl -X POST http://127.0.0.1:8787/v1/missions/$MID/preview -H "Authorization: Bearer $TOKEN"
+curl -X POST http://127.0.0.1:8787/v1/missions/$MID/start   -H "Authorization: Bearer $TOKEN" \
+  -H 'Content-Type: application/json' -d '{}'
 
 # 5. Wait ~20s, then read the brief
 sleep 25
-curl http://localhost:8787/v1/missions/$MID -H "Authorization: Bearer $TOKEN" | jq .brief
+curl http://127.0.0.1:8787/v1/missions/$MID -H "Authorization: Bearer $TOKEN" | jq .brief
 ```
 
-## Production deployment
+## Live mode
 
-1. Provision Postgres (or keep SQLite for low-traffic demo deployments).
-2. Set `CALLE_MOCK=0` and `CALLE_API_KEY=<real key>` in `.env`.
-3. Set `JWT_SECRET` to 32+ random bytes (`openssl rand -hex 32`).
-4. Set `APP_ORIGIN` to the deployed iOS client's origin.
-5. Run `npm run build && npm start` behind a TLS reverse proxy.
-6. iOS client sets `EXPO_PUBLIC_API_BASE_URL` to the public URL at build time.
-7. Demo with `CALLE_MOCK=1` until you're ready to burn free calls.
+Live mode is opt-in, for operators who control the recipients. It is a hackathon-grade demo path, not
+a production platform.
 
-## Integration paths
+1. Generate a real secret: `JWT_SECRET=$(openssl rand -hex 32)`. The server refuses to boot in live
+   mode, or on a non-loopback `HOST`, with an empty or public-example secret.
+2. Set `CALLE_MOCK=0` and `CALLE_API_KEY=<key>`. `CALLE_BASE_URL` must be one of the approved HTTPS
+   origins (`https://api.heycall-e.com`, `https://test-api.heycall-e.com`) or the server will not boot.
+3. Allowlist only numbers whose owners have authorized the call (`POST /v1/numbers`).
+4. Create each mission with a `region`, and send `{"confirm_live": true}` to `/start` for every run.
+5. Put any non-loopback deployment behind a TLS reverse proxy.
 
-AfterHold supports four ways to invoke missions, all backed by the same safety gates (consent, allowlist, quiet hours, rate limit). Pick whichever fits the caller:
+## Limits
 
-### 1. REST (default, used by the iOS client)
-
-```
-POST   /v1/missions                → draft
-POST   /v1/missions/:id/preview    → previewed (auto-builds the task string)
-POST   /v1/missions/:id/start      → queued (places the call via CALL-E)
-GET    /v1/missions/:id            → status + brief when terminal
-```
-
-### 2. MCP — Streamable HTTP (Claude Code / Codex / Cursor / Hermes)
-
-AfterHold exposes the same surface as CALL-E's own MCP server, but every dial passes through the AfterHold safety layer. Useful when you want an AI agent to fire calls without writing bespoke REST code.
-
-```
-POST   /v1/mcp    Accept: application/json, text/event-stream
-       { jsonrpc: "2.0", method: "tools/call", params: { name: "plan_call", arguments: {...} } }
-```
-
-Tools exposed:
-
-| Tool | Purpose |
-|---|---|
-| `plan_call(goal, phone, archetype?)` | Draft a mission, return `plan_id`. Does NOT place a call. |
-| `run_call(plan_id)` | Start the planned mission. CAN place a real call. |
-| `get_call_run(run_id)` | Poll status + structured result. |
-| `list_runs(filter?, limit?)` | List recent missions for the authenticated user. |
-
-Same Bearer JWT auth as REST. External clients register via `POST /v1/auth/register`, then point their MCP client at `https://<your-host>/v1/mcp`. The MCP SDK handles the Streamable HTTP / SSE handshake automatically.
-
-Minimal Claude Code config:
-
-```json
-{
-  "mcpServers": {
-    "afterhold": {
-      "type": "streamable-http",
-      "url": "https://api.afterhold.app/v1/mcp",
-      "headers": { "Authorization": "Bearer <AFTERHOLD_JWT>" }
-    }
-  }
-}
-```
-
-### 3. TypeScript SDK — `@call-e/calle` (server-side only)
-
-The AfterHold backend uses the official `@call-e/calle` SDK in `src/adapters/calle.ts` instead of raw `fetch`. The adapter loads the SDK lazily (it is ESM-only) and maps the SDK's `Call` shape to our internal `CallStatusResponse`. To use it from your own backend:
-
-```bash
-npm install @call-e/calle
-```
-
-```ts
-import { CalleClient } from '@call-e/calle';
-const calle = new CalleClient({ apiKey: process.env.CALLE_API_KEY });
-const call = await calle.calls.create({
-  task,
-  resultSchema,
-  recipient: { phones: [e164], locale: 'en-IN' },
-});
-const status = await calle.calls.get(call.id);
-```
-
-### 4. CLI — `@call-e/cli` (developer convenience)
-
-The CALL-E CLI provides OAuth brokered login and MCP client configuration:
-
-```bash
-npm install -g @call-e/cli
-calle auth login         # OAuth brokered login
-calle mcp tools          # list MCP tools from the CALL-E cloud
-calle mcp add afterhold  # register an MCP server entry pointing at /v1/mcp
-```
-
-The CLI is included as a devDependency in `afterhold-api` for local development; you do not need to install it separately to run the server.
-
-### Choosing a path
-
-| Caller | Best path |
-|---|---|
-| iOS / Android client | REST |
-| AI agent (Claude Code, Codex, Cursor, Hermes, etc.) | MCP |
-| Another backend you control | TypeScript SDK + REST |
-| Local dev / one-off script | CLI + MCP, or the bundled `scripts/run-mission.mjs` |
+- Cancellation is local; it does not recall an accepted call (see above).
+- One recipient per mission; no batch calls.
+- Scheduling is checked in the server's local timezone (`Date#getHours`).
+- Single process; SQLite by default. No outbox or distributed locks. Reconciling a
+  `submission_unknown` mission is a manual step.
+- Briefs are advisory. `needs_human` is the default when a result is missing or not in the enum.
+- The REST API is the only integration path. There is no MCP endpoint and no SDK dependency.
 
 ## See also
 
@@ -368,7 +320,9 @@ The CLI is included as a devDependency in `afterhold-api` for local development;
 - [references/task-template.md](references/task-template.md) — exact task-string format
 - [references/server.md](references/server.md) — server env, cadence, kill switches
 - [references/failure-mapping.md](references/failure-mapping.md) — full failure table
+- [references/safety.md](references/safety.md) — safety rules
+- [references/examples.md](references/examples.md) — usage examples
 - [scripts/dry-run.mjs](scripts/dry-run.mjs) — local dry-run script (no live calls)
-- [scripts/run-mission.mjs](scripts/run-mission.mjs) — full mission runner (uses live or mock)
+- [scripts/run-mission.mjs](scripts/run-mission.mjs) — mission runner (mock, or live with explicit confirmation)
 - [examples/](examples/) — worked JSON examples
 - [CALLE-AI/call-e-integrations](https://github.com/CALLE-AI/call-e-integrations) — official SDK, MCP, CLI, and skill packages

@@ -1,6 +1,7 @@
 {
   "archetype": "clinic",
-  "e164": "+914400003344",
+  "e164": "+12025550178",
+  "region": "US",
   "display_name": "Dr. Mehta Clinic",
   "goal": "Confirm tomorrow's 4:30 PM appointment with Dr. Mehta, ask for any prep instructions, and reschedule if unavailable.",
   "language": "en-IN",

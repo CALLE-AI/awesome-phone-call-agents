@@ -1,8 +1,9 @@
 {
-  "archetype": "utility",
-  "e164": "+911155500011",
-  "display_name": "Tata Power — Mumbai",
-  "goal": "Confirm the electricity outage status in our area, capture the expected restoration time, and ask for a reference number.",
+  "archetype": "courier",
+  "e164": "+12025550143",
+  "region": "US",
+  "display_name": "BlueDart Chennai Hub",
+  "goal": "Check if AWB 8821 is out for delivery today. If delayed, get the rider contact and reschedule delivery for tomorrow morning.",
   "language": "en-IN",
   "extract_schema": {
     "type": "object",
@@ -13,10 +14,10 @@
       "facts": {
         "type": "object",
         "properties": {
-          "account_number": { "type": "string" },
-          "service_type": { "type": "string" },
-          "reference_number": { "type": "string" },
-          "next_action_by_user": { "type": "string" }
+          "tracking_number": { "type": "string" },
+          "status": { "type": "string", "enum": ["Out for delivery", "Delayed", "Delivered", "Not shipped", "Unknown"] },
+          "expected_time": { "type": "string" },
+          "rider_contact": { "type": "string" }
         },
         "additionalProperties": true
       },

@@ -1,5 +1,8 @@
 import { REFUSAL_BLOCK } from '../lib/types.js';
 import type { MissionArchetype } from '../lib/types.js';
+import { getUser } from './auth.js';
+import { factsHint } from './resultSchema.js';
+import type { MissionRow } from './missions.js';
 
 export interface RenderTaskInput {
   e164: string;
@@ -55,4 +58,18 @@ export function renderTaskString(input: RenderTaskInput): string {
   ]
     .filter(Boolean)
     .join('\n');
+}
+
+/** Render the task string for a stored mission. */
+export function buildTaskFor(m: MissionRow): string {
+  const u = getUser(m.user_id)!;
+  return renderTaskString({
+    e164: m.e164,
+    goal: m.goal,
+    language: m.language,
+    archetype: m.archetype,
+    userName: u.name,
+    displayName: m.display_name,
+    extractSchemaFactsHint: factsHint(m.archetype),
+  });
 }

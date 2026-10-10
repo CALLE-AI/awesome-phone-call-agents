@@ -28,9 +28,14 @@ export function isQuietHours(nowMs: number, start: number, end: number): boolean
   return h >= start || h < end;
 }
 
-export function ensureNotQuietHours(quietStart: number, quietEnd: number) {
-  if (isQuietHours(now(), quietStart, quietEnd)) {
-    const e: any = new Error('Quiet hours are in effect. Schedule for later instead.');
+/**
+ * Refuse a dial that would happen inside quiet hours. `atMs` is when the call
+ * will actually be placed: now for an immediate start, `schedule_at` when
+ * scheduling. The dispatcher checks again at the real dial time.
+ */
+export function ensureNotQuietHours(quietStart: number, quietEnd: number, atMs: number = now()) {
+  if (isQuietHours(atMs, quietStart, quietEnd)) {
+    const e: any = new Error('That time is inside quiet hours. Pick a time outside them.');
     e.statusCode = 429;
     throw e;
   }

@@ -6,6 +6,8 @@
 export type MissionStatus =
   | 'draft'
   | 'previewed'
+  // Accepted for a future time; nothing has been sent to CALL-E yet.
+  | 'scheduled'
   | 'queued'
   | 'planning'
   | 'dialing'
@@ -14,7 +16,10 @@ export type MissionStatus =
   | 'completed'
   | 'voicemail'
   | 'failed'
-  | 'canceled';
+  | 'canceled'
+  // The create request may or may not have reached CALL-E (timeout, network
+  // error, 5xx). Blocks retry until an operator reconciles it.
+  | 'submission_unknown';
 
 export type MissionArchetype = 'courier' | 'clinic' | 'restaurant' | 'utility' | 'general';
 

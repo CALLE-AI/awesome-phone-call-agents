@@ -15,6 +15,7 @@ export interface MissionRow {
   goal: string;
   language: string;
   archetype: MissionArchetype;
+  region: string | null;
   schedule_at: number | null;
   extract_schema: string;
   consent_snapshot: string;
@@ -38,8 +39,8 @@ export const listMissions = (userId: string, statusFilter?: 'live' | 'scheduled'
   let where = 'user_id = ?';
   const args: any[] = [userId];
   if (statusFilter === 'live') where += " AND status IN ('queued','planning','dialing','in_conversation','wrapping')";
-  if (statusFilter === 'scheduled') where += " AND status = 'previewed' AND schedule_at IS NOT NULL";
-  if (statusFilter === 'done') where += " AND status IN ('completed','voicemail','failed','canceled')";
+  if (statusFilter === 'scheduled') where += " AND status = 'scheduled'";
+  if (statusFilter === 'done') where += " AND status IN ('completed','voicemail','failed','canceled','submission_unknown')";
   return db
     .prepare(`SELECT * FROM missions WHERE ${where} ORDER BY updated_at DESC LIMIT 50`)
     .all(...args) as MissionRow[];
@@ -52,6 +53,7 @@ export const createMission = (input: {
   goal: string;
   language: string;
   archetype: MissionArchetype;
+  region: string | null;
   scheduleAt: number | null;
   extractSchema: object;
   consentSnapshot: object;
@@ -61,10 +63,10 @@ export const createMission = (input: {
   const idem = hashKey(input.userId, input.e164, input.goal, input.scheduleAt ?? 'now', Math.floor(t / 600_000));
   db.prepare(
     `INSERT INTO missions (
-      id, user_id, e164, display_name, goal, language, archetype,
+      id, user_id, e164, display_name, goal, language, archetype, region,
       schedule_at, extract_schema, consent_snapshot, status,
       idempotency_key, created_at, updated_at
-    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'draft', ?, ?, ?)`,
+    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'draft', ?, ?, ?)`,
   ).run(
     id,
     input.userId,
@@ -73,6 +75,7 @@ export const createMission = (input: {
     input.goal,
     input.language,
     input.archetype,
+    input.region,
     input.scheduleAt,
     JSON.stringify(input.extractSchema),
     JSON.stringify(input.consentSnapshot),
@@ -102,6 +105,21 @@ export const updateMission = (id: string, patch: Partial<MissionRow>) => {
     next.schedule_at,
     id,
   );
+};
+
+/**
+ * Atomically move a mission from one of `from` to `to`. Returns false when the
+ * mission was not in an allowed state (already started, canceled, or claimed by
+ * a concurrent request), so callers never place a second call for one mission.
+ */
+export const claimStatus = (id: string, from: MissionStatus[], to: MissionStatus): boolean => {
+  const placeholders = from.map(() => '?').join(',');
+  const res = db
+    .prepare(`UPDATE missions SET status = ?, updated_at = ? WHERE id = ? AND status IN (${placeholders})`)
+    .run(to, now(), id, ...from);
+  if (res.changes !== 1) return false;
+  appendEvent(id, 'afterhold', 'status', { status: to, error: null });
+  return true;
 };
 
 export const setStatus = (id: string, status: MissionStatus, error?: string) => {

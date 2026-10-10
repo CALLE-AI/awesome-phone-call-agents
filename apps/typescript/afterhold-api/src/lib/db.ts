@@ -53,6 +53,7 @@ db.exec(`
     goal TEXT NOT NULL,
     language TEXT NOT NULL DEFAULT 'en-IN',
     archetype TEXT NOT NULL DEFAULT 'general',
+    region TEXT,
     schedule_at INTEGER,
     extract_schema TEXT NOT NULL,
     consent_snapshot TEXT NOT NULL,
@@ -107,5 +108,9 @@ db.exec(`
   );
   CREATE INDEX IF NOT EXISTS idx_rate_user_time ON rate_limit_log(user_id, started_at);
 `);
+
+// Additive migration for databases created before the `region` column existed.
+const missionCols = db.prepare('PRAGMA table_info(missions)').all() as Array<{ name: string }>;
+if (!missionCols.some((c) => c.name === 'region')) db.exec('ALTER TABLE missions ADD COLUMN region TEXT');
 
 export type DB = typeof db;

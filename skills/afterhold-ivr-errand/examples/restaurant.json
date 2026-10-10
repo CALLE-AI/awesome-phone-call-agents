@@ -1,8 +1,9 @@
 {
-  "archetype": "courier",
-  "e164": "+914400001122",
-  "display_name": "BlueDart Chennai Hub",
-  "goal": "Check if AWB 8821 is out for delivery today. If delayed, get the rider contact and reschedule delivery for tomorrow morning.",
+  "archetype": "restaurant",
+  "e164": "+13125550164",
+  "region": "US",
+  "display_name": "Pizza Hut Bandra",
+  "goal": "Confirm a 7:30 PM table for two tonight, ask about wait time, and capture any dietary accommodations the restaurant can hold.",
   "language": "en-IN",
   "extract_schema": {
     "type": "object",
@@ -13,10 +14,10 @@
       "facts": {
         "type": "object",
         "properties": {
-          "tracking_number": { "type": "string" },
-          "status": { "type": "string", "enum": ["Out for delivery", "Delayed", "Delivered", "Not shipped", "Unknown"] },
-          "expected_time": { "type": "string" },
-          "rider_contact": { "type": "string" }
+          "reservation_time": { "type": "string" },
+          "party_size": { "type": "integer" },
+          "wait_minutes": { "type": "integer" },
+          "dietary_accommodations": { "type": "string" }
         },
         "additionalProperties": true
       },

@@ -46,7 +46,7 @@ The server adds these typed properties per archetype:
   "tracking_number": "AWB 8821",
   "status": "Out for delivery",
   "expected_time": "4 PM today",
-  "rider_contact": "+91 98765 43210"
+  "rider_contact": "+1 202 555 0199"
 }
 ```
 
