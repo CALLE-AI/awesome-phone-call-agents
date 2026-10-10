@@ -1,0 +1,185 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>HELO Voice Bridge — Dashboard</title>
+  <meta name="description" content="HELO Voice Bridge booking verification dashboard." />
+
+  <!-- Fonts: Syne (display) + IBM Plex Sans (body) -->
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:wght@400;500;600&family=Syne:wght@700;800&display=swap" rel="stylesheet" />
+
+  <link rel="stylesheet" href="style.css" />
+</head>
+<body>
+
+<!-- Ambient warm glow -->
+<div class="glow-bg"></div>
+
+<!-- ── User bar ─────────────────────────────────────────────────────────── -->
+<header class="user-bar">
+  <a href="/" class="user-bar-logo">
+    <span class="logo-icon">📞</span>
+    <span class="user-bar-brand">HELO <span class="accent-text">Voice Bridge</span></span>
+  </a>
+
+  <div class="user-bar-right">
+    <!-- Real call budget counter -->
+    <div class="budget-counter" id="budget-counter" title="Real CALL-E calls placed this server session">
+      <span class="budget-icon">📞</span>
+      <span id="budget-label">Real calls: <strong id="budget-used">?</strong>/<strong id="budget-cap">5</strong></span>
+    </div>
+
+    <!-- Business identity -->
+    <div class="user-info">
+      <span class="user-biz-name" id="user-biz-name">Loading…</span>
+      <span class="badge badge-info" id="user-biz-type"></span>
+    </div>
+
+    <!-- Logout -->
+    <button class="btn-ghost-sm" id="logout-btn">Log out</button>
+  </div>
+</header>
+
+<!-- ── Admin switcher band (hidden — shown with ?admin=1) ──────────────── -->
+<div class="admin-switcher" id="admin-switcher" style="display:none;">
+  <span>👁 Admin view:</span>
+  <select id="admin-biz-select" class="admin-select">
+    <option value="">— choose business —</option>
+  </select>
+</div>
+
+<!-- ── Main content ─────────────────────────────────────────────────────── -->
+<div class="app-container">
+
+  <header class="app-header">
+    <p class="subtitle" id="dashboard-subtitle">Voice AI Booking Verification</p>
+  </header>
+
+  <main class="dashboard-grid">
+
+    <!-- ── Form panel ──────────────────────────────────────────────────── -->
+    <section class="card form-section" aria-label="Schedule verification form">
+      <h2 id="form-title">Schedule Verification</h2>
+      <p class="section-desc" id="form-desc">
+        Add a booking below. HELO will call the customer to confirm
+        when the threshold is reached, or you can trigger a call manually.
+      </p>
+
+      <form id="new-booking-form" autocomplete="off">
+        <div class="form-group">
+          <label for="customer-name" id="name-label">Customer name</label>
+          <input
+            type="text"
+            id="customer-name"
+            placeholder="e.g. Aarav Sharma"
+            required
+          />
+        </div>
+
+        <div class="form-group">
+          <label for="customer-phone">Phone number</label>
+          <input
+            type="tel"
+            id="customer-phone"
+            placeholder="+1 555 000 0000"
+            required
+          />
+        </div>
+
+        <div class="form-group">
+          <label for="booking-datetime">Date &amp; time</label>
+          <input
+            type="datetime-local"
+            id="booking-datetime"
+            required
+          />
+        </div>
+
+        <div class="form-group" style="display:flex; align-items:center; gap:0.6rem; margin-bottom:1.4rem;">
+          <input
+            type="checkbox"
+            id="mock-mode-toggle"
+            style="width:auto; accent-color:var(--copper); cursor:pointer;"
+          />
+          <label for="mock-mode-toggle" style="margin:0; color:var(--cream); font-size:0.82rem; cursor:pointer;">
+            Mock mode <span style="color:var(--muted); font-weight:400;">— simulate call, no real dial</span>
+          </label>
+        </div>
+
+        <button type="submit" class="btn btn-primary btn-full" id="create-btn">
+          <span id="create-btn-label">Create booking</span>
+        </button>
+      </form>
+    </section>
+
+    <!-- ── Records panel ────────────────────────────────────────────────── -->
+    <section class="card list-section" aria-label="Active booking records">
+      <div class="list-header">
+        <div>
+          <h2>Active Records</h2>
+          <p class="section-desc" style="margin-bottom:0;">
+            Calling cards are raised above the surface. Resolved records settle back down.
+          </p>
+        </div>
+        <span
+          class="badge badge-info"
+          id="booking-count"
+          style="flex-shrink:0; font-size:0.8rem; padding:0.25rem 0.7rem;"
+        >0</span>
+      </div>
+
+      <div class="bookings-grid" id="bookings-list">
+        <div class="loading-spinner">Loading records…</div>
+      </div>
+    </section>
+
+  </main>
+</div>
+
+
+<!-- ══════════════════════════════════════════════════════
+     LOG MODAL
+     ══════════════════════════════════════════════════════ -->
+<div class="modal" id="log-modal" role="dialog" aria-modal="true" aria-labelledby="modal-booking-name">
+  <div class="modal-content">
+
+    <div class="modal-header">
+      <h3 id="modal-booking-name">Call log</h3>
+      <button class="close-modal-btn" id="close-modal" aria-label="Close log">✕</button>
+    </div>
+
+    <div class="modal-body">
+      <!-- Summary banner -->
+      <div class="booking-summary-banner">
+        <div>
+          <h4 id="modal-booking-name" style="font-size:0.9rem;">—</h4>
+          <p id="modal-booking-phone">—</p>
+        </div>
+        <span class="badge badge-pending" id="modal-booking-status">—</span>
+      </div>
+
+      <!-- Tabs -->
+      <div class="log-tabs">
+        <button class="tab-btn active" data-tab="live-logs">Live logs</button>
+        <button class="tab-btn" data-tab="raw-json">Raw JSON</button>
+      </div>
+
+      <div class="tab-content active" id="tab-live-logs">
+        <pre class="log-terminal" id="terminal-logs">No logs yet.</pre>
+      </div>
+
+      <div class="tab-content" id="tab-raw-json">
+        <pre class="json-viewer" id="raw-json-content">null</pre>
+      </div>
+    </div>
+
+  </div>
+</div>
+
+
+<script src="app.js"></script>
+</body>
+</html>
