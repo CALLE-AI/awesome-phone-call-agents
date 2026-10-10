@@ -1,0 +1,57 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "sqlite"
+  url      = env("DATABASE_URL")
+}
+
+// Enums removed for SQLite compatibility; use strings for portability in dev
+
+model Patient {
+  id            String      @id @default(uuid())
+  first_name    String
+  last_name     String
+  phone_number  String
+  date_of_birth DateTime
+  email         String?
+  appointments  Appointment[]
+  waitlist      Waitlist[]
+  call_logs     CallLog[]
+}
+
+model Appointment {
+  id                 String            @id @default(uuid())
+  patient            Patient?          @relation(fields: [patient_id], references: [id])
+  patient_id         String?
+  provider_name      String
+  department         String
+  scheduled_at       DateTime
+  status             String @default("BOOKED")
+  is_backfill_eligible Boolean         @default(true)
+  created_at         DateTime          @default(now())
+}
+
+model Waitlist {
+  id                  String        @id @default(uuid())
+  patient             Patient       @relation(fields: [patient_id], references: [id])
+  patient_id          String
+  preferred_department String
+  target_provider     String?
+  priority_score      Int           @default(1)
+  status              String @default("WAITING")
+  created_at          DateTime      @default(now())
+}
+
+model CallLog {
+  id               String    @id @default(uuid())
+  calle_call_id    String
+  direction        String
+  patient          Patient   @relation(fields: [patient_id], references: [id])
+  patient_id       String
+  status           String
+  transcript_summary String?
+  structured_output String?
+  created_at       DateTime  @default(now())
+}
