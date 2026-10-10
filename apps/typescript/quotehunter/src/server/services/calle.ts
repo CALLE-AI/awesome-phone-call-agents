@@ -247,11 +247,7 @@ Compliance & Safety:
 
         if (!createRes.ok || !createData?.id) {
           const errMsg = createData?.error?.message || `API error ${createRes.status}`;
-          const errDetails = createData?.error?.details?.validation_errors
-            ? JSON.stringify(createData.error.details.validation_errors)
-            : JSON.stringify(createData?.error?.details || createData);
-
-          console.error(`❌ [CALL-E Live] Call creation failed for ${vendor.name}:`, errMsg, errDetails);
+          console.error('❌ [CALL-E Live] Call creation failed:', maskSensitiveText(errMsg));
           onVendorUpdate(vendor.id, {
             status: 'failed',
             providerNotes: `Call failed: ${errMsg}`,
@@ -288,7 +284,7 @@ Compliance & Safety:
           });
           return;
         }
-        console.error(`❌ [CALL-E Live] Unhandled error for ${vendor.name} (${maskPhoneNumber(vendor.phone)}):`, err);
+        console.error('❌ [CALL-E Live] Unhandled call error:', maskSensitiveText(String(err?.message || 'Call failed')));
         onVendorUpdate(vendor.id, {
           status: 'error',
           providerNotes: `Error: ${err.message || 'Call failed'}`,

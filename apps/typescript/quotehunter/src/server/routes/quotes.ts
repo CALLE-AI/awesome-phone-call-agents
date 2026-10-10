@@ -142,8 +142,9 @@ quotesRouter.post('/', async (req, res) => {
       job: sanitizeJobForResponse(job),
     });
   } catch (err: any) {
-    console.error('Failed to create quote hunt:', err);
-    res.status(500).json({ success: false, error: err.message || 'Internal server error' });
+    const message = maskSensitiveText(String(err?.message || 'Internal server error'));
+    console.error('Failed to create quote hunt:', message);
+    res.status(500).json({ success: false, error: message });
   }
 });
 
