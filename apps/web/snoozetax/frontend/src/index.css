@@ -1,0 +1,506 @@
+/* ── SnoozeTax design system ──────────────────────────────────────────
+   Neo-brutalist: hard ink borders, offset solid shadows, no blur, no
+   gradient decoration. Yellow is the alarm, pink is the consequence. */
+
+:root {
+  --yellow:      #FFD23F;
+  --yellow-soft: #FFE99A;
+  --ink:         #16140E;
+  --pink:        #FF3366;
+  --cream:       #FFF8E7;
+  --green:       #1AB867;
+  --paper:       #FFFFFF;
+  --night:       #14120D;
+
+  --sans:    'Space Grotesk', system-ui, sans-serif;
+  --display: 'Archivo Black', system-ui, sans-serif;
+  --mono:    'JetBrains Mono', ui-monospace, monospace;
+
+  --border: 3px solid var(--ink);
+  --shadow:    5px 5px 0 var(--ink);
+  --shadow-lg: 9px 9px 0 var(--ink);
+  --radius: 16px;
+
+  --page: 1080px;
+}
+
+* { box-sizing: border-box; margin: 0; padding: 0; }
+
+/* The header is sticky, so an un-padded anchor jump hides the heading behind
+   it. Applies to every #anchor on the site, not just the flow diagram. */
+html { scroll-behavior: smooth; scroll-padding-top: 96px; }
+@media (prefers-reduced-motion: reduce) {
+  html { scroll-behavior: auto; }
+  *, *::before, *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+  }
+}
+
+body {
+  font-family: var(--sans);
+  background: var(--cream);
+  color: var(--ink);
+  line-height: 1.55;
+  -webkit-font-smoothing: antialiased;
+}
+
+/* The footer must sit at the bottom of the viewport even when the signed-in
+   view is short, so the app root is a full-height column and the content
+   between header and footer takes up the slack. */
+html, body, #root { min-height: 100%; }
+#root {
+  display: flex; flex-direction: column; min-height: 100vh;
+}
+#root > main, #root > .auth-shell, #root > .landing { flex: 1 0 auto; }
+#root > .site-foot { flex-shrink: 0; }
+
+h1, h2, h3, h4 { font-family: var(--display); line-height: 1.02; letter-spacing: -0.02em; }
+a { color: inherit; }
+button { font-family: inherit; cursor: pointer; border: none; background: none; color: inherit; }
+input, select { font-family: inherit; font-size: 1rem; }
+
+:focus-visible {
+  outline: 3px solid var(--pink);
+  outline-offset: 3px;
+}
+
+.wrap {
+  width: 100%; max-width: var(--page); margin: 0 auto;
+  /* Inline only: a `padding: 0 24px` shorthand here silently zeroed the
+     vertical padding of .hero and .app-main, because index.css is bundled
+     after pages.css and .wrap has equal specificity. */
+  padding-inline: 24px;
+}
+
+/* ── Buttons ────────────────────────────────────────────────────── */
+.btn {
+  display: inline-flex; align-items: center; justify-content: center; gap: 10px;
+  font-family: var(--display); font-size: 15px; letter-spacing: 0.01em;
+  padding: 15px 26px; border-radius: 13px;
+  background: var(--yellow); color: var(--ink);
+  border: var(--border); box-shadow: var(--shadow);
+  transition: transform .08s, box-shadow .08s;
+  text-decoration: none; text-align: center;
+}
+.btn:hover { transform: translate(-1px,-1px); box-shadow: 6px 6px 0 var(--ink); }
+.btn:active { transform: translate(5px,5px); box-shadow: 0 0 0 var(--ink); }
+.btn[disabled] { opacity: .5; cursor: not-allowed; transform: none; box-shadow: var(--shadow); }
+.btn.pink  { background: var(--pink);  color: var(--cream); }
+.btn.ink   { background: var(--ink);   color: var(--yellow); }
+.btn.paper { background: var(--paper); }
+.btn.lg    { font-size: 18px; padding: 19px 34px; }
+.btn.sm    { font-size: 13px; padding: 10px 16px; border-width: 2px; box-shadow: 3px 3px 0 var(--ink); }
+.btn.full  { width: 100%; }
+.btn.quiet {
+  background: transparent; box-shadow: none; border-style: dashed;
+}
+
+/* ── Cards ──────────────────────────────────────────────────────── */
+.card {
+  background: var(--paper); border: var(--border);
+  border-radius: var(--radius); box-shadow: var(--shadow); padding: 26px;
+}
+.card.flat   { box-shadow: none; }
+.card.yellow { background: var(--yellow); }
+.card.ink    { background: var(--ink); color: var(--cream); }
+.card.pink   { background: var(--pink); color: var(--cream); }
+
+.tag {
+  display: inline-flex; align-items: center; gap: 6px;
+  padding: 5px 12px; border-radius: 999px;
+  border: 2px solid var(--ink); background: var(--cream);
+  font-size: 13px; font-weight: 700; white-space: nowrap;
+}
+.tag.pink   { background: var(--pink);   color: var(--cream); }
+.tag.green  { background: var(--green);  color: #fff; }
+.tag.yellow { background: var(--yellow); }
+
+/* ── Forms ──────────────────────────────────────────────────────── */
+.field { display: block; margin-bottom: 18px; }
+.field > span {
+  display: block; font-family: var(--display); font-size: 12px;
+  letter-spacing: .06em; margin-bottom: 7px;
+}
+.input {
+  width: 100%; padding: 14px 16px;
+  border: var(--border); border-radius: 12px;
+  background: var(--paper); color: var(--ink);
+}
+.input:focus { outline: none; box-shadow: inset 0 0 0 3px var(--yellow); }
+.input.big {
+  font-family: var(--mono); font-size: 30px; font-weight: 800;
+  text-align: center; letter-spacing: .18em;
+}
+.err {
+  color: var(--pink); font-weight: 700; font-size: 14px; margin-top: 8px;
+}
+
+/* ── Site header ────────────────────────────────────────────────── */
+.site-head {
+  position: sticky; top: 0; z-index: 50;
+  background: var(--cream); border-bottom: var(--border);
+}
+.site-head .inner {
+  display: flex; align-items: center; justify-content: space-between;
+  gap: 20px; height: 70px;
+}
+.logo {
+  display: flex; align-items: center; gap: 10px;
+  font-family: var(--display); font-size: 19px; text-decoration: none;
+}
+.site-nav { display: flex; align-items: center; gap: 26px; }
+.site-nav a {
+  font-weight: 700; font-size: 15px; text-decoration: none;
+  padding: 4px 0; border-bottom: 3px solid transparent;
+}
+.site-nav a:hover { border-bottom-color: var(--ink); }
+.nav-toggle { display: none; }
+
+@media (max-width: 760px) {
+  .site-nav {
+    display: none; position: absolute; top: 70px; left: 0; right: 0;
+    flex-direction: column; align-items: stretch; gap: 0;
+    background: var(--cream); border-bottom: var(--border);
+    padding: 8px 24px 20px;
+  }
+  .site-nav.open { display: flex; }
+  .site-nav a { padding: 14px 0; border-bottom: 2px solid rgba(22,20,14,.12); }
+  .site-nav .btn { margin-top: 14px; }
+  .nav-toggle {
+    display: inline-flex; align-items: center; justify-content: center;
+    width: 44px; height: 44px; border: var(--border); border-radius: 11px;
+    background: var(--paper); box-shadow: 3px 3px 0 var(--ink);
+  }
+}
+
+/* ── Footer ─────────────────────────────────────────────────────── */
+.site-foot {
+  background: var(--ink); color: var(--cream);
+  border-top: var(--border); margin-top: 90px; padding: 56px 0 30px;
+  flex-shrink: 0;
+}
+.foot-grid {
+  display: grid; grid-template-columns: 2fr 1fr 1fr 1fr;
+  gap: 40px; margin-bottom: 44px;
+}
+.foot-grid h4 {
+  font-size: 13px; letter-spacing: .08em; margin-bottom: 14px; color: var(--yellow);
+}
+.foot-grid ul { list-style: none; display: grid; gap: 9px; }
+.foot-grid a, .foot-grid li {
+  font-size: 14px; color: rgba(255,248,231,.72); text-decoration: none;
+}
+.foot-grid a:hover { color: var(--yellow); }
+.foot-bottom {
+  border-top: 1px solid rgba(255,248,231,.16); padding-top: 22px;
+  display: flex; justify-content: space-between; gap: 16px; flex-wrap: wrap;
+  font-size: 13px; color: rgba(255,248,231,.5);
+}
+@media (max-width: 760px) {
+  .foot-grid { grid-template-columns: 1fr 1fr; gap: 30px; }
+}
+
+/* ── Utilities ──────────────────────────────────────────────────── */
+.stack   { display: flex; flex-direction: column; gap: 20px; }
+.row     { display: flex; align-items: center; gap: 12px; }
+.wrapped { flex-wrap: wrap; }
+.grow    { flex: 1; }
+.center  { text-align: center; }
+.muted   { opacity: .62; }
+.mono    { font-family: var(--mono); }
+.sr-only {
+  position: absolute; width: 1px; height: 1px; padding: 0; margin: -1px;
+  overflow: hidden; clip: rect(0,0,0,0); white-space: nowrap; border: 0;
+}
+
+/* What was actually sent to CALL-E, shown in the test panel. Long task prompts
+   and schemas are scrollable rather than pushing the page open. */
+.code-block {
+  font-family: var(--mono);
+  font-size: 12.5px;
+  line-height: 1.55;
+  background: var(--ink);
+  color: #F4F1E8;
+  border: var(--border);
+  box-shadow: var(--shadow);
+  border-radius: 6px;
+  padding: 12px 14px;
+  margin: 0;
+  max-height: 260px;
+  overflow: auto;
+  white-space: pre-wrap;
+  word-break: break-word;
+}
+
+/* Prompt inspector: the challenge, shown as code -> reversed answer. */
+.challenge-demo {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 18px;
+  flex-wrap: wrap;
+  margin: 16px 0;
+  padding: 16px;
+  background: var(--paper);
+  color: var(--ink);
+  border: var(--border);
+  border-radius: 10px;
+}
+.challenge-demo > div { display: flex; flex-direction: column; align-items: center; gap: 4px; }
+.cd-label {
+  font-size: 11.5px; font-weight: 700; letter-spacing: .07em;
+  text-transform: uppercase; opacity: .6;
+}
+.cd-value { font-family: var(--mono); font-size: 34px; font-weight: 700; letter-spacing: .12em; }
+.cd-arrow { font-size: 26px; font-weight: 700; opacity: .5; }
+
+/* The parent card is dark, so these keep its light text on purpose. */
+.challenge-notes { margin: 0; font-size: 14px; }
+.challenge-notes dt {
+  font-weight: 700; margin-top: 12px;
+  font-size: 11.5px; letter-spacing: .07em; text-transform: uppercase; opacity: .75;
+}
+.challenge-notes dd { margin: 3px 0 0; opacity: .95; line-height: 1.5; }
+.challenge-notes ul { margin: 0; padding-left: 18px; }
+.challenge-notes li { margin-bottom: 4px; }
+
+/* The rescue code on the wake page: big enough to read half asleep. */
+.reveal-code {
+  font-family: var(--mono);
+  font-size: 52px;
+  font-weight: 700;
+  letter-spacing: .2em;
+  text-align: center;
+  padding: 14px 10px 14px 20px;
+  margin: 14px 0 4px;
+  background: var(--yellow);
+  color: var(--ink);
+  border: var(--border);
+  border-radius: 10px;
+  box-shadow: var(--shadow);
+}
+
+/* ── The wake-up flow diagram ───────────────────────────────────────
+   Three sequential stages, each followed by its own split. Drawn with borders
+   and grid, not an SVG or a chart library, so it stays selectable text: it has
+   to survive being screenshotted for the demo video, read by a screen reader,
+   and printed.
+
+   Every split shows its own exit to "You are up". An earlier version fanned all
+   three first-call outcomes across one row, which left the retry looking like a
+   box you could only ever fail out of, and left the web window looking like it
+   always ended in the accountability call. Both were false. */
+.flow-section { background: var(--cream); }
+
+.flow {
+  display: grid;
+  justify-items: center;
+  gap: 0;
+  margin-top: 10px;
+  max-width: 880px;
+  margin-inline: auto;
+}
+
+/* Every box in the diagram. */
+.flow-node {
+  background: var(--paper);
+  border: var(--border);
+  border-radius: var(--radius);
+  box-shadow: var(--shadow);
+  padding: 16px 18px;
+  text-align: center;
+  display: grid;
+  gap: 5px;
+  align-content: start;
+  width: 100%;
+}
+.flow-node strong { font-size: 16px; line-height: 1.25; }
+.flow-node .flow-sub { font-size: 13.5px; line-height: 1.45; opacity: .72; }
+.flow-node.sm { padding: 13px 15px; }
+.flow-node.sm strong { font-size: 15px; }
+.flow-node.sm .flow-sub { font-size: 12.5px; }
+
+/* Colour carries meaning: yellow rings, green passes, pink involves a human. */
+.flow-node.ring  { background: var(--yellow); }
+.flow-node.done  { background: var(--green); color: #fff; }
+.flow-node.done .flow-sub { opacity: .88; }
+.flow-node.alarm { background: var(--pink); color: var(--cream); }
+.flow-node.alarm .flow-sub { opacity: .86; }
+.flow-node.wide  { max-width: 520px; }
+
+/* A numbered stage. The badge sits outside the box so the three stages read as
+   one spine even though splits interrupt them. */
+.flow-stage {
+  position: relative;
+  width: 100%;
+  max-width: 520px;
+  display: grid;
+  justify-items: center;
+  margin-top: 30px;
+}
+.flow-stage:first-child { margin-top: 0; }
+.flow-stage-n {
+  position: absolute;
+  top: -13px;
+  left: -13px;
+  z-index: 2;
+  width: 30px;
+  height: 30px;
+  display: grid;
+  place-items: center;
+  font-family: var(--display);
+  font-size: 14px;
+  background: var(--ink);
+  color: var(--cream);
+  border-radius: 50%;
+  border: 3px solid var(--cream);
+}
+
+/* The timing chip: "7:00", "+1 min", "10 min". */
+.flow-time {
+  justify-self: center;
+  font-family: var(--mono);
+  font-size: 12px;
+  font-weight: 700;
+  letter-spacing: .06em;
+  padding: 3px 10px;
+  border: 2px solid var(--ink);
+  border-radius: 999px;
+  background: var(--cream);
+  color: var(--ink);
+}
+
+/* A plain vertical connector with an arrowhead. */
+.flow-arrow {
+  width: 3px;
+  height: 22px;
+  background: var(--ink);
+  position: relative;
+  margin: 0 auto;
+}
+.flow-arrow::after {
+  content: '';
+  position: absolute;
+  bottom: -2px;
+  left: 50%;
+  transform: translateX(-50%);
+  border-left: 7px solid transparent;
+  border-right: 7px solid transparent;
+  border-top: 9px solid var(--ink);
+}
+
+/* The outcomes of one stage, side by side. Three columns after the first call,
+   two after the retry and after the web window. */
+.flow-split {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 20px;
+  width: 100%;
+  position: relative;
+  padding-top: 44px;
+  margin-bottom: 4px;
+  align-items: stretch;
+}
+.flow-split.two { grid-template-columns: repeat(2, 1fr); }
+
+/* Stem down out of the stage box, then the rail that fans across the branches. */
+.flow-split::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: 50%;
+  width: 3px;
+  height: 22px;
+  background: var(--ink);
+  transform: translateX(-50%);
+}
+.flow-split::after {
+  content: '';
+  position: absolute;
+  top: 22px;
+  left: 16.66%;
+  right: 16.66%;
+  height: 3px;
+  background: var(--ink);
+}
+.flow-split.two::after { left: 25%; right: 25%; }
+
+.flow-branch {
+  display: grid;
+  justify-items: center;
+  grid-template-rows: auto auto 1fr;
+  gap: 0;
+  position: relative;
+  padding-top: 22px;
+}
+/* Boxes in one row must share a bottom edge. Without this the next stage rides
+   up alongside the shortest branch and overlaps the taller ones. */
+.flow-branch > .flow-node { height: 100%; align-content: center; }
+/* Drop from the rail into each branch. */
+.flow-branch::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: 50%;
+  width: 3px;
+  height: 22px;
+  background: var(--ink);
+  transform: translateX(-50%);
+}
+
+/* The condition that takes you down this branch. */
+.flow-cond {
+  font-size: 13px;
+  font-weight: 700;
+  line-height: 1.3;
+  text-align: center;
+  padding: 7px 14px;
+  border: 2px solid var(--ink);
+  border-radius: 999px;
+  background: var(--paper);
+  margin-bottom: 4px;
+}
+.flow-cond.green { background: var(--green); color: #fff; }
+.flow-cond.pink  { background: var(--pink);  color: var(--cream); }
+
+/* On a phone the branches stack, so a horizontal rail would be joining boxes
+   that are no longer side by side. */
+@media (max-width: 760px) {
+  .flow { max-width: none; }
+  .flow-split,
+  .flow-split.two {
+    grid-template-columns: 1fr;
+    gap: 16px;
+    padding-top: 26px;
+  }
+  .flow-split::after { display: none; }
+  .flow-branch { padding-top: 0; }
+  .flow-branch::before { display: none; }
+  .flow-stage { max-width: none; }
+  .flow-node strong { font-size: 15.5px; }
+}
+
+/* The sign-up screen waits on the phone call rather than on a keystroke, so it
+   needs to look alive while nothing is happening on screen. */
+.waiting-note {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  font-size: 13.5px;
+  opacity: .7;
+  margin: 12px 0 14px;
+  text-align: center;
+}
+
+/* Labels around the sign-up digits, so it is obvious which number is read to
+   you and which one you owe back. */
+.code-label {
+  text-align: center;
+  font-size: 13px;
+  font-weight: 700;
+  opacity: .66;
+  margin: 10px 0 2px;
+}
