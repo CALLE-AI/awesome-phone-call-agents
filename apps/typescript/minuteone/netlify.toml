@@ -1,0 +1,11 @@
+[build]
+  command = "npm run build"
+  publish = ".next"
+  functions = "netlify/functions"
+
+[[plugins]]
+  package = "@netlify/plugin-nextjs"
+
+# Deployed-mode env vars (set these in the Netlify UI or `netlify env:set`, never committed here):
+#   TURSO_DATABASE_URL, TURSO_AUTH_TOKEN — hosted libSQL DB (see lib/db/client.ts)
+#   DRY_RUN=false, CALLE_API_KEY          — only once ready to place real calls (see .env.example)
