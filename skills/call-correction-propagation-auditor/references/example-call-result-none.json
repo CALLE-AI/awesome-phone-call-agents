@@ -1,0 +1,13 @@
+{
+  "call_id": "demo-correct-003",
+  "status": "COMPLETED",
+  "result": {
+    "post_summary": "Reservation confirmed for Thursday at 19:00.",
+    "transcript": [
+      {"speaker": "agent", "text": "This is the restaurant calling about your reservation at +14155550151."},
+      {"speaker": "agent", "text": "Your table is confirmed for Thursday at 7 p.m."},
+      {"speaker": "callee", "text": "Thursday at 7 works. See you then."},
+      {"speaker": "agent", "text": "Great, see you Thursday."}
+    ]
+  }
+}
