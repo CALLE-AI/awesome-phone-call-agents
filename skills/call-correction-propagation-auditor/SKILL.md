@@ -55,7 +55,7 @@ automation acts on the stale one.
 |---|---|---|
 | `STALE_VALUE_IN_SUMMARY` | a superseded value appears in the summary while the corrected one does not | block the writeback; a human must read the call |
 | `CORRECTIONS_UNCONFIRMED` | a correction chain has no agent restate or callee ack within the confirmation window | verify the corrected value before acting |
-| `PROPAGATED` | every chain's corrected value reached the summary and is confirmed | proceed, keep the card as evidence |
+| `PROPAGATED` | detected chains are confirmed and no stale-only summary value was found; summary checks may still be unreported or ambiguous | inspect every summary check and advisory; human review before acting |
 | `NO_SELF_CORRECTIONS` | no agent self-correction detected; `reason` is `transcript_missing` (no turns) or absent (none detected) | no correction audit applies; run the faithfulness auditor |
 
 ## How It Works
@@ -124,6 +124,8 @@ carries corrections forward instead of stale values.
   other-corrections and out of scope
 - the whole audit is lexical, not semantic; a paraphrased correction or
   summary restatement can evade detection
+- the aggregate `PROPAGATED` label does not prove every correction reached
+  the summary; inspect each chain's summary check and the advisory list
 
 ## Testing
 
