@@ -6,8 +6,9 @@
   audio. It reads one JSON call-result file supplied by the operator.
 - Mask-first discipline: any 7+-digit run (separators included) is masked
   in every transcript turn and the post_summary before any classification,
-  keeping the last two characters. Phone numbers can never leak into the
-  output card, and masked runs are never graded.
+  keeping the last two characters. Masked runs are never graded. This is
+  heuristic masking, not complete anonymization: other phone formats,
+  names, email addresses, and identifiers may remain. Review output before sharing.
 - The output card quotes request sentences (already masked). Operators
   should still minimize who sees full call records.
 

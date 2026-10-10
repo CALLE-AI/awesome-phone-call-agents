@@ -54,7 +54,8 @@ Deterministic, offline, no LLM:
 
 1. **Mask first.** Any 7+-digit run (separators included) is masked in
    every turn and the post_summary before analysis, keeping the last two
-   characters. Masked digits never affect classification.
+   characters. Masked digits never affect classification. This heuristic
+   is not complete anonymization; other identifiers and phone formats may remain.
 2. **Detect request sentences** in agent turns only: imperatives
    (verb-initial: give/spell/repeat/confirm/read/write down/enter/press/
    bring/hand/state/list/say/tell/provide, plus "hold the line"), questions
@@ -130,5 +131,5 @@ python -m pytest scripts/test_politeness_strategy_auditor.py -q
 python3 scripts/test_politeness_strategy_auditor.py
 ```
 
-Both run the same tests; the second is the standalone runner used by
-reviewers without pytest installed.
+Both commands require pytest to be installed; the second invokes the
+test file's runner directly.
