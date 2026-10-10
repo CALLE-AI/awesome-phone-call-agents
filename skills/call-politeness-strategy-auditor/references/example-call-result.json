@@ -1,0 +1,25 @@
+{
+  "call_id": "demo-polite-001",
+  "status": "COMPLETED",
+  "result": {
+    "post_summary": "Verified account holder and confirmed delivery details for the order.",
+    "transcript": [
+      {
+        "speaker": "agent",
+        "text": "Hi, this is the clinic calling about your delivery to +14155550179. Could you confirm your date of birth, please?"
+      },
+      { "speaker": "callee", "text": "Sure, 02/14." },
+      {
+        "speaker": "agent",
+        "text": "Thank you. And could you spell your last name for me?"
+      },
+      { "speaker": "callee", "text": "N-G-U-Y-E-N." },
+      {
+        "speaker": "agent",
+        "text": "Perfect, thank you so much. Just one more thing - would you mind confirming the delivery address?"
+      },
+      { "speaker": "callee", "text": "Yes, 2203 Market Street." },
+      { "speaker": "agent", "text": "Thank you, that's everything. Have a great day." }
+    ]
+  }
+}
