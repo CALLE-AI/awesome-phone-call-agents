@@ -1,0 +1,16 @@
+{
+  "name": "bridge",
+  "version": "1.0.0",
+  "description": "CALL-E powered business coordination agent",
+  "main": "src/server.js",
+  "scripts": {
+    "start": "node src/server.js",
+    "dev": "node src/server.js",
+    "test": "node --test"
+  },
+  "dependencies": {
+    "cors": "^2.8.5",
+    "dotenv": "^17.2.2",
+    "express": "^5.1.0"
+  }
+}

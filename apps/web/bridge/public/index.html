@@ -1,0 +1,3108 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>BRIDGE — AI Coordination Layer for Businesses</title>
+  <meta name="description" content="BRIDGE autonomously resolves workflow blockers by identifying the right human, orchestrating CALL-E voice calls, extracting intelligence, and completing end-to-end resolution." />
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;600&display=swap" rel="stylesheet">
+  <style>
+    :root {
+      --primary: #4f46e5;
+      --primary-light: #6366f1;
+      --primary-dark: #3730a3;
+      --purple: #8b5cf6;
+      --purple-light: #a855f7;
+      --blue: #2563eb;
+      --cyan: #06b6d4;
+      --emerald: #10b981;
+      --amber: #f59e0b;
+      --rose: #f43f5e;
+      --bg-gradient: linear-gradient(135deg, #f9fbff 0%, #eef3ff 45%, #f6f0fe 100%);
+      --surface: rgba(255, 255, 255, 0.84);
+      --surface-solid: #ffffff;
+      --surface-hover: rgba(248, 250, 255, 0.94);
+      --border: rgba(99, 102, 241, 0.14);
+      --border-subtle: rgba(148, 163, 184, 0.18);
+      --text: #0f172a;
+      --text-secondary: #475569;
+      --text-muted: #64748b;
+      --shadow-sm: 0 4px 12px rgba(79, 70, 229, 0.04);
+      --shadow-md: 0 14px 34px -8px rgba(79, 70, 229, 0.1), 0 4px 12px rgba(15, 23, 42, 0.03);
+      --shadow-lg: 0 24px 54px -12px rgba(79, 70, 229, 0.16), 0 8px 24px rgba(15, 23, 42, 0.05);
+      --glass-blur: blur(16px);
+      --radius-sm: 10px;
+      --radius-md: 16px;
+      --radius-lg: 22px;
+      --radius-xl: 30px;
+    }
+
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    html, body {
+      min-height: 100%;
+      font-family: 'Plus Jakarta Sans', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+      background: var(--bg-gradient);
+      color: var(--text);
+      overflow-x: hidden;
+      -webkit-font-smoothing: antialiased;
+    }
+
+    /* Ambient aura */
+    .bg-aura {
+      position: fixed;
+      pointer-events: none;
+      z-index: 0;
+      width: 700px;
+      height: 700px;
+      border-radius: 50%;
+      filter: blur(120px);
+      opacity: 0.45;
+    }
+    .aura-1 { top: -200px; left: -100px; background: radial-gradient(circle, #c7d2fe 0%, #e0e7ff 70%); }
+    .aura-2 { bottom: -200px; right: -100px; background: radial-gradient(circle, #e9d5ff 0%, #fae8ff 70%); }
+    .aura-3 { top: 40%; left: 40%; width: 500px; height: 500px; background: radial-gradient(circle, #bae6fd 0%, transparent 70%); opacity: 0.3; }
+
+    /* App Shell */
+    .app-wrapper {
+      position: relative;
+      z-index: 1;
+      display: flex;
+      flex-direction: column;
+      min-height: 100vh;
+    }
+
+    /* Top Navigation Bar */
+    .top-nav {
+      position: sticky;
+      top: 0;
+      z-index: 100;
+      background: rgba(255, 255, 255, 0.78);
+      backdrop-filter: var(--glass-blur);
+      -webkit-backdrop-filter: var(--glass-blur);
+      border-bottom: 1px solid var(--border);
+      padding: 0 28px;
+      height: 70px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      transition: all 0.2s ease;
+    }
+
+    .brand-section {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      cursor: pointer;
+      text-decoration: none;
+    }
+
+    .brand-logo-badge {
+      width: 38px;
+      height: 38px;
+      border-radius: 12px;
+      background: linear-gradient(135deg, #4f46e5 0%, #7c3aed 100%);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      box-shadow: 0 8px 18px rgba(79, 70, 229, 0.32);
+      color: #fff;
+      font-weight: 800;
+      font-size: 1.15rem;
+      letter-spacing: -0.05em;
+    }
+
+    .brand-name-wrap {
+      display: flex;
+      flex-direction: column;
+    }
+
+    .brand-title {
+      font-size: 1.28rem;
+      font-weight: 800;
+      letter-spacing: -0.04em;
+      background: linear-gradient(135deg, #0f172a 0%, #3730a3 100%);
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
+      line-height: 1.1;
+    }
+
+    .brand-subtitle {
+      font-size: 0.68rem;
+      text-transform: uppercase;
+      letter-spacing: 0.12em;
+      font-weight: 700;
+      color: var(--primary);
+    }
+
+    .nav-links {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      list-style: none;
+    }
+
+    .nav-btn {
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
+      padding: 8px 14px;
+      border-radius: var(--radius-md);
+      border: 1px solid transparent;
+      background: transparent;
+      color: var(--text-secondary);
+      font-weight: 600;
+      font-size: 0.88rem;
+      cursor: pointer;
+      transition: all 0.2s cubic-bezier(0.16, 1, 0.3, 1);
+      text-decoration: none;
+    }
+
+    .nav-btn:hover {
+      color: var(--primary);
+      background: rgba(99, 102, 241, 0.06);
+    }
+
+    .nav-btn.active {
+      color: var(--primary);
+      background: rgba(99, 102, 241, 0.1);
+      border-color: rgba(99, 102, 241, 0.2);
+      font-weight: 700;
+    }
+
+    .nav-btn svg { width: 17px; height: 17px; stroke-width: 2.2; }
+
+    .nav-actions {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+    }
+
+    .mode-indicator {
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
+      padding: 6px 13px;
+      border-radius: 9999px;
+      font-size: 0.78rem;
+      font-weight: 700;
+      letter-spacing: 0.02em;
+      cursor: pointer;
+      transition: all 0.2s ease;
+    }
+    .mode-simulation {
+      background: rgba(16, 185, 129, 0.1);
+      border: 1px solid rgba(16, 185, 129, 0.24);
+      color: #065f46;
+    }
+    .mode-simulation:hover {
+      background: rgba(16, 185, 129, 0.18);
+    }
+    .mode-live {
+      background: rgba(244, 63, 94, 0.1);
+      border: 1px solid rgba(244, 63, 94, 0.24);
+      color: #9f1239;
+    }
+
+    .status-dot {
+      width: 7px;
+      height: 7px;
+      border-radius: 50%;
+      background: currentColor;
+      box-shadow: 0 0 0 4px rgba(16, 185, 129, 0.16);
+      animation: pulse-dot 2s infinite ease-in-out;
+    }
+    @keyframes pulse-dot {
+      0%, 100% { transform: scale(1); opacity: 1; }
+      50% { transform: scale(1.2); opacity: 0.6; }
+    }
+
+    .btn-quick-demo {
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
+      padding: 9px 18px;
+      border-radius: 12px;
+      border: none;
+      background: linear-gradient(135deg, #4f46e5 0%, #7c3aed 100%);
+      color: #fff;
+      font-weight: 700;
+      font-size: 0.86rem;
+      box-shadow: 0 10px 20px -4px rgba(79, 70, 229, 0.35);
+      cursor: pointer;
+      transition: transform 0.2s ease, box-shadow 0.2s ease;
+    }
+    .btn-quick-demo:hover {
+      transform: translateY(-1px);
+      box-shadow: 0 14px 26px -4px rgba(79, 70, 229, 0.45);
+    }
+    .btn-quick-demo:active { transform: translateY(0); }
+
+    /* Main Container */
+    .app-main {
+      flex: 1;
+      padding: 24px 28px 48px;
+      max-width: 1440px;
+      margin: 0 auto;
+      width: 100%;
+    }
+
+    /* Page View Transitions */
+    .page-view {
+      display: none;
+      animation: fadeInView 0.28s cubic-bezier(0.16, 1, 0.3, 1);
+    }
+    .page-view.active {
+      display: block;
+    }
+    @keyframes fadeInView {
+      from { opacity: 0; transform: translateY(8px); }
+      to { opacity: 1; transform: translateY(0); }
+    }
+
+    /* Buttons & Controls */
+    .btn {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      gap: 8px;
+      padding: 10px 18px;
+      border-radius: 12px;
+      font-size: 0.88rem;
+      font-weight: 600;
+      cursor: pointer;
+      transition: all 0.2s ease;
+      text-decoration: none;
+      border: 1px solid transparent;
+    }
+    .btn-primary {
+      background: linear-gradient(135deg, #4f46e5 0%, #6366f1 100%);
+      color: #fff;
+      box-shadow: 0 8px 20px -4px rgba(79, 70, 229, 0.32);
+    }
+    .btn-primary:hover {
+      background: linear-gradient(135deg, #4338ca 0%, #4f46e5 100%);
+      transform: translateY(-1px);
+      box-shadow: 0 12px 24px -4px rgba(79, 70, 229, 0.4);
+    }
+    .btn-secondary {
+      background: rgba(255, 255, 255, 0.9);
+      color: var(--primary);
+      border-color: rgba(99, 102, 241, 0.22);
+      box-shadow: var(--shadow-sm);
+    }
+    .btn-secondary:hover {
+      background: rgba(248, 250, 255, 1);
+      border-color: rgba(99, 102, 241, 0.35);
+      transform: translateY(-1px);
+    }
+    .btn-ghost {
+      background: transparent;
+      color: var(--text-secondary);
+    }
+    .btn-ghost:hover {
+      background: rgba(99, 102, 241, 0.08);
+      color: var(--primary);
+    }
+    .btn-danger {
+      background: rgba(244, 63, 94, 0.08);
+      color: #e11d48;
+      border-color: rgba(244, 63, 94, 0.2);
+    }
+    .btn-danger:hover {
+      background: rgba(244, 63, 94, 0.16);
+    }
+    .btn-sm {
+      padding: 6px 12px;
+      font-size: 0.8rem;
+      border-radius: 8px;
+    }
+    .btn-lg {
+      padding: 14px 26px;
+      font-size: 1rem;
+      border-radius: 14px;
+    }
+
+    /* Cards & Panels */
+    .card {
+      background: var(--surface);
+      backdrop-filter: var(--glass-blur);
+      -webkit-backdrop-filter: var(--glass-blur);
+      border: 1px solid var(--border);
+      border-radius: var(--radius-lg);
+      padding: 24px;
+      box-shadow: var(--shadow-md);
+      transition: all 0.2s ease;
+    }
+    .card:hover {
+      box-shadow: var(--shadow-lg);
+      border-color: rgba(99, 102, 241, 0.22);
+    }
+
+    .card-header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 16px;
+      margin-bottom: 20px;
+    }
+
+    .card-title-group {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+    }
+
+    .card-icon {
+      width: 40px;
+      height: 40px;
+      border-radius: 12px;
+      background: rgba(99, 102, 241, 0.1);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      color: var(--primary);
+    }
+
+    .card-title {
+      font-size: 1.15rem;
+      font-weight: 700;
+      letter-spacing: -0.02em;
+      color: var(--text);
+    }
+
+    .card-subtitle {
+      font-size: 0.82rem;
+      color: var(--text-muted);
+      margin-top: 2px;
+    }
+
+    /* Badge Pills */
+    .badge {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      padding: 4px 10px;
+      border-radius: 9999px;
+      font-size: 0.74rem;
+      font-weight: 700;
+      letter-spacing: 0.02em;
+      text-transform: uppercase;
+    }
+    .badge-primary { background: rgba(99, 102, 241, 0.1); color: var(--primary); border: 1px solid rgba(99, 102, 241, 0.2); }
+    .badge-emerald { background: rgba(16, 185, 129, 0.1); color: #059669; border: 1px solid rgba(16, 185, 129, 0.2); }
+    .badge-amber { background: rgba(245, 158, 11, 0.1); color: #d97706; border: 1px solid rgba(245, 158, 11, 0.2); }
+    .badge-rose { background: rgba(244, 63, 94, 0.1); color: #e11d48; border: 1px solid rgba(244, 63, 94, 0.2); }
+    .badge-purple { background: rgba(139, 92, 246, 0.1); color: #7c3aed; border: 1px solid rgba(139, 92, 246, 0.2); }
+
+    /* ========================================================
+       1. LANDING PAGE STYLES
+       ======================================================== */
+    .landing-hero {
+      text-align: center;
+      padding: 60px 20px 40px;
+      max-width: 960px;
+      margin: 0 auto;
+    }
+
+    .hero-eyebrow {
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
+      background: rgba(99, 102, 241, 0.08);
+      border: 1px solid rgba(99, 102, 241, 0.2);
+      padding: 6px 16px;
+      border-radius: 9999px;
+      color: var(--primary);
+      font-weight: 700;
+      font-size: 0.82rem;
+      margin-bottom: 24px;
+      letter-spacing: 0.04em;
+    }
+
+    .hero-headline {
+      font-size: clamp(2.4rem, 5.5vw, 4.2rem);
+      font-weight: 800;
+      line-height: 1.05;
+      letter-spacing: -0.05em;
+      margin-bottom: 24px;
+      background: linear-gradient(135deg, #0f172a 0%, #312e81 60%, #4f46e5 100%);
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
+    }
+
+    .hero-tagline {
+      font-size: clamp(1.05rem, 2vw, 1.35rem);
+      color: var(--text-secondary);
+      line-height: 1.65;
+      margin-bottom: 36px;
+      max-width: 760px;
+      margin-left: auto;
+      margin-right: auto;
+    }
+
+    .hero-cta-group {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 16px;
+      margin-bottom: 54px;
+      flex-wrap: wrap;
+    }
+
+    /* Interactive Workflow Visualization Widget */
+    .workflow-interactive-strip {
+      background: rgba(255, 255, 255, 0.9);
+      backdrop-filter: var(--glass-blur);
+      border: 1px solid var(--border);
+      border-radius: var(--radius-xl);
+      padding: 32px 28px;
+      box-shadow: var(--shadow-lg);
+      margin-top: 20px;
+      position: relative;
+      overflow: hidden;
+    }
+
+    .workflow-steps-track {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      position: relative;
+      gap: 14px;
+      padding: 20px 0;
+    }
+
+    .workflow-connecting-line {
+      position: absolute;
+      top: 52px;
+      left: 60px;
+      right: 60px;
+      height: 3px;
+      background: linear-gradient(90deg, #6366f1 0%, #a855f7 50%, #10b981 100%);
+      z-index: 1;
+      opacity: 0.35;
+    }
+
+    .flow-step-node {
+      position: relative;
+      z-index: 2;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      text-align: center;
+      flex: 1;
+      cursor: pointer;
+      transition: all 0.25s ease;
+    }
+
+    .flow-node-circle {
+      width: 66px;
+      height: 66px;
+      border-radius: 50%;
+      background: #ffffff;
+      border: 2px solid rgba(99, 102, 241, 0.24);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 1.5rem;
+      box-shadow: var(--shadow-md);
+      transition: all 0.3s cubic-bezier(0.16, 1, 0.3, 1);
+      margin-bottom: 12px;
+    }
+
+    .flow-step-node:hover .flow-node-circle,
+    .flow-step-node.active .flow-node-circle {
+      border-color: var(--primary);
+      transform: scale(1.14);
+      box-shadow: 0 0 0 8px rgba(99, 102, 241, 0.16), 0 16px 32px rgba(79, 70, 229, 0.25);
+    }
+
+    .flow-step-node.active .flow-node-circle {
+      background: linear-gradient(135deg, #4f46e5 0%, #7c3aed 100%);
+      color: #fff;
+    }
+
+    .flow-node-title {
+      font-weight: 700;
+      font-size: 0.92rem;
+      color: var(--text);
+      margin-bottom: 4px;
+    }
+
+    .flow-node-desc {
+      font-size: 0.74rem;
+      color: var(--text-muted);
+      line-height: 1.4;
+      max-width: 140px;
+    }
+
+    .landing-features-grid {
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      gap: 24px;
+      margin-top: 48px;
+    }
+
+    .feature-card {
+      background: rgba(255, 255, 255, 0.76);
+      backdrop-filter: var(--glass-blur);
+      border: 1px solid var(--border);
+      border-radius: var(--radius-lg);
+      padding: 28px 24px;
+      box-shadow: var(--shadow-sm);
+      text-align: left;
+      transition: all 0.25s ease;
+    }
+    .feature-card:hover {
+      transform: translateY(-4px);
+      box-shadow: var(--shadow-md);
+      border-color: rgba(99, 102, 241, 0.3);
+    }
+
+    .feature-icon-box {
+      width: 48px;
+      height: 48px;
+      border-radius: 14px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      margin-bottom: 18px;
+      color: #fff;
+      font-size: 1.35rem;
+    }
+
+    /* ========================================================
+       2. DASHBOARD STYLES
+       ======================================================== */
+    .dashboard-grid {
+      display: grid;
+      grid-template-columns: 1fr 390px;
+      gap: 24px;
+    }
+
+    .kpi-row {
+      display: grid;
+      grid-template-columns: repeat(4, 1fr);
+      gap: 16px;
+      margin-bottom: 24px;
+    }
+
+    .kpi-card {
+      background: var(--surface);
+      backdrop-filter: var(--glass-blur);
+      border: 1px solid var(--border);
+      border-radius: var(--radius-md);
+      padding: 18px;
+      box-shadow: var(--shadow-sm);
+      display: flex;
+      flex-direction: column;
+      justify-content: space-between;
+    }
+
+    .kpi-meta {
+      font-size: 0.76rem;
+      font-weight: 700;
+      text-transform: uppercase;
+      letter-spacing: 0.08em;
+      color: var(--text-muted);
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+    }
+
+    .kpi-value {
+      font-size: 1.95rem;
+      font-weight: 800;
+      letter-spacing: -0.04em;
+      color: var(--text);
+      margin: 8px 0 4px;
+    }
+
+    .kpi-subtext {
+      font-size: 0.76rem;
+      color: var(--emerald);
+      font-weight: 600;
+      display: flex;
+      align-items: center;
+      gap: 4px;
+    }
+
+    /* Main Incident Hero Card */
+    .delivery-exception-card {
+      background: linear-gradient(135deg, rgba(255, 255, 255, 0.95) 0%, rgba(245, 247, 255, 0.92) 100%);
+      border: 1px solid rgba(99, 102, 241, 0.22);
+      border-radius: var(--radius-lg);
+      padding: 24px;
+      box-shadow: var(--shadow-md);
+      margin-bottom: 24px;
+      position: relative;
+      overflow: hidden;
+    }
+
+    .incident-header {
+      display: flex;
+      align-items: flex-start;
+      justify-content: space-between;
+      gap: 16px;
+      margin-bottom: 20px;
+    }
+
+    .incident-title-wrap h2 {
+      font-size: 1.45rem;
+      font-weight: 800;
+      letter-spacing: -0.03em;
+      display: flex;
+      align-items: center;
+      gap: 10px;
+    }
+
+    .incident-subtitle {
+      font-size: 0.86rem;
+      color: var(--text-muted);
+      margin-top: 4px;
+    }
+
+    .incident-controls {
+      display: flex;
+      gap: 10px;
+      align-items: center;
+    }
+
+    /* 4-Stage Delivery Stepper */
+    .delivery-stepper {
+      display: grid;
+      grid-template-columns: repeat(4, 1fr);
+      gap: 14px;
+      margin: 20px 0;
+      position: relative;
+    }
+
+    .step-item {
+      background: rgba(255, 255, 255, 0.85);
+      border: 1px solid var(--border-subtle);
+      border-radius: var(--radius-md);
+      padding: 16px 14px;
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+      position: relative;
+      transition: all 0.25s cubic-bezier(0.16, 1, 0.3, 1);
+    }
+
+    .step-item.completed {
+      background: rgba(16, 185, 129, 0.05);
+      border-color: rgba(16, 185, 129, 0.3);
+    }
+
+    .step-item.active {
+      background: #ffffff;
+      border-color: var(--primary);
+      box-shadow: 0 0 0 3px rgba(99, 102, 241, 0.16), var(--shadow-md);
+      transform: translateY(-2px);
+    }
+
+    .step-header-row {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+    }
+
+    .step-num-badge {
+      width: 26px;
+      height: 26px;
+      border-radius: 50%;
+      background: rgba(148, 163, 184, 0.18);
+      color: var(--text-secondary);
+      font-size: 0.75rem;
+      font-weight: 800;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+    }
+    .step-item.completed .step-num-badge {
+      background: #10b981;
+      color: #fff;
+    }
+    .step-item.active .step-num-badge {
+      background: var(--primary);
+      color: #fff;
+      animation: pulse-ring 1.8s infinite;
+    }
+    @keyframes pulse-ring {
+      0% { box-shadow: 0 0 0 0 rgba(79, 70, 229, 0.4); }
+      70% { box-shadow: 0 0 0 8px rgba(79, 70, 229, 0); }
+      100% { box-shadow: 0 0 0 0 rgba(79, 70, 229, 0); }
+    }
+
+    .step-role-title {
+      font-weight: 800;
+      font-size: 0.95rem;
+      letter-spacing: -0.02em;
+    }
+
+    .step-person-name {
+      font-size: 0.8rem;
+      color: var(--text-muted);
+    }
+
+    .step-outcome-text {
+      font-size: 0.76rem;
+      color: var(--text-secondary);
+      line-height: 1.45;
+      background: rgba(248, 250, 255, 0.8);
+      padding: 8px 10px;
+      border-radius: 8px;
+      border: 1px dashed rgba(99, 102, 241, 0.2);
+    }
+
+    /* Live Voice Waveform */
+    .voice-visualizer-box {
+      background: linear-gradient(135deg, #1e1b4b 0%, #312e81 100%);
+      border-radius: var(--radius-lg);
+      padding: 22px;
+      color: #fff;
+      box-shadow: 0 16px 36px rgba(49, 46, 129, 0.25);
+      margin-bottom: 24px;
+      position: relative;
+      overflow: hidden;
+    }
+
+    .voice-header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      margin-bottom: 14px;
+    }
+
+    .caller-details {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+    }
+
+    .caller-avatar {
+      width: 44px;
+      height: 44px;
+      border-radius: 50%;
+      background: linear-gradient(135deg, #6366f1 0%, #a855f7 100%);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-weight: 800;
+      font-size: 1.1rem;
+      box-shadow: 0 0 0 3px rgba(255, 255, 255, 0.2);
+    }
+
+    .live-waves-container {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 5px;
+      height: 42px;
+      margin: 14px 0;
+      background: rgba(255, 255, 255, 0.06);
+      border-radius: 12px;
+      padding: 0 16px;
+    }
+
+    .wave-bar {
+      width: 4px;
+      border-radius: 9999px;
+      background: linear-gradient(180deg, #38bdf8 0%, #818cf8 100%);
+      animation: waveMove 1s infinite alternate ease-in-out;
+    }
+    .wave-bar:nth-child(1) { height: 14px; animation-delay: 0.1s; }
+    .wave-bar:nth-child(2) { height: 26px; animation-delay: 0.25s; }
+    .wave-bar:nth-child(3) { height: 34px; animation-delay: 0.15s; }
+    .wave-bar:nth-child(4) { height: 18px; animation-delay: 0.4s; }
+    .wave-bar:nth-child(5) { height: 30px; animation-delay: 0.05s; }
+    .wave-bar:nth-child(6) { height: 36px; animation-delay: 0.3s; }
+    .wave-bar:nth-child(7) { height: 22px; animation-delay: 0.2s; }
+    .wave-bar:nth-child(8) { height: 14px; animation-delay: 0.35s; }
+    @keyframes waveMove {
+      from { transform: scaleY(0.4); opacity: 0.5; }
+      to { transform: scaleY(1.1); opacity: 1; }
+    }
+
+    .live-transcript-bubble {
+      background: rgba(255, 255, 255, 0.12);
+      border: 1px solid rgba(255, 255, 255, 0.18);
+      border-radius: 12px;
+      padding: 12px 14px;
+      font-size: 0.88rem;
+      line-height: 1.55;
+      color: #e0e7ff;
+      min-height: 60px;
+    }
+
+    /* Timeline stream */
+    .timeline-container {
+      display: flex;
+      flex-direction: column;
+      gap: 16px;
+      position: relative;
+    }
+
+    .timeline-event {
+      display: flex;
+      gap: 14px;
+      align-items: flex-start;
+      position: relative;
+    }
+
+    .timeline-marker {
+      width: 32px;
+      height: 32px;
+      border-radius: 50%;
+      background: #ffffff;
+      border: 2px solid var(--primary);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      color: var(--primary);
+      font-size: 0.85rem;
+      flex-shrink: 0;
+      box-shadow: var(--shadow-sm);
+    }
+
+    .timeline-content {
+      background: rgba(255, 255, 255, 0.82);
+      border: 1px solid var(--border-subtle);
+      border-radius: 12px;
+      padding: 12px 14px;
+      flex: 1;
+    }
+
+    .timeline-title {
+      font-weight: 700;
+      font-size: 0.88rem;
+      margin-bottom: 3px;
+    }
+
+    .timeline-time {
+      font-size: 0.72rem;
+      color: var(--text-muted);
+      margin-bottom: 6px;
+    }
+
+    .timeline-body {
+      font-size: 0.82rem;
+      color: var(--text-secondary);
+      line-height: 1.5;
+    }
+
+    /* ========================================================
+       3. ORGANIZATION & GRAPH STYLES
+       ======================================================== */
+    .people-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fill, minmax(320px, 1fr));
+      gap: 20px;
+    }
+
+    .person-card {
+      background: var(--surface);
+      backdrop-filter: var(--glass-blur);
+      border: 1px solid var(--border);
+      border-radius: var(--radius-lg);
+      padding: 22px;
+      box-shadow: var(--shadow-sm);
+      display: flex;
+      flex-direction: column;
+      justify-content: space-between;
+      gap: 16px;
+      transition: all 0.2s ease;
+    }
+    .person-card:hover {
+      transform: translateY(-2px);
+      box-shadow: var(--shadow-md);
+      border-color: rgba(99, 102, 241, 0.25);
+    }
+
+    .person-top {
+      display: flex;
+      align-items: center;
+      gap: 14px;
+    }
+
+    .person-avatar-circle {
+      width: 52px;
+      height: 52px;
+      border-radius: 16px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 1.25rem;
+      font-weight: 800;
+      color: #fff;
+      background: linear-gradient(135deg, #6366f1 0%, #a855f7 100%);
+      box-shadow: 0 8px 18px rgba(99, 102, 241, 0.22);
+    }
+
+    .person-info h3 {
+      font-size: 1.12rem;
+      font-weight: 800;
+      letter-spacing: -0.02em;
+    }
+
+    .person-role-tag {
+      font-size: 0.82rem;
+      color: var(--primary);
+      font-weight: 700;
+    }
+
+    .person-details-list {
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+      font-size: 0.82rem;
+    }
+
+    .detail-row {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      color: var(--text-secondary);
+    }
+    .detail-label { color: var(--text-muted); }
+    .detail-val { font-weight: 600; color: var(--text); }
+
+    /* Interactive SVG Network Graph */
+    .graph-viewport {
+      background: radial-gradient(circle at center, rgba(255, 255, 255, 0.98), rgba(245, 248, 255, 0.85));
+      border: 1px solid var(--border);
+      border-radius: var(--radius-xl);
+      box-shadow: var(--shadow-lg);
+      padding: 30px;
+      position: relative;
+      min-height: 520px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      overflow: hidden;
+    }
+
+    /* ========================================================
+       4. WORKFLOW BUILDER STYLES
+       ======================================================== */
+    .wf-canvas-wrap {
+      display: grid;
+      grid-template-columns: 320px 1fr;
+      gap: 24px;
+    }
+
+    .wf-sidebar-list {
+      display: flex;
+      flex-direction: column;
+      gap: 12px;
+    }
+
+    .wf-item-card {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: var(--radius-md);
+      padding: 16px;
+      cursor: pointer;
+      transition: all 0.2s ease;
+    }
+    .wf-item-card:hover, .wf-item-card.active {
+      border-color: var(--primary);
+      box-shadow: 0 0 0 2px rgba(99, 102, 241, 0.16);
+      background: #ffffff;
+    }
+
+    .wf-pipeline-view {
+      background: rgba(255, 255, 255, 0.8);
+      backdrop-filter: var(--glass-blur);
+      border: 1px solid var(--border);
+      border-radius: var(--radius-lg);
+      padding: 24px;
+      display: flex;
+      flex-direction: column;
+      gap: 18px;
+    }
+
+    .pipeline-node-card {
+      background: #ffffff;
+      border: 1px solid var(--border-subtle);
+      border-radius: 14px;
+      padding: 16px 20px;
+      box-shadow: var(--shadow-sm);
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 16px;
+      transition: all 0.2s ease;
+      position: relative;
+    }
+    .pipeline-node-card:hover {
+      border-color: var(--primary);
+      transform: translateX(4px);
+    }
+
+    .pipeline-connector-line {
+      width: 2px;
+      height: 20px;
+      background: linear-gradient(180deg, var(--primary) 0%, var(--purple) 100%);
+      margin: -10px auto;
+      position: relative;
+      z-index: 1;
+    }
+
+    /* ========================================================
+       5. CALL-E CALL INTERFACE & DIALER
+       ======================================================== */
+    .dialer-grid {
+      display: grid;
+      grid-template-columns: 460px 1fr;
+      gap: 28px;
+    }
+
+    .phone-simulator-card {
+      background: linear-gradient(145deg, #181c32 0%, #0f172a 100%);
+      border-radius: 36px;
+      padding: 32px 28px;
+      color: #fff;
+      box-shadow: 0 30px 70px rgba(15, 23, 42, 0.35);
+      border: 2px solid rgba(255, 255, 255, 0.12);
+      display: flex;
+      flex-direction: column;
+      justify-content: space-between;
+      min-height: 600px;
+    }
+
+    .phone-screen-top {
+      text-align: center;
+    }
+
+    .phone-target-avatar {
+      width: 80px;
+      height: 80px;
+      border-radius: 50%;
+      background: linear-gradient(135deg, #6366f1 0%, #ec4899 100%);
+      margin: 0 auto 16px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 2rem;
+      font-weight: 800;
+      box-shadow: 0 0 0 6px rgba(255, 255, 255, 0.15);
+    }
+
+    .phone-call-state {
+      font-size: 0.85rem;
+      color: #94a3b8;
+      margin-top: 4px;
+    }
+
+    .phone-call-timer {
+      font-family: 'JetBrains Mono', monospace;
+      font-size: 1.8rem;
+      font-weight: 700;
+      letter-spacing: 0.05em;
+      color: #38bdf8;
+      margin: 12px 0;
+    }
+
+    .phone-action-row {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 20px;
+      margin-top: 24px;
+    }
+
+    .phone-round-btn {
+      width: 58px;
+      height: 58px;
+      border-radius: 50%;
+      border: none;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 1.4rem;
+      cursor: pointer;
+      transition: all 0.2s ease;
+    }
+    .btn-hangup { background: #ef4444; color: #fff; }
+    .btn-hangup:hover { transform: scale(1.08); background: #dc2626; }
+    .btn-dial { background: #10b981; color: #fff; }
+    .btn-dial:hover { transform: scale(1.08); background: #059669; }
+
+    /* ========================================================
+       6. CALL HISTORY TABLE
+       ======================================================== */
+    .table-container {
+      background: var(--surface);
+      backdrop-filter: var(--glass-blur);
+      border: 1px solid var(--border);
+      border-radius: var(--radius-lg);
+      overflow: hidden;
+      box-shadow: var(--shadow-md);
+    }
+
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      text-align: left;
+    }
+
+    th {
+      background: rgba(248, 250, 255, 0.9);
+      padding: 14px 18px;
+      font-size: 0.76rem;
+      font-weight: 700;
+      text-transform: uppercase;
+      letter-spacing: 0.06em;
+      color: var(--text-muted);
+      border-bottom: 1px solid var(--border);
+    }
+
+    td {
+      padding: 16px 18px;
+      font-size: 0.88rem;
+      border-bottom: 1px solid var(--border-subtle);
+      vertical-align: middle;
+    }
+
+    tr:hover td {
+      background: rgba(99, 102, 241, 0.03);
+    }
+
+    /* Modal Sheet */
+    .modal-overlay {
+      position: fixed;
+      inset: 0;
+      background: rgba(15, 23, 42, 0.45);
+      backdrop-filter: blur(8px);
+      z-index: 999;
+      display: none;
+      align-items: center;
+      justify-content: center;
+      padding: 20px;
+    }
+    .modal-overlay.active {
+      display: flex;
+    }
+
+    .modal-dialog {
+      background: #ffffff;
+      border: 1px solid var(--border);
+      border-radius: var(--radius-xl);
+      width: 100%;
+      max-width: 580px;
+      box-shadow: 0 30px 80px rgba(15, 23, 42, 0.25);
+      overflow: hidden;
+      animation: modalSlide 0.25s cubic-bezier(0.16, 1, 0.3, 1);
+    }
+    @keyframes modalSlide {
+      from { transform: scale(0.92) translateY(20px); opacity: 0; }
+      to { transform: scale(1) translateY(0); opacity: 1; }
+    }
+
+    .modal-head {
+      padding: 22px 26px;
+      border-bottom: 1px solid var(--border-subtle);
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+    }
+
+    .modal-body {
+      padding: 26px;
+      max-height: 75vh;
+      overflow-y: auto;
+    }
+
+    .modal-foot {
+      padding: 18px 26px;
+      border-top: 1px solid var(--border-subtle);
+      background: rgba(248, 250, 255, 0.8);
+      display: flex;
+      justify-content: flex-end;
+      gap: 12px;
+    }
+
+    /* Forms */
+    .form-group {
+      margin-bottom: 18px;
+    }
+    .form-group label {
+      display: block;
+      font-size: 0.78rem;
+      font-weight: 700;
+      text-transform: uppercase;
+      letter-spacing: 0.06em;
+      color: var(--text-muted);
+      margin-bottom: 6px;
+    }
+    .form-control {
+      width: 100%;
+      height: 46px;
+      border-radius: 12px;
+      border: 1px solid var(--border);
+      background: rgba(248, 250, 255, 0.85);
+      padding: 0 14px;
+      font-size: 0.92rem;
+      color: var(--text);
+      outline: none;
+      transition: all 0.2s ease;
+      font-family: inherit;
+    }
+    .form-control:focus {
+      border-color: var(--primary);
+      box-shadow: 0 0 0 3px rgba(99, 102, 241, 0.12);
+      background: #ffffff;
+    }
+
+    /* Notification Toast */
+    .toast-container {
+      position: fixed;
+      bottom: 24px;
+      right: 24px;
+      z-index: 1000;
+      display: flex;
+      flex-direction: column;
+      gap: 10px;
+    }
+
+    .toast-msg {
+      background: #1e1b4b;
+      color: #fff;
+      padding: 14px 20px;
+      border-radius: 14px;
+      font-size: 0.88rem;
+      font-weight: 600;
+      box-shadow: 0 16px 36px rgba(15, 23, 42, 0.2);
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      border: 1px solid rgba(255, 255, 255, 0.14);
+      animation: toastIn 0.3s cubic-bezier(0.16, 1, 0.3, 1);
+    }
+    @keyframes toastIn {
+      from { transform: translateX(40px); opacity: 0; }
+      to { transform: translateX(0); opacity: 1; }
+    }
+
+    /* Responsive */
+    @media (max-width: 1080px) {
+      .dashboard-grid { grid-template-columns: 1fr; }
+      .wf-canvas-wrap, .dialer-grid { grid-template-columns: 1fr; }
+      .landing-features-grid { grid-template-columns: 1fr; }
+      .kpi-row { grid-template-columns: repeat(2, 1fr); }
+      .delivery-stepper { grid-template-columns: repeat(2, 1fr); }
+    }
+
+    @media (max-width: 768px) {
+      .top-nav { padding: 0 16px; }
+      .nav-links { display: none; }
+      .kpi-row { grid-template-columns: 1fr; }
+      .delivery-stepper { grid-template-columns: 1fr; }
+      .app-main { padding: 16px; }
+    }
+  </style>
+</head>
+<body>
+
+  <!-- Ambient Light Orbs -->
+  <div class="bg-aura aura-1"></div>
+  <div class="bg-aura aura-2"></div>
+  <div class="bg-aura aura-3"></div>
+
+  <div class="app-wrapper">
+    <!-- Top Nav -->
+    <header class="top-nav">
+      <div class="brand-section" onclick="navigateTo('landing')">
+        <div class="brand-logo-badge">B</div>
+        <div class="brand-name-wrap">
+          <span class="brand-title">BRIDGE</span>
+          <span class="brand-subtitle">AI Coordination Layer</span>
+        </div>
+      </div>
+
+      <nav>
+        <ul class="nav-links">
+          <li><button class="nav-btn active" data-page="landing" onclick="navigateTo('landing')"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor"><path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"></path><polyline points="9 22 9 12 15 12 15 22"></polyline></svg>Home</button></li>
+          <li><button class="nav-btn" data-page="dashboard" onclick="navigateTo('dashboard')"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor"><rect x="3" y="3" width="7" height="9"></rect><rect x="14" y="3" width="7" height="5"></rect><rect x="14" y="12" width="7" height="9"></rect><rect x="3" y="16" width="7" height="5"></rect></svg>Dashboard</button></li>
+          <li><button class="nav-btn" data-page="tasks" onclick="navigateTo('tasks')"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor"><path d="M9 11l3 3L22 4"></path><path d="M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11"></path></svg>Tasks & Timeline</button></li>
+          <li><button class="nav-btn" data-page="people" onclick="navigateTo('people')"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"></path><circle cx="9" cy="7" r="4"></circle><path d="M23 21v-2a4 4 0 0 0-3-3.87"></path><path d="M16 3.13a4 4 0 0 1 0 7.75"></path></svg>People & Org</button></li>
+          <li><button class="nav-btn" data-page="graph" onclick="navigateTo('graph')"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor"><circle cx="6" cy="6" r="3"></circle><circle cx="18" cy="6" r="3"></circle><circle cx="12" cy="18" r="3"></circle><line x1="8.5" y1="7.5" x2="15.5" y2="7.5"></line><line x1="7.5" y1="8.5" x2="10.5" y2="15.5"></line><line x1="16.5" y1="8.5" x2="13.5" y2="15.5"></line></svg>Org Graph</button></li>
+          <li><button class="nav-btn" data-page="workflows" onclick="navigateTo('workflows')"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor"><polyline points="22 12 18 12 15 21 9 3 6 12 2 12"></polyline></svg>Workflow Builder</button></li>
+          <li><button class="nav-btn" data-page="calle" onclick="navigateTo('calle')"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor"><path d="M22 16.92v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07 19.5 19.5 0 0 1-6-6 19.79 19.79 0 0 1-3.07-8.67A2 2 0 0 1 4.11 2h3a2 2 0 0 1 2 1.72 12.84 12.84 0 0 0 .7 2.81 2 2 0 0 1-.45 2.11L8.09 9.91a16 16 0 0 0 6 6l1.27-1.27a2 2 0 0 1 2.11-.45 12.84 12.84 0 0 0 2.81.7A2 2 0 0 1 22 16.92z"></path></svg>CALL-E Console</button></li>
+          <li><button class="nav-btn" data-page="history" onclick="navigateTo('history')"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor"><circle cx="12" cy="12" r="10"></circle><polyline points="12 6 12 12 16 14"></polyline></svg>History</button></li>
+          <li><button class="nav-btn" data-page="settings" onclick="navigateTo('settings')"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor"><circle cx="12" cy="12" r="3"></circle><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z"></path></svg>Settings</button></li>
+        </ul>
+      </nav>
+
+      <div class="nav-actions">
+        <div id="modeBadge" class="mode-indicator mode-simulation" onclick="navigateTo('settings')" title="Click to change mode in Settings">
+          <span class="status-dot"></span>
+          <span id="modeBadgeText">SIMULATION MODE</span>
+        </div>
+        <button class="btn-quick-demo" onclick="startDeliveryExceptionDemo()">
+          <svg width="15" height="15" viewBox="0 0 24 24" fill="currentColor"><polygon points="5 3 19 12 5 21 5 3"></polygon></svg>
+          Run Main Demo
+        </button>
+      </div>
+    </header>
+
+    <!-- Main Views Area -->
+    <main class="app-main">
+
+      <!-- ========================================================
+           PAGE 1: LANDING PAGE
+           ======================================================== -->
+      <section id="page-landing" class="page-view active">
+        <div class="landing-hero">
+          <div class="hero-eyebrow">
+            <span>✨</span> Next-Generation Business Operations Layer
+          </div>
+          <h1 class="hero-headline">The AI coordination layer that resolves real-world blockers.</h1>
+          <p class="hero-tagline">
+            When software hits an exception, it waits for humans. <strong>BRIDGE</strong> proactively identifies the exact person, initiates intelligent CALL-E voice dialogues, extracts structured commitments, and pushes workflows to resolution.
+          </p>
+
+          <div class="hero-cta-group">
+            <button class="btn btn-primary btn-lg" onclick="startDeliveryExceptionDemo()">
+              ⚡ Launch Delivery Exception Demo
+            </button>
+            <button class="btn btn-secondary btn-lg" onclick="navigateTo('dashboard')">
+              Open Dashboard Console
+            </button>
+          </div>
+
+          <!-- Interactive Workflow Strip -->
+          <div class="workflow-interactive-strip">
+            <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:12px;">
+              <span style="font-size:0.8rem; font-weight:700; text-transform:uppercase; letter-spacing:0.08em; color:var(--primary);">
+                Autonomous Resolution Loop
+              </span>
+              <span class="badge badge-emerald">Interactive Workflow</span>
+            </div>
+
+            <div class="workflow-steps-track">
+              <div class="workflow-connecting-line"></div>
+
+              <div class="flow-step-node" onclick="showFlowInfo('problem')">
+                <div class="flow-node-circle">⚠️</div>
+                <div class="flow-node-title">1. Problem</div>
+                <div class="flow-node-desc">Breakdown / SLA Risk detected</div>
+              </div>
+
+              <div class="flow-step-node" onclick="showFlowInfo('identify')">
+                <div class="flow-node-circle">🎯</div>
+                <div class="flow-node-title">2. Identify Person</div>
+                <div class="flow-node-desc">AI authority & responsibility match</div>
+              </div>
+
+              <div class="flow-step-node" onclick="showFlowInfo('calle')">
+                <div class="flow-node-circle">📞</div>
+                <div class="flow-node-title">3. CALL-E Call</div>
+                <div class="flow-node-desc">Outbound dialogue executed</div>
+              </div>
+
+              <div class="flow-step-node" onclick="showFlowInfo('extract')">
+                <div class="flow-node-circle">🧠</div>
+                <div class="flow-node-title">4. Extract Response</div>
+                <div class="flow-node-desc">Structured commitments mined</div>
+              </div>
+
+              <div class="flow-step-node" onclick="showFlowInfo('decide')">
+                <div class="flow-node-circle">🔄</div>
+                <div class="flow-node-title">5. Decide Next</div>
+                <div class="flow-node-desc">Route or escalate automatically</div>
+              </div>
+
+              <div class="flow-step-node" onclick="showFlowInfo('resolved')">
+                <div class="flow-node-circle">✅</div>
+                <div class="flow-node-title">6. Resolution</div>
+                <div class="flow-node-desc">Customer confirmed & completed</div>
+              </div>
+            </div>
+
+            <div id="flowInfoBox" style="margin-top:16px; padding:14px; background:rgba(99,102,241,0.06); border-radius:12px; font-size:0.88rem; color:var(--text-secondary); text-align:left;">
+              <strong>Active Pipeline:</strong> Click any step above or click <em>"Launch Delivery Exception Demo"</em> to watch BRIDGE autonomously coordinate: <strong>Driver → Warehouse Manager → Operations Head → Customer → Resolved</strong>.
+            </div>
+          </div>
+
+          <!-- Feature Highlights -->
+          <div class="landing-features-grid">
+            <div class="feature-card">
+              <div class="feature-icon-box" style="background:linear-gradient(135deg,#3b82f6,#1d4ed8);">👥</div>
+              <h3 style="font-size:1.15rem; font-weight:700; margin-bottom:8px;">Organizational Graph</h3>
+              <p style="color:var(--text-muted); font-size:0.88rem; line-height:1.6;">
+                Models authority limits, reporting structures, on-call schedules, and responsibilities to pinpoint the ideal contact in seconds.
+              </p>
+            </div>
+
+            <div class="feature-card">
+              <div class="feature-icon-box" style="background:linear-gradient(135deg,#8b5cf6,#6d28d9);">🎙️</div>
+              <h3 style="font-size:1.15rem; font-weight:700; margin-bottom:8px;">CALL-E Voice Integration</h3>
+              <p style="color:var(--text-muted); font-size:0.88rem; line-height:1.6;">
+                Executes outbound voice calls via CALL-E with strict goal parameters, human speech confirmation, and transcript parsing.
+              </p>
+            </div>
+
+            <div class="feature-card">
+              <div class="feature-icon-box" style="background:linear-gradient(135deg,#10b981,#047857);">🛡️</div>
+              <h3 style="font-size:1.15rem; font-weight:700; margin-bottom:8px;">Simulation & Safety Controls</h3>
+              <p style="color:var(--text-muted); font-size:0.88rem; line-height:1.6;">
+                Built-in simulation sandbox allows zero-credit end-to-end testing, while live calling strictly enforces explicit human confirmation.
+              </p>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <!-- ========================================================
+           PAGE 2: DASHBOARD
+           ======================================================== -->
+      <section id="page-dashboard" class="page-view">
+        <!-- KPI Row -->
+        <div class="kpi-row">
+          <div class="kpi-card">
+            <div class="kpi-meta">
+              <span>Avg Resolution Time</span>
+              <span>⚡</span>
+            </div>
+            <div class="kpi-value">14.2 min</div>
+            <div class="kpi-subtext">↓ 86% vs manual escalation (3.2h)</div>
+          </div>
+
+          <div class="kpi-card">
+            <div class="kpi-meta">
+              <span>Autonomous Resolution</span>
+              <span>🎯</span>
+            </div>
+            <div class="kpi-value">94.8%</div>
+            <div class="kpi-subtext">↑ 12% this week</div>
+          </div>
+
+          <div class="kpi-card">
+            <div class="kpi-meta">
+              <span>Active Incidents</span>
+              <span>🚨</span>
+            </div>
+            <div class="kpi-value" id="kpiActiveIncidents">1</div>
+            <div class="kpi-subtext" style="color:var(--amber);">1 in coordination loop</div>
+          </div>
+
+          <div class="kpi-card">
+            <div class="kpi-meta">
+              <span>CALL-E Voice Minutes</span>
+              <span>📞</span>
+            </div>
+            <div class="kpi-value" id="kpiCallsCount">4</div>
+            <div class="kpi-subtext">Zero manual hold time</div>
+          </div>
+        </div>
+
+        <div class="dashboard-grid">
+          <!-- Left Column -->
+          <div>
+            <!-- Main Delivery Exception Card -->
+            <div class="delivery-exception-card">
+              <div class="incident-header">
+                <div class="incident-title-wrap">
+                  <div style="display:flex; align-items:center; gap:8px; margin-bottom:6px;">
+                    <span class="badge badge-rose">High SLA Impact</span>
+                    <span id="incidentStatusBadge" class="badge badge-amber">In Coordination</span>
+                    <span class="badge badge-primary">SHP-1001</span>
+                  </div>
+                  <h2>Delayed Delivery #SHP-1001</h2>
+                  <div class="incident-subtitle">
+                    Vehicle breakdown reported on NH-48. QuickMove Logistics target arrival: 18:00 max SLA.
+                  </div>
+                </div>
+
+                <div class="incident-controls">
+                  <button id="btnAutoStep" class="btn btn-primary" onclick="triggerAutoStep()">
+                    <span>▶</span> Step Next Action
+                  </button>
+                  <button class="btn btn-secondary btn-sm" onclick="resetDeliveryDemo()">
+                    Reset
+                  </button>
+                </div>
+              </div>
+
+              <!-- 4-Step Visual Stepper -->
+              <div class="delivery-stepper">
+                <!-- Step 1: Driver -->
+                <div id="stepCard-arjun" class="step-item active">
+                  <div class="step-header-row">
+                    <span class="step-num-badge">1</span>
+                    <span id="stepBadge-arjun" class="badge badge-amber">Calling</span>
+                  </div>
+                  <div>
+                    <div class="step-role-title">Driver</div>
+                    <div class="step-person-name">Arjun (+91 98...0878)</div>
+                  </div>
+                  <div id="stepOutcome-arjun" class="step-outcome-text">
+                    Triage stalled vehicle condition and confirm parcel safety.
+                  </div>
+                </div>
+
+                <!-- Step 2: Warehouse -->
+                <div id="stepCard-amit" class="step-item">
+                  <div class="step-header-row">
+                    <span class="step-num-badge">2</span>
+                    <span id="stepBadge-amit" class="badge">Standby</span>
+                  </div>
+                  <div>
+                    <div class="step-role-title">Warehouse Manager</div>
+                    <div class="step-person-name">Amit (+91 98...1432)</div>
+                  </div>
+                  <div id="stepOutcome-amit" class="step-outcome-text">
+                    Check replacement Van #9 availability & departure time.
+                  </div>
+                </div>
+
+                <!-- Step 3: Operations Head -->
+                <div id="stepCard-priya" class="step-item">
+                  <div class="step-header-row">
+                    <span class="step-num-badge">3</span>
+                    <span id="stepBadge-priya" class="badge">Standby</span>
+                  </div>
+                  <div>
+                    <div class="step-role-title">Operations Head</div>
+                    <div class="step-person-name">Priya (+91 98...9090)</div>
+                  </div>
+                  <div id="stepOutcome-priya" class="step-outcome-text">
+                    Authorize ₹1,500 emergency replacement dispatch fee.
+                  </div>
+                </div>
+
+                <!-- Step 4: Customer -->
+                <div id="stepCard-rahul" class="step-item">
+                  <div class="step-header-row">
+                    <span class="step-num-badge">4</span>
+                    <span id="stepBadge-rahul" class="badge">Standby</span>
+                  </div>
+                  <div>
+                    <div class="step-role-title">Customer</div>
+                    <div class="step-person-name">Rahul (+91 98...2211)</div>
+                  </div>
+                  <div id="stepOutcome-rahul" class="step-outcome-text">
+                    Confirm revised arrival at 17:00 before deadline.
+                  </div>
+                </div>
+              </div>
+
+              <!-- AI Rationale Bar -->
+              <div style="background:rgba(255,255,255,0.8); border:1px solid var(--border); border-radius:12px; padding:12px 16px; display:flex; align-items:center; gap:12px;">
+                <span style="font-size:1.1rem;">💡</span>
+                <div style="font-size:0.84rem; color:var(--text-secondary); line-height:1.4;">
+                  <strong>AI Coordination Rationale:</strong>
+                  <span id="dashboardRationaleText">Arjun (Driver) was selected to establish ground truth regarding vehicle overheating on NH-48.</span>
+                </div>
+              </div>
+            </div>
+
+            <!-- Recent Live Activity Stream -->
+            <div class="card">
+              <div class="card-header">
+                <div class="card-title-group">
+                  <div class="card-icon">📋</div>
+                  <div>
+                    <div class="card-title">Coordination Activity Feed</div>
+                    <div class="card-subtitle">Real-time decisions, CALL-E actions, and human responses</div>
+                  </div>
+                </div>
+                <button class="btn btn-secondary btn-sm" onclick="fetchTaskData()">Refresh</button>
+              </div>
+
+              <div id="dashboardActivityFeed" class="timeline-container">
+                <!-- Populated dynamically -->
+              </div>
+            </div>
+          </div>
+
+          <!-- Right Column -->
+          <div>
+            <!-- Live Voice Terminal Widget -->
+            <div class="voice-visualizer-box">
+              <div class="voice-header">
+                <div class="caller-details">
+                  <div id="voiceAvatar" class="caller-avatar">A</div>
+                  <div>
+                    <div id="voiceCallerName" style="font-weight:800; font-size:1.05rem;">Arjun (Driver)</div>
+                    <div id="voiceCallStatus" style="font-size:0.75rem; color:#93c5fd;">Active Outbound Call</div>
+                  </div>
+                </div>
+                <div id="voiceTimer" style="font-family:'JetBrains Mono',monospace; font-size:1.1rem; color:#38bdf8;">00:24</div>
+              </div>
+
+              <div class="live-waves-container">
+                <div class="wave-bar"></div><div class="wave-bar"></div><div class="wave-bar"></div>
+                <div class="wave-bar"></div><div class="wave-bar"></div><div class="wave-bar"></div>
+                <div class="wave-bar"></div><div class="wave-bar"></div>
+              </div>
+
+              <div id="voiceTranscriptBubble" class="live-transcript-bubble">
+                "Hello Arjun, this is BRIDGE regarding Shipment #SHP-1001. What is your current vehicle status?"
+              </div>
+
+              <div style="margin-top:14px; display:flex; justify-content:space-between; align-items:center;">
+                <span style="font-size:0.74rem; color:#cbd5e1;">CALL-E Protocol v1.4</span>
+                <button class="btn btn-sm" style="background:rgba(255,255,255,0.18); color:#fff;" onclick="navigateTo('calle')">
+                  Open Console →
+                </button>
+              </div>
+            </div>
+
+            <!-- Quick Action Hub -->
+            <div class="card" style="margin-bottom:24px;">
+              <h3 style="font-size:1rem; font-weight:700; margin-bottom:14px;">Demo Scenarios</h3>
+              <div style="display:flex; flex-direction:column; gap:10px;">
+                <button class="btn btn-primary" style="justify-content:flex-start;" onclick="startDeliveryExceptionDemo()">
+                  🚚 Delivery Exception (Full 4-Step Auto)
+                </button>
+                <button class="btn btn-secondary" style="justify-content:flex-start;" onclick="simulateCustomFailure()">
+                  ⚠️ Simulate "Driver No Answer" Escalation
+                </button>
+                <button class="btn btn-ghost" style="justify-content:flex-start;" onclick="navigateTo('workflows')">
+                  ➕ Build New Workflow...
+                </button>
+              </div>
+            </div>
+
+            <!-- Extracted Business Intelligence -->
+            <div class="card">
+              <h3 style="font-size:1rem; font-weight:700; margin-bottom:14px;">Extracted Intelligence</h3>
+              <div id="extractedDataList" style="display:flex; flex-direction:column; gap:10px; font-size:0.82rem;">
+                <!-- Populated dynamically -->
+                <div class="detail-row"><span class="detail-label">Initial Cause:</span><span class="detail-val">Radiator Hose Leak</span></div>
+                <div class="detail-row"><span class="detail-label">Replacement Van:</span><span class="detail-val">Van #9 (Amit)</span></div>
+                <div class="detail-row"><span class="detail-label">Authorized Cost:</span><span class="detail-val">₹1,500 (Priya approved)</span></div>
+                <div class="detail-row"><span class="detail-label">Agreed ETA:</span><span class="detail-val">17:00 (Rahul confirmed)</span></div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <!-- ========================================================
+           PAGE 3: TASKS & TIMELINE
+           ======================================================== -->
+      <section id="page-tasks" class="page-view">
+        <div class="card-header" style="margin-bottom:24px;">
+          <div>
+            <h2 style="font-size:1.6rem; font-weight:800; letter-spacing:-0.03em;">Tasks & Resolution Timelines</h2>
+            <p style="color:var(--text-muted); font-size:0.88rem;">Track every autonomous coordination task from blocker to final sign-off.</p>
+          </div>
+          <button class="btn btn-primary" onclick="openNewTaskModal()">
+            + Create New Task
+          </button>
+        </div>
+
+        <div style="display:grid; grid-template-columns: 360px 1fr; gap:24px;">
+          <!-- Tasks List -->
+          <div class="card" style="padding:16px;">
+            <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:14px; padding:0 6px;">
+              <span style="font-weight:700; font-size:0.9rem;">Active Tasks</span>
+              <span id="tasksCountBadge" class="badge badge-primary">1 task</span>
+            </div>
+            <div id="taskListContainer" style="display:flex; flex-direction:column; gap:10px;">
+              <!-- Populated dynamically -->
+            </div>
+          </div>
+
+          <!-- Deep Dive Timeline View -->
+          <div class="card">
+            <div id="taskDetailHeader" style="margin-bottom:20px;">
+              <!-- Populated dynamically -->
+            </div>
+            <div id="taskTimelineDeepList" class="timeline-container">
+              <!-- Populated dynamically -->
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <!-- ========================================================
+           PAGE 4: PEOPLE & ORGANIZATION MANAGEMENT
+           ======================================================== -->
+      <section id="page-people" class="page-view">
+        <div class="card-header" style="margin-bottom:24px;">
+          <div>
+            <h2 style="font-size:1.6rem; font-weight:800; letter-spacing:-0.03em;">People & Organization Directory</h2>
+            <p style="color:var(--text-muted); font-size:0.88rem;">Define decision authority, contact details, and escalation responsibilities.</p>
+          </div>
+          <div style="display:flex; gap:10px;">
+            <button class="btn btn-secondary" onclick="resetOrgToDefault()">Reset Defaults</button>
+            <button class="btn btn-primary" onclick="openAddPersonModal()">+ Add Person</button>
+          </div>
+        </div>
+
+        <div id="peopleGridContainer" class="people-grid">
+          <!-- Populated dynamically -->
+        </div>
+      </section>
+
+      <!-- ========================================================
+           PAGE 5: INTERACTIVE ORGANIZATION GRAPH
+           ======================================================== -->
+      <section id="page-graph" class="page-view">
+        <div class="card-header" style="margin-bottom:16px;">
+          <div>
+            <h2 style="font-size:1.6rem; font-weight:800; letter-spacing:-0.03em;">Interactive Organization Graph</h2>
+            <p style="color:var(--text-muted); font-size:0.88rem;">Visual representation of coordination paths, decision tiers, and currently active calls.</p>
+          </div>
+          <div style="display:flex; gap:10px; align-items:center;">
+            <span class="badge badge-emerald">Live Nodes</span>
+            <button class="btn btn-secondary btn-sm" onclick="renderOrgGraph()">Re-center Graph</button>
+          </div>
+        </div>
+
+        <div class="graph-viewport">
+          <svg id="orgGraphSvg" width="100%" height="480" style="overflow:visible;">
+            <!-- Rendered by D3 / SVG JS -->
+          </svg>
+        </div>
+
+        <!-- Node Inspector Drawer -->
+        <div id="graphNodeInspector" class="card" style="margin-top:20px; display:none;">
+          <div style="display:flex; justify-content:space-between; align-items:flex-start;">
+            <div style="display:flex; gap:14px; align-items:center;">
+              <div id="inspectAvatar" class="person-avatar-circle" style="width:48px; height:48px; font-size:1.1rem;">A</div>
+              <div>
+                <h3 id="inspectName" style="font-size:1.1rem; font-weight:800;">Arjun</h3>
+                <div id="inspectRole" style="font-size:0.82rem; color:var(--primary); font-weight:700;">Driver</div>
+              </div>
+            </div>
+            <button class="btn btn-primary btn-sm" onclick="triggerDirectCallFromGraph()">
+              📞 Test Call with CALL-E
+            </button>
+          </div>
+          <div style="display:grid; grid-template-columns: repeat(3, 1fr); gap:16px; margin-top:16px; font-size:0.84rem;">
+            <div><strong>Phone:</strong> <span id="inspectPhone">+91******0878</span></div>
+            <div><strong>Spend Authority:</strong> <span id="inspectAuthority">None</span></div>
+            <div><strong>Responsibilities:</strong> <span id="inspectResponsibilities">Delivery execution</span></div>
+          </div>
+        </div>
+      </section>
+
+      <!-- ========================================================
+           PAGE 6: WORKFLOW BUILDER
+           ======================================================== -->
+      <section id="page-workflows" class="page-view">
+        <div class="card-header" style="margin-bottom:24px;">
+          <div>
+            <h2 style="font-size:1.6rem; font-weight:800; letter-spacing:-0.03em;">Visual Workflow Builder</h2>
+            <p style="color:var(--text-muted); font-size:0.88rem;">Configure triggers, CALL-E outbound steps, and decision gates for any business process.</p>
+          </div>
+          <button class="btn btn-primary" onclick="openNewWorkflowModal()">+ New Workflow</button>
+        </div>
+
+        <div class="wf-canvas-wrap">
+          <div class="card" style="padding:16px;">
+            <div style="font-size:0.82rem; font-weight:700; text-transform:uppercase; letter-spacing:0.06em; color:var(--text-muted); margin-bottom:12px; padding:0 4px;">
+              Workflow Templates
+            </div>
+            <div id="workflowListContainer" class="wf-sidebar-list">
+              <!-- Populated dynamically -->
+            </div>
+          </div>
+
+          <div class="wf-pipeline-view">
+            <div style="display:flex; justify-content:space-between; align-items:center;">
+              <div>
+                <h3 id="wfActiveTitle" style="font-size:1.2rem; font-weight:800;">Delivery Exception Resolution</h3>
+                <p id="wfActiveDesc" style="font-size:0.84rem; color:var(--text-muted);">Autonomous driver triage, warehouse vehicle check, ops approval, and customer alignment.</p>
+              </div>
+              <div style="display:flex; gap:8px;">
+                <button class="btn btn-secondary btn-sm" onclick="startDeliveryExceptionDemo()">Run Workflow</button>
+              </div>
+            </div>
+
+            <div id="wfNodesPipelineContainer" style="display:flex; flex-direction:column; margin-top:14px;">
+              <!-- Pipeline nodes populated dynamically -->
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <!-- ========================================================
+           PAGE 7: CALL-E CALL INTERFACE & STATUS
+           ======================================================== -->
+      <section id="page-calle" class="page-view">
+        <div class="card-header" style="margin-bottom:24px;">
+          <div>
+            <h2 style="font-size:1.6rem; font-weight:800; letter-spacing:-0.03em;">CALL-E Live Voice Interface</h2>
+            <p style="color:var(--text-muted); font-size:0.88rem;">Live outbound dialing console, audio wave animation, real-time dialogue stream, and payload inspector.</p>
+          </div>
+          <div style="display:flex; gap:10px; align-items:center;">
+            <span class="badge badge-emerald">CALL-E Engine Online</span>
+          </div>
+        </div>
+
+        <div class="dialer-grid">
+          <!-- Virtual Phone Cockpit -->
+          <div class="phone-simulator-card">
+            <div class="phone-screen-top">
+              <div id="phoneTargetAvatar" class="phone-target-avatar">A</div>
+              <h2 id="phoneTargetName" style="font-size:1.4rem; font-weight:800;">Arjun</h2>
+              <div id="phoneTargetRole" style="color:#a5b4fc; font-weight:600; font-size:0.9rem;">Driver • QuickMove Logistics</div>
+              <div id="phoneTargetPhone" style="font-size:0.8rem; color:#94a3b8; margin-top:2px;">+91******0878</div>
+              <div id="phoneCallState" class="phone-call-state">Connected • High Quality HD Voice</div>
+              <div id="phoneCallTimer" class="phone-call-timer">00:42</div>
+            </div>
+
+            <!-- Waves -->
+            <div>
+              <div class="live-waves-container" style="background:rgba(255,255,255,0.08); height:48px;">
+                <div class="wave-bar"></div><div class="wave-bar"></div><div class="wave-bar"></div>
+                <div class="wave-bar"></div><div class="wave-bar"></div><div class="wave-bar"></div>
+                <div class="wave-bar"></div><div class="wave-bar"></div>
+              </div>
+
+              <div id="phoneLiveDialogue" style="background:rgba(255,255,255,0.08); border-radius:14px; padding:16px; font-size:0.9rem; line-height:1.6; color:#f1f5f9; min-height:100px;">
+                "Engine overheating, radiator hose leaking. Vehicle cannot continue route on NH-48. Parcels secure, need replacement van."
+              </div>
+            </div>
+
+            <!-- Controls -->
+            <div class="phone-action-row">
+              <button class="phone-round-btn btn-hangup" onclick="hangupCurrentCall()" title="End Call">
+                📴
+              </button>
+              <button class="phone-round-btn btn-dial" onclick="startActiveCallSimulation()" title="Dial / Restart Call">
+                📞
+              </button>
+            </div>
+          </div>
+
+          <!-- Structured Payload & Intelligence Viewer -->
+          <div style="display:flex; flex-direction:column; gap:20px;">
+            <div class="card">
+              <div class="card-header">
+                <div class="card-title-group">
+                  <div class="card-icon">📜</div>
+                  <div>
+                    <div class="card-title">Live CALL-E Transcript</div>
+                    <div class="card-subtitle">Complete turn-by-turn dialogue stream</div>
+                  </div>
+                </div>
+                <button class="btn btn-secondary btn-sm" onclick="speakTranscript()">
+                  🔊 Voice Playback
+                </button>
+              </div>
+
+              <div id="transcriptTurnsList" style="display:flex; flex-direction:column; gap:12px; max-height:280px; overflow-y:auto;">
+                <!-- Populated dynamically -->
+              </div>
+            </div>
+
+            <div class="card">
+              <div class="card-header">
+                <div class="card-title-group">
+                  <div class="card-icon">⚙️</div>
+                  <div>
+                    <div class="card-title">CALL-E Protocol Handshake</div>
+                    <div class="card-subtitle">Plan ID, confirmation token, and structured results</div>
+                  </div>
+                </div>
+              </div>
+
+              <div style="display:grid; grid-template-columns: repeat(2, 1fr); gap:12px; margin-bottom:14px; font-size:0.82rem;">
+                <div style="background:rgba(248,250,255,0.8); padding:10px; border-radius:8px; border:1px solid var(--border-subtle);">
+                  <div style="color:var(--text-muted); font-size:0.72rem; text-transform:uppercase;">Plan ID</div>
+                  <div id="callePlanIdVal" style="font-family:'JetBrains Mono',monospace; font-weight:700;">sim-plan-991823</div>
+                </div>
+                <div style="background:rgba(248,250,255,0.8); padding:10px; border-radius:8px; border:1px solid var(--border-subtle);">
+                  <div style="color:var(--text-muted); font-size:0.72rem; text-transform:uppercase;">Confirm Token</div>
+                  <div id="calleConfirmTokenVal" style="font-family:'JetBrains Mono',monospace; font-weight:700;">sim-confirm-991823</div>
+                </div>
+              </div>
+
+              <pre id="callePayloadJson" style="background:#0f172a; color:#38bdf8; padding:14px; border-radius:12px; font-family:'JetBrains Mono',monospace; font-size:0.76rem; max-height:160px; overflow:auto;">{}</pre>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <!-- ========================================================
+           PAGE 8: CALL HISTORY
+           ======================================================== -->
+      <section id="page-history" class="page-view">
+        <div class="card-header" style="margin-bottom:24px;">
+          <div>
+            <h2 style="font-size:1.6rem; font-weight:800; letter-spacing:-0.03em;">CALL-E Call History & Intelligence Logs</h2>
+            <p style="color:var(--text-muted); font-size:0.88rem;">Complete audit record of every automated outbound call, sentiment, and extracted outcome.</p>
+          </div>
+          <button class="btn btn-danger btn-sm" onclick="clearCallHistory()">Clear History</button>
+        </div>
+
+        <div class="table-container">
+          <table>
+            <thead>
+              <tr>
+                <th>Timestamp</th>
+                <th>Participant</th>
+                <th>Role</th>
+                <th>Duration</th>
+                <th>Sentiment</th>
+                <th>Status</th>
+                <th>Outcome Summary</th>
+              </tr>
+            </thead>
+            <tbody id="callHistoryTableBody">
+              <!-- Populated dynamically -->
+            </tbody>
+          </table>
+        </div>
+      </section>
+
+      <!-- ========================================================
+           PAGE 9: SETTINGS
+           ======================================================== -->
+      <section id="page-settings" class="page-view">
+        <div class="card-header" style="margin-bottom:24px;">
+          <div>
+            <h2 style="font-size:1.6rem; font-weight:800; letter-spacing:-0.03em;">Settings & System Configuration</h2>
+            <p style="color:var(--text-muted); font-size:0.88rem;">Configure simulation sandbox, live CLI connectivity, and safety confirmation gates.</p>
+          </div>
+          <button class="btn btn-primary" onclick="saveSettings()">Save Configuration</button>
+        </div>
+
+        <div style="max-width:760px; display:flex; flex-direction:column; gap:24px;">
+          <!-- Mode Switcher Card -->
+          <div class="card">
+            <h3 style="font-size:1.15rem; font-weight:800; margin-bottom:6px;">Execution Mode</h3>
+            <p style="color:var(--text-muted); font-size:0.86rem; margin-bottom:18px;">
+              Simulation Mode allows the entire coordination pipeline to run safely without consuming CALL-E voice credits.
+            </p>
+
+            <div style="display:grid; grid-template-columns: 1fr 1fr; gap:16px;">
+              <div id="modeCardSimulation" class="card" style="cursor:pointer; border-color:var(--emerald); background:rgba(16,185,129,0.06);" onclick="selectMode('simulation')">
+                <div style="display:flex; justify-content:space-between; align-items:center;">
+                  <strong style="font-size:1.05rem; color:#065f46;">🧪 Simulation Mode</strong>
+                  <span id="checkSim" style="color:#059669; font-weight:800;">✓</span>
+                </div>
+                <p style="font-size:0.8rem; color:#047857; margin-top:8px;">Zero credit cost. Rich multi-turn dialogues, realistic waveforms, and end-to-end hackathon demo ready.</p>
+              </div>
+
+              <div id="modeCardLive" class="card" style="cursor:pointer;" onclick="selectMode('live')">
+                <div style="display:flex; justify-content:space-between; align-items:center;">
+                  <strong style="font-size:1.05rem; color:#9f1239;">🚨 Live Calling Mode</strong>
+                  <span id="checkLive" style="color:#9f1239; font-weight:800; display:none;">✓</span>
+                </div>
+                <p style="font-size:0.8rem; color:var(--text-muted); margin-top:8px;">Real outbound calls via CALL-E CLI. Enforces explicit popup confirmation before placing calls.</p>
+              </div>
+            </div>
+          </div>
+
+          <!-- Environmental Status -->
+          <div class="card">
+            <h3 style="font-size:1.15rem; font-weight:800; margin-bottom:16px;">Integration Status</h3>
+            <div style="display:flex; flex-direction:column; gap:12px; font-size:0.88rem;">
+              <div class="detail-row">
+                <span class="detail-label">CALL-E CLI Binary:</span>
+                <span id="settingCliStatus" class="badge badge-primary">Checking...</span>
+              </div>
+              <div class="detail-row">
+                <span class="detail-label">Twilio / Webhook Status:</span>
+                <span class="badge badge-emerald">Ready</span>
+              </div>
+              <div class="detail-row">
+                <span class="detail-label">Web Speech API Voice:</span>
+                <span class="badge badge-purple">Available in Browser</span>
+              </div>
+            </div>
+          </div>
+
+          <!-- Preferences -->
+          <div class="card">
+            <h3 style="font-size:1.15rem; font-weight:800; margin-bottom:16px;">Demo & Audio Preferences</h3>
+            <div class="form-group">
+              <label><input type="checkbox" id="prefVoiceNarration" checked style="margin-right:8px;" /> Enable Browser Speech Synthesis Narration during calls</label>
+            </div>
+            <div class="form-group">
+              <label><input type="checkbox" id="prefCallConfirmation" checked style="margin-right:8px;" /> Require explicit modal confirmation before any live call</label>
+            </div>
+            <div class="form-group">
+              <label>Default Expense Discretionary Limit (₹)</label>
+              <input type="number" id="prefCostLimit" class="form-control" value="2000" />
+            </div>
+          </div>
+
+          <!-- Danger Zone -->
+          <div class="card" style="border-color:rgba(244,63,94,0.3); background:rgba(244,63,94,0.03);">
+            <h3 style="font-size:1rem; font-weight:800; color:#e11d48; margin-bottom:6px;">Reset Demo Data</h3>
+            <p style="font-size:0.82rem; color:var(--text-muted); margin-bottom:14px;">Resets organization, active tasks, and call history to default benchmark state.</p>
+            <button class="btn btn-danger btn-sm" onclick="resetAllDemoData()">
+              ⚠️ Reset Entire System State
+            </button>
+          </div>
+        </div>
+      </section>
+
+    </main>
+  </div>
+
+  <!-- ========================================================
+       MODALS
+       ======================================================== -->
+
+  <!-- Add Person Modal -->
+  <div id="modalAddPerson" class="modal-overlay">
+    <div class="modal-dialog">
+      <div class="modal-head">
+        <h3 style="font-size:1.2rem; font-weight:800;">Add Team Member</h3>
+        <button class="btn btn-ghost btn-sm" onclick="closeModal('modalAddPerson')">✕</button>
+      </div>
+      <form id="formAddPerson" onsubmit="submitAddPerson(event)">
+        <div class="modal-body">
+          <div class="form-group">
+            <label>Full Name</label>
+            <input name="name" class="form-control" placeholder="e.g. Vikram Sharma" required />
+          </div>
+          <div class="form-group">
+            <label>Role</label>
+            <select name="role" class="form-control" required>
+              <option value="Driver">Driver</option>
+              <option value="Warehouse Manager">Warehouse Manager</option>
+              <option value="Operations Head">Operations Head</option>
+              <option value="Customer">Customer</option>
+              <option value="Fleet Supervisor">Fleet Supervisor</option>
+              <option value="Quality Director">Quality Director</option>
+            </select>
+          </div>
+          <div class="form-group">
+            <label>Phone Number</label>
+            <input name="phone" class="form-control" placeholder="+91 98765 43210" required />
+          </div>
+          <div class="form-group">
+            <label>Spend Authorization Limit (₹)</label>
+            <input name="extraCostLimit" type="number" class="form-control" placeholder="e.g. 2000" />
+          </div>
+          <div class="form-group">
+            <label>Key Responsibilities (comma-separated)</label>
+            <input name="responsibilities" class="form-control" placeholder="Delivery execution, vehicle status, dispatch" />
+          </div>
+        </div>
+        <div class="modal-foot">
+          <button type="button" class="btn btn-secondary" onclick="closeModal('modalAddPerson')">Cancel</button>
+          <button type="submit" class="btn btn-primary">Add Person</button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <!-- Create Task Modal -->
+  <div id="modalNewTask" class="modal-overlay">
+    <div class="modal-dialog">
+      <div class="modal-head">
+        <h3 style="font-size:1.2rem; font-weight:800;">Create Coordination Task</h3>
+        <button class="btn btn-ghost btn-sm" onclick="closeModal('modalNewTask')">✕</button>
+      </div>
+      <form id="formNewTask" onsubmit="submitNewTask(event)">
+        <div class="modal-body">
+          <div class="form-group">
+            <label>Task Title / Subject</label>
+            <input name="title" class="form-control" placeholder="e.g. Urgent Warehouse Stockout #WH-202" required />
+          </div>
+          <div class="form-group">
+            <label>High-Level Goal</label>
+            <textarea name="goal" class="form-control" style="height:70px; padding:10px;" placeholder="Resolve missing shipment and align revised delivery deadline." required></textarea>
+          </div>
+          <div class="form-group">
+            <label>Initial Information Need</label>
+            <input name="currentNeed" class="form-control" placeholder="e.g. driver status confirmation" value="driver incident report" />
+          </div>
+        </div>
+        <div class="modal-foot">
+          <button type="button" class="btn btn-secondary" onclick="closeModal('modalNewTask')">Cancel</button>
+          <button type="submit" class="btn btn-primary">Create Task</button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <!-- Live Mode Safety Confirmation Modal -->
+  <div id="modalLiveConfirm" class="modal-overlay">
+    <div class="modal-dialog" style="max-width:480px; border-color:rgba(244,63,94,0.4);">
+      <div class="modal-head" style="background:rgba(244,63,94,0.06);">
+        <h3 style="font-size:1.15rem; font-weight:800; color:#e11d48;">🚨 Confirm Outbound Phone Call</h3>
+        <button class="btn btn-ghost btn-sm" onclick="closeModal('modalLiveConfirm')">✕</button>
+      </div>
+      <div class="modal-body">
+        <p style="font-size:0.9rem; line-height:1.6; color:var(--text);">
+          You are currently in <strong>LIVE CALLING MODE</strong>.
+        </p>
+        <div style="background:rgba(244,63,94,0.06); padding:14px; border-radius:12px; margin:12px 0; font-size:0.85rem; border:1px solid rgba(244,63,94,0.18);">
+          Calling: <strong id="liveConfirmTarget">Arjun (+91******0878)</strong><br />
+          Purpose: <span id="liveConfirmPurpose">Vehicle problem verification</span>
+        </div>
+        <p style="font-size:0.8rem; color:var(--text-muted);">
+          This will trigger a live telephony call via CALL-E CLI to the real phone number.
+        </p>
+      </div>
+      <div class="modal-foot">
+        <button class="btn btn-secondary" onclick="closeModal('modalLiveConfirm')">Cancel Call</button>
+        <button class="btn btn-danger" onclick="proceedWithLiveCall()">Authorize & Dial Now</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Toast Container -->
+  <div id="toastContainer" class="toast-container"></div>
+
+  <!-- Application Logic -->
+  <script>
+    // State Store
+    const state = {
+      currentPage: 'landing',
+      mode: 'simulation',
+      settings: {},
+      organization: { people: [] },
+      tasks: [],
+      currentTaskId: null,
+      callHistory: [],
+      workflows: [],
+      isAutoRunning: false,
+      activeCall: null,
+      callTimerInterval: null,
+      pendingLiveCallAction: null
+    };
+
+    // API Wrapper
+    async function api(endpoint, options = {}) {
+      const headers = { 'Content-Type': 'application/json', ...(options.headers || {}) };
+      const response = await fetch(endpoint, {
+        ...options,
+        headers,
+        body: options.body ? JSON.stringify(options.body) : undefined
+      });
+      const data = await response.json();
+      if (!response.ok) {
+        throw new Error(data.error?.message || 'API request failed');
+      }
+      return data;
+    }
+
+    // Navigation
+    function navigateTo(pageId) {
+      state.currentPage = pageId;
+      document.querySelectorAll('.page-view').forEach(view => view.classList.remove('active'));
+      const activeView = document.getElementById(`page-${pageId}`);
+      if (activeView) activeView.classList.add('active');
+
+      document.querySelectorAll('.nav-btn').forEach(btn => {
+        if (btn.getAttribute('data-page') === pageId) {
+          btn.classList.add('active');
+        } else {
+          btn.classList.remove('active');
+        }
+      });
+
+      window.scrollTo({ top: 0, behavior: 'smooth' });
+
+      if (pageId === 'graph') {
+        setTimeout(renderOrgGraph, 100);
+      }
+    }
+
+    // Toast notification
+    function showToast(message, icon = 'ℹ️') {
+      const container = document.getElementById('toastContainer');
+      const toast = document.createElement('div');
+      toast.className = 'toast-msg';
+      toast.innerHTML = `<span>${icon}</span><span>${message}</span>`;
+      container.appendChild(toast);
+      setTimeout(() => {
+        toast.style.opacity = '0';
+        toast.style.transform = 'translateY(10px)';
+        toast.style.transition = 'all 0.3s ease';
+        setTimeout(() => toast.remove(), 300);
+      }, 3500);
+    }
+
+    // Modal helpers
+    function openModal(id) { document.getElementById(id).classList.add('active'); }
+    function closeModal(id) { document.getElementById(id).classList.remove('active'); }
+
+    // Speech Synthesis
+    function speakText(text) {
+      if (!('speechSynthesis' in window) || !state.settings.audioNarration) return;
+      window.speechSynthesis.cancel();
+      const utterance = new SpeechSynthesisUtterance(text);
+      utterance.rate = 1.05;
+      utterance.pitch = 1.0;
+      window.speechSynthesis.speak(utterance);
+    }
+
+    // ========================================================
+    // DATA FETCHING & SYNC
+    // ========================================================
+    async function loadSettings() {
+      try {
+        const settings = await api('/api/settings');
+        state.settings = settings;
+        state.mode = settings.mode;
+        updateModeBadge(settings.mode);
+
+        const cliEl = document.getElementById('settingCliStatus');
+        if (cliEl) {
+          cliEl.textContent = settings.calleCliDetected ? 'Installed & Authenticated' : 'Simulated (Fallback Mode)';
+          cliEl.className = settings.calleCliDetected ? 'badge badge-emerald' : 'badge badge-primary';
+        }
+      } catch (err) {
+        console.warn('Settings load error:', err);
+      }
+    }
+
+    function updateModeBadge(mode) {
+      const badge = document.getElementById('modeBadge');
+      const text = document.getElementById('modeBadgeText');
+      if (mode === 'live') {
+        badge.className = 'mode-indicator mode-live';
+        text.textContent = 'LIVE CALLING MODE';
+      } else {
+        badge.className = 'mode-indicator mode-simulation';
+        text.textContent = 'SIMULATION MODE';
+      }
+    }
+
+    async function loadOrganization() {
+      try {
+        const org = await api('/api/organization');
+        state.organization = org;
+        renderPeopleGrid();
+      } catch (err) {
+        console.warn('Org load error:', err);
+      }
+    }
+
+    async function loadWorkflows() {
+      try {
+        const wfs = await api('/api/workflows');
+        state.workflows = wfs;
+        renderWorkflowList();
+      } catch (err) {
+        console.warn('Workflows load error:', err);
+      }
+    }
+
+    async function loadCallHistory() {
+      try {
+        const calls = await api('/api/calls');
+        state.callHistory = calls;
+        renderCallHistory();
+        document.getElementById('kpiCallsCount').textContent = calls.length || 4;
+      } catch (err) {
+        console.warn('Call history error:', err);
+      }
+    }
+
+    async function fetchTaskData() {
+      try {
+        const tasks = await api('/api/tasks');
+        state.tasks = tasks;
+
+        if (tasks.length > 0) {
+          const mainTask = tasks.find(t => t.type === 'delivery_exception') || tasks[0];
+          state.currentTaskId = mainTask.id;
+          updateDashboardTaskUI(mainTask);
+          renderTasksPage();
+        }
+      } catch (err) {
+        console.warn('Task load error:', err);
+      }
+    }
+
+    // ========================================================
+    // DASHBOARD & DELIVERY WORKFLOW ENGINE
+    // ========================================================
+    function updateDashboardTaskUI(task) {
+      if (!task) return;
+
+      const contacted = new Set(
+        (task.history || [])
+          .filter(h => h.type === 'call_result')
+          .map(h => h.personId)
+      );
+
+      const statusBadge = document.getElementById('incidentStatusBadge');
+      if (task.state === 'RESOLVED') {
+        statusBadge.textContent = 'Resolved & Verified';
+        statusBadge.className = 'badge badge-emerald';
+      } else {
+        statusBadge.textContent = 'In Coordination Loop';
+        statusBadge.className = 'badge badge-amber';
+      }
+
+      // 4 Steps definition
+      const sequence = [
+        { id: 'arjun', name: 'Arjun', role: 'Driver' },
+        { id: 'amit', name: 'Amit', role: 'Warehouse Manager' },
+        { id: 'priya', name: 'Priya', role: 'Operations Head' },
+        { id: 'rahul', name: 'Rahul', role: 'Customer' }
+      ];
+
+      let firstPending = null;
+
+      sequence.forEach((person, idx) => {
+        const card = document.getElementById(`stepCard-${person.id}`);
+        const badge = document.getElementById(`stepBadge-${person.id}`);
+        const outcome = document.getElementById(`stepOutcome-${person.id}`);
+        if (!card) return;
+
+        const callResult = [...(task.history || [])].reverse().find(h => h.type === 'call_result' && h.personId === person.id);
+
+        if (callResult) {
+          card.className = 'step-item completed';
+          badge.textContent = 'Completed';
+          badge.className = 'badge badge-emerald';
+          outcome.textContent = callResult.summary || 'Call complete.';
+        } else if (!firstPending) {
+          firstPending = person;
+          card.className = 'step-item active';
+          badge.textContent = task.state === 'RESOLVED' ? 'Complete' : 'Next in Queue';
+          badge.className = task.state === 'RESOLVED' ? 'badge badge-emerald' : 'badge badge-amber';
+        } else {
+          card.className = 'step-item';
+          badge.textContent = 'Standby';
+          badge.className = 'badge';
+        }
+      });
+
+      // Update Rationale
+      const lastSelected = [...(task.history || [])].reverse().find(h => h.type === 'person_selected');
+      if (lastSelected) {
+        document.getElementById('dashboardRationaleText').textContent = lastSelected.reason;
+      } else if (task.state === 'RESOLVED') {
+        document.getElementById('dashboardRationaleText').textContent = 'All parties successfully aligned. Van #9 dispatched, extra fee authorized, customer agreed to 17:00 arrival.';
+      }
+
+      // Update activity feed
+      renderActivityFeed(task);
+    }
+
+    function renderActivityFeed(task) {
+      const feedEl = document.getElementById('dashboardActivityFeed');
+      if (!feedEl) return;
+
+      const events = [...(task.history || [])].reverse().slice(0, 8);
+      if (events.length === 0) {
+        feedEl.innerHTML = '<div style="color:var(--text-muted); font-size:0.85rem; padding:12px;">No coordination events logged yet. Click "Step Next Action" or "Run Main Demo".</div>';
+        return;
+      }
+
+      feedEl.innerHTML = events.map(evt => {
+        let icon = '📞';
+        let title = 'Coordination Event';
+        let detail = evt.summary || evt.reason || evt.purpose || 'Action processed';
+
+        if (evt.type === 'person_selected') {
+          icon = '🎯';
+          title = `Identified Best Contact: ${evt.personName} (${evt.role})`;
+          detail = evt.reason;
+        } else if (evt.type === 'call_plan') {
+          icon = '📝';
+          title = `CALL-E Planned Outbound to ${evt.personName}`;
+          detail = `Plan ID: ${evt.planId} • Goal: ${evt.purpose}`;
+        } else if (evt.type === 'call_result') {
+          icon = '✅';
+          title = `CALL-E Response: ${evt.personName} (${evt.role})`;
+          detail = evt.summary;
+        } else if (evt.type === 'task_resolved') {
+          icon = '🏆';
+          title = 'Task Fully Resolved!';
+          detail = evt.summary;
+        }
+
+        return `
+          <div class="timeline-event">
+            <div class="timeline-marker">${icon}</div>
+            <div class="timeline-content">
+              <div class="timeline-title">${title}</div>
+              <div class="timeline-time">${new Date(evt.timestamp || Date.now()).toLocaleTimeString()}</div>
+              <div class="timeline-body">${detail}</div>
+            </div>
+          </div>
+        `;
+      }).join('');
+    }
+
+    // Auto-step single stage
+    async function triggerAutoStep() {
+      if (!state.currentTaskId) await fetchTaskData();
+      if (!state.currentTaskId) return;
+
+      try {
+        const btn = document.getElementById('btnAutoStep');
+        btn.disabled = true;
+        btn.innerHTML = '<span>⏳</span> Processing...';
+
+        const result = await api(`/api/tasks/${state.currentTaskId}/auto-step`, { method: 'POST' });
+
+        // Update voice visualizer with this person's call
+        if (result.nextPerson && result.callResult) {
+          updateVoiceVisualizer(result.nextPerson, result.callResult);
+          showToast(`Coordinated with ${result.nextPerson.name} (${result.nextPerson.role})`, '📞');
+
+          if (result.callResult.dialogue && result.callResult.dialogue[1]) {
+            speakText(result.callResult.dialogue[1].text);
+          }
+        }
+
+        if (result.isResolved) {
+          showToast('Delivery Exception fully resolved!', '🎉');
+        }
+
+        await fetchTaskData();
+        await loadCallHistory();
+      } catch (err) {
+        showToast(err.message, '⚠️');
+      } finally {
+        const btn = document.getElementById('btnAutoStep');
+        btn.disabled = false;
+        btn.innerHTML = '<span>▶</span> Step Next Action';
+      }
+    }
+
+    // Complete 4-Step Auto Runner Demo
+    async function startDeliveryExceptionDemo() {
+      navigateTo('dashboard');
+      showToast('Starting Delivery Exception Resolution Pipeline...', '⚡');
+
+      // Reset task first to ensure clean full run
+      await api(`/api/tasks/reset`, { method: 'POST' });
+      await fetchTaskData();
+
+      state.isAutoRunning = true;
+      const sequenceNames = ['Arjun (Driver)', 'Amit (Warehouse Manager)', 'Priya (Operations Head)', 'Rahul (Customer)'];
+
+      for (let i = 0; i < 4; i++) {
+        showToast(`Step ${i + 1}/4: Calling ${sequenceNames[i]}...`, '🎙️');
+        await triggerAutoStep();
+        // Pause between steps for visual animation clarity
+        await new Promise(r => setTimeout(r, 2200));
+      }
+
+      state.isAutoRunning = false;
+      showToast('Workflow resolved! Replacement Van #9 dispatched & confirmed at 17:00.', '🏆');
+    }
+
+    function resetDeliveryDemo() {
+      api(`/api/tasks/${state.currentTaskId}/reset`, { method: 'POST' })
+        .then(() => {
+          showToast('Delivery exception task reset to initial state.', '🔄');
+          fetchTaskData();
+        })
+        .catch(err => showToast(err.message, '⚠️'));
+    }
+
+    // Voice Visualizer update
+    function updateVoiceVisualizer(person, callResult) {
+      document.getElementById('voiceAvatar').textContent = (person.name || 'P')[0];
+      document.getElementById('voiceCallerName').textContent = `${person.name} (${person.role})`;
+      document.getElementById('voiceCallStatus').textContent = 'Completed Response Mined';
+      document.getElementById('voiceTranscriptBubble').textContent = `"${callResult.summary}"`;
+
+      // Also update dialer page if opened
+      document.getElementById('phoneTargetAvatar').textContent = (person.name || 'P')[0];
+      document.getElementById('phoneTargetName').textContent = person.name;
+      document.getElementById('phoneTargetRole').textContent = `${person.role} • QuickMove Logistics`;
+      document.getElementById('phoneTargetPhone').textContent = person.phone || '+91******';
+      document.getElementById('phoneLiveDialogue').textContent = `"${callResult.summary}"`;
+
+      renderTranscriptTurns(callResult.dialogue || []);
+      renderCallePayload(person, callResult);
+    }
+
+    function renderTranscriptTurns(dialogue) {
+      const listEl = document.getElementById('transcriptTurnsList');
+      if (!listEl) return;
+
+      listEl.innerHTML = dialogue.map(turn => `
+        <div style="background:rgba(248,250,255,0.85); border:1px solid var(--border-subtle); border-radius:10px; padding:10px 14px;">
+          <div style="font-weight:700; font-size:0.78rem; color:${turn.speaker.includes('CALL-E') ? 'var(--primary)' : 'var(--purple)'}; margin-bottom:2px;">
+            ${turn.speaker}
+          </div>
+          <div style="font-size:0.86rem; color:var(--text); line-height:1.45;">
+            ${turn.text}
+          </div>
+        </div>
+      `).join('');
+    }
+
+    function renderCallePayload(person, callResult) {
+      document.getElementById('callePlanIdVal').textContent = `plan-${Date.now()}`;
+      document.getElementById('calleConfirmTokenVal').textContent = `token-${Math.random().toString(36).slice(2, 10)}`;
+      document.getElementById('callePayloadJson').textContent = JSON.stringify({
+        status: callResult.status,
+        outcome: callResult.outcome,
+        extracted: callResult.extracted,
+        duration: callResult.durationSeconds || 35,
+        sentiment: callResult.sentiment
+      }, null, 2);
+    }
+
+    function speakTranscript() {
+      const bubble = document.getElementById('phoneLiveDialogue');
+      if (bubble) speakText(bubble.textContent);
+    }
+
+    // ========================================================
+    // PEOPLE & ORG DIRECTORY
+    // ========================================================
+    function renderPeopleGrid() {
+      const container = document.getElementById('peopleGridContainer');
+      if (!container) return;
+
+      const people = state.organization.people || [];
+      container.innerHTML = people.map(p => {
+        const initials = (p.name || 'P').split(' ').map(n => n[0]).slice(0, 2).join('');
+        const limitText = p.authority?.extraCostLimit ? `₹${p.authority.extraCostLimit.toLocaleString()}` : 'None';
+        const responsibilities = (p.responsibilities || []).join(', ') || 'General coordination';
+
+        return `
+          <div class="person-card">
+            <div>
+              <div class="person-top">
+                <div class="person-avatar-circle">${initials}</div>
+                <div class="person-info">
+                  <h3>${p.name}</h3>
+                  <div class="person-role-tag">${p.role}</div>
+                </div>
+              </div>
+
+              <div class="person-details-list" style="margin-top:16px;">
+                <div class="detail-row"><span class="detail-label">Phone:</span><span class="detail-val">${p.phone || 'N/A'}</span></div>
+                <div class="detail-row"><span class="detail-label">Spend Limit:</span><span class="detail-val">${limitText}</span></div>
+                <div class="detail-row"><span class="detail-label">Type:</span><span class="detail-val" style="text-transform:capitalize;">${p.type || 'Internal'}</span></div>
+              </div>
+
+              <div style="margin-top:12px; font-size:0.8rem; color:var(--text-muted); background:rgba(248,250,255,0.7); padding:8px 10px; border-radius:8px;">
+                <strong>Responsibilities:</strong> ${responsibilities}
+              </div>
+            </div>
+
+            <div style="display:flex; justify-content:space-between; align-items:center; border-top:1px solid var(--border-subtle); padding-top:12px;">
+              <button class="btn btn-secondary btn-sm" onclick="callPersonDirectly('${p.id}')">
+                📞 CALL-E Call
+              </button>
+              <button class="btn btn-danger btn-sm" onclick="deletePerson('${p.id}')">
+                Remove
+              </button>
+            </div>
+          </div>
+        `;
+      }).join('');
+    }
+
+    function openAddPersonModal() { openModal('modalAddPerson'); }
+
+    async function submitAddPerson(event) {
+      event.preventDefault();
+      const form = new FormData(event.target);
+      const name = form.get('name');
+      const role = form.get('role');
+      const phone = form.get('phone');
+      const extraCostLimit = Number(form.get('extraCostLimit')) || 0;
+      const responsibilities = String(form.get('responsibilities') || '').split(',').map(s => s.trim()).filter(Boolean);
+
+      const id = name.toLowerCase().replace(/[^a-z0-9]+/g, '-');
+
+      try {
+        await api('/api/people', {
+          method: 'POST',
+          body: {
+            id,
+            name,
+            role,
+            type: role === 'Customer' ? 'customer' : 'internal',
+            phone,
+            authority: extraCostLimit ? { extraCostLimit } : {},
+            responsibilities,
+            canDecide: [role],
+            connections: []
+          }
+        });
+
+        closeModal('modalAddPerson');
+        event.target.reset();
+        showToast(`${name} added to organization.`, '✅');
+        await loadOrganization();
+      } catch (err) {
+        showToast(err.message, '⚠️');
+      }
+    }
+
+    async function deletePerson(id) {
+      if (!confirm('Are you sure you want to remove this person from the organization?')) return;
+      try {
+        await api(`/api/people/${id}`, { method: 'DELETE' });
+        showToast('Person removed.', '🗑️');
+        await loadOrganization();
+      } catch (err) {
+        showToast(err.message, '⚠️');
+      }
+    }
+
+    async function resetOrgToDefault() {
+      try {
+        await api('/api/organization/reset', { method: 'POST' });
+        showToast('Organization reset to default structure.', '🔄');
+        await loadOrganization();
+      } catch (err) {
+        showToast(err.message, '⚠️');
+      }
+    }
+
+    // ========================================================
+    // INTERACTIVE ORG GRAPH (SVG)
+    // ========================================================
+    function renderOrgGraph() {
+      const svg = document.getElementById('orgGraphSvg');
+      if (!svg) return;
+
+      const people = state.organization.people || [];
+      const width = svg.clientWidth || 800;
+      const height = 480;
+
+      svg.innerHTML = '';
+
+      // Node coordinates in circular / diamond arrangement
+      const coords = [
+        { id: 'arjun', x: width * 0.18, y: height * 0.5 },
+        { id: 'amit', x: width * 0.40, y: height * 0.28 },
+        { id: 'priya', x: width * 0.65, y: height * 0.28 },
+        { id: 'rahul', x: width * 0.85, y: height * 0.5 }
+      ];
+
+      // Draw connection lines
+      const edges = [
+        { from: 'arjun', to: 'amit', label: 'Triage & Replacement' },
+        { from: 'amit', to: 'priya', label: 'Expense Escalation' },
+        { from: 'priya', to: 'rahul', label: 'Customer Alignment' }
+      ];
+
+      // Draw lines
+      edges.forEach(edge => {
+        const p1 = coords.find(c => c.id === edge.from);
+        const p2 = coords.find(c => c.id === edge.to);
+        if (p1 && p2) {
+          const line = document.createElementNS('http://www.w3.org/2000/svg', 'line');
+          line.setAttribute('x1', p1.x);
+          line.setAttribute('y1', p1.y);
+          line.setAttribute('x2', p2.x);
+          line.setAttribute('y2', p2.y);
+          line.setAttribute('stroke', '#818cf8');
+          line.setAttribute('stroke-width', '3');
+          line.setAttribute('stroke-dasharray', '6,6');
+          line.setAttribute('opacity', '0.6');
+          svg.appendChild(line);
+
+          // Edge label
+          const text = document.createElementNS('http://www.w3.org/2000/svg', 'text');
+          text.setAttribute('x', (p1.x + p2.x) / 2);
+          text.setAttribute('y', (p1.y + p2.y) / 2 - 10);
+          text.setAttribute('fill', '#64748b');
+          text.setAttribute('font-size', '11');
+          text.setAttribute('font-weight', '600');
+          text.setAttribute('text-anchor', 'middle');
+          text.textContent = edge.label;
+          svg.appendChild(text);
+        }
+      });
+
+      // Draw nodes
+      coords.forEach(coord => {
+        const person = people.find(p => p.id === coord.id) || { name: coord.id, role: 'Team' };
+
+        const g = document.createElementNS('http://www.w3.org/2000/svg', 'g');
+        g.style.cursor = 'pointer';
+        g.onclick = () => inspectGraphNode(coord.id);
+
+        // Glow ring
+        const ring = document.createElementNS('http://www.w3.org/2000/svg', 'circle');
+        ring.setAttribute('cx', coord.x);
+        ring.setAttribute('cy', coord.y);
+        ring.setAttribute('r', '36');
+        ring.setAttribute('fill', 'rgba(99, 102, 241, 0.12)');
+        ring.setAttribute('stroke', '#4f46e5');
+        ring.setAttribute('stroke-width', '2');
+        g.appendChild(ring);
+
+        // Circle
+        const circle = document.createElementNS('http://www.w3.org/2000/svg', 'circle');
+        circle.setAttribute('cx', coord.x);
+        circle.setAttribute('cy', coord.y);
+        circle.setAttribute('r', '28');
+        circle.setAttribute('fill', '#ffffff');
+        circle.setAttribute('filter', 'drop-shadow(0 4px 8px rgba(79,70,229,0.18))');
+        g.appendChild(circle);
+
+        // Name
+        const nameText = document.createElementNS('http://www.w3.org/2000/svg', 'text');
+        nameText.setAttribute('x', coord.x);
+        nameText.setAttribute('y', coord.y + 4);
+        nameText.setAttribute('fill', '#1e1b4b');
+        nameText.setAttribute('font-size', '13');
+        nameText.setAttribute('font-weight', '800');
+        nameText.setAttribute('text-anchor', 'middle');
+        nameText.textContent = person.name;
+        g.appendChild(nameText);
+
+        // Role Below
+        const roleText = document.createElementNS('http://www.w3.org/2000/svg', 'text');
+        roleText.setAttribute('x', coord.x);
+        roleText.setAttribute('y', coord.y + 50);
+        roleText.setAttribute('fill', '#4f46e5');
+        roleText.setAttribute('font-size', '12');
+        roleText.setAttribute('font-weight', '700');
+        roleText.setAttribute('text-anchor', 'middle');
+        roleText.textContent = person.role;
+        g.appendChild(roleText);
+
+        svg.appendChild(g);
+      });
+    }
+
+    function inspectGraphNode(personId) {
+      const person = (state.organization.people || []).find(p => p.id === personId);
+      if (!person) return;
+
+      const drawer = document.getElementById('graphNodeInspector');
+      drawer.style.display = 'block';
+
+      document.getElementById('inspectAvatar').textContent = person.name[0];
+      document.getElementById('inspectName').textContent = person.name;
+      document.getElementById('inspectRole').textContent = person.role;
+      document.getElementById('inspectPhone').textContent = person.phone || 'N/A';
+      document.getElementById('inspectAuthority').textContent = person.authority?.extraCostLimit ? `₹${person.authority.extraCostLimit}` : 'None';
+      document.getElementById('inspectResponsibilities').textContent = (person.responsibilities || []).join(', ') || 'N/A';
+
+      state.inspectedPersonId = personId;
+    }
+
+    function triggerDirectCallFromGraph() {
+      if (state.inspectedPersonId) {
+        callPersonDirectly(state.inspectedPersonId);
+      }
+    }
+
+    function callPersonDirectly(personId) {
+      const person = (state.organization.people || []).find(p => p.id === personId);
+      if (!person) return;
+
+      if (state.mode === 'live') {
+        document.getElementById('liveConfirmTarget').textContent = `${person.name} (${person.phone})`;
+        document.getElementById('liveConfirmPurpose').textContent = `Direct CALL-E coordination for role "${person.role}"`;
+        state.pendingLiveCallAction = () => executeDirectCall(person);
+        openModal('modalLiveConfirm');
+      } else {
+        executeDirectCall(person);
+      }
+    }
+
+    async function executeDirectCall(person) {
+      navigateTo('calle');
+      showToast(`Initiating call with ${person.name}...`, '📞');
+
+      try {
+        const simResult = await api(`/api/tasks/${state.currentTaskId || 'TASK-1'}/simulate-call`, {
+          method: 'POST',
+          body: { personId: person.id }
+        });
+
+        updateVoiceVisualizer(person, simResult.result);
+        speakText(simResult.result.summary);
+        await loadCallHistory();
+      } catch (err) {
+        showToast(err.message, '⚠️');
+      }
+    }
+
+    // ========================================================
+    // WORKFLOW BUILDER
+    // ========================================================
+    function renderWorkflowList() {
+      const container = document.getElementById('workflowListContainer');
+      if (!container) return;
+
+      container.innerHTML = state.workflows.map((wf, idx) => `
+        <div class="wf-item-card ${idx === 0 ? 'active' : ''}" onclick="selectWorkflow('${wf.id}')">
+          <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:4px;">
+            <strong style="font-size:0.92rem;">${wf.name}</strong>
+            <span class="badge badge-emerald">${wf.nodes ? wf.nodes.length : 4} nodes</span>
+          </div>
+          <div style="font-size:0.76rem; color:var(--text-muted);">${wf.category || 'Operations'}</div>
+        </div>
+      `).join('');
+
+      if (state.workflows.length > 0) {
+        renderPipelineNodes(state.workflows[0]);
+      }
+    }
+
+    function selectWorkflow(id) {
+      const wf = state.workflows.find(w => w.id === id);
+      if (!wf) return;
+
+      document.querySelectorAll('.wf-item-card').forEach(c => c.classList.remove('active'));
+      event.currentTarget.classList.add('active');
+
+      document.getElementById('wfActiveTitle').textContent = wf.name;
+      document.getElementById('wfActiveDesc').textContent = wf.description || '';
+      renderPipelineNodes(wf);
+    }
+
+    function renderPipelineNodes(wf) {
+      const container = document.getElementById('wfNodesPipelineContainer');
+      if (!container) return;
+
+      const nodes = wf.nodes || [];
+      container.innerHTML = nodes.map((node, i) => `
+        <div class="pipeline-node-card">
+          <div style="display:flex; align-items:center; gap:14px;">
+            <div style="width:34px; height:34px; border-radius:10px; background:rgba(99,102,241,0.1); color:var(--primary); display:flex; align-items:center; justify-content:center; font-weight:800; font-size:0.88rem;">
+              ${i + 1}
+            </div>
+            <div>
+              <div style="font-weight:800; font-size:0.95rem;">${node.title}</div>
+              <div style="font-size:0.78rem; color:var(--text-muted);">${node.description || node.goal || node.condition || 'Autonomous execution step'}</div>
+            </div>
+          </div>
+          <div>
+            <span class="badge ${node.type === 'calle_outbound' ? 'badge-primary' : node.type === 'decision_gate' ? 'badge-amber' : 'badge-emerald'}">
+              ${node.type}
+            </span>
+          </div>
+        </div>
+        ${i < nodes.length - 1 ? '<div class="pipeline-connector-line"></div>' : ''}
+      `).join('');
+    }
+
+    // ========================================================
+    // TASKS PAGE
+    // ========================================================
+    function renderTasksPage() {
+      const listEl = document.getElementById('taskListContainer');
+      const badgeEl = document.getElementById('tasksCountBadge');
+      if (!listEl) return;
+
+      badgeEl.textContent = `${state.tasks.length} task${state.tasks.length > 1 ? 's' : ''}`;
+
+      listEl.innerHTML = state.tasks.map(task => {
+        const isCurrent = task.id === state.currentTaskId;
+        return `
+          <div class="card" style="padding:14px; cursor:pointer; border-color:${isCurrent ? 'var(--primary)' : 'var(--border)'};" onclick="selectTaskDetail('${task.id}')">
+            <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:6px;">
+              <span class="badge ${task.state === 'RESOLVED' ? 'badge-emerald' : 'badge-amber'}">${task.state}</span>
+              <span style="font-size:0.75rem; color:var(--text-muted);">${task.id}</span>
+            </div>
+            <strong style="font-size:0.92rem; display:block; margin-bottom:4px;">${task.title || task.goal}</strong>
+            <div style="font-size:0.78rem; color:var(--text-secondary);">${task.currentNeed || 'In progress'}</div>
+          </div>
+        `;
+      }).join('');
+
+      renderTaskDeepTimeline();
+    }
+
+    function selectTaskDetail(id) {
+      state.currentTaskId = id;
+      renderTasksPage();
+    }
+
+    function renderTaskDeepTimeline() {
+      const task = state.tasks.find(t => t.id === state.currentTaskId) || state.tasks[0];
+      if (!task) return;
+
+      const headEl = document.getElementById('taskDetailHeader');
+      headEl.innerHTML = `
+        <div style="display:flex; justify-content:space-between; align-items:center;">
+          <div>
+            <span class="badge ${task.state === 'RESOLVED' ? 'badge-emerald' : 'badge-amber'}">${task.state}</span>
+            <h2 style="font-size:1.3rem; font-weight:800; margin-top:4px;">${task.title || task.goal}</h2>
+            <div style="font-size:0.84rem; color:var(--text-muted);">ID: ${task.id} • Target Deadline: ${task.constraints?.latestDeliveryTime || '18:00'}</div>
+          </div>
+          <button class="btn btn-secondary btn-sm" onclick="triggerAutoStep()">Advance Workflow</button>
+        </div>
+      `;
+
+      const timelineEl = document.getElementById('taskTimelineDeepList');
+      const history = [...(task.history || [])].reverse();
+
+      if (history.length === 0) {
+        timelineEl.innerHTML = '<div style="color:var(--text-muted); font-size:0.86rem; padding:20px;">No events logged yet for this task.</div>';
+        return;
+      }
+
+      timelineEl.innerHTML = history.map(evt => `
+        <div class="timeline-event">
+          <div class="timeline-marker">${evt.type.includes('call') ? '📞' : '🎯'}</div>
+          <div class="timeline-content">
+            <div class="timeline-title">${evt.personName ? `${evt.personName} (${evt.role || 'Contact'})` : evt.type}</div>
+            <div class="timeline-time">${new Date(evt.timestamp || Date.now()).toLocaleTimeString()}</div>
+            <div class="timeline-body">
+              ${evt.summary || evt.reason || evt.purpose || 'Operation recorded'}
+              ${evt.extracted && Object.keys(evt.extracted).length ? `<pre style="background:rgba(0,0,0,0.03); padding:8px; border-radius:6px; margin-top:8px; font-size:0.75rem;">${JSON.stringify(evt.extracted, null, 2)}</pre>` : ''}
+            </div>
+          </div>
+        </div>
+      `).join('');
+    }
+
+    function openNewTaskModal() { openModal('modalNewTask'); }
+
+    async function submitNewTask(event) {
+      event.preventDefault();
+      const form = new FormData(event.target);
+      const title = form.get('title');
+      const goal = form.get('goal');
+      const currentNeed = form.get('currentNeed');
+
+      try {
+        const newTask = await api('/api/tasks', {
+          method: 'POST',
+          body: {
+            title,
+            goal,
+            currentNeed,
+            type: 'custom_operation',
+            participants: (state.organization.people || []).slice(0, 4)
+          }
+        });
+
+        closeModal('modalNewTask');
+        event.target.reset();
+        showToast('New coordination task created.', '✅');
+        await fetchTaskData();
+      } catch (err) {
+        showToast(err.message, '⚠️');
+      }
+    }
+
+    // ========================================================
+    // CALL HISTORY
+    // ========================================================
+    function renderCallHistory() {
+      const tbody = document.getElementById('callHistoryTableBody');
+      if (!tbody) return;
+
+      if (state.callHistory.length === 0) {
+        tbody.innerHTML = '<tr><td colspan="7" style="text-align:center; color:var(--text-muted); padding:28px;">No calls logged yet. Run the Delivery Exception workflow to generate call history.</td></tr>';
+        return;
+      }
+
+      tbody.innerHTML = state.callHistory.map(call => `
+        <tr>
+          <td style="font-family:'JetBrains Mono',monospace; font-size:0.78rem;">${new Date(call.timestamp).toLocaleTimeString()}</td>
+          <td><strong>${call.personName}</strong></td>
+          <td><span class="badge badge-primary">${call.role}</span></td>
+          <td>${call.duration || 35}s</td>
+          <td><span class="badge badge-purple">${call.sentiment || 'collaborative'}</span></td>
+          <td><span class="badge badge-emerald">${call.status}</span></td>
+          <td style="max-width:300px; line-height:1.4; font-size:0.84rem;">${call.summary || 'Call complete.'}</td>
+        </tr>
+      `).join('');
+    }
+
+    async function clearCallHistory() {
+      try {
+        await api('/api/calls', { method: 'DELETE' });
+        showToast('Call history cleared.', '🗑️');
+        await loadCallHistory();
+      } catch (err) {
+        showToast(err.message, '⚠️');
+      }
+    }
+
+    // ========================================================
+    // SETTINGS & MODES
+    // ========================================================
+    function selectMode(mode) {
+      if (mode === 'live') {
+        if (confirm('Enable Live Outbound Calling Mode? Real phone calls will be placed via CALL-E CLI.')) {
+          state.mode = 'live';
+          document.getElementById('checkSim').style.display = 'none';
+          document.getElementById('checkLive').style.display = 'block';
+          document.getElementById('modeCardLive').style.borderColor = 'var(--rose)';
+          document.getElementById('modeCardSimulation').style.borderColor = 'var(--border)';
+        }
+      } else {
+        state.mode = 'simulation';
+        document.getElementById('checkSim').style.display = 'block';
+        document.getElementById('checkLive').style.display = 'none';
+        document.getElementById('modeCardSimulation').style.borderColor = 'var(--emerald)';
+        document.getElementById('modeCardLive').style.borderColor = 'var(--border)';
+      }
+      updateModeBadge(state.mode);
+    }
+
+    async function saveSettings() {
+      try {
+        const audioNarration = document.getElementById('prefVoiceNarration').checked;
+        const requireCallConfirmation = document.getElementById('prefCallConfirmation').checked;
+
+        await api('/api/settings', {
+          method: 'POST',
+          body: {
+            mode: state.mode,
+            audioNarration,
+            requireCallConfirmation
+          }
+        });
+
+        showToast('Settings saved successfully.', '💾');
+      } catch (err) {
+        showToast(err.message, '⚠️');
+      }
+    }
+
+    async function resetAllDemoData() {
+      if (!confirm('Reset entire system? This resets tasks, restores default staff, and purges history.')) return;
+      try {
+        await api('/api/organization/reset', { method: 'POST' });
+        await api('/api/tasks/reset', { method: 'POST' });
+        await api('/api/calls', { method: 'DELETE' });
+        showToast('System reset complete. Benchmark demo ready.', '✨');
+        await bootstrap();
+      } catch (err) {
+        showToast(err.message, '⚠️');
+      }
+    }
+
+    function proceedWithLiveCall() {
+      closeModal('modalLiveConfirm');
+      if (state.pendingLiveCallAction) {
+        state.pendingLiveCallAction();
+        state.pendingLiveCallAction = null;
+      }
+    }
+
+    function showFlowInfo(type) {
+      const box = document.getElementById('flowInfoBox');
+      const messages = {
+        problem: '⚠️ <strong>Step 1 (Problem):</strong> Real-time telematics or webhook flags breakdown on NH-48.',
+        identify: '🎯 <strong>Step 2 (Identify Person):</strong> BRIDGE matches problem to Driver Arjun for vehicle condition.',
+        calle: '📞 <strong>Step 3 (CALL-E Call):</strong> Outbound voice call verifies radiator leak & safety.',
+        extract: '🧠 <strong>Step 4 (Extract Response):</strong> Mined commitment: replacement vehicle needed within 90 min.',
+        decide: '🔄 <strong>Step 5 (Decide Next):</strong> BRIDGE routes to Warehouse Amit → Ops Priya for ₹1,500 approval.',
+        resolved: '✅ <strong>Step 6 (Resolution):</strong> Customer Rahul confirms revised 17:00 window. Ticket closed.'
+      };
+      box.innerHTML = messages[type] || messages.problem;
+    }
+
+    // ========================================================
+    // INITIAL BOOTSTRAP
+    // ========================================================
+    async function bootstrap() {
+      await loadSettings();
+      await loadOrganization();
+      await loadWorkflows();
+      await fetchTaskData();
+      await loadCallHistory();
+    }
+
+    window.addEventListener('DOMContentLoaded', bootstrap);
+  </script>
+</body>
+</html>
