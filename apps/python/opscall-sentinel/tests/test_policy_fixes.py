@@ -342,3 +342,31 @@ async def test_tenant_dispatch_simulation_safeguard():
         res_live = await ac.post("/api/v1/tenants/tenant-ecom-urbanstride/dispatch", json=req_payload_live)
         assert res_live.status_code == 501
         assert "Live tenant lead dispatch is disabled" in res_live.json()["detail"]
+
+
+def test_n8n_workflow_template_simulation_safety():
+    """
+    Requirement / Must Fix: templates/n8n/opscall_twenty_crm_workflow.json
+    must not route simulations to credentialed CRM writes or fabricate Status: VERIFIED.
+    """
+    import json
+    from pathlib import Path
+
+    wf_path = Path(__file__).resolve().parent.parent / "templates" / "n8n" / "opscall_twenty_crm_workflow.json"
+    assert wf_path.exists(), "n8n workflow template must exist"
+
+    with open(wf_path, "r", encoding="utf-8") as f:
+        wf = json.load(f)
+
+    # 1. Verification switch node must not check only $json.success
+    switch_node = next(n for n in wf["nodes"] if "Check" in n["name"] and n["type"] == "n8n-nodes-base.switch")
+    condition = switch_node["parameters"]["value1"]
+    assert "!$json.is_simulated" in condition, "Switch must explicitly gate against simulated payloads"
+
+    # 2. Credentialed CRM write node must be disabled for demo
+    crm_node = next(n for n in wf["nodes"] if "Twenty CRM" in n["name"])
+    assert crm_node.get("disabled") is True, "Credentialed CRM write node must be disabled for demo safety"
+
+    # 3. Payload must not unconditionally claim 'Status: VERIFIED'
+    body_str = crm_node["parameters"].get("jsonBody", "")
+    assert "$json.is_simulated" in body_str, "Payload must dynamically gate verification labels against simulation"

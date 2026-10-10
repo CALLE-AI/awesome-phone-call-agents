@@ -24,7 +24,7 @@
         "url": "=http://localhost:8000/api/v1/tenants/{{ $json.body.tenant_id || 'tenant-ecom-urbanstride' }}/dispatch",
         "sendBody": true,
         "specifyBody": "json",
-        "jsonBody": "={\n  \"tenant_id\": \"{{ $json.body.tenant_id || 'tenant-ecom-urbanstride' }}\",\n  \"customer_name\": \"{{ $json.body.name || 'Priya Sharma' }}\",\n  \"customer_phone\": \"{{ $json.body.phone || '+919876543210' }}\",\n  \"context\": {\n    \"item\": \"{{ $json.body.item || 'Premium Order' }}\",\n    \"amount\": {{ $json.body.amount || 2499 }}\n  },\n  \"callback_url\": \"http://localhost:5678/webhook/call-feedback-receiver\"\n}",
+        "jsonBody": "={\n  \"tenant_id\": \"{{ $json.body.tenant_id || 'tenant-ecom-urbanstride' }}\",\n  \"customer_name\": \"{{ $json.body.name || 'Priya Sharma' }}\",\n  \"customer_phone\": \"{{ $json.body.phone || '+919876543210' }}\",\n  \"context\": {\n    \"item\": \"{{ $json.body.item || 'Premium Order' }}\",\n    \"amount\": {{ $json.body.amount || 2499 }}\n  },\n  \"callback_url\": \"http://localhost:5678/webhook/call-feedback-receiver\",\n  \"is_simulation\": true,\n  \"allow_external_callbacks\": false\n}",
         "options": {
           "timeout": 10000
         }
@@ -41,7 +41,7 @@
     {
       "parameters": {
         "dataType": "boolean",
-        "value1": "={{ $json.success }}",
+        "value1": "={{ !$json.is_simulated && $json.status === 'COMPLETED' && $json.allow_external_crm === true }}",
         "rules": {
           "rules": [
             {
@@ -51,7 +51,7 @@
         }
       },
       "id": "3",
-      "name": "3. Check Verification Status",
+      "name": "3. Check Non-Simulated Verification & Write Intent",
       "type": "n8n-nodes-base.switch",
       "typeVersion": 3,
       "position": [
@@ -78,16 +78,28 @@
         },
         "sendBody": true,
         "specifyBody": "json",
-        "jsonBody": "={\n  \"title\": \"Voice Call Verified: {{ $json.callee }}\",\n  \"body\": \"Status: VERIFIED\\nPhone: {{ $json.phone }}\\nTask: {{ $json.task_id }}\",\n  \"phone\": \"{{ $json.phone }}\"\n}",
+        "jsonBody": "={\n  \"title\": \"={{ $json.is_simulated ? 'Simulated Call Buffer: ' + $json.callee : 'Voice Call Verified: ' + $json.callee }}\",\n  \"body\": \"={{ 'Status: ' + ($json.status || 'SIMULATED') + '\\nPhone: ' + $json.phone + '\\nTask: ' + $json.task_id }}\",\n  \"phone\": \"{{ $json.phone }}\"\n}",
         "options": {}
       },
+      "disabled": true,
       "id": "4",
-      "name": "4. Sync Call Record to Twenty CRM",
+      "name": "4. Sync Call Record to Twenty CRM (Disabled for Demo)",
       "type": "n8n-nodes-base.httpRequest",
       "typeVersion": 4.2,
       "position": [
         950,
         220
+      ]
+    },
+    {
+      "parameters": {},
+      "id": "4b",
+      "name": "4B. Local Simulation Audit Buffer (Zero External Mutation)",
+      "type": "n8n-nodes-base.noOp",
+      "typeVersion": 1,
+      "position": [
+        950,
+        340
       ]
     },
     {
@@ -99,13 +111,14 @@
         "jsonBody": "={\n  \"chat_id\": \"@alerts_channel\",\n  \"text\": \"⚠️ UNVERIFIED CALL: {{ $json.callee }} ({{ $json.phone }}) did not verify. Order held.\"\n}",
         "options": {}
       },
+      "disabled": true,
       "id": "5",
-      "name": "5. Alert Team on Slack / Telegram",
+      "name": "5. Alert Team on Slack / Telegram (Disabled for Demo)",
       "type": "n8n-nodes-base.httpRequest",
       "typeVersion": 4.2,
       "position": [
         950,
-        400
+        460
       ]
     }
   ],
@@ -125,25 +138,25 @@
       "main": [
         [
           {
-            "node": "3. Check Verification Status",
+            "node": "3. Check Non-Simulated Verification & Write Intent",
             "type": "main",
             "index": 0
           }
         ]
       ]
     },
-    "3. Check Verification Status": {
+    "3. Check Non-Simulated Verification & Write Intent": {
       "main": [
         [
           {
-            "node": "4. Sync Call Record to Twenty CRM",
+            "node": "4. Sync Call Record to Twenty CRM (Disabled for Demo)",
             "type": "main",
             "index": 0
           }
         ],
         [
           {
-            "node": "5. Alert Team on Slack / Telegram",
+            "node": "4B. Local Simulation Audit Buffer (Zero External Mutation)",
             "type": "main",
             "index": 0
           }
