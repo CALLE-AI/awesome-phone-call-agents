@@ -1,0 +1,27 @@
+# secrets and local env
+.env
+.env.*
+!.env.example
+*.pem
+*.key
+
+# deps and build
+node_modules/
+dist/
+coverage/
+
+# runtime incident store
+data/*.json
+!data/.gitkeep
+
+# logs and OS
+*.log
+npm-debug.log*
+.DS_Store
+Thumbs.db
+Desktop.ini
+
+# editor
+.idea/
+.vscode/
+*.swp

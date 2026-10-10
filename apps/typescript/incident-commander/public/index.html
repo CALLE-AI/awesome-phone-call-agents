@@ -1,0 +1,56 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>3 AM Incident Commander</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <script src="https://unpkg.com/@phosphor-icons/web"></script>
+    <link rel="stylesheet" href="/styles.css" />
+  </head>
+  <body>
+    <div class="page-top">
+      <header>
+        <div class="logo">
+          <i class="ph-fill ph-shield-warning" style="color: #3dd68c; font-size: 24px;"></i>
+          <span>CALL-E</span>
+        </div>
+        <div id="health" class="health"><i class="ph ph-spinner ph-spin"></i> checking AWS…</div>
+      </header>
+      
+      <div class="hero">
+        <h1>One on-call. No borders.<br>Your incident response, automated.</h1>
+        <p class="hint">
+          Pick a failure case. CALL-E places a real call. You speak the runbook line. The recorded fix is a real AWS command.
+        </p>
+        <div id="scenarios" class="scenarios"></div>
+      </div>
+    </div>
+
+    <div class="dashboard-wrapper">
+      <div class="dashboard">
+        <aside class="sidebar">
+          <div class="sidebar-header">
+            <i class="ph-fill ph-siren" style="color: #3dd68c; font-size: 24px;"></i>
+            <span>Commander</span>
+          </div>
+          <div class="nav-section">
+            <div class="nav-title">Incidents</div>
+            <ul id="list"></ul>
+          </div>
+        </aside>
+        <main class="main-content">
+          <article id="detail">
+            <div class="empty">
+              <i class="ph ph-hand-pointing" style="font-size: 48px; margin-bottom: 16px; opacity: 0.5;"></i>
+              <p>Select an incident or page on-call.</p>
+            </div>
+          </article>
+        </main>
+      </div>
+    </div>
+    <script src="/app.js"></script>
+  </body>
+</html>
