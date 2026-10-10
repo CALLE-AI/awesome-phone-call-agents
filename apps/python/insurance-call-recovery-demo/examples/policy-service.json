@@ -1,0 +1,6 @@
+{
+  "task_description": "Customer requested an address change and never received confirmation.",
+  "task_type": "policy_service",
+  "destination": "+15555010244",
+  "intended_outcome": "Confirm whether the requested change was applied."
+}

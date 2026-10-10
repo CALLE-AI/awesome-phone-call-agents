@@ -1,0 +1,7 @@
+{
+  "task_description": "Customer has not heard back on claim #CLM-88213.",
+  "task_type": "claim_status",
+  "destination": "+15555010199",
+  "intended_outcome": "Get current claim status and next step.",
+  "policy_or_claim_reference": "CLM-88213"
+}

@@ -1,0 +1,6 @@
+{
+  "task_description": "Policy renews soon and the customer has not confirmed intent.",
+  "task_type": "renewal",
+  "destination": "+15555010233",
+  "intended_outcome": "Confirm renewal intent: renew, decline, or needs more information."
+}

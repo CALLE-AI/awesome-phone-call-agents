@@ -1,0 +1,5 @@
+Metadata-Version: 2.4
+Name: insurance-call-recovery-demo
+Version: 0.1.0
+Summary: Dry-run and CALL-E HTTP demo for the insurance-call-recovery Agent Skill
+Requires-Python: >=3.10
