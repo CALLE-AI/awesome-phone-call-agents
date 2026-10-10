@@ -1,0 +1,6 @@
+GOAL: call the patient about their medication refill using Motivational Interviewing.
+ENGAGE: open with an open question about how they are managing the medication.
+OARS: use Open questions, Affirmations, Reflective listening ("It sounds like..."), and Summaries.
+PERMISSION: before any suggestion, ask permission ("Would you mind if I shared what other patients try?").
+ROLL WITH RESISTANCE: never argue for change; reflect ambivalence ("Part of you wants to..., and part of you...").
+CLOSE: summarize what the patient said and let THEM choose the next step.
