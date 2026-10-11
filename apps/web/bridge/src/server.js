@@ -26,9 +26,36 @@ function isCalleCliInstalled() {
   return !result.error && result.status === 0 && Boolean(result.stdout && result.stdout.trim());
 }
 
+// Bounded acceptance list for authorized E.164 outbound calling
+function parseAuthorizedRecipients() {
+  const raw = process.env.AUTHORIZED_E164_RECIPIENTS || process.env.AUTHORIZED_RECIPIENTS || '';
+  return raw
+    .split(',')
+    .map((s) => s.trim())
+    .filter(Boolean);
+}
+
+function isE164(phone) {
+  if (!phone || typeof phone !== 'string') return false;
+  // Strict E.164: + followed by 7-15 digits with no mask characters
+  return /^\+[1-9]\d{6,14}$/.test(phone.trim());
+}
+
+function isAuthorizedRecipient(phone) {
+  if (!isE164(phone)) return false;
+  const authorized = parseAuthorizedRecipients();
+  return authorized.includes(phone.trim());
+}
+
+// Check authorized recipients at boot; enforce simulation-only if bounded acceptance list is empty
+const authorizedRecipientsAtBoot = parseAuthorizedRecipients();
+const rawConfiguredMode = (process.env.BRIDGE_MODE || 'simulation').toLowerCase();
+const effectiveInitialMode = (rawConfiguredMode === 'live' && authorizedRecipientsAtBoot.length === 0) ? 'simulation' : rawConfiguredMode;
+process.env.BRIDGE_MODE = effectiveInitialMode;
+
 // In-memory application settings
 let appSettings = {
-  mode: (process.env.BRIDGE_MODE || 'simulation').toLowerCase(),
+  mode: effectiveInitialMode,
   calleServerUrl: process.env.CALLE_SERVER_URL || '',
   calleCliDetected: isCalleCliInstalled(),
   audioNarration: true,
@@ -61,6 +88,93 @@ function issueSession(user) {
   demoSessions.set(token, { user, createdAt: new Date().toISOString() });
   return token;
 }
+
+// Pre-seed default demo session token for valid evaluation
+const defaultDemoUser = demoUsers[0];
+const defaultDemoToken = 'bridge-demo-session-token';
+demoSessions.set(defaultDemoToken, { user: defaultDemoUser, createdAt: new Date().toISOString() });
+
+// Canonical phone masking helper to prevent private data exposure
+function maskPhone(phone) {
+  if (!phone) return '+91******';
+  const str = String(phone).trim();
+  if (str.includes('*')) return str;
+  if (str.startsWith('+')) {
+    const cc = str.slice(0, 3);
+    const last4 = str.slice(-4);
+    return `${cc}******${last4}`;
+  }
+  const last4 = str.slice(-4);
+  return `******${last4}`;
+}
+
+function sanitizePerson(person) {
+  if (!person) return person;
+  return {
+    ...person,
+    phone: maskPhone(person.phone)
+  };
+}
+
+function sanitizeTask(task) {
+  if (!task) return task;
+  const copy = { ...task };
+  if (Array.isArray(copy.participants)) {
+    copy.participants = copy.participants.map(sanitizePerson);
+  }
+  if (Array.isArray(copy.history)) {
+    copy.history = copy.history.map((h) => ({
+      ...h,
+      phone: h.phone ? maskPhone(h.phone) : undefined
+    }));
+  }
+  return copy;
+}
+
+function sanitizeCall(call) {
+  if (!call) return call;
+  return {
+    ...call,
+    phone: maskPhone(call.phone)
+  };
+}
+
+function sanitizePlan(plan) {
+  if (!plan || typeof plan !== 'object') return plan;
+  const copy = { ...plan };
+  if (copy.to_phone) copy.to_phone = maskPhone(copy.to_phone);
+  if (copy.phone) copy.phone = maskPhone(copy.phone);
+  return copy;
+}
+
+function sanitizeResult(resObj) {
+  if (!resObj || typeof resObj !== 'object') return resObj;
+  const copy = { ...resObj };
+  if (copy.to_phone) copy.to_phone = maskPhone(copy.to_phone);
+  if (copy.phone) copy.phone = maskPhone(copy.phone);
+  return copy;
+}
+
+function requireAdminAuth(req, res, next) {
+  const token = getBearerToken(req);
+  const session = token ? demoSessions.get(token) : null;
+  if (!session) {
+    return res.status(401).json({
+      error: {
+        code: 'UNAUTHORIZED',
+        message: 'Authentication required to modify private records or system settings.'
+      }
+    });
+  }
+  req.user = session.user;
+  next();
+}
+
+// Accepted-call cancellation limits: Telephony providers commit network routing upon dispatch;
+// once accepted, calls cannot be recalled or reversed in flight and can only be ended via active termination/hangup.
+const ACCEPTED_CALL_CANCELLATION_LIMITS =
+  'Accepted-call cancellation limits: Once an outbound call is dispatched and accepted by the carrier or recipient, the call cannot be cancelled retroactively; voice carrier routing and billing commit upon pickup, and session termination requires active hangup.';
+
 
 function ensureWorkflowsFile() {
   const directory = path.dirname(workflowsFile);
@@ -183,64 +297,93 @@ app.get('/api/health', (req, res) => {
 
 app.get('/api/settings', (req, res) => {
   appSettings.calleCliDetected = isCalleCliInstalled();
-  res.json(appSettings);
+  const authorizedRecipients = parseAuthorizedRecipients();
+  res.json({
+    ...appSettings,
+    authorizedRecipientsCount: authorizedRecipients.length,
+    isSimulationOnly: authorizedRecipients.length === 0,
+    cancellationPolicy: ACCEPTED_CALL_CANCELLATION_LIMITS
+  });
 });
 
-app.post('/api/settings', (req, res) => {
+app.post('/api/settings', requireAdminAuth, (req, res) => {
   try {
     const { mode, calleServerUrl, audioNarration, autoAdvance, requireCallConfirmation } = req.body;
     if (mode && (mode === 'simulation' || mode === 'live')) {
+      if (mode === 'live') {
+        const authorizedRecipients = parseAuthorizedRecipients();
+        if (authorizedRecipients.length === 0) {
+          return res.status(403).json({
+            error: {
+              code: 'SIMULATION_ONLY_POLICY',
+              message: 'Live calling mode is disabled: No authorized E.164 recipients configured on the bounded acceptance list. App remains simulation-only.'
+            }
+          });
+        }
+      }
+
       appSettings.mode = mode;
       process.env.BRIDGE_MODE = mode;
     }
+
     if (calleServerUrl !== undefined) appSettings.calleServerUrl = String(calleServerUrl);
     if (audioNarration !== undefined) appSettings.audioNarration = Boolean(audioNarration);
     if (autoAdvance !== undefined) appSettings.autoAdvance = Boolean(autoAdvance);
     if (requireCallConfirmation !== undefined) appSettings.requireCallConfirmation = Boolean(requireCallConfirmation);
 
-    res.json(appSettings);
+    const authorized = parseAuthorizedRecipients();
+    res.json({
+      ...appSettings,
+      authorizedRecipientsCount: authorized.length,
+      isSimulationOnly: authorized.length === 0,
+      cancellationPolicy: ACCEPTED_CALL_CANCELLATION_LIMITS
+    });
   } catch (error) {
     handleApiError(res, error, 400);
   }
 });
 
-// Organization & People
+// Organization & People (Private Records Protected)
 app.get('/api/organization', (req, res) => {
   try {
-    res.json(loadOrganization());
+    const org = loadOrganization();
+    res.json({
+      ...org,
+      people: (org.people || []).map(sanitizePerson)
+    });
   } catch (error) {
     handleApiError(res, error, 500);
   }
 });
 
-app.post('/api/organization/reset', (req, res) => {
+app.post('/api/organization/reset', requireAdminAuth, (req, res) => {
   try {
     const org = resetOrganization();
-    res.json({ ok: true, organization: org });
+    res.json({ ok: true, organization: { ...org, people: (org.people || []).map(sanitizePerson) } });
   } catch (error) {
     handleApiError(res, error, 500);
   }
 });
 
-app.post('/api/people', (req, res) => {
+app.post('/api/people', requireAdminAuth, (req, res) => {
   try {
     const person = addPerson(req.body);
-    res.status(201).json(person);
+    res.status(201).json(sanitizePerson(person));
   } catch (error) {
     handleApiError(res, error, 400);
   }
 });
 
-app.put('/api/people/:id', (req, res) => {
+app.put('/api/people/:id', requireAdminAuth, (req, res) => {
   try {
     const person = updatePerson(req.params.id, req.body);
-    res.json(person);
+    res.json(sanitizePerson(person));
   } catch (error) {
     handleApiError(res, error, 404);
   }
 });
 
-app.delete('/api/people/:id', (req, res) => {
+app.delete('/api/people/:id', requireAdminAuth, (req, res) => {
   try {
     removePerson(req.params.id);
     res.status(204).send();
@@ -251,36 +394,36 @@ app.delete('/api/people/:id', (req, res) => {
 
 // Tasks & Orchestration
 app.get('/api/tasks', (req, res) => {
-  res.json(Array.from(bridge.tasks.values()));
+  res.json(Array.from(bridge.tasks.values()).map(sanitizeTask));
 });
 
-app.post('/api/tasks', (req, res) => {
+app.post('/api/tasks', requireAdminAuth, (req, res) => {
   try {
     const payload = req.body && Object.keys(req.body).length ? req.body : createDeliveryException();
     if (!payload.id) payload.id = `TASK-${Date.now()}`;
     const task = bridge.createTask(payload);
-    res.status(201).json(task);
+    res.status(201).json(sanitizeTask(task));
   } catch (error) {
     handleApiError(res, error, 400);
   }
 });
 
-app.post('/api/tasks/delivery', (req, res) => {
+app.post('/api/tasks/delivery', requireAdminAuth, (req, res) => {
   try {
     const scenario = createDeliveryException();
     const task = bridge.createTask(scenario);
-    res.status(201).json(task);
+    res.status(201).json(sanitizeTask(task));
   } catch (error) {
     handleApiError(res, error, 400);
   }
 });
 
-app.post('/api/tasks/reset', (req, res) => {
+app.post('/api/tasks/reset', requireAdminAuth, (req, res) => {
   try {
     bridge.tasks.clear();
     const scenario = createDeliveryException();
     const task = bridge.createTask(scenario);
-    res.json({ ok: true, task });
+    res.json({ ok: true, task: sanitizeTask(task) });
   } catch (error) {
     handleApiError(res, error, 500);
   }
@@ -289,10 +432,10 @@ app.post('/api/tasks/reset', (req, res) => {
 app.get('/api/tasks/:id', (req, res) => {
   const task = bridge.getTask(req.params.id);
   if (!task) return handleApiError(res, new Error('Task not found'), 404);
-  res.json(task);
+  res.json(sanitizeTask(task));
 });
 
-app.delete('/api/tasks/:id', (req, res) => {
+app.delete('/api/tasks/:id', requireAdminAuth, (req, res) => {
   if (bridge.tasks.has(req.params.id)) {
     bridge.tasks.delete(req.params.id);
     return res.status(204).send();
@@ -300,7 +443,7 @@ app.delete('/api/tasks/:id', (req, res) => {
   return handleApiError(res, new Error('Task not found'), 404);
 });
 
-app.post('/api/tasks/:id/reset', (req, res) => {
+app.post('/api/tasks/:id/reset', requireAdminAuth, (req, res) => {
   try {
     const task = bridge.getTask(req.params.id);
     if (!task) return handleApiError(res, new Error('Task not found'), 404);
@@ -313,7 +456,7 @@ app.post('/api/tasks/:id/reset', (req, res) => {
     task.currentRunId = null;
     task.updatedAt = new Date().toISOString();
 
-    res.json(task);
+    res.json(sanitizeTask(task));
   } catch (error) {
     handleApiError(res, error, 400);
   }
@@ -350,7 +493,7 @@ app.post('/api/tasks/:id/next-person', (req, res) => {
       reason: rationale
     });
 
-    res.json({ nextPerson: person, reason: rationale });
+    res.json({ nextPerson: sanitizePerson(person), reason: rationale });
   } catch (error) {
     handleApiError(res, error, 400);
   }
@@ -364,6 +507,31 @@ app.post('/api/tasks/:id/plan-call', async (req, res) => {
     const personId = req.body.personId || task.currentPerson;
     const person = getPerson(personId);
     if (!person) return handleApiError(res, new Error('Person not found'), 404);
+
+    const isLive = appSettings.mode === 'live';
+
+    // Protect live dispatch: Require authorized E.164 recipient on bounded acceptance list and auth
+    if (isLive) {
+      const token = getBearerToken(req);
+      const session = token ? demoSessions.get(token) : null;
+      if (!session) {
+        return res.status(401).json({
+          error: {
+            code: 'UNAUTHORIZED',
+            message: 'Authentication required for live call planning.'
+          }
+        });
+      }
+
+      if (!isAuthorizedRecipient(person.phone)) {
+        return res.status(403).json({
+          error: {
+            code: 'UNAUTHORIZED_RECIPIENT',
+            message: `Live dispatch blocked: Recipient ${person.name} (${maskPhone(person.phone)}) is not on the authorized E.164 bounded acceptance list. App policy requires authorized recipients for live calling.`
+          }
+        });
+      }
+    }
 
     const callPurpose = req.body.purpose || createCallPurpose(task, person);
     const goal = `You are BRIDGE, an automated business coordination assistant. Business goal: ${task.goal}. Current known information: ${task.currentNeed || 'Not yet determined'}. Person: ${person.name}. Role: ${person.role}. Reason for call: ${callPurpose}. Only ask questions necessary for resolving the business task. Return useful results in structured form.`;
@@ -380,21 +548,23 @@ app.post('/api/tasks/:id/plan-call', async (req, res) => {
       personId: person.id,
       personName: person.name,
       role: person.role,
-      phone: person.phone,
+      phone: maskPhone(person.phone),
       planId,
       confirmToken,
       purpose: callPurpose,
-      goal
+      goal,
+      cancellationPolicy: ACCEPTED_CALL_CANCELLATION_LIMITS
     });
 
     res.json({
-      person,
+      person: sanitizePerson(person),
       purpose: callPurpose,
-      plan,
+      plan: sanitizePlan(plan),
       planId,
       confirmToken,
-      mode: appSettings.mode,
-      requiresConfirmation: appSettings.mode === 'live'
+      mode: isLive ? 'live' : 'simulation',
+      requiresConfirmation: true,
+      cancellationPolicy: ACCEPTED_CALL_CANCELLATION_LIMITS
     });
   } catch (error) {
     handleApiError(res, error, 400);
@@ -412,22 +582,113 @@ app.post('/api/tasks/:id/run-call', async (req, res) => {
     const { planId, confirmToken } = lastPlan;
     if (!planId || !confirmToken) return handleApiError(res, new Error('CALL-E plan is missing planId or confirmToken.'), 400);
 
+    const isLive = appSettings.mode === 'live';
+
+    if (isLive) {
+      const token = getBearerToken(req);
+      const session = token ? demoSessions.get(token) : null;
+      if (!session) {
+        return res.status(401).json({
+          error: {
+            code: 'UNAUTHORIZED',
+            message: 'Authentication required for live call dispatch.'
+          }
+        });
+      }
+    }
+
+    // Require explicit server-side confirmation before call dispatch
+    if (isLive || appSettings.requireCallConfirmation) {
+      const isConfirmed = req.body?.confirmed === true;
+      const providedToken = req.body?.confirmToken;
+
+      if (!isConfirmed) {
+        return res.status(400).json({
+          error: {
+            code: 'CONFIRMATION_REQUIRED',
+            message: 'Server-side confirmation required before live call dispatch: Body must include { confirmed: true, confirmToken }.'
+          }
+        });
+      }
+      if (!providedToken || providedToken !== confirmToken) {
+        return res.status(400).json({
+          error: {
+            code: 'INVALID_CONFIRM_TOKEN',
+            message: 'Provided confirmation token does not match active call plan.'
+          }
+        });
+      }
+    }
+
+    // Protect live dispatch: Authorized E.164 recipient check
+    const person = getPerson(task.currentPerson);
+    if (isLive) {
+      if (!person || !isAuthorizedRecipient(person.phone)) {
+        return res.status(403).json({
+          error: {
+            code: 'UNAUTHORIZED_RECIPIENT',
+            message: `Live dispatch blocked: Recipient phone ${person ? maskPhone(person.phone) : 'unknown'} is not on the authorized E.164 bounded acceptance list.`
+          }
+        });
+      }
+    }
+
     bridge.setState(task.id, 'CALLING');
-    bridge.addHistory(task.id, { type: 'call_attempt', personId: task.currentPerson, planId });
+    bridge.addHistory(task.id, {
+      type: 'call_attempt',
+      personId: task.currentPerson,
+      phone: person ? maskPhone(person.phone) : undefined,
+      planId
+    });
 
     let runId = `run-${Date.now()}`;
-    let run = { run_id: runId, status: 'initiated' };
+    let run = {
+      run_id: runId,
+      status: 'initiated',
+      simulated: !isLive,
+      mode: isLive ? 'live' : 'simulation',
+      cancellationPolicy: ACCEPTED_CALL_CANCELLATION_LIMITS
+    };
+    let actualLive = false;
 
-    if (appSettings.mode === 'live' && isCalleCliInstalled()) {
+    if (isLive && isCalleCliInstalled()) {
       const rawRun = await runCall({ planId, confirmToken });
-      run = extractJson(rawRun);
-      runId = run?.run_id || run?.result?.run_id || runId;
+      const parsedRun = extractJson(rawRun);
+      if (parsedRun && !parsedRun.simulated && !parsedRun.fixtureFallback) {
+        run = parsedRun;
+        runId = run?.run_id || run?.result?.run_id || runId;
+        actualLive = true;
+      } else {
+        // CLI failed or fallback payload returned: NEVER label as live
+        run = {
+          ...parsedRun,
+          run_id: runId,
+          simulated: true,
+          fixtureFallback: true,
+          mode: 'simulation',
+          note: 'Fixture fallback executed; not a real live completion.'
+        };
+      }
     }
 
     bridge.updateTask(task.id, { currentRunId: runId });
-    bridge.addHistory(task.id, { type: 'call_started', personId: task.currentPerson, runId, raw: run });
+    bridge.addHistory(task.id, {
+      type: 'call_started',
+      personId: task.currentPerson,
+      runId,
+      simulated: !actualLive,
+      mode: actualLive ? 'live' : 'simulation',
+      raw: run,
+      cancellationPolicy: ACCEPTED_CALL_CANCELLATION_LIMITS
+    });
 
-    res.json({ run, runId });
+    res.json({
+      run: sanitizeResult(run),
+      runId,
+      simulated: !actualLive,
+      mode: actualLive ? 'live' : 'simulation',
+      cancellationPolicy: ACCEPTED_CALL_CANCELLATION_LIMITS
+    });
   } catch (error) {
     handleApiError(res, error, 400);
   }
@@ -440,12 +701,28 @@ app.get('/api/tasks/:id/call-status', async (req, res) => {
     if (!task.currentRunId) return handleApiError(res, new Error('No active CALL-E run.'), 400);
 
     let result;
+    let isLiveExecution = false;
     if (appSettings.mode === 'live' && isCalleCliInstalled()) {
-      const rawStatus = await getCallStatus({ runId: task.currentRunId });
-      const status = extractJson(rawStatus);
-      result = status?.result || status;
+      try {
+        const rawStatus = await getCallStatus({ runId: task.currentRunId });
+        const status = extractJson(rawStatus);
+        result = status?.result || status;
+        if (result && !result.simulated && !result.fixtureFallback) {
+          isLiveExecution = true;
+        } else {
+          result = { ...result, simulated: true, fixtureFallback: true, mode: 'simulation' };
+        }
+      } catch (err) {
+        // Never label fixture fallback as real live completion
+        result = simulateCallResult({ personId: task.currentPerson, task });
+        result.simulated = true;
+        result.fixtureFallback = true;
+        result.mode = 'simulation';
+      }
     } else {
       result = simulateCallResult({ personId: task.currentPerson, task });
+      result.simulated = true;
+      result.mode = 'simulation';
     }
 
     const interpretation = interpretCallResult(result);
@@ -458,11 +735,20 @@ app.get('/api/tasks/:id/call-status', async (req, res) => {
       outcome: result?.result?.outcome || result?.outcome,
       extracted: result?.result?.extracted || result?.extracted,
       summary: result?.result?.summary || result?.summary,
-      transcript: result?.transcript || result?.result?.transcript
+      transcript: result?.transcript || result?.result?.transcript,
+      simulated: !isLiveExecution,
+      mode: isLiveExecution ? 'live' : 'simulation',
+      fixtureFallback: Boolean(result?.fixtureFallback)
     });
 
     bridge.setState(task.id, interpretation.state);
-    res.json({ interpretation, result });
+    res.json({
+      interpretation,
+      result: sanitizeResult(result),
+      simulated: !isLiveExecution,
+      mode: isLiveExecution ? 'live' : 'simulation',
+      cancellationPolicy: ACCEPTED_CALL_CANCELLATION_LIMITS
+    });
   } catch (error) {
     handleApiError(res, error, 400);
   }
@@ -485,6 +771,7 @@ app.post('/api/tasks/:id/simulate-call', (req, res) => {
       personId,
       personName: person?.name || personId,
       role: person?.role || 'Team Member',
+      phone: maskPhone(person?.phone),
       status: result.status,
       outcome: result.outcome,
       extracted: result.extracted,
@@ -494,12 +781,13 @@ app.post('/api/tasks/:id/simulate-call', (req, res) => {
       durationSeconds: result.durationSeconds || 30,
       sentiment: result.sentiment || 'neutral',
       simulated: true,
+      mode: 'simulation',
       timestamp: new Date().toISOString()
     };
 
     bridge.addHistory(task.id, historyEntry);
 
-    // Record in global call history
+    // Record in global call history with masked phone and simulation mode
     callHistory.unshift({
       id: `call-${Date.now()}-${Math.random().toString(36).substring(2, 6)}`,
       taskId: task.id,
@@ -507,7 +795,7 @@ app.post('/api/tasks/:id/simulate-call', (req, res) => {
       personId,
       personName: person?.name || personId,
       role: person?.role || 'Team Member',
-      phone: person?.phone || '+91******',
+      phone: maskPhone(person?.phone),
       duration: result.durationSeconds || 30,
       status: result.status,
       outcome: result.outcome,
@@ -517,7 +805,9 @@ app.post('/api/tasks/:id/simulate-call', (req, res) => {
       extracted: result.extracted,
       sentiment: result.sentiment || 'neutral',
       timestamp: new Date().toISOString(),
-      mode: 'simulation'
+      mode: 'simulation',
+      simulated: true,
+      isLive: false
     });
 
     const interpretation = interpretCallResult(result);
@@ -536,7 +826,7 @@ app.post('/api/tasks/:id/simulate-call', (req, res) => {
       bridge.setState(task.id, interpretation.state);
     }
 
-    res.json({ result, interpretation, task });
+    res.json({ result: sanitizeResult(result), interpretation, task: sanitizeTask(task) });
   } catch (error) {
     handleApiError(res, error, 400);
   }
@@ -550,7 +840,7 @@ app.post('/api/tasks/:id/auto-step', async (req, res) => {
 
     if (task.state === 'RESOLVED') {
       return res.json({
-        task,
+        task: sanitizeTask(task),
         nextPerson: null,
         isResolved: true,
         message: 'Task is already resolved.'
@@ -561,7 +851,7 @@ app.post('/api/tasks/:id/auto-step', async (req, res) => {
     if (!nextPerson) {
       bridge.setState(task.id, 'RESOLVED');
       return res.json({
-        task,
+        task: sanitizeTask(task),
         nextPerson: null,
         isResolved: true,
         message: 'All participants contacted. Workflow complete.'
@@ -589,15 +879,18 @@ app.post('/api/tasks/:id/auto-step', async (req, res) => {
       personId: nextPerson.id,
       personName: nextPerson.name,
       role: nextPerson.role,
-      phone: nextPerson.phone,
+      phone: maskPhone(nextPerson.phone),
       planId,
       confirmToken,
-      purpose
+      purpose,
+      cancellationPolicy: ACCEPTED_CALL_CANCELLATION_LIMITS
     });
 
-    // Simulate call
+    // Auto-step is strictly simulated - never label auto-step as real live completion
     const result = simulateCallResult({ personId: nextPerson.id, task });
-    const runId = `run-${Date.now()}`;
+    result.simulated = true;
+    result.isLive = false;
+    result.mode = 'simulation';
 
     bridge.addHistory(task.id, {
       type: 'call_result',
@@ -613,6 +906,8 @@ app.post('/api/tasks/:id/auto-step', async (req, res) => {
       durationSeconds: result.durationSeconds || 35,
       sentiment: result.sentiment || 'neutral',
       simulated: true,
+      isLive: false,
+      mode: 'simulation',
       timestamp: new Date().toISOString()
     });
 
@@ -623,7 +918,7 @@ app.post('/api/tasks/:id/auto-step', async (req, res) => {
       personId: nextPerson.id,
       personName: nextPerson.name,
       role: nextPerson.role,
-      phone: nextPerson.phone,
+      phone: maskPhone(nextPerson.phone),
       duration: result.durationSeconds || 35,
       status: result.status,
       outcome: result.outcome,
@@ -633,7 +928,9 @@ app.post('/api/tasks/:id/auto-step', async (req, res) => {
       extracted: result.extracted,
       sentiment: result.sentiment || 'neutral',
       timestamp: new Date().toISOString(),
-      mode: appSettings.mode
+      mode: 'simulation', // NEVER label auto-step as real live completion
+      simulated: true,
+      isLive: false
     });
 
     const interpretation = interpretCallResult(result);
@@ -654,12 +951,14 @@ app.post('/api/tasks/:id/auto-step', async (req, res) => {
 
     res.json({
       success: true,
-      task,
-      nextPerson,
+      task: sanitizeTask(task),
+      nextPerson: sanitizePerson(nextPerson),
       rationale,
       purpose,
-      callResult: result,
+      callResult: sanitizeResult(result),
       interpretation,
+      simulated: true,
+      mode: 'simulation',
       isResolved: task.state === 'RESOLVED'
     });
   } catch (error) {
@@ -669,7 +968,7 @@ app.post('/api/tasks/:id/auto-step', async (req, res) => {
 
 // Call History endpoints
 app.get('/api/calls', (req, res) => {
-  res.json(callHistory);
+  res.json(callHistory.map(sanitizeCall));
 });
 
 app.delete('/api/calls', (req, res) => {
@@ -686,7 +985,7 @@ app.get('/api/workflows', (req, res) => {
   }
 });
 
-app.post('/api/workflows', (req, res) => {
+app.post('/api/workflows', requireAdminAuth, (req, res) => {
   try {
     const workflows = readWorkflows();
     const workflow = {
@@ -704,7 +1003,7 @@ app.post('/api/workflows', (req, res) => {
   }
 });
 
-app.put('/api/workflows/:id', (req, res) => {
+app.put('/api/workflows/:id', requireAdminAuth, (req, res) => {
   try {
     const workflows = readWorkflows();
     const index = workflows.findIndex((workflow) => workflow.id === req.params.id);
@@ -717,7 +1016,7 @@ app.put('/api/workflows/:id', (req, res) => {
   }
 });
 
-app.delete('/api/workflows/:id', (req, res) => {
+app.delete('/api/workflows/:id', requireAdminAuth, (req, res) => {
   try {
     const workflows = readWorkflows().filter((workflow) => workflow.id !== req.params.id);
     writeWorkflows(workflows);

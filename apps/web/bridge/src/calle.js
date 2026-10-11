@@ -1,21 +1,62 @@
 const { spawn, spawnSync } = require("node:child_process");
 
-function isSimulationMode() {
-  return (process.env.BRIDGE_MODE || 'simulation').toLowerCase() === 'simulation';
+function isLiveMode() {
+  return (process.env.BRIDGE_MODE || '').toLowerCase() === 'live';
 }
 
-function buildSimulationCallPayload({ phone, goal }) {
+function isSimulationMode() {
+  return !isLiveMode();
+}
+
+function maskPhoneNumber(phone) {
+  if (!phone) return '+91******';
+  const str = String(phone).trim();
+  if (str.includes('*')) return str;
+  if (str.startsWith('+')) {
+    const cc = str.slice(0, 3);
+    const last4 = str.slice(-4);
+    return `${cc}******${last4}`;
+  }
+  const last4 = str.slice(-4);
+  return `******${last4}`;
+}
+
+function buildSimulationCallPayload({ phone, goal, planId, runId, command } = {}) {
   const stamp = Date.now();
   return {
     stdout: JSON.stringify({
-      plan_id: `sim-plan-${stamp}`,
+      plan_id: planId || `sim-plan-${stamp}`,
       confirm_token: `sim-confirm-${stamp}`,
-      mode: isSimulationMode() ? 'simulation' : 'live',
-      to_phone: phone,
+      run_id: runId || `sim-run-${stamp}`,
+      mode: 'simulation',
+      simulated: true,
+      isLive: false,
+      fixtureFallback: false,
+      to_phone: maskPhoneNumber(phone),
       goal,
-      status: 'planned'
+      status: command === 'run' ? 'in_progress' : command === 'status' ? 'completed' : 'planned'
     }),
     stderr: ""
+  };
+}
+
+function buildFallbackCallPayload({ phone, goal, planId, runId, stderr = "" } = {}) {
+  const stamp = Date.now();
+  return {
+    stdout: JSON.stringify({
+      plan_id: planId || `sim-plan-${stamp}`,
+      confirm_token: `sim-confirm-${stamp}`,
+      run_id: runId || `sim-run-${stamp}`,
+      mode: 'simulation',
+      simulated: true,
+      isLive: false,
+      fixtureFallback: true,
+      to_phone: maskPhoneNumber(phone),
+      goal,
+      status: 'planned',
+      note: 'Fixture fallback executed; not a real live completion.'
+    }),
+    stderr
   };
 }
 
@@ -29,10 +70,25 @@ function commandExists(command) {
 
 function runCalle(args) {
   return new Promise((resolve, reject) => {
-    if (isSimulationMode() && !commandExists('calle')) {
+    // Keep simulation unable to invoke the real CLI under all circumstances
+    if (isSimulationMode()) {
       resolve(buildSimulationCallPayload({
         phone: args.includes('--to-phone') ? args[args.indexOf('--to-phone') + 1] : undefined,
-        goal: args.includes('--goal') ? args[args.indexOf('--goal') + 1] : undefined
+        goal: args.includes('--goal') ? args[args.indexOf('--goal') + 1] : undefined,
+        planId: args.includes('--plan-id') ? args[args.indexOf('--plan-id') + 1] : undefined,
+        runId: args.includes('--run-id') ? args[args.indexOf('--run-id') + 1] : undefined,
+        command: args[1]
+      }));
+      return;
+    }
+
+    if (!commandExists('calle')) {
+      resolve(buildFallbackCallPayload({
+        phone: args.includes('--to-phone') ? args[args.indexOf('--to-phone') + 1] : undefined,
+        goal: args.includes('--goal') ? args[args.indexOf('--goal') + 1] : undefined,
+        planId: args.includes('--plan-id') ? args[args.indexOf('--plan-id') + 1] : undefined,
+        runId: args.includes('--run-id') ? args[args.indexOf('--run-id') + 1] : undefined,
+        stderr: 'CALL-E CLI not available on system'
       }));
       return;
     }
@@ -61,11 +117,12 @@ function runCalle(args) {
 
     child.on("error", (error) => {
       if (isSimulationMode() || error.code === 'ENOENT') {
-        const simulated = buildSimulationCallPayload({
+        const fallback = buildFallbackCallPayload({
           phone: args.includes('--to-phone') ? args[args.indexOf('--to-phone') + 1] : undefined,
-          goal: args.includes('--goal') ? args[args.indexOf('--goal') + 1] : undefined
+          goal: args.includes('--goal') ? args[args.indexOf('--goal') + 1] : undefined,
+          stderr: error.message
         });
-        resolve(simulated);
+        resolve(fallback);
         return;
       }
 
@@ -74,24 +131,12 @@ function runCalle(args) {
 
     child.on("close", code => {
       if (code !== 0) {
-        const fallback = isSimulationMode()
-          ? buildSimulationCallPayload({
-              phone: args.includes('--to-phone') ? args[args.indexOf('--to-phone') + 1] : undefined,
-              goal: args.includes('--goal') ? args[args.indexOf('--goal') + 1] : undefined
-            })
-          : { stdout: '', stderr };
-
-        if (isSimulationMode()) {
-          resolve(fallback);
-          return;
-        }
-
-        reject(
-          new Error(
-            `CALL-E exited with code ${code}\n${stderr}`
-          )
-        );
-
+        // Never label fixture fallback as real live completion
+        resolve(buildFallbackCallPayload({
+          phone: args.includes('--to-phone') ? args[args.indexOf('--to-phone') + 1] : undefined,
+          goal: args.includes('--goal') ? args[args.indexOf('--goal') + 1] : undefined,
+          stderr: `CALL-E exited with code ${code}\n${stderr}`
+        }));
         return;
       }
 

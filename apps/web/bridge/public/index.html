@@ -2013,6 +2013,17 @@
             </div>
           </div>
 
+          <!-- Telephony Safety & Cancellation Policy -->
+          <div class="card" style="border-left: 4px solid #f59e0b; background: rgba(245, 158, 11, 0.04);">
+            <h3 style="font-size:1.15rem; font-weight:800; margin-bottom:8px; color:var(--text);">🛡️ Telephony Safety & Cancellation Policy</h3>
+            <p style="font-size:0.84rem; line-height:1.55; color:var(--text-secondary); margin-bottom:10px;">
+              <strong>Accepted-Call Cancellation Limits:</strong> Once an outbound call is dispatched and accepted by the telephony carrier or callee, cancellation cannot recall or reverse in-flight voice transmission. Voice carrier routing and billing commit immediately upon pickup; cancellation is strictly limited to hanging up the active connection.
+            </p>
+            <p style="font-size:0.84rem; line-height:1.55; color:var(--text-secondary);">
+              <strong>Bounded Acceptance List:</strong> Under the community/demo policy, outbound live calls require authorized E.164 recipients configured via environment variables. When no authorized recipients are configured, the reachable app remains strictly simulation-only.
+            </p>
+          </div>
+
           <!-- Preferences -->
           <div class="card">
             <h3 style="font-size:1.15rem; font-weight:800; margin-bottom:16px;">Demo & Audio Preferences</h3>
@@ -2123,7 +2134,7 @@
 
   <!-- Live Mode Safety Confirmation Modal -->
   <div id="modalLiveConfirm" class="modal-overlay">
-    <div class="modal-dialog" style="max-width:480px; border-color:rgba(244,63,94,0.4);">
+    <div class="modal-dialog" style="max-width:520px; border-color:rgba(244,63,94,0.4);">
       <div class="modal-head" style="background:rgba(244,63,94,0.06);">
         <h3 style="font-size:1.15rem; font-weight:800; color:#e11d48;">🚨 Confirm Outbound Phone Call</h3>
         <button class="btn btn-ghost btn-sm" onclick="closeModal('modalLiveConfirm')">✕</button>
@@ -2136,8 +2147,11 @@
           Calling: <strong id="liveConfirmTarget">Arjun (+91******0878)</strong><br />
           Purpose: <span id="liveConfirmPurpose">Vehicle problem verification</span>
         </div>
+        <div style="background:rgba(245,158,11,0.08); padding:12px 14px; border-radius:10px; margin:12px 0; font-size:0.8rem; border:1px solid rgba(245,158,11,0.28); color:var(--text-secondary); line-height:1.45;">
+          <strong>⚠️ Accepted-Call Cancellation Limits:</strong> Once an outbound call is dispatched and accepted by the telephony carrier or callee, cancellation cannot recall or reverse in-flight voice transmission. Telephony routing and carrier minutes commit immediately upon connection; cancellation is strictly limited to hanging up the active call. Outbound calls are subject to the bounded acceptance list of authorized E.164 recipients.
+        </div>
         <p style="font-size:0.8rem; color:var(--text-muted);">
-          This will trigger a live telephony call via CALL-E CLI to the real phone number.
+          This will trigger a live telephony call via CALL-E CLI to an authorized recipient.
         </p>
       </div>
       <div class="modal-foot">
@@ -2152,10 +2166,32 @@
 
   <!-- Application Logic -->
   <script>
+    // Security & Sanitization Helpers
+    function escapeHtml(value) {
+      if (value === null || value === undefined) return '';
+      return String(value)
+        .replace(/&/g, '&amp;')
+        .replace(/</g, '&lt;')
+        .replace(/>/g, '&gt;')
+        .replace(/"/g, '&quot;')
+        .replace(/'/g, '&#39;');
+    }
+
+    function maskPhone(phone) {
+      if (!phone) return '+91******';
+      const str = String(phone).trim();
+      if (str.includes('*')) return str;
+      if (str.startsWith('+')) {
+        return `${str.slice(0, 3)}******${str.slice(-4)}`;
+      }
+      return `******${str.slice(-4)}`;
+    }
+
     // State Store
     const state = {
       currentPage: 'landing',
       mode: 'simulation',
+      token: 'bridge-demo-session-token',
       settings: {},
       organization: { people: [] },
       tasks: [],
@@ -2168,9 +2204,15 @@
       pendingLiveCallAction: null
     };
 
-    // API Wrapper
+    // API Wrapper with Authentication Token
     async function api(endpoint, options = {}) {
-      const headers = { 'Content-Type': 'application/json', ...(options.headers || {}) };
+      const headers = {
+        'Content-Type': 'application/json',
+        ...(options.headers || {})
+      };
+      if (state.token) {
+        headers['Authorization'] = `Bearer ${state.token}`;
+      }
       const response = await fetch(endpoint, {
         ...options,
         headers,
@@ -2205,12 +2247,12 @@
       }
     }
 
-    // Toast notification
+    // Toast notification with HTML escaping
     function showToast(message, icon = 'ℹ️') {
       const container = document.getElementById('toastContainer');
       const toast = document.createElement('div');
       toast.className = 'toast-msg';
-      toast.innerHTML = `<span>${icon}</span><span>${message}</span>`;
+      toast.innerHTML = `<span>${escapeHtml(icon)}</span><span>${escapeHtml(message)}</span>`;
       container.appendChild(toast);
       setTimeout(() => {
         toast.style.opacity = '0';
@@ -2416,11 +2458,11 @@
 
         return `
           <div class="timeline-event">
-            <div class="timeline-marker">${icon}</div>
+            <div class="timeline-marker">${escapeHtml(icon)}</div>
             <div class="timeline-content">
-              <div class="timeline-title">${title}</div>
-              <div class="timeline-time">${new Date(evt.timestamp || Date.now()).toLocaleTimeString()}</div>
-              <div class="timeline-body">${detail}</div>
+              <div class="timeline-title">${escapeHtml(title)}</div>
+              <div class="timeline-time">${escapeHtml(new Date(evt.timestamp || Date.now()).toLocaleTimeString())}</div>
+              <div class="timeline-body">${escapeHtml(detail)}</div>
             </div>
           </div>
         `;
@@ -2507,7 +2549,7 @@
       document.getElementById('phoneTargetAvatar').textContent = (person.name || 'P')[0];
       document.getElementById('phoneTargetName').textContent = person.name;
       document.getElementById('phoneTargetRole').textContent = `${person.role} • QuickMove Logistics`;
-      document.getElementById('phoneTargetPhone').textContent = person.phone || '+91******';
+      document.getElementById('phoneTargetPhone').textContent = maskPhone(person.phone);
       document.getElementById('phoneLiveDialogue').textContent = `"${callResult.summary}"`;
 
       renderTranscriptTurns(callResult.dialogue || []);
@@ -2521,10 +2563,10 @@
       listEl.innerHTML = dialogue.map(turn => `
         <div style="background:rgba(248,250,255,0.85); border:1px solid var(--border-subtle); border-radius:10px; padding:10px 14px;">
           <div style="font-weight:700; font-size:0.78rem; color:${turn.speaker.includes('CALL-E') ? 'var(--primary)' : 'var(--purple)'}; margin-bottom:2px;">
-            ${turn.speaker}
+            ${escapeHtml(turn.speaker)}
           </div>
           <div style="font-size:0.86rem; color:var(--text); line-height:1.45;">
-            ${turn.text}
+            ${escapeHtml(turn.text)}
           </div>
         </div>
       `).join('');
@@ -2564,29 +2606,29 @@
           <div class="person-card">
             <div>
               <div class="person-top">
-                <div class="person-avatar-circle">${initials}</div>
+                <div class="person-avatar-circle">${escapeHtml(initials)}</div>
                 <div class="person-info">
-                  <h3>${p.name}</h3>
-                  <div class="person-role-tag">${p.role}</div>
+                  <h3>${escapeHtml(p.name)}</h3>
+                  <div class="person-role-tag">${escapeHtml(p.role)}</div>
                 </div>
               </div>
 
               <div class="person-details-list" style="margin-top:16px;">
-                <div class="detail-row"><span class="detail-label">Phone:</span><span class="detail-val">${p.phone || 'N/A'}</span></div>
-                <div class="detail-row"><span class="detail-label">Spend Limit:</span><span class="detail-val">${limitText}</span></div>
-                <div class="detail-row"><span class="detail-label">Type:</span><span class="detail-val" style="text-transform:capitalize;">${p.type || 'Internal'}</span></div>
+                <div class="detail-row"><span class="detail-label">Phone:</span><span class="detail-val">${escapeHtml(maskPhone(p.phone))}</span></div>
+                <div class="detail-row"><span class="detail-label">Spend Limit:</span><span class="detail-val">${escapeHtml(limitText)}</span></div>
+                <div class="detail-row"><span class="detail-label">Type:</span><span class="detail-val" style="text-transform:capitalize;">${escapeHtml(p.type || 'Internal')}</span></div>
               </div>
 
               <div style="margin-top:12px; font-size:0.8rem; color:var(--text-muted); background:rgba(248,250,255,0.7); padding:8px 10px; border-radius:8px;">
-                <strong>Responsibilities:</strong> ${responsibilities}
+                <strong>Responsibilities:</strong> ${escapeHtml(responsibilities)}
               </div>
             </div>
 
             <div style="display:flex; justify-content:space-between; align-items:center; border-top:1px solid var(--border-subtle); padding-top:12px;">
-              <button class="btn btn-secondary btn-sm" onclick="callPersonDirectly('${p.id}')">
+              <button class="btn btn-secondary btn-sm" onclick="callPersonDirectly('${escapeHtml(p.id)}')">
                 📞 CALL-E Call
               </button>
-              <button class="btn btn-danger btn-sm" onclick="deletePerson('${p.id}')">
+              <button class="btn btn-danger btn-sm" onclick="deletePerson('${escapeHtml(p.id)}')">
                 Remove
               </button>
             </div>
@@ -2774,7 +2816,7 @@
       document.getElementById('inspectAvatar').textContent = person.name[0];
       document.getElementById('inspectName').textContent = person.name;
       document.getElementById('inspectRole').textContent = person.role;
-      document.getElementById('inspectPhone').textContent = person.phone || 'N/A';
+      document.getElementById('inspectPhone').textContent = maskPhone(person.phone);
       document.getElementById('inspectAuthority').textContent = person.authority?.extraCostLimit ? `₹${person.authority.extraCostLimit}` : 'None';
       document.getElementById('inspectResponsibilities').textContent = (person.responsibilities || []).join(', ') || 'N/A';
 
@@ -2792,7 +2834,7 @@
       if (!person) return;
 
       if (state.mode === 'live') {
-        document.getElementById('liveConfirmTarget').textContent = `${person.name} (${person.phone})`;
+        document.getElementById('liveConfirmTarget').textContent = `${person.name} (${maskPhone(person.phone)})`;
         document.getElementById('liveConfirmPurpose').textContent = `Direct CALL-E coordination for role "${person.role}"`;
         state.pendingLiveCallAction = () => executeDirectCall(person);
         openModal('modalLiveConfirm');
@@ -2827,12 +2869,12 @@
       if (!container) return;
 
       container.innerHTML = state.workflows.map((wf, idx) => `
-        <div class="wf-item-card ${idx === 0 ? 'active' : ''}" onclick="selectWorkflow('${wf.id}')">
+        <div class="wf-item-card ${idx === 0 ? 'active' : ''}" onclick="selectWorkflow('${escapeHtml(wf.id)}')">
           <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:4px;">
-            <strong style="font-size:0.92rem;">${wf.name}</strong>
+            <strong style="font-size:0.92rem;">${escapeHtml(wf.name)}</strong>
             <span class="badge badge-emerald">${wf.nodes ? wf.nodes.length : 4} nodes</span>
           </div>
-          <div style="font-size:0.76rem; color:var(--text-muted);">${wf.category || 'Operations'}</div>
+          <div style="font-size:0.76rem; color:var(--text-muted);">${escapeHtml(wf.category || 'Operations')}</div>
         </div>
       `).join('');
 
@@ -2865,13 +2907,13 @@
               ${i + 1}
             </div>
             <div>
-              <div style="font-weight:800; font-size:0.95rem;">${node.title}</div>
-              <div style="font-size:0.78rem; color:var(--text-muted);">${node.description || node.goal || node.condition || 'Autonomous execution step'}</div>
+              <div style="font-weight:800; font-size:0.95rem;">${escapeHtml(node.title)}</div>
+              <div style="font-size:0.78rem; color:var(--text-muted);">${escapeHtml(node.description || node.goal || node.condition || 'Autonomous execution step')}</div>
             </div>
           </div>
           <div>
             <span class="badge ${node.type === 'calle_outbound' ? 'badge-primary' : node.type === 'decision_gate' ? 'badge-amber' : 'badge-emerald'}">
-              ${node.type}
+              ${escapeHtml(node.type)}
             </span>
           </div>
         </div>
@@ -2892,13 +2934,13 @@
       listEl.innerHTML = state.tasks.map(task => {
         const isCurrent = task.id === state.currentTaskId;
         return `
-          <div class="card" style="padding:14px; cursor:pointer; border-color:${isCurrent ? 'var(--primary)' : 'var(--border)'};" onclick="selectTaskDetail('${task.id}')">
+          <div class="card" style="padding:14px; cursor:pointer; border-color:${isCurrent ? 'var(--primary)' : 'var(--border)'};" onclick="selectTaskDetail('${escapeHtml(task.id)}')">
             <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:6px;">
-              <span class="badge ${task.state === 'RESOLVED' ? 'badge-emerald' : 'badge-amber'}">${task.state}</span>
-              <span style="font-size:0.75rem; color:var(--text-muted);">${task.id}</span>
+              <span class="badge ${task.state === 'RESOLVED' ? 'badge-emerald' : 'badge-amber'}">${escapeHtml(task.state)}</span>
+              <span style="font-size:0.75rem; color:var(--text-muted);">${escapeHtml(task.id)}</span>
             </div>
-            <strong style="font-size:0.92rem; display:block; margin-bottom:4px;">${task.title || task.goal}</strong>
-            <div style="font-size:0.78rem; color:var(--text-secondary);">${task.currentNeed || 'In progress'}</div>
+            <strong style="font-size:0.92rem; display:block; margin-bottom:4px;">${escapeHtml(task.title || task.goal)}</strong>
+            <div style="font-size:0.78rem; color:var(--text-secondary);">${escapeHtml(task.currentNeed || 'In progress')}</div>
           </div>
         `;
       }).join('');
@@ -2919,9 +2961,9 @@
       headEl.innerHTML = `
         <div style="display:flex; justify-content:space-between; align-items:center;">
           <div>
-            <span class="badge ${task.state === 'RESOLVED' ? 'badge-emerald' : 'badge-amber'}">${task.state}</span>
-            <h2 style="font-size:1.3rem; font-weight:800; margin-top:4px;">${task.title || task.goal}</h2>
-            <div style="font-size:0.84rem; color:var(--text-muted);">ID: ${task.id} • Target Deadline: ${task.constraints?.latestDeliveryTime || '18:00'}</div>
+            <span class="badge ${task.state === 'RESOLVED' ? 'badge-emerald' : 'badge-amber'}">${escapeHtml(task.state)}</span>
+            <h2 style="font-size:1.3rem; font-weight:800; margin-top:4px;">${escapeHtml(task.title || task.goal)}</h2>
+            <div style="font-size:0.84rem; color:var(--text-muted);">ID: ${escapeHtml(task.id)} • Target Deadline: ${escapeHtml(task.constraints?.latestDeliveryTime || '18:00')}</div>
           </div>
           <button class="btn btn-secondary btn-sm" onclick="triggerAutoStep()">Advance Workflow</button>
         </div>
@@ -2939,11 +2981,11 @@
         <div class="timeline-event">
           <div class="timeline-marker">${evt.type.includes('call') ? '📞' : '🎯'}</div>
           <div class="timeline-content">
-            <div class="timeline-title">${evt.personName ? `${evt.personName} (${evt.role || 'Contact'})` : evt.type}</div>
-            <div class="timeline-time">${new Date(evt.timestamp || Date.now()).toLocaleTimeString()}</div>
+            <div class="timeline-title">${escapeHtml(evt.personName ? `${evt.personName} (${evt.role || 'Contact'})` : evt.type)}</div>
+            <div class="timeline-time">${escapeHtml(new Date(evt.timestamp || Date.now()).toLocaleTimeString())}</div>
             <div class="timeline-body">
-              ${evt.summary || evt.reason || evt.purpose || 'Operation recorded'}
-              ${evt.extracted && Object.keys(evt.extracted).length ? `<pre style="background:rgba(0,0,0,0.03); padding:8px; border-radius:6px; margin-top:8px; font-size:0.75rem;">${JSON.stringify(evt.extracted, null, 2)}</pre>` : ''}
+              ${escapeHtml(evt.summary || evt.reason || evt.purpose || 'Operation recorded')}
+              ${evt.extracted && Object.keys(evt.extracted).length ? `<pre style="background:rgba(0,0,0,0.03); padding:8px; border-radius:6px; margin-top:8px; font-size:0.75rem;">${escapeHtml(JSON.stringify(evt.extracted, null, 2))}</pre>` : ''}
             </div>
           </div>
         </div>
@@ -2994,13 +3036,13 @@
 
       tbody.innerHTML = state.callHistory.map(call => `
         <tr>
-          <td style="font-family:'JetBrains Mono',monospace; font-size:0.78rem;">${new Date(call.timestamp).toLocaleTimeString()}</td>
-          <td><strong>${call.personName}</strong></td>
-          <td><span class="badge badge-primary">${call.role}</span></td>
-          <td>${call.duration || 35}s</td>
-          <td><span class="badge badge-purple">${call.sentiment || 'collaborative'}</span></td>
-          <td><span class="badge badge-emerald">${call.status}</span></td>
-          <td style="max-width:300px; line-height:1.4; font-size:0.84rem;">${call.summary || 'Call complete.'}</td>
+          <td style="font-family:'JetBrains Mono',monospace; font-size:0.78rem;">${escapeHtml(new Date(call.timestamp).toLocaleTimeString())}</td>
+          <td><strong>${escapeHtml(call.personName)}</strong></td>
+          <td><span class="badge badge-primary">${escapeHtml(call.role)}</span></td>
+          <td>${escapeHtml(call.duration || 35)}s</td>
+          <td><span class="badge badge-purple">${escapeHtml(call.sentiment || 'collaborative')}</span></td>
+          <td><span class="badge ${call.mode === 'live' ? 'badge-rose' : 'badge-emerald'}">${escapeHtml(call.status)} (${escapeHtml(call.mode || 'sim')})</span></td>
+          <td style="max-width:300px; line-height:1.4; font-size:0.84rem;">${escapeHtml(call.summary || 'Call complete.')}</td>
         </tr>
       `).join('');
     }
@@ -3020,7 +3062,11 @@
     // ========================================================
     function selectMode(mode) {
       if (mode === 'live') {
-        if (confirm('Enable Live Outbound Calling Mode? Real phone calls will be placed via CALL-E CLI.')) {
+        if (state.settings?.isSimulationOnly) {
+          showToast('Live calling mode disabled: No authorized E.164 recipients configured on the bounded acceptance list. App remains simulation-only.', '⚠️');
+          return;
+        }
+        if (confirm('Enable Live Outbound Calling Mode? Real phone calls will be placed via CALL-E CLI to authorized E.164 recipients on bounded acceptance list only.')) {
           state.mode = 'live';
           document.getElementById('checkSim').style.display = 'none';
           document.getElementById('checkLive').style.display = 'block';
@@ -3042,7 +3088,7 @@
         const audioNarration = document.getElementById('prefVoiceNarration').checked;
         const requireCallConfirmation = document.getElementById('prefCallConfirmation').checked;
 
-        await api('/api/settings', {
+        const updated = await api('/api/settings', {
           method: 'POST',
           body: {
             mode: state.mode,
@@ -3051,9 +3097,13 @@
           }
         });
 
-        showToast('Settings saved successfully.', '💾');
+        state.settings = updated;
+        state.mode = updated.mode;
+        updateModeBadge(updated.mode);
+        showToast(`Settings saved successfully (Mode: ${updated.mode.toUpperCase()})`, '💾');
       } catch (err) {
         showToast(err.message, '⚠️');
+        await loadSettings();
       }
     }
 

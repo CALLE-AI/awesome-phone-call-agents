@@ -145,4 +145,24 @@ test('simulation mode returns a local CALL-E plan instead of crashing when the C
   assert.ok(parsed.plan_id);
   assert.ok(parsed.confirm_token);
   assert.equal(parsed.mode, 'simulation');
+  assert.equal(parsed.simulated, true);
+  assert.equal(parsed.isLive, false);
+  assert.ok(parsed.to_phone.includes('******'));
+});
+
+test('simulation mode cannot invoke real CLI and preserves simulation flags on runCall and getCallStatus', async () => {
+  process.env.BRIDGE_MODE = 'simulation';
+
+  const { runCall, getCallStatus } = require('../src/calle');
+  const run = await runCall({ planId: 'plan-123', confirmToken: 'token-abc' });
+  const parsedRun = JSON.parse(run.stdout);
+  assert.equal(parsedRun.mode, 'simulation');
+  assert.equal(parsedRun.simulated, true);
+  assert.equal(parsedRun.isLive, false);
+
+  const status = await getCallStatus({ runId: 'run-xyz' });
+  const parsedStatus = JSON.parse(status.stdout);
+  assert.equal(parsedStatus.mode, 'simulation');
+  assert.equal(parsedStatus.simulated, true);
+  assert.equal(parsedStatus.isLive, false);
 });

@@ -45,9 +45,12 @@ Driver --> Warehouse Manager --> Operations Head --> Customer --> Resolved
 ## Safety & Security
 
 - **Simulation Mode Default**: Runs by default in simulation mode for safe zero-cost evaluation.
-- **Explicit Live Confirmation**: Live CALL-E calls require explicit user confirmation via modal prompt before dialing.
-- **No Credentials Committed**: Uses environment variables from `.env.example` for secrets.
-- **Masked Fictional Numbers**: All sample contact numbers use standard masked numbers (e.g., `+91******0878`).
+- **Bounded Acceptance List Policy**: Outbound live calling requires authorized E.164 phone numbers defined in `AUTHORIZED_E164_RECIPIENTS`. When empty, the reachable app operates strictly simulation-only.
+- **Server-Side Call Confirmation**: Dispatches require server-side confirmation with active `confirmToken` matching before any telephony invocation.
+- **Accepted-Call Cancellation Limits**: Once an outbound call is dispatched and accepted by carrier/callee, in-flight voice transmission cannot be retroactively cancelled; cancellation is strictly limited to hanging up the active call.
+- **No Credentials Committed**: Uses environment variables from `.env.example` for all secrets.
+- **Masked Phone Copies**: All sample contacts and API/result copies mask recipient numbers (e.g., `+91******0878`).
+- **Stored XSS Prevention**: All writable person, workflow, task, and call properties are HTML-escaped before DOM rendering.
 
 ## Quick Start
 
