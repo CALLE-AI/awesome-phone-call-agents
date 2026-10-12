@@ -75,6 +75,15 @@ def test_fixture_005_no_request():
     assert report["review_action"] == "none"
 
 
+def test_phone_number_only_transcript():
+    # A transcript consisting of a bare phone number must not crash the
+    # analyzer and must yield NO_CANCELLATION_REQUEST.
+    turns = [{"role": "callee", "text": "415-555-0169"}]
+    report = analyze_turns(turns)
+    assert report["verdict"] == "NO_CANCELLATION_REQUEST"
+    assert report["request_turn_index"] is None
+
+
 def test_fixture_006_unresolved():
     report = analyze_turns(_fixture(6))
     assert report["verdict"] == "REQUEST_UNRESOLVED"
@@ -349,7 +358,7 @@ def test_craft_allow_save_offer(tmp_path: Path):
 
 
 def test_craft_rejects_non_reserved(tmp_path: Path):
-    proc = _run_cli("craft", "--number", "+14155550200")
+    proc = _run_cli("craft", "--number", "+19999999999")
     assert proc.returncode == 2
 
 
