@@ -67,6 +67,21 @@ def test_scared_variant_threat():
     assert "immediate_safety_threat" in report["crisis_categories"]
 
 
+def test_so_comma_space_all_set():
+    turns = _turns(
+        ("callee", "I want to end my life."),
+        ("agent", "So, we are all set for Friday."),
+    )
+    report = analyze_turns(turns)
+    assert report["verdict"] == "CRISIS_MISHANDLED"
+
+
+def test_fear_for_life_variant():
+    turns = _turns(("callee", "I fear for my life right now."))
+    report = analyze_turns(turns)
+    assert "immediate_safety_threat" in report["crisis_categories"]
+
+
 def test_safety_threat_detected():
     turns = _turns(("callee", "He is going to hurt me, please"))
     report = analyze_turns(turns)

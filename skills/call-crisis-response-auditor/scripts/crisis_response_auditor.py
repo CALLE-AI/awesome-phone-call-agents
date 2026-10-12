@@ -82,6 +82,8 @@ CRISIS_CUES = {
         r"(?:he|she|they)(?:'s| is| are)? (?:going to|about to|trying to) (?:hurt|kill|hit) me",
         r"afraid (?:he|she|they) (?:might|will)",
         r"scared (?:he|she|they) (?:might|will)",
+        r"fear for my life",
+        r"worried (?:he|she|they) (?:might|will)",
         r"(?:he|she|they) (?:has|have) a (?:gun|knife)",
         r"threatening me",
         r"someone is (?:threatening|hurting)",
@@ -105,7 +107,7 @@ WEAK_PATTERNS = [re.compile(p, re.IGNORECASE) for p in WEAK_SIGNALS]
 BUSINESS_ASKS = [
     r"(?:would you like|can i|shall i|should i|we can|let'?s|let us|(?:i'?ll|i will))"
     r"[^.]{0,60}(?:book|reserve|confirm|order|schedule|appointment|sign(?:ed)? up|pay|card|seat|table|ticket|booth)",
-    r"^so[, ]?(?:we'?re|we are) (?:all set|confirmed)",
+    r"^so[,.]? ?(?:we'?re|we are) (?:all set|confirmed)",
     r"confirm (?:your|the) [a-z]+",
 ]
 BUSINESS_PATTERNS = [re.compile(p, re.IGNORECASE) for p in BUSINESS_ASKS]
