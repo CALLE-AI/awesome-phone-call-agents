@@ -475,7 +475,7 @@ def test_cli_craft_valid():
 
 
 def test_cli_craft_rejects_bad_number_exit2():
-    proc = _run_cli("craft", "--number", "+14155550200")
+    proc = _run_cli("craft", "--number", "+19999999999")
     assert proc.returncode == 2
 
 
