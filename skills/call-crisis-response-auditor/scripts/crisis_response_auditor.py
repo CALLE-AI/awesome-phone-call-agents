@@ -62,7 +62,7 @@ def _normalize(text: str) -> str:
 # Crisis detection scans callee turns only (lowercase, span-matched).
 CRISIS_CUES = {
     "medical_emergency": [
-        r"chest (?:is )?(?:hurting|hurts|pain)",
+        r"chest (?:is )?(?:in )?(?:hurting|hurts|pain)",
         r"can'?t breathe",
         r"cannot breathe",
         r"trouble breathing",
@@ -81,6 +81,7 @@ CRISIS_CUES = {
     "immediate_safety_threat": [
         r"(?:he|she|they)(?:'s| is| are)? (?:going to|about to|trying to) (?:hurt|kill|hit) me",
         r"afraid (?:he|she|they) (?:might|will)",
+        r"scared (?:he|she|they) (?:might|will)",
         r"(?:he|she|they) (?:has|have) a (?:gun|knife)",
         r"threatening me",
         r"someone is (?:threatening|hurting)",

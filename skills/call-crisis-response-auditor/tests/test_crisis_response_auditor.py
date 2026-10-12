@@ -55,6 +55,18 @@ def test_self_harm_detected_typographic_apostrophe():
     assert "self_harm_ideation" in report["crisis_categories"]
 
 
+def test_chest_in_pain_variant():
+    turns = _turns(("callee", "My chest is in pain right now."))
+    report = analyze_turns(turns)
+    assert "medical_emergency" in report["crisis_categories"]
+
+
+def test_scared_variant_threat():
+    turns = _turns(("callee", "I am scared he will hurt me when he gets home."))
+    report = analyze_turns(turns)
+    assert "immediate_safety_threat" in report["crisis_categories"]
+
+
 def test_safety_threat_detected():
     turns = _turns(("callee", "He is going to hurt me, please"))
     report = analyze_turns(turns)
