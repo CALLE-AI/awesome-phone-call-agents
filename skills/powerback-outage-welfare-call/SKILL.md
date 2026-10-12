@@ -42,10 +42,14 @@ and routes to a human, rather than becoming a clean-looking statistic.
    agent will be told to say, with the number masked.
 5. **Simulate**: `python run_batch.py --simulate` — full loop against `FakeAdapter`,
    entirely offline, prints the triage board.
-6. **Live**: set `CALLE_API_KEY`, `PB_ALLOW_REAL_CALL=1`, and
-   `PB_ALLOWED_DESTINATIONS` (comma-separated E.164 numbers the operator has
-   authorised), then call `engine.run(..., mode="live", human_confirmed=True)`.
-   Four separate gates, on purpose. An empty or unset `PB_ALLOWED_DESTINATIONS`
+6. **Check the live request without placing one**:
+   `python scripts/check_sdk_contract.py` binds the request this skill would send
+   against the published `calle-ai==1.0.1` `create()` signature. Offline, no key.
+7. **Live**: set `CALLE_API_KEY`, `PB_ALLOW_REAL_CALL=1`, `PB_ALLOWED_DESTINATIONS`
+   (comma-separated E.164 numbers the operator has authorised) and `PB_BATCH_ID`
+   (a durable batch id, so a retry cannot place a second call to the same
+   household), then call `engine.run(..., mode="live", human_confirmed=True)`.
+   Five separate gates, on purpose. An empty or unset `PB_ALLOWED_DESTINATIONS`
    authorises **nothing** — there is no wildcard. Live calling is **not** exposed
    as a CLI flag.
 
@@ -89,13 +93,15 @@ powerback-outage-welfare-call/
 ├── references/
 │   ├── safety.md                   code gates vs prompt constraints
 │   ├── examples.md                 real captured output of every command below
+│   ├── sdk_contract.md             the pinned calle-ai==1.0.1 request contract
 │   ├── call_input.schema.json
 │   └── call_result.schema.json
 ├── scripts/
 │   ├── engine.py                   validation, gates, result shaping
 │   ├── consent.py                  disclosure opening + disclosure budget
 │   ├── triage.py                   ranking + batch loop + board
-│   └── adapters.py                 FakeAdapter (offline) / RealAdapter (gated)
+│   ├── adapters.py                 FakeAdapter (offline) / RealAdapter (gated)
+│   └── check_sdk_contract.py       offline check of the live request contract
 └── assets/
     └── synthetic_roster.json       8 synthetic cases, no real data
 ```
@@ -103,6 +109,12 @@ powerback-outage-welfare-call/
 ## Honest limits
 
 - **Every record shipped here is synthetic.** No real personal data was used.
+- The live path targets **`calle-ai==1.0.1`** and is verified only by an offline
+  contract check. **No live call has been placed from this skill.** The request is
+  asserted against the published `create()` signature; the provider's behaviour is not.
+- SDK 1.0 removed the provider confidence score, so the confidence gate relies on a
+  `confidence_label` the model reports about itself. That is weaker than a measured
+  score and is marked as such in `references/safety.md`.
 - The disclosure opening and the allowlist are **prompt constraints**: the code always
   builds them into the task text, but there is no output-side filter. Closing that
   properly needs a transcript check, which is not built.

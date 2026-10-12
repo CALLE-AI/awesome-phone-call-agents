@@ -175,22 +175,88 @@ def authorise_destination(phone: str) -> str:
     return number
 
 
-class RealAdapter:
-    """CALL-E SDK wrapper. Refuses to dial unless every gate is open."""
+# Pinned SDK contract. Everything below targets this exact published version:
+#   pip install calle-ai==1.0.1   (imported as `calle`)
+# SDK 1.0 replaced recipient/recipients with a single flat `phone`, made
+# idempotency_key and result_schema required, moved to POST /v2/calls, and removed
+# structured_result / confidence / summary from the response. The result schema must
+# follow the calle.result.scalar-object.v1 profile: scalar properties only, at most
+# 32 of them, additionalProperties false, no arrays and no nulls.
+CALLE_SDK_VERSION = "1.0.1"
 
+
+class RealAdapter:
+    """CALL-E SDK wrapper for calle-ai==1.0.1. Refuses to dial unless every gate is open."""
+
+    # Scalar-object profile: the array `needs` and the nullable battery field of the
+    # pre-1.0 schema cannot be expressed here, so each need is its own boolean and an
+    # unknown battery level is conveyed by omitting the property rather than by null.
     RESULT_SCHEMA = {
         "type": "object",
-        "required": ["is_safe", "has_power"],
+        "additionalProperties": False,
+        "required": ["is_safe", "has_power", "confidence_label"],
         "properties": {
             "is_safe": {"type": "string", "enum": ["yes", "no", "unknown"]},
             "has_power": {"type": "string", "enum": ["yes", "no", "unknown"]},
-            "battery_hours_left": {"type": ["number", "null"]},
-            "needs": {"type": "array", "items": {"type": "string", "enum": [
-                "generator", "oxygen_refill", "evacuation", "medical", "none"]}},
+            "battery_hours_left": {"type": "number"},
+            "needs_generator": {"type": "boolean"},
+            "needs_oxygen_refill": {"type": "boolean"},
+            "needs_evacuation": {"type": "boolean"},
+            "needs_medical": {"type": "boolean"},
+            "declined_to_talk": {"type": "boolean"},
+            "reached_intended_resident": {"type": "boolean"},
+            "confidence_label": {"type": "string", "enum": ["high", "medium", "low"]},
         },
     }
 
-    def dial(self, call_input: dict, task_text: str) -> dict:
+    # Maps the flat boolean fields back onto the internal needs list.
+    _NEED_FIELDS = (
+        ("needs_generator", "generator"),
+        ("needs_oxygen_refill", "oxygen_refill"),
+        ("needs_evacuation", "evacuation"),
+        ("needs_medical", "medical"),
+    )
+
+    # The engine gates on a number; SDK 1.0 no longer reports one, so the schema asks
+    # the model for a label instead. This mapping is the only place the two meet, and
+    # the label is self-reported - see references/safety.md.
+    _CONFIDENCE = {"high": 0.9, "medium": 0.7, "low": 0.3}
+
+    def build_request(self, call_input, task_text, idempotency_key):
+        """Assemble the create_and_wait kwargs for calle-ai==1.0.1.
+
+        Separated from dial() so the request contract can be asserted offline,
+        with no SDK installed and no call placed.
+        """
+        request = {
+            "task": task_text,
+            "phone": authorise_destination(call_input["phone"]),
+            "result_schema": self.RESULT_SCHEMA,
+            "idempotency_key": idempotency_key,
+            "metadata": {
+                "skill": "powerback-outage-welfare-call",
+                "case_id": call_input["case_id"],
+            },
+        }
+        if call_input.get("region"):
+            request["region"] = call_input["region"]
+        if call_input.get("locale"):
+            request["locale"] = call_input["locale"]
+        return request
+
+    @staticmethod
+    def idempotency_key(call_input, batch_id):
+        """Durable key: the same case in the same batch must never be called twice.
+
+        Persist batch_id before the first request and reuse it for network retries,
+        as the SDK requires.
+        """
+        key = "powerback:{}:{}:v1".format(batch_id, call_input["case_id"])
+        if not key.strip():
+            raise ValueError("A stable idempotency_key is required.")
+        return key
+
+    def dial(self, call_input, task_text, batch_id=""):
         api_key = os.environ.get("CALLE_API_KEY")
         if not api_key:
             raise PermissionError(
@@ -200,29 +266,74 @@ class RealAdapter:
                 "PB_ALLOW_REAL_CALL != 1 - placing a real call requires the operator to "
                 "enable it explicitly in the environment. This is a third gate, on top of "
                 "live mode and human confirmation.")
-        # The destination is validated and authorised before the SDK is even imported.
-        # Previously the recipient was never passed to CALL-E at all, so a "live" call
-        # could not reach the intended household; and the allowlist described in
-        # references/call_input.schema.json was documented but never enforced.
-        to_number = authorise_destination(call_input["phone"])
+        batch_id = batch_id or os.environ.get("PB_BATCH_ID", "")
+        if not batch_id.strip():
+            raise PermissionError(
+                "PB_BATCH_ID is not set - no durable idempotency key can be built, and a "
+                "network retry could place a second call to the same household "
+                "(fail-closed).")
+
+        # The destination is validated and authorised before the SDK is imported.
+        request = self.build_request(
+            call_input, task_text, self.idempotency_key(call_input, batch_id))
 
         from calle import CalleClient
 
-        client = CalleClient(api_key=api_key)
-        call = client.calls.create_and_wait(
-            to=to_number,
-            task=task_text,
-            result_schema=self.RESULT_SCHEMA,
-        )
-        status = call.get("status")
-        conf = (call.get("completion_confidence") or {}).get("score", 0.0)
-        structured = call.get("structured_result")
-        # Normalise onto the FakeAdapter shape so the engine has one code path.
+        with CalleClient(api_key=api_key) as client:
+            call = client.calls.create_and_wait(**request)
+        return self.normalise(call)
+
+    def normalise(self, call):
+        """Map a 1.0.1 call object onto the shape the engine consumes.
+
+        SDK 1.0 removed structured_result, confidence and summary. What remains is
+        `result` / `error` / `result_status` / `call_outcome` / `transcript`.
+        """
+        if call.get("error") is not None:
+            return {"status": "unknown", "raw_confidence": 0.0,
+                    "transcript_summary": [], "answered_by": None, "declined": False}
+
+        outcome = call.get("call_outcome")
+        transcript = [turn.get("text", "") for turn in (call.get("transcript") or [])
+                      if turn.get("speaker") == "user" and turn.get("text")]
+
+        if outcome in ("no_answer", "no-answer", "busy"):
+            return {"status": "no_answer", "raw_confidence": 1.0,
+                    "transcript_summary": [], "answered_by": None, "declined": False}
+        if outcome == "voicemail":
+            return {"status": "voicemail", "raw_confidence": 1.0,
+                    "transcript_summary": [], "answered_by": "voicemail",
+                    "declined": False}
+        if outcome == "declined":
+            return {"status": "completed", "raw_confidence": 1.0,
+                    "transcript_summary": [], "answered_by": "target", "declined": True}
+
+        result = call.get("result")
+        if call.get("result_status") != "ready" or result is None:
+            # unavailable / not_applicable / anything unrecognised: fail closed. The
+            # engine turns a sub-threshold confidence into insufficient_data.
+            return {"status": "completed", "raw_confidence": 0.0,
+                    "transcript_summary": transcript, "answered_by": "target",
+                    "declined": False}
+
+        if result.get("declined_to_talk"):
+            return {"status": "completed", "raw_confidence": 1.0,
+                    "transcript_summary": [], "answered_by": "target", "declined": True}
+
+        answered_by = ("target" if result.get("reached_intended_resident", True)
+                       else "wrong_person")
+        needs = [name for field, name in self._NEED_FIELDS if result.get(field)]
+        structured = {
+            "is_safe": result.get("is_safe", "unknown"),
+            "has_power": result.get("has_power", "unknown"),
+            "battery_hours_left": result.get("battery_hours_left"),
+            "needs": needs or ["none"],
+        }
         return {
-            "status": "completed" if status == "completed" else status or "unknown",
-            "raw_confidence": conf,
-            "transcript_summary": call.get("evidence") or [],
-            "answered_by": "target" if call.get("task_completed") else None,
+            "status": "completed",
+            "raw_confidence": self._CONFIDENCE.get(result.get("confidence_label"), 0.0),
+            "transcript_summary": transcript,
+            "answered_by": answered_by,
             "declined": False,
             "sdk_structured": structured,
         }

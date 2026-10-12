@@ -26,6 +26,8 @@ Only the second is a guarantee. This file keeps them apart on purpose.
 | The recipient is passed to CALL-E as the call destination | `adapters.py` `RealAdapter.dial()` |
 | Live destinations must be strict ASCII E.164 **and** on `PB_ALLOWED_DESTINATIONS`; empty list authorises nothing, and there is no wildcard | `adapters.py` `authorise_destination()` |
 | Keyword-derived welfare summaries are advisory: `advisory_needs_review`, `needs_human=True`, never dispatched | `engine.py` `run()` |
+| A live call needs a durable `PB_BATCH_ID`; without it no idempotency key can be built and the adapter refuses | `adapters.py` `RealAdapter.dial()` |
+| The live request is pinned to `calle-ai==1.0.1` and asserted against its published signature offline | `scripts/check_sdk_contract.py` |
 | Every result records where its assessment came from (`assessment_basis`) | `engine.py` `_result()` |
 
 ## Prompt constraints — deterministically built, but obeyed rather than enforced
@@ -55,6 +57,37 @@ This is a code gate, not a convention — the branch is in `engine.run()`.
 3. `PB_ALLOW_REAL_CALL=1` in the environment — plus `CALLE_API_KEY`
 4. The destination is on `PB_ALLOWED_DESTINATIONS` — an explicit operator allowlist,
    fail-closed when unset, with no wildcard
+5. `PB_BATCH_ID` is set — a durable idempotency key, so a network retry cannot place
+   a second call to the same household
+
+## SDK contract
+
+The live path targets **`calle-ai==1.0.1`** (`CALLE_SDK_VERSION` in `adapters.py`).
+SDK 1.0 submits a single flat `phone` to `/v2/calls`, requires `idempotency_key` and
+`result_schema`, and removed `structured_result`, the confidence score and the summary
+fields. The result schema follows the `calle.result.scalar-object.v1` profile, so the
+old `needs` array and the nullable battery field are expressed as booleans and an
+optional number instead.
+
+`python scripts/check_sdk_contract.py` binds the request against the published
+signature offline — no key, no network, no SDK import, no call placed.
+
+**What this does and does not establish.** It establishes that a live request would be
+accepted by the SDK rather than raising `TypeError`. It does not establish that a call
+succeeds, that the transcript is accurate, or that the provider behaves as documented.
+**No live call has been placed from this skill.**
+
+### Confidence is now self-reported
+
+The `< 0.6` gate predates SDK 1.0, which removed the provider confidence score. The
+result schema therefore asks the model for a `confidence_label`, and the adapter maps
+high/medium/low onto a number for the existing gate.
+
+That is **the model's own account of how sure it is** — a prompt-level signal, not a
+measurement, and it belongs in the same category as the disclosure wording above.
+`FakeAdapter` keeps a numeric confidence so the threshold branch stays exercised
+offline. Closing this properly needs a provider-side signal that SDK 1.0 does not
+expose.
 
 Live calling is deliberately **not** a CLI flag. Placing a phone call to a stranger in a
 disaster is not something a stray argument should be able to trigger.
