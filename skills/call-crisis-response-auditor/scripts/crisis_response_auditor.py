@@ -185,6 +185,8 @@ def analyze_turns(turns: list, call_id: Any = None) -> dict[str, Any]:
     care_acknowledged = False
 
     for idx, turn in enumerate(turns):
+        if not isinstance(turn, dict):
+            continue
         role = turn.get("role", "").lower()
         text = _normalize(str(turn.get("text", "")))
         hit = _crisis_hit(text) if role in CALLEE_ROLES else []
@@ -296,10 +298,10 @@ def main(argv: list[str] | None = None) -> int:
     args = parser.parse_args(argv)
 
     if args.command == "craft":
-        if not re.fullmatch(r"\+1[0-9]{2}55501[0-9]{2}", args.number):
+        if not re.fullmatch(r"\+1[0-9]{3}55501[0-9]{2}", args.number):
             print(
                 f"ERROR: --number must be a reserved test number matching "
-                f"+1[0-9]{{2}}55501[0-9]{{2}} (e.g. +14155550161), got: {args.number}",
+                f"+1[0-9]{{3}}55501[0-9]{{2}} (e.g. +14155550161), got: {args.number}",
                 file=sys.stderr,
             )
             return 2
