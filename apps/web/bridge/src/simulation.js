@@ -1,5 +1,6 @@
-function simulateCallResult({ personId, task }) {
-  const mapping = {
+const { getPerson } = require('./organization');
+
+const mapping = {
     arjun: {
       status: 'COMPLETED',
       personId: 'arjun',
@@ -106,26 +107,42 @@ function simulateCallResult({ personId, task }) {
     }
   };
 
-  const fallback = {
+function simulateCallResult({ personId, task }) {
+  const isDelivery = task?.type === 'delivery_exception';
+  if (isDelivery && mapping[personId]) {
+    return mapping[personId];
+  }
+
+  const person = getPerson(personId) || (task?.participants || []).find(p => p.id === personId) || { name: personId, role: 'Team Member' };
+  const name = person.name || personId;
+  const role = person.role || 'Coordinator';
+  const goal = task?.goal || task?.title || 'Operational alignment';
+  const need = task?.currentNeed || 'status confirmation';
+
+  return {
     status: 'COMPLETED',
     personId,
-    durationSeconds: 30,
-    sentiment: 'neutral',
-    outcome: 'information_received',
+    personName: name,
+    role: role,
+    phone: person.phone || '+91******0101',
+    durationSeconds: 38,
+    sentiment: 'collaborative_solution_oriented',
+    outcome: 'commitment_secured',
     dialogue: [
-      { speaker: 'CALL-E (BRIDGE AI)', text: `Hello, BRIDGE automated assistant calling to coordinate task "${task.goal || 'General operation'}".` },
-      { speaker: personId, text: 'I received the request and have provided the necessary operational data.' },
-      { speaker: 'CALL-E (BRIDGE AI)', text: 'Thank you. The response has been logged and the workflow will proceed.' }
+      { speaker: 'CALL-E (BRIDGE AI)', text: `Hello ${name}, this is BRIDGE AI coordinating workflow "${task?.title || goal}". We require your input on ${need}.` },
+      { speaker: `${name} (${role})`, text: `Hello! I have reviewed the situation. I confirm the action items on my end are aligned, and we are ready to proceed with the next step.` },
+      { speaker: 'CALL-E (BRIDGE AI)', text: `Thank you ${name}. Your commitment has been recorded and BRIDGE is advancing the workflow.` }
     ],
     extracted: {
-      actionCompleted: true,
+      confirmedBy: name,
+      role: role,
+      status: 'approved_and_verified',
+      actionPlan: `Aligned on ${need}`,
       timestamp: new Date().toISOString()
     },
-    summary: `Simulated participant ${personId} provided required input for "${task.currentNeed || 'general coordination'}".`,
-    transcript: `CALL-E: Assistant calling regarding ${task.goal}.\n${personId}: Input confirmed and logged.\nCALL-E: Thank you.`
+    summary: `${name} (${role}) confirmed commitment for "${need}". Approved proceeding to the next stage.`,
+    transcript: `CALL-E: Hello ${name}, coordinating ${goal}. Need input on ${need}.\n${name}: Reviewed and confirmed. Ready to proceed.\nCALL-E: Recorded commitment.`
   };
-
-  return mapping[personId] || fallback;
 }
 
 module.exports = {

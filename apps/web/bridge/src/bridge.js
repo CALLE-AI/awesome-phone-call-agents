@@ -6,7 +6,10 @@ class Bridge {
   createTask(task) {
     const bridgeTask = {
       id: task.id,
-      type: task.type,
+      type: task.type || 'custom_workflow',
+      title: task.title || task.name || task.goal,
+      category: task.category || 'Operations',
+      priority: task.priority || 'High',
       goal: task.goal,
       constraints: task.constraints || {},
 
@@ -14,7 +17,7 @@ class Bridge {
 
       state: "BLOCKED",
 
-      currentNeed: null,
+      currentNeed: task.currentNeed || null,
       currentPerson: null,
 
       history: [],

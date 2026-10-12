@@ -900,12 +900,17 @@ app.post('/api/tasks/:id/simulate-call', requirePrivateAccessAuth, (req, res) =>
       bridge.setCurrentNeed(task.id, interpretation.nextNeed);
     }
 
-    // Check if task is resolved (e.g. Rahul/Customer accepted or completed)
-    if (personId === 'rahul' || interpretation.state === 'RESOLVED') {
+    // Check if task is resolved
+    const remainingCandidate = chooseNextPerson(task);
+    const isResolved = !remainingCandidate || interpretation.state === 'RESOLVED' || (personId === 'rahul' && task.type === 'delivery_exception');
+    if (isResolved) {
       bridge.setState(task.id, 'RESOLVED');
+      const resSummary = task.type === 'delivery_exception'
+        ? 'Delivery exception resolved. Replacement van dispatched and confirmed with customer.'
+        : `Workflow fully resolved. All stakeholder commitments confirmed for ${task.title || task.goal}.`;
       bridge.addHistory(task.id, {
         type: 'task_resolved',
-        summary: 'Delivery exception resolved. Replacement van dispatched and confirmed with customer.'
+        summary: resSummary
       });
     } else {
       bridge.setState(task.id, interpretation.state);
@@ -1023,12 +1028,16 @@ app.post('/api/tasks/:id/auto-step', requirePrivateAccessAuth, async (req, res) 
       bridge.setCurrentNeed(task.id, interpretation.nextNeed);
     }
 
-    const isLastPerson = nextPerson.id === 'rahul' || interpretation.state === 'RESOLVED';
+    const remainingCandidate = chooseNextPerson(task);
+    const isLastPerson = !remainingCandidate || interpretation.state === 'RESOLVED' || (nextPerson.id === 'rahul' && task.type === 'delivery_exception');
     if (isLastPerson) {
       bridge.setState(task.id, 'RESOLVED');
+      const resSummary = task.type === 'delivery_exception'
+        ? 'Delivery exception resolved. Replacement van dispatched and confirmed with customer.'
+        : `Workflow fully resolved. All stakeholder commitments confirmed for ${task.title || task.goal}.`;
       bridge.addHistory(task.id, {
         type: 'task_resolved',
-        summary: 'Delivery exception resolved. Replacement van dispatched and confirmed with customer.'
+        summary: resSummary
       });
     } else {
       bridge.setState(task.id, interpretation.state);
