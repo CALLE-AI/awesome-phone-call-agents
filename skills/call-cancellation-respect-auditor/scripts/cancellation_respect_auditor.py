@@ -64,7 +64,9 @@ def _normalize(text: str) -> str:
 
 # Cancellation intent scans callee turns only (lowercase, sentence-scoped).
 CANCEL_INTENT = [
-    r"(?:cancel|terminate|end|stop)\s+(?:my|the|this)\s+"
+    # One optional modifier word may sit between the determiner and the noun
+    # ("cancel the media subscription"), so real product phrases are caught.
+    r"(?:cancel|terminate|end|stop)\s+(?:my|the|this|our)\s+(?:[a-z]+\s+)?"
     r"(?:subscription|membership|plan|order|booking|reservation|account|service|policy)",
     r"stop (?:charging|billing) me",
     r"i (?:want|want to|would like|would like to) (?:cancel|end my|terminate)",
@@ -104,6 +106,9 @@ ACK = [
     r"consider it done",
     r"right away",
     r"no problem",
+    # Acknowledgment without action: the request is noted, not honored.
+    r"cancellation (?:is|has been) noted",
+    r"i hear you",
 ]
 ACK_PATTERNS = [re.compile(p, re.IGNORECASE) for p in ACK]
 

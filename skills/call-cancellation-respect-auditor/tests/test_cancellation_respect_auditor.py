@@ -83,6 +83,34 @@ def test_fixture_006_unresolved():
     assert report["honored"] is False
 
 
+def test_modifier_noun_phrase_cancel():
+    # A modifier between the determiner and the noun ("the media
+    # subscription") must still count as a cancel request.
+    report = analyze_turns(
+        _turns(
+            ("callee", "Please cancel the media subscription."),
+            ("agent", "Sure. Your subscription is cancelled."),
+        )
+    )
+    assert report["request_turn_index"] == 0
+    assert report["verdict"] == "CANCELLATION_HONORED"
+    assert report["honored"] is True
+
+
+def test_cancellation_noted_is_acknowledged():
+    report = analyze_turns(
+        _turns(
+            ("callee", "Please cancel the media subscription."),
+            ("agent", "I hear you. Your cancellation is noted and we can finish later."),
+            ("callee", "Okay, thank you. Goodbye."),
+        )
+    )
+    assert report["verdict"] == "REQUEST_UNRESOLVED"
+    assert report["review_action"] == "review: cancellation acknowledged but unresolved"
+    assert report["acknowledged"] is True
+    assert report["honored"] is False
+
+
 def test_reschedule_guard_discards():
     turns = _turns(("callee", "I want to cancel my booking and move it to Friday instead."))
     report = analyze_turns(turns)
