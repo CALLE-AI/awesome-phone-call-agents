@@ -1,0 +1,6 @@
+[
+  {"role": "agent", "text": "Hi, this is Brightline Media."},
+  {"role": "callee", "text": "I want to cancel my subscription."},
+  {"role": "agent", "text": "Sure, I understand. Let me make a note of that. Thank you for your time - goodbye."},
+  {"role": "callee", "text": "Goodbye."}
+]

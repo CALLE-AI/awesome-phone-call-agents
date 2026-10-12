@@ -1,0 +1,7 @@
+[
+  {"role": "agent", "text": "Hi, confirming your booking for Friday?"},
+  {"role": "callee", "text": "Can we cancel Friday and move it to Monday instead?"},
+  {"role": "agent", "text": "Certainly - moved to Monday."},
+  {"role": "callee", "text": "Oh, and my card was cancelled last week, so use the other one."},
+  {"role": "agent", "text": "No problem, updated."}
+]
