@@ -76,7 +76,9 @@ def load_call_result(path: Path) -> dict[str, Any]:
     elif isinstance(raw_turns, list):
         turns = [
             {
-                "speaker": str(item.get("speaker", "unknown")),
+                # Real CALL-E get_call_run payloads key turns with "role";
+                # "speaker" stays as a fallback alias for legacy inputs.
+                "speaker": str(item.get("role", item.get("speaker", "unknown"))),
                 "text": str(item.get("text", item.get("content", ""))),
             }
             for item in raw_turns
@@ -206,7 +208,9 @@ def _records(turns: list[dict[str, str]]) -> list[dict[str, Any]]:
     for turn in turns:
         if not isinstance(turn, dict):
             continue
-        speaker = str(turn.get("speaker", "")).lower().strip()
+        # Same role-primary resolution as the loader so direct analyze_turns
+        # callers with "role"-keyed turns behave identically.
+        speaker = str(turn.get("role", turn.get("speaker", ""))).lower().strip()
         text = _smart_normalize(str(turn.get("text", turn.get("content", ""))))
         records.append({"callee": speaker in CALLEE_ROLES, "text": text, "low": text.lower().strip()})
     return records

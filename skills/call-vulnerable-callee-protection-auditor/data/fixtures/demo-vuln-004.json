@@ -2,9 +2,9 @@
   "call_id": "demo-vuln-004",
   "status": "COMPLETED",
   "transcript": [
-    {"speaker": "agent", "text": "Hi, this is River Services about your plan."},
-    {"speaker": "callee", "text": "Let me get my daughter, she handles these things."},
-    {"speaker": "agent", "text": "Of course, no rush. I can call back at a better time, or she is welcome to join us on the line."},
-    {"speaker": "callee", "text": "Thank you, goodbye."}
+    {"role": "agent", "text": "Hi, this is River Services about your plan."},
+    {"role": "callee", "text": "Let me get my daughter, she handles these things."},
+    {"role": "agent", "text": "Of course, no rush. I can call back at a better time, or she is welcome to join us on the line."},
+    {"role": "callee", "text": "Thank you, goodbye."}
   ]
 }
