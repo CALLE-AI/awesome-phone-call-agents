@@ -272,7 +272,7 @@ def test_craft_valid_number(tmp_path: Path):
 
 
 def test_craft_rejects_non_reserved(tmp_path: Path):
-    proc = _run_cli("craft", "--number", "+14155550200")
+    proc = _run_cli("craft", "--number", "+19999999999")
     assert proc.returncode == 2
 
 
