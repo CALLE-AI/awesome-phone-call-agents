@@ -81,8 +81,11 @@ See `.env.example`. The interesting knobs:
 - **Schedules.** `schedule_at` must be in the future. The mission is stored as `scheduled` and the
   server dials it when due, re-running every gate at that moment. It is never dialed early.
 - **Unknown creation.** If creating the CALL-E call times out or returns 5xx, the call may exist.
-  The mission becomes `submission_unknown` and is never retried automatically; `/retry` returns
-  `409` until you check the CALL-E dashboard.
+  The mission becomes `submission_unknown` and is never retried automatically; direct `/retry`
+  returns `409` while that status remains. Local cancellation changes the status to `canceled`
+  and permits an explicit replacement, but does not prove the earlier call stopped. Before
+  canceling and starting a replacement, check the CALL-E dashboard yourself. This demo does
+  not verify that manual reconciliation or prevent an operator from skipping it.
 - **Masking.** Phone-like numbers are masked in all responses (missions, task strings, events,
   briefs, errors) and in logged worker errors.
 
