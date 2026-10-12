@@ -212,6 +212,21 @@ def test_honored_readback():
         assert report["honored"] is True, probe
 
 
+def test_standalone_nounless_cancel():
+    # Standalone noun-less cancellation requests ("please cancel everything")
+    # carry no product noun and no "I want to" prefix, but are still requests.
+    report = analyze_turns(_turns(("callee", "Please cancel everything.")))
+    assert report["verdict"] != "NO_CANCELLATION_REQUEST"
+    assert report["request_turn_index"] == 0
+    honored = analyze_turns(
+        _turns(
+            ("callee", "Please cancel everything."),
+            ("agent", "Sure, your subscription is cancelled and a confirmation email is sent."),
+        )
+    )
+    assert honored["verdict"] == "CANCELLATION_HONORED"
+
+
 def test_nounless_honor_readback():
     turns = _turns(
         ("callee", "Please cancel my subscription."),

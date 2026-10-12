@@ -70,6 +70,9 @@ CANCEL_INTENT = [
     r"i (?:want|want to|would like|would like to) (?:cancel|end my|terminate)",
     r"take me off (?:the|your) (?:plan|list|subscription|membership)",
     r"cancel (?:it|my account)",
+    # Standalone noun-less requests: "please cancel everything", "cancel all
+    # of it", "cancel all my services" - no product noun, no "I want to" prefix.
+    r"cancel (?:everything|all of it|all my services|my services)",
 ]
 INTENT_PATTERNS = [re.compile(p, re.IGNORECASE) for p in CANCEL_INTENT]
 
