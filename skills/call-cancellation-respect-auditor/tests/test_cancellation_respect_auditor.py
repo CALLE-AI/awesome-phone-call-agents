@@ -256,6 +256,121 @@ def test_content_alias_turns():
     assert report["verdict"] != "NO_CANCELLATION_REQUEST"
 
 
+# ---------------------------------------------------------------- CLI / edges
+
+MODULE = SCRIPTS / "cancellation_respect_auditor.py"
+
+
+def _run_cli(*args: str) -> subprocess.CompletedProcess:
+    return subprocess.run(
+        [sys.executable, str(MODULE), *args],
+        capture_output=True,
+        text=True,
+    )
+
+
+def _write_file(tmp: Path, payload: object) -> Path:
+    p = tmp / "call-result.json"
+    p.write_text(json.dumps(payload), encoding="utf-8")
+    return p
+
+
+def test_craft_valid_number(tmp_path: Path):
+    proc = _run_cli("craft", "--number", "+14155550169")
+    assert proc.returncode == 0
+    goal = json.loads(proc.stdout)["goal_template"]
+    assert goal["to"] == "+14155550169"
+    assert "Do not make save offers" in goal["protocol"]
+    assert "never charge a cancellation fee" in goal["protocol"]
+
+
+def test_craft_allow_save_offer(tmp_path: Path):
+    proc = _run_cli("craft", "--number", "+14155550169", "--allow-save-offer")
+    assert proc.returncode == 0
+    protocol = json.loads(proc.stdout)["goal_template"]["protocol"]
+    assert "At most one brief, polite save offer" in protocol
+    assert "Do not make save offers" not in protocol
+
+
+def test_craft_rejects_non_reserved(tmp_path: Path):
+    proc = _run_cli("craft", "--number", "+14155550200")
+    assert proc.returncode == 2
+
+
+def test_craft_rejects_missing_number(tmp_path: Path):
+    proc = _run_cli("craft")
+    assert proc.returncode == 2
+
+
+def test_craft_language_vi_vn_passthrough(tmp_path: Path):
+    proc = _run_cli("craft", "--number", "+14155550169", "--language", "vi-VN")
+    assert proc.returncode == 0
+    assert json.loads(proc.stdout)["goal_template"]["language"] == "vi-VN"
+
+
+def test_wrapped_shape_result_transcript(tmp_path: Path):
+    payload = {
+        "status": "COMPLETED",
+        "result": {"post_summary": "call completed", "transcript": _fixture(2)},
+    }
+    report = analyze_payload(payload)
+    assert report["verdict"] == "RETENTION_DARK_PATTERN"
+
+
+def test_cli_invalid_json_exit_2(tmp_path: Path):
+    p = tmp_path / "broken.json"
+    p.write_text("{not json", encoding="utf-8")
+    proc = _run_cli("analyze", "--call-result", str(p))
+    assert proc.returncode == 2
+
+
+def test_cli_top_level_string_exit_2(tmp_path: Path):
+    p = _write_file(tmp_path, "just a string")
+    proc = _run_cli("analyze", "--call-result", str(p))
+    assert proc.returncode == 2
+
+
+def test_cli_missing_file_exit_2(tmp_path: Path):
+    proc = _run_cli("analyze", "--call-result", str(tmp_path / "nope.json"))
+    assert proc.returncode == 2
+
+
+def test_null_transcript():
+    report = analyze_payload({"status": "COMPLETED", "result": {"transcript": None}})
+    assert report["verdict"] == "NO_CANCELLATION_REQUEST"
+    assert report["request_turn_index"] is None
+
+
+def test_whitespace_transcript():
+    turns = _turns(("agent", "   "), ("callee", "   "))
+    report = analyze_turns(turns)
+    assert report["verdict"] == "NO_CANCELLATION_REQUEST"
+
+
+def test_mixed_list_skips_non_dicts():
+    turns = [
+        {"role": "agent", "text": "Hi."},
+        "not a dict",
+        None,
+        {"role": "callee", "text": "I want to cancel my membership."},
+        {"role": "agent", "text": "Sure, your membership is cancelled and a confirmation email is sent."},
+    ]
+    report = analyze_turns(turns)
+    assert report["verdict"] == "CANCELLATION_HONORED"
+    assert report["request_turn_index"] == 3
+
+
+def test_customer_role_variant():
+    turns = _turns(
+        ("agent", "Hi there."),
+        ("customer", "I want to cancel my plan."),
+        ("agent", "Sure, your plan is cancelled and a confirmation email is on its way."),
+    )
+    report = analyze_turns(turns)
+    assert report["verdict"] == "CANCELLATION_HONORED"
+    assert report["request_turn_index"] == 1
+
+
 # ---------------------------------------------------------------- runner
 
 
