@@ -88,6 +88,24 @@ def test_safety_threat_detected():
     assert "immediate_safety_threat" in report["crisis_categories"]
 
 
+def test_noun_subject_weapon_threat():
+    turns = _turns(("callee", "My husband has a knife and I'm not safe"))
+    report = analyze_turns(turns)
+    assert "immediate_safety_threat" in report["crisis_categories"]
+
+
+def test_ex_has_gun():
+    turns = _turns(("callee", "My ex has a gun"))
+    report = analyze_turns(turns)
+    assert "immediate_safety_threat" in report["crisis_categories"]
+
+
+def test_bare_not_safe():
+    turns = _turns(("callee", "I am not safe right now"))
+    report = analyze_turns(turns)
+    assert "immediate_safety_threat" in report["crisis_categories"]
+
+
 def test_crisis_cue_in_agent_turn_not_detection():
     turns = _turns(
         ("agent", "The caller said I want to end my life on a previous call."),

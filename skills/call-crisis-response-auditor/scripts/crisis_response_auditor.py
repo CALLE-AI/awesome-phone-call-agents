@@ -84,10 +84,11 @@ CRISIS_CUES = {
         r"scared (?:he|she|they) (?:might|will)",
         r"fear for my life",
         r"worried (?:he|she|they) (?:might|will)",
-        r"(?:he|she|they) (?:has|have) a (?:gun|knife)",
+        r"(?:he|she|they|someone) (?:has|have) a (?:gun|knife)",
+        r"(?:husband|wife|partner|ex|boyfriend|girlfriend|son|daughter|roommate) (?:has|have) a (?:gun|knife)",
         r"threatening me",
         r"someone is (?:threatening|hurting)",
-        r"not safe (?:here|at home)",
+        r"\bnot safe\b",
     ],
 }
 
@@ -161,7 +162,7 @@ def _load_turns(payload: Any) -> list[dict[str, str]]:
         if not isinstance(item, dict):
             continue
         text = item.get("text", item.get("content"))
-        turns.append({"role": str(item.get("role", "")), "text": _normalize(str(text if text is not None else ""))})
+        turns.append({"role": str(item.get("role", "")), "text": str(text if text is not None else "")})
     return turns
 
 
@@ -288,7 +289,7 @@ def main(argv: list[str] | None = None) -> int:
     sub = parser.add_subparsers(dest="command", required=True)
 
     p_craft = sub.add_parser("craft", help="Emit a crisis-safe goal template for plan_call.")
-    p_craft.add_argument("--number", required=True, help="E.164 number to call (reserved +1415555 01xx range only).")
+    p_craft.add_argument("--number", required=True, help="E.164 number to call (reserved NANP 555-01XX range, any area code (e.g. +14155550161)).")
     p_craft.add_argument("--business-name", default="the business")
     p_craft.add_argument("--task", default="confirm the upcoming appointment")
     p_craft.add_argument("--language", default="en-US")
