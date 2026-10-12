@@ -1,6 +1,6 @@
 ---
 name: call-vulnerable-callee-protection-auditor
-description: Offline experimental CALL-E transcript helper that detects struggle markers in the callee's turns (confusion, disorientation, hearing pleas, reliance transfers, repeated questions), tracks the active confusion windows, and grades whether the agent exploited the confusion to extract a commitment, ignored it, or accommodated it, plus a confusion-safe goal template with a verify-understanding protocol. It is not a clinical assessment of capacity or an authorization to act.
+description: Offline experimental CALL-E transcript helper that detects struggle markers in the callee's turns (confusion, disorientation, hearing pleas, reliance transfers, repeated questions), tracks the active confusion windows, and grades whether the agent exploited the confusion to extract a commitment, ignored it, or accommodated it, plus a confusion-safe goal template with a verify-understanding protocol. It is not a cognitive assessment, a consent determination, or an authorization to act.
 license: MIT
 ---
 
@@ -83,8 +83,17 @@ Accommodation kinds: `reexplain` ("let me explain that again"),
   prosody, and two clean turns do not prove understanding.
 - Smart quotes and dashes are normalized, but heavy ASR mis spelling
   ("I dont no what you mean") can fall outside the patterns.
+- The question-prefix rule (a turn starting with "what/which/when/how much"
+  counts as a question even without a question mark) can over-fire on
+  statement-shaped asks; the shared-word rule for `repeated_asks` mitigates
+  this by requiring the same content word twice.
 - Findings route to human review; this is not a capacity assessment and
   does not authorize any action on the call's result.
+
+## Distinctness
+
+`call-cognitive-load-monitor` estimates callee state (advisory); this skill
+audits what the agent did in those moments — the two compose.
 
 ## Usage
 
