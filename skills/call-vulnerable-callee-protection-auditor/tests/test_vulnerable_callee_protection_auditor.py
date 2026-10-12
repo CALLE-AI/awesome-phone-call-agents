@@ -441,6 +441,14 @@ def test_repeated_asks_without_question_marks():
     assert repeated[0]["turn_index"] == 3
 
 
+def test_multi_kind_turn_reports_all_kinds():
+    card = analyze_turns(
+        _turns(("callee", "I can't hear you well. Please speak slower. Which one is the dual?"))
+    )
+    kinds = {m["kind"] for m in card["markers"]}
+    assert kinds == {"comprehension_confusion", "pace_or_hearing_plea"}
+
+
 def test_whats_the_date_again():
     card = analyze_turns(_turns(("callee", "what's the date again?")))
     kinds = {m["kind"] for m in card["markers"]}

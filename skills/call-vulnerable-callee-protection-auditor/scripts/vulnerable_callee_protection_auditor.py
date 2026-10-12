@@ -216,12 +216,14 @@ def _records(turns: list[dict[str, str]]) -> list[dict[str, Any]]:
     return records
 
 
-def _lexical_markers(low: str) -> str | None:
-    for kind, patterns in STRUGGLE_MARKERS.items():
-        for pattern in patterns:
-            if re.search(pattern, low):
-                return kind
-    return None
+def _lexical_markers(low: str) -> list[str]:
+    """Return EVERY marker kind whose patterns match, so a multi-kind turn
+    (e.g. a hearing plea plus a comprehension question) is fully evidenced."""
+    return [
+        kind
+        for kind, patterns in STRUGGLE_MARKERS.items()
+        if any(re.search(pattern, low) for pattern in patterns)
+    ]
 
 
 def _is_resolution(low: str) -> bool:
@@ -294,8 +296,9 @@ def analyze_turns(turns: list[dict[str, str]]) -> dict[str, Any]:
     for index, rec in enumerate(records):
         if not rec["callee"] or rec["low"] in POLITE_BARE:
             continue
-        kind = _lexical_markers(rec["low"])
-        if kind:
+        for kind in _lexical_markers(rec["low"]):
+            # One entry per (kind, turn): each kind appears at most once per
+            # turn even if several of its patterns match.
             markers.append({"kind": kind, "turn_index": index, "span": mask_pii(rec["text"])})
     markers.extend(_repeated_ask_markers(records))
     markers.sort(key=lambda m: m["turn_index"])
