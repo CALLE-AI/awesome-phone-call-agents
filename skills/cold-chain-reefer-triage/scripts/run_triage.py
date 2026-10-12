@@ -26,6 +26,7 @@ if str(SKILL_DIR) not in sys.path:
 from triage import (
     initiate_reefer_triage,
     mask_phone,
+    redact_phone_numbers,
     validate_calle_base_url,
     validate_e164_phone,
 )
@@ -152,9 +153,12 @@ def main() -> int:
         live=args.live,
     )
 
-    # Print structured result as clean JSON with masked logging
+    # Print structured result as clean JSON with masked logging and phone redaction
+    result_dict = result.model_dump()
+    if "evidence" in result_dict and result_dict["evidence"]:
+        result_dict["evidence"] = redact_phone_numbers(result_dict["evidence"])
     print("\n=== TRIAGE RESULT ===")
-    print(json.dumps(result.model_dump(), indent=2))
+    print(json.dumps(result_dict, indent=2))
 
     return 0 if result.status in ("completed", "simulated") else 1
 

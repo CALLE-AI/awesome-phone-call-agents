@@ -23,10 +23,22 @@ from typing import Any, Dict, Literal, Optional, Union
 from pydantic import BaseModel, ConfigDict, Field
 
 logger = logging.getLogger("cold_chain_reefer_triage")
-
-# Strict E.164 regex: '+' followed by 1 to 14 digits (2 to 15 chars total)
-E164_PATTERN = re.compile(r"^\+[1-9]\d{1,14}$")
+# Strict ASCII-only E.164 regex: '+' followed by 1 to 14 ASCII digits (2 to 15 chars total).
+# Explicit [0-9] and re.ASCII ensure non-ASCII / Unicode digits (e.g. \u0661) are strictly rejected.
+E164_PATTERN = re.compile(r"^\+[1-9][0-9]{1,14}$", re.ASCII)
 EMERGENCY_SHORTCODES = {"911", "112", "999", "000", "110", "119"}
+
+# Approved CALL-E origins for API requests to prevent credential exfiltration
+APPROVED_CALLE_ORIGINS = {
+    "api.heycall-e.com",
+    "heycall-e.com",
+    "test-api.heycall-e.com",
+    "localhost",
+    "127.0.0.1",
+}
+
+# Regex pattern for redacting phone numbers (7 to 15 digits, optional leading +)
+PHONE_REDACTION_PATTERN = re.compile(r"\+?[0-9]{7,15}", re.ASCII)
 
 
 # ==============================================================================
@@ -35,7 +47,7 @@ EMERGENCY_SHORTCODES = {"911", "112", "999", "000", "110", "119"}
 
 def mask_phone(phone: Optional[str]) -> str:
     """Mask phone number for safe logging (e.g. +13035550147 -> +1303***0147)."""
-    if not phone:
+    if not phone or not isinstance(phone, str):
         return ""
     clean = phone.strip()
     if len(clean) >= 8:
@@ -45,8 +57,19 @@ def mask_phone(phone: Optional[str]) -> str:
     return "***"
 
 
+def redact_phone_numbers(text_or_obj: Any) -> Any:
+    """Recursively redact phone numbers in strings, dictionaries, or lists."""
+    if isinstance(text_or_obj, str):
+        return PHONE_REDACTION_PATTERN.sub(lambda m: mask_phone(m.group(0)), text_or_obj)
+    elif isinstance(text_or_obj, dict):
+        return {k: redact_phone_numbers(v) for k, v in text_or_obj.items()}
+    elif isinstance(text_or_obj, list):
+        return [redact_phone_numbers(item) for item in text_or_obj]
+    return text_or_obj
+
+
 def validate_e164_phone(phone: Optional[str]) -> bool:
-    """Validate that phone number strictly satisfies E.164 format and is not an emergency shortcode."""
+    """Validate that phone number strictly satisfies ASCII-only E.164 format and is not an emergency shortcode."""
     if not phone or not isinstance(phone, str):
         return False
     clean = phone.strip()
@@ -55,27 +78,51 @@ def validate_e164_phone(phone: Optional[str]) -> bool:
     # Reject emergency numbers embedded in country codes (e.g. +1911)
     digits = clean.lstrip("+")
     for code in EMERGENCY_SHORTCODES:
-        if digits == code or digits.endswith(code) and len(digits) <= 5:
+        if digits == code or (digits.endswith(code) and len(digits) <= 5):
             return False
     return True
 
 
 def validate_calle_base_url(url: Optional[str]) -> str:
-    """Validate that CALL-E API base URL enforces secure HTTPS protocol."""
-    target_url = url or "https://api.heycall-e.com"
+    """
+    Validate that CALL-E API base URL enforces secure HTTPS protocol and approved origin.
+
+    Approved origins: api.heycall-e.com, heycall-e.com, test-api.heycall-e.com, localhost, 127.0.0.1.
+    Rejects arbitrary external HTTPS hosts to prevent credential exfiltration.
+    """
+    if not isinstance(url, str) or not url.strip():
+        target_url = "https://api.heycall-e.com"
+    else:
+        target_url = url.strip()
+
     parsed = urllib.parse.urlparse(target_url)
     if parsed.scheme.lower() != "https":
         raise ValueError(
             f"Insecure CALLE_BASE_URL '{target_url}': Only secure 'https://' URLs are permitted."
         )
-    return target_url
+    hostname = (parsed.hostname or "").lower()
+    if not hostname or (hostname not in APPROVED_CALLE_ORIGINS and not hostname.endswith(".heycall-e.com")):
+        raise ValueError(
+            f"Unauthorized CALLE_BASE_URL host '{hostname}': Host must belong to approved CALL-E origins "
+            f"({sorted(APPROVED_CALLE_ORIGINS)}) to prevent credential exfiltration."
+        )
+    return target_url.rstrip("/")
 
 
 def sanitize_error_message(error_msg: str) -> str:
-    """Sanitize raw error messages to avoid leaking API tokens or sensitive headers."""
+    """Sanitize raw error messages to avoid leaking API tokens, sensitive headers, or raw phone numbers."""
+    if not error_msg:
+        return ""
     # Strip potential Bearer tokens or secret keys
     sanitized = re.sub(r"(Bearer\s+)[A-Za-z0-9_\-\.]{8,}", r"\1[REDACTED]", error_msg)
-    sanitized = re.sub(r"(api[_-]?key\s*[:=]\s*)[A-Za-z0-9_\-\.]{8,}", r"\1[REDACTED]", sanitized, flags=re.IGNORECASE)
+    sanitized = re.sub(
+        r"(api[_-]?key\s*[:=]\s*)[A-Za-z0-9_\-\.]{8,}",
+        r"\1[REDACTED]",
+        sanitized,
+        flags=re.IGNORECASE,
+    )
+    # Redact raw phone numbers (replace matches of \+?[0-9]{7,15} with masked versions like +1303***0147)
+    sanitized = redact_phone_numbers(sanitized)
     return sanitized
 
 
@@ -279,6 +326,8 @@ def initiate_reefer_triage(
 
     # Validate HTTPS base URL
     base_url = getattr(client, "base_url", None)
+    if not isinstance(base_url, str):
+        base_url = None
     try:
         validate_calle_base_url(base_url)
     except ValueError as val_err:
@@ -361,15 +410,17 @@ def initiate_reefer_triage(
             elif isinstance(raw_result, CallETriageStructuredResult):
                 structured_obj = raw_result
 
-        # Extract evidence transcript reference
+        # Extract evidence transcript reference and sanitize phone numbers
         evidence_dict: Dict[str, Any] = {}
         raw_evidence = get_field(call_response, "evidence")
         if isinstance(raw_evidence, dict):
-            evidence_dict = raw_evidence
+            evidence_dict = copy.deepcopy(raw_evidence)
         else:
             transcript = get_field(call_response, "transcript")
             if transcript:
                 evidence_dict = {"transcript": transcript}
+
+        evidence_dict = redact_phone_numbers(evidence_dict)
 
         task_completed = (raw_status == "completed" and structured_obj is not None)
 

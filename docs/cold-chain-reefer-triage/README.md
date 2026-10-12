@@ -12,9 +12,8 @@ The **Cold Chain Reefer Triage Agent** provides an automated, standardized voice
 
 ## Highlights
 
-- **No-Call Default**: Safe dry-run simulation mode is active by default; outbound calls require explicit authorization (`--live` or `live=True`).
-- **E.164 & HTTPS Validation**: Validates phone numbers strictly and enforces encrypted HTTPS endpoints.
-- **Privacy Masking**: Automatically masks driver destination phone numbers across logs (`+1303***0147`).
+- **ASCII E.164 & HTTPS Origin Validation**: Validates phone numbers strictly with ASCII-only regex (`^\+[1-9][0-9]{1,14}$`) and restricts API endpoints to approved CALL-E origins (`api.heycall-e.com`, `heycall-e.com`, `localhost`, `127.0.0.1`).
+- **Comprehensive Privacy Masking**: Automatically masks driver phone numbers across logs, error messages, and transcript/evidence payloads (`+1303***0147`).
 - **Advisory Scope**: Extracts structured mechanical checks, cargo condition, and FMCSA HOS drive time for human dispatch review.
 - **Zero-Redial**: Enforces exactly one call attempt; dropped or busy calls route to human dispatch rather than looping.
 
@@ -45,8 +44,8 @@ python scripts/run_triage.py --phone +13035550147 --live
    [Cold Chain Reefer Triage]
                │
    ├── 1. Pre-Flight Checks:
-   │      - Strict E.164 phone validation (rejects invalid & emergency numbers)
-   │      - Transport HTTPS validation
+   │      - Strict ASCII-only E.164 phone validation (rejects invalid & emergency numbers)
+   │      - Transport HTTPS origin validation (api.heycall-e.com / approved origins)
    │      - Masking of driver destination numbers (+1303***0147)
    │      - Safe No-Call Default: Dry-run simulation unless live=True explicitly passed
    │

@@ -18,9 +18,9 @@ When IoT sensors in a refrigerated trailer report a temperature excursion, this 
 ## Core Operational Principles
 
 1. **No-Call Default**: Dry-run simulation mode is active by default (`live=False`). Placing real outbound phone calls requires explicit authorization (`--live` or `live=True`).
-2. **Strict E.164 Validation**: Every destination phone number must strictly satisfy international E.164 format. Emergency numbers (911, 112, etc.) are rejected before payload creation.
-3. **Transport Security**: Requires secure HTTPS endpoints (`https://`) for CALL-E API communications.
-4. **Privacy & Masking**: Destination phone numbers are automatically masked in console outputs and trace logs (e.g. `+1303***0147`).
+2. **Strict ASCII E.164 Validation**: Every destination phone number must strictly satisfy ASCII E.164 format (`^\+[1-9][0-9]{1,14}$`). Unicode digits and emergency numbers (911, 112, etc.) are rejected before payload creation.
+3. **Transport Security & Origin Whitelist**: Requires secure HTTPS endpoints (`https://`) restricted to approved CALL-E origins (`api.heycall-e.com`, `heycall-e.com`, `localhost`, `127.0.0.1`) to prevent credential exfiltration.
+4. **Comprehensive Privacy & Masking**: Destination phone numbers are automatically masked in console outputs, error messages, and transcript/evidence payloads (e.g. `+1303***0147`).
 5. **Zero-Redial Policy**: Exactly one outbound call attempt is made. Dropped or unanswered calls yield structured failure states for human dispatcher review rather than automated redialing.
 
 ## Requirements
