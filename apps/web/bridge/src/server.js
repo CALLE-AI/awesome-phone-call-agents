@@ -1,4 +1,6 @@
-require('dotenv').config();
+try {
+  require('dotenv').config();
+} catch {}
 
 const express = require('express');
 const cors = require('cors');
@@ -47,10 +49,15 @@ function isAuthorizedRecipient(phone) {
   return authorized.includes(phone.trim());
 }
 
+// Operator Secret for nonpublic authority (mode changes and live dispatch)
+const OPERATOR_SECRET = process.env.OPERATOR_SECRET || process.env.BRIDGE_OPERATOR_SECRET || '';
+
 // Check authorized recipients at boot; enforce simulation-only if bounded acceptance list is empty
 const authorizedRecipientsAtBoot = parseAuthorizedRecipients();
 const rawConfiguredMode = (process.env.BRIDGE_MODE || 'simulation').toLowerCase();
-const effectiveInitialMode = (rawConfiguredMode === 'live' && authorizedRecipientsAtBoot.length === 0) ? 'simulation' : rawConfiguredMode;
+const effectiveInitialMode = (rawConfiguredMode === 'live' && (authorizedRecipientsAtBoot.length === 0 || !OPERATOR_SECRET))
+  ? 'simulation'
+  : rawConfiguredMode;
 process.env.BRIDGE_MODE = effectiveInitialMode;
 
 // In-memory application settings
@@ -80,7 +87,10 @@ const demoSessions = new Map();
 
 function getBearerToken(req) {
   const auth = req.headers.authorization || '';
-  return auth.startsWith('Bearer ') ? auth.slice(7) : null;
+  if (auth.startsWith('Bearer ')) return auth.slice(7).trim();
+  const customHeader = req.headers['x-operator-secret'];
+  if (customHeader) return String(customHeader).trim();
+  return null;
 }
 
 function issueSession(user) {
@@ -89,86 +99,156 @@ function issueSession(user) {
   return token;
 }
 
-// Pre-seed default demo session token for valid evaluation
-const defaultDemoUser = demoUsers[0];
-const defaultDemoToken = 'bridge-demo-session-token';
-demoSessions.set(defaultDemoToken, { user: defaultDemoUser, createdAt: new Date().toISOString() });
-
 // Canonical phone masking helper to prevent private data exposure
 function maskPhone(phone) {
   if (!phone) return '+91******';
   const str = String(phone).trim();
   if (str.includes('*')) return str;
   if (str.startsWith('+')) {
-    const cc = str.slice(0, 3);
-    const last4 = str.slice(-4);
+    const clean = str.replace(/[^\d+]/g, '');
+    const cc = clean.slice(0, 3);
+    const last4 = clean.slice(-4);
     return `${cc}******${last4}`;
   }
-  const last4 = str.slice(-4);
+  const clean = str.replace(/\D/g, '');
+  const last4 = clean.slice(-4);
   return `******${last4}`;
+}
+
+// Regex-based phone masking inside arbitrary text (transcripts, dialogue turns, error copies, stderr)
+function maskPhoneInText(text) {
+  if (typeof text !== 'string') return text;
+  if (!text) return text;
+  const intlRegex = /(\+\d{1,4}[-.\s]?(?:\(?\d{1,4}\)?[-.\s]?)?\d{2,5}[-.\s]?\d{2,5}(?:[-.\s]?\d{1,4})?)/g;
+  const localRegex = /(?<!\w)(\d{3,4}[-.\s]\d{3,4}[-.\s]\d{3,4}|\b[6-9]\d{9}\b)(?!\w)/g;
+
+  return text
+    .replace(intlRegex, (match) => {
+      if (match.includes('*')) return match;
+      const digits = match.replace(/\D/g, '');
+      if (digits.length >= 7 && digits.length <= 15) {
+        return maskPhone(match);
+      }
+      return match;
+    })
+    .replace(localRegex, (match) => {
+      if (match.includes('*')) return match;
+      const digits = match.replace(/\D/g, '');
+      if (digits.length >= 10 && digits.length <= 12) {
+        return maskPhone(match);
+      }
+      return match;
+    });
+}
+
+// Deep recursive phone masking across nested provider results, transcripts, and failure copies
+function deepMask(value) {
+  if (value === null || value === undefined) return value;
+  if (typeof value === 'string') {
+    return maskPhoneInText(value);
+  }
+  if (Array.isArray(value)) {
+    return value.map(item => deepMask(item));
+  }
+  if (typeof value === 'object') {
+    const copy = {};
+    for (const [key, val] of Object.entries(value)) {
+      const lower = key.toLowerCase();
+      const isPhoneField =
+        lower === 'phone' ||
+        lower.endsWith('phone') ||
+        lower.includes('phone') ||
+        lower.includes('phonenumber') ||
+        lower === 'to_phone' ||
+        lower === 'from_phone' ||
+        lower === 'caller_id' ||
+        lower === 'caller' ||
+        lower === 'callee' ||
+        lower === 'destination';
+
+      if (isPhoneField && typeof val === 'string') {
+        copy[key] = maskPhone(val);
+      } else {
+        copy[key] = deepMask(val);
+      }
+    }
+    return copy;
+  }
+  return value;
 }
 
 function sanitizePerson(person) {
   if (!person) return person;
-  return {
-    ...person,
-    phone: maskPhone(person.phone)
-  };
+  return deepMask(person);
 }
 
 function sanitizeTask(task) {
   if (!task) return task;
-  const copy = { ...task };
-  if (Array.isArray(copy.participants)) {
-    copy.participants = copy.participants.map(sanitizePerson);
-  }
-  if (Array.isArray(copy.history)) {
-    copy.history = copy.history.map((h) => ({
-      ...h,
-      phone: h.phone ? maskPhone(h.phone) : undefined
-    }));
-  }
-  return copy;
+  return deepMask(task);
 }
 
 function sanitizeCall(call) {
   if (!call) return call;
-  return {
-    ...call,
-    phone: maskPhone(call.phone)
-  };
+  return deepMask(call);
 }
 
 function sanitizePlan(plan) {
-  if (!plan || typeof plan !== 'object') return plan;
-  const copy = { ...plan };
-  if (copy.to_phone) copy.to_phone = maskPhone(copy.to_phone);
-  if (copy.phone) copy.phone = maskPhone(copy.phone);
-  return copy;
+  if (!plan) return plan;
+  return deepMask(plan);
 }
 
 function sanitizeResult(resObj) {
-  if (!resObj || typeof resObj !== 'object') return resObj;
-  const copy = { ...resObj };
-  if (copy.to_phone) copy.to_phone = maskPhone(copy.to_phone);
-  if (copy.phone) copy.phone = maskPhone(copy.phone);
-  return copy;
+  if (!resObj) return resObj;
+  return deepMask(resObj);
 }
 
-function requireAdminAuth(req, res, next) {
+// Automatically mask all entries stored in task history
+const origAddHistory = bridge.addHistory.bind(bridge);
+bridge.addHistory = (taskId, entry) => {
+  return origAddHistory(taskId, deepMask(entry));
+};
+
+function logCallHistory(call) {
+  callHistory.unshift(deepMask(call));
+}
+
+// Authority checks
+function isOperatorAuthorized(req) {
   const token = getBearerToken(req);
-  const session = token ? demoSessions.get(token) : null;
-  if (!session) {
+  if (!token) return false;
+  // Nonpublic operator secret is the sole authority for mode changes to live and live dispatch
+  if (OPERATOR_SECRET && token === OPERATOR_SECRET) {
+    return true;
+  }
+  return false;
+}
+
+function getAuthenticatedUser(req) {
+  const token = getBearerToken(req);
+  if (!token) return null;
+  if (OPERATOR_SECRET && token === OPERATOR_SECRET) {
+    return { email: 'operator@bridge.internal', name: 'System Operator', role: 'Operator' };
+  }
+  const session = demoSessions.get(token);
+  return session ? session.user : null;
+}
+
+// Middleware protecting private task/call/workflow records
+function requirePrivateAccessAuth(req, res, next) {
+  const user = getAuthenticatedUser(req);
+  if (!user) {
     return res.status(401).json({
       error: {
         code: 'UNAUTHORIZED',
-        message: 'Authentication required to modify private records or system settings.'
+        message: 'Authentication required to access private task, call, or system records.'
       }
     });
   }
-  req.user = session.user;
+  req.user = user;
   next();
 }
+
+const requireAdminAuth = requirePrivateAccessAuth;
 
 // Accepted-call cancellation limits: Telephony providers commit network routing upon dispatch;
 // once accepted, calls cannot be recalled or reversed in flight and can only be ended via active termination/hangup.
@@ -203,8 +283,10 @@ function writeWorkflows(workflows) {
 
 function handleApiError(res, error, status = 500) {
   const code = error.code || 'INTERNAL_ERROR';
-  const message = error.message || 'Something went wrong';
-  console.error(error);
+  const rawMsg = error.message || 'Something went wrong';
+  const message = maskPhoneInText(rawMsg);
+  const logMsg = maskPhoneInText(String(error.stack || error.message || error));
+  console.error(`[BRIDGE API ERROR] ${code}: ${logMsg}`);
   return res.status(status).json({
     error: {
       code,
@@ -258,21 +340,17 @@ app.post('/api/auth/login', (req, res) => {
 
 app.get('/api/auth/session', (req, res) => {
   try {
-    const token = getBearerToken(req);
-    const session = token ? demoSessions.get(token) : null;
-
-    if (!session) {
-      // Default to guest demo session for smooth hackathon evaluation if no token
-      return res.json({
-        user: {
-          email: 'demo@bridge.com',
-          name: 'Ava Lewis',
-          role: 'Operations Admin'
+    const user = getAuthenticatedUser(req);
+    if (!user) {
+      return res.status(401).json({
+        error: {
+          code: 'UNAUTHORIZED',
+          message: 'No active session.'
         }
       });
     }
 
-    res.json({ user: session.user });
+    res.json({ user });
   } catch (error) {
     handleApiError(res, error, 401);
   }
@@ -298,10 +376,11 @@ app.get('/api/health', (req, res) => {
 app.get('/api/settings', (req, res) => {
   appSettings.calleCliDetected = isCalleCliInstalled();
   const authorizedRecipients = parseAuthorizedRecipients();
+  const isSimulationOnly = !OPERATOR_SECRET || authorizedRecipients.length === 0;
   res.json({
     ...appSettings,
     authorizedRecipientsCount: authorizedRecipients.length,
-    isSimulationOnly: authorizedRecipients.length === 0,
+    isSimulationOnly,
     cancellationPolicy: ACCEPTED_CALL_CANCELLATION_LIMITS
   });
 });
@@ -311,6 +390,15 @@ app.post('/api/settings', requireAdminAuth, (req, res) => {
     const { mode, calleServerUrl, audioNarration, autoAdvance, requireCallConfirmation } = req.body;
     if (mode && (mode === 'simulation' || mode === 'live')) {
       if (mode === 'live') {
+        if (!OPERATOR_SECRET || !isOperatorAuthorized(req)) {
+          return res.status(403).json({
+            error: {
+              code: 'OPERATOR_SECRET_REQUIRED',
+              message: 'A nonpublic operator secret is required as authority for live mode changes.'
+            }
+          });
+        }
+
         const authorizedRecipients = parseAuthorizedRecipients();
         if (authorizedRecipients.length === 0) {
           return res.status(403).json({
@@ -332,10 +420,11 @@ app.post('/api/settings', requireAdminAuth, (req, res) => {
     if (requireCallConfirmation !== undefined) appSettings.requireCallConfirmation = Boolean(requireCallConfirmation);
 
     const authorized = parseAuthorizedRecipients();
+    const isSimulationOnly = !OPERATOR_SECRET || authorized.length === 0;
     res.json({
       ...appSettings,
       authorizedRecipientsCount: authorized.length,
-      isSimulationOnly: authorized.length === 0,
+      isSimulationOnly,
       cancellationPolicy: ACCEPTED_CALL_CANCELLATION_LIMITS
     });
   } catch (error) {
@@ -344,13 +433,13 @@ app.post('/api/settings', requireAdminAuth, (req, res) => {
 });
 
 // Organization & People (Private Records Protected)
-app.get('/api/organization', (req, res) => {
+app.get('/api/organization', requirePrivateAccessAuth, (req, res) => {
   try {
     const org = loadOrganization();
-    res.json({
+    res.json(deepMask({
       ...org,
       people: (org.people || []).map(sanitizePerson)
-    });
+    }));
   } catch (error) {
     handleApiError(res, error, 500);
   }
@@ -392,8 +481,8 @@ app.delete('/api/people/:id', requireAdminAuth, (req, res) => {
   }
 });
 
-// Tasks & Orchestration
-app.get('/api/tasks', (req, res) => {
+// Tasks & Orchestration (Protected Private Records)
+app.get('/api/tasks', requirePrivateAccessAuth, (req, res) => {
   res.json(Array.from(bridge.tasks.values()).map(sanitizeTask));
 });
 
@@ -429,7 +518,7 @@ app.post('/api/tasks/reset', requireAdminAuth, (req, res) => {
   }
 });
 
-app.get('/api/tasks/:id', (req, res) => {
+app.get('/api/tasks/:id', requirePrivateAccessAuth, (req, res) => {
   const task = bridge.getTask(req.params.id);
   if (!task) return handleApiError(res, new Error('Task not found'), 404);
   res.json(sanitizeTask(task));
@@ -462,7 +551,7 @@ app.post('/api/tasks/:id/reset', requireAdminAuth, (req, res) => {
   }
 });
 
-app.post('/api/tasks/:id/next-person', (req, res) => {
+app.post('/api/tasks/:id/next-person', requirePrivateAccessAuth, (req, res) => {
   try {
     const task = bridge.getTask(req.params.id);
     if (!task) return handleApiError(res, new Error('Task not found'), 404);
@@ -493,13 +582,13 @@ app.post('/api/tasks/:id/next-person', (req, res) => {
       reason: rationale
     });
 
-    res.json({ nextPerson: sanitizePerson(person), reason: rationale });
+    res.json(deepMask({ nextPerson: sanitizePerson(person), reason: rationale }));
   } catch (error) {
     handleApiError(res, error, 400);
   }
 });
 
-app.post('/api/tasks/:id/plan-call', async (req, res) => {
+app.post('/api/tasks/:id/plan-call', requirePrivateAccessAuth, async (req, res) => {
   try {
     const task = bridge.getTask(req.params.id);
     if (!task) return handleApiError(res, new Error('Task not found'), 404);
@@ -510,15 +599,13 @@ app.post('/api/tasks/:id/plan-call', async (req, res) => {
 
     const isLive = appSettings.mode === 'live';
 
-    // Protect live dispatch: Require authorized E.164 recipient on bounded acceptance list and auth
+    // Protect live dispatch: Require nonpublic operator secret as sole authority and authorized E.164 recipient
     if (isLive) {
-      const token = getBearerToken(req);
-      const session = token ? demoSessions.get(token) : null;
-      if (!session) {
-        return res.status(401).json({
+      if (!OPERATOR_SECRET || !isOperatorAuthorized(req)) {
+        return res.status(403).json({
           error: {
-            code: 'UNAUTHORIZED',
-            message: 'Authentication required for live call planning.'
+            code: 'OPERATOR_SECRET_REQUIRED',
+            message: 'Nonpublic operator secret required for live call planning.'
           }
         });
       }
@@ -556,7 +643,7 @@ app.post('/api/tasks/:id/plan-call', async (req, res) => {
       cancellationPolicy: ACCEPTED_CALL_CANCELLATION_LIMITS
     });
 
-    res.json({
+    res.json(deepMask({
       person: sanitizePerson(person),
       purpose: callPurpose,
       plan: sanitizePlan(plan),
@@ -565,13 +652,13 @@ app.post('/api/tasks/:id/plan-call', async (req, res) => {
       mode: isLive ? 'live' : 'simulation',
       requiresConfirmation: true,
       cancellationPolicy: ACCEPTED_CALL_CANCELLATION_LIMITS
-    });
+    }));
   } catch (error) {
     handleApiError(res, error, 400);
   }
 });
 
-app.post('/api/tasks/:id/run-call', async (req, res) => {
+app.post('/api/tasks/:id/run-call', requirePrivateAccessAuth, async (req, res) => {
   try {
     const task = bridge.getTask(req.params.id);
     if (!task) return handleApiError(res, new Error('Task not found'), 404);
@@ -585,13 +672,11 @@ app.post('/api/tasks/:id/run-call', async (req, res) => {
     const isLive = appSettings.mode === 'live';
 
     if (isLive) {
-      const token = getBearerToken(req);
-      const session = token ? demoSessions.get(token) : null;
-      if (!session) {
-        return res.status(401).json({
+      if (!OPERATOR_SECRET || !isOperatorAuthorized(req)) {
+        return res.status(403).json({
           error: {
-            code: 'UNAUTHORIZED',
-            message: 'Authentication required for live call dispatch.'
+            code: 'OPERATOR_SECRET_REQUIRED',
+            message: 'Nonpublic operator secret required for live call dispatch.'
           }
         });
       }
@@ -694,7 +779,7 @@ app.post('/api/tasks/:id/run-call', async (req, res) => {
   }
 });
 
-app.get('/api/tasks/:id/call-status', async (req, res) => {
+app.get('/api/tasks/:id/call-status', requirePrivateAccessAuth, async (req, res) => {
   try {
     const task = bridge.getTask(req.params.id);
     if (!task) return handleApiError(res, new Error('Task not found'), 404);
@@ -742,19 +827,19 @@ app.get('/api/tasks/:id/call-status', async (req, res) => {
     });
 
     bridge.setState(task.id, interpretation.state);
-    res.json({
+    res.json(deepMask({
       interpretation,
       result: sanitizeResult(result),
       simulated: !isLiveExecution,
       mode: isLiveExecution ? 'live' : 'simulation',
       cancellationPolicy: ACCEPTED_CALL_CANCELLATION_LIMITS
-    });
+    }));
   } catch (error) {
     handleApiError(res, error, 400);
   }
 });
 
-app.post('/api/tasks/:id/simulate-call', (req, res) => {
+app.post('/api/tasks/:id/simulate-call', requirePrivateAccessAuth, (req, res) => {
   try {
     const task = bridge.getTask(req.params.id);
     if (!task) return handleApiError(res, new Error('Task not found'), 404);
@@ -787,8 +872,8 @@ app.post('/api/tasks/:id/simulate-call', (req, res) => {
 
     bridge.addHistory(task.id, historyEntry);
 
-    // Record in global call history with masked phone and simulation mode
-    callHistory.unshift({
+    // Record in global call history with deep masking
+    logCallHistory({
       id: `call-${Date.now()}-${Math.random().toString(36).substring(2, 6)}`,
       taskId: task.id,
       taskTitle: task.title || task.goal,
@@ -826,36 +911,36 @@ app.post('/api/tasks/:id/simulate-call', (req, res) => {
       bridge.setState(task.id, interpretation.state);
     }
 
-    res.json({ result: sanitizeResult(result), interpretation, task: sanitizeTask(task) });
+    res.json(deepMask({ result: sanitizeResult(result), interpretation, task: sanitizeTask(task) }));
   } catch (error) {
     handleApiError(res, error, 400);
   }
 });
 
 // Autonomous Step Execution for seamless 1-click end-to-end demo
-app.post('/api/tasks/:id/auto-step', async (req, res) => {
+app.post('/api/tasks/:id/auto-step', requirePrivateAccessAuth, async (req, res) => {
   try {
     const task = bridge.getTask(req.params.id);
     if (!task) return handleApiError(res, new Error('Task not found'), 404);
 
     if (task.state === 'RESOLVED') {
-      return res.json({
+      return res.json(deepMask({
         task: sanitizeTask(task),
         nextPerson: null,
         isResolved: true,
         message: 'Task is already resolved.'
-      });
+      }));
     }
 
     const nextPerson = chooseNextPerson(task);
     if (!nextPerson) {
       bridge.setState(task.id, 'RESOLVED');
-      return res.json({
+      return res.json(deepMask({
         task: sanitizeTask(task),
         nextPerson: null,
         isResolved: true,
         message: 'All participants contacted. Workflow complete.'
-      });
+      }));
     }
 
     task.currentPerson = nextPerson.id;
@@ -911,7 +996,7 @@ app.post('/api/tasks/:id/auto-step', async (req, res) => {
       timestamp: new Date().toISOString()
     });
 
-    callHistory.unshift({
+    logCallHistory({
       id: `call-${Date.now()}-${Math.random().toString(36).substring(2, 6)}`,
       taskId: task.id,
       taskTitle: task.title || task.goal,
@@ -949,7 +1034,7 @@ app.post('/api/tasks/:id/auto-step', async (req, res) => {
       bridge.setState(task.id, interpretation.state);
     }
 
-    res.json({
+    res.json(deepMask({
       success: true,
       task: sanitizeTask(task),
       nextPerson: sanitizePerson(nextPerson),
@@ -960,26 +1045,26 @@ app.post('/api/tasks/:id/auto-step', async (req, res) => {
       simulated: true,
       mode: 'simulation',
       isResolved: task.state === 'RESOLVED'
-    });
+    }));
   } catch (error) {
     handleApiError(res, error, 500);
   }
 });
 
-// Call History endpoints
-app.get('/api/calls', (req, res) => {
+// Call History endpoints (Protected Private Records)
+app.get('/api/calls', requirePrivateAccessAuth, (req, res) => {
   res.json(callHistory.map(sanitizeCall));
 });
 
-app.delete('/api/calls', (req, res) => {
+app.delete('/api/calls', requirePrivateAccessAuth, (req, res) => {
   callHistory.length = 0;
   res.json({ ok: true, count: 0 });
 });
 
-// Workflow builder endpoints
-app.get('/api/workflows', (req, res) => {
+// Workflow builder endpoints (Protected)
+app.get('/api/workflows', requirePrivateAccessAuth, (req, res) => {
   try {
-    res.json(readWorkflows());
+    res.json(deepMask(readWorkflows()));
   } catch (error) {
     handleApiError(res, error, 500);
   }
@@ -997,7 +1082,7 @@ app.post('/api/workflows', requireAdminAuth, (req, res) => {
     };
     workflows.push(workflow);
     writeWorkflows(workflows);
-    res.status(201).json(workflow);
+    res.status(201).json(deepMask(workflow));
   } catch (error) {
     handleApiError(res, error, 400);
   }
@@ -1010,7 +1095,7 @@ app.put('/api/workflows/:id', requireAdminAuth, (req, res) => {
     if (index === -1) return handleApiError(res, new Error('Workflow not found'), 404);
     workflows[index] = { ...workflows[index], ...req.body };
     writeWorkflows(workflows);
-    res.json(workflows[index]);
+    res.json(deepMask(workflows[index]));
   } catch (error) {
     handleApiError(res, error, 400);
   }
@@ -1032,7 +1117,27 @@ app.use((req, res) => {
 });
 
 const PORT = process.env.PORT || 3000;
-app.listen(PORT, () => {
-  console.log(`BRIDGE AI coordination layer running at http://localhost:${PORT}`);
-  console.log(`Mode: ${appSettings.mode.toUpperCase()}`);
-});
+let serverInstance = null;
+if (require.main === module) {
+  serverInstance = app.listen(PORT, () => {
+    console.log(`BRIDGE AI coordination layer running at http://localhost:${PORT}`);
+    console.log(`Mode: ${appSettings.mode.toUpperCase()}`);
+  });
+}
+
+module.exports = {
+  app,
+  server: serverInstance,
+  bridge,
+  appSettings,
+  deepMask,
+  maskPhone,
+  maskPhoneInText,
+  isOperatorAuthorized,
+  getAuthenticatedUser,
+  issueSession,
+  demoSessions,
+  demoUsers,
+  logCallHistory,
+  callHistory
+};

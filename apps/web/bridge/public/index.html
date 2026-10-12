@@ -2039,6 +2039,19 @@
             </div>
           </div>
 
+          <!-- Operator Authority Card -->
+          <div class="card">
+            <h3 style="font-size:1.15rem; font-weight:800; margin-bottom:6px;">Operator Authority & Secret</h3>
+            <p style="color:var(--text-muted); font-size:0.86rem; margin-bottom:14px;">
+              Live calling mode and live dispatch require an authorized nonpublic operator secret. Without it, the application runs safely in simulation mode.
+            </p>
+            <div class="form-group" style="margin-bottom:12px;">
+              <label>Operator Secret (Authorized Telephony Operators)</label>
+              <input type="password" id="inputOperatorSecret" class="form-control" placeholder="Enter operator secret..." />
+            </div>
+            <button class="btn btn-secondary btn-sm" onclick="saveOperatorSecret()">Apply Operator Secret</button>
+          </div>
+
           <!-- Danger Zone -->
           <div class="card" style="border-color:rgba(244,63,94,0.3); background:rgba(244,63,94,0.03);">
             <h3 style="font-size:1rem; font-weight:800; color:#e11d48; margin-bottom:6px;">Reset Demo Data</h3>
@@ -2191,7 +2204,8 @@
     const state = {
       currentPage: 'landing',
       mode: 'simulation',
-      token: 'bridge-demo-session-token',
+      token: sessionStorage.getItem('bridge_auth_token') || '',
+      operatorSecret: sessionStorage.getItem('bridge_operator_secret') || '',
       settings: {},
       organization: { people: [] },
       tasks: [],
@@ -2204,7 +2218,7 @@
       pendingLiveCallAction: null
     };
 
-    // API Wrapper with Authentication Token
+    // API Wrapper with Authentication Token & Operator Secret
     async function api(endpoint, options = {}) {
       const headers = {
         'Content-Type': 'application/json',
@@ -2212,6 +2226,9 @@
       };
       if (state.token) {
         headers['Authorization'] = `Bearer ${state.token}`;
+      }
+      if (state.operatorSecret) {
+        headers['x-operator-secret'] = state.operatorSecret;
       }
       const response = await fetch(endpoint, {
         ...options,
@@ -2625,16 +2642,32 @@
             </div>
 
             <div style="display:flex; justify-content:space-between; align-items:center; border-top:1px solid var(--border-subtle); padding-top:12px;">
-              <button class="btn btn-secondary btn-sm" onclick="callPersonDirectly('${escapeHtml(p.id)}')">
+              <button class="btn btn-secondary btn-sm btn-call-person" data-person-id="${escapeHtml(p.id)}">
                 📞 CALL-E Call
               </button>
-              <button class="btn btn-danger btn-sm" onclick="deletePerson('${escapeHtml(p.id)}')">
+              <button class="btn btn-danger btn-sm btn-delete-person" data-person-id="${escapeHtml(p.id)}">
                 Remove
               </button>
             </div>
           </div>
         `;
       }).join('');
+
+      if (!container.dataset.bound) {
+        container.dataset.bound = 'true';
+        container.addEventListener('click', (e) => {
+          const callBtn = e.target.closest('.btn-call-person');
+          if (callBtn && callBtn.dataset.personId) {
+            callPersonDirectly(callBtn.dataset.personId);
+            return;
+          }
+          const delBtn = e.target.closest('.btn-delete-person');
+          if (delBtn && delBtn.dataset.personId) {
+            deletePerson(delBtn.dataset.personId);
+            return;
+          }
+        });
+      }
     }
 
     function openAddPersonModal() { openModal('modalAddPerson'); }
@@ -2869,7 +2902,7 @@
       if (!container) return;
 
       container.innerHTML = state.workflows.map((wf, idx) => `
-        <div class="wf-item-card ${idx === 0 ? 'active' : ''}" onclick="selectWorkflow('${escapeHtml(wf.id)}')">
+        <div class="wf-item-card ${idx === 0 ? 'active' : ''}" data-workflow-id="${escapeHtml(wf.id)}">
           <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:4px;">
             <strong style="font-size:0.92rem;">${escapeHtml(wf.name)}</strong>
             <span class="badge badge-emerald">${wf.nodes ? wf.nodes.length : 4} nodes</span>
@@ -2878,17 +2911,28 @@
         </div>
       `).join('');
 
+      if (!container.dataset.bound) {
+        container.dataset.bound = 'true';
+        container.addEventListener('click', (e) => {
+          const card = e.target.closest('.wf-item-card');
+          if (card && card.dataset.workflowId) {
+            selectWorkflow(card.dataset.workflowId, card);
+          }
+        });
+      }
+
       if (state.workflows.length > 0) {
         renderPipelineNodes(state.workflows[0]);
       }
     }
 
-    function selectWorkflow(id) {
+    function selectWorkflow(id, targetEl) {
       const wf = state.workflows.find(w => w.id === id);
       if (!wf) return;
 
       document.querySelectorAll('.wf-item-card').forEach(c => c.classList.remove('active'));
-      event.currentTarget.classList.add('active');
+      const activeEl = targetEl || document.querySelector(`.wf-item-card[data-workflow-id="${CSS.escape(id)}"]`);
+      if (activeEl) activeEl.classList.add('active');
 
       document.getElementById('wfActiveTitle').textContent = wf.name;
       document.getElementById('wfActiveDesc').textContent = wf.description || '';
@@ -2934,7 +2978,7 @@
       listEl.innerHTML = state.tasks.map(task => {
         const isCurrent = task.id === state.currentTaskId;
         return `
-          <div class="card" style="padding:14px; cursor:pointer; border-color:${isCurrent ? 'var(--primary)' : 'var(--border)'};" onclick="selectTaskDetail('${escapeHtml(task.id)}')">
+          <div class="card task-select-card" style="padding:14px; cursor:pointer; border-color:${isCurrent ? 'var(--primary)' : 'var(--border)'};" data-task-id="${escapeHtml(task.id)}">
             <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:6px;">
               <span class="badge ${task.state === 'RESOLVED' ? 'badge-emerald' : 'badge-amber'}">${escapeHtml(task.state)}</span>
               <span style="font-size:0.75rem; color:var(--text-muted);">${escapeHtml(task.id)}</span>
@@ -2944,6 +2988,16 @@
           </div>
         `;
       }).join('');
+
+      if (!listEl.dataset.bound) {
+        listEl.dataset.bound = 'true';
+        listEl.addEventListener('click', (e) => {
+          const card = e.target.closest('.task-select-card');
+          if (card && card.dataset.taskId) {
+            selectTaskDetail(card.dataset.taskId);
+          }
+        });
+      }
 
       renderTaskDeepTimeline();
     }
@@ -3060,10 +3114,27 @@
     // ========================================================
     // SETTINGS & MODES
     // ========================================================
+    function saveOperatorSecret() {
+      const input = document.getElementById('inputOperatorSecret');
+      const val = input ? input.value.trim() : '';
+      state.operatorSecret = val;
+      if (val) {
+        sessionStorage.setItem('bridge_operator_secret', val);
+        showToast('Operator secret applied for current session.', '🔑');
+      } else {
+        sessionStorage.removeItem('bridge_operator_secret');
+        showToast('Operator secret cleared.', 'ℹ️');
+      }
+    }
+
     function selectMode(mode) {
       if (mode === 'live') {
         if (state.settings?.isSimulationOnly) {
-          showToast('Live calling mode disabled: No authorized E.164 recipients configured on the bounded acceptance list. App remains simulation-only.', '⚠️');
+          showToast('Live calling mode disabled: Bounded acceptance list is empty or operator secret authority is required. App remains simulation-only.', '⚠️');
+          return;
+        }
+        if (!state.operatorSecret) {
+          showToast('Operator secret required: Please provide an authorized operator secret in Settings before activating live calling mode.', '⚠️');
           return;
         }
         if (confirm('Enable Live Outbound Calling Mode? Real phone calls will be placed via CALL-E CLI to authorized E.164 recipients on bounded acceptance list only.')) {
@@ -3144,7 +3215,34 @@
     // ========================================================
     // INITIAL BOOTSTRAP
     // ========================================================
+    async function ensureAuth() {
+      if (state.token || state.operatorSecret) {
+        try {
+          const session = await api('/api/auth/session');
+          if (session?.user) return;
+        } catch {
+          state.token = '';
+          sessionStorage.removeItem('bridge_auth_token');
+        }
+      }
+      try {
+        const res = await fetch('/api/auth/login', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ email: 'demo@bridge.com', password: 'Bridge123!' })
+        });
+        if (res.ok) {
+          const data = await res.json();
+          state.token = data.token;
+          sessionStorage.setItem('bridge_auth_token', data.token);
+        }
+      } catch (err) {
+        console.warn('Auto auth session acquisition error:', err);
+      }
+    }
+
     async function bootstrap() {
+      await ensureAuth();
       await loadSettings();
       await loadOrganization();
       await loadWorkflows();
