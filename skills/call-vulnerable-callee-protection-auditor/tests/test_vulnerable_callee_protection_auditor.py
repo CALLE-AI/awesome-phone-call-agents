@@ -57,7 +57,7 @@ def _run_cli(*args: str) -> subprocess.CompletedProcess:
 def test_mask_pii_keeps_last_two():
     masked = mask_pii("call +14155550175 now")
     assert "55550" not in masked
-    assert "+#########75" in masked
+    assert "+*********75" in masked
 
 
 def test_load_wrapped_shape_nested_call_id():
@@ -389,6 +389,13 @@ def test_slow_down_marker():
     card = analyze_turns(_turns(("callee", "slow down a little")))
     kinds = {m["kind"] for m in card["markers"]}
     assert "pace_or_hearing_plea" in kinds
+
+
+def test_can_you_speak_slower_marker():
+    for text in ("can you speak slower?", "can you talk slower?"):
+        card = analyze_turns(_turns(("callee", text)))
+        kinds = {m["kind"] for m in card["markers"]}
+        assert "pace_or_hearing_plea" in kinds, text
 
 
 def test_agent_slow_down_is_accommodation_not_marker():

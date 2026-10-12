@@ -49,7 +49,7 @@ def _mask_match(m: re.Match[str]) -> str:
     digit_count = sum(1 for ch in run if ch in "0123456789")
     if digit_count < 7:
         return run
-    return "#" * (len(run) - 2) + run[-2:]
+    return "*" * (len(run) - 2) + run[-2:]
 
 
 def mask_pii(text: str) -> str:
@@ -110,6 +110,8 @@ STRUGGLE_MARKERS: dict[str, list[str]] = {
     ],
     "pace_or_hearing_plea": [
         r"(?:speak|talk|say it|say that) (?:more )?slow(?:ly|er)",
+        # Polite interrogative form ("can you speak/talk slower?").
+        r"can you (?:speak|talk) slower",
         # Real-world phrasing splits the verb from "slower" ("speak a little
         # slower"); the contract test requires it, so the gap is allowed.
         r"\bspeak (?:a little |a bit )?slower\b",
