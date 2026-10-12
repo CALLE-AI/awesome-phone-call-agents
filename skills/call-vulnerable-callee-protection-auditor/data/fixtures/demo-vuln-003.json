@@ -1,0 +1,11 @@
+{
+  "call_id": "demo-vuln-003",
+  "status": "COMPLETED",
+  "transcript": [
+    {"speaker": "agent", "text": "Hi, this is River Services."},
+    {"speaker": "callee", "text": "I'm confused. What does that mean?"},
+    {"speaker": "agent", "text": "The venue is downtown and parking is free on weekends."},
+    {"speaker": "callee", "text": "Which one do you mean?"},
+    {"speaker": "agent", "text": "The doors open at eight."}
+  ]
+}

@@ -1,0 +1,12 @@
+{
+  "call_id": "demo-vuln-002",
+  "status": "COMPLETED",
+  "transcript": [
+    {"speaker": "agent", "text": "Hi, this is River Services about your renewal."},
+    {"speaker": "callee", "text": "I don't understand what you're offering."},
+    {"speaker": "agent", "text": "Let me explain that again in simpler terms - you keep your current plan, nothing changes. Does that make sense?"},
+    {"speaker": "callee", "text": "Oh, I see."},
+    {"speaker": "agent", "text": "Great - and just to make sure: you'd like to keep the current plan?"},
+    {"speaker": "callee", "text": "Yes, keep it."}
+  ]
+}

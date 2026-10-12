@@ -1,0 +1,10 @@
+{
+  "call_id": "demo-vuln-005",
+  "status": "COMPLETED",
+  "transcript": [
+    {"speaker": "agent", "text": "Hi, confirming Friday at 7?"},
+    {"speaker": "callee", "text": "Sorry?"},
+    {"speaker": "agent", "text": "Friday, seven o'clock, table for two."},
+    {"speaker": "callee", "text": "Got it. Friday works."}
+  ]
+}
