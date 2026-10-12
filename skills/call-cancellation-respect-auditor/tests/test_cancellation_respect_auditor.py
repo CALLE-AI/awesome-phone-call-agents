@@ -212,6 +212,19 @@ def test_honored_readback():
         assert report["honored"] is True, probe
 
 
+def test_nounless_honor_readback():
+    turns = _turns(
+        ("callee", "Please cancel my subscription."),
+        ("agent", "Sure, consider it cancelled. You'll get a confirmation email."),
+    )
+    report = analyze_turns(turns)
+    assert report["verdict"] == "CANCELLATION_HONORED"
+    # Noun-less readbacks without a confirmation number/email must still count.
+    for probe in ["It's cancelled.", "It is cancelled.", "It has been cancelled.", "Consider it cancelled."]:
+        probe_turns = _turns(("callee", "Please cancel my subscription."), ("agent", f"Sure, {probe}"))
+        assert analyze_turns(probe_turns)["honored"] is True, probe
+
+
 def test_window_extension():
     turns = _turns(
         ("agent", "Hi there."),
@@ -315,6 +328,15 @@ def test_wrapped_shape_result_transcript(tmp_path: Path):
     }
     report = analyze_payload(payload)
     assert report["verdict"] == "RETENTION_DARK_PATTERN"
+
+
+def test_call_id_nested_in_result():
+    payload = {
+        "status": "COMPLETED",
+        "result": {"call_id": "+14155550169", "transcript": _fixture(1)},
+    }
+    report = analyze_payload(payload)
+    assert report["call_id"] == "+*********69"
 
 
 def test_cli_invalid_json_exit_2(tmp_path: Path):

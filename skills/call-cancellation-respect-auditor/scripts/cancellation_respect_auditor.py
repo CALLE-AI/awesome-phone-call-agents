@@ -111,6 +111,10 @@ HONORED = [
     r"you'?re all (?:set|done)",
     r"confirmation (?:number|email)",
     r"(?:done|cancelled|canceled) for you",
+    # Noun-less readbacks: real agents often confirm without repeating the
+    # product noun ("it's cancelled", "consider it cancelled").
+    r"(?:it'?s|it is|it has been) cancel(?:l)?ed",
+    r"consider it cancel(?:l)?ed",
 ]
 HONORED_PATTERNS = [re.compile(p, re.IGNORECASE) for p in HONORED]
 
@@ -351,7 +355,12 @@ def analyze_turns(turns: list, call_id: Any = None) -> dict[str, Any]:
 def analyze_payload(payload: Any) -> dict[str, Any]:
     """Analyze a loaded call-result payload (dict with transcript or bare list)."""
     turns = _load_turns(payload)
-    call_id = payload.get("call_id") if isinstance(payload, dict) else None
+    call_id = None
+    if isinstance(payload, dict):
+        result = payload.get("result")
+        call_id = payload.get("call_id") or (
+            result.get("call_id") if isinstance(result, dict) else None
+        )
     return analyze_turns(turns, call_id=call_id)
 
 
