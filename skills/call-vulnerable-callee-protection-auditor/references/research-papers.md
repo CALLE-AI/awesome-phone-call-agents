@@ -1,4 +1,4 @@
-# Research Papers — call-vulnerable-callee-protection-auditor
+# Research Papers - call-vulnerable-callee-protection-auditor
 
 This skill is grounded in the following official and peer-reviewed sources.
 Every citation below has been checked to exist; no unverified references are
@@ -13,7 +13,7 @@ its design, they do not validate its output.
 - **Source**: Wayne State University; cross-sectional study, N=150, NIH-funded.
   https://doi.org/10.1002/bsa3.70001
 - **Relevance**: Establishes that confusion/memory markers co-occur with
-  financial exploitation vulnerability — the empirical basis for this skill's
+  financial exploitation vulnerability - the empirical basis for this skill's
   marker-to-exploitation window design: a struggle marker opens an observation
   window, and agent conduct *inside* that window is what gets audited.
 - **Venue correction note**: This paper appears in the *Behavior &
@@ -65,4 +65,4 @@ its design, they do not validate its output.
 - This skill explicitly does NOT duplicate
   [call-cognitive-load-monitor](../../call-cognitive-load-monitor/), which
   estimates callee state (advisory); this skill audits what the AGENT did in
-  those moments — the two compose.
+  those moments - the two compose.

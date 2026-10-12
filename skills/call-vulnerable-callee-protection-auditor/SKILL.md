@@ -93,7 +93,7 @@ Accommodation kinds: `reexplain` ("let me explain that again"),
 ## Distinctness
 
 `call-cognitive-load-monitor` estimates callee state (advisory); this skill
-audits what the agent did in those moments — the two compose.
+audits what the agent did in those moments - the two compose.
 
 ## Usage
 
