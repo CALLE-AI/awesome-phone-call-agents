@@ -101,6 +101,8 @@ STRUGGLE_MARKERS: dict[str, list[str]] = {
     "disorientation": [
         r"who (?:is this|are you) again",
         r"what day is it",
+        r"what'?s the (?:date|day) again",
+        r"what (?:date|day) (?:is it|did you say) again\??",
         r"am i speaking to",
         r"i thought (?:i was|this was)",
         r"wrong (?:person|number)",
@@ -113,6 +115,8 @@ STRUGGLE_MARKERS: dict[str, list[str]] = {
         r"\bspeak (?:a little |a bit )?slower\b",
         r"\blouder\b",
         r"speak up",
+        r"going too fast",
+        r"\bslow down\b",
         r"i can'?t hear (?:you|that|well)",
     ],
     "reliance_transfer": [
@@ -126,7 +130,11 @@ STRUGGLE_MARKERS: dict[str, list[str]] = {
 # NOT struggle markers: they belong to the repair/politeness auditors.
 POLITE_BARE = {"sorry?", "what?", "pardon?"}
 
+# Real ASR transcripts rarely emit question marks, so a callee turn that
+# STARTS with an interrogative token also counts as a question; shared
+# content-word rule still applies for repeated_asks.
 QUESTION_RE = re.compile(r"^(?:what|which|when|how much|how many)\b.*\?\s*$")
+QUESTION_PREFIX_RE = re.compile(r"^(?:what|which|when|how much|how many)\b")
 SHARED_ASK_WORDS = ("day", "time", "price", "amount", "name", "number", "card", "total", "date", "fee")
 
 RESOLUTION_RES = [
@@ -223,7 +231,7 @@ def _repeated_ask_markers(records: list[dict[str, Any]]) -> list[dict[str, Any]]
         if not rec["callee"] or rec["low"] in POLITE_BARE:
             continue
         for sentence in _sentences(rec["low"]):
-            if not QUESTION_RE.match(sentence):
+            if not (QUESTION_RE.match(sentence) or QUESTION_PREFIX_RE.match(sentence)):
                 continue
             words = {w for w in SHARED_ASK_WORDS if re.search(rf"\b{w}\b", sentence)}
             if words & seen:

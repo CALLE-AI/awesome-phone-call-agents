@@ -376,6 +376,51 @@ def test_cli_phone_only_callee_turn():
     assert card["verdict"] == "NO_STRUGGLE_MARKERS"
 
 
+# ---------------------------------------------------------------- red-green fixes
+
+
+def test_going_too_fast_marker():
+    card = analyze_turns(_turns(("callee", "you're going too fast for me")))
+    kinds = {m["kind"] for m in card["markers"]}
+    assert "pace_or_hearing_plea" in kinds
+
+
+def test_slow_down_marker():
+    card = analyze_turns(_turns(("callee", "slow down a little")))
+    kinds = {m["kind"] for m in card["markers"]}
+    assert "pace_or_hearing_plea" in kinds
+
+
+def test_agent_slow_down_is_accommodation_not_marker():
+    card = analyze_turns(
+        _turns(("callee", "I don't understand"), ("agent", "I'll slow down"))
+    )
+    assert all(m["kind"] != "pace_or_hearing_plea" for m in card["markers"])
+    assert card["verdict"] == "VULNERABILITY_RESPECTED"
+
+
+def test_repeated_asks_without_question_marks():
+    card = analyze_turns(
+        _turns(
+            ("agent", "The pickup time is 3pm"),
+            ("callee", "What time did you say"),
+            ("agent", "3pm"),
+            ("callee", "what time is it"),
+        )
+    )
+    repeated = [m for m in card["markers"] if m["kind"] == "repeated_asks"]
+    assert repeated, card["markers"]
+    assert repeated[0]["turn_index"] == 3
+
+
+def test_whats_the_date_again():
+    card = analyze_turns(_turns(("callee", "what's the date again?")))
+    kinds = {m["kind"] for m in card["markers"]}
+    assert "disorientation" in kinds
+    card2 = analyze_turns(_turns(("callee", "what date did you say again")))
+    assert {m["kind"] for m in card2["markers"]} >= {"disorientation"}
+
+
 # ---------------------------------------------------------------- CLI: craft (batch B)
 
 
