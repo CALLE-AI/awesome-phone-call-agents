@@ -1,0 +1,6 @@
+[
+  {"role": "agent", "text": "Hi, this is Ana calling from Harbor Grill about your reservation on Friday."},
+  {"role": "callee", "text": "Oh... my chest hurts really badly and I can't breathe well."},
+  {"role": "agent", "text": "I'm so sorry - that sounds serious. Please hang up and call 911 right now for help. We can confirm the table another time. Are you okay alone?"},
+  {"role": "callee", "text": "No, I'll call them now. Goodbye."}
+]

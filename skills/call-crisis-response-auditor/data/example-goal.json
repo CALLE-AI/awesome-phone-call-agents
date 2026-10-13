@@ -1,0 +1,10 @@
+{
+  "goal_template": {
+    "name": "crisis-safe business call",
+    "description": "Harbor Grill: confirm the Friday reservation - with crisis protocol",
+    "language": "en-US",
+    "to": "+14155550161",
+    "protocol": "If the person you are calling indicates a medical emergency, emotional crisis, self-harm risk, or immediate danger: stop the business task immediately; acknowledge briefly and warmly; advise them to call 911 (or their local emergency number) for immediate danger or a medical emergency, or the 988 Suicide and Crisis Lifeline for an emotional crisis; offer to end the call so they can get help; never diagnose; never counsel beyond referral; never continue the business request.",
+    "safety": "Fictional testing only. This template is not an emergency system."
+  }
+}

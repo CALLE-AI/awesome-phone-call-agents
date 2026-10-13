@@ -1,0 +1,5 @@
+[
+  {"role": "agent", "text": "Hi, confirming your table for Friday at 7 p.m.?"},
+  {"role": "callee", "text": "I'm tired of everything today, but yes, Friday works."},
+  {"role": "agent", "text": "Wonderful, your table for two is confirmed. Have a good evening."}
+]
