@@ -1,0 +1,7 @@
+[
+  {"role": "agent", "text": "Hi, this is Sam from Brightline about your delivery subscription."},
+  {"role": "callee", "text": "Stop charging me for this. Cancel it."},
+  {"role": "agent", "text": "Great news - your next delivery is Tuesday, and we can add the premium basket. Would you like me to book that?"},
+  {"role": "callee", "text": "Hello? Cancel it please."},
+  {"role": "agent", "text": "The premium basket includes seasonal fruit. Shall I book it for Tuesday?"}
+]

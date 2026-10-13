@@ -1,0 +1,7 @@
+[
+  {"role": "agent", "text": "Hi, this is Sam from Brightline Media."},
+  {"role": "callee", "text": "I would like to cancel my plan, please."},
+  {"role": "agent", "text": "Of course. Before I finalize - we can offer 20% off for three months. Would that help?"},
+  {"role": "callee", "text": "No, thank you, just cancel."},
+  {"role": "agent", "text": "Understood. Your plan is cancelled and a confirmation email is on its way."}
+]

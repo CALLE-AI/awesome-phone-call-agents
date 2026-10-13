@@ -1,0 +1,10 @@
+{
+  "goal_template": {
+    "name": "cancellation-respecting call",
+    "description": "Brightline Media: handle a subscription cancellation request - with cancellation-respect policy",
+    "language": "en-US",
+    "to": "+14155550169",
+    "protocol": "Acknowledge any cancellation request immediately and honor it directly during the same call. Do not make save offers; honor cancellation requests directly. Confirm the cancellation with a clear readback. Never obstruct a cancellation, never redirect it to another channel, never charge a cancellation fee, and never continue the original task after a cancellation request.",
+    "safety": "Fictional testing only."
+  }
+}
