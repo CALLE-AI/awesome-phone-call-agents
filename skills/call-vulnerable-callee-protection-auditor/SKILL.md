@@ -65,16 +65,17 @@ Accommodation kinds: `reexplain` ("let me explain that again"),
    Perception." BCS HCI 2025 (HCI4AI). DOI 10.14236/ewic/BCSHCI2025.66 -
    user perception of and compliance with voice agents is shaped by agent
    social behavior, the lever this skill audits.
-2. FTC Telemarketing Sales Rule, 16 CFR 310.3 - abusive telemarketing
-   practices include obtaining payment when the person cannot understand
-   the offer -
-   https://www.ecfr.gov/current/title-16/chapter-I/subchapter-C/part-310
+2. FTC Telemarketing Sales Rule, 16 CFR 310.3(a)(1) - requires specified
+   material disclosures before a customer consents to pay in covered
+   telemarketing transactions. This is background for human review, not
+   a legal test of understanding, capacity, or consent implemented here -
+   https://www.ecfr.gov/current/title-16/chapter-I/subchapter-C/part-310/section-310.3
 
 ## Limitations
 
-- Lexical and English-only: paraphrases outside the lexicon ("I'm lost",
-  "you're going too fast", "what's the date again" without a question
-  mark) are invisible to it and yield false negatives, not errors.
+- Lexical and English-only: paraphrases outside the implemented patterns
+  can yield false negatives, not errors; supported phrases are not a
+  complete model of comprehension.
 - A marker requires an exact-enough phrase; politeness can mask real
   confusion ("that's fine dear" fires nothing).
 - Exploitation is scored on agent turn text only, not on what the callee

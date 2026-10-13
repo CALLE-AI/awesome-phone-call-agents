@@ -13,9 +13,9 @@
 
 - This is a lexical marker and timing audit, not a clinical or legal
   assessment of a person's capacity to consent.
-- The lexicons are English-only and phrase-bound: "I'm lost", "you're
-  going too fast for me", or an unmarked "what's the date again" do not
-  fire, so a clean card does not prove the callee followed the call.
+- The lexicons are English-only and phrase-bound; paraphrases outside the
+  implemented patterns can be missed, so a clean card does not prove the
+  callee followed the call.
 - EXPLOITED_UNDER_CONFUSION infers risk from the agent's pressure pattern
   inside a confusion window; it does not verify that a payment or booking
   actually completed.
