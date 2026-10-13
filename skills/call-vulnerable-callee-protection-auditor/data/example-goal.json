@@ -1,0 +1,10 @@
+{
+  "goal_template": {
+    "name": "confusion-safe call",
+    "description": "River Services: renew the water plan - with verify-understanding protocol",
+    "language": "en-US",
+    "to": "+14155550175",
+    "protocol": "Watch for signs the person is struggling to follow: repeated questions, confusion, disorientation, requests to slow down, or offers to bring a family member. If you notice any: slow down; re-explain in simple words; check understanding before proceeding; re-confirm every commitment explicitly; offer to call back or to continue when a family member or caregiver is present; never close a booking or take payment while the person seems confused.",
+    "safety": "Fictional testing only."
+  }
+}

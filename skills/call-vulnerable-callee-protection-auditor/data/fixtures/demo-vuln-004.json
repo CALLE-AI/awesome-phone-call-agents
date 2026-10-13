@@ -1,0 +1,10 @@
+{
+  "call_id": "demo-vuln-004",
+  "status": "COMPLETED",
+  "transcript": [
+    {"role": "agent", "text": "Hi, this is River Services about your plan."},
+    {"role": "callee", "text": "Let me get my daughter, she handles these things."},
+    {"role": "agent", "text": "Of course, no rush. I can call back at a better time, or she is welcome to join us on the line."},
+    {"role": "callee", "text": "Thank you, goodbye."}
+  ]
+}

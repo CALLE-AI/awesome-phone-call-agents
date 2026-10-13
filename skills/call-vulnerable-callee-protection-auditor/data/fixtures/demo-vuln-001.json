@@ -1,0 +1,12 @@
+{
+  "call_id": "demo-vuln-001",
+  "status": "COMPLETED",
+  "transcript": [
+    {"role": "agent", "text": "Hi, this is River Services about your water plan renewal."},
+    {"role": "callee", "text": "Which one do you mean? I don't understand."},
+    {"role": "agent", "text": "The premium plan covers more, and the date is the 15th."},
+    {"role": "callee", "text": "What date is it? What date did you say?"},
+    {"role": "agent", "text": "Just say yes and we're all set - I'll book the premium plan and charge your card."},
+    {"role": "callee", "text": "Yes... okay."}
+  ]
+}
