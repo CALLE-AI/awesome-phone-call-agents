@@ -1,11 +1,11 @@
 # n8n CALL-E API Workflow Template
 
-This plugin contains an importable n8n workflow template that uses the CALL-E API directly. It does not require the CALL-E npm SDK, custom n8n nodes, Notion, a webhook receiver, or an Execute Command node.
+This plugin contains an importable n8n workflow template that uses Calls API v2 directly. It does not require the CALL-E npm SDK, custom n8n nodes, Notion, a webhook receiver, or an Execute Command node. Updating the separate CALL-E community node package does not update this template.
 
-The sample runs two call tasks one by one, waits for each call to reach a terminal state, and returns a compact result view with:
+The sample runs two call tasks one by one, waits for each business result to become available or unavailable, and returns a compact result view with:
 
 - metadata sent to CALL-E and metadata returned by CALL-E, with phone-bearing values masked
-- answered, no answer, busy, and failed status signals
+- telephone outcome, result readiness, and technical failure signals
 - summary, transcript turns, and structured result
 - redacted raw CALL-E call result for debugging
 - sanitized API error details when a request fails
@@ -25,9 +25,9 @@ The workflow keeps configuration, validation, dialing, parsing, and output handl
 3. `Validate CALL-E Config` fails fast if the polling settings are unsafe. The create node reads `CALL_E_API_KEY` only from n8n's deployment secret or environment-variable store.
 4. `Phone/Task List` defines two fictional IVR quality rows, validates E.164 numbers, and blocks the shipped placeholders.
 5. `Loop Over Calls` runs with batch size `1`, so calls are created and waited on one at a time.
-6. `Build CALL-E Request Payload` creates the request body, result schema, recipient schema, metadata, and idempotency key.
-7. `Create CALL-E Call and Wait` calls `POST /v1/calls`, polls `GET /v1/calls/{id}`, and waits for a terminal status for up to four minutes.
-8. `Parse CALL-E Result` extracts status, transcript, summary, structured result, metadata, and failure signals.
+6. `Build CALL-E Request Payload` sends one `phone`, a required closed scalar `result_schema`, metadata, and a stable idempotency key. It sends `region` and `locale` only when configured.
+7. `Create CALL-E Call and Wait` calls `POST /v2/calls`, then polls `GET /v2/calls/{id}` while `result_status=pending`, for up to four minutes. Telephone completion alone does not end polling.
+8. `Parse CALL-E Result` reads `call_outcome`, `result_status`, `result`, `error`, top-level `transcript`, and metadata.
 9. `Demo Result View` masks phone numbers across the complete displayed result, including metadata, raw call data, status messages, and API errors.
 10. `Execution Summary` reports counts and compact per-call results after the loop finishes.
 
@@ -36,7 +36,7 @@ The workflow keeps configuration, validation, dialing, parsing, and output handl
 1. Create or copy an API key from [CALL-E API Keys](https://dashboard.heycall-e.com/account/api-keys).
 2. In your n8n deployment's secret or environment-variable store, set `CALL_E_API_KEY` to that API key. Do not place it in workflow data or a Code node.
 3. Open n8n and import `examples/calle-ivr-quality-create-and-wait.workflow.json`.
-4. Use the [CALL-E API Reference](https://test-docs.heycall-e.com/api-reference) for endpoint, request, and response details.
+4. Use the [CALL-E API Reference](https://docs.heycall-e.com/api-reference) for endpoint, request, and response details.
 5. The workflow fixes its trusted API host to `https://api.heycall-e.com`; it will not send the Bearer credential to a user-configurable URL.
 6. In `Phone/Task List`, replace the blocked placeholders with owned or explicitly authorized E.164 test numbers.
 7. Review the IVR task, locale, and metadata for both rows before allowing a live call.
@@ -71,7 +71,7 @@ Configure the following workflow settings in `CALL-E Config`:
 | `pollIntervalSeconds` | Yes | Seconds between call status polls. Defaults to `5` and must be between `1` and `30`. |
 | `waitTimeoutMinutes` | Yes | Maximum Code-node polling time for each call. Defaults to `4` and cannot exceed `4`, leaving a one-minute buffer below n8n's default 300-second task-runner limit. |
 
-Set the required `CALL_E_API_KEY` through n8n's deployment secret or environment-variable store. `Create CALL-E Call and Wait` reads it at execution time and never copies it into item data. The API base URL is intentionally fixed to the trusted HTTPS host `https://api.heycall-e.com`.
+Set the required `CALL_E_API_KEY` through n8n's deployment secret or environment-variable store. `Create CALL-E Call and Wait` reads it at execution time and never copies it into item data. Use a self-hosted deployment where the administrator permits trusted Code nodes to read this environment variable; an environment-access block prevents dialing. The API base URL is fixed to the trusted HTTPS host `https://api.heycall-e.com`, and requests do not follow redirects.
 
 The workflow performs polling inside one Code-node task. n8n's [`N8N_RUNNERS_TASK_TIMEOUT`](https://docs.n8n.io/hosting/configuration/environment-variables/task-runners/) defaults to 300 seconds, so `Validate CALL-E Config` rejects waits above four minutes rather than advertising an unsupported 30-minute wait. Poll intervals are limited to 30 seconds, the final sleep is shortened to the remaining deadline, and each HTTP request is limited to 30 seconds. For longer-running calls, replace the Code-node polling loop with n8n Wait and HTTP Request nodes before raising this guard.
 
@@ -95,16 +95,19 @@ Configure each call row in `Phone/Task List`:
 | --- | --- |
 | `callItemId` | Stable identifier for the input row. |
 | `maskedPhone` | Masked destination phone number. |
+| `idempotencyKey` | Stable key for replaying the unchanged logical call. |
 | `task` | IVR quality-check instruction sent to CALL-E. |
 | `metadataSent` | Metadata included in the CALL-E create request, with phone-bearing values masked in the displayed output. |
 | `metadataReturned` | Metadata from the CALL-E call result, with phone-bearing values masked in the displayed output. |
 | `metadataRoundTrip` | Comparison for `lead_id`, `notion_page_id`, `company`, `property`, and `campaign`. |
-| `callStatus` | `ok`, call ID, raw status values, failure code/message, and answered/no answer/busy/failed booleans. |
-| `returnedData.summary` | Summary from structured result or call-level summary fields. |
-| `returnedData.transcript` | Transcript turns if returned by CALL-E. |
-| `returnedData.structuredResult` | Structured IVR quality result following the configured schema. |
+| `callStatus` | API `callId`, separate `billing_call_id`, `call_status`, `call_outcome`, `result_status`, error code/message, and outcome signals. `ok` excludes client errors, technical errors and cancellation; it does not establish business success. |
+| `returnedData.summary` | The `summary` field requested in the result schema, or null when unavailable. |
+| `returnedData.transcript` | The top-level CALL-E `transcript`, independent of result availability. |
+| `returnedData.structuredResult` | CALL-E `result`, including an empty available object or null when unavailable. |
 | `redactedRawCallResult` | Raw CALL-E call result with phone-number fields masked for safer inspection. |
 | `apiError` | Sanitized API error message and name when the create or poll request fails. Response bodies are omitted, and phone-like E.164 values are masked. |
+
+`Execution Summary` reports `availableResultCount`, `unavailableResultCount`, `notApplicableResultCount`, and `failedCount`. A no-answer, busy, or declined call may finish with `result_status=unavailable` and no technical error. It is not counted as an available result or automatically redialed. An available result still requires interpreting its business fields.
 
 ## Side Effects
 
@@ -117,6 +120,8 @@ To disable or roll back the sample:
 - stop a running n8n execution from the n8n execution view
 - delete the imported workflow from n8n when it is no longer needed
 
+Stopping an execution or reaching its wait timeout does not cancel the telephone call. This template has no Cancel action. The [Calls API cancellation endpoint](https://docs.heycall-e.com/calls#read-events-and-cancellation) can cancel only before provider submission, not hang up an active call. Do not use the template for emergency, medical, legal, or financial advice without human-reviewed safeguards.
+
 ## Manual Verification
 
 1. Import the workflow.
@@ -126,12 +131,21 @@ To disable or roll back the sample:
 5. Run the workflow again.
 6. Confirm the loop processes one item at a time and `Execution Summary` contains two result objects.
 7. Set `waitTimeoutMinutes` above `4` and confirm `Validate CALL-E Config` rejects the unsupported Code-node wait before dialing.
+8. Re-run with the same `callItemId` and unchanged call inputs. Confirm CALL-E returns the same API ID and does not place another call. Change the row's business identifier only when you intend a new call.
+
+## Migration And Recovery
+
+Import the v2 workflow for new work and review any custom request builders and downstream result consumers. The request no longer accepts `recipients` or `recipient_result_schema`; the result schema must be a closed object with scalar properties. The template no longer derives results from recipient attempts, legacy `structured_result`, or call-level summary fields.
+
+The API `id` belongs in v2 Get and event requests. The separate `call_id` is a Billing identifier and may be null. Read historical legacy Call IDs through their original interface; do not submit an accepted legacy task again through v2.
+
+After a timeout or poll failure, the workflow retains its last response and API ID. Resume with `GET /v2/calls/{id}`. If creation acceptance is unknown, replay only the saved original request and idempotency key. Do not copy inferred routing values from a response into a retry, change inputs, use a new key, or fall back to legacy creation. This template does not automatically retry creation.
 
 ## Notes
 
 - The workflow uses n8n `helpers.httpRequest` inside a Code node because n8n Code nodes may not expose global `fetch`.
 - The four-minute wait cap, deadline-aware sleeps, and 30-second HTTP request limit keep the polling Code node below the stock 300-second runner task timeout with a one-minute execution buffer.
-- The request uses a deterministic `Idempotency-Key` header derived from canonical call intent, including the task, recipient phone number, region, locale, schemas, metadata, and `callItemId`.
-- The workflow accepts a create or poll result only when it is a documented `CallTask`: `object: "call_task"`, a `call_` ID, and one of `queued`, `in_progress`, `completed`, `failed`, or `canceled`.
+- The request uses a deterministic `Idempotency-Key` header derived from canonical v2 call intent, including the task, phone, supplied routing hints, schema, metadata, and `callItemId`. Re-running unchanged rows replays those calls; it does not start a new QA session.
+- The workflow requires a `call_` API ID and a documented `result_status`. Polling ends for `available`, `unavailable`, or `not_applicable`, even when both `result` and `error` are null.
 - The workflow intentionally avoids Notion and webhooks so it can be imported and tested as a standalone CALL-E API example.
 - Run `node --test plugins/n8n-calle-api/test/workflow-safety.test.mjs` from the repository root to execute the focused safety regression tests.

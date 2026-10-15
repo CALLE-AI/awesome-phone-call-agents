@@ -109,7 +109,7 @@ test("API failure messages do not stringify unredacted response bodies", async (
             pollIntervalSeconds: 5,
             waitTimeoutMinutes: 4,
           },
-          createInput: { recipients: [{ phones: [responsePhone] }] },
+          createInput: { phone: responsePhone },
           idempotencyKey: "test-key",
           callItemId: "ivr_sample_001",
         },
@@ -138,7 +138,7 @@ test("Create CALL-E Call and Wait rejects a successful response without a docume
             pollIntervalSeconds: 5,
             waitTimeoutMinutes: 4,
           },
-          createInput: { recipients: [{ phones: ["+14155550100"] }] },
+          createInput: { phone: "+14155550100" },
           idempotencyKey: "test-key",
           callItemId: "ivr_sample_001",
         },
@@ -146,9 +146,9 @@ test("Create CALL-E Call and Wait rejects a successful response without a docume
     ],
     {
       httpRequest: async () => ({
-        statusCode: 201,
-        statusMessage: "Created",
-        body: { id: "job_123", object: "call_task", status: "completed" },
+        statusCode: 202,
+        statusMessage: "Accepted",
+        body: { id: "job_123", status: "completed", result_status: "available" },
       }),
     },
   );
@@ -180,7 +180,7 @@ test("Create CALL-E Call and Wait requires the deployment secret before dialing"
           {
             json: {
               calleConfig: { pollIntervalSeconds: 5, waitTimeoutMinutes: 4 },
-              createInput: { recipients: [{ phones: ["+14155550100"] }] },
+              createInput: { phone: "+14155550100" },
               idempotencyKey: "test-key",
               callItemId: "ivr_sample_001",
             },
@@ -274,7 +274,7 @@ test("polling stays within its deadline when the final interval is partial", asy
             pollIntervalSeconds: 29,
             waitTimeoutMinutes: 4,
           },
-          createInput: { recipients: [{ phones: ["+14155550100"] }] },
+          createInput: { phone: "+14155550100" },
           idempotencyKey: "test-key",
           callItemId: "ivr_sample_001",
         },
@@ -286,7 +286,7 @@ test("polling stays within its deadline when the final interval is partial", asy
         return {
           statusCode: 200,
           statusMessage: "OK",
-          body: { id: "call_123", object: "call_task", status: "in_progress" },
+          body: { id: "call_123", status: "in_progress", result_status: "pending" },
         };
       },
     },
@@ -309,6 +309,138 @@ test("polling stays within its deadline when the final interval is partial", asy
       (timeout) => Number.isFinite(timeout) && timeout > 0 && timeout <= 30 * 1000,
     ),
   );
+  assert.equal(output.json.rawCallResult.id, "call_123");
+  assert.equal(output.json.idempotencyKey, "test-key");
+});
+
+test("builds one v2 destination and a closed scalar schema without inventing routing hints", async () => {
+  const item = {
+    json: {
+      callItemId: "ivr_sample_001", phone: "+14155550100",
+      task: "Inspect the authorized IVR; report unknown when evidence is missing.",
+      metadata: { campaign: "qa" }, calleConfig: {},
+    },
+  };
+  const [first] = await runCodeNode("Build CALL-E Request Payload", [item]);
+  const [replay] = await runCodeNode("Build CALL-E Request Payload", [item]);
+  const body = first.json.createInput;
+  assert.equal(body.phone, item.json.phone);
+  assert.equal(Object.hasOwn(body, "recipients"), false);
+  assert.equal(Object.hasOwn(body, "recipient_result_schema"), false);
+  assert.equal(Object.hasOwn(body, "region"), false);
+  assert.equal(Object.hasOwn(body, "locale"), false);
+  assert.equal(body.result_schema.additionalProperties, false);
+  assert.ok(Object.values(body.result_schema.properties).every((field) => field.type === "string"));
+  assert.deepEqual(first, replay);
+});
+
+test("Calls v2 waits beyond telephone completion and preserves an empty available result", async () => {
+  const requests = [];
+  const final = { id: "call_123", status: "completed", result_status: "available", result: {}, error: null, transcript: [] };
+  const responses = [
+    { ...final, status: "queued", result_status: "pending", result: null },
+    { ...final, result_status: "pending", result: null },
+    final,
+  ];
+  const [output] = await runCodeNode("Create CALL-E Call and Wait", [{
+    json: { createInput: { phone: "+14155550100" }, idempotencyKey: "business-key", calleConfig: {} },
+  }], {
+    httpRequest: async (options) => {
+      requests.push(options);
+      return { statusCode: options.method === "POST" ? 202 : 200, body: responses.shift() };
+    },
+  }, { setTimeout: (resolve) => resolve() });
+  assert.equal(output.json.ok, true);
+  assert.deepEqual(output.json.rawCallResult, final);
+  assert.deepEqual(requests.map(({ method, url }) => [method, url]), [
+    ["POST", "https://api.heycall-e.com/v2/calls"],
+    ["GET", "https://api.heycall-e.com/v2/calls/call_123"],
+    ["GET", "https://api.heycall-e.com/v2/calls/call_123"],
+  ]);
+  assert.ok(requests.every((request) => request.disableFollowRedirect === true));
+  assert.equal(requests[0].headers["Idempotency-Key"], "business-key");
+  assert.equal(requests.filter(({ method }) => method === "POST").length, 1);
+});
+
+test("final unavailable results do not become technical failures or trigger another call", async () => {
+  let requestCount = 0;
+  const call = { id: "call_123", status: "completed", result_status: "unavailable", call_outcome: "no_answer", result: null, error: null, transcript: [] };
+  const [created] = await runCodeNode("Create CALL-E Call and Wait", [{
+    json: { createInput: { phone: "+14155550100" }, idempotencyKey: "business-key" },
+  }], { httpRequest: async () => { requestCount += 1; return { statusCode: 202, body: call }; } });
+  const [parsed] = await runCodeNode("Parse CALL-E Result", [created]);
+  assert.equal(requestCount, 1);
+  assert.equal(created.json.ok, true);
+  assert.equal(parsed.json.resultStatus, "unavailable");
+  assert.equal(parsed.json.statusSignals.no_answer, true);
+  assert.equal(parsed.json.statusSignals.failed, false);
+  assert.equal(parsed.json.structuredResult, null);
+  const [displayed] = await runCodeNode("Demo Result View", [parsed]);
+  const [summary] = await runCodeNode("Execution Summary", [displayed]);
+  assert.equal(summary.json.availableResultCount, 0);
+  assert.equal(summary.json.unavailableResultCount, 1);
+  assert.equal(summary.json.failedCount, 0);
+});
+
+test("v2 parsing separates the API ID, Billing ID, transcript, result and technical error", async () => {
+  const transcript = [{ speaker: "user", offset_seconds: 1, text: "The menu is clear." }];
+  const [available] = await runCodeNode("Parse CALL-E Result", [{ json: {
+    ok: true,
+    rawCallResult: { id: "call_api", call_id: "billing_id", status: "completed", call_outcome: "completed", result_status: "available", result: { summary: "Clear menu" }, error: null, transcript },
+  } }]);
+  assert.equal(available.json.callId, "call_api");
+  assert.equal(available.json.billingCallId, "billing_id");
+  assert.deepEqual(available.json.transcriptTurns, transcript);
+  assert.equal(available.json.summary, "Clear menu");
+  assert.equal(available.json.statusSignals.answered, true);
+  const [failed] = await runCodeNode("Parse CALL-E Result", [{ json: {
+    rawCallResult: { id: "call_api", call_id: null, status: "failed", result_status: "not_applicable", result: null, transcript: [], error: { code: "call_failed", message: "Provider failure" } },
+  } }]);
+  assert.equal(failed.json.billingCallId, null);
+  assert.equal(failed.json.failureCode, "call_failed");
+  assert.equal(failed.json.statusSignals.failed, true);
+});
+
+test("a poll failure keeps the accepted API ID and never falls back to a second POST", async () => {
+  const requests = [];
+  const accepted = { id: "call_accepted", status: "queued", result_status: "pending" };
+  const [output] = await runCodeNode("Create CALL-E Call and Wait", [{ json: {
+    createInput: { phone: "+14155550100" }, idempotencyKey: "business-key",
+  } }], { httpRequest: async (request) => {
+    requests.push(request);
+    if (request.method === "POST") return { statusCode: 202, body: accepted };
+    throw new Error("Temporary network error");
+  } }, { setTimeout: (resolve) => resolve() });
+  assert.equal(output.json.ok, false);
+  assert.equal(output.json.rawCallResult.id, accepted.id);
+  assert.equal(output.json.idempotencyKey, "business-key");
+  assert.deepEqual(requests.map(({ method }) => method), ["POST", "GET"]);
+});
+
+test("the shipped placeholder tasks fail validation before reaching the call node", async () => {
+  await assert.rejects(
+    () => runCodeNode("Phone/Task List", [{ json: { calleConfig: {} } }]),
+    /Replace the placeholder phone number/,
+  );
+});
+
+test("missing keys stop before dialing and invalid result readiness does not report success", async () => {
+  let requests = 0;
+  const helpers = { httpRequest: async () => {
+    requests += 1;
+    return { statusCode: 202, body: { id: "call_123", result_status: "unknown_status" } };
+  } };
+  await assert.rejects(
+    () => runCodeNode("Create CALL-E Call and Wait", [{ json: { createInput: {} } }], helpers),
+    /stable Idempotency-Key/,
+  );
+  assert.equal(requests, 0);
+  const [output] = await runCodeNode("Create CALL-E Call and Wait", [{ json: {
+    createInput: { phone: "+14155550100" }, idempotencyKey: "business-key",
+  } }], helpers);
+  assert.equal(requests, 1);
+  assert.equal(output.json.ok, false);
+  assert.match(output.json.apiError.message, /documented call ID and result_status/);
 });
 
 test("manifest describes the workflow safety gates and masked output", () => {

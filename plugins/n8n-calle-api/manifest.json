@@ -3,7 +3,7 @@
   "title": "n8n CALL-E API workflow template",
   "platform": "n8n",
   "type": "workflow-template",
-  "description": "Inactive-by-default n8n workflow that manually calls the CALL-E API, waits for completion, and returns masked metadata, status, transcript, summary, and structured results.",
+  "description": "Inactive-by-default n8n workflow that manually creates single-target Calls API v2 calls, waits for result readiness, and returns masked metadata, telephone outcomes, transcripts, and structured results.",
   "entrypoints": [
     {
       "name": "Run IVR call quality checks with CALL-E phone calls in n8n",
@@ -18,12 +18,14 @@
     "Validates E.164 destination numbers and blocks the shipped placeholder numbers.",
     "Use only phone numbers you own or are explicitly authorized to call.",
     "Masks phone numbers across displayed outputs, including metadata, raw results, status messages, and API errors.",
-    "Caps polling at four minutes, limits poll intervals and HTTP requests to 30 seconds, and shortens the final sleep so the Code-node task stays below n8n's default 300-second runner timeout."
+    "Caps polling at four minutes, limits poll intervals and HTTP requests to 30 seconds, and shortens the final sleep so the Code-node task stays below n8n's default 300-second runner timeout.",
+    "Replays unchanged calls with a stable idempotency key; does not automatically redial unavailable results or retry creation.",
+    "Retains the accepted API ID after a wait failure; stopping n8n execution does not cancel the telephone call."
   ],
   "credentials": [
     "CALL-E API key provided as CALL_E_API_KEY through the n8n deployment secret or environment-variable store; it is read at execution time and never stored in workflow data."
   ],
   "tested_with": {
-    "n8n": "2.26.4"
+    "n8n": "2.43.5"
   }
 }
