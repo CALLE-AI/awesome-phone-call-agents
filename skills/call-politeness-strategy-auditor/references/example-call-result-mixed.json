@@ -1,0 +1,20 @@
+{
+  "call_id": "demo-polite-003",
+  "status": "COMPLETED",
+  "result": {
+    "post_summary": "Confirmed mailing address with the account holder.",
+    "transcript": [
+      {
+        "speaker": "agent",
+        "text": "Good afternoon. I'm calling about the account on file for +14155550179. Give me your membership number."
+      },
+      { "speaker": "callee", "text": "Hold on, let me find the card." },
+      {
+        "speaker": "agent",
+        "text": "Thank you, dear. Could you confirm the mailing address when you have a moment?"
+      },
+      { "speaker": "callee", "text": "Sure, 88 Lake Road." },
+      { "speaker": "agent", "text": "Appreciated. Have a lovely day." }
+    ]
+  }
+}

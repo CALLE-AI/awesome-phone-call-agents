@@ -1,0 +1,16 @@
+{
+  "call_id": "demo-faithful-001",
+  "status": "COMPLETED",
+  "to": "+14155550196",
+  "result": {
+    "post_summary": "Guest confirmed party of 4 for Wednesday, October 14 at 2 p.m. A $20 deposit holds the table and the confirmation will be emailed.",
+    "transcript": [
+      {"speaker": "agent", "text": "Hello, this is an automated assistant calling from the restaurant to confirm your reservation."},
+      {"speaker": "callee", "text": "Hi, yes, hello."},
+      {"speaker": "agent", "text": "We have your party of 4 on Wednesday, October 14 at 2 p.m. Is that still correct?"},
+      {"speaker": "callee", "text": "Yes, that is right, we will be there."},
+      {"speaker": "agent", "text": "A $20 deposit holds the table, and I will email the confirmation."},
+      {"speaker": "callee", "text": "Perfect, confirmed."}
+    ]
+  }
+}

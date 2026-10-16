@@ -14,8 +14,9 @@ there is no suitable SDK. This skill adds no API or documentation MCP service.
 For a new integration, read the [quickstart](https://docs.heycall-e.com/quickstart.md)
 and the relevant part of the [SDK guide](https://docs.heycall-e.com/sdks.md).
 Distinguish request-scoped [Calls](https://docs.heycall-e.com/calls.md) from running
-a published [Goal](https://docs.heycall-e.com/goal-runs.md); do not mix their inputs
-or identifiers. Use the [documentation index](https://docs.heycall-e.com/llms.txt)
+a published [Goal](https://docs.heycall-e.com/goal-runs.md). Calls use `/v2/calls`
+with SDK 1.0.1; Goal Runs keep their own `/v1/goals` interface. Do not mix their
+inputs or identifiers. Use the [documentation index](https://docs.heycall-e.com/llms.txt)
 to find additional topics, not to load the entire site.
 
 Before writing or reviewing a request, inspect the relevant operation in the
@@ -24,9 +25,8 @@ For SDK code, also inspect the installed package version and its public types or
 source: [TypeScript](https://github.com/CALLE-AI/server-sdk-typescript) or
 [Python](https://github.com/CALLE-AI/server-sdk-python). HTTP fields and SDK
 arguments are not interchangeable. For payload reviews, inspect the SDK's
-request-building code, including compatibility aliases and which arguments
-become headers rather than JSON fields; a README alone does not establish that
-mapping. The Calls idempotency key belongs in the `Idempotency-Key` header over
+request-building code and which arguments become headers rather than JSON
+fields; a README alone does not establish that mapping. The Calls idempotency key belongs in the `Idempotency-Key` header over
 HTTP. Cite the source used and record the package
 version when reporting verification. If sources are unavailable or conflict,
 identify the specific unverified behavior rather than inventing fields.
@@ -41,7 +41,12 @@ any live path.
 - Keep credentials on the backend. Start with a preview or offline check; a code
   request is not authorization to place calls. Preserve the user's existing
   scoped authorization when live testing is requested.
-- Check recipient inputs and both result-schema fields against the chosen
+- For Calls V2, provide one E.164 `phone`, `task`, a closed scalar
+  `result_schema` and an `Idempotency-Key` header over HTTP. Python SDK 1.0.1
+  uses `result_schema` and `idempotency_key`; TypeScript uses `resultSchema`
+  in the input and `idempotencyKey` in the second options argument. SDK 1.x
+  does not accept `recipient`, `recipients` or a recipient result schema.
+  Check the chosen
   contract. Use supported schema features and represent uncertain answers.
   Check the [supported regions](https://docs.heycall-e.com/regions.md) before
   choosing destinations, regions or locales.
@@ -50,12 +55,21 @@ any live path.
   do not create a replacement just because waiting failed. For a lost create
   response, follow the current [recovery and error guide](https://docs.heycall-e.com/errors.md)
   with the saved request/key and stop automatic redial while acceptance is unknown.
-- Distinguish transport errors, API rejection, terminal call status and the
+- Wait while `result_status` is `pending`, including after `status` becomes
+  `completed`. Read the ready `result`, `error`, `call_outcome` and top-level
+  `transcript`; a final unavailable result can have both `result` and `error` null.
+  TypeScript wraps the status fields as `resultStatus` and `callOutcome`;
+  transcript turns keep `offset_seconds`.
+  Distinguish transport errors, API rejection, terminal call status and the
   business outcome. A completed call is not proof of a booking or other requested
   result. Validate the returned structured result; preserve null or unknown for
   review. Apply business-state changes once, including after a process restart.
 - For webhooks, read the [current delivery and verification guide](https://docs.heycall-e.com/webhooks.md).
-  Current event-ID matching is a consistency check, not sender authentication;
+  Route V2 payloads using `data.object: call`; preserve a separate legacy
+  receiver for earlier `call_task` payloads. V2 terminal events are
+  `call.completed`, `call.failed` and `call.canceled`; result validation errors
+  use `call.completed` with `error.code: result_invalid`. Current event-ID
+  matching is a consistency check, not sender authentication;
   do not invent a signing secret or signature header. Verify sensitive results
   through an authenticated API read and bind them to the saved call, workflow
   and recipient. Keep event receipts separate from completion of the business

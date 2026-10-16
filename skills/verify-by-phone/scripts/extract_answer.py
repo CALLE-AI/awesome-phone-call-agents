@@ -161,6 +161,10 @@ def normalize(text: str) -> str:
 
 
 def turns_from_payload(payload: dict) -> list[dict]:
+    if "transcript" in payload:
+        turns = payload["transcript"]
+        return list(turns) if isinstance(turns, list) else []
+    # Keep previously saved V1 payloads usable without another phone call.
     for recipient in payload.get("recipients", []):
         for attempt in recipient.get("attempts", []):
             turns = attempt.get("transcript_turns")
@@ -726,6 +730,10 @@ def main() -> None:
     with open(args.payload, encoding="utf-8") as handle:
         payload = json.load(handle)
     turns = turns_from_payload(payload)
+    # ponytail: V2 with any unattributed turn abstains; refine only with reliable speaker mapping.
+    unknown_speaker = "transcript" in payload and any(
+        turn.get("speaker") not in {"bot", "user"} for turn in turns
+    )
 
     # A call with no transcript is the single most common real outcome: nobody
     # picked up, or it went to voicemail and the agent correctly left nothing.
@@ -734,7 +742,7 @@ def main() -> None:
     # than an exceptional one. And a tool whose entire claim is that it emits an
     # explicit abstention when it learns nothing must emit that record LOUDEST
     # when it learned nothing at all. Silence is a result, not a failure.
-    if not turns:
+    if not turns or unknown_speaker:
         for claim in CLAIM_PATTERNS:
             print(
                 json.dumps(
@@ -745,7 +753,7 @@ def main() -> None:
                         "hedged": False,
                         "span": None,
                         "abstain": True,
-                        "gate": "no-transcript",
+                        "gate": "unknown-speaker" if unknown_speaker else "no-transcript",
                         "organization_confirmed": False,
                         "organization_denied": False,
                     }

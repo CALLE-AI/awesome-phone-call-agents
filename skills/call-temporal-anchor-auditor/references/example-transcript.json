@@ -1,0 +1,15 @@
+{
+  "call_id": "demo-temporal-001",
+  "status": "COMPLETED",
+  "to": "+14155550198",
+  "result": {
+    "post_summary": "Agent confirmed a fully anchored pickup slot (weekday + calendar date + clock + meridiem) and restated the same anchor once; the callee agreed.",
+    "transcript": [
+      {"speaker": "agent", "text": "Hello, this is the Example Depot dispatch assistant. I am calling to confirm your pickup window."},
+      {"speaker": "callee", "text": "Yes, what time?"},
+      {"speaker": "agent", "text": "Your pickup is scheduled for Wednesday, October 14 at 2 p.m."},
+      {"speaker": "callee", "text": "Got it, Wednesday the 14th at 2 p.m. works."},
+      {"speaker": "agent", "text": "To restate: Wednesday, October 14 at 2 p.m. We will see you then. Goodbye."}
+    ]
+  }
+}

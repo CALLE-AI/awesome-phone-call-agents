@@ -46,13 +46,17 @@ def row(database, workflow_id="workflow_test"):
 def snapshot(outcome="callback"):
     return {
         "id": "call_test",
+        "object": "call",
         "status": "completed",
+        "result_status": "available",
+        "call_outcome": "completed",
+        "error": None,
         "metadata": {
             "workflow": "webhook-result-receiver",
             "workflow_id": "workflow_test",
         },
-        "recipients": [{"phones": ["+12025550123"]}],
-        "structured_result": {
+        "phone": "+12025550123",
+        "result": {
             "outcome": outcome,
             "outcome_evidence": "Synthetic evidence.",
         },
@@ -103,7 +107,7 @@ def test_existing_outcome_fixtures_apply_once_to_application_record(tmp_path, ca
     value.update(
         id="call_test",
         metadata=snapshot()["metadata"],
-        recipients=snapshot()["recipients"],
+        phone=snapshot()["phone"],
     )
     calls = SimpleNamespace(
         create=lambda **_: {"id": "call_test", "status": "queued"}, get=lambda _: value
@@ -124,8 +128,8 @@ def test_unbound_or_unready_results_do_not_update_business_state(tmp_path):
     for change in (
         {"id": "other"},
         {"metadata": {}},
-        {"recipients": []},
-        {"recipients": [{"phones": ["+12025550124"]}]},
+        {"object": "call_task"},
+        {"phone": "+12025550124"},
         {"status": "surprise"},
     ):
         value = {**snapshot(), **change}
@@ -135,7 +139,7 @@ def test_unbound_or_unready_results_do_not_update_business_state(tmp_path):
         assert row(database)["business_state"] == "pending"
     calls.get = lambda _: {**snapshot(), "status": "in_progress"}
     assert workflow.resume(database, "workflow_test", client)["state"] == "accepted"
-    calls.get = lambda _: {**snapshot(), "structured_result": None}
+    calls.get = lambda _: {**snapshot(), "result": None}
     assert (
         workflow.resume(database, "workflow_test", client)["business_state"]
         == "needs_review"
@@ -225,3 +229,54 @@ def test_acknowledged_webhook_can_resume_a_missing_business_update(tmp_path):
     first = workflow.resume(database, "workflow_test", client)
     assert first["business_state"] == "needs_follow_up"
     assert workflow.resume(database, "workflow_test", client) == first
+
+
+def test_completed_execution_waits_for_ready_result_before_applying(tmp_path):
+    database = reserve(tmp_path)
+    value = {**snapshot(), "result_status": "pending", "result": None}
+    client = SimpleNamespace(calls=SimpleNamespace(
+        create=lambda **_: {"id": "call_test", "status": "queued"},
+        get=lambda _: value,
+    ))
+    workflow.submit(database, "workflow_test", client)
+    assert workflow.resume(database, "workflow_test", client)["state"] == "accepted"
+    assert row(database)["applied_at"] is None
+    value.update(snapshot())
+    assert workflow.resume(database, "workflow_test", client)["outcome"] == "callback"
+
+
+def test_legacy_saved_requests_never_cross_the_v2_network_boundary(tmp_path):
+    database = reserve(tmp_path)
+    request = json.loads(row(database)["request_json"])
+    request["recipient"] = {"phone": request.pop("phone")}
+    with workflow.connect(database) as connection:
+        connection.execute("UPDATE workflows SET request_json = ?", (json.dumps(request),))
+    forbidden = lambda *args, **kwargs: pytest.fail("legacy record used V2")
+    client = SimpleNamespace(calls=SimpleNamespace(create=forbidden, get=forbidden))
+    with pytest.raises(workflow.WorkflowError, match="Legacy"):
+        workflow.submit(database, "workflow_test", client)
+    with workflow.connect(database) as connection:
+        connection.execute("UPDATE workflows SET call_id = 'legacy_call', state = 'accepted'")
+    with pytest.raises(workflow.WorkflowError, match="Legacy"):
+        workflow.resume(database, "workflow_test", client)
+
+
+def test_saved_request_serializes_through_published_sdk_1_0_1(tmp_path):
+    import httpx
+    from calle import CalleClient
+
+    database = reserve(tmp_path)
+    saved = json.loads(row(database)["request_json"])
+    def handle(request):
+        assert request.method == "POST"
+        assert request.url.path == "/v2/calls"
+        assert request.headers["Idempotency-Key"] == saved["idempotency_key"]
+        body = json.loads(request.content)
+        assert body == {k: v for k, v in saved.items() if k != "idempotency_key"}
+        assert body["phone"] == "+12025550123"
+        assert "recipient" not in body and "recipients" not in body
+        return httpx.Response(202, json={"id": "call_test", "status": "queued"})
+
+    with httpx.Client(transport=httpx.MockTransport(handle), base_url="https://api.heycall-e.com") as http:
+        client = CalleClient(api_key="offline-test", http_client=http)
+        assert workflow.submit(database, "workflow_test", client)["call_id"] == "call_test"

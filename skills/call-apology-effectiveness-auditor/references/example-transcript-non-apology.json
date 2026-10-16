@@ -1,0 +1,11 @@
+{
+  "call_id": "run-apo-deflect-01",
+  "status": "COMPLETED",
+  "transcript": [
+    {"speaker": "agent", "text": "Hello, Northside Clinic scheduling."},
+    {"speaker": "callee", "text": "You promised Tuesday and nobody called. This is unacceptable."},
+    {"speaker": "agent", "text": "I'm sorry you feel that way. Let's move on to scheduling. Are you free Thursday at 10 a.m.?"},
+    {"speaker": "callee", "text": "I guess."}
+  ],
+  "callee_phone": "+14155550144"
+}

@@ -306,7 +306,7 @@ class CreateCallTests(unittest.TestCase):
                     "workflow_id": "workflow_123",
                 },
                 "webhook_url": PUBLIC_WEBHOOK_URL,
-                "recipient": {"phone": "+12025550100"},
+                "phone": "+12025550100",
                 "idempotency_key": "webhook-result-receiver:"
                 "cfe75f1332372c8f747bd3de3ced1fef",
             },
@@ -656,7 +656,7 @@ class CreateCallTests(unittest.TestCase):
         self.assertIsInstance(client, FakeCalleClient)
         self.assertEqual(
             captured,
-            {"api_key": "private-test-key", "timeout": 10.0},
+            {"api_key": "private-test-key", "timeout": 30.0},
         )
 
     def test_client_close_failure_is_contained_without_hiding_known_success(self):

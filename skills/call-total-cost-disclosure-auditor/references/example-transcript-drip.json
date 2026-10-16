@@ -1,0 +1,12 @@
+{
+  "call_id": "demo-cost-001-drip",
+  "status": "COMPLETED",
+  "callee_phone": "+14155550174",
+  "transcript": [
+    {"speaker": "agent", "text": "Hello, this is Example Bistro. The total comes to $45."},
+    {"speaker": "callee", "text": "Okay."},
+    {"speaker": "agent", "text": "Do you want to place the order?"},
+    {"speaker": "callee", "text": "Yes, go ahead."},
+    {"speaker": "agent", "text": "Great, just so you know, there is a $6 handling fee added at checkout."}
+  ]
+}

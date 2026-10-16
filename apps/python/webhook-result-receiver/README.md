@@ -1,7 +1,8 @@
 # Durable CALL-E webhook result receiver
 
-This reference app creates an explicitly authorized, one-off CALL-E follow-up
-call and durably receives its terminal result. It is designed for at-least-once
+This reference app uses Calls V2 (`/v2/calls`) and Python SDK `calle-ai==1.0.1`
+to create an explicitly authorized, one-off CALL-E follow-up call and durably
+receive its terminal result. It is designed for at-least-once
 webhook delivery: notification acceptance is stored in SQLite, a retried
 canonical event is deduplicated, and a different payload with the same event ID
 is rejected as a conflict.
@@ -83,11 +84,12 @@ uv run python create_call.py \
 
 Fixture replay is also local-only. It uses the fixture payload as a synthetic
 snapshot, marks the resulting row as `fixture`, and does not authenticate or
-contact CALL-E. Run all three replays against a disposable database:
+contact CALL-E. Run all four replays against a disposable database:
 
 ```bash
 uv run python receiver.py --database .tmp/fixture-replays.sqlite3 --replay fixtures/call-completed.json
 uv run python receiver.py --database .tmp/fixture-replays.sqlite3 --replay fixtures/call-failed.json
+uv run python receiver.py --database .tmp/fixture-replays.sqlite3 --replay fixtures/call-canceled.json
 uv run python receiver.py --database .tmp/fixture-replays.sqlite3 --replay fixtures/call-result-validation-failed.json
 ```
 
@@ -96,7 +98,7 @@ These commands do not access the network and cannot create a call. Delete
 
 ### Offline application outcomes
 
-The three fixtures above exercise receiver delivery and storage. The following
+The four fixtures above exercise receiver delivery and storage. The following
 five synthetic fixtures exercise application decisions. They use the same
 webhook envelope and the fields needed by this demo; they are not captured
 service responses or complete API response examples.
@@ -116,12 +118,13 @@ insufficient. It describes the offline examples; `create_call.py` continues
 to use its own human-callback schema.
 
 These outcome names are application choices, not CALL-E lifecycle statuses or
-event types. All five fixtures have `status: completed`; that status alone
-does not prove that anyone answered or a booking succeeded. The unanswered
-fixture explicitly supplies synthetic no-answer evidence and a matching
-extracted result. A null result, missing transcript, or generic failure must
-not be converted to `unanswered`. See the public
-[Calls result contract](https://docs.heycall-e.com/calls#task-completion) and
+event types. All five fixtures have `status: completed` and a ready `result_status`;
+execution completion alone does not prove that anyone answered or a booking
+succeeded. The unanswered fixture explicitly supplies `call_outcome: no_answer`,
+`result_status: unavailable` and a null result. A null result maps to `unanswered`
+only with that explicit telephone outcome; a missing transcript or generic
+failure does not establish it. See the public
+[Calls result contract](https://docs.heycall-e.com/calls#result-outcomes) and
 [webhook contract](https://docs.heycall-e.com/webhooks).
 
 Run both the receiver replay and the application decision for every case:
@@ -197,8 +200,9 @@ uv run python workflow.py submit --database "$WORKFLOW_DB" --workflow-id follow-
 
 These commands only save and preview the intent. They do not read credentials,
 resolve network addresses or call CALL-E. The preview masks the phone number.
-The saved request contains the original task, destination, schema, metadata
-and idempotency key; subsequent submissions use that saved content. An
+The saved request contains the original task, top-level `phone`, scalar result
+schema, metadata and idempotency key; subsequent submissions use that saved
+content. An
 optional `--webhook-url` on `reserve` uses the same public HTTPS validation as
 `create_call.py`. Omit it for the polling workflow shown here.
 
@@ -226,10 +230,12 @@ uv run python workflow.py show --database "$WORKFLOW_DB" --workflow-id follow-up
 ```
 
 Each `resume` invocation makes at most one authenticated call read and never
-submits a call. While the call is queued or running, the business record stays
-`pending`. Run it again later or when a notification arrives. Before applying
-a terminal result, it verifies the Call ID, workflow metadata and exact saved
-destination, then uses `application_outcome` to validate the result fields.
+submits a call. While the call is queued, running or has `result_status: pending`,
+the business record stays `pending`, even if execution status is already
+`completed`. Run it again later or when a notification arrives. Before applying
+a ready result, it verifies `object: call`, the Call ID, workflow metadata and
+exact saved top-level `phone`, then uses `application_outcome` to validate the
+result fields.
 Missing or invalid result evidence stays unknown.
 
 | Outcome | Saved business state |
@@ -286,6 +292,17 @@ with your OS's access controls, including Windows permissions. Keep this
 application database separate from disposable fixture databases. Do not delete
 or edit it to retry a live operation. This is a local reference workflow, not
 a production queue or an authentication layer for a public service.
+
+## Upgrade an existing receiver
+
+Use a new workflow database for Calls V2. Existing saved V1 requests and IDs
+retain their original API contract; do not edit their rows or send them to V2.
+The workflow refuses legacy requests before creating or fetching a call. Keep
+the old SDK and receiver available for those accepted tasks until they are
+reconciled. Both versions can send `call.completed`, so route outstanding
+legacy deliveries to a separate receiver path. A new V2 idempotency key does
+not recover or cancel an earlier V1 call. See the
+[migration guide](https://docs.heycall-e.com/migration).
 
 ## Run the receiver
 
@@ -372,12 +389,16 @@ claim. Only these terminal event types are supported:
 | Temporary CALL-E outage, SDK response decode failure, rate limit, or all eight handlers busy | Private `503` so delivery can retry |
 | Authentication, configured receiver/API, SQLite, or unexpected internal failure | Generic `500 internal_error` without exception details |
 
-Supported types are `call.completed`, `call.failed`, and
-`call.result_validation_failed`. Canonical event-ID deduplication makes the
+Supported types are `call.completed`, `call.failed` and `call.canceled`.
+Payloads must have `data.object: call`. Legacy `call_task` payloads are rejected.
+The authenticated snapshot must have a ready `result_status`; a result still
+`pending` cannot produce a successful receipt. Result-validation failures use
+`call.completed` with `error.code: result_invalid`. Canonical event-ID
+deduplication makes the
 handler safe for at-least-once delivery, not exactly-once delivery. A retry is
 safe only after the original accepted receipt exists. An unsigned notification
 alone is not trusted; the authenticated API result must agree on the call ID,
-terminal status, and this app's workflow metadata before storage.
+terminal status, ready result and this app's workflow metadata before storage.
 
 An existing matching `api` receipt is a duplicate. An existing matching
 `fixture` receipt is not trusted by live server mode: the receiver performs the
@@ -448,9 +469,12 @@ database as sensitive operational state even though its contents are minimized.
 Pressing `Ctrl+C` stops only the local receiver. Deleting the SQLite database
 removes only deduplication history, and rotating `CALLE_API_KEY` changes only
 future authentication. None of those actions cancels a call that CALL-E has
-already accepted. This demo has no cancellation command; if CALL-E exposes a
-dashboard or API cancellation mechanism, use it before the call reaches a
-terminal state. Wait until delivery retries are no longer expected before
+already accepted. The local `workflow.py cancel` command only cancels an
+unsubmitted reservation.
+For an accepted V2 Call, `calls.cancel(id)` can cancel only before provider
+submission; it returns `409 call_cannot_cancel` after submission starts and
+cannot hang up an active call. Wait until delivery retries are no longer
+expected before
 deleting the database.
 
 This demo is not for emergency, medical, legal, financial, other regulated-
@@ -470,6 +494,7 @@ uv run ruff check .
 uv run python create_call.py --phone +12025550123 --webhook-url "$PUBLIC_WEBHOOK_URL" --workflow-id preview-follow-up
 uv run python receiver.py --database .tmp/fixture-replays.sqlite3 --replay fixtures/call-completed.json
 uv run python receiver.py --database .tmp/fixture-replays.sqlite3 --replay fixtures/call-failed.json
+uv run python receiver.py --database .tmp/fixture-replays.sqlite3 --replay fixtures/call-canceled.json
 uv run python receiver.py --database .tmp/fixture-replays.sqlite3 --replay fixtures/call-result-validation-failed.json
 ```
 

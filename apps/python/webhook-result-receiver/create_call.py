@@ -19,7 +19,8 @@ WORKFLOW_ID = re.compile(r"^[A-Za-z0-9][A-Za-z0-9._-]{0,63}$")
 DNS_LABEL = re.compile(r"^[A-Za-z0-9](?:[A-Za-z0-9-]{0,61}[A-Za-z0-9])?$")
 LEGACY_NUMERIC_HOST = re.compile(r"^(?:[0-9]+|0[xX][0-9A-Fa-f]+)$")
 SAFE_PROVIDER_TOKEN = re.compile(r"^[A-Za-z0-9_-]{1,128}$")
-API_TIMEOUT_SECONDS = 10.0
+# Calls V2 preparation can take 25 seconds before creation returns.
+API_TIMEOUT_SECONDS = 30.0
 SPECIAL_USE_SUFFIXES = {
     "alt",
     "arpa",
@@ -221,7 +222,7 @@ def build_call_request(
             "workflow_id": workflow_id,
         },
         "webhook_url": webhook_url,
-        "recipient": {"phone": phone},
+        "phone": phone,
         "idempotency_key": idempotency_key(workflow_id, phone),
     }
 

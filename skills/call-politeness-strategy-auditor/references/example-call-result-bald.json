@@ -1,0 +1,19 @@
+{
+  "call_id": "demo-polite-002",
+  "status": "COMPLETED",
+  "result": {
+    "post_summary": "Collected account details from the account holder.",
+    "transcript": [
+      {
+        "speaker": "agent",
+        "text": "This is the service desk regarding the line +14155550179. Give me your account number. Spell your last name. Read the card digits."
+      },
+      { "speaker": "callee", "text": "Okay, okay, one at a time." },
+      {
+        "speaker": "agent",
+        "text": "Account number first. Repeat it after the tone."
+      },
+      { "speaker": "callee", "text": "Fine." }
+    ]
+  }
+}

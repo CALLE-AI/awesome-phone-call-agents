@@ -2,9 +2,9 @@
 
 ## Side effects
 
-- Exactly one outbound phone call per `--live` invocation of `scripts/place_verify_call.py`, to the operator-supplied number. Nothing else in this skill places calls.
+- At most one new outbound call per `--live` invocation of `scripts/place_verify_call.py`, to the operator-supplied number. Replaying the saved request returns the existing call. Nothing else in this skill places calls.
 - No recurring jobs, no scheduler, no daemon, no background retries. A retry is a new, explicit operator decision, and reusing the printed idempotency key prevents accidental double-dialing.
-- Local files only: payloads are written to paths the operator names. Nothing is transmitted anywhere except the CALL-E API itself.
+- Local files only: the original request/key and accepted API Call ID are saved to `--state`; terminal payloads are saved to `--out`. Both use mode 0600. Nothing is transmitted anywhere except the CALL-E API itself.
 
 ## Consent and disclosure
 
@@ -19,7 +19,7 @@
 - Phone numbers are masked in console output.
 - All sample numbers in this skill are reserved fictional numbers such as +15550101234.
 - No credentials are stored by this skill; `CALLE_API_KEY` is read from the environment at call time only.
-- The dry-run default and the bundled labeled scenario data mean everything except a live call runs with no credentials, no network, and no side effects.
+- Dry runs, calibration, extraction, reconciliation and offline tests need no credentials or network. Polling uses authenticated GET requests and does not place another call.
 
 ## Medical, legal, financial, and emergency boundaries
 
@@ -38,7 +38,7 @@ This skill calls healthcare organizations, so these boundaries are load-bearing 
 `scripts/poll_result.py` writes the terminal payload to disk, and that file is the most sensitive artifact this skill produces: it contains the recipient's phone number in the clear and a verbatim transcript of a real person who did not choose to be recorded by us.
 
 - It is written **mode 0600**, owner read/write only. The previous default of 0644 left it world-readable on any shared or multi-user machine.
-- The mode is enforced on write and re-applied afterwards, so re-running against a path that already exists with loose permissions still ends at 0600.
+- Saves atomically replace the file with a mode-0600 file, so re-running against a path with loose permissions still ends at 0600 and a failed write preserves the original.
 - Console output is masked, but **the file is not**. Do not paste it into an issue, a chat, or a pull request.
 
 ### Retention
@@ -50,6 +50,13 @@ This skill deliberately has no retention policy of its own, because it does not 
 - Delete with `rm result.json` when done. Nothing in the workflow needs the raw payload after `extract_answer.py` has produced the span-grounded record.
 
 Operators subject to a records regime should keep the derived record, which carries the span and the verdict, rather than the raw transcript, and should set their own retention window for anything they choose to keep.
+
+## Cancellation and retries
+
+- Stop before `--live` whenever possible. Calls V2 supports cancellation through `client.calls.cancel(id)` only before provider submission; a later attempt returns `409 call_cannot_cancel` and does not hang up an active call.
+- Stopping `poll_result.py` does not cancel the call. Resume polling the same API Call ID.
+- After uncertain creation, preserve the original `--state` file and unchanged input. Replaying its key and body does not dial again. Do not delete state or select a new state path to bypass an unresolved request.
+- Delete the state file only when verification and retry recovery are complete; it contains the unmasked number and task, even if creation failed before a response arrived.
 
 ## Honest failure modes
 

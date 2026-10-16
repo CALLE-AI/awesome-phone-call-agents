@@ -1,0 +1,5 @@
+GOAL: collect the required details from the callee.
+REQUEST DISCIPLINE: make every request with a modal ("Could you..."), attach
+"please" where natural, thank the caller after each compliance, and apologize
+once for the interruption at the start. Never use bare imperatives ("Give me
+...") - softened requests get the same data with less friction.

@@ -26,15 +26,15 @@ wheels = [
 
 [[package]]
 name = "calle-ai"
-version = "0.6.0"
+version = "1.0.1"
 source = { registry = "https://pypi.org/simple" }
 dependencies = [
     { name = "attrs" },
     { name = "httpx" },
 ]
-sdist = { url = "https://files.pythonhosted.org/packages/7a/71/092bb08f4a8de5ea44126e1a91888ecb60d0a6b0daea9491d2be435e03db/calle_ai-0.6.0.tar.gz", hash = "sha256:cc2fe06a1bdda61f103385263ef270b90dc98e44f38aa005fc49c329e580ee33", size = 98151, upload-time = "2026-07-30T03:25:56.041Z" }
+sdist = { url = "https://files.pythonhosted.org/packages/91/f9/d7d1e0fdd70f7e4eb26c1c6b7897647410d528f4c2c9a22a484d2d778efa/calle_ai-1.0.1.tar.gz", hash = "sha256:9f3237e6f0c582bd57b7daf5f0f11fcb78c0f576f1f38bc1d647a5674a1b2eb8", size = 159543, upload-time = "2026-09-23T10:25:09.307Z" }
 wheels = [
-    { url = "https://files.pythonhosted.org/packages/68/02/e8a394876c9d4f3603739aa80fb4f0c9ddc51fc8dff232226ffd2b4424cf/calle_ai-0.6.0-py3-none-any.whl", hash = "sha256:c2a25ffcd98ce985c4ec58e3b47cd6f072f8b3fd6ee1bbe2115d021a43911237", size = 62508, upload-time = "2026-07-30T03:25:54.927Z" },
+    { url = "https://files.pythonhosted.org/packages/a0/a7/061e79a83a9e431ed8285a1d8fef68cb882a10c09bd57608433056e51b2c/calle_ai-1.0.1-py3-none-any.whl", hash = "sha256:206170838892a0b0197b581b4bbbb6bd04145594e91a38bb01acee2f0a3ab9aa", size = 94792, upload-time = "2026-09-23T10:25:08.137Z" },
 ]
 
 [[package]]
@@ -202,7 +202,7 @@ dev = [
 ]
 
 [package.metadata]
-requires-dist = [{ name = "calle-ai", specifier = "==0.6.0" }]
+requires-dist = [{ name = "calle-ai", specifier = "==1.0.1" }]
 
 [package.metadata.requires-dev]
 dev = [

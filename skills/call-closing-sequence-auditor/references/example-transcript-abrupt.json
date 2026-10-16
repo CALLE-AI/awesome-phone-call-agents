@@ -1,0 +1,10 @@
+{
+  "call_id": "call-close-004",
+  "status": "COMPLETED",
+  "callee_phone": "+14155550146",
+  "transcript": [
+    {"speaker": "agent", "text": "Hello, this is the Example Bistro assistant calling about your reservation request."},
+    {"speaker": "callee", "text": "Hi, can we move our table to Friday evening?"},
+    {"speaker": "agent", "text": "Just to confirm - your table is booked for Friday the 15th at 7 p.m. You'll receive a text confirmation. So we'll see you Friday at 7 p.m., okay?"}
+  ]
+}

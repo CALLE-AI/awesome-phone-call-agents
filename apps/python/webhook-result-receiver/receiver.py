@@ -66,8 +66,8 @@ WEBHOOK_PATH = "/calle/webhook"
 SAFE_PROVIDER_TOKEN = re.compile(r"^[A-Za-z0-9_-]{1,128}$")
 TERMINAL_STATUSES = {
     "call.completed": {"completed"},
-    "call.failed": {"failed", "canceled"},
-    "call.result_validation_failed": {"completed"},
+    "call.failed": {"failed"},
+    "call.canceled": {"canceled"},
 }
 WORKFLOW = "webhook-result-receiver"
 SCHEMA = """
@@ -233,6 +233,8 @@ def validate_event(value: object, event_header: str | None) -> dict[str, Any]:
         raise InvalidEvent("event_id_mismatch")
     if event_type not in TERMINAL_STATUSES:
         raise InvalidEvent("unsupported_event_type")
+    if data.get("object") != "call":
+        raise InvalidEvent("unsupported_call_format")
     return value
 
 
@@ -272,7 +274,10 @@ def authoritative_record(
     metadata = snapshot.get("metadata")
     notification_metadata = notification.get("metadata")
     if (
-        not _nonempty_string(call_id)
+        snapshot.get("object") != "call"
+        or snapshot.get("result_status")
+        not in {"available", "unavailable", "not_applicable"}
+        or not _nonempty_string(call_id)
         or call_id != notification.get("id")
         or call_status not in TERMINAL_STATUSES[event["type"]]
         or not isinstance(metadata, dict)
@@ -284,11 +289,15 @@ def authoritative_record(
     ):
         raise InvalidEvent("authoritative_mismatch")
 
-    result = snapshot.get("structured_result")
+    result = snapshot.get("result")
     wants_callback = (
         result.get("wants_human_callback") if isinstance(result, dict) else None
     )
-    if wants_callback not in {"yes", "no", "unknown"}:
+    if (
+        snapshot.get("result_status") != "available"
+        or snapshot.get("error") is not None
+        or wants_callback not in {"yes", "no", "unknown"}
+    ):
         wants_callback = None
     return {
         "event_id": event["id"],

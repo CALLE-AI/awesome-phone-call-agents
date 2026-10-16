@@ -30,17 +30,12 @@ def fixture(name: str) -> dict[str, object]:
 
 def private_fixture_values(event: dict[str, object]) -> list[str]:
     data = event["data"]
-    evidence = data["evidence"]
     transcript = data["transcript"]
-    recipient = data["recipient"]
-    structured_result = data["structured_result"]
     return [
-        recipient["phone"],
+        data["phone"],
         data["task"],
-        data["summary"],
-        *(item for item in evidence),
         *(turn["text"] for turn in transcript),
-        structured_result["free_form_note"],
+        data["metadata"]["private_note"],
     ]
 
 
@@ -158,6 +153,7 @@ def rows(database: Path) -> list[sqlite3.Row]:
     [
         ("call-completed.json", "completed", "yes"),
         ("call-failed.json", "failed", None),
+        ("call-canceled.json", "canceled", None),
         ("call-result-validation-failed.json", "completed", None),
     ],
 )
@@ -633,8 +629,8 @@ def test_http_strict_json_rejects_nonfinite_numbers_before_fetch(tmp_path, const
     event = fixture("call-completed.json")
     rendered = json.dumps(event, separators=(",", ":")).encode()
     rendered = rendered.replace(
-        b'"summary":',
-        f'"nonfinite":{constant},"summary":'.encode(),
+        b'"task":',
+        f'"nonfinite":{constant},"task":'.encode(),
         1,
     )
     fetcher = Fetcher(fetch_snapshot(event))
@@ -651,8 +647,8 @@ def test_http_strict_json_rejects_duplicate_object_keys_before_fetch(tmp_path):
     event = fixture("call-completed.json")
     rendered = json.dumps(event, separators=(",", ":")).encode()
     rendered = rendered.replace(
-        b'"summary":',
-        b'"duplicate":1,"duplicate":2,"summary":',
+        b'"task":',
+        b'"duplicate":1,"duplicate":2,"task":',
         1,
     )
     fetcher = Fetcher(fetch_snapshot(event))
@@ -886,7 +882,7 @@ def test_canonical_dedupe_skips_refetch_and_conflicting_id_returns_409(tmp_path)
 def test_matching_fixture_receipt_is_live_verified_and_upgraded_without_downgrade(
     tmp_path,
 ):
-    event = fixture("call-failed.json")
+    event = fixture("call-completed.json")
     database = tmp_path / "cross-mode.sqlite3"
     store = receiver.EventStore(database)
     fixture_status, fixture_payload = receiver.process_event(
@@ -910,8 +906,7 @@ def test_matching_fixture_receipt_is_live_verified_and_upgraded_without_downgrad
     assert fixture_duplicate == (200, {"received": True, "duplicate": True})
 
     authoritative = fetch_snapshot(event)
-    authoritative["status"] = "canceled"
-    authoritative["structured_result"] = {"wants_human_callback": "no"}
+    authoritative["result"] = {"wants_human_callback": "no"}
     fetcher = Fetcher(authoritative)
     with running_server(
         tmp_path,
@@ -938,7 +933,7 @@ def test_matching_fixture_receipt_is_live_verified_and_upgraded_without_downgrad
     assert fetcher.call_ids == [event["data"]["id"]]
     stored = dict(rows(database)[0])
     assert stored["verification_mode"] == "api"
-    assert stored["call_status"] == "canceled"
+    assert stored["call_status"] == "completed"
     assert stored["wants_human_callback"] == "no"
 
 
@@ -1011,10 +1006,9 @@ def test_failed_live_reconciliation_leaves_matching_fixture_receipt_untrusted(
 
 
 def test_live_fetch_racing_fixture_insert_still_performs_atomic_api_upgrade(tmp_path):
-    event = fixture("call-failed.json")
+    event = fixture("call-completed.json")
     authoritative = fetch_snapshot(event)
-    authoritative["status"] = "canceled"
-    authoritative["structured_result"] = {"wants_human_callback": "yes"}
+    authoritative["result"] = {"wants_human_callback": "yes"}
     database = tmp_path / "cross-mode-insert-race.sqlite3"
     fetch_started = threading.Event()
     allow_fetch = threading.Event()
@@ -1049,7 +1043,7 @@ def test_live_fetch_racing_fixture_insert_still_performs_atomic_api_upgrade(tmp_
     assert live_result == (200, {"received": True, "duplicate": False})
     stored = rows(database)[0]
     assert stored["verification_mode"] == "api"
-    assert stored["call_status"] == "canceled"
+    assert stored["call_status"] == "completed"
     assert stored["wants_human_callback"] == "yes"
 
 
@@ -1071,7 +1065,7 @@ def test_concurrent_live_upgrade_of_fixture_has_one_acceptance_and_one_duplicate
         assert call_id == event["data"]["id"]
         barrier.wait(timeout=5)
         snapshot = fetch_snapshot(event)
-        snapshot["structured_result"] = {"wants_human_callback": "unknown"}
+        snapshot["result"] = {"wants_human_callback": "unknown"}
         return snapshot
 
     with (
@@ -1216,11 +1210,12 @@ def test_authoritative_call_id_status_and_workflow_must_match(tmp_path, mutate):
 
 
 @pytest.mark.parametrize("status", ["failed", "canceled"])
-def test_failed_event_accepts_only_failed_or_canceled_authoritative_status(
+def test_failed_and_canceled_events_match_authoritative_status(
     tmp_path, status
 ):
     event = fixture("call-failed.json")
     authoritative = fetch_snapshot(event)
+    event["type"] = f"call.{status}"
     authoritative["status"] = status
     with running_server(tmp_path, Fetcher(authoritative)) as (server, database):
         response = post_event(server, event)
@@ -1230,7 +1225,7 @@ def test_failed_event_accepts_only_failed_or_canceled_authoritative_status(
 
 
 @pytest.mark.parametrize(
-    ("structured_result", "stored"),
+    ("result", "stored"),
     [
         (None, None),
         ({"wants_human_callback": "yes"}, "yes"),
@@ -1241,12 +1236,12 @@ def test_failed_event_accepts_only_failed_or_canceled_authoritative_status(
         ("free-form private result", None),
     ],
 )
-def test_structured_result_is_nullable_and_only_enum_value_is_normalized(
-    tmp_path, structured_result, stored
+def test_result_is_nullable_and_only_enum_value_is_normalized(
+    tmp_path, result, stored
 ):
     event = fixture("call-completed.json")
     authoritative = fetch_snapshot(event)
-    authoritative["structured_result"] = structured_result
+    authoritative["result"] = result
     with running_server(tmp_path, Fetcher(authoritative)) as (server, database):
         response = post_event(server, event)
 
@@ -1398,12 +1393,12 @@ def test_replay_uses_strict_json_for_duplicate_keys_and_nonfinite_values(
     raw = json.dumps(event, separators=(",", ":")).encode()
     if malformation == "duplicate":
         raw = raw.replace(
-            b'"summary":',
-            b'"duplicate":1,"duplicate":2,"summary":',
+            b'"task":',
+            b'"duplicate":1,"duplicate":2,"task":',
             1,
         )
     else:
-        raw = raw.replace(b'"summary":', b'"nonfinite":NaN,"summary":', 1)
+        raw = raw.replace(b'"task":', b'"nonfinite":NaN,"task":', 1)
     fixture_path = tmp_path / f"{malformation}.json"
     fixture_path.write_bytes(raw)
     output = io.StringIO()
@@ -1684,3 +1679,28 @@ def test_serve_mode_closes_client_on_server_construction_or_close_failure(tmp_pa
             )
 
         assert fake_client.closed
+
+
+@pytest.mark.parametrize("change", [
+    {"object": "call_task"},
+    {"result_status": "pending"},
+    {"result_status": "unexpected"},
+])
+def test_v2_receiver_rejects_legacy_or_unready_authoritative_snapshots(tmp_path, change):
+    event = fixture("call-completed.json")
+    snapshot = {**fetch_snapshot(event), **change}
+    store = receiver.EventStore(tmp_path / "receipts.sqlite3")
+    status, payload = receiver.process_event(
+        store, event, event["id"], call_fetcher=lambda _: snapshot
+    )
+    assert (status, payload) == (409, {"error": "authoritative_mismatch"})
+    assert rows(tmp_path / "receipts.sqlite3") == []
+
+
+def test_v2_receiver_does_not_accept_legacy_call_task_delivery(tmp_path):
+    event = fixture("call-completed.json")
+    event["data"]["object"] = "call_task"
+    store = receiver.EventStore(tmp_path / "receipts.sqlite3")
+    assert receiver.process_event(
+        store, event, event["id"], call_fetcher=lambda _: pytest.fail("legacy fetch")
+    ) == (400, {"error": "unsupported_call_format"})

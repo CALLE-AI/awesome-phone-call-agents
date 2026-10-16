@@ -1,0 +1,36 @@
+# Dependencies
+node_modules/
+
+# Production builds
+dist/
+
+# Environment and Secrets (CRITICAL SECURITY)
+.env
+.env.*
+!.env.example
+*.pem
+*.key
+*.cert
+*.crt
+*.pfx
+*.p8
+.npmrc
+.yarnrc
+
+# Logs
+*.log
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+
+# OS & Editor Artifacts
+.DS_Store
+Thumbs.db
+.vscode/
+.idea/
+
+# Scratch & Temporary Testing Scripts
+src/test-*.ts
+src/get-openapi.ts
+src/check-events.ts
+fork_work/

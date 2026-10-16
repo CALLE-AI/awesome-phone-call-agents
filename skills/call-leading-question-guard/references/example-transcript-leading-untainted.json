@@ -1,0 +1,14 @@
+{
+  "call_id": "run-lead-untainted",
+  "status": "COMPLETED",
+  "callee_phone": "+14155550141",
+  "transcript": [
+    {"speaker": "agent", "text": "Hello, this is an automated assistant calling from Example Pharmacy."},
+    {"speaker": "callee", "text": "Hello."},
+    {"speaker": "agent", "text": "Obviously you'd want the earlier slot, wouldn't you?"},
+    {"speaker": "callee", "text": "Actually, Tuesday suits me better."},
+    {"speaker": "agent", "text": "When works best for you?"},
+    {"speaker": "callee", "text": "Tuesday morning is fine."},
+    {"speaker": "agent", "text": "Thank you, we will have it ready. Goodbye."}
+  ]
+}

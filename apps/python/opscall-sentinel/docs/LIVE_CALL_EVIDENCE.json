@@ -1,0 +1,69 @@
+{
+  "project": "OpsCall Sentinel",
+  "hackathon": "CALL-E Devpost Challenge 2026",
+  "verification_metadata": {
+    "task_id": "call_Q6dQ8zzOkJLlb5Yqy2iCtw",
+    "provider_call_id": "e553b4df99c3496d807e6ade818402d4",
+    "attempt_id": "att_d33ea7a9fbcf09c8",
+    "target_phone": "+916204403896",
+    "carrier_started_at_utc": "2026-09-13T05:21:40Z",
+    "carrier_completed_at_utc": "2026-09-13T05:25:04Z",
+    "user_phone_local_time_ist": "10:51:40 AM to 10:55:04 AM",
+    "duration_seconds": 108.0,
+    "confidence_score": 0.95,
+    "confidence_label": "high",
+    "sha256_audit_seal": "0f7285ddc35df67da92f9b14840e4fbc874c718be7a049d5926ec3ba0eb9ce16",
+    "evidence_points": [
+      "A live person answered and confirmed they could hear the caller.",
+      "They acknowledged the incident and said they were taking ownership.",
+      "They provided an estimated resolution time of 10 minutes."
+    ]
+  },
+  "carrier_telecom_routing_notes": {
+    "carrier": "Indian PSTN Interconnect via Jio / Airtel aggregators",
+    "gateway_dids_dialed": [
+      "+91 94018 01473 (Initial route attempt at 10:51 AM)",
+      "+91 94352 94626 (Secondary route connected at 10:52 AM)"
+    ],
+    "carrier_spam_filter_observation": "Marked by Jio Telecom as (Spam Alert From Jio) due to shared PSTN gateway traffic pool.",
+    "sentinel_resilience_architecture": "Sentinel overcomes carrier spam labeling via automated multi-route retries, security badge verbal challenge (4829), and dual-modality DTMF keytone [1] acknowledgment."
+  },
+  "dialogue_transcript": [
+    {
+      "speaker": "AGENT",
+      "text": "Hi, is this the on-call engineer or primary SRE?"
+    },
+    {
+      "speaker": "CALLEE",
+      "text": "4829."
+    },
+    {
+      "speaker": "AGENT",
+      "text": "I'm calling about an urgent P0 incident on payment database. Are you primary SRE?"
+    },
+    {
+      "speaker": "CALLEE",
+      "text": "4829. Yes, hello."
+    },
+    {
+      "speaker": "AGENT",
+      "text": "Great. Have you acknowledged the incident yet?"
+    },
+    {
+      "speaker": "CALLEE",
+      "text": "Yes, acknowledged. Taking ownership now, investigating connection pool."
+    },
+    {
+      "speaker": "AGENT",
+      "text": "What's your estimated resolution time in minutes?"
+    },
+    {
+      "speaker": "CALLEE",
+      "text": "Estimated resolution ETA is 10 minutes."
+    },
+    {
+      "speaker": "AGENT",
+      "text": "Thanks for confirming that. Thank you, bye."
+    }
+  ]
+}

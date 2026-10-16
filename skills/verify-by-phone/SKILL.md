@@ -48,7 +48,7 @@ These are load-bearing, not boilerplate:
 2. Collect the record to verify: organization name, published phone number in E.164, and the claims to check (for example accepting new patients, accepts a named plan).
 3. Confirm the operator authorizes this specific call to this specific number.
 4. Build the call task with `scripts/place_verify_call.py`. The script defaults to a dry run that prints the exact task and recipient without dialing; pass `--live` only after the dry run looks right.
-5. Poll for the terminal result with `scripts/poll_result.py`, which saves the full payload to a local file.
+5. Poll with `scripts/poll_result.py` until `result_status` is no longer `pending`, even if execution already says `completed`. It saves the full Calls V2 payload to a private local file. An unavailable result is a normal outcome; extraction still reads any recorded transcript.
 6. Extract the answer with `scripts/extract_answer.py --qhat` from step 1. Every extracted field carries the verbatim transcript span and character offsets that support it. Hedged answers ("I think so") keep their polarity at a dampened trust score. Non-responsive turns (wrong number, refusal, "call back later") never count as answers. The answer is served only when the calibrated prediction set is a single value and that value is not "unknown"; otherwise the result is an abstention. Omitting `--qhat` abstains on everything and labels the output `uncalibrated`, because a threshold with no calibration behind it guarantees nothing.
 7. Reconcile against the stored record with `scripts/reconcile_record.py`: each agreeing field adds documented bits of evidence, each disagreeing field subtracts them, and the verdict is verified, contradicted, or unverifiable.
 
@@ -70,24 +70,17 @@ here and answered there.
 
 ## Requirements
 
-There are **two different floors**, and conflating them is how you get a confusing failure:
-
-| What you are doing | Minimum Python | Why |
+| What you are doing | Minimum Python | Dependencies |
 |---|---|---|
-| Everything except placing a live call | **3.9** | Standard library only, verified by running the whole quick start on 3.9.6 |
-| Placing a live call (step 3, `--live`) | **3.11** | `calle-ai` declares `requires-python >=3.11`, so pip will not install it below that |
+| Dry run, calibration, extraction, reconciliation, offline tests | **3.9** | Standard library only |
+| Creating or polling a live call | **3.11** | Published `calle-ai==1.0.1` and `CALLE_API_KEY` |
 
-So calibrate, extract, reconcile and every dry run work on 3.9. The moment you actually dial, you need 3.11 or newer, because that is the SDK's own floor and not a choice this skill makes. Both numbers were read from the source rather than assumed: 3.9.6 by running it, 3.11 from the published package metadata.
-
-Two dependency notes worth stating rather than leaving to be discovered:
-
-- Step 3 needs `calle-ai` and a `CALLE_API_KEY`. Every other step runs with no credentials and places no call.
-- `scripts/verify_attestation.py` needs `cryptography`. It is the only other script with a third-party import, and it is optional: it checks an attestation signature and is not part of the verification workflow.
+`scripts/verify_attestation.py` additionally needs `cryptography`. It is optional and is not part of the verification workflow.
 
 ## Quick Start
 
 ```bash
-pip install calle-ai
+python3 -m pip install calle-ai==1.0.1
 
 # 1. Calibrate the gate first. Prints the qhat step 5 needs.
 python3 scripts/calibrate.py --data references/sample-scenarios.jsonl --alpha 0.1
@@ -99,10 +92,15 @@ python3 scripts/place_verify_call.py \
   --claim-accepting-new-patients yes \
   --claim-plan "Example Health PPO"
 
-# 3. Place the call for real (requires CALLE_API_KEY).
-python3 scripts/place_verify_call.py ... --live
+# 3. After authorizing the specific published organizational line, set
+#    VERIFY_ORG and VERIFY_PHONE to its actual name and E.164 number.
+#    Requires CALLE_API_KEY. Do not dial the fictional dry-run number.
+python3 scripts/place_verify_call.py \
+  --org "$VERIFY_ORG" --phone "$VERIFY_PHONE" \
+  --claim-accepting-new-patients yes --claim-plan "Example Health PPO" \
+  --state verify-call.json --live
 
-# 4. Wait for the terminal payload.
+# 4. Use the API id printed above; wait until result_status is no longer pending.
 python3 scripts/poll_result.py --call-id call_abc123 --out result.json
 
 # 5. Extract the span-grounded answer. --org is required: an answer is only
@@ -119,13 +117,18 @@ python3 scripts/reconcile_record.py --payload result.json --qhat 0.750 \
 
 Steps 5 and 6 run against the bundled `references/sample-call.json` if you want to see real output before placing any call.
 
-All sample numbers in this skill are reserved fictional numbers. The dry run path and the bundled sample data mean everything except step 3 runs with no credentials and no real call.
+All literal sample numbers in this skill are fictional and must not be dialed. Dry runs and steps 1, 5 and 6 using the bundled fixture need no credentials or network. Step 4 uses the live API and credentials but places no call.
 
-**Three things make a claim abstain no matter how clearly it was answered**, and all three are deliberate:
+The first live run saves the original request and idempotency key to `--state` **before** sending it, then adds the API Call ID after acceptance. Retry with the same arguments and state file, including after a timeout or across a UTC-date boundary. Keep the request unchanged; the script refuses a state file belonging to different input. For an intentionally new call, use a different state path and a fresh `--idempotency-key`; the default key deduplicates identical same-day requests. The state file includes the unmasked phone number and is written mode 0600.
+
+Run the offline migration checks with `python3 scripts/test_calls_v2.py`.
+
+**These conditions make a claim abstain no matter how clearly it was answered**:
 
 1. **No calibrated threshold** (`--qhat` missing). There is no coverage guarantee to answer behind.
 2. **Identity not positively confirmed.** Absence of a denial is not confirmation. Wrong numbers, answering services and reassigned lines all produce cooperative respondents who are not the listing.
 3. **Both questions asked in one turn.** A single "Yes" cannot be split between two claims after the fact, so it is attributed to neither. The call script asks one question at a time to avoid this.
+4. **A V2 transcript contains an unknown speaker.** An unattributed turn may be the agent rather than the respondent. The entire call abstains until speaker attribution is reliable; the saved transcript is retained unchanged.
 
 ## What The Output Looks Like
 
@@ -147,13 +150,13 @@ An abstention keeps the same shape with `"abstain": true`, either because the ca
 
 ## Side Effects And Cancellation
 
-- Side effect: exactly one outbound phone call per `--live` invocation, to the number the operator supplied. Nothing recurs; there is no scheduler in this skill.
-- Cost: one billable CALL-E call per live run. Dry runs are free.
-- Cancellation: CALL-E does not expose call cancellation, so the moment to stop is before `--live`. The dry-run default exists for exactly that reason.
+- Side effect: at most one new outbound call per `--live` invocation, to the authorized number. Replaying the saved request returns the existing call. Nothing recurs; there is no scheduler in this skill.
+- Cost: a new live call can incur CALL-E charges; use Dashboard Billing for actual fees. Dry runs place no call.
+- Cancellation: stop before `--live` whenever possible. Calls V2 supports `client.calls.cancel(id)` before provider submission; once submission starts it returns `409 call_cannot_cancel` and cannot hang up an active call. Stopping the polling script does not cancel the call.
 - Data: payloads are written to local files the operator names. Phone numbers are masked in console output. Nothing in this skill transmits results anywhere except the CALL-E API itself.
 
 ## References
 
-- `references/api-notes.md`: the empirically observed CALL-E payload shape and API behaviors this skill relies on, including facts that were discovered by testing rather than documentation.
+- `references/api-notes.md`: the Calls V2 request, result readiness, transcript, retry and cancellation contract used by this skill.
 - `references/verification-protocol.md`: the full disclosure script, the legal posture for outbound verification calls, and why abstention is the core design decision.
 - `references/sample-scenarios.jsonl`: labeled fictional scenario data used by `scripts/calibrate.py`, so calibration runs with no credentials and no calls.

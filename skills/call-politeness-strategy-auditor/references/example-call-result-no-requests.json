@@ -1,0 +1,15 @@
+{
+  "call_id": "demo-polite-004",
+  "status": "COMPLETED",
+  "result": {
+    "post_summary": "Informed patron the hold arrived and is kept for 7 days.",
+    "transcript": [
+      {
+        "speaker": "agent",
+        "text": "Good afternoon, this is the library calling about the hold placed from the account on the line +14155550179. Your item arrived yesterday. It will be kept at the front desk for 7 days. The library is open until 8 p.m. on weekdays."
+      },
+      { "speaker": "callee", "text": "Great, thanks for letting me know." },
+      { "speaker": "agent", "text": "You're welcome. Have a lovely day." }
+    ]
+  }
+}

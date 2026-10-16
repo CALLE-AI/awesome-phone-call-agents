@@ -1,0 +1,39 @@
+{
+  "call_id": "demo-mi-004",
+  "status": "COMPLETED",
+  "result": {
+    "post_summary": "Discussed medication routine; reminder text scheduled per patient choice.",
+    "transcript": [
+      {
+        "speaker": "agent",
+        "text": "Good afternoon, this is the care team about your medication, on record for the line +14155550165. Would you like to cut down on skipped doses this month?"
+      },
+      { "speaker": "callee", "text": "I want to stop skipping it, honestly." },
+      {
+        "speaker": "agent",
+        "text": "Do you keep the pill bottle by your coffee maker?"
+      },
+      { "speaker": "callee", "text": "Sometimes I do." },
+      {
+        "speaker": "agent",
+        "text": "Would a reminder text in the morning help?"
+      },
+      { "speaker": "callee", "text": "Maybe, yes." },
+      {
+        "speaker": "agent",
+        "text": "The pharmacy is open until 9 p.m. on weekdays. Your refill is ready either way."
+      },
+      { "speaker": "callee", "text": "Good to know." },
+      {
+        "speaker": "agent",
+        "text": "Would you prefer the reminder at 8 a.m. or noon?"
+      },
+      { "speaker": "callee", "text": "8 a.m. is fine." },
+      {
+        "speaker": "agent",
+        "text": "Okay, the 8 a.m. text is scheduled. The clinic will confirm it by email."
+      },
+      { "speaker": "callee", "text": "Thanks." }
+    ]
+  }
+}

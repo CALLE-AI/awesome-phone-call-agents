@@ -1,0 +1,15 @@
+{
+  "call_id": "demo-temporal-002",
+  "status": "COMPLETED",
+  "to": "+14155550198",
+  "result": {
+    "post_summary": "Agent committed to a slot with a calendar mismatch (said Tuesday for a Wednesday date) and a meridiem-less clock time; the internal date conflict dominates the verdict.",
+    "transcript": [
+      {"speaker": "agent", "text": "Hello, this is Example Depot. I am calling about your delivery."},
+      {"speaker": "callee", "text": "Oh yes, when?"},
+      {"speaker": "agent", "text": "It is Tuesday, October 14 at 2. Please be home."},
+      {"speaker": "callee", "text": "Tuesday the 14th, okay."},
+      {"speaker": "agent", "text": "Thank you. Goodbye."}
+    ]
+  }
+}

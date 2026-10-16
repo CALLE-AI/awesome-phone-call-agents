@@ -1,0 +1,15 @@
+__pycache__/
+*.pyc
+.venv/
+.env
+.fieldline/
+dist/
+.pytest_cache/
+uv.lock
+docs/event.md
+docs/plan.md
+docs/submit-checklist.md
+docs/video-script.md
+docs/video*.mp4
+docs/video-notes.md
+docs/video-narration.md

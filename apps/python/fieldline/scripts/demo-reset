@@ -1,0 +1,7 @@
+#!/usr/bin/env bash
+# Reset FieldLine to a clean demo starting state (one command, per
+# demo-hardening doctrine): clears state dir incl. old incident briefs.
+set -euo pipefail
+cd "$(dirname "$0")/.."
+rm -rf .fieldline
+echo "FieldLine demo state cleared. Run: uv run fieldline demo"

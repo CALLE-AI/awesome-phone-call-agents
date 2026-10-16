@@ -1,0 +1,42 @@
+# FieldLine trip plan.
+# Phone numbers below are FICTIONAL (+1-555-01xx reserved range).
+# For a live test, replace them with your own numbers in E.164 format.
+
+worker:
+  name: "Huanyi"
+  role: "marine field researcher"
+  phone: "+15555550100"
+  locale: "en-US"
+
+trip:
+  label: "Reef Station 3 sampling dive"
+  site: "Reef Station 3, Thuwal coast (Red Sea)"
+  vehicle: "White pickup, KAUST plate 7-3421, parked at South Pier"
+  date: "2026-09-05"
+  start: "08:00"
+  end: "18:00"
+  checkins: ["14:00", "18:00"]
+  grace_minutes: 15        # missed check-in becomes OVERDUE after this
+  retry_after_minutes: 5   # gap between dial attempts to the worker
+  max_retries: 1           # extra dials before escalating
+
+# Said verbatim on a call, this quietly triggers escalation without the
+# agent reacting. Pick something natural; at least 3 words.
+duress_phrase: "the weather has been lovely all week"
+
+# Called in order when the worker is overdue. Duress skips straight to
+# the last (highest-authority) rung.
+escalation:
+  - name: "Marco"
+    relation: "dive buddy coordinator"
+    phone: "+15555550101"
+  - name: "Dr. Rivera"
+    relation: "PI / field safety officer"
+    phone: "+15555550102"
+
+# Surfaced in the incident brief. FieldLine NEVER auto-dials emergency
+# services — a human makes that call.
+emergency_note: >-
+  If the worker cannot be located, notify KAUST Security control room
+  (number in the safety plan). FieldLine never auto-dials emergency
+  services.
