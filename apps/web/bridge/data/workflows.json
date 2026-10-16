@@ -1,0 +1,155 @@
+[
+  {
+    "id": "wf-delivery-exception",
+    "name": "Delivery Exception Resolution",
+    "description": "Orchestrates instant driver triage, replacement vehicle assignment, manager cost approval, and customer ETA alignment.",
+    "category": "Logistics & Supply Chain",
+    "active": true,
+    "trigger": {
+      "type": "event",
+      "event": "vehicle_breakdown_or_delay_detected",
+      "conditions": ["delay_minutes > 45", "sla_risk == high"]
+    },
+    "nodes": [
+      {
+        "id": "node-1",
+        "type": "identification",
+        "title": "Identify On-Route Driver",
+        "role": "Driver",
+        "description": "Locate driver assigned to stalled vehicle and determine breakdown coordinates."
+      },
+      {
+        "id": "node-2",
+        "type": "calle_outbound",
+        "title": "CALL-E Driver Triage",
+        "targetRole": "Driver",
+        "goal": "Verify vehicle condition, physical safety, and recovery ETA."
+      },
+      {
+        "id": "node-3",
+        "type": "decision_gate",
+        "title": "Need Replacement Vehicle?",
+        "condition": "extracted.vehicleCondition == 'unusable'",
+        "ifTrue": "node-4",
+        "ifFalse": "node-resolved"
+      },
+      {
+        "id": "node-4",
+        "type": "calle_outbound",
+        "title": "CALL-E Warehouse Dispatch",
+        "targetRole": "Warehouse Manager",
+        "goal": "Check spare van availability and emergency departure timing."
+      },
+      {
+        "id": "node-5",
+        "type": "decision_gate",
+        "title": "Cost Approval Check",
+        "condition": "extracted.extraCost > 0",
+        "ifTrue": "node-6",
+        "ifFalse": "node-7"
+      },
+      {
+        "id": "node-6",
+        "type": "calle_outbound",
+        "title": "CALL-E Ops Approval",
+        "targetRole": "Operations Head",
+        "goal": "Authorize additional emergency dispatch budget under ₹2,000 threshold."
+      },
+      {
+        "id": "node-7",
+        "type": "calle_outbound",
+        "title": "CALL-E Customer Confirmation",
+        "targetRole": "Customer",
+        "goal": "Confirm revised arrival window (17:00) with recipient."
+      },
+      {
+        "id": "node-resolved",
+        "type": "resolution",
+        "title": "Task Resolved",
+        "action": "Close ticket, send automated tracking link, notify dispatch log."
+      }
+    ]
+  },
+  {
+    "id": "wf-cold-chain-alarm",
+    "name": "Cold-Chain Temperature Alert",
+    "description": "Autonomous escalation when refrigerated temperature breaches thresholds during transit.",
+    "category": "Quality & Compliance",
+    "active": true,
+    "trigger": {
+      "type": "iot_sensor",
+      "event": "temp_exceeded_threshold",
+      "conditions": ["temp_celsius > 8", "duration_minutes > 15"]
+    },
+    "nodes": [
+      {
+        "id": "c-1",
+        "type": "identification",
+        "title": "Identify Reefer Tech",
+        "role": "Reefer Technician",
+        "description": "Locate nearest certified cold-chain technician on standby."
+      },
+      {
+        "id": "c-2",
+        "type": "calle_outbound",
+        "title": "CALL-E Triage Unit",
+        "targetRole": "Reefer Technician",
+        "goal": "Check compressor status, auxiliary power, and battery health."
+      },
+      {
+        "id": "c-3",
+        "type": "calle_outbound",
+        "title": "CALL-E Quality Assurance",
+        "targetRole": "QA Director",
+        "goal": "Obtain product quarantine guidance or diversion authorization."
+      },
+      {
+        "id": "c-resolved",
+        "type": "resolution",
+        "title": "Temperature Normalized",
+        "action": "Produce sensor integrity report for compliance audit."
+      }
+    ]
+  },
+  {
+    "id": "wf-vip-escalation",
+    "name": "High-Value Order Hold & SLA Escalation",
+    "description": "Handles enterprise customer critical shipment holds and immediate executive resolution.",
+    "category": "Customer Operations",
+    "active": true,
+    "trigger": {
+      "type": "crm_webhook",
+      "event": "vip_order_exception",
+      "conditions": ["order_value > 100000", "sla_status == danger"]
+    },
+    "nodes": [
+      {
+        "id": "v-1",
+        "type": "identification",
+        "title": "Identify Key Account Director",
+        "role": "Account Director",
+        "description": "Check SLA terms and strategic account tolerance."
+      },
+      {
+        "id": "v-2",
+        "type": "calle_outbound",
+        "title": "CALL-E Strategic Alignment",
+        "targetRole": "Account Director",
+        "goal": "Determine priority flight-freight or same-day courier dispatch."
+      },
+      {
+        "id": "v-3",
+        "type": "calle_outbound",
+        "title": "CALL-E Client Procurement Contact",
+        "targetRole": "Client VP Procurement",
+        "goal": "Explain proactive mitigation plan and secure delivery acceptance."
+      },
+      {
+        "id": "v-resolved",
+        "type": "resolution",
+        "title": "VIP Satisfaction Secured",
+        "action": "Record executive signoff and auto-issue service guarantee credit."
+      }
+    ]
+  }
+]
