@@ -67,10 +67,10 @@ def create_call(task, entity, result_schema, metadata, idempotency_key=None, liv
 
     digits = phone[1:]
 
-    if not re.fullmatch(r'[0-9]{8,15}', digits):
+    if not re.fullmatch(r'[1-9][0-9]{7,14}', digits):
         raise ValueError(
             'CALL-E recipient phone number must use E.164 format'
-        )
+    )
 
     if phone not in AUTHORIZED_NUMBERS:
         raise ValueError(

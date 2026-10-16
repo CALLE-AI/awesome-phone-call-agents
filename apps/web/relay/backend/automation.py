@@ -38,9 +38,9 @@ _status = {'running': False, 'interval_seconds': INTERVAL_SECONDS, 'last_run': N
 _status_lock = threading.Lock()
 _tick_lock = threading.Lock()
 
-_in_flight = {}  # (pillar, entity_id) -> call_id, for live calls still awaiting a result
+_in_flight = {}  # (company_id, pillar, entity_id) -> call_id, for live calls still awaiting a result
 
-_pending_reconciliation = {}  # (pillar, entity_id) -> unresolved attempt
+_pending_reconciliation = {}  # (company_id, pillar, entity_id) -> unresolved attempt
 
 def wire(execute_call_fn, refresh_call_fn):
     """Dependency injection instead of importing app.py directly, which
@@ -74,12 +74,28 @@ def _already_handled(e):
     return e.get('_auto_handled_for') == _signature(e)
 
 
-def _mark_handled(pillar, e):
-    fresh = get_entity(pillar, e['id']) or e
-    update_entity(pillar, e['id'], {'_auto_handled_for': _signature(fresh)})
+def _mark_handled(company_id, pillar, e):
+    fresh = get_entity(
+        pillar,
+        e['id'],
+        company_id
+    ) or e
 
-def _fire(pillar, e, act, fired):
-    key = (pillar, e['id'])
+    update_entity(
+        pillar,
+        e['id'],
+        company_id,
+        {
+            '_auto_handled_for': _signature(fresh)
+        }
+    )
+
+def _fire(company_id, pillar, e, act, fired):
+    key = (
+        company_id,
+        pillar,
+        e['id']
+    )
 
     # Never create another call while the previous attempt is unresolved.
     if key in _in_flight or key in _pending_reconciliation:
@@ -97,35 +113,42 @@ def _fire(pillar, e, act, fired):
             e['id'],
             act,
             idempotency_key=idempotency_key,
-            live_intent=True
+            live_intent=True,
+            company_id=company_id
         )
 
-    except Exception as ex:
         # The request may have reached CALL-E even if we never received
         # its response. Do NOT retry automatically.
+    except Exception as ex:
         _pending_reconciliation[key] = {
             'pillar': pillar,
             'entity_id': e['id'],
             'act': act,
             'idempotency_key': idempotency_key,
-            'error': str(ex),
+            'error': 'call_operation_failed',
             'detected_at': datetime.now().isoformat(),
         }
 
         fired.append({
+            'companyId': company_id,
             'pillar': pillar,
             'entityId': e['id'],
             'act': act,
             'status': 'pending_reconciliation',
-            'error': str(ex),
+            'error': 'call_operation_failed',
         })
         return
 
     if result.get('dryRun', True):
         # Dry-run calls resolve synchronously.
-        _mark_handled(pillar, e)
+        _mark_handled(
+            company_id,
+            pillar,
+            e
+        )
 
         fired.append({
+            'companyId': company_id,
             'pillar': pillar,
             'entityId': e['id'],
             'act': act,
@@ -150,6 +173,7 @@ def _fire(pillar, e, act, fired):
             }
 
             fired.append({
+                'companyId': company_id,
                 'pillar': pillar,
                 'entityId': e['id'],
                 'act': act,
@@ -160,6 +184,7 @@ def _fire(pillar, e, act, fired):
         _in_flight[key] = call_id
 
         fired.append({
+            'companyId': company_id,
             'pillar': pillar,
             'entityId': e['id'],
             'act': act,
@@ -168,13 +193,20 @@ def _fire(pillar, e, act, fired):
             'status': 'queued',
         })
         
-def _resolve_in_flight():
+def _resolve_in_flight(only_company_id=None):
     if not _refresh_call:
         return
 
     for key, call_id in list(_in_flight.items()):
+        if only_company_id is not None and key[0] != only_company_id:
+            continue
         try:
-            record = _refresh_call(call_id)
+            company_id, pillar, entity_id = key
+
+            record = _refresh_call(
+                call_id,
+                company_id
+            )
         except Exception:
             # Keep the call in flight. Do not create another call.
             continue
@@ -184,87 +216,169 @@ def _resolve_in_flight():
             'failed',
             'canceled'
         ):
-            pillar, entity_id = key
-            e = get_entity(pillar, entity_id)
-
-            if e:
-                _mark_handled(pillar, e)
-
+            if record:
+                e = get_entity(
+                    pillar,
+                    entity_id,
+                    company_id
+                )
+            
+                if e:
+                    _mark_handled(
+                        company_id,
+                        pillar,
+                        e
+                    )
             del _in_flight[key]
 
-def run_once():
+def run_once(only_company_id=None):
+    """One automation pass. The background loop passes no company and
+    processes every company; the run-once route passes the logged-in
+    company so a company can only trigger its own automation."""
     if _execute_call is None:
         return []
     if not _tick_lock.acquire(blocking=False):
         return []  # a tick is already running; skip rather than overlap
     fired = []
     try:
-        _resolve_in_flight()
-        state = get_state()
-        settings = state['settings']
-        if not settings.get('automatic_followups', True):
-            with _status_lock:
-                _status['last_run'] = datetime.now().isoformat()
-                _status['last_result'] = []
-            return []
-        now = datetime.now()
+        _resolve_in_flight(only_company_id)
+        # Automation runs outside a Flask request, so there is no session.
+        # Process each company independently.
+        conn = None
 
-        if settings.get(FEATURE_FOR['employee'], True):
-            for e in state['employees']:
-                key = ('employee', e['id'])
-                if key in _in_flight:
-                    continue
-                if e.get('flag') == 'Offboarding today' and not _already_handled(e):
-                    _fire('employee', e, 'offboard', fired)
-                    continue
-                if (e.get('attendance_status') == 'absent' and e.get('flag') != 'Escalation required'
-                        and now.hour >= CHECKIN_DEADLINE_HOUR and not _already_handled(e)):
-                    _fire('employee', e, 'checkin', fired)
+        from .db import connect
 
-        if settings.get(FEATURE_FOR['customer'], True):
-            for c in state['customers']:
-                key = ('customer', c['id'])
-                if key in _in_flight:
-                    continue
-                d = days_until(c.get('renewal_date'))
-                if (c.get('flag') in ('Renewal due', 'At risk') and d is not None
-                        and 0 <= d <= RENEWAL_WINDOW_DAYS and not _already_handled(c)):
-                    _fire('customer', c, 'renewal', fired)
+        conn = connect()
 
-        if settings.get(FEATURE_FOR['license'], True):
-            for l in state['licenses']:
-                key = ('license', l['id'])
-                if key in _in_flight:
-                    continue
-                if l.get('flag') == 'Reclaim needed' and not _already_handled(l):
-                    _fire('license', l, 'seat-reclaim', fired)
-                    continue
-                purchased = l.get('seats_purchased', 0) or 0
-                active = l.get('seats_active', 0) or 0
-                util = (active / purchased) if purchased else 1
-                d = days_until(l.get('renewal_date'))
-                if (util < LOW_UTILIZATION_THRESHOLD and d is not None and 0 <= d <= RENEWAL_WINDOW_DAYS
-                        and l.get('optimization_status') != 'optimized' and not _already_handled(l)):
-                    _fire('license', l, 'usage-review', fired)
+        if only_company_id is None:
+            company_rows = conn.execute(
+                'SELECT id FROM company ORDER BY id'
+            ).fetchall()
+        else:
+            company_rows = conn.execute(
+                'SELECT id FROM company WHERE id=?',
+                (only_company_id,)
+            ).fetchall()
+
+        conn.close()
+
+        for company_row in company_rows:
+            company_id = company_row['id']
+
+            state = get_state(company_id)
+            if not state:
+                continue
+
+            settings = state['settings']
+            if not settings.get('automatic_followups', True):
+                # Paused for this company only; keep processing the others.
+                continue
+            now = datetime.now()
+
+            if settings.get(FEATURE_FOR['employee'], True):
+                for e in state['employees']:
+                    key = (company_id, 'employee', e['id'])
+                    if key in _in_flight:
+                        continue
+                    if e.get('flag') == 'Offboarding today' and not _already_handled(e):
+                        _fire(
+                            company_id,
+                            'employee',
+                            e,
+                            'offboard',
+                            fired
+                        )
+                        continue
+                    if (e.get('attendance_status') == 'absent' and e.get('flag') != 'Escalation required'
+                            and now.hour >= CHECKIN_DEADLINE_HOUR and not _already_handled(e)):
+                        _fire(
+                            company_id,
+                            'employee',
+                            e,
+                            'checkin',
+                            fired
+                        )
+
+            if settings.get(FEATURE_FOR['customer'], True):
+                for c in state['customers']:
+                    key = (company_id, 'customer', c['id'])
+                    if key in _in_flight:
+                        continue
+                    d = days_until(c.get('renewal_date'))
+                    if (c.get('flag') in ('Renewal due', 'At risk') and d is not None
+                            and 0 <= d <= RENEWAL_WINDOW_DAYS and not _already_handled(c)):
+                        _fire(
+                            company_id,
+                            'customer',
+                            c,
+                            'renewal',
+                            fired
+                        )
+
+            if settings.get(FEATURE_FOR['license'], True):
+                for l in state['licenses']:
+                    key = (company_id, 'license', l['id'])
+                    if key in _in_flight:
+                        continue
+                    if l.get('flag') == 'Reclaim needed' and not _already_handled(l):
+                        _fire(
+                            company_id,
+                            'license',
+                            l,
+                            'seat-reclaim',
+                            fired
+                        )
+                        continue
+                    purchased = l.get('seats_purchased', 0) or 0
+                    active = l.get('seats_active', 0) or 0
+                    util = (active / purchased) if purchased else 1
+                    d = days_until(l.get('renewal_date'))
+                    if (util < LOW_UTILIZATION_THRESHOLD and d is not None and 0 <= d <= RENEWAL_WINDOW_DAYS
+                            and l.get('optimization_status') != 'optimized' and not _already_handled(l)):
+                        _fire(
+                            company_id,
+                            'license',
+                            l,
+                            'usage-review',
+                            fired
+                        )
     finally:
         _tick_lock.release()
 
     with _status_lock:
         _status['last_run'] = datetime.now().isoformat()
-        _status['last_result'] = fired
+        if only_company_id is None:
+            _status['last_result'] = fired
+        else:
+            # Replace only this company's entries from the last pass.
+            _status['last_result'] = [
+                item for item in _status['last_result']
+                if item.get('companyId') != only_company_id
+            ] + fired
     return fired
 
-def get_pending_reconciliation():
+
+def mask_errors(items):
+    """Mask phone-shaped text in error fields only, so IDs stay intact."""
+    return [
+        {**item, 'error': redact(item['error'])} if 'error' in item else item
+        for item in items
+    ]
+
+
+def get_pending_reconciliation(only_company_id=None):
     return {
-        f'{pillar}:{entity_id}': {
+        f'{company_id}:{pillar}:{entity_id}': {
+            'company_id': company_id,
             'pillar': info.get('pillar'),
             'entity_id': info.get('entity_id'),
             'act': info.get('act'),
             'error': redact(info.get('error')),
             'detected_at': info.get('detected_at'),
         }
-        for (pillar, entity_id), info
+        for (company_id,pillar, entity_id), info
         in _pending_reconciliation.items()
+        if only_company_id is None or company_id == only_company_id
     }
 
 def start_background_loop():
@@ -278,20 +392,24 @@ def start_background_loop():
     thread = threading.Thread(target=_loop, daemon=True, name='relay-automation')
     thread.start()
 
-def get_status():
+def get_status(only_company_id=None):
+    """Automation status. The API passes the logged-in company so a
+    company never sees another company's results or call IDs."""
     with _status_lock:
         status = dict(_status)
 
-    status['last_result'] = [
-        {**item, 'error': redact(item['error'])} if 'error' in item else item
-        for item in status.get('last_result', [])
-    ]
+    status['last_result'] = mask_errors([
+        item for item in status.get('last_result', [])
+        if only_company_id is None or item.get('companyId') == only_company_id
+    ])
 
     status['in_flight'] = {
-        f'{pillar}:{entity_id}': call_id
-        for (pillar, entity_id), call_id in _in_flight.items()
+        f'{company_id}:{pillar}:{entity_id}': call_id
+        for (company_id, pillar, entity_id), call_id
+        in _in_flight.items()
+        if only_company_id is None or company_id == only_company_id
     }
 
-    status['pending_reconciliation'] = get_pending_reconciliation()
+    status['pending_reconciliation'] = get_pending_reconciliation(only_company_id)
 
     return status
