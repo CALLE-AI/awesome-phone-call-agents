@@ -1,0 +1,16 @@
+{
+  "shift_name": "India Retail Data Platform On-Call Roster (English)",
+  "date": "2026-09-06",
+  "timezone": "Asia/Kolkata (IST)",
+  "engineer": {
+    "name": "Dev Sharma",
+    "role": "Senior Retail Data Platform Engineer (OnTripFix On-Call)",
+    "phone": "+919876543210",
+    "email": "dev.sharma@example.com",
+    "calle_id": "user_dev_01",
+    "source": "local_config_file",
+    "region": "IN",
+    "locale": "en-IN",
+    "userid": "d9s3h7"
+  }
+}

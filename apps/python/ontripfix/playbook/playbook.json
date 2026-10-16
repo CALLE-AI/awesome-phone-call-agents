@@ -1,0 +1,18 @@
+[
+  {
+    "id": "PB-SQL-001",
+    "pattern": "has no column named inventory_status",
+    "title": "Missing Column 'inventory_status' in daily_store_inventory_agg",
+    "category": "Schema Drift",
+    "recommended_sql": "ALTER TABLE daily_store_inventory_agg ADD COLUMN inventory_status TEXT DEFAULT 'OK';",
+    "description": "Target aggregation table lacks the inventory_status column expected by Sunday night retail ETL transformation step."
+  },
+  {
+    "id": "PB-SQL-002",
+    "pattern": "database is locked",
+    "title": "SQLite Database Lock Timeout",
+    "category": "Concurrency",
+    "recommended_sql": "PRAGMA optimize; VACUUM;",
+    "description": "A concurrent query held a write lock on retail_data.db during ETL processing."
+  }
+]
