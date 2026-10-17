@@ -1,0 +1,13 @@
+{
+  "synthetic": true,
+  "customer_id": "demo-123",
+  "organization": "ABC Company",
+  "preferred_language": null,
+  "preferred_channel": null,
+  "preferred_call_window": null,
+  "voicemail_allowed": null,
+  "global_do_not_call": false,
+  "task_suppressions": [],
+  "campaign_suppressions": [],
+  "scoped_preferences": []
+}

@@ -1,0 +1,15 @@
+{
+  "status": "preferences_detected",
+  "preferences": [
+    {
+      "preference_type": "call_window",
+      "duration": "ongoing",
+      "scope": "organization",
+      "recommended_action": "update_preference",
+      "requires_human_review": false,
+      "value": "after 18:00",
+      "evidence": "\u4ee5\u540e\u90fd\u665a\u4e0a\u516d\u70b9\u4ee5\u540e\u7ed9\u6211\u6253\u3002",
+      "confidence": "high"
+    }
+  ]
+}

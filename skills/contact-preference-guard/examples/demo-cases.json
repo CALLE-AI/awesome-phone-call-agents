@@ -1,0 +1,116 @@
+{
+  "mode": "illustrative_fixture_replay",
+  "cases": [
+    {
+      "id": "ongoing-window",
+      "input": {
+        "transcript": "\u4ee5\u540e\u90fd\u665a\u4e0a\u516d\u70b9\u4ee5\u540e\u7ed9\u6211\u6253\u3002",
+        "call_context": {
+          "organization": "ABC Company",
+          "purpose": "post-purchase follow-up",
+          "task": "order-demo-123",
+          "campaign": "after-sales-demo"
+        }
+      },
+      "proposal": {
+        "status": "preferences_detected",
+        "preferences": [
+          {
+            "preference_type": "call_window",
+            "duration": "ongoing",
+            "scope": "organization",
+            "recommended_action": "update_preference",
+            "requires_human_review": false,
+            "value": "after 18:00",
+            "evidence": "\u4ee5\u540e\u90fd\u665a\u4e0a\u516d\u70b9\u4ee5\u540e\u7ed9\u6211\u6253\u3002",
+            "confidence": "high"
+          }
+        ]
+      }
+    },
+    {
+      "id": "today-only",
+      "input": {
+        "transcript": "\u4eca\u5929\u522b\u518d\u6253\u4e86\u3002",
+        "call_context": {
+          "organization": "ABC Company",
+          "purpose": "post-purchase follow-up",
+          "task": "order-demo-123",
+          "campaign": "after-sales-demo"
+        }
+      },
+      "proposal": {
+        "status": "preferences_detected",
+        "preferences": [
+          {
+            "preference_type": "do_not_call",
+            "duration": "time_bounded",
+            "scope": "this_task",
+            "recommended_action": "update_preference",
+            "requires_human_review": false,
+            "value": true,
+            "evidence": "\u4eca\u5929\u522b\u518d\u6253\u4e86\u3002",
+            "confidence": "high",
+            "time_bound": "\u4eca\u5929"
+          }
+        ]
+      }
+    },
+    {
+      "id": "order-only",
+      "input": {
+        "transcript": "\u8fd9\u4e2a\u8ba2\u5355\u7684\u4e8b\u60c5\u4ee5\u540e\u4e0d\u8981\u518d\u7ed9\u6211\u6253\u7535\u8bdd\u4e86\u3002",
+        "call_context": {
+          "organization": "ABC Company",
+          "purpose": "post-purchase follow-up",
+          "task": "order-demo-123",
+          "campaign": "after-sales-demo"
+        }
+      },
+      "proposal": {
+        "status": "preferences_detected",
+        "preferences": [
+          {
+            "preference_type": "do_not_call",
+            "duration": "ongoing",
+            "scope": "this_task",
+            "recommended_action": "update_preference",
+            "requires_human_review": false,
+            "value": true,
+            "evidence": "\u8fd9\u4e2a\u8ba2\u5355\u7684\u4e8b\u60c5\u4ee5\u540e\u4e0d\u8981\u518d\u7ed9\u6211\u6253\u7535\u8bdd\u4e86\u3002",
+            "confidence": "high"
+          }
+        ]
+      }
+    },
+    {
+      "id": "complaint",
+      "input": {
+        "transcript": "\u4f60\u4eec\u600e\u4e48\u5929\u5929\u7ed9\u6211\u6253\u7535\u8bdd\uff0c\u70e6\u6b7b\u4e86\u3002",
+        "call_context": {
+          "organization": "ABC Company",
+          "purpose": "post-purchase follow-up",
+          "task": "order-demo-123",
+          "campaign": "after-sales-demo"
+        }
+      },
+      "proposal": {
+        "status": "review_required",
+        "preferences": [
+          {
+            "preference_type": "do_not_call",
+            "duration": "unknown",
+            "scope": "unknown",
+            "recommended_action": "request_confirmation",
+            "requires_human_review": true,
+            "value": null,
+            "evidence": "\u4f60\u4eec\u600e\u4e48\u5929\u5929\u7ed9\u6211\u6253\u7535\u8bdd\uff0c\u70e6\u6b7b\u4e86\u3002",
+            "confidence": "medium",
+            "review_reason": "A complaint about call frequency does not explicitly establish a restriction or its scope.",
+            "suggested_clarification": "Should calls stop, and if so for which task or organization and for how long?"
+          }
+        ]
+      }
+    }
+  ]
+}

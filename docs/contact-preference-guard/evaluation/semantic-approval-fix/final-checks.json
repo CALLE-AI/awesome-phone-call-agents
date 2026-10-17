@@ -1,0 +1,21 @@
+{
+  "repository_validation": {
+    "command": "PYTHONDONTWRITEBYTECODE=1 python3 scripts/validate_repository.py",
+    "exit_code": 0,
+    "stdout": "Repository validation passed.\n"
+  },
+  "skill_metadata_validation": {
+    "command": "PYTHONDONTWRITEBYTECODE=1 PYTHONPATH=/tmp/contact-guard-validation-deps python3 /Users/gaoze/.codex/skills/.system/skill-creator/scripts/quick_validate.py skills/contact-preference-guard",
+    "exit_code": 0,
+    "stdout": "Skill is valid!\n"
+  },
+  "git_diff_check_exit_code": 0,
+  "unchanged_checks": {
+    "type_duration_scope_action_enums": true,
+    "unaffected_15_safety_tests_ast_identical": true,
+    "supplemental_definitions_byte_identical": true,
+    "shipped_mock_byte_identical": true,
+    "historical_review_bundle_unchanged": true
+  },
+  "documentation_links_resolve": true
+}

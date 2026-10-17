@@ -1,0 +1,21 @@
+{
+  "recorded_date": "2026-10-17",
+  "evaluation": "author-run synthetic language interpretation by fresh-context agents; no expected answers supplied",
+  "review": "implementing agent inspected final golden and first-pass supplemental outputs; not independent human validation",
+  "initial_instruction_sha256": {
+    "SKILL.md": "2c126080b9d7edbf7277c3c4b580d78b5e6b46d33788bced08e41185c5ae060c",
+    "references/preference-schema.md": "952e56439aaf0421a6dcda5c8de70e7e226788c1c84fd45a1c7494ab2398f808",
+    "references/safety.md": "b3e6b8a627b2d7c98e5ee6288d8f34289bcb511fe60a67cd2a833e7774a56385"
+  },
+  "final_instruction_sha256": {
+    "SKILL.md": "2c126080b9d7edbf7277c3c4b580d78b5e6b46d33788bced08e41185c5ae060c",
+    "references/preference-schema.md": "1cf4ee5db3c64ed810c60b4f8c6cae7e023eceb6f3670393464f0dace47bebf5",
+    "references/safety.md": "b3e6b8a627b2d7c98e5ee6288d8f34289bcb511fe60a67cd2a833e7774a56385"
+  },
+  "regression_change": "Chinese language code convention clarified as zh-CN; expected golden answers unchanged",
+  "supplemental_timing": "created after initial Skill/schema draft and evaluated once before the language-code clarification; now public regression material",
+  "exact_model_version": "not independently recorded by evaluating agents",
+  "runtime_settings": "inherited agent configuration, no separate sampling settings captured",
+  "first_pass_cases": 47,
+  "final_golden_cases": 35
+}

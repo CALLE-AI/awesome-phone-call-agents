@@ -1,0 +1,669 @@
+{
+  "suite": "golden",
+  "case_count": 35,
+  "metrics": {
+    "type_accuracy": {
+      "numerator": 35,
+      "denominator": 35,
+      "rate": 1.0
+    },
+    "duration_accuracy": {
+      "numerator": 35,
+      "denominator": 35,
+      "rate": 1.0
+    },
+    "scope_accuracy": {
+      "numerator": 35,
+      "denominator": 35,
+      "rate": 1.0
+    },
+    "action_accuracy": {
+      "numerator": 35,
+      "denominator": 35,
+      "rate": 1.0
+    },
+    "false_positive_rate": {
+      "numerator": 0,
+      "denominator": 6,
+      "rate": 0.0
+    },
+    "ambiguity_handling": {
+      "numerator": 6,
+      "denominator": 6,
+      "rate": 1.0
+    },
+    "multi_preference_handling": {
+      "numerator": 2,
+      "denominator": 3,
+      "rate": 0.6666666666666666
+    },
+    "over_broad_update_rate": {
+      "numerator": 0,
+      "denominator": 35,
+      "rate": 0.0
+    },
+    "contract_validity": {
+      "numerator": 35,
+      "denominator": 35,
+      "rate": 1.0
+    },
+    "case_pass_rate": {
+      "numerator": 31,
+      "denominator": 35,
+      "rate": 0.8857142857142857
+    }
+  },
+  "details": [
+    {
+      "id": "golden-01",
+      "passed": true,
+      "checks": {
+        "type_accuracy": true,
+        "duration_accuracy": true,
+        "scope_accuracy": true,
+        "action_accuracy": true,
+        "contract_validity": true,
+        "case_pass_rate": true,
+        "over_broad_update_rate": false
+      },
+      "value_match": true,
+      "review_match": true,
+      "status_match": true,
+      "contract_errors": []
+    },
+    {
+      "id": "golden-02",
+      "passed": true,
+      "checks": {
+        "type_accuracy": true,
+        "duration_accuracy": true,
+        "scope_accuracy": true,
+        "action_accuracy": true,
+        "contract_validity": true,
+        "case_pass_rate": true,
+        "over_broad_update_rate": false,
+        "multi_preference_handling": true
+      },
+      "value_match": true,
+      "review_match": true,
+      "status_match": true,
+      "contract_errors": []
+    },
+    {
+      "id": "golden-03",
+      "passed": false,
+      "checks": {
+        "type_accuracy": true,
+        "duration_accuracy": true,
+        "scope_accuracy": true,
+        "action_accuracy": true,
+        "contract_validity": true,
+        "case_pass_rate": false,
+        "over_broad_update_rate": false
+      },
+      "value_match": false,
+      "review_match": true,
+      "status_match": true,
+      "contract_errors": []
+    },
+    {
+      "id": "golden-04",
+      "passed": true,
+      "checks": {
+        "type_accuracy": true,
+        "duration_accuracy": true,
+        "scope_accuracy": true,
+        "action_accuracy": true,
+        "contract_validity": true,
+        "case_pass_rate": true,
+        "over_broad_update_rate": false
+      },
+      "value_match": true,
+      "review_match": true,
+      "status_match": true,
+      "contract_errors": []
+    },
+    {
+      "id": "golden-05",
+      "passed": true,
+      "checks": {
+        "type_accuracy": true,
+        "duration_accuracy": true,
+        "scope_accuracy": true,
+        "action_accuracy": true,
+        "contract_validity": true,
+        "case_pass_rate": true,
+        "over_broad_update_rate": false
+      },
+      "value_match": true,
+      "review_match": true,
+      "status_match": true,
+      "contract_errors": []
+    },
+    {
+      "id": "golden-06",
+      "passed": true,
+      "checks": {
+        "type_accuracy": true,
+        "duration_accuracy": true,
+        "scope_accuracy": true,
+        "action_accuracy": true,
+        "contract_validity": true,
+        "case_pass_rate": true,
+        "over_broad_update_rate": false
+      },
+      "value_match": true,
+      "review_match": true,
+      "status_match": true,
+      "contract_errors": []
+    },
+    {
+      "id": "golden-07",
+      "passed": true,
+      "checks": {
+        "type_accuracy": true,
+        "duration_accuracy": true,
+        "scope_accuracy": true,
+        "action_accuracy": true,
+        "contract_validity": true,
+        "case_pass_rate": true,
+        "over_broad_update_rate": false
+      },
+      "value_match": true,
+      "review_match": true,
+      "status_match": true,
+      "contract_errors": []
+    },
+    {
+      "id": "golden-08",
+      "passed": true,
+      "checks": {
+        "type_accuracy": true,
+        "duration_accuracy": true,
+        "scope_accuracy": true,
+        "action_accuracy": true,
+        "contract_validity": true,
+        "case_pass_rate": true,
+        "over_broad_update_rate": false
+      },
+      "value_match": true,
+      "review_match": true,
+      "status_match": true,
+      "contract_errors": []
+    },
+    {
+      "id": "golden-09",
+      "passed": true,
+      "checks": {
+        "type_accuracy": true,
+        "duration_accuracy": true,
+        "scope_accuracy": true,
+        "action_accuracy": true,
+        "contract_validity": true,
+        "case_pass_rate": true,
+        "over_broad_update_rate": false
+      },
+      "value_match": true,
+      "review_match": true,
+      "status_match": true,
+      "contract_errors": []
+    },
+    {
+      "id": "golden-10",
+      "passed": true,
+      "checks": {
+        "type_accuracy": true,
+        "duration_accuracy": true,
+        "scope_accuracy": true,
+        "action_accuracy": true,
+        "contract_validity": true,
+        "case_pass_rate": true,
+        "over_broad_update_rate": false
+      },
+      "value_match": true,
+      "review_match": true,
+      "status_match": true,
+      "contract_errors": []
+    },
+    {
+      "id": "golden-11",
+      "passed": true,
+      "checks": {
+        "type_accuracy": true,
+        "duration_accuracy": true,
+        "scope_accuracy": true,
+        "action_accuracy": true,
+        "contract_validity": true,
+        "case_pass_rate": true,
+        "over_broad_update_rate": false
+      },
+      "value_match": true,
+      "review_match": true,
+      "status_match": true,
+      "contract_errors": []
+    },
+    {
+      "id": "golden-12",
+      "passed": true,
+      "checks": {
+        "type_accuracy": true,
+        "duration_accuracy": true,
+        "scope_accuracy": true,
+        "action_accuracy": true,
+        "contract_validity": true,
+        "case_pass_rate": true,
+        "over_broad_update_rate": false
+      },
+      "value_match": true,
+      "review_match": true,
+      "status_match": true,
+      "contract_errors": []
+    },
+    {
+      "id": "golden-13",
+      "passed": true,
+      "checks": {
+        "type_accuracy": true,
+        "duration_accuracy": true,
+        "scope_accuracy": true,
+        "action_accuracy": true,
+        "contract_validity": true,
+        "case_pass_rate": true,
+        "over_broad_update_rate": false
+      },
+      "value_match": true,
+      "review_match": true,
+      "status_match": true,
+      "contract_errors": []
+    },
+    {
+      "id": "golden-14",
+      "passed": true,
+      "checks": {
+        "type_accuracy": true,
+        "duration_accuracy": true,
+        "scope_accuracy": true,
+        "action_accuracy": true,
+        "contract_validity": true,
+        "case_pass_rate": true,
+        "over_broad_update_rate": false
+      },
+      "value_match": true,
+      "review_match": true,
+      "status_match": true,
+      "contract_errors": []
+    },
+    {
+      "id": "golden-15",
+      "passed": true,
+      "checks": {
+        "type_accuracy": true,
+        "duration_accuracy": true,
+        "scope_accuracy": true,
+        "action_accuracy": true,
+        "contract_validity": true,
+        "case_pass_rate": true,
+        "over_broad_update_rate": false
+      },
+      "value_match": true,
+      "review_match": true,
+      "status_match": true,
+      "contract_errors": []
+    },
+    {
+      "id": "golden-16",
+      "passed": false,
+      "checks": {
+        "type_accuracy": true,
+        "duration_accuracy": true,
+        "scope_accuracy": true,
+        "action_accuracy": true,
+        "contract_validity": true,
+        "case_pass_rate": false,
+        "over_broad_update_rate": false
+      },
+      "value_match": false,
+      "review_match": true,
+      "status_match": true,
+      "contract_errors": []
+    },
+    {
+      "id": "golden-17",
+      "passed": true,
+      "checks": {
+        "type_accuracy": true,
+        "duration_accuracy": true,
+        "scope_accuracy": true,
+        "action_accuracy": true,
+        "contract_validity": true,
+        "case_pass_rate": true,
+        "over_broad_update_rate": false
+      },
+      "value_match": true,
+      "review_match": true,
+      "status_match": true,
+      "contract_errors": []
+    },
+    {
+      "id": "golden-18",
+      "passed": true,
+      "checks": {
+        "type_accuracy": true,
+        "duration_accuracy": true,
+        "scope_accuracy": true,
+        "action_accuracy": true,
+        "contract_validity": true,
+        "case_pass_rate": true,
+        "over_broad_update_rate": false
+      },
+      "value_match": true,
+      "review_match": true,
+      "status_match": true,
+      "contract_errors": []
+    },
+    {
+      "id": "golden-19",
+      "passed": true,
+      "checks": {
+        "type_accuracy": true,
+        "duration_accuracy": true,
+        "scope_accuracy": true,
+        "action_accuracy": true,
+        "contract_validity": true,
+        "case_pass_rate": true,
+        "over_broad_update_rate": false,
+        "ambiguity_handling": true
+      },
+      "value_match": true,
+      "review_match": true,
+      "status_match": true,
+      "contract_errors": []
+    },
+    {
+      "id": "golden-20",
+      "passed": true,
+      "checks": {
+        "type_accuracy": true,
+        "duration_accuracy": true,
+        "scope_accuracy": true,
+        "action_accuracy": true,
+        "contract_validity": true,
+        "case_pass_rate": true,
+        "over_broad_update_rate": false,
+        "ambiguity_handling": true
+      },
+      "value_match": true,
+      "review_match": true,
+      "status_match": true,
+      "contract_errors": []
+    },
+    {
+      "id": "golden-21",
+      "passed": false,
+      "checks": {
+        "type_accuracy": true,
+        "duration_accuracy": true,
+        "scope_accuracy": true,
+        "action_accuracy": true,
+        "contract_validity": true,
+        "case_pass_rate": false,
+        "over_broad_update_rate": false,
+        "ambiguity_handling": true
+      },
+      "value_match": false,
+      "review_match": true,
+      "status_match": true,
+      "contract_errors": []
+    },
+    {
+      "id": "golden-22",
+      "passed": true,
+      "checks": {
+        "type_accuracy": true,
+        "duration_accuracy": true,
+        "scope_accuracy": true,
+        "action_accuracy": true,
+        "contract_validity": true,
+        "case_pass_rate": true,
+        "over_broad_update_rate": false,
+        "ambiguity_handling": true
+      },
+      "value_match": true,
+      "review_match": true,
+      "status_match": true,
+      "contract_errors": []
+    },
+    {
+      "id": "golden-23",
+      "passed": true,
+      "checks": {
+        "type_accuracy": true,
+        "duration_accuracy": true,
+        "scope_accuracy": true,
+        "action_accuracy": true,
+        "contract_validity": true,
+        "case_pass_rate": true,
+        "over_broad_update_rate": false,
+        "ambiguity_handling": true
+      },
+      "value_match": true,
+      "review_match": true,
+      "status_match": true,
+      "contract_errors": []
+    },
+    {
+      "id": "golden-24",
+      "passed": true,
+      "checks": {
+        "type_accuracy": true,
+        "duration_accuracy": true,
+        "scope_accuracy": true,
+        "action_accuracy": true,
+        "contract_validity": true,
+        "case_pass_rate": true,
+        "over_broad_update_rate": false,
+        "ambiguity_handling": true
+      },
+      "value_match": true,
+      "review_match": true,
+      "status_match": true,
+      "contract_errors": []
+    },
+    {
+      "id": "golden-25",
+      "passed": true,
+      "checks": {
+        "type_accuracy": true,
+        "duration_accuracy": true,
+        "scope_accuracy": true,
+        "action_accuracy": true,
+        "contract_validity": true,
+        "case_pass_rate": true,
+        "over_broad_update_rate": false,
+        "false_positive_rate": false
+      },
+      "value_match": true,
+      "review_match": true,
+      "status_match": true,
+      "contract_errors": []
+    },
+    {
+      "id": "golden-26",
+      "passed": true,
+      "checks": {
+        "type_accuracy": true,
+        "duration_accuracy": true,
+        "scope_accuracy": true,
+        "action_accuracy": true,
+        "contract_validity": true,
+        "case_pass_rate": true,
+        "over_broad_update_rate": false,
+        "false_positive_rate": false
+      },
+      "value_match": true,
+      "review_match": true,
+      "status_match": true,
+      "contract_errors": []
+    },
+    {
+      "id": "golden-27",
+      "passed": true,
+      "checks": {
+        "type_accuracy": true,
+        "duration_accuracy": true,
+        "scope_accuracy": true,
+        "action_accuracy": true,
+        "contract_validity": true,
+        "case_pass_rate": true,
+        "over_broad_update_rate": false,
+        "false_positive_rate": false
+      },
+      "value_match": true,
+      "review_match": true,
+      "status_match": true,
+      "contract_errors": []
+    },
+    {
+      "id": "golden-28",
+      "passed": true,
+      "checks": {
+        "type_accuracy": true,
+        "duration_accuracy": true,
+        "scope_accuracy": true,
+        "action_accuracy": true,
+        "contract_validity": true,
+        "case_pass_rate": true,
+        "over_broad_update_rate": false,
+        "false_positive_rate": false
+      },
+      "value_match": true,
+      "review_match": true,
+      "status_match": true,
+      "contract_errors": []
+    },
+    {
+      "id": "golden-29",
+      "passed": true,
+      "checks": {
+        "type_accuracy": true,
+        "duration_accuracy": true,
+        "scope_accuracy": true,
+        "action_accuracy": true,
+        "contract_validity": true,
+        "case_pass_rate": true,
+        "over_broad_update_rate": false,
+        "false_positive_rate": false
+      },
+      "value_match": true,
+      "review_match": true,
+      "status_match": true,
+      "contract_errors": []
+    },
+    {
+      "id": "golden-30",
+      "passed": true,
+      "checks": {
+        "type_accuracy": true,
+        "duration_accuracy": true,
+        "scope_accuracy": true,
+        "action_accuracy": true,
+        "contract_validity": true,
+        "case_pass_rate": true,
+        "over_broad_update_rate": false,
+        "false_positive_rate": false
+      },
+      "value_match": true,
+      "review_match": true,
+      "status_match": true,
+      "contract_errors": []
+    },
+    {
+      "id": "golden-31",
+      "passed": false,
+      "checks": {
+        "type_accuracy": true,
+        "duration_accuracy": true,
+        "scope_accuracy": true,
+        "action_accuracy": true,
+        "contract_validity": true,
+        "case_pass_rate": false,
+        "over_broad_update_rate": false,
+        "multi_preference_handling": false
+      },
+      "value_match": false,
+      "review_match": true,
+      "status_match": true,
+      "contract_errors": []
+    },
+    {
+      "id": "golden-32",
+      "passed": true,
+      "checks": {
+        "type_accuracy": true,
+        "duration_accuracy": true,
+        "scope_accuracy": true,
+        "action_accuracy": true,
+        "contract_validity": true,
+        "case_pass_rate": true,
+        "over_broad_update_rate": false,
+        "multi_preference_handling": true
+      },
+      "value_match": true,
+      "review_match": true,
+      "status_match": true,
+      "contract_errors": []
+    },
+    {
+      "id": "golden-33",
+      "passed": true,
+      "checks": {
+        "type_accuracy": true,
+        "duration_accuracy": true,
+        "scope_accuracy": true,
+        "action_accuracy": true,
+        "contract_validity": true,
+        "case_pass_rate": true,
+        "over_broad_update_rate": false
+      },
+      "value_match": true,
+      "review_match": true,
+      "status_match": true,
+      "contract_errors": []
+    },
+    {
+      "id": "golden-34",
+      "passed": true,
+      "checks": {
+        "type_accuracy": true,
+        "duration_accuracy": true,
+        "scope_accuracy": true,
+        "action_accuracy": true,
+        "contract_validity": true,
+        "case_pass_rate": true,
+        "over_broad_update_rate": false
+      },
+      "value_match": true,
+      "review_match": true,
+      "status_match": true,
+      "contract_errors": []
+    },
+    {
+      "id": "golden-35",
+      "passed": true,
+      "checks": {
+        "type_accuracy": true,
+        "duration_accuracy": true,
+        "scope_accuracy": true,
+        "action_accuracy": true,
+        "contract_validity": true,
+        "case_pass_rate": true,
+        "over_broad_update_rate": false
+      },
+      "value_match": true,
+      "review_match": true,
+      "status_match": true,
+      "contract_errors": []
+    }
+  ],
+  "limitations": "Case-level synthetic checks. Empty cases count as correct categorical outputs. Over-broad metric covers encoded assertions only; human semantic review is required. This script scores saved outputs and does not invoke a model."
+}
