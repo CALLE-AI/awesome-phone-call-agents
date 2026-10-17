@@ -1,0 +1,108 @@
+[
+  {
+    "id": "golden-02",
+    "before": {
+      "status": "review_required",
+      "preferences": [
+        {
+          "preference_type": "channel",
+          "duration": "ongoing",
+          "scope": "organization",
+          "recommended_action": "update_preference",
+          "requires_human_review": false,
+          "value": "sms"
+        },
+        {
+          "preference_type": "do_not_call",
+          "duration": "ongoing",
+          "scope": "organization",
+          "recommended_action": "request_confirmation",
+          "requires_human_review": true,
+          "value": true
+        }
+      ]
+    },
+    "after": {
+      "status": "preferences_detected",
+      "preferences": [
+        {
+          "preference_type": "channel",
+          "duration": "ongoing",
+          "scope": "organization",
+          "recommended_action": "update_preference",
+          "requires_human_review": false,
+          "value": "sms"
+        },
+        {
+          "preference_type": "do_not_call",
+          "duration": "ongoing",
+          "scope": "organization",
+          "recommended_action": "update_preference",
+          "requires_human_review": false,
+          "value": true
+        }
+      ]
+    },
+    "reason": "User-requested separation of semantic uncertainty and operator approval"
+  },
+  {
+    "id": "golden-06",
+    "before": {
+      "status": "review_required",
+      "preferences": [
+        {
+          "preference_type": "do_not_call",
+          "duration": "ongoing",
+          "scope": "organization",
+          "recommended_action": "request_confirmation",
+          "requires_human_review": true,
+          "value": true
+        }
+      ]
+    },
+    "after": {
+      "status": "preferences_detected",
+      "preferences": [
+        {
+          "preference_type": "do_not_call",
+          "duration": "ongoing",
+          "scope": "organization",
+          "recommended_action": "update_preference",
+          "requires_human_review": false,
+          "value": true
+        }
+      ]
+    },
+    "reason": "User-requested separation of semantic uncertainty and operator approval"
+  },
+  {
+    "id": "golden-15",
+    "before": {
+      "status": "review_required",
+      "preferences": [
+        {
+          "preference_type": "do_not_call",
+          "duration": "ongoing",
+          "scope": "organization",
+          "recommended_action": "request_confirmation",
+          "requires_human_review": true,
+          "value": true
+        }
+      ]
+    },
+    "after": {
+      "status": "preferences_detected",
+      "preferences": [
+        {
+          "preference_type": "do_not_call",
+          "duration": "ongoing",
+          "scope": "organization",
+          "recommended_action": "update_preference",
+          "requires_human_review": false,
+          "value": true
+        }
+      ]
+    },
+    "reason": "User-requested separation of semantic uncertainty and operator approval"
+  }
+]

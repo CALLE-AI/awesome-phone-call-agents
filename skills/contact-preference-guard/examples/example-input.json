@@ -1,0 +1,9 @@
+{
+  "transcript": "\u4ee5\u540e\u90fd\u665a\u4e0a\u516d\u70b9\u4ee5\u540e\u7ed9\u6211\u6253\u3002",
+  "call_context": {
+    "organization": "ABC Company",
+    "purpose": "post-purchase follow-up",
+    "task": "order-demo-123",
+    "campaign": "after-sales-demo"
+  }
+}

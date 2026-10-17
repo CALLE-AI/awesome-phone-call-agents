@@ -1,0 +1,845 @@
+{
+  "suite": "golden",
+  "description": "35 handoff cases. Expectations are assertions, not executable interpretation. Added conservative choices for unspecified fields are documented in the README.",
+  "cases": [
+    {
+      "id": "golden-01",
+      "input": {
+        "transcript": "\u4ee5\u540e\u90fd\u665a\u4e0a\u516d\u70b9\u4ee5\u540e\u7ed9\u6211\u6253\u3002",
+        "call_context": {
+          "organization": "ABC Company",
+          "purpose": "post-purchase follow-up",
+          "task": "order-demo-123",
+          "campaign": "after-sales-demo"
+        }
+      },
+      "expected": {
+        "status": "preferences_detected",
+        "preferences": [
+          {
+            "preference_type": "call_window",
+            "duration": "ongoing",
+            "scope": "organization",
+            "recommended_action": "update_preference",
+            "requires_human_review": false
+          }
+        ]
+      }
+    },
+    {
+      "id": "golden-02",
+      "input": {
+        "transcript": "\u4ee5\u540e\u7ed9\u6211\u53d1\u77ed\u4fe1\u5c31\u884c\uff0c\u522b\u6253\u7535\u8bdd\u3002",
+        "call_context": {
+          "organization": "ABC Company",
+          "purpose": "post-purchase follow-up",
+          "task": "order-demo-123",
+          "campaign": "after-sales-demo"
+        }
+      },
+      "expected": {
+        "status": "preferences_detected",
+        "preferences": [
+          {
+            "preference_type": "channel",
+            "duration": "ongoing",
+            "scope": "organization",
+            "recommended_action": "update_preference",
+            "requires_human_review": false,
+            "value": "sms"
+          },
+          {
+            "preference_type": "do_not_call",
+            "duration": "ongoing",
+            "scope": "organization",
+            "recommended_action": "update_preference",
+            "requires_human_review": false,
+            "value": true
+          }
+        ]
+      }
+    },
+    {
+      "id": "golden-03",
+      "input": {
+        "transcript": "\u4ee5\u540e\u8ddf\u6211\u8bf4\u4e2d\u6587\u5427\u3002",
+        "call_context": {
+          "organization": "ABC Company",
+          "purpose": "post-purchase follow-up",
+          "task": "order-demo-123",
+          "campaign": "after-sales-demo"
+        }
+      },
+      "expected": {
+        "status": "preferences_detected",
+        "preferences": [
+          {
+            "preference_type": "language",
+            "duration": "ongoing",
+            "scope": "organization",
+            "recommended_action": "update_preference",
+            "requires_human_review": false,
+            "value": "zh-CN"
+          }
+        ]
+      }
+    },
+    {
+      "id": "golden-04",
+      "input": {
+        "transcript": "\u5982\u679c\u6211\u6ca1\u63a5\uff0c\u4f60\u53ef\u4ee5\u7ed9\u6211\u7559\u8bed\u97f3\u3002",
+        "call_context": {
+          "organization": "ABC Company",
+          "purpose": "post-purchase follow-up",
+          "task": "order-demo-123",
+          "campaign": "after-sales-demo"
+        }
+      },
+      "expected": {
+        "status": "preferences_detected",
+        "preferences": [
+          {
+            "preference_type": "voicemail",
+            "duration": "ongoing",
+            "scope": "organization",
+            "recommended_action": "update_preference",
+            "requires_human_review": false,
+            "value": "allowed"
+          }
+        ]
+      }
+    },
+    {
+      "id": "golden-05",
+      "input": {
+        "transcript": "\u4ee5\u540e\u4e0d\u8981\u7ed9\u6211\u7559\u8bed\u97f3\u7559\u8a00\u3002",
+        "call_context": {
+          "organization": "ABC Company",
+          "purpose": "post-purchase follow-up",
+          "task": "order-demo-123",
+          "campaign": "after-sales-demo"
+        }
+      },
+      "expected": {
+        "status": "preferences_detected",
+        "preferences": [
+          {
+            "preference_type": "voicemail",
+            "duration": "ongoing",
+            "scope": "organization",
+            "recommended_action": "update_preference",
+            "requires_human_review": false,
+            "value": "not_allowed"
+          }
+        ]
+      }
+    },
+    {
+      "id": "golden-06",
+      "input": {
+        "transcript": "\u4f60\u4eec\u516c\u53f8\u4ee5\u540e\u4e0d\u8981\u518d\u7ed9\u6211\u6253\u7535\u8bdd\u3002",
+        "call_context": {
+          "organization": "ABC Company",
+          "purpose": "post-purchase follow-up",
+          "task": "order-demo-123",
+          "campaign": "after-sales-demo"
+        }
+      },
+      "expected": {
+        "status": "preferences_detected",
+        "preferences": [
+          {
+            "preference_type": "do_not_call",
+            "duration": "ongoing",
+            "scope": "organization",
+            "recommended_action": "update_preference",
+            "requires_human_review": false,
+            "value": true
+          }
+        ]
+      }
+    },
+    {
+      "id": "golden-07",
+      "input": {
+        "transcript": "\u660e\u5929\u4e0b\u5348\u518d\u7ed9\u6211\u6253\u5427\u3002",
+        "call_context": {
+          "organization": "ABC Company",
+          "purpose": "post-purchase follow-up",
+          "task": "order-demo-123",
+          "campaign": "after-sales-demo"
+        }
+      },
+      "expected": {
+        "status": "preferences_detected",
+        "preferences": [
+          {
+            "preference_type": "call_window",
+            "duration": "one_time",
+            "scope": "this_task",
+            "recommended_action": "update_preference",
+            "requires_human_review": false
+          }
+        ]
+      }
+    },
+    {
+      "id": "golden-08",
+      "input": {
+        "transcript": "\u4eca\u5929\u665a\u4e0a\u516d\u70b9\u4ee5\u540e\u518d\u8054\u7cfb\u6211\u3002",
+        "call_context": {
+          "organization": "ABC Company",
+          "purpose": "post-purchase follow-up",
+          "task": "order-demo-123",
+          "campaign": "after-sales-demo"
+        }
+      },
+      "expected": {
+        "status": "preferences_detected",
+        "preferences": [
+          {
+            "preference_type": "call_window",
+            "duration": "one_time",
+            "scope": "this_task",
+            "recommended_action": "update_preference",
+            "requires_human_review": false
+          }
+        ]
+      }
+    },
+    {
+      "id": "golden-09",
+      "input": {
+        "transcript": "\u8fd9\u5468\u5148\u522b\u7ed9\u6211\u6253\u7535\u8bdd\u3002",
+        "call_context": {
+          "organization": "ABC Company",
+          "purpose": "post-purchase follow-up",
+          "task": "order-demo-123",
+          "campaign": "after-sales-demo"
+        }
+      },
+      "expected": {
+        "status": "preferences_detected",
+        "preferences": [
+          {
+            "preference_type": "do_not_call",
+            "duration": "time_bounded",
+            "scope": "this_task",
+            "recommended_action": "update_preference",
+            "requires_human_review": false,
+            "value": true
+          }
+        ]
+      }
+    },
+    {
+      "id": "golden-10",
+      "input": {
+        "transcript": "\u4e0b\u5468\u518d\u8054\u7cfb\u6211\u5427\u3002",
+        "call_context": {
+          "organization": "ABC Company",
+          "purpose": "post-purchase follow-up",
+          "task": "order-demo-123",
+          "campaign": "after-sales-demo"
+        }
+      },
+      "expected": {
+        "status": "preferences_detected",
+        "preferences": [
+          {
+            "preference_type": "call_window",
+            "duration": "time_bounded",
+            "scope": "this_task",
+            "recommended_action": "update_preference",
+            "requires_human_review": false
+          }
+        ]
+      }
+    },
+    {
+      "id": "golden-11",
+      "input": {
+        "transcript": "\u4eca\u5929\u522b\u518d\u6253\u4e86\u3002",
+        "call_context": {
+          "organization": "ABC Company",
+          "purpose": "post-purchase follow-up",
+          "task": "order-demo-123",
+          "campaign": "after-sales-demo"
+        }
+      },
+      "expected": {
+        "status": "preferences_detected",
+        "preferences": [
+          {
+            "preference_type": "do_not_call",
+            "duration": "time_bounded",
+            "scope": "this_task",
+            "recommended_action": "update_preference",
+            "requires_human_review": false,
+            "value": true
+          }
+        ]
+      }
+    },
+    {
+      "id": "golden-12",
+      "input": {
+        "transcript": "\u6211\u4eca\u5929\u53ea\u80fd\u63a5\u77ed\u4fe1\u3002",
+        "call_context": {
+          "organization": "ABC Company",
+          "purpose": "post-purchase follow-up",
+          "task": "order-demo-123",
+          "campaign": "after-sales-demo"
+        }
+      },
+      "expected": {
+        "status": "preferences_detected",
+        "preferences": [
+          {
+            "preference_type": "channel",
+            "duration": "time_bounded",
+            "scope": "this_task",
+            "recommended_action": "update_preference",
+            "requires_human_review": false,
+            "value": "sms"
+          }
+        ]
+      }
+    },
+    {
+      "id": "golden-13",
+      "input": {
+        "transcript": "\u8fd9\u4e2a\u8ba2\u5355\u7684\u4e8b\u60c5\u4ee5\u540e\u4e0d\u8981\u518d\u7ed9\u6211\u6253\u7535\u8bdd\u4e86\u3002",
+        "call_context": {
+          "organization": "ABC Company",
+          "purpose": "post-purchase follow-up",
+          "task": "order-demo-123",
+          "campaign": "after-sales-demo"
+        }
+      },
+      "expected": {
+        "status": "preferences_detected",
+        "preferences": [
+          {
+            "preference_type": "do_not_call",
+            "duration": "ongoing",
+            "scope": "this_task",
+            "recommended_action": "update_preference",
+            "requires_human_review": false,
+            "value": true
+          }
+        ]
+      }
+    },
+    {
+      "id": "golden-14",
+      "input": {
+        "transcript": "\u8fd9\u6b21\u4fc3\u9500\u522b\u518d\u6253\u7ed9\u6211\u4e86\u3002",
+        "call_context": {
+          "organization": "ABC Company",
+          "purpose": "post-purchase follow-up",
+          "task": "order-demo-123",
+          "campaign": "after-sales-demo"
+        }
+      },
+      "expected": {
+        "status": "preferences_detected",
+        "preferences": [
+          {
+            "preference_type": "do_not_call",
+            "duration": "ongoing",
+            "scope": "this_campaign",
+            "recommended_action": "update_preference",
+            "requires_human_review": false,
+            "value": true
+          }
+        ]
+      }
+    },
+    {
+      "id": "golden-15",
+      "input": {
+        "transcript": "\u4f60\u4eec\u516c\u53f8\u4ee5\u540e\u90fd\u4e0d\u8981\u6253\u6211\u7535\u8bdd\u3002",
+        "call_context": {
+          "organization": "ABC Company",
+          "purpose": "post-purchase follow-up",
+          "task": "order-demo-123",
+          "campaign": "after-sales-demo"
+        }
+      },
+      "expected": {
+        "status": "preferences_detected",
+        "preferences": [
+          {
+            "preference_type": "do_not_call",
+            "duration": "ongoing",
+            "scope": "organization",
+            "recommended_action": "update_preference",
+            "requires_human_review": false,
+            "value": true
+          }
+        ]
+      }
+    },
+    {
+      "id": "golden-16",
+      "input": {
+        "transcript": "\u8fd9\u4e00\u901a\u4f60\u7528\u4e2d\u6587\u8bf4\u5427\u3002",
+        "call_context": {
+          "organization": "ABC Company",
+          "purpose": "post-purchase follow-up",
+          "task": "order-demo-123",
+          "campaign": "after-sales-demo"
+        }
+      },
+      "expected": {
+        "status": "preferences_detected",
+        "preferences": [
+          {
+            "preference_type": "language",
+            "duration": "one_time",
+            "scope": "this_call",
+            "recommended_action": "no_update",
+            "requires_human_review": false,
+            "value": "zh-CN"
+          }
+        ]
+      }
+    },
+    {
+      "id": "golden-17",
+      "input": {
+        "transcript": "\u8fd9\u4e2a\u8ba2\u5355\u540e\u7eed\u7528\u77ed\u4fe1\u8054\u7cfb\u6211\u3002",
+        "call_context": {
+          "organization": "ABC Company",
+          "purpose": "post-purchase follow-up",
+          "task": "order-demo-123",
+          "campaign": "after-sales-demo"
+        }
+      },
+      "expected": {
+        "status": "preferences_detected",
+        "preferences": [
+          {
+            "preference_type": "channel",
+            "duration": "ongoing",
+            "scope": "this_task",
+            "recommended_action": "update_preference",
+            "requires_human_review": false,
+            "value": "sms"
+          }
+        ]
+      }
+    },
+    {
+      "id": "golden-18",
+      "input": {
+        "transcript": "\u8fd9\u6b21\u6d3b\u52a8\u5982\u679c\u6211\u6ca1\u63a5\uff0c\u4e0d\u8981\u7559\u8a00\u3002",
+        "call_context": {
+          "organization": "ABC Company",
+          "purpose": "post-purchase follow-up",
+          "task": "order-demo-123",
+          "campaign": "after-sales-demo"
+        }
+      },
+      "expected": {
+        "status": "preferences_detected",
+        "preferences": [
+          {
+            "preference_type": "voicemail",
+            "duration": "ongoing",
+            "scope": "this_campaign",
+            "recommended_action": "update_preference",
+            "requires_human_review": false,
+            "value": "not_allowed"
+          }
+        ]
+      }
+    },
+    {
+      "id": "golden-19",
+      "input": {
+        "transcript": "\u665a\u4e0a\u8054\u7cfb\u6bd4\u8f83\u65b9\u4fbf\u3002",
+        "call_context": {
+          "organization": "ABC Company",
+          "purpose": "post-purchase follow-up",
+          "task": "order-demo-123",
+          "campaign": "after-sales-demo"
+        }
+      },
+      "expected": {
+        "status": "review_required",
+        "preferences": [
+          {
+            "preference_type": "call_window",
+            "duration": "unknown",
+            "scope": "unknown",
+            "recommended_action": "request_confirmation",
+            "requires_human_review": true
+          }
+        ]
+      }
+    },
+    {
+      "id": "golden-20",
+      "input": {
+        "transcript": "\u77ed\u4fe1\u65b9\u4fbf\u4e00\u70b9\u3002",
+        "call_context": {
+          "organization": "ABC Company",
+          "purpose": "post-purchase follow-up",
+          "task": "order-demo-123",
+          "campaign": "after-sales-demo"
+        }
+      },
+      "expected": {
+        "status": "review_required",
+        "preferences": [
+          {
+            "preference_type": "channel",
+            "duration": "unknown",
+            "scope": "unknown",
+            "recommended_action": "request_confirmation",
+            "requires_human_review": true,
+            "value": "sms"
+          }
+        ]
+      }
+    },
+    {
+      "id": "golden-21",
+      "input": {
+        "transcript": "\u6211\u4e2d\u6587\u6bd4\u8f83\u65b9\u4fbf\u3002",
+        "call_context": {
+          "organization": "ABC Company",
+          "purpose": "post-purchase follow-up",
+          "task": "order-demo-123",
+          "campaign": "after-sales-demo"
+        }
+      },
+      "expected": {
+        "status": "review_required",
+        "preferences": [
+          {
+            "preference_type": "language",
+            "duration": "unknown",
+            "scope": "unknown",
+            "recommended_action": "request_confirmation",
+            "requires_human_review": true,
+            "value": "zh-CN"
+          }
+        ]
+      }
+    },
+    {
+      "id": "golden-22",
+      "input": {
+        "transcript": "\u4f60\u4eec\u600e\u4e48\u5929\u5929\u7ed9\u6211\u6253\u7535\u8bdd\uff0c\u70e6\u6b7b\u4e86\u3002",
+        "call_context": {
+          "organization": "ABC Company",
+          "purpose": "post-purchase follow-up",
+          "task": "order-demo-123",
+          "campaign": "after-sales-demo"
+        }
+      },
+      "expected": {
+        "status": "review_required",
+        "preferences": [
+          {
+            "preference_type": "do_not_call",
+            "duration": "unknown",
+            "scope": "unknown",
+            "recommended_action": "request_confirmation",
+            "requires_human_review": true
+          }
+        ]
+      }
+    },
+    {
+      "id": "golden-23",
+      "input": {
+        "transcript": "\u522b\u8fd9\u6837\u8054\u7cfb\u6211\u4e86\u3002",
+        "call_context": {
+          "organization": "ABC Company",
+          "purpose": "post-purchase follow-up",
+          "task": "order-demo-123",
+          "campaign": "after-sales-demo"
+        }
+      },
+      "expected": {
+        "status": "review_required",
+        "preferences": [
+          {
+            "preference_type": "channel",
+            "duration": "unknown",
+            "scope": "unknown",
+            "recommended_action": "request_confirmation",
+            "requires_human_review": true,
+            "accepted_types": [
+              "channel",
+              "do_not_call"
+            ]
+          }
+        ]
+      }
+    },
+    {
+      "id": "golden-24",
+      "input": {
+        "transcript": "\u4ee5\u540e\u6362\u4e2a\u65b9\u5f0f\u8054\u7cfb\u5427\u3002",
+        "call_context": {
+          "organization": "ABC Company",
+          "purpose": "post-purchase follow-up",
+          "task": "order-demo-123",
+          "campaign": "after-sales-demo"
+        }
+      },
+      "expected": {
+        "status": "review_required",
+        "preferences": [
+          {
+            "preference_type": "channel",
+            "duration": "ongoing",
+            "scope": "organization",
+            "recommended_action": "request_confirmation",
+            "requires_human_review": true
+          }
+        ]
+      }
+    },
+    {
+      "id": "golden-25",
+      "input": {
+        "transcript": "\u6211\u73b0\u5728\u5728\u5f00\u4f1a\u3002",
+        "call_context": {
+          "organization": "ABC Company",
+          "purpose": "post-purchase follow-up",
+          "task": "order-demo-123",
+          "campaign": "after-sales-demo"
+        }
+      },
+      "expected": {
+        "status": "no_preference_detected",
+        "preferences": []
+      }
+    },
+    {
+      "id": "golden-26",
+      "input": {
+        "transcript": "\u6211\u4eca\u5929\u5f88\u5fd9\u3002",
+        "call_context": {
+          "organization": "ABC Company",
+          "purpose": "post-purchase follow-up",
+          "task": "order-demo-123",
+          "campaign": "after-sales-demo"
+        }
+      },
+      "expected": {
+        "status": "no_preference_detected",
+        "preferences": []
+      }
+    },
+    {
+      "id": "golden-27",
+      "input": {
+        "transcript": "\u6211\u4e0d\u611f\u5174\u8da3\u3002",
+        "call_context": {
+          "organization": "ABC Company",
+          "purpose": "post-purchase follow-up",
+          "task": "order-demo-123",
+          "campaign": "after-sales-demo"
+        }
+      },
+      "expected": {
+        "status": "no_preference_detected",
+        "preferences": []
+      }
+    },
+    {
+      "id": "golden-28",
+      "input": {
+        "transcript": "\u8fd9\u4e2a\u4ea7\u54c1\u592a\u8d35\u4e86\u3002",
+        "call_context": {
+          "organization": "ABC Company",
+          "purpose": "post-purchase follow-up",
+          "task": "order-demo-123",
+          "campaign": "after-sales-demo"
+        }
+      },
+      "expected": {
+        "status": "no_preference_detected",
+        "preferences": []
+      }
+    },
+    {
+      "id": "golden-29",
+      "input": {
+        "transcript": "\u4f60\u8bf4\u6162\u4e00\u70b9\uff0c\u6211\u6ca1\u542c\u6e05\u695a\u3002",
+        "call_context": {
+          "organization": "ABC Company",
+          "purpose": "post-purchase follow-up",
+          "task": "order-demo-123",
+          "campaign": "after-sales-demo"
+        }
+      },
+      "expected": {
+        "status": "no_preference_detected",
+        "preferences": []
+      }
+    },
+    {
+      "id": "golden-30",
+      "input": {
+        "transcript": "\u6211\u4e0d\u559c\u6b22\u4f60\u4eec\u516c\u53f8\u3002",
+        "call_context": {
+          "organization": "ABC Company",
+          "purpose": "post-purchase follow-up",
+          "task": "order-demo-123",
+          "campaign": "after-sales-demo"
+        }
+      },
+      "expected": {
+        "status": "no_preference_detected",
+        "preferences": []
+      }
+    },
+    {
+      "id": "golden-31",
+      "input": {
+        "transcript": "\u4ee5\u540e\u665a\u4e0a\u516d\u70b9\u4ee5\u540e\u6253\uff0c\u6700\u597d\u8bf4\u4e2d\u6587\u3002",
+        "call_context": {
+          "organization": "ABC Company",
+          "purpose": "post-purchase follow-up",
+          "task": "order-demo-123",
+          "campaign": "after-sales-demo"
+        }
+      },
+      "expected": {
+        "status": "preferences_detected",
+        "preferences": [
+          {
+            "preference_type": "call_window",
+            "duration": "ongoing",
+            "scope": "organization",
+            "recommended_action": "update_preference",
+            "requires_human_review": false
+          },
+          {
+            "preference_type": "language",
+            "duration": "ongoing",
+            "scope": "organization",
+            "recommended_action": "update_preference",
+            "requires_human_review": false,
+            "value": "zh-CN"
+          }
+        ]
+      }
+    },
+    {
+      "id": "golden-32",
+      "input": {
+        "transcript": "\u4eca\u5929\u522b\u6253\u4e86\uff0c\u4ee5\u540e\u665a\u4e0a\u516d\u70b9\u4ee5\u540e\u8054\u7cfb\u3002",
+        "call_context": {
+          "organization": "ABC Company",
+          "purpose": "post-purchase follow-up",
+          "task": "order-demo-123",
+          "campaign": "after-sales-demo"
+        }
+      },
+      "expected": {
+        "status": "preferences_detected",
+        "preferences": [
+          {
+            "preference_type": "do_not_call",
+            "duration": "time_bounded",
+            "scope": "this_task",
+            "recommended_action": "update_preference",
+            "requires_human_review": false,
+            "value": true
+          },
+          {
+            "preference_type": "call_window",
+            "duration": "ongoing",
+            "scope": "organization",
+            "recommended_action": "update_preference",
+            "requires_human_review": false
+          }
+        ]
+      }
+    },
+    {
+      "id": "golden-33",
+      "input": {
+        "transcript": "\u4ee5\u540e\u4e0d\u8981\u7ed9\u6211\u6253\u2014\u2014\u7b97\u4e86\uff0c\u4e0d\u662f\uff0c\u6211\u662f\u8bf4\u4eca\u5929\u4e0d\u8981\u6253\u4e86\u3002",
+        "call_context": {
+          "organization": "ABC Company",
+          "purpose": "post-purchase follow-up",
+          "task": "order-demo-123",
+          "campaign": "after-sales-demo"
+        }
+      },
+      "expected": {
+        "status": "preferences_detected",
+        "preferences": [
+          {
+            "preference_type": "do_not_call",
+            "duration": "time_bounded",
+            "scope": "this_task",
+            "recommended_action": "update_preference",
+            "requires_human_review": false,
+            "value": true
+          }
+        ]
+      }
+    },
+    {
+      "id": "golden-34",
+      "input": {
+        "transcript": "\u4ee5\u540e\u53d1\u77ed\u4fe1\u7ed9\u6211\u5427\u3002",
+        "call_context": {
+          "organization": "ABC Company",
+          "purpose": "post-purchase follow-up",
+          "task": "order-demo-123",
+          "campaign": "after-sales-demo"
+        }
+      },
+      "expected": {
+        "status": "preferences_detected",
+        "preferences": [
+          {
+            "preference_type": "channel",
+            "duration": "ongoing",
+            "scope": "organization",
+            "recommended_action": "update_preference",
+            "requires_human_review": false,
+            "value": "sms"
+          }
+        ]
+      }
+    },
+    {
+      "id": "golden-35",
+      "input": {
+        "transcript": "\u8fd9\u4e2a\u8ba2\u5355\u522b\u518d\u7ed9\u6211\u6253\u7535\u8bdd\uff0c\u4f46\u5176\u4ed6\u4e8b\u60c5\u53ef\u4ee5\u6b63\u5e38\u8054\u7cfb\u3002",
+        "call_context": {
+          "organization": "ABC Company",
+          "purpose": "post-purchase follow-up",
+          "task": "order-demo-123",
+          "campaign": "after-sales-demo"
+        }
+      },
+      "expected": {
+        "status": "preferences_detected",
+        "preferences": [
+          {
+            "preference_type": "do_not_call",
+            "duration": "ongoing",
+            "scope": "this_task",
+            "recommended_action": "update_preference",
+            "requires_human_review": false,
+            "value": true
+          }
+        ]
+      }
+    }
+  ]
+}

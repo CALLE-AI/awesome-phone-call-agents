@@ -1,0 +1,629 @@
+{
+  "run_metadata": {
+    "method": "fresh-context agent interpretation",
+    "model": "inherited agent model; exact runtime version not independently verified",
+    "limitations": "one synthetic regression pass; no expected answers supplied"
+  },
+  "results": [
+    {
+      "id": "golden-01",
+      "output": {
+        "status": "preferences_detected",
+        "preferences": [
+          {
+            "preference_type": "call_window",
+            "value": "\u665a\u4e0a\u516d\u70b9\u4ee5\u540e",
+            "duration": "ongoing",
+            "scope": "organization",
+            "evidence": "\u4ee5\u540e\u90fd\u665a\u4e0a\u516d\u70b9\u4ee5\u540e\u7ed9\u6211\u6253\u3002",
+            "confidence": "high",
+            "requires_human_review": false,
+            "recommended_action": "update_preference"
+          }
+        ]
+      }
+    },
+    {
+      "id": "golden-02",
+      "output": {
+        "status": "review_required",
+        "preferences": [
+          {
+            "preference_type": "channel",
+            "value": "sms",
+            "duration": "ongoing",
+            "scope": "organization",
+            "evidence": "\u4ee5\u540e\u7ed9\u6211\u53d1\u77ed\u4fe1\u5c31\u884c\uff0c\u522b\u6253\u7535\u8bdd\u3002",
+            "confidence": "high",
+            "requires_human_review": false,
+            "recommended_action": "update_preference"
+          },
+          {
+            "preference_type": "do_not_call",
+            "value": true,
+            "duration": "ongoing",
+            "scope": "organization",
+            "evidence": "\u4ee5\u540e\u7ed9\u6211\u53d1\u77ed\u4fe1\u5c31\u884c\uff0c\u522b\u6253\u7535\u8bdd\u3002",
+            "confidence": "high",
+            "requires_human_review": true,
+            "recommended_action": "request_confirmation",
+            "review_reason": "Explicit ongoing organization-wide do-not-call request requires human review and confirmation.",
+            "suggested_clarification": "Please confirm that this request applies to all future calls from ABC Company."
+          }
+        ]
+      }
+    },
+    {
+      "id": "golden-03",
+      "output": {
+        "status": "preferences_detected",
+        "preferences": [
+          {
+            "preference_type": "language",
+            "value": "zh-CN",
+            "duration": "ongoing",
+            "scope": "organization",
+            "evidence": "\u4ee5\u540e\u8ddf\u6211\u8bf4\u4e2d\u6587\u5427\u3002",
+            "confidence": "high",
+            "requires_human_review": false,
+            "recommended_action": "update_preference"
+          }
+        ]
+      }
+    },
+    {
+      "id": "golden-04",
+      "output": {
+        "status": "preferences_detected",
+        "preferences": [
+          {
+            "preference_type": "voicemail",
+            "value": "allowed",
+            "duration": "ongoing",
+            "scope": "organization",
+            "evidence": "\u5982\u679c\u6211\u6ca1\u63a5\uff0c\u4f60\u53ef\u4ee5\u7ed9\u6211\u7559\u8bed\u97f3\u3002",
+            "confidence": "high",
+            "requires_human_review": false,
+            "recommended_action": "update_preference"
+          }
+        ]
+      }
+    },
+    {
+      "id": "golden-05",
+      "output": {
+        "status": "preferences_detected",
+        "preferences": [
+          {
+            "preference_type": "voicemail",
+            "value": "not_allowed",
+            "duration": "ongoing",
+            "scope": "organization",
+            "evidence": "\u4ee5\u540e\u4e0d\u8981\u7ed9\u6211\u7559\u8bed\u97f3\u7559\u8a00\u3002",
+            "confidence": "high",
+            "requires_human_review": false,
+            "recommended_action": "update_preference"
+          }
+        ]
+      }
+    },
+    {
+      "id": "golden-06",
+      "output": {
+        "status": "review_required",
+        "preferences": [
+          {
+            "preference_type": "do_not_call",
+            "value": true,
+            "duration": "ongoing",
+            "scope": "organization",
+            "evidence": "\u4f60\u4eec\u516c\u53f8\u4ee5\u540e\u4e0d\u8981\u518d\u7ed9\u6211\u6253\u7535\u8bdd\u3002",
+            "confidence": "high",
+            "requires_human_review": true,
+            "recommended_action": "request_confirmation",
+            "review_reason": "Explicit ongoing organization-wide do-not-call request requires human review and confirmation.",
+            "suggested_clarification": "Please confirm that this request applies to all future calls from ABC Company."
+          }
+        ]
+      }
+    },
+    {
+      "id": "golden-07",
+      "output": {
+        "status": "preferences_detected",
+        "preferences": [
+          {
+            "preference_type": "call_window",
+            "value": "\u660e\u5929\u4e0b\u5348",
+            "duration": "one_time",
+            "scope": "this_task",
+            "evidence": "\u660e\u5929\u4e0b\u5348\u518d\u7ed9\u6211\u6253\u5427\u3002",
+            "confidence": "high",
+            "requires_human_review": false,
+            "recommended_action": "update_preference",
+            "time_bound": "\u660e\u5929\u4e0b\u5348"
+          }
+        ]
+      }
+    },
+    {
+      "id": "golden-08",
+      "output": {
+        "status": "preferences_detected",
+        "preferences": [
+          {
+            "preference_type": "call_window",
+            "value": "\u4eca\u5929\u665a\u4e0a\u516d\u70b9\u4ee5\u540e",
+            "duration": "one_time",
+            "scope": "this_task",
+            "evidence": "\u4eca\u5929\u665a\u4e0a\u516d\u70b9\u4ee5\u540e\u518d\u8054\u7cfb\u6211\u3002",
+            "confidence": "high",
+            "requires_human_review": false,
+            "recommended_action": "update_preference",
+            "time_bound": "\u4eca\u5929\u665a\u4e0a\u516d\u70b9\u4ee5\u540e"
+          }
+        ]
+      }
+    },
+    {
+      "id": "golden-09",
+      "output": {
+        "status": "preferences_detected",
+        "preferences": [
+          {
+            "preference_type": "do_not_call",
+            "value": true,
+            "duration": "time_bounded",
+            "scope": "this_task",
+            "evidence": "\u8fd9\u5468\u5148\u522b\u7ed9\u6211\u6253\u7535\u8bdd\u3002",
+            "confidence": "high",
+            "requires_human_review": false,
+            "recommended_action": "update_preference",
+            "time_bound": "\u8fd9\u5468"
+          }
+        ]
+      }
+    },
+    {
+      "id": "golden-10",
+      "output": {
+        "status": "preferences_detected",
+        "preferences": [
+          {
+            "preference_type": "call_window",
+            "value": "\u4e0b\u5468",
+            "duration": "time_bounded",
+            "scope": "this_task",
+            "evidence": "\u4e0b\u5468\u518d\u8054\u7cfb\u6211\u5427\u3002",
+            "confidence": "high",
+            "requires_human_review": false,
+            "recommended_action": "update_preference",
+            "time_bound": "\u4e0b\u5468"
+          }
+        ]
+      }
+    },
+    {
+      "id": "golden-11",
+      "output": {
+        "status": "preferences_detected",
+        "preferences": [
+          {
+            "preference_type": "do_not_call",
+            "value": true,
+            "duration": "time_bounded",
+            "scope": "this_task",
+            "evidence": "\u4eca\u5929\u522b\u518d\u6253\u4e86\u3002",
+            "confidence": "high",
+            "requires_human_review": false,
+            "recommended_action": "update_preference",
+            "time_bound": "\u4eca\u5929"
+          }
+        ]
+      }
+    },
+    {
+      "id": "golden-12",
+      "output": {
+        "status": "preferences_detected",
+        "preferences": [
+          {
+            "preference_type": "channel",
+            "value": "sms",
+            "duration": "time_bounded",
+            "scope": "this_task",
+            "evidence": "\u6211\u4eca\u5929\u53ea\u80fd\u63a5\u77ed\u4fe1\u3002",
+            "confidence": "high",
+            "requires_human_review": false,
+            "recommended_action": "update_preference",
+            "time_bound": "\u4eca\u5929"
+          }
+        ]
+      }
+    },
+    {
+      "id": "golden-13",
+      "output": {
+        "status": "preferences_detected",
+        "preferences": [
+          {
+            "preference_type": "do_not_call",
+            "value": true,
+            "duration": "ongoing",
+            "scope": "this_task",
+            "evidence": "\u8fd9\u4e2a\u8ba2\u5355\u7684\u4e8b\u60c5\u4ee5\u540e\u4e0d\u8981\u518d\u7ed9\u6211\u6253\u7535\u8bdd\u4e86\u3002",
+            "confidence": "high",
+            "requires_human_review": false,
+            "recommended_action": "update_preference"
+          }
+        ]
+      }
+    },
+    {
+      "id": "golden-14",
+      "output": {
+        "status": "preferences_detected",
+        "preferences": [
+          {
+            "preference_type": "do_not_call",
+            "value": true,
+            "duration": "ongoing",
+            "scope": "this_campaign",
+            "evidence": "\u8fd9\u6b21\u4fc3\u9500\u522b\u518d\u6253\u7ed9\u6211\u4e86\u3002",
+            "confidence": "high",
+            "requires_human_review": false,
+            "recommended_action": "update_preference"
+          }
+        ]
+      }
+    },
+    {
+      "id": "golden-15",
+      "output": {
+        "status": "review_required",
+        "preferences": [
+          {
+            "preference_type": "do_not_call",
+            "value": true,
+            "duration": "ongoing",
+            "scope": "organization",
+            "evidence": "\u4f60\u4eec\u516c\u53f8\u4ee5\u540e\u90fd\u4e0d\u8981\u6253\u6211\u7535\u8bdd\u3002",
+            "confidence": "high",
+            "requires_human_review": true,
+            "recommended_action": "request_confirmation",
+            "review_reason": "Explicit ongoing organization-wide do-not-call request requires human review and confirmation.",
+            "suggested_clarification": "Please confirm that this request applies to all future calls from ABC Company."
+          }
+        ]
+      }
+    },
+    {
+      "id": "golden-16",
+      "output": {
+        "status": "preferences_detected",
+        "preferences": [
+          {
+            "preference_type": "language",
+            "value": "zh-CN",
+            "duration": "one_time",
+            "scope": "this_call",
+            "evidence": "\u8fd9\u4e00\u901a\u4f60\u7528\u4e2d\u6587\u8bf4\u5427\u3002",
+            "confidence": "high",
+            "requires_human_review": false,
+            "recommended_action": "no_update"
+          }
+        ]
+      }
+    },
+    {
+      "id": "golden-17",
+      "output": {
+        "status": "preferences_detected",
+        "preferences": [
+          {
+            "preference_type": "channel",
+            "value": "sms",
+            "duration": "ongoing",
+            "scope": "this_task",
+            "evidence": "\u8fd9\u4e2a\u8ba2\u5355\u540e\u7eed\u7528\u77ed\u4fe1\u8054\u7cfb\u6211\u3002",
+            "confidence": "high",
+            "requires_human_review": false,
+            "recommended_action": "update_preference"
+          }
+        ]
+      }
+    },
+    {
+      "id": "golden-18",
+      "output": {
+        "status": "preferences_detected",
+        "preferences": [
+          {
+            "preference_type": "voicemail",
+            "value": "not_allowed",
+            "duration": "ongoing",
+            "scope": "this_campaign",
+            "evidence": "\u8fd9\u6b21\u6d3b\u52a8\u5982\u679c\u6211\u6ca1\u63a5\uff0c\u4e0d\u8981\u7559\u8a00\u3002",
+            "confidence": "high",
+            "requires_human_review": false,
+            "recommended_action": "update_preference"
+          }
+        ]
+      }
+    },
+    {
+      "id": "golden-19",
+      "output": {
+        "status": "review_required",
+        "preferences": [
+          {
+            "preference_type": "call_window",
+            "value": "\u665a\u4e0a",
+            "duration": "unknown",
+            "scope": "unknown",
+            "evidence": "\u665a\u4e0a\u8054\u7cfb\u6bd4\u8f83\u65b9\u4fbf\u3002",
+            "confidence": "medium",
+            "requires_human_review": true,
+            "recommended_action": "request_confirmation",
+            "review_reason": "The statement indicates a preferred evening window but does not establish whether it is a one-off callback or a standing instruction, or its scope.",
+            "suggested_clarification": "Is evening contact preferred for one callback, for this order, or for all future contact from ABC Company?"
+          }
+        ]
+      }
+    },
+    {
+      "id": "golden-20",
+      "output": {
+        "status": "review_required",
+        "preferences": [
+          {
+            "preference_type": "channel",
+            "value": "sms",
+            "duration": "unknown",
+            "scope": "unknown",
+            "evidence": "\u77ed\u4fe1\u65b9\u4fbf\u4e00\u70b9\u3002",
+            "confidence": "medium",
+            "requires_human_review": true,
+            "recommended_action": "request_confirmation",
+            "review_reason": "The preferred contact method or language is identifiable, but its duration and scope are not stated.",
+            "suggested_clarification": "Should SMS be used for this order only, for a limited period, or for all future contact from ABC Company?"
+          }
+        ]
+      }
+    },
+    {
+      "id": "golden-21",
+      "output": {
+        "status": "review_required",
+        "preferences": [
+          {
+            "preference_type": "language",
+            "value": "zh-CN",
+            "duration": "unknown",
+            "scope": "unknown",
+            "evidence": "\u6211\u4e2d\u6587\u6bd4\u8f83\u65b9\u4fbf\u3002",
+            "confidence": "medium",
+            "requires_human_review": true,
+            "recommended_action": "request_confirmation",
+            "review_reason": "The preferred contact method or language is identifiable, but its duration and scope are not stated.",
+            "suggested_clarification": "Was Chinese preferred only for this call, for this order, or for all future conversations with ABC Company?"
+          }
+        ]
+      }
+    },
+    {
+      "id": "golden-22",
+      "output": {
+        "status": "review_required",
+        "preferences": [
+          {
+            "preference_type": "do_not_call",
+            "value": null,
+            "duration": "unknown",
+            "scope": "unknown",
+            "evidence": "\u4f60\u4eec\u600e\u4e48\u5929\u5929\u7ed9\u6211\u6253\u7535\u8bdd\uff0c\u70e6\u6b7b\u4e86\u3002",
+            "confidence": "low",
+            "requires_human_review": true,
+            "recommended_action": "request_confirmation",
+            "review_reason": "The complaint concerns repeated calls and may indicate do-not-call intent, but no explicit restriction, duration, or scope is stated.",
+            "suggested_clarification": "Would you like calls to stop, or only to become less frequent, and for which matters and period?"
+          }
+        ]
+      }
+    },
+    {
+      "id": "golden-23",
+      "output": {
+        "status": "review_required",
+        "preferences": [
+          {
+            "preference_type": "channel",
+            "value": null,
+            "duration": "unknown",
+            "scope": "unknown",
+            "evidence": "\u522b\u8fd9\u6837\u8054\u7cfb\u6211\u4e86\u3002",
+            "confidence": "low",
+            "requires_human_review": true,
+            "recommended_action": "request_confirmation",
+            "review_reason": "The recipient rejects an unspecified manner of contact; the desired channel, duration, and scope remain unclear.",
+            "suggested_clarification": "What contact method would you prefer, and should that apply to this order or to future contact generally?"
+          }
+        ]
+      }
+    },
+    {
+      "id": "golden-24",
+      "output": {
+        "status": "review_required",
+        "preferences": [
+          {
+            "preference_type": "channel",
+            "value": null,
+            "duration": "ongoing",
+            "scope": "organization",
+            "evidence": "\u4ee5\u540e\u6362\u4e2a\u65b9\u5f0f\u8054\u7cfb\u5427\u3002",
+            "confidence": "medium",
+            "requires_human_review": true,
+            "recommended_action": "request_confirmation",
+            "review_reason": "A standing change of contact method is requested, but the replacement channel is not named.",
+            "suggested_clarification": "Which channel should ABC Company use for future contact?"
+          }
+        ]
+      }
+    },
+    {
+      "id": "golden-25",
+      "output": {
+        "status": "no_preference_detected",
+        "preferences": []
+      }
+    },
+    {
+      "id": "golden-26",
+      "output": {
+        "status": "no_preference_detected",
+        "preferences": []
+      }
+    },
+    {
+      "id": "golden-27",
+      "output": {
+        "status": "no_preference_detected",
+        "preferences": []
+      }
+    },
+    {
+      "id": "golden-28",
+      "output": {
+        "status": "no_preference_detected",
+        "preferences": []
+      }
+    },
+    {
+      "id": "golden-29",
+      "output": {
+        "status": "no_preference_detected",
+        "preferences": []
+      }
+    },
+    {
+      "id": "golden-30",
+      "output": {
+        "status": "no_preference_detected",
+        "preferences": []
+      }
+    },
+    {
+      "id": "golden-31",
+      "output": {
+        "status": "preferences_detected",
+        "preferences": [
+          {
+            "preference_type": "call_window",
+            "value": "\u665a\u4e0a\u516d\u70b9\u4ee5\u540e",
+            "duration": "ongoing",
+            "scope": "organization",
+            "evidence": "\u4ee5\u540e\u665a\u4e0a\u516d\u70b9\u4ee5\u540e\u6253\uff0c\u6700\u597d\u8bf4\u4e2d\u6587\u3002",
+            "confidence": "high",
+            "requires_human_review": false,
+            "recommended_action": "update_preference"
+          },
+          {
+            "preference_type": "language",
+            "value": "zh-CN",
+            "duration": "ongoing",
+            "scope": "organization",
+            "evidence": "\u4ee5\u540e\u665a\u4e0a\u516d\u70b9\u4ee5\u540e\u6253\uff0c\u6700\u597d\u8bf4\u4e2d\u6587\u3002",
+            "confidence": "high",
+            "requires_human_review": false,
+            "recommended_action": "update_preference"
+          }
+        ]
+      }
+    },
+    {
+      "id": "golden-32",
+      "output": {
+        "status": "preferences_detected",
+        "preferences": [
+          {
+            "preference_type": "do_not_call",
+            "value": true,
+            "duration": "time_bounded",
+            "scope": "this_task",
+            "evidence": "\u4eca\u5929\u522b\u6253\u4e86\uff0c\u4ee5\u540e\u665a\u4e0a\u516d\u70b9\u4ee5\u540e\u8054\u7cfb\u3002",
+            "confidence": "high",
+            "requires_human_review": false,
+            "recommended_action": "update_preference",
+            "time_bound": "\u4eca\u5929"
+          },
+          {
+            "preference_type": "call_window",
+            "value": "\u665a\u4e0a\u516d\u70b9\u4ee5\u540e",
+            "duration": "ongoing",
+            "scope": "organization",
+            "evidence": "\u4eca\u5929\u522b\u6253\u4e86\uff0c\u4ee5\u540e\u665a\u4e0a\u516d\u70b9\u4ee5\u540e\u8054\u7cfb\u3002",
+            "confidence": "high",
+            "requires_human_review": false,
+            "recommended_action": "update_preference"
+          }
+        ]
+      }
+    },
+    {
+      "id": "golden-33",
+      "output": {
+        "status": "preferences_detected",
+        "preferences": [
+          {
+            "preference_type": "do_not_call",
+            "value": true,
+            "duration": "time_bounded",
+            "scope": "this_task",
+            "evidence": "\u4ee5\u540e\u4e0d\u8981\u7ed9\u6211\u6253\u2014\u2014\u7b97\u4e86\uff0c\u4e0d\u662f\uff0c\u6211\u662f\u8bf4\u4eca\u5929\u4e0d\u8981\u6253\u4e86\u3002",
+            "confidence": "high",
+            "requires_human_review": false,
+            "recommended_action": "update_preference",
+            "time_bound": "\u4eca\u5929"
+          }
+        ]
+      }
+    },
+    {
+      "id": "golden-34",
+      "output": {
+        "status": "preferences_detected",
+        "preferences": [
+          {
+            "preference_type": "channel",
+            "value": "sms",
+            "duration": "ongoing",
+            "scope": "organization",
+            "evidence": "\u4ee5\u540e\u53d1\u77ed\u4fe1\u7ed9\u6211\u5427\u3002",
+            "confidence": "high",
+            "requires_human_review": false,
+            "recommended_action": "update_preference"
+          }
+        ]
+      }
+    },
+    {
+      "id": "golden-35",
+      "output": {
+        "status": "preferences_detected",
+        "preferences": [
+          {
+            "preference_type": "do_not_call",
+            "value": true,
+            "duration": "ongoing",
+            "scope": "this_task",
+            "evidence": "\u8fd9\u4e2a\u8ba2\u5355\u522b\u518d\u7ed9\u6211\u6253\u7535\u8bdd\uff0c\u4f46\u5176\u4ed6\u4e8b\u60c5\u53ef\u4ee5\u6b63\u5e38\u8054\u7cfb\u3002",
+            "confidence": "high",
+            "requires_human_review": false,
+            "recommended_action": "update_preference"
+          }
+        ]
+      }
+    }
+  ]
+}

@@ -1,0 +1,12 @@
+{
+  "method": "fresh-context agent interpretation of 35 core, 12 supplemental synthetic and 4 exact requested cases",
+  "expected_answers_provided": false,
+  "instruction_sha256": {
+    "SKILL.md": "e36bdde9551f38cd064718cf2d764008f4739ad171849b43fdf19642bf4368f7",
+    "references/preference-schema.md": "0d367635f9eb2096b9e8cfd62e3651086ab54c6b1759cdf42de6892e56bc5412",
+    "references/safety.md": "bd779629753fe860eff24e49a3b16314613a39633c62a8d2094157b23c679b00"
+  },
+  "model_and_settings": "inherited agent configuration; exact runtime model version and sampling settings not independently recorded",
+  "limitations": "One author-run synthetic evaluation; shared filesystem, no filesystem access isolation; no live calls",
+  "source_output": "/tmp/contact-guard-semantic-approval-evaluation/actual-results.json"
+}
