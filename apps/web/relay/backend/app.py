@@ -610,7 +610,7 @@ def schedule_meeting():
     for e in employees:
         try: meeting['reminder_calls'].append(execute_call('employee',e['id'],'meeting-reminder',{'title':title,'date':date,'time':tm},live_intent=True)['callId'])
         except Exception as ex:
-            app.logger.exception('Meeting reminder call failed')
+            app.logger.error('Meeting reminder call failed: %s', call_error_code(ex))
             errors.append(f"{e['name']}: {call_error_code(ex)}")
     meeting['reminder_status']='completed' if employees and not errors else ('no_recipients' if not employees else 'partial')
     upsert_entity(
@@ -658,7 +658,7 @@ def publish_memo():
     for e in employees:
         try: memo['delivery_calls'].append(execute_call('employee',e['id'],'memo',{'title':title,'body':memo_body},live_intent=True)['callId'])
         except Exception as ex:
-            app.logger.exception('Memo delivery call failed')
+            app.logger.error('Memo delivery call failed: %s', call_error_code(ex))
             errors.append(f"{e['name']}: {call_error_code(ex)}")
     memo['delivery_status']='completed' if employees and not errors else ('no_recipients' if not employees else 'partial')
     upsert_entity(
@@ -705,7 +705,7 @@ def trigger():
         }), 400
 
     except Exception as ex:
-        app.logger.exception('CALL operation failed')
+        app.logger.error('CALL operation failed: %s', call_error_code(ex))
         return jsonify({
             'error': 'call_operation_failed'
         }), 500
