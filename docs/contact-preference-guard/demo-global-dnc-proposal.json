@@ -1,0 +1,15 @@
+{
+  "status": "preferences_detected",
+  "preferences": [
+    {
+      "preference_type": "do_not_call",
+      "value": true,
+      "duration": "ongoing",
+      "scope": "organization",
+      "evidence": "You should never call me again from your company.",
+      "confidence": "high",
+      "requires_human_review": false,
+      "recommended_action": "update_preference"
+    }
+  ]
+}

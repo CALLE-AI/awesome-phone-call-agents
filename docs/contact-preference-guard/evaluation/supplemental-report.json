@@ -1,0 +1,268 @@
+{
+  "suite": "supplemental",
+  "case_count": 12,
+  "metrics": {
+    "type_accuracy": {
+      "numerator": 12,
+      "denominator": 12,
+      "rate": 1.0
+    },
+    "duration_accuracy": {
+      "numerator": 12,
+      "denominator": 12,
+      "rate": 1.0
+    },
+    "scope_accuracy": {
+      "numerator": 12,
+      "denominator": 12,
+      "rate": 1.0
+    },
+    "action_accuracy": {
+      "numerator": 12,
+      "denominator": 12,
+      "rate": 1.0
+    },
+    "false_positive_rate": {
+      "numerator": 0,
+      "denominator": 3,
+      "rate": 0.0
+    },
+    "ambiguity_handling": {
+      "numerator": 1,
+      "denominator": 1,
+      "rate": 1.0
+    },
+    "multi_preference_handling": {
+      "numerator": 1,
+      "denominator": 1,
+      "rate": 1.0
+    },
+    "over_broad_update_rate": {
+      "numerator": 0,
+      "denominator": 12,
+      "rate": 0.0
+    },
+    "contract_validity": {
+      "numerator": 12,
+      "denominator": 12,
+      "rate": 1.0
+    },
+    "case_pass_rate": {
+      "numerator": 12,
+      "denominator": 12,
+      "rate": 1.0
+    }
+  },
+  "details": [
+    {
+      "id": "supplemental-01",
+      "passed": true,
+      "checks": {
+        "type_accuracy": true,
+        "duration_accuracy": true,
+        "scope_accuracy": true,
+        "action_accuracy": true,
+        "contract_validity": true,
+        "case_pass_rate": true,
+        "over_broad_update_rate": false
+      },
+      "value_match": true,
+      "review_match": true,
+      "status_match": true,
+      "contract_errors": []
+    },
+    {
+      "id": "supplemental-02",
+      "passed": true,
+      "checks": {
+        "type_accuracy": true,
+        "duration_accuracy": true,
+        "scope_accuracy": true,
+        "action_accuracy": true,
+        "contract_validity": true,
+        "case_pass_rate": true,
+        "over_broad_update_rate": false,
+        "false_positive_rate": false
+      },
+      "value_match": true,
+      "review_match": true,
+      "status_match": true,
+      "contract_errors": []
+    },
+    {
+      "id": "supplemental-03",
+      "passed": true,
+      "checks": {
+        "type_accuracy": true,
+        "duration_accuracy": true,
+        "scope_accuracy": true,
+        "action_accuracy": true,
+        "contract_validity": true,
+        "case_pass_rate": true,
+        "over_broad_update_rate": false,
+        "multi_preference_handling": true
+      },
+      "value_match": true,
+      "review_match": true,
+      "status_match": true,
+      "contract_errors": []
+    },
+    {
+      "id": "supplemental-04",
+      "passed": true,
+      "checks": {
+        "type_accuracy": true,
+        "duration_accuracy": true,
+        "scope_accuracy": true,
+        "action_accuracy": true,
+        "contract_validity": true,
+        "case_pass_rate": true,
+        "over_broad_update_rate": false
+      },
+      "value_match": true,
+      "review_match": true,
+      "status_match": true,
+      "contract_errors": []
+    },
+    {
+      "id": "supplemental-05",
+      "passed": true,
+      "checks": {
+        "type_accuracy": true,
+        "duration_accuracy": true,
+        "scope_accuracy": true,
+        "action_accuracy": true,
+        "contract_validity": true,
+        "case_pass_rate": true,
+        "over_broad_update_rate": false
+      },
+      "value_match": true,
+      "review_match": true,
+      "status_match": true,
+      "contract_errors": []
+    },
+    {
+      "id": "supplemental-06",
+      "passed": true,
+      "checks": {
+        "type_accuracy": true,
+        "duration_accuracy": true,
+        "scope_accuracy": true,
+        "action_accuracy": true,
+        "contract_validity": true,
+        "case_pass_rate": true,
+        "over_broad_update_rate": false,
+        "false_positive_rate": false
+      },
+      "value_match": true,
+      "review_match": true,
+      "status_match": true,
+      "contract_errors": []
+    },
+    {
+      "id": "supplemental-07",
+      "passed": true,
+      "checks": {
+        "type_accuracy": true,
+        "duration_accuracy": true,
+        "scope_accuracy": true,
+        "action_accuracy": true,
+        "contract_validity": true,
+        "case_pass_rate": true,
+        "over_broad_update_rate": false,
+        "ambiguity_handling": true
+      },
+      "value_match": true,
+      "review_match": true,
+      "status_match": true,
+      "contract_errors": []
+    },
+    {
+      "id": "supplemental-08",
+      "passed": true,
+      "checks": {
+        "type_accuracy": true,
+        "duration_accuracy": true,
+        "scope_accuracy": true,
+        "action_accuracy": true,
+        "contract_validity": true,
+        "case_pass_rate": true,
+        "over_broad_update_rate": false
+      },
+      "value_match": true,
+      "review_match": true,
+      "status_match": true,
+      "contract_errors": []
+    },
+    {
+      "id": "supplemental-09",
+      "passed": true,
+      "checks": {
+        "type_accuracy": true,
+        "duration_accuracy": true,
+        "scope_accuracy": true,
+        "action_accuracy": true,
+        "contract_validity": true,
+        "case_pass_rate": true,
+        "over_broad_update_rate": false,
+        "false_positive_rate": false
+      },
+      "value_match": true,
+      "review_match": true,
+      "status_match": true,
+      "contract_errors": []
+    },
+    {
+      "id": "supplemental-10",
+      "passed": true,
+      "checks": {
+        "type_accuracy": true,
+        "duration_accuracy": true,
+        "scope_accuracy": true,
+        "action_accuracy": true,
+        "contract_validity": true,
+        "case_pass_rate": true,
+        "over_broad_update_rate": false
+      },
+      "value_match": true,
+      "review_match": true,
+      "status_match": true,
+      "contract_errors": []
+    },
+    {
+      "id": "supplemental-11",
+      "passed": true,
+      "checks": {
+        "type_accuracy": true,
+        "duration_accuracy": true,
+        "scope_accuracy": true,
+        "action_accuracy": true,
+        "contract_validity": true,
+        "case_pass_rate": true,
+        "over_broad_update_rate": false
+      },
+      "value_match": true,
+      "review_match": true,
+      "status_match": true,
+      "contract_errors": []
+    },
+    {
+      "id": "supplemental-12",
+      "passed": true,
+      "checks": {
+        "type_accuracy": true,
+        "duration_accuracy": true,
+        "scope_accuracy": true,
+        "action_accuracy": true,
+        "contract_validity": true,
+        "case_pass_rate": true,
+        "over_broad_update_rate": false
+      },
+      "value_match": true,
+      "review_match": true,
+      "status_match": true,
+      "contract_errors": []
+    }
+  ],
+  "limitations": "Case-level synthetic checks. Empty cases count as correct categorical outputs. Over-broad metric covers encoded assertions only; human semantic review is required. This script scores saved outputs and does not invoke a model."
+}

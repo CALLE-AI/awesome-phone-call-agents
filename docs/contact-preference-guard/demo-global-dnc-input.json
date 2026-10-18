@@ -1,0 +1,9 @@
+{
+  "transcript": "You should never call me again from your company.",
+  "call_context": {
+    "organization": "ABC Company",
+    "purpose": "post-purchase follow-up",
+    "task": "order-demo-123",
+    "campaign": "after-sales-demo"
+  }
+}

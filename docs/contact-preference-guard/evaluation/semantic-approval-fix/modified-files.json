@@ -1,0 +1,47 @@
+[
+  {
+    "path": "skills/contact-preference-guard/SKILL.md",
+    "before_sha256": "2c126080b9d7edbf7277c3c4b580d78b5e6b46d33788bced08e41185c5ae060c",
+    "after_sha256": "e36bdde9551f38cd064718cf2d764008f4739ad171849b43fdf19642bf4368f7"
+  },
+  {
+    "path": "skills/contact-preference-guard/demo/dry_run.py",
+    "before_sha256": "08a6205dee6a2cbc6d443f483b9a5c0f445232bb1ec280d85b0dc6c7c3410046",
+    "after_sha256": "d26ea5d20a998767c6a8f5983b60121e247eafb98c730e4778f5c0578d5b8db5"
+  },
+  {
+    "path": "skills/contact-preference-guard/references/examples.md",
+    "before_sha256": "e734d8d6efc31c1018c5ac80841697447281da66dd1f61ddb2bd5a36be6bdc19",
+    "after_sha256": "bf8cf99fcf0e43b23a5e914ca09fdcd4c0a4b28aa361d65933cf2763479e274c"
+  },
+  {
+    "path": "skills/contact-preference-guard/references/safety.md",
+    "before_sha256": "b3e6b8a627b2d7c98e5ee6288d8f34289bcb511fe60a67cd2a833e7774a56385",
+    "after_sha256": "bd779629753fe860eff24e49a3b16314613a39633c62a8d2094157b23c679b00"
+  },
+  {
+    "path": "skills/contact-preference-guard/references/preference-schema.md",
+    "before_sha256": "1cf4ee5db3c64ed810c60b4f8c6cae7e023eceb6f3670393464f0dace47bebf5",
+    "after_sha256": "0d367635f9eb2096b9e8cfd62e3651086ab54c6b1759cdf42de6892e56bc5412"
+  },
+  {
+    "path": "skills/contact-preference-guard/tests/test_safety.py",
+    "before_sha256": "8bd6a23b8a6fa3e32d0414e47ef6368168dc930678fc62057d042369d26ed3f0",
+    "after_sha256": "bd374bdbde380840ea6ee0c9312a578bd2e088766a83d77e8911dedb8b8572d6"
+  },
+  {
+    "path": "skills/contact-preference-guard/tests/golden-test-cases.json",
+    "before_sha256": "da453cd22b1629ceb5ed0cf3839989d76ceb1de1be7f62e762a551fa70c9cb2d",
+    "after_sha256": "bab401dc855205ac5d38191f36c3aecaa30f6c064220ee646f88947582699d66"
+  },
+  {
+    "path": "skills/contact-preference-guard/scripts/validate.py",
+    "before_sha256": "ace7a3d532e8a07ff936ff4b8b479bb36b75aeb4def637cb49b09b1d2f03e489",
+    "after_sha256": "8ee8b0f4253ad6ee1ab15db7663e7293a264a44af1b5c5254aa37b43ad0a8bc7"
+  },
+  {
+    "path": "docs/contact-preference-guard/README.md",
+    "before_sha256": "149f7673769d7ce5cd14be77a50aa19bd3f63657df2071faa1b7efe2634c002e",
+    "after_sha256": "8efbd7078733ebb39ae24cd3f2b763a4ea709b5e3875b426bec504ab971825fd"
+  }
+]

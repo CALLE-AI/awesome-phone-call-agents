@@ -1,0 +1,128 @@
+{
+  "suite": "semantic-approval",
+  "case_count": 4,
+  "metrics": {
+    "type_accuracy": {
+      "numerator": 4,
+      "denominator": 4,
+      "rate": 1.0
+    },
+    "duration_accuracy": {
+      "numerator": 4,
+      "denominator": 4,
+      "rate": 1.0
+    },
+    "scope_accuracy": {
+      "numerator": 4,
+      "denominator": 4,
+      "rate": 1.0
+    },
+    "action_accuracy": {
+      "numerator": 4,
+      "denominator": 4,
+      "rate": 1.0
+    },
+    "false_positive_rate": {
+      "numerator": 0,
+      "denominator": 0,
+      "rate": null
+    },
+    "ambiguity_handling": {
+      "numerator": 1,
+      "denominator": 1,
+      "rate": 1.0
+    },
+    "multi_preference_handling": {
+      "numerator": 0,
+      "denominator": 0,
+      "rate": null
+    },
+    "over_broad_update_rate": {
+      "numerator": 0,
+      "denominator": 4,
+      "rate": 0.0
+    },
+    "contract_validity": {
+      "numerator": 4,
+      "denominator": 4,
+      "rate": 1.0
+    },
+    "case_pass_rate": {
+      "numerator": 4,
+      "denominator": 4,
+      "rate": 1.0
+    }
+  },
+  "details": [
+    {
+      "id": "case-a",
+      "passed": true,
+      "checks": {
+        "type_accuracy": true,
+        "duration_accuracy": true,
+        "scope_accuracy": true,
+        "action_accuracy": true,
+        "contract_validity": true,
+        "case_pass_rate": true,
+        "over_broad_update_rate": false
+      },
+      "value_match": true,
+      "review_match": true,
+      "status_match": true,
+      "contract_errors": []
+    },
+    {
+      "id": "case-b",
+      "passed": true,
+      "checks": {
+        "type_accuracy": true,
+        "duration_accuracy": true,
+        "scope_accuracy": true,
+        "action_accuracy": true,
+        "contract_validity": true,
+        "case_pass_rate": true,
+        "over_broad_update_rate": false
+      },
+      "value_match": true,
+      "review_match": true,
+      "status_match": true,
+      "contract_errors": []
+    },
+    {
+      "id": "case-c",
+      "passed": true,
+      "checks": {
+        "type_accuracy": true,
+        "duration_accuracy": true,
+        "scope_accuracy": true,
+        "action_accuracy": true,
+        "contract_validity": true,
+        "case_pass_rate": true,
+        "over_broad_update_rate": false
+      },
+      "value_match": true,
+      "review_match": true,
+      "status_match": true,
+      "contract_errors": []
+    },
+    {
+      "id": "case-d",
+      "passed": true,
+      "checks": {
+        "type_accuracy": true,
+        "duration_accuracy": true,
+        "scope_accuracy": true,
+        "action_accuracy": true,
+        "contract_validity": true,
+        "case_pass_rate": true,
+        "over_broad_update_rate": false,
+        "ambiguity_handling": true
+      },
+      "value_match": true,
+      "review_match": true,
+      "status_match": true,
+      "contract_errors": []
+    }
+  ],
+  "limitations": "Case-level synthetic checks. Empty cases count as correct categorical outputs. Over-broad metric covers encoded assertions only; human semantic review is required. This script scores saved outputs and does not invoke a model."
+}

@@ -1,0 +1,106 @@
+{
+  "suite": "semantic-approval",
+  "description": "Four exact user-requested regressions separating semantic clarification from adapter approval. Case A high confidence is checked separately in the execution verification.",
+  "cases": [
+    {
+      "id": "case-a",
+      "input": {
+        "transcript": "\u4f60\u4eec\u516c\u53f8\u4ee5\u540e\u4e0d\u8981\u518d\u7ed9\u6211\u6253\u7535\u8bdd\u3002",
+        "call_context": {
+          "organization": "ABC Company",
+          "purpose": "post-purchase follow-up",
+          "task": "order-demo-123",
+          "campaign": "after-sales-demo"
+        }
+      },
+      "expected": {
+        "status": "preferences_detected",
+        "preferences": [
+          {
+            "preference_type": "do_not_call",
+            "value": true,
+            "duration": "ongoing",
+            "scope": "organization",
+            "recommended_action": "update_preference",
+            "requires_human_review": false
+          }
+        ]
+      }
+    },
+    {
+      "id": "case-b",
+      "input": {
+        "transcript": "\u8fd9\u4e2a\u8ba2\u5355\u522b\u518d\u7ed9\u6211\u6253\u7535\u8bdd\u3002",
+        "call_context": {
+          "organization": "ABC Company",
+          "purpose": "post-purchase follow-up",
+          "task": "order-demo-123",
+          "campaign": "after-sales-demo"
+        }
+      },
+      "expected": {
+        "status": "preferences_detected",
+        "preferences": [
+          {
+            "preference_type": "do_not_call",
+            "value": true,
+            "duration": "ongoing",
+            "scope": "this_task",
+            "recommended_action": "update_preference",
+            "requires_human_review": false
+          }
+        ]
+      }
+    },
+    {
+      "id": "case-c",
+      "input": {
+        "transcript": "\u4eca\u5929\u522b\u6253\u4e86\u3002",
+        "call_context": {
+          "organization": "ABC Company",
+          "purpose": "post-purchase follow-up",
+          "task": "order-demo-123",
+          "campaign": "after-sales-demo"
+        }
+      },
+      "expected": {
+        "status": "preferences_detected",
+        "preferences": [
+          {
+            "preference_type": "do_not_call",
+            "value": true,
+            "duration": "time_bounded",
+            "scope": "this_task",
+            "recommended_action": "update_preference",
+            "requires_human_review": false
+          }
+        ]
+      }
+    },
+    {
+      "id": "case-d",
+      "input": {
+        "transcript": "\u4f60\u4eec\u600e\u4e48\u5929\u5929\u7ed9\u6211\u6253\u7535\u8bdd\uff0c\u70e6\u6b7b\u4e86\u3002",
+        "call_context": {
+          "organization": "ABC Company",
+          "purpose": "post-purchase follow-up",
+          "task": "order-demo-123",
+          "campaign": "after-sales-demo"
+        }
+      },
+      "expected": {
+        "status": "review_required",
+        "preferences": [
+          {
+            "preference_type": "do_not_call",
+            "value": null,
+            "duration": "unknown",
+            "scope": "unknown",
+            "recommended_action": "request_confirmation",
+            "requires_human_review": true
+          }
+        ]
+      }
+    }
+  ]
+}
