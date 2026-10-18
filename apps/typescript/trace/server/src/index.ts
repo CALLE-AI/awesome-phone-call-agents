@@ -62,7 +62,7 @@ app.post('/api/mode', enforceLocalOrAuthenticated, (req, res) => {
 // -------------------------------------------------------------
 // 2. VERIFICATION TASKS COLLECTION
 // -------------------------------------------------------------
-app.get('/api/tasks', (req, res) => {
+app.get('/api/tasks', enforceLocalOrAuthenticated, (req, res) => {
   const tasks = taskService.getAllTasks();
   const stats = taskService.getStats();
   res.json({ tasks, stats });
@@ -219,7 +219,7 @@ app.get('/api/tasks/:id/export.json', enforceLocalOrAuthenticated, (req, res) =>
   }
 });
 
-app.get('/api/tasks/:id', (req, res) => {
+app.get('/api/tasks/:id', enforceLocalOrAuthenticated, (req, res) => {
   const task = taskService.getTaskById(req.params.id);
   if (!task) {
     return res.status(404).json({ error: `Task ${req.params.id} not found.` });
@@ -255,7 +255,7 @@ app.post('/api/tasks/:id/verify', enforceLocalOrAuthenticated, async (req, res) 
   res.json(outcome.task);
 });
 
-app.get('/api/calls/:id', (req, res) => {
+app.get('/api/calls/:id', enforceLocalOrAuthenticated, (req, res) => {
   const callId = req.params.id;
   const taskId = req.query.taskId as string | undefined;
 

@@ -1,7 +1,7 @@
 import { CalleClient } from '@call-e/calle';
 import dotenv from 'dotenv';
 import path from 'node:path';
-import { isDestinationAuthorized, maskPhoneNumber } from './utils/phone.js';
+import { isDestinationAuthorized, maskPhoneNumber, maskPhoneNumbersInText } from './utils/phone.js';
 
 dotenv.config({ path: path.resolve(process.cwd(), '.env') });
 dotenv.config({ path: path.resolve(process.cwd(), '../.env') });
@@ -20,7 +20,7 @@ if (!targetPhone) {
 
 const authCheck = isDestinationAuthorized(targetPhone, 'LIVE');
 if (!authCheck.authorized) {
-  console.error(`Destination authorization failed: ${authCheck.reason}`);
+  console.error(`Destination authorization failed: ${maskPhoneNumbersInText(authCheck.reason || '')}`);
   process.exit(1);
 }
 
@@ -57,13 +57,13 @@ async function monitor() {
 
     if (attempt?.transcriptTurns && attempt.transcriptTurns.length > 0) {
       console.log('--- TRANSCRIPT TURNS RECEIVED ---');
-      attempt.transcriptTurns.forEach((t: any) => console.log(`[${t.speaker || t.role || 'UNKNOWN'}] ${t.text}`));
+      attempt.transcriptTurns.forEach((t: any) => console.log(`[${t.speaker || t.role || 'UNKNOWN'}] ${maskPhoneNumbersInText(t.text)}`));
     }
 
     if (status.status === 'completed' || status.status === 'failed') {
       console.log('Final Call Outcome:', status.status);
-      if (status.failureMessage) console.log('Failure Message:', status.failureMessage);
-      if (status.summary) console.log('Summary:', status.summary);
+      if (status.failureMessage) console.log('Failure Message:', maskPhoneNumbersInText(status.failureMessage));
+      if (status.summary) console.log('Summary:', maskPhoneNumbersInText(status.summary));
       break;
     }
   }

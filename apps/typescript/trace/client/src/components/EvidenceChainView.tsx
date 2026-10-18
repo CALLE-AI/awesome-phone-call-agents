@@ -30,14 +30,14 @@ export const EvidenceChainView: React.FC<EvidenceChainViewProps> = ({
           icon: <CheckCircle2 className="w-4 h-4 text-[#16A34A]" />,
           bg: 'bg-[#F0FDF4] border-[#86EFAC] text-[#166534]',
           title: 'VERIFIED',
-          desc: 'Physical reality confirms digital claim.',
+          desc: 'Conversational phone evidence matches digital claim (experimental/advisory).',
         };
       case 'CONTRADICTED':
         return {
           icon: <AlertTriangle className="w-4 h-4 text-[#DC2626]" />,
           bg: 'bg-[#FEF2F2] border-[#FCA5A5] text-[#991B1B]',
           title: 'CONTRADICTED',
-          desc: 'Discrepancy detected between claim and phone reality.',
+          desc: 'Discrepancy detected between digital claim and conversational phone evidence.',
         };
       case 'UNREACHABLE':
         return {
@@ -228,6 +228,11 @@ export const EvidenceChainView: React.FC<EvidenceChainViewProps> = ({
               </p>
             </div>
           </div>
+        </div>
+
+        {/* Advisory Qualification Footnote */}
+        <div className="pt-2 border-t border-slate-100 text-[11px] text-slate-500 italic">
+          Advisory Notice: Extracted quantities and verification outcomes represent conversational evidence gathered during phone inquiries. They serve as advisory decision-support signals, not certified physical warehouse ground truth.
         </div>
       </div>
     </div>

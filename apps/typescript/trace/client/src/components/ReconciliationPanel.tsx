@@ -140,6 +140,11 @@ export const ReconciliationPanel: React.FC<ReconciliationPanelProps> = ({
           </p>
         </div>
       )}
+
+      {/* Advisory Notice */}
+      <div className="pt-2 border-t border-slate-100 text-[10px] text-slate-500 italic">
+        Advisory: Outcomes reflect conversational evidence extracted during phone inquiries. They serve as operational decision-support signals rather than independent physical warehouse verification.
+      </div>
     </div>
   );
 };

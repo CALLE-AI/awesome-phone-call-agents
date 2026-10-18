@@ -67,6 +67,32 @@ export function maskPhoneNumber(rawPhone: string | null | undefined): string {
 }
 
 /**
+ * Mask any phone numbers found within freeform text (logs, errors, transcripts, summaries).
+ * Matches international format (+ followed by 7-15 digits) or standard US 10-11 digit numbers.
+ */
+export function maskPhoneNumbersInText(text: string | null | undefined): string {
+  if (!text || typeof text !== 'string') {
+    return '';
+  }
+  return text.replace(/(?:\+?[1-9]\d{0,2}[\s-]?)?\(?\d{3}\)?[\s-]?\d{3}[\s-]?\d{4}|\+[1-9]\d{6,14}/g, (match) => {
+    const digits = match.replace(/\D/g, '');
+    if (digits.length >= 7 && digits.length <= 15) {
+      if (match.startsWith('+')) {
+        return maskPhoneNumber(`+${digits}`);
+      }
+      if (digits.length === 10) {
+        return maskPhoneNumber(`+1${digits}`);
+      }
+      if (digits.length === 11 && digits.startsWith('1')) {
+        return maskPhoneNumber(`+${digits}`);
+      }
+      return maskPhoneNumber(match);
+    }
+    return match;
+  });
+}
+
+/**
  * Validates whether a destination phone number is authorized for outbound calling.
  *
  * In MOCK mode: all destinations are allowed.

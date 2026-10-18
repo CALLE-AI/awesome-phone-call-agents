@@ -1,14 +1,14 @@
 # TRACE — Phone-Verified Operational Claims
 
-> Autonomous phone verification engine for operational supply chains. TRACE verifies whether digital inventory, availability, and order claims match physical reality by conducting structured phone calls through **CALL-E**.
+> Autonomous phone verification engine for operational supply chains. TRACE gathers conversational evidence on digital inventory, availability, and order claims through structured phone calls conducted by **CALL-E**.
 
 ---
 
 ## 1. Overview
 
-**TRACE** (_Telephony Reconciliation & Autonomous Claim Evaluation for supply-chain_) takes a digital operational claim, uses **CALL-E** to obtain phone-derived evidence from real-world sources (e.g., supplier desks, dispatchers), deterministically reconciles that evidence against the claim, and records an audit trail.
+**TRACE** (_Telephony Reconciliation & Autonomous Claim Evaluation for supply-chain_) takes a digital operational claim, uses **CALL-E** to obtain phone-derived conversational evidence from representatives (e.g., supplier desks, dispatchers), deterministically reconciles that dialogue against the claim, and records an audit trail.
 
-`Digital Claim → CALL-E Phone Call → Speaker-Aware Evidence → Deterministic Reconciliation → Outcome → Audit Trail`
+`Digital Claim → CALL-E Phone Call → Speaker-Aware Dialogue → Deterministic Reconciliation → Advisory Outcome → Audit Trail`
 
 ---
 
@@ -28,9 +28,9 @@ TRACE automates phone verification with strict evidence integrity:
 
 1. Ingests a digital claim baseline and targeted questions.
 2. CALL-E autonomously calls the supplier and conducts a structured inquiry.
-3. Extracts speaker-attributed facts and verbatim quotes.
-4. Deterministically calculates discrepancies (Verified Quantity - Claimed Quantity) without LLM hallucinations.
-5. Produces actionable recommendations and a multi-sheet audit trail.
+3. Extracts speaker-attributed facts and verbatim quotes from the conversation.
+4. Deterministically calculates discrepancies (Extracted Conversational Quantity - Claimed Quantity) without LLM hallucinations.
+5. Produces advisory operational recommendations and a multi-sheet audit trail.
 
 ---
 
@@ -50,7 +50,7 @@ TRACE automates phone verification with strict evidence integrity:
 1. **Task Setup**: Define target organization, E.164 phone number, questions, and claimed quantity/status.
 2. **Execution**: CALL-E dials the target (or Mock Provider simulates the call).
 3. **Fact Extraction**: Timestamped turns are captured, separating `AI` vs `STAFF` speech.
-4. **Reconciliation**: Evaluates physical facts against digital claims using strict equality and delta arithmetic.
+4. **Reconciliation**: Evaluates conversational facts against digital claims using rule-based delta arithmetic.
 5. **Audit Logging**: Saves structured results, transcript turns, and generated recommendations.
 
 ---
@@ -78,25 +78,29 @@ CALL-E provides the live voice runtime:
 
 ---
 
-## 8. Verification Outcomes
+## 8. Verification Outcomes & Advisory Qualification
 
-| Outcome                      | Condition                                                   | Example                              | Operational Recommendation                          |
-| :--------------------------- | :---------------------------------------------------------- | :----------------------------------- | :-------------------------------------------------- |
-| **`VERIFIED`**               | Phone evidence confirms claimed status and count.           | Claimed 40, Verified 40 (Δ = 0)      | Maintain schedule; confirm carrier tracking.        |
-| **`CONTRADICTED`**           | Phone evidence conflicts with claimed status or count.      | Claimed 500, Verified 320 (Δ = -180) | Issue partial PO for 320; expedite remaining 180.   |
-| **`UNKNOWN / INCONCLUSIVE`** | Respondent cannot verify stock, reached wrong line/hotline. | Staff has no inventory access        | Do not rely on claim; flag for manual audit.        |
-| **`UNREACHABLE`**            | Call failed to connect, line busy, or no answer.            | 4 unanswered rings                   | Retry in 30 minutes; escalate to secondary contact. |
+| Outcome                      | Condition                                                              | Example                                  | Operational Recommendation                          |
+| :--------------------------- | :--------------------------------------------------------------------- | :--------------------------------------- | :-------------------------------------------------- |
+| **`VERIFIED`**               | Conversational evidence matches claimed status and count (advisory).   | Claimed 40, Extracted 40 (Δ = 0)         | Maintain schedule; confirm carrier tracking.        |
+| **`CONTRADICTED`**           | Conversational evidence conflicts with claimed status or count.        | Claimed 500, Extracted 320 (Δ = -180)    | Issue partial PO for 320; expedite remaining 180.   |
+| **`UNKNOWN / INCONCLUSIVE`** | Respondent cannot verify stock, reached wrong line/hotline.            | Staff has no inventory access            | Do not rely on claim; flag for manual audit.        |
+| **`UNREACHABLE`**            | Call failed to connect, line busy, or no answer.                       | 4 unanswered rings                       | Retry in 30 minutes; escalate to secondary contact. |
+
+> [!IMPORTANT]
+> **Advisory & Experimental Evidence Notice**: Exact-count matches and `VERIFIED` outcomes reflect conversational statements extracted from phone dialogue with respondents. Extracting conversational quantities from natural-language dialogue is an **advisory and experimental operational signal**, NOT an independent physical warehouse audit or certified ground truth. Conversational confirmation from a phone respondent does not guarantee physical stock availability or replace physical warehouse inventory controls.
 
 ---
 
 ## 9. Evidence Integrity / Trust Model
 
+- **Advisory Operational Evidence**: Phone confirmations represent conversational evidence from representative dialogue, not absolute physical ground truth.
+- **Conversational Quantities**: Extracting conversational numbers from dialogue is qualified as advisory; it does not constitute independent verification of physical stock.
 - **No Self-Confirmation**: The agent's own speech is strictly excluded from supplier evidence.
 - **Speaker Attribution**: Speaker roles (`AI` vs `STAFF` vs `UNKNOWN`) are preserved. Unbound roles remain `UNKNOWN` rather than assumed `STAFF`.
 - **Ambiguity Is Inconclusive**: Unverifiable responses strictly yield `UNKNOWN / INCONCLUSIVE` with a `NEEDS_REVIEW` badge.
 - **Ambiguous Submissions**: Submissions with unconfirmed provider status are retained as `PENDING_RECONCILIATION` with stable idempotency keys; batches halt immediately.
-- **No Phantom Numbers**: Quantities evaluate to `null` unless explicitly stated by the respondent.
-- **Phone-Derived Evidence**: Phone confirmations are recorded as phone-derived operational evidence, not absolute physical ground truth.
+- **No Phantom Numbers**: Conversational quantities evaluate to `null` unless explicitly stated by the respondent.
 
 ---
 

@@ -49,7 +49,11 @@ class CallService {
 
   private modeOverride: 'LIVE' | 'MOCK' | null = null;
 
-  public setMode(mode: 'LIVE' | 'MOCK') {
+  public setMode(mode: 'LIVE' | 'MOCK' | null) {
+    if (mode === null) {
+      this.modeOverride = null;
+      return;
+    }
     const isForcedMock = process.env.PHONE_PROVIDER_MODE === 'mock';
     if (isForcedMock && mode === 'LIVE') {
       throw new Error('Cannot switch to LIVE mode: Environment has forced PHONE_PROVIDER_MODE=mock.');
@@ -102,7 +106,27 @@ class CallService {
       return { success: false, error: 'Cannot initiate verification call: target phone number is missing.' };
     }
 
-    const { provider, mode } = this.getActiveProvider(forceMock);
+    // Determine whether LIVE mode is selected across environment configuration and runtime overrides
+    const isForcedMock = process.env.PHONE_PROVIDER_MODE === 'mock';
+    const isLiveConfigured =
+      !isForcedMock &&
+      !forceMock &&
+      (this.modeOverride === 'LIVE' || (!this.modeOverride && process.env.PHONE_PROVIDER_MODE === 'calle'));
+
+    // Enforce explicit user confirmation at the call-submission boundary for LIVE calls
+    if (isLiveConfigured && explicitLive !== true) {
+      const error = 'Cannot initiate live verification call: explicitLive confirmation is required to place real outbound phone calls.';
+      return { success: false, error, task };
+    }
+
+    if (isLiveConfigured && !this.callEProvider.isConfigured()) {
+      const error = 'Cannot initiate live verification call: CALLE_API_KEY is not configured on the server.';
+      return { success: false, error, task };
+    }
+
+    const provider: PhoneAgentProvider = isLiveConfigured ? this.callEProvider : this.mockProvider;
+    const mode: 'LIVE' | 'MOCK' = isLiveConfigured ? 'LIVE' : 'MOCK';
+
     const idempotencyKey = getOrCreateIdempotencyKey(taskId);
 
     // Validate authorized destination for the active mode

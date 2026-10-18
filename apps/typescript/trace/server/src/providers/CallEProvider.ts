@@ -1,6 +1,6 @@
 import { CalleClient, CalleAuthenticationError, CalleRateLimitError, CalleAPIError } from '@call-e/calle';
 import { PhoneAgentProvider } from './PhoneAgentProvider.js';
-import { isDestinationAuthorized, maskPhoneNumber } from '../utils/phone.js';
+import { isDestinationAuthorized, maskPhoneNumber, maskPhoneNumbersInText } from '../utils/phone.js';
 import {
   CallRecord,
   CallState,
@@ -213,7 +213,7 @@ export class CallEProvider implements PhoneAgentProvider {
 
       return { callId: call.id, initialRecord: record };
     } catch (err: any) {
-      console.error('CALL-E API call creation error:', err?.message || err);
+      console.error('CALL-E API call creation error:', maskPhoneNumbersInText(err?.message || String(err)));
       const isDefinitiveRejection =
         Boolean(err.isDefinitiveRejection) ||
         err instanceof CalleAuthenticationError ||
@@ -232,9 +232,9 @@ export class CallEProvider implements PhoneAgentProvider {
       } else if (err instanceof CalleRateLimitError || err?.status === 429) {
         errorMsg = 'CALL-E API rate limit reached (429). Please retry shortly.';
       } else if (err instanceof CalleAPIError) {
-        errorMsg = `CALL-E API error (${err.status}): ${err.message}`;
+        errorMsg = `CALL-E API error (${err.status}): ${maskPhoneNumbersInText(err.message)}`;
       } else {
-        errorMsg = err.message || 'Failed to initiate real CALL-E phone call';
+        errorMsg = maskPhoneNumbersInText(err.message) || 'Failed to initiate real CALL-E phone call';
       }
 
       const wrappedErr = new Error(errorMsg);
@@ -333,7 +333,7 @@ export class CallEProvider implements PhoneAgentProvider {
             id: `turn_${turn.id || index}`,
             timestamp: `${mins}:${secs}`,
             speaker,
-            text: turn.text || '',
+            text: maskPhoneNumbersInText(turn.text || ''),
           });
         });
       }
@@ -604,11 +604,11 @@ export class CallEProvider implements PhoneAgentProvider {
         durationSeconds,
         transcriptTurns,
         structuredResult,
-        error: call.failureMessage || undefined,
+        error: maskPhoneNumbersInText(call.failureMessage) || undefined,
       };
     } catch (err: any) {
-      console.error(`Error fetching CALL-E call status for ${callId}:`, err);
-      throw new Error(`Failed to fetch CALL-E call progress: ${err.message || String(err)}`);
+      console.error(`Error fetching CALL-E call status for ${callId}:`, maskPhoneNumbersInText(err?.message || String(err)));
+      throw new Error(`Failed to fetch CALL-E call progress: ${maskPhoneNumbersInText(err.message || String(err))}`);
     }
   }
 

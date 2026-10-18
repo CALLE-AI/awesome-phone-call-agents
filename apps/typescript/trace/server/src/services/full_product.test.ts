@@ -623,6 +623,415 @@ describe('TRACE Supply-Chain Verification Engine Integration & Rules', () => {
       expect(nextCalled).toBe(false);
       expect(statusCode).toBe(403);
       expect(jsonResponse.error).toContain('Access Forbidden');
+
+      // Remote request with valid TRACE_API_TOKEN -> permitted
+      const origToken = process.env.TRACE_API_TOKEN;
+      try {
+        process.env.TRACE_API_TOKEN = 'secret-token-123';
+        nextCalled = false;
+        const reqAuth: any = {
+          socket: { remoteAddress: '203.0.113.195' },
+          headers: { authorization: 'Bearer secret-token-123' },
+        };
+        enforceLocalOrAuthenticated(reqAuth, resRemote, next);
+        expect(nextCalled).toBe(true);
+
+        // Remote request with invalid token -> 403 Forbidden
+        nextCalled = false;
+        statusCode = 0;
+        const reqWrong: any = {
+          socket: { remoteAddress: '203.0.113.195' },
+          headers: { authorization: 'Bearer wrong-token' },
+        };
+        enforceLocalOrAuthenticated(reqWrong, resRemote, next);
+        expect(nextCalled).toBe(false);
+        expect(statusCode).toBe(403);
+      } finally {
+        process.env.TRACE_API_TOKEN = origToken;
+      }
+    });
+
+    // 20.7 Enforce explicitLive Confirmation at Actual Call Submission Boundary (Must-Fix Item #1)
+    describe('Safety Rule 8: explicitLive Confirmation at Actual Call Submission Boundary', () => {
+      test('Case 1: MOCK mode without explicit confirmation proceeds safely with MockProvider', async () => {
+        const origEnv = process.env.PHONE_PROVIDER_MODE;
+        const origMockStart = (callService as any).mockProvider.startVerificationCall;
+        const origCallEStart = (callService as any).callEProvider.startVerificationCall;
+        let mockInvoked = false;
+        let callEInvoked = false;
+
+        try {
+          delete process.env.PHONE_PROVIDER_MODE;
+          callService.setMode('MOCK');
+
+          (callService as any).mockProvider.startVerificationCall = async (task: any, key: string) => {
+            mockInvoked = true;
+            return origMockStart.call((callService as any).mockProvider, task, key);
+          };
+          (callService as any).callEProvider.startVerificationCall = async () => {
+            callEInvoked = true;
+            throw new Error('CallEProvider should not be called in MOCK mode');
+          };
+
+          const created = taskService.createTask({
+            target: { organizationName: 'Mock Target Corp', phoneNumber: '+14155550181' },
+            item: 'Mock Resistors',
+            subject: 'Mock Stock Test',
+            verificationGoal: 'Verify mock stock',
+            questions: [{ id: 'q1', order: 1, question: 'In stock?', expectedType: 'boolean', required: true }],
+          });
+          expect(created.success).toBe(true);
+          const taskId = created.task!.id;
+
+          const result = await callService.startVerification(taskId, false, false);
+          expect(result.success).toBe(true);
+          expect(mockInvoked).toBe(true);
+          expect(callEInvoked).toBe(false);
+          expect(result.task?.mode).toBe('MOCK');
+          expect(result.task?.callState).toBe('QUEUED');
+        } finally {
+          process.env.PHONE_PROVIDER_MODE = origEnv;
+          callService.setMode(null);
+          (callService as any).mockProvider.startVerificationCall = origMockStart;
+          (callService as any).callEProvider.startVerificationCall = origCallEStart;
+        }
+      });
+
+      test('Case 2: LIVE mode without explicit confirmation rejects before calling provider', async () => {
+        const origEnv = process.env.PHONE_PROVIDER_MODE;
+        const origKey = process.env.CALLE_API_KEY;
+        const origAllowed = process.env.ALLOWED_DESTINATIONS;
+        const origMockStart = (callService as any).mockProvider.startVerificationCall;
+        const origCallEStart = (callService as any).callEProvider.startVerificationCall;
+        let mockInvoked = false;
+        let callEInvoked = false;
+
+        try {
+          process.env.PHONE_PROVIDER_MODE = 'calle';
+          process.env.CALLE_API_KEY = 'mock_live_api_key_for_testing';
+          process.env.ALLOWED_DESTINATIONS = '+14155550181';
+          callService.setMode(null);
+
+          (callService as any).mockProvider.startVerificationCall = async () => {
+            mockInvoked = true;
+            throw new Error('MockProvider should not be called');
+          };
+          (callService as any).callEProvider.startVerificationCall = async () => {
+            callEInvoked = true;
+            throw new Error('CallEProvider should not be called without explicitLive');
+          };
+
+          const created = taskService.createTask({
+            target: { organizationName: 'Live Target Corp', phoneNumber: '+14155550181' },
+            item: 'Microcontrollers',
+            subject: 'Live Stock Check',
+            verificationGoal: 'Verify stock on shelf',
+            questions: [{ id: 'q1', order: 1, question: 'Available?', expectedType: 'boolean', required: true }],
+          });
+          expect(created.success).toBe(true);
+          const taskId = created.task!.id;
+
+          // Dispatch WITHOUT explicitLive (explicitLive = false)
+          const result = await callService.startVerification(taskId, false, false);
+          expect(result.success).toBe(false);
+          expect(result.error).toContain('explicitLive confirmation is required');
+          expect(callEInvoked).toBe(false);
+          expect(mockInvoked).toBe(false); // Did not silently fall back to mock
+          expect(result.task?.callState).toBe('IDLE');
+          expect(result.task?.status).toBe('UNKNOWN / INCONCLUSIVE');
+          expect(result.task?.reviewStatus).toBe('NONE');
+        } finally {
+          process.env.PHONE_PROVIDER_MODE = origEnv;
+          process.env.CALLE_API_KEY = origKey;
+          process.env.ALLOWED_DESTINATIONS = origAllowed;
+          callService.setMode(null);
+          (callService as any).mockProvider.startVerificationCall = origMockStart;
+          (callService as any).callEProvider.startVerificationCall = origCallEStart;
+        }
+      });
+
+      test('Case 3: LIVE mode with explicit confirmation invokes CALL-E provider', async () => {
+        const origEnv = process.env.PHONE_PROVIDER_MODE;
+        const origKey = process.env.CALLE_API_KEY;
+        const origAllowed = process.env.ALLOWED_DESTINATIONS;
+        const origMockStart = (callService as any).mockProvider.startVerificationCall;
+        const origCallEStart = (callService as any).callEProvider.startVerificationCall;
+        let mockInvoked = false;
+        let callEInvoked = false;
+
+        try {
+          process.env.PHONE_PROVIDER_MODE = 'calle';
+          process.env.CALLE_API_KEY = 'mock_live_api_key_for_testing';
+          process.env.ALLOWED_DESTINATIONS = '+14155550181';
+          callService.setMode(null);
+
+          (callService as any).mockProvider.startVerificationCall = async () => {
+            mockInvoked = true;
+            throw new Error('MockProvider should not be called');
+          };
+          (callService as any).callEProvider.startVerificationCall = async (task: any, key: string) => {
+            callEInvoked = true;
+            return {
+              callId: `live_call_${task.id}`,
+              initialRecord: {
+                id: `call_${task.id}`,
+                taskId: task.id,
+                providerCallId: `live_call_${task.id}`,
+                idempotencyKey: key,
+                phoneNumber: task.target.phoneNumber,
+                mode: 'LIVE',
+                callState: 'QUEUED',
+                startedAt: new Date().toISOString(),
+                durationSeconds: 0,
+                transcriptTurns: [],
+                structuredResult: null,
+              },
+            };
+          };
+
+          const created = taskService.createTask({
+            target: { organizationName: 'Live Target Corp', phoneNumber: '+14155550181' },
+            item: 'Capacitors',
+            subject: 'Stock Audit',
+            verificationGoal: 'Verify warehouse inventory',
+            questions: [{ id: 'q1', order: 1, question: 'Available?', expectedType: 'boolean', required: true }],
+          });
+          expect(created.success).toBe(true);
+          const taskId = created.task!.id;
+
+          // Dispatch WITH explicitLive = true
+          const result = await callService.startVerification(taskId, false, true);
+          expect(result.success).toBe(true);
+          expect(callEInvoked).toBe(true);
+          expect(mockInvoked).toBe(false);
+          expect(result.task?.mode).toBe('LIVE');
+          expect(result.task?.callState).toBe('QUEUED');
+        } finally {
+          process.env.PHONE_PROVIDER_MODE = origEnv;
+          process.env.CALLE_API_KEY = origKey;
+          process.env.ALLOWED_DESTINATIONS = origAllowed;
+          callService.setMode(null);
+          (callService as any).mockProvider.startVerificationCall = origMockStart;
+          (callService as any).callEProvider.startVerificationCall = origCallEStart;
+        }
+      });
+
+      test('Case 4: LIVE mode selected via runtime override (setMode("LIVE")) requires explicitLive === true and rejects without it', async () => {
+        const origEnv = process.env.PHONE_PROVIDER_MODE;
+        const origKey = process.env.CALLE_API_KEY;
+        const origAllowed = process.env.ALLOWED_DESTINATIONS;
+        const origMockStart = (callService as any).mockProvider.startVerificationCall;
+        const origCallEStart = (callService as any).callEProvider.startVerificationCall;
+        let mockInvoked = false;
+        let callEInvoked = false;
+
+        try {
+          delete process.env.PHONE_PROVIDER_MODE;
+          process.env.CALLE_API_KEY = 'mock_live_api_key_for_testing';
+          process.env.ALLOWED_DESTINATIONS = '+14155550181';
+          callService.setMode('LIVE');
+
+          (callService as any).mockProvider.startVerificationCall = async () => {
+            mockInvoked = true;
+            throw new Error('MockProvider should not be called');
+          };
+          (callService as any).callEProvider.startVerificationCall = async (task: any, key: string) => {
+            callEInvoked = true;
+            return {
+              callId: `live_call_${task.id}`,
+              initialRecord: {
+                id: `call_${task.id}`,
+                taskId: task.id,
+                providerCallId: `live_call_${task.id}`,
+                idempotencyKey: key,
+                phoneNumber: task.target.phoneNumber,
+                mode: 'LIVE',
+                callState: 'QUEUED',
+                startedAt: new Date().toISOString(),
+                durationSeconds: 0,
+                transcriptTurns: [],
+                structuredResult: null,
+              },
+            };
+          };
+
+          const created1 = taskService.createTask({
+            target: { organizationName: 'Override Target Corp', phoneNumber: '+14155550181' },
+            item: 'Sensors Part 1',
+            subject: 'Override Stock Audit',
+            verificationGoal: 'Verify inventory',
+            questions: [{ id: 'q1', order: 1, question: 'In stock?', expectedType: 'boolean', required: true }],
+          });
+          expect(created1.success).toBe(true);
+
+          // Without explicitLive -> must reject safely and preserve IDLE task state
+          const unconfirmedResult = await callService.startVerification(created1.task!.id, false, false);
+          expect(unconfirmedResult.success).toBe(false);
+          expect(unconfirmedResult.error).toContain('explicitLive confirmation is required');
+          expect(callEInvoked).toBe(false);
+          expect(unconfirmedResult.task?.callState).toBe('IDLE');
+          expect(unconfirmedResult.task?.status).toBe('UNKNOWN / INCONCLUSIVE');
+
+          // Confirmed retry on the SAME task must succeed and invoke CALL-E
+          const confirmedResult = await callService.startVerification(created1.task!.id, false, true);
+          expect(confirmedResult.success).toBe(true);
+          expect(callEInvoked).toBe(true);
+          expect(confirmedResult.task?.mode).toBe('LIVE');
+          expect(confirmedResult.task?.callState).toBe('QUEUED');
+        } finally {
+          process.env.PHONE_PROVIDER_MODE = origEnv;
+          process.env.CALLE_API_KEY = origKey;
+          process.env.ALLOWED_DESTINATIONS = origAllowed;
+          callService.setMode(null);
+          (callService as any).mockProvider.startVerificationCall = origMockStart;
+          (callService as any).callEProvider.startVerificationCall = origCallEStart;
+        }
+      });
+
+      test('Case 5: forceMock=true forces MOCK mode and prevents CALL-E invocation even if global LIVE is configured', async () => {
+        const origEnv = process.env.PHONE_PROVIDER_MODE;
+        const origKey = process.env.CALLE_API_KEY;
+        const origAllowed = process.env.ALLOWED_DESTINATIONS;
+        const origMockStart = (callService as any).mockProvider.startVerificationCall;
+        const origCallEStart = (callService as any).callEProvider.startVerificationCall;
+        let mockInvoked = false;
+        let callEInvoked = false;
+
+        try {
+          process.env.PHONE_PROVIDER_MODE = 'calle';
+          process.env.CALLE_API_KEY = 'mock_live_api_key_for_testing';
+          process.env.ALLOWED_DESTINATIONS = '+14155550181';
+          callService.setMode(null);
+
+          (callService as any).mockProvider.startVerificationCall = async (task: any, key: string) => {
+            mockInvoked = true;
+            return origMockStart.call((callService as any).mockProvider, task, key);
+          };
+          (callService as any).callEProvider.startVerificationCall = async () => {
+            callEInvoked = true;
+            throw new Error('CallEProvider should not be called when forceMock=true');
+          };
+
+          const created = taskService.createTask({
+            target: { organizationName: 'ForceMock Target', phoneNumber: '+14155550181' },
+            item: 'Diodes',
+            subject: 'Forced Mock Test',
+            verificationGoal: 'Verify fallback behavior',
+            questions: [{ id: 'q1', order: 1, question: 'In stock?', expectedType: 'boolean', required: true }],
+          });
+          expect(created.success).toBe(true);
+          const taskId = created.task!.id;
+
+          // Call with forceMock = true and explicitLive = true
+          const result = await callService.startVerification(taskId, true, true);
+          expect(result.success).toBe(true);
+          expect(callEInvoked).toBe(false); // CALL-E provider MUST NOT be called!
+          expect(mockInvoked).toBe(true);   // Mock provider handled it
+          expect(result.task?.mode).toBe('MOCK');
+        } finally {
+          process.env.PHONE_PROVIDER_MODE = origEnv;
+          process.env.CALLE_API_KEY = origKey;
+          process.env.ALLOWED_DESTINATIONS = origAllowed;
+          callService.setMode(null);
+          (callService as any).mockProvider.startVerificationCall = origMockStart;
+          (callService as any).callEProvider.startVerificationCall = origCallEStart;
+        }
+      });
+
+      test('Case 6: Unconfigured LIVE mode produces an explicit error without silent fallback to MOCK', async () => {
+        const origEnv = process.env.PHONE_PROVIDER_MODE;
+        const origKey = process.env.CALLE_API_KEY;
+        const origEKey = process.env.CALL_E_API_KEY;
+        const origAllowed = process.env.ALLOWED_DESTINATIONS;
+        const origMockStart = (callService as any).mockProvider.startVerificationCall;
+        const origCallEStart = (callService as any).callEProvider.startVerificationCall;
+        let mockInvoked = false;
+        let callEInvoked = false;
+
+        try {
+          process.env.PHONE_PROVIDER_MODE = 'calle';
+          delete process.env.CALLE_API_KEY;
+          delete process.env.CALL_E_API_KEY;
+          process.env.ALLOWED_DESTINATIONS = '+14155550181';
+          callService.setMode(null);
+
+          (callService as any).mockProvider.startVerificationCall = async () => {
+            mockInvoked = true;
+            throw new Error('MockProvider should not be called');
+          };
+          (callService as any).callEProvider.startVerificationCall = async () => {
+            callEInvoked = true;
+            throw new Error('CallEProvider should not be called');
+          };
+
+          const created = taskService.createTask({
+            target: { organizationName: 'Unconfigured Live Target', phoneNumber: '+14155550181' },
+            item: 'Relays',
+            subject: 'Unconfigured Live Test',
+            verificationGoal: 'Verify failure on unconfigured API key',
+            questions: [{ id: 'q1', order: 1, question: 'In stock?', expectedType: 'boolean', required: true }],
+          });
+          expect(created.success).toBe(true);
+          const taskId = created.task!.id;
+
+          const result = await callService.startVerification(taskId, false, true);
+          expect(result.success).toBe(false);
+          expect(result.error).toContain('CALLE_API_KEY is not configured');
+          expect(callEInvoked).toBe(false);
+          expect(mockInvoked).toBe(false);
+          expect(result.task?.callState).toBe('IDLE');
+          expect(result.task?.status).toBe('UNKNOWN / INCONCLUSIVE');
+        } finally {
+          process.env.PHONE_PROVIDER_MODE = origEnv;
+          process.env.CALLE_API_KEY = origKey;
+          process.env.CALL_E_API_KEY = origEKey;
+          process.env.ALLOWED_DESTINATIONS = origAllowed;
+          callService.setMode(null);
+          (callService as any).mockProvider.startVerificationCall = origMockStart;
+          (callService as any).callEProvider.startVerificationCall = origCallEStart;
+        }
+      });
+    });
+
+    // 20.8 Phone number masking in freeform text & diagnostic paths
+    test('Safety Rule 9: maskPhoneNumbersInText redacts phone numbers in logs, transcripts, and errors without altering quantities', async () => {
+      const { maskPhoneNumbersInText } = await import('../utils/phone.js');
+
+      // Embedded phone numbers
+      expect(maskPhoneNumbersInText('Direct dialing +14155550181 initiated')).toBe('Direct dialing +1******0181 initiated');
+      expect(maskPhoneNumbersInText('Error from carrier for +919876543210: busy')).toBe('Error from carrier for +91******3210: busy');
+      expect(maskPhoneNumbersInText('Caller at 415-555-0181 picked up')).toBe('Caller at +1******0181 picked up');
+
+      // Quantities, prices, part numbers must NOT be redacted
+      expect(maskPhoneNumbersInText('Confirmed 500 units in stock at $12.50 each')).toBe('Confirmed 500 units in stock at $12.50 each');
+      expect(maskPhoneNumbersInText('Part number STM32F401RE is on shelf')).toBe('Part number STM32F401RE is on shelf');
+      expect(maskPhoneNumbersInText('')).toBe('');
+      expect(maskPhoneNumbersInText(null as any)).toBe('');
+    });
+
+    // 20.9 Qualified verification claims (advisory/experimental notice)
+    test('Safety Rule 10: Reconciliation outcomes qualify claims as conversational phone evidence rather than ground truth', () => {
+      const result = reconcileVerificationResult(
+        { claimedStatus: 'AVAILABLE', claimText: 'Claim 500 units available' },
+        {
+          call_outcome: 'confirmed',
+          verification_confidence: 'high',
+          availability_status: 'available',
+          quantity_or_capacity: '500',
+          next_available_time: null,
+          contact_name: 'Staff',
+          notes: 'Confirmed stock',
+          evidence: ['500 units in stock'],
+          question_answers: {},
+        },
+        'COMPLETED'
+      );
+
+      expect(result.outcome).toBe('VERIFIED');
+      expect(result.explanation).toContain('(advisory)');
+      expect(result.explanation).toContain('conversational phone evidence');
+      expect(result.explanation).not.toContain('physical reality');
+      expect(result.evidenceChain?.comparison).toContain('(advisory)');
     });
   });
 });
