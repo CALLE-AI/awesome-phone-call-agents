@@ -2,7 +2,6 @@
 
 from __future__ import annotations
 
-import hashlib
 import json
 from pathlib import Path
 
@@ -27,8 +26,6 @@ def test_the_public_cassette_passes_the_export_gate_and_replays():
 
 def test_the_public_receipt_matches_the_recorded_outcome_and_artifacts():
     receipt = json.loads(RECEIPT_PATH.read_text(encoding="utf-8"))
-    cassette_path = CASSETTE_DIR / "r3.json"
-    cassette_hash = hashlib.sha256(cassette_path.read_bytes()).hexdigest()
 
     assert receipt["row"] == "R3"
     assert receipt["calls_created"] == 1
