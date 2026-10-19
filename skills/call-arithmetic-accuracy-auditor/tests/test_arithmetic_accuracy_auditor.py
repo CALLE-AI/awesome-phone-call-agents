@@ -443,6 +443,61 @@ def test_single_digit_bare_numbers_gated():
         assert 2.0 not in comp["factors"].get("operands", [])
 
 
+# ---------------------------------------------------------------- add_carry running-total continuation
+
+def test_add_carry_probe_dialogue_fee_on_prior_subtotal():
+    turns = _turns(
+        ("agent", "You had 4 tickets at 45 dollars each, so that comes to 180 dollars even."),
+        ("callee", "Okay."),
+        ("agent", "With the 18 dollar service fee that totals to 220 dollars."),
+    )
+    report = analyze_turns(turns)
+    assert report["computations"][0]["kind"] == "multiply"
+    assert report["computations"][0]["status"] == "CORRECT"
+    carry = report["computations"][1]
+    assert carry["kind"] == "add_carry"
+    assert carry["status"] == "INCORRECT"
+    assert carry["computed_result"] == 198.0
+    assert carry["stated_result"] == 220.0
+    assert carry["delta"] == 22.0
+    assert carry["factors"]["implicit_base"] == 180.0
+    assert carry["factors"]["implicit_base_turn_index"] == 0
+    assert carry["factors"]["operand"] == 18.0
+    assert report["verdict"] == "ARITHMETIC_ERRORS_FOUND"
+
+
+def test_add_carry_guard_no_fee_noun_stays_unverifiable():
+    turns = _turns(
+        ("agent", "I have you for 3 nights at 120 dollars a night, so that's 360 dollars total."),
+        ("agent", "The 30 dollar gift card comes to 30 dollars."),
+    )
+    report = analyze_turns(turns)
+    comp = report["computations"][1]
+    assert comp["kind"] in ("add", "total_only")
+    assert comp["status"] == "UNVERIFIABLE"
+    assert comp["reason"] == "FACTORS_MISSING"
+
+
+def test_add_carry_guard_no_prior_computation():
+    turns = _turns(("agent", "With the 18 dollar service fee that totals to 220 dollars."))
+    report = analyze_turns(turns)
+    comp = report["computations"][0]
+    assert comp["kind"] == "add"
+    assert comp["status"] == "UNVERIFIABLE"
+    assert comp["reason"] == "FACTORS_MISSING"
+
+
+def test_add_carry_guard_prior_unverifiable_no_base():
+    turns = _turns(
+        ("agent", "Your total comes to 250 dollars."),
+        ("agent", "With the 18 dollar service fee that totals to 268 dollars."),
+    )
+    report = analyze_turns(turns)
+    kinds = [c["kind"] for c in report["computations"]]
+    assert "add_carry" not in kinds
+    assert report["computations"][1]["status"] == "UNVERIFIABLE"
+
+
 # ---------------------------------------------------------------- CLI
 
 MODULE = SCRIPTS / "arithmetic_accuracy_auditor.py"

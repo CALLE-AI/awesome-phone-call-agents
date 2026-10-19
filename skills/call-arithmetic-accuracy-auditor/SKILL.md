@@ -121,6 +121,9 @@ Output report keys: `skill`, `mode`, `call_id` (masked), `verdict`,
 
 Detected kinds: `multiply` (qty x unit price), `add` (line-item sums),
 `percent_off`, `subtract` (balance due), `duration` (clock ranges),
+`add_carry` (single fee-like operand continued from the prior stated
+subtotal; guarded by a fee noun and an immediately preceding verifiable
+computation),
 `total_only` (a bare total with zero factor tokens; always UNVERIFIABLE).
 CORRECT tolerance: |computed - stated| < 0.005.
 

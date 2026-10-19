@@ -41,7 +41,11 @@ total on a live call and it cannot determine what any party owed.**
   total with zero factor tokens is classified `total_only` and reported
   UNVERIFIABLE, never as a verified sum.
 - Sentence scope: factors in one sentence and a total in the next are
-  not joined; cross-sentence computations are invisible.
+  not joined; cross-sentence computations are invisible (the one
+  exception is `add_carry`, which continues a running total only when
+  the sentence names a fee-like noun AND an immediately preceding
+  verifiable computation supplies the stated base; a topic change
+  between the two sentences could still be misread as a continuation).
 - `post_summary` is out of scope - this skill audits agent turns only,
   never whether the summary faithfully reflects them.
 - English only; heuristic patterns, not a validated instrument.

@@ -98,6 +98,13 @@ _DURATION_RE = re.compile(
 
 _HOURS_RE = re.compile(r"(?:that(?:'s| is)|so) (\d+(?:\.\d+)?) hours", re.IGNORECASE)
 
+# Fee-like nouns gating add_carry: a single-operand total is only treated as
+# a continuation of a prior stated subtotal when the operand is a surcharge.
+_FEE_NOUN_RE = re.compile(
+    r"\b(?:fee|charge|tax|service|deposit|cleaning|upgrade)\b",
+    re.IGNORECASE,
+)
+
 TOLERANCE = 0.005
 
 
@@ -371,7 +378,11 @@ def _comp(
     }
 
 
-def _evaluate_sentence(sentence: str, turn_index: int) -> list[dict[str, Any]]:
+def _evaluate_sentence(
+    sentence: str,
+    turn_index: int,
+    last_comp: dict[str, Any] | None = None,
+) -> list[dict[str, Any]]:
     # Matching runs on a pre-masked copy so long digit runs (phone/card PII)
     # never tokenize as amount operands; the raw sentence is kept for display
     # (mask_pii is idempotent, so the report masks it exactly once).
@@ -430,7 +441,22 @@ def _evaluate_sentence(sentence: str, turn_index: int) -> list[dict[str, Any]]:
             ))
         else:
             leading = [t["value"] for t in tokens if t["start"] < result["start"]]
-            if leading:
+            if len(leading) == 1 and _FEE_NOUN_RE.search(match_text) and last_comp is not None and last_comp["status"] != "UNVERIFIABLE":
+                # Running-total continuation: the agent stacks a fee on its own
+                # previously STATED subtotal (not the recomputed value), so the
+                # base is verifiable even when the prior sentence was not.
+                base = last_comp["stated_result"]
+                operand = leading[0]
+                comps.append(_comp(
+                    turn_index, sentence, "add_carry",
+                    {
+                        "implicit_base": base,
+                        "implicit_base_turn_index": last_comp["turn_index"],
+                        "operand": operand,
+                    },
+                    result["value"], round(base + operand, 2),
+                ))
+            elif leading:
                 comps.append(_comp(
                     turn_index, sentence, "add", {"operands": leading},
                     result["value"], None,
@@ -448,6 +474,7 @@ def _evaluate_sentence(sentence: str, turn_index: int) -> list[dict[str, Any]]:
 def analyze_turns(turns: list, call_id: Any = None) -> dict[str, Any]:
     """Audit AGENT turns for spoken arithmetic against stated factors."""
     computations: list[dict[str, Any]] = []
+    last_comp: dict[str, Any] | None = None
     for idx, turn in enumerate(turns):
         if not isinstance(turn, dict):
             continue
@@ -458,7 +485,10 @@ def analyze_turns(turns: list, call_id: Any = None) -> dict[str, Any]:
         if not text.strip():
             continue
         for sentence in _SENTENCE_SPLIT_RE.split(text):
-            computations.extend(_evaluate_sentence(sentence, idx))
+            comps = _evaluate_sentence(sentence, idx, last_comp)
+            computations.extend(comps)
+            if comps:
+                last_comp = comps[-1]
 
     detected = len(computations)
     correct = sum(1 for c in computations if c["status"] == "CORRECT")
