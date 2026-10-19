@@ -1,0 +1,12 @@
+{
+  "goal_template": {
+    "name": "open-questioning business call",
+    "description": "Harbor Inn: confirm the Friday arrival time - with open-questioning protocol",
+    "language": "en-US",
+    "to": "+14155550168",
+    "business_name": "Harbor Inn",
+    "task": "confirm the Friday arrival time",
+    "protocol": "If the person is unsure, accept 'not sure' as the answer of record. Offer to confirm by callback or message instead of pressing. Never ask for a best guess on facts the person cannot know. When a person volunteers an uncertain value, repeat it back with their qualifier and mark it tentative in the summary. Ask open questions (what works best for you) rather than pressing for specific values.",
+    "safety": "Fictional testing only. This template does not authorize any real call."
+  }
+}
