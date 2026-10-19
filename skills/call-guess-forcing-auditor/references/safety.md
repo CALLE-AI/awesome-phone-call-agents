@@ -25,7 +25,9 @@ any action against an agent, a business, or a person.**
 
 - Detection is heuristic and English-only; paraphrases outside the
   listed patterns are missed, and common words in the hedge list
-  ("about", "around") can fire on non-hedge usage.
+  ("about", "around") can fire on non-hedge usage. Explicit
+  guess-invitation phrases fire in any sentence form; wh-re-asks fire
+  only when interrogative, so declarative wh-mentions are not pressure.
 - The i+1..i+2 bind window is a policy choice; sequences outside it are
   invisible.
 - Transcript-only: no prosody, no stress cues, no pause timing. Nothing

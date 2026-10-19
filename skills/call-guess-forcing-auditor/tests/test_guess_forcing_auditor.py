@@ -167,6 +167,56 @@ def test_declarative_offer_does_not_fire():
     assert report["counts"]["pressure_events"] == 0
 
 
+# ---------------------------------------------------- imperative guess-invitations
+
+_PROBE_TURNS = _turns(
+    ("callee", "Honestly I can't remember the confirmation code."),
+    ("agent", "Take a guess, even two digits help."),
+    ("callee", "Roughly 55?"),
+    ("agent", "55 it is, locked in."),
+)
+
+
+def test_imperative_probe_full_sequence():
+    report = analyze_turns(_PROBE_TURNS)
+    assert report["verdict"] == "GUESS_PRESSURE_UNMITIGATED"
+    assert report["counts"] == {
+        "uncertainty_events": 1,
+        "pressure_events": 1,
+        "yields": 1,
+        "consolidations_as_fact": 1,
+        "consolidations_hedge_preserved": 0,
+        "shifts": 0,
+    }
+
+
+def test_imperative_probe_wrapped_summary_carries_value():
+    report = analyze_payload(
+        {"result": {"transcript": list(_PROBE_TURNS)}, "post_summary": "Arrival noted at 55."}
+    )
+    assert report["summary_carries_value"] is True
+
+
+def test_imperative_give_me_rough_number_fires():
+    report = _uncertainty_pressure("c", "Just give me a rough number.")
+    assert report["counts"]["pressure_events"] == 1
+
+
+def test_imperative_even_approximately_fine_fires():
+    report = _uncertainty_pressure("c", "Even approximately is fine.")
+    assert report["counts"]["pressure_events"] == 1
+
+
+def test_imperative_ballpark_fires():
+    report = _uncertainty_pressure("c", "Ballpark it for me.")
+    assert report["counts"]["pressure_events"] == 1
+
+
+def test_declarative_wh_mention_does_not_fire():
+    report = _uncertainty_pressure("c", "I will ask the manager what time works.")
+    assert report["counts"]["pressure_events"] == 0
+
+
 def test_pressure_window_three_turns_later_does_not_bind():
     turns = _turns(
         ("callee", "I'm not sure what time we'll arrive."),

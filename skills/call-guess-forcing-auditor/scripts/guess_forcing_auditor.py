@@ -78,7 +78,7 @@ _UNCERTAINTY_RE = re.compile(
 _PRESSURE_LEXICON_RE = re.compile(
     r"(?:best guess|take (?:a |your )?guess|just roughly"
     r"|roughly (?:what|when|how)|ballpark|approximately (?:what|when|how)"
-    r"|around what|give me (?:a |an )?(?:number|estimate|time|date)"
+    r"|around what|give me (?:a |an )?(?:rough )?(?:number|estimate|time|date)"
     r"|even approximately|something like)",
     re.IGNORECASE,
 )
@@ -236,19 +236,23 @@ def analyze_turns(turns: list, call_id: Any = None, post_summary: Any = None) ->
                 negative_feedback = True
 
             # 2. Agent pressure after expressed uncertainty.
-            if (
-                is_agent
-                and _is_interrogative(sentence)
-                and _binds(last_uncertainty_idx, idx)
-            ):
+            # (a) Explicit guess-invitation lexicon fires in ANY sentence
+            # form: these phrases are inherently elicitations regardless of
+            # punctuation (imperatives like "Take a guess." are the most
+            # common real form).
+            kind_detail = None
+            if is_agent and _binds(last_uncertainty_idx, idx):
                 m = _PRESSURE_LEXICON_RE.search(sentence)
-                kind_detail = None
                 if m:
                     kind_detail = m.group(0)
                 else:
-                    wm = _WH_RE_ASK_RE.search(sentence)
-                    if wm:
-                        kind_detail = wm.group(0)
+                    # (b) Wh re-ask stays interrogative-gated: a plain
+                    # declarative wh-mention ("I will ask what time works")
+                    # is not pressure.
+                    if _is_interrogative(sentence):
+                        wm = _WH_RE_ASK_RE.search(sentence)
+                        if wm:
+                            kind_detail = wm.group(0)
                 if kind_detail:
                     events.append(
                         {

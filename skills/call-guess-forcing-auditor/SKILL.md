@@ -127,7 +127,10 @@ consolidations_hedge_preserved, shifts`),
 ## Limitations
 
 - Detection uses heuristic English-only lexicons; paraphrases outside
-  the listed patterns are missed.
+  the listed patterns are missed. Pressure detection is two-branch:
+  explicit guess-invitation phrases (take a guess, ballpark, give me a
+  number) fire in any sentence form including imperatives; wh-re-asks
+  (what time, how many) fire only when interrogative.
 - The bind window (pressure/yield/consolidation attach only within
   i+1..i+2 turns of their trigger) is a policy choice, not a cognitive
   claim.
