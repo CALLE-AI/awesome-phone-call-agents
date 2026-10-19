@@ -128,6 +128,60 @@ def test_empty_transcript_no_list():
     assert report["review_action"] == "none"
 
 
+# ------------------------------------------------- inline string transcripts
+# The live get_call_run endpoint also returns result.transcript as a single
+# inline string ("[MM:SS] BOT: ... [MM:SS] USER: ..."), per the observed-live
+# fixture in apps/python/ringdown/tests/fixtures.
+
+_STRING_LIST_SIGNAL = (
+    "[00:00] USER: We need a crib, late checkout, and a room on a high floor.\n"
+    "[00:06] BOT: I have you down for a crib and late checkout. Is that everything?"
+)
+
+
+def test_string_transcript_items_dropped():
+    report = analyze_payload({"transcript": _STRING_LIST_SIGNAL})
+    assert report["verdict"] == "ITEMS_DROPPED"
+    assert [d["item"] for d in report["dropped_items"]] == ["high floor"]
+
+
+def test_string_transcript_wrapped_shape_and_call_id():
+    payload = {
+        "status": "COMPLETED",
+        "call_id": "call-string-002",
+        "result": {"transcript": _STRING_LIST_SIGNAL, "post_summary": "Rooms noted."},
+    }
+    report = analyze_payload(payload)
+    assert report["verdict"] == "ITEMS_DROPPED"
+    assert report["call_id"] == "call-string-002"
+
+
+def test_string_transcript_wrapped_continuation_join():
+    wrapped = (
+        "[00:00] USER: We need a crib, late checkout, and a room\n"
+        "on a high floor.\n"
+        "[00:06] BOT: I have you down for a crib and late checkout. Is that everything?"
+    )
+    report = analyze_payload({"status": "COMPLETED", "result": {"transcript": wrapped}})
+    assert report["verdict"] == "ITEMS_DROPPED"
+    assert [d["item"] for d in report["dropped_items"]] == ["high floor"]
+
+
+def test_string_transcript_label_coverage():
+    payload = {
+        "transcript": (
+            "[00:00] AI: What do you need?\n"
+            "[00:04] CALLEE: A crib and late checkout.\n"
+            "[00:06] CALLER: Got it.\n"
+            "[00:08] CUSTOMER: Thanks."
+        )
+    }
+    report = analyze_payload(payload)
+    # the callee statement forms the list; the short agent ack counts as the readback
+    assert report["verdict"] == "ITEMS_DROPPED"
+    assert report["counts"]["lists_detected"] == 1
+
+
 # ---------------------------------------------------------------- chunking / item normalization
 
 def test_three_chunk_sentence_makes_three_items():

@@ -114,6 +114,8 @@ Input: a JSON file that is either the wrapped `get_call_run` shape
 
 or a bare dict with a `transcript` key, or a flat list of
 `{"role", "text"}` turns (`speaker` is accepted as a role alias).
+Inline string transcripts from live `get_call_run` payloads are parsed;
+timestamps are ignored; unknown speaker labels are treated as continuations.
 Callee-side roles: `callee`, `customer`, `called_party`, `recipient`,
 `human`. Agent-side: `agent`, `assistant`, `ai`, `bot`, `caller`.
 Typographic apostrophes are normalized before matching; digit runs of
