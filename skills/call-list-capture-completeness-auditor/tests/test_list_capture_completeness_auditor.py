@@ -256,6 +256,70 @@ def test_verdict_priority_both_beats_dropped():
     assert report["verdict"] == "BOTH_DROPPED_AND_ADDED"
 
 
+# ---------------------------------------------------------------- correction / withdrawal semantics
+
+def test_correction_turn_withdrawal_probe_all_captured():
+    turns = _turns(
+        ("callee", "We need a crib and late checkout."),
+        ("agent", "I have you down for a crib and late checkout."),
+        ("callee", "Actually, two cribs - and drop the late checkout."),
+        ("agent", "Two cribs, no late checkout - got it."),
+    )
+    report = analyze_turns(turns)
+    assert report["verdict"] == "ALL_ITEMS_CAPTURED"
+    assert report["dropped_items"] == []
+    assert report["added_items"] == []
+    assert report["counts"]["items_total"] == 1
+    assert report["counts"]["items_captured"] == 1
+    assert report["counts"]["items_dropped"] == 0
+    assert report["counts"]["items_added"] == 0
+
+
+def test_first_statement_negation_is_item():
+    turns = _turns(
+        ("callee", "No onions, extra cheese, and thin crust please."),
+        ("agent", "I have you down for no onions, extra cheese, and thin crust. Is that everything?"),
+    )
+    report = analyze_turns(turns)
+    assert report["verdict"] == "ALL_ITEMS_CAPTURED"
+    assert report["counts"]["items_total"] == 3
+    assert "no onions" in _item_displays(report)
+
+
+def test_withdrawal_of_unstated_item_stays_item():
+    turns = _turns(
+        ("callee", "We need a crib and no late checkout."),
+        ("agent", "Let me confirm: a crib and no late checkout. Is that everything?"),
+    )
+    report = analyze_turns(turns)
+    assert report["verdict"] == "ALL_ITEMS_CAPTURED"
+    assert report["counts"]["items_total"] == 2
+    assert "crib" in _item_displays(report)
+    assert "no late checkout" in _item_displays(report)
+
+
+def test_as_well_as_chunk_split():
+    turns = _turns(
+        ("callee", "We need cribs as well as high chairs and a stroller."),
+        ("agent", "I have you down for cribs, high chairs, and a stroller. Is that everything?"),
+    )
+    report = analyze_turns(turns)
+    assert report["counts"]["items_total"] == 3
+    assert report["verdict"] == "ALL_ITEMS_CAPTURED"
+
+
+def test_imperative_verb_filler_stripped():
+    turns = _turns(
+        ("callee", "Add two garden salads, a margherita, and sparkling water."),
+        ("agent", "Let me read that back: two garden salads, a margherita, and sparkling water. Is that everything?"),
+    )
+    report = analyze_turns(turns)
+    assert report["counts"]["items_total"] == 3
+    assert "garden salads" in _item_displays(report)
+    assert all(not d.startswith("add") for d in _item_displays(report))
+    assert report["verdict"] == "ALL_ITEMS_CAPTURED"
+
+
 # ---------------------------------------------------------------- fixture grading
 
 def test_fixture_001_all_captured_counts():

@@ -54,20 +54,44 @@ CUE_RE = re.compile(
 # so greetings/fillers ("Hi, we need ...", "Uh, sure.") do not become items.
 _LEAD_MARKERS_RE = re.compile(
     r"^(?:(?:also|plus|and|uh|um|ok|okay|well|hi|hello|hey|yes|yeah|so|please"
-    r"|thanks|now|then|first|great|perfect|right|sure|alright)\b[,;: ]*)+",
+    r"|thanks|now|then|first|great|perfect|right|sure|alright"
+    r"|actually|sorry|correction|wait|never mind|on second thought)\b[,;: ]*)+",
     re.IGNORECASE,
 )
 
-_CHUNK_SPLIT_RE = re.compile(r",|\band\b|\bplus\b")
+_CHUNK_SPLIT_RE = re.compile(r",|\band\b|\bplus\b|\bas well as\b")
 
 _SENTENCE_SPLIT_RE = re.compile(r"(?<=[.!?])(?<![aApP]\.m\.)\s+(?=[A-Z])")
 
 # Stopwords stripped from item chunk edges (spec set, matching only).
-_ITEM_STOPWORDS = {"please", "maybe", "also", "well", "ok", "okay", "uh", "um", "thanks"}
+# Correction-discourse tokens ("actually", "sorry", "wait", "never mind",
+# ...) are stripped so a correction preamble never becomes a chunk-item.
+_ITEM_STOPWORDS = {
+    "please", "maybe", "also", "well", "ok", "okay", "uh", "um", "thanks",
+    "actually", "sorry", "correction", "wait", "never", "mind",
+}
 
 # Leading filler verb phrases stripped so the item is the noun phrase.
+# The second alternative covers leading imperatives ("Add two salads ...").
 _VERB_FILLER_RE = re.compile(
-    r"^(?:we|i|you)\s+(?:also\s+)?(?:need|wanted?|would\s+like|'d\s+like|'ll\s+take)\s+"
+    r"^(?:(?:we|i|you)\s+(?:also\s+)?(?:need|wanted?|would\s+like|'d\s+like|'ll\s+take)"
+    r"|(?:add|include|get|order|put\s+down))\s+"
+)
+
+# A correction sentence extends the active list instead of starting a new
+# one, so the withdrawal inside it edits the list it corrects.
+_CORRECTION_MARKER_RE = re.compile(
+    r"^(?:actually|sorry|correction|wait|never mind|on second thought)\b",
+    re.IGNORECASE,
+)
+
+# A negated chunk names an item being WITHDRAWN from the active list
+# ("drop the late checkout", "no late checkout") rather than being a new
+# item - but only when that item is already in the list; a first-mention
+# negation ("no onions") is an item/modification.
+_WITHDRAWAL_RE = re.compile(
+    r"^(?:(?:drop|remove|cancel|forget|skip)\s+(?:the\s+)?|no\s+)(.+)$",
+    re.IGNORECASE,
 )
 
 # Prepositional tail split: the last segment is the payload noun phrase.
@@ -226,20 +250,33 @@ def _raw_chunks(sentence: str) -> list[str]:
     return [c for c in (part.strip() for part in _CHUNK_SPLIT_RE.split(sentence)) if c]
 
 
-def _chunk_items(sentence: str) -> list[tuple[str, set[str], str | None]]:
+def _withdrawal_target(raw_chunk: str) -> str | None:
+    """Return the item name a chunk withdraws, or None if not a negation."""
+
+    s = re.sub(r"[^a-z0-9\s']", " ", raw_chunk.lower())
+    s = re.sub(r"\s+", " ", s).strip()
+    m = _WITHDRAWAL_RE.match(s)
+    return m.group(1).strip() if m else None
+
+
+def _chunk_items(sentence: str) -> list[tuple[str, set[str], str | None, str]]:
     """Strip leading discourse markers, then normalize each chunk; drop
-    chunk-empty items."""
+    chunk-empty items. Returns (display, tokens, note, raw_chunk)."""
     stripped = _LEAD_MARKERS_RE.sub("", sentence).strip()
     items = []
     for chunk in _raw_chunks(stripped):
         display, tokens, note = normalize_item(chunk)
         if tokens:
-            items.append((display, tokens, note))
+            items.append((display, tokens, note, chunk))
     return items
 
 
 def _extends_active_list(sentence: str) -> bool:
-    return bool(re.match(r"(?:also|plus|and)\b", sentence, re.IGNORECASE))
+    if re.match(r"(?:also|plus|and)\b", sentence, re.IGNORECASE):
+        return True
+    # A correction ("Actually, two cribs - and drop the late checkout.")
+    # edits the existing list rather than starting a new one.
+    return bool(_CORRECTION_MARKER_RE.match(sentence))
 
 
 def analyze_turns(turns: list, call_id: Any = None) -> dict[str, Any]:
@@ -255,8 +292,9 @@ def analyze_turns(turns: list, call_id: Any = None) -> dict[str, Any]:
             continue
         norm_turns.append((idx, role, text))
 
-    # ---- pass 1: extract callee item lists
+    # ---- pass 1: extract callee item lists (with withdrawal semantics)
     lists: list[dict[str, Any]] = []
+    withdrawn_tokens: list[set[str]] = []
     for idx, role, text in norm_turns:
         if role not in CALLEE_ROLES:
             continue
@@ -274,7 +312,24 @@ def analyze_turns(turns: list, call_id: Any = None) -> dict[str, Any]:
             # A >=2-chunk sentence without a marker STARTS a new list.
             lists.append({"start_turn_index": idx, "items": []})
         target = lists[-1]
-        for display, tokens, note in chunk_items:
+        for display, tokens, note, raw in chunk_items:
+            wtarget = _withdrawal_target(raw)
+            if wtarget is not None:
+                # Withdrawal ONLY when the named item is already in the
+                # active list; a first-mention negation stays an item.
+                wt_tokens = item_tokens(wtarget)
+                match_idx = next(
+                    (
+                        i
+                        for i, it in enumerate(target["items"])
+                        if items_match(wt_tokens, it["_tokens"])
+                    ),
+                    None,
+                )
+                if match_idx is not None:
+                    removed = target["items"].pop(match_idx)
+                    withdrawn_tokens.append(removed["_tokens"])
+                    continue
             if any(tokens == it["_tokens"] for it in target["items"]):
                 continue  # dedupe within the same list
             target["items"].append(
@@ -296,7 +351,7 @@ def analyze_turns(turns: list, call_id: Any = None) -> dict[str, Any]:
         if role not in AGENT_ROLES:
             continue
         for sentence in _sentences(text):
-            for display, tokens, _note in _chunk_items(sentence):
+            for display, tokens, _note, _raw in _chunk_items(sentence):
                 agent_chunks.append((idx, tokens))
     for lst, it in all_items:
         for j, tokens in agent_chunks:
@@ -318,16 +373,28 @@ def analyze_turns(turns: list, call_id: Any = None) -> dict[str, Any]:
             has_cue = bool(CUE_RE.search(sentence))
             matches_item = any(
                 items_match(tokens, it["_tokens"])
-                for _, tokens, _note in chunk_norms
+                for _, tokens, _note, _raw in chunk_norms
                 for _, it in all_items
             )
             is_readback = bool(lists) and ((len(chunk_norms) >= 2) or has_cue) and matches_item
             if is_readback or has_cue:
                 readback_seen = True
             if is_readback:
-                for display, tokens, _note in chunk_norms:
+                for display, tokens, _note, raw in chunk_norms:
                     if any(items_match(tokens, it["_tokens"]) for _, it in all_items):
                         continue
+                    # An agent restating a withdrawn item - directly
+                    # ("late checkout") or as a negation ("no late
+                    # checkout") - is not an added item.
+                    if any(items_match(tokens, wtok) for wtok in withdrawn_tokens):
+                        continue
+                    wtarget = _withdrawal_target(raw)
+                    if wtarget is not None:
+                        wt_tokens = item_tokens(wtarget)
+                        if any(items_match(wt_tokens, it["_tokens"]) for _, it in all_items) or any(
+                            items_match(wt_tokens, wtok) for wtok in withdrawn_tokens
+                        ):
+                            continue
                     if any(items_match(tokens, tokens2) for _, tokens2 in agent_stated):
                         continue
                     key = (display, idx)
@@ -335,7 +402,7 @@ def analyze_turns(turns: list, call_id: Any = None) -> dict[str, Any]:
                         added_keys.add(key)
                         added_items.append({"item": display, "turn_index": idx})
             else:
-                for display, tokens, _note in chunk_norms:
+                for display, tokens, _note, _raw in chunk_norms:
                     agent_stated.append((idx, tokens))
 
     dropped = [

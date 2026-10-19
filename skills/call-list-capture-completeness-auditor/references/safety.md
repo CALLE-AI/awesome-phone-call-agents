@@ -24,6 +24,12 @@ heuristic grade of transcript text for human review only.**
 - Detection is English-only.
 - Items are noun phrases; quantities are carried as notes and are not
   separately verified ("two pizzas" vs "three pizzas" is not counted).
+- Negated chunks are treated as withdrawals only when they reference an
+  item already in the active list ("no late checkout" after late
+  checkout was requested); first-mention negations ("no onions") are
+  items. This is a heuristic; ambiguous corrections should be
+  human-reviewed (the report already exposes per-list items with turn
+  indices).
 
 ## Data handling
 
