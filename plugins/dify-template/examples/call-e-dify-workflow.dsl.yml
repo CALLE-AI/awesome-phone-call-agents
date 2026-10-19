@@ -1726,14 +1726,14 @@ workflow:
           \ = raw_item.get(\"reconciliation\")\n        safe_reconciliation = safe_item.get(\"\
           reconciliation\")\n        if not isinstance(raw_reconciliation, dict) or\
           \ not isinstance(safe_reconciliation, dict):\n            continue\n   \
-          \     if not raw_reconciliation.get(\"required\"):\n            continue\n\
-          \        if CALL_ID_RE.fullmatch(call_id):\n            safe_reconciliation[\"\
+          \     if CALL_ID_RE.fullmatch(call_id):\n            safe_reconciliation[\"\
           callId\"] = call_id\n        idempotency_key = validated_idempotency_key(raw_reconciliation.get(\"\
           idempotencyKey\"))\n        if not idempotency_key:\n            continue\n\
           \        safe_reconciliation[\"idempotencyKey\"] = idempotency_key\n   \
-          \     safe_reconciliation[\"instruction\"] = reconciliation_status_text(safe_reconciliation)\n\
-          \    return safe_results\n\ndef as_obj(value):\n    if isinstance(value,\
-          \ dict):\n        return value\n    if isinstance(value, str) and value.strip():\n\
+          \     if raw_reconciliation.get(\"required\"):\n            safe_reconciliation[\"\
+          instruction\"] = reconciliation_status_text(safe_reconciliation)\n    return\
+          \ safe_results\n\ndef as_obj(value):\n    if isinstance(value, dict):\n\
+          \        return value\n    if isinstance(value, str) and value.strip():\n\
           \        try:\n            parsed = json.loads(value)\n            return\
           \ parsed if isinstance(parsed, dict) else {}\n        except Exception:\n\
           \            return {}\n    return {}\n\ndef line_value(value, fallback=\"\

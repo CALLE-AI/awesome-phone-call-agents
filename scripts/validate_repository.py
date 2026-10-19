@@ -1431,7 +1431,8 @@ def validate_dify_template() -> None:
         "transcript": [{"speaker": "user", "offset_seconds": None, "text": "Call +15555550124."}],
         "metadata": payload["metadata"],
     }
-    context = extract_main(call, 202, built["base_url"], built["metadata_sent_json"], built["masked_phone"], built["idempotency_key"], "call_001")["call_context"]
+    numeric_idempotency_key = "dify-" + "a" * 57 + "1234567"
+    context = extract_main(call, 202, built["base_url"], built["metadata_sent_json"], built["masked_phone"], numeric_idempotency_key, "call_001")["call_context"]
     if context["initialDone"] or context["callId"] != call["id"]:
         fail("Dify must keep polling a completed Call whose business result is pending.")
 
@@ -1469,8 +1470,13 @@ def validate_dify_template() -> None:
         counts = json.loads(summary["summary_json"])
         if counts["resultStatusCounts"][readiness] != 1 or counts["creationOutcomeUnknownCount"] != 0:
             fail("Dify must count readiness independently of creation and business success.")
-        if call_task["phone"] in summary["report"] + summary["summary_json"] or call["id"] not in summary["report"]:
-            fail("Dify must mask phone-bearing results and transcripts while preserving the accepted API ID.")
+        if (
+            call_task["phone"] in summary["report"] + summary["summary_json"] or call["id"] not in summary["report"]
+            or counts["results"][0]["reconciliation"]["callId"] != call["id"]
+            or counts["results"][0]["reconciliation"]["idempotencyKey"] != numeric_idempotency_key
+            or (not item["reconciliation"]["required"] and counts["results"][0]["reconciliation"]["instruction"])
+        ):
+            fail("Dify must mask phone-bearing results while preserving validated Call IDs and idempotency keys in every result.")
 
     for status_code in (0, 408, 409, 500, 503):
         body = {"error": {"code": "idempotency_conflict", "details": {"reason_code": "creation_in_progress"}}}
@@ -1499,7 +1505,7 @@ def validate_dify_template() -> None:
             or counts["liveCallsCreated"] != 1 or counts["creationOutcomeUnknownCount"] != 0
             or f"Resume GET /v2/calls/{call['id']}" not in counts["results"][0]["reconciliation"]["instruction"]
             or f"Resume GET /v2/calls/{call['id']}" not in summary["report"]
-            or built["idempotency_key"] not in summary["report"]
+            or numeric_idempotency_key not in summary["report"]
         ):
             fail("Dify failed or timed-out lookups must preserve the accepted ID, last evidence, exact key, and read-only recovery instruction.")
 
