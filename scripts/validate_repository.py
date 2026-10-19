@@ -822,7 +822,7 @@ def validate_dify_template() -> None:
             "rawLookupJson\": json.dumps(redact_phone_values(final_body), ensure_ascii=False)",
             "raw_call_result_json = json.dumps(redact_phone_values(call), ensure_ascii=False)",
             "safe_call = redact_phone_values(call)",
-            "safe_call_payload[\"_dify_metadata_round_trip\"] = metadata_round_trip",
+            "safe_call[\"_dify_metadata_round_trip\"] = metadata_round_trip",
             "\"latest_call_json\": json.dumps(safe_call, ensure_ascii=False)",
             "\"initialCallJson\": redacted_json",
             "\"createResponseJson\": redacted_json",
@@ -830,7 +830,7 @@ def validate_dify_template() -> None:
             "context.get(\"createOutcomeUnknown\")",
             "\"creation_state\": \"unknown_possibly_created\"",
             "\"created\": None",
-            "CALL-E create request ended without a determinate HTTP response.",
+            "CALL-E create request did not establish whether a Call was accepted.",
             "Replay or reconcile this request only with the same Idempotency-Key",
             "title: Gate live calls after API preflight",
             "api_health_status_code",
@@ -846,8 +846,8 @@ def validate_dify_template() -> None:
             "f\"Call creation outcomes unknown (possibly created): {creation_unknown}\"",
             "\"liveCallsCreated\": 0 if dry_run_enabled else (None if creation_unknown else created_count)",
             "\"creationOutcomeUnknownCount\": 0 if dry_run_enabled else creation_unknown",
-            "def documented_call_task(value):",
-            "value.get(\"object\") != \"call_task\"",
+            "def documented_call(value):",
+            "value.get(\"object\") != \"call\"",
             "CALL_ID_RE.fullmatch(call_id)",
             "status not in DOCUMENTED_CALL_STATUSES",
             "poll_error = str(poll_error_message or call.get(\"_dify_poll_error\") or \"\").strip()",
@@ -920,22 +920,10 @@ def validate_dify_template() -> None:
         fail("Dify E.164 validation must accept 7-15 digits and reject shorter or longer values.")
 
     review_regressions = []
-    if (
-        "recipient_result_schema = {" not in build_payload_section
-        or '"recipient_result_schema": recipient_result_schema' not in build_payload_section
-        or '"recipient_result_schema": result_schema' in build_payload_section
-    ):
-        review_regressions.append(
-            "Build per-call payload must use a separate recipient_result_schema instead of reusing result_schema."
-        )
-    else:
-        recipient_schema_section = build_payload_section.split("recipient_result_schema = {", 1)[1].split(
-            "request_payload = {", 1
-        )[0]
-        if '"summary"' in recipient_schema_section:
-            review_regressions.append(
-                "recipient_result_schema must not declare CALL-E's reserved summary response field."
-            )
+    if '"additionalProperties": False' not in build_payload_section or '"phone": call_task["phone"]' not in build_payload_section:
+        review_regressions.append("Build per-call payload must send one phone and a closed scalar v2 result schema.")
+    if '"recipients"' in build_payload_section or '"recipient_result_schema"' in build_payload_section:
+        review_regressions.append("Build per-call payload must not send legacy recipient fields.")
 
     loop_count_match = re.search(r"^\s*loop_count:\s*(\d+)\s*$", nodes_section, re.MULTILINE)
     loop_count = int(loop_count_match.group(1)) if loop_count_match else 0
@@ -984,12 +972,13 @@ def validate_dify_template() -> None:
         )
 
     cancellation_boundary_snippets = [
-        "After `POST /v1/calls` succeeds, stopping the Dify execution stops only this workflow's polling; it does not cancel the outbound call.",
-        "The CALL-E API used by this template does not provide a call-cancel action, so cancellation is available only before call creation.",
+        "After `POST /v2/calls` succeeds, stopping the Dify execution stops only this workflow's polling; it does not cancel the outbound call.",
+        "This template does not invoke cancellation.",
+        "After submission, cancellation returns `409 call_cannot_cancel` and does not hang up an active call.",
     ]
     if any(snippet not in read(readme_path) for snippet in cancellation_boundary_snippets):
         review_regressions.append(
-            "Dify documentation must state the post-create cancellation boundary and lack of a call-cancel action."
+            "Dify documentation must state the template and v2 cancellation boundaries."
         )
 
     metadata_round_trip_helper = "def compare_metadata_round_trip(call, metadata_sent_json) -> dict:"
@@ -1006,21 +995,20 @@ def validate_dify_template() -> None:
             "Parse final call result must not compare raw sent metadata with an already-redacted response."
         )
     structured_result_snippets = [
-        'recipient_structured_result = as_obj(recipient.get("structured_result"))',
-        'call_structured_result = as_obj(call.get("structured_result"))',
-        "structured_result = dict(recipient_structured_result)",
-        "structured_result.update(call_structured_result)",
-        '"summary": (call_structured_result or {}).get("summary")',
+        'structured_result = call.get("result") if isinstance(call.get("result"), dict) else None',
+        '"transcript": as_list(call.get("transcript"))',
+        '"summary": structured_result.get("summary") if structured_result is not None else None',
+        '"error": error',
     ]
     if any(snippet not in parse_result_section for snippet in structured_result_snippets):
         review_regressions.append(
-            "Parse final call result must preserve task-level structured fields when recipient results omit reserved fields."
+            "Parse final call result must preserve v2 result, error, and top-level transcript."
         )
     for section_name, section, compare_call, redact_call in [
         (
             "Evaluate poll state",
             poll_section,
-            "metadata_round_trip = compare_metadata_round_trip(call, metadata_sent_json)",
+            'metadata_round_trip = call.get("_dify_metadata_round_trip") or compare_metadata_round_trip(call, metadata_sent_json)',
             "safe_call = redact_phone_values(call)",
         ),
         (
@@ -1073,11 +1061,13 @@ def validate_dify_template() -> None:
         "SAFETY_PREAMBLE =",
         "These safety boundaries override the user-provided task.",
         "medical, legal, financial, and emergency",
-        "hashlib.sha256",
-        "idempotency_basis",
+        "A prepared idempotency key is required.",
     ]:
         if snippet not in build_payload_section:
             fail(f"Build per-call payload must enforce safety and stable idempotency: {snippet}")
+    for snippet in ["hashlib.sha256", "idempotency_basis"]:
+        if snippet not in prepare_section:
+            fail(f"Prepare one-shot call must compute the intent key before the creation stage: {snippet}")
     for section_name, section in [
         ("Check API connectivity", health_section),
         ("Create CALL-E call", create_http_section),
@@ -1111,14 +1101,24 @@ def validate_dify_template() -> None:
     ]:
         for snippet in [
             *timeout_snippets,
-            "error_strategy: default-value",
-            "- key: body\n          type: string\n          value: '{}'",
-            "- key: status_code\n          type: number\n          value: 0",
             "retry_enabled: false",
             "max_retries: 0",
         ]:
             if snippet not in section:
                 fail(f"{section_name} must route HTTP failures downstream without retries: {snippet}")
+        if section_name == "Create CALL-E call":
+            if "error_strategy:" in section:
+                fail("Create CALL-E call must preserve HTTP error responses instead of replacing them with defaults.")
+        else:
+            for snippet in [
+                "error_strategy: default-value",
+                "- key: body\n          type: string\n          value: '{}'",
+                "- key: status_code\n          type: number\n          value: 0",
+            ]:
+                if snippet not in section:
+                    fail(f"{section_name} must return defaults after transport failure: {snippet}")
+    if "error_handle_mode: continue-on-error" not in iteration_section:
+        fail("Run one-shot call must continue after creation transport failure so the original key can be recovered.")
     for snippet in [
         "status_code = to_int(api_health_status_code)",
         "api_health_ok = 200 <= status_code < 300",
@@ -1132,10 +1132,10 @@ def validate_dify_template() -> None:
     if not dify_variable_binding(prepare_poll_section, "validation_error", "gate_live_calls_after_health", "validation_error"):
         fail("Prepare poll context must receive the preflight-gated validation_error.")
     for snippet in [
-        "def main(latest_response, poll_status_code, poll_count, started_at_ms, wait_timeout_minutes, max_poll_count, metadata_sent_json, has_live_call) -> dict:",
-        "call = documented_call_task(response_body)",
+        "def main(latest_response, poll_status_code, poll_count, started_at_ms, wait_timeout_minutes, max_poll_count, metadata_sent_json, has_live_call, previous_call_response) -> dict:",
+        "call = documented_call(response_body)",
         "if 200 <= poll_status < 300 and not call:",
-        "without a documented CallTask",
+        "without a documented Call",
         "poll_status = int(as_number(poll_status_code, 0))",
         "if not (200 <= poll_status < 300):",
         "CALL-E poll request returned HTTP",
@@ -1151,7 +1151,7 @@ def validate_dify_template() -> None:
     for snippet in [
         "def main(create_response, create_status_code, base_url: str, metadata_sent_json: str, masked_phone: str, idempotency_key: str, call_item_id: str) -> dict:",
         "status_code = to_int(create_status_code)",
-        "if status_code == 0:",
+        "if status_code in {0, 408, 409} or status_code >= 500:",
         "if not (200 <= status_code < 300):",
         "\"createFailed\": True",
         "CALL-E create request returned HTTP",
@@ -1179,13 +1179,13 @@ def validate_dify_template() -> None:
         "\"creation_state\": \"unknown_possibly_created\"",
         "\"required\": True",
         "\"idempotencyKey\": idempotency_key",
-        "\"next_action\": \"manual_review\"",
+        "\"structuredResult\": None",
     ]:
         if snippet not in parse_result_section:
             fail(f"Parse final call result must report an unknown, possibly-created outcome: {snippet}")
     for snippet in [
-        "if status.get(\"ok\") is True:",
-        "elif status.get(\"ok\") is False:",
+        "result_counts = {value: 0",
+        "if status.get(\"ok\") is False:",
         "creation_unknown += 1",
         "item[\"callStatus\"].get(\"created\") is True",
         "Live calls confirmed created:",
@@ -1200,10 +1200,10 @@ def validate_dify_template() -> None:
     if "raise ValueError(\"CALL-E create response did not include a recognized call id." in extract_section:
         fail("Extract call lookup id must return a masked unknown context instead of raising on missing call id.")
     if "call_payload_from_response" in dsl_text:
-        fail("Dify CallTask handling must not accept legacy wrapper or call-id response shapes.")
+        fail("Dify Call handling must not accept legacy wrapper or call-id response shapes.")
     for snippet in ["from urllib.parse import urlparse", "TRUSTED_BASE_URLS", "normalize_trusted_base_url"]:
         if snippet in extract_section:
-            fail(f"Extract call lookup id must not duplicate base URL allowlist checks after POST /v1/calls: {snippet}")
+            fail(f"Extract call lookup id must not duplicate base URL allowlist checks after POST /v2/calls: {snippet}")
     require_text(
         manifest_path,
         [
@@ -1213,7 +1213,7 @@ def validate_dify_template() -> None:
             "display formats with parentheses",
             "unknown and possibly created",
             "same idempotency key",
-            "indeterminate create transport and force-failed HTTP outcomes",
+            "creation-stage transport failures and HTTP 408/409/5xx",
         ],
     )
     forbid_text(
@@ -1223,8 +1223,8 @@ def validate_dify_template() -> None:
         ],
     )
     manifest = json.loads(read(manifest_path))
-    if manifest.get("template_version") != "0.6.1":
-        fail("Dify manifest must retain template release version 0.6.1.")
+    if manifest.get("template_version") != "0.7.0":
+        fail("Dify manifest must retain template release version 0.7.0.")
     manifest_description = str(manifest.get("description") or "").lower()
     if "transcript" in manifest_description or "structured result" in manifest_description:
         fail("Dify manifest must not advertise data that the End node does not expose.")
@@ -1298,7 +1298,7 @@ def validate_dify_template() -> None:
     )
     legacy_context = legacy_create.get("call_context", {})
     if not legacy_context.get("createOutcomeUnknown") or legacy_context.get("callId"):
-        fail("Dify must treat a successful create response without a documented CallTask as unknown.")
+        fail("Dify must treat a successful create response without a documented Call as unknown.")
 
     poll_main = embedded_python_main(dsl_path, poll_section)
     poll_failure = poll_main(
@@ -1310,6 +1310,7 @@ def validate_dify_template() -> None:
         45,
         "{}",
         True,
+        {"object": "call", "id": "call_test", "status": "in_progress", "result_status": "pending"},
     )
     if not poll_failure.get("done") or not poll_failure.get("error_message"):
         fail("Dify poll transport failures must terminate polling with an error result.")
@@ -1323,18 +1324,19 @@ def validate_dify_template() -> None:
         45,
         "{}",
         True,
+        {"object": "call", "id": "call_test", "status": "in_progress", "result_status": "pending"},
     )
     if (
         not invalid_poll_response.get("done")
-        or "documented CallTask" not in str(invalid_poll_response.get("error_message") or "")
+        or "documented Call" not in str(invalid_poll_response.get("error_message") or "")
     ):
-        fail("Dify successful poll responses must require a documented CallTask before completion.")
+        fail("Dify successful poll responses must require a documented Call before completion.")
 
     parse_main = embedded_python_main(dsl_path, parse_result_section)
     parsed_poll_failure = parse_main(
         {
             "callId": "call-test",
-            "lookupUrl": "https://api.heycall-e.com/v1/calls/call-test",
+            "lookupUrl": "https://api.heycall-e.com/v2/calls/call-test",
             "initialCallJson": '{"data":{"id":"call-test","status":"running"}}',
             "createResponseJson": "{}",
             "metadataSentJson": "{}",
@@ -1351,7 +1353,7 @@ def validate_dify_template() -> None:
         fail("Dify nested poll payloads with poll errors must be counted as failed results.")
 
     documented_create = extract_main(
-        '{"object":"call_task","id":"call_test","status":"in_progress"}',
+        '{"object":"call","id":"call_test","status":"in_progress","result_status":"pending"}',
         201,
         "https://api.heycall-e.com",
         "{}",
@@ -1368,10 +1370,138 @@ def validate_dify_template() -> None:
     )
     invalid_poll_status = invalid_poll.get("result", {}).get("callStatus", {})
     if (
-        invalid_poll_status.get("created") is not None
-        or invalid_poll_status.get("creation_state") != "unknown_possibly_created"
+        invalid_poll_status.get("created") is not True
+        or invalid_poll_status.get("creation_state") != "confirmed_created"
+        or invalid_poll_status.get("callId") != "call_test"
     ):
-        fail("Dify must not report an invalid 2xx poll response as a confirmed CallTask.")
+        fail("Dify must retain the confirmed Call ID after an invalid poll response.")
+
+    if not dify_variable_binding(poll_section, "previous_call_response", "poll_until_terminal", "latest_call_json"):
+        fail("Dify polling must receive the last accepted response for lookup recovery.")
+    if "/v1/calls" in dsl_text:
+        fail("Dify call creation and lookup must use v2; the Goals preflight stays on v1.")
+
+    build_main = embedded_python_main(dsl_path, build_payload_section)
+    def prepare_task(request_id="dify-v2-regression-001", phone="+15555550124", task="Ask an authorized test recipient to confirm the appointment time."):
+        return prepare_main("https://api.heycall-e.com", "false", request_id, phone, task)["call_tasks"][0]
+
+    call_task = prepare_task()
+    call_task["metadata"] = {"reference_phone": "+15555550124"}
+    built = build_main(call_task, "https://api.heycall-e.com")
+    payload = json.loads(built["request_payload_json"])
+    schema = payload["result_schema"]
+    if (
+        payload["phone"] != call_task["phone"]
+        or set(payload) != {"phone", "task", "result_schema", "metadata"}
+        or schema.get("additionalProperties") is not False
+        or any(prop.get("type") not in {"string", "boolean", "integer", "number"} for prop in schema["properties"].values())
+        or "unknown for missing answers" not in payload["task"]
+    ):
+        fail("Dify must send a closed scalar v2 schema, explicit fallback rules, and one phone without legacy or inferred routing fields.")
+    for edit in ({}, {"phone": "+15555550125"}, {"task": "A different task."}, {"metadata": {"changed": True}}):
+        replay_task = prepare_task(phone=edit.get("phone", call_task["phone"]), task=edit.get("task", call_task["task"]))
+        replay_task["metadata"] = edit.get("metadata", call_task["metadata"])
+        replay = build_main(replay_task, "https://api.heycall-e.com")
+        if replay["idempotency_key"] != built["idempotency_key"]:
+            fail("Dify must retain the intent key so v2 can reject changed-input replay.")
+        if not edit and replay["request_payload_json"] != built["request_payload_json"]:
+            fail("Dify unchanged replay must preserve the exact request body.")
+    new_intent = build_main(prepare_task(request_id="dify-v2-regression-002"), "https://api.heycall-e.com")
+    if new_intent["idempotency_key"] == built["idempotency_key"]:
+        fail("Dify intentionally new calls must use a different intent key.")
+
+    prepare_poll_main = embedded_python_main(dsl_path, prepare_poll_section)
+    stopped = prepare_poll_main([None], "false", "", "https://api.heycall-e.com", [call_task])
+    recovered = parse_main(stopped["call_context"], stopped["initial_call_json"], 0, False, "")["result"]
+    if (
+        recovered["callStatus"]["creation_state"] != "unknown_possibly_created"
+        or recovered["reconciliation"]["idempotencyKey"] != built["idempotency_key"]
+        or not recovered["reconciliation"]["required"]
+        or "+15555550124" in json.dumps(recovered)
+    ):
+        fail("Dify a failed creation stage must return a masked unknown outcome with the precomputed key.")
+    blocked = prepare_poll_main([], "false", "Preflight failed.", "https://api.heycall-e.com", [])
+    if blocked["call_context"] or blocked["has_live_call"]:
+        fail("Dify a blocked preflight must not be reported as an uncertain creation.")
+
+    summary_main = embedded_python_main(dsl_path, summary_section)
+    call = {
+        "object": "call", "id": "call_1234567890", "status": "completed",
+        "result_status": "pending", "call_outcome": "completed", "result": None, "error": None,
+        "transcript": [{"speaker": "user", "offset_seconds": None, "text": "Call +15555550124."}],
+        "metadata": payload["metadata"],
+    }
+    context = extract_main(call, 202, built["base_url"], built["metadata_sent_json"], built["masked_phone"], built["idempotency_key"], "call_001")["call_context"]
+    if context["initialDone"] or context["callId"] != call["id"]:
+        fail("Dify must keep polling a completed Call whose business result is pending.")
+
+    scenarios = [
+        ("completed", "pending", "completed", None, None, False),
+        ("completed", "available", "completed", {}, None, False),
+        ("completed", "available", "completed", {"summary": "Confirmed +15555550124.", "call_completed": "yes"}, None, False),
+        ("completed", "unavailable", "completed", None, None, False),
+        ("completed", "unavailable", "no_answer", None, None, False),
+        ("completed", "unavailable", "busy", None, None, False),
+        ("completed", "unavailable", "declined", None, None, False),
+        ("completed", "unavailable", "completed", None, {"code": "result_failed", "message": "Processing failed."}, True),
+        ("failed", "not_applicable", None, None, {"code": "call_failed", "message": "Execution failed."}, True),
+        ("canceled", "not_applicable", None, None, None, True),
+    ]
+    for lifecycle, readiness, outcome, business_result, error, failed in scenarios:
+        response = dict(call, status=lifecycle, result_status=readiness, call_outcome=outcome, result=business_result, error=error)
+        replay_context = extract_main(response, 202, built["base_url"], built["metadata_sent_json"], built["masked_phone"], built["idempotency_key"], "call_001")["call_context"]
+        state = poll_main(response, 200, 0, int(time.time() * 1000), 15, 45, built["metadata_sent_json"], True, context["initialCallJson"])
+        if state["done"] != (readiness != "pending") or replay_context["initialDone"] != state["done"]:
+            fail(f"Dify creation replay and polling must agree on result readiness: {readiness}.")
+        parsed = parse_main(context, state["latest_call_json"], state["poll_count"], state["timed_out"], state["error_message"])
+        item = parsed["result"]
+        if (
+            item["callStatus"]["failed"] != failed
+            or item["callStatus"]["call_outcome"] != outcome
+            or item["callStatus"]["answered"] != (outcome == "completed" if outcome else None)
+            or item["returnedData"]["transcript"][0]["offset_seconds"] is not None
+            or not item["metadataRoundTrip"]["allRequestedKeysReturned"]
+        ):
+            fail("Dify must distinguish telephone outcome, technical failure, transcript evidence, and business result readiness.")
+        if business_result in (None, {}) and item["returnedData"]["structuredResult"] != business_result:
+            fail("Dify must preserve null unavailable results and empty available objects.")
+        summary = summary_main(parsed["results"], 1, 1, "false", "{}", "{}", 200, "")
+        counts = json.loads(summary["summary_json"])
+        if counts["resultStatusCounts"][readiness] != 1 or counts["creationOutcomeUnknownCount"] != 0:
+            fail("Dify must count readiness independently of creation and business success.")
+        if call_task["phone"] in summary["report"] + summary["summary_json"] or call["id"] not in summary["report"]:
+            fail("Dify must mask phone-bearing results and transcripts while preserving the accepted API ID.")
+
+    for status_code in (0, 408, 409, 500, 503):
+        body = {"error": {"code": "idempotency_conflict", "details": {"reason_code": "creation_in_progress"}}}
+        unknown = extract_main(body, status_code, built["base_url"], "{}", built["masked_phone"], built["idempotency_key"], "call_001")["call_context"]
+        parsed = parse_main(unknown, "{}", 0, False, "")
+        if parsed["result"]["callStatus"]["created"] is not None or parsed["result"]["reconciliation"]["idempotencyKey"] != built["idempotency_key"]:
+            fail("Dify uncertain creation and conflicts must preserve the original intent key without claiming no call exists.")
+
+    rejection = {"error": {"code": "input_incomplete", "details": {"missing_inputs": ["Confirm +15555550124 and the appointment date."]}}}
+    for status_code in (400, 401, 403, 422, 429):
+        rejected = extract_main(rejection, status_code, built["base_url"], "{}", built["masked_phone"], built["idempotency_key"], "call_001")["call_context"]
+        parsed = parse_main(rejected, "{}", 0, False, "")
+        report = summary_main(parsed["results"], 1, 1, "false", "{}", "{}", 200, "")["report"]
+        if parsed["result"]["callStatus"]["created"] is not False or "appointment date" not in report or call_task["phone"] in report:
+            fail("Dify definite rejection must expose masked error details and missing prerequisites.")
+
+    for response, status_code, max_polls in (({}, 0, 45), ({}, 503, 45), (dict(call, id="call_other"), 200, 45), (dict(call, result_status="unknown"), 200, 45), (dict(call, result_status=[]), 200, 45), (dict(call, result_status=None), 200, 45), (call, 200, 1)):
+        state = poll_main(response, status_code, 0, int(time.time() * 1000), 15, max_polls, built["metadata_sent_json"], True, context["initialCallJson"])
+        parsed = parse_main(context, state["latest_call_json"], state["poll_count"], state["timed_out"], state["error_message"])
+        item = parsed["result"]
+        summary = summary_main(parsed["results"], 1, 1, "false", "{}", "{}", 200, "")
+        counts = json.loads(summary["summary_json"])
+        if (
+            item["callStatus"]["created"] is not True or item["callStatus"]["callId"] != call["id"]
+            or not item["returnedData"]["transcript"] or not item["reconciliation"]["required"]
+            or counts["liveCallsCreated"] != 1 or counts["creationOutcomeUnknownCount"] != 0
+            or f"Resume GET /v2/calls/{call['id']}" not in counts["results"][0]["reconciliation"]["instruction"]
+            or f"Resume GET /v2/calls/{call['id']}" not in summary["report"]
+            or built["idempotency_key"] not in summary["report"]
+        ):
+            fail("Dify failed or timed-out lookups must preserve the accepted ID, last evidence, exact key, and read-only recovery instruction.")
 
 
 def require_text_content(path: Path, text: str, snippets: list[str]) -> None:
