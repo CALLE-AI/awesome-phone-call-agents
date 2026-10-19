@@ -1,0 +1,9 @@
+{
+  "call_id": "demo-arith-003",
+  "to_number": "+14155550135",
+  "transcript": [
+    {"role": "agent", "text": "Good news, we can take 20% off the 80 dollar rate, so that's 65 dollars."},
+    {"role": "callee", "text": "Great."},
+    {"role": "agent", "text": "Your pickup window runs from 2 p.m. to 5 p.m., that's 3 hours."}
+  ]
+}

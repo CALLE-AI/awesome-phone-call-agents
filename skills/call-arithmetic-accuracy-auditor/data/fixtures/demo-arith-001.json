@@ -1,0 +1,10 @@
+{
+  "call_id": "demo-arith-001",
+  "to_number": "+14155550135",
+  "transcript": [
+    {"role": "agent", "text": "Thanks for holding. I see 3 nights at 120 dollars a night, so that comes to 360 dollars total."},
+    {"role": "callee", "text": "That sounds right."},
+    {"role": "agent", "text": "There is also a 45 dollar cleaning fee, so 360 and 45 comes to 405 dollars."},
+    {"role": "callee", "text": "Okay, see you Friday."}
+  ]
+}
