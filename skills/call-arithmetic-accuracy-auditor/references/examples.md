@@ -193,3 +193,30 @@ Output:
 }```
 
 A bare "250 dollars" total with no spoken factors, and a clock range with no meridiem ("from 9 to 11") - both route to UNVERIFIABLE with an explicit reason, and the review action asks the goal template to state factors aloud before totals.
+
+## 5. Analyze - NO_SPOKEN_COMPUTATIONS (demo-arith-005)
+
+```bash
+python3 scripts/arithmetic_accuracy_auditor.py analyze --call-result data/fixtures/demo-arith-005.json
+```
+
+Output:
+
+```json
+{
+  "skill": "call-arithmetic-accuracy-auditor",
+  "mode": "analyze",
+  "call_id": "demo-arith-005",
+  "verdict": "NO_SPOKEN_COMPUTATIONS",
+  "computations": [],
+  "counts": {
+    "detected": 0,
+    "correct": 0,
+    "incorrect": 0,
+    "unverifiable": 0
+  },
+  "review_action": "none"
+}
+```
+
+A confirmation call where the agent says "a table for 4" (a party size with no unit price, so no multiply) and "runs from 2 p.m. to 5 p.m." (a clock window with no spoken "that's N hours" result, so no duration computation) produces zero detected computations. The verdict matrix is complete: ALL_COMPUTATIONS_CORRECT, ARITHMETIC_ERRORS_FOUND, UNVERIFIABLE_COMPUTATIONS_ONLY, NO_SPOKEN_COMPUTATIONS.

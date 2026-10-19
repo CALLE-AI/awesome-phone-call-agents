@@ -339,6 +339,13 @@ def test_fixture_004_unverifiable_only():
     assert all(c["status"] == "UNVERIFIABLE" for c in report["computations"])
 
 
+def test_fixture_005_no_spoken_computations():
+    report = analyze_turns(_fixture_turns(5))
+    assert report["verdict"] == "NO_SPOKEN_COMPUTATIONS"
+    assert report["counts"]["detected"] == 0
+    assert report["review_action"] == "none"
+
+
 def test_wrapped_fixture_001_same_verdict():
     payload = {
         "status": "COMPLETED",
