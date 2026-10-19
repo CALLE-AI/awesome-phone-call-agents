@@ -109,6 +109,8 @@ Input: a JSON file that is either the wrapped `get_call_run` shape
 
 or a bare dict with a `transcript` key, or a flat list of
 `{"role", "text"}` turns (`speaker` is accepted as a role alias).
+Inline string transcripts from live `get_call_run` payloads are parsed;
+timestamps are ignored; unknown speaker labels are treated as continuations.
 Agent-side roles: `agent`, `assistant`, `ai`, `bot`, `caller`. Callee
 turns and `post_summary` are out of scope. Typographic quotes are
 normalized before matching; digit runs of 7+ are masked in output.

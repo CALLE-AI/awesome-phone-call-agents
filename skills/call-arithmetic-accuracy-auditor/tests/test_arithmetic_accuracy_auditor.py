@@ -101,6 +101,61 @@ def test_call_id_from_result_call_id(tmp_path: Path):
     assert report["call_id"] == "demo-arith-001"
 
 
+# ------------------------------------------------- inline string transcripts
+# The live get_call_run endpoint also returns result.transcript as a single
+# inline string ("[MM:SS] BOT: ... [MM:SS] USER: ..."), per the observed-live
+# fixture in apps/python/ringdown/tests/fixtures.
+
+_STRING_SIGNAL = (
+    "[00:00] BOT: Thanks for holding. I see 3 nights at 120 dollars a night, "
+    "so that comes to 360 dollars total.\n"
+    "[00:05] USER: That sounds right.\n"
+    "[00:07] BOT: And with the 45 dollar cleaning fee, 360 and 45 comes to 475 dollars."
+)
+
+
+def test_string_transcript_arithmetic_errors():
+    report = analyze_payload({"transcript": _STRING_SIGNAL})
+    assert report["counts"]["detected"] >= 2
+    assert report["verdict"] == "ARITHMETIC_ERRORS_FOUND"
+
+
+def test_string_transcript_wrapped_shape_and_call_id(tmp_path: Path):
+    payload = {
+        "status": "COMPLETED",
+        "call_id": "call-string-001",
+        "result": {"transcript": _STRING_SIGNAL, "post_summary": "Booking confirmed."},
+    }
+    report = analyze_payload(payload)
+    assert report["verdict"] == "ARITHMETIC_ERRORS_FOUND"
+    assert report["call_id"] == "call-string-001"
+
+
+def test_string_transcript_wrapped_continuation_join():
+    wrapped = (
+        "[00:00] BOT: I see 3 nights at 120 dollars a night, so that\n"
+        "comes to 360 dollars total.\n"
+        "[00:05] USER: Great."
+    )
+    report = analyze_payload({"status": "COMPLETED", "result": {"transcript": wrapped}})
+    assert report["counts"]["detected"] >= 1
+    assert report["verdict"] == "ALL_COMPUTATIONS_CORRECT"
+    assert report["computations"][0]["status"] == "CORRECT"
+
+
+def test_string_transcript_label_coverage():
+    payload = {
+        "transcript": (
+            "[00:00] AI: Your total comes to 250 dollars.\n"
+            "[00:04] CALLEE: Okay.\n"
+            "[00:06] CALLER: Fine.\n"
+            "[00:08] CUSTOMER: Bye."
+        )
+    }
+    report = analyze_payload(payload)
+    assert report["counts"]["detected"] == 1
+
+
 # ---------------------------------------------------------------- detector units
 
 def test_multiply_correct():
