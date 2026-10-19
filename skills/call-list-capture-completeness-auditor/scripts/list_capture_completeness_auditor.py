@@ -500,18 +500,22 @@ def analyze_turns(turns: list, call_id: Any = None) -> dict[str, Any]:
 
     items_total = len(all_items)
     items_captured = sum(1 for _, it in all_items if captured[id(it)])
+    # Doctrine: ITEMS_DROPPED / ITEMS_ADDED / BOTH_DROPPED_AND_ADDED require
+    # at least one readback sentence. With zero readback sentences the call
+    # never got a confirmation attempt, so the verdict is NO_READBACK_DETECTED
+    # (dropped items are still reported as supporting detail).
     if not lists:
         verdict = "NO_LIST_EXCHANGED"
+    elif not readback_seen:
+        verdict = "NO_READBACK_DETECTED"
     elif dropped and added_items:
         verdict = "BOTH_DROPPED_AND_ADDED"
     elif dropped:
         verdict = "ITEMS_DROPPED"
     elif added_items:
         verdict = "ITEMS_ADDED"
-    elif readback_seen:
-        verdict = "ALL_ITEMS_CAPTURED"
     else:
-        verdict = "NO_READBACK_DETECTED"
+        verdict = "ALL_ITEMS_CAPTURED"
 
     review_action = {
         "BOTH_DROPPED_AND_ADDED": REVIEW_ACTION_BOTH,

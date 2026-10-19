@@ -177,9 +177,12 @@ def test_string_transcript_label_coverage():
         )
     }
     report = analyze_payload(payload)
-    # the callee statement forms the list; the short agent ack counts as the readback
-    assert report["verdict"] == "ITEMS_DROPPED"
+    # the callee statement forms the list; a bare "Got it." ack is not a
+    # readback sentence, so per the zero-readback doctrine the verdict is
+    # NO_READBACK_DETECTED (with the items dropped as supporting detail)
+    assert report["verdict"] == "NO_READBACK_DETECTED"
     assert report["counts"]["lists_detected"] == 1
+    assert report["counts"]["items_dropped"] == 2
 
 
 # ---------------------------------------------------------------- chunking / item normalization
@@ -308,6 +311,28 @@ def test_verdict_priority_both_beats_dropped():
     )
     report = analyze_turns(turns)
     assert report["verdict"] == "BOTH_DROPPED_AND_ADDED"
+
+
+def test_doctrine_zero_readback_beats_dropped():
+    # A callee list with ZERO readback/confirmation sentences in the whole
+    # transcript must grade NO_READBACK_DETECTED (dropped items still
+    # reported as supporting detail) - ITEMS_DROPPED requires at least one
+    # readback sentence.
+    turns = _turns(
+        ("agent", "Harbor Grill, this is Dana."),
+        ("callee", "Hi, we need a crib, late checkout, and a high floor room."),
+        ("agent", "Great, I have noted your requests. Anything else I can help with?"),
+        ("callee", "No, that's it."),
+    )
+    report = analyze_turns(turns)
+    assert report["verdict"] == "NO_READBACK_DETECTED"
+    assert report["review_action"] == "add a closing readback step to the goal template"
+    assert report["counts"]["items_dropped"] == 3
+    assert [d["item"] for d in report["dropped_items"]] == [
+        "crib",
+        "late checkout",
+        "high floor room",
+    ]
 
 
 # ---------------------------------------------------------------- correction / withdrawal semantics
@@ -466,6 +491,33 @@ def test_fixture_004_no_list_exchanged():
     assert report["verdict"] == "NO_LIST_EXCHANGED"
     assert report["review_action"] == "none"
     assert report["lists"] == []
+
+
+def test_fixture_005_both_dropped_and_added():
+    report = analyze_turns(_turns_of(5))
+    assert report["verdict"] == "BOTH_DROPPED_AND_ADDED"
+    assert [d["item"] for d in report["dropped_items"]] == ["extra towels"]
+    assert [a["item"] for a in report["added_items"]] == ["breakfast package"]
+    assert report["counts"] == {
+        "lists_detected": 1,
+        "items_total": 3,
+        "items_captured": 2,
+        "items_dropped": 1,
+        "items_added": 1,
+    }
+
+
+def test_fixture_006_no_readback_detected():
+    report = analyze_turns(_turns_of(6))
+    assert report["verdict"] == "NO_READBACK_DETECTED"
+    assert report["review_action"] == "add a closing readback step to the goal template"
+    assert report["counts"]["items_dropped"] == 3
+    assert report["counts"]["items_added"] == 0
+    assert [d["item"] for d in report["dropped_items"]] == [
+        "crib",
+        "late checkout",
+        "high floor room",
+    ]
 
 
 # ---------------------------------------------------------------- PII masking

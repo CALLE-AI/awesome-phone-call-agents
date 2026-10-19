@@ -78,7 +78,7 @@ the summary exactly as confirmed.
 | Verdict | Trigger | review_action |
 |---|---|---|
 | `BOTH_DROPPED_AND_ADDED` | at least one callee item never captured by the agent AND at least one invented item in a confirmation sentence | `rework the goal template readback: capture every item and drop invented ones` |
-| `ITEMS_DROPPED` | at least one callee item never matched in any later agent turn | `add item-by-item readback to the goal template` |
+| `ITEMS_DROPPED` | at least one readback sentence exists AND at least one callee item was never matched in any later agent turn (zero readback sentences grade `NO_READBACK_DETECTED`) | `add item-by-item readback to the goal template` |
 | `ITEMS_ADDED` | a confirmation sentence contains an item matching nothing the callee listed or the agent stated earlier | `remove unverifiable items from the confirmation script` |
 | `ALL_ITEMS_CAPTURED` | every callee item captured and at least one agent readback/confirmation sentence exists | `none` |
 | `NO_READBACK_DETECTED` | a list was exchanged but no agent readback/confirmation sentence exists | `add a closing readback step to the goal template` |
