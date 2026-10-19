@@ -37,6 +37,9 @@ total on a live call and it cannot determine what any party owed.**
 - Countable-noun whitelist: multiply only fires for whitelisted nouns;
   unusual units are missed by design.
 - Digits-only quantities: number words ("twenty") are not detected.
+- Bare number tokens need at least 2 digits to count as amounts; a
+  total with zero factor tokens is classified `total_only` and reported
+  UNVERIFIABLE, never as a verified sum.
 - Sentence scope: factors in one sentence and a total in the next are
   not joined; cross-sentence computations are invisible.
 - `post_summary` is out of scope - this skill audits agent turns only,

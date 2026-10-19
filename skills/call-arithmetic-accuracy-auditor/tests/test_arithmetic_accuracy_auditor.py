@@ -335,6 +335,114 @@ def test_verdict_priority_errors_beat_correct():
     assert report["verdict"] == "ARITHMETIC_ERRORS_FOUND"
 
 
+# ---------------------------------------------------------------- review round 1 regressions
+
+def test_duration_minutes_included_half_hour():
+    turns = _turns(("agent", "Your slot runs from 2 p.m. to 4:30 p.m., that's 2.5 hours."))
+    report = analyze_turns(turns)
+    comp = report["computations"][0]
+    assert comp["kind"] == "duration"
+    assert comp["status"] == "CORRECT"
+    assert comp["computed_result"] == 2.5
+
+
+def test_duration_whole_hours_am_still_correct():
+    turns = _turns(("agent", "Your slot runs from 9 a.m. to 11 a.m., that's 2 hours."))
+    report = analyze_turns(turns)
+    comp = report["computations"][0]
+    assert comp["kind"] == "duration"
+    assert comp["status"] == "CORRECT"
+    assert comp["computed_result"] == 2.0
+
+
+def test_duration_noon_12pm():
+    turns = _turns(("agent", "Your slot runs from 12 p.m. to 3 p.m., that's 3 hours."))
+    report = analyze_turns(turns)
+    comp = report["computations"][0]
+    assert comp["kind"] == "duration"
+    assert comp["status"] == "CORRECT"
+    assert comp["computed_result"] == 3.0
+
+
+def test_pii_digit_run_not_amount_operand():
+    turns = _turns((
+        "agent",
+        "Your card ending 4111111111111 was charged 420 dollars total, that comes to 420 dollars.",
+    ))
+    report = analyze_turns(turns)
+    comp = report["computations"][0]
+    operands = comp["factors"].get("operands", [])
+    assert all(op < 10000 for op in operands), operands
+    assert comp["status"] == "UNVERIFIABLE"
+    sentence = comp["sentence"]
+    assert "4111111111111" not in sentence
+    assert "*" in sentence
+    # mask_pii must be idempotent on already-masked output
+    assert mask_pii(sentence) == sentence
+
+
+def test_total_only_classification_bare_total():
+    turns = _turns(("agent", "Your total comes to 42 dollars."))
+    report = analyze_turns(turns)
+    assert report["counts"]["detected"] == 1
+    comp = report["computations"][0]
+    assert comp["kind"] == "total_only"
+    assert comp["factors"] == {}
+    assert comp["status"] == "UNVERIFIABLE"
+    assert comp["reason"] == "FACTORS_MISSING"
+    assert report["verdict"] == "UNVERIFIABLE_COMPUTATIONS_ONLY"
+
+
+def test_fixture_004_first_computation_total_only():
+    report = analyze_turns(_fixture_turns(4))
+    assert report["computations"][0]["kind"] == "total_only"
+    assert report["computations"][0]["status"] == "UNVERIFIABLE"
+
+
+def test_percent_off_of_phrasing():
+    turns = _turns(("agent", "10% off of 90 is 81 dollars."))
+    report = analyze_turns(turns)
+    comp = report["computations"][0]
+    assert comp["kind"] == "percent_off"
+    assert comp["status"] == "CORRECT"
+    assert comp["computed_result"] == 81.0
+
+
+def test_percent_off_so_result_even_suffix():
+    turns = _turns(("agent", "Take 50 percent off the 60 dollar plan, so 30 dollars even."))
+    report = analyze_turns(turns)
+    comp = report["computations"][0]
+    assert comp["kind"] == "percent_off"
+    assert comp["status"] == "CORRECT"
+    assert comp["computed_result"] == 30.0
+
+
+def test_balance_cue_remains():
+    turns = _turns(("agent", "The deposit is 100 dollars of the 500 dollar total, so 400 dollars remains."))
+    report = analyze_turns(turns)
+    comp = report["computations"][0]
+    assert comp["kind"] == "subtract"
+    assert comp["status"] == "CORRECT"
+    assert comp["computed_result"] == 400.0
+
+
+def test_two_digit_bare_operands_still_add():
+    turns = _turns(("agent", "45 plus 45, totaling 90 dollars."))
+    report = analyze_turns(turns)
+    comp = report["computations"][0]
+    assert comp["kind"] == "add"
+    assert comp["status"] == "CORRECT"
+    assert comp["factors"]["operands"] == [45.0, 45.0]
+
+
+def test_single_digit_bare_numbers_gated():
+    turns = _turns(("agent", "Options 1 and 2 were declined, so the total comes to 45 dollars."))
+    report = analyze_turns(turns)
+    for comp in report["computations"]:
+        assert 1.0 not in comp["factors"].get("operands", [])
+        assert 2.0 not in comp["factors"].get("operands", [])
+
+
 # ---------------------------------------------------------------- CLI
 
 MODULE = SCRIPTS / "arithmetic_accuracy_auditor.py"

@@ -120,7 +120,8 @@ Output report keys: `skill`, `mode`, `call_id` (masked), `verdict`,
 (`detected`/`correct`/`incorrect`/`unverifiable`), `review_action`.
 
 Detected kinds: `multiply` (qty x unit price), `add` (line-item sums),
-`percent_off`, `subtract` (balance due), `duration` (clock ranges).
+`percent_off`, `subtract` (balance due), `duration` (clock ranges),
+`total_only` (a bare total with zero factor tokens; always UNVERIFIABLE).
 CORRECT tolerance: |computed - stated| < 0.005.
 
 ## Limitations
@@ -131,6 +132,8 @@ CORRECT tolerance: |computed - stated| < 0.005.
   fire - keeping the whitelist small trades recall for a low false
   positive rate.
 - Quantities are digits only: "twenty nights" is not detected.
+- Bare number tokens need at least 2 digits to count as amounts:
+  single-digit bare numbers are treated as quantities.
 - Analysis is sentence-scoped: factors in one sentence and the total in
   the next are not joined.
 - Duration math is 12-hour only and requires meridiem markers on both

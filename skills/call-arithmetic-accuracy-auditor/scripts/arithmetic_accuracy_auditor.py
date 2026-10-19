@@ -49,7 +49,9 @@ TOTAL_CUE_RE = re.compile(
 _TOKEN_RE = re.compile(
     r"(?P<cur>\$\d{1,6}(?:\.\d{2})?)"
     r"|(?P<word>\d{1,6}(?:\.\d{2})? (?:dollars?|bucks))"
-    r"|(?P<bare>\d{1,6}(?:\.\d{2})?)",
+    # bare branch requires >= 2 digits: single-digit bare numbers are
+    # quantities ("3 nights"), not spoken amounts
+    r"|(?P<bare>\d{2,6}(?:\.\d{2})?)",
     re.IGNORECASE,
 )
 
@@ -75,14 +77,18 @@ _UNIT_RE = re.compile(
     re.IGNORECASE,
 )
 
-_PERCENT_RE = re.compile(r"(\d{1,3}) ?% off|(\d{1,3}) percent off", re.IGNORECASE)
+_PERCENT_RE = re.compile(r"(\d{1,3}) ?% off(?: of)?|(\d{1,3}) percent off(?: of)?", re.IGNORECASE)
+
+# percent_off-only result fallback: a bare "is"/"so" right before the result
+# amount. Deliberately NOT in the global total-cue list used by add/multiply.
+_PERCENT_RESULT_FALLBACK_RE = re.compile(r"\b(?:is|so) (" + AMOUNT + r")", re.IGNORECASE)
 
 _DEPOSIT_RE = re.compile(
     r"(?:deposit|down payment|already paid|paid)\D{0,10}(" + AMOUNT + r")",
     re.IGNORECASE,
 )
 
-_BALANCE_CUE_RE = re.compile(r"\b(?:balance|remaining|rest|amount due|due)\b", re.IGNORECASE)
+_BALANCE_CUE_RE = re.compile(r"\b(?:balance|remaining|remains|rest|amount due|due)\b", re.IGNORECASE)
 
 _DURATION_RE = re.compile(
     r"from (\d{1,2})(?::(\d{2}))? ?(a\.m\.|p\.m\.|am|pm)?"
@@ -217,9 +223,19 @@ def _detect_multiply(sentence: str, result: dict[str, Any] | None) -> dict[str, 
 
 def _detect_percent(sentence: str, tokens: list[dict[str, Any]], result: dict[str, Any] | None) -> dict[str, Any] | None:
     pm = _PERCENT_RE.search(sentence)
-    if pm is None or result is None:
+    if pm is None:
         return None
+    if result is None:
+        # percent_off-only result cue: bare "is"/"so" before the result amount
+        fm = _PERCENT_RESULT_FALLBACK_RE.search(sentence, pm.end())
+        if fm is None:
+            return None
+        pos = fm.start(1)
+        result = next((t for t in tokens if t["start"] == pos), None)
+        if result is None:
+            return None
     pct = int(pm.group(1) or pm.group(2))
+    stated = result["value"]
     base = next(
         (
             t for t in tokens
@@ -228,9 +244,18 @@ def _detect_percent(sentence: str, tokens: list[dict[str, Any]], result: dict[st
         None,
     )
     if base is None:
-        return {"factors": {"percent": pct}, "computed": None}
+        # a bare amount may be the only base ("10% off of 90 is 81 dollars")
+        base = next(
+            (
+                t for t in tokens
+                if t["kind"] == "bare" and t["start"] >= pm.end() and t is not result
+            ),
+            None,
+        )
+    if base is None:
+        return {"factors": {"percent": pct}, "computed": None, "stated": stated}
     computed = round(base["value"] * (1 - pct / 100), 2)
-    return {"factors": {"base": base["value"], "percent": pct}, "computed": computed}
+    return {"factors": {"base": base["value"], "percent": pct}, "computed": computed, "stated": stated}
 
 
 def _detect_subtract(sentence: str, tokens: list[dict[str, Any]], result: dict[str, Any] | None) -> dict[str, Any] | None:
@@ -263,14 +288,18 @@ def _detect_subtract(sentence: str, tokens: list[dict[str, Any]], result: dict[s
     }
 
 
-def _clock_24(hour: str, meridiem: str | None) -> int | None:
+def _clock_24(hour: str, minute: str | None, meridiem: str | None) -> float | None:
+    """24-hour clock position as a float so minutes count toward durations."""
     if meridiem is None:
         return None
     h = int(hour)
+    mins = int(minute) if minute else 0
     m = meridiem.lower().replace(".", "")
     if h == 12:
-        return 0 if m == "am" else 12
-    return h + 12 if m == "pm" else h
+        base = 0 if m == "am" else 12
+    else:
+        base = h + 12 if m == "pm" else h
+    return base + mins / 60
 
 
 def _detect_duration(sentence: str) -> dict[str, Any] | None:
@@ -287,8 +316,8 @@ def _detect_duration(sentence: str) -> dict[str, Any] | None:
         start_label += " " + dm.group(3)
     if dm.group(6):
         end_label += " " + dm.group(6)
-    start24 = _clock_24(dm.group(1), dm.group(3))
-    end24 = _clock_24(dm.group(4), dm.group(6))
+    start24 = _clock_24(dm.group(1), dm.group(2), dm.group(3))
+    end24 = _clock_24(dm.group(4), dm.group(5), dm.group(6))
     if start24 is None or end24 is None:
         return {
             "factors": {"start": start_label, "end": end_label},
@@ -343,36 +372,40 @@ def _comp(
 
 
 def _evaluate_sentence(sentence: str, turn_index: int) -> list[dict[str, Any]]:
+    # Matching runs on a pre-masked copy so long digit runs (phone/card PII)
+    # never tokenize as amount operands; the raw sentence is kept for display
+    # (mask_pii is idempotent, so the report masks it exactly once).
+    match_text = mask_pii(sentence)
     # Duration is evaluated first and exclusively: spoken clock factors like
     # "3 hours" would otherwise double-fire as a multiply structure.
-    dur = _detect_duration(sentence)
+    dur = _detect_duration(match_text)
     if dur is not None:
         return [_comp(
             turn_index, sentence, "duration", dur["factors"],
             dur["stated"], dur["computed"], dur["reason"],
         )]
 
-    tokens = _tokens(sentence)
+    tokens = _tokens(match_text)
     if not tokens:
         return []
-    result = _result_after_cue(tokens, sentence)
+    result = _result_after_cue(tokens, match_text)
     comps: list[dict[str, Any]] = []
 
-    mult = _detect_multiply(sentence, result)
+    mult = _detect_multiply(match_text, result)
     if mult is not None:
         comps.append(_comp(
             turn_index, sentence, "multiply", mult["factors"],
             result["value"], mult["computed"],
         ))
 
-    pct = _detect_percent(sentence, tokens, result)
+    pct = _detect_percent(match_text, tokens, result)
     if pct is not None:
         comps.append(_comp(
             turn_index, sentence, "percent_off", pct["factors"],
-            result["value"], pct["computed"],
+            pct["stated"], pct["computed"],
         ))
 
-    sub = _detect_subtract(sentence, tokens, result)
+    sub = _detect_subtract(match_text, tokens, result)
     if sub is not None:
         comps.append(_comp(
             turn_index, sentence, "subtract", sub["factors"],
@@ -384,7 +417,7 @@ def _evaluate_sentence(sentence: str, turn_index: int) -> list[dict[str, Any]]:
     # for add operands.
     if not comps and result is not None:
         chain = None
-        for candidate in _chains(tokens, sentence):
+        for candidate in _chains(tokens, match_text):
             before = [t for t in candidate if t["start"] < result["start"]]
             if len(before) >= 2:
                 chain = before
@@ -397,10 +430,18 @@ def _evaluate_sentence(sentence: str, turn_index: int) -> list[dict[str, Any]]:
             ))
         else:
             leading = [t["value"] for t in tokens if t["start"] < result["start"]]
-            comps.append(_comp(
-                turn_index, sentence, "add", {"operands": leading},
-                result["value"], None,
-            ))
+            if leading:
+                comps.append(_comp(
+                    turn_index, sentence, "add", {"operands": leading},
+                    result["value"], None,
+                ))
+            else:
+                # total cue + result but zero operand tokens: classify as a
+                # bare total, not an add with empty operands
+                comps.append(_comp(
+                    turn_index, sentence, "total_only", {},
+                    result["value"], None,
+                ))
     return comps
 
 
