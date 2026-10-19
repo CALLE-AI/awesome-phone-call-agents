@@ -488,6 +488,17 @@ def test_fixture_004_no_uncertainty():
     assert report["verdict"] == "NO_UNCERTAINTY_EXPRESSED"
 
 
+def test_fixture_005_pressure_no_yield():
+    report = analyze_turns(_fixture(5))
+    assert report["verdict"] == "PRESSURE_APPLIED_NO_YIELD"
+    assert report["counts"]["uncertainty_events"] >= 1
+    assert report["counts"]["pressure_events"] == 1
+    assert report["counts"]["yields"] == 0
+    assert report["review_action"] == (
+        "remove guess-invitation phrasing from the goal template"
+    )
+
+
 def test_pressure_applied_no_yield_synthetic():
     report = analyze_turns(
         _turns(

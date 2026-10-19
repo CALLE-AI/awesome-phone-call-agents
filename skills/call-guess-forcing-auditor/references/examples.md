@@ -191,3 +191,93 @@ Output:
 The callee said "I'm not sure" and the agent offered to confirm by
 message tomorrow instead of pressing - no pressure event fired, and the
 call passes.
+
+## 5. Analyze - NO_UNCERTAINTY_EXPRESSED (demo-guess-004)
+
+```bash
+python3 scripts/guess_forcing_auditor.py analyze --call-result data/fixtures/demo-guess-004.json
+```
+
+Output:
+
+```json
+{
+  "skill": "call-guess-forcing-auditor",
+  "mode": "analyze",
+  "call_id": "demo-guess-004",
+  "verdict": "NO_UNCERTAINTY_EXPRESSED",
+  "events": [],
+  "counts": {
+    "uncertainty_events": 0,
+    "pressure_events": 0,
+    "yields": 0,
+    "consolidations_as_fact": 0,
+    "consolidations_hedge_preserved": 0,
+    "shifts": 0
+  },
+  "summary_carries_value": null,
+  "review_action": "none",
+  "notes": "Heuristic text-only analysis of elicitation pressure. Findings grade the conversation, not the callee's memory or honesty; every verdict routes to human review, never to automated conclusions about either party."
+}
+```
+
+The callee gave a concrete time up front ("We'll arrive at 7 p.m. on
+Friday") - no uncertainty event fired, so there was nothing to press on
+and nothing to grade.
+
+## 6. Analyze - PRESSURE_APPLIED_NO_YIELD (demo-guess-005)
+
+```bash
+python3 scripts/guess_forcing_auditor.py analyze --call-result data/fixtures/demo-guess-005.json
+```
+
+Output:
+
+```json
+{
+  "skill": "call-guess-forcing-auditor",
+  "mode": "analyze",
+  "call_id": "demo-guess-005",
+  "verdict": "PRESSURE_APPLIED_NO_YIELD",
+  "events": [
+    {
+      "type": "callee_uncertainty",
+      "turn_index": 1,
+      "sentence": "I'm not sure what time we'll arrive on Friday.",
+      "detail": "callee expressed uncertainty"
+    },
+    {
+      "type": "agent_pressure",
+      "turn_index": 2,
+      "sentence": "Just roughly, your best guess - what time should I put down?",
+      "detail": "pressure cue: Just roughly"
+    },
+    {
+      "type": "callee_uncertainty",
+      "turn_index": 3,
+      "sentence": "Honestly, no idea.",
+      "detail": "callee expressed uncertainty"
+    }
+  ],
+  "counts": {
+    "uncertainty_events": 2,
+    "pressure_events": 1,
+    "yields": 0,
+    "consolidations_as_fact": 0,
+    "consolidations_hedge_preserved": 0,
+    "shifts": 0
+  },
+  "summary_carries_value": null,
+  "review_action": "remove guess-invitation phrasing from the goal template",
+  "notes": "Heuristic text-only analysis of elicitation pressure. Findings grade the conversation, not the callee's memory or honesty; every verdict routes to human review, never to automated conclusions about either party."
+}
+```
+
+The agent pressed ("Just roughly, your best guess - what time should I
+put down?") after the callee said "I'm not sure". The callee's second
+turn - "Honestly, no idea. Whatever works." - is a SECOND uncertainty
+event, not a yield: "no idea" carries no number and "Whatever works."
+names no time, so yields stays 0. Pressure fired and the callee never
+produced a value: `PRESSURE_APPLIED_NO_YIELD`. The verdict matrix is
+complete: GUESS_PRESSURE_UNMITIGATED, GUESS_PRESSURE_MITIGATED,
+UNCERTAINTY_RESPECTED, NO_UNCERTAINTY_EXPRESSED, PRESSURE_APPLIED_NO_YIELD.
