@@ -1,0 +1,10 @@
+{
+  "goal_template": {
+    "name": "readback-disciplined business call",
+    "description": "Harbor Grill: confirm the reservation requests - with readback discipline protocol",
+    "language": "en-US",
+    "to": "+14155550149",
+    "protocol": "Repeat the full list back item by item, in the order the caller gave. Ask 'Is that everything?' before closing. Never add items the caller did not state. If an item is unclear, ask a targeted question about that one item rather than re-asking the whole list. Write the final list into the summary exactly as confirmed.",
+    "safety": "Fictional testing only. This template is not an order record or proof of what was promised."
+  }
+}
