@@ -255,6 +255,22 @@ def test_consolidation_tentative_marker_hedge_preserved():
     assert report["counts"]["consolidations_hedge_preserved"] == 1
 
 
+def test_consolidation_value_mismatch_time_continuation_no_bind():
+    # "7" inside "7:30" is a different value; the yield value must not bind there.
+    report = analyze_turns(
+        _turns(
+            ("agent", "Harbor Inn."),
+            ("callee", "I'm not sure what time we'll arrive."),
+            ("agent", "Just roughly - your best guess?"),
+            ("callee", "Maybe 7?"),
+            ("agent", "Got it, 7:30 it is - all set."),
+        )
+    )
+    assert report["counts"]["consolidations_as_fact"] == 0
+    assert report["counts"]["consolidations_hedge_preserved"] == 0
+    assert report["verdict"] == "GUESS_PRESSURE_MITIGATED"
+
+
 def test_consolidation_window_outside_does_not_bind():
     report = analyze_turns(
         _turns(

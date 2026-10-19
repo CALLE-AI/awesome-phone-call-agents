@@ -122,6 +122,21 @@ _NEGATIVE_FEEDBACK_RE = re.compile(
 
 _NUMBER_TOKEN_RE = re.compile(r"\d+")
 
+# Time continuation like "7:30" (or "9:45:12") is a DIFFERENT value than the
+# bare number; a yield value must not bind inside it.
+_TIME_CONTINUATION_RE = re.compile(r"\d+:\d+(?::\d+)*")
+
+
+def _matches_yield_value(value: str, sentence: str) -> bool:
+    """Match the yield value token unless it only appears inside a time continuation."""
+    for m in re.finditer(rf"\b{re.escape(value)}\b", sentence):
+        before = sentence[: m.start()].rstrip()
+        after = sentence[m.end() :].lstrip()
+        if after.startswith(":") or before.endswith(":"):
+            continue
+        return True
+    return False
+
 # Bind window: pressure/yield/consolidation attach only within i+1..i+2
 # turns of their trigger. This is a policy choice, not a cognitive claim.
 _WINDOW = 2
@@ -249,7 +264,7 @@ def analyze_turns(turns: list, call_id: Any = None, post_summary: Any = None) ->
 
             # 4. Agent consolidation of a yield value.
             if is_agent and _binds(last_yield_idx, idx) and last_yield_value:
-                if re.search(rf"\b{re.escape(last_yield_value)}\b", sentence):
+                if _matches_yield_value(last_yield_value, sentence):
                     confirm = _CONFIRM_CUE_RE.search(sentence)
                     if confirm:
                         if _HEDGE_RE.search(sentence) or _TENTATIVE_RE.search(sentence):
