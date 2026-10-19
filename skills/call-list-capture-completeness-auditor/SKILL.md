@@ -140,6 +140,8 @@ Output report keys: `skill`, `mode`, `call_id` (masked), `verdict`,
   ("no onions") is an item. This is a heuristic; ambiguous corrections
   should be human-reviewed (the report already exposes per-list items
   with turn indices).
+- Closing-acknowledgment-only sentences ("No, that's it.", "Yep,
+  nothing else.") never create or extend a list.
 - `call-closing-sequence-auditor` audits that a summary EXISTS at the
   close; this skill audits the item SET inside that summary.
 - `exact-ref` gates identifier strings; this skill audits enumerated

@@ -30,6 +30,10 @@ heuristic grade of transcript text for human review only.**
   items. This is a heuristic; ambiguous corrections should be
   human-reviewed (the report already exposes per-list items with turn
   indices).
+- Closing-acknowledgment-only sentences ("No, that's it.", "Yep,
+  nothing else.") never create or extend a list; the token set is a
+  fixed heuristic, so an unusual closing phrase could still be
+  mis-chunked and should be human-reviewed.
 
 ## Data handling
 

@@ -320,6 +320,62 @@ def test_imperative_verb_filler_stripped():
     assert report["verdict"] == "ALL_ITEMS_CAPTURED"
 
 
+# ------------------------------------------------- closing acknowledgment guard
+
+def test_closing_ack_probe_no_that_is_it_never_creates_list():
+    # Real-shape probe: the callee's "No, that's it." used to create a second
+    # list with items ["no", "that's it"], inflating dropped_items and counts.
+    turns = _turns(
+        ("agent", "Deli line, this is Sam."),
+        ("callee", "Add two garden salads, a margherita, and sparkling water."),
+        ("agent", "I have that as two garden salads and a margherita - anything else?"),
+        ("callee", "No, that's it."),
+    )
+    report = analyze_turns(turns)
+    assert report["verdict"] == "ITEMS_DROPPED"
+    assert [d["item"] for d in report["dropped_items"]] == ["sparkling water"]
+    assert report["counts"] == {
+        "lists_detected": 1,
+        "items_total": 3,
+        "items_captured": 2,
+        "items_dropped": 1,
+        "items_added": 0,
+    }
+
+
+def test_closing_ack_variants_never_create_lists():
+    variants = ["Yes, that's everything.", "Nope, nothing else.", "That's all, thanks."]
+    for closing in variants:
+        turns = _turns(
+            ("callee", "We need a crib and a high chair."),
+            ("agent", "I have you down for a crib and a high chair. Anything else?"),
+            ("callee", closing),
+        )
+        report = analyze_turns(turns)
+        assert report["verdict"] == "ALL_ITEMS_CAPTURED", closing
+        assert report["counts"]["lists_detected"] == 1, closing
+        assert report["counts"]["items_total"] == 2, closing
+
+
+def test_closing_ack_with_real_item_still_processed():
+    # "No, that's it, and also a lemonade." is NOT all acknowledgment chunks -
+    # list creation/extension proceeds and the lemonade is handled normally.
+    turns = _turns(
+        ("callee", "We need a crib and a high chair."),
+        ("agent", "I have you down for a crib and a high chair. Anything else?"),
+        ("callee", "No, that's it, and also a lemonade."),
+        ("agent", "Got it - a crib, a high chair, and a lemonade. That's everything."),
+    )
+    report = analyze_turns(turns)
+    assert "lemonade" in _item_displays(report)
+    lemonade_captured = any(
+        item["item"] == "lemonade" and item["captured"]
+        for lst in report["lists"]
+        for item in lst["items"]
+    )
+    assert lemonade_captured
+
+
 # ---------------------------------------------------------------- fixture grading
 
 def test_fixture_001_all_captured_counts():

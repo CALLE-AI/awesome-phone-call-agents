@@ -63,6 +63,18 @@ _CHUNK_SPLIT_RE = re.compile(r",|\band\b|\bplus\b|\bas well as\b")
 
 _SENTENCE_SPLIT_RE = re.compile(r"(?<=[.!?])(?<![aApP]\.m\.)\s+(?=[A-Z])")
 
+# A sentence whose every chunk (after normalization + stopword strip) is a
+# closing acknowledgment ("No, that's it.", "Yep, nothing else.") never
+# creates or extends a list - it is the callee closing the exchange.
+_CLOSING_ACK_TOKENS = {
+    "no", "yes", "yeah", "yep", "nope", "nah",
+    "that's it", "that is it", "that's all", "that is all",
+    "that's everything", "that is everything",
+    "nothing else", "nothing more", "all set",
+    "perfect", "great", "got it", "sounds good",
+    "thanks", "thank you", "ok", "okay",
+}
+
 # Stopwords stripped from item chunk edges (spec set, matching only).
 # Correction-discourse tokens ("actually", "sorry", "wait", "never mind",
 # ...) are stripped so a correction preamble never becomes a chunk-item.
@@ -271,6 +283,32 @@ def _chunk_items(sentence: str) -> list[tuple[str, set[str], str | None, str]]:
     return items
 
 
+def _closing_ack_chunk(chunk: str) -> bool:
+    """True when a chunk reduces to a closing-acknowledgment token (or to
+    nothing but stopwords, which carry no item content)."""
+
+    s = re.sub(r"[^a-z0-9\s']", " ", chunk.lower())
+    s = re.sub(r"\s+", " ", s).strip()
+    changed = True
+    while changed and s:
+        changed = False
+        toks = s.split()
+        if toks and toks[0] in _ITEM_STOPWORDS:
+            s = " ".join(toks[1:])
+            changed = True
+    return not s or s in _CLOSING_ACK_TOKENS
+
+
+def _is_closing_ack(sentence: str) -> bool:
+    """True when EVERY chunk of the sentence is a closing acknowledgment."""
+
+    stripped = _LEAD_MARKERS_RE.sub("", sentence).strip()
+    chunks = _raw_chunks(stripped)
+    if not chunks:
+        return False
+    return all(_closing_ack_chunk(c) for c in chunks)
+
+
 def _extends_active_list(sentence: str) -> bool:
     if re.match(r"(?:also|plus|and)\b", sentence, re.IGNORECASE):
         return True
@@ -297,6 +335,8 @@ def analyze_turns(turns: list, call_id: Any = None) -> dict[str, Any]:
     withdrawn_tokens: list[set[str]] = []
     for idx, role, text in norm_turns:
         if role not in CALLEE_ROLES:
+            continue
+        if _is_closing_ack(text):
             continue
         extends = _extends_active_list(text)
         chunk_items = _chunk_items(text)
