@@ -113,6 +113,62 @@ def test_no_text_entries_skipped():
     assert report["counts"]["uncertainty_events"] == 1
 
 
+# ------------------------------------------------- inline string transcripts
+# The live get_call_run endpoint also returns result.transcript as a single
+# inline string ("[MM:SS] BOT: ... [MM:SS] USER: ..."), per the observed-live
+# fixture in apps/python/ringdown/tests/fixtures.
+
+_STRING_GUESS_SIGNAL = (
+    "[00:00] USER: I'm not sure what time we'll arrive.\n"
+    "[00:04] BOT: Just roughly, your best guess?\n"
+    "[00:08] USER: Maybe 7?\n"
+    "[00:10] BOT: Perfect, 7 p.m. it is."
+)
+
+
+def test_string_transcript_guess_pressure():
+    report = analyze_payload({"transcript": _STRING_GUESS_SIGNAL})
+    assert report["verdict"] == "GUESS_PRESSURE_UNMITIGATED"
+
+
+def test_string_transcript_wrapped_shape_and_call_id():
+    payload = {
+        "status": "COMPLETED",
+        "call_id": "call-string-003",
+        "result": {"transcript": _STRING_GUESS_SIGNAL, "post_summary": "Arrival 7 p.m."},
+    }
+    report = analyze_payload(payload)
+    assert report["verdict"] == "GUESS_PRESSURE_UNMITIGATED"
+    assert report["call_id"] == "call-string-003"
+
+
+def test_string_transcript_wrapped_continuation_join():
+    wrapped = (
+        "[00:00] USER: I don't know the arrival time, I\n"
+        "am really not sure yet.\n"
+        "[00:04] BOT: Just roughly, your best guess?\n"
+        "[00:08] USER: Maybe 7?\n"
+        "[00:10] BOT: Perfect, 7 p.m. it is."
+    )
+    report = analyze_payload({"status": "COMPLETED", "result": {"transcript": wrapped}})
+    assert report["verdict"] == "GUESS_PRESSURE_UNMITIGATED"
+    assert report["counts"]["uncertainty_events"] >= 1
+
+
+def test_string_transcript_label_coverage():
+    payload = {
+        "transcript": (
+            "[00:00] AI: When will you arrive?\n"
+            "[00:04] CALLEE: I'm not sure.\n"
+            "[00:06] CALLER: Understood.\n"
+            "[00:08] CUSTOMER: Thanks."
+        )
+    }
+    report = analyze_payload(payload)
+    # uncertainty from the CALLEE turn is registered even with no pressure cue
+    assert report["counts"]["uncertainty_events"] == 1
+
+
 # ---------------------------------------------------------------- uncertainty signal
 
 def test_uncertainty_variants_fire():

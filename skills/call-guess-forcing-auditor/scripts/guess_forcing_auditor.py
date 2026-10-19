@@ -148,6 +148,51 @@ REVIEW_ACTION_UNMITIGATED = (
 REVIEW_ACTION_NO_YIELD = "remove guess-invitation phrasing from the goal template"
 
 
+# Inline string transcripts ("[MM:SS] BOT: ...") observed against the live
+# get_call_run endpoint: optional [HH:]MM:SS timestamp prefix (ignored),
+# speaker label before the first colon, remainder is the turn text.
+_STRING_LINE_RE = re.compile(
+    r"^\s*(?:\[(\d{1,2}):(\d{2})(?::(\d{2}))?\]\s*)?([A-Za-z_ ]+?)\s*:\s*(.*)$"
+)
+
+_AGENT_LABEL_TOKENS = {"BOT", "AI", "AGENT", "ASSISTANT", "SYSTEM", "CALLER", "AUTOMATED"}
+_CALLEE_LABEL_TOKENS = {"USER", "CALLEE", "HUMAN", "CUSTOMER", "RECIPIENT", "CALLED", "PARTY"}
+
+
+def _string_line_role(label: str) -> str | None:
+    tokens = set(label.upper().replace("_", " ").split())
+    if tokens & _AGENT_LABEL_TOKENS:
+        return "agent"
+    if tokens & _CALLEE_LABEL_TOKENS:
+        return "callee"
+    return None
+
+
+def _parse_string_transcript(raw: str) -> list[dict[str, str]]:
+    """Parse an inline string transcript into the {role, text} turn dicts.
+
+    Unknown speaker labels and label-less wrapped lines are treated as
+    continuations of the previous turn; timestamps never enter the text.
+    """
+    turns: list[dict[str, str]] = []
+    for line in raw.splitlines():
+        if not line.strip():
+            continue
+        m = _STRING_LINE_RE.match(line)
+        if m is None:
+            if turns:
+                turns[-1]["text"] += " " + line.strip()
+            continue
+        role = _string_line_role(m.group(4))
+        text = m.group(5).strip()
+        if role is None:
+            if turns and text:
+                turns[-1]["text"] += " " + text
+            continue
+        turns.append({"role": role, "text": text})
+    return turns
+
+
 def _load_turns(payload: Any) -> tuple[list[dict[str, str]], Any, Any]:
     """Normalize a call-result payload to (turns, call_id, post_summary).
 
@@ -163,7 +208,9 @@ def _load_turns(payload: Any) -> tuple[list[dict[str, str]], Any, Any]:
     else:
         raw = payload
     turns = []
-    if isinstance(raw, list):
+    if isinstance(raw, str):
+        turns = _parse_string_transcript(raw)
+    elif isinstance(raw, list):
         for item in raw:
             if not isinstance(item, dict):
                 continue
