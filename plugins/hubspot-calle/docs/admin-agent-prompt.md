@@ -14,7 +14,7 @@ Hard rules
 - Collect secrets only through hidden local terminal input: hidden input -> environment -> existing installer -> HubSpot secret store. The workflow action must not contain a reusable credential field. All other exposure remains forbidden.
 - The HubSpot App Client Secret is a request-validation credential. If it is rotated in HubSpot, the administrator must explicitly update `HUBSPOT_CLIENT_SECRET` through the installer and redeploy before workflows are re-enabled.
 - When the administrator needs a CALL-E API key, direct them to https://dashboard.heycall-e.com/account/api-keys. Do not ask them to paste the key into chat.
-- Use the official CALL-E API Reference at https://test-docs.heycall-e.com/api-reference when checking CALL-E request and response contracts. Do not infer undocumented fields or behavior.
+- Use the official CALL-E API Reference at https://docs.heycall-e.com/api-reference/calls when checking CALL-E request and response contracts. Do not infer undocumented fields or behavior.
 - Default to no live call. A real call needs a separate final confirmation after deployment and UI setup are complete.
 
 Phase 1 - Read-only discovery
@@ -51,7 +51,7 @@ Phase 2 - Local validation and credential readiness
 2. If any validation fails, stop and report the failure without secrets.
 3. Confirm credential readiness:
    - CALL-E API key acquisition page: https://dashboard.heycall-e.com/account/api-keys
-   - CALL-E API Reference: https://test-docs.heycall-e.com/api-reference
+   - CALL-E API Reference: https://docs.heycall-e.com/api-reference/calls
    - HubSpot App Client Secret location: `Development -> Projects -> hubspot-calle -> CALL-E for HubSpot -> Auth`
    - Hidden local terminal input for `CALL_E_API_KEY` and `HUBSPOT_CLIENT_SECRET` in the same dedicated subshell session that runs the installer
 4. If you cannot securely prompt for hidden terminal input yourself, stop and tell the administrator that, after explicit deployment approval in Phase 3, they must run the single Phase 3 installer subshell in their own terminal and return only the masked completion state. Explain that exports in another terminal do not reach the Agent shell. Do not continue by using chat, shell history, command arguments, temp files, browser fields, or installer-generated output for secrets.
@@ -140,6 +140,7 @@ Phase 4 - HubSpot UI completion
    - activating the workflow
 
 Phase 5 - Verification and handoff
+For a Calls v2 upgrade, follow the manual's upgrade and timeout-recovery instructions. A new Card confirmation or workflow re-enrollment is not a replay; keep the original request identity and unchanged input.
 1. Default to no live call. Treat manual workflow enrollment as a live call action. Do not enroll any record or place a real call during verification unless the administrator gives a separate final confirmation that includes the masked destination, exact call task, consent evidence, do-not-call status, duplicate-risk check, and accepted real-world side effect.
 2. If a smoke test is separately authorized, keep it manual and minimal:
    - use one administrator-approved record

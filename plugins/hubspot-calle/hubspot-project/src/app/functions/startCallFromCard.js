@@ -104,9 +104,13 @@ exports.main = async (context) => {
 
   return cardResponse(200, {
     success: true,
-    call_id: maskPhoneNumbers(call.id || call.call_id || "", [phone]),
+    call_id: maskPhoneNumbers(call.id, [phone]),
     status: maskPhoneNumbers(call.status || "queued", [phone]),
+    result_status: call.result_status,
+    call_outcome: maskPhoneNumbers(call.call_outcome || "", [phone]),
     masked_phone: candidate.maskedPhone,
-    error: "",
+    error: maskPhoneNumbers(
+      [call.error?.code, call.error?.detail_code, call.error?.message].filter(Boolean).join(": "), [phone]
+    ),
   });
 };

@@ -69,7 +69,7 @@ function CallCandidateCard({ context, addAlert }) {
       }
       setResult(body);
       addAlert({
-        title: body.success ? "CALL-E call started" : "CALL-E call was not started",
+        title: body.success ? "CALL-E call accepted" : "CALL-E request needs attention",
         message: buildCallSummary(body),
         type: body.success ? "success" : "danger",
       });

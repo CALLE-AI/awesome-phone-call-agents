@@ -196,6 +196,17 @@ test("reduces Card intent state for every terminal and retry outcome", () => {
 test("formats safe card call summaries", () => {
   assert.equal(
     buildCallSummary({
+      call_id: "call_123", status: "completed", result_status: "unavailable", call_outcome: "busy",
+      masked_phone: "[phone]", error: "",
+    }),
+    "CALL-E call call_123 is completed for [phone]. Outcome: busy. Result: unavailable."
+  );
+  assert.match(
+    buildCallSummary({ call_id: "call_123", status: "failed", result_status: "not_applicable", error: "Execution failed." }),
+    /Result: not_applicable\. Execution failed\./
+  );
+  assert.equal(
+    buildCallSummary({
       call_id: "call_123",
       status: "queued",
       masked_phone: "[phone]",

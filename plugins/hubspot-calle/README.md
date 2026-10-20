@@ -1,6 +1,6 @@
 # HubSpot CALL-E Integration
 
-This directory contains a private, static HubSpot Projects app for creating CALL-E call tasks from HubSpot workflows or CRM record App Cards. The low-permission implementation reads CRM records but does not create HubSpot properties, custom objects, tasks, notes, or CALL-E status writebacks.
+This directory contains a private, static HubSpot Projects app for creating Calls API v2 calls from HubSpot workflows or CRM record App Cards. The low-permission implementation reads CRM records but does not create HubSpot properties, custom objects, tasks, notes, or CALL-E status writebacks.
 
 ## Deployment Model
 
@@ -14,7 +14,7 @@ Administrators deploy the project, manage HubSpot secrets, install or reinstall 
 
 The [CALL-E for HubSpot Direct-Call User Manual](docs/direct-call-user-manual.md) is the authoritative installation, administrator, and user guide. See [setup.md](docs/setup.md) for a concise deployment and local-verification reference.
 For administrator-led deployments, use the [Administrator Agent Prompt](docs/admin-agent-prompt.md). It automates preflight checks, validation, deployment, and guided HubSpot UI setup with approval gates before secret entry, remote mutations, layout saves, workflow activation, or real calls.
-For CALL-E request and response contracts, use the official [CALL-E API Reference](https://test-docs.heycall-e.com/api-reference).
+For CALL-E request and response contracts, use the official [Calls guide](https://docs.heycall-e.com/calls) and [API reference](https://docs.heycall-e.com/api-reference/calls). Existing deployments must follow the [Calls v2 upgrade and recovery instructions](docs/direct-call-user-manual.md#administrator-upgrade-to-calls-api-v2).
 
 ## Entry Points
 
@@ -23,11 +23,13 @@ For CALL-E request and response contracts, use the official [CALL-E API Referenc
 - `CALL-E Quick Call` right-sidebar App Card for Contact records.
 - `scripts/install-direct-call.mjs` installer for endpoint configuration, secret handling, validation, upload, and install-state reporting.
 
-The App Cards map HubSpot `crm.objectTypeId` value `0-1` to Contact, let the user select only the standard Contact `phone` or `mobilephone` property, and require an explicit confirmation click. They request both allowlisted fields through HubSpot's private-function `propertiesToSend` contract; the function uses `accountId` and only the selected returned property, without fetching a client-supplied CRM object or trusting a parameter phone value. Each confirmation intent gets a new request ID. Network, response-read, response-parse, `429`, and retryable CALL-E provider failures preserve that ID and confirmation so an explicit retry reuses the same CALL-E idempotency key. Success, deterministic provider rejections, and cancellation clear it. The Cards do not expose the CALL-E API key to the browser.
+The App Cards map HubSpot `crm.objectTypeId` value `0-1` to Contact, let the user select only the standard Contact `phone` or `mobilephone` property, and require an explicit confirmation click. They request both allowlisted fields through HubSpot's private-function `propertiesToSend` contract; the function uses `accountId` and only the selected returned property, without fetching a client-supplied CRM object or trusting a parameter phone value. Each confirmation intent gets a new request ID. Timeout, network, response-read, response-parse, `429`, idempotency-conflict, and retryable provider failures preserve that ID and confirmation so an explicit retry reuses the same CALL-E idempotency key. Success, definitive validation rejections, and cancellation clear it. The Cards do not expose the CALL-E API key to the browser.
 
 ## Workflow Inputs And Outputs
 
-The action receives the source object type and ID, an E.164 phone value and property name, a call task, and static consent and do-not-call selections. It returns `call_id`, `status`, `masked_phone`, and `error`. It does not accept a credential field: the public serverless function validates HubSpot's v3 signature and five-minute request timestamp using server-side HubSpot App Client Secret and workflow action URL secrets before processing any workflow input.
+The action receives the source object type and ID, an E.164 phone value and property name, a call task, and static consent and do-not-call selections. It returns `call_id`, `status`, `result_status`, `call_outcome`, `masked_phone`, and `error`. The existing `call_id` output remains the CALL-E API resource `id`, used with `/v2/calls/{id}`; it is not the separate Billing `call_id`. It does not accept a credential field: the public serverless function validates HubSpot's v3 signature and five-minute request timestamp using server-side HubSpot App Client Secret and workflow action URL secrets before processing any workflow input.
+
+Both entry points send one `phone` and a closed scalar result schema requesting an evidence-based `summary`. Creation returns acceptance, not a finished business result. HubSpot does not poll or write back results; use the returned API ID to read CALL-E while `result_status` is `pending`. A final `unavailable` result is valid and must not cause an automatic replacement call. The workflow requires HubSpot's stable `callbackId` or an explicit workflow-run ID; missing identity is rejected before calling.
 
 The workflow action supports Contact and Deal enrollments when the administrator maps an explicit phone property into its `Phone number` input. The App Cards intentionally support Contact only because `phone` and `mobilephone` are portable default Contact properties, not portable Deal properties.
 

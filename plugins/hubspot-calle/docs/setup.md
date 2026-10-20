@@ -8,13 +8,15 @@ Administrators who want an approval-gated operator flow can use the [Administrat
 - Node.js `20.0.0` or newer.
 - HubSpot CLI `8.4.0` or newer, authenticated with a deployer's personal access key that can upload developer projects and read or write serverless secrets for the target standard account.
 - Content Hub Enterprise for the public serverless endpoint used by the workflow action.
-- A CALL-E API key from https://dashboard.heycall-e.com/account/api-keys and an authorized E.164 test phone number. Use the official [CALL-E API Reference](https://test-docs.heycall-e.com/api-reference) for request and response contracts. Enter the key only through hidden local terminal input, never in Agent chat or command arguments.
+- A CALL-E API key from https://dashboard.heycall-e.com/account/api-keys and an authorized E.164 test phone number. Use the official [Calls v2 contract](https://docs.heycall-e.com/calls) for request and response semantics. Enter the key only through hidden local terminal input, never in Agent chat or command arguments.
 - Administrator access to install or reinstall the static app and customize Contact record layouts.
 - The HubSpot App Client Secret from `Development -> Projects -> hubspot-calle -> CALL-E for HubSpot -> Auth`. Enter it only through hidden local terminal input, never in Agent chat or command arguments.
 
 The installed static app's scopes are separate from CLI deployment permissions. Its only scope in `hubspot-project/src/app/app-hsmeta.json` is `crm.objects.contacts.read`, providing read-only access to Contact properties used by the App Cards.
 
 ## Deploy Or Recover
+
+Existing installations must first follow [Upgrade To Calls API v2](direct-call-user-manual.md#administrator-upgrade-to-calls-api-v2), including reconciliation of uncertain v1 submissions. Deploy the function bundles and workflow output metadata from the same source revision.
 
 Authenticate and verify the configured target alias before deployment:
 
@@ -71,11 +73,14 @@ Do not put those values in CRM records, workflow documentation, client-side code
 
 ## Local Tests And Manual Verification
 
-The serverless tests do not call HubSpot or CALL-E:
+These checks do not call HubSpot or CALL-E. Run from the repository root:
 
 ```bash
-cd plugins/hubspot-calle/hubspot-project/src/app/functions
-npm test
+node plugins/hubspot-calle/hubspot-project/src/app/functions/build-bundles.mjs
+npm test --prefix plugins/hubspot-calle/hubspot-project/src/app/functions
+node --test plugins/hubspot-calle/hubspot-project/src/app/cards/test/*.test.mjs
+node --test plugins/hubspot-calle/scripts/test/*.test.mjs
+python3 scripts/validate_repository.py
 ```
 
 Before broader enrollment:
@@ -83,8 +88,8 @@ Before broader enrollment:
 1. Use a manually enrolled Contact workflow and one authorized E.164 test number.
 2. Confirm a record with no phone or an invalid phone creates no CALL-E request.
 3. Confirm the action creates no request unless `Phone contact allowed` is explicitly `Yes` and `Do not call` is explicitly `No`. These selections are static configuration, not per-record CRM checks, so enrollment filters must still exclude records without phone-contact consent and records marked do-not-call.
-4. Confirm one eligible record returns `call_id`, `status`, `masked_phone`, and `error` without exposing secrets.
-5. Replay the same workflow run and confirm idempotency prevents a duplicate task.
+4. Confirm one eligible record returns the API resource ID in `call_id`, `status`, `result_status`, `call_outcome`, `masked_phone`, and a safe `error`, without exposing secrets. Read the accepted API ID until `result_status` is final and inspect the result and transcript in CALL-E.
+5. For each entry point, test a creation timeout and recover through the original Card intent or workflow callback with identical input. Verify an in-progress conflict preserves the key, then replay again after completion. Confirm the API ID and Billing telephone ID remain the same and the test produced only one telephone call per intention. For a disposable timeout-test deployment, temporarily shorten `CALL_E_REQUEST_TIMEOUT_MS`; restore the source's eight-second deadline before final deployment and record both build IDs and the test deadline. Re-enrollment or a new Card confirmation is a new call, not recovery.
 6. Confirm both Contact App Cards require confirmation before creating a task and that the standard installed app is available from the App Card library.
 7. Confirm every CALL-E task begins with the fixed high-stakes instruction before the user-provided task.
 
