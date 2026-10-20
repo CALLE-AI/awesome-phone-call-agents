@@ -533,6 +533,22 @@ def test_empty_transcript_no_uncertainty():
     assert report["verdict"] == "NO_UNCERTAINTY_EXPRESSED"
 
 
+def test_yield_value_masking_preserves_internal_matching():
+    number = "14155550168"  # Reserved fictional fixture, never called.
+    turns = _turns(
+        ("callee", "I'm not sure."),
+        ("agent", "Give me your best guess."),
+        ("callee", f"Maybe {number}?"),
+        ("agent", f"Perfect, {number} it is."),
+    )
+    report = analyze_turns(turns, post_summary=f"Confirmed {number}.")
+    assert report["verdict"] == "GUESS_PRESSURE_UNMITIGATED"
+    assert report["summary_carries_value"] is True
+    event = next(e for e in report["events"] if e["type"] == "callee_yield")
+    assert event["yield_value"] == mask_pii(number)
+    assert number not in json.dumps(report)
+
+
 def test_mask_pii_and_call_id_masking():
     assert mask_pii("backup number 415-555-0168 here") == "backup number ********68 here"
     assert mask_pii("call +14155550168 now").startswith("call +")

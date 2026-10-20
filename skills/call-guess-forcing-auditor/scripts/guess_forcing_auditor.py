@@ -386,7 +386,7 @@ def analyze_turns(turns: list, call_id: Any = None, post_summary: Any = None) ->
                             "turn_index": idx,
                             "sentence": mask_pii(sentence),
                             "detail": f"kind: {kind}",
-                            "yield_value": value,
+                            "yield_value": mask_pii(value),
                         }
                     )
                     yield_values.append(value)
