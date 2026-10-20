@@ -1,0 +1,10 @@
+{
+  "call_id": "demo-arith-005",
+  "to_number": "+14155550135",
+  "transcript": [
+    {"role": "agent", "text": "Harbor Grill, this is Dana."},
+    {"role": "callee", "text": "Hi, just confirming we are set for Friday."},
+    {"role": "agent", "text": "You are confirmed: a table for 4 this Friday at 7 p.m. The pickup window for the shuttle runs from 2 p.m. to 5 p.m."},
+    {"role": "callee", "text": "Great, see you then."}
+  ]
+}

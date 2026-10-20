@@ -1,0 +1,9 @@
+{
+  "call_id": "demo-arith-004",
+  "to_number": "+14155550135",
+  "transcript": [
+    {"role": "agent", "text": "Your total comes to 250 dollars."},
+    {"role": "callee", "text": "What is in that?"},
+    {"role": "agent", "text": "The run goes from 9 to 11, that's 2 hours, all included."}
+  ]
+}

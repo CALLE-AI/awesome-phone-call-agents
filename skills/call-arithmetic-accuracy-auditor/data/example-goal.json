@@ -1,0 +1,10 @@
+{
+  "goal_template": {
+    "name": "arithmetic-accurate business call",
+    "description": "Harbor Grill: confirm the Friday reservation total - with factors-first arithmetic protocol",
+    "language": "en-US",
+    "to": "+14155550135",
+    "protocol": "Arithmetic protocol: state the quantities and unit prices aloud BEFORE any total; compute the total yourself before speaking it; read every total digit by digit (for example, three six zero dollars); if you are unsure of a total, state the line items separately and offer to confirm the sum in writing; never round a total up.",
+    "safety": "Fictional testing only. This template is not a pricing or billing system."
+  }
+}
