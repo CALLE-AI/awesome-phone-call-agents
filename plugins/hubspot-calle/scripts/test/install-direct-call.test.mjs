@@ -232,7 +232,8 @@ test("accepts masked non-TTY password prompt redraws before an exact confirmatio
   const prompt = "? Enter a value for the secret:\u001b[34G"
     + "\u001b[2K\u001b[G? Enter a value for the secret:  *\u001b[35G"
     + "\u001b[2K\u001b[G? Enter a value for the secret:  **\u001b[36G"
-    + "\u001b[2K\u001b[G✔ Enter a value for the secret:  **\u001b[36G\n\u001b[?25h";
+    + "\u001b[2K\u001b[G? Enter a value for the secret:  ***\n***\u001b[1A"
+    + "\u001b[2K\u001b[G✔ Enter a value for the secret:  ***\n***\n\u001b[?25h";
   for (const action of ["add", "update"]) {
     const account = { id: "123456789", name: "expected-account" };
     const target = action === "add" ? "expected-account [standard] (123456789)" : account.id;
