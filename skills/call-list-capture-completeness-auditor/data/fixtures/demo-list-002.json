@@ -1,0 +1,11 @@
+{
+  "call_id": "demo-list-002",
+  "to_number": "+14155550149",
+  "transcript": [
+    {"role": "agent", "text": "Harbor Grill, this is Dana."},
+    {"role": "callee", "text": "Hi, we need a crib, late checkout, and a room on a high floor."},
+    {"role": "agent", "text": "Of course. Let me read that back: a crib and late checkout. Is that everything?"},
+    {"role": "callee", "text": "And the high floor."},
+    {"role": "agent", "text": "Got it."}
+  ]
+}
