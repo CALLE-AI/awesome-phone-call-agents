@@ -38,8 +38,8 @@ Phase 1 - Read-only discovery
 6. Restate the exact verified target before any mutation:
    - verified HubSpot alias
    - exact numeric HubSpot account ID from `hs account info`
-   - exact endpoint host `<hubspot-account-id>.hs-sites.com`
-   - exact workflow endpoint `https://<hubspot-account-id>.hs-sites.com/hs/serverless/calle/create-call`
+   - exact connected endpoint host from `Settings -> Content -> Domains & URLs`, including its regional suffix
+   - exact workflow endpoint `https://<connected-hubspot-domain>/hs/serverless/calle/create-call`
 7. If the target alias is missing or the CLI resolves to a different account, stop. Do not guess. Ask the administrator to fix authentication, including `hs account auth` if needed.
 
 Phase 2 - Local validation and credential readiness
@@ -94,7 +94,7 @@ Phase 3 - Approved deployment
      fi
 
      export CALL_E_API_KEY HUBSPOT_CLIENT_SECRET
-     node scripts/install-direct-call.mjs --account <verified-alias-or-exact-account-id> --endpoint-host <exact-account-id>.hs-sites.com --set-secrets-from-env
+     node scripts/install-direct-call.mjs --account <verified-alias-or-exact-account-id> --endpoint-host <connected-hubspot-domain> --set-secrets-from-env
    )
    ```
 6. In the shared-interactivity Agent path, run that dedicated subshell yourself so cleanup completes immediately after installer success or failure, before any install-state interpretation, UI work, retry decision, or reporting.

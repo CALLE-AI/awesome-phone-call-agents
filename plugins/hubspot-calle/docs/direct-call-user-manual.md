@@ -24,6 +24,14 @@ Keep these permission boundaries separate.
 
 Before the first deployment, confirm that the test phone number is authorized for outbound contact and stored in E.164 format, for example `+15555550123`.
 
+### Free Acceptance Test Account
+
+HubSpot offers [free developer test accounts](https://developers.hubspot.com/docs/getting-started/account-types) with 90-day enterprise test entitlements. Select Content Hub Enterprise for public functions and Marketing Hub Enterprise for workflows when creating the test account. This is a development environment; the production account still needs the product entitlement listed above.
+
+Deploy the project directly into that test account and install its app through `Distribution -> Standard install`. Use the test account's connected system domain from `Settings -> Content -> Domains & URLs`, including its actual regional suffix. Installing an app owned by another account through `Test installs` does not publish its public function on the test account's domain.
+
+Use one manually enrolled test Contact, keep re-enrollment off, and turn the workflow off after acceptance. Follow [Timeout And Replay Recovery](#timeout-and-replay-recovery) for uncertain requests instead of enrolling the Contact again.
+
 ## Administrator: Agent-Assisted Installation
 
 Administrators who want Agent assistance should start with the [Administrator Agent Prompt](./admin-agent-prompt.md). It begins with a read-only preflight, keeps this manual authoritative for deployment behavior, and stops for explicit approval before secret entry, uploads, permission grants, record-layout saves, workflow activation, or real calls.
@@ -44,6 +52,8 @@ hs account info <configured-standard-account>
 
 From the repository checkout, use hidden shell prompts for the CALL-E key and the HubSpot App Client Secret. Find the latter at `Development -> Projects -> hubspot-calle -> CALL-E for HubSpot -> Auth`. Do not place either value in Agent chat or command history.
 
+If the app does not exist yet, keep it uninstalled and workflows off during the initial upload. Supply a temporary random signature secret through the local environment, then replace it with the generated App Client Secret and rerun the installer before installation or testing. The temporary value must never be used for an active workflow.
+
 ```bash
 cd plugins/hubspot-calle
 read -r -s CALL_E_API_KEY
@@ -52,12 +62,12 @@ read -r -s HUBSPOT_CLIENT_SECRET
 export HUBSPOT_CLIENT_SECRET
 node scripts/install-direct-call.mjs \
   --account <configured-standard-account> \
-  --endpoint-host <hubspot-account-id>.hs-sites.com \
+  --endpoint-host <connected-hubspot-domain> \
   --set-secrets-from-env
 unset CALL_E_API_KEY HUBSPOT_CLIENT_SECRET
 ```
 
-`CALL_E_BASE_URL` defaults to and accepts only the exact origin `https://api.heycall-e.com`, with no alternate host, path, credentials, query, or fragment. `--endpoint-host` expands to `https://<hubspot-account-id>.hs-sites.com/hs/serverless/calle/create-call`; use `--endpoint-url` only when supplying that complete HTTPS URL.
+`CALL_E_BASE_URL` defaults to and accepts only the exact origin `https://api.heycall-e.com`, with no alternate host, path, credentials, query, or fragment. Read the connected domain from `Settings -> Content -> Domains & URLs`; do not guess its suffix from the account ID. `--endpoint-host` expands to `https://<connected-hubspot-domain>/hs/serverless/calle/create-call`; use `--endpoint-url` only when supplying that complete HTTPS URL.
 
 ### What The Installer Does
 
@@ -88,7 +98,7 @@ read -r -s HUBSPOT_CLIENT_SECRET
 export HUBSPOT_CLIENT_SECRET
 node scripts/install-direct-call.mjs \
   --account <configured-standard-account> \
-  --endpoint-host <hubspot-account-id>.hs-sites.com \
+  --endpoint-host <connected-hubspot-domain> \
   --set-secrets-from-env
 unset CALL_E_API_KEY HUBSPOT_CLIENT_SECRET
 ```

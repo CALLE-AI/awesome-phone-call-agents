@@ -12,6 +12,8 @@ Administrators who want an approval-gated operator flow can use the [Administrat
 - Administrator access to install or reinstall the static app and customize Contact record layouts.
 - The HubSpot App Client Secret from `Development -> Projects -> hubspot-calle -> CALL-E for HubSpot -> Auth`. Enter it only through hidden local terminal input, never in Agent chat or command arguments.
 
+For no-purchase acceptance testing, use a free developer test account with the required enterprise test entitlements and deploy directly into that account. See [Free Acceptance Test Account](direct-call-user-manual.md#free-acceptance-test-account) for the time limit, hosting domain, and installation steps.
+
 The installed static app's scopes are separate from CLI deployment permissions. Its only scope in `hubspot-project/src/app/app-hsmeta.json` is `crm.objects.contacts.read`, providing read-only access to Contact properties used by the App Cards.
 
 ## Deploy Or Recover
@@ -26,7 +28,7 @@ hs account list
 hs account info <configured-standard-account>
 ```
 
-Use a hidden shell prompt so the API key does not enter shell history. `CALL_E_BASE_URL` defaults to and accepts only the exact origin `https://api.heycall-e.com`, with no alternate host, path, credentials, query, or fragment. The workflow endpoint must use HTTPS and the exact `/hs/serverless/calle/create-call` path.
+Use a hidden shell prompt so the API key does not enter shell history. `CALL_E_BASE_URL` defaults to and accepts only the exact origin `https://api.heycall-e.com`, with no alternate host, path, credentials, query, or fragment. The workflow endpoint must use HTTPS and the exact `/hs/serverless/calle/create-call` path. Read the connected system domain from `Settings -> Content -> Domains & URLs`; do not derive it from the account ID because regional suffixes differ.
 
 ```bash
 cd plugins/hubspot-calle
@@ -36,7 +38,7 @@ read -r -s HUBSPOT_CLIENT_SECRET
 export HUBSPOT_CLIENT_SECRET
 node scripts/install-direct-call.mjs \
   --account <configured-standard-account> \
-  --endpoint-host <hubspot-account-id>.hs-sites.com \
+  --endpoint-host <connected-hubspot-domain> \
   --set-secrets-from-env
 unset CALL_E_API_KEY HUBSPOT_CLIENT_SECRET
 ```
