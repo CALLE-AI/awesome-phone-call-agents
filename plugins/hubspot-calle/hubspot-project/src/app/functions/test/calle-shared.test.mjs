@@ -986,7 +986,7 @@ test("card handler rejects unsupported phone properties before provider lookup",
   }
 });
 
-test("card handler trusts accountId and selected Contact propertiesToSend value", async () => {
+test("card handler trusts portalId with an accountId fallback and selected Contact properties", async () => {
   const originalFetch = global.fetch;
   const originalApiKey = process.env.CALL_E_API_KEY;
   const originalBaseUrl = process.env.CALL_E_BASE_URL;
@@ -1003,33 +1003,39 @@ test("card handler trusts accountId and selected Contact propertiesToSend value"
   };
 
   try {
-    const response = await startCallFromCard({
-      accountId: "trusted-portal",
-      parameters: {
-        portal_id: "client-portal",
+    for (const identity of [
+      { portalId: "trusted-portal" },
+      { portalId: "trusted-portal", accountId: "legacy-other-account" },
+      { accountId: "trusted-portal" },
+    ]) {
+      const response = await startCallFromCard({
+        ...identity,
+        parameters: {
+          portal_id: "client-portal",
+          source_object_type: "contact",
+          source_object_id: "trusted-record",
+          phone_property: "mobilephone",
+          call_task: "Qualify demo interest.",
+          request_id: "intent-1",
+          confirmed: true,
+        },
+        propertiesToSend: { mobilephone: "+15555550123", phone: "" },
+      });
+
+      assert.equal(response.statusCode, 200);
+      assert.equal(
+        requests.at(-1).options.headers["idempotency-key"],
+        "hubspot-calle:trusted-portal:contact:trusted-record:intent-1"
+      );
+      assert.deepEqual(JSON.parse(requests.at(-1).options.body).metadata, {
+        source_platform: "hubspot",
+        source_entrypoint: "app_card",
+        portal_id: "trusted-portal",
         source_object_type: "contact",
         source_object_id: "trusted-record",
         phone_property: "mobilephone",
-        call_task: "Qualify demo interest.",
-        request_id: "intent-1",
-        confirmed: true,
-      },
-      propertiesToSend: { mobilephone: "+15555550123", phone: "" },
-    });
-
-    assert.equal(response.statusCode, 200);
-    assert.equal(
-      requests[0].options.headers["idempotency-key"],
-      "hubspot-calle:trusted-portal:contact:trusted-record:intent-1"
-    );
-    assert.deepEqual(JSON.parse(requests[0].options.body).metadata, {
-      source_platform: "hubspot",
-      source_entrypoint: "app_card",
-      portal_id: "trusted-portal",
-      source_object_type: "contact",
-      source_object_id: "trusted-record",
-      phone_property: "mobilephone",
-    });
+      });
+    }
   } finally {
     global.fetch = originalFetch;
     restoreEnv("CALL_E_API_KEY", originalApiKey);
