@@ -1,0 +1,11 @@
+{
+  "call_id": "demo-guess-005",
+  "to_number": "+14155550168",
+  "transcript": [
+    {"role": "agent", "text": "Harbor Inn, this is Alex."},
+    {"role": "callee", "text": "I'm not sure what time we'll arrive on Friday."},
+    {"role": "agent", "text": "Just roughly, your best guess - what time should I put down?"},
+    {"role": "callee", "text": "Honestly, no idea. Whatever works."},
+    {"role": "agent", "text": "No problem - we'll confirm the time by message tomorrow."}
+  ]
+}
