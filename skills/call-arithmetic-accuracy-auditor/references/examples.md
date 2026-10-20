@@ -190,7 +190,8 @@ Output:
     "unverifiable": 2
   },
   "review_action": "state the factors aloud before the total so arithmetic can be verified"
-}```
+}
+```
 
 A bare "250 dollars" total with no spoken factors, and a clock range with no meridiem ("from 9 to 11") - both route to UNVERIFIABLE with an explicit reason, and the review action asks the goal template to state factors aloud before totals.
 
