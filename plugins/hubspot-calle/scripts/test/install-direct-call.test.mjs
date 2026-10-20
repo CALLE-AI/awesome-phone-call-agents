@@ -228,6 +228,24 @@ test("accepts a named HubSpot secret add confirmation for the resolved account",
   ));
 });
 
+test("accepts masked non-TTY password prompt redraws before an exact confirmation", () => {
+  const prompt = "? Enter a value for the secret:\u001b[34G"
+    + "\u001b[2K\u001b[G? Enter a value for the secret:  *\u001b[35G"
+    + "\u001b[2K\u001b[G? Enter a value for the secret:  **\u001b[36G"
+    + "\u001b[2K\u001b[G✔ Enter a value for the secret:  **\u001b[36G\n\u001b[?25h";
+  for (const action of ["add", "update"]) {
+    const account = { id: "123456789", name: "expected-account" };
+    const target = action === "add" ? "expected-account [standard] (123456789)" : account.id;
+    const verb = action === "add" ? "added to" : "updated in";
+    assert.doesNotThrow(() => assertSecretMutationConfirmation(
+      action,
+      "HUBSPOT_CLIENT_SECRET",
+      account,
+      { stdout: `${prompt}✔ SUCCESS The secret "HUBSPOT_CLIENT_SECRET" was ${verb} the HubSpot account: ${target}\n`, stderr: "" }
+    ));
+  }
+});
+
 function assertAmbiguousSecretMutationOutput(output) {
   const account = { id: "123456789", name: "expected-account" };
   assert.throws(
@@ -240,6 +258,13 @@ function assertAmbiguousSecretMutationOutput(output) {
     /did not confirm update.*HUBSPOT_CLIENT_SECRET.*123456789/i
   );
 }
+
+test("rejects unmasked password prompt content before a success confirmation", () => {
+  assertAmbiguousSecretMutationOutput(
+    "? Enter a value for the secret: synthetic-secret\n"
+    + "The secret \"HUBSPOT_CLIENT_SECRET\" was updated in the HubSpot account: 123456789"
+  );
+});
 
 test("rejects a wrong-account confirmation with the target ID later in prose", () => {
   assertAmbiguousSecretMutationOutput(
