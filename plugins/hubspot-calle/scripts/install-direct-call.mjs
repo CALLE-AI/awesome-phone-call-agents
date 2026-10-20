@@ -393,6 +393,8 @@ export function assertSecretMutationConfirmation(action, name, account, result) 
   );
   const allowedUpdateExplanation = "Existing serverless functions will start using this new value within 10 seconds.";
   const lines = normalizeCliOutput(`${result.stdout || ""}\n${result.stderr || ""}`)
+    // Inquirer's masked prompt redraws share a line when input is piped to the CLI.
+    .replace(/[?✔] Enter a value for the secret:[\s*]*/g, "")
     .split("\n")
     .filter((line) => line.length > 0);
   const matchingMutationLines = lines.filter((line) => mutationLine.test(line));

@@ -32,6 +32,8 @@ exports.main = async (context) => {
 
   const input = readWorkflowInput(context);
   const validationErrors = validateCandidateInput(input);
+  const workflowRunId = String(input.workflowRunId || input.workflow_run_id || "").trim();
+  if (!workflowRunId) validationErrors.push("missing_workflow_run_id");
   if (validationErrors.length > 0) {
     return jsonResponse(400, {
       success: false,
@@ -48,7 +50,7 @@ exports.main = async (context) => {
     portalId: input.portalId || input.portal_id,
     objectType: input.source_object_type,
     objectId: input.source_object_id,
-    workflowRunId: input.workflowRunId || input.workflow_run_id,
+    workflowRunId,
     phone: input.phone,
     phoneProperty: input.phone_property,
     callPurpose: input.call_task || input.call_purpose,
@@ -69,7 +71,6 @@ exports.main = async (context) => {
     });
   }
 
-  const workflowRunId = candidate.workflowRunId || "manual";
   const idempotencyKey = buildDirectCallIdempotencyKey({
     portalId: candidate.portalId,
     objectType: candidate.objectType,
@@ -106,10 +107,14 @@ exports.main = async (context) => {
   return jsonResponse(200, {
     success: true,
     outputFields: {
-      call_id: maskPhoneNumbers(call.id || call.call_id || "", [input.phone]),
+      call_id: maskPhoneNumbers(call.id, [input.phone]),
       status: maskPhoneNumbers(call.status || "queued", [input.phone]),
+      result_status: call.result_status,
+      call_outcome: maskPhoneNumbers(call.call_outcome || "", [input.phone]),
       masked_phone: candidate.maskedPhone,
-      error: "",
+      error: maskPhoneNumbers(
+        [call.error?.code, call.error?.detail_code, call.error?.message].filter(Boolean).join(": "), [input.phone]
+      ),
     },
   });
 };

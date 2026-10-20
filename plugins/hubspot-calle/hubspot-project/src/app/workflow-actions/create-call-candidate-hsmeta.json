@@ -150,6 +150,20 @@
           "type": "string",
           "fieldType": "text"
         }
+      },
+      {
+        "typeDefinition": {
+          "name": "result_status",
+          "type": "string",
+          "fieldType": "text"
+        }
+      },
+      {
+        "typeDefinition": {
+          "name": "call_outcome",
+          "type": "string",
+          "fieldType": "text"
+        }
       }
     ],
     "labels": {
@@ -177,10 +191,12 @@
           "do_not_call": "Select Yes to skip records that must not be called."
         },
         "outputFieldLabels": {
-          "call_id": "CALL-E call ID",
-          "status": "CALL-E call status",
+          "call_id": "CALL-E API resource ID",
+          "status": "CALL-E execution status",
           "error": "CALL-E safe error",
-          "masked_phone": "Masked phone number"
+          "masked_phone": "Masked phone number",
+          "result_status": "CALL-E result status",
+          "call_outcome": "CALL-E telephone outcome"
         },
         "inputFieldOptionLabels": {
           "source_object_type": {

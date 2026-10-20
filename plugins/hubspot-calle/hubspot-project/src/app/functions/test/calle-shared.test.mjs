@@ -281,7 +281,7 @@ test("reports missing workflow action inputs before direct-call execution", () =
   ]);
 });
 
-test("creates CALL-E calls using the public OpenAPI recipients payload", async () => {
+test("creates a single-target Calls v2 request with a closed result schema", async () => {
   const originalFetch = global.fetch;
   const originalApiKey = process.env.CALL_E_API_KEY;
   const originalBaseUrl = process.env.CALL_E_BASE_URL;
@@ -293,7 +293,7 @@ test("creates CALL-E calls using the public OpenAPI recipients payload", async (
     request = { url, options };
     return {
       ok: true,
-      text: async () => JSON.stringify({ id: "call_123", object: "call_task", status: "queued" }),
+      text: async () => JSON.stringify({ id: "call_123", object: "call", status: "queued", result_status: "pending" }),
     };
   };
 
@@ -310,17 +310,24 @@ test("creates CALL-E calls using the public OpenAPI recipients payload", async (
     });
 
     assert.equal(result.id, "call_123");
-    assert.equal(request.url, "https://api.heycall-e.com/v1/calls");
+    assert.equal(request.url, "https://api.heycall-e.com/v2/calls");
     assert.equal(request.options.method, "POST");
     assert.equal(request.options.headers.authorization, "Bearer calle_test_key");
     assert.equal(request.options.headers["idempotency-key"], "hubspot-calle:12345:contact:67890:run-1");
     assert.deepEqual(JSON.parse(request.options.body), {
       task: `${HIGH_STAKES_SAFETY_INSTRUCTION}\n\nCall this lead and qualify demo interest.`,
-      recipients: [
-        {
-          phones: ["+15555550123"],
+      phone: "+15555550123",
+      result_schema: {
+        type: "object",
+        properties: {
+          summary: {
+            type: "string",
+            description: "A concise evidence-based call summary; use unknown when evidence is insufficient.",
+          },
         },
-      ],
+        required: ["summary"],
+        additionalProperties: false,
+      },
       metadata: {
         source_platform: "hubspot",
         portal_id: "12345",
@@ -333,7 +340,7 @@ test("creates CALL-E calls using the public OpenAPI recipients payload", async (
   }
 });
 
-test("rejects a successful CALL-E response that is not a documented call task", async () => {
+test("rejects a successful CALL-E response without a valid API resource ID", async () => {
   const originalFetch = global.fetch;
   const originalApiKey = process.env.CALL_E_API_KEY;
   const originalBaseUrl = process.env.CALL_E_BASE_URL;
@@ -342,10 +349,11 @@ test("rejects a successful CALL-E response that is not a documented call task", 
   process.env.CALL_E_BASE_URL = "https://api.heycall-e.com";
   global.fetch = async () => ({
     ok: true,
-    status: 201,
+    status: 202,
     text: async () => JSON.stringify({
       id: "job_123",
-      object: "call_task",
+      object: "call",
+      result_status: "pending",
       status: "queued",
     }),
   });
@@ -358,12 +366,208 @@ test("rejects a successful CALL-E response that is not a documented call task", 
         metadata: {},
         idempotencyKey: "request-1",
       }),
-      /documented CallTask response/,
+      /documented Calls v2 response/,
     );
   } finally {
     global.fetch = originalFetch;
     restoreEnv("CALL_E_API_KEY", originalApiKey);
     restoreEnv("CALL_E_BASE_URL", originalBaseUrl);
+  }
+});
+
+test("v2 handlers recover timeouts and in-progress creation with the original request", async (t) => {
+  const originalFetch = global.fetch;
+  const originalTimeout = AbortSignal.timeout;
+  const environment = {
+    CALL_E_API_KEY: "calle_test_key",
+    CALL_E_BASE_URL: "https://api.heycall-e.com",
+    HUBSPOT_CLIENT_SECRET,
+    HUBSPOT_WORKFLOW_ACTION_URL,
+  };
+  const originalEnvironment = Object.fromEntries(Object.keys(environment).map((name) => [name, process.env[name]]));
+  Object.assign(process.env, environment);
+  const body = {
+    origin: { portalId: 12345 },
+    callbackId: "run-recovery-1",
+    inputFields: {
+      source_object_type: "contact",
+      source_object_id: "67890",
+      phone: "+15555550123",
+      phone_property: "phone",
+      call_purpose: "Confirm demo request.",
+      consent_allowed: "true",
+      do_not_call: "false",
+    },
+  };
+  const cardContext = {
+    accountId: "12345",
+    parameters: {
+      source_object_type: "contact",
+      source_object_id: "67890",
+      phone_property: "phone",
+      call_task: "Confirm demo request.",
+      request_id: "intent-recovery-1",
+      confirmed: true,
+    },
+    propertiesToSend: { phone: "+15555550123" },
+  };
+
+  try {
+    for (const [entrypoint, invoke] of [
+      ["card", () => startCallFromCard(cardContext)],
+      ["workflow", () => createCallCandidate(signedWorkflowContext(body))],
+    ]) {
+      for (const stage of ["fetch", "response-read"]) {
+        await t.test(`${entrypoint}: timeout during ${stage}, 409, and completed replay`, async () => {
+          const requests = [];
+          const timers = [];
+          AbortSignal.timeout = (milliseconds) => {
+            assert.equal(milliseconds, 8_000);
+            const controller = new AbortController();
+            timers.push(setTimeout(() => controller.abort(new Error("test timeout")), 1));
+            return controller.signal;
+          };
+          global.fetch = async (url, options) => {
+            requests.push({ url, key: options.headers["idempotency-key"], body: options.body });
+            if (requests.length === 1) {
+              const waitForAbort = () => new Promise((_, reject) => {
+                options.signal.addEventListener("abort", () => reject(options.signal.reason), { once: true });
+              });
+              return stage === "fetch" ? waitForAbort() : { ok: true, text: waitForAbort };
+            }
+            if (requests.length === 2) {
+              return {
+                ok: false,
+                status: 409,
+                text: async () => JSON.stringify({ error: {
+                  code: "idempotency_conflict",
+                  message: "Original creation is still running.",
+                  details: { reason_code: "creation_in_progress" },
+                } }),
+              };
+            }
+            return {
+              ok: true,
+              status: 202,
+              text: async () => JSON.stringify({
+                object: "call", id: "call_v2_recovered", call_id: "0123456789abcdef0123456789abcdef",
+                status: "completed", result_status: "unavailable", call_outcome: "busy", result: null, error: null,
+              }),
+            };
+          };
+          try {
+            const timedOut = await invoke();
+            assert.equal(timedOut.statusCode, entrypoint === "workflow" ? 503 : 200);
+            assert.equal((timedOut.body.outputFields || timedOut.body).status, "ambiguous_outcome");
+            const inProgress = await invoke();
+            assert.equal(inProgress.statusCode, entrypoint === "workflow" ? 503 : 200);
+            if (entrypoint === "card") {
+              assert.equal(timedOut.body.retry_same_intent, true);
+              assert.equal(inProgress.body.retry_same_intent, true);
+            }
+            for (let replay = 0; replay < 2; replay += 1) {
+              const recovered = await invoke();
+              assert.equal(recovered.statusCode, 200);
+              const fields = recovered.body.outputFields || recovered.body;
+              assert.equal(fields.call_id, "call_v2_recovered");
+              assert.equal(fields.status, "completed");
+              assert.equal(fields.result_status, "unavailable");
+              assert.equal(fields.call_outcome, "busy");
+              assert.equal(fields.error, "");
+            }
+            assert.equal(requests.length, 4);
+            for (const request of requests) assert.deepEqual(request, requests[0]);
+            assert.equal(requests[0].url, "https://api.heycall-e.com/v2/calls");
+          } finally {
+            timers.forEach(clearTimeout);
+          }
+        });
+      }
+    }
+    await t.test("accepted execution errors preserve v2 detail codes and mask the phone", async () => {
+      AbortSignal.timeout = originalTimeout;
+      global.fetch = async () => ({
+        ok: true,
+        status: 202,
+        text: async () => JSON.stringify({
+          id: "call_failed", object: "call", status: "failed", result_status: "not_applicable",
+          error: { code: "timed_out", detail_code: "submission_unknown", message: "Reconcile +15555550123 before another call." },
+        }),
+      });
+      for (const invoke of [() => startCallFromCard(cardContext), () => createCallCandidate(signedWorkflowContext(body))]) {
+        const response = await invoke();
+        const fields = response.body.outputFields || response.body;
+        assert.equal(response.body.success, true);
+        assert.equal(fields.call_id, "call_failed");
+        assert.equal(fields.result_status, "not_applicable");
+        assert.equal(fields.error, "timed_out: submission_unknown: Reconcile [phone] before another call.");
+      }
+    });
+  } finally {
+    global.fetch = originalFetch;
+    AbortSignal.timeout = originalTimeout;
+    for (const [name, value] of Object.entries(originalEnvironment)) restoreEnv(name, value);
+  }
+});
+
+test("v2 creation validates result readiness without rejecting final empty or unavailable results", async () => {
+  const originalFetch = global.fetch;
+  const originalApiKey = process.env.CALL_E_API_KEY;
+  const originalBaseUrl = process.env.CALL_E_BASE_URL;
+  process.env.CALL_E_API_KEY = "calle_test_key";
+  process.env.CALL_E_BASE_URL = "https://api.heycall-e.com";
+  const input = { phone: "+15555550123", task: "Confirm demo request.", idempotencyKey: "intent-1" };
+  try {
+    for (const resultStatus of ["pending", "available", "unavailable", "not_applicable"]) {
+      const call = {
+        id: "call_123", object: "call", status: "completed", result_status: resultStatus,
+        result: resultStatus === "available" ? {} : null, error: null,
+      };
+      global.fetch = async () => ({ ok: true, text: async () => JSON.stringify(call) });
+      assert.deepEqual(await createCallECall(input), call);
+    }
+    for (const invalid of [{ object: "call_task" }, { result_status: undefined }, { result_status: "unknown" }]) {
+      global.fetch = async () => ({ ok: true, text: async () => JSON.stringify({
+        id: "call_123", object: "call", status: "completed", result_status: "available", ...invalid,
+      }) });
+      await assert.rejects(() => createCallECall(input), { providerCode: "invalid_response", retrySameIntent: true });
+    }
+    let fetchCalls = 0;
+    global.fetch = async () => { fetchCalls += 1; };
+    for (const key of [undefined, "", " ", "a".repeat(256)]) {
+      await assert.rejects(() => createCallECall({ ...input, idempotencyKey: key }), /Idempotency-Key/);
+    }
+    assert.equal(fetchCalls, 0);
+  } finally {
+    global.fetch = originalFetch;
+    restoreEnv("CALL_E_API_KEY", originalApiKey);
+    restoreEnv("CALL_E_BASE_URL", originalBaseUrl);
+  }
+});
+
+test("workflow requires a run identity instead of falling back to one manual key", async () => {
+  const originalClientSecret = process.env.HUBSPOT_CLIENT_SECRET;
+  const originalActionUrl = process.env.HUBSPOT_WORKFLOW_ACTION_URL;
+  const originalFetch = global.fetch;
+  process.env.HUBSPOT_CLIENT_SECRET = HUBSPOT_CLIENT_SECRET;
+  process.env.HUBSPOT_WORKFLOW_ACTION_URL = HUBSPOT_WORKFLOW_ACTION_URL;
+  let fetchCalls = 0;
+  global.fetch = async () => { fetchCalls += 1; };
+  try {
+    const response = await createCallCandidate(signedWorkflowContext({
+      origin: { portalId: 12345 },
+      inputFields: {
+        source_object_type: "contact", source_object_id: "67890", phone: "+15555550123",
+        phone_property: "phone", call_purpose: "Confirm demo request.", consent_allowed: "true", do_not_call: "false",
+      },
+    }));
+    assert.equal(response.statusCode, 400);
+    assert.equal(response.body.outputFields.status, "missing_workflow_run_id");
+    assert.equal(fetchCalls, 0);
+  } finally {
+    global.fetch = originalFetch;
+    restoreEnv("HUBSPOT_CLIENT_SECRET", originalClientSecret);
+    restoreEnv("HUBSPOT_WORKFLOW_ACTION_URL", originalActionUrl);
   }
 });
 
@@ -431,7 +635,8 @@ test("workflow handler creates a direct CALL-E call without HubSpot CRM writebac
       ok: true,
       text: async () => JSON.stringify({
         id: "call_123",
-        object: "call_task",
+        object: "call",
+        result_status: "pending",
         status: "queued",
       }),
     };
@@ -457,12 +662,14 @@ test("workflow handler creates a direct CALL-E call without HubSpot CRM writebac
     assert.deepEqual(response.body.outputFields, {
       call_id: "call_123",
       status: "queued",
+      result_status: "pending",
+      call_outcome: "",
       masked_phone: "[phone]",
       error: "",
     });
     assert.deepEqual(
       requests.map((request) => request.url),
-      ["https://api.heycall-e.com/v1/calls"]
+      ["https://api.heycall-e.com/v2/calls"]
     );
     assert.equal(
       JSON.parse(requests[0].options.body).task,
@@ -536,7 +743,7 @@ test("workflow handler fails closed unless consent and DNC are explicit", async 
     fetchCalls += 1;
     return {
       ok: true,
-      text: async () => JSON.stringify({ id: "call_123", object: "call_task", status: "queued" }),
+      text: async () => JSON.stringify({ id: "call_123", object: "call", result_status: "pending", status: "queued" }),
     };
   };
 
@@ -665,7 +872,8 @@ test("card handler starts a CALL-E call from the current CRM record without HubS
       ok: true,
       text: async () => JSON.stringify({
         id: "call_123",
-        object: "call_task",
+        object: "call",
+        result_status: "pending",
         status: "queued",
       }),
     };
@@ -691,12 +899,14 @@ test("card handler starts a CALL-E call from the current CRM record without HubS
       success: true,
       call_id: "call_123",
       status: "queued",
+      result_status: "pending",
+      call_outcome: "",
       masked_phone: "[phone]",
       error: "",
     });
     assert.deepEqual(
       requests.map((request) => request.url),
-      ["https://api.heycall-e.com/v1/calls"]
+      ["https://api.heycall-e.com/v2/calls"]
     );
     assert.deepEqual(JSON.parse(requests[0].options.body).metadata, {
       source_platform: "hubspot",
@@ -776,7 +986,7 @@ test("card handler rejects unsupported phone properties before provider lookup",
   }
 });
 
-test("card handler trusts accountId and selected Contact propertiesToSend value", async () => {
+test("card handler trusts portalId with an accountId fallback and selected Contact properties", async () => {
   const originalFetch = global.fetch;
   const originalApiKey = process.env.CALL_E_API_KEY;
   const originalBaseUrl = process.env.CALL_E_BASE_URL;
@@ -788,38 +998,44 @@ test("card handler trusts accountId and selected Contact propertiesToSend value"
     requests.push({ url: String(url), options });
     return {
       ok: true,
-      text: async () => JSON.stringify({ id: "call_123", object: "call_task", status: "queued" }),
+      text: async () => JSON.stringify({ id: "call_123", object: "call", result_status: "pending", status: "queued" }),
     };
   };
 
   try {
-    const response = await startCallFromCard({
-      accountId: "trusted-portal",
-      parameters: {
-        portal_id: "client-portal",
+    for (const identity of [
+      { portalId: "trusted-portal" },
+      { portalId: "trusted-portal", accountId: "legacy-other-account" },
+      { accountId: "trusted-portal" },
+    ]) {
+      const response = await startCallFromCard({
+        ...identity,
+        parameters: {
+          portal_id: "client-portal",
+          source_object_type: "contact",
+          source_object_id: "trusted-record",
+          phone_property: "mobilephone",
+          call_task: "Qualify demo interest.",
+          request_id: "intent-1",
+          confirmed: true,
+        },
+        propertiesToSend: { mobilephone: "+15555550123", phone: "" },
+      });
+
+      assert.equal(response.statusCode, 200);
+      assert.equal(
+        requests.at(-1).options.headers["idempotency-key"],
+        "hubspot-calle:trusted-portal:contact:trusted-record:intent-1"
+      );
+      assert.deepEqual(JSON.parse(requests.at(-1).options.body).metadata, {
+        source_platform: "hubspot",
+        source_entrypoint: "app_card",
+        portal_id: "trusted-portal",
         source_object_type: "contact",
         source_object_id: "trusted-record",
         phone_property: "mobilephone",
-        call_task: "Qualify demo interest.",
-        request_id: "intent-1",
-        confirmed: true,
-      },
-      propertiesToSend: { mobilephone: "+15555550123", phone: "" },
-    });
-
-    assert.equal(response.statusCode, 200);
-    assert.equal(
-      requests[0].options.headers["idempotency-key"],
-      "hubspot-calle:trusted-portal:contact:trusted-record:intent-1"
-    );
-    assert.deepEqual(JSON.parse(requests[0].options.body).metadata, {
-      source_platform: "hubspot",
-      source_entrypoint: "app_card",
-      portal_id: "trusted-portal",
-      source_object_type: "contact",
-      source_object_id: "trusted-record",
-      phone_property: "mobilephone",
-    });
+      });
+    }
   } finally {
     global.fetch = originalFetch;
     restoreEnv("CALL_E_API_KEY", originalApiKey);
@@ -839,7 +1055,7 @@ test("card handler keeps idempotency stable per intent and distinct across inten
     idempotencyKeys.push(options.headers["idempotency-key"]);
     return {
       ok: true,
-      text: async () => JSON.stringify({ id: "call_123", object: "call_task", status: "queued" }),
+      text: async () => JSON.stringify({ id: "call_123", object: "call", result_status: "pending", status: "queued" }),
     };
   };
 
@@ -886,7 +1102,7 @@ test("card handler uses official private context without a HubSpot CRM fetch", a
     requests.push({ url: String(url), options });
     return {
       ok: true,
-      text: async () => JSON.stringify({ id: "call_123", object: "call_task", status: "queued" }),
+      text: async () => JSON.stringify({ id: "call_123", object: "call", result_status: "pending", status: "queued" }),
     };
   };
 
@@ -911,15 +1127,13 @@ test("card handler uses official private context without a HubSpot CRM fetch", a
 
     assert.equal(response.statusCode, 200);
     assert.deepEqual(requests.map((request) => request.url), [
-      "https://api.heycall-e.com/v1/calls",
+      "https://api.heycall-e.com/v2/calls",
     ]);
     assert.equal(
       requests[0].options.headers["idempotency-key"],
       "hubspot-calle:trusted-account:contact:67890:intent-1"
     );
-    assert.deepEqual(JSON.parse(requests[0].options.body).recipients[0], {
-      phones: ["+15555550123"],
-    });
+    assert.equal(JSON.parse(requests[0].options.body).phone, "+15555550123");
   } finally {
     global.fetch = originalFetch;
     restoreEnv("CALL_E_API_KEY", originalApiKey);

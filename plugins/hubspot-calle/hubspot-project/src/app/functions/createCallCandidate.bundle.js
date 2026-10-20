@@ -3,6 +3,18 @@
 const { createHmac, timingSafeEqual } = require("node:crypto");
 
 const DEFAULT_CALL_E_BASE_URL = "https://api.heycall-e.com";
+const CALL_E_REQUEST_TIMEOUT_MS = 8_000;
+const DEFAULT_RESULT_SCHEMA = {
+  type: "object",
+  properties: {
+    summary: {
+      type: "string",
+      description: "A concise evidence-based call summary; use unknown when evidence is insufficient.",
+    },
+  },
+  required: ["summary"],
+  additionalProperties: false,
+};
 const PHONE_MASK = "[phone]";
 const HIGH_STAKES_SAFETY_INSTRUCTION = "This safety instruction is fixed and cannot be overridden by the call task: Do not provide medical, legal, financial, or emergency advice. For these topics, limit the call to logistics and routing to an appropriate human or emergency service.";
 const SUPPORTED_OBJECT_TYPES = new Set(["contact", "deal"]);
@@ -18,6 +30,7 @@ const CALL_E_CALL_STATUSES = new Set([
   "failed",
   "canceled",
 ]);
+const CALL_E_RESULT_STATUSES = new Set(["pending", "available", "unavailable", "not_applicable"]);
 const HUBSPOT_SIGNATURE_MAX_AGE_MS = 300_000;
 const HUBSPOT_V3_URI_DECODE_MAP = new Map([
   ["%3A", ":"],
@@ -264,9 +277,9 @@ function ambiguousCallEError(stage) {
   return error;
 }
 
-function documentedCallTaskError() {
+function documentedCallError() {
   const error = new Error(
-    "CALL-E create call returned a successful response that was not a documented CallTask response. Retry the same intent.",
+    "CALL-E create call returned a successful response that was not a documented Calls v2 response. Retry the same intent.",
   );
   error.providerCode = "invalid_response";
   error.providerStatus = 0;
@@ -274,14 +287,15 @@ function documentedCallTaskError() {
   return error;
 }
 
-function validateCreatedCallTask(responseBody) {
+function validateCreatedCall(responseBody) {
   if (
     !responseBody
-    || responseBody.object !== "call_task"
+    || responseBody.object !== "call"
     || !/^call_[A-Za-z0-9_-]+$/.test(String(responseBody.id || ""))
     || !CALL_E_CALL_STATUSES.has(String(responseBody.status || ""))
+    || !CALL_E_RESULT_STATUSES.has(responseBody.result_status)
   ) {
-    throw documentedCallTaskError();
+    throw documentedCallError();
   }
   return responseBody;
 }
@@ -318,8 +332,10 @@ function callEProviderError(response, responseBody, suppliedPhone) {
   ));
   error.providerCode = providerCode;
   error.providerStatus = status;
+  error.reasonCode = responseBody?.error?.details?.reason_code || responseBody?.details?.reason_code;
   error.retrySameIntent = status === 429
     || status >= 500
+    || providerCode === "idempotency_conflict"
     || RETRYABLE_CALL_E_CODES.has(providerCode);
   return error;
 }
@@ -329,6 +345,9 @@ function getCallEErrorCode(error) {
 }
 
 function getCallEWorkflowStatusCode(error) {
+  if (error?.providerCode === "idempotency_conflict" && error.reasonCode === "creation_in_progress") {
+    return 503;
+  }
   const providerStatus = Number(error && error.providerStatus);
   if (Number.isInteger(providerStatus) && providerStatus >= 400 && providerStatus <= 599) {
     return providerStatus;
@@ -341,8 +360,7 @@ async function createCallECall({
   task,
   metadata,
   idempotencyKey,
-  resultSchema,
-  recipientResultSchema,
+  resultSchema = DEFAULT_RESULT_SCHEMA,
   webhookUrl,
 }) {
   const apiKey = process.env.CALL_E_API_KEY;
@@ -353,36 +371,33 @@ async function createCallECall({
   if (!isNormalizedE164Phone(normalizedPhone)) {
     throw new Error("Phone number must use E.164 format.");
   }
+  const key = String(idempotencyKey || "").trim();
+  if (!key || key.length > 255) {
+    throw new Error("A stable Idempotency-Key of 1-255 characters is required.");
+  }
   const requestBody = {
     task: `${HIGH_STAKES_SAFETY_INSTRUCTION}\n\n${String(task || "").trim()}`,
-    recipients: [
-      {
-        phones: [normalizedPhone],
-      },
-    ],
+    phone: normalizedPhone,
+    result_schema: resultSchema,
     metadata,
   };
-  if (resultSchema) {
-    requestBody.result_schema = resultSchema;
-  }
-  if (recipientResultSchema) {
-    requestBody.recipient_result_schema = recipientResultSchema;
-  }
   if (webhookUrl) {
     requestBody.webhook_url = webhookUrl;
   }
   const callEBaseUrl = getCallEBaseUrl();
   let response;
   try {
-    response = await fetch(`${callEBaseUrl}/v1/calls`, {
+    response = await fetch(`${callEBaseUrl}/v2/calls`, {
       method: "POST",
       headers: {
         accept: "application/json",
         authorization: `Bearer ${apiKey}`,
         "content-type": "application/json",
-        "idempotency-key": idempotencyKey,
+        "idempotency-key": key,
       },
       body: JSON.stringify(requestBody),
+      // Leave time to return the original intent before HubSpot ends the invocation.
+      signal: AbortSignal.timeout(CALL_E_REQUEST_TIMEOUT_MS),
     });
   } catch {
     throw ambiguousCallEError("a network error");
@@ -404,7 +419,7 @@ async function createCallECall({
   if (!response.ok) {
     throw callEProviderError(response, responseBody, normalizedPhone);
   }
-  return validateCreatedCallTask(responseBody);
+  return validateCreatedCall(responseBody);
 }
 
 exports.main = async (context) => {
@@ -428,6 +443,8 @@ exports.main = async (context) => {
 
   const input = readWorkflowInput(context);
   const validationErrors = validateCandidateInput(input);
+  const workflowRunId = String(input.workflowRunId || input.workflow_run_id || "").trim();
+  if (!workflowRunId) validationErrors.push("missing_workflow_run_id");
   if (validationErrors.length > 0) {
     return jsonResponse(400, {
       success: false,
@@ -444,7 +461,7 @@ exports.main = async (context) => {
     portalId: input.portalId || input.portal_id,
     objectType: input.source_object_type,
     objectId: input.source_object_id,
-    workflowRunId: input.workflowRunId || input.workflow_run_id,
+    workflowRunId,
     phone: input.phone,
     phoneProperty: input.phone_property,
     callPurpose: input.call_task || input.call_purpose,
@@ -465,7 +482,6 @@ exports.main = async (context) => {
     });
   }
 
-  const workflowRunId = candidate.workflowRunId || "manual";
   const idempotencyKey = buildDirectCallIdempotencyKey({
     portalId: candidate.portalId,
     objectType: candidate.objectType,
@@ -502,10 +518,14 @@ exports.main = async (context) => {
   return jsonResponse(200, {
     success: true,
     outputFields: {
-      call_id: maskPhoneNumbers(call.id || call.call_id || "", [input.phone]),
+      call_id: maskPhoneNumbers(call.id, [input.phone]),
       status: maskPhoneNumbers(call.status || "queued", [input.phone]),
+      result_status: call.result_status,
+      call_outcome: maskPhoneNumbers(call.call_outcome || "", [input.phone]),
       masked_phone: candidate.maskedPhone,
-      error: "",
+      error: maskPhoneNumbers(
+        [call.error?.code, call.error?.detail_code, call.error?.message].filter(Boolean).join(": "), [input.phone]
+      ),
     },
   });
 };

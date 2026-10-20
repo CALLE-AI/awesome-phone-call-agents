@@ -86,7 +86,12 @@ export function reduceCardIntentState(state = {}, event = {}, requestIdFactory =
 
 export function buildCallSummary(result = {}) {
   if (result.call_id) {
-    return `CALL-E call ${result.call_id} is ${result.status || "queued"} for ${result.masked_phone || "[phone]"}.`;
+    return [
+      `CALL-E call ${result.call_id} is ${result.status || "queued"} for ${result.masked_phone || "[phone]"}.`,
+      result.call_outcome && `Outcome: ${result.call_outcome}.`,
+      result.result_status && `Result: ${result.result_status}.`,
+      result.error,
+    ].filter(Boolean).join(" ");
   }
   if (result.error) {
     return `${result.status || "failed"}: ${result.error}`;

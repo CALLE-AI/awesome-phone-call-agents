@@ -17,7 +17,7 @@ exports.main = async (context) => {
   const propertiesToSend = context.propertiesToSend && typeof context.propertiesToSend === "object"
     ? context.propertiesToSend
     : {};
-  const portalId = String(context.accountId || "").trim();
+  const portalId = String(context.portalId || context.accountId || "").trim();
   const objectType = normalizeObjectType(parameters.source_object_type || parameters.objectType);
   const objectId = String(parameters.source_object_id || parameters.objectId || "").trim();
   const phoneProperty = String(parameters.phone_property || parameters.phoneProperty || "phone").trim().toLowerCase() || "phone";
@@ -25,7 +25,7 @@ exports.main = async (context) => {
   const requestId = String(parameters.request_id || parameters.requestId || "").trim();
 
   if (!portalId) {
-    return cardResponse(400, { success: false, call_id: "", status: "missing_account_id", masked_phone: "", error: "HubSpot accountId is required." });
+    return cardResponse(400, { success: false, call_id: "", status: "missing_account_id", masked_phone: "", error: "HubSpot account context is required." });
   }
   if (!objectId) {
     return cardResponse(400, { success: false, call_id: "", status: "missing_source_object_id", masked_phone: "", error: "source_object_id is required." });
@@ -104,9 +104,13 @@ exports.main = async (context) => {
 
   return cardResponse(200, {
     success: true,
-    call_id: maskPhoneNumbers(call.id || call.call_id || "", [phone]),
+    call_id: maskPhoneNumbers(call.id, [phone]),
     status: maskPhoneNumbers(call.status || "queued", [phone]),
+    result_status: call.result_status,
+    call_outcome: maskPhoneNumbers(call.call_outcome || "", [phone]),
     masked_phone: candidate.maskedPhone,
-    error: "",
+    error: maskPhoneNumbers(
+      [call.error?.code, call.error?.detail_code, call.error?.message].filter(Boolean).join(": "), [phone]
+    ),
   });
 };
