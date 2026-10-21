@@ -1,0 +1,19 @@
+node_modules/
+dist/
+.next/
+.expo/
+.pgdata/
+*.tsbuildinfo
+.env
+.env.local
+.DS_Store
+coverage/
+*.log
+android/
+ios/
+# A database moved aside after it could not be opened. Kept on disk for
+# recovery, but it is a thousand binary files and belongs in no commit.
+.pgdata.corrupt-*/
+
+# JetBrains project files
+.idea/
