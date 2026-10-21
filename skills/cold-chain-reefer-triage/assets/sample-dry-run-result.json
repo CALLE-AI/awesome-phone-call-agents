@@ -1,0 +1,24 @@
+{
+  "call_id": "sim-dryrun-reefer-triage-001",
+  "status": "completed",
+  "task_completed": true,
+  "completion_confidence": 0.95,
+  "structured_result": {
+    "driver_verified_safe_location": true,
+    "reefer_engine_running": true,
+    "air_bulkhead_obstructed": false,
+    "cargo_sweating_detected": false,
+    "driver_reported_alarm_code": "ALARM 18 - HIGH ENGINE TEMP",
+    "driver_hos_minutes_remaining": 45,
+    "selected_option": "DIVERT_TO_COLD_HUB",
+    "emergency_reported": false
+  },
+  "evidence": {
+    "simulation": true,
+    "note": "[DRY-RUN: No live call placed] Explicit authorization flag (--live / live=True) required for network call.",
+    "target_destination_masked": "+1303***0147",
+    "truck_id": "TRK-902",
+    "trailer_id": "TRL-8841"
+  },
+  "error": null
+}
