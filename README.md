@@ -548,6 +548,7 @@ Externally hosted user-facing apps built on CALL-E. They live in their own repos
 - [Khoj](https://github.com/manyamharshitha/KHOJ) - Consent-first CALL-E verification calls to Indian rental brokers that check rent, deposit and availability against the advert and keep the full transcript. See the [CALL-E integration notes](https://github.com/manyamharshitha/KHOJ#call-e-integration-notes).
 - [Novyra](https://novyra-rgaa.onrender.com/) - External AI-powered lifestyle app with a CALL-E phone workflow for personalized user interactions.
 - [Vera](https://github.com/shalynmonet/vera) - Strands-orchestrated wellness companion that places recurring CALL-E calls to seniors, evaluates outcomes with Amazon Bedrock against each resident's own escalation criteria, and alerts caregivers automatically when something needs attention.
+- [DoomPay](https://github.com/doomsday-network/doom-pay) - 2-line Stripe-style non-custodial Web3 checkout widget (`pay.js`), HTTP 402 payment wall, and MCP tool server for verifying Layer-1 `DOOM` and Base Mainnet `wDOOM` payments.
 
 ### Plugins
 
