@@ -14,7 +14,7 @@ reschedule, and who canceled.
    calendar event (configure the trigger's lead time in Zapier, for example
    one day before).
 2. **Action:** CALL-E - Place Call and Wait for Outcome. Calls the person
-   attached to the event and waits for the terminal outcome.
+   attached to the event and waits for result readiness.
 3. **Action:** Google Sheets - Create Spreadsheet Row. Logs the outcome to a
    tracking sheet.
 
@@ -51,18 +51,43 @@ must already be in E.164 format, for example `+15550123456`.
   "properties": {
     "confirmed": {
       "type": "string",
-      "enum": ["yes", "no", "reschedule", "unknown"],
+      "enum": [
+        "yes",
+        "no",
+        "reschedule",
+        "unknown"
+      ],
       "description": "Use yes when the person confirms the stated time. Use reschedule when they want a different time. Use no when they cancel. Use unknown when the call did not establish this."
     },
     "preferred_time": {
       "type": "string",
       "description": "The alternative time in the person's own words when confirmed is reschedule. Empty string otherwise."
+    },
+    "business_confirmed": {
+      "type": "boolean",
+      "description": "True only when the recipient explicitly confirms, cancels, or requests rescheduling of the stated appointment. False if no clear decision was established."
+    },
+    "business_confirmed_quote": {
+      "type": "string",
+      "description": "Exact recipient words supporting business_confirmed, or unknown when no such evidence exists."
+    },
+    "summary": {
+      "type": "string",
+      "description": "Short factual account of the conversation, or unknown when no usable conversation exists."
     }
   },
-  "required": ["confirmed"],
+  "required": [
+    "confirmed",
+    "business_confirmed",
+    "business_confirmed_quote"
+  ],
   "additionalProperties": false
 }
 ```
+
+The schema requests an explicit business decision and its recipient quote.
+Automatic steps must check `is_actionable` and the relevant business fields;
+`result_status: available` alone is insufficient.
 
 ## Routing table
 
@@ -73,7 +98,6 @@ must already be in E.164 format, for example `+15550123456`.
 | `confirmed` | `result_confirmed = no` | Log a "Canceled" row. A human frees up the slot. |
 | `review_required` | `result_confirmed = unknown` | Log an "Ambiguous - needs review" row with `review_excerpt` so the human sees what the patient actually said. The integration will not report `confirmed` for an `unknown` answer in a required field. |
 | `review_required` | - | Log a "Needs review" row with `disposition_reason` and `review_excerpt`. A human calls back. |
-| `result_invalid` | - | Log a "Needs review" row with `disposition_reason`. A human calls back. |
 | `failed` | - | Log a "Call failed - retry" row with `disposition_reason`. A human retries or calls back manually. |
 | `canceled` | - | Log a "Call canceled" row with `disposition_reason`. A human decides whether to retry. |
 | `outcome_unknown` | - | Log a "Still in progress - recheck" row. Do not treat this as a failed or missed call - see the note below. |
@@ -83,23 +107,19 @@ must already be in E.164 format, for example `+15550123456`.
 | `retry_policy_blocked` | - | Log a "Not called - too soon since last attempt" row with `disposition_reason`. No call was placed; the row is picked up again on a later run rather than being redialled now. |
 | any | `opt_out_requested = true` | Append the number to the Do Not Call List sheet **before** logging anything else, and mark the row do-not-contact. `disposition` will already be `needs_human` and `lead_state` `blocked_compliance` whatever the appointment answer was. |
 
-Only `confirmed` needs no follow-up. Every other outcome gets logged for a
+A confirmed appointment response can still require the human action listed above. Every other outcome gets logged for a
 human to act on rather than being silently treated as a successful
 confirmation.
 
-**Simpler alternative:** if these twelve rows are more branching than you
+**Simpler alternative:** if these rows are more branching than you
 want to build, filter on `lead_state` instead - three branches (`qualified`,
 `needs_human`, `blocked_compliance`) cover the same ground, and
 `disposition_reason` still tells the human which case they are looking at.
 
-**Note on `outcome_unknown` and `queued`:** in a live test call, a call sat
-at status `queued` for over two minutes while the phone was actually ringing
-and being answered - it never showed `in_progress`. If a `Place Call and
-Wait for Outcome` step is interrupted, or you build a separate
-reconciliation Zap with `Find Call Result`, a call still in that state
-reports `outcome_unknown`, not a failure. Recheck it later with
-`Find Call Result` using the recorded `call_id` rather than assuming the
-call did not go through.
+**Reconciliation:** read the original API `call_id` while `result_status` is
+`pending`, even when `status` is `completed`. Final unavailable results and
+uncertain creation require manual review. Do not create a replacement call
+just because a callback is late.
 
 ## Zapier plan needed
 
@@ -110,14 +130,10 @@ Google Sheets accounts themselves are free.
 
 ## What to check before turning it on
 
-- Set Region and Locale explicitly on the call step. CALL-E never infers
-  them from the phone number, and a live test call to a number outside the
-  assumed default region returned `HTTP 422` with error code
-  `call_not_ready` and a `details.questions` array asking which language to
-  use before it would place the call. If appointments span multiple
-  countries, map Region and Locale from a calendar or contact field rather
-  than leaving them blank, or the call may be rejected until the question is
-  answered.
+- Region and Locale are optional in v2. Set them explicitly when the intended
+  destination and spoken language are known. Conflicts or ambiguity return
+  `input_incomplete` with `details.missing_inputs`; correct the input before
+  acceptance. Preserve the exact original hints on an uncertain replay.
 - Confirm the phone number field on your calendar events is populated and in
   E.164 format before the Zap runs against real appointments.
 - Confirm the Google Sheet has columns matching every field you map

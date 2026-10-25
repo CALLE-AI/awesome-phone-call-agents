@@ -6,7 +6,7 @@ const input = {
   phone: '+15550123456',
   region: 'US',
   locale: 'en-US',
-  result_schema: '{"type":"object","properties":{"acknowledged":{"type":"string"}}}',
+  result_schema: '{"type":"object","properties":{"acknowledged":{"type":"string"}},"additionalProperties":false}',
   correlation_id: 'incident-42',
 };
 
@@ -15,9 +15,10 @@ describe('buildPayload', () => {
     const { payload, errors } = buildPayload(input, {});
     expect(errors).toEqual([]);
     expect(payload.task).toBe(input.task);
-    expect(payload.recipients).toEqual([
-      { phones: ['+15550123456'], region: 'US', locale: 'en-US' },
-    ]);
+    expect(payload.phone).toBe('+15550123456');
+    expect(payload.region).toBe('US');
+    expect(payload.locale).toBe('en-US');
+    expect(payload.recipients).toBeUndefined();
     expect(payload.metadata.correlation_id).toBe('incident-42');
   });
 
@@ -34,7 +35,9 @@ describe('buildPayload', () => {
 
   it('omits region and locale when not supplied rather than guessing', () => {
     const { payload } = buildPayload({ task: input.task, phone: input.phone }, {});
-    expect(payload.recipients[0]).toEqual({ phones: ['+15550123456'] });
+    expect(payload.phone).toBe('+15550123456');
+    expect(payload).not.toHaveProperty('region');
+    expect(payload).not.toHaveProperty('locale');
   });
 
   it('surfaces result schema errors', () => {

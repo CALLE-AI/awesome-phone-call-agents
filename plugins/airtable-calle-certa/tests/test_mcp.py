@@ -37,10 +37,8 @@ class Stub(McpTransport):
         return self._replies.pop(0)
 
 
-def payload(phones=(FICTIONAL,), **extra):
-    recipient = {"phones": list(phones)}
-    recipient.update(extra)
-    return {"task": "Call Kestrel Logistics to verify employment.", "recipients": [recipient]}
+def payload(phone=FICTIONAL, **extra):
+    return {"task": "Call Kestrel Logistics to verify employment.", "phone": phone, **extra}
 
 
 PLANNED = envelope({"plan_id": "pABC", "confirm_token": "cXYZ", "ready_to_run": True})
@@ -86,17 +84,16 @@ class Placing(unittest.TestCase):
     def test_several_recipients_are_refused_not_silently_truncated(self):
         t = Stub([])
         task = payload()
-        task["recipients"].append({"phones": ["+15550102038"]})
+        task["recipients"] = [{"phones": ["+15550102038"]}]
         with self.assertRaises(TransportError) as ctx:
             t.create_call(task, idempotency_key="k")
         self.assertIn("one destination at a time", str(ctx.exception))
 
-    def test_every_number_on_a_recipient_is_dialled_not_just_the_first(self):
-        """Dropping the extras would silently narrow an authorised intent."""
-        t = Stub([PLANNED, STARTED])
-        t.create_call(payload(phones=[FICTIONAL, "+15550102038"]), idempotency_key="k")
-        self.assertEqual(t.commands[0].count("--to-phone"), 2)
-        self.assertIn("+15550102038", t.commands[0])
+    def test_a_phone_array_is_refused(self):
+        t = Stub([])
+        with self.assertRaises(TransportError):
+            t.create_call(payload(phone=[FICTIONAL, "+15550102038"]), idempotency_key="k")
+        self.assertEqual(t.commands, [])
 
     def test_no_recipient_is_refused(self):
         with self.assertRaises(TransportError):
@@ -124,7 +121,7 @@ class Reading(unittest.TestCase):
     def test_no_structured_result_is_fabricated(self):
         """Extraction is CALL-E's job. Doing it here would be a different product."""
         t = Stub([envelope({"status": "completed", "summary": "Yes, employed."})])
-        self.assertIsNone(t.get_call("run_1")["recipients"][0]["structured_result"])
+        self.assertIsNone(t.get_call("run_1")["result"])
 
     def test_a_completed_mcp_call_routes_to_a_human(self):
         """The fail-closed rule doing exactly what it was written for."""

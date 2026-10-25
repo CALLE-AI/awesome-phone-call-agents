@@ -18,7 +18,7 @@
 // `opt_out_requested` as an enum with an `unknown` member, which puts the
 // judgment in the extraction model where it belongs, and keep this as the
 // backstop for callers who did not add that field.
-import { normalizeSpeech } from './transcript.js';
+import { normalizeSpeech, transcriptTurns } from './transcript.js';
 
 const OPT_OUT_PHRASES = [
   'stop calling',
@@ -64,9 +64,7 @@ const notRequested = () => ({
 // mark every compliant call as a revocation.
 export function detectOptOut(recipients) {
   try {
-    const turns = (Array.isArray(recipients) ? recipients : [])
-      .flatMap((recipient) => (recipient && recipient.attempts) || [])
-      .flatMap((attempt) => (attempt && attempt.transcript_turns) || [])
+    const turns = transcriptTurns(recipients)
       .filter((turn) => turn && turn.speaker === 'user' && typeof turn.text === 'string');
 
     for (const turn of turns) {

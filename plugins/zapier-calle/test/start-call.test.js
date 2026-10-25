@@ -30,6 +30,7 @@ const bundleFor = (server, inputData) => ({
 const input = {
   task: 'Call the on-call engineer and get an acknowledgement.',
   phone: '+15550123456',
+  result_schema: { type: 'object', properties: { acknowledged: { type: 'string' } }, required: ['acknowledged'], additionalProperties: false },
   dry_run: false,
 };
 
@@ -58,7 +59,7 @@ describe('start-call', () => {
 
     expect(output.call_id).toMatch(/^call_/);
     expect(output.disposition).toBe('outcome_unknown');
-    expect(server.lastRequest().path).toBe('/v1/calls');
+    expect(server.lastRequest().path).toBe('/v2/calls');
     expect(server.lastRequest().headers['idempotency-key']).toMatch(/^[0-9a-f]{64}$/);
   });
 
@@ -273,7 +274,7 @@ describe('start-call', () => {
 
     expect(output.disposition).toBe('outcome_unknown');
     expect(output.call_id).toMatch(/^call_/);
-    expect(server.lastRequest().path).toBe('/v1/calls');
+    expect(server.lastRequest().path).toBe('/v2/calls');
   });
 
   it('places the call normally when inside the configured calling window', async () => {
@@ -294,7 +295,7 @@ describe('start-call', () => {
 
       expect(output.disposition).toBe('outcome_unknown');
       expect(output.call_id).toMatch(/^call_/);
-      expect(server.lastRequest().path).toBe('/v1/calls');
+      expect(server.lastRequest().path).toBe('/v2/calls');
     } finally {
       vi.useRealTimers();
     }

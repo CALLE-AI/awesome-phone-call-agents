@@ -23,6 +23,8 @@ import {
   DEFAULT_MIN_CONFIDENCE_SCORE,
 } from './result-quality.js';
 import { checkGrounding, describeUngrounded } from './grounding.js';
+import { scalarMatches } from './result-schema.js';
+import { normalizeSpeech } from './transcript.js';
 
 const KNOWN_EVENT_TYPES = new Set([
   'call.completed',
@@ -146,25 +148,70 @@ function classify(event, options) {
   return result('confirmed', 'Call completed with a high-confidence validated result.');
 }
 
-// Fail-closed at the function boundary: a malformed or hostile event must
-// classify as needs_human, never escape as an exception. Task 8 spreads this
-// return value straight into a Zap output, so a throw here would abort the
-// Zap instead of routing the call to human review.
-//
-// `options.resultSchema` is the parsed result_schema the call was placed
-// with, when the caller has it. The create actions do; the Call Completed
-// trigger and Find Call Result do not, because they observe calls that may
-// have been placed anywhere - so they get the weaker schemaless check rather
-// than no check at all. `options.minConfidenceScore` defaults to the module
-// default; pass 0 to disable the score floor.
+function classifyCall(event, options) {
+  const data = event.data;
+  if (!['call.completed', 'call.failed', 'call.canceled'].includes(event.type)) {
+    return result('needs_human', `Unrecognized v2 event type: ${truncate(event.type)}.`);
+  }
+  if (!Object.hasOwn(data, 'status') || !KNOWN_STATUSES.has(data.status)) {
+    return result('needs_human', 'Call has no recognized execution status.');
+  }
+  if (data.result_status === 'pending' || NON_TERMINAL_STATUSES.has(data.status)) {
+    return result('outcome_unknown', 'Call result is still pending; retrieve the same API Call ID.');
+  }
+  if (!['available', 'unavailable', 'not_applicable'].includes(data.result_status)) {
+    return result('needs_human', 'Call has no recognized result readiness state.');
+  }
+  if (data.status === 'failed' || event.type === 'call.failed' || data.error) {
+    return result('failed', `Call error: ${truncate(data.error?.code || 'unspecified')}.`);
+  }
+  if (data.status === 'canceled' || event.type === 'call.canceled') {
+    return result('canceled', 'Call was canceled.');
+  }
+  if (data.call_outcome !== 'completed') {
+    return result('review_required', `Telephone outcome was ${truncate(data.call_outcome)}; no business confirmation.`);
+  }
+  const answers = data.result;
+  if (data.result_status !== 'available' || !answers || typeof answers !== 'object' || Array.isArray(answers) || Object.keys(answers).length === 0) {
+    return result('review_required', 'No usable business result is available; do not redial automatically.');
+  }
+  if (Object.values(answers).some((value) => value === null || !['string', 'boolean', 'number'].includes(typeof value) || (typeof value === 'number' && !Number.isFinite(value)))) {
+    return result('review_required', 'Call result is not a flat scalar object.');
+  }
+  const schema = options.resultSchema;
+  if (schema?.properties) {
+    const invalid = Object.entries(answers).find(([key, value]) => {
+      const rule = schema.properties[key];
+      return !rule || !scalarMatches(rule.type, value) || (Array.isArray(rule.enum) && !rule.enum.includes(value));
+    });
+    if (invalid) return result('review_required', `Result field ${truncate(invalid[0])} does not match its schema.`);
+  }
+  const unusable = findUnusableFields(answers, schema);
+  if (unusable.length) return result('review_required', `Result is not actionable: ${truncate(describeUnusableFields(unusable))}.`);
+  if (!Object.hasOwn(answers, 'business_confirmed') || answers.business_confirmed !== true) {
+    return result('review_required', 'result.business_confirmed must explicitly be true before automatic confirmation.');
+  }
+  if (typeof answers.business_confirmed_quote !== 'string' || !answers.business_confirmed_quote.trim()) {
+    return result('review_required', 'Business confirmation requires a recipient quote.');
+  }
+  const grounding = checkGrounding(answers, data, schema);
+  if (!grounding.enforced || grounding.ungrounded.length) {
+    return result('review_required', `Business result is not supported by the transcript: ${truncate(describeUngrounded(grounding.ungrounded))}.`);
+  }
+  // shortcut: English denial cues only; review other languages or ambiguous wording manually.
+  if (/\b(no|not|never|cannot|cant|dont|doesnt|didnt|isnt|arent|wasnt|werent|wont|wouldnt|couldnt|havent|hasnt|hadnt|unsure|uncertain)\b/.test(normalizeSpeech(answers.business_confirmed_quote))) {
+    return result('review_required', 'The confirmation quote contains a denial or uncertainty; review it against the business answer.');
+  }
+  return result('confirmed', 'Business confirmation is explicit and its quote matches the recipient transcript.');
+}
+
 export function deriveDisposition(event, options = {}) {
   try {
+    if (event?.data?.object === 'call') return classifyCall(event, options);
+    if (event?.data?.object !== 'call_task') return result('needs_human', 'Unknown Call interface; use the interface that created this record.');
     return classify(event, {
       resultSchema: options.resultSchema,
-      minConfidenceScore:
-        options.minConfidenceScore === undefined
-          ? DEFAULT_MIN_CONFIDENCE_SCORE
-          : options.minConfidenceScore,
+      minConfidenceScore: options.minConfidenceScore === undefined ? DEFAULT_MIN_CONFIDENCE_SCORE : options.minConfidenceScore,
     });
   } catch {
     return result('needs_human', 'Could not classify the webhook event.');

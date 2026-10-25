@@ -17,7 +17,7 @@ you build anything that writes the result somewhere else.
    built-in Zapier trigger, so this Zap needs no third-party app connection
    at all beyond the CALL-E connection itself.
 2. **Action:** CALL-E - Place Call and Wait for Outcome. Calls a number you
-   choose and waits for the terminal outcome.
+   choose and waits for result readiness.
 
 That is the whole Zap. There is no third step. Nothing writes the result
 anywhere automatically - you read it from the Zap's run history in the
@@ -42,7 +42,7 @@ format, for example `+15550123456`.
 Region: set explicitly, for example `US`. Locale: set explicitly, for
 example `en-US`. See
 [What to check before turning it on](#what-to-check-before-turning-it-on)
-for why leaving either blank can stop the call before it starts.
+for how explicit hints resolve ambiguous call intent.
 
 ## Result Schema
 
@@ -56,14 +56,37 @@ for why leaving either blank can stop the call before it starts.
     },
     "answered": {
       "type": "string",
-      "enum": ["yes", "no"],
+      "enum": [
+        "yes",
+        "no"
+      ],
       "description": "Use yes if the person answered and spoke with the agent at all. Use no if the call was not answered."
+    },
+    "business_confirmed": {
+      "type": "boolean",
+      "description": "True only when the recipient explicitly states a favorite color. False when no color was established."
+    },
+    "business_confirmed_quote": {
+      "type": "string",
+      "description": "Exact recipient words supporting business_confirmed, or unknown when no such evidence exists."
+    },
+    "summary": {
+      "type": "string",
+      "description": "Short factual account of the conversation, or unknown when no usable conversation exists."
     }
   },
-  "required": ["answered"],
+  "required": [
+    "answered",
+    "business_confirmed",
+    "business_confirmed_quote"
+  ],
   "additionalProperties": false
 }
 ```
+
+The schema requests an explicit business decision and its recipient quote.
+Automatic steps must check `is_actionable` and the relevant business fields;
+`result_status: available` alone is insufficient.
 
 ## Routing table
 
@@ -74,9 +97,8 @@ disposition - not an action the Zap takes on your behalf.
 | Disposition | What you would do next |
 | --- | --- |
 | `confirmed` | Read `result_color` and `result_answered` in the run's output. The call worked end to end and extracted a validated result. |
-| `review_required` | Read `disposition_reason`. The call completed but CALL-E did not consider the task completed, was not highly confident, or extracted no usable result - decide by hand whether to call again. |
-| `result_invalid` | Read `disposition_reason`. CALL-E could not validate the extracted result against the Result Schema above - check the schema and the Call Task text agree with each other. |
-| `failed` | Read `disposition_reason` and `failure_code`. The call itself failed - decide by hand whether to retry. |
+| `review_required` | Read `disposition_reason`. The call completed but the result was unavailable, the business confirmation was false, or its recipient quote could not be verified - decide by hand whether to call again. |
+| `failed` | Read `disposition_reason` and `error_code`. The call itself failed - decide by hand whether to retry. |
 | `canceled` | Read `disposition_reason`. The call was canceled before it completed. |
 | `outcome_unknown` | Read `disposition_reason`. The call has not reached a terminal state, or the callback payload was unreadable. Do not conclude the call failed or that the person was not reached - see the note below - and check back later with `Find Call Result` using the run's `call_id`. |
 | `needs_human` | Read `disposition_reason`. The fail-closed default: a malformed event, an unrecognized status, or a callback that failed identity verification. Treat it as unresolved, not as a specific known outcome. |
@@ -94,12 +116,10 @@ called again. `disposition` will be `needs_human` no matter how well the
 call otherwise went; `opt_out_excerpt` quotes the request. Add that number
 to a `Do Not Call List` before running this Zap again.
 
-**Note on `outcome_unknown` and `queued`:** in a live test call, a call sat
-at status `queued` for a 300-second polling window while the phone was
-actually ringing and being answered, and never showed `in_progress`. With
-no writeback step to hide behind, this Zap's run history will show
-`outcome_unknown` in exactly that situation - that is expected behavior,
-not a broken Zap, and it is not evidence the call did not go through.
+**Reconciliation:** read the original API `call_id` while `result_status` is
+`pending`, even when `status` is `completed`. Final unavailable results and
+uncertain creation require manual review. Do not create a replacement call
+just because a callback is late.
 
 ## Zapier plan needed
 
@@ -110,11 +130,10 @@ additional app connection is required beyond the CALL-E connection.
 
 ## What to check before turning it on
 
-- Set Region and Locale explicitly, as shown above. CALL-E never infers
-  either from the phone number, and can reject call creation with
-  `HTTP 422` and error code `call_not_ready`, returning a
-  `details.questions` array asking for the missing information, until both
-  are supplied.
+- Region and Locale are optional in v2. Set them explicitly when the intended
+  destination and spoken language are known. Conflicts or ambiguity return
+  `input_incomplete` with `details.missing_inputs`; correct the input before
+  acceptance. Preserve the exact original hints on an uncertain replay.
 - Confirm the phone number is E.164 format and one you are authorized to
   call.
 - Leave Dry Run set to `true` first and run the Zap once. Open the run in

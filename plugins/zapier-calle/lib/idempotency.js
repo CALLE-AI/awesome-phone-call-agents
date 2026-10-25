@@ -2,9 +2,10 @@ import { createHash } from 'node:crypto';
 
 const CANONICAL_FIELDS = [
   'task',
-  'recipients',
+  'phone',
+  'region',
+  'locale',
   'result_schema',
-  'recipient_result_schema',
   'metadata',
 ];
 

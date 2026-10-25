@@ -61,56 +61,22 @@ return [{
     absenceDate: new Date().toISOString().slice(0, 10),
     apiBaseUrl: "https://api.heycall-e.com",
     // A wave, not a broadcast. CALL-E's own guidance is against starting every call at
-    // once, and there is no cancel endpoint, so this cap is the only brake that exists.
+    // once; accepted calls may continue after this workflow is stopped.
     concurrency: 3,
     maxWaitSeconds: 240,
     dryRun: true,
   },
 }];`;
 
-const APPROVED_API_GATE = `// The only hosts this recipe will send a CALL-E key to.
-//
-// apiBaseUrl sits on the config screen so an operator can point the recipe at their own
-// tenant, and it was interpolated straight into the request URL. The Authorization header
-// is built from CALL_E_API_KEY on the same line, so whatever host ended up in that field
-// received a live credential: a typo, an http:// paste, or an edited export was enough.
-//
-// So the field is resolved against this list rather than trusted. Exact hostname match
-// rather than a suffix test, because api.heycall-e.com.example.net ends with the approved
-// name and is not the approved host. HTTPS only, no credentials in the URL, no query, no
-// fragment and no path, because a base URL carrying any of those is not a base URL.
+const APPROVED_API_GATE = `// Exact HTTPS origins also work in n8n runners without a global URL parser.
 const APPROVED_API_HOSTS = ["api.heycall-e.com"];
 
 function approvedApiBaseUrl(raw) {
-  if (typeof raw !== "string" || raw.trim() === "") {
-    return { error: "apiBaseUrl is empty. Set it to https://api.heycall-e.com." };
+  const origin = typeof raw === "string" ? raw.trim().toLowerCase().replace(/\\/$/, "") : "";
+  if (!APPROVED_API_HOSTS.some((host) => origin === "https://" + host)) {
+    return { error: "apiBaseUrl must be an approved HTTPS origin without credentials, path, query or fragment." };
   }
-  let url;
-  try {
-    url = new URL(raw.trim());
-  } catch {
-    return { error: "apiBaseUrl " + JSON.stringify(raw) + " is not a URL." };
-  }
-  if (url.protocol !== "https:") {
-    return { error: "apiBaseUrl must use https, not " + url.protocol.replace(":", "")
-      + ". A CALL-E key sent over http is a key on the wire in clear text." };
-  }
-  if (url.username || url.password) {
-    return { error: "apiBaseUrl carries credentials in the URL. Remove them; the key is "
-      + "read from CALL_E_API_KEY at execution time." };
-  }
-  if (url.search || url.hash) {
-    return { error: "apiBaseUrl carries a query or a fragment. A base URL has neither." };
-  }
-  if (url.pathname !== "/" && url.pathname !== "") {
-    return { error: "apiBaseUrl carries the path " + JSON.stringify(url.pathname)
-      + ". Give the host only; the recipe appends /v1/calls itself." };
-  }
-  if (!APPROVED_API_HOSTS.includes(url.hostname)) {
-    return { error: "apiBaseUrl host " + JSON.stringify(url.hostname)
-      + " is not approved. Approved: " + APPROVED_API_HOSTS.join(", ") + "." };
-  }
-  return { url: "https://" + url.host };
+  return { url: origin };
 }
 
 // A redirect is the other way the key leaves the approved host. n8n's httpRequest follows
@@ -127,7 +93,7 @@ const VALIDATE = `${APPROVED_API_GATE}
 const cfg = $input.first().json;
 const problems = [];
 
-if (!process.env.CALL_E_API_KEY && !cfg.dryRun) {
+if (!cfg.dryRun && !$env.CALL_E_API_KEY) {
   problems.push("CALL_E_API_KEY is not set. Set it in your n8n deployment, or leave dryRun true.");
 }
 
@@ -201,9 +167,7 @@ return [{
     ...row,
     idempotencyKey,
     request: {
-      // The whole fallback chain goes in the request. CALL-E tries them in order; the
-      // workflow does not orchestrate retries itself.
-      phones: row.phones,
+      phone: row.phones[0],
       // The language belongs to the family, not to the deployment. This is the single
       // field that makes the recipe work outside one country.
       locale: row.locale,
@@ -218,6 +182,7 @@ return [{
       ].join("\\n"),
       result_schema: {
         type: "object",
+        additionalProperties: false,
         required: ["reason_category", "expected_return"],
         properties: {
           reason_category: { type: "string", enum: ["illness", "medical_appointment", "family_emergency", "religious_observance", "transport", "other", "unknown"] },
@@ -231,90 +196,88 @@ return [{
 }];`;
 
 const CREATE = `${APPROVED_API_GATE}
-// Place the call and wait for it to finish, with a hard ceiling on the wait.
 const row = $input.first().json;
-if (row.skip) {
-  return [{ json: row }];
-}
+if (row.skip) return [{ json: row }];
 
-// dryRun returns a shaped response and places no call, so the whole recipe can be run
-// once end to end before it is pointed at a real number.
 if (row.dryRun) {
   const shapes = {
-    // Two rows that close. An explicit "yes" on parent_confirmed_aware is what closing
-    // requires, and leaving that field out of these shapes is how the first version of this
-    // demo escalated all three and reported a resolution rate of zero.
-    "S-1041": { status: "completed", structured_result: { reason_category: "illness", expected_return: "tomorrow", parent_confirmed_aware: "yes" } },
-    "S-1042": { status: "completed", structured_result: { reason_category: "medical_appointment", expected_return: "today", parent_confirmed_aware: "yes" } },
-    // A schema-valid answer from a parent who did not know. Resolved, escalated, not closed,
-    // and first in the queue. This is the row worth reading in the output.
-    "S-1043": { status: "completed", structured_result: { reason_category: "transport", expected_return: "today", parent_confirmed_aware: "no" }, attempts: 2 },
-    // The two shapes that are easy to get wrong, both taken from real calls.
-    "S-1044": { status: "completed", structured_result: null },
-    "S-1046": { status: "no_answer", structured_result: null, attempts: 2 },
+    "S-1041": { status: "completed", call_outcome: "completed", result_status: "available", result: { reason_category: "illness", expected_return: "tomorrow", parent_confirmed_aware: "yes" } },
+    "S-1042": { status: "completed", call_outcome: "completed", result_status: "available", result: { reason_category: "medical_appointment", expected_return: "today", parent_confirmed_aware: "yes" } },
+    "S-1043": { status: "completed", call_outcome: "completed", result_status: "available", result: { reason_category: "transport", expected_return: "today", parent_confirmed_aware: "no" }, submissions: 2 },
+    "S-1044": { status: "completed", call_outcome: "completed", result_status: "unavailable", result: null },
+    "S-1046": { status: "completed", call_outcome: "no_answer", result_status: "unavailable", result: null, submissions: 2 },
   };
-  const shape = shapes[row.id] || { status: "completed", structured_result: null };
-  const attempts = Array.from({ length: shape.attempts || 1 }, (_, i) => ({
-    provider_call_id: \`dry_\${row.id}_\${i + 1}\`,
+  const shape = shapes[row.id] || { status: "completed", call_outcome: "completed", result_status: "unavailable", result: null };
+  const submittedCalls = Array.from({ length: shape.submissions || 1 }, (_, i) => ({
+    id: \`dry_\${row.id}_\${i + 1}\`,
   }));
-  return [{ json: { ...row, recipient: { ...shape, attempts }, placedByThisRun: false } }];
+  return [{ json: { ...row, call: { ...shape, id: submittedCalls.at(-1).id },
+                    submittedCalls, submittedByThisRun: false } }];
 }
 
-// Resolved again here rather than trusted from the config node. This is the line that
-// builds the Authorization header, so this is where the destination has to be known good:
-// a node inserted between the two, or an edited export, changes the field without ever
-// passing the earlier check.
 const base = approvedApiBaseUrl(row.apiBaseUrl);
-if (base.error) {
-  throw new Error("Refusing to send a CALL-E key. " + base.error);
-}
+if (base.error) throw new Error("Refusing to send a CALL-E key. " + base.error);
 const apiBaseUrl = base.url;
-
-const headers = {
-  Authorization: \`Bearer \${process.env.CALL_E_API_KEY}\`,
-  "Idempotency-Key": row.idempotencyKey,
-  "Content-Type": "application/json",
-};
-
-const created = await this.helpers.httpRequest({
-  method: "POST",
-  url: \`\${apiBaseUrl}/v1/calls\`,
-  headers,
-  body: row.request,
-  json: true,
-  timeout: 30000,
-  ...NO_CREDENTIAL_REDIRECTS,
-});
-
-const callId = created.id || created.call_id;
+const ready = ["available", "unavailable", "not_applicable"];
 const deadline = Date.now() + (row.maxWaitSeconds || 240) * 1000;
-let call = created;
+const submittedCalls = [];
+let call = null;
+let reconciliationRequired = false;
 
-while (Date.now() < deadline) {
-  const terminal = ["completed", "failed", "no_answer", "busy", "cancelled"];
-  const recipient = (call.recipients || [])[0];
-  if (recipient && terminal.includes(recipient.status)) {
+for (let index = 0; index < row.phones.length; index += 1) {
+  if (Date.now() >= deadline) break;
+  const headers = {
+    Authorization: \`Bearer \${$env.CALL_E_API_KEY}\`,
+    "Idempotency-Key": \`\${row.idempotencyKey}-\${index}\`,
+    "Content-Type": "application/json",
+  };
+  try {
+    const created = await this.helpers.httpRequest({
+      method: "POST",
+      url: \`\${apiBaseUrl}/v2/calls\`,
+      headers,
+      body: { ...row.request, phone: row.phones[index] },
+      json: true,
+      timeout: 30000,
+      ...NO_CREDENTIAL_REDIRECTS,
+    });
+    if (typeof created.id !== "string" || !created.id) {
+      throw new Error("CALL-E returned no API resource id");
+    }
+    const callId = created.id;
+    submittedCalls.push({ id: callId });
+    call = created;
+    while (!ready.includes(call.result_status) && Date.now() < deadline) {
+      await new Promise((resolve) => setTimeout(resolve, Math.min(5000, deadline - Date.now())));
+      const received = await this.helpers.httpRequest({
+        method: "GET",
+        url: \`\${apiBaseUrl}/v2/calls/\${encodeURIComponent(callId)}\`,
+        headers: { Authorization: headers.Authorization },
+        json: true,
+        timeout: 30000,
+        ...NO_CREDENTIAL_REDIRECTS,
+      });
+      if (received.id !== callId) throw new Error("CALL-E returned a different Call");
+      call = received;
+    }
+    submittedCalls[submittedCalls.length - 1] = {
+      id: callId, call_id: call.call_id || null, status: call.status,
+      call_outcome: call.call_outcome, result_status: call.result_status,
+    };
+  } catch {
+    reconciliationRequired = true;
     break;
   }
-  await new Promise((resolve) => setTimeout(resolve, 5000));
-  call = await this.helpers.httpRequest({
-    method: "GET",
-    url: \`\${apiBaseUrl}/v1/calls/\${callId}\`,
-    headers: { Authorization: headers.Authorization },
-    json: true,
-    timeout: 30000,
-    ...NO_CREDENTIAL_REDIRECTS,
-  });
+  // Only a confirmed unanswered call permits the next authorized number.
+  if (!ready.includes(call.result_status) || call.status !== "completed"
+      || !["no_answer", "busy"].includes(call.call_outcome)) break;
 }
 
-// Only the two fields the classifier needs from the call, rather than the whole
-// payload. A transcript travelling between nodes is a transcript in a log somebody has
-// not thought about, and the classifier reads the recipient count and the task-level
-// result and nothing else.
-return [{ json: { ...row, callId, recipient: (call.recipients || [])[0] || null,
-                  call: { recipients: call.recipients || [],
-                          structured_result: call.structured_result || null },
-                  placedByThisRun: true } }];`;
+return [{ json: { ...row, submittedCalls, reconciliationRequired,
+  call: call && { id: call.id, call_id: call.call_id, status: call.status,
+    call_outcome: call.call_outcome, result_status: call.result_status, result: call.result },
+  submittedByThisRun: submittedCalls.length > 0,
+} }];`;
 
 const CLASSIFY = `${classifier}
 
@@ -323,16 +286,14 @@ const row = $input.first().json;
 if (row.skip) {
   return [{ json: row }];
 }
-// row.call carries the recipient count and the task-level result, which is what lets a
-// single-recipient task-level result be read. A row without it classifies on the
-// recipient alone.
-const verdict = classifyRecipient(row.recipient, row.call);
+const verdict = classifyCall(row.reconciliationRequired ? null : row.call, row.submittedCalls);
 return [{
   json: {
     id: row.id,
     locale: row.locale,
     phone: maskNumber((row.phones || [])[0]),
-    placedByThisRun: row.placedByThisRun === true,
+    submittedByThisRun: row.submittedByThisRun === true,
+    callIds: (row.submittedCalls || []).map((call) => call.id),
     ...verdict,
   },
 }];`;
@@ -348,7 +309,7 @@ const lines = [
   \`resolved      \${summary.counts.resolved}   schema-valid reason on record\`,
   \`undetermined  \${summary.counts.undetermined}   a call happened, no usable answer, needs a person\`,
   \`failed        \${summary.counts.failed}   nobody reached on any number\`,
-  \`attempts billed \${summary.attemptsBilled}, of which \${summary.attemptsOpen} left somebody with work to do\`,
+  \`calls submitted \${summary.callsSubmitted}, of which \${summary.callsOpen} left somebody with work to do\`,
 ];
 if (summary.resolutionRate !== null) {
   lines.push(\`resolution rate \${Math.round(summary.resolutionRate * 100)}%\`);
@@ -372,16 +333,16 @@ const nodes = [
       "first run places no calls at all.",
       "",
       "### To run it for real",
-      "1. Set `CALL_E_API_KEY` in your n8n deployment's environment.",
+      "1. Set `CALL_E_API_KEY` in your self-hosted n8n environment and allow `$env` access.",
       "2. Replace the placeholder numbers in **Absence Config**. The validator refuses",
       "   to dial anything starting `+91555`.",
       "3. Set `dryRun` to false.",
       "4. To schedule it, enable **Every School Morning** and activate the workflow.",
       "",
       "### To stop it",
-      "Deactivate the workflow, or disable the schedule node. There is no cancel",
-      "endpoint on the API, so a call already accepted will complete. The concurrency",
-      "cap is what limits how many are in flight when you stop it.",
+      "Deactivate the workflow, or disable the schedule node. This template does not",
+      "cancel accepted calls. Keep their API IDs and read their results; the API",
+      "can cancel only before provider submission.",
     ].join("\n")),
   note("Three outcomes note", [1740, -160], 420, 300,
     [
@@ -394,7 +355,7 @@ const nodes = [
       "- **failed** nobody was reached",
       "",
       "The middle one is the point. CALL-E can return `completed` with",
-      "`structured_result: null`, and it can return every required field as",
+      "`result_status: unavailable`, and it can return every required field as",
       "`\"unknown\"`. Both are real conversations worth nothing, and filing them",
       "with the successes is how a dashboard reports full coverage for a child",
       "nobody heard about.",

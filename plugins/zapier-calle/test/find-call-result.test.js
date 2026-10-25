@@ -35,7 +35,7 @@ describe('find-call-result', () => {
 
     const results = await findCallResult.operation.perform(z, {
       authData: { apiKey: 'k', baseUrl: server.url },
-      inputData: { call_id: created.id },
+      inputData: { calls_api: 'v1', call_id: created.id },
     });
 
     expect(results).toHaveLength(1);
@@ -55,7 +55,7 @@ describe('find-call-result', () => {
 
     const results = await findCallResult.operation.perform(z, {
       authData: { apiKey: 'k', baseUrl: server.url },
-      inputData: { call_id: created.id },
+      inputData: { calls_api: 'v1', call_id: created.id },
     });
 
     expect(results[0].disposition).toBe('outcome_unknown');
@@ -80,7 +80,7 @@ describe('find-call-result', () => {
     const lookup = (callId, inputData) =>
       findCallResult.operation.perform(z, {
         authData: { apiKey: 'k', baseUrl: server.url },
-        inputData: { call_id: callId, ...inputData },
+        inputData: { calls_api: 'v1', call_id: callId, ...inputData },
       });
 
     const minutesAgo = (minutes) => new Date(Date.now() - minutes * 60000).toISOString();

@@ -14,6 +14,7 @@ const completedEvent = {
   created_at: '2026-08-02T00:01:00Z',
   data: {
     id: 'call_1',
+    object: 'call_task',
     status: 'completed',
     completed_at: minutesAgo(0.5),
     task_completed: true,
@@ -44,7 +45,7 @@ const completedEvent = {
 const failedEvent = {
   id: 'evt_2',
   type: 'call.failed',
-  data: { id: 'call_2', status: 'failed', failure_code: 'provider_error', recipients: [] },
+  data: { id: 'call_2', object: 'call_task', status: 'failed', failure_code: 'provider_error', recipients: [] },
 };
 
 const bundleFor = (cleanedRequest) => ({ cleanedRequest, authData: { apiKey: 'k' } });
@@ -171,6 +172,7 @@ describe('call_completed trigger', () => {
       type: 'call.completed',
       data: {
         id: 'call_1',
+        object: 'call_task',
         status: 'completed',
         task_completed: true,
         completion_confidence: { score: 1, label: 'high' },
@@ -194,6 +196,7 @@ describe('call_completed trigger', () => {
       type: 'call.completed',
       data: {
         id: 'call_does_not_exist',
+        object: 'call_task',
         status: 'completed',
         task_completed: true,
         completion_confidence: { score: 1, label: 'high' },
@@ -218,7 +221,7 @@ describe('call_completed trigger', () => {
   it('makes no lookup, and confirms nothing, when the payload carries no call id', async () => {
     const seen = [];
     const z = { request: async (options) => { seen.push(options); return { status: 200, data: {} }; } };
-    const out = await perform(z, bundleFor({ id: 'evt_x', type: 'call.completed', data: { status: 'completed' } }));
+    const out = await perform(z, bundleFor({ id: 'evt_x', type: 'call.completed', data: { object: 'call_task', status: 'completed' } }));
     expect(seen).toEqual([]);
     expect(out).toHaveLength(1);
     expect(out[0].is_actionable).toBe(false);
@@ -230,6 +233,7 @@ describe('call_completed trigger', () => {
       type: 'call.completed',
       data: {
         id: 'call_3',
+        object: 'call_task',
         status: 'completed',
         task_completed: true,
         completion_confidence: { label: 'high' },
@@ -268,7 +272,7 @@ describe('call_completed trigger', () => {
   });
 
   it('classifies an unrecognized event type to needs_human instead of dropping it', async () => {
-    const event = { id: 'evt_6', type: 'call.something_new', data: { id: 'call_6', status: 'completed' } };
+    const event = { id: 'evt_6', type: 'call.something_new', data: { id: 'call_6', object: 'call_task', status: 'completed' } };
     const out = await perform(zServing([event.data]), bundleFor(event));
     expect(out).toHaveLength(1);
     expect(out[0].disposition).toBe('needs_human');

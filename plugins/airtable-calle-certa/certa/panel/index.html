@@ -597,7 +597,6 @@ function renderRun(s) {
         </div>
         <span class="tag" data-s="${TONE[r.disposition] || "idle"}">
           ${esc(r.disposition.replace(/_/g, " "))}
-          ${r.confidence != null ? `<span class="cf">${r.confidence.toFixed(2)}</span>` : ""}
         </span>
       </div>
     </article>`).join("");

@@ -110,17 +110,17 @@ class LiveTransport:
     def create_call(self, payload: dict[str, Any], *, idempotency_key: str) -> dict[str, Any]:
         return self._request(
             "POST",
-            "/v1/calls",
+            "/v2/calls",
             body=payload,
             headers={"Idempotency-Key": idempotency_key},
         )
 
     def get_call(self, call_id: str) -> dict[str, Any]:
-        return self._request("GET", f"/v1/calls/{urllib.parse.quote(call_id)}")
+        return self._request("GET", f"/v2/calls/{urllib.parse.quote(call_id, safe='')}")
 
     def list_events(self, call_id: str) -> dict[str, Any]:
         return self._request(
-            "GET", f"/v1/calls/{urllib.parse.quote(call_id)}/events"
+            "GET", f"/v2/calls/{urllib.parse.quote(call_id, safe='')}/events"
         )
 
 
@@ -130,9 +130,9 @@ class FixtureTransport:
     A fixture file is a JSON object:
 
         {
-          "create": { ...POST /v1/calls response... },
+          "create": { ...POST /v2/calls response... },
           "poll":   [ { ...first GET... }, { ...second GET... } ],
-          "events": { ...GET /v1/calls/{id}/events response... }
+          "events": { ...GET /v2/calls/{id}/events response... }
         }
 
     `poll` is consumed in order and the last entry repeats, so a scenario can

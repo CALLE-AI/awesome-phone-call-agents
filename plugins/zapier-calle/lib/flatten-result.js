@@ -7,7 +7,7 @@ import { transcriptText, lastUserTurn } from './transcript.js';
 // `options` carries what the caller knows that the payload does not: the
 // result_schema the call was placed with, and the confidence floor the user
 // configured. The Call Completed trigger has neither, and passes nothing.
-export function flattenResult(event, options = {}) {
+function flattenLegacyResult(event, options = {}) {
   const derived = deriveDisposition(event, options);
   const data = (event && event.data) || {};
   const recipients = Array.isArray(data.recipients) ? data.recipients : [];
@@ -50,6 +50,7 @@ export function flattenResult(event, options = {}) {
   const reviewTurn = disposition === 'confirmed' ? null : lastUserTurn(recipients);
 
   const flat = {
+    calls_api: 'v1',
     disposition,
     disposition_reason: reason,
     is_actionable: isActionable,
@@ -107,5 +108,52 @@ export function flattenResult(event, options = {}) {
     flat[`result_${key}`] = value;
   }
 
+  return redactDeep(flat);
+}
+
+
+export function flattenResult(event, options = {}) {
+  if (event?.data?.object !== 'call') return flattenLegacyResult(event, options);
+  const data = event.data;
+  const derived = deriveDisposition(event, options);
+  const optOut = detectOptOut(data);
+  const unreadable = !Array.isArray(data.transcript) || data.transcript.some(
+    (turn) => !turn || typeof turn.text !== 'string' || !['user', 'bot'].includes(turn.speaker),
+  );
+  if (optOut.requested) {
+    Object.assign(derived, { disposition: 'needs_human', reason: OPT_OUT_REASON, is_actionable: false });
+  } else if (unreadable && derived.is_actionable) {
+    Object.assign(derived, { disposition: 'review_required', reason: 'The full transcript could not be checked for opt-out requests.', is_actionable: false });
+  }
+  const review = derived.is_actionable ? null : lastUserTurn(data);
+  const answers = data.result && typeof data.result === 'object' && !Array.isArray(data.result) ? data.result : {};
+  const flat = {
+    calls_api: 'v2',
+    disposition: derived.disposition,
+    disposition_reason: derived.reason,
+    is_actionable: derived.is_actionable,
+    lead_state: toLeadState(derived.disposition, { optOutRequested: optOut.requested }),
+    event_id: event.id,
+    event_type: event.type,
+    call_id: data.id,
+    telephone_call_id: data.call_id ?? null,
+    status: data.status,
+    call_outcome: data.call_outcome,
+    result_status: data.result_status,
+    result: data.result ?? null,
+    summary: answers.summary ?? null,
+    error_code: data.error?.code ?? null,
+    error_message: data.error?.message ?? null,
+    error_detail_code: data.error?.detail_code ?? null,
+    correlation_id: data.metadata?.correlation_id ?? null,
+    completed_at: data.completed_at ?? null,
+    transcript_text: transcriptText(data),
+    review_excerpt: review?.text ?? null,
+    review_excerpt_offset_seconds: typeof review?.offset_seconds === 'number' ? review.offset_seconds : null,
+    opt_out_requested: optOut.requested,
+    opt_out_excerpt: optOut.excerpt,
+    opt_out_offset_seconds: optOut.offsetSeconds,
+  };
+  for (const [key, value] of Object.entries(answers)) flat[`result_${key}`] = value;
   return redactDeep(flat);
 }

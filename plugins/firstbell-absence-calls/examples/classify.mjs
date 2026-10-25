@@ -351,9 +351,31 @@ export function classifyRecipient(recipient, call) {
   };
 }
 
-/**
- * Mask a number for display. Never print a family's phone number into an execution log.
- */
+// Keep the business classifier shared with the Python example behind this v2 boundary.
+export function classifyCall(call, submittedCalls = []) {
+  const attempts = (Array.isArray(submittedCalls) ? submittedCalls : []).map((entry) => ({
+    provider_call_id: entry?.call_id || null,
+  }));
+  if (!isObject(call) || !["completed", "failed", "canceled"].includes(call.status)
+      || !["available", "unavailable", "not_applicable"].includes(call.result_status)
+      || (!call.call_outcome && !["failed", "canceled"].includes(call.status))) {
+    return { resolution: "undetermined", reason: "the call result is unconfirmed; reconcile the original request before calling again",
+      attempts: attempts.length, providerCallId: null, escalation: "none", needsAHuman: true };
+  }
+  const verdict = classifyRecipient({
+    status: call.status === "completed" ? call.call_outcome : call.status,
+    structured_result: call.result_status === "available" ? call.result : null,
+    attempts,
+  });
+  if (["failed", "canceled"].includes(call.status)) {
+    verdict.reason = `call ended ${call.status}; no verified business result`;
+  } else if (call.call_outcome === "declined") {
+    verdict.reason = "the recipient declined; do not call another number automatically";
+  }
+  return verdict;
+}
+
+/** Mask a number before it reaches a displayed summary. */
 export function maskNumber(value) {
   if (typeof value !== "string" || value.length < 4) {
     return "****";
@@ -370,8 +392,8 @@ export function maskNumber(value) {
 export function summariseWave(rows) {
   const counts = { resolved: 0, undetermined: 0, failed: 0, skipped: 0 };
   const queue = [];
-  let attemptsBilled = 0;
-  let attemptsResolved = 0;
+  let callsSubmitted = 0;
+  let callsResolved = 0;
   let escalated = 0;
   let escalatedUnresolved = 0;
 
@@ -395,11 +417,11 @@ export function summariseWave(rows) {
       escalatedUnresolved += 1;
     }
     const attempts = Number.isInteger(row.attempts) ? row.attempts : 0;
-    attemptsBilled += attempts;
+    callsSubmitted += attempts;
     // An escalated call is resolved and is not closed, so its attempts are still somebody's
     // work. Counting them as saved would report a saving on the calls that cost the most.
     if (resolution === "resolved" && !isEscalated) {
-      attemptsResolved += attempts;
+      callsResolved += attempts;
     }
     if (row.needsAHuman) {
       queue.push({ id: row.id, reason: row.reason, escalation: row.escalation || "none" });
@@ -424,9 +446,9 @@ export function summariseWave(rows) {
     escalatedUnresolved,
     closed,
     safeguardingCallbackMinutes: SAFEGUARDING_CALLBACK_MINUTES,
-    attemptsBilled,
-    attemptsResolved,
-    attemptsOpen: attemptsBilled - attemptsResolved,
+    callsSubmitted,
+    callsResolved,
+    callsOpen: callsSubmitted - callsResolved,
     resolutionRate: attempted === 0 ? null : closed / attempted,
     queue,
   };

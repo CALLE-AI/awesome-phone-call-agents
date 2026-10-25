@@ -17,11 +17,8 @@ ring. Its ordering is the correctness property worth reading:
   4. Dispatch concurrently, poll to terminal, interpret, audit the outcome,
      write the answers back.
 
-Cancellation is honest about what CALL-E offers. The API has no operation to
-stop an in-flight call -- POST /v1/calls, GET /v1/calls/{id} and
-GET /v1/calls/{id}/events are the whole surface -- so cancelling a request
-guarantees that nothing further is dispatched for it, and says exactly that
-rather than implying a stop button that does not exist.
+Cancelling a row prevents future dispatch. This workflow does not send API
+cancellation requests; accepted calls must be reconciled by their original ID.
 """
 
 from __future__ import annotations
@@ -34,7 +31,6 @@ from typing import Any, Callable, Sequence
 from .airtable import AirtableClient, FieldMap, Row, Scope, answer_columns, scope, to_row
 from .audit import AuditLog
 from .calle import (
-    DEFAULT_CONFIDENCE_FLOOR,
     Disposition,
     Interpretation,
     build_call_payload,
@@ -43,7 +39,7 @@ from .calle import (
 )
 from .consent import authorize
 from .dialplan import UnsupportedRegion, resolve
-from .schema import DerivedSchema, SchemaError, derive_recipient_schema
+from .schema import DerivedSchema, SchemaError, derive_recipient_schema, valid_answer
 from .tasks import TASK_SPEC_VERSION, TaskError, build_task
 from .transport import Transport
 from .types import BoundaryError, ConsentedEmployerContact, Relationship, redact
@@ -53,11 +49,7 @@ DEFAULT_POLL_FIRST_DELAY = 60.0
 DEFAULT_POLL_INTERVAL = 8.0
 DEFAULT_POLL_TIMEOUT = 900.0
 
-# CALL-E keeps refining a recipient result after the call reaches a terminal
-# status. A live call read `title_matches: "yes"` at the moment it completed
-# and `"unknown"` a minute later, which is the difference between a verified
-# row and a partial one. So the first terminal read is confirmed rather than
-# trusted, and this is how long to wait before confirming it.
+# Confirm ready answers before writing a consequential disposition.
 DEFAULT_SETTLE_DELAY = 12.0
 
 
@@ -202,7 +194,6 @@ def _poll_to_terminal(
     call_id: str,
     derived: DerivedSchema,
     *,
-    confidence_floor: float,
     first_delay: float,
     interval: float,
     timeout: float,
@@ -212,28 +203,32 @@ def _poll_to_terminal(
 ) -> tuple[dict[str, Any], Interpretation]:
     """Poll one call until it is terminal, then interpret it.
 
-    CALL-E's docs recommend waiting about 60 seconds before the first poll.
+    The initial delay and polling interval are configurable.
     On timeout the call is left pending rather than guessed at: an unknown
-    outcome must never become a verified one, and the events endpoint is the
+    outcome must never become a verified one, and GET /v2/calls/{id} is the
     reconciliation path for a result that arrives later.
     """
     deadline = now() + timeout
     sleep(first_delay)
     call: dict[str, Any] = {}
     while True:
-        call = transport.get_call(call_id)
-        result = interpret(call, derived, confidence_floor=confidence_floor)
+        try:
+            call = transport.get_call(call_id)
+            if not isinstance(call, dict) or call.get("id") != call_id:
+                raise RunError("no matching API Call record")
+        except Exception:
+            return call, Interpretation(Disposition.NEEDS_REVIEW, "Call read failed; reconcile this API ID before retrying")
+        result = interpret(call, derived)
         if result.is_terminal:
             return _confirm(
                 transport, call_id, derived, call, result,
-                confidence_floor=confidence_floor,
                 settle_delay=settle_delay, sleep=sleep,
             )
         if now() >= deadline:
             return call, Interpretation(
                 Disposition.PENDING,
                 f"still not terminal after {timeout:.0f}s; reconcile from the "
-                "events endpoint rather than redialing",
+                "Call endpoint rather than redialing",
             )
         sleep(interval)
 
@@ -245,31 +240,22 @@ def _confirm(
     call: dict[str, Any],
     result: Interpretation,
     *,
-    confidence_floor: float,
     settle_delay: float,
     sleep: Callable[[float], None],
 ) -> tuple[dict[str, Any], Interpretation]:
-    """Read a terminal call a second time and refuse to guess if it moved.
-
-    CALL-E revises a recipient result after the call is terminal. Observed
-    live: `title_matches` read `"yes"` on completion and `"unknown"` shortly
-    after -- a verified row that should have been partial.
-
-    Neither read is knowably the final one, so this does not pick a winner.
-    A result that changed under us is one a person should look at, which is
-    the same fail-closed rule the rest of the interpreter follows. A second
-    read that agrees costs one request and settles the question.
-    """
+    """Confirm ready business answers agree across two authenticated reads."""
     if settle_delay <= 0:
         return call, result
 
     sleep(settle_delay)
     try:
         again = transport.get_call(call_id)
+        if not isinstance(again, dict) or again.get("id") != call_id:
+            raise RunError("no matching API Call record")
     except Exception:  # noqa: BLE001 - a failed confirmation is not a verdict
         return call, result
 
-    confirmed = interpret(again, derived, confidence_floor=confidence_floor)
+    confirmed = interpret(again, derived)
     if not confirmed.is_terminal:
         return call, result
 
@@ -286,10 +272,9 @@ def _confirm(
     )
     return again, Interpretation(
         Disposition.NEEDS_REVIEW,
-        f"CALL-E revised the result after the call was terminal ({changes}); "
-        "neither read is knowably final, so a person decides",
+        f"CALL-E revised the ready result between reads ({changes}); "
+        "a person must reconcile the disagreement",
         evidence=confirmed.evidence,
-        confidence=confirmed.confidence,
         answers=confirmed.answers,
     )
 
@@ -304,7 +289,6 @@ def execute(
     requester_name: str,
     fields: FieldMap | None = None,
     max_calls: int = DEFAULT_MAX_CALLS_PER_RUN,
-    confidence_floor: float = DEFAULT_CONFIDENCE_FLOOR,
     max_workers: int = 6,
     first_delay: float = DEFAULT_POLL_FIRST_DELAY,
     interval: float = DEFAULT_POLL_INTERVAL,
@@ -388,8 +372,16 @@ def execute(
                 "idempotency_key": item.idempotency,
             },
         )
-        created = transport.create_call(item.payload, idempotency_key=item.idempotency)
-        call_id = str(created.get("id") or created.get("call_id") or "")
+        try:
+            created = transport.create_call(item.payload, idempotency_key=item.idempotency)
+            call_id = created.get("id")
+            if not isinstance(call_id, str) or not call_id:
+                raise RunError("no API resource id returned")
+        except Exception:
+            result = Interpretation(Disposition.NEEDS_REVIEW, "Call acceptance is uncertain; reconcile the original request and key before retrying")
+            audit.append("call.uncertain", request_id=item.contact.request_id,
+                         detail={"idempotency_key": item.idempotency})
+            return Outcome(item.contact.request_id, item.row.record_id, "", result)
         audit.append(
             "call.dispatched",
             request_id=item.contact.request_id,
@@ -402,7 +394,6 @@ def execute(
             transport,
             call_id,
             current.derived,
-            confidence_floor=confidence_floor,
             first_delay=first_delay,
             interval=interval,
             timeout=timeout,
@@ -419,7 +410,6 @@ def execute(
             detail={
                 "disposition": result.disposition.value,
                 "reason": result.reason,
-                "confidence": result.confidence,
                 "retryable": result.retryable,
             },
         )
@@ -451,7 +441,7 @@ def _write_back(
         }
         for key, value in (outcome.interpretation.answers or {}).items():
             column = current.derived.field_names.get(key)
-            if not column:
+            if not column or not valid_answer(current.derived.schema["properties"][key], value):
                 continue
             displayed = current.derived.choice_labels.get((key, value), value)
             values[column] = redact(displayed) if isinstance(displayed, str) else displayed
@@ -477,24 +467,12 @@ def reconcile(
     audit: AuditLog,
     call_id: str,
     derived: DerivedSchema,
-    *,
-    confidence_floor: float = DEFAULT_CONFIDENCE_FLOOR,
 ) -> Interpretation:
-    """Re-read one call that a webhook may have missed.
-
-    Uses GET /v1/calls/{id} and falls back to the events endpoint for a call
-    the status endpoint still reports as in progress. Never dispatches.
-    """
+    """Read the authenticated v2 Call; lifecycle events are not result snapshots."""
     call = transport.get_call(call_id)
-    result = interpret(call, derived, confidence_floor=confidence_floor)
-    if not result.is_terminal:
-        events = transport.list_events(call_id) or {}
-        for event in reversed(events.get("data") or []):
-            data = (event or {}).get("data") or {}
-            if isinstance(data, dict) and data.get("status"):
-                result = interpret(data, derived, confidence_floor=confidence_floor)
-                if result.is_terminal:
-                    break
+    if not isinstance(call, dict) or call.get("id") != call_id:
+        raise RunError("no matching API Call record")
+    result = interpret(call, derived)
     audit.append(
         "call.reconciled",
         call_id=call_id,

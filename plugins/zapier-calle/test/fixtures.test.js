@@ -15,6 +15,9 @@ const APPOINTMENT_SCHEMA = {
   required: ['confirmed'],
   properties: {
     confirmed: { type: 'string', enum: ['yes', 'no', 'unknown'] },
+    business_confirmed: { type: 'boolean' },
+    business_confirmed_quote: { type: 'string' },
+    summary: { type: 'string' },
     reschedule_requested: { type: 'string', enum: ['yes', 'no', 'unknown'] },
   },
 };
@@ -43,11 +46,11 @@ describe('fixture: CALL-E reports completed but the recipient hung up', () => {
   const event = load('fixture-user-hung-up');
   const flat = flattenResult(event, { resultSchema: APPOINTMENT_SCHEMA });
 
-  it('is indistinguishable from success on every top-level CALL-E field', () => {
+  it('is completed with an available result but no business confirmation', () => {
     expect(event.data.status).toBe('completed');
-    expect(event.data.task_completed).toBe(true);
-    expect(event.data.completion_confidence.label).toBe('high');
-    expect(event.data.structured_result).toBeTruthy();
+    expect(event.data.result_status).toBe('available');
+    expect(event.data.result.business_confirmed).toBe(false);
+    expect(event.data.result).toBeTruthy();
   });
 
   it('is refused anyway, because the extracted answer is unknown', () => {

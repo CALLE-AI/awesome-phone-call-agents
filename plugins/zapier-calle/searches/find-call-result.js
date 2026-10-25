@@ -1,8 +1,7 @@
 import { flattenResult } from '../lib/flatten-result.js';
-import { baseUrl } from '../lib/client.js';
 import { toMinConfidenceScore } from '../lib/result-quality.js';
 import { toLeadState } from '../lib/lead-state.js';
-import { syntheticEvent } from '../lib/reconcile.js';
+import { syntheticEvent, fetchAuthoritativeCall } from '../lib/reconcile.js';
 
 const NON_TERMINAL_STATUSES = new Set(['queued', 'in_progress']);
 const MS_PER_MINUTE = 60000;
@@ -23,7 +22,7 @@ function toMinutes(value) {
 // the call.
 function reconciliationTimedOut(data, maxWaitMinutes, now) {
   if (maxWaitMinutes === null) return null;
-  if (!NON_TERMINAL_STATUSES.has(data.status)) return null;
+  if (data.object === 'call' ? data.result_status !== 'pending' : !NON_TERMINAL_STATUSES.has(data.status)) return null;
 
   const createdAt = Date.parse(data.created_at);
   if (!Number.isFinite(createdAt)) {
@@ -43,8 +42,10 @@ const perform = async (z, bundle) => {
   const callId = bundle.inputData.call_id;
   if (!callId) throw new Error('A CALL-E call id is required to look up a result.');
 
-  const response = await z.request({ url: `${baseUrl(bundle)}/v1/calls/${encodeURIComponent(callId)}` });
-  const data = response.data;
+  const api = bundle.inputData.calls_api || 'v2';
+  const authoritative = await fetchAuthoritativeCall(z, bundle, callId, api);
+  if (!authoritative.ok) throw new Error(authoritative.reason);
+  const data = authoritative.data;
 
   // This search is the one surface that never had an authentication problem:
   // it reads the call straight from CALL-E over the connection's API key. That
@@ -104,16 +105,16 @@ export default {
         type: 'integer',
         required: false,
         helpText:
-          'When set, a call still queued or in progress this many minutes after CALL-E created it is reported as needs_human rather than outcome_unknown. Put a Zapier Delay step before this search to build a timeout: Zapier itself holds a waiting callback step for up to 30 days and provides no timeout hook. Leave blank to disable.',
+          'When set, a call whose result is still pending this many minutes after CALL-E created it is reported as needs_human rather than outcome_unknown. Put a Zapier Delay step before this search to build a timeout: Zapier itself holds a waiting callback step for up to 30 days and provides no timeout hook. Leave blank to disable.',
       },
       {
-        key: 'min_confidence_score',
-        label: 'Minimum Confidence Score',
+        key: 'calls_api',
+        label: 'Calls API Version',
         type: 'string',
-        required: false,
-        default: '0.6',
-        helpText:
-          'A result is only marked confirmed when CALL-E\'s 0-1 confidence score is at least this value. Set to 0 to accept the confidence label alone.',
+        required: true,
+        default: 'v2',
+        choices: { v2: 'Calls v2', v1: 'Legacy call tasks (read only)' },
+        helpText: 'Use the interface that created the API Call ID. Historical v1 IDs cannot be read through v2.',
       },
     ],
     perform,

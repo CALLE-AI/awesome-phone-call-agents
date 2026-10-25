@@ -315,6 +315,7 @@ describe('grounding against the declared schema', () => {
     type: 'call.completed',
     data: {
       id: 'call_1',
+      object: 'call_task',
       status: 'completed',
       task_completed: true,
       completion_confidence: { score: 0.95, label: 'high' },

@@ -46,11 +46,10 @@ export function checkForErrors(response, z, bundle) {
 
   const safeDetail = maskPhone(detail);
 
-  if (response.status === 422 && parsed && parsed.error && parsed.error.code === 'call_not_ready') {
-    const questions = parsed.error.details && Array.isArray(parsed.error.details.questions)
-      ? parsed.error.details.questions
-      : null;
-    let questionText = questions && questions.length > 0 ? questions.join(' ') : detail;
+  if (response.status === 422 && ['input_incomplete', 'call_not_ready'].includes(parsed?.error?.code)) {
+    const details = parsed.error.details;
+    const questions = details?.missing_inputs || details?.questions;
+    let questionText = Array.isArray(questions) && questions.length > 0 ? questions.join(' ') : detail;
     if (apiKey) {
       questionText = questionText.split(apiKey).join('[redacted]');
     }
@@ -62,6 +61,13 @@ export function checkForErrors(response, z, bundle) {
       `CALL-E needs more information before it will place this call (clarification requested): ${questionText} ` +
       'Answer the question directly in the Call Task text, and set the Region and Locale input fields ' +
       'explicitly - this integration never infers them from the phone number.'
+    );
+  }
+
+  if (response.status === 409 && parsed?.error?.code === 'idempotency_conflict') {
+    throw new Error(
+      'CALL-E could not replay this request. Keep the original key, payload and callback URL; ' +
+      'do not restart with a new key. If creation is still in progress, retry the same Zap execution later. ' + safeDetail,
     );
   }
 

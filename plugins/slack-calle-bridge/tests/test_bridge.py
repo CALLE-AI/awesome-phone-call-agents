@@ -67,7 +67,9 @@ class BridgeTests(unittest.TestCase):
 
     def test_payload_is_one_recipient_and_disclosed(self):
         payload = bridge.build_call_payload("+12025550123", "confirm the service ETA")
-        self.assertEqual(payload["recipients"], [{"phones": ["+12025550123"]}])
+        self.assertEqual(payload["phone"], "+12025550123")
+        self.assertNotIn("recipients", payload)
+        self.assertIs(payload["result_schema"]["additionalProperties"], False)
         self.assertIn("AI calling", payload["task"])
         self.assertIn("Do not buy anything", payload["task"])
 
@@ -84,8 +86,8 @@ class BridgeTests(unittest.TestCase):
     def test_safe_result_excludes_transcript(self):
         call = {
             "id": "call_1",
-            "status": "completed",
-            "structured_result": {"outcome": "resolved", "summary": "ETA is 4 PM"},
+            "status": "completed", "result_status": "available", "call_outcome": "completed",
+            "result": {"outcome": "resolved", "summary": "ETA is 4 PM"},
             "transcript": "private full transcript",
             "recording_url": "https://example.invalid/private.mp3",
         }
@@ -103,8 +105,8 @@ class BridgeTests(unittest.TestCase):
                 return {"id": "call_123", "status": "queued"}
             return {
                 "id": "call_123",
-                "status": "completed",
-                "structured_result": {"outcome": "resolved", "summary": "Window confirmed"},
+                "status": "completed", "result_status": "available", "call_outcome": "completed",
+                "result": {"outcome": "resolved", "summary": "Window confirmed"},
             }
 
         form = {"team_id": "T1", "channel_id": "C1", "user_id": "U1"}
@@ -120,6 +122,82 @@ class BridgeTests(unittest.TestCase):
         self.assertEqual(result["outcome"], "resolved")
         self.assertEqual([item[0] for item in calls], ["POST", "GET"])
         self.assertTrue(calls[0][2]["Idempotency-Key"].startswith("slack-calle-"))
+        self.assertTrue(calls[0][1].endswith("/v2/calls"))
+        self.assertTrue(calls[1][1].endswith("/v2/calls/call_123"))
+
+    def test_waits_for_result_after_execution_completes(self):
+        replies = iter([
+            {"id": "call_123", "status": "completed", "result_status": "pending"},
+            {"id": "call_123", "status": "completed", "result_status": "available",
+             "call_outcome": "completed", "result": {}},
+        ])
+        requests = []
+
+        def transport(*args):
+            requests.append(args)
+            return next(replies)
+
+        result = bridge.run_calle({}, bridge.parse_command("run +12025550123 | check"),
+                                  "test-key", bridge.DEFAULT_CALLE_BASE_URL,
+                                  transport=transport, sleep=lambda _: None)
+        self.assertEqual([item[0] for item in requests], ["POST", "GET"])
+        self.assertEqual(result["result_status"], "available")
+        self.assertEqual(result["outcome"], "needs_human")
+
+    def test_final_unavailable_and_not_applicable_results_do_not_poll(self):
+        for result_status, status, call_outcome, expected in [
+            ("unavailable", "completed", "no_answer", "unreached"),
+            ("unavailable", "completed", "busy", "unreached"),
+            ("unavailable", "completed", "declined", "declined"),
+            ("not_applicable", "canceled", None, "needs_human"),
+            ("not_applicable", "failed", None, "needs_human"),
+        ]:
+            with self.subTest(result_status=result_status, call_outcome=call_outcome):
+                requests = []
+
+                def transport(*args):
+                    requests.append(args)
+                    return {"id": "call_123", "status": status, "result_status": result_status,
+                            "call_outcome": call_outcome, "result": None, "error": None}
+
+                result = bridge.run_calle({}, bridge.parse_command("run +12025550123 | check"),
+                                          "test-key", bridge.DEFAULT_CALLE_BASE_URL,
+                                          transport=transport, sleep=lambda _: None)
+                self.assertEqual(len(requests), 1)
+                self.assertEqual(result["outcome"], expected)
+
+    def test_poll_timeout_and_read_error_keep_the_api_id_without_redial(self):
+        for fail_read in (False, True):
+            with self.subTest(fail_read=fail_read):
+                requests = []
+
+                def transport(method, url, headers, body=None):
+                    requests.append((method, url))
+                    if fail_read and method == "GET":
+                        raise TimeoutError("read failed")
+                    return {"id": "call_123", "call_id": "billing_id", "status": "completed",
+                            "result_status": "pending"}
+
+                result = bridge.run_calle({}, bridge.parse_command("run +12025550123 | check"),
+                                          "test-key", bridge.DEFAULT_CALLE_BASE_URL,
+                                          transport=transport, sleep=lambda _: None)
+                self.assertEqual(result["call_id"], "call_123")
+                self.assertEqual(result["status"], "poll_error" if fail_read else "poll_timeout")
+                self.assertEqual([m for m, _ in requests].count("POST"), 1)
+                self.assertTrue(all("billing_id" not in url for _, url in requests))
+
+    def test_billing_id_cannot_replace_missing_api_id(self):
+        with self.assertRaisesRegex(RuntimeError, "API resource id"):
+            bridge.run_calle({}, bridge.parse_command("run +12025550123 | check"),
+                             "test-key", bridge.DEFAULT_CALLE_BASE_URL,
+                             transport=lambda *args: {"call_id": "billing_id"})
+
+    def test_http_timeout_covers_v2_preparation(self):
+        with patch.object(bridge, "build_opener") as opener:
+            opener.return_value.open.return_value.__enter__.return_value.read.return_value = b'{}'
+            bridge.request_json("POST", bridge.DEFAULT_CALLE_BASE_URL + "/v2/calls",
+                                {"Authorization": "Bearer test-key"}, {})
+        self.assertEqual(opener.return_value.open.call_args.kwargs["timeout"], 30)
 
     def test_run_rejects_unapproved_origin_before_transport(self):
         calls = []
@@ -140,8 +218,8 @@ class BridgeTests(unittest.TestCase):
 
     def test_provider_summary_is_bounded_and_masks_phone_data(self):
         call = {
-            "status": "completed",
-            "structured_result": {
+            "status": "completed", "result_status": "available", "call_outcome": "completed",
+            "result": {
                 "outcome": "resolved",
                 "summary": "Call +1 (202) 555-0123 done\n" + "x" * 600,
             },
@@ -154,21 +232,19 @@ class BridgeTests(unittest.TestCase):
 
     def test_provider_result_types_fail_closed(self):
         call = {
-            "status": "completed",
-            "structured_result": {"outcome": "invented", "summary": {"phone": "+12025550123"}},
+            "status": "completed", "result_status": "available", "call_outcome": "completed",
+            "result": {"outcome": "invented", "summary": {"phone": "+12025550123"}},
         }
         result = bridge.safe_result(call, "+12025550123")
         self.assertEqual(result["outcome"], "needs_human")
         self.assertEqual(result["summary"], "No structured summary returned.")
 
 
-    def test_nested_recipient_result_is_supported(self):
+    def test_top_level_result_is_supported(self):
         call = {
             "id": "call_nested",
-            "status": "completed",
-            "recipients": [
-                {"structured_result": {"outcome": "declined", "summary": "Asked not to be called."}}
-            ],
+            "status": "completed", "result_status": "available", "call_outcome": "completed",
+            "result": {"outcome": "declined", "summary": "Asked not to be called."},
         }
         result = bridge.safe_result(call, "+12025550123")
         self.assertEqual(result["outcome"], "declined")
@@ -205,7 +281,7 @@ class BridgeTests(unittest.TestCase):
             with self.subTest(header=name):
                 with patch.object(HTTPSHandler, "https_open") as network:
                     with self.assertRaises(ValueError):
-                        bridge.request_json("GET", "https://evil.example/v1/calls",
+                        bridge.request_json("GET", "https://evil.example/v2/calls",
                                             {name: "Bearer test-key"})
                     network.assert_not_called()
 
@@ -229,7 +305,7 @@ class BridgeTests(unittest.TestCase):
                     with patch.object(HTTPSHandler, "https_open", fake_open), \
                          patch.object(HTTPHandler, "http_open", fake_open):
                         with self.assertRaises(HTTPError):
-                            bridge.request_json(method, bridge.DEFAULT_CALLE_BASE_URL + "/v1/calls",
+                            bridge.request_json(method, bridge.DEFAULT_CALLE_BASE_URL + "/v2/calls",
                                                 {"Authorization": "Bearer test-key"},
                                                 {} if method == "POST" else None)
                     self.assertEqual(len(seen), 1)
@@ -276,16 +352,16 @@ class BridgeTests(unittest.TestCase):
     def test_unhashable_outcomes_fail_closed(self):
         for outcome in ([], {}, None, 1):
             with self.subTest(outcome=outcome):
-                result = bridge.safe_result({"status": "completed", "structured_result": {
+                result = bridge.safe_result({"status": "completed", "result_status": "available", "call_outcome": "completed", "result": {
                     "outcome": outcome, "summary": ["private transcript", "+12025550123"]}},
                     "+12025550123")
                 self.assertEqual(result["outcome"], "needs_human")
                 self.assertEqual(result["summary"], "No structured summary returned.")
 
-    def test_nested_provider_summary_is_sanitized_before_slack(self):
-        call = {"status": "completed", "transcript": "private transcript", "recipients": [{
-            "structured_result": {"outcome": "resolved", "summary": "<!channel> +1/202/555/0123"},
-            "recording_url": "https://example.invalid/private.mp3"}]}
+    def test_provider_summary_is_sanitized_before_slack(self):
+        call = {"status": "completed", "result_status": "available", "call_outcome": "completed", "transcript": "private transcript",
+            "result": {"outcome": "resolved", "summary": "<!channel> +1/202/555/0123"},
+            "recording_url": "https://example.invalid/private.mp3"}
         result = bridge.safe_result(call, "+12025550123")
         with patch.object(bridge, "request_json") as send:
             bridge.post_slack_result("https://hooks.slack.com/actions/T/B/test", result)
@@ -301,13 +377,13 @@ class BridgeTests(unittest.TestCase):
 
         def transport(method, url, headers, body=None):
             submissions.append((method, url, dict(headers), body))
-            return {"id": "call_test", "status": "completed"}
+            return {"id": "call_test", "status": "completed", "result_status": "unavailable"}
 
         for delivery in (form, {**form, "response_url": "new-delivery-metadata"}):
             bridge.run_calle(delivery, command, "test-key", bridge.DEFAULT_CALLE_BASE_URL,
                              transport=transport)
         self.assertEqual(submissions[0], submissions[1])
-        self.assertEqual(submissions[0][3]["recipients"], [{"phones": ["+12025550123"]}])
+        self.assertEqual(submissions[0][3]["phone"], "+12025550123")
 
     def test_new_slack_trigger_or_changed_intent_gets_new_key(self):
         form = {"team_id": "T1", "channel_id": "C1", "user_id": "U1", "trigger_id": "original"}

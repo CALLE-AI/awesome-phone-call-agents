@@ -5,10 +5,10 @@ import { flattenResult } from '../lib/flatten-result.js';
 import { checkCallingWindow, callingWindowOptionsFromInput } from '../lib/calling-window.js';
 import { checkSuppression } from '../lib/suppression.js';
 import { checkRetryPolicy, retryPolicyOptionsFromInput } from '../lib/retry-policy.js';
-import { parseResultSchema } from '../lib/result-schema.js';
+import { parseResultSchema, parseLegacyResultSchema } from '../lib/result-schema.js';
 import { toMinConfidenceScore } from '../lib/result-quality.js';
 import { toLeadState } from '../lib/lead-state.js';
-import { fetchAuthoritativeCall, syntheticEvent } from '../lib/reconcile.js';
+import { fetchAuthoritativeCall, syntheticEvent, callbackApi } from '../lib/reconcile.js';
 
 const perform = async (z, bundle) => {
   const dryRun = isDryRun(bundle.inputData.dry_run);
@@ -22,27 +22,19 @@ const perform = async (z, bundle) => {
   const suppressed =
     errors.length === 0 &&
     checkSuppression({
-      phone: payload.recipients[0].phones[0],
+      phone: payload.phone,
       suppressionList: bundle.inputData.suppression_list,
     }).suppressed;
   const windowCheck = checkCallingWindow(callingWindowOptionsFromInput(bundle.inputData));
   const retryCheck = checkRetryPolicy(retryPolicyOptionsFromInput(bundle.inputData));
-  const blocked = suppressed || dryRun || !windowCheck.allowed || !retryCheck.allowed;
+  const blocked = errors.length > 0 || suppressed || dryRun || !windowCheck.allowed || !retryCheck.allowed;
+  // Zapier supplies one callback URL per execution event; retries must reuse that event.
   const webhookUrl = blocked ? undefined : z.generateCallbackUrl();
+  if (!blocked && (typeof webhookUrl !== 'string' || !webhookUrl)) {
+    throw new Error('Zapier supplied no callback URL; no call was placed.');
+  }
   return createCall(z, bundle, { webhookUrl });
 };
-
-// The schema and the confidence floor are inputs to this step, so this action
-// can hold the classifier to the caller's own contract - it can tell that a
-// field the caller declared required never came back. The Call Completed
-// trigger sees the same webhook without either, and gets the weaker
-// schemaless check.
-const classifierOptions = (bundle) => ({
-  resultSchema: parseResultSchema(bundle.inputData && bundle.inputData.result_schema).schema,
-  minConfidenceScore: toMinConfidenceScore(
-    bundle.inputData && bundle.inputData.min_confidence_score,
-  ),
-});
 
 const unresumable = (bundle, reason) => ({
   ...bundle.outputData,
@@ -103,7 +95,15 @@ const performResume = async (z, bundle) => {
   // classify that instead. The delivered body contributes nothing but its
   // envelope - and an unreadable or unreachable answer means no actionable
   // result at all.
-  const authoritative = await fetchAuthoritativeCall(z, bundle, startedCallId);
+  const api = callbackApi(event);
+  if (!api || (bundle.outputData?.calls_api && bundle.outputData.calls_api !== api)) {
+    return unresumable(bundle, { disposition: 'needs_human', text: 'Callback interface did not match the original Call.' });
+  }
+  const parsed = (api === 'v1' ? parseLegacyResultSchema : parseResultSchema)(bundle.inputData?.result_schema);
+  if (parsed.errors.length) {
+    return unresumable(bundle, { disposition: 'needs_human', text: 'The original result schema could not be read; reconcile this Call manually.' });
+  }
+  const authoritative = await fetchAuthoritativeCall(z, bundle, startedCallId, api);
   if (!authoritative.ok) {
     return unresumable(bundle, {
       disposition: 'needs_human',
@@ -116,7 +116,10 @@ const performResume = async (z, bundle) => {
   const verified = syntheticEvent(authoritative.data, { id: event.id, type: event.type });
   return {
     ...bundle.outputData,
-    ...flattenResult(verified, classifierOptions(bundle)),
+    ...flattenResult(verified, {
+      resultSchema: parsed.schema,
+      minConfidenceScore: toMinConfidenceScore(bundle.inputData?.min_confidence_score),
+    }),
     verified: true,
   };
 };
@@ -135,20 +138,20 @@ export default {
     performResume,
     sample: {
       disposition: 'confirmed',
-      disposition_reason: 'Call completed with a high-confidence validated result.',
+      disposition_reason: 'Business confirmation is explicit and its quote matches the recipient transcript.',
       is_actionable: true,
       lead_state: 'qualified',
       verified: true,
       call_id: 'call_123',
+      calls_api: 'v2',
+      telephone_call_id: null,
       status: 'completed',
-      task_completed: true,
-      confidence_label: 'high',
-      confidence_score: 0.92,
+      call_outcome: 'completed',
+      result_status: 'available',
+      result_business_confirmed: true,
+      result_business_confirmed_quote: 'Yes, on it.',
       summary: 'The engineer acknowledged the incident.',
       correlation_id: 'incident-42',
-      recipients_total: 1,
-      recipients_completed: 1,
-      recipients_failed: 0,
       transcript_text: 'bot: Are you able to take this incident?\nuser: Yes, on it.',
     },
   },

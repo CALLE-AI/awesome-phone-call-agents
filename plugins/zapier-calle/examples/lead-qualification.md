@@ -14,7 +14,7 @@ clear-cut.
 1. **Trigger:** HubSpot - New Contact. Fires when a new contact is created
    in HubSpot.
 2. **Action:** CALL-E - Place Call and Wait for Outcome. Calls the new
-   contact and waits for the terminal outcome.
+   contact and waits for result readiness.
 3. **Action:** HubSpot - Update Contact. Writes the outcome back onto the
    contact record.
 
@@ -53,24 +53,58 @@ the call step to convert it, or the call step will reject the number.
   "properties": {
     "interest_level": {
       "type": "string",
-      "enum": ["strong", "moderate", "none", "unknown"],
+      "enum": [
+        "strong",
+        "moderate",
+        "none",
+        "unknown"
+      ],
       "description": "Use strong when the prospect asks about pricing, a demo, or next steps. Use moderate when they are curious but not ready. Use none when they decline. Use unknown when the call did not establish this."
     },
     "timeline": {
       "type": "string",
-      "enum": ["this_month", "this_quarter", "later", "unknown"],
+      "enum": [
+        "this_month",
+        "this_quarter",
+        "later",
+        "unknown"
+      ],
       "description": "When the prospect says they intend to decide."
     },
     "callback_requested": {
       "type": "string",
-      "enum": ["yes", "no", "unknown"],
+      "enum": [
+        "yes",
+        "no",
+        "unknown"
+      ],
       "description": "Use yes only when the prospect explicitly asks to be called back."
+    },
+    "business_confirmed": {
+      "type": "boolean",
+      "description": "True only when the recipient clearly states their interest level. False when it remains unknown or unsupported."
+    },
+    "business_confirmed_quote": {
+      "type": "string",
+      "description": "Exact recipient words supporting business_confirmed, or unknown when no such evidence exists."
+    },
+    "summary": {
+      "type": "string",
+      "description": "Short factual account of the conversation, or unknown when no usable conversation exists."
     }
   },
-  "required": ["interest_level"],
+  "required": [
+    "interest_level",
+    "business_confirmed",
+    "business_confirmed_quote"
+  ],
   "additionalProperties": false
 }
 ```
+
+The schema requests an explicit business decision and its recipient quote.
+Automatic steps must check `is_actionable` and the relevant business fields;
+`result_status: available` alone is insufficient.
 
 ## Routing table
 
@@ -78,7 +112,6 @@ the call step to convert it, or the call step will reject the number.
 | --- | --- |
 | `confirmed` | Write `result_interest_level`, `result_timeline`, and `result_callback_requested` onto the HubSpot custom properties. No task is created. |
 | `review_required` | Do not write the interest-level property. Create a HubSpot task for a human and write `disposition_reason` to the contact note. |
-| `result_invalid` | Same as `review_required`: create a task for a human, write `disposition_reason` to the note. |
 | `failed` | Same as `review_required`: create a task for a human, write `disposition_reason` to the note. |
 | `canceled` | Same as `review_required`: create a task for a human, write `disposition_reason` to the note. |
 | `outcome_unknown` | Same as `review_required`: create a task for a human, write `disposition_reason` to the note. Do not conclude the call failed - it may simply not have reached a terminal state yet (see the note below). |
@@ -108,12 +141,10 @@ returns when the prospect never gave enough evidence. Declare
 be written onto the record as an interest level. Without that check, "we
 could not tell" is stored as a qualification.
 
-**Note on `outcome_unknown` and `queued`:** in a live test call, a call sat
-at status `queued` for over two minutes while the phone was actually ringing
-and being answered - it never showed `in_progress`. If you poll
-`Find Call Result` for a call that is still in this state, expect
-`outcome_unknown`, not a failure; treat it as "still running," not "did not
-work."
+**Reconciliation:** read the original API `call_id` while `result_status` is
+`pending`, even when `status` is `completed`. Final unavailable results and
+uncertain creation require manual review. Do not create a replacement call
+just because a callback is late.
 
 ## Zapier plan needed
 
@@ -125,14 +156,10 @@ independent of your Zapier plan.)
 
 ## What to check before turning it on
 
-- Set Region and Locale explicitly on the call step. CALL-E never infers
-  them from the phone number, and a live test call to a number outside the
-  assumed default region returned `HTTP 422` with error code
-  `call_not_ready` and a `details.questions` array asking which language to
-  use before it would place the call. If your contacts span multiple
-  countries, map Region and Locale from a HubSpot property rather than
-  leaving them blank, or the call may be rejected until the question is
-  answered.
+- Region and Locale are optional in v2. Set them explicitly when the intended
+  destination and spoken language are known. Conflicts or ambiguity return
+  `input_incomplete` with `details.missing_inputs`; correct the input before
+  acceptance. Preserve the exact original hints on an uncertain replay.
 - Confirm the HubSpot custom properties (`interest_level`, `timeline`,
   `callback_requested`) exist on the contact object before mapping to them.
 - Confirm your organization has a legitimate basis (for example, existing

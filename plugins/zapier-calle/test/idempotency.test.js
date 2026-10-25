@@ -3,9 +3,8 @@ import { idempotencyKey, canonicalize } from '../lib/idempotency.js';
 
 const base = {
   task: 'Call +15550123456 and confirm the 9am appointment.',
-  recipients: [{ phones: ['+15550123456'], region: 'US', locale: 'en-US' }],
+  phone: '+15550123456', region: 'US', locale: 'en-US',
   result_schema: { type: 'object', properties: { confirmed: { type: 'string' } } },
-  recipient_result_schema: null,
   metadata: { correlation_id: 'zap-1' },
 };
 
@@ -21,9 +20,8 @@ describe('idempotencyKey', () => {
   it('ignores key ordering', () => {
     const reordered = {
       metadata: { correlation_id: 'zap-1' },
-      recipient_result_schema: null,
       result_schema: { properties: { confirmed: { type: 'string' } }, type: 'object' },
-      recipients: [{ locale: 'en-US', region: 'US', phones: ['+15550123456'] }],
+      locale: 'en-US', region: 'US', phone: '+15550123456',
       task: base.task,
     };
     expect(idempotencyKey(reordered)).toBe(idempotencyKey(base));
@@ -32,7 +30,7 @@ describe('idempotencyKey', () => {
   it('changes when the phone number changes', () => {
     const edited = {
       ...base,
-      recipients: [{ phones: ['+15550199999'], region: 'US', locale: 'en-US' }],
+      phone: '+15550199999', region: 'US', locale: 'en-US',
     };
     expect(idempotencyKey(edited)).not.toBe(idempotencyKey(base));
   });

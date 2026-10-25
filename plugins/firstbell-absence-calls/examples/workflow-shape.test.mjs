@@ -22,7 +22,7 @@ import assert from "node:assert/strict";
 import { readFile } from "node:fs/promises";
 import { fileURLToPath } from "node:url";
 import { dirname, join } from "node:path";
-import { classifyRecipient, summariseWave } from "./classify.mjs";
+import { classifyCall, summariseWave } from "./classify.mjs";
 
 const HERE = dirname(fileURLToPath(import.meta.url));
 const workflow = JSON.parse(
@@ -137,11 +137,9 @@ test("the shipped dry run closes something, escalates something, and queues the 
   const consented = [...seed.parameters.jsCode.matchAll(/id:\s*"(S-\d+)"[^}]*consent:\s*(true|false)/g)];
   const rows = consented.map(([, id, consent]) => {
     if (consent === "false") return { id, resolution: "skipped" };
-    const shape = shapes[id] ?? { status: "completed", structured_result: null };
-    const attempts = Array.from({ length: shape.attempts ?? 1 }, (_, i) => ({
-      provider_call_id: `dry_${id}_${i + 1}`,
-    }));
-    return { id, ...classifyRecipient({ ...shape, attempts }) };
+    const shape = shapes[id] ?? { status: "completed", call_outcome: "completed", result_status: "unavailable", result: null };
+    const submittedCalls = Array.from({ length: shape.submissions ?? 1 }, (_, i) => ({ id: `dry_${id}_${i + 1}` }));
+    return { id, ...classifyCall(shape, submittedCalls) };
   });
 
   const summary = summariseWave(rows);
