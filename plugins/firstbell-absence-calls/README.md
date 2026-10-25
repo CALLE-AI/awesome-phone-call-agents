@@ -29,7 +29,7 @@ record.
 | `failed` | Nobody was reached on any number | A person |
 
 The middle row is the one that is easy to get wrong, and there are two ways to land in it.
-The obvious one is `structured_result: null` on a call whose status is `completed`. The
+The obvious one is `result_status: unavailable` on a call whose status is `completed`. The
 second is subtler and was found by placing a real call rather than by reading the API: the
 person said they could not talk, and CALL-E returned a schema-valid result with every
 required field set to `"unknown"`, alongside its own note saying no reason and no return
@@ -58,6 +58,7 @@ printed a resolution rate of zero while all 26 tests passed.
 
 ```
 node --test examples/classify.test.mjs examples/workflow-shape.test.mjs   # 35 passing
+node --test examples/workflow-v2.test.mjs examples/workflow-safety.test.mjs
 node examples/build-workflow.mjs                                         # regenerate the workflow
 ```
 
@@ -124,18 +125,24 @@ stranded, and that no credential is baked in. A workflow can be well-formed JSON
 classifier test, and still be refused on load because a node was renamed and one reference
 was missed.
 
-They do not prove it imports. Only an n8n instance proves that, and there is none here. What
-they rule out is the class of defect that would stop an import and can rot quietly while
-nobody is looking. Each of the five was confirmed by breaking the workflow that way and
-watching the suite go red.
+Those shape checks alone do not prove importability. On 2026-10-25 the generated
+workflow was imported into an isolated n8n 2.44.6 instance and executed from the
+CLI with no CALL-E key. It completed all six sample rows: five attempted, one
+skipped, two closed, one safeguarding record first in the queue, and a 40 percent
+resolution rate. The imported workflow remained inactive with its schedule disabled.
+The live Code-node path was also checked by replaying a saved, authorized hotline
+request with its original key: n8n received the same completed Call ID and
+finished the workflow without creating a replacement Call.
 
 ## Install
 
 1. Import `examples/absence-wave.workflow.json`. It arrives inactive.
 2. Run it from the **Manual Trigger**. Nothing is dialled while `dryRun` is `true`.
-3. Set `CALL_E_API_KEY` in your n8n deployment's environment or secret store. It is read
-   at execution time and never written into workflow data, so it does not travel in an
-   export.
+3. For live use, set `CALL_E_API_KEY` in a self-hosted n8n deployment and allow Code
+   nodes to read `$env` (`N8N_BLOCK_ENV_ACCESS_IN_NODE=false`). The key is read at
+   execution time, never placed in workflow data or an export. Dry runs do not
+   access `$env` and work with environment access blocked. See the
+   [n8n environment-access setting](https://docs.n8n.io/deploy/host-n8n/configure-n8n/basic-configuration/use-environment-variables/security.md).
 4. Replace the placeholder numbers in **Absence Config**. They use the `+91 555` range,
    which cannot be assigned to a subscriber, and **Validate Config** refuses to dial them
    once `dryRun` is off.
@@ -149,6 +156,26 @@ Enable the **Every School Morning** node and activate the workflow. It ships dis
 it exists so that recurrence is a thing the host does rather than a sentence in a README.
 Set the hour to whenever your register closes.
 
+## Calls v2 and fallback numbers
+
+Each request sends one `phone` and a closed, flat `result_schema` to `POST /v2/calls`.
+The workflow waits for `result_status` to be `available`, `unavailable`, or
+`not_applicable`, even after execution is `completed`. Empty or unavailable results
+remain open for a person. Only a completed `no_answer` or `busy` call permits the next
+consented number. A refusal, technical failure, ambiguous creation or read failure,
+or timeout stops fallback and leaves the record for manual reconciliation.
+
+Each number has its own stable key derived from student, absence date, and number
+index. Preserve the original row, number order, request and key on recovery; changing
+input under the same key is a conflict, not permission to make a new call. The summary
+counts submitted Call resources, including idempotent replays, rather than billed
+provider attempts. Retain the returned API `callIds` for lookup; telephone `call_id`
+is a separate Billing identifier.
+
+Before importing this version into an existing deployment, drain its v1 executions
+and keep their original IDs and v1 readers. Do not resume an old execution midway
+with v2 nodes. See the [migration guide](https://docs.heycall-e.com/migration).
+
 ## Cancellation, rollback and disabling
 
 Read this before the first live run, because the honest answer is narrower than the word
@@ -156,22 +183,20 @@ cancel suggests.
 
 - **To stop new calls:** deactivate the workflow, or disable the **Every School Morning**
   node. No further calls will be placed.
-- **What cannot be undone:** the CALL-E API has no cancel endpoint. A call already accepted
-  by the API will run to completion even after you deactivate the workflow. Cancellation
-  can only mean stop dispatching, never stop the calls.
-- **Which is why concurrency is capped at three.** With no cancel endpoint, the concurrency
-  cap is the only thing that limits how many calls are in flight at the moment you stop.
-  Raising it raises the number of calls you cannot recall.
-- **Rollback:** there is no state to roll back. The workflow writes nothing to a system of
-  record; it returns a summary and a queue. Re-running is safe because the
-  `Idempotency-Key` is derived from student and date, so a repeat within the same day
-  returns the original call rather than placing a second one.
+- **Accepted calls:** deactivation does not cancel them. Calls v2 permits cancellation
+  only before provider submission; this template does not send cancellation requests.
+  Keep the accepted API IDs and reconcile their results.
+- **Limits:** the wave caps concurrency at three and shares a four-minute wait budget
+  across a row's fallback numbers. A timeout routes the row to a person.
+- **Rollback:** the workflow writes no system-of-record data. Restore the previous
+  inactive workflow for future runs only after draining accepted calls; keep each ID
+  with the interface that created it.
 
 ## What this recipe does not claim
 
-- **It has not been imported into a running n8n instance.** The classifier is tested on
-  node. The workflow's importability is not verified, and `manifest.json` says so under
-  `verification.not_verified`.
+- **A local import and dry run are verified, not a school deployment.** The tests use
+  synthetic rows and the authorized CALL-E test hotline. No production register,
+  real family contact, hosted schedule, or online instance has been switched.
 - **The sample rows are fictional.** Six students with unassignable numbers. They mirror
   the example file in the Python app so the two can be compared.
 - **It is not a system-of-record integration.** Rows are declared in a Code node. Reading

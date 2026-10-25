@@ -176,10 +176,10 @@ test("the wave summary keeps skipped rows out of the attempted count", () => {
   ]);
   assert.equal(summary.attempted, 5, "skipped is never attempted");
   assert.equal(summary.counts.skipped, 1);
-  assert.equal(summary.attemptsBilled, 7);
-  assert.equal(summary.attemptsResolved, 4);
-  assert.equal(summary.attemptsOpen, 3);
-  assert.equal(summary.attemptsResolved + summary.attemptsOpen, summary.attemptsBilled);
+  assert.equal(summary.callsSubmitted, 7);
+  assert.equal(summary.callsResolved, 4);
+  assert.equal(summary.callsOpen, 3);
+  assert.equal(summary.callsResolved + summary.callsOpen, summary.callsSubmitted);
   assert.equal(summary.counts.resolved / summary.attempted, summary.resolutionRate);
   assert.deepEqual(summary.queue.map((q) => q.id), ["S-4", "S-6"]);
 });
@@ -264,8 +264,8 @@ test("an escalated call is not counted as closed", () => {
   // Two resolved out of two attempted would read as 100%. One of them is not finished with.
   assert.equal(summary.resolutionRate, 0.5);
   // B's three attempts are still somebody's work, so they are not counted as saved.
-  assert.equal(summary.attemptsResolved, 1);
-  assert.equal(summary.attemptsOpen, 3);
+  assert.equal(summary.callsResolved, 1);
+  assert.equal(summary.callsOpen, 3);
   assert.equal(summary.safeguardingCallbackMinutes, SAFEGUARDING_CALLBACK_MINUTES);
 });
 

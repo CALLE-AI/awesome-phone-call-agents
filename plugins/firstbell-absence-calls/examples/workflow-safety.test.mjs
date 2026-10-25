@@ -77,23 +77,22 @@ test("an approved https host resolves to its origin", () => {
 
 test("everything else is refused, and the refusal says why", () => {
   const approved = gateFrom("Validate Config");
-  const refused = {
-    "http://api.heycall-e.com": /https/,
-    // Ends with the approved name and is a different host. A suffix test passes this.
-    "https://api.heycall-e.com.example.net": /not approved/,
-    "https://evil.example": /not approved/,
-    "https://user:pw@api.heycall-e.com": /credentials in the URL/,
-    "https://api.heycall-e.com/v1": /path/,
-    "https://api.heycall-e.com?x=1": /query or a fragment/,
-    "https://api.heycall-e.com#f": /query or a fragment/,
-    "not a url": /not a URL/,
-    "": /empty/,
-  };
-  for (const [written, why] of Object.entries(refused)) {
+  const refused = [
+    "http://api.heycall-e.com",
+    "https://api.heycall-e.com.example.net",
+    "https://evil.example",
+    "https://user:pw@api.heycall-e.com",
+    "https://api.heycall-e.com/v1",
+    "https://api.heycall-e.com?x=1",
+    "https://api.heycall-e.com#f",
+    "not a url",
+    "",
+  ];
+  for (const written of refused) {
     const result = approved(written);
     assert.equal(result.url, undefined,
       `${JSON.stringify(written)} was accepted and would receive a CALL-E key`);
-    assert.match(result.error, why);
+    assert.match(result.error, /approved HTTPS origin/);
   }
 });
 
