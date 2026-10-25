@@ -7,6 +7,7 @@
   "actions": ["preview", "run one CALL-E outbound call"],
   "credentials": ["SLACK_SIGNING_SECRET", "CALLE_API_KEY"],
   "default_mode": "preview",
+  "calls_api": "v2",
   "side_effects": [
     "run mode may place exactly one real phone call",
     "terminal results may be posted to a Slack response URL"

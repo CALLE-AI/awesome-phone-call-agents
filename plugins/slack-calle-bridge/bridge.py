@@ -10,13 +10,14 @@ import time
 import unicodedata
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from typing import Any, Callable
-from urllib.parse import parse_qs, urlparse
+from urllib.parse import parse_qs, quote, urlparse
 from urllib.request import HTTPRedirectHandler, Request, build_opener
 
 DEFAULT_CALLE_BASE_URL = "https://api.heycall-e.com"
 E164_RE = re.compile(r"^\+[1-9][0-9]{7,14}$", re.ASCII)
 PHONE_LIKE_RE = re.compile(r"(?<![0-9])\+?[0-9](?:[ ()./\-]*[0-9]){6,}(?![0-9])", re.ASCII)
-TERMINAL_STATUSES = {"completed", "failed", "canceled", "cancelled"}
+TERMINAL_STATUSES = {"completed", "failed", "canceled"}
+READY_RESULT_STATUSES = {"available", "unavailable", "not_applicable"}
 SAFE_OUTCOMES = {"resolved", "needs_human", "declined", "unreached"}
 MAX_SLACK_AGE_SECONDS = 300
 MAX_BODY_BYTES = 64_000
@@ -97,9 +98,10 @@ def build_call_payload(phone: str, goal: str) -> dict[str, Any]:
     )
     return {
         "task": task,
-        "recipients": [{"phones": [phone]}],
-        "recipient_result_schema": {
+        "phone": phone,
+        "result_schema": {
             "type": "object",
+            "additionalProperties": False,
             "required": ["outcome", "summary"],
             "properties": {
                 "outcome": {
@@ -134,7 +136,7 @@ def request_json(
         calle_base_url(f"{parsed.scheme}://{parsed.netloc}")
     data = None if body is None else json.dumps(body).encode()
     req = Request(url, data=data, headers=headers, method=method)
-    with build_opener(NoRedirectHandler()).open(req, timeout=15) as response:
+    with build_opener(NoRedirectHandler()).open(req, timeout=30) as response:
         payload = response.read()
     if not payload:
         return {}
@@ -161,22 +163,33 @@ def provider_safe_summary(value: Any) -> str:
 
 
 def safe_result(call: dict[str, Any], phone: str) -> dict[str, Any]:
-    structured = call.get("structured_result")
-    if not isinstance(structured, dict):
-        recipients = call.get("recipients")
-        if isinstance(recipients, list) and recipients and isinstance(recipients[0], dict):
-            structured = recipients[0].get("structured_result")
+    structured = call.get("result") if (
+        call.get("result_status") == "available"
+        and call.get("status") == "completed"
+        and call.get("call_outcome") == "completed"
+    ) else None
     if not isinstance(structured, dict):
         structured = {}
     raw_status = str(call.get("status") or "unknown").lower()
-    status = raw_status if raw_status in TERMINAL_STATUSES | {"poll_timeout"} else "unknown"
+    status = raw_status if raw_status in TERMINAL_STATUSES | {"poll_timeout", "poll_error"} else "unknown"
+    call_outcome = call.get("call_outcome")
     raw_outcome = structured.get("outcome")
     outcome = (
         raw_outcome if isinstance(raw_outcome, str) and raw_outcome in SAFE_OUTCOMES
         else "needs_human"
     )
+    if status != "completed":
+        outcome = "needs_human"
+    elif call_outcome in ("no_answer", "busy"):
+        outcome = "unreached"
+    elif call_outcome == "declined":
+        outcome = "declined"
+    elif call_outcome != "completed":
+        outcome = "needs_human"
     return {
+        "call_id": call.get("id") if isinstance(call.get("id"), str) else None,
         "status": status,
+        "result_status": call.get("result_status"),
         "phone": mask_phone(phone),
         "outcome": outcome,
         "summary": provider_safe_summary(structured.get("summary")),
@@ -201,17 +214,24 @@ def run_calle(
         "Content-Type": "application/json",
         "Idempotency-Key": idempotency_key(form, phone, goal),
     }
-    created = transport("POST", f"{base_url}/v1/calls", headers, build_call_payload(phone, goal))
-    call_id = str(created.get("id") or created.get("call_id") or "")
-    if not call_id:
-        raise RuntimeError("CALL-E did not return a call id")
+    created = transport("POST", f"{base_url}/v2/calls", headers, build_call_payload(phone, goal))
+    call_id = created.get("id")
+    if not isinstance(call_id, str) or not call_id:
+        raise RuntimeError("CALL-E did not return an API resource id")
     call = created
-    for _ in range(24):
-        status = str(call.get("status") or "").lower()
-        if status in TERMINAL_STATUSES:
+    for poll in range(25):
+        if isinstance(call.get("result_status"), str) and call["result_status"] in READY_RESULT_STATUSES:
             return safe_result(call, phone)
+        if poll == 24:
+            break
         sleep(5)
-        call = transport("GET", f"{base_url}/v1/calls/{call_id}", headers)
+        try:
+            received = transport("GET", f"{base_url}/v2/calls/{quote(call_id, safe='')}", headers)
+            if not isinstance(received, dict) or received.get("id") != call_id:
+                raise RuntimeError("CALL-E returned no matching Call record")
+            call = received
+        except Exception:
+            return safe_result({**call, "status": "poll_error", "id": call_id}, phone)
     return safe_result({**call, "status": "poll_timeout", "id": call_id}, phone)
 
 
@@ -229,6 +249,8 @@ def post_slack_result(response_url: str, result: dict[str, Any]) -> None:
         f"CALL-E {slack_safe_text(result['status'])} for {result['phone']}: "
         f"{slack_safe_text(result['outcome'])} — {slack_safe_text(result['summary'])}"
     )
+    if result.get("call_id"):
+        text += f"\nAPI Call ID: {slack_safe_text(result['call_id'])}"
     request_json(
         "POST",
         url,
@@ -251,10 +273,10 @@ def execute_and_respond(form: dict[str, str], command: dict[str, str]) -> None:
             post_slack_result(
                 form["response_url"],
                 {
-                    "status": "failed",
+                    "status": "outcome_unknown",
                     "phone": mask_phone(command["phone"]),
                     "outcome": "needs_human",
-                    "summary": f"Bridge error: {type(exc).__name__}",
+                    "summary": f"Bridge error: {type(exc).__name__}. Check the original request before calling again.",
                 },
             )
         except Exception:

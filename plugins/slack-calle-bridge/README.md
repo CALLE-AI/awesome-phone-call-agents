@@ -2,7 +2,7 @@
 
 A small Slack slash-command bridge for one-off, human-confirmed CALL-E phone work.
 
-The default command is a **preview** and places no call. A Slack user must repeat the command with an explicit `run` prefix before the bridge sends one request to CALL-E. The result returned to Slack is intentionally narrow: masked phone, terminal status, structured outcome, and structured summary. Full transcripts and recording URLs are not posted back.
+The default command is a **preview** and places no call. A Slack user must repeat the command with an explicit `run` prefix before the bridge sends one request to CALL-E Calls v2. Slack receives the API Call ID, masked phone, execution status, structured outcome, and summary. Full transcripts and recording URLs are not posted back.
 
 ## Workflow
 
@@ -66,20 +66,32 @@ The live task instructs CALL-E to disclose that it is an AI, collect facts only,
 
 ## Outputs
 
-Slack receives an ephemeral acknowledgement immediately. After CALL-E reaches a terminal state, the bridge posts another ephemeral message containing only:
+Slack receives an ephemeral acknowledgement immediately. Once `result_status` is `available`, `unavailable`, or `not_applicable`, the bridge posts another ephemeral message containing only:
 
 - masked recipient phone number
+- API Call ID (`id`, not the telephone `call_id` used in Billing)
 - CALL-E terminal status
 - structured outcome: `resolved`, `needs_human`, `declined`, or `unreached`
 - structured summary
 
 The bridge never returns a full transcript or recording URL to Slack.
 
+`status: completed` alone does not finish polling. An available empty result goes to
+`needs_human`; unavailable results finish without another call. No-answer and busy
+outcomes become `unreached`, and a declined call stays `declined`. A read error or
+polling timeout retains the API Call ID so an operator can retrieve that same call.
+
 ## Idempotency and retries
 
 The CALL-E `Idempotency-Key` is derived from the original signed Slack team, channel, user, trigger, recipient, and goal. Replaying that same accepted request preserves the key and call payload; delivery metadata such as `response_url` is not part of the intent. Deduplication of repeated creation requests depends on CALL-E honoring that key.
 
 The bridge sends one creation request and does **not** automatically retry a failed or timed-out request. Repeating the slash command produces a fresh Slack trigger and a **new call intent**, not a same-call retry. After an ambiguous timeout, reconcile the original task with CALL-E before issuing another `run`; the provider may already have accepted the call. An integration that retries the same call must retain the original signed intent fields rather than substitute a fresh trigger, destination, or goal.
+
+Calls use `POST /v2/calls` with one `phone` and a closed, flat `result_schema`.
+The HTTP timeout is 30 seconds to cover v2 task preparation. New requests and reads
+use v2. Before replacing an existing bridge, let its in-flight v1 workers finish;
+historical v1 IDs must still be read through `/v1/calls/{id}`. See the
+[migration guide](https://docs.heycall-e.com/migration).
 
 ## Side effects and cancellation
 
