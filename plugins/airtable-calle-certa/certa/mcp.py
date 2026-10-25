@@ -2,7 +2,7 @@
 
 The REST Developer API is the primary path and the one Certa is built around:
 it is the only surface that accepts `result_schema` and
-`recipient_result_schema`, which is what turns an operator's columns into
+`result_schema`, which is what turns an operator's columns into
 typed answers.
 
 This transport exists because that path can be unavailable. On a network whose
@@ -139,29 +139,14 @@ class McpTransport:
         if idempotency_key in self.runs:
             return {"id": self.runs[idempotency_key], "replayed": True}
 
-        recipients = payload.get("recipients") or []
-        if not recipients:
-            raise TransportError("no recipient to call")
-        if len(recipients) > 1:
-            raise TransportError(
-                "MCP plan_call takes one destination at a time; the batch "
-                "surface exists only on the REST API"
-            )
-        phones = recipients[0].get("phones") or []
-        if not phones:
-            raise TransportError("recipient carries no phone number")
-
-        # The CLI takes --to-phone once per destination, so every number on the
-        # recipient is passed. Dropping the extras and dialling only the first
-        # would silently narrow an authorised intent.
-        plan_args = ["call", "plan"]
-        for phone in phones:
-            plan_args += ["--to-phone", phone]
-        plan_args += ["--goal", payload["task"]]
-        if recipients[0].get("region"):
-            plan_args += ["--region", recipients[0]["region"]]
-        if recipients[0].get("locale"):
-            plan_args += ["--language", recipients[0]["locale"]]
+        phone = payload.get("phone")
+        if not isinstance(phone, str) or not phone or "recipients" in payload:
+            raise TransportError("one destination at a time is required in phone")
+        plan_args = ["call", "plan", "--to-phone", phone, "--goal", payload["task"]]
+        if payload.get("region"):
+            plan_args += ["--region", payload["region"]]
+        if payload.get("locale"):
+            plan_args += ["--language", payload["locale"]]
         if self.timezone:
             plan_args += ["--timezone", self.timezone]
 
@@ -193,7 +178,7 @@ class McpTransport:
     def get_call(self, call_id: str) -> dict[str, Any]:
         """Read a run and shape it like a REST call object.
 
-        `structured_result` is deliberately absent: MCP cannot produce one, and
+        `result` is deliberately absent: MCP cannot produce one, and
         inventing it here would mean Certa, not CALL-E, did the extraction.
         The interpreter's fail-closed rule then routes the call to a human,
         which is the correct outcome rather than a workaround.
@@ -218,7 +203,9 @@ class McpTransport:
             "id": call_id,
             "status": status,
             "evidence": evidence,
-            "recipients": [{"structured_result": None}],
+            "result": None,
+            "result_status": "unavailable" if status == "completed" else "not_applicable" if status in ("failed", "canceled") else "pending",
+            "call_outcome": "completed" if status == "completed" else None,
             "mcp_raw_status": raw_status,
             "transport": "mcp",
         }

@@ -8,7 +8,6 @@ import unittest
 
 from certa.calle import (
     CONTACT_GATE_KEY,
-    DEFAULT_CONFIDENCE_FLOOR,
     CalleError,
     Disposition,
     build_call_payload,
@@ -88,7 +87,6 @@ def a_call(
     employment="yes",
     title="yes",
     declined="no",
-    confidence=0.93,
     evidence=("HR confirmed employment and job title.",),
 ):
     answers = {}
@@ -102,19 +100,19 @@ def a_call(
         answers["declined_to_answer"] = declined
     return {
         "status": status,
-        "task_completed": True,
-        "completion_confidence": {"score": confidence, "label": "high"},
-        "evidence": list(evidence),
-        "recipients": [{"structured_result": answers}],
+        "result_status": "available" if status == "completed" else "not_applicable" if status in ("failed", "canceled") else "pending",
+        "call_outcome": "completed" if status == "completed" else None,
+        "result": {**answers, "evidence_quote": evidence[0] if evidence else ""},
+        "transcript": [{"speaker": "user", "text": text} for text in evidence],
     }
 
 
 class Payload(unittest.TestCase):
-    def test_payload_carries_both_schemas_and_metadata(self):
+    def test_payload_carries_one_schema_and_metadata(self):
         payload = build_call_payload(
             [a_contact()], derived=DERIVED, requester_name=REQUESTER
         )
-        self.assertIn("recipient_result_schema", payload)
+        self.assertNotIn("recipient_result_schema", payload)
         self.assertIn("result_schema", payload)
         self.assertEqual(payload["metadata"]["request_id"], "VR-1041")
         self.assertEqual(payload["metadata"]["number_sources"], ["official_site"])
@@ -124,18 +122,15 @@ class Payload(unittest.TestCase):
             [a_contact()], derived=DERIVED, requester_name=REQUESTER,
             region="US", locale="en-US",
         )
-        recipient = payload["recipients"][0]
-        self.assertEqual(recipient["phones"], [A])
+        recipient = payload
+        self.assertEqual(recipient["phone"], A)
         self.assertEqual(recipient["region"], "US")
         self.assertEqual(recipient["locale"], "en-US")
 
-    def test_two_numbers_for_one_employer_become_two_recipients(self):
-        payload = build_call_payload(
-            [a_contact(phone=A), a_contact(phone=B)],
-            derived=DERIVED,
-            requester_name=REQUESTER,
-        )
-        self.assertEqual(len(payload["recipients"]), 2)
+    def test_multiple_contacts_are_refused_before_submission(self):
+        with self.assertRaisesRegex(CalleError, "exactly one"):
+            build_call_payload([a_contact(phone=A), a_contact(phone=B)],
+                               derived=DERIVED, requester_name=REQUESTER)
 
     def test_mixing_requests_in_one_task_is_refused(self):
         with self.assertRaises(CalleError):
@@ -180,6 +175,18 @@ class Idempotency(unittest.TestCase):
         self.assertEqual(len(transport.created), 1)
 
 
+class ContradictoryEvidence(unittest.TestCase):
+    def test_positive_employment_with_denial_quote_requires_review(self):
+        for quote in ("No, this person has never worked here.", "They don't work here.", "I am unsure."):
+            with self.subTest(quote=quote):
+                self.assertEqual(interpret(a_call(evidence=(quote,)), DERIVED).disposition,
+                                 Disposition.NEEDS_REVIEW)
+
+    def test_a_supported_negative_employment_answer_remains_not_verified(self):
+        self.assertEqual(interpret(a_call(employment="no", evidence=("No, this person has never worked here.",)), DERIVED).disposition,
+                         Disposition.NOT_VERIFIED)
+
+
 class ContactGate(unittest.TestCase):
     """CALL-E issue #341: task_completed can be true with no call placed."""
 
@@ -192,7 +199,7 @@ class ContactGate(unittest.TestCase):
 
     def test_absent_gate_field_is_never_verified(self):
         result = interpret(a_call(reached=None), DERIVED)
-        self.assertEqual(result.disposition, Disposition.EMPLOYER_UNREACHABLE)
+        self.assertEqual(result.disposition, Disposition.NEEDS_REVIEW)
 
     def test_unknown_gate_is_never_verified(self):
         result = interpret(a_call(reached="unknown"), DERIVED)
@@ -212,7 +219,7 @@ class ProviderReasonMasking(unittest.TestCase):
                 result = interpret(call, DERIVED)
                 self.assertNotIn(phone, result.reason)
                 self.assertEqual(result.answers[answer_key], phone)
-                self.assertEqual(call["recipients"][0]["structured_result"][answer_key], phone)
+                self.assertEqual(call["result"][answer_key], phone)
 
 
 class RefusalIsTerminal(unittest.TestCase):
@@ -237,20 +244,20 @@ class FailsClosed(unittest.TestCase):
             self.assertEqual(result.disposition, Disposition.PENDING)
             self.assertFalse(result.is_terminal)
 
-    def test_failed_call_is_unreachable_and_retryable(self):
+    def test_failed_call_requires_review_before_any_retry(self):
         result = interpret(a_call(status="failed"), DERIVED)
-        self.assertEqual(result.disposition, Disposition.EMPLOYER_UNREACHABLE)
-        self.assertTrue(result.retryable)
+        self.assertEqual(result.disposition, Disposition.NEEDS_REVIEW)
+        self.assertFalse(result.retryable)
 
     def test_missing_structured_result_goes_to_review(self):
         call = a_call()
-        call["recipients"] = [{"structured_result": None}]
+        call["result"] = None
         self.assertEqual(interpret(call, DERIVED).disposition, Disposition.NEEDS_REVIEW)
 
-    def test_low_confidence_goes_to_review(self):
-        result = interpret(a_call(confidence=0.4), DERIVED)
-        self.assertEqual(result.disposition, Disposition.NEEDS_REVIEW)
-        self.assertIn("below", result.reason)
+    def test_an_ungrounded_quote_goes_to_review(self):
+        call = a_call()
+        call["result"]["evidence_quote"] = "invented confirmation"
+        self.assertEqual(interpret(call, DERIVED).disposition, Disposition.NEEDS_REVIEW)
 
     def test_positive_claim_with_no_evidence_goes_to_review(self):
         result = interpret(a_call(evidence=()), DERIVED)
@@ -272,10 +279,7 @@ class FailsClosed(unittest.TestCase):
     def test_clean_result_verifies(self):
         result = interpret(a_call(), DERIVED)
         self.assertEqual(result.disposition, Disposition.VERIFIED)
-        self.assertEqual(result.confidence, 0.93)
-
-    def test_default_floor_is_not_permissive(self):
-        self.assertGreaterEqual(DEFAULT_CONFIDENCE_FLOOR, 0.7)
+        self.assertTrue(result.evidence)
 
     def test_no_rule_can_promote_a_result(self):
         """Every gate can only move a disposition toward review."""
@@ -283,12 +287,34 @@ class FailsClosed(unittest.TestCase):
         for call in (
             a_call(reached="no"),
             a_call(declined="yes"),
-            a_call(confidence=0.1),
+            a_call(reached="unknown"),
             a_call(evidence=()),
             a_call(title="no"),
             a_call(status="failed"),
         ):
             self.assertNotEqual(interpret(call, DERIVED).disposition, promoted)
+
+    def test_execution_completion_does_not_end_result_waiting(self):
+        call = a_call()
+        call["result_status"] = "pending"
+        self.assertEqual(interpret(call, DERIVED).disposition, Disposition.PENDING)
+
+    def test_final_unavailable_or_empty_result_needs_review(self):
+        for readiness, result in [("available", {}), ("unavailable", None), ("not_applicable", None)]:
+            call = {**a_call(), "result_status": readiness, "result": result, "error": None}
+            verdict = interpret(call, DERIVED)
+            self.assertEqual(verdict.disposition, Disposition.NEEDS_REVIEW)
+            self.assertFalse(verdict.retryable)
+
+    def test_final_call_outcomes_do_not_require_business_answers(self):
+        for outcome, expected in [("no_answer", Disposition.EMPLOYER_UNREACHABLE), ("busy", Disposition.EMPLOYER_UNREACHABLE), ("declined", Disposition.DECLINED)]:
+            call = {**a_call(), "call_outcome": outcome, "result_status": "unavailable", "result": None}
+            self.assertEqual(interpret(call, DERIVED).disposition, expected)
+
+    def test_malformed_business_values_never_verify(self):
+        for value in [None, {}, [], True, 7]:
+            self.assertEqual(interpret(a_call(title=value), DERIVED).disposition, Disposition.NEEDS_REVIEW)
+
 
 
 class CredentialBoundary(unittest.TestCase):
@@ -310,6 +336,19 @@ class CredentialBoundary(unittest.TestCase):
     def test_documented_origin_is_the_only_allowance(self):
         self.assertEqual(ALLOWED_CREDENTIAL_ORIGINS, frozenset({"api.heycall-e.com"}))
 
+    def test_live_transport_uses_v2_resource_ids_for_every_call_endpoint(self):
+        transport = LiveTransport("fake-key")
+        requests = []
+        transport._request = lambda method, path, **kwargs: requests.append((method, path, kwargs)) or {}
+        transport.create_call({"phone": A}, idempotency_key="fixed-key")
+        transport.get_call("call/a")
+        transport.list_events("call/a")
+        self.assertEqual([(method, path) for method, path, _ in requests], [
+            ("POST", "/v2/calls"), ("GET", "/v2/calls/call%2Fa"), ("GET", "/v2/calls/call%2Fa/events")])
+        self.assertEqual(requests[0][2]["headers"]["Idempotency-Key"], "fixed-key")
+        self.assertEqual(transport.timeout, 30)
+
+
 
 class FixtureReplay(unittest.TestCase):
     def test_poll_sequence_advances_then_holds(self):
@@ -328,35 +367,21 @@ class FixtureReplay(unittest.TestCase):
         self.assertFalse(hasattr(transport, "api_key"))
 
 
-class GatesThatWereSkippable(unittest.TestCase):
-    """Two ways a result reached VERIFIED without being checked.
-
-    Both were raised in review on PR #552 and both were real: a call with no
-    `completion_confidence` skipped the floor entirely, and a value the
-    schema does not define was neither a contradiction nor an unknown, so it
-    passed both of those checks and counted as an established fact.
-    """
-
-    def call(self, answers, confidence=0.93):
-        body = {
-            "status": "completed",
-            "evidence": ["a person confirmed employment"],
-            "recipients": [{"structured_result": answers}],
-        }
-        if confidence is not None:
-            body["completion_confidence"] = {"score": confidence}
-        return interpret(body, DERIVED, confidence_floor=DEFAULT_CONFIDENCE_FLOOR)
+class AnswerValidation(unittest.TestCase):
+    def call(self, answers):
+        body = a_call()
+        body["result"].update(answers)
+        return interpret(body, DERIVED)
 
     BASE = {"reached_employer": "yes", "employment_confirmed": "yes"}
 
-    def test_a_missing_confidence_is_not_a_passed_confidence(self):
-        result = self.call({**self.BASE, "title_matches": "yes"}, confidence=None)
-        self.assertEqual(result.disposition, Disposition.NEEDS_REVIEW)
-        self.assertIn("no completion confidence", result.reason)
+    def test_a_bot_quote_cannot_support_verification(self):
+        body = a_call()
+        body["transcript"][0]["speaker"] = "bot"
+        self.assertEqual(interpret(body, DERIVED).disposition, Disposition.NEEDS_REVIEW)
 
-    def test_a_present_confidence_still_verifies(self):
-        result = self.call({**self.BASE, "title_matches": "yes"}, confidence=0.93)
-        self.assertEqual(result.disposition, Disposition.VERIFIED)
+    def test_ready_business_answers_verify_without_legacy_confidence(self):
+        self.assertEqual(self.call({**self.BASE, "title_matches": "yes"}).disposition, Disposition.VERIFIED)
 
     def test_a_value_outside_the_schema_is_not_a_fact(self):
         for bad in ("probably", "YES", "y", "true", ""):

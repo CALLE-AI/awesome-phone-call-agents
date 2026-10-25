@@ -70,16 +70,16 @@ def completed_call(**answers):
     return {
         "id": "call_1",
         "status": "completed",
-        "completion_confidence": {"score": 0.94, "label": "high"},
-        "evidence": ["HR confirmed employment, title and start date."],
-        "recipients": [{"structured_result": result}],
+        "result_status": "available", "call_outcome": "completed",
+        "result": {**result, "evidence_quote": "HR confirmed employment, title and start date."},
+        "transcript": [{"speaker": "user", "text": "HR confirmed employment, title and start date."}],
     }
 
 
 def scenario(**answers):
     return {
         "create": {"id": "call_1", "status": "queued"},
-        "poll": [{"status": "in_progress"}, completed_call(**answers)],
+        "poll": [{"id": "call_1", "status": "in_progress", "result_status": "pending"}, completed_call(**answers)],
     }
 
 
@@ -256,7 +256,7 @@ class Execution(Base):
 class Timeout(Base):
     def test_never_terminal_stays_pending_rather_than_guessing(self):
         self.transport = FixtureTransport(
-            {"create": {"id": "call_1"}, "poll": [{"status": "in_progress"}]}
+            {"create": {"id": "call_1"}, "poll": [{"id": "call_1", "status": "in_progress", "result_status": "pending"}]}
         )
         report = execute(
             self.client([consented()]),
@@ -270,12 +270,41 @@ class Timeout(Base):
         self.assertEqual(result.disposition, Disposition.PENDING)
         self.assertIn("rather than redialing", result.reason)
 
+    def test_completed_pending_is_polled_until_the_result_is_available(self):
+        pending = {**completed_call(), "result_status": "pending", "result": None}
+        self.transport = FixtureTransport({"create": {"id": "call_1"}, "poll": [pending, completed_call()]})
+        result = self.run_it(self.client([consented()]), settle_delay=0)
+        self.assertEqual(result.by_disposition(), {"verified": 1})
+        self.assertEqual(self.transport._poll_index, 2)
+
+    def test_a_read_error_preserves_the_accepted_id_without_redial(self):
+        def broken(call_id):
+            raise TransportError("unreachable")
+        self.transport.get_call = broken
+        result = self.run_it(self.client([consented()]))
+        self.assertEqual(result.outcomes[0].call_id, "call_1")
+        self.assertEqual(result.by_disposition(), {"needs_review": 1})
+        self.assertEqual(len(self.transport.created), 1)
+
+    def test_billing_id_is_not_used_for_polling_after_uncertain_creation(self):
+        self.transport = FixtureTransport({"create": {"call_id": "billing_1"}})
+        result = self.run_it(self.client([consented()]))
+        self.assertEqual(result.outcomes[0].call_id, "")
+        self.assertIn("uncertain", result.outcomes[0].interpretation.reason)
+        self.assertEqual(self.transport._poll_index, 0)
+
+    def test_wrong_call_id_does_not_verify_the_row(self):
+        self.transport = FixtureTransport({"create": {"id": "call_1"}, "poll": [{**completed_call(), "id": "other_call"}]})
+        result = self.run_it(self.client([consented()]))
+        self.assertEqual(result.by_disposition(), {"needs_review": 1})
+
+
 
 class Reconciliation(Base):
-    def test_events_provide_a_terminal_result_when_status_lags(self):
+    def test_events_cannot_replace_a_pending_authenticated_call(self):
         transport = FixtureTransport(
             {
-                "poll": [{"status": "in_progress"}],
+                "poll": [{"id": "call_1", "status": "in_progress", "result_status": "pending"}],
                 "events": {"data": [{"data": completed_call()}]},
             }
         )
@@ -283,7 +312,7 @@ class Reconciliation(Base):
             self.client([consented()]), table=TABLE, view=VIEW, requester_name=REQUESTER
         ).derived
         result = reconcile(transport, self.audit, "call_1", derived)
-        self.assertEqual(result.disposition, Disposition.VERIFIED)
+        self.assertEqual(result.disposition, Disposition.PENDING)
 
     def test_reconcile_never_dispatches(self):
         transport = FixtureTransport({"poll": [completed_call()]})
@@ -317,16 +346,15 @@ class TestRegionReachesThePayload(unittest.TestCase):
         )
         self.assertTrue(result.planned)
         for planned in result.planned:
-            for recipient in planned.payload["recipients"]:
-                self.assertIn("region", recipient, "a call would dial with no region")
-                self.assertIn("locale", recipient)
+            self.assertIn("region", planned.payload, "a call would dial with no region")
+            self.assertIn("locale", planned.payload)
 
     def test_region_matches_the_number_being_dialed(self):
         result = plan(
             self.client([consented()]), table=TABLE, view=VIEW, requester_name=REQUESTER
         )
-        recipient = result.planned[0].payload["recipients"][0]
-        self.assertEqual(recipient["phones"], [SOURCED])
+        recipient = result.planned[0].payload
+        self.assertEqual(recipient["phone"], SOURCED)
         self.assertEqual(recipient["region"], "US")  # SOURCED is +1 555...
 
     def test_indian_number_plans_as_in(self):
@@ -338,7 +366,7 @@ class TestRegionReachesThePayload(unittest.TestCase):
         })
         result = plan(self.client([row]), table=TABLE, view=VIEW, requester_name=REQUESTER)
         self.assertEqual(result.call_count, 1, result.skipped and result.skipped[0].reason)
-        self.assertEqual(result.planned[0].payload["recipients"][0]["region"], "IN")
+        self.assertEqual(result.planned[0].payload["region"], "IN")
 
     def test_uncovered_country_is_skipped_before_any_call(self):
         """Better to name the country than to spend a call discovering it."""
@@ -367,7 +395,7 @@ class RevisedAfterTerminal(Base):
         self.transport = FixtureTransport({
             "create": {"id": "call_1", "status": "queued"},
             "poll": [
-                {"status": "in_progress"},
+                {"id": "call_1", "status": "in_progress", "result_status": "pending"},
                 completed_call(**first),
                 completed_call(**second),
             ],

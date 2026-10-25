@@ -304,7 +304,6 @@ class Panel:
                             "request_id": outcome.request_id,
                             "disposition": outcome.interpretation.disposition.value,
                             "reason": outcome.interpretation.reason,
-                            "confidence": outcome.interpretation.confidence,
                             "evidence": list(outcome.interpretation.evidence),
                         }
                     for item in report.plan.skipped:
@@ -313,7 +312,6 @@ class Panel:
                             "request_id": rid,
                             "disposition": "skipped",
                             "reason": item.reason,
-                            "confidence": None,
                             "evidence": [],
                         }
                     state.counts = report.by_disposition()

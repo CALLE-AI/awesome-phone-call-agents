@@ -1,4 +1,4 @@
-"""Derive CALL-E's `recipient_result_schema` from the table's own columns.
+"""Derive CALL-E's `result_schema` from the table's own columns.
 
 Nobody on a verification desk writes JSON Schema. They do, however, create
 columns -- and a column already carries everything the schema needs. A single
@@ -11,17 +11,8 @@ So the schema is not written; it is read off the table:
         -> {"type": "string", "enum": ["yes", "no", "unknown"],
             "description": <the column's description>}
 
-Two decisions here come straight from CALL-E's API documentation rather than
-from taste:
-
-  * "Prefer string enums over booleans for business decisions that may be
-    unclear, and include an `unknown` enum value when the call may not provide
-    enough evidence." So `unknown` is appended to every derived enum, and an
-    Airtable checkbox becomes yes/no/unknown rather than a boolean. A verifier
-    who could not get an answer must be able to say so.
-  * "Do not use reserved recipient response field names such as `summary`,
-    `status`, `transcript`, `call_id`, or timing fields." Columns that collide
-    are rejected with the rename spelled out, rather than silently dropped.
+Every select includes an explicit unknown value. Certa reserves its existing
+response-field names so answer columns cannot be confused with call metadata.
 
 Only the schema features CALL-E documents as supported are ever emitted: type,
 properties, required, enum, description and `additionalProperties: false`.
@@ -31,13 +22,12 @@ schema.
 
 from __future__ import annotations
 
+import math
 import re
 from dataclasses import dataclass, field
 from typing import Any
 
-# Reserved by CALL-E on the recipient result object. A derived column that
-# collides would be silently discarded server-side, so it is refused here with
-# a concrete suggestion instead.
+# Certa keeps answer columns distinct from its call metadata.
 RESERVED_KEYS = frozenset(
     {
         "summary",
@@ -139,7 +129,7 @@ def _enum_property(
 
 
 def derive_recipient_schema(columns: list[dict[str, Any]]) -> DerivedSchema:
-    """Build `recipient_result_schema` from Airtable field definitions.
+    """Build `result_schema` from Airtable field definitions.
 
     `columns` is the `fields` array from
     `GET /v0/meta/bases/{baseId}/tables`, filtered to the answer columns.
@@ -155,8 +145,8 @@ def derive_recipient_schema(columns: list[dict[str, Any]]) -> DerivedSchema:
 
         if key in RESERVED_KEYS:
             raise SchemaError(
-                f"column {raw_name!r} maps to {key!r}, which CALL-E reserves on "
-                f"the recipient result. Rename the column, for example "
+                f"column {raw_name!r} maps to {key!r}, which Certa reserves on "
+                f"its result. Rename the column, for example "
                 f"{'employer_' + key!r}."
             )
         if key in properties:
@@ -169,7 +159,7 @@ def derive_recipient_schema(columns: list[dict[str, Any]]) -> DerivedSchema:
         options = column.get("options") or {}
         prop: dict[str, Any]
 
-        if kind in ("singleSelect", "multipleSelects"):
+        if kind == "singleSelect":
             prop, choice_labels = _enum_property(
                 key, column, options.get("choices") or []
             )
@@ -230,35 +220,29 @@ def derive_recipient_schema(columns: list[dict[str, Any]]) -> DerivedSchema:
     return DerivedSchema(schema=schema, field_names=names, choice_labels=labels)
 
 
-def derive_task_schema() -> dict[str, Any]:
-    """Request-level roll-up, sent as CALL-E's `result_schema`.
-
-    Fixed rather than derived: these are the dispositions the workflow itself
-    defines, not something an operator should be able to redraw by adding a
-    column.
-    """
-    return {
-        "type": "object",
-        "properties": {
-            "verification_outcome": {
-                "type": "string",
-                "enum": [
-                    "verified",
-                    "partial",
-                    "not_verified",
-                    "employer_unreachable",
-                    "declined",
-                    UNKNOWN,
-                ],
-                "description": (
-                    "Use verified only when a person at the employer was reached "
-                    "and confirmed employment. Use declined when someone was "
-                    "reached but would not answer. Use employer_unreachable when "
-                    "no person was reached. Use unknown if the evidence does not "
-                    "support any of the others."
-                ),
-            }
-        },
-        "required": ["verification_outcome"],
-        "additionalProperties": False,
+def call_result_schema(derived: DerivedSchema) -> dict[str, Any]:
+    """Keep the answer columns and one transcript quote in a flat v2 schema."""
+    properties = dict(derived.schema["properties"])
+    if "evidence_quote" in properties:
+        raise SchemaError("evidence_quote is reserved by Certa; rename that answer column")
+    if len(properties) >= 32:
+        raise SchemaError("Calls v2 allows 32 fields; use at most 31 answer columns plus evidence_quote")
+    properties["evidence_quote"] = {
+        "type": "string",
+        "description": "A verbatim recipient quote supporting the employment answers. Use an empty string when none exists; never invent evidence.",
     }
+    return {"type": "object", "properties": properties,
+            "required": [*derived.schema["required"], "evidence_quote"], "additionalProperties": False}
+
+
+def valid_answer(rule: dict[str, Any], value: Any) -> bool:
+    kind = rule.get("type")
+    if kind == "string":
+        valid = isinstance(value, str)
+    elif kind == "integer":
+        valid = type(value) is int
+    elif kind == "number":
+        valid = type(value) is int or (type(value) is float and math.isfinite(value))
+    else:
+        valid = False
+    return valid and ("enum" not in rule or value in rule["enum"])

@@ -55,7 +55,7 @@ would become a verified employment record in a lending file.
 
 **Two transports, one of them primary.** The REST Developer API is the product:
 it is the only surface that accepts `result_schema` and
-`recipient_result_schema`, which is what turns your columns into typed answers.
+`result_schema`, which is what turns your columns into typed answers.
 The MCP surface (`plan_call` → `run_call`) is a fallback for a network where
 the REST host will not resolve; it takes no schema, so a call placed over it
 returns a transcript and **can never read as verified** — `tests/test_mcp.py`
@@ -162,7 +162,7 @@ Tests: `tests/test_boundaries.py` asserts direct construction fails, that no fun
 
 **Nobody writes JSON Schema. They create columns.**
 
-A single select's choices *are* an enum, its description *is* the extraction instruction, and its name *is* the field. So `recipient_result_schema` is read off the table rather than written:
+A single select's choices *are* an enum, its description *is* the extraction instruction, and its name *is* the field. So `result_schema` is read off the table rather than written:
 
 ```
 single select "Employment confirmed" (Yes | No)
@@ -196,29 +196,28 @@ directly rather than trusting the reading.
 
 ```mermaid
 flowchart TD
-  R["CALL-E returns"] --> T{"terminal?"}
-  T -->|no| PEND["PENDING<br/>reconcile later"]
-  T -->|yes| F{"failed or canceled?"}
-  F -->|yes| UNR["EMPLOYER_UNREACHABLE"]
-  F -->|no| ST{"structured result present?"}
-  ST -->|no| NR["NEEDS REVIEW<br/>a person reads it"]
-  ST -->|yes| RE{"reached_employer == yes?"}
-  RE -->|no| UNR
-  RE -->|yes| DEC{"declined_to_answer == yes?"}
-  DEC -->|yes| DCL["DECLINED<br/>retryable = False"]
-  DEC -->|no| CONF{"confidence >= floor?"}
-  CONF -->|no| NR
-  CONF -->|yes| EV{"evidence supports the claim?"}
+  R["Authenticated Call"] --> T{"result ready?"}
+  T -->|no| PEND["PENDING: read the same API ID"]
+  T -->|yes| O{"call outcome"}
+  O -->|no_answer or busy| UNR["EMPLOYER_UNREACHABLE"]
+  O -->|declined| DCL["DECLINED: no retry"]
+  O -->|failed or canceled| NR["NEEDS REVIEW"]
+  O -->|completed| ST{"available result and reached_employer == yes?"}
+  ST -->|no| NR
+  ST -->|yes| DEC{"declined_to_answer == yes?"}
+  DEC -->|yes| DCL
+  DEC -->|no| EV{"quote matches a recipient transcript turn?"}
   EV -->|no| NR
-  EV -->|yes| CON{"internal contradiction?"}
+  EV -->|yes| VALID{"answers match the schema?"}
+  VALID -->|no| NR
+  VALID -->|yes| EMP{"employment confirmed?"}
+  EMP -->|no| NV["NOT_VERIFIED"]
+  EMP -->|unknown| NR
+  EMP -->|yes| CON{"contradictory details?"}
   CON -->|yes| NR
-  CON -->|no| EST{"all three facts established?"}
+  CON -->|no| EST{"all requested facts established?"}
   EST -->|no| PAR["PARTIAL"]
   EST -->|yes| VER["VERIFIED"]
-
-  style VER fill:#1f3b2a,stroke:#448b63,color:#d5e8dd
-  style NR fill:#3b331f,stroke:#8b7a44,color:#e8e2d5
-  style DCL fill:#2a2a33,stroke:#6a6a80,color:#dcdce6
 ```
 
 The `reached_employer` gate is the one that matters most. CALL-E issue **#341**
@@ -227,11 +226,19 @@ before dialing — for a verification product that is *employment confirmed with
 no conversation*. That gate sits above every positive outcome, and a table
 whose columns cannot express it is refused at setup.
 
-**Fails closed.** Low confidence, a positive claim with no supporting evidence string, or any internal contradiction all route to human review. `tests/test_calle.py` asserts **no rule can promote a result** — every gate can only move a disposition toward review.
+**Fails closed.** The flat `result_schema` combines the answer columns with
+`evidence_quote`. A quote must match a recipient (`speaker: user`) transcript turn;
+a bot statement cannot support verification. Missing, invalid or contradictory
+answers go to review. Calls v2 has no completion-confidence score, and Certa does
+not invent one. Unknown enum answers stay partial or require review. Positive employment paired
+with an English denial or uncertainty cue in its quote also requires review.
+This conservative phrase check is not semantic validation; other languages and
+ambiguous statements require human interpretation.
 
-Two gates existed only after review on this PR pointed out they did not. A call carrying no `completion_confidence` skipped the floor comparison entirely and could reach `verified` with no score at all; and a value the derived schema does not define — `"probably"`, `"YES"` — was neither a contradiction nor an `unknown`, so it passed both of those checks and counted as an established fact. Both now route to review, and `GatesThatWereSkippable` in `tests/test_calle.py` fails if either regresses.
-
-![Every gate moves a disposition only toward review; none can promote one](assets/disposition-gates.jpg)
+At most 31 answer columns fit beside the evidence quote. Multi-select, nested and
+array fields are refused before dispatch; use separate scalar columns for the
+facts you need. Values that fail their column schema are excluded from Airtable
+answer writeback, while the disposition and reason still reach the row.
 
 **Hash-chained audit log.** Editing a record, deleting one from the middle, or reordering all break the chain, and `verify_chain()` names the sequence number. Records are fsynced before the call they authorise is dispatched: a record with no call is recoverable, a call with no record is not.
 
@@ -259,10 +266,10 @@ sequenceDiagram
   O->>C: Run — explicit confirmation
   C->>C: append call.authorized, fsync
   Note right of C: record before dispatch:<br/>a record with no call is recoverable,<br/>a call with no record is not
-  C->>E: POST /v1/calls
+  C->>E: POST /v2/calls
   E->>H: dials the sourced number
   H-->>E: speech
-  E-->>C: typed answers + confidence + evidence
+  E-->>C: result_status + result + transcript
   C->>C: ordered gates → disposition
   C->>A: writeback
   C->>C: append call.interpreted
@@ -271,57 +278,39 @@ sequenceDiagram
 
 ![The console previewing a run: one call, five cents, and the row it refuses](assets/console-preview.jpg)
 
-### Live testing, stated precisely
+### Validation and migration
 
-This has been run against the real CALL-E API and a real Airtable base, not
-only fixtures. Being exact about what that did and did not establish:
+Run `python3 -m unittest discover -s tests -t .` with Python 3.11 or newer.
+The fixture suite covers schema derivation, consent and number-source gates,
+Calls v2 readiness, transcript-grounded evidence, idempotency, reconciliation,
+Airtable writeback, the audit chain and the local panel. Fixtures place no calls.
 
-**Confirmed working end to end.** A call placed through CALL-E to a real phone
-connected, held a 48-second conversation over 13 turns, and CALL-E returned the
-extraction *"confirmed that the applicant is currently employed there as an
-operations manager, with a start date of 2 March"*. Separately, the Airtable
-writeback has landed real dispositions (`Status`, `Reason`, `Call ID`,
-`Consent receipt ID`) on a live base, and the audit chain verified intact
-across consent, authorisation, dispatch and interpretation records.
+The REST transport sends one `phone` to `/v2/calls` and waits for `result_status`
+to be `available`, `unavailable` or `not_applicable`. Empty and unavailable results
+finish without another call. A read failure retains the API `id` for reconciliation;
+the nullable telephone `call_id` is only for Billing. Events describe lifecycle
+changes and are never treated as complete Call result snapshots.
 
-**Demonstrated since.** A full product payload — REST, derived region, both
-schemas — completed a 51-second call over 13 turns at confidence 0.93,
-returning `reached_employer: yes` and `employment_confirmed: yes`. The row
-wrote back as **verified** with its call id, consent receipt and reason, and
-the chain verified intact across consent, authorisation, dispatch and
-interpretation.
+Keep the original request and idempotency key when recovering an uncertain
+submission. Do not switch an accepted v1 request to v2 or retry it under a fresh
+key. Drain active v1 runs before replacing an installation, and retain its v1
+reader for historical IDs. See the [migration guide](https://docs.heycall-e.com/migration).
+The optional MCP transport remains a separate Goal Run path and cannot supply
+Certa's result schema; its completed runs continue to require manual review.
 
-**A finding from that run.** CALL-E kept refining the recipient result *after*
-the call was terminal: `title_matches` read `"yes"` when the runner read it and
-`"unknown"` about a minute later. The row was written verified and was, by
-CALL-E's own later answer, partial. `_confirm` now re-reads a terminal call
-after a settle delay; a result that moved routes to **needs review**, because
-neither read is knowably the final one and picking a winner would be the
-guessing this product exists to avoid. An unchanged second read costs one
-request and settles it.
-
-**Still open.** Some live attempts failed inside CALL-E's telephony leg before
-the destination rang — `failure_code` varying (404, 500) across payloads whose
-recipient fields were byte-identical to one that connected. That is not a
-signature this plugin's input can produce. It is reported upstream and
-recorded here rather than omitted.
-
-**What that means for a reviewer.** The plugin's own path — schema derivation,
-consent gating, provenance refusal, region resolution, dispatch, audit
-chaining, interpretation and writeback — is exercised by 250 tests and by live
-traffic. The remaining gap is CALL-E-side call completion, which this plugin
-cannot fix and does not pretend to.
+Earlier real-call and Airtable writeback evidence was collected with the legacy
+interface. It does not establish a v2 deployment or a live v2 Airtable writeback.
 
 ## Limits, stated plainly
 
 - **The audit chain cannot detect tail truncation.** Removing records from the end leaves a shorter but internally valid chain. `head()` returns the value to anchor externally; this plugin does not anchor it for you. A test asserts this is a limit rather than pretending otherwise.
 - **An attacker with write access and the code can rebuild the log.** The chain makes tampering evident to someone holding an earlier head, not impossible.
 - **One writing process per log.** Appends are serialised in-process; two processes would interleave and break the chain.
-- **CALL-E has no cancel-in-flight operation.** `POST /v1/calls`, `GET /v1/calls/{id}` and `GET /v1/calls/{id}/events` are the whole surface. Cancelling a request guarantees **nothing further is dispatched**; a call already dialing runs to completion.
+- **Cancelling a row stops future dispatch.** Calls v2 supports cancellation only before provider submission. Certa does not send cancellation requests; reconcile accepted calls by their original IDs.
 - **Call count is capped, not spend.** The plugin cannot infer a dollar amount from the number of calls. CALL-E charges a Call Fee plus any applicable Success Fee; check [Dashboard billing](https://dashboard.heycall-e.com/account/billing) for actual charges.
 - **Airtable free plan: 1,000 API calls per workspace per month**, 5 requests/second. This plugin uses the Web API rather than an extension or scripted automation precisely so it runs on free, where neither is available.
 - **Number provenance is asserted by the operator**, recorded in a `Number source` column and carried into the call metadata. Certa does not itself source numbers.
-- **Revoking consent mid-run stops calls not yet placed, but cannot recall one already dialed.** Consent is re-read immediately before each call, so a revocation made while a batch is running does stop the rows still queued. A call already handed to CALL-E is gone: there is no cancel-in-flight operation to reach it with. Treat "revoked" as "nothing further will be dialed", not as "the call in progress will stop".
+- **Revoking consent mid-run stops calls not yet placed, but cannot recall one already dialed.** Consent is re-read immediately before each call, so a revocation made while a batch is running does stop the rows still queued. Certa does not cancel an accepted Call through the API. Treat "revoked" as "nothing further will be dialed", not as "the call in progress will stop".
 - **A confirming re-read can fail, and then the first read stands.** A terminal result is read a second time after a settle delay, and a changed answer routes to review. If that second request raises, the first interpretation is kept rather than invented — so a network failure during confirmation leaves the original disposition in place, unconfirmed.
 - **`verified` is a disposition, not a legal attestation.** It means a person at an independently sourced number was reached, answered, and their answers passed every gate at the moment they were read. It does not certify identity, authority, or that the person who answered was entitled to speak for the employer.
 
@@ -528,7 +517,7 @@ python3 -m http.server 8090 --bind 127.0.0.1 --directory site
 | **Cancellation** | Tick `Cancelled` on a request; nothing further is dispatched for it. In-flight calls cannot be stopped — see Limits. |
 | **Rollback** | Dispositions are overwritten by a later run; the audit log is append-only by design and is not rolled back. |
 | **Recurrence** | None. This plugin has no scheduler and creates no recurring job. |
-| **Tests** | `python3 -m unittest discover -s tests -t .` — 184 tests, no credentials, no outbound network, no call placed. The panel tests bind a loopback socket. |
+| **Tests** | `python3 -m unittest discover -s tests -t .` — no credentials, no outbound network, no call placed. The panel tests bind a loopback socket. |
 
 ---
 

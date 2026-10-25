@@ -8,7 +8,7 @@ from certa.schema import (
     UNKNOWN,
     SchemaError,
     derive_recipient_schema,
-    derive_task_schema,
+    call_result_schema,
     slug,
 )
 
@@ -160,6 +160,12 @@ class OnlySupportedFeatures(unittest.TestCase):
         for name in ("summary", "status", "transcript", "call_id"):
             self.assertIn(name, RESERVED_KEYS)
 
+    def test_multiple_selects_are_not_silently_flattened(self):
+        field = select("Roles", ["Admin", "Staff", "Unknown"])
+        field["type"] = "multipleSelects"
+        with self.assertRaises(SchemaError):
+            derive_recipient_schema([GATE, field])
+
 
 class ContactGate(unittest.TestCase):
     """Guards CALL-E issue #341: task_completed can be true with no call."""
@@ -206,22 +212,23 @@ class Collisions(unittest.TestCase):
             slug("   ")
 
 
-class TaskSchema(unittest.TestCase):
-    def test_outcome_enum_covers_the_dispositions_and_unknown(self):
-        schema = derive_task_schema()
-        enum = schema["properties"]["verification_outcome"]["enum"]
-        for expected in (
-            "verified",
-            "partial",
-            "not_verified",
-            "employer_unreachable",
-            "declined",
-            UNKNOWN,
-        ):
-            self.assertIn(expected, enum)
+class CallSchema(unittest.TestCase):
+    def test_answer_columns_and_quote_share_one_closed_schema(self):
+        derived = derive_recipient_schema([GATE])
+        schema = call_result_schema(derived)
+        self.assertEqual(set(schema["properties"]), {"reached_employer", "evidence_quote"})
+        self.assertEqual(schema["additionalProperties"], False)
+        self.assertEqual(schema["required"], ["reached_employer", "evidence_quote"])
 
-    def test_task_schema_is_strict(self):
-        self.assertEqual(derive_task_schema()["additionalProperties"], False)
+    def test_v2_field_limit_reserves_room_for_evidence(self):
+        columns = [GATE] + [{"name": f"Fact {i}", "type": "singleLineText"} for i in range(31)]
+        with self.assertRaisesRegex(SchemaError, "31 answer"):
+            call_result_schema(derive_recipient_schema(columns))
+        self.assertEqual(len(call_result_schema(derive_recipient_schema(columns[:-1]))["properties"]), 32)
+
+    def test_evidence_quote_collision_is_rejected(self):
+        with self.assertRaisesRegex(SchemaError, "reserved"):
+            call_result_schema(derive_recipient_schema([GATE, {"name": "Evidence quote", "type": "singleLineText"}]))
 
 
 if __name__ == "__main__":
