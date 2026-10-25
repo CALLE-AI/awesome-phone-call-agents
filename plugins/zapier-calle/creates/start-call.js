@@ -19,7 +19,7 @@ export const createCall = async (z, bundle, { webhookUrl } = {}) => {
   // a do-not-call list is not a harmless preview, it is the wrong behavior
   // dressed up as one. Do not "fix" this asymmetry to match the window guard.
   const suppressionCheck = checkSuppression({
-    phone: payload.recipients[0].phones[0],
+    phone: payload.phone,
     suppressionList: bundle.inputData.suppression_list,
   });
 
@@ -51,7 +51,7 @@ export const createCall = async (z, bundle, { webhookUrl } = {}) => {
       call_id: null,
       disposition: 'outcome_unknown',
       lead_state: 'needs_human',
-      preview: redactDeep({ endpoint: `${baseUrl(bundle)}/v1/calls`, idempotency_key: key, payload }),
+      preview: redactDeep({ endpoint: `${baseUrl(bundle)}/v2/calls`, idempotency_key: key, payload }),
       calling_window: {
         enforced: windowCheck.enforced,
         allowed: windowCheck.allowed,
@@ -99,14 +99,20 @@ export const createCall = async (z, bundle, { webhookUrl } = {}) => {
 
   const response = await z.request({
     method: 'POST',
-    url: `${baseUrl(bundle)}/v1/calls`,
+    url: `${baseUrl(bundle)}/v2/calls`,
     headers: { 'Idempotency-Key': key },
     body: payload,
+    timeout: 30000,
   });
+  if (typeof response.data?.id !== 'string' || !response.data.id) {
+    throw new Error(`Call acceptance is uncertain. Preserve the original request and key ${key}; do not use a Billing call_id or redial.`);
+  }
 
   return {
     dry_run: false,
     call_id: response.data.id,
+    calls_api: 'v2',
+    result_status: response.data.result_status,
     status: response.data.status,
     disposition: 'outcome_unknown',
     lead_state: 'needs_human',
@@ -129,6 +135,8 @@ export default {
     sample: {
       dry_run: false,
       call_id: 'call_123',
+      calls_api: 'v2',
+      result_status: 'pending',
       status: 'queued',
       disposition: 'outcome_unknown',
       lead_state: 'needs_human',

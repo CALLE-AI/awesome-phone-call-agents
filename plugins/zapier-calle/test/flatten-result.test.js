@@ -148,6 +148,7 @@ describe('flattenResult', () => {
       type: 'call.completed',
       data: {
         id: 'call_r',
+        object: 'call_task',
         status: 'completed',
         task_completed: true,
         completion_confidence: { score: 0.9, label: 'high' },
@@ -248,7 +249,7 @@ describe('flattenResult', () => {
     const out = flattenResult({
       id: 'evt_2',
       type: 'call.failed',
-      data: { id: 'call_2', status: 'failed', failure_code: 'provider_error', recipients: [] },
+      data: { id: 'call_2', object: 'call_task', status: 'failed', failure_code: 'provider_error', recipients: [] },
     });
     expect(out.disposition).toBe('failed');
     expect(out.failure_code).toBe('provider_error');

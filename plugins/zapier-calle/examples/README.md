@@ -3,7 +3,7 @@
 Four concrete, runnable Zap recipes built on the Zapier CALL-E integration.
 Each one names the exact apps, trigger, and actions to use; gives
 copy-pasteable Call Task text; a complete Result Schema; a routing table
-covering all ten dispositions; the Zapier plan you need; and what to
+covering the v2 dispositions; the Zapier plan you need; and what to
 verify before you let it place real calls.
 
 | Recipe | Purpose | Zapier plan |
@@ -28,11 +28,12 @@ check before turning it on" section, verify the Zap behaves as expected, and
 only then turn Dry Run off deliberately - it is never turned off as part of
 copying the recipe.
 
-Every recipe also sets Region and Locale explicitly rather than leaving them
-blank. CALL-E does not infer either from the phone number, and can reject a
-call with `HTTP 422` and error code `call_not_ready` until the missing
-information is supplied. See each recipe's "What to check" section for
-details.
+Every recipe uses a closed flat schema with business confirmation and a
+recipient quote. Region and Locale are optional hints in v2; CALL-E infers
+omitted hints and returns `input_incomplete` if intent remains ambiguous.
+Keep the original hints and callback URL unchanged when replaying an uncertain
+request. These recipes target the unpublished v2 source; validate a separate
+test Zap before moving an existing instance.
 
 None of these recipes set `Recipient Timezone (IANA)` or `Do Not Call
 List`, so none of them enforce a calling window or a suppression list out

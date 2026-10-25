@@ -54,13 +54,9 @@ export function buildPayload(inputData, extras = {}) {
   const { schema, errors: schemaErrors } = parseResultSchema(inputData.result_schema);
   errors.push(...schemaErrors);
 
-  const recipient = { phones: [phone] };
-  if (inputData.region) recipient.region = String(inputData.region).trim();
-  if (inputData.locale) recipient.locale = String(inputData.locale).trim();
-
   const payload = {
     task,
-    recipients: [recipient],
+    phone,
     metadata: {
       source_platform: 'zapier',
       correlation_id: normalizeCorrelationId(inputData.correlation_id),
@@ -68,6 +64,8 @@ export function buildPayload(inputData, extras = {}) {
     },
   };
   if (schema) payload.result_schema = schema;
+  if (inputData.region) payload.region = String(inputData.region).trim();
+  if (inputData.locale) payload.locale = String(inputData.locale).trim();
 
   const key = idempotencyKey(payload);
   if (extras.webhookUrl) payload.webhook_url = extras.webhookUrl;

@@ -14,14 +14,14 @@ describe('fetchAuthoritativeCall', () => {
   it('returns the record when CALL-E confirms the call id', async () => {
     const seen = [];
     const result = await fetchAuthoritativeCall(
-      zServing(200, { id: 'call_9', status: 'completed' }, seen),
+      zServing(200, { id: 'call_9', object: 'call', status: 'completed' }, seen),
       bundle,
       'call_9',
     );
 
     expect(result.ok).toBe(true);
     expect(result.data.status).toBe('completed');
-    expect(seen[0].url).toBe('https://example.invalid/v1/calls/call_9');
+    expect(seen[0].url).toBe('https://example.invalid/v2/calls/call_9');
     // The status has to be inspected here rather than thrown on, so a 404 can
     // be told apart from a transient outage.
     expect(seen[0].skipThrowForStatus).toBe(true);

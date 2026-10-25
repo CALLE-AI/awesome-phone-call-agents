@@ -19,14 +19,14 @@ export const INPUT_FIELDS = [
     label: 'Region',
     type: 'string',
     required: false,
-    helpText: 'Optional ISO country code such as US. Leave blank if unknown; it is never inferred.',
+    helpText: 'Optional ISO country code such as US. Leave blank for CALL-E to infer it.',
   },
   {
     key: 'locale',
     label: 'Locale',
     type: 'string',
     required: false,
-    helpText: 'Optional locale such as en-US. Leave blank if unknown; it is never inferred.',
+    helpText: 'Optional locale such as en-US. Leave blank for CALL-E to infer it.',
   },
   {
     key: 'calling_window_timezone',
@@ -97,21 +97,12 @@ export const INPUT_FIELDS = [
       'Refuses to dial if the most recent attempt was more recently than this. Only applies when Previous Attempt Times is set.',
   },
   {
-    key: 'min_confidence_score',
-    label: 'Minimum Confidence Score',
-    type: 'string',
-    required: false,
-    default: '0.6',
-    helpText:
-      "CALL-E returns both a confidence label and a 0-1 score. A result is only marked confirmed when the score is at least this value, so a 'high' label carrying a low score is sent to review instead. Set to 0 to accept the label alone. Anything unparseable falls back to 0.6 rather than disabling the check.",
-  },
-  {
     key: 'result_schema',
     label: 'Result Schema (JSON)',
     type: 'text',
-    required: false,
+    required: true,
     helpText:
-      'Optional JSON Schema describing the structured result to extract. Supported: type, properties, required, enum, nested objects, array items, description, additionalProperties false. Not supported: $ref, oneOf, anyOf, allOf.',
+      'Required closed object with at most 32 string, boolean, integer or number fields and additionalProperties false. Nested objects, arrays and nulls are unsupported. To allow automatic confirmation, explicitly request business_confirmed (boolean) and business_confirmed_quote (recipient words supporting it).',
   },
   {
     key: 'correlation_id',

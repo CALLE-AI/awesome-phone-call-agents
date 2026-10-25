@@ -16,7 +16,7 @@ import { baseUrl } from './client.js';
 const EVENT_TYPE_BY_STATUS = {
   completed: 'call.completed',
   failed: 'call.failed',
-  canceled: 'call.completed',
+  canceled: 'call.canceled',
   queued: 'call.completed',
   in_progress: 'call.completed',
 };
@@ -31,7 +31,7 @@ const EVENT_TYPE_BY_STATUS = {
 export function syntheticEvent(data, overrides = {}) {
   return {
     id: overrides.id || `lookup_${data.id}`,
-    type: overrides.type || EVENT_TYPE_BY_STATUS[data.status] || 'call.completed',
+    type: overrides.type || (data.object === 'call_task' && data.status === 'canceled' ? 'call.completed' : EVENT_TYPE_BY_STATUS[data.status]) || 'call.completed',
     created_at: data.completed_at || data.created_at,
     data,
   };
@@ -39,7 +39,8 @@ export function syntheticEvent(data, overrides = {}) {
 
 const notVerified = (reason, notFound = false) => ({ ok: false, notFound, reason });
 
-export async function fetchAuthoritativeCall(z, bundle, callId) {
+export async function fetchAuthoritativeCall(z, bundle, callId, api = 'v2') {
+  if (!['v1', 'v2'].includes(api)) return notVerified('Choose v1 or v2 to match the original Call.');
   if (typeof callId !== 'string' || callId.trim() === '') {
     return notVerified('No call id was available to confirm the outcome with CALL-E.');
   }
@@ -53,7 +54,7 @@ export async function fetchAuthoritativeCall(z, bundle, callId) {
     // told apart from a transient outage. One means the payload was not about a
     // call we own; the other means we simply could not check.
     response = await z.request({
-      url: `${baseUrl(bundle)}/v1/calls/${encodeURIComponent(callId.trim())}`,
+      url: `${baseUrl(bundle)}/${api}/calls/${encodeURIComponent(callId.trim())}`,
       skipThrowForStatus: true,
     });
   } catch (error) {
@@ -76,5 +77,15 @@ export async function fetchAuthoritativeCall(z, bundle, callId) {
     return notVerified('CALL-E returned a record for a different call than the one asked about.');
   }
 
+  if (data.object !== (api === 'v2' ? 'call' : 'call_task')) {
+    return notVerified('CALL-E returned a record from a different interface.');
+  }
   return { ok: true, notFound: false, data };
+}
+
+
+export function callbackApi(event) {
+  if (event?.data?.object === 'call') return 'v2';
+  if (event?.data?.object === 'call_task') return 'v1';
+  return null;
 }

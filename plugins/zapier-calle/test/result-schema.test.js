@@ -13,15 +13,16 @@ describe('parseResultSchema', () => {
   });
 
   it('parses a JSON string', () => {
-    const { schema, errors } = parseResultSchema('{"type":"object","properties":{}}');
+    const { schema, errors } = parseResultSchema('{"type":"object","properties":{},"additionalProperties":false}');
     expect(errors).toEqual([]);
     expect(schema.type).toBe('object');
   });
 
-  it('treats empty input as no schema', () => {
-    expect(parseResultSchema(null)).toEqual({ schema: null, errors: [] });
-    expect(parseResultSchema('')).toEqual({ schema: null, errors: [] });
-    expect(parseResultSchema('   ')).toEqual({ schema: null, errors: [] });
+  it('requires a schema even when the input is blank', () => {
+    for (const raw of [null, undefined, '', '   ']) {
+      expect(parseResultSchema(raw).schema).toBeNull();
+      expect(parseResultSchema(raw).errors.join(' ')).toContain('required');
+    }
   });
 
   it('reports invalid JSON', () => {
@@ -73,7 +74,7 @@ describe('parseResultSchema', () => {
   });
 
   it('accepts a field whose name collides with a schema keyword', () => {
-    const raw = { type: 'object', properties: { oneOf: { type: 'string' } } };
+    const raw = { type: 'object', properties: { oneOf: { type: 'string' } }, additionalProperties: false };
     expect(parseResultSchema(raw)).toEqual({ schema: raw, errors: [] });
   });
 

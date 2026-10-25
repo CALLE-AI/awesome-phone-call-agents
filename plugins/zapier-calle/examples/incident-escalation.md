@@ -4,7 +4,7 @@
 
 An on-call rotation needs a primary engineer paged by phone for a live
 incident, with an automatic escalation to a backup engineer if the primary
-does not clearly acknowledge. Text and app notifications get missed; a phone
+is confirmed unreachable. Text and app notifications get missed; a phone
 call that asks a direct yes/no question and records the answer does not.
 
 ## Zap shape
@@ -14,14 +14,13 @@ call that asks a direct yes/no question and records the answer does not.
    JSON body here when a new incident opens. This recipe assumes the body
    includes at least an incident title, a severity, and a summary.
 2. **Action:** CALL-E - Place Call and Wait for Outcome. Calls the primary
-   on-call engineer and waits for the terminal outcome.
-3. **Action:** Filter by Zapier. Only continue if `disposition` is not
-   `confirmed` OR `result_acknowledged` is not `yes`. In other words: continue
-   past the filter for every case except a clean acknowledgment, so the Zap
-   proceeds to escalation whenever the primary engineer did not clearly say
-   yes.
-4. **Action:** CALL-E - Place Call and Wait for Outcome. Calls the backup
-   on-call engineer as the escalation.
+   on-call engineer and waits for result readiness.
+3. **Action:** Filter by Zapier. Continue to the backup only when the primary's
+   result is no longer pending, `call_outcome` is `no_answer` or `busy`, and
+   `opt_out_requested` is false. Route uncertainty, refusal, cancellation,
+   technical errors, or an unsupported business answer to a human.
+4. **Action:** CALL-E - Place Call and Wait for Outcome. Calls the authorized
+   backup on-call engineer as a separate logical Call.
 
 This is a four-step Zap (trigger, call, filter, call), so it needs a paid
 Zapier plan - see [Zapier plan needed](#zapier-plan-needed) below.
@@ -61,87 +60,60 @@ explicitly on both call steps - see
   "properties": {
     "acknowledged": {
       "type": "string",
-      "enum": ["yes", "no", "unknown"],
+      "enum": [
+        "yes",
+        "no",
+        "unknown"
+      ],
       "description": "Use yes only when the engineer clearly states they are taking the incident now. Use no when they decline or cannot take it. Use unknown when the call did not establish this."
     },
     "eta_minutes": {
       "type": "string",
       "description": "Minutes until the engineer starts, as stated by them. Empty string when not stated."
+    },
+    "business_confirmed": {
+      "type": "boolean",
+      "description": "True only when the engineer explicitly agrees to take this incident now. False for refusal, uncertainty, or no answer."
+    },
+    "business_confirmed_quote": {
+      "type": "string",
+      "description": "Exact recipient words supporting business_confirmed, or unknown when no such evidence exists."
+    },
+    "summary": {
+      "type": "string",
+      "description": "Short factual account of the conversation, or unknown when no usable conversation exists."
     }
   },
-  "required": ["acknowledged"],
+  "required": [
+    "acknowledged",
+    "business_confirmed",
+    "business_confirmed_quote"
+  ],
   "additionalProperties": false
 }
 ```
+
+The schema requests an explicit business decision and its recipient quote.
+Automatic steps must check `is_actionable` and the relevant business fields;
+`result_status: available` alone is insufficient.
 
 ## Routing table
 
 | Disposition | Sub-case | Action taken |
 | --- | --- | --- |
-| `confirmed` | `result_acknowledged = yes` | Stop. Incident acknowledged; no escalation call is made. |
-| `confirmed` | `result_acknowledged = no` or `unknown` | Escalate: continue to the backup engineer call. |
-| `review_required` | - | Escalate: continue to the backup engineer call. |
-| `result_invalid` | - | Escalate: continue to the backup engineer call. |
-| `failed` | - | Escalate: continue to the backup engineer call. |
-| `canceled` | - | Escalate: continue to the backup engineer call. |
-| `outcome_unknown` | - | Escalate: continue to the backup engineer call. Do not treat this as a failed page - it means the call has not reached a terminal state yet (see the note below). |
-| `needs_human` | - | Escalate: continue to the backup engineer call. |
+| `confirmed` | `is_actionable = true` and `result_acknowledged = yes` | Stop; the engineer acknowledged taking the incident. |
+| `review_required` | Final `no_answer` or `busy`, no opt-out | Call the separately authorized backup. |
+| any | `opt_out_requested = true` | Stop the calling ladder and hand off to a human. |
+| any other result | Including pending, unavailable, declined, canceled, technical error or failed verification | Reconcile the original Call or hand off to a human. No automatic replacement call. |
 
-This table has no row for `outside_calling_window` on purpose: leave
-`Recipient Timezone (IANA)` blank on both call steps in this recipe. The
-calling-window guard exists to stop a solicitation-style call from dialing
-someone at 3am; a page for a live incident is the opposite case - an outage
-does not respect business hours, and a guard that silently deferred the
-primary's page until 8am would turn "escalate immediately" into "escalate
-after sleeping on it." If you do set a timezone here anyway (for example, a
-non-urgent, business-hours-only rotation), route `outside_calling_window`
-the same as every other non-`confirmed` disposition above: escalate to the
-backup engineer, since a page that never dialed is exactly as unacknowledged
-as one that failed.
+An on-call policy may intentionally permit paging outside normal calling
+hours, but configure that policy explicitly. Do not bypass suppression or
+opt-out because a page is urgent. Retry histories belong to each target
+number; the primary and backup are separate contacts.
 
-This table also has no row for `suppressed`, for the same reason: leave
-`Do Not Call List` blank on both call steps here too. A suppression list
-exists to stop a person who has opted out of being contacted from being
-dialed again, which is the right guard for an outbound solicitation or
-qualification call. An on-call rotation is the opposite case - the on-call
-engineer and their backup are expected to be reachable while on rotation,
-and a paging recipe should not carry a do-not-call list that could silently
-suppress the very page the rotation exists to deliver.
-
-There is no row for `retry_policy_blocked` either, and the reason is the
-same one twice over: leave `Previous Attempt Times` blank on both call steps.
-A retry cap exists to stop an outbound campaign from redialling someone who
-did not answer. Paging is the case where redialling is the entire point -
-the escalation ladder in this recipe *is* a second attempt - so a cap that
-refused the backup engineer's page because the primary had just been called
-would break the one guarantee an on-call rotation makes.
-
-**Do still watch `opt_out_requested`.** It is unlikely to fire on a paging
-call, but if an engineer says "stop calling me" to an automated pager, that
-is a conversation for a human to have and not something to escalate past.
-Route it to the incident channel rather than to the backup engineer.
-
-The general rule these three exceptions share: every guard in this
-integration is designed for outbound contact with someone who did not ask
-to be called. An on-call rotation inverts that premise - the recipient
-signed up to be reachable - so the guards that protect an unwilling
-recipient become obstacles to a willing one. Turning a safety control off is
-a decision worth making deliberately and writing down, which is why this
-recipe explains each one rather than silently omitting it.
-
-Escalating on ambiguity is deliberate. Only `confirmed` with
-`result_acknowledged = yes` stops the ladder; every other outcome, including
-an outcome that simply could not be classified, pages the backup engineer.
-A missed page costs far more than a duplicate one, so this recipe is built
-to over-page rather than under-page.
-
-**Note on `outcome_unknown` and `queued`:** in a live test call, a call sat
-at status `queued` for over two minutes while the phone was actually ringing
-and being answered - it never showed `in_progress`. `Find Call Result` on a
-call in that state reports `outcome_unknown`, not a failure. If you build a
-separate reconciliation Zap around `Find Call Result` instead of using
-`Place Call and Wait for Outcome`, do not treat `outcome_unknown` as proof
-the page failed; it may just mean the call is still ringing.
+**Reconciliation:** keep the API `call_id` and interface. Read the same Call
+while `result_status` is pending. A timeout cannot establish whether the
+primary was reached, and does not authorize another call to that person.
 
 ## Zapier plan needed
 
@@ -152,12 +124,10 @@ trigger-and-action pair require a paid Zapier plan.
 
 ## What to check before turning it on
 
-- Set Region and Locale explicitly on both call steps. CALL-E never infers
-  them from the phone number, and a live test call to a number outside the
-  assumed default region returned `HTTP 422` with error code
-  `call_not_ready` and a `details.questions` array asking which language to
-  use before it would place the call. Leaving Region and Locale blank can
-  cause CALL-E to reject the request until that question is answered.
+- Region and Locale are optional in v2. Set them explicitly when the intended
+  destination and spoken language are known. Conflicts or ambiguity return
+  `input_incomplete` with `details.missing_inputs`; correct the input before
+  acceptance. Preserve the exact original hints on an uncertain replay.
 - Confirm the primary and backup phone numbers are correct and that you are
   authorized to call both of them.
 - Leave Dry Run set to `true` on both call steps and run the Zap against a

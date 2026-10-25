@@ -24,14 +24,13 @@ const authData = (apiKey) => ({ apiKey, baseUrl: server.url });
 
 // dry_run is explicitly false here because it defaults to a dry run: placing a
 // real call takes a deliberate opt-in, and these tests are the ones opting in.
-const CALL_INPUT = { task: 'Call the on-call engineer.', phone: '+15550123456', dry_run: false };
+const CALL_INPUT = { task: 'Call the on-call engineer.', phone: '+15550123456', result_schema: { type: 'object', properties: { acknowledged: { type: 'string' }, business_confirmed: { type: 'boolean' }, business_confirmed_quote: { type: 'string' } }, required: ['acknowledged', 'business_confirmed', 'business_confirmed_quote'], additionalProperties: false }, dry_run: false };
 
 const COMPLETED_RECORD = {
-  status: 'completed',
-  task_completed: true,
-  completion_confidence: { score: 0.95, label: 'high' },
-  structured_result: { acknowledged: 'yes' },
-  completed_at: '2026-08-02T00:05:00Z',
+  object: 'call', status: 'completed', call_outcome: 'completed', result_status: 'available',
+  result: { acknowledged: 'yes', business_confirmed: true, business_confirmed_quote: 'Yes, on it.' },
+  transcript: [{ speaker: 'user', text: 'Yes, on it.', offset_seconds: 4 }],
+  error: null, completed_at: '2026-08-02T00:05:00Z',
 };
 
 describe('authentication through the real Zapier runtime', () => {
@@ -57,7 +56,7 @@ describe('authentication through the real Zapier runtime', () => {
 });
 
 describe('start_call through the real Zapier runtime', () => {
-  it('posts to /v1/calls with an idempotency key and returns a call id', async () => {
+  it('posts to /v2/calls with an idempotency key and returns a call id', async () => {
     server = await startFakeCalle({});
 
     const output = await appTester(App.creates.start_call.operation.perform, {
@@ -66,7 +65,7 @@ describe('start_call through the real Zapier runtime', () => {
     });
 
     expect(server.lastRequest().method).toBe('POST');
-    expect(server.lastRequest().path).toBe('/v1/calls');
+    expect(server.lastRequest().path).toBe('/v2/calls');
     expect(server.lastRequest().headers['idempotency-key']).toMatch(/^[0-9a-f]{64}$/);
     expect(output.call_id).toMatch(/^call_/);
   });
@@ -112,17 +111,7 @@ describe('place_call_and_wait through the real Zapier runtime', () => {
   //     fail-closed matching logic runs under the real checkOutput/callback
   //     middleware chain, not a hand-rolled fake.
   const completedEvent = (callId) => ({
-    id: 'evt_1',
-    type: 'call.completed',
-    data: {
-      id: callId,
-      status: 'completed',
-      task_completed: true,
-      completion_confidence: { score: 0.95, label: 'high' },
-      structured_result: { acknowledged: 'yes' },
-      metadata: { correlation_id: 'incident-42' },
-      recipients: [],
-    },
+    id: 'evt_1', type: 'call.completed', data: { id: callId, object: 'call' },
   });
 
   it('completes the callback cycle to a confirmed, actionable disposition', async () => {
@@ -140,6 +129,7 @@ describe('place_call_and_wait through the real Zapier runtime', () => {
 
     const resumed = await appTester(App.creates.place_call_and_wait.operation.performResume, {
       authData: authData('k'),
+      inputData: CALL_INPUT,
       outputData: performed,
       cleanedRequest: completedEvent(performed.call_id),
     });
@@ -150,7 +140,7 @@ describe('place_call_and_wait through the real Zapier runtime', () => {
     // The resume made its own authenticated GET back to CALL-E, through the
     // real middleware chain - Bearer header and all.
     expect(server.lastRequest().method).toBe('GET');
-    expect(server.lastRequest().path).toBe(`/v1/calls/${performed.call_id}`);
+    expect(server.lastRequest().path).toBe(`/v2/calls/${performed.call_id}`);
     expect(server.lastRequest().headers.authorization).toBe('Bearer k');
   });
 
@@ -168,6 +158,7 @@ describe('place_call_and_wait through the real Zapier runtime', () => {
     // the callback body insists the call completed with a clean result.
     const resumed = await appTester(App.creates.place_call_and_wait.operation.performResume, {
       authData: authData('k'),
+      inputData: CALL_INPUT,
       outputData: performed,
       cleanedRequest: completedEvent(performed.call_id),
     });
@@ -181,6 +172,7 @@ describe('place_call_and_wait through the real Zapier runtime', () => {
 
     const resumed = await appTester(App.creates.place_call_and_wait.operation.performResume, {
       authData: authData('k'),
+      inputData: CALL_INPUT,
       outputData: { call_id: 'call_never_placed' },
       cleanedRequest: completedEvent('call_never_placed'),
     });
@@ -199,6 +191,7 @@ describe('place_call_and_wait through the real Zapier runtime', () => {
     });
 
     const resumed = await appTester(App.creates.place_call_and_wait.operation.performResume, {
+      inputData: CALL_INPUT,
       outputData: performed,
       cleanedRequest: completedEvent('call_totally_different'),
     });

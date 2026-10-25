@@ -26,7 +26,7 @@ const zFor = (calls = []) => ({
 });
 
 // Dialing is opt-in, so the tests that expect a real call say so explicitly.
-const input = { task: 'Call the on-call engineer.', phone: '+15550123456', dry_run: false };
+const input = { task: 'Call the on-call engineer.', phone: '+15550123456', result_schema: { type: 'object', properties: { acknowledged: { type: 'string' } }, required: ['acknowledged'], additionalProperties: false }, dry_run: false };
 
 describe('place-call-and-wait perform', () => {
   it('mints no callback url and places no call when dry_run was never set', async () => {
@@ -188,6 +188,7 @@ describe('place-call-and-wait retry policy', () => {
 describe('place-call-and-wait performResume', () => {
   const record = {
     id: 'call_9',
+    object: 'call_task',
     status: 'completed',
     task_completed: true,
     completion_confidence: { score: 0.95, label: 'high' },
@@ -234,6 +235,7 @@ describe('place-call-and-wait performResume', () => {
       type: 'call.completed',
       data: {
         id: 'call_9',
+        object: 'call_task',
         status: 'completed',
         task_completed: true,
         completion_confidence: { score: 1, label: 'high' },

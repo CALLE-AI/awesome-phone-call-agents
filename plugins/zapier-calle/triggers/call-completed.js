@@ -1,6 +1,6 @@
 import { flattenResult } from '../lib/flatten-result.js';
 import { toMinConfidenceScore } from '../lib/result-quality.js';
-import { fetchAuthoritativeCall, syntheticEvent } from '../lib/reconcile.js';
+import { fetchAuthoritativeCall, syntheticEvent, callbackApi } from '../lib/reconcile.js';
 import { checkNotificationFreshness } from '../lib/notification-freshness.js';
 import { toLeadState } from '../lib/lead-state.js';
 
@@ -64,8 +64,10 @@ const perform = async (z, bundle) => {
   // from it is the call id it names - and that id is then handed to CALL-E over
   // this connection's own API key, so every field the Zap goes on to act on
   // comes from an authenticated response rather than from whoever POSTed here.
+  const api = callbackApi(event);
+  if (!api) return [];
   const claimedCallId = event.data.id;
-  const authoritative = await fetchAuthoritativeCall(z, bundle, claimedCallId);
+  const authoritative = await fetchAuthoritativeCall(z, bundle, claimedCallId, api);
 
   // A call this connection cannot see is not this Zap's call - a forged POST,
   // a stale delivery, or a webhook wired to the wrong CALL-E project. Trigger
@@ -140,7 +142,7 @@ export default {
     label: 'Call Completed',
     description:
       'Triggers when any CALL-E call reaches a terminal state (completed, failed, or ' +
-      'result validation failed) - including calls started outside Zapier, such as from ' +
+      'canceled) - including calls started outside Zapier, such as from ' +
       "CALL-E's CLI or MCP tools. Requires pasting the webhook URL Zapier provides into " +
       "your CALL-E project's webhook settings; see the setup directions for this trigger. " +
       'Outcomes arrive here for routing and review, never marked actionable: use Find Call ' +
@@ -166,22 +168,12 @@ export default {
   },
   operation: {
     type: 'hook',
-    inputFields: [
-      {
-        key: 'min_confidence_score',
-        label: 'Minimum Confidence Score',
-        type: 'string',
-        required: false,
-        default: '0.6',
-        helpText:
-          'A result is only marked confirmed when CALL-E\'s 0-1 confidence score is at least this value. Set to 0 to accept the confidence label alone.',
-      },
-    ],
+    inputFields: [],
     perform,
     sample: {
       disposition: 'confirmed',
       disposition_reason:
-        'Call completed with a high-confidence validated result. This outcome arrived on an ' +
+        'Business confirmation is explicit and supported by a recipient quote. This outcome arrived on an ' +
         'unauthenticated webhook URL, so it is reported for routing only and is never marked ' +
         'actionable.',
       is_actionable: false,
@@ -193,14 +185,14 @@ export default {
       event_type: 'call.completed',
       call_id: 'call_123',
       status: 'completed',
-      task_completed: true,
-      confidence_label: 'high',
-      confidence_score: 0.92,
+      calls_api: 'v2',
+      telephone_call_id: null,
+      result_status: 'available',
+      call_outcome: 'completed',
+      result_business_confirmed: true,
+      result_business_confirmed_quote: 'Yes, on it.',
       summary: 'The engineer acknowledged the incident.',
       correlation_id: 'incident-42',
-      recipients_total: 1,
-      recipients_completed: 1,
-      recipients_failed: 0,
       transcript_text: 'bot: Are you able to take this incident?\nuser: Yes, on it.',
     },
   },

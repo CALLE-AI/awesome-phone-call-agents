@@ -66,7 +66,7 @@ const walk = (node, path, errors, depth) => {
   }
 };
 
-export function parseResultSchema(raw) {
+export function parseLegacyResultSchema(raw) {
   if (raw === null || raw === undefined) return { schema: null, errors: [] };
 
   let candidate = raw;
@@ -90,4 +90,46 @@ export function parseResultSchema(raw) {
   walk(candidate, 'schema', errors, 0);
 
   return { schema: errors.length ? null : candidate, errors };
+}
+
+const SCALAR_TYPES = new Set(['string', 'boolean', 'integer', 'number']);
+const ROOT_KEYS = new Set(['type', 'properties', 'required', 'description', 'additionalProperties']);
+const PROPERTY_KEYS = new Set(['type', 'enum', 'description']);
+
+export function parseResultSchema(raw) {
+  const parsed = parseLegacyResultSchema(raw);
+  if (!parsed.schema) {
+    return parsed.errors.length ? parsed : { schema: null, errors: ['A result_schema is required for Calls v2.'] };
+  }
+  const schema = parsed.schema;
+  const errors = [];
+  for (const key of Object.keys(schema)) {
+    if (!ROOT_KEYS.has(key)) errors.push(`Calls v2 does not support "${key}" at the schema root.`);
+  }
+  if (schema.additionalProperties !== false) errors.push('Calls v2 requires "additionalProperties: false".');
+  const properties = schema.properties;
+  if (!properties || typeof properties !== 'object' || Array.isArray(properties)) {
+    errors.push('Calls v2 requires an object of scalar properties.');
+  } else {
+    if (Object.keys(properties).length > 32) errors.push('Calls v2 supports at most 32 properties.');
+    for (const [name, rule] of Object.entries(properties)) {
+      if (!SCALAR_TYPES.has(rule.type)) errors.push(`${name} must be a string, boolean, integer or number; flatten nested fields.`);
+      for (const key of Object.keys(rule)) {
+        if (!PROPERTY_KEYS.has(key)) errors.push(`Calls v2 does not support "${key}" on ${name}.`);
+      }
+      if (Array.isArray(rule.enum) && (rule.enum.length === 0 || rule.enum.some((value) => !scalarMatches(rule.type, value)))) {
+        errors.push(`${name} enum values must match its scalar type and cannot be null.`);
+      }
+    }
+    if (Array.isArray(schema.required) && (new Set(schema.required).size !== schema.required.length || schema.required.some((name) => !Object.hasOwn(properties, name)))) {
+      errors.push('Required fields must be unique declared properties.');
+    }
+  }
+  return { schema: errors.length ? null : schema, errors };
+}
+
+export function scalarMatches(type, value) {
+  if (type === 'integer') return Number.isInteger(value);
+  if (type === 'number') return typeof value === 'number' && Number.isFinite(value);
+  return (type === 'string' || type === 'boolean') && typeof value === type;
 }

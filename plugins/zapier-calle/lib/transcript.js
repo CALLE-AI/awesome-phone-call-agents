@@ -1,8 +1,10 @@
-// Shared transcript access. CALL-E nests turns two levels deep
-// (recipients[].attempts[].transcript_turns[]), and three call sites needed
-// the same defensive walk, so it lives here once.
+// Calls v2 has fixed top-level turns; legacy callbacks retain their recipient walk.
 
 export function transcriptTurns(recipients) {
+  if (recipients?.object === 'call') {
+    return (Array.isArray(recipients.transcript) ? recipients.transcript : [])
+      .filter((turn) => turn && typeof turn === 'object');
+  }
   return (Array.isArray(recipients) ? recipients : [])
     .flatMap((recipient) => (recipient && recipient.attempts) || [])
     .flatMap((attempt) => (attempt && attempt.transcript_turns) || [])
