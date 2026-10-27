@@ -8,6 +8,8 @@ Use [docs/community-review-policy.md](./docs/community-review-policy.md) for con
 tiers, Must Fix severity, proportionate validation, privacy/history exceptions, and
 merge decisions. It applies to existing PRs and automated reviews and supersedes
 stricter historical review comments. Optional production hardening does not block demos.
+All CI checks for the current PR head must complete successfully before merging,
+including checks unrelated to the change. Recheck the head and results before merge.
 
 ## Language
 
