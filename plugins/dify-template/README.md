@@ -13,17 +13,17 @@ The workflow validates one authorized phone/task pair, performs a read-only `GET
 
 The workflow is intentionally small and visible:
 
-1. `Start` accepts `base_url`, `dry_run`, `request_id`, `phone_number`, and `task`; only the HTTP request nodes read the Dify secret environment variable `CALL_E_API_KEY`.
+1. `Start` accepts `base_url`, `dry_run`, `request_id`, `phone_number`, `task`, and optional `result_schema`; only the HTTP request nodes read the Dify secret environment variable `CALL_E_API_KEY`.
 2. `Prepare one-shot call` validates required fields, normalizes the CALL-E base URL, rejects non-HTTPS or untrusted API hosts, enforces E.164 phone number format, rejects placeholder phone numbers for live calls, and prepares a masked preview.
 3. `Check API connectivity` calls the documented, read-only `GET /v1/goals?limit=1` endpoint on the configured CALL-E API host. Transport and forced HTTP failures use an explicit Dify default-value error strategy so the preflight gate can return a final report instead of terminating the workflow.
 4. `Gate live calls after API preflight` allows live-call creation only when `GET /v1/goals?limit=1` returns a 2xx status code.
 5. `Run one-shot call` creates one CALL-E call only when `dry_run=false` and the API preflight passes.
-6. `Build per-call payload` creates a v2 request with one top-level `phone`, a closed scalar `result_schema`, metadata, and the idempotency key prepared before the creation stage. It prepends safety boundaries and explicit missing-answer rules to the task; routing hints remain omitted.
+6. `Build per-call payload` creates a v2 request with one top-level `phone`, the validated custom or default `result_schema`, metadata, and the idempotency key prepared before the creation stage. It prepends safety boundaries and explicit missing-answer rules to the task; routing hints remain omitted.
 7. `Create CALL-E call` calls `POST /v2/calls`, which returns HTTP 202 after acceptance. Transport failures, HTTP 408/409/5xx, and forced HTTP failures retain the original key and report that a call may already exist.
 8. `Extract call lookup id` validates `object: "call"`, a `call_` API resource ID, a documented lifecycle status, and a known `result_status` before preparing the lookup URL. An invalid 2xx response requires reconciliation with the same key and unchanged request body.
 9. `Poll until terminal` polls `GET /v2/calls/{id}` while `result_status` is `pending`, including when `status` is already `completed`. It stops on a final result status, timeout, or lookup failure. Failed lookups retain the last valid response and accepted Call ID.
 10. `Parse final call result` reads `result`, `error`, `call_outcome`, `result_status`, top-level `transcript`, and metadata, with phone numbers masked. The summary comes from `result.summary`.
-11. `Summarize iteration results` builds the readable final report and keeps `summary_json` inside that node for debugging.
+11. `Summarize iteration results` builds the readable final report and exposes the business result, Call ID, readiness, telephone outcome, error, and timeout flag. It keeps `summary_json` inside that node for debugging.
 
 ## Setup
 
@@ -51,20 +51,66 @@ Configure these fields in `Start`:
 | `request_id` | Yes | Replay-safe request identifier, stable per intended live call. It must be 8-120 characters and may contain only `[A-Za-z0-9._:-]`. The same value retains the same key, including when inputs change, so v2 can reject conflicting replay. Use a new value only for an intentionally new call. |
 | `phone_number` | Yes | Destination phone number in E.164 format. Use only owned or explicitly authorized numbers. |
 | `task` | Yes | English instruction for the CALL-E agent. Non-overridable safety boundaries are prepended before this task reaches CALL-E, including logistics-only handling for medical, legal, financial, and emergency topics. |
+| `result_schema` | No | Closed JSON Schema with up to 32 flat scalar fields. Leave blank to retain the built-in fields. Invalid schemas stop before call creation; the read-only API preflight can still run. |
 
 Configure `CALL_E_API_KEY` as a secret Dify environment variable before running the workflow. The HTTP request nodes consume it directly; code nodes do not receive it as an input. Do not put live CALL-E API keys in Start inputs, task text, or exported example files.
 
 ## Output
 
-The Dify End node exposes only:
+The Dify End node exposes:
 
 | Field | Description |
 | --- | --- |
 | `report` | Human-readable final answer returned by the End node. |
+| `result` | Business result object with original field names, values, and types, including an available empty object; null when no object result is available. Inspect `result_status` and `error`. |
+| `call_id` | Accepted API Call ID for later reads, or an empty string if acceptance was not established. |
+| `result_status` | `available`, `unavailable`, `pending`, or `not_applicable`; empty before a documented Call exists. |
+| `call_outcome` | Telephone outcome such as `completed` or `no_answer`; empty when not established. |
+| `error` | API, validation, creation, or polling error object; null when no error is present. |
+| `timed_out` | Whether this workflow stopped waiting before the result resolved. |
+
+`result` and `error` use nullable object outputs so Dify nodes can consume them without parsing a string. An empty `result` does not prove success, and `available` can legitimately contain an empty object.
 
 `summary_json` remains available inside the `Summarize iteration results` node for debugging. It includes dry-run mode, preview data, live-call counts, parsed status, metadata round trip, polling state, transcript turns, summary, structured result, error, and redacted raw call result.
 
 `resultStatusCounts` counts `available`, `unavailable`, `pending`, and `not_applicable` separately. An available empty object is preserved. A final unavailable result can have both `result` and `error` set to null. No-answer, busy, and declined outcomes are telephone outcomes, not technical failures. Neither `status: "completed"` nor an available result proves business success; inspect the schema fields for that decision.
+
+## Custom Result Fields
+
+Leave `result_schema` empty to request the existing nine result fields. A custom schema replaces those fields. It must use `type: object`, `additionalProperties: false`, and up to 32 properties whose types are `string`, `boolean`, `integer`, or `number`. Arrays, nested objects, nullable types, duplicate keys, undeclared required fields, and unsupported schema keywords are rejected. Property names must match `[a-z][a-z0-9_]{0,63}`. Descriptions may contain up to 512 characters, typed enums may contain 1-32 distinct values, and the schema must fit in 32 KiB of JSON.
+
+For an appointment workflow, supply:
+
+```json
+{
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["appointment_status", "preferred_time"],
+  "properties": {
+    "appointment_status": {
+      "type": "string",
+      "enum": ["confirmed", "reschedule_requested", "unknown"]
+    },
+    "preferred_time": {"type": "string"}
+  }
+}
+```
+
+Use a task such as: "Ask whether the recipient confirms the fictional test appointment tomorrow at 10 AM. Use appointment_status=confirmed only after explicit confirmation. If they request a different time, use reschedule_requested and record preferred_time, without booking or promising a new appointment. Otherwise use unknown. Set preferred_time to unknown when no alternative was stated."
+
+After importing this workflow as a tool in another Dify app, read `result` in a Code node, then branch with If/Else. Custom keys are not generated as individual variable-picker entries. An example decision function is:
+
+```python
+def main(result: dict, result_status: str, call_outcome: str, error: dict, timed_out: bool) -> dict:
+    route = "manual_review"
+    if isinstance(result, dict) and result_status == "available" and call_outcome == "completed" and not error and not timed_out:
+        decision = result.get("appointment_status")
+        if decision in {"confirmed", "reschedule_requested"}:
+            route = decision
+    return {"route": route, "preferred_time": result.get("preferred_time", "unknown") if isinstance(result, dict) else "unknown"}
+```
+
+This is a usage example for this template. Only explicit confirmed results take the confirmation branch; unknown, empty, unavailable, pending, failed, and error results require manual review. Save `result_schema` with the original request inputs. Editing an accepted schema while keeping `request_id` produces an idempotency conflict; a new request ID is only for an intentionally new call.
 
 ## Side Effects
 
@@ -122,4 +168,4 @@ Run `python3 scripts/validate_repository.py` for credential-free regressions cov
 
 - This is a one-shot workflow. For batch behavior, call this Dify workflow from an external loop or scheduler.
 - Host schedulers should handle recurrence. CALL-E should handle exactly one call per scheduled run.
-- The workflow masks E.164, common US-style, and grouped international phone numbers, including display formats with parentheses such as `+44 (20) 7123 4567`, in summaries, transcripts, evidence, structured results, raw result output, and final report text.
+- The workflow masks E.164, common US-style, and grouped international phone numbers, including display formats with parentheses such as `+44 (20) 7123 4567`, in the human-readable report and debugging summaries. The `result` output preserves business values and types, including phone-like strings and phone-named fields, so downstream decisions receive the requested data. Result data is also retained between creation and polling nodes and may contain personal data; restrict access to workflow runs and downstream consumers accordingly.

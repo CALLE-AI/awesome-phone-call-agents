@@ -3,7 +3,7 @@
   "title": "Dify CALL-E workflow template",
   "platform": "Dify",
   "type": "workflow-template",
-  "description": "Importable Dify workflow DSL that validates one authorized CALL-E phone task, performs a read-only API preflight, supports dry-run preview, creates one live call only when requested, polls until the v2 business result status resolves, and returns a masked human-readable status and summary report.",
+  "description": "Importable Dify workflow DSL with optional custom result fields, dry-run preview, one authorized live call, result polling, a masked report, and structured result and status outputs for downstream workflow decisions.",
   "entrypoints": [
     {
       "name": "CALL-E Outbound Call Tool",
@@ -26,7 +26,8 @@
     "Reports a 2xx create response without a documented v2 Call as unknown and possibly created, and requires replay or reconciliation with the same idempotency key and unchanged request body. Poll failures retain the accepted Call ID.",
     "Preserves create HTTP error status codes and details. Reports creation-stage transport failures and HTTP 408/409/5xx as unknown and possibly created, retaining the key prepared before submission for reconciliation.",
     "Masks E.164, common US-style, and grouped international phone numbers, including display formats with parentheses, in summaries and raw result output.",
+    "Preserves original business result values and types in the result output; this data may contain personal data. Human-readable reports and debugging summaries remain masked.",
     "Does not create recurring schedules."
   ],
-  "template_version": "0.7.0"
+  "template_version": "0.8.0"
 }
