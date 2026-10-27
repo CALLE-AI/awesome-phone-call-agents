@@ -327,9 +327,7 @@ workflow:
       zIndex: 1002
     nodes:
     - data:
-        desc: Set the CALL_E_API_KEY secret environment variable, then fill one phone_number
-          and one task. Keep dry_run=true to preview and check API connectivity only.
-          Switch dry_run=false only when you want one live call.
+        desc: "Set CALL_E_API_KEY as a secret environment variable, enter one authorized phone number and task, and optionally supply a custom result schema. Keep dry_run=true for preview and read-only preflight."
         selected: false
         title: Start
         type: start
@@ -592,10 +590,7 @@ workflow:
           \            \"tasks\": preview,\n        }, ensure_ascii=False, indent=2),\n\
           \    }\n"
         code_language: python3
-        desc: 'Converts the Start inputs into one normalized CALL-E task.
-
-          This is the safety gate: it stops the run before HTTP requests if required
-          fields are missing or placeholders are still present.'
+        desc: "Validates one call request and its optional result schema. Missing or invalid inputs block call creation; the read-only API preflight can still run."
         outputs:
           base_url:
             children: null
@@ -1737,8 +1732,7 @@ workflow:
           : raw_call_result_json,\n    }\n    return {\"result\": result, \"results\"\
           : [result]}\n"
         code_language: python3
-        desc: Parses documented CALL-E Call responses into a demo-friendly summary with
-          phone numbers masked. Invalid successful poll responses require reconciliation.
+        desc: "Preserves business result values for downstream nodes and masks report data. Invalid poll responses retain the accepted Call ID for reconciliation."
         outputs:
           result:
             children: null
@@ -1853,9 +1847,7 @@ workflow:
           \ ensure_ascii=False),\n        \"metadata_sent_json\": json.dumps(request_payload[\"\
           metadata\"], ensure_ascii=False),\n    }\n"
         code_language: python3
-        desc: Builds the CALL-E create-call payload from the normalized task. Phone
-          numbers are masked in outputs, and the raw request body is prepared for
-          the following HTTP node.
+        desc: "Builds one create-call request with the validated custom or default result schema, metadata, and the saved idempotency key."
         isInIteration: true
         iteration_id: iterate_call_tasks
         outputs:
@@ -2355,9 +2347,7 @@ workflow:
           \   \"report\": \"\\n\".join(report_lines),\n        \"summary_json\": json.dumps(summary,\
           \ ensure_ascii=False, indent=2)\n    }\n"
         code_language: python3
-        desc: Builds the user-facing report and also keeps summary_json inside this
-          node for debugging. Click this node to inspect summary_json; it is not shown
-          in the final Result.
+        desc: "Returns a masked report, original business result, Call ID, readiness, telephone outcome, error, and timeout flag. The masked summary_json stays inside this node for debugging."
         outputs:
           report:
             children: null
@@ -2433,9 +2423,7 @@ workflow:
       type: custom
       width: 242
     - data:
-        desc: Final output shows only the user-facing report. The debug summary_json
-          remains available inside the Summarize iteration results node and is intentionally
-          not included here.
+        desc: "Returns the report and structured business result, Call ID, readiness, telephone outcome, error, and timeout flag. The debugging summary_json remains internal."
         outputs:
         - value_selector:
           - summarize_iteration_results
