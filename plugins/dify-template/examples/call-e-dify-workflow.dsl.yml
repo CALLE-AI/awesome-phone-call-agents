@@ -367,6 +367,12 @@ workflow:
           required: true
           type: paragraph
           variable: task
+        - default: ''
+          label: Result Schema JSON (optional; blank keeps default fields)
+          max_length: 32768
+          required: false
+          type: paragraph
+          variable: result_schema
       height: 337
       id: start
       position:
@@ -381,35 +387,35 @@ workflow:
       type: custom
       width: 242
     - data:
-        code: "import hashlib\nimport json\nimport re\nimport time\nfrom urllib.parse\
-          \ import urlparse\n\nTERMINAL_STATUSES = {\n    \"completed\", \"failed\"\
-          , \"canceled\", \"cancelled\",\n    \"no_answer\", \"declined\", \"voicemail\"\
-          , \"busy\", \"expired\"\n}\n\nTRUSTED_BASE_URLS = {\n    \"https://api.heycall-e.com\"\
-          ,\n    # Add CALL-E-managed test hosts here before running non-production\
-          \ workflows.\n}\nPLACEHOLDER_PHONES = {\"+15555550101\", \"+15555550102\"\
-          , \"+15555550123\", \"+14155550123\"}\nE164_RE = re.compile(r\"^\\+[1-9]\\\
-          d{6,14}$\")\nREQUEST_ID_RE = re.compile(r\"^[A-Za-z0-9._:-]{8,120}$\")\n\
-          PHONE_IN_TEXT_RE = re.compile(r\"\\+[1-9]\\d{6,14}\")\nINTERNATIONAL_GROUPED_PHONE_RE\
-          \ = re.compile(r\"(?<!\\w)\\+[1-9](?:[\\s().-]*\\d){6,14}(?![\\s().-]*\\\
-          d)\")\nPHONE_LIKE_RE = re.compile(r\"(?<!\\d)(?:\\+?1[\\s.-]?)?(?:\\(?[2-9]\\\
-          d{2}\\)?[\\s.-]?[2-9]\\d{2}[\\s.-]?\\d{4}|[1-9]\\d{6,14})(?!\\d)\")\n\n\
-          def normalize_trusted_base_url(value) -> str:\n    raw = str(value or \"\
-          https://api.heycall-e.com\").strip().rstrip(\"/\")\n    if raw.endswith((\"\
-          /v1\", \"/v2\")):\n        raw = raw[:-3].rstrip(\"/\")\n    parsed = urlparse(raw)\n\
-          \    if parsed.scheme.lower() != \"https\":\n        raise ValueError(\"\
-          CALL-E base_url must use https.\")\n    if parsed.params or parsed.query\
-          \ or parsed.fragment:\n        raise ValueError(\"CALL-E base_url must not\
-          \ include parameters, query strings, or fragments.\")\n    if parsed.path\
-          \ not in {\"\", \"/\"}:\n        raise ValueError(\"CALL-E base_url must\
-          \ be a host URL only; do not include a path except /v1 or /v2.\")\n    normalized\
-          \ = f\"https://{parsed.netloc.lower()}\".rstrip(\"/\")\n    if normalized\
-          \ not in TRUSTED_BASE_URLS:\n        raise ValueError(\"CALL-E base_url\
-          \ must be a trusted CALL-E API host. Use https://api.heycall-e.com or add\
-          \ a CALL-E-managed test host to the workflow allowlist.\")\n    return normalized\n\
-          \ndef mask_phone(phone: str) -> str:\n    value = str(phone or \"\").strip()\n\
-          \    if not value:\n        return \"\"\n    if len(value) <= 5:\n     \
-          \   return \"****\"\n    return value[:3] + \"****\" + value[-2:]\n\ndef\
-          \ mask_phone_like(value: str) -> str:\n    raw = str(value or \"\").strip()\n\
+        code: "import hashlib\nimport json\nimport math\nimport re\nimport time\n\
+          from urllib.parse import urlparse\n\nTERMINAL_STATUSES = {\n    \"completed\"\
+          , \"failed\", \"canceled\", \"cancelled\",\n    \"no_answer\", \"declined\"\
+          , \"voicemail\", \"busy\", \"expired\"\n}\n\nTRUSTED_BASE_URLS = {\n   \
+          \ \"https://api.heycall-e.com\",\n    # Add CALL-E-managed test hosts here\
+          \ before running non-production workflows.\n}\nPLACEHOLDER_PHONES = {\"\
+          +15555550101\", \"+15555550102\", \"+15555550123\", \"+14155550123\"}\n\
+          E164_RE = re.compile(r\"^\\+[1-9]\\d{6,14}$\")\nREQUEST_ID_RE = re.compile(r\"\
+          ^[A-Za-z0-9._:-]{8,120}$\")\nPHONE_IN_TEXT_RE = re.compile(r\"\\+[1-9]\\\
+          d{6,14}\")\nINTERNATIONAL_GROUPED_PHONE_RE = re.compile(r\"(?<!\\w)\\+[1-9](?:[\\\
+          s().-]*\\d){6,14}(?![\\s().-]*\\d)\")\nPHONE_LIKE_RE = re.compile(r\"(?<!\\\
+          d)(?:\\+?1[\\s.-]?)?(?:\\(?[2-9]\\d{2}\\)?[\\s.-]?[2-9]\\d{2}[\\s.-]?\\\
+          d{4}|[1-9]\\d{6,14})(?!\\d)\")\n\ndef normalize_trusted_base_url(value)\
+          \ -> str:\n    raw = str(value or \"https://api.heycall-e.com\").strip().rstrip(\"\
+          /\")\n    if raw.endswith((\"/v1\", \"/v2\")):\n        raw = raw[:-3].rstrip(\"\
+          /\")\n    parsed = urlparse(raw)\n    if parsed.scheme.lower() != \"https\"\
+          :\n        raise ValueError(\"CALL-E base_url must use https.\")\n    if\
+          \ parsed.params or parsed.query or parsed.fragment:\n        raise ValueError(\"\
+          CALL-E base_url must not include parameters, query strings, or fragments.\"\
+          )\n    if parsed.path not in {\"\", \"/\"}:\n        raise ValueError(\"\
+          CALL-E base_url must be a host URL only; do not include a path except /v1\
+          \ or /v2.\")\n    normalized = f\"https://{parsed.netloc.lower()}\".rstrip(\"\
+          /\")\n    if normalized not in TRUSTED_BASE_URLS:\n        raise ValueError(\"\
+          CALL-E base_url must be a trusted CALL-E API host. Use https://api.heycall-e.com\
+          \ or add a CALL-E-managed test host to the workflow allowlist.\")\n    return\
+          \ normalized\n\ndef mask_phone(phone: str) -> str:\n    value = str(phone\
+          \ or \"\").strip()\n    if not value:\n        return \"\"\n    if len(value)\
+          \ <= 5:\n        return \"****\"\n    return value[:3] + \"****\" + value[-2:]\n\
+          \ndef mask_phone_like(value: str) -> str:\n    raw = str(value or \"\").strip()\n\
           \    digits = re.sub(r\"\\D\", \"\", raw)\n    if not digits:\n        return\
           \ \"\"\n    if len(digits) <= 5:\n        return \"****\"\n    if raw.startswith(\"\
           +\"):\n        return \"+\" + digits[:2] + \"****\" + digits[-2:]\n    return\
@@ -422,12 +428,84 @@ workflow:
           \        return [redact_phone_values(v) for v in value]\n    if isinstance(value,\
           \ dict):\n        return {redact_phone_text(k) if isinstance(k, str) else\
           \ k: redact_phone_values(v) for k, v in value.items()}\n    return value\n\
-          \ndef parse_dry_run(value) -> bool:\n    normalized = str(value or \"\"\
-          ).strip()\n    if normalized == \"true\":\n        return True\n    if normalized\
-          \ == \"false\":\n        return False\n    raise ValueError(\"dry_run must\
-          \ be either true or false. Use false only when you intend to create one\
-          \ live outbound call.\")\n\ndef validation_response(base_url: str, dry_run_enabled:\
-          \ bool, message: str) -> dict:\n    poll_interval_seconds = 20\n    wait_timeout_minutes\
+          \ndef default_result_schema() -> dict:\n    return {\n        \"type\":\
+          \ \"object\",\n        \"additionalProperties\": False,\n        \"required\"\
+          : [\"call_completed\", \"outcome\", \"summary\", \"next_action\"],\n   \
+          \     \"properties\": {\n            \"call_completed\": {\"type\": \"string\"\
+          , \"enum\": [\"yes\", \"no\", \"partial\", \"unknown\"]},\n            \"\
+          outcome\": {\n                \"type\": \"string\",\n                \"\
+          enum\": [\"completed\", \"partial\", \"no_answer\", \"voicemail\", \"busy\"\
+          , \"failed\", \"unknown\"],\n            },\n            \"summary\": {\"\
+          type\": \"string\"},\n            \"next_action\": {\"type\": \"string\"\
+          , \"enum\": [\"none\", \"follow_up\", \"retry_later\", \"manual_review\"\
+          ]},\n            \"language_detected\": {\"type\": \"string\"},\n      \
+          \      \"participant_response\": {\"type\": \"string\"},\n            \"\
+          key_points\": {\"type\": \"string\"},\n            \"issues\": {\"type\"\
+          : \"string\"},\n            \"audio_or_connection_notes\": {\"type\": \"\
+          string\"},\n        },\n    }\n\ndef parse_result_schema(value) -> dict:\n\
+          \    if value is None or (isinstance(value, str) and not value.strip()):\n\
+          \        return default_result_schema()\n\n    def unique_object(pairs):\n\
+          \        parsed = dict(pairs)\n        if len(parsed) != len(pairs):\n \
+          \           raise ValueError(\"result_schema must not repeat JSON object\
+          \ keys.\")\n        return parsed\n\n    if isinstance(value, str):\n  \
+          \      try:\n            value = json.loads(value, object_pairs_hook=unique_object)\n\
+          \        except json.JSONDecodeError as error:\n            raise ValueError(\"\
+          result_schema must be a valid JSON object string.\") from error\n    if\
+          \ not isinstance(value, dict):\n        raise ValueError(\"result_schema\
+          \ must be a JSON object.\")\n    root_keywords = {\"$schema\", \"type\"\
+          , \"description\", \"additionalProperties\", \"properties\", \"required\"\
+          }\n    if set(value) - root_keywords:\n        raise ValueError(\"result_schema\
+          \ contains unsupported root keywords.\")\n    if value.get(\"$schema\")\
+          \ not in (None, \"https://json-schema.org/draft/2020-12/schema\"):\n   \
+          \     raise ValueError(\"result_schema.$schema must use JSON Schema draft\
+          \ 2020-12.\")\n    if value.get(\"type\") != \"object\" or value.get(\"\
+          additionalProperties\") is not False:\n        raise ValueError(\"result_schema\
+          \ requires type=object and additionalProperties=false.\")\n    properties\
+          \ = value.get(\"properties\")\n    if not isinstance(properties, dict) or\
+          \ len(properties) > 32:\n        raise ValueError(\"result_schema.properties\
+          \ must be an object with at most 32 fields.\")\n    required = value.get(\"\
+          required\", [])\n    if (\n        not isinstance(required, list)\n    \
+          \    or any(not isinstance(name, str) or name not in properties for name\
+          \ in required)\n        or len(set(required)) != len(required)\n    ):\n\
+          \        raise ValueError(\"result_schema.required must list declared field\
+          \ names without duplicates.\")\n    for node in [value, *properties.values()]:\n\
+          \        if not isinstance(node, dict):\n            raise ValueError(\"\
+          Each result_schema property must be a scalar schema object.\")\n       \
+          \ description = node.get(\"description\")\n        if description is not\
+          \ None and (not isinstance(description, str) or len(description) > 512):\n\
+          \            raise ValueError(\"result_schema descriptions must contain\
+          \ at most 512 characters.\")\n    scalar_types = {\"string\": (str,), \"\
+          boolean\": (bool,), \"integer\": (int,), \"number\": (int, float)}\n   \
+          \ for name, schema in properties.items():\n        if not isinstance(name,\
+          \ str) or not re.fullmatch(r\"[a-z][a-z0-9_]{0,63}\", name):\n         \
+          \   raise ValueError(\"result_schema field names must match [a-z][a-z0-9_]{0,63}.\"\
+          )\n        if set(schema) - {\"type\", \"description\", \"enum\"}:\n   \
+          \         raise ValueError(f\"result_schema.properties.{name} only supports\
+          \ type, description, and enum.\")\n        kind = schema.get(\"type\")\n\
+          \        if not isinstance(kind, str) or kind not in scalar_types:\n   \
+          \         raise ValueError(f\"result_schema.properties.{name} must be string,\
+          \ boolean, integer, or number.\")\n        if \"enum\" in schema:\n    \
+          \        values = schema[\"enum\"]\n            if not isinstance(values,\
+          \ list) or not 1 <= len(values) <= 32:\n                raise ValueError(f\"\
+          result_schema.properties.{name}.enum must contain 1-32 values.\")\n    \
+          \        if any(\n                type(item) not in scalar_types[kind]\n\
+          \                or (isinstance(item, float) and not math.isfinite(item))\n\
+          \                or (type(item) is int and abs(item) > 9007199254740991)\n\
+          \                for item in values\n            ):\n                raise\
+          \ ValueError(f\"result_schema.properties.{name}.enum values must match its\
+          \ finite scalar type.\")\n            if len(set(values)) != len(values):\n\
+          \                raise ValueError(f\"result_schema.properties.{name}.enum\
+          \ must not contain duplicates.\")\n    encoded = json.dumps({key: item for\
+          \ key, item in value.items() if key != \"$schema\"},\n                 \
+          \        ensure_ascii=False, allow_nan=False, separators=(\",\", \":\")).encode(\"\
+          utf-8\")\n    if len(encoded) > 32768:\n        raise ValueError(\"result_schema\
+          \ must not exceed 32 KiB of JSON.\")\n    return value\n\ndef parse_dry_run(value)\
+          \ -> bool:\n    normalized = str(value or \"\").strip()\n    if normalized\
+          \ == \"true\":\n        return True\n    if normalized == \"false\":\n \
+          \       return False\n    raise ValueError(\"dry_run must be either true\
+          \ or false. Use false only when you intend to create one live outbound call.\"\
+          )\n\ndef validation_response(base_url: str, dry_run_enabled: bool, message:\
+          \ str) -> dict:\n    poll_interval_seconds = 20\n    wait_timeout_minutes\
           \ = 15\n    return {\n        \"base_url\": base_url,\n        \"dry_run\"\
           : \"true\" if dry_run_enabled else \"false\",\n        \"poll_interval_seconds\"\
           : poll_interval_seconds,\n        \"wait_timeout_minutes\": wait_timeout_minutes,\n\
@@ -443,66 +521,72 @@ workflow:
           \             \"timeoutMinutes\": wait_timeout_minutes,\n            },\n\
           \            \"tasks\": [],\n            \"validationError\": message,\n\
           \        }, ensure_ascii=False, indent=2),\n    }\n\ndef main(base_url:\
-          \ str, dry_run: str, request_id: str, phone_number: str, task: str) -> dict:\n\
-          \    base_url = normalize_trusted_base_url(base_url)\n    dry_run_enabled\
-          \ = parse_dry_run(dry_run)\n    request_id = str(request_id or \"\").strip()\n\
-          \    default_phone = str(phone_number or \"\").strip()\n    default_task\
-          \ = str(task or \"\").strip()\n    poll_interval_seconds = 20\n    wait_timeout_minutes\
-          \ = 15\n\n    if not request_id:\n        return validation_response(base_url,\
-          \ dry_run_enabled, \"Fill request_id with a stable unique value for this\
-          \ intended call. Reuse it only when replaying the same call after an ambiguous\
-          \ create result.\")\n    if not REQUEST_ID_RE.match(request_id):\n     \
-          \   return validation_response(base_url, dry_run_enabled, \"request_id must\
-          \ be 8-120 characters using letters, numbers, dot, underscore, colon, or\
-          \ hyphen.\")\n    if not default_phone or not default_task:\n        return\
-          \ validation_response(base_url, dry_run_enabled, \"Fill both phone_number\
-          \ and task for this one-shot call.\")\n    if default_phone and not E164_RE.match(default_phone):\n\
-          \        raise ValueError(\"phone_number must be in E.164 format, for example\
-          \ +15555550123.\")\n    if not dry_run_enabled and default_phone in PLACEHOLDER_PHONES:\n\
-          \        raise ValueError(\"Replace the placeholder phone_number with a\
-          \ number you own or are explicitly authorized to call before running live\
-          \ calls.\")\n\n    call_tasks = [{\n        \"callItemId\": \"call_001\"\
-          ,\n        \"requestId\": request_id,\n        \"callName\": \"One-shot\
-          \ outbound call\",\n        \"phone\": default_phone,\n        \"task\"\
-          : default_task,\n        \"metadata\": {},\n    }]\n\n    normalized = []\n\
-          \    for index, task in enumerate(call_tasks):\n        if not isinstance(task,\
-          \ dict):\n            raise ValueError(f\"Call task at index {index} must\
-          \ be an object.\")\n        phone = default_phone\n        call_item_id\
-          \ = str(task.get(\"callItemId\") or f\"call_{index + 1}\")\n        if not\
-          \ E164_RE.match(phone):\n            raise ValueError(f\"Fill phone_number\
-          \ for {call_item_id} using E.164 format, for example +15555550123.\")\n\
-          \        if not dry_run_enabled and phone in PLACEHOLDER_PHONES:\n     \
-          \       raise ValueError(f\"Replace the placeholder phone number for {call_item_id}\
-          \ with a number you own or are explicitly authorized to call before running\
-          \ live calls.\")\n        task_text = default_task\n        if not task_text:\n\
-          \            raise ValueError(f\"Fill task for {call_item_id}.\")\n    \
-          \    idempotency_basis = json.dumps({\n            \"requestId\": str(task.get(\"\
-          requestId\") or request_id),\n            \"callItemId\": call_item_id,\n\
-          \        }, ensure_ascii=False, sort_keys=True, separators=(\",\", \":\"\
-          ))\n        normalized.append({\n            \"callItemId\": call_item_id,\n\
-          \            \"requestId\": str(task.get(\"requestId\") or request_id),\n\
-          \            \"idempotencyKey\": \"dify-\" + hashlib.sha256(idempotency_basis.encode(\"\
+          \ str, dry_run: str, request_id: str, phone_number: str, task: str, result_schema:\
+          \ str = \"\") -> dict:\n    base_url = normalize_trusted_base_url(base_url)\n\
+          \    dry_run_enabled = parse_dry_run(dry_run)\n    request_id = str(request_id\
+          \ or \"\").strip()\n    default_phone = str(phone_number or \"\").strip()\n\
+          \    default_task = str(task or \"\").strip()\n    poll_interval_seconds\
+          \ = 20\n    wait_timeout_minutes = 15\n\n    if not request_id:\n      \
+          \  return validation_response(base_url, dry_run_enabled, \"Fill request_id\
+          \ with a stable unique value for this intended call. Reuse it only when\
+          \ replaying the same call after an ambiguous create result.\")\n    if not\
+          \ REQUEST_ID_RE.match(request_id):\n        return validation_response(base_url,\
+          \ dry_run_enabled, \"request_id must be 8-120 characters using letters,\
+          \ numbers, dot, underscore, colon, or hyphen.\")\n    if not default_phone\
+          \ or not default_task:\n        return validation_response(base_url, dry_run_enabled,\
+          \ \"Fill both phone_number and task for this one-shot call.\")\n    if default_phone\
+          \ and not E164_RE.match(default_phone):\n        raise ValueError(\"phone_number\
+          \ must be in E.164 format, for example +15555550123.\")\n    if not dry_run_enabled\
+          \ and default_phone in PLACEHOLDER_PHONES:\n        raise ValueError(\"\
+          Replace the placeholder phone_number with a number you own or are explicitly\
+          \ authorized to call before running live calls.\")\n\n    try:\n       \
+          \ effective_schema = parse_result_schema(result_schema)\n    except ValueError\
+          \ as error:\n        return validation_response(base_url, dry_run_enabled,\
+          \ str(error))\n    custom_schema = bool(result_schema and str(result_schema).strip())\n\
+          \n    call_tasks = [{\n        \"callItemId\": \"call_001\",\n        \"\
+          requestId\": request_id,\n        \"callName\": \"One-shot outbound call\"\
+          ,\n        \"phone\": default_phone,\n        \"task\": default_task,\n\
+          \        \"metadata\": {},\n    }]\n\n    normalized = []\n    for index,\
+          \ task in enumerate(call_tasks):\n        if not isinstance(task, dict):\n\
+          \            raise ValueError(f\"Call task at index {index} must be an object.\"\
+          )\n        phone = default_phone\n        call_item_id = str(task.get(\"\
+          callItemId\") or f\"call_{index + 1}\")\n        if not E164_RE.match(phone):\n\
+          \            raise ValueError(f\"Fill phone_number for {call_item_id} using\
+          \ E.164 format, for example +15555550123.\")\n        if not dry_run_enabled\
+          \ and phone in PLACEHOLDER_PHONES:\n            raise ValueError(f\"Replace\
+          \ the placeholder phone number for {call_item_id} with a number you own\
+          \ or are explicitly authorized to call before running live calls.\")\n \
+          \       task_text = default_task\n        if not task_text:\n          \
+          \  raise ValueError(f\"Fill task for {call_item_id}.\")\n        idempotency_basis\
+          \ = json.dumps({\n            \"requestId\": str(task.get(\"requestId\"\
+          ) or request_id),\n            \"callItemId\": call_item_id,\n        },\
+          \ ensure_ascii=False, sort_keys=True, separators=(\",\", \":\"))\n     \
+          \   normalized.append({\n            \"callItemId\": call_item_id,\n   \
+          \         \"requestId\": str(task.get(\"requestId\") or request_id),\n \
+          \           \"idempotencyKey\": \"dify-\" + hashlib.sha256(idempotency_basis.encode(\"\
           utf-8\")).hexdigest(),\n            \"callName\": task.get(\"callName\"\
           ) or task.get(\"ivrName\") or call_item_id,\n            \"phone\": phone,\n\
-          \            \"task\": task_text,\n            \"metadata\": task.get(\"\
-          metadata\") if isinstance(task.get(\"metadata\"), dict) else {},\n     \
-          \   })\n\n    preview = [{\n        \"callItemId\": item[\"callItemId\"\
+          \            \"task\": task_text,\n            \"resultSchema\": effective_schema,\n\
+          \            \"customResultSchema\": custom_schema,\n            \"metadata\"\
+          : task.get(\"metadata\") if isinstance(task.get(\"metadata\"), dict) else\
+          \ {},\n        })\n\n    preview = [{\n        \"callItemId\": item[\"callItemId\"\
           ],\n        \"callName\": item[\"callName\"],\n        \"requestId\": item[\"\
           requestId\"],\n        \"maskedPhone\": mask_phone(item[\"phone\"]),\n \
-          \       \"task\": redact_phone_text(item[\"task\"]),\n        \"metadata\"\
-          : redact_phone_values(item[\"metadata\"]),\n    } for item in normalized]\n\
-          \n    return {\n        \"base_url\": base_url,\n        \"dry_run\": \"\
-          true\" if dry_run_enabled else \"false\",\n        \"poll_interval_seconds\"\
-          : poll_interval_seconds,\n        \"wait_timeout_minutes\": wait_timeout_minutes,\n\
-          \        \"max_poll_count\": int((wait_timeout_minutes * 60) / poll_interval_seconds),\n\
-          \        \"call_tasks\": [] if dry_run_enabled else normalized,\n      \
-          \  \"preview_tasks\": preview,\n        \"task_count\": len(normalized),\n\
-          \        \"live_task_count\": 0 if dry_run_enabled else len(normalized),\n\
-          \        \"validation_error\": \"\",\n        \"preview_json\": json.dumps({\n\
-          \            \"dryRun\": dry_run_enabled,\n            \"willCreateLiveCalls\"\
-          : not dry_run_enabled,\n            \"connectivityCheck\": f\"{base_url}/v1/goals?limit=1\"\
-          ,\n            \"liveCreateEndpoint\": f\"{base_url}/v2/calls\",\n     \
-          \       \"liveResultLookup\": {\n                \"endpoint\": f\"{base_url}/v2/calls/{{id}}\"\
+          \       \"task\": redact_phone_text(item[\"task\"]),\n        \"resultSchema\"\
+          : item[\"resultSchema\"],\n        \"metadata\": redact_phone_values(item[\"\
+          metadata\"]),\n    } for item in normalized]\n\n    return {\n        \"\
+          base_url\": base_url,\n        \"dry_run\": \"true\" if dry_run_enabled\
+          \ else \"false\",\n        \"poll_interval_seconds\": poll_interval_seconds,\n\
+          \        \"wait_timeout_minutes\": wait_timeout_minutes,\n        \"max_poll_count\"\
+          : int((wait_timeout_minutes * 60) / poll_interval_seconds),\n        \"\
+          call_tasks\": [] if dry_run_enabled else normalized,\n        \"preview_tasks\"\
+          : preview,\n        \"task_count\": len(normalized),\n        \"live_task_count\"\
+          : 0 if dry_run_enabled else len(normalized),\n        \"validation_error\"\
+          : \"\",\n        \"preview_json\": json.dumps({\n            \"dryRun\"\
+          : dry_run_enabled,\n            \"willCreateLiveCalls\": not dry_run_enabled,\n\
+          \            \"connectivityCheck\": f\"{base_url}/v1/goals?limit=1\",\n\
+          \            \"liveCreateEndpoint\": f\"{base_url}/v2/calls\",\n       \
+          \     \"liveResultLookup\": {\n                \"endpoint\": f\"{base_url}/v2/calls/{{id}}\"\
           ,\n                \"pollIntervalSeconds\": poll_interval_seconds,\n   \
           \             \"timeoutMinutes\": wait_timeout_minutes,\n            },\n\
           \            \"tasks\": preview,\n        }, ensure_ascii=False, indent=2),\n\
@@ -570,6 +654,10 @@ workflow:
           - start
           - task
           variable: task
+        - value_selector:
+          - start
+          - result_schema
+          variable: result_schema
       height: 160
       id: prepare_call_tasks
       position:
@@ -1224,7 +1312,91 @@ workflow:
       width: 242
       zIndex: 1002
     - data:
-        code: "import json\nimport re\nimport time\n\nFINAL_RESULT_STATUSES = {\"available\", \"unavailable\", \"not_applicable\"}\nDOCUMENTED_CALL_STATUSES = {\"queued\", \"in_progress\", \"completed\", \"failed\", \"canceled\"}\nCALL_ID_RE = re.compile(r\"^call_[A-Za-z0-9_-]+$\")\nPHONE_IN_TEXT_RE = re.compile(r\"\\+[1-9]\\d{6,14}\")\nINTERNATIONAL_GROUPED_PHONE_RE = re.compile(r\"(?<!\\w)\\+[1-9](?:[\\s().-]*\\d){6,14}(?![\\s().-]*\\d)\")\nPHONE_LIKE_RE = re.compile(r\"(?<!\\d)(?:\\+?1[\\s.-]?)?(?:\\(?[2-9]\\d{2}\\)?[\\s.-]?[2-9]\\d{2}[\\s.-]?\\d{4}|[1-9]\\d{6,14})(?!\\d)\")\n\ndef as_obj(value):\n    if isinstance(value, dict):\n        return value\n    if isinstance(value, str) and value.strip():\n        try:\n            parsed = json.loads(value)\n            return parsed if isinstance(parsed, dict) else {}\n        except Exception:\n            return {}\n    return {}\n\ndef as_number(value, fallback):\n    try:\n        return float(value)\n    except Exception:\n        return float(fallback)\n\ndef documented_call(value):\n    if not isinstance(value, dict) or value.get(\"object\") != \"call\":\n        return {}\n    call_id = str(value.get(\"id\") or \"\")\n    status = str(value.get(\"status\") or \"\").strip()\n    if not CALL_ID_RE.fullmatch(call_id) or status not in DOCUMENTED_CALL_STATUSES:\n        return {}\n    result_status = value.get(\"result_status\")\n    if not isinstance(result_status, str) or result_status not in FINAL_RESULT_STATUSES | {\"pending\"}:\n        return {}\n    return value\n\ndef compare_metadata_round_trip(call, metadata_sent_json) -> dict:\n    metadata_sent = as_obj(metadata_sent_json)\n    call_payload = documented_call(call)\n    metadata_returned = as_obj(call_payload.get(\"metadata\"))\n    metadata_keys = sorted([str(k) for k in metadata_sent.keys()])\n    missing_or_different = [\n        key for key in metadata_keys\n        if metadata_sent.get(key) != metadata_returned.get(key)\n    ]\n    return {\n        \"requestedKeys\": metadata_keys,\n        \"allRequestedKeysReturned\": len(missing_or_different) == 0,\n        \"missingOrDifferentKeys\": missing_or_different,\n    }\n\ndef mask_phone_like(value: str) -> str:\n    raw = str(value or \"\").strip()\n    digits = re.sub(r\"\\D\", \"\", raw)\n    if not digits:\n        return \"\"\n    if len(digits) <= 5:\n        return \"****\"\n    if raw.startswith(\"+\"):\n        return \"+\" + digits[:2] + \"****\" + digits[-2:]\n    return digits[:3] + \"****\" + digits[-2:]\n\ndef redact_phone_text(value: str) -> str:\n    text = INTERNATIONAL_GROUPED_PHONE_RE.sub(lambda match: mask_phone_like(match.group(0)), str(value or \"\"))\n    text = PHONE_IN_TEXT_RE.sub(lambda match: mask_phone_like(match.group(0)), text)\n    return PHONE_LIKE_RE.sub(lambda match: mask_phone_like(match.group(0)), text)\n\ndef redact_phone_values(value):\n    if isinstance(value, str):\n        return redact_phone_text(value)\n    if isinstance(value, list):\n        return [redact_phone_values(v) for v in value]\n    if isinstance(value, dict):\n        return {redact_phone_text(k) if isinstance(k, str) else k: redact_phone_values(v) for k, v in value.items()}\n    return value\n\ndef main(latest_response, poll_status_code, poll_count, started_at_ms, wait_timeout_minutes, max_poll_count, metadata_sent_json, has_live_call, previous_call_response) -> dict:\n    if not bool(has_live_call):\n        return {\n            \"latest_call_json\": '{\"status\":\"completed\",\"_dify_no_live_call\":true}',\n            \"poll_count\": int(as_number(poll_count, 0)),\n            \"status\": \"no_live_call\",\n            \"done\": True,\n            \"timed_out\": False,\n            \"error_message\": \"\",\n        }\n    response_body = as_obj(latest_response)\n    call = documented_call(response_body)\n    previous_call = documented_call(as_obj(previous_call_response))\n    if previous_call and call.get(\"id\") != previous_call[\"id\"]:\n        call = {}\n    status = str(call.get(\"status\") or previous_call.get(\"status\") or \"invalid_call\")\n    poll_status = int(as_number(poll_status_code, 0))\n    next_poll_count = int(as_number(poll_count, 0)) + 1\n    started = int(as_number(started_at_ms, int(time.time() * 1000)))\n    timeout_ms = max(1.0, as_number(wait_timeout_minutes, 15)) * 60 * 1000\n    elapsed_ms = int(time.time() * 1000) - started\n    max_polls = int(as_number(max_poll_count, 90))\n    done = call.get(\"result_status\") in FINAL_RESULT_STATUSES\n    timed_out = (elapsed_ms >= timeout_ms or next_poll_count >= max_polls) and not done\n    error_message = \"\"\n    if 200 <= poll_status < 300 and not call:\n        done = True\n        timed_out = False\n        error_message = \"CALL-E poll response returned HTTP 2xx without a documented Call matching the accepted ID and a known result_status.\"\n        call = dict(previous_call)\n        call[\"_dify_poll_failed\"] = True\n        call[\"_dify_poll_http_status\"] = poll_status\n        call[\"_dify_poll_error\"] = error_message\n    elif not (200 <= poll_status < 300):\n        done = True\n        timed_out = False\n        error_message = (\n            f\"CALL-E poll request returned HTTP {poll_status}.\"\n            if poll_status\n            else \"CALL-E poll request failed before a response was available.\"\n        )\n        call = dict(previous_call)\n        call[\"_dify_poll_failed\"] = True\n        call[\"_dify_poll_http_status\"] = poll_status\n        call[\"_dify_poll_error\"] = error_message\n    elif timed_out:\n        call_id = str(call.get(\"id\") or \"\")\n        error_message = f\"Timed out waiting for CALL-E call {call_id or ''} after {next_poll_count} polls.\"\n        call = dict(call)\n        call[\"_dify_poll_timeout\"] = True\n        call[\"_dify_poll_error\"] = error_message\n    metadata_round_trip = call.get(\"_dify_metadata_round_trip\") or compare_metadata_round_trip(call, metadata_sent_json)\n    safe_call = redact_phone_values(call)\n    if documented_call(call):\n        safe_call[\"id\"] = call[\"id\"]\n        safe_call[\"_dify_metadata_round_trip\"] = metadata_round_trip\n    return {\n        \"latest_call_json\": json.dumps(safe_call, ensure_ascii=False),\n        \"poll_count\": next_poll_count,\n        \"status\": status,\n        \"done\": done,\n        \"timed_out\": timed_out,\n        \"error_message\": error_message,\n    }\n"
+        code: "import json\nimport re\nimport time\n\nFINAL_RESULT_STATUSES = {\"\
+          available\", \"unavailable\", \"not_applicable\"}\nDOCUMENTED_CALL_STATUSES\
+          \ = {\"queued\", \"in_progress\", \"completed\", \"failed\", \"canceled\"\
+          }\nCALL_ID_RE = re.compile(r\"^call_[A-Za-z0-9_-]+$\")\nPHONE_IN_TEXT_RE\
+          \ = re.compile(r\"\\+[1-9]\\d{6,14}\")\nINTERNATIONAL_GROUPED_PHONE_RE =\
+          \ re.compile(r\"(?<!\\w)\\+[1-9](?:[\\s().-]*\\d){6,14}(?![\\s().-]*\\d)\"\
+          )\nPHONE_LIKE_RE = re.compile(r\"(?<!\\d)(?:\\+?1[\\s.-]?)?(?:\\(?[2-9]\\\
+          d{2}\\)?[\\s.-]?[2-9]\\d{2}[\\s.-]?\\d{4}|[1-9]\\d{6,14})(?!\\d)\")\n\n\
+          def as_obj(value):\n    if isinstance(value, dict):\n        return value\n\
+          \    if isinstance(value, str) and value.strip():\n        try:\n      \
+          \      parsed = json.loads(value)\n            return parsed if isinstance(parsed,\
+          \ dict) else {}\n        except Exception:\n            return {}\n    return\
+          \ {}\n\ndef as_number(value, fallback):\n    try:\n        return float(value)\n\
+          \    except Exception:\n        return float(fallback)\n\ndef documented_call(value):\n\
+          \    if not isinstance(value, dict) or value.get(\"object\") != \"call\"\
+          :\n        return {}\n    call_id = str(value.get(\"id\") or \"\")\n   \
+          \ status = str(value.get(\"status\") or \"\").strip()\n    if not CALL_ID_RE.fullmatch(call_id)\
+          \ or status not in DOCUMENTED_CALL_STATUSES:\n        return {}\n    result_status\
+          \ = value.get(\"result_status\")\n    if not isinstance(result_status, str)\
+          \ or result_status not in FINAL_RESULT_STATUSES | {\"pending\"}:\n     \
+          \   return {}\n    return value\n\ndef compare_metadata_round_trip(call,\
+          \ metadata_sent_json) -> dict:\n    metadata_sent = as_obj(metadata_sent_json)\n\
+          \    call_payload = documented_call(call)\n    metadata_returned = as_obj(call_payload.get(\"\
+          metadata\"))\n    metadata_keys = sorted([str(k) for k in metadata_sent.keys()])\n\
+          \    missing_or_different = [\n        key for key in metadata_keys\n  \
+          \      if metadata_sent.get(key) != metadata_returned.get(key)\n    ]\n\
+          \    return {\n        \"requestedKeys\": metadata_keys,\n        \"allRequestedKeysReturned\"\
+          : len(missing_or_different) == 0,\n        \"missingOrDifferentKeys\": missing_or_different,\n\
+          \    }\n\ndef mask_phone_like(value: str) -> str:\n    raw = str(value or\
+          \ \"\").strip()\n    digits = re.sub(r\"\\D\", \"\", raw)\n    if not digits:\n\
+          \        return \"\"\n    if len(digits) <= 5:\n        return \"****\"\n\
+          \    if raw.startswith(\"+\"):\n        return \"+\" + digits[:2] + \"****\"\
+          \ + digits[-2:]\n    return digits[:3] + \"****\" + digits[-2:]\n\ndef redact_phone_text(value:\
+          \ str) -> str:\n    text = INTERNATIONAL_GROUPED_PHONE_RE.sub(lambda match:\
+          \ mask_phone_like(match.group(0)), str(value or \"\"))\n    text = PHONE_IN_TEXT_RE.sub(lambda\
+          \ match: mask_phone_like(match.group(0)), text)\n    return PHONE_LIKE_RE.sub(lambda\
+          \ match: mask_phone_like(match.group(0)), text)\n\ndef redact_phone_values(value):\n\
+          \    if isinstance(value, str):\n        return redact_phone_text(value)\n\
+          \    if isinstance(value, list):\n        return [redact_phone_values(v)\
+          \ for v in value]\n    if isinstance(value, dict):\n        return {redact_phone_text(k)\
+          \ if isinstance(k, str) else k: redact_phone_values(v) for k, v in value.items()}\n\
+          \    return value\n\ndef main(latest_response, poll_status_code, poll_count,\
+          \ started_at_ms, wait_timeout_minutes, max_poll_count, metadata_sent_json,\
+          \ has_live_call, previous_call_response) -> dict:\n    if not bool(has_live_call):\n\
+          \        return {\n            \"latest_call_json\": '{\"status\":\"completed\"\
+          ,\"_dify_no_live_call\":true}',\n            \"poll_count\": int(as_number(poll_count,\
+          \ 0)),\n            \"status\": \"no_live_call\",\n            \"done\"\
+          : True,\n            \"timed_out\": False,\n            \"error_message\"\
+          : \"\",\n        }\n    response_body = as_obj(latest_response)\n    call\
+          \ = documented_call(response_body)\n    previous_call = documented_call(as_obj(previous_call_response))\n\
+          \    if previous_call and call.get(\"id\") != previous_call[\"id\"]:\n \
+          \       call = {}\n    status = str(call.get(\"status\") or previous_call.get(\"\
+          status\") or \"invalid_call\")\n    poll_status = int(as_number(poll_status_code,\
+          \ 0))\n    next_poll_count = int(as_number(poll_count, 0)) + 1\n    started\
+          \ = int(as_number(started_at_ms, int(time.time() * 1000)))\n    timeout_ms\
+          \ = max(1.0, as_number(wait_timeout_minutes, 15)) * 60 * 1000\n    elapsed_ms\
+          \ = int(time.time() * 1000) - started\n    max_polls = int(as_number(max_poll_count,\
+          \ 90))\n    done = call.get(\"result_status\") in FINAL_RESULT_STATUSES\n\
+          \    timed_out = (elapsed_ms >= timeout_ms or next_poll_count >= max_polls)\
+          \ and not done\n    error_message = \"\"\n    if 200 <= poll_status < 300\
+          \ and not call:\n        done = True\n        timed_out = False\n      \
+          \  error_message = \"CALL-E poll response returned HTTP 2xx without a documented\
+          \ Call matching the accepted ID and a known result_status.\"\n        call\
+          \ = dict(previous_call)\n        call[\"_dify_poll_failed\"] = True\n  \
+          \      call[\"_dify_poll_http_status\"] = poll_status\n        call[\"_dify_poll_error\"\
+          ] = error_message\n    elif not (200 <= poll_status < 300):\n        done\
+          \ = True\n        timed_out = False\n        error_message = (\n       \
+          \     f\"CALL-E poll request returned HTTP {poll_status}.\"\n          \
+          \  if poll_status\n            else \"CALL-E poll request failed before\
+          \ a response was available.\"\n        )\n        call = dict(previous_call)\n\
+          \        call[\"_dify_poll_failed\"] = True\n        call[\"_dify_poll_http_status\"\
+          ] = poll_status\n        call[\"_dify_poll_error\"] = error_message\n  \
+          \  elif timed_out:\n        call_id = str(call.get(\"id\") or \"\")\n  \
+          \      error_message = f\"Timed out waiting for CALL-E call {call_id or\
+          \ ''} after {next_poll_count} polls.\"\n        call = dict(call)\n    \
+          \    call[\"_dify_poll_timeout\"] = True\n        call[\"_dify_poll_error\"\
+          ] = error_message\n    metadata_round_trip = call.get(\"_dify_metadata_round_trip\"\
+          ) or compare_metadata_round_trip(call, metadata_sent_json)\n    safe_call\
+          \ = redact_phone_values(call)\n    if \"result\" in call:\n        safe_call[\"\
+          result\"] = call[\"result\"]\n    if documented_call(call):\n        safe_call[\"\
+          id\"] = call[\"id\"]\n        safe_call[\"_dify_metadata_round_trip\"] =\
+          \ metadata_round_trip\n    return {\n        \"latest_call_json\": json.dumps(safe_call,\
+          \ ensure_ascii=False),\n        \"poll_count\": next_poll_count,\n     \
+          \   \"status\": status,\n        \"done\": done,\n        \"timed_out\"\
+          : timed_out,\n        \"error_message\": error_message,\n    }\n"
         code_language: python3
         desc: Validates the latest CALL-E Call response and decides whether polling is
           complete or timed out. A non-Call success response requires reconciliation.
@@ -1386,7 +1558,184 @@ workflow:
       width: 242
       zIndex: 1002
     - data:
-        code: "import json\nimport re\n\ndef as_obj(value):\n    if isinstance(value, dict):\n        return value\n    if isinstance(value, str) and value.strip():\n        try:\n            parsed = json.loads(value)\n            return parsed if isinstance(parsed, dict) else {}\n        except Exception:\n            return {}\n    return {}\n\ndef as_list(value):\n    return value if isinstance(value, list) else []\n\nPHONE_IN_TEXT_RE = re.compile(r\"\\+[1-9]\\d{6,14}\")\nINTERNATIONAL_GROUPED_PHONE_RE = re.compile(r\"(?<!\\w)\\+[1-9](?:[\\s().-]*\\d){6,14}(?![\\s().-]*\\d)\")\nPHONE_LIKE_RE = re.compile(r\"(?<!\\d)(?:\\+?1[\\s.-]?)?(?:\\(?[2-9]\\d{2}\\)?[\\s.-]?[2-9]\\d{2}[\\s.-]?\\d{4}|[1-9]\\d{6,14})(?!\\d)\")\n\ndef mask_phone_like(value: str) -> str:\n    raw = str(value or \"\").strip()\n    digits = re.sub(r\"\\D\", \"\", raw)\n    if not digits:\n        return \"\"\n    if len(digits) <= 5:\n        return \"****\"\n    if raw.startswith(\"+\"):\n        return \"+\" + digits[:2] + \"****\" + digits[-2:]\n    return digits[:3] + \"****\" + digits[-2:]\n\ndef redact_phone_text(value: str) -> str:\n    text = INTERNATIONAL_GROUPED_PHONE_RE.sub(lambda match: mask_phone_like(match.group(0)), str(value or \"\"))\n    text = PHONE_IN_TEXT_RE.sub(lambda match: mask_phone_like(match.group(0)), text)\n    return PHONE_LIKE_RE.sub(lambda match: mask_phone_like(match.group(0)), text)\n\ndef redact_phone_values(value):\n    if isinstance(value, str):\n        return redact_phone_text(value)\n    if isinstance(value, list):\n        return [redact_phone_values(v) for v in value]\n    if isinstance(value, dict):\n        return {redact_phone_text(k) if isinstance(k, str) else k: redact_phone_values(v) for k, v in value.items()}\n    return value\n\nFINAL_RESULT_STATUSES = {\"available\", \"unavailable\", \"not_applicable\"}\nDOCUMENTED_CALL_STATUSES = {\"queued\", \"in_progress\", \"completed\", \"failed\", \"canceled\"}\nCALL_ID_RE = re.compile(r\"^call_[A-Za-z0-9_-]+$\")\n\ndef documented_call(value):\n    if not isinstance(value, dict) or value.get(\"object\") != \"call\":\n        return {}\n    call_id = str(value.get(\"id\") or \"\")\n    status = str(value.get(\"status\") or \"\").strip()\n    if not CALL_ID_RE.fullmatch(call_id) or status not in DOCUMENTED_CALL_STATUSES:\n        return {}\n    result_status = value.get(\"result_status\")\n    if not isinstance(result_status, str) or result_status not in FINAL_RESULT_STATUSES | {\"pending\"}:\n        return {}\n    return value\n\ndef main(call_context: dict, final_call_response, poll_count, poll_timed_out, poll_error_message: str) -> dict:\n    context = call_context if isinstance(call_context, dict) else {}\n    create_body = as_obj(context.get(\"createResponseJson\"))\n    metadata_sent_raw = as_obj(context.get(\"metadataSentJson\"))\n    metadata_sent = redact_phone_values(metadata_sent_raw)\n    if context.get(\"createFailed\"):\n        metadata_keys = sorted([str(k) for k in metadata_sent_raw.keys()])\n        raw_call_result_json = json.dumps(redact_phone_values(create_body), ensure_ascii=False)\n        result = {\n            \"callItemId\": context.get(\"callItemId\"),\n            \"maskedPhone\": context.get(\"maskedPhone\"),\n            \"metadataSent\": metadata_sent,\n            \"metadataReturned\": {},\n            \"metadataRoundTrip\": {\n                \"requestedKeys\": metadata_keys,\n                \"allRequestedKeysReturned\": False,\n                \"missingOrDifferentKeys\": metadata_keys,\n            },\n            \"polling\": {\n                \"pollCount\": 0,\n                \"timedOut\": False,\n                \"errorMessage\": context.get(\"createErrorMessage\") or \"CALL-E create request failed.\",\n            },\n            \"callStatus\": {\n                \"ok\": False,\n                \"created\": False,\n                \"creation_state\": \"not_created\",\n                \"callId\": \"\",\n                \"call_status\": \"create_failed\",\n                \"call_outcome\": None,\n                \"result_status\": None,\n                \"failure_code\": as_obj(create_body.get(\"error\")).get(\"code\") or \"create_failed\",\n                \"failure_message\": context.get(\"createErrorMessage\") or \"CALL-E create request failed.\",\n                \"answered\": None,\n                \"no_answer\": False,\n                \"busy\": False,\n                \"failed\": True,\n            },\n            \"lookup\": {\n                \"skipped\": True,\n                \"url\": \"\",\n                \"reason\": \"The create request failed, so no result lookup was attempted.\",\n                \"rawLookupJson\": raw_call_result_json,\n            },\n            \"reconciliation\": {\n                \"required\": False,\n                \"idempotencyKey\": context.get(\"idempotencyKey\") or \"\",\n                \"instruction\": \"\",\n            },\n            \"returnedData\": redact_phone_values({\n                \"summary\": context.get(\"createErrorMessage\") or \"CALL-E create request failed.\",\n                \"transcript\": [],\n                \"structuredResult\": None,\n                \"error\": create_body.get(\"error\"),\n            }),\n            \"rawCallResultJson\": raw_call_result_json,\n        }\n        return {\"result\": result, \"results\": [result]}\n    if context.get(\"createOutcomeUnknown\"):\n        metadata_keys = sorted([str(k) for k in metadata_sent_raw.keys()])\n        raw_call_result_json = json.dumps(redact_phone_values(create_body), ensure_ascii=False)\n        idempotency_key = str(context.get(\"idempotencyKey\") or \"\")\n        message = context.get(\"createOutcomeMessage\") or (\n            \"CALL-E returned a successful create status without a recognized call id. \"\n            \"The call may already have been created.\"\n        )\n        reconciliation_instruction = (\n            f\"Replay or reconcile this request only with the same Idempotency-Key ({idempotency_key}) and unchanged request body; \"\n            \"do not generate a new key.\"\n            if idempotency_key\n            else \"Reconcile this request before retrying; do not submit it with a new idempotency key.\"\n        )\n        result = {\n            \"callItemId\": context.get(\"callItemId\"),\n            \"maskedPhone\": context.get(\"maskedPhone\"),\n            \"metadataSent\": metadata_sent,\n            \"metadataReturned\": {},\n            \"metadataRoundTrip\": {\n                \"requestedKeys\": metadata_keys,\n                \"allRequestedKeysReturned\": False,\n                \"missingOrDifferentKeys\": metadata_keys,\n            },\n            \"polling\": {\n                \"pollCount\": 0,\n                \"timedOut\": False,\n                \"errorMessage\": \"\",\n            },\n            \"callStatus\": {\n                \"ok\": None,\n                \"created\": None,\n                \"creation_state\": \"unknown_possibly_created\",\n                \"callId\": \"\",\n                \"call_status\": \"create_outcome_unknown\",\n                \"call_outcome\": None,\n                \"result_status\": None,\n                \"failure_code\": None,\n                \"failure_message\": None,\n                \"answered\": None,\n                \"no_answer\": False,\n                \"busy\": False,\n                \"failed\": False,\n            },\n            \"lookup\": {\n                \"skipped\": True,\n                \"url\": \"\",\n                \"reason\": \"No recognized call id was returned, so automatic result lookup is unavailable.\",\n                \"rawLookupJson\": raw_call_result_json,\n            },\n            \"reconciliation\": {\n                \"required\": True,\n                \"idempotencyKey\": idempotency_key,\n                \"instruction\": reconciliation_instruction,\n            },\n            \"returnedData\": redact_phone_values({\n                \"summary\": message,\n                \"transcript\": [],\n                \"structuredResult\": None,\n                \"error\": create_body.get(\"error\"),\n            }),\n            \"rawCallResultJson\": raw_call_result_json,\n        }\n        return {\"result\": result, \"results\": [result]}\n    if not context.get(\"callId\"):\n        return {\"result\": {}, \"results\": []}\n    final_body = as_obj(final_call_response)\n    initial_body = as_obj(context.get(\"initialCallJson\"))\n    final_call = documented_call(final_body)\n    initial_call = documented_call(initial_body)\n    create_call = documented_call(create_body)\n    invalid_poll_call = bool(final_body) and (not final_call or final_call.get(\"id\") != context[\"callId\"])\n    call = (final_call if not invalid_poll_call else {}) or initial_call or create_call\n    structured_result = call.get(\"result\") if isinstance(call.get(\"result\"), dict) else None\n    error = call.get(\"error\") if isinstance(call.get(\"error\"), dict) else None\n    call_status = call.get(\"status\")\n    call_outcome = call.get(\"call_outcome\")\n    result_status = call.get(\"result_status\")\n    poll_error = str(poll_error_message or call.get(\"_dify_poll_error\") or \"\").strip()\n    if invalid_poll_call and not poll_error:\n        poll_error = \"CALL-E poll response did not match the accepted Call and known result_status.\"\n    failed = bool(poll_error) or bool(poll_timed_out) or bool(call.get(\"_dify_poll_timeout\")) or bool(call.get(\"_dify_poll_failed\")) or bool(error) or call_status in {\"failed\", \"canceled\"}\n    needs_reconciliation = bool(poll_error) or bool(poll_timed_out) or bool(call.get(\"_dify_poll_timeout\"))\n    metadata_returned = redact_phone_values(as_obj(call.get(\"metadata\")))\n    metadata_round_trip = as_obj(call.get(\"_dify_metadata_round_trip\"))\n    requested_keys = metadata_round_trip.get(\"requestedKeys\")\n    metadata_keys = (\n        sorted([str(k) for k in requested_keys])\n        if isinstance(requested_keys, list)\n        else sorted([str(k) for k in metadata_sent_raw.keys()])\n    )\n    different_keys = metadata_round_trip.get(\"missingOrDifferentKeys\")\n    missing_or_different = (\n        sorted([str(k) for k in different_keys])\n        if isinstance(different_keys, list)\n        else metadata_keys\n    )\n    metadata_all_returned = bool(metadata_round_trip) and len(missing_or_different) == 0\n    raw_call_result_json = json.dumps(redact_phone_values(call), ensure_ascii=False)\n    if len(raw_call_result_json) > 75000:\n        raw_call_result_json = raw_call_result_json[:75000] + \"...[truncated]\"\n    redacted_returned_data = redact_phone_values({\n        \"summary\": structured_result.get(\"summary\") if structured_result is not None else None,\n        \"transcript\": as_list(call.get(\"transcript\")),\n        \"structuredResult\": structured_result,\n        \"error\": error,\n    })\n    result = {\n        \"callItemId\": context.get(\"callItemId\"),\n        \"maskedPhone\": context.get(\"maskedPhone\"),\n        \"metadataSent\": metadata_sent,\n        \"metadataReturned\": metadata_returned,\n        \"metadataRoundTrip\": {\n            \"requestedKeys\": metadata_keys,\n            \"allRequestedKeysReturned\": metadata_all_returned,\n            \"missingOrDifferentKeys\": missing_or_different,\n        },\n        \"polling\": {\n            \"pollCount\": int(poll_count or 0),\n            \"timedOut\": bool(poll_timed_out) or bool(call.get(\"_dify_poll_timeout\")),\n            \"errorMessage\": poll_error,\n        },\n        \"callStatus\": {\n            \"ok\": not failed,\n            \"created\": True,\n            \"creation_state\": \"confirmed_created\",\n            \"callId\": context[\"callId\"],\n            \"call_status\": call_status,\n            \"call_outcome\": call_outcome,\n            \"result_status\": result_status,\n            \"failure_code\": error.get(\"code\") if error else None,\n            \"failure_message\": redact_phone_values(error.get(\"message\")) if error else None,\n            \"answered\": call_outcome == \"completed\" if call_outcome is not None else None,\n            \"no_answer\": call_outcome == \"no_answer\",\n            \"busy\": call_outcome == \"busy\",\n            \"declined\": call_outcome == \"declined\",\n            \"failed\": failed,\n        },\n        \"lookup\": {\n            \"skipped\": False,\n            \"url\": context.get(\"lookupUrl\"),\n            \"reason\": \"\",\n            \"rawLookupJson\": json.dumps(redact_phone_values(final_body), ensure_ascii=False),\n        },\n        \"reconciliation\": {\n            \"required\": needs_reconciliation,\n            \"callId\": context[\"callId\"],\n            \"idempotencyKey\": context.get(\"idempotencyKey\") or \"\",\n            \"instruction\": (\n                f\"Resume GET /v2/calls/{context['callId']}; the accepted call is still created. \"\n                \"If creation replay is needed, use the same Idempotency-Key and unchanged request body.\"\n                if needs_reconciliation else \"\"\n            ),\n        },\n        \"returnedData\": redacted_returned_data,\n        \"rawCallResultJson\": raw_call_result_json,\n    }\n    return {\"result\": result, \"results\": [result]}\n"
+        code: "import json\nimport re\n\ndef as_obj(value):\n    if isinstance(value,\
+          \ dict):\n        return value\n    if isinstance(value, str) and value.strip():\n\
+          \        try:\n            parsed = json.loads(value)\n            return\
+          \ parsed if isinstance(parsed, dict) else {}\n        except Exception:\n\
+          \            return {}\n    return {}\n\ndef as_list(value):\n    return\
+          \ value if isinstance(value, list) else []\n\nPHONE_IN_TEXT_RE = re.compile(r\"\
+          \\+[1-9]\\d{6,14}\")\nINTERNATIONAL_GROUPED_PHONE_RE = re.compile(r\"(?<!\\\
+          w)\\+[1-9](?:[\\s().-]*\\d){6,14}(?![\\s().-]*\\d)\")\nPHONE_LIKE_RE = re.compile(r\"\
+          (?<!\\d)(?:\\+?1[\\s.-]?)?(?:\\(?[2-9]\\d{2}\\)?[\\s.-]?[2-9]\\d{2}[\\s.-]?\\\
+          d{4}|[1-9]\\d{6,14})(?!\\d)\")\n\ndef mask_phone_like(value: str) -> str:\n\
+          \    raw = str(value or \"\").strip()\n    digits = re.sub(r\"\\D\", \"\"\
+          , raw)\n    if not digits:\n        return \"\"\n    if len(digits) <= 5:\n\
+          \        return \"****\"\n    if raw.startswith(\"+\"):\n        return\
+          \ \"+\" + digits[:2] + \"****\" + digits[-2:]\n    return digits[:3] + \"\
+          ****\" + digits[-2:]\n\ndef redact_phone_text(value: str) -> str:\n    text\
+          \ = INTERNATIONAL_GROUPED_PHONE_RE.sub(lambda match: mask_phone_like(match.group(0)),\
+          \ str(value or \"\"))\n    text = PHONE_IN_TEXT_RE.sub(lambda match: mask_phone_like(match.group(0)),\
+          \ text)\n    return PHONE_LIKE_RE.sub(lambda match: mask_phone_like(match.group(0)),\
+          \ text)\n\ndef redact_phone_values(value):\n    if isinstance(value, str):\n\
+          \        return redact_phone_text(value)\n    if isinstance(value, list):\n\
+          \        return [redact_phone_values(v) for v in value]\n    if isinstance(value,\
+          \ dict):\n        return {redact_phone_text(k) if isinstance(k, str) else\
+          \ k: redact_phone_values(v) for k, v in value.items()}\n    return value\n\
+          \nFINAL_RESULT_STATUSES = {\"available\", \"unavailable\", \"not_applicable\"\
+          }\nDOCUMENTED_CALL_STATUSES = {\"queued\", \"in_progress\", \"completed\"\
+          , \"failed\", \"canceled\"}\nCALL_ID_RE = re.compile(r\"^call_[A-Za-z0-9_-]+$\"\
+          )\n\ndef documented_call(value):\n    if not isinstance(value, dict) or\
+          \ value.get(\"object\") != \"call\":\n        return {}\n    call_id = str(value.get(\"\
+          id\") or \"\")\n    status = str(value.get(\"status\") or \"\").strip()\n\
+          \    if not CALL_ID_RE.fullmatch(call_id) or status not in DOCUMENTED_CALL_STATUSES:\n\
+          \        return {}\n    result_status = value.get(\"result_status\")\n \
+          \   if not isinstance(result_status, str) or result_status not in FINAL_RESULT_STATUSES\
+          \ | {\"pending\"}:\n        return {}\n    return value\n\ndef main(call_context:\
+          \ dict, final_call_response, poll_count, poll_timed_out, poll_error_message:\
+          \ str) -> dict:\n    context = call_context if isinstance(call_context,\
+          \ dict) else {}\n    create_body = as_obj(context.get(\"createResponseJson\"\
+          ))\n    metadata_sent_raw = as_obj(context.get(\"metadataSentJson\"))\n\
+          \    metadata_sent = redact_phone_values(metadata_sent_raw)\n    if context.get(\"\
+          createFailed\"):\n        metadata_keys = sorted([str(k) for k in metadata_sent_raw.keys()])\n\
+          \        raw_call_result_json = json.dumps(redact_phone_values(create_body),\
+          \ ensure_ascii=False)\n        result = {\n            \"callItemId\": context.get(\"\
+          callItemId\"),\n            \"maskedPhone\": context.get(\"maskedPhone\"\
+          ),\n            \"metadataSent\": metadata_sent,\n            \"metadataReturned\"\
+          : {},\n            \"metadataRoundTrip\": {\n                \"requestedKeys\"\
+          : metadata_keys,\n                \"allRequestedKeysReturned\": False,\n\
+          \                \"missingOrDifferentKeys\": metadata_keys,\n          \
+          \  },\n            \"polling\": {\n                \"pollCount\": 0,\n \
+          \               \"timedOut\": False,\n                \"errorMessage\":\
+          \ context.get(\"createErrorMessage\") or \"CALL-E create request failed.\"\
+          ,\n            },\n            \"callStatus\": {\n                \"ok\"\
+          : False,\n                \"created\": False,\n                \"creation_state\"\
+          : \"not_created\",\n                \"callId\": \"\",\n                \"\
+          call_status\": \"create_failed\",\n                \"call_outcome\": None,\n\
+          \                \"result_status\": None,\n                \"failure_code\"\
+          : as_obj(create_body.get(\"error\")).get(\"code\") or \"create_failed\"\
+          ,\n                \"failure_message\": context.get(\"createErrorMessage\"\
+          ) or \"CALL-E create request failed.\",\n                \"answered\": None,\n\
+          \                \"no_answer\": False,\n                \"busy\": False,\n\
+          \                \"failed\": True,\n            },\n            \"lookup\"\
+          : {\n                \"skipped\": True,\n                \"url\": \"\",\n\
+          \                \"reason\": \"The create request failed, so no result lookup\
+          \ was attempted.\",\n                \"rawLookupJson\": raw_call_result_json,\n\
+          \            },\n            \"reconciliation\": {\n                \"required\"\
+          : False,\n                \"idempotencyKey\": context.get(\"idempotencyKey\"\
+          ) or \"\",\n                \"instruction\": \"\",\n            },\n   \
+          \         \"returnedData\": redact_phone_values({\n                \"summary\"\
+          : context.get(\"createErrorMessage\") or \"CALL-E create request failed.\"\
+          ,\n                \"transcript\": [],\n                \"structuredResult\"\
+          : None,\n                \"error\": create_body.get(\"error\"),\n      \
+          \      }),\n            \"rawCallResultJson\": raw_call_result_json,\n \
+          \       }\n        return {\"result\": result, \"results\": [result]}\n\
+          \    if context.get(\"createOutcomeUnknown\"):\n        metadata_keys =\
+          \ sorted([str(k) for k in metadata_sent_raw.keys()])\n        raw_call_result_json\
+          \ = json.dumps(redact_phone_values(create_body), ensure_ascii=False)\n \
+          \       idempotency_key = str(context.get(\"idempotencyKey\") or \"\")\n\
+          \        message = context.get(\"createOutcomeMessage\") or (\n        \
+          \    \"CALL-E returned a successful create status without a recognized call\
+          \ id. \"\n            \"The call may already have been created.\"\n    \
+          \    )\n        reconciliation_instruction = (\n            f\"Replay or\
+          \ reconcile this request only with the same Idempotency-Key ({idempotency_key})\
+          \ and unchanged request body; \"\n            \"do not generate a new key.\"\
+          \n            if idempotency_key\n            else \"Reconcile this request\
+          \ before retrying; do not submit it with a new idempotency key.\"\n    \
+          \    )\n        result = {\n            \"callItemId\": context.get(\"callItemId\"\
+          ),\n            \"maskedPhone\": context.get(\"maskedPhone\"),\n       \
+          \     \"metadataSent\": metadata_sent,\n            \"metadataReturned\"\
+          : {},\n            \"metadataRoundTrip\": {\n                \"requestedKeys\"\
+          : metadata_keys,\n                \"allRequestedKeysReturned\": False,\n\
+          \                \"missingOrDifferentKeys\": metadata_keys,\n          \
+          \  },\n            \"polling\": {\n                \"pollCount\": 0,\n \
+          \               \"timedOut\": False,\n                \"errorMessage\":\
+          \ \"\",\n            },\n            \"callStatus\": {\n               \
+          \ \"ok\": None,\n                \"created\": None,\n                \"\
+          creation_state\": \"unknown_possibly_created\",\n                \"callId\"\
+          : \"\",\n                \"call_status\": \"create_outcome_unknown\",\n\
+          \                \"call_outcome\": None,\n                \"result_status\"\
+          : None,\n                \"failure_code\": None,\n                \"failure_message\"\
+          : None,\n                \"answered\": None,\n                \"no_answer\"\
+          : False,\n                \"busy\": False,\n                \"failed\":\
+          \ False,\n            },\n            \"lookup\": {\n                \"\
+          skipped\": True,\n                \"url\": \"\",\n                \"reason\"\
+          : \"No recognized call id was returned, so automatic result lookup is unavailable.\"\
+          ,\n                \"rawLookupJson\": raw_call_result_json,\n          \
+          \  },\n            \"reconciliation\": {\n                \"required\":\
+          \ True,\n                \"idempotencyKey\": idempotency_key,\n        \
+          \        \"instruction\": reconciliation_instruction,\n            },\n\
+          \            \"returnedData\": redact_phone_values({\n                \"\
+          summary\": message,\n                \"transcript\": [],\n             \
+          \   \"structuredResult\": None,\n                \"error\": create_body.get(\"\
+          error\"),\n            }),\n            \"rawCallResultJson\": raw_call_result_json,\n\
+          \        }\n        return {\"result\": result, \"results\": [result]}\n\
+          \    if not context.get(\"callId\"):\n        return {\"result\": {}, \"\
+          results\": []}\n    final_body = as_obj(final_call_response)\n    initial_body\
+          \ = as_obj(context.get(\"initialCallJson\"))\n    final_call = documented_call(final_body)\n\
+          \    initial_call = documented_call(initial_body)\n    create_call = documented_call(create_body)\n\
+          \    invalid_poll_call = bool(final_body) and (not final_call or final_call.get(\"\
+          id\") != context[\"callId\"])\n    call = (final_call if not invalid_poll_call\
+          \ else {}) or initial_call or create_call\n    structured_result = call.get(\"\
+          result\") if isinstance(call.get(\"result\"), dict) else None\n    error\
+          \ = call.get(\"error\") if isinstance(call.get(\"error\"), dict) else None\n\
+          \    call_status = call.get(\"status\")\n    call_outcome = call.get(\"\
+          call_outcome\")\n    result_status = call.get(\"result_status\")\n    poll_error\
+          \ = str(poll_error_message or call.get(\"_dify_poll_error\") or \"\").strip()\n\
+          \    if invalid_poll_call and not poll_error:\n        poll_error = \"CALL-E\
+          \ poll response did not match the accepted Call and known result_status.\"\
+          \n    failed = bool(poll_error) or bool(poll_timed_out) or bool(call.get(\"\
+          _dify_poll_timeout\")) or bool(call.get(\"_dify_poll_failed\")) or bool(error)\
+          \ or call_status in {\"failed\", \"canceled\"}\n    needs_reconciliation\
+          \ = bool(poll_error) or bool(poll_timed_out) or bool(call.get(\"_dify_poll_timeout\"\
+          ))\n    metadata_returned = redact_phone_values(as_obj(call.get(\"metadata\"\
+          )))\n    metadata_round_trip = as_obj(call.get(\"_dify_metadata_round_trip\"\
+          ))\n    requested_keys = metadata_round_trip.get(\"requestedKeys\")\n  \
+          \  metadata_keys = (\n        sorted([str(k) for k in requested_keys])\n\
+          \        if isinstance(requested_keys, list)\n        else sorted([str(k)\
+          \ for k in metadata_sent_raw.keys()])\n    )\n    different_keys = metadata_round_trip.get(\"\
+          missingOrDifferentKeys\")\n    missing_or_different = (\n        sorted([str(k)\
+          \ for k in different_keys])\n        if isinstance(different_keys, list)\n\
+          \        else metadata_keys\n    )\n    metadata_all_returned = bool(metadata_round_trip)\
+          \ and len(missing_or_different) == 0\n    raw_call_result_json = json.dumps(redact_phone_values(call),\
+          \ ensure_ascii=False)\n    if len(raw_call_result_json) > 75000:\n     \
+          \   raw_call_result_json = raw_call_result_json[:75000] + \"...[truncated]\"\
+          \n    redacted_returned_data = redact_phone_values({\n        \"summary\"\
+          : structured_result.get(\"summary\") if structured_result is not None else\
+          \ None,\n        \"transcript\": as_list(call.get(\"transcript\")),\n  \
+          \      \"structuredResult\": structured_result,\n        \"error\": error,\n\
+          \    })\n    result = {\n        \"callItemId\": context.get(\"callItemId\"\
+          ),\n        \"maskedPhone\": context.get(\"maskedPhone\"),\n        \"metadataSent\"\
+          : metadata_sent,\n        \"metadataReturned\": metadata_returned,\n   \
+          \     \"metadataRoundTrip\": {\n            \"requestedKeys\": metadata_keys,\n\
+          \            \"allRequestedKeysReturned\": metadata_all_returned,\n    \
+          \        \"missingOrDifferentKeys\": missing_or_different,\n        },\n\
+          \        \"polling\": {\n            \"pollCount\": int(poll_count or 0),\n\
+          \            \"timedOut\": bool(poll_timed_out) or bool(call.get(\"_dify_poll_timeout\"\
+          )),\n            \"errorMessage\": poll_error,\n        },\n        \"callStatus\"\
+          : {\n            \"ok\": not failed,\n            \"created\": True,\n \
+          \           \"creation_state\": \"confirmed_created\",\n            \"callId\"\
+          : context[\"callId\"],\n            \"call_status\": call_status,\n    \
+          \        \"call_outcome\": call_outcome,\n            \"result_status\"\
+          : result_status,\n            \"failure_code\": error.get(\"code\") if error\
+          \ else None,\n            \"failure_message\": redact_phone_values(error.get(\"\
+          message\")) if error else None,\n            \"answered\": call_outcome\
+          \ == \"completed\" if call_outcome is not None else None,\n            \"\
+          no_answer\": call_outcome == \"no_answer\",\n            \"busy\": call_outcome\
+          \ == \"busy\",\n            \"declined\": call_outcome == \"declined\",\n\
+          \            \"failed\": failed,\n        },\n        \"lookup\": {\n  \
+          \          \"skipped\": False,\n            \"url\": context.get(\"lookupUrl\"\
+          ),\n            \"reason\": \"\",\n            \"rawLookupJson\": json.dumps(redact_phone_values(final_body),\
+          \ ensure_ascii=False),\n        },\n        \"reconciliation\": {\n    \
+          \        \"required\": needs_reconciliation,\n            \"callId\": context[\"\
+          callId\"],\n            \"idempotencyKey\": context.get(\"idempotencyKey\"\
+          ) or \"\",\n            \"instruction\": (\n                f\"Resume GET\
+          \ /v2/calls/{context['callId']}; the accepted call is still created. \"\n\
+          \                \"If creation replay is needed, use the same Idempotency-Key\
+          \ and unchanged request body.\"\n                if needs_reconciliation\
+          \ else \"\"\n            ),\n        },\n        \"businessResult\": structured_result,\n\
+          \        \"returnedData\": redacted_returned_data,\n        \"rawCallResultJson\"\
+          : raw_call_result_json,\n    }\n    return {\"result\": result, \"results\"\
+          : [result]}\n"
         code_language: python3
         desc: Parses documented CALL-E Call responses into a demo-friendly summary with
           phone numbers masked. Invalid successful poll responses require reconciliation.
@@ -1472,33 +1821,28 @@ workflow:
           \ str) -> str:\n    value = str(phone or \"\").strip()\n    if not value:\n\
           \        return \"\"\n    if len(value) <= 5:\n        return \"****\"\n\
           \    return value[:3] + \"****\" + value[-2:]\n\ndef build_safe_task(user_task:\
-          \ str) -> str:\n    return (\n        SAFETY_PREAMBLE\n        + \"\\n\\\
-          nResult rules: Use unknown for missing answers, including call_completed\
-          \ and outcome. \"\n        \"Use manual_review for next_action when no next\
-          \ step is supported by the conversation. \"\n        \"Never infer completion\
-          \ from a missing answer.\\n\\nUser-provided task:\\n\"\n        + str(user_task\
-          \ or \"\").strip()\n    )\n\ndef main(call_task: dict, base_url: str) ->\
-          \ dict:\n    normalized_base_url = str(base_url or \"\").strip().rstrip(\"\
-          /\")\n    if not normalized_base_url:\n        raise ValueError(\"Normalized\
-          \ CALL-E base_url is required.\")\n    metadata = call_task.get(\"metadata\"\
-          ) if isinstance(call_task.get(\"metadata\"), dict) else {}\n    request_id\
-          \ = str(call_task.get(\"requestId\") or \"\").strip()\n    if not request_id:\n\
-          \        raise ValueError(\"request_id is required to build a replay-safe\
-          \ idempotency key.\")\n    result_schema = {\n        \"type\": \"object\"\
-          ,\n        \"additionalProperties\": False,\n        \"required\": [\"call_completed\"\
-          , \"outcome\", \"summary\", \"next_action\"],\n        \"properties\": {\n\
-          \            \"call_completed\": {\"type\": \"string\", \"enum\": [\"yes\"\
-          , \"no\", \"partial\", \"unknown\"]},\n            \"outcome\": {\"type\"\
-          : \"string\", \"enum\": [\"completed\", \"partial\", \"no_answer\", \"voicemail\"\
-          , \"busy\", \"failed\", \"unknown\"]},\n            \"summary\": {\"type\"\
-          : \"string\"},\n            \"next_action\": {\"type\": \"string\", \"enum\"\
-          : [\"none\", \"follow_up\", \"retry_later\", \"manual_review\"]},\n    \
-          \        \"language_detected\": {\"type\": \"string\"},\n            \"\
-          participant_response\": {\"type\": \"string\"},\n            \"key_points\"\
-          : {\"type\": \"string\"},\n            \"issues\": {\"type\": \"string\"\
-          },\n            \"audio_or_connection_notes\": {\"type\": \"string\"},\n\
-          \        },\n    }\n    request_payload = {\n        \"task\": build_safe_task(call_task[\"\
-          task\"]),\n        \"phone\": call_task[\"phone\"],\n        \"result_schema\"\
+          \ str, custom_schema: bool = False) -> str:\n    if custom_schema:\n   \
+          \     return (\n            SAFETY_PREAMBLE\n            + \"\\n\\nResult\
+          \ rules: Return only fields from the supplied result schema. \"\n      \
+          \      \"Follow the task's missing-answer rules and the schema's allowed\
+          \ values. \"\n            \"Never invent an answer or infer business success\
+          \ from missing evidence.\"\n            \"\\n\\nUser-provided task:\\n\"\
+          \ + str(user_task or \"\").strip()\n        )\n    return (\n        SAFETY_PREAMBLE\n\
+          \        + \"\\n\\nResult rules: Use unknown for missing answers, including\
+          \ call_completed and outcome. \"\n        \"Use manual_review for next_action\
+          \ when no next step is supported by the conversation. \"\n        \"Never\
+          \ infer completion from a missing answer.\\n\\nUser-provided task:\\n\"\n\
+          \        + str(user_task or \"\").strip()\n    )\n\ndef main(call_task:\
+          \ dict, base_url: str) -> dict:\n    normalized_base_url = str(base_url\
+          \ or \"\").strip().rstrip(\"/\")\n    if not normalized_base_url:\n    \
+          \    raise ValueError(\"Normalized CALL-E base_url is required.\")\n   \
+          \ metadata = call_task.get(\"metadata\") if isinstance(call_task.get(\"\
+          metadata\"), dict) else {}\n    request_id = str(call_task.get(\"requestId\"\
+          ) or \"\").strip()\n    if not request_id:\n        raise ValueError(\"\
+          request_id is required to build a replay-safe idempotency key.\")\n    result_schema\
+          \ = call_task[\"resultSchema\"]\n    request_payload = {\n        \"task\"\
+          : build_safe_task(call_task[\"task\"], bool(call_task.get(\"customResultSchema\"\
+          ))),\n        \"phone\": call_task[\"phone\"],\n        \"result_schema\"\
           : result_schema,\n        \"metadata\": dict(metadata, source=\"dify_one_shot_call_tool\"\
           , request_id=request_id),\n    }\n    idempotency_key = str(call_task.get(\"\
           idempotencyKey\") or \"\")\n    if not idempotency_key:\n        raise ValueError(\"\
@@ -1615,7 +1959,131 @@ workflow:
       width: 242
       zIndex: 1002
     - data:
-        code: "import json\nimport re\nimport time\n\nFINAL_RESULT_STATUSES = {\"available\", \"unavailable\", \"not_applicable\"}\nDOCUMENTED_CALL_STATUSES = {\"queued\", \"in_progress\", \"completed\", \"failed\", \"canceled\"}\nCALL_ID_RE = re.compile(r\"^call_[A-Za-z0-9_-]+$\")\nPHONE_IN_TEXT_RE = re.compile(r\"\\+[1-9]\\d{6,14}\")\nINTERNATIONAL_GROUPED_PHONE_RE = re.compile(r\"(?<!\\w)\\+[1-9](?:[\\s().-]*\\d){6,14}(?![\\s().-]*\\d)\")\nPHONE_LIKE_RE = re.compile(r\"(?<!\\d)(?:\\+?1[\\s.-]?)?(?:\\(?[2-9]\\d{2}\\)?[\\s.-]?[2-9]\\d{2}[\\s.-]?\\d{4}|[1-9]\\d{6,14})(?!\\d)\")\n\ndef as_obj(value):\n    if isinstance(value, dict):\n        return value\n    if isinstance(value, str) and value.strip():\n        try:\n            parsed = json.loads(value)\n            return parsed if isinstance(parsed, dict) else {}\n        except Exception:\n            return {}\n    return {}\n\ndef documented_call(value):\n    if not isinstance(value, dict) or value.get(\"object\") != \"call\":\n        return {}\n    call_id = str(value.get(\"id\") or \"\")\n    status = str(value.get(\"status\") or \"\").strip()\n    if not CALL_ID_RE.fullmatch(call_id) or status not in DOCUMENTED_CALL_STATUSES:\n        return {}\n    result_status = value.get(\"result_status\")\n    if not isinstance(result_status, str) or result_status not in FINAL_RESULT_STATUSES | {\"pending\"}:\n        return {}\n    return value\n\ndef compare_metadata_round_trip(call, metadata_sent_json) -> dict:\n    metadata_sent = as_obj(metadata_sent_json)\n    call_payload = documented_call(call)\n    metadata_returned = as_obj(call_payload.get(\"metadata\"))\n    metadata_keys = sorted([str(k) for k in metadata_sent.keys()])\n    missing_or_different = [\n        key for key in metadata_keys\n        if metadata_sent.get(key) != metadata_returned.get(key)\n    ]\n    return {\n        \"requestedKeys\": metadata_keys,\n        \"allRequestedKeysReturned\": len(missing_or_different) == 0,\n        \"missingOrDifferentKeys\": missing_or_different,\n    }\n\ndef to_int(value) -> int:\n    try:\n        return int(value)\n    except Exception:\n        return 0\n\ndef mask_phone_like(value: str) -> str:\n    raw = str(value or \"\").strip()\n    digits = re.sub(r\"\\D\", \"\", raw)\n    if not digits:\n        return \"\"\n    if len(digits) <= 5:\n        return \"****\"\n    if raw.startswith(\"+\"):\n        return \"+\" + digits[:2] + \"****\" + digits[-2:]\n    return digits[:3] + \"****\" + digits[-2:]\n\ndef redact_phone_text(value: str) -> str:\n    text = INTERNATIONAL_GROUPED_PHONE_RE.sub(lambda match: mask_phone_like(match.group(0)), str(value or \"\"))\n    text = PHONE_IN_TEXT_RE.sub(lambda match: mask_phone_like(match.group(0)), text)\n    return PHONE_LIKE_RE.sub(lambda match: mask_phone_like(match.group(0)), text)\n\ndef redact_phone_values(value):\n    if isinstance(value, str):\n        return redact_phone_text(value)\n    if isinstance(value, list):\n        return [redact_phone_values(v) for v in value]\n    if isinstance(value, dict):\n        return {redact_phone_text(k) if isinstance(k, str) else k: redact_phone_values(v) for k, v in value.items()}\n    return value\n\ndef create_failure_context(body: dict, status_code: int, message: str, metadata_sent_json: str, masked_phone: str, idempotency_key: str, call_item_id: str) -> dict:\n    redacted_body = redact_phone_values(body)\n    redacted_json = json.dumps(redacted_body, ensure_ascii=False)\n    now_ms = int(time.time() * 1000)\n    context = {\n        \"callId\": \"\",\n        \"lookupUrl\": \"\",\n        \"initialCallJson\": redacted_json,\n        \"createResponseJson\": redacted_json,\n        \"startedAtMs\": now_ms,\n        \"initialStatus\": \"create_failed\",\n        \"initialDone\": True,\n        \"metadataSentJson\": metadata_sent_json,\n        \"maskedPhone\": masked_phone,\n        \"callItemId\": call_item_id,\n        \"createFailed\": True,\n        \"createOutcomeUnknown\": False,\n        \"createStatusCode\": status_code,\n        \"createErrorMessage\": message,\n        \"idempotencyKey\": idempotency_key,\n    }\n    return {\n        \"call_id\": \"\",\n        \"lookup_url\": \"\",\n        \"initial_call_json\": redacted_json,\n        \"started_at_ms\": now_ms,\n        \"initial_status\": \"create_failed\",\n        \"initial_done\": True,\n        \"call_context\": context,\n    }\n\ndef create_unknown_context(body: dict, status_code: int, message: str, metadata_sent_json: str, masked_phone: str, idempotency_key: str, call_item_id: str) -> dict:\n    redacted_body = redact_phone_values(body)\n    redacted_json = json.dumps(redacted_body, ensure_ascii=False)\n    now_ms = int(time.time() * 1000)\n    context = {\n        \"callId\": \"\",\n        \"lookupUrl\": \"\",\n        \"initialCallJson\": redacted_json,\n        \"createResponseJson\": redacted_json,\n        \"startedAtMs\": now_ms,\n        \"initialStatus\": \"create_outcome_unknown\",\n        \"initialDone\": True,\n        \"metadataSentJson\": metadata_sent_json,\n        \"maskedPhone\": masked_phone,\n        \"callItemId\": call_item_id,\n        \"createFailed\": False,\n        \"createOutcomeUnknown\": True,\n        \"createStatusCode\": status_code,\n        \"createOutcomeMessage\": message,\n        \"idempotencyKey\": idempotency_key,\n    }\n    return {\n        \"call_id\": \"\",\n        \"lookup_url\": \"\",\n        \"initial_call_json\": redacted_json,\n        \"started_at_ms\": now_ms,\n        \"initial_status\": \"create_outcome_unknown\",\n        \"initial_done\": True,\n        \"call_context\": context,\n    }\n\ndef main(create_response, create_status_code, base_url: str, metadata_sent_json: str, masked_phone: str, idempotency_key: str, call_item_id: str) -> dict:\n    body = as_obj(create_response)\n    status_code = to_int(create_status_code)\n    if status_code in {0, 408, 409} or status_code >= 500:\n        return create_unknown_context(\n            body,\n            status_code,\n            \"CALL-E create request did not establish whether a Call was accepted. \"\n            f\"HTTP status: {status_code or 'unknown'}. The call may already have been created. \"\n            \"For creation_in_progress, back off before replaying. For other conflicts, restore the original inputs. \"\n            \"Replay or reconcile only with the same Idempotency-Key and unchanged request body; do not generate a new key.\",\n            metadata_sent_json,\n            masked_phone,\n            idempotency_key,\n            call_item_id,\n        )\n    if not (200 <= status_code < 300):\n        return create_failure_context(\n            body,\n            status_code,\n            f\"CALL-E create request returned HTTP {status_code or 'unknown'}. \"\n            + (\"Back off and retry with the same request_id and unchanged request body.\" if status_code == 429 else \"Inspect the returned error and correct rejected inputs before retrying.\"),\n            metadata_sent_json,\n            masked_phone,\n            idempotency_key,\n            call_item_id,\n        )\n    call = documented_call(body)\n    if not call:\n        response_keys = \", \".join(sorted([str(k) for k in body.keys()])) or \"(none)\"\n        return create_unknown_context(\n            body,\n            status_code,\n            f\"CALL-E create request returned HTTP {status_code} without a documented Call (object=call, a call_ ID, a documented lifecycle status, and a known result_status). The call may already have been created. Replay or reconcile only with the same Idempotency-Key; do not generate a new key. Response keys: {response_keys}\",\n            metadata_sent_json,\n            masked_phone,\n            idempotency_key,\n            call_item_id,\n        )\n    call_id = str(call[\"id\"])\n    root = str(base_url or \"\").strip().rstrip(\"/\")\n    if not root:\n        raise ValueError(\"CALL-E create response included a documented Call, but the normalized lookup base URL is missing.\")\n    status = str(call[\"status\"])\n    lookup_url = f\"{root}/v2/calls/{call_id}\"\n    metadata_round_trip = compare_metadata_round_trip(call, metadata_sent_json)\n    redacted_body = redact_phone_values(call)\n    redacted_body[\"id\"] = call_id\n    redacted_body[\"_dify_metadata_round_trip\"] = metadata_round_trip\n    redacted_json = json.dumps(redacted_body, ensure_ascii=False)\n    context = {\n        \"callId\": call_id,\n        \"lookupUrl\": lookup_url,\n        \"initialCallJson\": redacted_json,\n        \"createResponseJson\": redacted_json,\n        \"startedAtMs\": int(time.time() * 1000),\n        \"initialStatus\": status,\n        \"initialDone\": call[\"result_status\"] in FINAL_RESULT_STATUSES,\n        \"metadataSentJson\": metadata_sent_json,\n        \"maskedPhone\": masked_phone,\n        \"callItemId\": call_item_id,\n        \"createFailed\": False,\n        \"createOutcomeUnknown\": False,\n        \"createStatusCode\": status_code,\n        \"idempotencyKey\": idempotency_key,\n    }\n    return {\n        \"call_id\": call_id,\n        \"lookup_url\": lookup_url,\n        \"initial_call_json\": context[\"initialCallJson\"],\n        \"started_at_ms\": context[\"startedAtMs\"],\n        \"initial_status\": status,\n        \"initial_done\": context[\"initialDone\"],\n        \"call_context\": context,\n    }\n"
+        code: "import json\nimport re\nimport time\n\nFINAL_RESULT_STATUSES = {\"\
+          available\", \"unavailable\", \"not_applicable\"}\nDOCUMENTED_CALL_STATUSES\
+          \ = {\"queued\", \"in_progress\", \"completed\", \"failed\", \"canceled\"\
+          }\nCALL_ID_RE = re.compile(r\"^call_[A-Za-z0-9_-]+$\")\nPHONE_IN_TEXT_RE\
+          \ = re.compile(r\"\\+[1-9]\\d{6,14}\")\nINTERNATIONAL_GROUPED_PHONE_RE =\
+          \ re.compile(r\"(?<!\\w)\\+[1-9](?:[\\s().-]*\\d){6,14}(?![\\s().-]*\\d)\"\
+          )\nPHONE_LIKE_RE = re.compile(r\"(?<!\\d)(?:\\+?1[\\s.-]?)?(?:\\(?[2-9]\\\
+          d{2}\\)?[\\s.-]?[2-9]\\d{2}[\\s.-]?\\d{4}|[1-9]\\d{6,14})(?!\\d)\")\n\n\
+          def as_obj(value):\n    if isinstance(value, dict):\n        return value\n\
+          \    if isinstance(value, str) and value.strip():\n        try:\n      \
+          \      parsed = json.loads(value)\n            return parsed if isinstance(parsed,\
+          \ dict) else {}\n        except Exception:\n            return {}\n    return\
+          \ {}\n\ndef documented_call(value):\n    if not isinstance(value, dict)\
+          \ or value.get(\"object\") != \"call\":\n        return {}\n    call_id\
+          \ = str(value.get(\"id\") or \"\")\n    status = str(value.get(\"status\"\
+          ) or \"\").strip()\n    if not CALL_ID_RE.fullmatch(call_id) or status not\
+          \ in DOCUMENTED_CALL_STATUSES:\n        return {}\n    result_status = value.get(\"\
+          result_status\")\n    if not isinstance(result_status, str) or result_status\
+          \ not in FINAL_RESULT_STATUSES | {\"pending\"}:\n        return {}\n   \
+          \ return value\n\ndef compare_metadata_round_trip(call, metadata_sent_json)\
+          \ -> dict:\n    metadata_sent = as_obj(metadata_sent_json)\n    call_payload\
+          \ = documented_call(call)\n    metadata_returned = as_obj(call_payload.get(\"\
+          metadata\"))\n    metadata_keys = sorted([str(k) for k in metadata_sent.keys()])\n\
+          \    missing_or_different = [\n        key for key in metadata_keys\n  \
+          \      if metadata_sent.get(key) != metadata_returned.get(key)\n    ]\n\
+          \    return {\n        \"requestedKeys\": metadata_keys,\n        \"allRequestedKeysReturned\"\
+          : len(missing_or_different) == 0,\n        \"missingOrDifferentKeys\": missing_or_different,\n\
+          \    }\n\ndef to_int(value) -> int:\n    try:\n        return int(value)\n\
+          \    except Exception:\n        return 0\n\ndef mask_phone_like(value: str)\
+          \ -> str:\n    raw = str(value or \"\").strip()\n    digits = re.sub(r\"\
+          \\D\", \"\", raw)\n    if not digits:\n        return \"\"\n    if len(digits)\
+          \ <= 5:\n        return \"****\"\n    if raw.startswith(\"+\"):\n      \
+          \  return \"+\" + digits[:2] + \"****\" + digits[-2:]\n    return digits[:3]\
+          \ + \"****\" + digits[-2:]\n\ndef redact_phone_text(value: str) -> str:\n\
+          \    text = INTERNATIONAL_GROUPED_PHONE_RE.sub(lambda match: mask_phone_like(match.group(0)),\
+          \ str(value or \"\"))\n    text = PHONE_IN_TEXT_RE.sub(lambda match: mask_phone_like(match.group(0)),\
+          \ text)\n    return PHONE_LIKE_RE.sub(lambda match: mask_phone_like(match.group(0)),\
+          \ text)\n\ndef redact_phone_values(value):\n    if isinstance(value, str):\n\
+          \        return redact_phone_text(value)\n    if isinstance(value, list):\n\
+          \        return [redact_phone_values(v) for v in value]\n    if isinstance(value,\
+          \ dict):\n        return {redact_phone_text(k) if isinstance(k, str) else\
+          \ k: redact_phone_values(v) for k, v in value.items()}\n    return value\n\
+          \ndef create_failure_context(body: dict, status_code: int, message: str,\
+          \ metadata_sent_json: str, masked_phone: str, idempotency_key: str, call_item_id:\
+          \ str) -> dict:\n    redacted_body = redact_phone_values(body)\n    redacted_json\
+          \ = json.dumps(redacted_body, ensure_ascii=False)\n    now_ms = int(time.time()\
+          \ * 1000)\n    context = {\n        \"callId\": \"\",\n        \"lookupUrl\"\
+          : \"\",\n        \"initialCallJson\": redacted_json,\n        \"createResponseJson\"\
+          : redacted_json,\n        \"startedAtMs\": now_ms,\n        \"initialStatus\"\
+          : \"create_failed\",\n        \"initialDone\": True,\n        \"metadataSentJson\"\
+          : metadata_sent_json,\n        \"maskedPhone\": masked_phone,\n        \"\
+          callItemId\": call_item_id,\n        \"createFailed\": True,\n        \"\
+          createOutcomeUnknown\": False,\n        \"createStatusCode\": status_code,\n\
+          \        \"createErrorMessage\": message,\n        \"idempotencyKey\": idempotency_key,\n\
+          \    }\n    return {\n        \"call_id\": \"\",\n        \"lookup_url\"\
+          : \"\",\n        \"initial_call_json\": redacted_json,\n        \"started_at_ms\"\
+          : now_ms,\n        \"initial_status\": \"create_failed\",\n        \"initial_done\"\
+          : True,\n        \"call_context\": context,\n    }\n\ndef create_unknown_context(body:\
+          \ dict, status_code: int, message: str, metadata_sent_json: str, masked_phone:\
+          \ str, idempotency_key: str, call_item_id: str) -> dict:\n    redacted_body\
+          \ = redact_phone_values(body)\n    redacted_json = json.dumps(redacted_body,\
+          \ ensure_ascii=False)\n    now_ms = int(time.time() * 1000)\n    context\
+          \ = {\n        \"callId\": \"\",\n        \"lookupUrl\": \"\",\n       \
+          \ \"initialCallJson\": redacted_json,\n        \"createResponseJson\": redacted_json,\n\
+          \        \"startedAtMs\": now_ms,\n        \"initialStatus\": \"create_outcome_unknown\"\
+          ,\n        \"initialDone\": True,\n        \"metadataSentJson\": metadata_sent_json,\n\
+          \        \"maskedPhone\": masked_phone,\n        \"callItemId\": call_item_id,\n\
+          \        \"createFailed\": False,\n        \"createOutcomeUnknown\": True,\n\
+          \        \"createStatusCode\": status_code,\n        \"createOutcomeMessage\"\
+          : message,\n        \"idempotencyKey\": idempotency_key,\n    }\n    return\
+          \ {\n        \"call_id\": \"\",\n        \"lookup_url\": \"\",\n       \
+          \ \"initial_call_json\": redacted_json,\n        \"started_at_ms\": now_ms,\n\
+          \        \"initial_status\": \"create_outcome_unknown\",\n        \"initial_done\"\
+          : True,\n        \"call_context\": context,\n    }\n\ndef main(create_response,\
+          \ create_status_code, base_url: str, metadata_sent_json: str, masked_phone:\
+          \ str, idempotency_key: str, call_item_id: str) -> dict:\n    body = as_obj(create_response)\n\
+          \    status_code = to_int(create_status_code)\n    if status_code in {0,\
+          \ 408, 409} or status_code >= 500:\n        return create_unknown_context(\n\
+          \            body,\n            status_code,\n            \"CALL-E create\
+          \ request did not establish whether a Call was accepted. \"\n          \
+          \  f\"HTTP status: {status_code or 'unknown'}. The call may already have\
+          \ been created. \"\n            \"For creation_in_progress, back off before\
+          \ replaying. For other conflicts, restore the original inputs. \"\n    \
+          \        \"Replay or reconcile only with the same Idempotency-Key and unchanged\
+          \ request body; do not generate a new key.\",\n            metadata_sent_json,\n\
+          \            masked_phone,\n            idempotency_key,\n            call_item_id,\n\
+          \        )\n    if not (200 <= status_code < 300):\n        return create_failure_context(\n\
+          \            body,\n            status_code,\n            f\"CALL-E create\
+          \ request returned HTTP {status_code or 'unknown'}. \"\n            + (\"\
+          Back off and retry with the same request_id and unchanged request body.\"\
+          \ if status_code == 429 else \"Inspect the returned error and correct rejected\
+          \ inputs before retrying.\"),\n            metadata_sent_json,\n       \
+          \     masked_phone,\n            idempotency_key,\n            call_item_id,\n\
+          \        )\n    call = documented_call(body)\n    if not call:\n       \
+          \ response_keys = \", \".join(sorted([str(k) for k in body.keys()])) or\
+          \ \"(none)\"\n        return create_unknown_context(\n            body,\n\
+          \            status_code,\n            f\"CALL-E create request returned\
+          \ HTTP {status_code} without a documented Call (object=call, a call_ ID,\
+          \ a documented lifecycle status, and a known result_status). The call may\
+          \ already have been created. Replay or reconcile only with the same Idempotency-Key;\
+          \ do not generate a new key. Response keys: {response_keys}\",\n       \
+          \     metadata_sent_json,\n            masked_phone,\n            idempotency_key,\n\
+          \            call_item_id,\n        )\n    call_id = str(call[\"id\"])\n\
+          \    root = str(base_url or \"\").strip().rstrip(\"/\")\n    if not root:\n\
+          \        raise ValueError(\"CALL-E create response included a documented\
+          \ Call, but the normalized lookup base URL is missing.\")\n    status =\
+          \ str(call[\"status\"])\n    lookup_url = f\"{root}/v2/calls/{call_id}\"\
+          \n    metadata_round_trip = compare_metadata_round_trip(call, metadata_sent_json)\n\
+          \    redacted_body = redact_phone_values(call)\n    if \"result\" in call:\n\
+          \        redacted_body[\"result\"] = call[\"result\"]\n    redacted_body[\"\
+          id\"] = call_id\n    redacted_body[\"_dify_metadata_round_trip\"] = metadata_round_trip\n\
+          \    redacted_json = json.dumps(redacted_body, ensure_ascii=False)\n   \
+          \ context = {\n        \"callId\": call_id,\n        \"lookupUrl\": lookup_url,\n\
+          \        \"initialCallJson\": redacted_json,\n        \"createResponseJson\"\
+          : redacted_json,\n        \"startedAtMs\": int(time.time() * 1000),\n  \
+          \      \"initialStatus\": status,\n        \"initialDone\": call[\"result_status\"\
+          ] in FINAL_RESULT_STATUSES,\n        \"metadataSentJson\": metadata_sent_json,\n\
+          \        \"maskedPhone\": masked_phone,\n        \"callItemId\": call_item_id,\n\
+          \        \"createFailed\": False,\n        \"createOutcomeUnknown\": False,\n\
+          \        \"createStatusCode\": status_code,\n        \"idempotencyKey\"\
+          : idempotency_key,\n    }\n    return {\n        \"call_id\": call_id,\n\
+          \        \"lookup_url\": lookup_url,\n        \"initial_call_json\": context[\"\
+          initialCallJson\"],\n        \"started_at_ms\": context[\"startedAtMs\"\
+          ],\n        \"initial_status\": status,\n        \"initial_done\": context[\"\
+          initialDone\"],\n        \"call_context\": context,\n    }\n"
         code_language: python3
         desc: Extracts the call id only from a documented CALL-E Call before looking
           up the result. A valid response requires object=call, a call_ ID,
@@ -1752,12 +2220,13 @@ workflow:
           ]\n    lines = []\n    for index, task in enumerate(tasks, 1):\n       \
           \ lines.extend([\n            f\"{index}. {line_value(task.get('callName')\
           \ or task.get('callItemId'))}\",\n            f\"   Phone: {line_value(task.get('maskedPhone'))}\"\
-          ,\n            f\"   Task: {line_value(task.get('task'))}\",\n        ])\n\
-          \    return lines\n\ndef lookup_status_text(lookup, polling) -> str:\n \
-          \   if lookup.get(\"skipped\"):\n        return lookup.get(\"reason\") or\
-          \ \"skipped\"\n    if polling.get(\"timedOut\"):\n        return \"timed\
-          \ out\"\n    if polling.get(\"errorMessage\"):\n        return \"failed\"\
-          \n    return \"result status resolved\"\n\ndef build_live_lines(results):\n\
+          ,\n            f\"   Task: {line_value(task.get('task'))}\",\n         \
+          \   f\"   Result schema: {line_value(json.dumps(task.get('resultSchema',\
+          \ {}), ensure_ascii=False))}\",\n        ])\n    return lines\n\ndef lookup_status_text(lookup,\
+          \ polling) -> str:\n    if lookup.get(\"skipped\"):\n        return lookup.get(\"\
+          reason\") or \"skipped\"\n    if polling.get(\"timedOut\"):\n        return\
+          \ \"timed out\"\n    if polling.get(\"errorMessage\"):\n        return \"\
+          failed\"\n    return \"result status resolved\"\n\ndef build_live_lines(results):\n\
           \    if not results:\n        return [\"No live call results were returned.\"\
           ]\n    lines = []\n    for index, item in enumerate(results, 1):\n     \
           \   status = item.get(\"callStatus\", {}) if isinstance(item.get(\"callStatus\"\
@@ -1863,9 +2332,28 @@ workflow:
           \ GET /v2/calls/{id} while result_status is pending, until the polling timeout\
           \ or a lookup error. Resume reads using the accepted Call ID. Replay creation\
           \ only with the original request_id and unchanged inputs. For batch behavior,\
-          \ call this one-shot tool from an external loop.\"\n    }\n    return {\n\
-          \        \"report\": \"\\n\".join(report_lines),\n        \"summary_json\"\
-          : json.dumps(summary, ensure_ascii=False, indent=2)\n    }\n"
+          \ call this one-shot tool from an external loop.\"\n    }\n    primary =\
+          \ raw_results[0] if raw_results and isinstance(raw_results[0], dict) else\
+          \ {}\n    status = as_obj(primary.get(\"callStatus\"))\n    polling = as_obj(primary.get(\"\
+          polling\"))\n    data = as_obj(primary.get(\"returnedData\"))\n    error\
+          \ = as_obj(data.get(\"error\"))\n    if not error and validation_error:\n\
+          \        error = {\"code\": \"validation_error\", \"message\": validation_error}\n\
+          \    elif not error and polling.get(\"errorMessage\"):\n        error =\
+          \ {\"code\": \"lookup_incomplete\", \"message\": polling[\"errorMessage\"\
+          ]}\n    elif not error and primary and status.get(\"created\") is None:\n\
+          \        error = {\"code\": \"creation_outcome_unknown\", \"message\": data.get(\"\
+          summary\") or \"Reconcile the original request before retrying.\"}\n   \
+          \ elif not error and status.get(\"failed\"):\n        error = {\"code\"\
+          : status.get(\"failure_code\") or \"call_failed\", \"message\": status.get(\"\
+          failure_message\") or \"Call execution failed.\"}\n    return {\n      \
+          \  \"result\": primary.get(\"businessResult\") if isinstance(primary.get(\"\
+          businessResult\"), dict) else None,\n        \"call_id\": str(status.get(\"\
+          callId\") or \"\"),\n        \"result_status\": str(status.get(\"result_status\"\
+          ) or \"\"),\n        \"call_outcome\": str(status.get(\"call_outcome\")\
+          \ or \"\"),\n        \"error\": redact_phone_values(error) if error else\
+          \ None,\n        \"timed_out\": bool(polling.get(\"timedOut\")),\n     \
+          \   \"report\": \"\\n\".join(report_lines),\n        \"summary_json\": json.dumps(summary,\
+          \ ensure_ascii=False, indent=2)\n    }\n"
         code_language: python3
         desc: Builds the user-facing report and also keeps summary_json inside this
           node for debugging. Click this node to inspect summary_json; it is not shown
@@ -1877,6 +2365,24 @@ workflow:
           summary_json:
             children: null
             type: string
+          result:
+            children: null
+            type: object
+          call_id:
+            children: null
+            type: string
+          result_status:
+            children: null
+            type: string
+          call_outcome:
+            children: null
+            type: string
+          error:
+            children: null
+            type: object
+          timed_out:
+            children: null
+            type: boolean
         selected: false
         title: Summarize iteration results
         type: code
@@ -1936,6 +2442,36 @@ workflow:
           - report
           value_type: string
           variable: report
+        - value_selector:
+          - summarize_iteration_results
+          - result
+          value_type: object
+          variable: result
+        - value_selector:
+          - summarize_iteration_results
+          - call_id
+          value_type: string
+          variable: call_id
+        - value_selector:
+          - summarize_iteration_results
+          - result_status
+          value_type: string
+          variable: result_status
+        - value_selector:
+          - summarize_iteration_results
+          - call_outcome
+          value_type: string
+          variable: call_outcome
+        - value_selector:
+          - summarize_iteration_results
+          - error
+          value_type: object
+          variable: error
+        - value_selector:
+          - summarize_iteration_results
+          - timed_out
+          value_type: boolean
+          variable: timed_out
         selected: false
         title: End
         type: end

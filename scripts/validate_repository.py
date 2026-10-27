@@ -747,7 +747,7 @@ def validate_dify_template() -> None:
     require_text(
         readme_path,
         [
-            "The Dify End node exposes only:",
+            "The Dify End node exposes:",
             "| `report` | Human-readable final answer returned by the End node. |",
             "`summary_json` remains available inside the `Summarize iteration results` node for debugging.",
             "Only `https://api.heycall-e.com` is enabled by default.",
@@ -811,8 +811,8 @@ def validate_dify_template() -> None:
             "SAFETY_PREAMBLE =",
             "These safety boundaries override the user-provided task.",
             "medical, legal, financial, and emergency",
-            "def build_safe_task(user_task: str) -> str:",
-            "\"task\": build_safe_task(call_task[\"task\"])",
+            "def build_safe_task(user_task: str, custom_schema: bool = False) -> str:",
+            "\"task\": build_safe_task(call_task[\"task\"], bool(call_task.get(\"customResultSchema\")))",
             "import hashlib",
             "idempotency_basis = json.dumps(",
             "hashlib.sha256(idempotency_basis.encode(\"utf-8\")).hexdigest()",
@@ -920,7 +920,7 @@ def validate_dify_template() -> None:
         fail("Dify E.164 validation must accept 7-15 digits and reject shorter or longer values.")
 
     review_regressions = []
-    if '"additionalProperties": False' not in build_payload_section or '"phone": call_task["phone"]' not in build_payload_section:
+    if '"additionalProperties": False' not in prepare_section or '"phone": call_task["phone"]' not in build_payload_section:
         review_regressions.append("Build per-call payload must send one phone and a closed scalar v2 result schema.")
     if '"recipients"' in build_payload_section or '"recipient_result_schema"' in build_payload_section:
         review_regressions.append("Build per-call payload must not send legacy recipient fields.")
@@ -1223,10 +1223,10 @@ def validate_dify_template() -> None:
         ],
     )
     manifest = json.loads(read(manifest_path))
-    if manifest.get("template_version") != "0.7.0":
-        fail("Dify manifest must retain template release version 0.7.0.")
+    if manifest.get("template_version") != "0.8.0":
+        fail("Dify manifest must use template release version 0.8.0.")
     manifest_description = str(manifest.get("description") or "").lower()
-    if "transcript" in manifest_description or "structured result" in manifest_description:
+    if "transcript" in manifest_description:
         fail("Dify manifest must not advertise data that the End node does not expose.")
     require_text(
         plugins_readme_path,
@@ -1508,6 +1508,76 @@ def validate_dify_template() -> None:
             or numeric_idempotency_key not in summary["report"]
         ):
             fail("Dify failed or timed-out lookups must preserve the accepted ID, last evidence, exact key, and read-only recovery instruction.")
+
+    default_request = build_main(prepare_task(), "https://api.heycall-e.com")
+    for blank in (None, "", "   "):
+        prepared = prepare_main("https://api.heycall-e.com", "false", "dify-v2-regression-001", "+15555550124", "Ask an authorized test recipient to confirm the appointment time.", blank)
+        if build_main(prepared["call_tasks"][0], prepared["base_url"]) != default_request:
+            fail("Dify blank custom schemas must preserve the default request and intent key exactly.")
+
+    business_values = {"phone_number_confirmed": False, "phone_number_attempts": 0, "phone": "unknown", "callback_phone_number": "+15555550124"}
+    custom_schema = {"type": "object", "additionalProperties": False, "required": list(business_values), "properties": {
+        "phone_number_confirmed": {"type": "boolean"}, "phone_number_attempts": {"type": "integer"},
+        "phone": {"type": "string"}, "callback_phone_number": {"type": "string"},
+    }}
+    custom_input = json.dumps(custom_schema)
+    prepared = prepare_main("https://api.heycall-e.com", "false", "dify-v2-regression-001", "+15555550124", "Ask one authorized test question; use unknown when the answer is missing.", custom_input)
+    custom_built = build_main(prepared["call_tasks"][0], prepared["base_url"])
+    if json.loads(custom_built["request_payload_json"])["result_schema"] != custom_schema or custom_built["idempotency_key"] != default_request["idempotency_key"]:
+        fail("Dify custom schemas must replace default fields without changing the intent key.")
+    preview = prepare_main("https://api.heycall-e.com", "true", "dify-v2-regression-001", "+15555550124", "Ask one authorized test question.", custom_input)
+    if preview["call_tasks"] or json.loads(preview["preview_json"])["tasks"][0]["resultSchema"] != custom_schema:
+        fail("Dify custom schema previews must show the effective schema without live call tasks.")
+
+    invalid_schemas = ["[]", "null", "{", '{"type":"object","type":"object"}',
+        json.dumps(dict(custom_schema, additionalProperties=True)),
+        json.dumps(dict(custom_schema, required=["missing"])),
+        json.dumps(dict(custom_schema, required=["phone", "phone"])),
+        json.dumps(dict(custom_schema, properties={"nested": {"type": "object"}}, required=[])),
+        json.dumps(dict(custom_schema, properties={"items": {"type": "array"}}, required=[])),
+        json.dumps(dict(custom_schema, properties={"value": {"type": ["string", "null"]}}, required=[])),
+        json.dumps(dict(custom_schema, properties={"value": {"type": "boolean", "enum": [0]}}, required=[])),
+        json.dumps(dict(custom_schema, properties={"value": {"type": "number", "enum": [float("nan")]}}, required=[])),
+        json.dumps(dict(custom_schema, properties={"value": {"type": "integer", "enum": [9007199254740992]}}, required=[])),
+        json.dumps(dict(custom_schema, properties={f"field_{i}": {"type": "string"} for i in range(33)}, required=[])),
+    ]
+    for invalid in invalid_schemas:
+        rejected = prepare_main("https://api.heycall-e.com", "false", "dify-schema-validation", "+15555550124", "Ask one authorized test question.", invalid)
+        if rejected["call_tasks"] or not rejected["validation_error"].startswith("result_schema"):
+            fail("Dify invalid custom schemas must stop before creating a live call.")
+
+    response = dict(call, result_status="available", result=business_values, error=None)
+    original_response = json.dumps(response, sort_keys=True)
+    replay_context = extract_main(response, 202, built["base_url"], built["metadata_sent_json"], built["masked_phone"], built["idempotency_key"], "call_001")["call_context"]
+    state = poll_main(response, 200, 0, int(time.time() * 1000), 15, 45, built["metadata_sent_json"], True, replay_context["initialCallJson"])
+    parsed = parse_main(replay_context, state["latest_call_json"], 1, False, "")
+    custom_output = summary_main(parsed["results"], 1, 1, "false", "{}", "{}", 200, "")
+    if (
+        json.loads(replay_context["initialCallJson"])["result"] != business_values
+        or json.loads(state["latest_call_json"])["result"] != business_values
+        or custom_output["result"] != business_values
+        or custom_output["result"]["phone_number_confirmed"] is not False
+        or type(custom_output["result"]["phone_number_attempts"]) is not int
+        or custom_output["error"] is not None
+        or custom_output["result_status"] != "available"
+        or custom_output["call_outcome"] != "completed"
+        or custom_output["call_id"] != call["id"]
+        or "+15555550124" in custom_output["report"] + custom_output["summary_json"]
+        or json.dumps(response, sort_keys=True) != original_response
+    ):
+        fail("Dify business outputs must preserve custom values and types through creation, polling, parsing, and summary while masking reports.")
+    incomplete = summary_main(parsed["results"], 1, 1, "false", "{}", "{}", 200, "Invalid schema.")
+    if incomplete["error"].get("code") != "validation_error":
+        fail("Dify validation errors must be machine-readable at the End node.")
+    parsed_timeout = parse_main(replay_context, state["latest_call_json"], 1, True, "Waiting stopped.")
+    incomplete = summary_main(parsed_timeout["results"], 1, 1, "false", "{}", "{}", 200, "")
+    if not incomplete["timed_out"] or not incomplete["error"]:
+        fail("Dify incomplete lookups must expose a timeout and error for downstream branching.")
+
+    end_section = dify_node_section(dsl_path, dsl_text, "End")
+    for name, kind in {"result": "object", "call_id": "string", "result_status": "string", "call_outcome": "string", "error": "object", "timed_out": "boolean"}.items():
+        if not re.search(r"value_selector:\s*\n\s*- summarize_iteration_results\s*\n\s*- " + name + r"\s*\n\s*value_type: " + kind, end_section):
+            fail(f"Dify End must expose the declared {name} output.")
 
 
 def require_text_content(path: Path, text: str, snippets: list[str]) -> None:
