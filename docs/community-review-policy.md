@@ -1,18 +1,24 @@
 # Community Review and Merge Policy
 
-Policy version: 2026-09-11. This policy governs review severity and merge decisions,
+Policy version: 2026-10-27. This policy governs review severity and merge decisions,
 including older PRs and automated reviews. It supersedes stricter historical review
 comments. Apply it alongside AGENTS.md and CONTRIBUTING.md; do not turn optional
 hardening or tooling labels into additional merge requirements.
 
 ## Merge gate
 
-Merge a non-draft PR when GitHub reports it mergeable, proportionate validation
-supports its documented workflow, and no current Must Fix remains. Should Fix and
-Nice to Have findings do not block. Missing CI, an UNSTABLE label, unrelated existing
-failures, limited coverage, and unavailable external infrastructure are not themselves
-blockers. Explain validation limits; do not equate an untested path with a demonstrated
-defect or assume an unverified critical safety boundary works.
+Merge a non-draft PR only when GitHub reports it mergeable, all CI checks for the
+current PR head have completed successfully, proportionate validation supports its
+documented workflow, and no current Must Fix remains. Recheck the head commit and
+all check results immediately before merging. Failed, cancelled, timed-out, skipped,
+pending, or missing expected CI results block merging, including unrelated existing
+failures and unavailable external infrastructure. Do not disable checks or use an
+administrative override to bypass this gate.
+
+Should Fix and Nice to Have findings do not block. An UNSTABLE label or limited
+coverage alone does not block a PR that meets the merge gate. Explain validation
+limits; do not equate an untested path with a demonstrated defect or assume an
+unverified critical safety boundary works.
 
 ## Contribution tiers
 
@@ -95,7 +101,7 @@ use real credentials or place a call during review.
 
 ## Must Fix and bounded review
 
-Only these conditions block:
+In addition to the CI merge gate above, only these review findings block:
 
 - Unresolved material repository-rule violations, destructive/unrelated changes, or
   demonstrated breakage of the documented basic workflow.

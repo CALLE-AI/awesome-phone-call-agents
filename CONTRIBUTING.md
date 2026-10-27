@@ -8,8 +8,9 @@ This repository collects portable phone-call Agent Skills, apps, provider adapte
 
 We welcome small experimental examples and Hackathon demos. Follow the
 [community review and merge policy](docs/community-review-policy.md): a working
-fake/dry-run or manual verification path can be sufficient, production hardening is
-optional unless claimed, and only current Must Fix findings block merging. The policy
+fake/dry-run or manual verification path can be sufficient, and production hardening is
+optional unless claimed. All CI checks for the current PR head must pass before merging,
+and no current Must Fix finding may remain. The policy
 also defines how synthetic examples, public project contacts, historical data, and
 author-reported evidence are assessed. Maintainers may help with small mechanical fixes.
 
