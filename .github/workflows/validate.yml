@@ -21,3 +21,11 @@ jobs:
         run: python3 scripts/validate_repository.py
       - name: Test n8n workflow templates
         run: node --test plugins/n8n-calle-api/test/*.test.mjs
+      - name: Test DineLine n8n backend
+        working-directory: apps/typescript/dineline-calle-edition
+        run: |
+          npm ci --ignore-scripts
+          npm run check
+          npm run build
+          npm run build:n8n
+          git diff --exit-code -- n8n/

@@ -192,10 +192,26 @@ Arming one role does not arm the other. A destination is checked again inside
 the real provider immediately before CALL-E dispatch, so a browser-supplied
 number cannot bypass the policy.
 
-CALL-E accepts a constrained JSON Schema subset for structured call results.
-The wire contracts use only supported primitive fields, enums, arrays, and
-descriptions. Explicit `unknown`, `none`, and `0` sentinels are normalized into
-DineLine's stricter nullable domain values before verification.
+Live n8n dispatches use this backend's pinned `@call-e/calle` 1.0.1 SDK for
+`POST /v2/calls` and `GET /v2/calls/{id}`. Calls use flat `phone`, `region`, and
+`locale` inputs. The result wait and status reconciliation use `result_status`;
+telephone completion alone does not mean the structured result is ready.
+The fixture export continues to use local fixture providers.
+
+Calls v2 accepts a closed object of scalar result fields with lowercase,
+underscore-separated names, mapped back to the existing domain fields. Dietary
+needs travel as a JSON-encoded array string and are decoded before domain validation;
+malformed values require user input. Explicit `unknown`, `none`, and `0`
+sentinels become DineLine's nullable domain values. Evidence, confidence, task
+completion, and summary are explicitly requested result fields. The backend
+requires a transcript-supported quote and a valid confidence score before the
+existing booking or preference verifier can accept the outcome. Unavailable
+results remain unverified.
+
+Before upgrading a live installation, finish any pending Calls v1 requests with
+the original backend. Preserve `.call-journal` and its idempotency keys; the
+upgraded reader only queries Calls v2 IDs. Do not recreate an uncertain v1 call
+through v2 to recover its status.
 
 In real mode, the browser reveals a controlled test-line field and hides the
 fixture-only outcome selector and sample-request shortcut. The field does not

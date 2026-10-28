@@ -59,11 +59,9 @@ export class CalleSdkProvider implements BookingCallProvider {
       this.#client,
       {
         task: buildBookingTask(contract),
-        recipient: {
-          phone: contract.restaurant.phone,
-          region: "US",
-          locale: "en-US",
-        },
+        phone: contract.restaurant.phone,
+        region: "US",
+        locale: "en-US",
         resultSchema: calleResultJsonSchema,
         metadata: {
           application: "dineline-calle-edition",

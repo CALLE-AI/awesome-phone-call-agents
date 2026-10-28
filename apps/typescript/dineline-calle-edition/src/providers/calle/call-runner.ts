@@ -32,24 +32,35 @@ export async function readCalleCall(
 }
 
 export function mapCalleCall(call: Call): ProviderCallResult {
-  const transcript = call.recipients.flatMap((recipient) =>
-    recipient.attempts.flatMap((attempt) =>
-      attempt.transcriptTurns.map(
-        (turn) => `${turn.speaker}: ${turn.text}`,
-      ),
-    ),
-  );
+  const transcript = call.transcript.map((turn) => `${turn.speaker}: ${turn.text}`);
+  const result =
+    call.resultStatus === "available" && call.status === "completed" && !call.error
+      ? call.result
+      : null;
+  const score = result?.completion_confidence;
+  const quote = typeof result?.evidence === "string" ? result.evidence.trim() : "";
+  const normalize = (value: string) => value.toLowerCase().replace(/\s+/g, " ").trim();
+  // v2 has no platform evidence/confidence fields; use requested fields only with transcript support.
+  const evidence =
+    quote && normalize(call.transcript.map((turn) => turn.text).join(" ")).includes(normalize(quote))
+      ? [quote]
+      : [];
 
   return {
     providerCallId: call.id,
     status: call.status,
-    taskCompleted: call.taskCompleted,
-    completionConfidence: call.completionConfidence,
-    structuredResult: call.structuredResult,
-    evidence: call.evidence,
-    summary: call.summary,
+    resultStatus: call.resultStatus,
+    taskCompleted:
+      typeof result?.task_completed === "boolean" ? result.task_completed : null,
+    completionConfidence:
+      typeof score === "number" && Number.isFinite(score) && score >= 0 && score <= 1
+        ? { score, label: "reported" }
+        : null,
+    structuredResult: result,
+    evidence,
+    summary: typeof result?.summary === "string" ? result.summary : null,
     transcript,
-    failureCode: call.failureCode,
-    failureMessage: call.failureMessage,
+    failureCode: call.error?.code ?? null,
+    failureMessage: call.error?.message ?? null,
   };
 }

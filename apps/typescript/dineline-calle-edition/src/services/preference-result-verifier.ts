@@ -33,6 +33,7 @@ export function verifyPreferenceOutcome(
 
   if (
     raw.status !== "completed" ||
+    raw.resultStatus !== "available" ||
     raw.taskCompleted !== true ||
     !parsed.success ||
     evidence.length === 0 ||

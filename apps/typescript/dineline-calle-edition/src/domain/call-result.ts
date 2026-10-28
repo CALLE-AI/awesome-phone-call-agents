@@ -29,20 +29,41 @@ export type CalleStructuredResult = z.infer<
   typeof CalleStructuredResultSchema
 >;
 
+export const calleVerificationFields = {
+  task_completed: {
+    type: "boolean",
+    description: "Whether the requested task was explicitly completed. Use false when evidence is insufficient.",
+  },
+  completion_confidence: {
+    type: "number",
+    description: "Evidence-based confidence between 0 and 1. Use 0 when the outcome is unknown.",
+  },
+  evidence: {
+    type: "string",
+    description: "One exact transcript quote supporting the result, or an empty string when there is no supporting quote.",
+  },
+  summary: {
+    type: "string",
+    description: "A short summary supported by the recorded conversation.",
+  },
+} as const;
+
 export const calleResultJsonSchema = {
   type: "object",
   additionalProperties: false,
   required: [
+    ...Object.keys(calleVerificationFields),
     "outcome",
-    "confirmedDate",
-    "confirmedTime",
-    "confirmedPartySize",
-    "confirmationCode",
-    "alternativeDate",
-    "alternativeTime",
+    "confirmed_date",
+    "confirmed_time",
+    "confirmed_party_size",
+    "confirmation_code",
+    "alternative_date",
+    "alternative_time",
     "notes",
   ],
   properties: {
+    ...calleVerificationFields,
     outcome: {
       type: "string",
       enum: [
@@ -53,27 +74,27 @@ export const calleResultJsonSchema = {
         "uncertain",
       ],
     },
-    confirmedDate: {
+    confirmed_date: {
       type: "string",
       description: "Confirmed date as YYYY-MM-DD. Use unknown when no reservation was confirmed.",
     },
-    confirmedTime: {
+    confirmed_time: {
       type: "string",
       description: "Confirmed local time as 24-hour HH:MM. Use unknown when no reservation was confirmed.",
     },
-    confirmedPartySize: {
+    confirmed_party_size: {
       type: "integer",
       description: "Confirmed party size. Use 0 when no reservation was confirmed.",
     },
-    confirmationCode: {
+    confirmation_code: {
       type: "string",
       description: "Restaurant confirmation code. Use none if no code was given.",
     },
-    alternativeDate: {
+    alternative_date: {
       type: "string",
       description: "Alternative date as YYYY-MM-DD. Use unknown if none was offered.",
     },
-    alternativeTime: {
+    alternative_time: {
       type: "string",
       description: "Alternative local time as 24-hour HH:MM. Use unknown if none was offered.",
     },
@@ -89,19 +110,20 @@ export function normalizeCalleStructuredResult(value: unknown): unknown {
     return value;
   }
 
+  const partySize = value.confirmed_party_size ?? value.confirmedPartySize;
   return {
     outcome: value.outcome,
-    confirmedDate: nullableWireString(value.confirmedDate),
-    confirmedTime: nullableWireString(value.confirmedTime),
+    confirmedDate: nullableWireString(value.confirmed_date ?? value.confirmedDate),
+    confirmedTime: nullableWireString(value.confirmed_time ?? value.confirmedTime),
     confirmedPartySize:
-      Number.isInteger(value.confirmedPartySize) &&
-      typeof value.confirmedPartySize === "number" &&
-      value.confirmedPartySize > 0
-        ? value.confirmedPartySize
+      Number.isInteger(partySize) &&
+      typeof partySize === "number" &&
+      partySize > 0
+        ? partySize
         : null,
-    confirmationCode: nullableWireString(value.confirmationCode),
-    alternativeDate: nullableWireString(value.alternativeDate),
-    alternativeTime: nullableWireString(value.alternativeTime),
+    confirmationCode: nullableWireString(value.confirmation_code ?? value.confirmationCode),
+    alternativeDate: nullableWireString(value.alternative_date ?? value.alternativeDate),
+    alternativeTime: nullableWireString(value.alternative_time ?? value.alternativeTime),
     notes: typeof value.notes === "string" ? value.notes : "",
   };
 }

@@ -27,6 +27,7 @@ export class FixtureBookingProvider implements BookingCallProvider {
     const base = {
       providerCallId: `fixture-${this.callCount}`,
       status: "completed" as const,
+      resultStatus: "available" as const,
       taskCompleted: true,
       completionConfidence: { score: 0.97, label: "high" },
       failureCode: null,

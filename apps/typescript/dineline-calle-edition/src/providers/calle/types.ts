@@ -4,6 +4,7 @@ import type { BookingExecutionContext } from "../../domain/execution-context.js"
 export interface ProviderCallResult {
   providerCallId: string;
   status: "queued" | "in_progress" | "completed" | "failed" | "canceled";
+  resultStatus: "pending" | "available" | "unavailable" | "not_applicable";
   taskCompleted: boolean | null;
   completionConfidence: {
     score: number;
@@ -44,7 +45,8 @@ export function acceptedProviderCallId(error: unknown): string | null {
 }
 
 export function isTerminalCallResult(result: ProviderCallResult): boolean {
-  return ["completed", "failed", "canceled"].includes(result.status);
+  return ["completed", "failed", "canceled"].includes(result.status) &&
+    result.resultStatus !== "pending";
 }
 
 export interface BookingCallProvider {
