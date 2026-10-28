@@ -25,8 +25,8 @@
     "Imports inactive and runs only from its Manual Trigger.",
     "Validates E.164 destination numbers and blocks the shipped placeholder numbers.",
     "Use only phone numbers you own or are explicitly authorized to call.",
-    "Masks phone numbers across displayed outputs, including metadata, raw results, status messages, and API errors.",
-    "Caps polling at four minutes, limits poll intervals and HTTP requests to 30 seconds, and shortens the final sleep so the Code-node task stays below n8n's default 300-second runner timeout.",
+    "The IVR example masks phone numbers across displayed metadata, raw results, status messages, and API errors. Appointment and Goal summaries mask phone numbers; their intermediate execution data contains private business inputs and API responses.",
+    "The IVR example caps polling at four minutes, limits poll intervals and HTTP requests to 30 seconds, and shortens the final sleep so the Code-node task stays below n8n's default 300-second runner timeout.",
     "Replays unchanged calls with a stable idempotency key; does not automatically redial unavailable results or retry creation.",
     "Retains the accepted API ID after a wait failure; stopping n8n execution does not cancel the telephone call.",
     "Appointment and Goal examples start with dry_run=true and require an explicit live-mode change before creation.",
@@ -34,7 +34,7 @@
     "Goal preparation is read-only, validates business variables, and requires a fixed reviewed interface before readiness."
   ],
   "credentials": [
-    "CALL-E API key provided as CALL_E_API_KEY through the n8n deployment secret or environment-variable store; it is read at execution time and never stored in workflow data.",
+    "The IVR example reads CALL_E_API_KEY from the n8n deployment secret or environment-variable store at execution time; the key is never stored in workflow data.",
     "Appointment and Goal examples require the CALL-E API credential in @call-e/n8n-nodes-calle >=0.3.0; no key is stored in the workflow export."
   ],
   "tested_with": {
