@@ -19,3 +19,5 @@ jobs:
           node-version: '20'
       - name: Validate repository
         run: python3 scripts/validate_repository.py
+      - name: Test n8n workflow templates
+        run: node --test plugins/n8n-calle-api/test/*.test.mjs

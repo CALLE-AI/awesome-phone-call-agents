@@ -1,6 +1,6 @@
 # n8n CALL-E API Workflow Template
 
-This plugin contains an importable n8n workflow template that uses Calls API v2 directly. It does not require the CALL-E npm SDK, custom n8n nodes, Notion, a webhook receiver, or an Execute Command node. Updating the separate CALL-E community node package does not update this template.
+This plugin contains three inactive, manually triggered n8n workflow templates. The IVR quality example uses Calls API v2 directly without custom nodes. The appointment and Goal configuration examples use `@call-e/n8n-nodes-calle` 0.3.0 or later. Updating the community node package does not update imported workflow templates.
 
 The sample runs two call tasks one by one, waits for each business result to become available or unavailable, and returns a compact result view with:
 
@@ -13,10 +13,14 @@ The sample runs two call tasks one by one, waits for each business result to bec
 ## Files
 
 - `examples/calle-ivr-quality-create-and-wait.workflow.json` - n8n workflow import file.
+- `examples/calle-appointment-recoverable.workflow.json` - appointment record, durable waiting, and recoverable writeback.
+- `examples/calle-goal-configuration.workflow.json` - published Goal selection, interface review, and validated business mapping.
 - `manifest.json` - plugin metadata for this repository.
 - `test/workflow-safety.test.mjs` - regression tests for masking, timeout bounds, and manifest safety claims.
 
 ## What The Workflow Does
+
+The following sections describe the standalone IVR example. See [Recoverable appointments](#recoverable-appointments) and [Goal configuration](#goal-configuration) for the other templates.
 
 The workflow keeps configuration, validation, dialing, parsing, and output handling visible:
 
@@ -149,3 +153,49 @@ After a timeout or poll failure, the workflow retains its last response and API 
 - The workflow requires a `call_` API ID and a documented `result_status`. Polling ends for `available`, `unavailable`, or `not_applicable`, even when both `result` and `error` are null.
 - The workflow intentionally avoids Notion and webhooks so it can be imported and tested as a standalone CALL-E API example.
 - Run `node --test plugins/n8n-calle-api/test/workflow-safety.test.mjs` from the repository root to execute the focused safety regression tests.
+
+## Recoverable appointments
+
+Import `calle-appointment-recoverable.workflow.json` into n8n 2.43.5 with the CALL-E community node 0.3.0 or later installed. Select the same **CALL-E API** credential on `Create CALL-E Call` and `Get CALL-E Call`. Keep the workflow saved and inactive; it runs only from `Manual Trigger`.
+
+Create an n8n **Data Table** in the workflow's project. Add these **string** columns; n8n supplies the numeric `id` system column:
+
+| Columns | Purpose |
+| --- | --- |
+| `business_event_id`, `appointment_reference`, `phone`, `appointment_time` | Existing business event and authorized appointment data. |
+| `original_request_json`, `idempotency_key`, `call_id` | Durable call recovery record. |
+| `result_status`, `call_status`, `result_json` | Cached terminal result used for writeback retries. |
+| `appointment_status`, `preferred_time`, `writeback_event_id` | Business result and completion marker. |
+
+Add one appointment row yourself. Set a stable `business_event_id` using 1–64 letters, digits, underscores, or hyphens, an authorized E.164 `phone`, a reference, and an appointment time. Leave all recovery/result/marker columns empty. Set the table ID and existing row ID in `Appointment Settings`. Run with `dry_run: true` and review the masked preview. Explicitly change it to `false` only when ready to place that call. Example phone numbers beginning `+14155550` are blocked.
+
+The workflow updates that existing row; it never inserts or upserts business records. Before any POST, a conditional update saves the original request and deterministic business key only while the saved request is empty, then reads them back. Creation always uses that saved body and key. Concurrent or repeated triggers therefore replay the same call intent. A saved accepted **API resource ID** bypasses creation. Editing ordinary appointment data later does not alter the saved request.
+
+While `result_status=pending`, the native `Durable Wait` node waits 70 seconds and resumes with **Get**, using the saved Call ID. This exceeds n8n's 65-second in-process wait threshold, so n8n checkpoints the execution in its database. Use persistent n8n database storage and retain the saved workflow and credentials across restarts. Telephone completion alone does not finish business-result waiting.
+
+After a terminal result, the workflow caches its structured result and status before updating `appointment_status` and `preferred_time` on the same row. Only an explicit usable `confirmed` or `reschedule_requested` value is applied. Unknown, empty, unavailable, canceled, or failed results produce `unknown`; they never become confirmations. Writeback sets values and an event marker; it does not append another record or increment counters.
+
+### Recovery
+
+| Interruption | Re-run the same row |
+| --- | --- |
+| Creation timed out before its ID was saved | Replay only its saved original request and key. Acceptance may already have happened. |
+| A Call ID was saved but waiting stopped | Skip creation and Get that ID; a pending result returns to native Wait. |
+| Business writeback failed after the terminal result was cached | Skip all CALL-E requests and retry only mapping/writeback. |
+| The completion marker matches the event | Return the existing receipt without calling or writing again. |
+
+Never clear or edit a row's saved request, key, event ID, accepted ID, cached result, or completion marker to force a retry. Preserve the record until processing is complete. Use a **new row and new business event** only for an intentionally new call. A missing/deleted or inconsistent record stops processing; restore its original recovery data. Stopping n8n does not cancel or hang up an accepted call. The Data Table and intermediate execution data contain private appointment inputs and API responses; restrict access and retention. Final preview/receipt outputs mask phone numbers.
+
+Native acceptance covers an authorized hotline call, repeated trigger, lost creation response with exact replay, restart during durable Wait, unavailable results, and writeback-only retry. Failure branches use a controlled API; they do not claim the service naturally failed. Regression checks run with `node --test plugins/n8n-calle-api/test/*.test.mjs`.
+
+## Goal configuration
+
+Import `calle-goal-configuration.workflow.json` with community node 0.3.0 or later. Select the same CALL-E credential on both CALL-E nodes. Choose a published Goal using `Published Goal → From List` on `Prepare Goal Run Configuration`, or set `goal_id` in `Goal Settings and Business Mapping`. The list shows title, published version, and ID; it supports search and opaque pagination.
+
+Keep `dry_run: true`. The first execution is read-only and shows input/result fields, required flags, types, defaults, enums, and the published RunSpec ID/version. Map your business row into `variables`. The sample maps `appointment_reference` to `test_reference`; this is an example Goal input, not a standard parameter. Use the fields actually declared by your selected Goal.
+
+Review both input and result mappings, then save the returned `goal_json` as a **fixed** `reviewed_goal_interface` in the settings. Do not bind it to a fresh Goal response. Missing/unknown fields, wrong types, unsupported schema shapes, and publication changes block readiness with affected field paths. Optional published defaults are applied before required checks; values are not coerced. Flat scalar inputs and nullable scalar results are supported; nested objects and future constraints require review.
+
+Creation requires both `ready=true` and explicitly setting `dry_run=false`, with an authorized phone and stable event ID. The sample maps only an explicit available `confirmed=yes` to business confirmation. Review that result name and values against your Goal's `result_fields` before live use; all other results remain `unknown`.
+
+The API chooses its current published RunSpec at acceptance, with no per-run version selector. The final mapping checks the accepted RunSpec against preparation. A race produces `review_required` and retains the accepted Goal Run ID. It does not create a replacement run. The example's bounded `Create and Wait` timeout also retains the Run ID in its error; recover with `Goal Run → Get`. If acceptance is uncertain, reuse the original request and key. For durable business-state storage and long waits, follow the appointment example's Data Table/Wait pattern.
