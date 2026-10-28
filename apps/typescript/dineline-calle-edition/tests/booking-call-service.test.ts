@@ -159,6 +159,9 @@ describe("DineLine CALL-E booking closure loop", () => {
 
     const first = await service.execute(contract);
     const stored = await store.read(contract.idempotencyKey);
+    const pending = await service.reconcile(contract);
+    expect(pending).toMatchObject({ kind: "dispatch_unknown" });
+    expect(await store.read(contract.idempotencyKey)).toMatchObject({ state: "dispatch_unknown" });
     const reconciled = await service.reconcile(contract);
 
     expect(first).toMatchObject({
@@ -174,7 +177,7 @@ describe("DineLine CALL-E booking closure loop", () => {
       outcome: { outcome: "confirmed" },
     });
     expect(provider.executeCount).toBe(1);
-    expect(provider.readCount).toBe(1);
+    expect(provider.readCount).toBe(2);
   });
 
   it("reserves the fingerprint before execution and blocks a duplicate", async () => {
@@ -279,6 +282,7 @@ class AcceptedThenCompletedProvider implements BookingCallProvider {
     return {
       ...confirmedResult(this.contract),
       providerCallId,
+      resultStatus: this.readCount === 1 ? "pending" : "available",
     };
   }
 }
@@ -289,6 +293,7 @@ function confirmedResult(
   return {
     providerCallId: "scripted-call-1",
     status: "completed",
+    resultStatus: "available",
     taskCompleted: true,
     completionConfidence: { score: 0.98, label: "high" },
     structuredResult: {

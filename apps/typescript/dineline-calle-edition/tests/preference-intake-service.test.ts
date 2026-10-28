@@ -117,6 +117,9 @@ describe("DineLine CALL-E preference intake", () => {
 
     const first = await service.execute(contract);
     const stored = await store.read(contract.idempotencyKey);
+    const pending = await service.reconcile(contract);
+    expect(pending).toMatchObject({ kind: "dispatch_unknown" });
+    expect(await store.read(contract.idempotencyKey)).toMatchObject({ state: "dispatch_unknown" });
     const reconciled = await service.reconcile(contract);
 
     expect(first).toMatchObject({
@@ -132,7 +135,7 @@ describe("DineLine CALL-E preference intake", () => {
       outcome: { usableForSearch: true },
     });
     expect(provider.executeCount).toBe(1);
-    expect(provider.readCount).toBe(1);
+    expect(provider.readCount).toBe(2);
   });
 
   it("creates a stable frozen request without storing the phone in the ID", () => {
@@ -192,6 +195,7 @@ class PhoneBearingIntakeProvider implements PreferenceIntakeProvider {
     return {
       providerCallId: "fixture-phone-bearing-intake",
       status: "completed",
+      resultStatus: "available",
       taskCompleted: true,
       completionConfidence: { score: 0.98, label: "high" },
       structuredResult: {
@@ -224,6 +228,7 @@ class NoEvidenceProvider implements PreferenceIntakeProvider {
     return {
       providerCallId: "fixture-no-evidence",
       status: "completed",
+      resultStatus: "available",
       taskCompleted: true,
       completionConfidence: { score: 0.98, label: "high" },
       structuredResult: {
@@ -265,6 +270,7 @@ class AcceptedThenCompletedIntakeProvider implements PreferenceIntakeProvider {
     return {
       providerCallId,
       status: "completed",
+      resultStatus: this.readCount === 1 ? "pending" : "available",
       taskCompleted: true,
       completionConfidence: { score: 0.95, label: "high" },
       structuredResult: {

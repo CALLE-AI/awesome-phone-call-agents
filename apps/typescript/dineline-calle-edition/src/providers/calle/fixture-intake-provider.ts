@@ -44,6 +44,7 @@ export class FixturePreferenceIntakeProvider
     return {
       providerCallId: `fixture-intake-${this.callCount}`,
       status: "completed",
+      resultStatus: "available",
       taskCompleted: true,
       completionConfidence: { score: 0.96, label: "high" },
       structuredResult: preferences,

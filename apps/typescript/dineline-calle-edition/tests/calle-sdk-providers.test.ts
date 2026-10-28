@@ -36,13 +36,13 @@ describe("native CALL-E SDK providers", () => {
     const call = makeSdkCall({
       structuredResult: {
         outcome: "confirmed",
-        confirmedDate: "2026-09-18",
-        confirmedTime: "19:30",
-        confirmedPartySize: 2,
-        confirmationCode: "SDK-42",
-        alternativeDate: null,
-        alternativeTime: null,
-        notes: null,
+        confirmed_date: "2026-09-18",
+        confirmed_time: "19:30",
+        confirmed_party_size: 2,
+        confirmation_code: "SDK-42",
+        alternative_date: "unknown",
+        alternative_time: "unknown",
+        notes: "none",
       },
       transcriptTurns: [
         { speaker: "agent", text: "I am an AI assistant calling for a diner." },
@@ -84,7 +84,7 @@ describe("native CALL-E SDK providers", () => {
     expect(sdk.waitForResult).toHaveBeenCalledOnce();
     const [request, options] = sdk.create.mock.calls[0] ?? [];
     expect(request).toMatchObject({
-      recipient: { phone: "+12025550143", region: "US", locale: "en-US" },
+      phone: "+12025550143", region: "US", locale: "en-US",
       metadata: {
         application: "dineline-calle-edition",
         contractId: contract.contractId,
@@ -117,12 +117,12 @@ describe("native CALL-E SDK providers", () => {
         cuisine: "Italian",
         date: "2026-09-18",
         time: "19:30",
-        timeZone: "America/New_York",
-        partySize: 2,
+        time_zone: "America/New_York",
+        party_size: 2,
         budget: "upscale",
         atmosphere: "quiet enough to talk",
-        dietaryNeeds: [],
-        notes: null,
+        dietary_needs: "[]",
+        notes: "none",
       },
       transcriptTurns: [
         { speaker: "agent", text: "I am the DineLine AI assistant." },
@@ -154,7 +154,7 @@ describe("native CALL-E SDK providers", () => {
     expect(sdk.waitForResult).toHaveBeenCalledOnce();
     const [request, options] = sdk.create.mock.calls[0] ?? [];
     expect(request).toMatchObject({
-      recipient: { phone: "+12025550109", region: "US", locale: "en-US" },
+      phone: "+12025550109", region: "US", locale: "en-US",
       metadata: {
         application: "dineline-calle-edition",
         agentRole: "dining-preference-intake",
@@ -234,12 +234,12 @@ describe("native CALL-E SDK providers", () => {
     const call = makeSdkCall({
       structuredResult: {
         outcome: "unavailable",
-        confirmedDate: "unknown",
-        confirmedTime: "unknown",
-        confirmedPartySize: 0,
-        confirmationCode: "none",
-        alternativeDate: "unknown",
-        alternativeTime: "unknown",
+        confirmed_date: "unknown",
+        confirmed_time: "unknown",
+        confirmed_party_size: 0,
+        confirmation_code: "none",
+        alternative_date: "unknown",
+        alternative_time: "unknown",
         notes: "Requested time was unavailable.",
       },
       transcriptTurns: [],
@@ -257,31 +257,60 @@ describe("native CALL-E SDK providers", () => {
     expect(sdk.create).not.toHaveBeenCalled();
     expect(result.providerCallId).toBe("call-test-1");
   });
+
+  it.each(["pending", "unavailable", "not_applicable"])(
+    "does not expose business results while result status is %s",
+    async (resultStatus) => {
+      sdk.get.mockResolvedValue({
+        ...makeSdkCall({ structuredResult: { outcome: "confirmed" }, transcriptTurns: [] }),
+        resultStatus,
+      });
+      const result = await new CalleSdkProvider({
+        apiKey: "local-test-key", allowRealCalls: false, allowedPhoneNumbers: new Set(),
+      }).getResult("call-test-1");
+      expect(result).toMatchObject({
+        resultStatus, structuredResult: null, taskCompleted: null,
+        completionConfidence: null, evidence: [],
+      });
+      expect(sdk.create).not.toHaveBeenCalled();
+    },
+  );
+
+  it("rejects invented evidence and invalid confidence rather than supplying defaults", async () => {
+    const call = makeSdkCall({
+      structuredResult: { outcome: "confirmed" },
+      transcriptTurns: [{ speaker: "callee", text: "I cannot confirm that." }],
+    });
+    sdk.get.mockResolvedValue({ ...call, result: {
+      ...call.result, evidence: "Reservation confirmed.", completion_confidence: 2, task_completed: "true",
+    } });
+
+    const result = await new CalleSdkProvider({
+      apiKey: "local-test-key", allowRealCalls: false, allowedPhoneNumbers: new Set(),
+    }).getResult("call-test-1");
+    expect(result).toMatchObject({ taskCompleted: null, completionConfidence: null, evidence: [] });
+    expect(result.transcript).toEqual(["callee: I cannot confirm that."]);
+  });
 });
 
 function makeSdkCall(input: {
-  structuredResult: unknown;
+  structuredResult: Record<string, unknown> | null;
   transcriptTurns: Array<{ speaker: string; text: string }>;
 }) {
   return {
     id: "call-test-1",
+    callId: "billing-id-not-for-polling",
     status: "completed",
-    taskCompleted: true,
-    completionConfidence: { score: 0.98, label: "high" },
-    structuredResult: input.structuredResult,
-    evidence: ["The requested facts were confirmed during the call."],
-    summary: "The call completed.",
-    recipients: [
-      {
-        attempts: [
-          {
-            transcriptTurns: input.transcriptTurns,
-          },
-        ],
-      },
-    ],
-    failureCode: null,
-    failureMessage: null,
+    resultStatus: input.structuredResult ? "available" : "pending",
+    result: input.structuredResult ? {
+      ...input.structuredResult,
+      task_completed: true,
+      completion_confidence: 0.98,
+      evidence: input.transcriptTurns.at(-1)?.text ?? "",
+      summary: "The call completed.",
+    } : null,
+    transcript: input.transcriptTurns,
+    error: null,
     metadata: {},
     createdAt: "2026-09-12T07:43:05.000Z",
     completedAt: "2026-09-12T07:46:26.000Z",

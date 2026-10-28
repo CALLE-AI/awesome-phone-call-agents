@@ -28,7 +28,7 @@ export function verifyBookingOutcome(
   );
   const confidence = raw.completionConfidence?.score ?? 0;
 
-  if (raw.status !== "completed") {
+  if (raw.status !== "completed" || raw.resultStatus !== "available") {
     return uncertain(raw, evidence, raw.failureMessage ?? `Provider status: ${raw.status}`);
   }
 

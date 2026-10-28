@@ -21,6 +21,12 @@ credentials, private phone numbers, or production webhook identifiers.
 Vapi is not present in this generated workflow. The original Vapi DineLine
 projects remain untouched as rollback references.
 
+Both exports call the local DineLine backend. Use the current backend and its
+locked `@call-e/calle` 1.0.1 dependency to dispatch and read Calls API v2; the JSON
+nodes do not call CALL-E directly. Follow the [upgrade notes](../README.md#controlled-real-call-setup)
+before replacing a backend with pending Calls v1 requests. n8n's built-in node
+versions and `executionOrder: "v1"` are unrelated to the CALL-E API version.
+
 ## Fixture proof
 
 `dineline-calle-fixture-roundtrip.workflow.json` executes the same trust

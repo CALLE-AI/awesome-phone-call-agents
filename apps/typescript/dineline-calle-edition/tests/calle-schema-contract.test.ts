@@ -6,6 +6,7 @@ import {
 } from "../src/domain/call-result.js";
 import {
   diningPreferencesJsonSchema,
+  DiningPreferencesSchema,
   normalizeDiningPreferencesResult,
 } from "../src/domain/dining-preferences.js";
 
@@ -14,7 +15,6 @@ const allowedKeywords = new Set([
   "properties",
   "required",
   "enum",
-  "items",
   "description",
   "additionalProperties",
 ]);
@@ -60,12 +60,12 @@ describe("CALL-E result schema contract", () => {
     expect(
       normalizeCalleStructuredResult({
         outcome: "unavailable",
-        confirmedDate: "unknown",
-        confirmedTime: "unknown",
-        confirmedPartySize: 0,
-        confirmationCode: "none",
-        alternativeDate: "unknown",
-        alternativeTime: "unknown",
+        confirmed_date: "unknown",
+        confirmed_time: "unknown",
+        confirmed_party_size: 0,
+        confirmation_code: "none",
+        alternative_date: "unknown",
+        alternative_time: "unknown",
         notes: "The requested time was unavailable.",
       }),
     ).toEqual({
@@ -78,6 +78,21 @@ describe("CALL-E result schema contract", () => {
       alternativeTime: null,
       notes: "The requested time was unavailable.",
     });
+  });
+
+  it("decodes dietary needs from the scalar wire format without discarding invalid input", () => {
+    const preferences = {
+      location: "Manhattan", cuisine: "Italian", date: "2026-11-06", time: "19:30",
+      time_zone: "America/New_York", party_size: 2, budget: "moderate", atmosphere: "quiet", notes: "none",
+    };
+    expect(DiningPreferencesSchema.parse(normalizeDiningPreferencesResult({
+      ...preferences, dietary_needs: '["no peanuts", " vegetarian "]',
+    })).dietaryNeeds).toEqual(["no peanuts", "vegetarian"]);
+    for (const dietaryNeeds of ["no peanuts", '{"allergy":"peanuts"}', "null", undefined]) {
+      expect(DiningPreferencesSchema.safeParse(normalizeDiningPreferencesResult({
+        ...preferences, dietary_needs: dietaryNeeds,
+      })).success).toBe(false);
+    }
   });
 });
 
@@ -93,23 +108,21 @@ function schemaProblems(schema: unknown, path = "$" ): string[] {
     }
   }
 
-  if (typeof schema.type !== "string") {
-    problems.push(`${path}.type must be one string`);
-  }
-  if (
-    "additionalProperties" in schema &&
-    schema.additionalProperties !== false
-  ) {
-    problems.push(`${path}.additionalProperties must be false`);
-  }
-
-  if (isRecord(schema.properties)) {
-    for (const [name, child] of Object.entries(schema.properties)) {
-      problems.push(...schemaProblems(child, `${path}.properties.${name}`));
+  if (path === "$") {
+    if (schema.type !== "object" || schema.additionalProperties !== false || !isRecord(schema.properties)) {
+      return [...problems, "The result must be a closed object"];
     }
-  }
-  if (schema.items !== undefined) {
-    problems.push(...schemaProblems(schema.items, `${path}.items`));
+    const fields = Object.keys(schema.properties);
+    if (fields.some((name) => !/^[a-z][a-z0-9_]{0,63}$/.test(name))) problems.push("Use lowercase result field names");
+    if (fields.length === 0 || fields.length > 32) problems.push("Use 1 to 32 result fields");
+    if (JSON.stringify([...(schema.required as string[])].sort()) !== JSON.stringify([...fields].sort())) {
+      problems.push("Every result field must be required");
+    }
+    for (const [name, child] of Object.entries(schema.properties)) {
+      problems.push(...schemaProblems(child, `${path}.${name}`));
+    }
+  } else if (!["string", "number", "integer", "boolean"].includes(String(schema.type))) {
+    problems.push(`${path} must be a scalar field`);
   }
 
   return problems;

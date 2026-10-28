@@ -1,6 +1,7 @@
 import { createHash } from "node:crypto";
 
 import { z } from "zod";
+import { calleVerificationFields } from "./call-result.js";
 
 import {
   LocalDateSchema,
@@ -39,18 +40,20 @@ export const diningPreferencesJsonSchema = {
   type: "object",
   additionalProperties: false,
   required: [
+    ...Object.keys(calleVerificationFields),
     "location",
     "cuisine",
     "date",
     "time",
-    "timeZone",
-    "partySize",
+    "time_zone",
+    "party_size",
     "budget",
     "atmosphere",
-    "dietaryNeeds",
+    "dietary_needs",
     "notes",
   ],
   properties: {
+    ...calleVerificationFields,
     location: {
       type: "string",
       description: "Requested city or neighborhood. Use unknown if it was not provided.",
@@ -67,11 +70,11 @@ export const diningPreferencesJsonSchema = {
       type: "string",
       description: "Requested local time as 24-hour HH:MM. Use unknown if it was not provided.",
     },
-    timeZone: {
+    time_zone: {
       type: "string",
       description: "IANA time zone for the requested location. Use unknown if it is unclear.",
     },
-    partySize: {
+    party_size: {
       type: "integer",
       description: "Number of diners. Use 0 if it was not provided.",
     },
@@ -84,10 +87,9 @@ export const diningPreferencesJsonSchema = {
       type: "string",
       description: "The room or mood the diner wants. Use unknown if it was not provided.",
     },
-    dietaryNeeds: {
-      type: "array",
-      items: { type: "string" },
-      description: "Dietary needs stated by the diner. Use an empty array when none were stated.",
+    dietary_needs: {
+      type: "string",
+      description: 'A JSON-encoded array of dietary needs, such as ["no peanuts"]. Use [] when none were stated.',
     },
     notes: {
       type: "string",
@@ -101,30 +103,39 @@ export function normalizeDiningPreferencesResult(value: unknown): unknown {
     return value;
   }
 
+  const partySize = value.party_size ?? value.partySize;
+  let dietaryNeeds = value.dietary_needs ?? value.dietaryNeeds;
+  if (typeof dietaryNeeds === "string") {
+    try {
+      dietaryNeeds = JSON.parse(dietaryNeeds);
+    } catch {
+      // Leave malformed wire data invalid so the verifier asks the user for input.
+    }
+  }
   return {
     location: nullableWireString(value.location),
     cuisine: nullableWireString(value.cuisine),
     date: nullableWireString(value.date),
     time: nullableWireString(value.time),
-    timeZone: nullableWireString(value.timeZone),
+    timeZone: nullableWireString(value.time_zone ?? value.timeZone),
     partySize:
-      Number.isInteger(value.partySize) &&
-      typeof value.partySize === "number" &&
-      value.partySize >= 1 &&
-      value.partySize <= 20
-        ? value.partySize
+      Number.isInteger(partySize) &&
+      typeof partySize === "number" &&
+      partySize >= 1 &&
+      partySize <= 20
+        ? partySize
         : null,
     budget: DiningBudgetSchema.safeParse(value.budget).success
       ? value.budget
       : "unknown",
     atmosphere: nullableWireString(value.atmosphere),
-    dietaryNeeds: Array.isArray(value.dietaryNeeds)
-      ? value.dietaryNeeds
+    dietaryNeeds: Array.isArray(dietaryNeeds)
+      ? dietaryNeeds
           .filter((item): item is string => typeof item === "string")
           .map((item) => item.trim())
           .filter(Boolean)
           .slice(0, 12)
-      : [],
+      : dietaryNeeds,
     notes: nullableWireString(value.notes),
   };
 }

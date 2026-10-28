@@ -58,7 +58,9 @@ export class CalleIntakeProvider implements PreferenceIntakeProvider {
       this.#client,
       {
         task: buildPreferenceTask(contract),
-        recipient: { phone: contract.phone, region: "US", locale: "en-US" },
+        phone: contract.phone,
+        region: "US",
+        locale: "en-US",
         resultSchema: diningPreferencesJsonSchema,
         metadata: {
           application: "dineline-calle-edition",
@@ -93,6 +95,7 @@ function buildPreferenceTask(contract: ApprovedPreferenceIntakeContract): string
     "Capture conversational preferences such as quiet enough to talk, celebratory but not stuffy, or a cuisine they want to avoid.",
     `The reference date for relative dates is ${referenceDate}. Return dates as YYYY-MM-DD and times as 24-hour HH:MM.`,
     "If the diner does not know a text field, return unknown. Use none for optional notes and 0 for an unknown party size rather than inventing a value.",
+    'Return dietary_needs as a JSON-encoded array string, for example ["no peanuts"], or [] when no dietary needs were stated.',
     "Briefly repeat the captured request and let the diner correct it before ending.",
     "Do not search for restaurants, recommend a specific business, make a reservation, or contact anyone else.",
     "Close by saying that DineLine will prepare five options for the diner to review.",
