@@ -1,0 +1,219 @@
+{
+  "name": "Prepare and validate a CALL-E Goal Run business mapping",
+  "nodes": [
+    {
+      "id": "3dc949ff-93f1-5566-a889-2889ec83a404",
+      "name": "Manual Trigger",
+      "type": "n8n-nodes-base.manualTrigger",
+      "typeVersion": 1,
+      "position": [
+        0,
+        0
+      ],
+      "parameters": {}
+    },
+    {
+      "id": "4300cd49-21a7-5d3d-b54d-8a26bee5b7aa",
+      "name": "Goal Settings and Business Mapping",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        240,
+        0
+      ],
+      "parameters": {
+        "jsCode": "const businessRow = { event_id: 'booking-8472-confirm-1', appointment_reference: 'booking-8472', phone: '+14155550100' };\nreturn [{ json: {\n  dry_run: true,\n  goal_id: '',\n  reviewed_goal_interface: '',\n  business_event_id: businessRow.event_id,\n  phone: businessRow.phone,\n  variables: { test_reference: businessRow.appointment_reference },\n} }];"
+      }
+    },
+    {
+      "id": "19ab3c25-4739-536b-a712-d4d55fa1933c",
+      "name": "Prepare Goal Run Configuration",
+      "type": "@call-e/n8n-nodes-calle.calle",
+      "typeVersion": 2,
+      "position": [
+        480,
+        0
+      ],
+      "parameters": {
+        "resource": "goalRun",
+        "operation": "prepareGoalRun",
+        "publishedGoal": {
+          "__rl": true,
+          "value": "={{ $('Goal Settings and Business Mapping').first().json.goal_id }}",
+          "mode": "id"
+        },
+        "reviewedGoalInterface": "={{ $('Goal Settings and Business Mapping').first().json.reviewed_goal_interface }}",
+        "goalRunVariables": "={{ $json.variables }}"
+      }
+    },
+    {
+      "id": "5d2ab8da-e5da-53e3-8bba-0be039308dad",
+      "name": "Review Fields and Mapping",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        720,
+        0
+      ],
+      "parameters": {
+        "jsCode": "const preparation = $input.first().json;\nconst settings = $('Goal Settings and Business Mapping').first().json;\nif (typeof settings.dry_run !== 'boolean') throw new Error('dry_run must be a boolean.');\nconst live = settings.dry_run === false && preparation.ready === true;\nif (live && (!/^\\+[1-9]\\d{7,14}$/.test(settings.phone) || /^\\+14155550\\d{3}$/.test(settings.phone) || !/^[A-Za-z0-9_-]{1,64}$/.test(settings.business_event_id))) throw new Error('Set an authorized E.164 phone and stable business event before live execution.');\nreturn [{ json: { ...preparation, live } }];"
+      }
+    },
+    {
+      "id": "f13414be-df51-52db-a85f-3bd3b933d69b",
+      "name": "Ready and Live?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2,
+      "position": [
+        960,
+        0
+      ],
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 2
+          },
+          "conditions": [
+            {
+              "id": "Ready and Live?",
+              "leftValue": "={{ $json.live }}",
+              "rightValue": "",
+              "operator": {
+                "type": "boolean",
+                "operation": "true",
+                "singleValue": true
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      }
+    },
+    {
+      "id": "4fe2e2d2-487d-5e3c-a163-0a4663470751",
+      "name": "Create Goal Run and Wait",
+      "type": "@call-e/n8n-nodes-calle.calle",
+      "typeVersion": 2,
+      "position": [
+        1200,
+        0
+      ],
+      "parameters": {
+        "resource": "goalRun",
+        "operation": "createGoalRunAndWait",
+        "goalId": "={{ $json.goal_id }}",
+        "goalRunPhoneNumber": "={{ $('Goal Settings and Business Mapping').first().json.phone }}",
+        "goalRunIdempotencyKey": "={{ 'goal-mapping:' + $('Goal Settings and Business Mapping').first().json.business_event_id }}",
+        "goalRunVariables": "={{ $json.variables_json }}",
+        "pollingInterval": 5000,
+        "timeout": 180000
+      }
+    },
+    {
+      "id": "791527e2-ce8f-5942-85de-36f9d31984c3",
+      "name": "Map Explicit Goal Result",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1440,
+        0
+      ],
+      "parameters": {
+        "jsCode": "const run = $input.first().json;\nconst prepared = $('Prepare Goal Run Configuration').first().json;\nconst samePublication = run.goal_id === prepared.goal_id && run.run_spec?.id === prepared.run_spec_id && run.run_spec?.version === prepared.run_spec_version;\nconst confirmed = samePublication && run.status === 'completed' && run.result_status === 'available' && run.result?.confirmed === 'yes';\nreturn [{ json: { goal_run_id: run.id, run_spec: run.run_spec, result_status: run.result_status, mapping_needs_review: !samePublication, business_status: samePublication ? (confirmed ? 'confirmed' : 'unknown') : 'review_required', recovery: 'Save this Goal Run ID. Use Goal Run Get after interruption; never create a replacement run.' } }];"
+      }
+    },
+    {
+      "id": "3799e5fc-1db8-5124-982e-bcda0d3adcbf",
+      "name": "Configuration guide",
+      "type": "n8n-nodes-base.stickyNote",
+      "typeVersion": 1,
+      "position": [
+        0,
+        -700
+      ],
+      "parameters": {
+        "content": "## Prepare a Goal mapping before dialing\n\nRequires @call-e/n8n-nodes-calle >=0.3.0. Select your CALL-E credential on both CALL-E nodes. Choose your published Goal with Published Goal \u2192 From List, or set goal_id in Goal Settings. Keep dry_run=true. The first preparation shows input_fields, result_fields, required flags, types, defaults, enums, and RunSpec version.\n\nMap your business row to the returned input names. test_reference is an example input, not a standard field. Review the result mapping too: this sample only treats explicit confirmed=yes as confirmation. Save goal_json as a fixed reviewed_goal_interface in Goal Settings after reviewing it. Do not bind it to the latest Goal output.\n\nMissing/unknown/wrongly typed fields and publication changes keep ready=false and goal_id empty. Change the saved interface only after reviewing the affected input and result mappings. Set dry_run=false and an authorized phone only when ready for a real call.\n\nThe API pins the current publication at acceptance; it has no per-run version selector. The final mapping checks the accepted RunSpec and retains the Run ID if publication raced with preparation. Save original input/key for uncertain-create recovery. Timeout does not cancel a run; recover with Get by ID. For durable business-state storage and waiting, use the appointment example.",
+        "height": 620,
+        "width": 800
+      }
+    }
+  ],
+  "connections": {
+    "Manual Trigger": {
+      "main": [
+        [
+          {
+            "node": "Goal Settings and Business Mapping",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Goal Settings and Business Mapping": {
+      "main": [
+        [
+          {
+            "node": "Prepare Goal Run Configuration",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Prepare Goal Run Configuration": {
+      "main": [
+        [
+          {
+            "node": "Review Fields and Mapping",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Review Fields and Mapping": {
+      "main": [
+        [
+          {
+            "node": "Ready and Live?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Ready and Live?": {
+      "main": [
+        [
+          {
+            "node": "Create Goal Run and Wait",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Create Goal Run and Wait": {
+      "main": [
+        [
+          {
+            "node": "Map Explicit Goal Result",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "active": false,
+  "settings": {
+    "executionOrder": "v1"
+  },
+  "pinData": {},
+  "tags": []
+}
