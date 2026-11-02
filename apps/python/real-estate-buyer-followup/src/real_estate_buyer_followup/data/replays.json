@@ -1,0 +1,336 @@
+{
+  "preferences": {
+    "label": "分房源反馈与偏好变化",
+    "transcript": [
+      {
+        "speaker": "bot",
+        "offset_seconds": 0,
+        "text": "您好，我是受经纪人委托的AI助手，现在方便聊上次看房的感受吗？"
+      },
+      {
+        "speaker": "user",
+        "offset_seconds": 5,
+        "text": "A房源位置不错，但客厅太小。"
+      },
+      {
+        "speaker": "user",
+        "offset_seconds": 13,
+        "text": "B房源的客厅我挺喜欢的，但530万还是超预算了。"
+      },
+      {
+        "speaker": "user",
+        "offset_seconds": 21,
+        "text": "现在客厅空间更重要，可以接受离地铁远一点，但预算最多还是500万。"
+      },
+      {
+        "speaker": "bot",
+        "offset_seconds": 30,
+        "text": "如果后续有客厅更宽敞、价格合适的房源，您还愿意看看吗？"
+      },
+      {
+        "speaker": "user",
+        "offset_seconds": 36,
+        "text": "可以，有合适的可以再约我看看。"
+      }
+    ],
+    "analysis": {
+      "summary": "A位置满意但客厅小；B客厅满意但530万超预算。空间优先、交通可适当放宽但范围未知，预算仍500万，愿意考虑合适房源。",
+      "changes": [
+        {
+          "field": "living_room_priority",
+          "value": "高",
+          "evidence": {
+            "turn_index": 3,
+            "quote": "现在客厅空间更重要，可以接受离地铁远一点，但预算最多还是500万。"
+          },
+          "reason": "客户明确表达",
+          "uncertain": false
+        },
+        {
+          "field": "subway_preference",
+          "value": "可接受适当远离地铁",
+          "evidence": {
+            "turn_index": 3,
+            "quote": "现在客厅空间更重要，可以接受离地铁远一点，但预算最多还是500万。"
+          },
+          "reason": "客户明确表达",
+          "uncertain": false
+        },
+        {
+          "field": "budget_max",
+          "value": 5000000,
+          "evidence": {
+            "turn_index": 3,
+            "quote": "现在客厅空间更重要，可以接受离地铁远一点，但预算最多还是500万。"
+          },
+          "reason": "客户明确表达",
+          "uncertain": false
+        },
+        {
+          "field": "next_viewing_interest",
+          "value": "愿意考虑合适房源",
+          "evidence": {
+            "turn_index": 5,
+            "quote": "可以，有合适的可以再约我看看。"
+          },
+          "reason": "明确继续看房意愿，不等于确定购买",
+          "uncertain": false
+        }
+      ],
+      "feedback": [
+        {
+          "property_id": "property_a",
+          "dimension": "空间",
+          "text": "位置不错但客厅偏小",
+          "evidence": {
+            "turn_index": 1,
+            "quote": "A房源位置不错，但客厅太小。"
+          },
+          "uncertain": false
+        },
+        {
+          "property_id": "property_b",
+          "dimension": "空间与价格",
+          "text": "客厅满意，但530万超出预算",
+          "evidence": {
+            "turn_index": 2,
+            "quote": "B房源的客厅我挺喜欢的，但530万还是超预算了。"
+          },
+          "uncertain": false
+        }
+      ],
+      "signals": [],
+      "unresolved": [
+        "可接受的最大地铁距离尚未明确，保留定性变化，不生成距离数值。"
+      ]
+    },
+    "call_outcome": "completed",
+    "result_status": "available"
+  },
+  "high_intent": {
+    "label": "明确机会与真人接管",
+    "transcript": [
+      {
+        "speaker": "bot",
+        "offset_seconds": 0,
+        "text": "您好，我是受经纪人委托的AI助手，现在方便聊上次看房的感受吗？"
+      },
+      {
+        "speaker": "user",
+        "offset_seconds": 5,
+        "text": "B房源我挺满意的，如果价格能谈到500万左右，我这周就想再去看看，最好让经纪人联系我。"
+      }
+    ],
+    "analysis": {
+      "summary": "对B有条件兴趣，希望谈到500万左右并在本周复看，要求经纪人联系；未承诺成交。",
+      "changes": [],
+      "feedback": [
+        {
+          "property_id": "property_b",
+          "dimension": "整体",
+          "text": "满意，想进一步了解",
+          "evidence": {
+            "turn_index": 1,
+            "quote": "B房源我挺满意的，如果价格能谈到500万左右，我这周就想再去看看，最好让经纪人联系我。"
+          },
+          "uncertain": false
+        }
+      ],
+      "signals": [
+        {
+          "kind": "revisit",
+          "property_id": "property_b",
+          "timeframe": "本周",
+          "condition": "希望谈到500万左右，需经纪人核实，不代表已降价",
+          "evidence": {
+            "turn_index": 1,
+            "quote": "B房源我挺满意的，如果价格能谈到500万左右，我这周就想再去看看，最好让经纪人联系我。"
+          }
+        },
+        {
+          "kind": "negotiation",
+          "property_id": "property_b",
+          "timeframe": "本周",
+          "condition": "希望谈到500万左右，需经纪人核实，不代表已降价",
+          "evidence": {
+            "turn_index": 1,
+            "quote": "B房源我挺满意的，如果价格能谈到500万左右，我这周就想再去看看，最好让经纪人联系我。"
+          }
+        }
+      ],
+      "unresolved": []
+    },
+    "call_outcome": "completed",
+    "result_status": "available"
+  },
+  "uncertain_budget": {
+    "label": "预算含糊，保持旧值",
+    "transcript": [
+      {
+        "speaker": "bot",
+        "offset_seconds": 0,
+        "text": "您好，我是受经纪人委托的AI助手，现在方便聊上次看房的感受吗？"
+      },
+      {
+        "speaker": "user",
+        "offset_seconds": 5,
+        "text": "如果房子真的合适，预算也许可以再加一点，具体还没想好。"
+      }
+    ],
+    "analysis": {
+      "summary": "虚构通话回放",
+      "changes": [
+        {
+          "field": "budget_max",
+          "value": null,
+          "evidence": {
+            "turn_index": 1,
+            "quote": "如果房子真的合适，预算也许可以再加一点，具体还没想好。"
+          },
+          "reason": "存在弹性信号，没有明确新上限",
+          "uncertain": true
+        }
+      ],
+      "feedback": [],
+      "signals": [],
+      "unresolved": [
+        "预算是否调整及具体上限，需经纪人进一步确认。"
+      ]
+    },
+    "call_outcome": "completed",
+    "result_status": "available"
+  },
+  "explicit_budget": {
+    "label": "预算明确变化，人工确认",
+    "transcript": [
+      {
+        "speaker": "bot",
+        "offset_seconds": 0,
+        "text": "您好，我是受经纪人委托的AI助手，现在方便聊上次看房的感受吗？"
+      },
+      {
+        "speaker": "user",
+        "offset_seconds": 5,
+        "text": "我确认预算上限改为550万。"
+      }
+    ],
+    "analysis": {
+      "summary": "虚构通话回放",
+      "changes": [
+        {
+          "field": "budget_max",
+          "value": 5500000,
+          "evidence": {
+            "turn_index": 1,
+            "quote": "我确认预算上限改为550万。"
+          },
+          "reason": "客户明确表达",
+          "uncertain": false
+        }
+      ],
+      "feedback": [],
+      "signals": [],
+      "unresolved": []
+    },
+    "call_outcome": "completed",
+    "result_status": "available"
+  },
+  "ambiguous_property": {
+    "label": "房源指代不清",
+    "transcript": [
+      {
+        "speaker": "bot",
+        "offset_seconds": 0,
+        "text": "您好，我是受经纪人委托的AI助手，现在方便聊上次看房的感受吗？"
+      },
+      {
+        "speaker": "user",
+        "offset_seconds": 5,
+        "text": "那套还行，但我记不清你说的是哪套。"
+      }
+    ],
+    "analysis": {
+      "summary": "虚构通话回放",
+      "changes": [],
+      "feedback": [],
+      "signals": [],
+      "unresolved": [
+        "无法确定客户指的是A还是B，不能自动归属反馈。"
+      ]
+    },
+    "call_outcome": "completed",
+    "result_status": "available"
+  },
+  "opt_out": {
+    "label": "拒绝后续联系",
+    "transcript": [
+      {
+        "speaker": "bot",
+        "offset_seconds": 0,
+        "text": "您好，我是受经纪人委托的AI助手，现在方便聊上次看房的感受吗？"
+      },
+      {
+        "speaker": "user",
+        "offset_seconds": 5,
+        "text": "请不要再给我打电话了。"
+      }
+    ],
+    "analysis": {
+      "summary": "虚构通话回放",
+      "changes": [
+        {
+          "field": "contact_allowed",
+          "value": false,
+          "evidence": {
+            "turn_index": 1,
+            "quote": "请不要再给我打电话了。"
+          },
+          "reason": "客户明确表达",
+          "uncertain": false
+        }
+      ],
+      "feedback": [],
+      "signals": [],
+      "unresolved": []
+    },
+    "call_outcome": "completed",
+    "result_status": "available"
+  },
+  "missing_evidence": {
+    "label": "结构化结果缺少转写依据",
+    "transcript": [],
+    "analysis": {
+      "summary": "虚构通话回放",
+      "changes": [
+        {
+          "field": "budget_max",
+          "value": 5500000,
+          "evidence": {
+            "turn_index": 0,
+            "quote": "我确认预算上限改为550万。"
+          },
+          "reason": "客户明确表达",
+          "uncertain": false
+        }
+      ],
+      "feedback": [],
+      "signals": [],
+      "unresolved": []
+    },
+    "call_outcome": "completed",
+    "result_status": "available"
+  },
+  "no_answer": {
+    "label": "无人接听，无业务结果",
+    "transcript": [],
+    "analysis": {
+      "summary": "虚构通话回放",
+      "changes": [],
+      "feedback": [],
+      "signals": [],
+      "unresolved": []
+    },
+    "call_outcome": "no_answer",
+    "result_status": "unavailable"
+  }
+}

@@ -1,0 +1,78 @@
+{
+  "additionalProperties": false,
+  "properties": {
+    "budget_statement": {
+      "description": "预算原话及是否改变现有上限；没有明确新金额时不得推算金额。 根据明确对话填写；未提及填unknown，房源归属不清填unclear。",
+      "type": "string"
+    },
+    "contact_preference": {
+      "description": "客户是否允许后续联系及其原话；明确拒绝联系填do_not_contact。 根据明确对话填写；未提及填unknown，房源归属不清填unclear。",
+      "type": "string"
+    },
+    "next_step_statement": {
+      "description": "继续看房、指定房源复看、希望经纪人联系或暂缓等下一步意愿，保留时间与条件。 根据明确对话填写；未提及填unknown，房源归属不清填unclear。",
+      "type": "string"
+    },
+    "p1_feedback": {
+      "description": "仅记录A 浦东花园（property_a）的整体反馈与是否继续考虑，不得混入其他房源。 根据明确对话填写；未提及填unknown，房源归属不清填unclear。",
+      "type": "string"
+    },
+    "p1_negative": {
+      "description": "仅记录A 浦东花园（property_a）的顾虑、不满意点和拒绝原因，不得混入其他房源。 根据明确对话填写；未提及填unknown，房源归属不清填unclear。",
+      "type": "string"
+    },
+    "p1_next_step": {
+      "description": "仅记录A 浦东花园（property_a）的针对本房源的复看、谈价或真人联系诉求及条件，不得混入其他房源。 根据明确对话填写；未提及填unknown，房源归属不清填unclear。",
+      "type": "string"
+    },
+    "p1_positive": {
+      "description": "仅记录A 浦东花园（property_a）的满意点，不得混入其他房源。 根据明确对话填写；未提及填unknown，房源归属不清填unclear。",
+      "type": "string"
+    },
+    "p2_feedback": {
+      "description": "仅记录B 滨江公馆（property_b）的整体反馈与是否继续考虑，不得混入其他房源。 根据明确对话填写；未提及填unknown，房源归属不清填unclear。",
+      "type": "string"
+    },
+    "p2_negative": {
+      "description": "仅记录B 滨江公馆（property_b）的顾虑、不满意点和拒绝原因，不得混入其他房源。 根据明确对话填写；未提及填unknown，房源归属不清填unclear。",
+      "type": "string"
+    },
+    "p2_next_step": {
+      "description": "仅记录B 滨江公馆（property_b）的针对本房源的复看、谈价或真人联系诉求及条件，不得混入其他房源。 根据明确对话填写；未提及填unknown，房源归属不清填unclear。",
+      "type": "string"
+    },
+    "p2_positive": {
+      "description": "仅记录B 滨江公馆（property_b）的满意点，不得混入其他房源。 根据明确对话填写；未提及填unknown，房源归属不清填unclear。",
+      "type": "string"
+    },
+    "priority_statement": {
+      "description": "空间、预算、交通等优先级与取舍原话；未确认的精确距离不得补全。 根据明确对话填写；未提及填unknown，房源归属不清填unclear。",
+      "type": "string"
+    },
+    "summary": {
+      "description": "本次通话简要总结，区分客户明确表达与未知，不替客户作出购买承诺。 根据明确对话填写；未提及填unknown，房源归属不清填unclear。",
+      "type": "string"
+    },
+    "unresolved_questions": {
+      "description": "客户提出但资料无法回答、或须经纪人核实的问题；不得编造答案。 根据明确对话填写；未提及填unknown，房源归属不清填unclear。",
+      "type": "string"
+    }
+  },
+  "required": [
+    "summary",
+    "contact_preference",
+    "budget_statement",
+    "priority_statement",
+    "next_step_statement",
+    "unresolved_questions",
+    "p1_feedback",
+    "p1_positive",
+    "p1_negative",
+    "p1_next_step",
+    "p2_feedback",
+    "p2_positive",
+    "p2_negative",
+    "p2_next_step"
+  ],
+  "type": "object"
+}

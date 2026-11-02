@@ -1,0 +1,100 @@
+{
+  "scenario_version": "post-viewing-v2",
+  "evaluation_date": "2026-11-02",
+  "customer": {
+    "id": "customer_zhang",
+    "name": "张女士（虚构）",
+    "version": 1,
+    "preferences": {
+      "budget_max": 5000000,
+      "preferred_area": "浦东",
+      "bedrooms": 3,
+      "living_room_priority": "提到客厅空间重要，与交通及预算的优先级未确认",
+      "subway_preference": "偏好步行10分钟内，是否愿意放宽尚未确认",
+      "purchase_timeline": "3个月内",
+      "next_viewing_interest": "待确认",
+      "subway_walk_limit_minutes": 10
+    },
+    "contact_allowed": true,
+    "intent": "待了解",
+    "handoff_required": false,
+    "display_id": "C001",
+    "city": "上海",
+    "customer_type": "改善型购房",
+    "status": "持续跟进中"
+  },
+  "properties": [
+    {
+      "id": "property_a",
+      "label": "A 浦东花园",
+      "price": 4800000,
+      "living_room_sqm": 18,
+      "subway_walk_minutes": 8,
+      "status": "带看时资料，拨号前需核实",
+      "updated_at": "2026-10-30",
+      "area": "浦东",
+      "display_id": "P001",
+      "floor_area_sqm": 92,
+      "subway_distance_m": 500,
+      "living_room_description": "相对紧凑",
+      "bedrooms": 3
+    },
+    {
+      "id": "property_b",
+      "label": "B 滨江公馆",
+      "price": 5300000,
+      "living_room_sqm": 30,
+      "subway_walk_minutes": 18,
+      "status": "带看时资料，拨号前需核实",
+      "updated_at": "2026-10-30",
+      "area": "浦东",
+      "display_id": "P002",
+      "floor_area_sqm": 108,
+      "subway_distance_m": 1200,
+      "living_room_description": "较宽敞",
+      "bedrooms": 3
+    }
+  ],
+  "viewings": [
+    {
+      "id": "viewing_a",
+      "customer_id": "customer_zhang",
+      "property_id": "property_a",
+      "viewed_at": "2026-10-30",
+      "feedback": []
+    },
+    {
+      "id": "viewing_b",
+      "customer_id": "customer_zhang",
+      "property_id": "property_b",
+      "viewed_at": "2026-10-30",
+      "feedback": []
+    }
+  ],
+  "communications": [
+    {
+      "id": "source_initial",
+      "kind": "customer_statement",
+      "recorded_at": "2026-10-12",
+      "summary": "重视地铁距离，偏好步行10分钟内。",
+      "text": "我主要想看浦东的三房，预算最好不要超过500万，离地铁近一点，步行十分钟以内最好。",
+      "confirmed": true
+    },
+    {
+      "id": "source_preference_change",
+      "kind": "customer_statement",
+      "recorded_at": "2026-10-20",
+      "summary": "表示客厅空间也很重要，想看过房再比较。",
+      "text": "我想了想，客厅的空间也挺重要的，还是想看过实际的房子再比较。",
+      "confirmed": true
+    },
+    {
+      "id": "source_viewing",
+      "kind": "viewing_record",
+      "recorded_at": "2026-10-30",
+      "text": "完成浦东花园（A）和滨江公馆（B）带看，详细反馈待收集。",
+      "confirmed": true
+    }
+  ],
+  "candidates": []
+}
