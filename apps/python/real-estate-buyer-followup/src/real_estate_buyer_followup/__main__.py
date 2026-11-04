@@ -11,7 +11,7 @@ def main():
     parser.add_argument("--case",choices=list(fixture("replays.json")),default="preferences")
     args=parser.parse_args()
     w=Workflow(Settings(db_path=args.db))
-    run=w.prepare("customer_zhang","跟进张女士上次看房情况",replay_case=args.case)
+    run=w.prepare("customer_zhang","Follow up on Ms. Zhang's recent viewings",replay_case=args.case)
     print("MODE: deterministic planning + prerecorded extraction; synthetic telephone replay")
     print(dump({"assessment":run["assessment"],"plan":run["plan"]}))
     run=w.approve(run["id"],run["revision"],contact_authorized=True,broker="offline_demo")

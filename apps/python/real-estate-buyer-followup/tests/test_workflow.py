@@ -18,7 +18,7 @@ def w(tmp_path):
 
 
 def execute(w, case="preferences"):
-    r=w.prepare("customer_zhang","跟进张女士上次看房情况",replay_case=case)
+    r=w.prepare("customer_zhang","Follow up on Ms. Zhang's recent viewings",replay_case=case)
     r=w.approve(r["id"],r["revision"],True)
     return w.execute(r["id"])
 
@@ -34,13 +34,13 @@ def test_context_and_plan_change_with_evidence(w):
     assert {i.category for i in a.insights}=={"fact","hypothesis","conflict","gap"}
     assert "source_irrelevant" not in a.selected_sources
     assert not any(i.category=="fact" and i.source_ids==["source_space_observation"] for i in a.insights)
-    plan=plan_offline("回访",a,ctx)
+    plan=plan_offline('Follow-up',a,ctx)
     assert len(plan.communication_topics)==3 and not plan.questions
     assert all(t.source_ids and t.content for t in plan.communication_topics)
     changed=copy.deepcopy(ctx)
     changed["communications"]=[s for s in changed["communications"] if s["id"] not in {"source_space_observation","source_budget_old","source_budget_latest","source_preference_change"}]
     changed["properties"][1]["price"]=4800000
-    fresh=plan_offline("回访",assess_offline(changed),changed)
+    fresh=plan_offline('Follow-up',assess_offline(changed),changed)
     assert fresh.communication_topics[1].content!=plan.communication_topics[1].content
     with pytest.raises(ValueError):
         a.insights[0].source_ids=["invented"]
@@ -51,9 +51,9 @@ def test_real_writeback_and_repeat_replay_are_idempotent(w):
     r=finish(w)
     ctx=w.crm.context("customer_zhang")
     assert ctx["customer"]["preferences"]["budget_max"]==5000000
-    assert ctx["customer"]["preferences"]["living_room_priority"]=="高"
-    assert "客厅" in ctx["viewings"][0]["feedback"][0]["text"]
-    assert "超出预算" in ctx["viewings"][1]["feedback"][0]["text"]
+    assert ctx["customer"]["preferences"]["living_room_priority"]=='high'
+    assert 'living room' in ctx["viewings"][0]["feedback"][0]["text"]
+    assert 'exceeds budget' in ctx["viewings"][1]["feedback"][0]["text"]
     before=w.store.history("customer_zhang")
     w.process(r["id"],confirm_writeback=True);w.execute(r["id"])
     assert w.store.history("customer_zhang")==before
@@ -90,7 +90,7 @@ def test_handoff_is_evidence_bound_and_notification_is_deduplicated(w):
     assert w.crm.context("customer_zhang")["customer"]["handoff_required"]
     w.process(r["id"],confirm_writeback=True)
     assert len(w.crm.notifications(r["id"]))==1
-    assert "尚未预约" in r["receipt"]["handoff"]["action"]
+    assert 'no appointment or price promised' in r["receipt"]["handoff"]["action"]
 
 
 def test_missing_evidence_and_final_unavailable(w):
@@ -102,43 +102,43 @@ def test_missing_evidence_and_final_unavailable(w):
 
 
 def test_edit_requires_reapproval_and_review_is_bound_to_body(w):
-    r=w.prepare("customer_zhang","回访")
+    r=w.prepare("customer_zhang",'Follow-up')
     rev=r["revision"]
     with pytest.raises(ValueError):w.approve(r["id"],rev,False)
     r=w.approve(r["id"],rev,True)
-    changed=copy.deepcopy(r["plan"]);changed['communication_topics'][0]['content']='分别了解A、B房源的真实体验，记录各自的顾虑。'
+    changed=copy.deepcopy(r["plan"]);changed['communication_topics'][0]['content']='Collect genuine impressions of A and B separately and record their concerns.'
     r=w.edit(r["id"],r["revision"],changed)
     assert r["status"]=="pending_approval"
     assert w.execute(r["id"])["call"] is None
     with pytest.raises(ValueError):w.approve(r["id"],rev,True)
     r=w.approve(r["id"],r["revision"],True)
-    assert '分别了解A、B房源的真实体验' in r['request']['task']
+    assert 'Collect genuine impressions of A and B separately' in r['request']['task']
     r["request"]["task"]="tampered"
     w.store.save_run(r,r["revision"])
     with pytest.raises(ValueError):w.execute(r["id"])
 
 
 def test_opt_out_blocks_previously_approved_and_new_calls(w):
-    earlier=w.prepare("customer_zhang","回访")
+    earlier=w.prepare("customer_zhang",'Follow-up')
     earlier=w.approve(earlier["id"],earlier["revision"],True)
     finish(w,"opt_out")
     assert not w.crm.context("customer_zhang")["customer"]["contact_allowed"]
     with pytest.raises(ValueError):w.execute(earlier["id"])
-    with pytest.raises(ValueError):w.prepare("customer_zhang","再回访")
+    with pytest.raises(ValueError):w.prepare("customer_zhang",'Follow up again')
 
 
 def test_legacy_approved_task_requires_reapproval_before_submission(w):
     from real_estate_buyer_followup.storage import digest
-    r=w.prepare('customer_zhang','回访')
+    r=w.prepare('customer_zhang','Follow-up')
     r=w.approve(r['id'],r['revision'],True)
     r['request']['task']='legacy task with internal analysis JSON'
     r['approved_digest']=digest(r['request'])
     w.store.save_run(r,r['revision'])
-    with pytest.raises(ValueError,match='重新批准'):w.execute(r['id'])
+    with pytest.raises(ValueError,match='approve again'):w.execute(r['id'])
     assert w.store.run(r['id'])['call'] is None
     r=w.edit(r['id'],r['revision'],r['plan'])
     r=w.approve(r['id'],r['revision'],True)
-    assert r['request']['task'].startswith('身份与目标\n')
+    assert r['request']['task'].startswith('Identity and objective\n')
     assert w.execute(r['id'])['call']['simulation'] is True
 
 
@@ -158,7 +158,7 @@ def test_stale_customer_does_not_get_overwritten(w):
         row=db.execute("SELECT data FROM customers").fetchone();c=json.loads(row[0])
         c["version"]+=1;c["preferences"]["budget_max"]=4900000
         db.execute("UPDATE customers SET version=?,data=?",(c["version"],dump(c)))
-    with pytest.raises(ValueError,match="版本"):w.process(r["id"],confirm_writeback=True)
+    with pytest.raises(ValueError,match='revision'):w.process(r["id"],confirm_writeback=True)
     assert w.crm.context("customer_zhang")["customer"]["preferences"]["budget_max"]==4900000
 
 
@@ -174,7 +174,7 @@ def test_lost_submission_recovers_same_identity_and_pending_result(w,tmp_path):
         def read(self,request,key,resource_id):
             return FakeProvider.submit(self,request,key)
     provider=Uncertain();w.provider_override=provider
-    r=w.prepare("customer_zhang","回访");r=w.approve(r["id"],r["revision"],True)
+    r=w.prepare("customer_zhang",'Follow-up');r=w.approve(r["id"],r["revision"],True)
     with pytest.raises(ValueError):w.execute(r["id"])
     recovered=Workflow(w.settings,provider=provider)
     with pytest.raises(ValueError):recovered.execute(r["id"])
@@ -239,7 +239,7 @@ def test_live_number_is_frozen_per_plan_and_sdk_submission_is_explicit(w,monkeyp
     monkeypatch.setattr(calle,'CalleClient',Client)
     monkeypatch.setattr(w,'_ai',lambda run=None:Intelligence(Settings(),mode='replay'))
     w.settings.enable_live=True;w.settings.calle_key='offline-placeholder';w.settings.analysis_mode='doubao'
-    r=w.prepare('customer_zhang','回访',mode='live',phone='+12025550123',locale='en-US')
+    r=w.prepare('customer_zhang','Follow-up',mode='live',phone='+12025550123',locale='en-US')
     assert not seen and r['live_destination']=={'phone':'+12025550123','locale':'en-US'}
     with pytest.raises(ValueError):w.approve(r['id'],r['revision'],False)
     r=w.approve(r['id'],r['revision'],True)
@@ -249,9 +249,9 @@ def test_live_number_is_frozen_per_plan_and_sdk_submission_is_explicit(w,monkeyp
     assert len(seen)==1 and seen[0]['phone']=='+12025550123' and seen[0]['locale']=='en-US'
     assert w.refresh(r['id'])['call']['id']=='sdk_1'
     assert len(seen)==1
-    new=w.prepare('customer_zhang','回访',mode='live',phone='+12025550124',locale='en-US')
+    new=w.prepare('customer_zhang','Follow-up',mode='live',phone='+12025550124',locale='en-US')
     assert new['id']!=r['id'] and new['live_destination']['phone']=='+12025550124'
-    with pytest.raises(ValueError,match='国家区号'):w.prepare('customer_zhang','回访',mode='live',phone='123',locale='en-US')
+    with pytest.raises(ValueError,match='E.164'):w.prepare('customer_zhang','Follow-up',mode='live',phone='123',locale='en-US')
 
 
 def test_live_rejection_reports_supported_reason_without_provider_payload(monkeypatch):
@@ -264,7 +264,7 @@ def test_live_rejection_reports_supported_reason_without_provider_payload(monkey
         def __init__(self,**kwargs):self.calls=Calls()
     monkeypatch.setattr(calle,'CalleClient',Client)
     p=LiveProvider(Settings(enable_live=True,calle_key='offline-placeholder'))
-    with pytest.raises(ProviderError,match='所选语言') as e:
+    with pytest.raises(ProviderError,match='selected language') as e:
         p.submit({'phone':'+12025550123','locale':'zh-CN'},'same-key')
     assert not e.value.uncertain and 'private-provider-payload' not in str(e.value)
 
@@ -272,7 +272,7 @@ def test_live_rejection_reports_supported_reason_without_provider_payload(monkey
 def test_literal_quote_is_not_enough_for_unrelated_change(w):
     r=execute(w,"high_intent")
     analysis=Analysis.model_validate({"summary":"incorrect inference","changes":[
-        {"field":"living_room_priority","value":"高","reason":"unsupported","uncertain":False,
+        {"field":"living_room_priority","value":'high',"reason":"unsupported","uncertain":False,
          "evidence":{"turn_index":1,"quote":r["call"]["transcript"][1]["text"]}}],
         "feedback":[],"signals":[],"unresolved":[]})
     batch=build_batch(r,analysis)
@@ -328,7 +328,7 @@ def test_concurrent_execution_claim_does_not_submit_twice(w):
             self.count+=1;entered.set();assert release.wait(3)
             return super().submit(request,key)
     provider=Slow();w.provider_override=provider
-    r=w.prepare("customer_zhang","回访");w.approve(r["id"],r["revision"],True)
+    r=w.prepare("customer_zhang",'Follow-up');w.approve(r["id"],r["revision"],True)
     with ThreadPoolExecutor(max_workers=1) as pool:
         first=pool.submit(w.execute,r["id"])
         assert entered.wait(3)
@@ -365,7 +365,7 @@ def test_monitoring_advances_same_call_until_business_result_then_processes_once
 
 def test_automatic_monitor_never_resubmits_or_retries_failed_analysis(w,monkeypatch):
     r=execute(w)
-    before=w.prepare('customer_zhang','尚未拨号')
+    before=w.prepare('customer_zhang','Not dialed')
     calls=[]
     class Failing:
         def analyze(self,run):calls.append(run['id']);raise ValueError('temporary analysis failure')
@@ -389,8 +389,8 @@ def test_live_result_requires_destination_specific_consent_before_model_analysis
     monkeypatch.setattr(w,'_ai',lambda *args:Analyzer())
     r=w.advance_call(r['id'])
     assert r['status']=='awaiting_analysis_consent' and not calls
-    with pytest.raises(ValueError,match='尚未同意'):w.process(r['id'])
-    with pytest.raises(ValueError,match='明确同意'):w.authorize_analysis(r['id'],r['revision'])
+    with pytest.raises(ValueError,match='not authorized yet'):w.process(r['id'])
+    with pytest.raises(ValueError,match='explicitly authorize'):w.authorize_analysis(r['id'],r['revision'])
     r=w.authorize_analysis(r['id'],r['revision'],confirmed=True)
     assert r['analysis_consent']['provider']=='doubao' and r['allow_doubao_analysis']
     r=w.advance_call(r['id'])
@@ -429,19 +429,19 @@ def test_proposed_updates_survive_restart_and_require_explicit_confirmation(w):
     c=restored.crm.context('customer_zhang')['customer']
     assert c['preferences']['budget_max']==5000000
     assert c['preferences']['subway_walk_limit_minutes']==10
-    assert c['preferences']['next_viewing_interest']=='愿意考虑合适房源'
-    assert c['intent']=='有继续看房意愿' and not c['handoff_required']
+    assert c['preferences']['next_viewing_interest']=='Willing to consider suitable homes'
+    assert c['intent']=='Interested in further viewings' and not c['handoff_required']
     restored.process(r['id'],confirm_writeback=True)
     assert len(restored.store.history('customer_zhang'))==5
 
 
 def test_refusal_blocks_other_calls_before_crm_confirmation(w):
-    earlier=w.prepare('customer_zhang','回访')
+    earlier=w.prepare('customer_zhang','Follow-up')
     w.approve(earlier['id'],earlier['revision'],True)
     refusal=execute(w,'opt_out')
     w.process(refusal['id'])
     assert w.crm.context('customer_zhang')['customer']['contact_allowed'] is True
-    with pytest.raises(ValueError,match='联系限制'):w.execute(earlier['id'])
+    with pytest.raises(ValueError,match='Contact restriction'):w.execute(earlier['id'])
 
 
 def test_existing_database_is_not_reseeded_with_new_history(w):
@@ -456,25 +456,25 @@ def test_existing_database_is_not_reseeded_with_new_history(w):
 def test_natural_language_replanning_invalidates_approval_and_preserves_evidence(w,monkeypatch):
     from real_estate_buyer_followup.integrations.llm import Intelligence
     from real_estate_buyer_followup.models import Plan
-    r=w.prepare('customer_zhang','回访')
+    r=w.prepare('customer_zhang','Follow-up')
     r=w.approve(r['id'],r['revision'],True)
     before=copy.deepcopy(r)
     def replan(self,request,plan,assessment,context):
-        assert request=='重点了解 B 的价格顾虑，暂时不问购房时间'
+        assert request=="Focus on B's price concerns; do not ask about purchase timing for now"
         updated=copy.deepcopy(plan)
-        updated['communication_topics'][0]['content']='重点了解B的价格顾虑，区分预算硬约束和性价比判断。'
+        updated['communication_topics'][0]['content']="Focus on B's price concerns; distinguish a hard budget constraint from value-for-money concerns."
         return Plan.model_validate(updated)
     monkeypatch.setattr(Intelligence,'replan',replan)
-    r=w.replan(r['id'],r['revision'],'重点了解 B 的价格顾虑，暂时不问购房时间')
+    r=w.replan(r['id'],r['revision'],"Focus on B's price concerns; do not ask about purchase timing for now")
     assert r['status']=='pending_approval' and r['approved_digest'] is None
     assert r['context']==before['context'] and r['assessment']==before['assessment']
     assert r['plan_history'][0]['previous_plan']==before['plan']
     assert w.execute(r['id'])['call'] is None
-    with pytest.raises(ValueError):w.replan(r['id'],before['revision'],'再次修改')
+    with pytest.raises(ValueError):w.replan(r['id'],before['revision'],'Revise again')
     def fail(*args):raise ValueError('model unavailable')
     monkeypatch.setattr(Intelligence,'replan',fail)
     saved=w.store.run(r['id'])
-    with pytest.raises(ValueError):w.replan(r['id'],r['revision'],'重点问价格')
+    with pytest.raises(ValueError):w.replan(r['id'],r['revision'],'Focus on price')
     assert w.store.run(r['id'])==saved
 
 
@@ -495,7 +495,7 @@ def test_invalid_source_gets_one_correction_without_mutating_context(w,monkeypat
     assert ctx==before
     seen.clear()
     monkeypatch.setattr(Intelligence,'_json',lambda self,*args:(seen.append(1) or invalid))
-    with pytest.raises(ValueError,match='引用仍未通过校验'):ai.assess(ctx)
+    with pytest.raises(ValueError,match='source references still fail validation'):ai.assess(ctx)
     assert len(seen)==2
 
 
@@ -506,7 +506,7 @@ def test_json_syntax_error_has_bounded_regeneration_and_safe_message(w,monkeypat
     from real_estate_buyer_followup.integrations.llm import Intelligence
     from real_estate_buyer_followup.models import Plan
     ctx=w.crm.context('customer_zhang')
-    good=plan_offline('回访',assess_offline(ctx),ctx).model_dump()
+    good=plan_offline('Follow-up',assess_offline(ctx),ctx).model_dump()
     calls=[]
     class Responses:
         def create(self,**kwargs):
@@ -521,11 +521,11 @@ def test_json_syntax_error_has_bounded_regeneration_and_safe_message(w,monkeypat
     monkeypatch.setattr(openai,'OpenAI',Client)
     ai=Intelligence(Settings(doubao_key='test-only',doubao_model='test-only'),mode='doubao')
     if permanent:
-        with pytest.raises(ValueError,match='连续两次') as err:ai._json(Plan,'JSON',{'context':ctx})
+        with pytest.raises(ValueError,match='two consecutive') as err:ai._json(Plan,'JSON',{'context':ctx})
         assert 'PRIVATE_MODEL_OUTPUT' not in str(err.value)
         assert 'validation error' not in str(err.value)
     else:
-        assert ai._json(Plan,'JSON',{'context':ctx}).objective=='回访'
+        assert ai._json(Plan,'JSON',{'context':ctx}).objective=='Follow-up'
     assert len(calls)==2
     assert 'format_correction' in calls[1]['input'][0]['content']
     assert 'PRIVATE_MODEL_OUTPUT' not in calls[1]['input'][0]['content']

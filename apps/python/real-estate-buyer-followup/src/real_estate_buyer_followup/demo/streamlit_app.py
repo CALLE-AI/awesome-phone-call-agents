@@ -5,7 +5,10 @@ Real transcript analysis honors the project owner authorization or per-call cons
 from html import escape
 import copy
 import json
-import streamlit as st
+import streamlit as _streamlit
+from real_estate_buyer_followup.demo.privacy import Presentation
+
+st = Presentation(_streamlit)
 from real_estate_buyer_followup.config import Settings
 from real_estate_buyer_followup.storage import fixture
 from real_estate_buyer_followup.agent.planning import task_sections
@@ -15,7 +18,7 @@ from real_estate_buyer_followup.services.workflow import Workflow
 from real_estate_buyer_followup.demo.results import has_value,crm_suggestions,task_overview,recording_url
 
 
-PAGES = ["① 任务准备", "② Agent Planning", "③ 通话执行", "④ 结果与更新"]
+PAGES = ['① Preparation', "② Agent Planning", '③ Execution', '④ Results and updates']
 
 
 def page_for_run(run):
@@ -26,7 +29,7 @@ def page_for_run(run):
     return PAGES[2]
 
 
-def action(fn, destination=None, message=None, label='正在处理，请勿重复点击…'):
+def action(fn, destination=None, message=None, label='Working; do not click repeatedly…'):
     """Persist feedback and navigate on rerun, including failed requests.
 
     Never set a navigation widget's value after it was instantiated. Queue the
@@ -36,53 +39,53 @@ def action(fn, destination=None, message=None, label='正在处理，请勿重�
     try:
         with st.status(label,expanded=True) as status:
             result=fn()
-            status.update(label='处理完成',state='complete',expanded=False)
+            status.update(label='Complete',state='complete',expanded=False)
         if isinstance(result,dict) and 'id' in result:
             st.session_state['run_id']=result['id']
         if destination:
             st.session_state['_next_page']=destination(result) if callable(destination) else destination
-        st.session_state['_feedback']=('success',message or '操作已完成。')
+        st.session_state['_feedback']=('success',message or 'Action completed.')
     except Exception as exc:
         if destination:
             # A failed planning request belongs on the planning page as well.
             st.session_state['_next_page']=destination if isinstance(destination,str) else PAGES[2]
         st.session_state['_feedback']=('error',str(exc) if isinstance(exc,ValueError)
-            else '本地执行出错，任务已保留；请查看状态后重试。')
+            else 'Local execution failed; task retained. Check its state before retrying.')
     st.rerun()
 
 
 def show_evidence(ev):
     if not ev:
-        st.caption("没有有效用户转写证据")
+        st.caption('No valid user transcript evidence')
         return
-    st.caption(f"转写第 {ev['turn_index']} 条 · 偏移 {ev.get('offset_seconds','未知')} 秒 · 快照 {ev.get('snapshot_id','')[:10]}")
+    st.caption(f"Transcript turn {ev['turn_index']} · Offset {ev.get('offset_seconds', 'Unknown')} seconds · Snapshot {ev.get('snapshot_id', '')[:10]}")
     st.code(ev["quote"],language=None)
 
 
 def show_call_status(run):
     call=run['call']
-    execution={'queued':'准备通话','in_progress':'通话进行中','completed':'通话已结束',
-        'failed':'通话执行失败','canceled':'已取消'}.get(run['execution_status'],run['execution_status'])
-    result={'pending':'等待服务端结果','available':'结果已返回','unavailable':'无可用结构化结果',
-        'not_applicable':'无业务结果'}.get(call['result_status'],call['result_status'])
-    extraction={'not_started':'等待通话结果','completed':'分析完成','unavailable':'无需分析',
-        'failed':'分析失败'}.get(run['extraction_status'],run['extraction_status'])
-    for col,title,value in zip(st.columns(3),['电话执行','业务结果','结果分析'],[execution,result,extraction]):
+    execution={'queued':'Preparing call','in_progress':'Call in progress','completed':'Call ended',
+        'failed':'Call execution failed','canceled':'Canceled'}.get(run['execution_status'],run['execution_status'])
+    result={'pending':'Awaiting provider result','available':'Result returned','unavailable':'No usable structured result',
+        'not_applicable':'No business result'}.get(call['result_status'],call['result_status'])
+    extraction={'not_started':'Awaiting call result','completed':'Analysis complete','unavailable':'Analysis not applicable',
+        'failed':'Analysis failed'}.get(run['extraction_status'],run['extraction_status'])
+    for col,title,value in zip(st.columns(3),['Call execution','Business result','Result analysis'],[execution,result,extraction]):
         col.metric(title,value)
 
 
 def show_transcript(run):
     call=run.get('call') or {}
     turns=call.get('transcript') or []
-    label='演示转写（固定虚构案例）' if run['mode']=='fake' else '完整通话转写'
+    label='Demo transcript (fixed fictional case)' if run['mode']=='fake' else 'Full call transcript'
     with st.expander(label,expanded=bool(turns)):
         for i,turn in enumerate(turns):
-            st.write(f"{i} · {turn['speaker']} · {turn.get('offset_seconds','')}s：{turn['text']}")
+            st.write(f"{i} · {turn['speaker']} · {turn.get('offset_seconds','')}s: {turn['text']}")
         if not turns:
             if call.get('result_status')=='pending':
-                st.info('通话或结果整理尚未完成，完整转写通常在通话结束后返回。')
+                st.info('Call or result preparation is incomplete; the full transcript normally arrives after the call.')
             else:
-                st.info('本次电话未返回完整转写。')
+                st.info('This call did not return a full transcript.')
 
 
 @st.fragment(run_every='3s')
@@ -92,7 +95,7 @@ def follow_existing_call(w,run_id):
     run=w.store.run(run_id)
     if st.session_state.get(retry_key,0)<3:
         try:
-            with st.spinner('正在更新这通电话的状态；结果就绪后自动分析…'):
+            with st.spinner('Updating this call; analysis begins when results are ready…'):
                 run=w.advance_call(run_id)
             st.session_state[retry_key]=0
         except Exception as exc:
@@ -102,44 +105,44 @@ def follow_existing_call(w,run_id):
                 pass  # Render the persisted error once below.
             else:
                 st.session_state[retry_key]=st.session_state.get(retry_key,0)+1
-                st.warning(str(exc) if isinstance(exc,ValueError) else '状态查询暂时失败，未重拨。')
+                st.warning(str(exc) if isinstance(exc,ValueError) else 'Status read temporarily failed; no redial.')
     if run.get('batch') or run['status'] in {'no_business_result','awaiting_analysis_consent'}:
         st.session_state['_next_page']=PAGES[3]
         st.rerun()
     show_call_status(run)
     if run['status']=='processing_failed':
-        st.error(run.get('error') or '结果分析失败；电话不会重新拨打。')
-        if st.button('重试结果分析（不重拨）'):
+        st.error(run.get('error') or 'Result analysis failed; the call will not be placed again.')
+        if st.button('Retry result analysis (no redial)'):
             action(lambda:w.process(run_id,review_before_write=True),destination=PAGES[3],
-                message='结果分析已完成，仅预览CRM更新。')
+                message='Analysis complete; CRM suggestions are preview-only.')
     elif st.session_state.get(retry_key,0)>=3:
-        st.warning('连续三次查询未成功，已暂停自动查询；电话本身不会取消或重拨。')
-        if st.button('继续查询这通电话（不重拨）'):
+        st.warning('Three consecutive reads failed. Automatic polling paused; the call is neither canceled nor redialed.')
+        if st.button('Resume reading this call (no redial)'):
             st.session_state[retry_key]=0
             st.rerun()
     elif run['call']['result_status']=='pending':
-        st.caption('每3秒自动查询已有电话，刷新或重新打开页面会继续跟踪，不会重新拨号。')
+        st.caption('Polling the saved call every three seconds; refreshing or reopening tracks the same call without redialing.')
         if run['execution_status']=='completed':
-            st.info('通话已结束，CALL-E正在整理结构化结果和完整转写。')
+            st.info('Call ended; CALL-E is preparing structured results and the full transcript.')
     show_transcript(run)
 
 
 def show_plan(plan):
-    st.write("**通话目标**",plan["objective"])
+    st.write('**Call goal**',plan["objective"])
     for goal in plan.get("goals",[]):st.markdown("- "+goal)
     for i,q in enumerate(plan["questions"],1):
         with st.container(border=True):
             st.markdown(f"**{i}. [{q['priority']}] {q['question']}**")
-            st.write("为什么问：",q["reason"])
-            st.write("期望补齐：",q["expected_information"])
-            st.caption("来源："+", ".join(q["source_ids"]))
-    for key,label in [("skip_questions","不必重复问"),("verification_items","需核实"),("response_branches","回答后的策略"),("constraints","沟通边界")]:
+            st.write('Why: ',q["reason"])
+            st.write('Expected information: ',q["expected_information"])
+            st.caption('Sources: '+", ".join(q["source_ids"]))
+    for key,label in [("skip_questions",'Skip repeated questions'),("verification_items",'Needs verification'),("response_branches",'Conditional response strategy'),("constraints",'Communication boundaries')]:
         st.write("**"+label+"**")
         for item in plan[key]:st.markdown("- "+item)
 
 
 def main():
-    st.set_page_config(page_title="看房后持续跟进 Agent",page_icon="🏡",layout="wide")
+    st.set_page_config(page_title='Post-viewing Follow-up Agent',page_icon="🏡",layout="wide")
     settings=Settings.from_env()
     settings.db_path=st.session_state.get("demo_db_path",settings.db_path)
     settings.analysis_mode='doubao'
@@ -159,7 +162,7 @@ def main():
     .context-brief p {margin:0 0 10px;}
     .badge {background:#f1f2f2;border-radius:20px;padding:6px 14px;float:right;font-size:16px;}
     </style>""",unsafe_allow_html=True)
-    st.title("房产客户跟进 Agent")
+    st.title('Real Estate Buyer Follow-up Agent')
     w=Workflow(settings)
     runs=w.store.list_runs()
     # Keep one current flow. Refresh resumes it; old records stay on disk.
@@ -172,7 +175,7 @@ def main():
     customer=w.crm.customers()[0]
     context=w.crm.context(customer["id"])
     if not customer.get('display_id'):
-        st.warning('当前档案是旧版资料，已保留原记录；新任务使用任务准备中的当前资料。')
+        st.warning('An older profile was retained; new tasks use the current preparation data.')
     current_id=st.session_state.get("run_id")
     run=w.store.run(current_id) if current_id else None
     target=st.session_state.pop('_next_page',None)
@@ -180,65 +183,65 @@ def main():
         st.session_state['current_page']=target
     elif 'current_page' not in st.session_state:
         st.session_state['current_page']=PAGES[0]
-    page=st.radio('跟进流程',PAGES,horizontal=True,key='current_page',label_visibility='collapsed')
+    page=st.radio('Follow-up workflow',PAGES,horizontal=True,key='current_page',label_visibility='collapsed')
     if st.session_state.get('_feedback'):
         level,text=st.session_state['_feedback']
         getattr(st,level)(text)
     if page==PAGES[0]:
         st.markdown('<span class="badge">CRM · Mock</span>',unsafe_allow_html=True)
-        st.header("任务准备")
-        phone_mode=st.radio('通话方式',['fake','live'],horizontal=True,key='call_mode',
-            format_func=lambda value:'Mock 演示' if value=='fake' else '输入手机号真实拨打')
+        st.header('Preparation')
+        phone_mode=st.radio('Call mode',['fake','live'],horizontal=True,key='call_mode',
+            format_func=lambda value:'Mock demo' if value=='fake' else 'Enter a number for a live call')
         phone=None
         locale=None
         if phone_mode=='fake':
-            st.caption('固定场景：两套房带看后的首次回访，收集实际反馈与需求取舍。不会拨打电话。')
+            st.caption('Fixed scenario: first follow-up after two viewings, collecting actual feedback and trade-offs. No call is placed.')
         else:
-            phone=st.text_input('接听手机号',key='call_phone',placeholder='+国家区号和手机号，例如 +12025550123')
+            phone=st.text_input('Destination phone',key='call_phone',placeholder='E.164 destination, e.g. +12025550123')
             languages=['en-US','id-ID','zh-CN']
             default_locale=settings.live_locale if settings.live_locale in languages else 'en-US'
-            locale=st.selectbox('通话语言',languages,index=languages.index(default_locale),key='call_locale',
-                format_func=lambda value:{'en-US':'英语（美国）','id-ID':'印度尼西亚语','zh-CN':'中文'}[value])
-            st.caption('仅填写本人或已授权测试号码。地区与语言须由CALL-E支持；输入号码、生成规划和批准均不会立即拨号。')
-            st.caption('真实测试仍使用页面中的张女士虚构购房背景，由接听者扮演客户。')
-            st.caption('[查看CALL-E支持的地区与语言](https://docs.heycall-e.com/regions)：当前公开表未列中国大陆；美国号码列英语和印度尼西亚语。')
+            locale=st.selectbox('Call locale',languages,index=languages.index(default_locale),key='call_locale',
+                format_func=lambda value:{'en-US':'English (US)','id-ID':'Indonesian','zh-CN':'Chinese'}[value])
+            st.caption('Use only your own or an authorized test number. CALL-E must support the region and locale. Entering a number, planning and approval do not dial.')
+            st.caption("Live testing uses Ms. Zhang's fictional purchase background shown here; the recipient role-plays the customer.")
+            st.caption('[CALL-E regions and languages](https://docs.heycall-e.com/regions): check current provider coverage before selecting a destination and locale.')
             if not settings.calle_key:
-                st.info('尚未配置本应用的 CALLE_API_KEY。请在本应用 .env 中填写 CALL-E Dashboard 的项目 API Key；已有 MCP 登录不会自动用于这里。')
+                st.info("CALLE_API_KEY is not configured for this app. Set a CALL-E Dashboard project API key in this app's .env; MCP login is separate.")
         pref=customer['preferences']
         left,right=st.columns(2)
         with left,st.container(border=True):
-            st.subheader("♙ 客户画像")
-            st.write(f"{customer['name']} · {pref['preferred_area']}{pref['bedrooms']}房 · {pref['budget_max']/10000:g} 万预算")
+            st.subheader('♙ Customer profile')
+            st.write(f"{customer['name']} · {pref['preferred_area']} · {pref['bedrooms']} bedrooms · CNY {pref['budget_max']:,.0f} budget")
             with st.popover('CRM / customers/'+customer.get('display_id','C001')+' ↗'):
                 st.json(customer)
         with right,st.container(border=True):
-            st.subheader("♧ 历史沟通")
+            st.subheader('♧ Communication history')
             history=sorted(context['communications'],key=lambda x:x['recorded_at'])
-            st.write('；'.join(f"{x['recorded_at'][5:].replace('-','/')} {x['text'][:24]}…" for x in history if x['kind']=='customer_statement'))
+            st.write('; '.join(f"{x['recorded_at'][5:].replace('-','/')} {x['text'][:24]}…" for x in history if x['kind']=='customer_statement'))
             with st.popover('CRM / interactions ↗'):
                 for x in history:st.write(x['recorded_at'],x['text'])
         left,right=st.columns(2)
         with left,st.container(border=True):
-            st.subheader("☑ 带看记录")
+            st.subheader('☑ Viewing records')
             properties={p['id']:p for p in context['properties']}
-            viewing_records=[{'带看日期':v['viewed_at'],
-                '已看房源':properties[v['property_id']]['label'],
-                '带看状态':'已完成'} for v in context['viewings']]
-            st.write('；'.join(f"{r['带看日期'][5:].replace('-','/')} 已看 {r['已看房源']}" for r in viewing_records))
-            st.caption('仅记录已完成的带看；本次电话收集的评价将在结果页审核。')
+            viewing_records=[{'Viewing date':v['viewed_at'],
+                'Viewed property':properties[v['property_id']]['label'],
+                'Viewing status':'Completed'} for v in context['viewings']]
+            st.write('; '.join(f"{r['Viewing date'][5:].replace('-', '/')} viewed {r['Viewed property']}" for r in viewing_records))
+            st.caption('Only completed viewings are listed. Feedback collected during this call is reviewed on the results page.')
             with st.popover('CRM / viewings ↗'):
                 st.dataframe(viewing_records,hide_index=True,use_container_width=True)
         with right,st.container(border=True):
-            st.subheader("⌂ 关联房源")
+            st.subheader('⌂ Related properties')
             viewed={v['property_id'] for v in context['viewings']}
             props=[p for p in context['properties'] if p['id'] in viewed]
-            st.write('；'.join(f"{p['label']}：{p['price']/10000:g} 万 / {p.get('floor_area_sqm','未知')}㎡" for p in props))
+            st.write('; '.join(f"{p['label']}: CNY {p['price']:,.0f} / {p.get('floor_area_sqm', 'Unknown')} m²" for p in props))
             with st.popover('CRM / properties ↗'):
                 st.json(props)
         st.divider()
         catalog=knowledge_files()
-        st.subheader('▣ 业务知识库')
-        st.caption('用于通话规划、业务判断和必要的信息补充。默认选中以下两份文件。')
+        st.subheader('▣ Business knowledge')
+        st.caption('For call planning, business judgment and relevant information. Both files are selected by default.')
         selected_knowledge_files=[]
         for document in catalog:
             left,right=st.columns([4,1])
@@ -247,59 +250,59 @@ def main():
                 st.caption(document['description'])
             with right:st.caption(document['category'])
             if checked:selected_knowledge_files.append(document['id'])
-        st.caption(f'已选 {len(selected_knowledge_files)} 份资料。Agent 按任务提取相关段落，不默认将所有文档全文带入通话。')
+        st.caption(f'Selected {len(selected_knowledge_files)} selected files. The agent selects relevant paragraphs rather than including every document in full.')
         st.divider()
         with st.form('prepare'):
-            objective=st.text_area('经纪人本次任务',value='回访张女士上次看的两套房，了解她的实际感受和目前的购房想法。如果有明确的复看或议价意向，提醒我跟进。',height=120)
-            st.caption('Agent 结合以上业务数据和经纪人目标，自动生成通话所需上下文及执行计划。')
-            submit=st.form_submit_button('生成 Agent 规划 →',type='primary',use_container_width=True)
+            objective=st.text_area('Broker objective',value='Follow up on the two homes Ms. Zhang viewed, collect her actual impressions and current buying preferences. Alert me to explicit revisit or negotiation interest.',height=120)
+            st.caption("The agent combines business context and the broker's objective to prepare call context and an execution plan.")
+            submit=st.form_submit_button('Generate Agent plan →',type='primary',use_container_width=True)
         if submit:
             def generate():
                 return w.prepare(customer['id'],objective,mode=phone_mode,replay_case='preferences',phone=phone,locale=locale,
                     on_created=lambda rid:st.session_state.update(run_id=rid),on_progress=st.write,
                     knowledge_file_ids=selected_knowledge_files)
-            action(generate,destination=PAGES[1],message='规划已生成，请审核下方通话上下文与沟通方向。',
-                   label='正在生成 Agent 规划，请等待；完成后自动进入规划页…')
+            action(generate,destination=PAGES[1],message='Plan ready; review the call context and communication directions below.',
+                   label='Generating the agent plan; you will move to planning when ready…')
     if page==PAGES[1]:
         st.header('Agent Planning')
-        if not run:st.info('在任务准备中输入一句目标，即可自动规划。')
+        if not run:st.info('Enter a goal in preparation to generate a plan.')
         elif run['status'] in {'planning','planning_failed'}:
-            st.error(run.get('error') or '本任务规划尚未完成，可以继续原任务，不会拨号。')
-            if st.button('重试本任务规划（不拨号）'):
+            st.error(run.get('error') or 'Planning is incomplete. Continue this task without dialing.')
+            if st.button("Retry this task's planning (no dialing)"):
                 action(lambda:w.plan(run['id'],on_progress=st.write),destination=PAGES[1],
-                    message='规划已完成，请审核。',label='正在重试本任务规划…')
+                    message='Planning complete; please review.',label="Retrying this task's planning…")
         else:
-            st.caption('已结合客户背景、业务知识和经纪人目标生成通话任务。')
-            if run['analysis_mode']!='doubao':st.info('历史离线演示任务；新任务使用豆包。')
+            st.caption('Call task generated from customer context, business knowledge and broker objective.')
+            if run['analysis_mode']!='doubao':st.info('Historical offline task; new tasks use Doubao.')
             old_scenario=run['context'].get('scenario_version')!=context.get('scenario_version')
             old_format=not run['plan'].get('communication_topics')
             with st.container(border=True):
-                st.subheader('① Agent 生成的通话任务')
+                st.subheader('① Agent-generated call task')
                 if old_scenario or old_format:
-                    st.warning('这是旧版案例或逐题计划的历史快照。请按当前案例重新生成，避免沿用通话前已放宽地铁距离的旧设定；旧记录会保留。')
+                    st.warning('This is a historical scenario or questionnaire snapshot. Regenerate using the current chronology, without assuming pre-call metro flexibility; old records remain intact.')
                 for title,body in task_sections(Plan.model_validate(run['plan']),Assessment.model_validate(run['assessment']),run['context']):
                     st.markdown('**'+title+'**')
                     st.markdown(body)
-                    if title!='预期输出':st.divider()
+                    if title!='Expected output':st.divider()
             with st.container(border=True):
-                st.subheader('② 经纪人确认')
-                st.caption('直接批准，或者通过一句自然语言反馈让 Agent 重新规划。')
+                st.subheader('② Broker confirmation')
+                st.caption('Approve directly, or request replanning with one sentence.')
                 editable=run['status'] in {'pending_approval','approved'} and not old_scenario and not old_format
                 opened='feedback_open_'+run['id']
                 authorized=True
                 allow_analysis=settings.doubao_analysis_authorized
                 if run['mode']=='live' and editable:
                     destination=run.get('live_destination') or run.get('request') or {}
-                    st.caption('本次接听号码：***'+destination.get('phone','')[-4:]+' · 通话语言：'+destination.get('locale','未设置'))
-                    authorized=st.checkbox('已核对计划和联系权限，同意执行本次任务',key='auth_'+run['id']+str(run['revision']))
+                    st.caption('Reviewed destination: ***'+destination.get('phone','')[-4:]+' · Call locale: '+destination.get('locale','Not set'))
+                    authorized=st.checkbox('I reviewed the plan and contact permission and authorize this task',key='auth_'+run['id']+str(run['revision']))
                     if not settings.doubao_analysis_authorized:
-                        allow_analysis=st.checkbox('同意将本次真实通话的转写和结构化结果发送给豆包，用于分析反馈和生成CRM更新建议',
+                        allow_analysis=st.checkbox('I authorize sending this real call transcript and structured result to Doubao for feedback analysis and CRM suggestions',
                             key='analysis_auth_'+run['id']+str(run['revision']))
                 left,right=st.columns(2)
-                if left.button('提出修改意见',disabled=not editable,use_container_width=True):
+                if left.button('Request changes',disabled=not editable,use_container_width=True):
                     st.session_state[opened]=True
                     st.rerun()
-                if right.button('批准并进入通话',type='primary',disabled=not editable or not authorized,use_container_width=True):
+                if right.button('Approve and enter execution',type='primary',disabled=not editable or not authorized,use_container_width=True):
                     def approve_current():
                         current=run
                         # Reconfirm older, not-yet-submitted tasks using the
@@ -307,49 +310,49 @@ def main():
                         if current['status']=='approved':
                             current=w.edit(current['id'],current['revision'],current['plan'])
                         return w.approve(current['id'],current['revision'],authorized,allow_doubao_analysis=allow_analysis)
-                    action(approve_current,destination=PAGES[2],message='通话任务已批准；尚未拨号。')
+                    action(approve_current,destination=PAGES[2],message='Call task approved; not dialed.')
                 if editable and st.session_state.get(opened):
                     with st.form('replan_'+run['id']+str(run['revision'])):
-                        instruction=st.text_input('修改要求',placeholder='重点了解 B 的价格顾虑，暂时不问购房时间')
-                        regenerate=st.form_submit_button('让 Agent 重新规划',disabled=run['analysis_mode']!='doubao')
+                        instruction=st.text_input('Change request',placeholder="Focus on B's price concerns; do not ask about purchase timing for now")
+                        regenerate=st.form_submit_button('Replan with Agent',disabled=run['analysis_mode']!='doubao')
                     if regenerate:
                         action(lambda:w.replan(run['id'],run['revision'],instruction),destination=PAGES[1],
-                            message='已按修改意见重新规划，请审核新版本后批准。',label='正在重新规划通话任务…')
-                if not editable and not (old_scenario or old_format):st.caption('本任务已结束或已执行，可查看内容；如需新的电话，请在任务准备中重新生成。')
+                            message='Replanned from your feedback; review the new revision before approval.',label='Replanning the call task…')
+                if not editable and not (old_scenario or old_format):st.caption('This task ended or was executed. Its contents remain viewable; prepare a new task for another call.')
                 if old_scenario or old_format:
-                    if st.button('按当前案例重新生成规划',type='primary'):
+                    if st.button('Regenerate using the current scenario',type='primary'):
                         action(lambda:w.prepare(customer['id'],run['objective'],mode=run['mode'],replay_case='preferences',
                             phone=(run.get('live_destination') or run.get('request') or {}).get('phone'),
                             locale=(run.get('live_destination') or run.get('request') or {}).get('locale'),
                             knowledge_file_ids=run['context'].get('knowledge_files'),
                             on_created=lambda rid:st.session_state.update(run_id=rid),on_progress=st.write),
-                            destination=PAGES[1],message='已按修正后的时序生成沟通方向，请审核。',label='正在按当前案例重新规划…')
+                            destination=PAGES[1],message='Generated directions with the corrected chronology; please review.',label='Replanning with the current scenario…')
     if page==PAGES[2]:
-        if not run:st.info("请先生成并审核计划")
+        if not run:st.info('Generate and review a plan first')
         else:
-            st.subheader("CALL-E 通话执行")
-            st.write("客户：",customer['name'])
-            st.write("模式：", "Mock Call · 预置虚构对话，不拨号" if run['mode']=='fake' else 'Live Call · 授权真实电话')
+            st.subheader('CALL-E execution')
+            st.write('Customer: ',customer['name'])
+            st.write('Mode: ', 'Mock Call · Fixed fictional transcript, no dialing' if run['mode']=='fake' else 'Live Call · Authorized telephone call')
             auto_follow=run['mode']=='live' and run.get('call') and run['status'] in {'monitoring','result_ready','processing_failed'}
             if run['mode']=='live':
                 destination=run.get('request') or run.get('live_destination') or {}
-                st.warning('目标号码：***'+destination.get('phone','')[-4:]+' · 语言：'+destination.get('locale','未设置'))
+                st.warning('Destination: ***'+destination.get('phone','')[-4:]+' · Locale: '+destination.get('locale','Not set'))
             if run["status"]=="approved":
-                if run["mode"]=="live":st.warning("将拨打本次审核的号码，可能产生费用；已提交的通话无法保证主动挂断。")
-                if st.button("执行电话回放并处理结果" if run["mode"]=="fake" else "拨打这一通真实 CALL-E 电话",type="primary"):
+                if run["mode"]=="live":st.warning('This will call the reviewed destination and may incur charges; hanging up a submitted call is not guaranteed.')
+                if st.button('Run Mock call and analyze results' if run["mode"]=="fake" else 'Place this real CALL-E call',type="primary"):
                     def execute():
                         result=w.execute(run["id"])
                         return w.advance_call(run['id']) if result['call'] and result['call']['result_status']!='pending' else result
-                    action(execute,destination=page_for_run,message='电话处理状态已更新。请查看当前页面。',label='正在执行电话并分析结果…')
+                    action(execute,destination=page_for_run,message='Call processing state updated; review the current page.',label='Executing call and analyzing results…')
             if run["status"] in {"submitting","submission_unknown"}:
-                st.warning("上次提交结果未知，不能创建新身份重拨。")
-                if st.button("恢复同一原请求（保持幂等身份）"):action(lambda:w.execute(run["id"],recover=True))
+                st.warning('Previous submission outcome is unknown; do not create a new identity to redial.')
+                if st.button('Recover original request (same idempotency identity)'):action(lambda:w.execute(run["id"],recover=True))
             if run["status"]=="monitoring" and not auto_follow:
-                if st.button("读取这通电话状态（不重拨）"):action(lambda:w.refresh(run["id"]))
+                if st.button("Read this call's status (no redial)"):action(lambda:w.refresh(run["id"]))
             if run["status"] in {"result_ready","processing_failed","writeback_pending"} and not auto_follow:
-                if st.button("重试结果分析（不重拨）"):action(lambda:w.process(run["id"],review_before_write=True),destination=PAGES[3],message="更新建议已生成，仅供预览，不写入CRM。")
+                if st.button('Retry result analysis (no redial)'):action(lambda:w.process(run["id"],review_before_write=True),destination=PAGES[3],message='Suggestions generated for preview only; CRM unchanged.')
             if run.get("error") and st.session_state.get("_feedback")!=("error",run["error"]):st.error(run["error"])
-            with st.expander("审核后的技术请求（隐藏真实号码）"):
+            with st.expander('Reviewed technical request (destination masked)'):
                 request=copy.deepcopy(run.get("request",{}))
                 if request.get("phone") and run["mode"]=="live":request["phone"]="***"+request["phone"][-4:]
                 st.json(request or run.get("schema",{}))
@@ -359,77 +362,77 @@ def main():
                 else:
                     show_call_status(run)
                     show_transcript(run)
-                if run.get('analysis'):st.success("分析已准备，请到「④ 结果与更新」审核更新建议。")
+                if run.get('analysis'):st.success('Analysis is ready. Review suggestions in Results and updates.')
     if page==PAGES[3]:
         if run and run['status']=='awaiting_analysis_consent' and settings.doubao_analysis_authorized:
-            action(lambda:w.advance_call(run['id']),destination=PAGES[3],message='分析完成，仅预览CRM更新建议。')
-        if not run or not run.get('call'):st.info("完成电话后在此审核业务更新")
+            action(lambda:w.advance_call(run['id']),destination=PAGES[3],message='Analysis complete; CRM suggestions are preview-only.')
+        if not run or not run.get('call'):st.info('Review business suggestions here after the call')
         else:
-            st.subheader('① 内容总结与任务概述')
-            st.markdown('**本次任务：** '+run.get('plan',{}).get('objective',run['objective']))
+            st.subheader('① Summary and task overview')
+            st.markdown('**Current task:** '+run.get('plan',{}).get('objective',run['objective']))
             original=run['call'].get('result') or {}
             summary=(run.get('analysis') or {}).get('summary') or original.get('summary')
             if has_value(summary):st.write(summary)
-            else:st.info('本次尚无可用内容总结。')
+            else:st.info('No content summary is available yet.')
             for title,lines in task_overview(run):
                 st.markdown('**'+title+'**')
                 for line in lines:st.write(line)
-            if run['status']=='no_business_result':st.warning('本次未取得可用业务结果。')
+            if run['status']=='no_business_result':st.warning('No usable business result was obtained.')
             if run['mode']=='live' and run['call']['result_status']=='available' and not run.get('allow_doubao_analysis') and not settings.doubao_analysis_authorized:
-                st.info('进一步分析会将真实转写与结果发送给豆包；尚未发送。')
-                consent=st.checkbox('同意将这通电话的转写和结构化结果发送给豆包分析',key='result_analysis_'+run['id'])
-                if st.button('同意并分析这通电话',disabled=not consent):
+                st.info('Further analysis sends the real transcript and result to Doubao; nothing has been sent yet.')
+                consent=st.checkbox('I authorize sending this call transcript and structured result to Doubao for analysis',key='result_analysis_'+run['id'])
+                if st.button('Authorize and analyze this call',disabled=not consent):
                     def analyze_authorized():
                         authorized=w.authorize_analysis(run['id'],run['revision'],confirmed=True)
                         return w.process(authorized['id'],review_before_write=True)
-                    action(analyze_authorized,destination=PAGES[3],message='分析完成，仅预览CRM更新建议。')
+                    action(analyze_authorized,destination=PAGES[3],message='Analysis complete; CRM suggestions are preview-only.')
 
             st.divider()
-            st.subheader('② 建议更新的 CRM 字段')
-            st.caption('仅展示有值的建议，尚未写入CRM；待确认项不视为已确认变更。')
+            st.subheader('② Proposed CRM changes')
+            st.caption('Only nonempty suggestions are shown. Nothing is written to CRM; pending items are not confirmed changes.')
             suggestions=crm_suggestions(run)
             for entry in suggestions:
                 with st.container(border=True):
                     st.markdown('**'+entry['label']+'** · '+entry['display_status'])
                     st.write(entry['display_old']+' → '+entry['display_new'])
-                    if entry['display_status']=='待确认' and has_value(entry.get('reason')):st.caption(entry['reason'])
+                    if entry['display_status']=='Pending review' and has_value(entry.get('reason')):st.caption(entry['reason'])
                     if entry.get('evidence'):
-                        with st.expander('查看该建议的通话依据'):show_evidence(entry['evidence'])
-            if not suggestions:st.caption('暂无有值的CRM更新建议。')
+                        with st.expander('Evidence for this suggestion'):show_evidence(entry['evidence'])
+            if not suggestions:st.caption('No nonempty CRM suggestions available.')
 
             st.divider()
-            st.subheader('③ 后续行动建议')
+            st.subheader('③ Follow-up recommendations')
             batch=run.get('batch') or {}
             handoff=batch.get('handoff') or {}
             if has_value(handoff.get('action')):
                 st.info(handoff['action'])
                 if has_value(handoff.get('reason')):st.write(handoff['reason'])
-                if handoff.get('priority')=='high':st.success('建议经纪人优先接管。')
-                elif handoff.get('priority')=='suppressed':st.warning('暂停后续销售联系，先核实联系限制。')
-            else:st.caption('暂无经分析确认的后续行动建议。')
+                if handoff.get('priority')=='high':st.success('Recommend priority broker handoff.')
+                elif handoff.get('priority')=='suppressed':st.warning('Pause sales contact and verify contact restrictions first.')
+            else:st.caption('No analyzed follow-up recommendation available.')
             for signal in handoff.get('signals',[]):
                 props={p['id']:p['label'] for p in run['context']['properties']}
-                detail=[props.get(signal['property_id'],'房源待确认')]
+                detail=[props.get(signal['property_id'],'Property pending attribution')]
                 detail.extend(str(signal[k]) for k in ['timeframe','condition'] if has_value(signal.get(k)))
                 st.write(' · '.join(detail))
             unresolved=[x for x in batch.get('unresolved',[]) if has_value(x)]
             if unresolved:
-                with st.expander('需要继续跟进的事项'):
+                with st.expander('Items requiring follow-up'):
                     for item in unresolved:st.write(item)
 
             st.divider()
-            st.subheader('④ 原始录音与转写')
+            st.subheader('④ Original recording and transcript')
             audio=recording_url(run['call'])
             if audio:st.audio(audio)
-            elif run['mode']=='fake':st.caption('Mock使用固定虚构转写，没有原始电话录音。')
-            else:st.caption('本次CALL-E返回中未提供录音，暂不能播放原始语音。')
+            elif run['mode']=='fake':st.caption('Mock uses a fixed fictional transcript and has no original call recording.')
+            else:st.caption('CALL-E did not provide a recording for this call; original audio is unavailable.')
             show_transcript(run)
-            with st.expander('查看原始结构化数据与执行状态'):
+            with st.expander('Raw structured data and execution status'):
                 show_call_status(run)
-                st.write('CALL-E返回结果')
+                st.write('CALL-E result')
                 st.json(original)
                 if run.get('analysis'):
-                    st.write('豆包提取结果')
+                    st.write('Doubao analysis')
                     st.json(run['analysis'])
 
 

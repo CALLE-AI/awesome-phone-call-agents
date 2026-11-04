@@ -24,12 +24,12 @@ class MockCRM:
         if self.preview_only:
             seed=fixture('crm.json')
             if customer_id!=seed['customer']['id']:
-                raise ValueError('客户不存在')
+                raise ValueError('Customer not found')
             return seed
         with self.store.tx() as db:
             row = db.execute("SELECT data FROM customers WHERE id=?", (customer_id,)).fetchone()
             if not row:
-                raise ValueError("客户不存在")
+                raise ValueError('Customer not found')
             customer = json.loads(row[0])
             viewings = [json.loads(r[0]) for r in db.execute("SELECT data FROM viewings WHERE customer_id=? ORDER BY id", (customer_id,))]
             properties = [json.loads(r[0]) for r in db.execute("SELECT data FROM properties ORDER BY id")]
@@ -46,17 +46,17 @@ class MockCRM:
         newer customer edit. The optional hook is only for rollback testing.
         """
         if self.preview_only:
-            raise ValueError('当前演示仅预览，禁止写入CRM')
+            raise ValueError('This demo is preview-only; CRM writes are prohibited')
         payload_hash = digest(batch)
         with self.store.tx() as db:
             saved = db.execute("SELECT payload_hash,data FROM receipts WHERE id=?", (operation_id,)).fetchone()
             if saved:
                 if saved[0] != payload_hash:
-                    raise ValueError("同一写入身份不能对应不同内容")
+                    raise ValueError('One write identity cannot refer to different content')
                 return json.loads(saved[1])
             row = db.execute("SELECT version,data FROM customers WHERE id=?", (run["customer_id"],)).fetchone()
             if row[0] != batch["expected_version"]:
-                raise ValueError("客户资料版本已变化，须重新核对，未覆盖现有数据")
+                raise ValueError('Customer revision changed; recheck required, existing data not overwritten')
             c = json.loads(row[1])
             applied = []
             for entry in batch["accepted"]:
@@ -64,7 +64,7 @@ class MockCRM:
                 if entry["kind"] == "preference":
                     old = c.get(field) if field == "contact_allowed" else c["preferences"].get(field)
                     if old != entry["old_value"]:
-                        raise ValueError("字段旧值已变化，未覆盖新数据")
+                        raise ValueError('The previous value changed; newer data was not overwritten')
                     if field == "contact_allowed":
                         c[field] = entry["value"]
                     else:
@@ -72,10 +72,10 @@ class MockCRM:
                 else:
                     vrow = db.execute("SELECT data FROM viewings WHERE id=? AND customer_id=?", (target, c["id"])).fetchone()
                     if not vrow:
-                        raise ValueError("带看记录不属于当前客户")
+                        raise ValueError('Viewing does not belong to this customer')
                     v = json.loads(vrow[0])
                     if v["property_id"] != entry["property_id"]:
-                        raise ValueError("房源与带看不一致")
+                        raise ValueError('Property and viewing do not match')
                     v["feedback"].append({"id":entry["id"], "dimension":field, "text":entry["value"], "evidence":entry["evidence"]})
                     db.execute("UPDATE viewings SET data=? WHERE id=?", (dump(v), target))
                 db.execute("INSERT INTO changes VALUES(?,?,?,?,?,?,?,?)", (
@@ -83,11 +83,11 @@ class MockCRM:
                 applied.append(entry)
             handoff = batch["handoff"]
             if not c["contact_allowed"]:
-                c["intent"], c["handoff_required"] = "停止联系", False
+                c["intent"], c["handoff_required"] = 'Stop contact', False
             elif handoff.get("priority") == "high":
-                c["intent"], c["handoff_required"] = "明确推进信号", True
+                c["intent"], c["handoff_required"] = 'Explicit action signal', True
             elif any(e['field']=='next_viewing_interest' for e in batch['accepted']):
-                c['intent'], c['handoff_required'] = '有继续看房意愿', False
+                c['intent'], c['handoff_required'] = 'Interested in further viewings', False
             if handoff.get("priority") == "high" and c["contact_allowed"]:
                 key = digest([run["id"], "handoff"])
                 db.execute("INSERT OR IGNORE INTO notifications VALUES(?,?,?,?)", (key, run["id"], "handoff", dump(handoff)))

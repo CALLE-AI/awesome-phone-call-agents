@@ -17,6 +17,20 @@ from ..agent.planning import compile_task, result_schema, baseline_task, validat
 from ..agent.extraction import build_batch, validate_value
 
 
+def explicitly_states_amount(quote, value):
+    """Recognize explicit English currency amounts without inferring flexibility."""
+    import re
+    from decimal import Decimal
+    pattern = r"(?<![\w.])(?:CNY\s*)?([0-9]+(?:,[0-9]{3})*(?:\.[0-9]+)?)\s*(million|m|yuan)?(?!\w)"
+    for match in re.finditer(pattern, quote, re.I):
+        amount = Decimal(match[1].replace(',', ''))
+        if (match[2] or '').lower() in {'m', 'million'}:
+            amount *= 1000000
+        if amount == value:
+            return True
+    return False
+
+
 class Workflow:
     def __init__(self, settings, provider=None):
         self.settings = settings
@@ -29,20 +43,20 @@ class Workflow:
 
     def prepare(self, customer_id, objective, viewing_ids=None, mode="fake", replay_case="preferences", on_created=None, on_progress=None, knowledge_file_ids=None, phone=None, locale=None):
         if not objective.strip():
-            raise ValueError("请输入回访目标")
+            raise ValueError('Enter a follow-up goal')
         if mode not in {"fake","live"} or replay_case not in fixture("replays.json"):
-            raise ValueError("电话模式或回放案例无效")
+            raise ValueError('Invalid call mode or replay case')
         destination=self._live_ready({'phone':phone if phone is not None else self.settings.live_phone,
             'locale':locale if locale is not None else self.settings.live_locale}) if mode=='live' else None
         context = self.crm.context(customer_id)
         context['knowledge_files']=[f['id'] for f in knowledge_files()] if knowledge_file_ids is None else list(knowledge_file_ids)
         context["knowledge_library"] = load_knowledge(context['knowledge_files'])
         if not context["customer"]["contact_allowed"]:
-            raise ValueError("客户已拒绝联系，不能准备新的电话")
+            raise ValueError('Customer refused contact; a new call cannot be prepared')
         available = {v["id"] for v in context["viewings"]}
         selected = available if viewing_ids is None else set(viewing_ids)
         if not selected or not selected <= available or len(selected)>3:
-            raise ValueError("请选择当前客户的1至3条带看记录")
+            raise ValueError('Select one to three viewing records for this customer')
         context["viewings"] = [v for v in context["viewings"] if v["id"] in selected]
         run = {"id":"run_"+uuid.uuid4().hex, "revision":1, "status":"planning", "customer_id":customer_id,
                "objective":objective.strip(),"context":context,"analysis_mode":self.settings.analysis_mode,
@@ -63,22 +77,22 @@ class Workflow:
         try:
             ai = self._ai(run)
             if on_progress:
-                on_progress('1/3 正在整合客户资料、历史沟通与带看信息…')
+                on_progress('1/3 Integrating customer profile, communications and viewing records…')
             assessment = ai.assess({**run["context"],"objective":run["objective"],"knowledge_library":[]})
             if on_progress:
-                on_progress('2/3 正在从经纪人知识库选择相关政策段落…')
+                on_progress('2/3 Selecting relevant paragraphs from broker knowledge…')
             selection=ai.select_policy(run['objective'],run['context'])
             assessment.policy_uses=selection.policy_uses
             assessment.policy_questions=selection.policy_questions
             assessment=validate_assessment(assessment,run['context'])
             if on_progress:
-                on_progress('3/3 客户理解与知识筛选已完成，正在生成通话目标与沟通方向…')
+                on_progress('3/3 Context and knowledge selection complete; generating call objectives and communication directions…')
             plan = ai.plan(run["objective"],assessment,run["context"])
             run.update(assessment=assessment.model_dump(),plan=plan.model_dump(),
                        schema=result_schema(run["context"]),baseline=baseline_task(run["objective"],run["context"]),
                        status="pending_approval",error=None)
         except Exception:
-            run.update(status="planning_failed",error="理解/规划未完成，请检查本项目配置与输出后重试；未拨号")
+            run.update(status="planning_failed",error="Assessment/planning incomplete. Check this project's configuration and output before retrying; not dialed")
             run["revision"]+=1
             self.store.save_run(run,expected)
             raise
@@ -89,7 +103,7 @@ class Workflow:
     def edit(self, run_id, revision, plan_data):
         run = self.store.run(run_id)
         if run["revision"] != revision or run["status"] not in {"pending_approval","approved"}:
-            raise ValueError("不能修改该版本；请重新载入未执行计划")
+            raise ValueError('This revision cannot be edited; reload an unexecuted plan')
         plan = validate_plan(Plan.model_validate(plan_data),run["context"])
         run.update(plan=plan.model_dump(),status="pending_approval",approved_at=None,approved_digest=None)
         run["revision"]+=1
@@ -105,9 +119,9 @@ class Workflow:
         """
         run = self.store.run(run_id)
         if run['revision'] != revision or run['status'] not in {'pending_approval','approved'}:
-            raise ValueError('该版本已改变或已执行，不能重新规划')
+            raise ValueError('Revision changed or executed; replanning blocked')
         if not instruction.strip() or len(instruction)>2000:
-            raise ValueError('请输入不超过2000字的修改要求')
+            raise ValueError('Enter a change request of at most 2000 characters')
         plan = self._ai(run).replan(instruction.strip(),run['plan'],run['assessment'],run['context'])
         plan = validate_plan(Plan.model_validate(plan),run['context'])
         run.setdefault('plan_history',[]).append({'at':now(),'instruction':instruction.strip(),
@@ -120,15 +134,15 @@ class Workflow:
         with self.store.tx() as db:
             row=db.execute("SELECT data FROM runs WHERE id=?",(run_id,)).fetchone()
             if not row:
-                raise ValueError("任务不存在")
+                raise ValueError('Task not found')
             run=json.loads(row[0])
             if run["status"] == "approved" and run.get("approved_plan_revision") == revision:
                 return run
             if run["revision"] != revision or run["status"] != "pending_approval" or not contact_authorized:
-                raise ValueError("需要确认联系权限并审核当前计划版本")
+                raise ValueError('Confirm contact authorization and review the current plan revision')
             destination=self._live_ready(run.get('live_destination')) if run['mode']=='live' else None
             phone = destination['phone'] if destination else "<SYNTHETIC_NO_CALL>"
-            locale = destination['locale'] if destination else "zh-CN"
+            locale = destination['locale'] if destination else "en-US"
             request={"phone":phone,"locale":locale,
                      "task":compile_task(Plan.model_validate(run["plan"]),Assessment.model_validate(run["assessment"]),run["context"]),
                      "result_schema":run["schema"],"metadata":{"run_id":run_id,"replay_case":run["replay_case"]}}
@@ -146,16 +160,16 @@ class Workflow:
     def _live_ready(self, destination=None):
         s=self.settings
         if not s.enable_live or not s.calle_key:
-            raise ValueError("真实CALL-E未就绪：需要启用真实拨号并配置本应用CALLE_API_KEY；MCP登录不代替SDK凭证")
+            raise ValueError("Live CALL-E unavailable: enable calling and configure this app's CALLE_API_KEY; MCP login is not an SDK credential")
         destination=destination or {'phone':s.live_phone,'locale':s.live_locale}
         phone=destination.get('phone','').strip()
         locale=destination.get('locale','').strip()
         if not re.fullmatch(r"\+[1-9][0-9]{7,14}",phone):
-            raise ValueError('请输入带国家区号的授权测试号码，例如+12025550123')
+            raise ValueError('Enter an authorized E.164 test number, e.g. +12025550123')
         if not re.fullmatch(r'[a-z]{2,3}-[A-Z]{2}',locale):
-            raise ValueError('请选择或填写账号支持的语言代码，例如en-US；不能根据手机号推断支持语言')
+            raise ValueError('Choose an account-supported locale such as en-US; a phone number does not determine language support')
         if s.analysis_mode != "doubao":
-            raise ValueError("真实电话需豆包分析，不能套用预置答案")
+            raise ValueError('Live calls require Doubao analysis, not recorded answers')
         return {'phone':phone,'locale':locale}
 
     def _provider(self, run):
@@ -171,25 +185,25 @@ class Workflow:
         if initial["status"] not in {"approved","submitting","submission_unknown"}:
             return initial
         if initial["status"] in {"submitting","submission_unknown"} and not recover:
-            raise ValueError("提交结果未知，请使用恢复原请求，不要重拨")
+            raise ValueError('Submission outcome unknown; recover the original request rather than redial')
         current = self.crm.context(initial["customer_id"])
         if "knowledge_library" in initial["context"]:
             if 'knowledge_files' in initial['context']:
                 current['knowledge_files']=initial['context']['knowledge_files']
             current["knowledge_library"] = load_knowledge(initial['context'].get('knowledge_files'))
         if not current["customer"]["contact_allowed"] or self._contact_blocked(initial["customer_id"]):
-            raise ValueError("联系限制或待核实拒绝指令阻止拨号")
+            raise ValueError('Contact restriction or unresolved refusal blocks dispatch')
         if initial["status"] == "approved":
             # Any CRM record change makes the pre-call knowledge stale.
             selected={v["id"] for v in initial["context"]["viewings"]}
             current["viewings"]=[v for v in current["viewings"] if v["id"] in selected]
             if digest(current) != digest(initial["context"]):
-                raise ValueError("资料已改变，请基于新资料重新准备并审核")
+                raise ValueError('Source data changed; prepare and review again')
         if digest(initial["request"]) != initial["approved_digest"]:
-            raise ValueError("审核后的电话内容已改变，禁止提交")
+            raise ValueError('Reviewed call content changed; submission blocked')
         if initial['status']=='approved' and initial['request']['task'] != compile_task(
                 Plan.model_validate(initial['plan']),Assessment.model_validate(initial['assessment']),initial['context']):
-            raise ValueError('通话任务展示已更新，请返回规划页重新批准后执行')
+            raise ValueError('Call task projection changed; return to planning and approve again before execution')
         with self.store.tx() as db:
             run=json.loads(db.execute("SELECT data FROM runs WHERE id=?",(run_id,)).fetchone()[0])
             if run["revision"] != initial["revision"]:
@@ -204,7 +218,7 @@ class Workflow:
             uncertain = not isinstance(exc,ProviderError) or exc.uncertain
             run.update(status="submission_unknown" if uncertain else "execution_failed",
                        execution_status="submission_unknown" if uncertain else "failed",
-                       error="提交未获确认；只能恢复原身份" if uncertain else str(exc))
+                       error='Submission not confirmed; recover the original identity only' if uncertain else str(exc))
             self._save_next(run)
             raise ValueError(run["error"]) from None
         return self._save_snapshot(run,snapshot)
@@ -215,12 +229,12 @@ class Workflow:
 
     def _save_snapshot(self,run,snapshot):
         if not isinstance(snapshot,dict) or not snapshot.get("id") or snapshot.get("result_status") not in {"pending","available","unavailable","not_applicable"}:
-            run.update(status="submission_unknown",error="供应商响应不完整，保留原请求恢复")
+            run.update(status="submission_unknown",error='Provider response is incomplete; retain the original request for recovery')
             self._save_next(run)
             raise ValueError(run["error"])
         # Never let a supplemental read silently switch call identities.
         if run.get("call") and run["call"]["id"] != snapshot["id"]:
-            raise ValueError("电话查询返回的资源身份不一致")
+            raise ValueError('Read returned a different call identity')
         run.update(call=snapshot,execution_status=snapshot["status"],
                    status="monitoring" if snapshot["result_status"]=="pending" else "result_ready",error=None)
         return self._save_next(run)
@@ -228,7 +242,7 @@ class Workflow:
     def refresh(self,run_id):
         run=self.store.run(run_id)
         if not run.get("call"):
-            raise ValueError("尚无电话资源，请先执行或恢复原请求")
+            raise ValueError('No call resource exists; execute or recover the original request first')
         if run["call"]["result_status"] != "pending":
             return run
         snapshot=self._provider(run).read(run["request"],run["idempotency_key"],run["call"]["id"])
@@ -257,7 +271,7 @@ class Workflow:
         """Explicit destination-specific permission for one existing real Call."""
         run=self.store.run(run_id)
         if not confirmed or run['revision']!=revision or not run.get('call') or run['call']['result_status']!='available':
-            raise ValueError('请先明确同意将本通电话转写和结构化结果发送给豆包，并核对当前版本')
+            raise ValueError('First explicitly authorize sending this transcript and structured result to Doubao and verify the current revision')
         if run.get('allow_doubao_analysis'):
             return run
         run.update(allow_doubao_analysis=True,
@@ -268,7 +282,7 @@ class Workflow:
         run=self.store.run(run_id)
         if run['mode']=='live' and (run.get('call') or {}).get('result_status')=='available' and not run.get('allow_doubao_analysis'):
             if not self.settings.doubao_analysis_authorized:
-                raise ValueError('尚未同意将真实通话转写和结构化结果发送给豆包；可先查看CALL-E原始结果')
+                raise ValueError('Sending this real transcript and result to Doubao is not authorized yet; the original CALL-E result remains viewable')
             run=self.authorize_analysis(run_id,run['revision'],confirmed=True,source='project_setting')
         if self.settings.preview_only and run.get('batch'):
             if run.get('writeback_status')=='preview_only' and not run.get('receipt'):
@@ -283,7 +297,7 @@ class Workflow:
         if run.get("requires_writeback_review") and not confirm_writeback:
             return run
         if not run.get("call") or run["call"]["result_status"]=="pending":
-            raise ValueError("电话业务结果尚未结束")
+            raise ValueError('Call business result is not final')
         try:
             if run["batch"] is None:
                 if run["call"]["result_status"] != "available":
@@ -306,40 +320,40 @@ class Workflow:
                        status="review_required" if receipt["pending"] or receipt["unresolved"] else "done",error=None)
             return self._save_next(run)
         except Exception as exc:
-            run.update(status="processing_failed",error=str(exc) if isinstance(exc,ValueError) else "本地处理失败，未重新拨号",writeback_status="failed",
+            run.update(status="processing_failed",error=str(exc) if isinstance(exc,ValueError) else 'Local processing failed; no redial',writeback_status="failed",
                 extraction_status='failed' if run.get('analysis') is None else run['extraction_status'])
             self._save_next(run)
             raise
 
     def resolve(self,run_id,change_id,decision):
         if self.settings.preview_only:
-            raise ValueError('当前演示仅预览，不执行CRM确认或回填')
+            raise ValueError('This demo is preview-only; CRM confirmation/writeback is disabled')
         if decision not in {"approve","dismiss"}:
-            raise ValueError("无效审核动作")
+            raise ValueError('Invalid review action')
         run=self.store.run(run_id)
         if not run.get("receipt"):
-            raise ValueError("没有待审核结果")
+            raise ValueError('No result awaiting review')
         if any(x["change_id"]==change_id for x in run["reviews"]):
             return run
         entry=next((x for x in run["receipt"]["pending"] if x["id"]==change_id),None)
         if not entry:
-            raise ValueError("变更不存在")
+            raise ValueError('Change not found')
         receipt=None
         previous_request=run.get("review_requests",{}).get(change_id)
         if previous_request and previous_request["decision"] != decision:
-            raise ValueError("该审核动作已开始，请先恢复原处理")
+            raise ValueError('This review action started already; recover the original operation first')
         if decision=="approve":
             if entry["kind"] != "preference" or not entry.get("evidence") or not validate_value(entry["field"],entry["value"]):
-                raise ValueError("无有效新值、来源或归属；请补充业务信息，不能强制确认")
+                raise ValueError('No valid new value, source or attribution; supply business information rather than forcing approval')
             if sum(x.field==entry["field"] for x in Analysis.model_validate(run["analysis"]).changes)>1:
-                raise ValueError("存在同字段冲突，不能直接确认")
+                raise ValueError('Conflicting entries for this field cannot be approved directly')
             if entry["field"]=="budget_max":
                 quote=entry["evidence"]["quote"]
                 value=entry["value"]
-                if str(value) not in quote and f"{value/10000:g}万" not in quote:
-                    raise ValueError("原话中没有这个明确金额，不能据此提高预算")
+                if not explicitly_states_amount(quote, value):
+                    raise ValueError('The quote does not contain this explicit amount; do not increase the budget from it')
             batch={"expected_version":self.crm.context(run["customer_id"])["customer"]["version"],
-                   "accepted":[entry],"pending":[],"unresolved":[],"handoff":{"priority":"normal","reason":"经纪人确认字段","signals":[],"action":"保留审核记录"}}
+                   "accepted":[entry],"pending":[],"unresolved":[],"handoff":{"priority":"normal","reason":'Broker-confirmed field',"signals":[],"action":'Retain review record'}}
             if previous_request:
                 batch=previous_request["batch"]
             else:
@@ -355,7 +369,7 @@ class Workflow:
     def cancel(self,run_id):
         run=self.store.run(run_id)
         if run["status"] not in {"planning_failed","pending_approval","approved"}:
-            raise ValueError("只可取消本地尚未提交的计划，不能承诺挂断已提交电话")
+            raise ValueError('Only unsubmitted local plans can be canceled; hanging up submitted calls is not guaranteed')
         run.update(status="canceled")
         return self._save_next(run)
 

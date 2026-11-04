@@ -5,28 +5,27 @@ import re
 from .storage import digest
 
 KNOWLEDGE_DIR = Path(__file__).parent / 'knowledge'
-KNOWLEDGE_PATH = KNOWLEDGE_DIR / '购房政策 FAQ.md'
+KNOWLEDGE_PATH = KNOWLEDGE_DIR / 'shanghai-purchase-faq.md'
 
 
 def knowledge_files():
     return [
-        {'id':'followup_guide','name':'看房反馈分析与回访指导.md','category':'业务经验',
-         'description':'价格顾虑、偏好变化与追问原则'},
-        {'id':'purchase_faq','name':'购房政策 FAQ.md','category':'政策资料',
-         'description':'上海购房资格、新房积分、贷款与置换政策'},
+        {'id':'followup_guide','name':'viewing-feedback-guide.md','category':'Business guidance',
+         'description':'Price objections, preference changes and follow-up principles'},
+        {'id':'purchase_faq','name':'shanghai-purchase-faq.md','category':'Policy references',
+         'description':'Shanghai purchase eligibility, new-home points, loans and replacement policies'},
     ]
 
 
 def load_knowledge(file_ids=None):
     """Load only explicitly selected files; [] means use no library.
 
-    The earlier English-name Markdown is retained on disk but is no longer a
-    catalog entry. File selection is frozen alongside each planning snapshot.
+    Historical knowledge drafts are archived outside the contribution. File selection is frozen alongside each planning snapshot.
     """
     catalog=knowledge_files()
     selected={f['id'] for f in catalog} if file_ids is None else set(file_ids)
     if not selected <= {f['id'] for f in catalog}:
-        raise ValueError('所选知识文件不存在')
+        raise ValueError('Selected knowledge file not found')
     entries=[]
     for item in catalog:
         if item['id'] not in selected:
@@ -34,7 +33,7 @@ def load_knowledge(file_ids=None):
         text=(KNOWLEDGE_DIR/item['name']).read_text(encoding='utf-8')
         entries.extend(_parse_document(text,item))
     if len({e['id'] for e in entries})!=len(entries):
-        raise ValueError('知识库包含重复编号')
+        raise ValueError('Knowledge library has duplicate IDs')
     return entries
 
 
@@ -45,12 +44,12 @@ def _parse_document(text, document):
         sid,title,body=parts[i:i+3]
         meta=dict(re.findall(r'^- (published|effective|reviewed|source|status): (.+)$',body,flags=re.M))
         if set(meta)!={'published','effective','reviewed','source','status'}:
-            raise ValueError('知识库条目缺少来源或日期，请检查 '+sid)
+            raise ValueError('Knowledge entry lacks source or date metadata: '+sid)
         for key in ('published','effective','reviewed'):date.fromisoformat(meta[key])
         content=re.sub(r'^- (published|effective|reviewed|source|status): .+\n?','',body,flags=re.M).strip()
         entries.append({'id':sid,'kind':'broker_guidance' if meta['status']=='broker_guidance' else 'broker_policy_reference',
                         'document_id':document['id'],'document_name':document['name'],'title':title,
                         'text':content,'paragraphs':[{'paragraph_index':i,'text':p} for i,p in enumerate(content.split('\n\n'))],**meta,'version':digest([meta,content])})
     if not entries or len({e['id'] for e in entries})!=len(entries):
-        raise ValueError('知识库不能为空或包含重复编号')
+        raise ValueError('Knowledge library is empty or has duplicate IDs')
     return entries

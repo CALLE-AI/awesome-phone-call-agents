@@ -77,7 +77,7 @@ class Store:
         with self.tx() as db:
             row = db.execute("SELECT data FROM runs WHERE id=?", (run_id,)).fetchone()
             if not row:
-                raise ValueError("找不到该任务")
+                raise ValueError('Task not found')
             return json.loads(row[0])
 
     def create_run(self, run):
@@ -93,7 +93,7 @@ class Store:
         cursor = db.execute("UPDATE runs SET revision=?,data=? WHERE id=? AND revision=?",
                             (run["revision"], dump(run), run["id"], expected_revision))
         if cursor.rowcount != 1:
-            raise ValueError("任务已被其他操作修改，请重新载入")
+            raise ValueError('Task changed concurrently; reload it')
 
     def list_runs(self):
         with self.tx() as db:

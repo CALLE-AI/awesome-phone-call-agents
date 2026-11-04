@@ -1,9 +1,7 @@
-# 演示资料
+# Synthetic CALL-E request examples
 
-所有案例均为虚构。实际加载的资料位于包内 `data/crm.json` 和 `data/replays.json`，便于安装后运行。评估日期固定为 2026-11-02，不使用运行当天推断历史。
+- `calle-request-preview.json`: compiled request with a no-call destination placeholder, task and result schema.
+- `calle-task-preview.txt`: the same human-readable task.
+- `calle-result-schema.json`: the application's deterministic provider result schema.
 
-回放中的提取结果为人工预置，只验证处理流程；豆包模式才会调用真实模型。
-
-当前案例版本为post-viewing-v2，时间线见[场景说明](../docs/demo-scenario.md)。10月20日只提到空间重要；地铁可放宽是本次普通回访的新反馈。各回放为同一初始背景下的独立分支。
-
-CALL-E请求附件采用新版背景下的真实豆包规划，并按用户给定文案校订三个沟通方向。它是经审核的无拨号请求预览，不是未经修改的模型原始输出；14字段Schema由程序生成。
+These files are offline previews, not proof of a live call. The application compiles the request from the reviewed plan; examples contain no credentials or private call data. Run the offline CLI described in the app README to inspect the current flow. CRM changes are suggestions only.
