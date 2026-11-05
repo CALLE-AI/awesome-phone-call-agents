@@ -1,0 +1,336 @@
+{
+  "preferences": {
+    "label": "Per-property feedback and preference changes",
+    "transcript": [
+      {
+        "speaker": "bot",
+        "offset_seconds": 0,
+        "text": "Hello, I am an AI assistant acting for your broker. Is now a convenient time to discuss your recent viewings?"
+      },
+      {
+        "speaker": "user",
+        "offset_seconds": 5,
+        "text": "A has a good location but the living room is too small."
+      },
+      {
+        "speaker": "user",
+        "offset_seconds": 13,
+        "text": "I like B's living room, but CNY 5.3m still exceeds my budget."
+      },
+      {
+        "speaker": "user",
+        "offset_seconds": 21,
+        "text": "Living-room space matters more now. I can accept a longer metro walk, but my budget ceiling is still CNY 5m."
+      },
+      {
+        "speaker": "bot",
+        "offset_seconds": 30,
+        "text": "Would you consider another home with a larger living room and a suitable price?"
+      },
+      {
+        "speaker": "user",
+        "offset_seconds": 36,
+        "text": "Yes, you can arrange another viewing if something suitable comes up."
+      }
+    ],
+    "analysis": {
+      "summary": "A has a good location but a small living room; B has a good living room but exceeds the budget at CNY 5.3m. Space is prioritized and transport may relax, with no confirmed distance. Budget remains CNY 5m; suitable homes remain of interest.",
+      "changes": [
+        {
+          "field": "living_room_priority",
+          "value": "high",
+          "evidence": {
+            "turn_index": 3,
+            "quote": "Living-room space matters more now. I can accept a longer metro walk, but my budget ceiling is still CNY 5m."
+          },
+          "reason": "Explicit customer statement",
+          "uncertain": false
+        },
+        {
+          "field": "subway_preference",
+          "value": "Can accept a somewhat longer metro walk",
+          "evidence": {
+            "turn_index": 3,
+            "quote": "Living-room space matters more now. I can accept a longer metro walk, but my budget ceiling is still CNY 5m."
+          },
+          "reason": "Explicit customer statement",
+          "uncertain": false
+        },
+        {
+          "field": "budget_max",
+          "value": 5000000,
+          "evidence": {
+            "turn_index": 3,
+            "quote": "Living-room space matters more now. I can accept a longer metro walk, but my budget ceiling is still CNY 5m."
+          },
+          "reason": "Explicit customer statement",
+          "uncertain": false
+        },
+        {
+          "field": "next_viewing_interest",
+          "value": "Willing to consider suitable homes",
+          "evidence": {
+            "turn_index": 5,
+            "quote": "Yes, you can arrange another viewing if something suitable comes up."
+          },
+          "reason": "Continued viewing interest is not a purchase commitment",
+          "uncertain": false
+        }
+      ],
+      "feedback": [
+        {
+          "property_id": "property_a",
+          "dimension": "space",
+          "text": "Good location but small living room",
+          "evidence": {
+            "turn_index": 1,
+            "quote": "A has a good location but the living room is too small."
+          },
+          "uncertain": false
+        },
+        {
+          "property_id": "property_b",
+          "dimension": "Space and price",
+          "text": "Likes the living room but CNY 5.3m exceeds budget",
+          "evidence": {
+            "turn_index": 2,
+            "quote": "I like B's living room, but CNY 5.3m still exceeds my budget."
+          },
+          "uncertain": false
+        }
+      ],
+      "signals": [],
+      "unresolved": [
+        "The maximum acceptable metro distance is unknown; retain the qualitative change without inventing a distance."
+      ]
+    },
+    "call_outcome": "completed",
+    "result_status": "available"
+  },
+  "high_intent": {
+    "label": "Explicit opportunity and broker handoff",
+    "transcript": [
+      {
+        "speaker": "bot",
+        "offset_seconds": 0,
+        "text": "Hello, I am an AI assistant acting for your broker. Is now a convenient time to discuss your recent viewings?"
+      },
+      {
+        "speaker": "user",
+        "offset_seconds": 5,
+        "text": "I like property B. If the price can be discussed down to about CNY 5m, I would like to revisit this week. Please have the broker contact me."
+      }
+    ],
+    "analysis": {
+      "summary": "Conditional interest in B: wants about CNY 5m, a revisit this week and broker contact; no purchase commitment.",
+      "changes": [],
+      "feedback": [
+        {
+          "property_id": "property_b",
+          "dimension": "Overall",
+          "text": "Satisfied and wants to learn more",
+          "evidence": {
+            "turn_index": 1,
+            "quote": "I like property B. If the price can be discussed down to about CNY 5m, I would like to revisit this week. Please have the broker contact me."
+          },
+          "uncertain": false
+        }
+      ],
+      "signals": [
+        {
+          "kind": "revisit",
+          "property_id": "property_b",
+          "timeframe": "this week",
+          "condition": "Wants about CNY 5m; broker verification required, not an actual price reduction",
+          "evidence": {
+            "turn_index": 1,
+            "quote": "I like property B. If the price can be discussed down to about CNY 5m, I would like to revisit this week. Please have the broker contact me."
+          }
+        },
+        {
+          "kind": "negotiation",
+          "property_id": "property_b",
+          "timeframe": "this week",
+          "condition": "Wants about CNY 5m; broker verification required, not an actual price reduction",
+          "evidence": {
+            "turn_index": 1,
+            "quote": "I like property B. If the price can be discussed down to about CNY 5m, I would like to revisit this week. Please have the broker contact me."
+          }
+        }
+      ],
+      "unresolved": []
+    },
+    "call_outcome": "completed",
+    "result_status": "available"
+  },
+  "uncertain_budget": {
+    "label": "Ambiguous budget; retain the old value",
+    "transcript": [
+      {
+        "speaker": "bot",
+        "offset_seconds": 0,
+        "text": "Hello, I am an AI assistant acting for your broker. Is now a convenient time to discuss your recent viewings?"
+      },
+      {
+        "speaker": "user",
+        "offset_seconds": 5,
+        "text": "If a home is really suitable, I might add a little to the budget; I have not decided how much."
+      }
+    ],
+    "analysis": {
+      "summary": "Fictional call replay",
+      "changes": [
+        {
+          "field": "budget_max",
+          "value": null,
+          "evidence": {
+            "turn_index": 1,
+            "quote": "If a home is really suitable, I might add a little to the budget; I have not decided how much."
+          },
+          "reason": "Possible flexibility without an explicit new ceiling",
+          "uncertain": true
+        }
+      ],
+      "feedback": [],
+      "signals": [],
+      "unresolved": [
+        "Whether the budget changes and its exact ceiling require further broker confirmation."
+      ]
+    },
+    "call_outcome": "completed",
+    "result_status": "available"
+  },
+  "explicit_budget": {
+    "label": "Explicit budget change requires broker review",
+    "transcript": [
+      {
+        "speaker": "bot",
+        "offset_seconds": 0,
+        "text": "Hello, I am an AI assistant acting for your broker. Is now a convenient time to discuss your recent viewings?"
+      },
+      {
+        "speaker": "user",
+        "offset_seconds": 5,
+        "text": "I confirm my budget ceiling is now CNY 5.5m."
+      }
+    ],
+    "analysis": {
+      "summary": "Fictional call replay",
+      "changes": [
+        {
+          "field": "budget_max",
+          "value": 5500000,
+          "evidence": {
+            "turn_index": 1,
+            "quote": "I confirm my budget ceiling is now CNY 5.5m."
+          },
+          "reason": "Explicit customer statement",
+          "uncertain": false
+        }
+      ],
+      "feedback": [],
+      "signals": [],
+      "unresolved": []
+    },
+    "call_outcome": "completed",
+    "result_status": "available"
+  },
+  "ambiguous_property": {
+    "label": "Unclear property reference",
+    "transcript": [
+      {
+        "speaker": "bot",
+        "offset_seconds": 0,
+        "text": "Hello, I am an AI assistant acting for your broker. Is now a convenient time to discuss your recent viewings?"
+      },
+      {
+        "speaker": "user",
+        "offset_seconds": 5,
+        "text": "That one is okay, but I cannot remember which one you mean."
+      }
+    ],
+    "analysis": {
+      "summary": "Fictional call replay",
+      "changes": [],
+      "feedback": [],
+      "signals": [],
+      "unresolved": [
+        "Cannot determine whether the customer means A or B; feedback cannot be attributed automatically."
+      ]
+    },
+    "call_outcome": "completed",
+    "result_status": "available"
+  },
+  "opt_out": {
+    "label": "Refuses further contact",
+    "transcript": [
+      {
+        "speaker": "bot",
+        "offset_seconds": 0,
+        "text": "Hello, I am an AI assistant acting for your broker. Is now a convenient time to discuss your recent viewings?"
+      },
+      {
+        "speaker": "user",
+        "offset_seconds": 5,
+        "text": "Please do not call me again."
+      }
+    ],
+    "analysis": {
+      "summary": "Fictional call replay",
+      "changes": [
+        {
+          "field": "contact_allowed",
+          "value": false,
+          "evidence": {
+            "turn_index": 1,
+            "quote": "Please do not call me again."
+          },
+          "reason": "Explicit customer statement",
+          "uncertain": false
+        }
+      ],
+      "feedback": [],
+      "signals": [],
+      "unresolved": []
+    },
+    "call_outcome": "completed",
+    "result_status": "available"
+  },
+  "missing_evidence": {
+    "label": "Structured result lacks transcript evidence",
+    "transcript": [],
+    "analysis": {
+      "summary": "Fictional call replay",
+      "changes": [
+        {
+          "field": "budget_max",
+          "value": 5500000,
+          "evidence": {
+            "turn_index": 0,
+            "quote": "I confirm my budget ceiling is now CNY 5.5m."
+          },
+          "reason": "Explicit customer statement",
+          "uncertain": false
+        }
+      ],
+      "feedback": [],
+      "signals": [],
+      "unresolved": []
+    },
+    "call_outcome": "completed",
+    "result_status": "available"
+  },
+  "no_answer": {
+    "label": "No answer; no business result",
+    "transcript": [],
+    "analysis": {
+      "summary": "Fictional call replay",
+      "changes": [],
+      "feedback": [],
+      "signals": [],
+      "unresolved": []
+    },
+    "call_outcome": "no_answer",
+    "result_status": "unavailable"
+  }
+}
