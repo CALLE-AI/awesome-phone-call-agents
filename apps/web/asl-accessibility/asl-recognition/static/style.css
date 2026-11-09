@@ -1,0 +1,390 @@
+/* Warm paper background, deep pine primary, terracotta accent for selection.
+   Controls are large enough to hit reliably on a phone. */
+
+@import url('https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,500;9..144,600&family=Public+Sans:wght@400;500;600;700&display=swap');
+
+:root {
+  --bg: #f5f1e8;
+  --surface: #fffdf8;
+  --surface-sunken: #ece4d3;
+  --border: #ddd2b8;
+  --border-strong: #c7b997;
+  --text: #211c15;
+  --text-muted: #7c7260;
+  --primary: #2f4a3c;
+  --primary-dark: #1e3128;
+  --primary-tint: #e3ebe3;
+  --accent: #b5502e;
+  --accent-tint: #f6e5d9;
+  --danger: #a8402c;
+  --danger-tint: #f8e6e1;
+  --radius-lg: 18px;
+  --radius: 12px;
+  --radius-sm: 8px;
+  --shadow-sm: 0 1px 2px rgba(33, 28, 21, 0.07);
+  --shadow-md: 0 16px 32px -18px rgba(33, 28, 21, 0.35);
+  --font-display: "Fraunces", Georgia, "Times New Roman", serif;
+  --font-body: "Public Sans", -apple-system, "Segoe UI", Helvetica, Arial, sans-serif;
+  color-scheme: light;
+}
+
+* { box-sizing: border-box; }
+
+html, body {
+  margin: 0;
+  background: var(--bg);
+  color: var(--text);
+  font-family: var(--font-body);
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+body {
+  min-height: 100vh;
+  display: flex;
+  justify-content: center;
+}
+
+#app {
+  width: 100%;
+  max-width: 460px;
+  padding: 28px 20px 40px;
+  display: flex;
+  flex-direction: column;
+  min-height: 100vh;
+  position: relative;
+}
+
+/* Float the whole thing as a phone-shaped card once there's room beside it,
+   rather than stretching a phone-first layout across a wide viewport. */
+@media (min-width: 560px) {
+  html, body { height: 100%; }
+  body { align-items: center; padding: 32px 20px; }
+  #app {
+    height: 840px;
+    max-height: 92vh;
+    min-height: 0;
+    border-radius: 28px;
+    box-shadow: var(--shadow-md), 0 0 0 1px var(--border);
+    overflow-y: auto;
+  }
+}
+
+/* ---------- step progress ---------- */
+#stepBar {
+  display: flex;
+  gap: 6px;
+  margin-bottom: 28px;
+}
+#stepBar .dot {
+  flex: 1;
+  height: 4px;
+  border-radius: 999px;
+  background: var(--border);
+  transition: background-color 0.2s ease;
+}
+#stepBar .dot.done { background: var(--primary); }
+#stepBar .dot.current { background: var(--accent); }
+
+/* ---------- screens ---------- */
+.screen { display: none; flex: 1; flex-direction: column; }
+.screen.active { display: flex; animation: screenIn 0.4s cubic-bezier(0.2, 0.7, 0.3, 1) both; }
+@keyframes screenIn {
+  from { opacity: 0; transform: translateY(8px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+
+h1 {
+  font-family: var(--font-display);
+  font-size: 1.6rem;
+  font-weight: 600;
+  letter-spacing: -0.01em;
+  margin: 2px 0 8px;
+  color: var(--text);
+}
+.hint {
+  color: var(--text-muted);
+  font-size: 0.94rem;
+  margin: 0 0 24px;
+  line-height: 1.5;
+}
+
+/* ---------- buttons ---------- */
+.btn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+  width: 100%;
+  padding: 16px 18px;
+  font-size: 1.02rem;
+  font-weight: 600;
+  letter-spacing: 0.002em;
+  border-radius: var(--radius);
+  border: none;
+  cursor: pointer;
+  font-family: var(--font-body);
+  transition: transform 0.12s ease, background-color 0.15s ease, color 0.15s ease, box-shadow 0.15s ease;
+}
+.btn-primary { background: var(--primary); color: #faf7ef; box-shadow: var(--shadow-sm); }
+.btn-primary:active { background: var(--primary-dark); transform: scale(0.98); }
+.btn-primary:disabled { background: #ddd6c3; color: #a9a08a; box-shadow: none; cursor: not-allowed; }
+.btn-secondary { background: transparent; color: var(--text); border: 1.5px dashed var(--border-strong); }
+.btn-secondary:active { border-color: var(--primary); color: var(--primary); }
+.btn-danger { background: var(--danger-tint); color: var(--danger); }
+.btn-text { background: transparent; color: var(--primary); padding: 12px; font-weight: 600; }
+.btn-row { display: flex; gap: 10px; }
+.btn-row .btn { flex: 1; }
+
+.actions {
+  margin-top: auto;
+  padding-top: 24px;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+/* ---------- big choice cards ---------- */
+.choice-card {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  width: 100%;
+  padding: 18px 20px;
+  margin-bottom: 12px;
+  background: var(--surface);
+  border: 1.5px solid var(--border);
+  border-radius: var(--radius-lg);
+  box-shadow: var(--shadow-sm);
+  cursor: pointer;
+  text-align: left;
+  font-family: var(--font-body);
+  transition: border-color 0.15s ease, background-color 0.15s ease, transform 0.12s ease;
+}
+.choice-card:active { transform: scale(0.99); }
+.choice-card.selected { border-color: var(--accent); background: var(--accent-tint); }
+.choice-card .icon {
+  flex-shrink: 0;
+  width: 40px;
+  height: 40px;
+  border-radius: 11px;
+  background: var(--primary-tint);
+  color: var(--primary);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: background-color 0.15s ease, color 0.15s ease;
+}
+.choice-card .icon svg { width: 20px; height: 20px; }
+.choice-card.selected .icon { background: var(--accent); color: #fff; }
+.choice-card .label { font-size: 1.01rem; font-weight: 600; }
+.choice-card .sub { font-size: 0.83rem; color: var(--text-muted); margin-top: 2px; }
+
+/* ---------- form fields ---------- */
+.field { margin-bottom: 16px; }
+.field label {
+  display: block;
+  font-size: 0.78rem;
+  font-weight: 700;
+  color: var(--text-muted);
+  margin-bottom: 7px;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+}
+.field input, .field select {
+  width: 100%;
+  padding: 13px 14px;
+  font-size: 1.02rem;
+  border: 1.5px solid var(--border);
+  border-radius: var(--radius-sm);
+  font-family: var(--font-body);
+  background: var(--surface);
+  color: var(--text);
+  transition: border-color 0.15s ease, box-shadow 0.15s ease;
+}
+.field input:focus, .field select:focus {
+  outline: none;
+  border-color: var(--primary);
+  box-shadow: 0 0 0 3px var(--primary-tint);
+}
+
+/* ---------- family member rows ---------- */
+.family-card {
+  background: var(--surface);
+  border: 1.5px solid var(--border);
+  border-radius: var(--radius-lg);
+  padding: 16px;
+  margin-bottom: 12px;
+}
+.family-card-head {
+  display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px;
+}
+.family-card-head span { font-weight: 700; font-family: var(--font-display); font-size: 1.02rem; }
+.remove-link {
+  color: var(--danger); font-size: 0.83rem; font-weight: 600; background: none; border: none;
+  cursor: pointer; padding: 4px; font-family: var(--font-body);
+}
+
+/* ---------- availability rows ---------- */
+.avail-row {
+  display: flex; gap: 8px; align-items: center; margin-bottom: 10px;
+}
+.avail-row .field { margin-bottom: 0; flex: 1; }
+.avail-row .remove-link { flex-shrink: 0; }
+
+/* ---------- review rows ---------- */
+.review-row {
+  display: flex; justify-content: space-between; gap: 12px;
+  padding: 13px 0; border-bottom: 1px solid var(--border);
+}
+.review-row .k { color: var(--text-muted); font-size: 0.88rem; }
+.review-row .v { font-weight: 600; text-align: right; }
+
+/* ---------- upload tiles ---------- */
+.upload-tile {
+  border: 1.5px dashed var(--border-strong);
+  border-radius: var(--radius-lg);
+  padding: 26px 20px;
+  text-align: center;
+  margin-bottom: 14px;
+  background: var(--surface);
+  cursor: pointer;
+  transition: border-color 0.15s ease, background-color 0.15s ease;
+}
+.upload-tile.filled { border-style: solid; border-color: var(--primary); background: var(--primary-tint); }
+.upload-tile .icon {
+  width: 42px; height: 42px; margin: 0 auto 10px; border-radius: 12px;
+  background: var(--primary-tint); color: var(--primary);
+  display: flex; align-items: center; justify-content: center;
+}
+.upload-tile .icon svg { width: 21px; height: 21px; }
+.upload-tile.filled .icon { background: var(--primary); color: #fff; }
+.upload-tile .label { font-weight: 600; }
+.upload-tile img { max-width: 100%; max-height: 140px; border-radius: var(--radius-sm); margin-top: 12px; }
+
+/* ---------- input-method toggle (type vs sign) -- segmented control ---------- */
+.toggle-row {
+  display: flex; gap: 4px; margin-bottom: 20px;
+  background: var(--surface-sunken); padding: 4px; border-radius: 999px;
+}
+.toggle-row button {
+  flex: 1; padding: 10px; border-radius: 999px; border: none;
+  background: transparent; color: var(--text-muted);
+  font-weight: 600; font-size: 0.96rem; cursor: pointer; font-family: var(--font-body);
+  transition: background-color 0.15s ease, color 0.15s ease, box-shadow 0.15s ease;
+}
+.toggle-row button.active { background: var(--surface); color: var(--text); box-shadow: var(--shadow-sm); }
+
+textarea#typedInput {
+  width: 100%; min-height: 110px; padding: 14px; font-size: 1.05rem;
+  border: 1.5px solid var(--border); border-radius: var(--radius); font-family: var(--font-body); resize: vertical;
+  background: var(--surface); color: var(--text);
+}
+textarea#typedInput:focus { outline: none; border-color: var(--primary); box-shadow: 0 0 0 3px var(--primary-tint); }
+
+/* ---------- camera (sign input) ---------- */
+#videoWrap {
+  position: relative; width: 100%; aspect-ratio: 4/3;
+  background: #1b1911; border-radius: var(--radius-lg); overflow: hidden;
+  box-shadow: 0 0 0 1.5px var(--border), var(--shadow-md);
+  transition: box-shadow 0.2s ease;
+}
+#videoWrap.signing { box-shadow: 0 0 0 2px var(--accent), var(--shadow-md); }
+#videoWrap video { width: 100%; height: 100%; object-fit: cover; transform: scaleX(-1); }
+#statusBadge {
+  position: absolute; top: 12px; left: 12px; padding: 6px 12px 6px 10px;
+  border-radius: 999px; font-size: 0.78rem; font-weight: 600; color: #f7f3ea;
+  background: rgba(20, 18, 12, 0.55); backdrop-filter: blur(6px);
+  display: flex; align-items: center; gap: 7px;
+}
+#statusBadge::before { content: ""; width: 6px; height: 6px; border-radius: 50%; background: #e7a98e; flex-shrink: 0; }
+#statusBadge.signing { background: rgba(47, 74, 60, 0.78); }
+#statusBadge.signing::before { background: #8fd0a6; }
+#transcriptBox {
+  margin-top: 14px; width: 100%; min-height: 70px;
+  background: var(--surface); border: 1.5px solid var(--border); border-radius: var(--radius-lg);
+  box-shadow: var(--shadow-sm);
+  padding: 16px; font-family: var(--font-display); font-size: 1.55rem; font-weight: 500;
+  line-height: 1.3; word-wrap: break-word;
+}
+#transcriptBox:empty::before {
+  content: "Signed words appear here"; color: var(--text-muted);
+  font-family: var(--font-body); font-size: 0.95rem; font-weight: 400;
+}
+#lastWord { margin: 8px 0 2px; min-height: 1.2em; font-size: 0.83rem; color: var(--text-muted); }
+canvas#captureCanvas { display: none; }
+
+/* ---------- loading overlay ---------- */
+#loadingOverlay {
+  position: fixed; inset: 0; background: rgba(245, 241, 232, 0.94);
+  display: none; align-items: center; justify-content: center; flex-direction: column; gap: 16px;
+  z-index: 50; text-align: center; padding: 24px;
+}
+#loadingOverlay.active { display: flex; }
+.spinner {
+  width: 36px; height: 36px; border-radius: 50%;
+  border: 3px solid var(--border); border-top-color: var(--primary); border-right-color: var(--accent);
+  animation: spin 0.8s linear infinite;
+}
+@keyframes spin { to { transform: rotate(360deg); } }
+#loadingOverlay .msg { font-weight: 600; font-size: 1.02rem; color: var(--text); }
+
+/* ---------- inline error / notice banners ---------- */
+.banner {
+  padding: 12px 14px; border-radius: var(--radius-sm); font-size: 0.89rem; font-weight: 600;
+  margin-bottom: 16px; display: none; border-left: 3px solid transparent;
+}
+.banner.show { display: block; }
+.banner.error { background: var(--danger-tint); color: var(--danger); border-left-color: var(--danger); }
+
+/* ---------- confirmation screen ---------- */
+.confirm-icon {
+  width: 60px; height: 60px; margin: 0 auto 16px; border-radius: 50%;
+  background: var(--primary-tint); color: var(--primary);
+  display: flex; align-items: center; justify-content: center;
+}
+.confirm-icon svg { width: 30px; height: 30px; }
+.confirm-title { text-align: center; font-family: var(--font-display); font-size: 1.4rem; font-weight: 600; margin-bottom: 8px; }
+.confirm-sub { text-align: center; color: var(--text-muted); margin-bottom: 24px; }
+
+/* ---------- workflow progress / approval / outcome ---------- */
+[hidden] { display: none !important; }
+
+.status-block {
+  display: flex; flex-direction: column; align-items: center; text-align: center;
+  margin: 8vh 0 28px;
+}
+.status-block .spinner { margin-bottom: 20px; }
+.status-block .hint { margin-bottom: 0; }
+
+.confirm-icon .icon-stop { display: none; }
+.confirm-icon[data-kind="stop"] { background: var(--danger-tint); color: var(--danger); }
+.confirm-icon[data-kind="stop"] .icon-ok { display: none; }
+.confirm-icon[data-kind="stop"] .icon-stop { display: block; }
+
+/* A box for things the user should read: what the clinic requires, and any
+   concerns raised on the calls. */
+.notice {
+  background: var(--accent-tint); border-left: 3px solid var(--accent);
+  border-radius: var(--radius-sm); padding: 14px 16px; margin: 16px 0;
+}
+.notice-muted { background: var(--surface-sunken); border-left-color: var(--border-strong); }
+.notice-title {
+  font-size: 0.78rem; font-weight: 700; text-transform: uppercase; letter-spacing: 0.06em;
+  color: var(--text-muted); margin-bottom: 8px;
+}
+.notice ul { margin: 0; padding-left: 18px; line-height: 1.5; }
+.notice li + li { margin-top: 4px; }
+
+/* ---------- collapsible secondary detail (rate breakdown, alternates,
+   requirements, notes) -- kept out of the main view by default so the
+   essentials (date, time, clinic, interpreter) aren't buried in text. ---------- */
+.more-details { margin: 4px 0 16px; }
+.more-details summary {
+  cursor: pointer; font-weight: 600; color: var(--primary);
+  padding: 10px 0; list-style: none;
+}
+.more-details summary::-webkit-details-marker { display: none; }
+.more-details summary::after { content: "Show"; float: right; font-weight: 500; color: var(--text-muted); font-size: 0.85rem; }
+.more-details[open] summary::after { content: "Hide"; }
+.more-details[open] summary { border-bottom: 1px solid var(--border); margin-bottom: 4px; }

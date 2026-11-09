@@ -1,0 +1,17 @@
+# Real secrets -- never commit. See .env.example for the template.
+.env
+
+# Written by every clinic search for inspection. Holds real business names
+# and phone numbers pulled from Google Maps -- kept out of the repo on purpose.
+data/clinics_last_search.json
+data/clinics_last_search.json.tmp
+
+# Virtual environment -- large, machine-specific, never committed.
+.venv/
+
+# Python artifacts
+__pycache__/
+*.pyc
+*.pyo
+
+.DS_Store

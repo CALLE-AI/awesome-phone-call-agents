@@ -1,0 +1,11 @@
+# The local SQLite store -- real profile data (name, phone, DOB, address,
+# insurance) and real booking records (including family members' contact
+# info) live here. Never committed; was tracked in earlier commits, which
+# this only stops going forward. See db.py's own module docstring.
+data/app.db
+data/*.db
+
+# Real secrets -- never commit. See .env.example for the template.
+.env
+
+.DS_Store

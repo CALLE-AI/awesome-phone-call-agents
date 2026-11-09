@@ -1,0 +1,90 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://github.com/signcall/schemas/user_input.schema.json",
+  "title": "signcall user input",
+  "description": "The complete input CALL-E's Interpreter Mesh workflow works from. This object is the agent's input contract -- how it gets produced (typed, signed, or read back from a registered profile) is outside this schema. Availability is given as fixed timestamps: a slot of '2PM' means the user is free 2:00PM-3:00PM.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "name", "date_of_birth", "age", "phone_number", "zipcode",
+    "appointment_type", "insurance", "availability", "has_interpreter"
+  ],
+  "properties": {
+    "name": { "type": "string", "minLength": 1 },
+    "date_of_birth": {
+      "type": "string",
+      "pattern": "^[0-9]{4}-[0-9]{2}-[0-9]{2}$",
+      "description": "YYYY-MM-DD"
+    },
+    "age": { "type": "integer", "minimum": 0, "maximum": 120 },
+    "phone_number": {
+      "type": "string",
+      "pattern": "^\\+1[0-9]{10}$",
+      "description": "US only, E.164 (+1 followed by 10 digits)"
+    },
+    "zipcode": {
+      "type": "string",
+      "pattern": "^[0-9]{5}$",
+      "description": "5-digit US ZIP. This build's clinic-distance table covers Nevada and Illinois only (see workflow/user_input.py::COVERED_STATES); a ZIP outside both is rejected at parse time, not here."
+    },
+    "appointment_type": {
+      "type": "string",
+      "enum": ["physical_therapy", "eyes", "ent", "dental", "mental", "general"]
+    },
+    "insurance": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["provider_name", "policy_number"],
+      "properties": {
+        "provider_name": { "type": "string", "minLength": 1 },
+        "policy_number": { "type": "string", "minLength": 1 }
+      }
+    },
+    "availability": {
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["day", "date", "time"],
+        "properties": {
+          "day": {
+            "type": "string",
+            "enum": ["monday", "tuesday", "wednesday", "thursday", "friday", "saturday", "sunday"]
+          },
+          "date": { "type": "string", "pattern": "^[0-9]{4}-[0-9]{2}-[0-9]{2}$" },
+          "time": {
+            "type": "string",
+            "pattern": "^(1[0-2]|[1-9])(:[0-5][0-9])?(AM|PM)$",
+            "description": "Fixed timestamp, e.g. '2PM' or '4:30PM'. The free window is that time plus one hour."
+          }
+        }
+      }
+    },
+    "has_interpreter": {
+      "type": "boolean",
+      "description": "True when the user has already arranged their own interpreter. No contact details are collected for them, so the workflow books around the user's availability and notifies only the user."
+    },
+    "family_members": {
+      "type": "array",
+      "description": "Provided only when has_interpreter is false. Called one at a time, in this order.",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["name", "relation", "phone_number"],
+        "properties": {
+          "name": { "type": "string", "minLength": 1 },
+          "relation": { "type": "string", "minLength": 1 },
+          "phone_number": { "type": "string", "pattern": "^\\+1[0-9]{10}$" }
+        }
+      }
+    }
+  },
+  "if": { "properties": { "has_interpreter": { "const": true } } },
+  "then": {
+    "properties": { "family_members": { "type": "array", "maxItems": 0 } }
+  },
+  "else": {
+    "required": ["family_members"]
+  }
+}
