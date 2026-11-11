@@ -15,7 +15,7 @@
 ## Privacy & Destination Masking
 
 - Destination telephone numbers are automatically masked across all console logs, trace spans, error messages, and operational summaries (e.g., formatting `+13035550147` as `+1303***0147`).
-- Transcripts and evidence payloads undergo recursive phone number redaction (`\+?[0-9]{7,15}`) to prevent exposure of raw driver telephone numbers in logs or downstream JSON artifacts.
+- Transcripts and evidence payloads recursively mask 7-to-15-digit numbers in compact, spaced, parenthesized or hyphenated formats. Review output before sharing; unusual number formats and other personal data are not covered by this phone-specific filter.
 - Voice call recordings and raw conversational transcripts must not be exposed in unauthenticated interfaces or forwarded to third-party endpoints.
 
 ## Zero-Redial Policy

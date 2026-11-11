@@ -13,7 +13,7 @@ The **Cold Chain Reefer Triage Agent** provides an automated, standardized voice
 ## Highlights
 
 - **ASCII E.164 & HTTPS Origin Validation**: Validates phone numbers strictly with ASCII-only regex (`^\+[1-9][0-9]{1,14}$`) and restricts API endpoints to approved CALL-E origins (`api.heycall-e.com`, `heycall-e.com`, `localhost`, `127.0.0.1`).
-- **Comprehensive Privacy Masking**: Automatically masks driver phone numbers across logs, error messages, and transcript/evidence payloads (`+1303***0147`).
+- **Phone-Number Masking**: Masks compact and ordinarily formatted driver numbers in logs, errors and transcript/evidence payloads. Review output before sharing; other personal data is not automatically redacted.
 - **Advisory Scope**: Extracts structured mechanical checks, cargo condition, and FMCSA HOS drive time for human dispatch review.
 - **Zero-Redial**: Enforces exactly one call attempt; dropped or busy calls route to human dispatch rather than looping.
 
