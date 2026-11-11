@@ -1,0 +1,62 @@
+{
+  "description": "Structured evidence and remediation intent extracted from driver triage call.",
+  "properties": {
+    "driver_verified_safe_location": {
+      "description": "Whether driver confirmed truck is stopped in a safe location (e.g., shoulder, rest stop)",
+      "title": "Driver Verified Safe Location",
+      "type": "boolean"
+    },
+    "reefer_engine_running": {
+      "description": "Whether the diesel reefer refrigeration unit is actively running/humming",
+      "title": "Reefer Engine Running",
+      "type": "boolean"
+    },
+    "air_bulkhead_obstructed": {
+      "description": "Whether freight or pallets are blocking the front return air bulkhead",
+      "title": "Air Bulkhead Obstructed",
+      "type": "boolean"
+    },
+    "cargo_sweating_detected": {
+      "description": "Whether visible moisture, sweating, or condensation was observed on cargo packaging",
+      "title": "Cargo Sweating Detected",
+      "type": "boolean"
+    },
+    "driver_reported_alarm_code": {
+      "description": "Active microprocessor alarm code displayed on unit controller (e.g., 'ALARM 18')",
+      "title": "Driver Reported Alarm Code",
+      "type": "string"
+    },
+    "driver_hos_minutes_remaining": {
+      "description": "Driver-reported remaining driving hours in minutes under FMCSA 49 CFR Part 395",
+      "title": "Driver Hos Minutes Remaining",
+      "type": "integer"
+    },
+    "selected_option": {
+      "description": "Remediation option agreed upon with driver during voice triage",
+      "enum": [
+        "DIVERT_TO_COLD_HUB",
+        "CONTINUE_MONITORED",
+        "ROADSIDE_SERVICE",
+        "DRIVER_REFUSED"
+      ],
+      "title": "Selected Option",
+      "type": "string"
+    },
+    "emergency_reported": {
+      "description": "Whether driver reported an active physical accident, cargo fire, or road hazard",
+      "title": "Emergency Reported",
+      "type": "boolean"
+    }
+  },
+  "required": [
+    "driver_verified_safe_location",
+    "reefer_engine_running",
+    "air_bulkhead_obstructed",
+    "cargo_sweating_detected",
+    "driver_hos_minutes_remaining",
+    "selected_option",
+    "emergency_reported"
+  ],
+  "title": "CallETriageStructuredResult",
+  "type": "object"
+}
