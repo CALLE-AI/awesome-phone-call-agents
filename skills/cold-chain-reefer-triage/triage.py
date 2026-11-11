@@ -37,8 +37,8 @@ APPROVED_CALLE_ORIGINS = {
     "127.0.0.1",
 }
 
-# Regex pattern for redacting phone numbers (7 to 15 digits, optional leading +)
-PHONE_REDACTION_PATTERN = re.compile(r"\+?[0-9]{7,15}", re.ASCII)
+# Redact 7 to 15 digits even when provider output adds ordinary phone punctuation.
+PHONE_REDACTION_PATTERN = re.compile(r"\+?[0-9](?:[ .()-]*[0-9]){6,14}", re.ASCII)
 
 
 # ==============================================================================
@@ -72,8 +72,8 @@ def validate_e164_phone(phone: Optional[str]) -> bool:
     """Validate that phone number strictly satisfies ASCII-only E.164 format and is not an emergency shortcode."""
     if not phone or not isinstance(phone, str):
         return False
-    clean = phone.strip()
-    if not E164_PATTERN.match(clean):
+    clean = phone
+    if not E164_PATTERN.fullmatch(clean):
         return False
     # Reject emergency numbers embedded in country codes (e.g. +1911)
     digits = clean.lstrip("+")
@@ -121,7 +121,7 @@ def sanitize_error_message(error_msg: str) -> str:
         sanitized,
         flags=re.IGNORECASE,
     )
-    # Redact raw phone numbers (replace matches of \+?[0-9]{7,15} with masked versions like +1303***0147)
+    # Redact compact and ordinarily formatted provider phone numbers.
     sanitized = redact_phone_numbers(sanitized)
     return sanitized
 
