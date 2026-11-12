@@ -39,11 +39,6 @@ class CallPurpose(str, Enum):
     INTERPRETER_RELEASE = "interpreter_release"
 
 
-# These ring the family member's own number, as entered in the user's profile.
-_FAMILY_PURPOSES = frozenset({
-    CallPurpose.FAMILY_AVAILABILITY, CallPurpose.FAMILY_CONFIRM, CallPurpose.FAMILY_RELEASE,
-})
-
 # A superset of the statuses the SDK documents; extras are harmless if never returned.
 TERMINAL_STATUSES = {
     "COMPLETED", "FAILED", "NO_ANSWER", "DECLINED",
@@ -159,12 +154,11 @@ def _create_call_with_concurrency_retry(client, **kwargs) -> dict:
 
 # --- Real-mode call routing -------------------------------------------------
 #
-# Clinic and interpreter numbers are never dialled directly. In real mode each
-# is mapped onto one of the phones listed in SIGNCALL_TEST_LINES, which the
-# operator owns. The logical recipient still drives the task text, the mock
-# lookup and the evidence trail; only the number handed to the SDK changes.
-# Family numbers were entered by the user in their own profile and are dialled
-# as given.
+# No recipient's number is ever dialled directly. In real mode every clinic,
+# interpreter and family member is mapped onto one of the phones listed in
+# SIGNCALL_TEST_LINES, which the operator owns. The logical recipient still
+# drives the task text, the mock lookup and the evidence trail; only the
+# number handed to the SDK changes.
 #
 # A recipient's line is chosen by its position within the group being called
 # (the clinic list or an interpreter batch) and is then sticky, so a clinic
@@ -209,8 +203,8 @@ def reset_call_routing() -> None:
 
 
 def resolve_dial_target(logical_phone: str, batch_position: int | None = None) -> str:
-    """The number actually dialled for a clinic or interpreter: always one of
-    the configured test lines, never `logical_phone`. Pure and independent of
+    """The number actually dialled for any recipient: always one of the
+    configured test lines, never `logical_phone`. Pure and independent of
     mock mode, so it can be tested directly."""
     with _routing_lock:
         assigned = _line_assignments.get(logical_phone)
@@ -232,16 +226,6 @@ def resolve_dial_target(logical_phone: str, batch_position: int | None = None) -
         line = lines[batch_position % len(lines)]
         _line_assignments[logical_phone] = line
         return line
-
-
-def resolve_call_target(
-    logical_phone: str, purpose: CallPurpose, batch_position: int | None = None
-) -> str:
-    """The number a real-mode call dials: the family member's own number for
-    family calls, a test line for everything else."""
-    if purpose in _FAMILY_PURPOSES:
-        return logical_phone
-    return resolve_dial_target(logical_phone, batch_position)
 
 
 # --- Mock mode ----------------------------------------------------------------
@@ -293,7 +277,7 @@ def call_and_wait(
     """Place one call and block until it finishes. `phone` is the LOGICAL
     recipient (clinic, interpreter or family member). In mock mode it selects
     the scripted response; in real mode it is mapped to the number to dial by
-    resolve_call_target(). `batch_position` is the recipient's index within
+    resolve_dial_target(). `batch_position` is the recipient's index within
     its group and is required the first time they are reached.
 
     Safe to call from several threads: calls to different numbers run in
@@ -309,7 +293,7 @@ def call_and_wait(
         return resolver(task, phone, purpose)
 
     client = _get_client()
-    dial_target = resolve_call_target(phone, purpose, batch_position)
+    dial_target = resolve_dial_target(phone, batch_position)
     with _dial_lock(dial_target):
         created = _create_call_with_concurrency_retry(
             client, task=task, recipient={"phone": dial_target}, result_schema=result_schema,

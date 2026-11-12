@@ -1319,19 +1319,13 @@ def scenario_call_routing() -> None:
             "BUG: assignments survived a reset and would leak between runs"
         )
 
-        # Family calls dial the number the user entered; everything else goes to a test line.
+        # Every kind of call, family included, goes to a test line and never to
+        # the recipient's own number.
         sister = "+17025550123"
-        for purpose in (CallPurpose.FAMILY_AVAILABILITY, CallPurpose.FAMILY_CONFIRM,
-                        CallPurpose.FAMILY_RELEASE):
-            assert calle_run.resolve_call_target(sister, purpose, 0) == sister, (
-                f"BUG: a {purpose.value} call did not dial the family member directly"
-            )
-        for purpose in (CallPurpose.CLINIC_SEARCH, CallPurpose.CLINIC_BOOK, CallPurpose.CLINIC_CANCEL,
-                        CallPurpose.INTERPRETER_AVAILABILITY, CallPurpose.INTERPRETER_CONFIRM,
-                        CallPurpose.INTERPRETER_RELEASE):
-            assert calle_run.resolve_call_target(sister, purpose, 0) in lines, (
-                f"BUG: a {purpose.value} call dialled a number directly"
-            )
+        assert calle_run.resolve_dial_target(sister, 0) in lines, (
+            "BUG: a family member's call would dial a number outside the test lines"
+        )
+        assert calle_run.resolve_dial_target(sister, 0) != sister
 
         # One phone can't take two calls at once: the same number shares a lock,
         # different numbers don't.
@@ -1393,6 +1387,23 @@ def scenario_api_endpoint() -> None:
         assert health["real_calls_allowed"] is False
         assert health["calle_api_key_present"] in (True, False)
         assert "CALLE_API_KEY" not in str(health), "credentials must never be echoed"
+
+        # 0. A page on another site can send a POST without a CORS preflight
+        #    (text/plain), so every state-changing route refuses a cross-site
+        #    Origin before doing anything.
+        for path in ("/runs", "/runs/anything/confirm", "/runs/anything/cancel"):
+            blocked = client.post(
+                path, content=json.dumps(_input_json(zipcode=il_zip)),
+                headers={"Origin": "https://evil.example", "Content-Type": "text/plain"},
+            )
+            assert blocked.status_code == 403, (
+                f"BUG: {path} accepted a cross-site POST ({blocked.status_code})"
+            )
+        assert client.post(
+            "/runs", json=_input_json(zipcode=il_zip),
+            headers={"Sec-Fetch-Site": "cross-site"},
+        ).status_code == 403
+        assert not server._runs and not CALLS, "a refused cross-site request must start nothing"
 
         # 1. A malformed profile is rejected before anything is accepted.
         bad = client.post("/runs", json=_input_json(zipcode="10001"))  # New York -- neither NV nor IL

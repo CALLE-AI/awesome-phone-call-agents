@@ -44,6 +44,7 @@ from __future__ import annotations
 
 import dataclasses
 import os
+import re
 import threading
 import uuid
 from datetime import datetime
@@ -54,7 +55,7 @@ from fastapi.responses import JSONResponse
 from pydantic import BaseModel, StrictBool
 
 from ..calle import MOCK_MODE
-from ..calle.run import TEST_LINES_ENV, clear_default_mock, register_default_mock
+from ..calle.run import TEST_LINES_ENV, clear_default_mock, register_default_mock, test_lines
 from ..workflow.appointment import cancel_appointment, describe_goal, run_interpreter_mesh
 from ..workflow.confirmation import CancellationUnresolved
 from ..workflow.confirmation import ApprovalFn, BookingDeclined, BookingProposal, NoMatchFound
@@ -67,9 +68,9 @@ ALLOW_REAL_CALLS = os.environ.get("SIGNCALL_API_ALLOW_REAL_CALLS") == "1"
 USE_DEMO_MOCKS = os.environ.get("SIGNCALL_API_DEMO_MOCKS") == "1"
 CONFIRM_TIMEOUT_SECONDS = float(os.environ.get("SIGNCALL_CONFIRM_TIMEOUT_SECONDS", "900"))
 
-# CORS only stops another site's JavaScript from reading responses. It is not a
-# security boundary: it does not stop anything from POSTing.
-LOCALHOST_ORIGIN_REGEX = r"http://(localhost|127\.0\.0\.1)(:\d+)?"
+# CORS only stops another site's JavaScript from reading responses; it does not
+# stop a page from sending a POST. The middleware below refuses those.
+LOCALHOST_ORIGIN_REGEX = r"http://(localhost|127\.0\.0\.1|\[::1\])(:\d+)?"
 
 app = FastAPI(
     title="signcall",
@@ -82,6 +83,20 @@ app.add_middleware(
     allow_methods=["GET", "POST", "OPTIONS"],
     allow_headers=["*"],
 )
+
+
+@app.middleware("http")
+async def reject_cross_site_requests(request: Request, call_next):
+    """Browsers attach an Origin header to cross-site POSTs, even "simple"
+    ones that skip the CORS preflight, so refuse any POST whose Origin is not a
+    localhost page. Requests with no Origin (the web app's server, curl) are
+    not from a web page."""
+    if request.method not in ("GET", "HEAD", "OPTIONS"):
+        origin = request.headers.get("origin")
+        cross_site = request.headers.get("sec-fetch-site") == "cross-site"
+        if cross_site or (origin is not None and not re.fullmatch(LOCALHOST_ORIGIN_REGEX, origin)):
+            return JSONResponse(status_code=403, content={"detail": "Cross-site request refused."})
+    return await call_next(request)
 
 # One run at a time. The real-mode line assignments and the mock registry are
 # module-level state that every run resets, so overlapping runs would erase each
@@ -123,11 +138,11 @@ def _assert_mode_is_deliberate() -> None:
             "CALLE_MOCK_MODE=1 to serve safely, or SIGNCALL_API_ALLOW_REAL_CALLS=1 "
             "to say you meant it."
         )
-    if not os.environ.get(TEST_LINES_ENV):
+    if not test_lines():  # also raises if any entry is not a valid E.164 number
         raise RuntimeError(
-            f"Refusing to start in real-call mode: {TEST_LINES_ENV} is not set. Clinic "
-            f"and interpreter calls are only placed to phones you own; set it to one "
-            f"or more comma-separated E.164 numbers."
+            f"Refusing to start in real-call mode: {TEST_LINES_ENV} is not set. Every "
+            f"call is placed to phones you own; set it to one or more "
+            f"comma-separated E.164 numbers."
         )
 
 

@@ -96,7 +96,8 @@ def confirm_family_member(
         f"interpret at that time. Get a clear yes or no."
     )
     result = call_and_wait(
-        task, member.phone, FAMILY_CONFIRM_SCHEMA, purpose=CallPurpose.FAMILY_CONFIRM,
+        task, member.phone, FAMILY_CONFIRM_SCHEMA, batch_position=0,
+        purpose=CallPurpose.FAMILY_CONFIRM,
     )
     member.notes = append_note(member.notes, result.structured_result.get("additional_notes"))
     # A voicemail, dropped or unfinished call is not a commitment.
@@ -119,5 +120,6 @@ def release_family_member(
         f"has been cancelled: {reason}. They do not need to interpret for it."
     )
     call_and_wait(
-        task, member.phone, FAMILY_RELEASE_SCHEMA, purpose=CallPurpose.FAMILY_RELEASE,
+        task, member.phone, FAMILY_RELEASE_SCHEMA, batch_position=0,
+        purpose=CallPurpose.FAMILY_RELEASE,
     )

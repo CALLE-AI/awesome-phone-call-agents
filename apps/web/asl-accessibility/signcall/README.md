@@ -64,7 +64,7 @@ A run is accepted, not awaited: a real one places many calls over minutes, so cl
 
 Before pointing anything else at it:
 
-- **No authentication.** It is a single-user local server. CORS only admits `localhost` origins, but CORS is not a security boundary.
+- **No authentication.** It is a single-user local server. CORS only admits `localhost` origins, and any POST carrying another site's `Origin` is refused with `403`, so a web page open in your browser cannot start, confirm or cancel a run. Anything that is not a browser, such as curl, can still call it.
 - **One run at a time**, enforced with a lock (a second `POST /runs` gets `409`). The line-assignment map in `calle/run.py` is per run, so overlapping runs would corrupt it. Do not use `--workers` greater than 1 or `--reload`, and do not bind `0.0.0.0`.
 - **`GET /runs/{id}` returns the plan text**, which includes the patient's name, date of birth and insurance policy number. The run registry is in memory and unbounded; restarting forgets it.
 - **Phone numbers are masked** to their last four digits in everything the API returns or pushes (results, proposals, plan, errors, events) by [`api/masking.py`](./api/masking.py). The real numbers are kept in memory under internal fields that `GET /runs/{id}` never returns; cancellation dials from that private copy.
@@ -117,7 +117,7 @@ for s in clinic_search shortcut decline_then_retry cheapest_wrong_day family_loc
 CALLE_MOCK_MODE=0 python3 -m signcall.dev.text_harness <scenario>
 ```
 
-In real mode `resolve_dial_target()` maps every clinic and interpreter onto `SIGNCALL_TEST_LINES`, so it cannot reach a real business. Family numbers are dialed as entered. [`dev/live_smoke_test.py`](./dev/live_smoke_test.py) places one call and prints CALL-E's raw response next to the mapped result, to check that the field mapping in `calle/run.py` still matches the live API; it refuses numbers outside the test lines.
+In real mode `resolve_dial_target()` maps every clinic, interpreter and family member onto `SIGNCALL_TEST_LINES`, so it cannot reach a real business or a real person. [`dev/live_smoke_test.py`](./dev/live_smoke_test.py) places one call and prints CALL-E's raw response next to the mapped result, to check that the field mapping in `calle/run.py` still matches the live API; it refuses numbers outside the test lines.
 
 ## Coverage and data sources
 
@@ -166,6 +166,7 @@ Only the `calle-ai` SDK is used (pinned to `0.7.0` because `calle/run.py` relies
 - **Satisficing, not optimising.** "Cheapest" and "nearest" are compared only within the batch that first matched, so two runs against the same pool can book different people.
 - **A freelancer who is available but gives no hourly rate is not counted as a match**, so an unpriced candidate never reaches the binding confirm.
 - **Call caps are fixed constants** (`MAX_CLINICS_CALLED` in `workflow/clinic_call.py`; `DEFAULT_BATCH_SIZE` and `MAX_INTERPRETER_BATCHES` in `workflow/interpreter_matching.py`).
+- **A release call is not verified.** After the clinic confirms a cancellation, the interpreter is phoned to say it is off, but the result of that call is not checked, so the outcome screen can say the interpreter was told when the call did not connect.
 - **No clinic-initiated reversal.** If a clinic cancels after an interpreter confirmed, nothing notices. `interpreter_matching.send_release()` exists but only user-initiated cancellation calls it.
 - **Confirmation text is not delivered and nothing is added to a calendar.** `reminders.send_confirmation_text()` is a stub; the undelivered message is recorded in the run's `evidence`.
 - **The booking call identifies the patient** (name, date of birth, age, phone, insurance provider and policy number) to the clinic that ends up holding the appointment. The search calls say nothing about the patient, and the consent text discloses this before anything is dialed.
