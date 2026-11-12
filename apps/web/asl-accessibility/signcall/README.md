@@ -67,7 +67,7 @@ Before pointing anything else at it:
 - **No authentication.** It is a single-user local server. CORS only admits `localhost` origins, but CORS is not a security boundary.
 - **One run at a time**, enforced with a lock (a second `POST /runs` gets `409`). The line-assignment map in `calle/run.py` is per run, so overlapping runs would corrupt it. Do not use `--workers` greater than 1 or `--reload`, and do not bind `0.0.0.0`.
 - **`GET /runs/{id}` returns the plan text**, which includes the patient's name, date of birth and insurance policy number. The run registry is in memory and unbounded; restarting forgets it.
-- **Phone numbers are real and unmasked** in `clinic_contact.phone` and `interpreter.phone`, because cancellation needs them. Mask them in anything public.
+- **Phone numbers are masked** to their last four digits in everything the API returns or pushes (results, proposals, plan, errors, events) by [`api/masking.py`](./api/masking.py). The real numbers are kept in memory under internal fields that `GET /runs/{id}` never returns; cancellation dials from that private copy.
 
 ## Testing
 
@@ -99,7 +99,7 @@ python3 -m signcall.dev.text_harness <scenario>
 | `clinic_lookup` | The Maps parser and filters against canned Apify items; empty result on a missing token. |
 | `il_interpreter_lookup` | Illinois ZIP and county lookup, phone extraction, Active-plus-phone filter, county-then-region tiers, against canned rows. |
 | `call_routing` | Real-mode dialing resolves only to configured test lines, stickily per recipient, and refuses when missing or malformed. |
-| `api_endpoint` | The HTTP flow in-process: 400, 202, confirm, cancel, 409, 404, the forgotten-run cancel, an unconfirmed clinic cancel that stops without releasing the interpreter, timeout to declined. |
+| `api_endpoint` | The HTTP flow in-process: 400, 202, confirm, cancel, 409, 404, the forgotten-run cancel, an unconfirmed clinic cancel that stops without releasing the interpreter, phone numbers masked in everything returned or pushed, timeout to declined. |
 
 Run them all:
 

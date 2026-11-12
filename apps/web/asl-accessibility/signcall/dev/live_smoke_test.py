@@ -6,7 +6,9 @@ mapping still matches the live API. It is not part of the workflow.
 It bypasses call_and_wait(), so it enforces the same routing rule itself: the
 number must be one of SIGNCALL_TEST_LINES, so this script can't be a way to
 dial a number nobody vetted. The raw JSON is printed before mapping so a
-mapping bug still leaves you the data you came for.
+mapping bug still leaves you the data you came for. Everything it prints has
+phone numbers masked to the last four digits (api/masking.py), so its output
+is safe to paste into an issue or a log.
 
     cd apps/web/asl-accessibility
     CALLE_MOCK_MODE=0 python3 -m signcall.dev.live_smoke_test +15555550123   # new call
@@ -18,7 +20,13 @@ mapping bug still leaves you the data you came for.
 import json
 import sys
 
+from ..api.masking import mask_text
 from ..calle.run import TEST_LINES_ENV, _get_client, _map_result, _poll_until_terminal, test_lines
+
+
+def say(text: str = "") -> None:
+    """print(), with phone numbers masked."""
+    print(mask_text(str(text)))
 
 
 def _looks_like_call_id(arg: str) -> bool:
@@ -43,12 +51,12 @@ RESULT_SCHEMA = {
 def main() -> None:
     lines = test_lines()
     if len(sys.argv) != 2:
-        print(f"Usage: python3 -m signcall.dev.live_smoke_test <one of {TEST_LINES_ENV}: {', '.join(lines) or '(not set)'}>")
-        print("   or: python3 -m signcall.dev.live_smoke_test call_XXXXXXXX  (re-inspect, no new call)")
+        say(f"Usage: python3 -m signcall.dev.live_smoke_test <one of {TEST_LINES_ENV}: {', '.join(lines) or '(not set)'}>")
+        say("   or: python3 -m signcall.dev.live_smoke_test call_XXXXXXXX  (re-inspect, no new call)")
         sys.exit(1)
     arg = sys.argv[1]
     if not _looks_like_call_id(arg) and arg not in lines:
-        print(
+        say(
             f"Refusing to dial {arg!r}: calls are only placed to numbers listed in "
             f"{TEST_LINES_ENV} ({', '.join(lines) or 'not set'}). Pass one of those, or "
             f"an existing call_... id to re-inspect a completed call."
@@ -58,30 +66,30 @@ def main() -> None:
 
     if _looks_like_call_id(arg):
         call_id = arg
-        print(f"Re-inspecting existing call {call_id}; no new call placed.")
+        say(f"Re-inspecting existing call {call_id}; no new call placed.")
         raw = client.calls.get(call_id)
     else:
         phone = arg
-        print(f"Placing one real call to {phone}. This will actually ring.")
+        say(f"Placing one real call to {phone}. This will actually ring.")
         created = client.calls.create(task=TASK, recipient={"phone": phone}, result_schema=RESULT_SCHEMA)
         call_id = str(created["id"])
-        print(f"Call created, id={call_id}. Polling until terminal status...")
+        say(f"Call created, id={call_id}. Polling until terminal status...")
         raw = _poll_until_terminal(client, call_id)
 
-    print("\n=== RAW response from client.calls.get() ===")
-    print(json.dumps(raw, indent=2, default=str))
+    say("\n=== RAW response from client.calls.get() (phone numbers masked) ===")
+    say(json.dumps(raw, indent=2, default=str))
 
     try:
         mapped = _map_result(raw)
     except Exception as exc:
-        print(f"\n=== _map_result() CRASHED: {exc!r} ===")
-        print("The raw JSON above is still valid; fix calle/run.py::_map_result() against it.")
+        say(f"\n=== _map_result() CRASHED: {exc!r} ===")
+        say("The raw JSON above is still valid; fix calle/run.py::_map_result() against it.")
         sys.exit(1)
 
-    print("\n=== MAPPED CallResult ===")
-    print(mapped)
+    say("\n=== MAPPED CallResult ===")
+    say(mapped)
 
-    print("\n=== Check ===")
+    say("\n=== Check ===")
     missing = []
     if not mapped.status:
         missing.append("status")
@@ -90,12 +98,12 @@ def main() -> None:
     if not mapped.transcript_turns and _anywhere_nonempty(raw, "transcript_turns"):
         missing.append("transcript_turns (raw has turns somewhere nested, mapped came back empty)")
     if missing:
-        print(
+        say(
             f"MISMATCH: {', '.join(missing)} didn't map correctly. Compare the raw "
             f"key names above against calle/run.py::_map_result()."
         )
     else:
-        print("Mapping looks consistent: status, structured_result and transcript_turns all came through.")
+        say("Mapping looks consistent: status, structured_result and transcript_turns all came through.")
 
 
 def _anywhere_nonempty(obj, key: str) -> bool:

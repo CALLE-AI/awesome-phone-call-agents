@@ -737,6 +737,14 @@ function describeInterpreterStatus(interpreter) {
   return interpreter.confirmed ? `${who} (confirmed)` : who;
 }
 
+// The workflow masks every phone number it returns (e.g. "+*******4605").
+// Shown as "ends in 4605": enough to match a number you know, while the name,
+// address and booking reference are what you'd give a relay service.
+function phoneEnding(masked) {
+  const digits = String(masked || "").replace(/\D/g, "");
+  return digits.length >= 4 ? `ends in ${digits.slice(-4)}` : "";
+}
+
 function describeClinic(name, zipcode, address) {
   return address ? `${name} -- ${address}` : `${name} (ZIP ${zipcode})`;
 }
@@ -897,7 +905,8 @@ function showOutcome(booking) {
       ["Interpreter", describeInterpreterStatus(result && result.interpreter)],
     ];
     const appointment = (result && result.appointment) || {};
-    if (appointment.booking_reference) moreRows.push(["Booking reference", appointment.booking_reference]);
+    if (appointment.booking_reference) rows.push(["Booking reference", appointment.booking_reference]);
+    if (phoneEnding(contact.phone)) rows.push(["Clinic phone", phoneEnding(contact.phone)]);
     if (appointment.confirmed_by) moreRows.push(["Confirmed by", appointment.confirmed_by]);
     if (result && result.interpreter && result.interpreter.tier === "freelance") {
       moreRows.push(["Interpreter rate", describeInterpreter(result.interpreter)]);
@@ -1030,6 +1039,9 @@ function renderUpcoming(appointments) {
       card.append(el("div", "family-card-head", `${formatDate(appt.date)} · ${formatTime(appt.time)}`));
       card.append(el("div", "", appt.clinic || ""));
       card.append(el("div", "hint", appt.address || (appt.zipcode ? `ZIP ${appt.zipcode}` : "")));
+      const ref = [appt.booking_reference && `Ref ${appt.booking_reference}`, phoneEnding(appt.phone) && `phone ${phoneEnding(appt.phone)}`]
+        .filter(Boolean).join(" · ");
+      if (ref) card.append(el("div", "hint", ref));
       card.append(el("div", "hint", `Interpreter: ${describeInterpreterStatus(appt.interpreter)}`));
 
       const btn = el("button", "btn btn-danger", "Cancel");

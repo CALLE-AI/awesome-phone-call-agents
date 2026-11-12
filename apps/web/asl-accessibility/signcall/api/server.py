@@ -61,6 +61,7 @@ from ..workflow.confirmation import ApprovalFn, BookingDeclined, BookingProposal
 from ..workflow.types import UserInput
 from ..workflow.user_input import UserInputError, load_user_input
 from . import demo_mocks, notify
+from .masking import mask
 
 ALLOW_REAL_CALLS = os.environ.get("SIGNCALL_API_ALLOW_REAL_CALLS") == "1"
 USE_DEMO_MOCKS = os.environ.get("SIGNCALL_API_DEMO_MOCKS") == "1"
@@ -143,7 +144,12 @@ def _record(run_id: str, **fields) -> None:
 
 
 def _finish(run_id: str, **fields) -> None:
-    """Records how a run ended, then tells whoever is listening."""
+    """Records how a run ended, then tells whoever is listening. The raw
+    result is kept privately under `_result` (cancellation dials from it);
+    every field that is returned or pushed is phone-masked."""
+    if fields.get("result") is not None:
+        fields["_result"] = fields["result"]
+    fields = {k: (v if k.startswith("_") else mask(v)) for k, v in fields.items()}
     _record(run_id, finished_at=_now(), **fields)
     notify.send_event({
         "event": "run_finished",
@@ -161,7 +167,7 @@ def _approver(run_id: str) -> ApprovalFn:
 
     def approve(proposal: BookingProposal) -> bool:
         decision = _Decision()
-        proposal_data = dataclasses.asdict(proposal)
+        proposal_data = mask(dataclasses.asdict(proposal))
         with _runs_guard:
             _decisions[run_id] = decision
             _runs[run_id].update(status="awaiting_confirmation", proposal=proposal_data)
@@ -241,7 +247,7 @@ async def start_run(request: Request) -> JSONResponse:
     try:
         user = load_user_input(payload)
     except UserInputError as exc:
-        raise HTTPException(status_code=400, detail=str(exc))
+        raise HTTPException(status_code=400, detail=mask(str(exc)))
 
     if not _run_lock.acquire(blocking=False):
         raise HTTPException(
@@ -255,7 +261,7 @@ async def start_run(request: Request) -> JSONResponse:
         )
 
     run_id = str(uuid.uuid4())
-    plan = describe_goal(user)
+    plan = mask(describe_goal(user))
     with _runs_guard:
         _runs[run_id] = {
             "run_id": run_id, "status": "running", "plan": plan,
@@ -320,26 +326,28 @@ def _execute_cancel(run_id: str) -> None:
         if USE_DEMO_MOCKS:
             register_default_mock(demo_mocks.build_cancel_resolver())
         with _runs_guard:
-            result = _runs[run_id]["result"]
+            result = _runs[run_id]["_result"]  # the raw copy: it has the real numbers
             patient_name = _runs[run_id]["_patient_name"]
-        cancellation = cancel_appointment(result, patient_name)
+        cancellation = mask(cancel_appointment(result, patient_name))
     except CancellationUnresolved as exc:
+        error = mask(str(exc))
         _record(
             run_id, status="cancel_unresolved", finished_at=_now(),
-            error=str(exc), error_type=type(exc).__name__,
+            error=error, error_type=type(exc).__name__,
         )
         notify.send_event({
             "event": "run_cancelled", "run_id": run_id, "status": "cancel_unresolved",
-            "error": str(exc),
+            "error": error,
         })
     except Exception as exc:
+        error = mask(str(exc) or type(exc).__name__)
         _record(
             run_id, status="cancel_failed", finished_at=_now(),
-            error=str(exc) or type(exc).__name__, error_type=type(exc).__name__,
+            error=error, error_type=type(exc).__name__,
         )
         notify.send_event({
             "event": "run_cancelled", "run_id": run_id, "status": "cancel_failed",
-            "error": str(exc) or type(exc).__name__,
+            "error": error,
         })
     else:
         _record(run_id, status="cancelled", finished_at=_now(), cancellation=cancellation)

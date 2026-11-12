@@ -1501,6 +1501,19 @@ def scenario_api_endpoint() -> None:
         assert "_patient_name" not in status, (
             "BUG: get_run() leaked an internal (leading-underscore) field"
         )
+        assert "_result" not in status, "BUG: get_run() leaked the raw (unmasked) result"
+        # Phone numbers leave the process masked: the plan, the proposal, the
+        # result and every pushed event. The raw copy stays in memory only.
+        raw_number = re.compile(r"\+\d{7,15}")
+        for label, payload in (("plan", body["plan"]), ("proposal", proposal),
+                               ("GET /runs", status), ("events", events)):
+            leaked = raw_number.findall(json.dumps(payload))
+            assert not leaked, f"BUG: {label} exposed unmasked phone numbers: {leaked}"
+        raw_clinic_phone = server._runs[run_id]["_result"]["clinic_contact"]["phone"]
+        assert raw_number.fullmatch(raw_clinic_phone), "the private copy keeps the real number"
+        assert status["result"]["clinic_contact"]["phone"].endswith(raw_clinic_phone[-4:]), (
+            "a masked number keeps its last four digits"
+        )
 
         # 4b. The user cancels the succeeded booking: the clinic is called to
         #     cancel, then the confirmed interpreter is released. Only valid
@@ -1509,7 +1522,7 @@ def scenario_api_endpoint() -> None:
             "a succeeded result must carry enough contact info to cancel it later"
         )
         calls_before_cancel = len(CALLS)
-        real_clinic_phone = status["result"]["clinic_contact"]["phone"]
+        real_clinic_phone = server._runs[run_id]["_result"]["clinic_contact"]["phone"]
         # A body trying to swap in another clinic number is ignored: the
         # cancel call must go to the number from this run's own record.
         swapped = {**status["result"], "clinic_contact": {

@@ -509,6 +509,8 @@ def list_upcoming_endpoint(user_id: str = Query(...)):
             "clinic": contact.get("name"),
             "address": contact.get("address"),
             "zipcode": contact.get("zipcode"),
+            "phone": contact.get("phone"),  # already masked by the workflow
+            "booking_reference": (result.get("appointment") or {}).get("booking_reference"),
             "interpreter": {k: interpreter.get(k) for k in ("tier", "name", "relation")},
         })
     return {"appointments": appointments}

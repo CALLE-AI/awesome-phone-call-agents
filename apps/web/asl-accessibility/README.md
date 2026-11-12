@@ -54,6 +54,7 @@ What is limited or missing:
 - No user login, and the booking API is single user. Do not expose either server to a network.
 - The confirmation text to the person is composed but not sent (`signcall/workflow/reminders.py` is a stub). Nothing is added to a calendar.
 - The booking is made on a phone call to a real business, so what the clinic says is whatever an AI voice agent understood. Results are checked (for example a clinic offering a different time than asked is rejected), but a phone call is not an API.
+- **The person never sees the clinic's full phone number.** Numbers are masked everywhere outside the workflow server (see [Safety design](#safety-design)), so the outcome screen shows "ends in 4605". To follow up with a clinic themselves, for example through a relay service, the person uses the clinic's name, address and booking reference, which are shown in full, or looks the clinic up. This is a deliberate trade-off: an earlier version left numbers unmasked because cancellation needed them, but cancellation now uses the workflow server's own copy, so that reason no longer applies.
 
 ## Quick start (mock mode: no calls, no cost)
 
@@ -157,7 +158,7 @@ How it works (`signcall/calle/run.py`, `resolve_dial_target`):
 - Two calls to the same line queue instead of overlapping, so one line is enough for testing but serialises everything. Parallel batch calling needs more than one line.
 - **Family members are the exception.** Their numbers are dialed exactly as entered in the profile, because they are the user's own contacts. In real mode, only enter family numbers you are happy to have called.
 - An unset or malformed `SIGNCALL_TEST_LINES` is an error, never a fallback to the real number.
-- The live smoke test (`python3 -m signcall.dev.live_smoke_test`) places one call and prints CALL-E's raw response next to the mapped result. It refuses any number not in `SIGNCALL_TEST_LINES`.
+- The live smoke test (`python3 -m signcall.dev.live_smoke_test`) places one call and prints CALL-E's raw response next to the mapped result, with phone numbers masked. It refuses any number not in `SIGNCALL_TEST_LINES`.
 
 Cost control: each run is capped at **10 clinics called** and **3 interpreter batches of 2 (6 interpreter calls)**, plus the family list. Every call script opens with "I am an AI agent calling on behalf of ..." and ends with a brevity rule, because calls are billed per second.
 
@@ -173,7 +174,7 @@ Cost control: each run is capped at **10 clinics called** and **3 interpreter ba
 - **Local requests only.** The web app accepts browser requests only from its own `localhost` page; a POST from any other website is refused (`403`). Workflow notifications must carry the shared secret `SIGNCALL_NOTIFY_SECRET`, so nothing else that can reach port 8000 can post a fake booking result.
 - **Scope of the calls.** Scripts restrict the agent to scheduling and logistics, tell it to give no medical, legal or financial advice, and tell it to direct anyone describing an emergency to 911 and end the call. This app is not for emergencies; a Deaf person in an emergency should use their local text-to-911 or relay service.
 - **Credentials.** Keys live in git-ignored `.env` files and are read only by the server that needs them. `/health` reports presence, never values.
-- **Phone numbers are not masked.** Clinic and interpreter numbers are real and unmasked in API responses and in the local database, because the cancel flow needs them. Mask them before putting the app on a screen recording, a public demo or a shared log.
+- **Phone numbers are masked.** Everything the workflow server returns or pushes (results, proposals, the plan, errors, notification events) has every phone number masked to its last four digits, as do the live smoke test's printouts. The real numbers stay only in the workflow server's memory, where placing and cancelling calls needs them, so the web app's database and screens only ever hold masked numbers. Screens show the clinic's name, address, booking reference and "ends in 4605". The family numbers you type in your own profile are shown back to you unmasked on the profile screens so you can check them.
 - **Personal data.** The profile (name, phone, date of birth, address, insurance, family contacts) and booking records are stored in plaintext SQLite at `asl-recognition/data/app.db` (git-ignored). The booking call tells the clinic the patient's name, date of birth and insurance because a clinic cannot book an anonymous slot. There is no login: a "user" is a random ID kept in the browser's localStorage.
 
 ## Troubleshooting
