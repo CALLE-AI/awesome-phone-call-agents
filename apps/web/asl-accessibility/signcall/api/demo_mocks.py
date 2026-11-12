@@ -49,6 +49,8 @@ def build_resolver(user: UserInput, gate: "threading.Event | None" = None):
         if purpose is CallPurpose.CLINIC_BOOK:
             return _ok({
                 "booked": True,
+                "confirmed_date": slot_date,
+                "confirmed_time": slot_time,
                 "confirmed_by": "Demo front desk",
                 "booking_reference": f"DEMO-{slot_date}",
                 "requirements": [],

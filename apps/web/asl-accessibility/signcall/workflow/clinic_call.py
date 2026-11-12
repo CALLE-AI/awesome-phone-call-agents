@@ -236,23 +236,26 @@ def _require_booked(result, slot: ClinicSlot) -> None:
     booked = bool(result.task_completed and structured.get("booked"))
     confirmed_date = structured.get("confirmed_date")
     confirmed_time = structured.get("confirmed_time")
-    mismatched = booked and (
-        (isinstance(confirmed_date, str) and confirmed_date != slot.date)
-        or (isinstance(confirmed_time, str) and confirmed_time != slot.time)
-    )
-    if booked and not mismatched:
+    # Both must be stated and equal to the approved slot; a booking with a
+    # missing date or time cannot be shown to be the one the user approved.
+    matches = confirmed_date == slot.date and confirmed_time == slot.time
+    if booked and matches:
         return
 
     slot_description = f"{slot.date} {slot.time}"
-    if mismatched:
+    if booked:
+        stated = (
+            f"{confirmed_date} {confirmed_time}"
+            if isinstance(confirmed_date, str) and isinstance(confirmed_time, str)
+            else "no clear date and time"
+        )
         detail = (
-            f"REJECTED: the clinic reported booking "
-            f"{confirmed_date or slot.date} {confirmed_time or slot.time} "
-            f"instead -- only the exact requested time may be accepted, so "
-            f"this is treated as not booked. No interpreter was confirmed. "
-            f"If the clinic's own system was already updated during the "
-            f"call, call them directly to make sure nothing is on their "
-            f"books for the wrong day."
+            f"REJECTED: the clinic reported booking {stated} instead of "
+            f"the requested time -- only the exact requested date and time "
+            f"may be accepted, so this is treated as not booked. No "
+            f"interpreter was confirmed. If the clinic's own system was "
+            f"already updated during the call, call them directly to make "
+            f"sure nothing is on their books for the wrong day."
         )
     else:
         detail = "Nothing was booked and no interpreter was confirmed, so nothing needs cancelling."

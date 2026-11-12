@@ -23,7 +23,7 @@ STEP 5  book, confirm, notify          appointment.py      clinic first, then th
 - **Consent has two stages.** `POST /runs` consents to the *search*: it returns `plan`, the plain-language text of what will be done, and starts calling clinics and asking interpreters whether they are free. Nothing is booked or bindingly confirmed until the run reaches `awaiting_confirmation` with a concrete proposal (clinic, date, time, interpreter, estimated cost) and `POST /runs/{id}/confirm` is answered `true`. A `false`, or no answer within `SIGNCALL_CONFIRM_TIMEOUT_SECONDS` (default 900), ends the run as `declined` with nothing booked.
 - **Clinic search.** The ZIP and appointment type go to an Apify Google Maps search. Results are filtered (callable US number, open, matching category, de-duplicated by phone) and sorted nearest first by ZIP centroid. Each clinic is called in turn to check if it accepts the user's insurance, and is user provided time slots are free. The search stops at the first clinic whose slots overlap the person's availability. At most **10 clinics** are called.
 - **Interpreter.** Three sources, in this order of the person's choice. (1) The person brings their own: nobody is called. (2) A family member: the family list is called one at a time, after the clinic match, and stops at the first yes. (3) A freelance interpreter: batches of 2 are asked about availability and hourly rate, and at most **3 batches (6 interpreter calls)** are tried. The cheapest available interpreter in the first batch with a match gets the binding confirm; if they decline, the next one in that batch is tried.
-- **Booking.** After approval the clinic is booked first (a patient booking is normally free to cancel), then the interpreter is asked to commit. A family member's earlier "yes" was given before the slot was booked, so they get the same binding confirm; if all decline, a freelancer covers that slot. **If nobody confirms, the clinic booking is cancelled.** A booking call is only accepted if the clinic confirms the exact date and time asked for.
+- **Booking.** After approval the clinic is booked first (a patient booking is normally free to cancel), then the interpreter is asked to commit. A family member's earlier "yes" was given before the slot was booked, so they get the same binding confirm. Only the interpreter the person approved is asked: **if they decline, or the call does not complete, the clinic booking is cancelled and the run ends.** No other family member or paid interpreter is substituted without the person's approval. A booking is only accepted if the call completed and the clinic stated the exact date and time that was approved; a missing or different date or time is rejected.
 - **Honest failure.** If no clinic can be found, or no interpreter can be found, the run ends `declined` with a plain message ("nothing booked") and nobody is charged. There is no synthetic fallback dataset anywhere.
 - **Cancellation.** `POST /runs/{id}/cancel` calls the clinic to cancel, then releases whoever was interpreting (nobody for a user-arranged interpreter). It can be retried after `cancel_failed`. The server keeps runs in memory only, so the caller (the web app) sends the stored `result` and `patient_name` with the request and the server adopts a run it has forgotten.
 
@@ -85,16 +85,16 @@ python3 -m signcall.dev.text_harness <scenario>
 | `decline_then_retry` | The cheapest interpreter declines the binding confirm; the next in that batch takes it. |
 | `cheapest_wrong_day` | The confirmed interpreter is booked for the slot they named, never another. |
 | `family_locks_in` | Family are called one at a time after the clinic match and stop at the first yes. |
-| `family_confirm_fallback` | Every family member declines the binding confirm; a freelancer covers the booked slot. |
+| `family_confirm_declined` | The approved family member declines the binding confirm, or the call does not complete: the clinic booking is cancelled and nobody else is substituted. |
 | `clinic_search_exhausted` | The 10-clinic ceiling: 11 offered, exactly 10 called. |
 | `no_interpreter_available` | No interpreter found: honest "nothing booked", no clinic appointment taken. |
 | `call_scripts` | All 9 call types open by saying they are an AI agent and end with the brevity and safety rule. |
 | `requirements` | Requirements and notes from calls reach the proposal. |
-| `clinic_alternate_date_rejected` | A booking call reporting a different date or time is rejected, not accepted. |
+| `clinic_alternate_date_rejected` | A booking call reporting a different date or time, or none at all, is rejected, not accepted. |
 | `freelance_parallel` | `SIGNCALL_FREELANCE_PARALLEL_BATCH=1`: a batch's members are dialed at once. |
 | `sequential_batch_calls_both` | The default sequential dispatch still asks every member of a batch. |
 | `declined` | The person says no: nothing booked, clean end. |
-| `interpreters_all_decline` | Every interpreter declines the final confirm; the clinic booking is cancelled. |
+| `interpreters_all_decline` | Every interpreter declines the final confirm, or the confirm call does not complete; the clinic booking is cancelled. |
 | `input_validation` | Every malformed profile is rejected before any call. |
 | `clinic_lookup` | The Maps parser and filters against canned Apify items; empty result on a missing token. |
 | `il_interpreter_lookup` | Illinois ZIP and county lookup, phone extraction, Active-plus-phone filter, county-then-region tiers, against canned rows. |
@@ -105,7 +105,7 @@ Run them all:
 
 ```bash
 for s in clinic_search shortcut decline_then_retry cheapest_wrong_day family_locks_in \
-         family_confirm_fallback clinic_search_exhausted no_interpreter_available call_scripts \
+         family_confirm_declined clinic_search_exhausted no_interpreter_available call_scripts \
          requirements clinic_alternate_date_rejected freelance_parallel sequential_batch_calls_both \
          declined interpreters_all_decline input_validation clinic_lookup il_interpreter_lookup \
          call_routing api_endpoint; do python3 -m signcall.dev.text_harness $s || break; done

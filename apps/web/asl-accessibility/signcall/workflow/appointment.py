@@ -16,9 +16,10 @@ The order is what keeps the fee-bearing commitment last. Nothing binding
 happens before the user approves. After that the clinic is booked first (a
 patient booking is normally free to cancel) and only then is the interpreter
 asked to commit. A family member's earlier "yes" was given for a slot that
-wasn't booked yet, so they get the same binding confirm; if they decline, the
-next family member is tried, then freelancers for that one slot. If nobody
-confirms, the clinic booking is cancelled.
+wasn't booked yet, so they get the same binding confirm. The interpreter the
+user approved is the only one asked: if they decline (or the call does not
+complete), the clinic booking is cancelled and the run ends. No other family
+member or paid interpreter is substituted without the user's approval.
 """
 
 from __future__ import annotations
@@ -52,15 +53,9 @@ class _Arrangement:
     family_tier_result: str
     evidence: list[str]
     family_member: FamilyInterpreter | None = None
-    # Family only: the members after `family_member`, who were never asked
-    # (the search stopped at the first yes) and are the fallback if it declines.
-    remaining_family: list[FamilyInterpreter] = field(default_factory=list)
     # Freelance only: the cheapest match first, then anyone else in that batch
     # who named the same slot, as fallbacks if the first declines.
     freelancers: list[InterpreterCandidate] = field(default_factory=list)
-    # Family only: the caller-supplied candidate pool (tests) or None, carried
-    # unresolved so the family-confirm fallback searches the same pool.
-    freelance_pool: list[InterpreterCandidate] | None = None
 
     def person(self) -> "FamilyInterpreter | InterpreterCandidate | None":
         """Who the agent will contact for the interpreter, if anyone."""
@@ -186,11 +181,6 @@ def _arrange_interpreter(
                 source="family",
                 family_tier_result="locked_in",
                 family_member=member,
-                # Matched by identity: two entries could share every field.
-                remaining_family=user.family[
-                    next(i for i, m in enumerate(user.family) if m is member) + 1 :
-                ],
-                freelance_pool=candidates,
                 evidence=[
                     f"Family member {member.name} ({member.relation}) locked "
                     f"in for {slot.date} {slot.time} (list order, stopped there)."
@@ -329,25 +319,17 @@ def _book_and_confirm(
         )
         source = "freelance"
     elif arrangement.source == "family":
-        interpreter, source = _confirm_family(user, clinic, slot, booking, arrangement)
-        if source == "family":
-            interpreter_detail = {
-                "tier": "family", "name": interpreter.name,
-                "relation": interpreter.relation, "phone": interpreter.phone,
-                "confirmed": True,
-            }
-            arrangement.evidence.append(
-                f"{interpreter.name} ({interpreter.relation}) confirmed for "
-                f"{slot.date} {slot.time}."
-            )
-        else:
-            # Every family member declined; a freelancer covered the booked slot.
-            interpreter_detail = {**_freelancer_detail(interpreter), "confirmed": True}
-            arrangement.evidence.append(
-                f"No family member could confirm {slot.date} {slot.time}; "
-                f"{interpreter.name} (freelance) confirmed instead at "
-                f"${interpreter.rate_per_hour}/hr."
-            )
+        interpreter = _confirm_family(user, clinic, slot, booking, arrangement.family_member)
+        source = "family"
+        interpreter_detail = {
+            "tier": "family", "name": interpreter.name,
+            "relation": interpreter.relation, "phone": interpreter.phone,
+            "confirmed": True,
+        }
+        arrangement.evidence.append(
+            f"{interpreter.name} ({interpreter.relation}) confirmed for "
+            f"{slot.date} {slot.time}."
+        )
     else:
         interpreter = arrangement.family_member  # None when the user arranged their own
         interpreter_detail = _interpreter_detail(arrangement)
@@ -425,31 +407,18 @@ def _confirm_family(
     clinic: ClinicCandidate,
     slot: ClinicSlot,
     booking: dict,
-    arrangement: _Arrangement,
-) -> "tuple[FamilyInterpreter | InterpreterCandidate, str]":
-    """The binding ask for a family arrangement, after the clinic is booked.
-    The locked-in member is called back to confirm for real; if they decline,
-    the next unreached member is asked directly. If the whole list declines,
-    freelancers are searched for this one booked slot. Returns who confirmed
-    and "family" or "freelance"; cancels the clinic booking and raises if
-    nobody does."""
-    for member in (arrangement.family_member, *arrangement.remaining_family):
-        if family_call.confirm_family_member(member, slot, user, clinic):
-            return member, "family"
-
-    # Resolved only now: most runs never reach this fallback.
-    freelance_pool = _resolve_freelance_pool(clinic, arrangement.freelance_pool)
-    ranked = interpreter_matching.search_freelancers_in_batches(
-        freelance_pool, [slot], clinic, batch_size=interpreter_matching.DEFAULT_BATCH_SIZE
-    )
-    for candidate in ranked:
-        if interpreter_matching.confirm_interpreter(candidate, slot, clinic, user):
-            return candidate, "freelance"
-
+    member: FamilyInterpreter,
+) -> FamilyInterpreter:
+    """The binding ask for the family member the user approved, after the
+    clinic is booked. If they decline, the clinic booking is cancelled and the
+    run ends: no other family member or paid interpreter is substituted for
+    the one the user agreed to."""
+    if family_call.confirm_family_member(member, slot, user, clinic):
+        return member
     _cancel_and_raise(
         user, clinic, slot, booking,
-        f"Every family member and freelance interpreter who could cover "
-        f"{slot.date} {slot.time} declined the final confirmation.",
+        f"{member.name} ({member.relation}), the family member you approved, "
+        f"could not confirm {slot.date} {slot.time}.",
     )
 
 

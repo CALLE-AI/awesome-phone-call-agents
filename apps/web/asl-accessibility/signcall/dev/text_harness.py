@@ -18,6 +18,7 @@ an interpreter for availability then confirm).
 import json
 import os
 import random
+import re
 import sys
 import tempfile
 import threading
@@ -108,6 +109,15 @@ def _ok(structured: dict) -> CallResult:
     )
 
 
+def _incomplete(structured: dict) -> CallResult:
+    """A call that ended without completing the task, even though some
+    structured data came back (a dropped call, say)."""
+    return CallResult(
+        status="completed", task_completed=False, completion_confidence=0.2,
+        structured_result=structured,
+    )
+
+
 def _no_answer() -> CallResult:
     return CallResult(
         status="no_answer", task_completed=False, completion_confidence=0.0,
@@ -176,13 +186,15 @@ def clinic(
     blocked_reason: str | None = None,
     cancels: bool = True,
     offers_alternate: "tuple[str, str] | None" = None,
+    omits_confirmation: bool = False,
 ) -> ClinicCandidate:
     """Registers this clinic's scripted responses and returns the candidate, so
     scenarios can assert on what the search wrote back into it.
     `blocked_reason` makes the booking call refuse; `cancels` says whether a
     later cancel call succeeds; `offers_alternate=(date, time)` scripts a
     booking call that reports booked=True for a different date or time than
-    was asked for."""
+    was asked for, and `omits_confirmation=True` one that reports booked=True
+    without stating any date or time."""
 
     def resolver(task, phone_, purpose):
         CALLS.append((phone_, task, purpose))
@@ -201,8 +213,15 @@ def clinic(
                     "confirmed_date": alt_date, "confirmed_time": alt_time,
                     "booking_reference": booking_reference,
                 })
+            if omits_confirmation:
+                return _ok({
+                    "booked": True, "confirmed_by": "Dana",
+                    "booking_reference": booking_reference,
+                })
+            asked = re.search(r"Book the (\d{4}-\d\d-\d\d) (\d\d:\d\d) appointment", task)
             return _ok({
                 "booked": True, "confirmed_by": "Dana",
+                "confirmed_date": asked.group(1), "confirmed_time": asked.group(2),
                 "booking_reference": booking_reference,
             })
         if not answers:
@@ -228,16 +247,20 @@ def clinic(
 def family(
     name: str, relation: str, phone: str, *,
     covers: tuple = (), answers: bool = True, confirms: bool = True,
+    confirm_completes: bool = True,
 ) -> dict:
     """`confirms` scripts the later binding confirm, separately from
     `covers`/`answers`, which script the availability call: a member can say
-    yes to availability and still decline the confirm."""
+    yes to availability and still decline the confirm. `confirm_completes=False`
+    makes that call end without completing while still carrying a "yes"."""
 
     def resolver(task, phone_, purpose):
         CALLS.append((phone_, task, purpose))
         if not answers:
             return _no_answer()
         if purpose is CallPurpose.FAMILY_CONFIRM:
+            if not confirm_completes:
+                return _incomplete({"confirmed": confirms})
             return _ok({"confirmed": confirms})
         return _ok({"coverable_slots": list(covers)})
 
@@ -253,13 +276,15 @@ def freelancer(
     rate: float | None = None,
     minimum_hours: float | None = 2.0,
     confirms: bool = True,
+    confirm_completes: bool = True,
     answers: bool = True,
     register: bool = True,
     wait_for: "threading.Barrier | None" = None,
 ) -> InterpreterCandidate:
     """`register=False` leaves this number unmocked, so any call to it raises
     KeyError instead of failing silently. `wait_for` makes the availability
-    call block on a barrier, to prove calls overlap."""
+    call block on a barrier, to prove calls overlap. `confirm_completes=False`
+    makes the confirm call end without completing while still carrying a "yes"."""
 
     def resolver(task, phone_, purpose):
         CALLS.append((phone_, task, purpose))
@@ -268,6 +293,8 @@ def freelancer(
         if not answers:
             return _no_answer()
         if _is_confirm(purpose):
+            if not confirm_completes:
+                return _incomplete({"confirmed": confirms})
             return _ok({"confirmed": confirms})
         return _ok({
             "coverable_slots": list(covers),
@@ -567,100 +594,51 @@ def scenario_family_locks_in() -> None:
           "no freelance call placed, and the secured family member was texted.")
 
 
-def scenario_family_confirm_fallback() -> None:
-    """What happens when the binding family confirm fails, in three phases:
-
-      A. The locked-in member declines; the next member, never asked during
-         the search, is reached directly and confirms. Source stays "family".
-      B. Every family member declines; a freelance search for the booked slot
-         finds someone who confirms. Source becomes "freelance".
-      C. Nobody confirms, so the clinic booking is cancelled."""
-    _reset()
+def scenario_family_confirm_declined() -> None:
+    """The family member the user approved declines the binding confirm (or the
+    call does not complete). The run must cancel the clinic booking and stop:
+    no other family member and no paid freelancer is substituted, because the
+    user never approved either."""
     thu = _date(3)
 
-    # --- A: locked-in member declines, backup (never called) confirms ------
-    matched = clinic("Clinic", "+17025551061", 1.0, slots=((thu, "14:00"),),
-                     booking_reference="CLINIC-FAMFALLBACK-A")
-    primary = family("Primary", "sister", "+17025552061",
-                     covers=(f"{thu} 14:00",), confirms=False)
-    backup = family("Backup", "cousin", "+17025552062", confirms=True)
-    never = freelancer("Freelancer", "+17025553061", covers=(f"{thu} 14:00",),
-                       rate=50.0, register=False)
+    def run_with(primary_kwargs: dict, label: str) -> str:
+        _reset()
+        matched = clinic(f"Clinic {label}", "+17025551061", 1.0, slots=((thu, "14:00"),),
+                         booking_reference=f"CLINIC-FAM-{label}")
+        primary = family(f"Primary {label}", "sister", "+17025552061",
+                         covers=(f"{thu} 14:00",), **primary_kwargs)
+        backup = family(f"Backup {label}", "cousin", "+17025552062", confirms=True)
+        paid = freelancer("Freelancer", "+17025553061", covers=(f"{thu} 14:00",),
+                          rate=50.0, register=False)
+        try:
+            run_interpreter_mesh(
+                load_user_input(_input_json(family_members=[primary, backup])),
+                clinics=[matched], candidates=[paid],
+            )
+        except RuntimeError as exc:
+            message = str(exc)
+            print(f"\n--- RAISED (expected, {label}) ---\n{message}")
+        else:
+            raise AssertionError(f"BUG: ({label}) the approved family member did not confirm, yet the run succeeded")
 
-    result = run_interpreter_mesh(
-        load_user_input(_input_json(family_members=[primary, backup])),
-        clinics=[matched], candidates=[never],
-    )
-    print("\n--- RESULT (A) ---")
-    print(result)
-
-    assert result.interpreter_source == "family"
-    assert result.interpreter["name"] == "Backup"
-    confirm_order = [phone for phone, _, p in CALLS if p is CallPurpose.FAMILY_CONFIRM]
-    assert confirm_order == [primary["phone_number"], backup["phone_number"]], (
-        f"BUG: expected the primary confirm to be tried before the backup, got {confirm_order}"
-    )
-    assert never.phone not in _phones_called(), (
-        "BUG: freelance was called even though a family fallback confirmed"
-    )
-    texts = [e for e in result.evidence if "Confirmation text" in e]
-    assert any("Backup" in t for t in texts), f"the member who actually confirmed is texted, got {texts}"
-
-    # --- B: every family member declines, freelance covers the exact slot --
-    _reset()
-    matched_b = clinic("Clinic B", "+17025551071", 1.0, slots=((thu, "14:00"),),
-                       booking_reference="CLINIC-FAMFALLBACK-B")
-    primary_b = family("Primary B", "sister", "+17025552071",
-                       covers=(f"{thu} 14:00",), confirms=False)
-    kim = freelancer("J. Kim", "+17025553071", covers=(f"{thu} 14:00",), rate=95.0)
-
-    result_b = run_interpreter_mesh(
-        load_user_input(_input_json(family_members=[primary_b])),
-        clinics=[matched_b], candidates=[kim],
-    )
-    print("\n--- RESULT (B) ---")
-    print(result_b)
-
-    assert result_b.interpreter_source == "freelance", (
-        "BUG: source must flip to freelance once every family member declines"
-    )
-    assert result_b.interpreter["name"] == "J. Kim"
-    assert result_b.family_tier_result == "locked_in", (
-        "family_tier_result describes the SEARCH tier's outcome, not who "
-        "ultimately confirmed -- it must not be rewritten by the fallback"
-    )
-    assert sum(1 for _, _, p in CALLS if p is CallPurpose.CLINIC_BOOK) == 1, (
-        "the clinic must still be booked only once, not re-booked for the fallback"
-    )
-
-    # --- C: nobody confirms, the booking is cancelled -----------------------
-    _reset()
-    undoable = clinic("Clinic C", "+17025551081", 1.0, slots=((thu, "14:00"),),
-                      booking_reference="CLINIC-FAMFALLBACK-C")
-    primary_c = family("Primary C", "sister", "+17025552081",
-                       covers=(f"{thu} 14:00",), confirms=False)
-    declines = freelancer("Declines", "+17025553081", covers=(f"{thu} 14:00",),
-                          rate=80.0, confirms=False)
-    try:
-        run_interpreter_mesh(
-            load_user_input(_input_json(family_members=[primary_c])),
-            clinics=[undoable], candidates=[declines],
+        purposes = [p for _, _, p in CALLS]
+        assert purposes.count(CallPurpose.CLINIC_BOOK) == 1, "booked once, never re-booked"
+        assert purposes.count(CallPurpose.FAMILY_CONFIRM) == 1, (
+            f"BUG: ({label}) only the approved member is asked to confirm, got "
+            f"{[ph for ph, _, p in CALLS if p is CallPurpose.FAMILY_CONFIRM]}"
         )
-    except RuntimeError as exc:
-        message = str(exc)
-        print(f"\n--- RAISED (expected, C) ---\n{message}")
-    else:
-        raise AssertionError("BUG: nobody confirmed, yet the run succeeded")
+        assert "+17025552062" not in _phones_called(), f"BUG: ({label}) the backup family member was called"
+        assert paid.phone not in _phones_called(), f"BUG: ({label}) a paid freelancer was called"
+        assert purposes[-1] is CallPurpose.CLINIC_CANCEL, "the booking must be undone last"
+        assert "was cancelled" in message
+        return message
 
-    assert "family member and freelance interpreter" in message
-    assert "was cancelled" in message
-    assert [p for _, _, p in CALLS][-1] is CallPurpose.CLINIC_CANCEL, (
-        "the booking must be undone last"
-    )
+    run_with({"confirms": False}, "A")
+    run_with({"confirms": True, "confirm_completes": False}, "B")
 
-    print("\nOK: a declined family confirm fell back to the next family "
-          "member, then to freelance for the exact booked slot, and to "
-          "cancellation when nobody confirmed at all.")
+    print("\nOK: when the approved family member declined, or the confirm call did "
+          "not complete, the clinic booking was cancelled and nobody else was "
+          "substituted.")
 
 
 def scenario_clinic_search_exhausted() -> None:
@@ -873,9 +851,30 @@ def scenario_clinic_alternate_date_rejected() -> None:
         "nothing needs cancelling on OUR side -- book_slot() never returned success"
     )
     assert len(PROPOSALS) == 1, "the user was asked once, over the ORIGINAL approved slot"
-    print("\nOK: a clinic that booked a different date than the one approved "
-          "was rejected outright -- the run ended there, and no interpreter "
-          "was ever asked to confirm a date that was never actually booked.")
+
+    # A booking that states no date or time at all cannot be shown to be the
+    # approved one either.
+    _reset()
+    vague = clinic("Vague Clinic", "+17025551092", 1.0, slots=((approved, "14:00"),),
+                   omits_confirmation=True)
+    kim2 = freelancer("J. Kim", "+17025553092", covers=(f"{approved} 14:00",), rate=95.0)
+    try:
+        run_interpreter_mesh(
+            load_user_input(_input_json()), clinics=[vague], candidates=[kim2]
+        )
+    except RuntimeError as exc:
+        message = str(exc)
+        print(f"\n--- RAISED (expected, missing date/time) ---\n{message}")
+    else:
+        raise AssertionError("BUG: a booking with no confirmed date or time was accepted")
+    assert "REJECTED" in message
+    assert not any(_is_confirm(p) for _, _, p in CALLS), (
+        "BUG: an interpreter was confirmed for a booking that never stated its date and time"
+    )
+
+    print("\nOK: a clinic that booked a different date than the one approved, "
+          "or stated no date and time at all, was rejected outright -- the run "
+          "ended there, and no interpreter was ever asked to confirm.")
 
 
 def scenario_freelance_parallel() -> None:
@@ -1024,6 +1023,21 @@ def scenario_interpreters_all_decline() -> None:
     assert "could NOT be cancelled" in message and "CLINIC-STUCK" in message, (
         "if the clinic won't cancel, the user must be told which booking to undo"
     )
+
+    _reset()
+    flaky_clinic = clinic("Flaky clinic", "+17025551051", 1.0, slots=((thu, "14:00"),),
+                          booking_reference="CLINIC-FLAKY")
+    d = freelancer("D", "+17025553051", covers=(f"{thu} 14:00",), rate=80.0,
+                   confirms=True, confirm_completes=False)
+    try:
+        run_interpreter_mesh(
+            load_user_input(_input_json()), clinics=[flaky_clinic], candidates=[d]
+        )
+    except RuntimeError as exc:
+        print(f"\n--- RAISED (expected, incomplete confirm) ---\n{exc}")
+    else:
+        raise AssertionError("BUG: an interpreter confirm call that did not complete was accepted")
+    assert [p for _, _, p in CALLS][-1] is CallPurpose.CLINIC_CANCEL
 
     print("\nOK: after every interpreter declined, the booking was cancelled, "
           "and a failed cancellation told the user which booking to undo.")
@@ -1621,7 +1635,7 @@ SCENARIOS = {
     "decline_then_retry": scenario_decline_then_retry,
     "cheapest_wrong_day": scenario_cheapest_wrong_day,
     "family_locks_in": scenario_family_locks_in,
-    "family_confirm_fallback": scenario_family_confirm_fallback,
+    "family_confirm_declined": scenario_family_confirm_declined,
     "clinic_search_exhausted": scenario_clinic_search_exhausted,
     "no_interpreter_available": scenario_no_interpreter_available,
     "call_scripts": scenario_call_scripts,

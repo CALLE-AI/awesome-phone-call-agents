@@ -182,7 +182,8 @@ def confirm_interpreter(
         purpose=CallPurpose.INTERPRETER_CONFIRM,
     )
     candidate.notes = append_note(candidate.notes, result.structured_result.get("additional_notes"))
-    return bool(result.structured_result.get("confirmed", False))
+    # A voicemail, dropped or unfinished call is not a commitment.
+    return bool(result.task_completed and result.structured_result.get("confirmed", False))
 
 
 def send_release(candidate: InterpreterCandidate, reason: str) -> None:

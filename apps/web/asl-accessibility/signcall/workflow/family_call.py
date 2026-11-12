@@ -99,7 +99,8 @@ def confirm_family_member(
         task, member.phone, FAMILY_CONFIRM_SCHEMA, purpose=CallPurpose.FAMILY_CONFIRM,
     )
     member.notes = append_note(member.notes, result.structured_result.get("additional_notes"))
-    return bool(result.structured_result.get("confirmed", False))
+    # A voicemail, dropped or unfinished call is not a commitment.
+    return bool(result.task_completed and result.structured_result.get("confirmed", False))
 
 
 def release_family_member(
