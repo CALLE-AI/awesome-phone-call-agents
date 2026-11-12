@@ -1509,7 +1509,14 @@ def scenario_api_endpoint() -> None:
             "a succeeded result must carry enough contact info to cancel it later"
         )
         calls_before_cancel = len(CALLS)
-        cancel_resp = client.post(f"/runs/{run_id}/cancel")
+        real_clinic_phone = status["result"]["clinic_contact"]["phone"]
+        # A body trying to swap in another clinic number is ignored: the
+        # cancel call must go to the number from this run's own record.
+        swapped = {**status["result"], "clinic_contact": {
+            **status["result"]["clinic_contact"], "phone": "+17025550199"}}
+        cancel_resp = client.post(
+            f"/runs/{run_id}/cancel", json={"result": swapped, "patient_name": "Someone Else"},
+        )
         assert cancel_resp.status_code == 202, cancel_resp.text
         assert cancel_resp.json()["status"] == "cancelling"
         assert client.post(f"/runs/{run_id}/cancel").status_code == 409, (
@@ -1523,6 +1530,10 @@ def scenario_api_endpoint() -> None:
         assert cancelled["cancellation"]["interpreter_released"] is True
         cancel_purposes = [p for _, _, p in CALLS[calls_before_cancel:]]
         assert CallPurpose.CLINIC_CANCEL in cancel_purposes
+        cancel_numbers = [ph for ph, _, p in CALLS[calls_before_cancel:] if p is CallPurpose.CLINIC_CANCEL]
+        assert cancel_numbers == [real_clinic_phone], (
+            f"BUG: the cancel call went to {cancel_numbers}, not the run's own clinic {real_clinic_phone}"
+        )
         assert CallPurpose.INTERPRETER_RELEASE in cancel_purposes
         assert events[-1]["event"] == "run_cancelled" and events[-1]["status"] == "cancelled"
         assert client.post(f"/runs/{run_id}/cancel").status_code == 409, (
@@ -1548,21 +1559,21 @@ def scenario_api_endpoint() -> None:
         assert client.get(f"/runs/{run_id}").status_code == 404, (
             "sanity check: the run must actually be gone from memory now"
         )
-        assert client.post(f"/runs/{run_id}/cancel").status_code == 404, (
-            "with no body and no memory of the run, there's nothing to adopt it from"
-        )
-
         calls_before_forgotten_cancel = len(CALLS)
-        adopted = client.post(
-            f"/runs/{run_id}/cancel", json={"result": saved_result, "patient_name": "Dana Reyes"},
+        assert client.post(f"/runs/{run_id}/cancel").status_code == 404, (
+            "a run this process forgot has no trusted record to cancel from"
         )
-        assert adopted.status_code == 202, adopted.text
-        resolved = wait_for(run_id, "cancelled", "cancel_failed")
-        assert resolved["status"] == "cancelled", (
-            f"a run adopted from a supplied body must still cancel cleanly: {resolved}"
+        # A caller-supplied booking is never trusted, not even the run's own,
+        # and certainly not one with a swapped-in clinic number.
+        forged = {**saved_result, "clinic_contact": {**saved_result["clinic_contact"], "phone": "+17025550199"}}
+        for body in (saved_result, forged):
+            refused = client.post(
+                f"/runs/{run_id}/cancel", json={"result": body, "patient_name": "Dana Reyes"},
+            )
+            assert refused.status_code == 404, refused.text
+        assert len(CALLS) == calls_before_forgotten_cancel, (
+            "BUG: a cancel built from a caller-supplied record placed calls"
         )
-        forgotten_purposes = [p for _, _, p in CALLS[calls_before_forgotten_cancel:]]
-        assert CallPurpose.CLINIC_CANCEL in forgotten_purposes
 
         # 4d. The clinic does not confirm the cancellation. The outcome is
         #     ambiguous (the appointment may still exist), so the run stops:
@@ -1658,8 +1669,8 @@ def scenario_api_endpoint() -> None:
           "refused 409; cancelling the succeeded booking cancelled the clinic "
           "and released the interpreter, refused a second cancel, and leaked "
           "no internal fields; a run this process had forgotten (the real "
-          "restart-then-cancel scenario) still cancelled cleanly once its own "
-          "stored result was supplied; saying no ended it as declined with "
+          "restart-then-cancel scenario) was refused with no calls, even with a "
+          "supplied record, and a swapped clinic number was ignored; saying no ended it as declined with "
           "nothing booked; no answer timed out to declined; the lock was "
           "released each time.")
 

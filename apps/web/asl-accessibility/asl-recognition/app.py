@@ -9,6 +9,7 @@ workflow server.
 Run it from this folder: model, label map and static paths are relative. The
 browser only grants camera access on localhost or https.
 """
+import hmac
 import json
 import os
 import re
@@ -20,8 +21,9 @@ from pathlib import Path
 import cv2
 import numpy as np
 from dotenv import load_dotenv
-from fastapi import Body, FastAPI, File, HTTPException, Path as PathParam, Query, UploadFile, WebSocket, WebSocketDisconnect
+from fastapi import Body, FastAPI, File, Header, HTTPException, Path as PathParam, Query, Request, UploadFile, WebSocket, WebSocketDisconnect
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.responses import JSONResponse
 from fastapi.staticfiles import StaticFiles
 
 import db
@@ -37,14 +39,37 @@ load_dotenv(Path(__file__).resolve().parent / ".env")
 # The signcall workflow's POST /runs endpoint, where booking requests are sent.
 BOOKING_WORKFLOW_URL = os.environ.get("BOOKING_WORKFLOW_URL", "")
 
+# Shared with the signcall server (same value in both .env files). The
+# workflow sends it with every notification; anything without it is refused.
+NOTIFY_SECRET = os.environ.get("SIGNCALL_NOTIFY_SECRET", "")
+
 WEEKDAY_NAMES = ["monday", "tuesday", "wednesday", "thursday", "friday", "saturday", "sunday"]
 
 app = FastAPI(title="ASL-to-text inference + booking app")
 
-# Open CORS and no authentication: this is a local demo, not a deployable service.
+# No user login: this is a local, single-user demo, not a deployable service.
+# Browser requests are only accepted from this app's own localhost page, so a
+# different website open in the same browser can't book, confirm or cancel.
+LOCALHOST_ORIGIN = re.compile(r"^https?://(localhost|127\.0\.0\.1|\[::1\])(:\d+)?$")
+
 app.add_middleware(
-    CORSMiddleware, allow_origins=["*"], allow_methods=["*"], allow_headers=["*"],
+    CORSMiddleware, allow_origin_regex=LOCALHOST_ORIGIN.pattern,
+    allow_methods=["GET", "POST", "OPTIONS"], allow_headers=["Content-Type"],
 )
+
+
+@app.middleware("http")
+async def reject_cross_site_requests(request: Request, call_next):
+    """CORS only stops another site from reading the answer; the request
+    itself would still run. Browsers attach an Origin header to cross-site
+    POSTs, so refuse any POST whose Origin isn't a localhost page. Requests
+    with no Origin (the workflow server, curl) aren't from a web page."""
+    if request.method not in ("GET", "HEAD", "OPTIONS"):
+        origin = request.headers.get("origin")
+        cross_site = request.headers.get("sec-fetch-site") == "cross-site"
+        if cross_site or (origin is not None and not LOCALHOST_ORIGIN.match(origin)):
+            return JSONResponse(status_code=403, content={"detail": "Cross-site request refused."})
+    return await call_next(request)
 
 
 @app.on_event("startup")
@@ -342,15 +367,24 @@ def _sync_from_workflow(booking: dict) -> dict:
 
 
 @app.post("/notifications")
-def receive_notification_endpoint(payload: dict = Body(...)):
+def receive_notification_endpoint(
+    payload: dict = Body(...),
+    secret: str = Header("", alias="X-Signcall-Secret"),
+):
     """Receives the workflow's events (its SIGNCALL_NOTIFY_URL points here).
-    They are stored and shown by the open page. Nothing authenticates the
-    sender beyond the run id being unguessable.
+    They are stored and shown by the open page. Each one must carry the
+    shared secret (SIGNCALL_NOTIFY_SECRET) in X-Signcall-Secret.
 
     Events, from the workflow's api/notify.py:
       confirmation_requested  {run_id, proposal}
       run_finished            {run_id, status, result, error, reason}
       run_cancelled           {run_id, status, cancellation, error}"""
+    # Only the workflow server knows the shared secret. Without a configured
+    # secret every event is refused; the progress screens still update by
+    # polling GET /bookings/{run_id}.
+    if not NOTIFY_SECRET or not hmac.compare_digest(secret.encode(), NOTIFY_SECRET.encode()):
+        raise HTTPException(401, "notification refused: missing or wrong X-Signcall-Secret")
+
     run_id = payload.get("run_id")
     if not isinstance(run_id, str) or not run_id:
         raise HTTPException(400, "run_id is required")
@@ -425,32 +459,29 @@ def confirm_booking_endpoint(run_id: str, payload: dict = Body(...)):
 @app.post("/bookings/{run_id}/cancel")
 def cancel_booking_endpoint(run_id: str, payload: dict = Body(...)):
     """Cancels a booked appointment, from the outcome screen or the upcoming
-    list. The workflow keeps runs in memory only, so the stored `result` and
-    the patient's name are sent along for it to adopt the run if it has
-    forgotten it. The frontend then polls GET /bookings/{run_id}."""
+    list. Only the run id is sent: the workflow cancels using its own record
+    of the run, never details sent from here. If the workflow server has
+    restarted since the booking it no longer has that record and refuses, and
+    the person is told to contact the clinic. The frontend then polls
+    GET /bookings/{run_id}."""
     user_id = payload.get("user_id")
     booking = _booking_for(run_id, user_id)
     if booking["status"] not in ("succeeded", "cancel_failed"):
         raise HTTPException(409, "This booking has nothing to cancel right now.")
-    if not booking["result"]:
-        raise HTTPException(500, "This booking has no stored details to cancel it with.")
     if not BOOKING_WORKFLOW_URL:
         raise HTTPException(500, "BOOKING_WORKFLOW_URL is not set on the server")
 
-    profile = db.get_profile(user_id)
-    patient_name = (profile or {}).get("name")
-    if not patient_name:
-        raise HTTPException(500, "No profile on file to get the patient's name from.")
-
-    body = json.dumps({"result": booking["result"], "patient_name": patient_name}).encode("utf-8")
-    req = urllib.request.Request(
-        _workflow_url(run_id, "cancel"), data=body, method="POST",
-        headers={"Content-Type": "application/json"},
-    )
+    req = urllib.request.Request(_workflow_url(run_id, "cancel"), data=b"", method="POST")
     try:
         with urllib.request.urlopen(req, timeout=15):
             pass
     except urllib.error.HTTPError as e:
+        if e.code == 404:
+            raise HTTPException(
+                409,
+                "The booking service has restarted since this was booked, so it "
+                "can't cancel it safely. Please contact the clinic directly to cancel.",
+            )
         if e.code == 409:
             raise HTTPException(409, "This booking is already being cancelled, or was already cancelled.")
         raise HTTPException(502, f"booking workflow rejected the cancellation ({e.code})")

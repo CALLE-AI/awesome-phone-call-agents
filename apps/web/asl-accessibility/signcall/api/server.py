@@ -5,10 +5,9 @@ The HTTP API the frontend talks to.
     GET  /runs/{id}          -> {status, proposal, result | error | reason, plan,
                                  started_at, finished_at}
     POST /runs/{id}/confirm  -> the user's answer: {"approved": true | false}
-    POST /runs/{id}/cancel   -> 202; cancels an already-succeeded booking.
-                                Optional body {"result": {...}, "patient_name": "..."}
-                                supplies the booking's own details when this process
-                                no longer remembers the run.
+    POST /runs/{id}/cancel   -> 202; cancels an already-succeeded booking this
+                                process ran, using only its own record of the run.
+                                Any request body is ignored. After a restart: 404.
     GET  /health             -> mode flags and whether credentials are present
 
 A run's status goes running -> awaiting_confirmation -> running -> one of
@@ -29,9 +28,9 @@ Design:
     No answer within SIGNCALL_CONFIRM_TIMEOUT_SECONDS (default 900) counts as
     "no" and the run ends as declined.
   - This server keeps no durable storage. `_runs` is an in-memory dict that
-    disappears on restart, while the frontend's database outlives it, so
-    POST .../cancel accepts the booking's stored `result` and "adopts" a run
-    this process has forgotten.
+    disappears on restart. Cancellation uses only that record, never booking
+    or contact details sent by a caller, so after a restart a cancel is
+    refused (404) instead of trusting a caller-supplied record.
 
 Run it from the directory above signcall/ (see the README), never with
 --workers > 1 or --reload: the run lock, the run registry and the real-mode
@@ -49,7 +48,7 @@ import threading
 import uuid
 from datetime import datetime
 
-from fastapi import Body, FastAPI, HTTPException, Request
+from fastapi import FastAPI, HTTPException, Request
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 from pydantic import BaseModel, StrictBool
@@ -107,14 +106,6 @@ _decisions: dict[str, _Decision] = {}
 
 class ConfirmRequest(BaseModel):
     approved: StrictBool
-
-
-class CancelRequest(BaseModel):
-    """Only needed when this process doesn't already have the run in memory.
-    `result` is the dict a succeeded run's `result` field already is."""
-
-    result: dict | None = None
-    patient_name: str | None = None
 
 
 def _assert_mode_is_deliberate() -> None:
@@ -364,47 +355,33 @@ def _execute_cancel(run_id: str) -> None:
 
 
 @app.post("/runs/{run_id}/cancel", status_code=202)
-def cancel_run(run_id: str, body: CancelRequest | None = Body(default=None)) -> JSONResponse:
+def cancel_run(run_id: str) -> JSONResponse:
     """Cancels an already-succeeded booking: calls the clinic, then releases
     whoever was lined up to interpret it. Valid from `succeeded`, and
     retriable from `cancel_failed`. Refused from any other status and while a
     cancellation is already in flight.
 
-    If this process has no memory of the run, `body.result` and
-    `body.patient_name` let it adopt the run instead of returning 404. If it
-    does remember the run, a supplied body still wins: the frontend's copy is
-    the durable one."""
+    Only this process's own record of the run is used: the clinic and
+    interpreter numbers dialled come from the run it executed, never from
+    the request (any body is ignored). If the server restarted since the
+    booking, the run is gone and this returns 404."""
     global _active_run_id
 
     with _runs_guard:
         run = _runs.get(run_id)
         if run is None:
-            if body is None or body.result is None or not body.patient_name:
-                raise HTTPException(
-                    status_code=404,
-                    detail=(
-                        f"No run with id {run_id}, and no booking details were "
-                        f"supplied to cancel it with. This server keeps no "
-                        f"memory of a run across a restart; pass `result` and "
-                        f"`patient_name` from your own stored record."
-                    ),
-                )
-            run = _runs[run_id] = {
-                "run_id": run_id, "status": "succeeded", "plan": None,
-                "mock_mode": MOCK_MODE, "started_at": None, "finished_at": None,
-                "proposal": None, "result": body.result, "error": None,
-                "error_type": None, "reason": None, "cancellation": None,
-                "_patient_name": body.patient_name,
-            }
-        elif run["status"] not in ("succeeded", "cancel_failed"):
+            raise HTTPException(
+                status_code=404,
+                detail=(
+                    f"No run with id {run_id}. This server keeps no memory of a "
+                    f"run across a restart, so it can't cancel it safely."
+                ),
+            )
+        if run["status"] not in ("succeeded", "cancel_failed"):
             raise HTTPException(
                 status_code=409,
                 detail=f"Run {run_id} has nothing to cancel right now (status: {run['status']}).",
             )
-        elif body is not None and body.result is not None:
-            run["result"] = body.result
-            if body.patient_name:
-                run["_patient_name"] = body.patient_name
 
     if not _run_lock.acquire(blocking=False):
         raise HTTPException(

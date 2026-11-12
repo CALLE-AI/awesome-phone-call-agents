@@ -24,6 +24,7 @@ The booking itself needs the workflow server from [`../signcall`](../signcall/RE
 |---|---|
 | `GEMINI_API_KEY` | Reads ID and insurance card photos, and turns the request text into availability. Without it, fill the profile in by hand; the request-parsing step fails. |
 | `BOOKING_WORKFLOW_URL` | The signcall `POST /runs` URL, e.g. `http://localhost:8001/runs`. |
+| `SIGNCALL_NOTIFY_SECRET` | Shared secret; must equal `SIGNCALL_NOTIFY_SECRET` in `signcall/.env`. Notifications without it are refused. |
 | `GEMINI_MODEL` | Optional. Default `gemini-flash-latest`, with a fallback to `gemini-flash-lite-latest` when the model is overloaded (HTTP 429/503). |
 
 Requirements: Python 3.11 or newer; `numpy<2` (pinned for the MediaPipe and PyTorch versions used). `torch` is a large download; the model runs fine on CPU.
@@ -35,7 +36,7 @@ Requirements: Python 3.11 or newer; `numpy<2` (pinned for the MediaPipe and PyTo
 3. **Parsing.** Gemini resolves "Tuesday 3" to a real date and time using today's date and returns structured availability. The person checks it, chooses the appointment type, and says whether they already have an interpreter.
 4. **Send.** The request is reshaped to signcall's input schema and posted to `POST /runs`.
 5. **Progress, approval, outcome.** The page follows the run, shows a plain proposal (date, time, clinic, interpreter) for a yes or no, and then the result. "More details" holds rates, requirements and notes.
-6. **Upcoming.** A list of booked future appointments, each with a Cancel button that works even days later or after the workflow server restarted.
+6. **Upcoming.** A list of booked future appointments, each with a Cancel button. The cancel needs the workflow server that made the booking to still be running; after it restarts, the person is told to contact the clinic directly.
 
 The UI is deliberately short on text, because it is meant for people who may not want to read long English paragraphs.
 
@@ -110,9 +111,9 @@ The useful directions are more signers and conditions per word, sentence-level (
 | `POST /bookings/{run_id}/confirm` | The person's yes or no to the proposal. |
 | `POST /bookings/{run_id}/cancel` | Cancel a booked appointment. |
 | `GET /appointments/upcoming?user_id=` | Booked future appointments. |
-| `POST /notifications` | Receives signcall's events (its `SIGNCALL_NOTIFY_URL`). |
+| `POST /notifications` | Receives signcall's events (its `SIGNCALL_NOTIFY_URL`). Requires the `X-Signcall-Secret` header. |
 
-There is no authentication and CORS is open. This is a local demo server; do not expose it to a network.
+There is no user login. Browser requests are only accepted from this app's own `localhost` page (other origins get `403`), and notifications need the shared secret. This is a local demo server; do not expose it to a network.
 
 ## Privacy
 

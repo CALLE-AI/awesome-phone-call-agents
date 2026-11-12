@@ -11,6 +11,10 @@ Events (all carry "event" and "run_id"):
     {"event": "run_cancelled", "status": "cancelled" | "cancel_failed" | "cancel_unresolved",
      "cancellation": {...} | undefined, "error": str | undefined}
 
+Every event carries the shared secret SIGNCALL_NOTIFY_SECRET in the
+X-Signcall-Secret header. The web app refuses events without it, so nothing
+else that can reach its port can post a fake outcome.
+
 Delivery is best effort. A notifier that is down must never break a run, and
 the same state is always available by polling GET /runs/{run_id}.
 """
@@ -23,6 +27,8 @@ import os
 import httpx
 
 logger = logging.getLogger(__name__)
+
+SECRET_HEADER = "X-Signcall-Secret"
 
 TIMEOUT_SECONDS = 5.0
 
@@ -44,7 +50,8 @@ def send_event(event: dict) -> bool:
             _warned_no_url = True
         return False
     try:
-        httpx.post(url, json=event, timeout=TIMEOUT_SECONDS).raise_for_status()
+        headers = {SECRET_HEADER: os.environ.get("SIGNCALL_NOTIFY_SECRET", "")}
+        httpx.post(url, json=event, headers=headers, timeout=TIMEOUT_SECONDS).raise_for_status()
     except httpx.HTTPError as exc:
         logger.warning(
             "Could not deliver %r for run %s to %s: %s",

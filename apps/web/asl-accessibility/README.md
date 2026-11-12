@@ -51,7 +51,7 @@ What is limited or missing:
 
 - **Clinic search covers Nevada and Illinois ZIP codes only.** Other ZIPs are rejected up front.
 - **Interpreter search is real for Illinois clinics only.** For any other state, the freelance-interpreter search returns nothing and the run ends honestly. A person who brings their own interpreter, or who has a family member to interpret, is unaffected.
-- No authentication, and the booking API is single user. Do not expose either server to a network.
+- No user login, and the booking API is single user. Do not expose either server to a network.
 - The confirmation text to the person is composed but not sent (`signcall/workflow/reminders.py` is a stub). Nothing is added to a calendar.
 - The booking is made on a phone call to a real business, so what the clinic says is whatever an AI voice agent understood. Results are checked (for example a clinic offering a different time than asked is rejected), but a phone call is not an API.
 
@@ -67,7 +67,10 @@ pip install -r signcall/requirements.txt -r asl-recognition/requirements.txt
 
 cp signcall/.env.example signcall/.env
 cp asl-recognition/.env.example asl-recognition/.env
+python3 -c "import secrets; print(secrets.token_urlsafe(32))"
 ```
+
+Paste the printed value into `SIGNCALL_NOTIFY_SECRET` in **both** `.env` files. It lets the web app trust the workflow's notifications; if it is missing or different, the app still works but updates by polling.
 
 Mock mode is the default in `signcall/.env.example` (`CALLE_MOCK_MODE=1`, `SIGNCALL_API_DEMO_MOCKS=1`). Every call is answered by a script, so no key is needed for the workflow. Terminal 1:
 
@@ -122,6 +125,7 @@ No key is ever sent to the browser. `.env` files are git-ignored. The Illinois i
 | `SIGNCALL_FREELANCE_PARALLEL_BATCH` | `0` | `1`: call the members of an interpreter batch at the same time. Needs a CALL-E plan that allows concurrent outbound calls and at least as many test lines as the batch size (default 2). |
 | `SIGNCALL_DISABLE_IL_LOOKUP` | `0` | `1`: skip the live Illinois registry query (offline development). |
 | `SIGNCALL_NOTIFY_URL` | none | Where run events are POSTed. Set it to `http://localhost:8000/notifications` for the web app. |
+| `SIGNCALL_NOTIFY_SECRET` | none | Shared secret sent with every event. Must match the same setting in `asl-recognition/.env`; without it the web app refuses events and updates by polling instead. |
 | `SIGNCALL_CONFIRM_TIMEOUT_SECONDS` | `900` | How long to wait for the person's approval. No answer counts as "no". |
 | `CALLE_CONCURRENCY_RETRY_DEADLINE_SECONDS` | `300` | How long to keep retrying when CALL-E reports its concurrent-call limit. |
 
@@ -131,6 +135,7 @@ No key is ever sent to the browser. `.env` files are git-ignored. The Illinois i
 |---|---|---|
 | `GEMINI_API_KEY` | | Required for card reading and request parsing. |
 | `BOOKING_WORKFLOW_URL` | | The signcall `POST /runs` URL, normally `http://localhost:8001/runs`. |
+| `SIGNCALL_NOTIFY_SECRET` | | Same value as in `signcall/.env`. Notifications without it are refused. |
 | `GEMINI_MODEL` | `gemini-flash-latest` | Pin a Gemini model. If the model stays overloaded (HTTP 429/503) the app falls back to `gemini-flash-lite-latest`. |
 
 ## Real calls and the test-line safety net
@@ -164,7 +169,8 @@ Cost control: each run is capped at **10 clinics called** and **3 interpreter ba
 - **Disclosure.** Every call opens by saying it is an AI agent calling on behalf of the patient.
 - **E.164 numbers.** The web app normalises US numbers to `+1XXXXXXXXXX`; the schema rejects anything else.
 - **No hidden schedules, no duplicate jobs.** The app never schedules recurring calls. One run at a time (a second `POST /runs` gets `409`), and a run cannot be double-confirmed.
-- **Cancellation.** A booked appointment can be cancelled from the outcome screen or the "Upcoming" list. The workflow calls the clinic to cancel, and only once the clinic confirms does it release the interpreter. If the clinic does not confirm, the outcome is ambiguous (the appointment may still exist), so the run stops as "not confirmed": the interpreter is not told anything, nothing is retried, and the person is shown which clinic to contact. It is stateless about it: the web app sends the stored booking back, so a cancel works even after the workflow server restarted.
+- **Cancellation.** A booked appointment can be cancelled from the outcome screen or the "Upcoming" list. The workflow calls the clinic to cancel, and only once the clinic confirms does it release the interpreter. If the clinic does not confirm, the outcome is ambiguous (the appointment may still exist), so the run stops as "not confirmed": the interpreter is not told anything, nothing is retried, and the person is shown which clinic to contact. The cancel uses only the workflow server's own record of the booking; the web app sends just the run id, so nobody can swap in a different clinic or number. If the workflow server restarted since the booking, it no longer has that record and the cancel is refused: the person is asked to contact the clinic directly.
+- **Local requests only.** The web app accepts browser requests only from its own `localhost` page; a POST from any other website is refused (`403`). Workflow notifications must carry the shared secret `SIGNCALL_NOTIFY_SECRET`, so nothing else that can reach port 8000 can post a fake booking result.
 - **Scope of the calls.** Scripts restrict the agent to scheduling and logistics, tell it to give no medical, legal or financial advice, and tell it to direct anyone describing an emergency to 911 and end the call. This app is not for emergencies; a Deaf person in an emergency should use their local text-to-911 or relay service.
 - **Credentials.** Keys live in git-ignored `.env` files and are read only by the server that needs them. `/health` reports presence, never values.
 - **Phone numbers are not masked.** Clinic and interpreter numbers are real and unmasked in API responses and in the local database, because the cancel flow needs them. Mask them before putting the app on a screen recording, a public demo or a shared log.
