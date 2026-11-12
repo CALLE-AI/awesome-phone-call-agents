@@ -331,7 +331,7 @@ def _sync_from_workflow(booking: dict) -> dict:
             booking["run_id"], status,
             result=run.get("result"), error=run.get("error"), reason=run.get("reason"),
         )
-    elif status in ("cancelled", "cancel_failed"):
+    elif status in ("cancelled", "cancel_failed", "cancel_unresolved"):
         db.record_cancellation(
             booking["run_id"], status,
             cancellation=run.get("cancellation"), error=run.get("error"),
@@ -371,7 +371,7 @@ def receive_notification_endpoint(payload: dict = Body(...)):
         )
     elif event == "run_cancelled":
         status = payload.get("status")
-        if status not in ("cancelled", "cancel_failed"):
+        if status not in ("cancelled", "cancel_failed", "cancel_unresolved"):
             raise HTTPException(400, f"unknown cancellation status {status!r}")
         db.record_cancellation(run_id, status, cancellation=payload.get("cancellation"), error=payload.get("error"))
     else:
@@ -383,7 +383,7 @@ def receive_notification_endpoint(payload: dict = Body(...)):
 def get_booking_endpoint(run_id: str, user_id: str = Query(...)):
     """What the progress, confirm and outcome screens poll. `status` is one of
     running, awaiting_confirmation, succeeded, declined, failed, cancelling,
-    cancelled, cancel_failed."""
+    cancelled, cancel_failed, cancel_unresolved."""
     booking = _sync_from_workflow(_booking_for(run_id, user_id))
     return {
         key: booking[key]

@@ -1564,6 +1564,41 @@ def scenario_api_endpoint() -> None:
         forgotten_purposes = [p for _, _, p in CALLS[calls_before_forgotten_cancel:]]
         assert CallPurpose.CLINIC_CANCEL in forgotten_purposes
 
+        # 4d. The clinic does not confirm the cancellation. The outcome is
+        #     ambiguous (the appointment may still exist), so the run stops:
+        #     the interpreter is NOT released, nothing is retried, and the
+        #     person is told to contact the clinic.
+        _reset()
+        events.clear()
+        run_id = start_run()["run_id"]
+        wait_for(run_id, "awaiting_confirmation")
+        confirm(run_id, True)
+        assert wait_for(run_id, "succeeded", "failed", "declined")["status"] == "succeeded"
+
+        def unconfirmed_cancel_build():
+            def resolver(task, phone, purpose):
+                CALLS.append((phone, task, purpose))
+                return _ok({"cancelled": False})
+
+            return resolver
+
+        demo_mocks.build_cancel_resolver = unconfirmed_cancel_build
+        calls_before = len(CALLS)
+        assert client.post(f"/runs/{run_id}/cancel").status_code == 202
+        unresolved = wait_for(run_id, "cancelled", "cancel_failed", "cancel_unresolved")
+        demo_mocks.build_cancel_resolver = spying_cancel_build
+        assert unresolved["status"] == "cancel_unresolved", unresolved
+        assert "may still be booked" in unresolved["error"], unresolved["error"]
+        after = [p for _, _, p in CALLS[calls_before:]]
+        assert after == [CallPurpose.CLINIC_CANCEL], (
+            f"BUG: after an unconfirmed clinic cancel only that one call may be placed "
+            f"(no interpreter release, no retry), got {after}"
+        )
+        assert events[-1]["event"] == "run_cancelled" and events[-1]["status"] == "cancel_unresolved"
+        assert client.post(f"/runs/{run_id}/cancel").status_code == 409, (
+            "an unresolved cancellation is not retried automatically or on demand"
+        )
+
         # 5. Saying no ends the run with nothing booked, and frees the lock.
         _reset()
         events.clear()

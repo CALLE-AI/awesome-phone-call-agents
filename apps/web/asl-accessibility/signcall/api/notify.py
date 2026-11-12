@@ -8,7 +8,7 @@ Events (all carry "event" and "run_id"):
     {"event": "confirmation_requested", "proposal": {...}}
     {"event": "run_finished", "status": "succeeded" | "declined" | "failed",
      "result": {...} | null, "error": str | null, "reason": str | null}
-    {"event": "run_cancelled", "status": "cancelled" | "cancel_failed",
+    {"event": "run_cancelled", "status": "cancelled" | "cancel_failed" | "cancel_unresolved",
      "cancellation": {...} | undefined, "error": str | undefined}
 
 Delivery is best effort. A notifier that is down must never break a run, and

@@ -99,7 +99,7 @@ def get_profile(user_id: str):
 # --- bookings ---------------------------------------------------------------
 #
 # status: running -> awaiting_confirmation -> running -> succeeded | declined | failed
-#         succeeded -> cancelling -> cancelled | cancel_failed (user-initiated only)
+#         succeeded -> cancelling -> cancelled | cancel_failed | cancel_unresolved (user-initiated only)
 #
 # Workflow notifications can arrive before /submit-booking has recorded who
 # the run belongs to, so every write is an upsert on run_id that never rolls a
@@ -170,7 +170,7 @@ def record_cancelling(run_id: str):
 
 
 def record_cancellation(run_id: str, status: str, cancellation=None, error=None):
-    """How the cancellation ended: cancelled or cancel_failed."""
+    """How the cancellation ended: cancelled, cancel_failed or cancel_unresolved."""
     with _transaction() as conn:
         conn.execute("""
             UPDATE bookings SET status=?, cancellation_json=?, error=?, updated_at=CURRENT_TIMESTAMP

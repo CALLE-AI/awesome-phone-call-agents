@@ -24,6 +24,12 @@ class NoMatchFound(RuntimeError):
     api/server.py ends the run as "declined" with this message."""
 
 
+class CancellationUnresolved(RuntimeError):
+    """The clinic did not confirm a cancellation, so the appointment may still
+    exist. Nobody else is told it is off, and nothing is retried: the person
+    has to settle it with the clinic directly."""
+
+
 @dataclass
 class BookingProposal:
     """What the user is asked to approve. Plain data, so it serializes as-is."""

@@ -913,8 +913,12 @@ function showOutcome(booking) {
   } else if (booking.status === "cancelled") {
     title = "Cancelled";
     const cancellation = booking.cancellation || {};
-    rows.push(["Clinic", cancellation.clinic_cancelled ? "Cancelled" : "Not confirmed. Call them."]);
+    rows.push(["Clinic", "Cancelled"]);
     if (cancellation.interpreter_released === true) rows.push(["Interpreter", "Told"]);
+  } else if (booking.status === "cancel_unresolved") {
+    title = "Not confirmed";
+    sub = booking.error || "The clinic did not confirm. It may still be booked. Please contact them.";
+    kind = "stop";
   } else if (booking.status === "cancel_failed") {
     title = "Couldn't cancel";
     sub = booking.error || "Still booked.";

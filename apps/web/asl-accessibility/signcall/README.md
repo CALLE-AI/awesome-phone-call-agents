@@ -25,7 +25,7 @@ STEP 5  book, confirm, notify          appointment.py      clinic first, then th
 - **Interpreter.** Three sources, in this order of the person's choice. (1) The person brings their own: nobody is called. (2) A family member: the family list is called one at a time, after the clinic match, and stops at the first yes. (3) A freelance interpreter: batches of 2 are asked about availability and hourly rate, and at most **3 batches (6 interpreter calls)** are tried. The cheapest available interpreter in the first batch with a match gets the binding confirm; if they decline, the next one in that batch is tried.
 - **Booking.** After approval the clinic is booked first (a patient booking is normally free to cancel), then the interpreter is asked to commit. A family member's earlier "yes" was given before the slot was booked, so they get the same binding confirm. Only the interpreter the person approved is asked: **if they decline, or the call does not complete, the clinic booking is cancelled and the run ends.** No other family member or paid interpreter is substituted without the person's approval. A booking is only accepted if the call completed and the clinic stated the exact date and time that was approved; a missing or different date or time is rejected.
 - **Honest failure.** If no clinic can be found, or no interpreter can be found, the run ends `declined` with a plain message ("nothing booked") and nobody is charged. There is no synthetic fallback dataset anywhere.
-- **Cancellation.** `POST /runs/{id}/cancel` calls the clinic to cancel, then releases whoever was interpreting (nobody for a user-arranged interpreter). It can be retried after `cancel_failed`. The server keeps runs in memory only, so the caller (the web app) sends the stored `result` and `patient_name` with the request and the server adopts a run it has forgotten.
+- **Cancellation.** `POST /runs/{id}/cancel` calls the clinic to cancel, then releases whoever was interpreting (nobody for a user-arranged interpreter), but only after the clinic confirms. If the clinic does not confirm, the run ends as `cancel_unresolved`: the interpreter is not released, nothing is retried, and the error names the clinic and booking reference to contact. A technical failure (`cancel_failed`) can be retried. The server keeps runs in memory only, so the caller (the web app) sends the stored `result` and `patient_name` with the request and the server adopts a run it has forgotten.
 
 ## Setup
 
@@ -53,7 +53,7 @@ CALLE_MOCK_MODE=1 SIGNCALL_API_DEMO_MOCKS=1 \
 | Route | Request | Response |
 |---|---|---|
 | `POST /runs` | the user-input JSON | **202** `{run_id, status, mock_mode, plan}` · **400** with the validator's message (nothing called) · **409** if a run is active |
-| `GET /runs/{run_id}` | | `{status, proposal, result, error, error_type, plan, started_at, finished_at}` · **404** unknown. `status` is `running`, `awaiting_confirmation`, `succeeded`, `declined`, `failed`, `cancelling`, `cancelled` or `cancel_failed` |
+| `GET /runs/{run_id}` | | `{status, proposal, result, error, error_type, plan, started_at, finished_at}` · **404** unknown. `status` is `running`, `awaiting_confirmation`, `succeeded`, `declined`, `failed`, `cancelling`, `cancelled`, `cancel_failed` or `cancel_unresolved` |
 | `POST /runs/{run_id}/confirm` | `{"approved": true\|false}` | **200** · **409** if no answer is awaited (including a second answer) · **404** |
 | `POST /runs/{run_id}/cancel` | optional `{"result": {...}, "patient_name": "..."}` for a run this process forgot | **202** · **409** if nothing to cancel or already cancelling · **404** |
 | `GET /health` | | mode flags and whether keys are present (never their values) |
@@ -99,7 +99,7 @@ python3 -m signcall.dev.text_harness <scenario>
 | `clinic_lookup` | The Maps parser and filters against canned Apify items; empty result on a missing token. |
 | `il_interpreter_lookup` | Illinois ZIP and county lookup, phone extraction, Active-plus-phone filter, county-then-region tiers, against canned rows. |
 | `call_routing` | Real-mode dialing resolves only to configured test lines, stickily per recipient, and refuses when missing or malformed. |
-| `api_endpoint` | The HTTP flow in-process: 400, 202, confirm, cancel, 409, 404, the forgotten-run cancel, timeout to declined. |
+| `api_endpoint` | The HTTP flow in-process: 400, 202, confirm, cancel, 409, 404, the forgotten-run cancel, an unconfirmed clinic cancel that stops without releasing the interpreter, timeout to declined. |
 
 Run them all:
 

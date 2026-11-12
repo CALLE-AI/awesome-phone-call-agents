@@ -31,7 +31,13 @@ from typing import NoReturn
 from ..calle.run import reset_call_routing
 
 from . import calendar, clinic_call, clinic_lookup, family_call, interpreter_lookup, interpreter_matching, reminders
-from .confirmation import ApprovalFn, BookingDeclined, BookingProposal, NoMatchFound
+from .confirmation import (
+    ApprovalFn,
+    BookingDeclined,
+    BookingProposal,
+    CancellationUnresolved,
+    NoMatchFound,
+)
 from .types import (
     AppointmentResult,
     ClinicCandidate,
@@ -469,11 +475,9 @@ def cancel_appointment(result: dict, patient_name: str) -> dict:
 
     `result` is the plain dict a succeeded run's AppointmentResult serializes
     to, so this works from a stored record alone, long after the run's objects
-    are gone. The clinic cancel and the interpreter release are both
-    attempted whatever the other's outcome, because an interpreter who
-    no-shows is worse than a clinic that still thinks the slot is taken. A
-    clinic that doesn't confirm is reported, not raised, so the user knows to
-    follow up."""
+    are gone. If the clinic does not confirm the cancellation the outcome is
+    ambiguous (the appointment may still exist), so this raises
+    CancellationUnresolved before the interpreter is told anything."""
     contact = result.get("clinic_contact") or {}
     if not contact.get("phone"):
         raise RuntimeError(
@@ -491,15 +495,16 @@ def cancel_appointment(result: dict, patient_name: str) -> dict:
     slot = ClinicSlot(date=slot_dict.get("date", ""), time=slot_dict.get("time", ""))
     booking_reference = (result.get("appointment") or {}).get("booking_reference")
 
-    clinic_cancelled = clinic_call.cancel_booking(clinic, slot, patient_name, booking_reference)
-    evidence = [
-        f"Clinic {clinic.name} "
-        + (
-            "confirmed the cancellation."
-            if clinic_cancelled
-            else "did NOT confirm the cancellation -- call them directly to make sure."
+    if not clinic_call.cancel_booking(clinic, slot, patient_name, booking_reference):
+        where = f" ({clinic.address})" if clinic.address else ""
+        reference = f" Booking reference: {booking_reference}." if booking_reference else ""
+        raise CancellationUnresolved(
+            f"{clinic.name}{where} did not confirm the cancellation of the "
+            f"{slot.date} {slot.time} appointment, so it may still be booked. "
+            f"The interpreter was not told anything. Please contact the "
+            f"clinic to confirm.{reference}"
         )
-    ]
+    evidence = [f"Clinic {clinic.name} confirmed the cancellation."]
 
     interpreter = result.get("interpreter") or {}
     tier = interpreter.get("tier")
@@ -528,7 +533,7 @@ def cancel_appointment(result: dict, patient_name: str) -> dict:
         )
 
     return {
-        "clinic_cancelled": clinic_cancelled,
+        "clinic_cancelled": True,
         "interpreter_released": interpreter_released,
         "evidence": evidence,
     }

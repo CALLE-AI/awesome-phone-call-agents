@@ -13,7 +13,8 @@ The HTTP API the frontend talks to.
 
 A run's status goes running -> awaiting_confirmation -> running -> one of
 succeeded | declined | failed. A succeeded run can move on once more, only at
-the user's request: succeeded -> cancelling -> cancelled | cancel_failed.
+the user's request: succeeded -> cancelling -> cancelled | cancel_failed |
+cancel_unresolved (the clinic did not confirm; final, nothing is retried).
 
 Design:
 
@@ -56,6 +57,7 @@ from pydantic import BaseModel, StrictBool
 from ..calle import MOCK_MODE
 from ..calle.run import TEST_LINES_ENV, clear_default_mock, register_default_mock
 from ..workflow.appointment import cancel_appointment, describe_goal, run_interpreter_mesh
+from ..workflow.confirmation import CancellationUnresolved
 from ..workflow.confirmation import ApprovalFn, BookingDeclined, BookingProposal, NoMatchFound
 from ..workflow.types import UserInput
 from ..workflow.user_input import UserInputError, load_user_input
@@ -330,6 +332,15 @@ def _execute_cancel(run_id: str) -> None:
             result = _runs[run_id]["result"]
             patient_name = _runs[run_id]["_patient_name"]
         cancellation = cancel_appointment(result, patient_name)
+    except CancellationUnresolved as exc:
+        _record(
+            run_id, status="cancel_unresolved", finished_at=_now(),
+            error=str(exc), error_type=type(exc).__name__,
+        )
+        notify.send_event({
+            "event": "run_cancelled", "run_id": run_id, "status": "cancel_unresolved",
+            "error": str(exc),
+        })
     except Exception as exc:
         _record(
             run_id, status="cancel_failed", finished_at=_now(),
