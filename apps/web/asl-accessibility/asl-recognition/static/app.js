@@ -266,23 +266,40 @@ function addFamilyRow() {
   state.family.push({ name: "", relation: "", phone: "" });
 }
 
+// Inputs get their value as a property, so it is never parsed as HTML.
+function inputEl(type, field, i, value, placeholder) {
+  const input = el("input");
+  input.type = type;
+  input.dataset.field = field;
+  input.dataset.i = i;
+  input.value = value || "";
+  if (placeholder) input.placeholder = placeholder;
+  return input;
+}
+
+function textField(label, type, field, i, value, placeholder) {
+  const wrap = el("div", "field");
+  wrap.append(el("label", "", label), inputEl(type, field, i, value, placeholder));
+  return wrap;
+}
+
 function renderFamilyList() {
   const container = document.getElementById("familyCards");
   const empty = document.getElementById("familyEmptyHint");
   container.innerHTML = "";
   empty.style.display = state.family.length === 0 ? "block" : "none";
   state.family.forEach((member, i) => {
-    const card = document.createElement("div");
-    card.className = "family-card";
-    card.innerHTML = `
-      <div class="family-card-head">
-        <span>Family member ${i + 1}</span>
-        <button class="remove-link" data-i="${i}">Remove</button>
-      </div>
-      <div class="field"><label>Name</label><input type="text" data-field="name" data-i="${i}" value="${member.name}"></div>
-      <div class="field"><label>Relation</label><input type="text" data-field="relation" data-i="${i}" placeholder="e.g. sister" value="${member.relation}"></div>
-      <div class="field"><label>Phone number</label><input type="tel" data-field="phone" data-i="${i}" value="${member.phone}"></div>
-    `;
+    const card = el("div", "family-card");
+    const head = el("div", "family-card-head");
+    const remove = el("button", "remove-link", "Remove");
+    remove.dataset.i = i;
+    head.append(el("span", "", `Family member ${i + 1}`), remove);
+    card.append(
+      head,
+      textField("Name", "text", "name", i, member.name),
+      textField("Relation", "text", "relation", i, member.relation, "e.g. sister"),
+      textField("Phone number", "tel", "phone", i, member.phone),
+    );
     container.appendChild(card);
   });
   container.querySelectorAll("input").forEach((inp) => {
@@ -318,13 +335,14 @@ function wireFamilyList() {
   });
 }
 
+function familyRows() {
+  return state.family.map((m) => [m.relation || "Family", `${m.name} \u00b7 ${m.phone}`]);
+}
+
 function renderFamilyVerify() {
   const container = document.getElementById("familyReview");
-  container.innerHTML = state.family.length
-    ? state.family.map((m) => `
-        <div class="review-row"><span class="k">${m.relation || "Family"}</span><span class="v">${m.name} &middot; ${m.phone}</span></div>
-      `).join("")
-    : `<p class="hint">None added.</p>`;
+  if (state.family.length) fillRows(container, familyRows());
+  else container.replaceChildren(el("p", "hint", "None added."));
 }
 
 function wireFamilyVerify() {
@@ -503,11 +521,11 @@ function stopSession() {
 
 function fillBookingConfirm() {
   const p = state.profile;
-  document.getElementById("bc_profileSummary").innerHTML = `
-    <div class="review-row"><span class="k">Name</span><span class="v">${p.name || "--"}</span></div>
-    <div class="review-row"><span class="k">DOB</span><span class="v">${p.dob || "--"}</span></div>
-    <div class="review-row"><span class="k">Insurance</span><span class="v">${p.insurance_name || "--"}</span></div>
-  `;
+  fillRows(document.getElementById("bc_profileSummary"), [
+    ["Name", p.name || "--"],
+    ["DOB", p.dob || "--"],
+    ["Insurance", p.insurance_name || "--"],
+  ]);
 
   const clinicSelect = document.getElementById("bc_clinicType");
   clinicSelect.innerHTML = CLINIC_TYPES.map((c) => `<option value="${c.value}">${c.label}</option>`).join("");
@@ -534,9 +552,7 @@ function selectBookingInterpreter(hasOwn) {
   const familyReview = document.getElementById("bc_familyReview");
   if (hasOwn === false) {
     familyReview.style.display = "block";
-    familyReview.innerHTML = state.family.length
-      ? state.family.map((m) => `<div class="review-row"><span class="k">${m.relation || "Family"}</span><span class="v">${m.name} &middot; ${m.phone}</span></div>`).join("")
-      : "";
+    fillRows(familyReview, familyRows());
   } else {
     familyReview.style.display = "none";
   }
@@ -565,16 +581,24 @@ function renderAvailabilityRows() {
   const container = document.getElementById("availabilityRows");
   container.innerHTML = "";
   state.booking.availability.forEach((row, i) => {
-    const wrap = document.createElement("div");
+    const wrap = el("div");
     wrap.style.marginBottom = "10px";
-    wrap.innerHTML = `
-      <div class="hint" style="margin:0 0 4px;font-weight:700;color:var(--text);" data-day-label="${i}">${availabilityLabel(row)}</div>
-      <div class="avail-row" style="margin-bottom:0;">
-        <div class="field"><input type="date" data-field="date" data-i="${i}" value="${row.date || ""}"></div>
-        <div class="field"><input type="time" data-field="time" data-i="${i}" value="${row.time || ""}"></div>
-        ${state.booking.availability.length > 1 ? `<button class="remove-link" data-i="${i}">Remove</button>` : ""}
-      </div>
-    `;
+    const label = el("div", "hint", availabilityLabel(row));
+    label.style.cssText = "margin:0 0 4px;font-weight:700;color:var(--text);";
+    label.dataset.dayLabel = i;
+    const inputs = el("div", "avail-row");
+    inputs.style.marginBottom = "0";
+    for (const field of ["date", "time"]) {
+      const fieldWrap = el("div", "field");
+      fieldWrap.appendChild(inputEl(field, field, i, row[field]));
+      inputs.appendChild(fieldWrap);
+    }
+    if (state.booking.availability.length > 1) {
+      const remove = el("button", "remove-link", "Remove");
+      remove.dataset.i = i;
+      inputs.appendChild(remove);
+    }
+    wrap.append(label, inputs);
     container.appendChild(wrap);
   });
   container.querySelectorAll("input").forEach((inp) => {
