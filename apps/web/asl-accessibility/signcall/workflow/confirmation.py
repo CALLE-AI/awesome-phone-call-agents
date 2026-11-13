@@ -30,6 +30,24 @@ class CancellationUnresolved(RuntimeError):
     has to settle it with the clinic directly."""
 
 
+class CommitmentUnresolved(RuntimeError):
+    """The answer to a binding confirmation is unknown: the call did not
+    finish, or it gave no clear yes or no. That is different from a completed,
+    explicit "no". The interpreter may or may not be committed, so nothing
+    further is done (no other interpreter is called and the clinic booking is
+    not cancelled) and the person is told to follow up."""
+
+
+def explicit_answer(result, key: str = "confirmed") -> bool:
+    """The yes or no a completed call gave. Raises CommitmentUnresolved when
+    the call did not complete or `key` is not a clear true or false, even if
+    an unfinished result happens to carry confirmed=true."""
+    answer = result.structured_result.get(key)
+    if not result.task_completed or not isinstance(answer, bool):
+        raise CommitmentUnresolved("The binding confirmation gave no clear answer.")
+    return answer
+
+
 @dataclass
 class BookingProposal:
     """What the user is asked to approve. Plain data, so it serializes as-is."""

@@ -13,6 +13,7 @@ After the clinic is booked, `confirm_family_member()` places the binding ask
 
 from ..calle.run import CallPurpose, call_and_wait
 
+from .confirmation import explicit_answer
 from .types import ClinicCandidate, ClinicSlot, FamilyInterpreter, UserInput, append_note
 
 _NOTES_FIELD = {
@@ -87,7 +88,8 @@ def confirm_family_member(
     exact slot. Works for the member locked in during the search and for one
     further down the list who was never reached, so the wording doesn't assume
     an earlier call. Includes the location, since this call tells them whether
-    they need to show up."""
+    they need to show up. True for a clear yes, False for a clear no; raises
+    CommitmentUnresolved if the call did not finish or gave no clear answer."""
     task = (
         f"Start by saying you are an AI agent calling on behalf of {user.name}. "
         f"Tell {member.name} that {user.name}'s appointment has been booked "
@@ -100,8 +102,7 @@ def confirm_family_member(
         purpose=CallPurpose.FAMILY_CONFIRM,
     )
     member.notes = append_note(member.notes, result.structured_result.get("additional_notes"))
-    # A voicemail, dropped or unfinished call is not a commitment.
-    return bool(result.task_completed and result.structured_result.get("confirmed", False))
+    return explicit_answer(result)  # raises CommitmentUnresolved if unclear
 
 
 def release_family_member(

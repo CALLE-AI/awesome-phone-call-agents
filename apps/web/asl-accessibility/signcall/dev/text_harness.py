@@ -34,7 +34,12 @@ from ..calle import run as calle_run  # noqa: E402
 from ..calle.run import CallPurpose, CallResult, register_mock  # noqa: E402
 from ..workflow import clinic_lookup, interpreter_lookup, interpreter_matching  # noqa: E402
 from ..workflow.appointment import run_interpreter_mesh as _run_interpreter_mesh  # noqa: E402
-from ..workflow.confirmation import BookingDeclined, BookingProposal, NoMatchFound  # noqa: E402
+from ..workflow.confirmation import (  # noqa: E402
+    BookingDeclined,
+    BookingProposal,
+    CommitmentUnresolved,
+    NoMatchFound,
+)  # noqa: E402
 from ..workflow.types import AppointmentType, ClinicCandidate, InterpreterCandidate  # noqa: E402
 from ..workflow.user_input import UserInputError, load_user_input  # noqa: E402
 
@@ -595,13 +600,18 @@ def scenario_family_locks_in() -> None:
 
 
 def scenario_family_confirm_declined() -> None:
-    """The family member the user approved declines the binding confirm (or the
-    call does not complete). The run must cancel the clinic booking and stop:
-    no other family member and no paid freelancer is substituted, because the
-    user never approved either."""
+    """The family member the user approved answers the binding confirm.
+
+      A. An explicit "no" cancels the clinic booking and ends the run. No other
+         family member and no paid freelancer is substituted, because the user
+         never approved either.
+      B. An unclear answer (the call did not finish, even though the result
+         carries confirmed=true) or a completed call with no clear yes or no
+         is NOT a refusal: the run stops with the booking left in place, no
+         cancellation, no other call, and a message saying what is open."""
     thu = _date(3)
 
-    def run_with(primary_kwargs: dict, label: str) -> str:
+    def run_with(primary_kwargs: dict, label: str) -> tuple[str, Exception]:
         _reset()
         matched = clinic(f"Clinic {label}", "+17025551061", 1.0, slots=((thu, "14:00"),),
                          booking_reference=f"CLINIC-FAM-{label}")
@@ -615,8 +625,9 @@ def scenario_family_confirm_declined() -> None:
                 load_user_input(_input_json(family_members=[primary, backup])),
                 clinics=[matched], candidates=[paid],
             )
-        except RuntimeError as exc:
-            message = str(exc)
+        except RuntimeError as raised:
+            error = raised
+            message = str(raised)
             print(f"\n--- RAISED (expected, {label}) ---\n{message}")
         else:
             raise AssertionError(f"BUG: ({label}) the approved family member did not confirm, yet the run succeeded")
@@ -629,16 +640,29 @@ def scenario_family_confirm_declined() -> None:
         )
         assert "+17025552062" not in _phones_called(), f"BUG: ({label}) the backup family member was called"
         assert paid.phone not in _phones_called(), f"BUG: ({label}) a paid freelancer was called"
-        assert purposes[-1] is CallPurpose.CLINIC_CANCEL, "the booking must be undone last"
-        assert "was cancelled" in message
-        return message
+        return message, error
 
-    run_with({"confirms": False}, "A")
-    run_with({"confirms": True, "confirm_completes": False}, "B")
+    # A. explicit refusal: the booking is undone
+    message, exc = run_with({"confirms": False}, "A")
+    assert not isinstance(exc, CommitmentUnresolved)
+    assert [p for _, _, p in CALLS][-1] is CallPurpose.CLINIC_CANCEL, "the booking must be undone last"
+    assert "was cancelled" in message
 
-    print("\nOK: when the approved family member declined, or the confirm call did "
-          "not complete, the clinic booking was cancelled and nobody else was "
-          "substituted.")
+    # B. unclear answers: stop, leave everything as it is
+    for kwargs, label in (
+        ({"confirms": True, "confirm_completes": False}, "B1 unfinished call carrying confirmed=true"),
+        ({"confirms": None}, "B2 completed call with no clear answer"),
+    ):
+        message, exc = run_with(kwargs, label[:2])
+        assert isinstance(exc, CommitmentUnresolved), f"BUG: ({label}) was treated as an explicit refusal"
+        assert CallPurpose.CLINIC_CANCEL not in [p for _, _, p in CALLS], (
+            f"BUG: ({label}) the clinic booking was cancelled after an unclear answer"
+        )
+        assert "still booked" in message and "CLINIC-FAM" in message, message
+
+    print("\nOK: an explicit refusal from the approved family member cancelled the "
+          "clinic booking; an unclear answer stopped the run with the booking "
+          "left in place, nothing cancelled and nobody else called.")
 
 
 def scenario_clinic_search_exhausted() -> None:
@@ -1024,23 +1048,37 @@ def scenario_interpreters_all_decline() -> None:
         "if the clinic won't cancel, the user must be told which booking to undo"
     )
 
+    # An unclear answer is not a refusal: the cheaper interpreter's call did
+    # not finish (carrying confirmed=true), so the run stops there. The other
+    # interpreter in the batch is NOT asked and the booking is NOT cancelled.
     _reset()
     flaky_clinic = clinic("Flaky clinic", "+17025551051", 1.0, slots=((thu, "14:00"),),
                           booking_reference="CLINIC-FLAKY")
-    d = freelancer("D", "+17025553051", covers=(f"{thu} 14:00",), rate=80.0,
+    d = freelancer("D", "+17025553051", covers=(f"{thu} 14:00",), rate=60.0,
                    confirms=True, confirm_completes=False)
+    e = freelancer("E", "+17025553052", covers=(f"{thu} 14:00",), rate=90.0, confirms=True)
     try:
         run_interpreter_mesh(
-            load_user_input(_input_json()), clinics=[flaky_clinic], candidates=[d]
+            load_user_input(_input_json()), clinics=[flaky_clinic], candidates=[d, e]
         )
-    except RuntimeError as exc:
-        print(f"\n--- RAISED (expected, incomplete confirm) ---\n{exc}")
+    except CommitmentUnresolved as exc:
+        message = str(exc)
+        print(f"\n--- RAISED (expected, unclear confirm) ---\n{message}")
     else:
-        raise AssertionError("BUG: an interpreter confirm call that did not complete was accepted")
-    assert [p for _, _, p in CALLS][-1] is CallPurpose.CLINIC_CANCEL
+        raise AssertionError("BUG: an interpreter confirm call that did not complete did not stop the run")
+    purposes = [p for _, _, p in CALLS]
+    assert purposes.count(CallPurpose.INTERPRETER_CONFIRM) == 1, (
+        "BUG: another interpreter was asked to commit after an unclear answer"
+    )
+    assert CallPurpose.CLINIC_CANCEL not in purposes, (
+        "BUG: the clinic booking was cancelled after an unclear answer"
+    )
+    assert "still booked" in message and "CLINIC-FLAKY" in message and "D" in message, message
 
     print("\nOK: after every interpreter declined, the booking was cancelled, "
-          "and a failed cancellation told the user which booking to undo.")
+          "and a failed cancellation told the user which booking to undo; an "
+          "unclear answer stopped the run instead, with nothing cancelled and "
+          "no other interpreter asked.")
 
 
 def scenario_input_validation() -> None:

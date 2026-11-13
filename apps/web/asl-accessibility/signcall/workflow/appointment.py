@@ -36,6 +36,7 @@ from .confirmation import (
     BookingDeclined,
     BookingProposal,
     CancellationUnresolved,
+    CommitmentUnresolved,
     NoMatchFound,
 )
 from .types import (
@@ -388,6 +389,25 @@ def _cancel_and_raise(
     raise RuntimeError(f"{reason} {outcome}")
 
 
+def _stop_unresolved(
+    clinic: ClinicCandidate, slot: ClinicSlot, booking: dict, who: str
+) -> NoReturn:
+    """The binding answer was unclear, so stop here: no other interpreter is
+    called, the clinic booking is left alone, and the person is told exactly
+    what is still open."""
+    reference = booking.get("booking_reference")
+    where = f" ({clinic.address})" if clinic.address else ""
+    reference_text = f" Booking reference: {reference}." if reference else ""
+    raise CommitmentUnresolved(
+        f"The answer from {who} about {slot.date} {slot.time} was unclear (the "
+        f"call did not finish or gave no clear yes or no), so nothing more was "
+        f"done: no other interpreter was called and the clinic booking was not "
+        f"cancelled. The appointment at {clinic.name}{where} is still booked "
+        f"and {who} may or may not be committed. Please contact {who} and the "
+        f"clinic to settle it.{reference_text}"
+    )
+
+
 def _confirm_freelancer(
     user: UserInput,
     clinic: ClinicCandidate,
@@ -396,11 +416,16 @@ def _confirm_freelancer(
     freelancers: list[InterpreterCandidate],
 ) -> InterpreterCandidate:
     """The binding ask, after the clinic is booked. The first freelancer to say
-    yes gets the engagement; if none does, the clinic booking is cancelled so
-    no appointment is left without an interpreter."""
+    yes gets the engagement; if every one explicitly declines, the clinic
+    booking is cancelled so no appointment is left without an interpreter. An
+    unclear answer (an unfinished call, no clear yes or no) stops the run
+    instead: see _stop_unresolved()."""
     for candidate in freelancers:
-        if interpreter_matching.confirm_interpreter(candidate, slot, clinic, user):
-            return candidate
+        try:
+            if interpreter_matching.confirm_interpreter(candidate, slot, clinic, user):
+                return candidate
+        except CommitmentUnresolved:
+            _stop_unresolved(clinic, slot, booking, candidate.name)
     _cancel_and_raise(
         user, clinic, slot, booking,
         f"Every interpreter who could cover {slot.date} {slot.time} declined "
@@ -416,11 +441,15 @@ def _confirm_family(
     member: FamilyInterpreter,
 ) -> FamilyInterpreter:
     """The binding ask for the family member the user approved, after the
-    clinic is booked. If they decline, the clinic booking is cancelled and the
-    run ends: no other family member or paid interpreter is substituted for
-    the one the user agreed to."""
-    if family_call.confirm_family_member(member, slot, user, clinic):
-        return member
+    clinic is booked. If they explicitly decline, the clinic booking is
+    cancelled and the run ends; if the answer is unclear, the run stops
+    without cancelling. Either way no other family member or paid interpreter
+    is substituted for the one the user agreed to."""
+    try:
+        if family_call.confirm_family_member(member, slot, user, clinic):
+            return member
+    except CommitmentUnresolved:
+        _stop_unresolved(clinic, slot, booking, member.name)
     _cancel_and_raise(
         user, clinic, slot, booking,
         f"{member.name} ({member.relation}), the family member you approved, "

@@ -28,6 +28,7 @@ from concurrent.futures import ThreadPoolExecutor
 
 from ..calle.run import CallPurpose, call_and_wait
 
+from .confirmation import explicit_answer
 from .types import ClinicCandidate, ClinicSlot, InterpreterCandidate, UserInput, append_note
 
 _NOTES_FIELD = {
@@ -168,7 +169,9 @@ def confirm_interpreter(
     """The one moment an interpreter is asked to commit: a live yes/no on the
     exact slot and price, made after the user approved and the clinic is
     booked. Only the person about to be hired is called, so this is where they
-    learn where the appointment is and who they are interpreting for."""
+    learn where the appointment is and who they are interpreting for. True for
+    a clear yes, False for a clear no; raises CommitmentUnresolved if the call
+    did not finish or gave no clear answer."""
     task = (
         f"Start by saying you are an AI agent calling on behalf of {user.name}. "
         f"Call this interpreter back and confirm: can they do "
@@ -182,8 +185,7 @@ def confirm_interpreter(
         purpose=CallPurpose.INTERPRETER_CONFIRM,
     )
     candidate.notes = append_note(candidate.notes, result.structured_result.get("additional_notes"))
-    # A voicemail, dropped or unfinished call is not a commitment.
-    return bool(result.task_completed and result.structured_result.get("confirmed", False))
+    return explicit_answer(result)  # raises CommitmentUnresolved if unclear
 
 
 def send_release(candidate: InterpreterCandidate, reason: str) -> None:
