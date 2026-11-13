@@ -1334,7 +1334,7 @@ def scenario_call_routing() -> None:
 
         # No configured lines, or a malformed entry, must refuse rather than guess.
         calle_run.reset_call_routing()
-        for bad in ("", "5555550101", "+1 not a number"):
+        for bad in ("", "5555550101", "+1 not a number", "+1" + "\u0661" * 7, "+1" + "\uff11" * 7):
             os.environ[calle_run.TEST_LINES_ENV] = bad
             try:
                 calle_run.resolve_dial_target("+17025557777", 0)

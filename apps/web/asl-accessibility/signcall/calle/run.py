@@ -165,7 +165,7 @@ def _create_call_with_concurrency_retry(client, **kwargs) -> dict:
 # searched on line 2 is booked on line 2.
 
 TEST_LINES_ENV = "SIGNCALL_TEST_LINES"
-_E164 = re.compile(r"^\+[1-9]\d{6,14}$")
+_E164 = re.compile(r"\+[1-9][0-9]{6,14}", re.ASCII)
 
 _line_assignments: dict[str, str] = {}
 _routing_lock = threading.Lock()
@@ -185,7 +185,7 @@ def test_lines() -> tuple[str, ...]:
     """The phones real-mode calls are routed to, from SIGNCALL_TEST_LINES
     (comma-separated E.164 numbers). Read on every call so tests can change it."""
     lines = tuple(n.strip() for n in os.environ.get(TEST_LINES_ENV, "").split(",") if n.strip())
-    bad = [n for n in lines if not _E164.match(n)]
+    bad = [n for n in lines if not _E164.fullmatch(n)]
     if bad:
         raise CallRoutingError(f"{TEST_LINES_ENV} has entries that are not E.164 numbers: {bad}")
     return lines

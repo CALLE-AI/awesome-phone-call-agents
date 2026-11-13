@@ -336,7 +336,7 @@ function wireFamilyList() {
 }
 
 function familyRows() {
-  return state.family.map((m) => [m.relation || "Family", `${m.name} \u00b7 ${m.phone}`]);
+  return state.family.map((m) => [m.relation || "Family", `${m.name} \u00b7 ${phoneEnding(m.phone)}`]);
 }
 
 function renderFamilyVerify() {
