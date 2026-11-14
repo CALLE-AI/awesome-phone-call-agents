@@ -1,0 +1,9458 @@
+{
+ "state": "IL",
+ "source": "GeoNames postal-code export (https://download.geonames.org/export/zip/), CC BY 4.0",
+ "retrieved": "2026-10-01",
+ "note": "ZIP centroids and county for Illinois. county matches the bare county names used by the Illinois Deaf and Hard of Hearing Commission licensed-interpreter directory (idhhc.illinois.gov), used to match clinic ZIP to interpreter county -- see workflow/interpreter_lookup.py.",
+ "zips": {
+  "60001": {
+   "city": "Alden",
+   "lat": 42.3248,
+   "lon": -88.4525,
+   "county": "McHenry"
+  },
+  "60002": {
+   "city": "Antioch",
+   "lat": 42.4648,
+   "lon": -88.1178,
+   "county": "Lake"
+  },
+  "60004": {
+   "city": "Arlington Heights",
+   "lat": 42.112,
+   "lon": -87.9792,
+   "county": "Cook"
+  },
+  "60005": {
+   "city": "Arlington Heights",
+   "lat": 42.0639,
+   "lon": -87.9856,
+   "county": "Cook"
+  },
+  "60006": {
+   "city": "Arlington Heights",
+   "lat": 42.0884,
+   "lon": -87.9806,
+   "county": "Cook"
+  },
+  "60007": {
+   "city": "Elk Grove Village",
+   "lat": 42.0076,
+   "lon": -87.9931,
+   "county": "Cook"
+  },
+  "60008": {
+   "city": "Rolling Meadows",
+   "lat": 42.073,
+   "lon": -88.0191,
+   "county": "Cook"
+  },
+  "60009": {
+   "city": "Elk Grove Village",
+   "lat": 42.0039,
+   "lon": -87.9703,
+   "county": "Cook"
+  },
+  "60010": {
+   "city": "Barrington",
+   "lat": 42.1614,
+   "lon": -88.1383,
+   "county": "Lake"
+  },
+  "60011": {
+   "city": "Barrington",
+   "lat": 42.3228,
+   "lon": -87.6101,
+   "county": "Lake"
+  },
+  "60012": {
+   "city": "Crystal Lake",
+   "lat": 42.2662,
+   "lon": -88.3213,
+   "county": "McHenry"
+  },
+  "60013": {
+   "city": "Cary",
+   "lat": 42.2196,
+   "lon": -88.2426,
+   "county": "McHenry"
+  },
+  "60014": {
+   "city": "Crystal Lake",
+   "lat": 42.2308,
+   "lon": -88.3324,
+   "county": "McHenry"
+  },
+  "60015": {
+   "city": "Deerfield",
+   "lat": 42.1705,
+   "lon": -87.859,
+   "county": "Lake"
+  },
+  "60016": {
+   "city": "Des Plaines",
+   "lat": 42.0467,
+   "lon": -87.8859,
+   "county": "Cook"
+  },
+  "60017": {
+   "city": "Des Plaines",
+   "lat": 42.0288,
+   "lon": -87.8944,
+   "county": "Cook"
+  },
+  "60018": {
+   "city": "Des Plaines",
+   "lat": 42.0155,
+   "lon": -87.8687,
+   "county": "Cook"
+  },
+  "60019": {
+   "city": "Des Plaines",
+   "lat": 42.0243,
+   "lon": -87.9071,
+   "county": "Cook"
+  },
+  "60020": {
+   "city": "Fox Lake",
+   "lat": 42.3937,
+   "lon": -88.1648,
+   "county": "Lake"
+  },
+  "60021": {
+   "city": "Fox River Grove",
+   "lat": 42.1936,
+   "lon": -88.2205,
+   "county": "McHenry"
+  },
+  "60022": {
+   "city": "Glencoe",
+   "lat": 42.1333,
+   "lon": -87.7615,
+   "county": "Cook"
+  },
+  "60025": {
+   "city": "Glenview",
+   "lat": 42.0758,
+   "lon": -87.8223,
+   "county": "Cook"
+  },
+  "60026": {
+   "city": "Glenview",
+   "lat": 42.0698,
+   "lon": -87.7878,
+   "county": "Cook"
+  },
+  "60029": {
+   "city": "Golf",
+   "lat": 42.058,
+   "lon": -87.7916,
+   "county": "Cook"
+  },
+  "60030": {
+   "city": "Grayslake",
+   "lat": 42.3524,
+   "lon": -88.0545,
+   "county": "Lake"
+  },
+  "60031": {
+   "city": "Gurnee",
+   "lat": 42.3669,
+   "lon": -87.9452,
+   "county": "Lake"
+  },
+  "60033": {
+   "city": "Harvard",
+   "lat": 42.4227,
+   "lon": -88.6048,
+   "county": "McHenry"
+  },
+  "60034": {
+   "city": "Hebron",
+   "lat": 42.4642,
+   "lon": -88.4176,
+   "county": "McHenry"
+  },
+  "60035": {
+   "city": "Highland Park",
+   "lat": 42.1794,
+   "lon": -87.8059,
+   "county": "Lake"
+  },
+  "60037": {
+   "city": "Fort Sheridan",
+   "lat": 42.2097,
+   "lon": -87.8056,
+   "county": "Lake"
+  },
+  "60038": {
+   "city": "Palatine",
+   "lat": 42.098,
+   "lon": -88.0141,
+   "county": "Cook"
+  },
+  "60039": {
+   "city": "Crystal Lake",
+   "lat": 42.3248,
+   "lon": -88.4525,
+   "county": "McHenry"
+  },
+  "60040": {
+   "city": "Highwood",
+   "lat": 42.2035,
+   "lon": -87.8141,
+   "county": "Lake"
+  },
+  "60041": {
+   "city": "Ingleside",
+   "lat": 42.3631,
+   "lon": -88.1587,
+   "county": "Lake"
+  },
+  "60042": {
+   "city": "Island Lake",
+   "lat": 42.2742,
+   "lon": -88.1926,
+   "county": "Lake"
+  },
+  "60043": {
+   "city": "Kenilworth",
+   "lat": 42.0884,
+   "lon": -87.7165,
+   "county": "Cook"
+  },
+  "60044": {
+   "city": "Lake Bluff",
+   "lat": 42.282,
+   "lon": -87.856,
+   "county": "Lake"
+  },
+  "60045": {
+   "city": "Lake Forest",
+   "lat": 42.2374,
+   "lon": -87.8482,
+   "county": "Lake"
+  },
+  "60046": {
+   "city": "Lake Villa",
+   "lat": 42.3813,
+   "lon": -87.9991,
+   "county": "Lake"
+  },
+  "60047": {
+   "city": "Lake Zurich",
+   "lat": 42.2165,
+   "lon": -88.0769,
+   "county": "Lake"
+  },
+  "60048": {
+   "city": "Libertyville",
+   "lat": 42.281,
+   "lon": -87.95,
+   "county": "Lake"
+  },
+  "60050": {
+   "city": "Mchenry",
+   "lat": 42.3311,
+   "lon": -88.2955,
+   "county": "McHenry"
+  },
+  "60051": {
+   "city": "Mchenry",
+   "lat": 42.3542,
+   "lon": -88.2294,
+   "county": "McHenry"
+  },
+  "60053": {
+   "city": "Morton Grove",
+   "lat": 42.0431,
+   "lon": -87.7899,
+   "county": "Cook"
+  },
+  "60055": {
+   "city": "Palatine",
+   "lat": 42.098,
+   "lon": -88.0141,
+   "county": "Cook"
+  },
+  "60056": {
+   "city": "Mount Prospect",
+   "lat": 42.0624,
+   "lon": -87.9377,
+   "county": "Cook"
+  },
+  "60060": {
+   "city": "Mundelein",
+   "lat": 42.2636,
+   "lon": -88.0048,
+   "county": "Lake"
+  },
+  "60061": {
+   "city": "Vernon Hills",
+   "lat": 42.2288,
+   "lon": -87.9719,
+   "county": "Lake"
+  },
+  "60062": {
+   "city": "Northbrook",
+   "lat": 42.1254,
+   "lon": -87.8465,
+   "county": "Cook"
+  },
+  "60064": {
+   "city": "North Chicago",
+   "lat": 42.3247,
+   "lon": -87.8564,
+   "county": "Lake"
+  },
+  "60065": {
+   "city": "Northbrook",
+   "lat": 42.1275,
+   "lon": -87.829,
+   "county": "Cook"
+  },
+  "60067": {
+   "city": "Palatine",
+   "lat": 42.1139,
+   "lon": -88.0429,
+   "county": "Cook"
+  },
+  "60068": {
+   "city": "Park Ridge",
+   "lat": 42.0122,
+   "lon": -87.8417,
+   "county": "Cook"
+  },
+  "60069": {
+   "city": "Lincolnshire",
+   "lat": 42.1976,
+   "lon": -87.9261,
+   "county": "Lake"
+  },
+  "60070": {
+   "city": "Prospect Heights",
+   "lat": 42.1058,
+   "lon": -87.9395,
+   "county": "Cook"
+  },
+  "60071": {
+   "city": "Richmond",
+   "lat": 42.4669,
+   "lon": -88.29,
+   "county": "McHenry"
+  },
+  "60072": {
+   "city": "Ringwood",
+   "lat": 42.4048,
+   "lon": -88.3054,
+   "county": "McHenry"
+  },
+  "60073": {
+   "city": "Round Lake",
+   "lat": 42.3668,
+   "lon": -88.0888,
+   "county": "Lake"
+  },
+  "60074": {
+   "city": "Palatine",
+   "lat": 42.1458,
+   "lon": -88.023,
+   "county": "Cook"
+  },
+  "60075": {
+   "city": "Russell",
+   "lat": 42.4906,
+   "lon": -87.9126,
+   "county": "Lake"
+  },
+  "60076": {
+   "city": "Skokie",
+   "lat": 42.0362,
+   "lon": -87.7328,
+   "county": "Cook"
+  },
+  "60077": {
+   "city": "Skokie",
+   "lat": 42.0345,
+   "lon": -87.7541,
+   "county": "Cook"
+  },
+  "60078": {
+   "city": "Palatine",
+   "lat": 42.1103,
+   "lon": -88.0342,
+   "county": "Cook"
+  },
+  "60079": {
+   "city": "Waukegan",
+   "lat": 42.3636,
+   "lon": -87.8448,
+   "county": "Lake"
+  },
+  "60081": {
+   "city": "Spring Grove",
+   "lat": 42.4413,
+   "lon": -88.2237,
+   "county": "McHenry"
+  },
+  "60082": {
+   "city": "Techny",
+   "lat": 42.1164,
+   "lon": -87.8121,
+   "county": "Cook"
+  },
+  "60083": {
+   "city": "Wadsworth",
+   "lat": 42.446,
+   "lon": -87.904,
+   "county": "Lake"
+  },
+  "60084": {
+   "city": "Wauconda",
+   "lat": 42.2636,
+   "lon": -88.1333,
+   "county": "Lake"
+  },
+  "60085": {
+   "city": "Waukegan",
+   "lat": 42.3542,
+   "lon": -87.8651,
+   "county": "Lake"
+  },
+  "60086": {
+   "city": "North Chicago",
+   "lat": 42.4333,
+   "lon": -87.7766,
+   "county": "Lake"
+  },
+  "60087": {
+   "city": "Waukegan",
+   "lat": 42.3989,
+   "lon": -87.8554,
+   "county": "Lake"
+  },
+  "60088": {
+   "city": "Great Lakes",
+   "lat": 42.3032,
+   "lon": -87.8642,
+   "county": "Lake"
+  },
+  "60089": {
+   "city": "Buffalo Grove",
+   "lat": 42.1598,
+   "lon": -87.9644,
+   "county": "Lake"
+  },
+  "60090": {
+   "city": "Wheeling",
+   "lat": 42.134,
+   "lon": -87.9341,
+   "county": "Cook"
+  },
+  "60091": {
+   "city": "Wilmette",
+   "lat": 42.0765,
+   "lon": -87.7246,
+   "county": "Cook"
+  },
+  "60093": {
+   "city": "Winnetka",
+   "lat": 42.1054,
+   "lon": -87.7535,
+   "county": "Cook"
+  },
+  "60094": {
+   "city": "Palatine",
+   "lat": 42.1103,
+   "lon": -88.0342,
+   "county": "Cook"
+  },
+  "60095": {
+   "city": "Palatine",
+   "lat": 42.1103,
+   "lon": -88.0342,
+   "county": "Cook"
+  },
+  "60096": {
+   "city": "Winthrop Harbor",
+   "lat": 42.4793,
+   "lon": -87.8318,
+   "county": "Lake"
+  },
+  "60097": {
+   "city": "Wonder Lake",
+   "lat": 42.3849,
+   "lon": -88.3534,
+   "county": "McHenry"
+  },
+  "60098": {
+   "city": "Woodstock",
+   "lat": 42.3198,
+   "lon": -88.4477,
+   "county": "McHenry"
+  },
+  "60099": {
+   "city": "Zion",
+   "lat": 42.4442,
+   "lon": -87.8389,
+   "county": "Lake"
+  },
+  "60101": {
+   "city": "Addison",
+   "lat": 41.9335,
+   "lon": -88.0054,
+   "county": "DuPage"
+  },
+  "60102": {
+   "city": "Algonquin",
+   "lat": 42.1641,
+   "lon": -88.3064,
+   "county": "McHenry"
+  },
+  "60103": {
+   "city": "Bartlett",
+   "lat": 41.9794,
+   "lon": -88.2063,
+   "county": "Cook"
+  },
+  "60104": {
+   "city": "Bellwood",
+   "lat": 41.8825,
+   "lon": -87.8786,
+   "county": "Cook"
+  },
+  "60105": {
+   "city": "Bensenville",
+   "lat": 41.955,
+   "lon": -87.9401,
+   "county": "DuPage"
+  },
+  "60106": {
+   "city": "Bensenville",
+   "lat": 41.9501,
+   "lon": -87.945,
+   "county": "DuPage"
+  },
+  "60107": {
+   "city": "Streamwood",
+   "lat": 42.0225,
+   "lon": -88.169,
+   "county": "Cook"
+  },
+  "60108": {
+   "city": "Bloomingdale",
+   "lat": 41.9483,
+   "lon": -88.0782,
+   "county": "DuPage"
+  },
+  "60109": {
+   "city": "Burlington",
+   "lat": 42.0458,
+   "lon": -88.539,
+   "county": "Kane"
+  },
+  "60110": {
+   "city": "Carpentersville",
+   "lat": 42.123,
+   "lon": -88.2606,
+   "county": "Kane"
+  },
+  "60111": {
+   "city": "Clare",
+   "lat": 42.0086,
+   "lon": -88.8306,
+   "county": "DeKalb"
+  },
+  "60112": {
+   "city": "Cortland",
+   "lat": 41.92,
+   "lon": -88.6887,
+   "county": "DeKalb"
+  },
+  "60113": {
+   "city": "Creston",
+   "lat": 41.9312,
+   "lon": -88.9566,
+   "county": "Ogle"
+  },
+  "60115": {
+   "city": "Dekalb",
+   "lat": 41.9008,
+   "lon": -88.7548,
+   "county": "DeKalb"
+  },
+  "60116": {
+   "city": "Carol Stream",
+   "lat": 41.9125,
+   "lon": -88.1348,
+   "county": "DuPage"
+  },
+  "60117": {
+   "city": "Bloomingdale",
+   "lat": 41.8397,
+   "lon": -88.0887,
+   "county": "DuPage"
+  },
+  "60118": {
+   "city": "Dundee",
+   "lat": 42.0962,
+   "lon": -88.2902,
+   "county": "Kane"
+  },
+  "60119": {
+   "city": "Elburn",
+   "lat": 41.8824,
+   "lon": -88.4611,
+   "county": "Kane"
+  },
+  "60120": {
+   "city": "Elgin",
+   "lat": 42.0384,
+   "lon": -88.2606,
+   "county": "Kane"
+  },
+  "60121": {
+   "city": "Elgin",
+   "lat": 42.0372,
+   "lon": -88.2812,
+   "county": "Kane"
+  },
+  "60122": {
+   "city": "Elgin",
+   "lat": 42.0671,
+   "lon": -88.305,
+   "county": "Kane"
+  },
+  "60123": {
+   "city": "Elgin",
+   "lat": 42.0376,
+   "lon": -88.3186,
+   "county": "Kane"
+  },
+  "60124": {
+   "city": "Elgin",
+   "lat": 42.0293,
+   "lon": -88.3747,
+   "county": "Kane"
+  },
+  "60126": {
+   "city": "Elmhurst",
+   "lat": 41.8927,
+   "lon": -87.941,
+   "county": "DuPage"
+  },
+  "60128": {
+   "city": "Carol Stream",
+   "lat": 41.8397,
+   "lon": -88.0887,
+   "county": "DuPage"
+  },
+  "60129": {
+   "city": "Esmond",
+   "lat": 42.0225,
+   "lon": -88.9439,
+   "county": "DeKalb"
+  },
+  "60130": {
+   "city": "Forest Park",
+   "lat": 41.8744,
+   "lon": -87.8106,
+   "county": "Cook"
+  },
+  "60131": {
+   "city": "Franklin Park",
+   "lat": 41.9339,
+   "lon": -87.8734,
+   "county": "Cook"
+  },
+  "60132": {
+   "city": "Carol Stream",
+   "lat": 41.8397,
+   "lon": -88.0887,
+   "county": "DuPage"
+  },
+  "60133": {
+   "city": "Hanover Park",
+   "lat": 41.9995,
+   "lon": -88.1451,
+   "county": "DuPage"
+  },
+  "60134": {
+   "city": "Geneva",
+   "lat": 41.886,
+   "lon": -88.311,
+   "county": "Kane"
+  },
+  "60135": {
+   "city": "Genoa",
+   "lat": 42.0981,
+   "lon": -88.6908,
+   "county": "DeKalb"
+  },
+  "60136": {
+   "city": "Gilberts",
+   "lat": 42.0984,
+   "lon": -88.3691,
+   "county": "Kane"
+  },
+  "60137": {
+   "city": "Glen Ellyn",
+   "lat": 41.8661,
+   "lon": -88.0648,
+   "county": "DuPage"
+  },
+  "60138": {
+   "city": "Glen Ellyn",
+   "lat": 41.8775,
+   "lon": -88.067,
+   "county": "DuPage"
+  },
+  "60139": {
+   "city": "Glendale Heights",
+   "lat": 41.9205,
+   "lon": -88.0793,
+   "county": "DuPage"
+  },
+  "60140": {
+   "city": "Hampshire",
+   "lat": 42.0807,
+   "lon": -88.517,
+   "county": "Kane"
+  },
+  "60141": {
+   "city": "Hines",
+   "lat": 41.8623,
+   "lon": -87.8355,
+   "county": "Cook"
+  },
+  "60142": {
+   "city": "Huntley",
+   "lat": 42.1756,
+   "lon": -88.4268,
+   "county": "McHenry"
+  },
+  "60143": {
+   "city": "Itasca",
+   "lat": 41.972,
+   "lon": -88.0202,
+   "county": "DuPage"
+  },
+  "60144": {
+   "city": "Kaneville",
+   "lat": 41.8353,
+   "lon": -88.522,
+   "county": "Kane"
+  },
+  "60145": {
+   "city": "Kingston",
+   "lat": 42.1057,
+   "lon": -88.7695,
+   "county": "DeKalb"
+  },
+  "60146": {
+   "city": "Kirkland",
+   "lat": 42.1014,
+   "lon": -88.8685,
+   "county": "DeKalb"
+  },
+  "60147": {
+   "city": "Lafox",
+   "lat": 41.937,
+   "lon": -88.4202,
+   "county": "Kane"
+  },
+  "60148": {
+   "city": "Lombard",
+   "lat": 41.8721,
+   "lon": -88.016,
+   "county": "DuPage"
+  },
+  "60150": {
+   "city": "Malta",
+   "lat": 41.9183,
+   "lon": -88.8688,
+   "county": "DeKalb"
+  },
+  "60151": {
+   "city": "Maple Park",
+   "lat": 41.9232,
+   "lon": -88.5999,
+   "county": "Kane"
+  },
+  "60152": {
+   "city": "Marengo",
+   "lat": 42.2442,
+   "lon": -88.6074,
+   "county": "McHenry"
+  },
+  "60153": {
+   "city": "Maywood",
+   "lat": 41.8793,
+   "lon": -87.8433,
+   "county": "Cook"
+  },
+  "60154": {
+   "city": "Westchester",
+   "lat": 41.8524,
+   "lon": -87.8845,
+   "county": "Cook"
+  },
+  "60155": {
+   "city": "Broadview",
+   "lat": 41.8577,
+   "lon": -87.8562,
+   "county": "Cook"
+  },
+  "60156": {
+   "city": "Lake In The Hills",
+   "lat": 42.1817,
+   "lon": -88.3304,
+   "county": "McHenry"
+  },
+  "60157": {
+   "city": "Medinah",
+   "lat": 41.9814,
+   "lon": -88.0512,
+   "county": "DuPage"
+  },
+  "60159": {
+   "city": "Schaumburg",
+   "lat": 42.0334,
+   "lon": -88.0834,
+   "county": "Cook"
+  },
+  "60160": {
+   "city": "Melrose Park",
+   "lat": 41.9003,
+   "lon": -87.8581,
+   "county": "Cook"
+  },
+  "60161": {
+   "city": "Melrose Park",
+   "lat": 41.9006,
+   "lon": -87.8567,
+   "county": "Cook"
+  },
+  "60162": {
+   "city": "Hillside",
+   "lat": 41.8725,
+   "lon": -87.9016,
+   "county": "Cook"
+  },
+  "60163": {
+   "city": "Berkeley",
+   "lat": 41.8888,
+   "lon": -87.909,
+   "county": "Cook"
+  },
+  "60164": {
+   "city": "Melrose Park",
+   "lat": 41.9214,
+   "lon": -87.8924,
+   "county": "Cook"
+  },
+  "60165": {
+   "city": "Stone Park",
+   "lat": 41.903,
+   "lon": -87.8811,
+   "county": "Cook"
+  },
+  "60168": {
+   "city": "Schaumburg",
+   "lat": 42.0334,
+   "lon": -88.0834,
+   "county": "Cook"
+  },
+  "60169": {
+   "city": "Hoffman Estates",
+   "lat": 42.0493,
+   "lon": -88.1065,
+   "county": "Cook"
+  },
+  "60171": {
+   "city": "River Grove",
+   "lat": 41.9279,
+   "lon": -87.8387,
+   "county": "Cook"
+  },
+  "60172": {
+   "city": "Roselle",
+   "lat": 41.9798,
+   "lon": -88.0857,
+   "county": "DuPage"
+  },
+  "60173": {
+   "city": "Schaumburg",
+   "lat": 42.0581,
+   "lon": -88.0482,
+   "county": "Cook"
+  },
+  "60174": {
+   "city": "Saint Charles",
+   "lat": 41.9194,
+   "lon": -88.307,
+   "county": "Kane"
+  },
+  "60175": {
+   "city": "Saint Charles",
+   "lat": 41.9478,
+   "lon": -88.3918,
+   "county": "Kane"
+  },
+  "60176": {
+   "city": "Schiller Park",
+   "lat": 41.9563,
+   "lon": -87.8692,
+   "county": "Cook"
+  },
+  "60177": {
+   "city": "South Elgin",
+   "lat": 41.9969,
+   "lon": -88.2986,
+   "county": "Kane"
+  },
+  "60178": {
+   "city": "Sycamore",
+   "lat": 41.9911,
+   "lon": -88.6928,
+   "county": "DeKalb"
+  },
+  "60179": {
+   "city": "Hoffman Estates",
+   "lat": 42.0793,
+   "lon": -88.2237,
+   "county": "Cook"
+  },
+  "60180": {
+   "city": "Union",
+   "lat": 42.2103,
+   "lon": -88.5283,
+   "county": "McHenry"
+  },
+  "60181": {
+   "city": "Villa Park",
+   "lat": 41.8799,
+   "lon": -87.9782,
+   "county": "DuPage"
+  },
+  "60183": {
+   "city": "Wasco",
+   "lat": 41.937,
+   "lon": -88.4202,
+   "county": "Kane"
+  },
+  "60184": {
+   "city": "Wayne",
+   "lat": 41.9525,
+   "lon": -88.2536,
+   "county": "DuPage"
+  },
+  "60185": {
+   "city": "West Chicago",
+   "lat": 41.8886,
+   "lon": -88.2022,
+   "county": "DuPage"
+  },
+  "60186": {
+   "city": "West Chicago",
+   "lat": 41.8848,
+   "lon": -88.204,
+   "county": "DuPage"
+  },
+  "60187": {
+   "city": "Wheaton",
+   "lat": 41.8724,
+   "lon": -88.1123,
+   "county": "DuPage"
+  },
+  "60188": {
+   "city": "Carol Stream",
+   "lat": 41.9178,
+   "lon": -88.137,
+   "county": "DuPage"
+  },
+  "60189": {
+   "city": "Wheaton",
+   "lat": 41.8397,
+   "lon": -88.0887,
+   "county": "DuPage"
+  },
+  "60190": {
+   "city": "Winfield",
+   "lat": 41.8744,
+   "lon": -88.1516,
+   "county": "DuPage"
+  },
+  "60191": {
+   "city": "Wood Dale",
+   "lat": 41.9602,
+   "lon": -87.981,
+   "county": "DuPage"
+  },
+  "60192": {
+   "city": "Hoffman Estates",
+   "lat": 42.0428,
+   "lon": -88.0798,
+   "county": "Cook"
+  },
+  "60193": {
+   "city": "Schaumburg",
+   "lat": 42.0144,
+   "lon": -88.0935,
+   "county": "Cook"
+  },
+  "60194": {
+   "city": "Schaumburg",
+   "lat": 42.0289,
+   "lon": -88.1167,
+   "county": "Cook"
+  },
+  "60195": {
+   "city": "Schaumburg",
+   "lat": 42.0764,
+   "lon": -88.1093,
+   "county": "Cook"
+  },
+  "60196": {
+   "city": "Schaumburg",
+   "lat": 42.0564,
+   "lon": -88.0725,
+   "county": "Cook"
+  },
+  "60197": {
+   "city": "Carol Stream",
+   "lat": 41.9125,
+   "lon": -88.1348,
+   "county": "DuPage"
+  },
+  "60199": {
+   "city": "Carol Stream",
+   "lat": 41.8397,
+   "lon": -88.0887,
+   "county": "DuPage"
+  },
+  "60201": {
+   "city": "Evanston",
+   "lat": 42.0546,
+   "lon": -87.6943,
+   "county": "Cook"
+  },
+  "60202": {
+   "city": "Evanston",
+   "lat": 42.0302,
+   "lon": -87.6865,
+   "county": "Cook"
+  },
+  "60203": {
+   "city": "Evanston",
+   "lat": 42.0485,
+   "lon": -87.7176,
+   "county": "Cook"
+  },
+  "60204": {
+   "city": "Evanston",
+   "lat": 42.0411,
+   "lon": -87.6901,
+   "county": "Cook"
+  },
+  "60208": {
+   "city": "Evanston",
+   "lat": 42.0586,
+   "lon": -87.6845,
+   "county": "Cook"
+  },
+  "60209": {
+   "city": "Evanston",
+   "lat": 42.0497,
+   "lon": -87.6794,
+   "county": "Cook"
+  },
+  "60301": {
+   "city": "Oak Park",
+   "lat": 41.8886,
+   "lon": -87.7986,
+   "county": "Cook"
+  },
+  "60302": {
+   "city": "Oak Park",
+   "lat": 41.8925,
+   "lon": -87.7895,
+   "county": "Cook"
+  },
+  "60303": {
+   "city": "Oak Park",
+   "lat": 41.885,
+   "lon": -87.7845,
+   "county": "Cook"
+  },
+  "60304": {
+   "city": "Oak Park",
+   "lat": 41.8725,
+   "lon": -87.7877,
+   "county": "Cook"
+  },
+  "60305": {
+   "city": "River Forest",
+   "lat": 41.8951,
+   "lon": -87.8159,
+   "county": "Cook"
+  },
+  "60399": {
+   "city": "Wood Dale",
+   "lat": 41.9545,
+   "lon": -87.9377,
+   "county": "DuPage"
+  },
+  "60401": {
+   "city": "Beecher",
+   "lat": 41.3444,
+   "lon": -87.6115,
+   "county": "Will"
+  },
+  "60402": {
+   "city": "Berwyn",
+   "lat": 41.8347,
+   "lon": -87.7914,
+   "county": "Cook"
+  },
+  "60403": {
+   "city": "Crest Hill",
+   "lat": 41.5548,
+   "lon": -88.0987,
+   "county": "Will"
+  },
+  "60404": {
+   "city": "Shorewood",
+   "lat": 41.5076,
+   "lon": -88.2169,
+   "county": "Will"
+  },
+  "60406": {
+   "city": "Blue Island",
+   "lat": 41.6582,
+   "lon": -87.6795,
+   "county": "Cook"
+  },
+  "60407": {
+   "city": "Braceville",
+   "lat": 41.2288,
+   "lon": -88.269,
+   "county": "Grundy"
+  },
+  "60408": {
+   "city": "Braidwood",
+   "lat": 41.2657,
+   "lon": -88.2231,
+   "county": "Will"
+  },
+  "60409": {
+   "city": "Calumet City",
+   "lat": 41.6153,
+   "lon": -87.5483,
+   "county": "Cook"
+  },
+  "60410": {
+   "city": "Channahon",
+   "lat": 41.4347,
+   "lon": -88.2138,
+   "county": "Will"
+  },
+  "60411": {
+   "city": "Chicago Heights",
+   "lat": 41.5087,
+   "lon": -87.5904,
+   "county": "Cook"
+  },
+  "60412": {
+   "city": "Chicago Heights",
+   "lat": 41.5061,
+   "lon": -87.6356,
+   "county": "Cook"
+  },
+  "60415": {
+   "city": "Chicago Ridge",
+   "lat": 41.7017,
+   "lon": -87.7774,
+   "county": "Cook"
+  },
+  "60416": {
+   "city": "Coal City",
+   "lat": 41.2908,
+   "lon": -88.2823,
+   "county": "Grundy"
+  },
+  "60417": {
+   "city": "Crete",
+   "lat": 41.439,
+   "lon": -87.6027,
+   "county": "Will"
+  },
+  "60418": {
+   "city": "Crestwood",
+   "lat": 41.6446,
+   "lon": -87.7415,
+   "county": "Cook"
+  },
+  "60419": {
+   "city": "Dolton",
+   "lat": 41.6257,
+   "lon": -87.598,
+   "county": "Cook"
+  },
+  "60420": {
+   "city": "Dwight",
+   "lat": 41.0887,
+   "lon": -88.4159,
+   "county": "Livingston"
+  },
+  "60421": {
+   "city": "Elwood",
+   "lat": 41.426,
+   "lon": -88.0864,
+   "county": "Will"
+  },
+  "60422": {
+   "city": "Flossmoor",
+   "lat": 41.5406,
+   "lon": -87.6837,
+   "county": "Cook"
+  },
+  "60423": {
+   "city": "Frankfort",
+   "lat": 41.5094,
+   "lon": -87.8248,
+   "county": "Will"
+  },
+  "60424": {
+   "city": "Gardner",
+   "lat": 41.1775,
+   "lon": -88.338,
+   "county": "Grundy"
+  },
+  "60425": {
+   "city": "Glenwood",
+   "lat": 41.5467,
+   "lon": -87.6126,
+   "county": "Cook"
+  },
+  "60426": {
+   "city": "Harvey",
+   "lat": 41.6103,
+   "lon": -87.6534,
+   "county": "Cook"
+  },
+  "60428": {
+   "city": "Markham",
+   "lat": 41.5998,
+   "lon": -87.6906,
+   "county": "Will"
+  },
+  "60429": {
+   "city": "Hazel Crest",
+   "lat": 41.5738,
+   "lon": -87.6849,
+   "county": "Cook"
+  },
+  "60430": {
+   "city": "Homewood",
+   "lat": 41.5556,
+   "lon": -87.6616,
+   "county": "Cook"
+  },
+  "60431": {
+   "city": "Joliet",
+   "lat": 41.4712,
+   "lon": -87.9391,
+   "county": "Will"
+  },
+  "60432": {
+   "city": "Joliet",
+   "lat": 41.5378,
+   "lon": -88.0572,
+   "county": "Will"
+  },
+  "60433": {
+   "city": "Joliet",
+   "lat": 41.5119,
+   "lon": -88.0569,
+   "county": "Will"
+  },
+  "60434": {
+   "city": "Joliet",
+   "lat": 41.5254,
+   "lon": -88.0842,
+   "county": "Will"
+  },
+  "60435": {
+   "city": "Joliet",
+   "lat": 41.5454,
+   "lon": -88.1299,
+   "county": "Will"
+  },
+  "60436": {
+   "city": "Joliet",
+   "lat": 41.4884,
+   "lon": -88.1572,
+   "county": "Will"
+  },
+  "60437": {
+   "city": "Kinsman",
+   "lat": 41.1631,
+   "lon": -88.5535,
+   "county": "Grundy"
+  },
+  "60438": {
+   "city": "Lansing",
+   "lat": 41.566,
+   "lon": -87.5446,
+   "county": "Cook"
+  },
+  "60439": {
+   "city": "Lemont",
+   "lat": 41.7074,
+   "lon": -87.9756,
+   "county": "DuPage"
+  },
+  "60440": {
+   "city": "Bolingbrook",
+   "lat": 41.6976,
+   "lon": -88.0873,
+   "county": "Will"
+  },
+  "60441": {
+   "city": "Lockport",
+   "lat": 41.593,
+   "lon": -88.0507,
+   "county": "Will"
+  },
+  "60442": {
+   "city": "Manhattan",
+   "lat": 41.4289,
+   "lon": -87.9771,
+   "county": "Will"
+  },
+  "60443": {
+   "city": "Matteson",
+   "lat": 41.5102,
+   "lon": -87.7406,
+   "county": "Cook"
+  },
+  "60444": {
+   "city": "Mazon",
+   "lat": 41.2264,
+   "lon": -88.4217,
+   "county": "Grundy"
+  },
+  "60445": {
+   "city": "Midlothian",
+   "lat": 41.635,
+   "lon": -87.7362,
+   "county": "Cook"
+  },
+  "60446": {
+   "city": "Romeoville",
+   "lat": 41.6404,
+   "lon": -88.0696,
+   "county": "Will"
+  },
+  "60447": {
+   "city": "Minooka",
+   "lat": 41.4615,
+   "lon": -88.2786,
+   "county": "Grundy"
+  },
+  "60448": {
+   "city": "Mokena",
+   "lat": 41.5342,
+   "lon": -87.8911,
+   "county": "Will"
+  },
+  "60449": {
+   "city": "Monee",
+   "lat": 41.4191,
+   "lon": -87.7748,
+   "county": "Will"
+  },
+  "60450": {
+   "city": "Morris",
+   "lat": 41.3672,
+   "lon": -88.4178,
+   "county": "Grundy"
+  },
+  "60451": {
+   "city": "New Lenox",
+   "lat": 41.5067,
+   "lon": -87.9631,
+   "county": "Will"
+  },
+  "60452": {
+   "city": "Oak Forest",
+   "lat": 41.6077,
+   "lon": -87.7542,
+   "county": "Cook"
+  },
+  "60453": {
+   "city": "Oak Lawn",
+   "lat": 41.7143,
+   "lon": -87.7516,
+   "county": "Cook"
+  },
+  "60454": {
+   "city": "Oak Lawn",
+   "lat": 41.8119,
+   "lon": -87.6873,
+   "county": "Cook"
+  },
+  "60455": {
+   "city": "Bridgeview",
+   "lat": 41.7431,
+   "lon": -87.8066,
+   "county": "Cook"
+  },
+  "60456": {
+   "city": "Hometown",
+   "lat": 41.7311,
+   "lon": -87.7315,
+   "county": "Cook"
+  },
+  "60457": {
+   "city": "Hickory Hills",
+   "lat": 41.7262,
+   "lon": -87.8289,
+   "county": "Cook"
+  },
+  "60458": {
+   "city": "Justice",
+   "lat": 41.7447,
+   "lon": -87.8346,
+   "county": "Cook"
+  },
+  "60459": {
+   "city": "Burbank",
+   "lat": 41.7447,
+   "lon": -87.7699,
+   "county": "Cook"
+  },
+  "60460": {
+   "city": "Odell",
+   "lat": 41.0238,
+   "lon": -88.5156,
+   "county": "Livingston"
+  },
+  "60461": {
+   "city": "Olympia Fields",
+   "lat": 41.5134,
+   "lon": -87.6742,
+   "county": "Cook"
+  },
+  "60462": {
+   "city": "Orland Park",
+   "lat": 41.6194,
+   "lon": -87.8423,
+   "county": "Cook"
+  },
+  "60463": {
+   "city": "Palos Heights",
+   "lat": 41.6621,
+   "lon": -87.7927,
+   "county": "Cook"
+  },
+  "60464": {
+   "city": "Palos Park",
+   "lat": 41.6624,
+   "lon": -87.8521,
+   "county": "Cook"
+  },
+  "60465": {
+   "city": "Palos Hills",
+   "lat": 41.7004,
+   "lon": -87.8263,
+   "county": "Cook"
+  },
+  "60466": {
+   "city": "Park Forest",
+   "lat": 41.479,
+   "lon": -87.6828,
+   "county": "Cook"
+  },
+  "60467": {
+   "city": "Orland Park",
+   "lat": 41.6018,
+   "lon": -87.8899,
+   "county": "Cook"
+  },
+  "60468": {
+   "city": "Peotone",
+   "lat": 41.3361,
+   "lon": -87.7897,
+   "county": "Will"
+  },
+  "60469": {
+   "city": "Posen",
+   "lat": 41.6277,
+   "lon": -87.6872,
+   "county": "Cook"
+  },
+  "60470": {
+   "city": "Ransom",
+   "lat": 41.153,
+   "lon": -88.6502,
+   "county": "LaSalle"
+  },
+  "60471": {
+   "city": "Richton Park",
+   "lat": 41.4819,
+   "lon": -87.7238,
+   "county": "Cook"
+  },
+  "60472": {
+   "city": "Robbins",
+   "lat": 41.6423,
+   "lon": -87.7089,
+   "county": "Cook"
+  },
+  "60473": {
+   "city": "South Holland",
+   "lat": 41.5979,
+   "lon": -87.5938,
+   "county": "Cook"
+  },
+  "60474": {
+   "city": "South Wilmington",
+   "lat": 41.1728,
+   "lon": -88.2767,
+   "county": "Grundy"
+  },
+  "60475": {
+   "city": "Steger",
+   "lat": 41.4686,
+   "lon": -87.6386,
+   "county": "Cook"
+  },
+  "60476": {
+   "city": "Thornton",
+   "lat": 41.5727,
+   "lon": -87.6078,
+   "county": "Cook"
+  },
+  "60477": {
+   "city": "Tinley Park",
+   "lat": 41.5825,
+   "lon": -87.805,
+   "county": "Cook"
+  },
+  "60478": {
+   "city": "Country Club Hills",
+   "lat": 41.5637,
+   "lon": -87.7247,
+   "county": "Cook"
+  },
+  "60479": {
+   "city": "Verona",
+   "lat": 41.2501,
+   "lon": -88.517,
+   "county": "Grundy"
+  },
+  "60480": {
+   "city": "Willow Springs",
+   "lat": 41.7364,
+   "lon": -87.8786,
+   "county": "Cook"
+  },
+  "60481": {
+   "city": "Wilmington",
+   "lat": 41.3078,
+   "lon": -88.1467,
+   "county": "Will"
+  },
+  "60482": {
+   "city": "Worth",
+   "lat": 41.6895,
+   "lon": -87.7863,
+   "county": "Cook"
+  },
+  "60484": {
+   "city": "University Park",
+   "lat": 41.4418,
+   "lon": -87.7101,
+   "county": "Will"
+  },
+  "60487": {
+   "city": "Tinley Park",
+   "lat": 41.5636,
+   "lon": -87.8342,
+   "county": "Will"
+  },
+  "60490": {
+   "city": "Bolingbrook",
+   "lat": 41.679,
+   "lon": -88.1403,
+   "county": "Will"
+  },
+  "60491": {
+   "city": "Homer Glen",
+   "lat": 41.6028,
+   "lon": -87.9599,
+   "county": "Will"
+  },
+  "60499": {
+   "city": "Bedford Park",
+   "lat": 41.8119,
+   "lon": -87.6873,
+   "county": "Cook"
+  },
+  "60501": {
+   "city": "Summit Argo",
+   "lat": 41.7801,
+   "lon": -87.824,
+   "county": "Cook"
+  },
+  "60502": {
+   "city": "Aurora",
+   "lat": 41.7845,
+   "lon": -88.2616,
+   "county": "Kane"
+  },
+  "60503": {
+   "city": "Aurora",
+   "lat": 41.7199,
+   "lon": -88.2548,
+   "county": "Will"
+  },
+  "60504": {
+   "city": "Aurora",
+   "lat": 41.7523,
+   "lon": -88.2453,
+   "county": "DuPage"
+  },
+  "60505": {
+   "city": "Aurora",
+   "lat": 41.7582,
+   "lon": -88.2971,
+   "county": "Kane"
+  },
+  "60506": {
+   "city": "Aurora",
+   "lat": 41.7664,
+   "lon": -88.3446,
+   "county": "Kane"
+  },
+  "60507": {
+   "city": "Aurora",
+   "lat": 41.7606,
+   "lon": -88.3201,
+   "county": "Kane"
+  },
+  "60510": {
+   "city": "Batavia",
+   "lat": 41.8482,
+   "lon": -88.3098,
+   "county": "Kane"
+  },
+  "60511": {
+   "city": "Big Rock",
+   "lat": 41.7593,
+   "lon": -88.5376,
+   "county": "Kane"
+  },
+  "60512": {
+   "city": "Bristol",
+   "lat": 41.7016,
+   "lon": -88.4398,
+   "county": "Kendall"
+  },
+  "60513": {
+   "city": "Brookfield",
+   "lat": 41.8217,
+   "lon": -87.8492,
+   "county": "Cook"
+  },
+  "60514": {
+   "city": "Clarendon Hills",
+   "lat": 41.7965,
+   "lon": -87.9569,
+   "county": "DuPage"
+  },
+  "60515": {
+   "city": "Downers Grove",
+   "lat": 41.8034,
+   "lon": -88.0138,
+   "county": "DuPage"
+  },
+  "60516": {
+   "city": "Downers Grove",
+   "lat": 41.7602,
+   "lon": -88.0159,
+   "county": "DuPage"
+  },
+  "60517": {
+   "city": "Woodridge",
+   "lat": 41.7518,
+   "lon": -88.0489,
+   "county": "DuPage"
+  },
+  "60518": {
+   "city": "Earlville",
+   "lat": 41.5859,
+   "lon": -88.9103,
+   "county": "LaSalle"
+  },
+  "60519": {
+   "city": "Eola",
+   "lat": 41.7775,
+   "lon": -88.2428,
+   "county": "DuPage"
+  },
+  "60520": {
+   "city": "Hinckley",
+   "lat": 41.7691,
+   "lon": -88.6448,
+   "county": "DeKalb"
+  },
+  "60521": {
+   "city": "Hinsdale",
+   "lat": 41.8001,
+   "lon": -87.9287,
+   "county": "DuPage"
+  },
+  "60522": {
+   "city": "Hinsdale",
+   "lat": 41.8397,
+   "lon": -88.0887,
+   "county": "DuPage"
+  },
+  "60523": {
+   "city": "Oak Brook",
+   "lat": 41.8371,
+   "lon": -87.9638,
+   "county": "DuPage"
+  },
+  "60525": {
+   "city": "La Grange",
+   "lat": 41.7842,
+   "lon": -87.8689,
+   "county": "Cook"
+  },
+  "60526": {
+   "city": "La Grange Park",
+   "lat": 41.8318,
+   "lon": -87.874,
+   "county": "Cook"
+  },
+  "60527": {
+   "city": "Willowbrook",
+   "lat": 41.7447,
+   "lon": -87.9334,
+   "county": "DuPage"
+  },
+  "60530": {
+   "city": "Lee",
+   "lat": 41.7864,
+   "lon": -88.9714,
+   "county": "Lee"
+  },
+  "60531": {
+   "city": "Leland",
+   "lat": 41.6066,
+   "lon": -88.7716,
+   "county": "LaSalle"
+  },
+  "60532": {
+   "city": "Lisle",
+   "lat": 41.7862,
+   "lon": -88.0879,
+   "county": "DuPage"
+  },
+  "60534": {
+   "city": "Lyons",
+   "lat": 41.813,
+   "lon": -87.8236,
+   "county": "Cook"
+  },
+  "60536": {
+   "city": "Millbrook",
+   "lat": 41.5984,
+   "lon": -88.5529,
+   "county": "Kendall"
+  },
+  "60537": {
+   "city": "Millington",
+   "lat": 41.5614,
+   "lon": -88.5975,
+   "county": "Kendall"
+  },
+  "60538": {
+   "city": "Montgomery",
+   "lat": 41.7177,
+   "lon": -88.332,
+   "county": "Kendall"
+  },
+  "60539": {
+   "city": "Mooseheart",
+   "lat": 41.8241,
+   "lon": -88.3315,
+   "county": "Kane"
+  },
+  "60540": {
+   "city": "Naperville",
+   "lat": 41.7662,
+   "lon": -88.141,
+   "county": "DuPage"
+  },
+  "60541": {
+   "city": "Newark",
+   "lat": 41.5267,
+   "lon": -88.527,
+   "county": "Kendall"
+  },
+  "60542": {
+   "city": "North Aurora",
+   "lat": 41.8089,
+   "lon": -88.3274,
+   "county": "Kane"
+  },
+  "60543": {
+   "city": "Oswego",
+   "lat": 41.6849,
+   "lon": -88.3453,
+   "county": "Kendall"
+  },
+  "60544": {
+   "city": "Plainfield",
+   "lat": 41.6009,
+   "lon": -88.1994,
+   "county": "Will"
+  },
+  "60545": {
+   "city": "Plano",
+   "lat": 41.667,
+   "lon": -88.5384,
+   "county": "Kendall"
+  },
+  "60546": {
+   "city": "Riverside",
+   "lat": 41.8379,
+   "lon": -87.8213,
+   "county": "Cook"
+  },
+  "60548": {
+   "city": "Sandwich",
+   "lat": 41.6353,
+   "lon": -88.6393,
+   "county": "DeKalb"
+  },
+  "60549": {
+   "city": "Serena",
+   "lat": 41.4995,
+   "lon": -88.7509,
+   "county": "LaSalle"
+  },
+  "60550": {
+   "city": "Shabbona",
+   "lat": 41.7638,
+   "lon": -88.8752,
+   "county": "DeKalb"
+  },
+  "60551": {
+   "city": "Sheridan",
+   "lat": 41.5164,
+   "lon": -88.6706,
+   "county": "LaSalle"
+  },
+  "60552": {
+   "city": "Somonauk",
+   "lat": 41.6383,
+   "lon": -88.6816,
+   "county": "DeKalb"
+  },
+  "60553": {
+   "city": "Steward",
+   "lat": 41.8475,
+   "lon": -89.0151,
+   "county": "Lee"
+  },
+  "60554": {
+   "city": "Sugar Grove",
+   "lat": 41.7741,
+   "lon": -88.4397,
+   "county": "Kane"
+  },
+  "60555": {
+   "city": "Warrenville",
+   "lat": 41.828,
+   "lon": -88.1921,
+   "county": "DuPage"
+  },
+  "60556": {
+   "city": "Waterman",
+   "lat": 41.7504,
+   "lon": -88.7754,
+   "county": "DeKalb"
+  },
+  "60557": {
+   "city": "Wedron",
+   "lat": 41.4409,
+   "lon": -88.7703,
+   "county": "LaSalle"
+  },
+  "60558": {
+   "city": "Western Springs",
+   "lat": 41.8049,
+   "lon": -87.8995,
+   "county": "Cook"
+  },
+  "60559": {
+   "city": "Westmont",
+   "lat": 41.7728,
+   "lon": -87.9757,
+   "county": "DuPage"
+  },
+  "60560": {
+   "city": "Yorkville",
+   "lat": 41.6387,
+   "lon": -88.4438,
+   "county": "Kendall"
+  },
+  "60561": {
+   "city": "Darien",
+   "lat": 41.7434,
+   "lon": -87.9805,
+   "county": "DuPage"
+  },
+  "60563": {
+   "city": "Naperville",
+   "lat": 41.7895,
+   "lon": -88.169,
+   "county": "DuPage"
+  },
+  "60564": {
+   "city": "Naperville",
+   "lat": 41.704,
+   "lon": -88.1952,
+   "county": "Will"
+  },
+  "60565": {
+   "city": "Naperville",
+   "lat": 41.7328,
+   "lon": -88.1282,
+   "county": "DuPage"
+  },
+  "60566": {
+   "city": "Naperville",
+   "lat": 41.8397,
+   "lon": -88.0887,
+   "county": "DuPage"
+  },
+  "60567": {
+   "city": "Naperville",
+   "lat": 41.7859,
+   "lon": -88.1473,
+   "county": "DuPage"
+  },
+  "60568": {
+   "city": "Aurora",
+   "lat": 41.7606,
+   "lon": -88.3201,
+   "county": "Kane"
+  },
+  "60569": {
+   "city": "Aurora",
+   "lat": 41.8122,
+   "lon": -88.2172,
+   "county": "DuPage"
+  },
+  "60572": {
+   "city": "Aurora",
+   "lat": 41.7606,
+   "lon": -88.3201,
+   "county": "DuPage"
+  },
+  "60585": {
+   "city": "Plainfield",
+   "lat": 41.6558,
+   "lon": -88.2203,
+   "county": "Will"
+  },
+  "60586": {
+   "city": "Plainfield",
+   "lat": 41.5642,
+   "lon": -88.2178,
+   "county": "Will"
+  },
+  "60598": {
+   "city": "Aurora",
+   "lat": 41.8397,
+   "lon": -88.0887,
+   "county": "DuPage"
+  },
+  "60599": {
+   "city": "Fox Valley",
+   "lat": 41.8397,
+   "lon": -88.0887,
+   "county": "DuPage"
+  },
+  "60601": {
+   "city": "Chicago",
+   "lat": 41.8858,
+   "lon": -87.6181,
+   "county": "Cook"
+  },
+  "60602": {
+   "city": "Chicago",
+   "lat": 41.8829,
+   "lon": -87.6321,
+   "county": "Cook"
+  },
+  "60603": {
+   "city": "Chicago",
+   "lat": 41.8798,
+   "lon": -87.6285,
+   "county": "Cook"
+  },
+  "60604": {
+   "city": "Chicago",
+   "lat": 41.8785,
+   "lon": -87.633,
+   "county": "Cook"
+  },
+  "60605": {
+   "city": "Chicago",
+   "lat": 41.8713,
+   "lon": -87.6277,
+   "county": "Cook"
+  },
+  "60606": {
+   "city": "Chicago",
+   "lat": 41.8868,
+   "lon": -87.6386,
+   "county": "Cook"
+  },
+  "60607": {
+   "city": "Chicago",
+   "lat": 41.8721,
+   "lon": -87.6578,
+   "county": "Cook"
+  },
+  "60608": {
+   "city": "Chicago",
+   "lat": 41.8515,
+   "lon": -87.6694,
+   "county": "Cook"
+  },
+  "60609": {
+   "city": "Chicago",
+   "lat": 41.8097,
+   "lon": -87.6533,
+   "county": "Cook"
+  },
+  "60610": {
+   "city": "Chicago",
+   "lat": 41.9033,
+   "lon": -87.6336,
+   "county": "Cook"
+  },
+  "60611": {
+   "city": "Chicago",
+   "lat": 41.8971,
+   "lon": -87.6223,
+   "county": "Cook"
+  },
+  "60612": {
+   "city": "Chicago",
+   "lat": 41.8805,
+   "lon": -87.6873,
+   "county": "Cook"
+  },
+  "60613": {
+   "city": "Chicago",
+   "lat": 41.9543,
+   "lon": -87.6575,
+   "county": "Cook"
+  },
+  "60614": {
+   "city": "Chicago",
+   "lat": 41.9229,
+   "lon": -87.6483,
+   "county": "Cook"
+  },
+  "60615": {
+   "city": "Chicago",
+   "lat": 41.8022,
+   "lon": -87.6006,
+   "county": "Cook"
+  },
+  "60616": {
+   "city": "Chicago",
+   "lat": 41.8426,
+   "lon": -87.6306,
+   "county": "Cook"
+  },
+  "60617": {
+   "city": "Chicago",
+   "lat": 41.7257,
+   "lon": -87.556,
+   "county": "Cook"
+  },
+  "60618": {
+   "city": "Chicago",
+   "lat": 41.9464,
+   "lon": -87.7042,
+   "county": "Cook"
+  },
+  "60619": {
+   "city": "Chicago",
+   "lat": 41.7458,
+   "lon": -87.6054,
+   "county": "Cook"
+  },
+  "60620": {
+   "city": "Chicago",
+   "lat": 41.7411,
+   "lon": -87.6543,
+   "county": "Cook"
+  },
+  "60621": {
+   "city": "Chicago",
+   "lat": 41.775,
+   "lon": -87.6421,
+   "county": "Cook"
+  },
+  "60622": {
+   "city": "Chicago",
+   "lat": 41.9019,
+   "lon": -87.6779,
+   "county": "Cook"
+  },
+  "60623": {
+   "city": "Chicago",
+   "lat": 41.849,
+   "lon": -87.7157,
+   "county": "Cook"
+  },
+  "60624": {
+   "city": "Chicago",
+   "lat": 41.8804,
+   "lon": -87.7223,
+   "county": "Cook"
+  },
+  "60625": {
+   "city": "Chicago",
+   "lat": 41.9703,
+   "lon": -87.7042,
+   "county": "Cook"
+  },
+  "60626": {
+   "city": "Chicago",
+   "lat": 42.0095,
+   "lon": -87.6689,
+   "county": "Cook"
+  },
+  "60628": {
+   "city": "Chicago",
+   "lat": 41.6934,
+   "lon": -87.6243,
+   "county": "Cook"
+  },
+  "60629": {
+   "city": "Chicago",
+   "lat": 41.7781,
+   "lon": -87.7069,
+   "county": "Cook"
+  },
+  "60630": {
+   "city": "Chicago",
+   "lat": 41.9699,
+   "lon": -87.7603,
+   "county": "Cook"
+  },
+  "60631": {
+   "city": "Chicago",
+   "lat": 41.9951,
+   "lon": -87.8082,
+   "county": "Cook"
+  },
+  "60632": {
+   "city": "Chicago",
+   "lat": 41.8093,
+   "lon": -87.7052,
+   "county": "Cook"
+  },
+  "60633": {
+   "city": "Chicago",
+   "lat": 41.6642,
+   "lon": -87.5612,
+   "county": "Cook"
+  },
+  "60634": {
+   "city": "Chicago",
+   "lat": 41.9463,
+   "lon": -87.8061,
+   "county": "Cook"
+  },
+  "60636": {
+   "city": "Chicago",
+   "lat": 41.776,
+   "lon": -87.6674,
+   "county": "Cook"
+  },
+  "60637": {
+   "city": "Chicago",
+   "lat": 41.7813,
+   "lon": -87.6051,
+   "county": "Cook"
+  },
+  "60638": {
+   "city": "Chicago",
+   "lat": 41.7814,
+   "lon": -87.7705,
+   "county": "Cook"
+  },
+  "60639": {
+   "city": "Chicago",
+   "lat": 41.9202,
+   "lon": -87.7535,
+   "county": "Cook"
+  },
+  "60640": {
+   "city": "Chicago",
+   "lat": 41.9719,
+   "lon": -87.6624,
+   "county": "Cook"
+  },
+  "60641": {
+   "city": "Chicago",
+   "lat": 41.9453,
+   "lon": -87.7474,
+   "county": "Cook"
+  },
+  "60642": {
+   "city": "Chicago",
+   "lat": 41.9008,
+   "lon": -87.6528,
+   "county": "Cook"
+  },
+  "60643": {
+   "city": "Chicago",
+   "lat": 41.6996,
+   "lon": -87.6628,
+   "county": "Cook"
+  },
+  "60644": {
+   "city": "Chicago",
+   "lat": 41.8829,
+   "lon": -87.7582,
+   "county": "Cook"
+  },
+  "60645": {
+   "city": "Chicago",
+   "lat": 42.0086,
+   "lon": -87.6947,
+   "county": "Cook"
+  },
+  "60646": {
+   "city": "Chicago",
+   "lat": 41.993,
+   "lon": -87.7596,
+   "county": "Cook"
+  },
+  "60647": {
+   "city": "Chicago",
+   "lat": 41.9209,
+   "lon": -87.7043,
+   "county": "Cook"
+  },
+  "60649": {
+   "city": "Chicago",
+   "lat": 41.762,
+   "lon": -87.5703,
+   "county": "Cook"
+  },
+  "60651": {
+   "city": "Chicago",
+   "lat": 41.9025,
+   "lon": -87.7393,
+   "county": "Cook"
+  },
+  "60652": {
+   "city": "Chicago",
+   "lat": 41.7454,
+   "lon": -87.7135,
+   "county": "Cook"
+  },
+  "60653": {
+   "city": "Chicago",
+   "lat": 41.8196,
+   "lon": -87.6126,
+   "county": "Cook"
+  },
+  "60654": {
+   "city": "Chicago",
+   "lat": 41.8923,
+   "lon": -87.6373,
+   "county": "Cook"
+  },
+  "60655": {
+   "city": "Chicago",
+   "lat": 41.6948,
+   "lon": -87.7038,
+   "county": "Cook"
+  },
+  "60656": {
+   "city": "Chicago",
+   "lat": 41.9735,
+   "lon": -87.8658,
+   "county": "Cook"
+  },
+  "60657": {
+   "city": "Chicago",
+   "lat": 41.9399,
+   "lon": -87.6528,
+   "county": "Cook"
+  },
+  "60659": {
+   "city": "Chicago",
+   "lat": 41.9972,
+   "lon": -87.7166,
+   "county": "Cook"
+  },
+  "60660": {
+   "city": "Chicago",
+   "lat": 41.9909,
+   "lon": -87.6629,
+   "county": "Cook"
+  },
+  "60661": {
+   "city": "Chicago",
+   "lat": 41.8814,
+   "lon": -87.643,
+   "county": "Cook"
+  },
+  "60664": {
+   "city": "Chicago",
+   "lat": 41.8119,
+   "lon": -87.6873,
+   "county": "Cook"
+  },
+  "60666": {
+   "city": "Chicago",
+   "lat": 41.85,
+   "lon": -87.6501,
+   "county": "Cook"
+  },
+  "60668": {
+   "city": "Chicago",
+   "lat": 41.8119,
+   "lon": -87.6873,
+   "county": "Cook"
+  },
+  "60669": {
+   "city": "Chicago",
+   "lat": 41.8119,
+   "lon": -87.6873,
+   "county": "Cook"
+  },
+  "60670": {
+   "city": "Chicago",
+   "lat": 41.8119,
+   "lon": -87.6873,
+   "county": "Cook"
+  },
+  "60673": {
+   "city": "Chicago",
+   "lat": 41.8119,
+   "lon": -87.6873,
+   "county": "Cook"
+  },
+  "60674": {
+   "city": "Chicago",
+   "lat": 41.8119,
+   "lon": -87.6873,
+   "county": "Cook"
+  },
+  "60675": {
+   "city": "Chicago",
+   "lat": 41.8119,
+   "lon": -87.6873,
+   "county": "Cook"
+  },
+  "60677": {
+   "city": "Chicago",
+   "lat": 41.8119,
+   "lon": -87.6873,
+   "county": "Cook"
+  },
+  "60678": {
+   "city": "Chicago",
+   "lat": 41.8119,
+   "lon": -87.6873,
+   "county": "Cook"
+  },
+  "60680": {
+   "city": "Chicago",
+   "lat": 41.8119,
+   "lon": -87.6873,
+   "county": "Cook"
+  },
+  "60681": {
+   "city": "Chicago",
+   "lat": 41.8119,
+   "lon": -87.6873,
+   "county": "Cook"
+  },
+  "60682": {
+   "city": "Chicago",
+   "lat": 41.837,
+   "lon": -87.685,
+   "county": "Cook"
+  },
+  "60684": {
+   "city": "Chicago",
+   "lat": 41.8119,
+   "lon": -87.6873,
+   "county": "Cook"
+  },
+  "60685": {
+   "city": "Chicago",
+   "lat": 41.8119,
+   "lon": -87.6873,
+   "county": "Cook"
+  },
+  "60686": {
+   "city": "Chicago",
+   "lat": 41.8756,
+   "lon": -87.6378,
+   "county": "Cook"
+  },
+  "60687": {
+   "city": "Chicago",
+   "lat": 41.8119,
+   "lon": -87.6873,
+   "county": "Cook"
+  },
+  "60688": {
+   "city": "Chicago",
+   "lat": 41.8724,
+   "lon": -87.6688,
+   "county": "Cook"
+  },
+  "60689": {
+   "city": "Chicago",
+   "lat": 41.8745,
+   "lon": -87.6353,
+   "county": "Cook"
+  },
+  "60690": {
+   "city": "Chicago",
+   "lat": 41.8119,
+   "lon": -87.6873,
+   "county": "Cook"
+  },
+  "60691": {
+   "city": "Chicago",
+   "lat": 41.8119,
+   "lon": -87.6873,
+   "county": "Cook"
+  },
+  "60693": {
+   "city": "Chicago",
+   "lat": 41.85,
+   "lon": -87.6501,
+   "county": "Cook"
+  },
+  "60694": {
+   "city": "Chicago",
+   "lat": 41.8119,
+   "lon": -87.6873,
+   "county": "Cook"
+  },
+  "60695": {
+   "city": "Chicago",
+   "lat": 41.8839,
+   "lon": -87.6317,
+   "county": "Cook"
+  },
+  "60696": {
+   "city": "Chicago",
+   "lat": 41.8684,
+   "lon": -87.6649,
+   "county": "Cook"
+  },
+  "60697": {
+   "city": "Chicago",
+   "lat": 41.8119,
+   "lon": -87.6873,
+   "county": "Cook"
+  },
+  "60699": {
+   "city": "Chicago",
+   "lat": 41.8119,
+   "lon": -87.6873,
+   "county": "Cook"
+  },
+  "60701": {
+   "city": "Chicago",
+   "lat": 41.8119,
+   "lon": -87.6873,
+   "county": "Cook"
+  },
+  "60706": {
+   "city": "Harwood Heights",
+   "lat": 41.9643,
+   "lon": -87.8162,
+   "county": "Cook"
+  },
+  "60707": {
+   "city": "Elmwood Park",
+   "lat": 41.9232,
+   "lon": -87.8185,
+   "county": "Cook"
+  },
+  "60712": {
+   "city": "Lincolnwood",
+   "lat": 42.008,
+   "lon": -87.7361,
+   "county": "Cook"
+  },
+  "60714": {
+   "city": "Niles",
+   "lat": 42.0312,
+   "lon": -87.8112,
+   "county": "Cook"
+  },
+  "60803": {
+   "city": "Alsip",
+   "lat": 41.6721,
+   "lon": -87.7357,
+   "county": "Cook"
+  },
+  "60804": {
+   "city": "Cicero",
+   "lat": 41.8378,
+   "lon": -87.7602,
+   "county": "Cook"
+  },
+  "60805": {
+   "city": "Evergreen Park",
+   "lat": 41.722,
+   "lon": -87.7024,
+   "county": "Cook"
+  },
+  "60827": {
+   "city": "Riverdale",
+   "lat": 41.6496,
+   "lon": -87.6301,
+   "county": "Cook"
+  },
+  "60901": {
+   "city": "Kankakee",
+   "lat": 41.1166,
+   "lon": -87.8696,
+   "county": "Kankakee"
+  },
+  "60910": {
+   "city": "Aroma Park",
+   "lat": 41.0798,
+   "lon": -87.8114,
+   "county": "Kankakee"
+  },
+  "60911": {
+   "city": "Ashkum",
+   "lat": 40.8844,
+   "lon": -87.9411,
+   "county": "Iroquois"
+  },
+  "60912": {
+   "city": "Beaverville",
+   "lat": 40.9672,
+   "lon": -87.6217,
+   "county": "Iroquois"
+  },
+  "60913": {
+   "city": "Bonfield",
+   "lat": 41.1573,
+   "lon": -88.0619,
+   "county": "Kankakee"
+  },
+  "60914": {
+   "city": "Bourbonnais",
+   "lat": 41.1661,
+   "lon": -87.879,
+   "county": "Kankakee"
+  },
+  "60915": {
+   "city": "Bradley",
+   "lat": 41.1454,
+   "lon": -87.8601,
+   "county": "Kankakee"
+  },
+  "60917": {
+   "city": "Buckingham",
+   "lat": 41.0433,
+   "lon": -88.1772,
+   "county": "Kankakee"
+  },
+  "60918": {
+   "city": "Buckley",
+   "lat": 40.6018,
+   "lon": -88.0361,
+   "county": "Iroquois"
+  },
+  "60919": {
+   "city": "Cabery",
+   "lat": 40.9819,
+   "lon": -88.1921,
+   "county": "Ford"
+  },
+  "60920": {
+   "city": "Campus",
+   "lat": 41.0248,
+   "lon": -88.3072,
+   "county": "Livingston"
+  },
+  "60921": {
+   "city": "Chatsworth",
+   "lat": 40.7484,
+   "lon": -88.2937,
+   "county": "Livingston"
+  },
+  "60922": {
+   "city": "Chebanse",
+   "lat": 41.0254,
+   "lon": -87.8959,
+   "county": "Iroquois"
+  },
+  "60924": {
+   "city": "Cissna Park",
+   "lat": 40.5858,
+   "lon": -87.8759,
+   "county": "Iroquois"
+  },
+  "60926": {
+   "city": "Claytonville",
+   "lat": 40.5676,
+   "lon": -87.804,
+   "county": "Iroquois"
+  },
+  "60927": {
+   "city": "Clifton",
+   "lat": 40.9394,
+   "lon": -87.9202,
+   "county": "Iroquois"
+  },
+  "60928": {
+   "city": "Crescent City",
+   "lat": 40.7417,
+   "lon": -87.849,
+   "county": "Iroquois"
+  },
+  "60929": {
+   "city": "Cullom",
+   "lat": 40.8781,
+   "lon": -88.2765,
+   "county": "Livingston"
+  },
+  "60930": {
+   "city": "Danforth",
+   "lat": 40.8244,
+   "lon": -87.9868,
+   "county": "Iroquois"
+  },
+  "60931": {
+   "city": "Donovan",
+   "lat": 40.8891,
+   "lon": -87.6046,
+   "county": "Iroquois"
+  },
+  "60932": {
+   "city": "East Lynn",
+   "lat": 40.4633,
+   "lon": -87.8056,
+   "county": "Vermilion"
+  },
+  "60933": {
+   "city": "Elliott",
+   "lat": 40.4648,
+   "lon": -88.2712,
+   "county": "Ford"
+  },
+  "60934": {
+   "city": "Emington",
+   "lat": 40.9692,
+   "lon": -88.3589,
+   "county": "Livingston"
+  },
+  "60935": {
+   "city": "Essex",
+   "lat": 41.1676,
+   "lon": -88.1845,
+   "county": "Kankakee"
+  },
+  "60936": {
+   "city": "Gibson City",
+   "lat": 40.4659,
+   "lon": -88.3609,
+   "county": "Ford"
+  },
+  "60938": {
+   "city": "Gilman",
+   "lat": 40.768,
+   "lon": -87.9933,
+   "county": "Iroquois"
+  },
+  "60939": {
+   "city": "Goodwine",
+   "lat": 40.5673,
+   "lon": -87.7845,
+   "county": "Iroquois"
+  },
+  "60940": {
+   "city": "Grant Park",
+   "lat": 41.2477,
+   "lon": -87.648,
+   "county": "Kankakee"
+  },
+  "60941": {
+   "city": "Herscher",
+   "lat": 41.0464,
+   "lon": -88.0858,
+   "county": "Kankakee"
+  },
+  "60942": {
+   "city": "Hoopeston",
+   "lat": 40.4639,
+   "lon": -87.6662,
+   "county": "Vermilion"
+  },
+  "60944": {
+   "city": "Hopkins Park",
+   "lat": 41.0634,
+   "lon": -87.625,
+   "county": "Kankakee"
+  },
+  "60945": {
+   "city": "Iroquois",
+   "lat": 40.8269,
+   "lon": -87.5847,
+   "county": "Iroquois"
+  },
+  "60946": {
+   "city": "Kempton",
+   "lat": 40.9126,
+   "lon": -88.209,
+   "county": "Ford"
+  },
+  "60948": {
+   "city": "Loda",
+   "lat": 40.5241,
+   "lon": -88.0927,
+   "county": "Iroquois"
+  },
+  "60949": {
+   "city": "Ludlow",
+   "lat": 40.3747,
+   "lon": -88.138,
+   "county": "Champaign"
+  },
+  "60950": {
+   "city": "Manteno",
+   "lat": 41.2514,
+   "lon": -87.8468,
+   "county": "Kankakee"
+  },
+  "60951": {
+   "city": "Martinton",
+   "lat": 40.9052,
+   "lon": -87.7443,
+   "county": "Iroquois"
+  },
+  "60952": {
+   "city": "Melvin",
+   "lat": 40.5714,
+   "lon": -88.2551,
+   "county": "Ford"
+  },
+  "60953": {
+   "city": "Milford",
+   "lat": 40.6293,
+   "lon": -87.6853,
+   "county": "Iroquois"
+  },
+  "60954": {
+   "city": "Momence",
+   "lat": 41.1593,
+   "lon": -87.6575,
+   "county": "Kankakee"
+  },
+  "60955": {
+   "city": "Onarga",
+   "lat": 40.712,
+   "lon": -87.9958,
+   "county": "Iroquois"
+  },
+  "60956": {
+   "city": "Papineau",
+   "lat": 40.967,
+   "lon": -87.7161,
+   "county": "Iroquois"
+  },
+  "60957": {
+   "city": "Paxton",
+   "lat": 40.4565,
+   "lon": -88.099,
+   "county": "Ford"
+  },
+  "60958": {
+   "city": "Pembroke Township",
+   "lat": 41.0646,
+   "lon": -87.5917,
+   "county": "Kankakee"
+  },
+  "60959": {
+   "city": "Piper City",
+   "lat": 40.7556,
+   "lon": -88.1873,
+   "county": "Ford"
+  },
+  "60960": {
+   "city": "Rankin",
+   "lat": 40.4559,
+   "lon": -87.8884,
+   "county": "Vermilion"
+  },
+  "60961": {
+   "city": "Reddick",
+   "lat": 41.1005,
+   "lon": -88.2089,
+   "county": "Kankakee"
+  },
+  "60962": {
+   "city": "Roberts",
+   "lat": 40.6193,
+   "lon": -88.1804,
+   "county": "Ford"
+  },
+  "60963": {
+   "city": "Rossville",
+   "lat": 40.3625,
+   "lon": -87.6692,
+   "county": "Vermilion"
+  },
+  "60964": {
+   "city": "Saint Anne",
+   "lat": 41.0487,
+   "lon": -87.6564,
+   "county": "Kankakee"
+  },
+  "60966": {
+   "city": "Sheldon",
+   "lat": 40.7803,
+   "lon": -87.5736,
+   "county": "Iroquois"
+  },
+  "60967": {
+   "city": "Stockland",
+   "lat": 40.6145,
+   "lon": -87.5928,
+   "county": "Iroquois"
+  },
+  "60968": {
+   "city": "Thawville",
+   "lat": 40.684,
+   "lon": -88.0999,
+   "county": "Iroquois"
+  },
+  "60969": {
+   "city": "Union Hill",
+   "lat": 41.1088,
+   "lon": -88.1465,
+   "county": "Kankakee"
+  },
+  "60970": {
+   "city": "Watseka",
+   "lat": 40.7734,
+   "lon": -87.7309,
+   "county": "Iroquois"
+  },
+  "60973": {
+   "city": "Wellington",
+   "lat": 40.5339,
+   "lon": -87.6561,
+   "county": "Iroquois"
+  },
+  "60974": {
+   "city": "Woodland",
+   "lat": 40.7151,
+   "lon": -87.7307,
+   "county": "Iroquois"
+  },
+  "61001": {
+   "city": "Apple River",
+   "lat": 42.4714,
+   "lon": -90.1201,
+   "county": "Jo Daviess"
+  },
+  "61006": {
+   "city": "Ashton",
+   "lat": 41.8643,
+   "lon": -89.2086,
+   "county": "Lee"
+  },
+  "61007": {
+   "city": "Baileyville",
+   "lat": 42.1905,
+   "lon": -89.5939,
+   "county": "Ogle"
+  },
+  "61008": {
+   "city": "Belvidere",
+   "lat": 42.2595,
+   "lon": -88.8509,
+   "county": "Boone"
+  },
+  "61010": {
+   "city": "Byron",
+   "lat": 42.1292,
+   "lon": -89.2659,
+   "county": "Ogle"
+  },
+  "61011": {
+   "city": "Caledonia",
+   "lat": 42.3835,
+   "lon": -88.9185,
+   "county": "Boone"
+  },
+  "61012": {
+   "city": "Capron",
+   "lat": 42.4087,
+   "lon": -88.7465,
+   "county": "Boone"
+  },
+  "61013": {
+   "city": "Cedarville",
+   "lat": 42.3761,
+   "lon": -89.6365,
+   "county": "Stephenson"
+  },
+  "61014": {
+   "city": "Chadwick",
+   "lat": 41.9962,
+   "lon": -89.8963,
+   "county": "Carroll"
+  },
+  "61015": {
+   "city": "Chana",
+   "lat": 41.9933,
+   "lon": -89.2117,
+   "county": "Ogle"
+  },
+  "61016": {
+   "city": "Cherry Valley",
+   "lat": 42.2206,
+   "lon": -88.9619,
+   "county": "Winnebago"
+  },
+  "61018": {
+   "city": "Dakota",
+   "lat": 42.4031,
+   "lon": -89.5468,
+   "county": "Stephenson"
+  },
+  "61019": {
+   "city": "Davis",
+   "lat": 42.4422,
+   "lon": -89.4067,
+   "county": "Stephenson"
+  },
+  "61020": {
+   "city": "Davis Junction",
+   "lat": 42.0979,
+   "lon": -89.0838,
+   "county": "Ogle"
+  },
+  "61021": {
+   "city": "Dixon",
+   "lat": 41.8478,
+   "lon": -89.4893,
+   "county": "Lee"
+  },
+  "61024": {
+   "city": "Durand",
+   "lat": 42.4337,
+   "lon": -89.3094,
+   "county": "Winnebago"
+  },
+  "61025": {
+   "city": "East Dubuque",
+   "lat": 42.4875,
+   "lon": -90.6046,
+   "county": "Jo Daviess"
+  },
+  "61027": {
+   "city": "Eleroy",
+   "lat": 42.332,
+   "lon": -89.7612,
+   "county": "Stephenson"
+  },
+  "61028": {
+   "city": "Elizabeth",
+   "lat": 42.3089,
+   "lon": -90.1986,
+   "county": "Jo Daviess"
+  },
+  "61030": {
+   "city": "Forreston",
+   "lat": 42.1229,
+   "lon": -89.5831,
+   "county": "Ogle"
+  },
+  "61031": {
+   "city": "Franklin Grove",
+   "lat": 41.858,
+   "lon": -89.3171,
+   "county": "Lee"
+  },
+  "61032": {
+   "city": "Freeport",
+   "lat": 42.2991,
+   "lon": -89.6345,
+   "county": "Stephenson"
+  },
+  "61036": {
+   "city": "Galena",
+   "lat": 42.4182,
+   "lon": -90.4195,
+   "county": "Jo Daviess"
+  },
+  "61037": {
+   "city": "Galt",
+   "lat": 41.7865,
+   "lon": -89.761,
+   "county": "Whiteside"
+  },
+  "61038": {
+   "city": "Garden Prairie",
+   "lat": 42.251,
+   "lon": -88.7437,
+   "county": "Boone"
+  },
+  "61039": {
+   "city": "German Valley",
+   "lat": 42.2176,
+   "lon": -89.4712,
+   "county": "Stephenson"
+  },
+  "61041": {
+   "city": "Hanover",
+   "lat": 42.2594,
+   "lon": -90.2897,
+   "county": "Jo Daviess"
+  },
+  "61042": {
+   "city": "Harmon",
+   "lat": 41.6973,
+   "lon": -89.5695,
+   "county": "Lee"
+  },
+  "61043": {
+   "city": "Holcomb",
+   "lat": 42.0647,
+   "lon": -89.0957,
+   "county": "Ogle"
+  },
+  "61044": {
+   "city": "Kent",
+   "lat": 42.3155,
+   "lon": -89.9195,
+   "county": "Stephenson"
+  },
+  "61046": {
+   "city": "Lanark",
+   "lat": 42.0935,
+   "lon": -89.8247,
+   "county": "Carroll"
+  },
+  "61047": {
+   "city": "Leaf River",
+   "lat": 42.1532,
+   "lon": -89.3959,
+   "county": "Ogle"
+  },
+  "61048": {
+   "city": "Lena",
+   "lat": 42.3791,
+   "lon": -89.8253,
+   "county": "Stephenson"
+  },
+  "61049": {
+   "city": "Lindenwood",
+   "lat": 42.0507,
+   "lon": -89.034,
+   "county": "Ogle"
+  },
+  "61050": {
+   "city": "Mc Connell",
+   "lat": 42.4281,
+   "lon": -89.7643,
+   "county": "Stephenson"
+  },
+  "61051": {
+   "city": "Milledgeville",
+   "lat": 41.9674,
+   "lon": -89.7801,
+   "county": "Carroll"
+  },
+  "61052": {
+   "city": "Monroe Center",
+   "lat": 42.105,
+   "lon": -89.0169,
+   "county": "Ogle"
+  },
+  "61053": {
+   "city": "Mount Carroll",
+   "lat": 42.1053,
+   "lon": -89.9845,
+   "county": "Carroll"
+  },
+  "61054": {
+   "city": "Mount Morris",
+   "lat": 42.0479,
+   "lon": -89.4346,
+   "county": "Ogle"
+  },
+  "61057": {
+   "city": "Nachusa",
+   "lat": 41.8316,
+   "lon": -89.3896,
+   "county": "Lee"
+  },
+  "61059": {
+   "city": "Nora",
+   "lat": 42.4558,
+   "lon": -89.9454,
+   "county": "Jo Daviess"
+  },
+  "61060": {
+   "city": "Orangeville",
+   "lat": 42.4728,
+   "lon": -89.6448,
+   "county": "Stephenson"
+  },
+  "61061": {
+   "city": "Oregon",
+   "lat": 42.0095,
+   "lon": -89.3444,
+   "county": "Ogle"
+  },
+  "61062": {
+   "city": "Pearl City",
+   "lat": 42.261,
+   "lon": -89.8393,
+   "county": "Stephenson"
+  },
+  "61063": {
+   "city": "Pecatonica",
+   "lat": 42.3051,
+   "lon": -89.3472,
+   "county": "Winnebago"
+  },
+  "61064": {
+   "city": "Polo",
+   "lat": 41.989,
+   "lon": -89.5984,
+   "county": "Ogle"
+  },
+  "61065": {
+   "city": "Poplar Grove",
+   "lat": 42.3594,
+   "lon": -88.8428,
+   "county": "Boone"
+  },
+  "61067": {
+   "city": "Ridott",
+   "lat": 42.2996,
+   "lon": -89.4627,
+   "county": "Stephenson"
+  },
+  "61068": {
+   "city": "Rochelle",
+   "lat": 41.9282,
+   "lon": -89.071,
+   "county": "Ogle"
+  },
+  "61070": {
+   "city": "Rock City",
+   "lat": 42.4103,
+   "lon": -89.4759,
+   "county": "Stephenson"
+  },
+  "61071": {
+   "city": "Rock Falls",
+   "lat": 41.7665,
+   "lon": -89.6925,
+   "county": "Whiteside"
+  },
+  "61072": {
+   "city": "Rockton",
+   "lat": 42.4544,
+   "lon": -89.0887,
+   "county": "Winnebago"
+  },
+  "61073": {
+   "city": "Roscoe",
+   "lat": 42.4217,
+   "lon": -88.9943,
+   "county": "Winnebago"
+  },
+  "61074": {
+   "city": "Savanna",
+   "lat": 42.0956,
+   "lon": -90.1401,
+   "county": "Carroll"
+  },
+  "61075": {
+   "city": "Scales Mound",
+   "lat": 42.4715,
+   "lon": -90.258,
+   "county": "Jo Daviess"
+  },
+  "61077": {
+   "city": "Seward",
+   "lat": 42.2368,
+   "lon": -89.358,
+   "county": "Winnebago"
+  },
+  "61078": {
+   "city": "Shannon",
+   "lat": 42.161,
+   "lon": -89.7481,
+   "county": "Carroll"
+  },
+  "61079": {
+   "city": "Shirland",
+   "lat": 42.4445,
+   "lon": -89.1976,
+   "county": "Winnebago"
+  },
+  "61080": {
+   "city": "South Beloit",
+   "lat": 42.4837,
+   "lon": -89.0298,
+   "county": "Winnebago"
+  },
+  "61081": {
+   "city": "Sterling",
+   "lat": 41.8055,
+   "lon": -89.7054,
+   "county": "Whiteside"
+  },
+  "61084": {
+   "city": "Stillman Valley",
+   "lat": 42.1183,
+   "lon": -89.1898,
+   "county": "Ogle"
+  },
+  "61085": {
+   "city": "Stockton",
+   "lat": 42.3492,
+   "lon": -90.0202,
+   "county": "Jo Daviess"
+  },
+  "61087": {
+   "city": "Warren",
+   "lat": 42.489,
+   "lon": -89.986,
+   "county": "Jo Daviess"
+  },
+  "61088": {
+   "city": "Winnebago",
+   "lat": 42.2727,
+   "lon": -89.2373,
+   "county": "Winnebago"
+  },
+  "61089": {
+   "city": "Winslow",
+   "lat": 42.4838,
+   "lon": -89.806,
+   "county": "Stephenson"
+  },
+  "61091": {
+   "city": "Woosung",
+   "lat": 41.9034,
+   "lon": -89.5409,
+   "county": "Ogle"
+  },
+  "61101": {
+   "city": "Rockford",
+   "lat": 42.2922,
+   "lon": -89.1161,
+   "county": "Winnebago"
+  },
+  "61102": {
+   "city": "Rockford",
+   "lat": 42.2547,
+   "lon": -89.1247,
+   "county": "Winnebago"
+  },
+  "61103": {
+   "city": "Rockford",
+   "lat": 42.301,
+   "lon": -89.0833,
+   "county": "Winnebago"
+  },
+  "61104": {
+   "city": "Rockford",
+   "lat": 42.2554,
+   "lon": -89.0768,
+   "county": "Winnebago"
+  },
+  "61105": {
+   "city": "Rockford",
+   "lat": 42.2711,
+   "lon": -89.094,
+   "county": "Winnebago"
+  },
+  "61106": {
+   "city": "Rockford",
+   "lat": 42.3254,
+   "lon": -89.1705,
+   "county": "Winnebago"
+  },
+  "61107": {
+   "city": "Rockford",
+   "lat": 42.2786,
+   "lon": -89.0361,
+   "county": "Winnebago"
+  },
+  "61108": {
+   "city": "Rockford",
+   "lat": 42.2514,
+   "lon": -89.0235,
+   "county": "Winnebago"
+  },
+  "61109": {
+   "city": "Rockford",
+   "lat": 42.2166,
+   "lon": -89.0512,
+   "county": "Winnebago"
+  },
+  "61110": {
+   "city": "Rockford",
+   "lat": 42.3254,
+   "lon": -89.1705,
+   "county": "Winnebago"
+  },
+  "61111": {
+   "city": "Loves Park",
+   "lat": 42.3295,
+   "lon": -89.0335,
+   "county": "Winnebago"
+  },
+  "61112": {
+   "city": "Rockford",
+   "lat": 42.2456,
+   "lon": -88.9704,
+   "county": "Winnebago"
+  },
+  "61114": {
+   "city": "Rockford",
+   "lat": 42.3185,
+   "lon": -88.9972,
+   "county": "Winnebago"
+  },
+  "61115": {
+   "city": "Machesney Park",
+   "lat": 42.3545,
+   "lon": -89.0397,
+   "county": "Winnebago"
+  },
+  "61125": {
+   "city": "Rockford",
+   "lat": 42.3254,
+   "lon": -89.1705,
+   "county": "Winnebago"
+  },
+  "61126": {
+   "city": "Rockford",
+   "lat": 42.3254,
+   "lon": -89.1705,
+   "county": "Winnebago"
+  },
+  "61130": {
+   "city": "Loves Park",
+   "lat": 42.3254,
+   "lon": -89.1705,
+   "county": "Winnebago"
+  },
+  "61131": {
+   "city": "Loves Park",
+   "lat": 42.3254,
+   "lon": -89.1705,
+   "county": "Winnebago"
+  },
+  "61132": {
+   "city": "Loves Park",
+   "lat": 42.3254,
+   "lon": -89.1705,
+   "county": "Winnebago"
+  },
+  "61201": {
+   "city": "Rock Island",
+   "lat": 41.4913,
+   "lon": -90.5648,
+   "county": "Rock Island"
+  },
+  "61204": {
+   "city": "Rock Island",
+   "lat": 41.5549,
+   "lon": -90.616,
+   "county": "Rock Island"
+  },
+  "61230": {
+   "city": "Albany",
+   "lat": 41.7659,
+   "lon": -90.2081,
+   "county": "Whiteside"
+  },
+  "61231": {
+   "city": "Aledo",
+   "lat": 41.2008,
+   "lon": -90.7416,
+   "county": "Mercer"
+  },
+  "61232": {
+   "city": "Andalusia",
+   "lat": 41.4392,
+   "lon": -90.7176,
+   "county": "Rock Island"
+  },
+  "61233": {
+   "city": "Andover",
+   "lat": 41.2954,
+   "lon": -90.2905,
+   "county": "Henry"
+  },
+  "61234": {
+   "city": "Annawan",
+   "lat": 41.398,
+   "lon": -89.9129,
+   "county": "Henry"
+  },
+  "61235": {
+   "city": "Atkinson",
+   "lat": 41.4162,
+   "lon": -90.0225,
+   "county": "Henry"
+  },
+  "61236": {
+   "city": "Barstow",
+   "lat": 41.5147,
+   "lon": -90.3577,
+   "county": "Rock Island"
+  },
+  "61237": {
+   "city": "Buffalo Prairie",
+   "lat": 41.3368,
+   "lon": -90.8522,
+   "county": "Rock Island"
+  },
+  "61238": {
+   "city": "Cambridge",
+   "lat": 41.3114,
+   "lon": -90.1805,
+   "county": "Henry"
+  },
+  "61239": {
+   "city": "Carbon Cliff",
+   "lat": 41.4948,
+   "lon": -90.3907,
+   "county": "Rock Island"
+  },
+  "61240": {
+   "city": "Coal Valley",
+   "lat": 41.4351,
+   "lon": -90.4652,
+   "county": "Rock Island"
+  },
+  "61241": {
+   "city": "Colona",
+   "lat": 41.4885,
+   "lon": -90.321,
+   "county": "Henry"
+  },
+  "61242": {
+   "city": "Cordova",
+   "lat": 41.6928,
+   "lon": -90.3071,
+   "county": "Rock Island"
+  },
+  "61243": {
+   "city": "Deer Grove",
+   "lat": 41.6316,
+   "lon": -89.6972,
+   "county": "Whiteside"
+  },
+  "61244": {
+   "city": "East Moline",
+   "lat": 41.5118,
+   "lon": -90.4321,
+   "county": "Rock Island"
+  },
+  "61250": {
+   "city": "Erie",
+   "lat": 41.656,
+   "lon": -90.0843,
+   "county": "Whiteside"
+  },
+  "61251": {
+   "city": "Fenton",
+   "lat": 41.7285,
+   "lon": -90.0457,
+   "county": "Whiteside"
+  },
+  "61252": {
+   "city": "Fulton",
+   "lat": 41.8522,
+   "lon": -90.1507,
+   "county": "Whiteside"
+  },
+  "61254": {
+   "city": "Geneseo",
+   "lat": 41.4688,
+   "lon": -90.1711,
+   "county": "Henry"
+  },
+  "61256": {
+   "city": "Hampton",
+   "lat": 41.5559,
+   "lon": -90.4093,
+   "county": "Rock Island"
+  },
+  "61257": {
+   "city": "Hillsdale",
+   "lat": 41.5929,
+   "lon": -90.2263,
+   "county": "Rock Island"
+  },
+  "61258": {
+   "city": "Hooppole",
+   "lat": 41.522,
+   "lon": -89.9122,
+   "county": "Henry"
+  },
+  "61259": {
+   "city": "Illinois City",
+   "lat": 41.3892,
+   "lon": -90.8925,
+   "county": "Rock Island"
+  },
+  "61260": {
+   "city": "Joy",
+   "lat": 41.2262,
+   "lon": -90.8518,
+   "county": "Mercer"
+  },
+  "61261": {
+   "city": "Lyndon",
+   "lat": 41.7199,
+   "lon": -89.9169,
+   "county": "Whiteside"
+  },
+  "61262": {
+   "city": "Lynn Center",
+   "lat": 41.2888,
+   "lon": -90.3304,
+   "county": "Henry"
+  },
+  "61263": {
+   "city": "Matherville",
+   "lat": 41.2599,
+   "lon": -90.6128,
+   "county": "Mercer"
+  },
+  "61264": {
+   "city": "Milan",
+   "lat": 41.4262,
+   "lon": -90.5739,
+   "county": "Rock Island"
+  },
+  "61265": {
+   "city": "Moline",
+   "lat": 41.4906,
+   "lon": -90.498,
+   "county": "Rock Island"
+  },
+  "61266": {
+   "city": "Moline",
+   "lat": 41.5067,
+   "lon": -90.5151,
+   "county": "Rock Island"
+  },
+  "61270": {
+   "city": "Morrison",
+   "lat": 41.8167,
+   "lon": -89.969,
+   "county": "Whiteside"
+  },
+  "61272": {
+   "city": "New Boston",
+   "lat": 41.2153,
+   "lon": -90.9879,
+   "county": "Mercer"
+  },
+  "61273": {
+   "city": "Orion",
+   "lat": 41.3634,
+   "lon": -90.3849,
+   "county": "Henry"
+  },
+  "61274": {
+   "city": "Osco",
+   "lat": 41.3637,
+   "lon": -90.2681,
+   "county": "Henry"
+  },
+  "61275": {
+   "city": "Port Byron",
+   "lat": 41.6013,
+   "lon": -90.3263,
+   "county": "Rock Island"
+  },
+  "61276": {
+   "city": "Preemption",
+   "lat": 41.2996,
+   "lon": -90.5866,
+   "county": "Mercer"
+  },
+  "61277": {
+   "city": "Prophetstown",
+   "lat": 41.6312,
+   "lon": -89.9467,
+   "county": "Whiteside"
+  },
+  "61278": {
+   "city": "Rapids City",
+   "lat": 41.5817,
+   "lon": -90.3435,
+   "county": "Rock Island"
+  },
+  "61279": {
+   "city": "Reynolds",
+   "lat": 41.3277,
+   "lon": -90.6384,
+   "county": "Rock Island"
+  },
+  "61281": {
+   "city": "Sherrard",
+   "lat": 41.3027,
+   "lon": -90.4939,
+   "county": "Mercer"
+  },
+  "61282": {
+   "city": "Silvis",
+   "lat": 41.5007,
+   "lon": -90.4126,
+   "county": "Rock Island"
+  },
+  "61283": {
+   "city": "Tampico",
+   "lat": 41.6522,
+   "lon": -89.7948,
+   "county": "Whiteside"
+  },
+  "61284": {
+   "city": "Taylor Ridge",
+   "lat": 41.3828,
+   "lon": -90.734,
+   "county": "Rock Island"
+  },
+  "61285": {
+   "city": "Thomson",
+   "lat": 41.9816,
+   "lon": -90.0844,
+   "county": "Carroll"
+  },
+  "61299": {
+   "city": "Rock Island",
+   "lat": 41.5203,
+   "lon": -90.5416,
+   "county": "Rock Island"
+  },
+  "61301": {
+   "city": "La Salle",
+   "lat": 41.3442,
+   "lon": -89.0955,
+   "county": "LaSalle"
+  },
+  "61310": {
+   "city": "Amboy",
+   "lat": 41.7042,
+   "lon": -89.3472,
+   "county": "Lee"
+  },
+  "61311": {
+   "city": "Ancona",
+   "lat": 41.0426,
+   "lon": -88.8642,
+   "county": "Livingston"
+  },
+  "61312": {
+   "city": "Arlington",
+   "lat": 41.4437,
+   "lon": -89.2219,
+   "county": "Bureau"
+  },
+  "61313": {
+   "city": "Blackstone",
+   "lat": 41.0719,
+   "lon": -88.6498,
+   "county": "Livingston"
+  },
+  "61314": {
+   "city": "Buda",
+   "lat": 41.314,
+   "lon": -89.6795,
+   "county": "Bureau"
+  },
+  "61315": {
+   "city": "Bureau",
+   "lat": 41.2894,
+   "lon": -89.3686,
+   "county": "Bureau"
+  },
+  "61316": {
+   "city": "Cedar Point",
+   "lat": 41.2617,
+   "lon": -89.1237,
+   "county": "LaSalle"
+  },
+  "61317": {
+   "city": "Cherry",
+   "lat": 41.4264,
+   "lon": -89.2126,
+   "county": "Bureau"
+  },
+  "61318": {
+   "city": "Compton",
+   "lat": 41.685,
+   "lon": -89.0877,
+   "county": "Lee"
+  },
+  "61319": {
+   "city": "Cornell",
+   "lat": 41.031,
+   "lon": -88.7668,
+   "county": "Livingston"
+  },
+  "61320": {
+   "city": "Dalzell",
+   "lat": 41.3547,
+   "lon": -89.1705,
+   "county": "Bureau"
+  },
+  "61321": {
+   "city": "Dana",
+   "lat": 40.9547,
+   "lon": -88.9628,
+   "county": "LaSalle"
+  },
+  "61322": {
+   "city": "Depue",
+   "lat": 41.3092,
+   "lon": -89.3252,
+   "county": "Bureau"
+  },
+  "61323": {
+   "city": "Dover",
+   "lat": 41.4362,
+   "lon": -89.396,
+   "county": "Bureau"
+  },
+  "61324": {
+   "city": "Eldena",
+   "lat": 41.7711,
+   "lon": -89.4123,
+   "county": "Lee"
+  },
+  "61325": {
+   "city": "Grand Ridge",
+   "lat": 41.2386,
+   "lon": -88.8168,
+   "county": "LaSalle"
+  },
+  "61326": {
+   "city": "Granville",
+   "lat": 41.2642,
+   "lon": -89.225,
+   "county": "Putnam"
+  },
+  "61327": {
+   "city": "Hennepin",
+   "lat": 41.2352,
+   "lon": -89.3218,
+   "county": "Putnam"
+  },
+  "61328": {
+   "city": "Kasbeer",
+   "lat": 41.505,
+   "lon": -89.4634,
+   "county": "Bureau"
+  },
+  "61329": {
+   "city": "Ladd",
+   "lat": 41.3825,
+   "lon": -89.219,
+   "county": "Bureau"
+  },
+  "61330": {
+   "city": "La Moille",
+   "lat": 41.5376,
+   "lon": -89.297,
+   "county": "Bureau"
+  },
+  "61331": {
+   "city": "Lee Center",
+   "lat": 41.7488,
+   "lon": -89.2827,
+   "county": "Lee"
+  },
+  "61332": {
+   "city": "Leonore",
+   "lat": 41.1895,
+   "lon": -88.9806,
+   "county": "LaSalle"
+  },
+  "61333": {
+   "city": "Long Point",
+   "lat": 40.9896,
+   "lon": -88.8811,
+   "county": "Livingston"
+  },
+  "61334": {
+   "city": "Lostant",
+   "lat": 41.145,
+   "lon": -89.075,
+   "county": "LaSalle"
+  },
+  "61335": {
+   "city": "Mc Nabb",
+   "lat": 41.173,
+   "lon": -89.2187,
+   "county": "Putnam"
+  },
+  "61336": {
+   "city": "Magnolia",
+   "lat": 41.1164,
+   "lon": -89.227,
+   "county": "Putnam"
+  },
+  "61337": {
+   "city": "Malden",
+   "lat": 41.4245,
+   "lon": -89.3693,
+   "county": "Bureau"
+  },
+  "61338": {
+   "city": "Manlius",
+   "lat": 41.4555,
+   "lon": -89.6697,
+   "county": "Bureau"
+  },
+  "61340": {
+   "city": "Mark",
+   "lat": 41.266,
+   "lon": -89.2491,
+   "county": "Putnam"
+  },
+  "61341": {
+   "city": "Marseilles",
+   "lat": 41.3302,
+   "lon": -88.6947,
+   "county": "LaSalle"
+  },
+  "61342": {
+   "city": "Mendota",
+   "lat": 41.5443,
+   "lon": -89.1083,
+   "county": "LaSalle"
+  },
+  "61344": {
+   "city": "Mineral",
+   "lat": 41.4036,
+   "lon": -89.8201,
+   "county": "Bureau"
+  },
+  "61345": {
+   "city": "Neponset",
+   "lat": 41.2905,
+   "lon": -89.7944,
+   "county": "Bureau"
+  },
+  "61346": {
+   "city": "New Bedford",
+   "lat": 41.5122,
+   "lon": -89.7199,
+   "county": "Bureau"
+  },
+  "61348": {
+   "city": "Oglesby",
+   "lat": 41.2928,
+   "lon": -89.0553,
+   "county": "LaSalle"
+  },
+  "61349": {
+   "city": "Ohio",
+   "lat": 41.5371,
+   "lon": -89.4574,
+   "county": "Bureau"
+  },
+  "61350": {
+   "city": "Ottawa",
+   "lat": 41.3526,
+   "lon": -88.8416,
+   "county": "LaSalle"
+  },
+  "61353": {
+   "city": "Paw Paw",
+   "lat": 41.6852,
+   "lon": -88.9674,
+   "county": "Lee"
+  },
+  "61354": {
+   "city": "Peru",
+   "lat": 41.333,
+   "lon": -89.1265,
+   "county": "LaSalle"
+  },
+  "61356": {
+   "city": "Princeton",
+   "lat": 41.3629,
+   "lon": -89.427,
+   "county": "Bureau"
+  },
+  "61358": {
+   "city": "Rutland",
+   "lat": 40.9844,
+   "lon": -89.0388,
+   "county": "LaSalle"
+  },
+  "61359": {
+   "city": "Seatonville",
+   "lat": 41.3613,
+   "lon": -89.2691,
+   "county": "Bureau"
+  },
+  "61360": {
+   "city": "Seneca",
+   "lat": 41.3152,
+   "lon": -88.61,
+   "county": "LaSalle"
+  },
+  "61361": {
+   "city": "Sheffield",
+   "lat": 41.3949,
+   "lon": -89.7115,
+   "county": "Bureau"
+  },
+  "61362": {
+   "city": "Spring Valley",
+   "lat": 41.3279,
+   "lon": -89.2042,
+   "county": "Bureau"
+  },
+  "61363": {
+   "city": "Standard",
+   "lat": 41.2567,
+   "lon": -89.1778,
+   "county": "Putnam"
+  },
+  "61364": {
+   "city": "Streator",
+   "lat": 41.1225,
+   "lon": -88.8307,
+   "county": "LaSalle"
+  },
+  "61367": {
+   "city": "Sublette",
+   "lat": 41.6331,
+   "lon": -89.2354,
+   "county": "Lee"
+  },
+  "61368": {
+   "city": "Tiskilwa",
+   "lat": 41.2891,
+   "lon": -89.508,
+   "county": "Bureau"
+  },
+  "61369": {
+   "city": "Toluca",
+   "lat": 41.0046,
+   "lon": -89.1348,
+   "county": "Marshall"
+  },
+  "61370": {
+   "city": "Tonica",
+   "lat": 41.2327,
+   "lon": -89.089,
+   "county": "LaSalle"
+  },
+  "61371": {
+   "city": "Triumph",
+   "lat": 41.4991,
+   "lon": -89.0219,
+   "county": "LaSalle"
+  },
+  "61372": {
+   "city": "Troy Grove",
+   "lat": 41.4678,
+   "lon": -89.0831,
+   "county": "LaSalle"
+  },
+  "61373": {
+   "city": "Utica",
+   "lat": 41.363,
+   "lon": -89.0008,
+   "county": "LaSalle"
+  },
+  "61374": {
+   "city": "Van Orin",
+   "lat": 41.55,
+   "lon": -89.3534,
+   "county": "Bureau"
+  },
+  "61375": {
+   "city": "Varna",
+   "lat": 41.0327,
+   "lon": -89.2483,
+   "county": "Marshall"
+  },
+  "61376": {
+   "city": "Walnut",
+   "lat": 41.5394,
+   "lon": -89.6092,
+   "county": "Bureau"
+  },
+  "61377": {
+   "city": "Wenona",
+   "lat": 41.0548,
+   "lon": -89.0416,
+   "county": "Marshall"
+  },
+  "61378": {
+   "city": "West Brooklyn",
+   "lat": 41.7292,
+   "lon": -89.1909,
+   "county": "Lee"
+  },
+  "61379": {
+   "city": "Wyanet",
+   "lat": 41.3785,
+   "lon": -89.5744,
+   "county": "Bureau"
+  },
+  "61401": {
+   "city": "Galesburg",
+   "lat": 40.9521,
+   "lon": -90.3698,
+   "county": "Knox"
+  },
+  "61402": {
+   "city": "Galesburg",
+   "lat": 40.9478,
+   "lon": -90.3712,
+   "county": "Knox"
+  },
+  "61410": {
+   "city": "Abingdon",
+   "lat": 40.8023,
+   "lon": -90.4009,
+   "county": "Knox"
+  },
+  "61411": {
+   "city": "Adair",
+   "lat": 40.3852,
+   "lon": -90.5037,
+   "county": "McDonough"
+  },
+  "61412": {
+   "city": "Alexis",
+   "lat": 41.0521,
+   "lon": -90.5436,
+   "county": "Mercer"
+  },
+  "61413": {
+   "city": "Alpha",
+   "lat": 41.193,
+   "lon": -90.3821,
+   "county": "Henry"
+  },
+  "61414": {
+   "city": "Altona",
+   "lat": 41.1128,
+   "lon": -90.1598,
+   "county": "Knox"
+  },
+  "61415": {
+   "city": "Avon",
+   "lat": 40.6549,
+   "lon": -90.4461,
+   "county": "Fulton"
+  },
+  "61416": {
+   "city": "Bardolph",
+   "lat": 40.495,
+   "lon": -90.5646,
+   "county": "McDonough"
+  },
+  "61417": {
+   "city": "Berwick",
+   "lat": 40.7799,
+   "lon": -90.5059,
+   "county": "Warren"
+  },
+  "61418": {
+   "city": "Biggsville",
+   "lat": 40.8531,
+   "lon": -90.8561,
+   "county": "Henderson"
+  },
+  "61419": {
+   "city": "Bishop Hill",
+   "lat": 41.1977,
+   "lon": -90.1183,
+   "county": "Henry"
+  },
+  "61420": {
+   "city": "Blandinsville",
+   "lat": 40.5516,
+   "lon": -90.8595,
+   "county": "McDonough"
+  },
+  "61421": {
+   "city": "Bradford",
+   "lat": 41.1532,
+   "lon": -89.6521,
+   "county": "Stark"
+  },
+  "61422": {
+   "city": "Bushnell",
+   "lat": 40.5539,
+   "lon": -90.506,
+   "county": "McDonough"
+  },
+  "61423": {
+   "city": "Cameron",
+   "lat": 40.889,
+   "lon": -90.5001,
+   "county": "Warren"
+  },
+  "61424": {
+   "city": "Camp Grove",
+   "lat": 41.078,
+   "lon": -89.6332,
+   "county": "Marshall"
+  },
+  "61425": {
+   "city": "Carman",
+   "lat": 40.7551,
+   "lon": -91.0564,
+   "county": "Henderson"
+  },
+  "61426": {
+   "city": "Castleton",
+   "lat": 41.1183,
+   "lon": -89.7071,
+   "county": "Stark"
+  },
+  "61427": {
+   "city": "Cuba",
+   "lat": 40.4995,
+   "lon": -90.1811,
+   "county": "Fulton"
+  },
+  "61428": {
+   "city": "Dahinda",
+   "lat": 40.9551,
+   "lon": -90.1398,
+   "county": "Knox"
+  },
+  "61430": {
+   "city": "East Galesburg",
+   "lat": 40.9402,
+   "lon": -90.3109,
+   "county": "Knox"
+  },
+  "61431": {
+   "city": "Ellisville",
+   "lat": 40.6047,
+   "lon": -90.2875,
+   "county": "Fulton"
+  },
+  "61432": {
+   "city": "Fairview",
+   "lat": 40.6442,
+   "lon": -90.1653,
+   "county": "Fulton"
+  },
+  "61433": {
+   "city": "Fiatt",
+   "lat": 40.5603,
+   "lon": -90.1798,
+   "county": "Fulton"
+  },
+  "61434": {
+   "city": "Galva",
+   "lat": 41.1656,
+   "lon": -90.0481,
+   "county": "Henry"
+  },
+  "61435": {
+   "city": "Gerlaw",
+   "lat": 40.9863,
+   "lon": -90.5491,
+   "county": "Warren"
+  },
+  "61436": {
+   "city": "Gilson",
+   "lat": 40.8765,
+   "lon": -90.1747,
+   "county": "Knox"
+  },
+  "61437": {
+   "city": "Gladstone",
+   "lat": 40.8377,
+   "lon": -90.9941,
+   "county": "Henderson"
+  },
+  "61438": {
+   "city": "Good Hope",
+   "lat": 40.5578,
+   "lon": -90.6735,
+   "county": "McDonough"
+  },
+  "61439": {
+   "city": "Henderson",
+   "lat": 41.0276,
+   "lon": -90.3575,
+   "county": "Knox"
+  },
+  "61440": {
+   "city": "Industry",
+   "lat": 40.3256,
+   "lon": -90.6105,
+   "county": "McDonough"
+  },
+  "61441": {
+   "city": "Ipava",
+   "lat": 40.3594,
+   "lon": -90.2967,
+   "county": "Fulton"
+  },
+  "61442": {
+   "city": "Keithsburg",
+   "lat": 41.1043,
+   "lon": -90.9263,
+   "county": "Mercer"
+  },
+  "61443": {
+   "city": "Kewanee",
+   "lat": 41.2411,
+   "lon": -89.9274,
+   "county": "Henry"
+  },
+  "61447": {
+   "city": "Kirkwood",
+   "lat": 40.8638,
+   "lon": -90.7457,
+   "county": "Warren"
+  },
+  "61448": {
+   "city": "Knoxville",
+   "lat": 40.9107,
+   "lon": -90.2871,
+   "county": "Knox"
+  },
+  "61449": {
+   "city": "La Fayette",
+   "lat": 41.1095,
+   "lon": -89.9575,
+   "county": "Stark"
+  },
+  "61450": {
+   "city": "La Harpe",
+   "lat": 40.5846,
+   "lon": -90.9687,
+   "county": "Hancock"
+  },
+  "61451": {
+   "city": "Laura",
+   "lat": 40.9335,
+   "lon": -89.9349,
+   "county": "Peoria"
+  },
+  "61452": {
+   "city": "Littleton",
+   "lat": 40.2339,
+   "lon": -90.619,
+   "county": "Schuyler"
+  },
+  "61453": {
+   "city": "Little York",
+   "lat": 41.0153,
+   "lon": -90.7364,
+   "county": "Warren"
+  },
+  "61454": {
+   "city": "Lomax",
+   "lat": 40.6761,
+   "lon": -91.0391,
+   "county": "Henderson"
+  },
+  "61455": {
+   "city": "Macomb",
+   "lat": 40.4617,
+   "lon": -90.6787,
+   "county": "McDonough"
+  },
+  "61458": {
+   "city": "Maquon",
+   "lat": 40.7849,
+   "lon": -90.2008,
+   "county": "Knox"
+  },
+  "61459": {
+   "city": "Marietta",
+   "lat": 40.4978,
+   "lon": -90.3885,
+   "county": "Fulton"
+  },
+  "61460": {
+   "city": "Media",
+   "lat": 40.7618,
+   "lon": -90.857,
+   "county": "Henderson"
+  },
+  "61462": {
+   "city": "Monmouth",
+   "lat": 40.9107,
+   "lon": -90.6448,
+   "county": "Warren"
+  },
+  "61465": {
+   "city": "New Windsor",
+   "lat": 41.1987,
+   "lon": -90.4598,
+   "county": "Mercer"
+  },
+  "61466": {
+   "city": "North Henderson",
+   "lat": 41.1006,
+   "lon": -90.4736,
+   "county": "Mercer"
+  },
+  "61467": {
+   "city": "Oneida",
+   "lat": 41.0832,
+   "lon": -90.2391,
+   "county": "Knox"
+  },
+  "61468": {
+   "city": "Ophiem",
+   "lat": 41.2525,
+   "lon": -90.3876,
+   "county": "Henry"
+  },
+  "61469": {
+   "city": "Oquawka",
+   "lat": 40.9442,
+   "lon": -90.9302,
+   "county": "Henderson"
+  },
+  "61470": {
+   "city": "Prairie City",
+   "lat": 40.618,
+   "lon": -90.4727,
+   "county": "McDonough"
+  },
+  "61471": {
+   "city": "Raritan",
+   "lat": 40.6959,
+   "lon": -90.8274,
+   "county": "Henderson"
+  },
+  "61472": {
+   "city": "Rio",
+   "lat": 41.1103,
+   "lon": -90.39,
+   "county": "Knox"
+  },
+  "61473": {
+   "city": "Roseville",
+   "lat": 40.7238,
+   "lon": -90.6514,
+   "county": "Warren"
+  },
+  "61474": {
+   "city": "Saint Augustine",
+   "lat": 40.7289,
+   "lon": -90.3798,
+   "county": "Knox"
+  },
+  "61475": {
+   "city": "Sciota",
+   "lat": 40.5832,
+   "lon": -90.7316,
+   "county": "McDonough"
+  },
+  "61476": {
+   "city": "Seaton",
+   "lat": 41.0732,
+   "lon": -90.8257,
+   "county": "Mercer"
+  },
+  "61477": {
+   "city": "Smithfield",
+   "lat": 40.4855,
+   "lon": -90.2856,
+   "county": "Fulton"
+  },
+  "61478": {
+   "city": "Smithshire",
+   "lat": 40.7579,
+   "lon": -90.7606,
+   "county": "Warren"
+  },
+  "61479": {
+   "city": "Speer",
+   "lat": 40.9872,
+   "lon": -89.652,
+   "county": "Stark"
+  },
+  "61480": {
+   "city": "Stronghurst",
+   "lat": 40.7523,
+   "lon": -90.9257,
+   "county": "Henderson"
+  },
+  "61482": {
+   "city": "Table Grove",
+   "lat": 40.3784,
+   "lon": -90.4239,
+   "county": "Fulton"
+  },
+  "61483": {
+   "city": "Toulon",
+   "lat": 41.1009,
+   "lon": -89.8606,
+   "county": "Stark"
+  },
+  "61484": {
+   "city": "Vermont",
+   "lat": 40.3062,
+   "lon": -90.422,
+   "county": "Fulton"
+  },
+  "61485": {
+   "city": "Victoria",
+   "lat": 41.0256,
+   "lon": -90.0933,
+   "county": "Knox"
+  },
+  "61486": {
+   "city": "Viola",
+   "lat": 41.2024,
+   "lon": -90.5936,
+   "county": "Mercer"
+  },
+  "61488": {
+   "city": "Wataga",
+   "lat": 41.0224,
+   "lon": -90.2723,
+   "county": "Knox"
+  },
+  "61489": {
+   "city": "Williamsfield",
+   "lat": 40.9277,
+   "lon": -90.0267,
+   "county": "Knox"
+  },
+  "61490": {
+   "city": "Woodhull",
+   "lat": 41.1849,
+   "lon": -90.2833,
+   "county": "Henry"
+  },
+  "61491": {
+   "city": "Wyoming",
+   "lat": 41.0599,
+   "lon": -89.7782,
+   "county": "Stark"
+  },
+  "61501": {
+   "city": "Astoria",
+   "lat": 40.2311,
+   "lon": -90.3443,
+   "county": "Fulton"
+  },
+  "61516": {
+   "city": "Benson",
+   "lat": 40.8306,
+   "lon": -89.1165,
+   "county": "Woodford"
+  },
+  "61517": {
+   "city": "Brimfield",
+   "lat": 40.8407,
+   "lon": -89.897,
+   "county": "Peoria"
+  },
+  "61519": {
+   "city": "Bryant",
+   "lat": 40.4663,
+   "lon": -90.091,
+   "county": "Fulton"
+  },
+  "61520": {
+   "city": "Canton",
+   "lat": 40.5601,
+   "lon": -90.0242,
+   "county": "Fulton"
+  },
+  "61523": {
+   "city": "Chillicothe",
+   "lat": 40.9013,
+   "lon": -89.5068,
+   "county": "Peoria"
+  },
+  "61524": {
+   "city": "Dunfermline",
+   "lat": 40.4912,
+   "lon": -90.0318,
+   "county": "Fulton"
+  },
+  "61525": {
+   "city": "Dunlap",
+   "lat": 40.8444,
+   "lon": -89.6397,
+   "county": "Peoria"
+  },
+  "61526": {
+   "city": "Edelstein",
+   "lat": 40.9454,
+   "lon": -89.5858,
+   "county": "Peoria"
+  },
+  "61528": {
+   "city": "Edwards",
+   "lat": 40.779,
+   "lon": -89.723,
+   "county": "Peoria"
+  },
+  "61529": {
+   "city": "Elmwood",
+   "lat": 40.7726,
+   "lon": -89.9289,
+   "county": "Peoria"
+  },
+  "61530": {
+   "city": "Eureka",
+   "lat": 40.7152,
+   "lon": -89.2706,
+   "county": "Woodford"
+  },
+  "61531": {
+   "city": "Farmington",
+   "lat": 40.6832,
+   "lon": -90.035,
+   "county": "Fulton"
+  },
+  "61532": {
+   "city": "Forest City",
+   "lat": 40.3594,
+   "lon": -89.8334,
+   "county": "Mason"
+  },
+  "61533": {
+   "city": "Glasford",
+   "lat": 40.576,
+   "lon": -89.8113,
+   "county": "Peoria"
+  },
+  "61534": {
+   "city": "Green Valley",
+   "lat": 40.4198,
+   "lon": -89.6549,
+   "county": "Tazewell"
+  },
+  "61535": {
+   "city": "Groveland",
+   "lat": 40.5925,
+   "lon": -89.5345,
+   "county": "Tazewell"
+  },
+  "61536": {
+   "city": "Hanna City",
+   "lat": 40.6798,
+   "lon": -89.7952,
+   "county": "Peoria"
+  },
+  "61537": {
+   "city": "Henry",
+   "lat": 41.1115,
+   "lon": -89.3743,
+   "county": "Marshall"
+  },
+  "61539": {
+   "city": "Kingston Mines",
+   "lat": 40.5571,
+   "lon": -89.7685,
+   "county": "Peoria"
+  },
+  "61540": {
+   "city": "Lacon",
+   "lat": 41.0216,
+   "lon": -89.4008,
+   "county": "Marshall"
+  },
+  "61541": {
+   "city": "La Rose",
+   "lat": 40.9823,
+   "lon": -89.2354,
+   "county": "Marshall"
+  },
+  "61542": {
+   "city": "Lewistown",
+   "lat": 40.383,
+   "lon": -90.1563,
+   "county": "Fulton"
+  },
+  "61543": {
+   "city": "Liverpool",
+   "lat": 40.3902,
+   "lon": -90.0026,
+   "county": "Fulton"
+  },
+  "61544": {
+   "city": "London Mills",
+   "lat": 40.695,
+   "lon": -90.2616,
+   "county": "Fulton"
+  },
+  "61545": {
+   "city": "Lowpoint",
+   "lat": 40.8793,
+   "lon": -89.3703,
+   "county": "Woodford"
+  },
+  "61546": {
+   "city": "Manito",
+   "lat": 40.416,
+   "lon": -89.7898,
+   "county": "Mason"
+  },
+  "61547": {
+   "city": "Mapleton",
+   "lat": 40.6117,
+   "lon": -89.7184,
+   "county": "Peoria"
+  },
+  "61548": {
+   "city": "Metamora",
+   "lat": 40.7844,
+   "lon": -89.4309,
+   "county": "Woodford"
+  },
+  "61550": {
+   "city": "Morton",
+   "lat": 40.6148,
+   "lon": -89.4604,
+   "county": "Tazewell"
+  },
+  "61552": {
+   "city": "Mossville",
+   "lat": 40.818,
+   "lon": -89.568,
+   "county": "Peoria"
+  },
+  "61553": {
+   "city": "Norris",
+   "lat": 40.6259,
+   "lon": -90.0323,
+   "county": "Fulton"
+  },
+  "61554": {
+   "city": "Pekin",
+   "lat": 40.5674,
+   "lon": -89.6243,
+   "county": "Tazewell"
+  },
+  "61555": {
+   "city": "Pekin",
+   "lat": 40.5607,
+   "lon": -89.6502,
+   "county": "Tazewell"
+  },
+  "61558": {
+   "city": "Pekin",
+   "lat": 40.5675,
+   "lon": -89.6407,
+   "county": "Tazewell"
+  },
+  "61559": {
+   "city": "Princeville",
+   "lat": 40.9093,
+   "lon": -89.7723,
+   "county": "Stark"
+  },
+  "61560": {
+   "city": "Putnam",
+   "lat": 41.1949,
+   "lon": -89.4409,
+   "county": "Putnam"
+  },
+  "61561": {
+   "city": "Roanoke",
+   "lat": 40.7956,
+   "lon": -89.2093,
+   "county": "Woodford"
+  },
+  "61562": {
+   "city": "Rome",
+   "lat": 40.8743,
+   "lon": -89.5067,
+   "county": "Peoria"
+  },
+  "61563": {
+   "city": "Saint David",
+   "lat": 40.4912,
+   "lon": -90.0505,
+   "county": "Fulton"
+  },
+  "61564": {
+   "city": "South Pekin",
+   "lat": 40.4945,
+   "lon": -89.6518,
+   "county": "Tazewell"
+  },
+  "61565": {
+   "city": "Sparland",
+   "lat": 41.0134,
+   "lon": -89.4571,
+   "county": "Marshall"
+  },
+  "61567": {
+   "city": "Topeka",
+   "lat": 40.3303,
+   "lon": -89.9312,
+   "county": "Mason"
+  },
+  "61568": {
+   "city": "Tremont",
+   "lat": 40.5053,
+   "lon": -89.4833,
+   "county": "Tazewell"
+  },
+  "61569": {
+   "city": "Trivoli",
+   "lat": 40.6795,
+   "lon": -89.9135,
+   "county": "Peoria"
+  },
+  "61570": {
+   "city": "Washburn",
+   "lat": 40.9141,
+   "lon": -89.283,
+   "county": "Marshall"
+  },
+  "61571": {
+   "city": "Washington",
+   "lat": 40.7034,
+   "lon": -89.4194,
+   "county": "Tazewell"
+  },
+  "61572": {
+   "city": "Yates City",
+   "lat": 40.7878,
+   "lon": -90.0265,
+   "county": "Knox"
+  },
+  "61601": {
+   "city": "Peoria",
+   "lat": 40.6931,
+   "lon": -89.5898,
+   "county": "Peoria"
+  },
+  "61602": {
+   "city": "Peoria",
+   "lat": 40.6936,
+   "lon": -89.589,
+   "county": "Peoria"
+  },
+  "61603": {
+   "city": "Peoria",
+   "lat": 40.7132,
+   "lon": -89.577,
+   "county": "Peoria"
+  },
+  "61604": {
+   "city": "Peoria",
+   "lat": 40.7111,
+   "lon": -89.6324,
+   "county": "Peoria"
+  },
+  "61605": {
+   "city": "Peoria",
+   "lat": 40.6775,
+   "lon": -89.6263,
+   "county": "Peoria"
+  },
+  "61606": {
+   "city": "Peoria",
+   "lat": 40.6989,
+   "lon": -89.6122,
+   "county": "Peoria"
+  },
+  "61607": {
+   "city": "Peoria",
+   "lat": 40.6321,
+   "lon": -89.6903,
+   "county": "Peoria"
+  },
+  "61610": {
+   "city": "Creve Coeur",
+   "lat": 40.6428,
+   "lon": -89.5988,
+   "county": "Tazewell"
+  },
+  "61611": {
+   "city": "East Peoria",
+   "lat": 40.6731,
+   "lon": -89.5514,
+   "county": "Tazewell"
+  },
+  "61612": {
+   "city": "Peoria",
+   "lat": 40.7442,
+   "lon": -89.7184,
+   "county": "Peoria"
+  },
+  "61613": {
+   "city": "Peoria",
+   "lat": 40.7425,
+   "lon": -89.6279,
+   "county": "Peoria"
+  },
+  "61614": {
+   "city": "Peoria",
+   "lat": 40.7681,
+   "lon": -89.6026,
+   "county": "Peoria"
+  },
+  "61615": {
+   "city": "Peoria",
+   "lat": 40.7661,
+   "lon": -89.645,
+   "county": "Peoria"
+  },
+  "61616": {
+   "city": "Peoria Heights",
+   "lat": 40.7473,
+   "lon": -89.574,
+   "county": "Peoria"
+  },
+  "61625": {
+   "city": "Peoria",
+   "lat": 40.6963,
+   "lon": -89.6166,
+   "county": "Peoria"
+  },
+  "61629": {
+   "city": "Peoria",
+   "lat": 40.692,
+   "lon": -89.5887,
+   "county": "Peoria"
+  },
+  "61630": {
+   "city": "Peoria",
+   "lat": 40.7442,
+   "lon": -89.7184,
+   "county": "Peoria"
+  },
+  "61633": {
+   "city": "Peoria",
+   "lat": 40.7312,
+   "lon": -89.6031,
+   "county": "Peoria"
+  },
+  "61634": {
+   "city": "Peoria",
+   "lat": 40.6896,
+   "lon": -89.5926,
+   "county": "Peoria"
+  },
+  "61635": {
+   "city": "East Peoria",
+   "lat": 40.6661,
+   "lon": -89.5801,
+   "county": "Tazewell"
+  },
+  "61636": {
+   "city": "Peoria",
+   "lat": 40.6999,
+   "lon": -89.5951,
+   "county": "Peoria"
+  },
+  "61637": {
+   "city": "Peoria",
+   "lat": 40.7025,
+   "lon": -89.5898,
+   "county": "Peoria"
+  },
+  "61638": {
+   "city": "Peoria",
+   "lat": 40.7969,
+   "lon": -89.6111,
+   "county": "Peoria"
+  },
+  "61639": {
+   "city": "Peoria",
+   "lat": 40.7098,
+   "lon": -89.5636,
+   "county": "Peoria"
+  },
+  "61641": {
+   "city": "Peoria",
+   "lat": 40.64,
+   "lon": -89.652,
+   "county": "Peoria"
+  },
+  "61643": {
+   "city": "Peoria",
+   "lat": 40.7442,
+   "lon": -89.7184,
+   "county": "Peoria"
+  },
+  "61650": {
+   "city": "Peoria",
+   "lat": 40.7442,
+   "lon": -89.7184,
+   "county": "Peoria"
+  },
+  "61651": {
+   "city": "Peoria",
+   "lat": 40.7442,
+   "lon": -89.7184,
+   "county": "Peoria"
+  },
+  "61652": {
+   "city": "Peoria",
+   "lat": 40.8767,
+   "lon": -89.5091,
+   "county": "Peoria"
+  },
+  "61653": {
+   "city": "Peoria",
+   "lat": 40.7442,
+   "lon": -89.7184,
+   "county": "Peoria"
+  },
+  "61654": {
+   "city": "Peoria",
+   "lat": 40.7442,
+   "lon": -89.7184,
+   "county": "Peoria"
+  },
+  "61655": {
+   "city": "Peoria",
+   "lat": 40.7442,
+   "lon": -89.7184,
+   "county": "Peoria"
+  },
+  "61656": {
+   "city": "Peoria",
+   "lat": 40.7442,
+   "lon": -89.7184,
+   "county": "Peoria"
+  },
+  "61701": {
+   "city": "Bloomington",
+   "lat": 40.4783,
+   "lon": -88.9893,
+   "county": "McLean"
+  },
+  "61702": {
+   "city": "Bloomington",
+   "lat": 40.5192,
+   "lon": -88.8643,
+   "county": "McLean"
+  },
+  "61704": {
+   "city": "Bloomington",
+   "lat": 40.4705,
+   "lon": -88.9433,
+   "county": "McLean"
+  },
+  "61705": {
+   "city": "Bloomington",
+   "lat": 40.44,
+   "lon": -89.067,
+   "county": "McLean"
+  },
+  "61709": {
+   "city": "Bloomington",
+   "lat": 40.4614,
+   "lon": -88.953,
+   "county": "McLean"
+  },
+  "61710": {
+   "city": "Bloomington",
+   "lat": 40.4777,
+   "lon": -88.9542,
+   "county": "McLean"
+  },
+  "61720": {
+   "city": "Anchor",
+   "lat": 40.5441,
+   "lon": -88.5266,
+   "county": "McLean"
+  },
+  "61721": {
+   "city": "Armington",
+   "lat": 40.3613,
+   "lon": -89.3231,
+   "county": "Tazewell"
+  },
+  "61722": {
+   "city": "Arrowsmith",
+   "lat": 40.412,
+   "lon": -88.6296,
+   "county": "McLean"
+  },
+  "61723": {
+   "city": "Atlanta",
+   "lat": 40.2586,
+   "lon": -89.23,
+   "county": "Logan"
+  },
+  "61724": {
+   "city": "Bellflower",
+   "lat": 40.3401,
+   "lon": -88.5227,
+   "county": "McLean"
+  },
+  "61725": {
+   "city": "Carlock",
+   "lat": 40.6029,
+   "lon": -89.1098,
+   "county": "McLean"
+  },
+  "61726": {
+   "city": "Chenoa",
+   "lat": 40.7446,
+   "lon": -88.7219,
+   "county": "McLean"
+  },
+  "61727": {
+   "city": "Clinton",
+   "lat": 40.1487,
+   "lon": -88.9627,
+   "county": "De Witt"
+  },
+  "61728": {
+   "city": "Colfax",
+   "lat": 40.5704,
+   "lon": -88.62,
+   "county": "McLean"
+  },
+  "61729": {
+   "city": "Congerville",
+   "lat": 40.6208,
+   "lon": -89.1994,
+   "county": "Woodford"
+  },
+  "61730": {
+   "city": "Cooksville",
+   "lat": 40.536,
+   "lon": -88.735,
+   "county": "McLean"
+  },
+  "61731": {
+   "city": "Cropsey",
+   "lat": 40.603,
+   "lon": -88.4943,
+   "county": "McLean"
+  },
+  "61732": {
+   "city": "Danvers",
+   "lat": 40.5364,
+   "lon": -89.1885,
+   "county": "McLean"
+  },
+  "61733": {
+   "city": "Deer Creek",
+   "lat": 40.6224,
+   "lon": -89.3323,
+   "county": "Tazewell"
+  },
+  "61734": {
+   "city": "Delavan",
+   "lat": 40.369,
+   "lon": -89.5321,
+   "county": "Tazewell"
+  },
+  "61735": {
+   "city": "Dewitt",
+   "lat": 40.1848,
+   "lon": -88.7637,
+   "county": "De Witt"
+  },
+  "61736": {
+   "city": "Downs",
+   "lat": 40.3989,
+   "lon": -88.8686,
+   "county": "McLean"
+  },
+  "61737": {
+   "city": "Ellsworth",
+   "lat": 40.4432,
+   "lon": -88.7371,
+   "county": "McLean"
+  },
+  "61738": {
+   "city": "El Paso",
+   "lat": 40.7389,
+   "lon": -89.012,
+   "county": "Woodford"
+  },
+  "61739": {
+   "city": "Fairbury",
+   "lat": 40.745,
+   "lon": -88.5165,
+   "county": "Livingston"
+  },
+  "61740": {
+   "city": "Flanagan",
+   "lat": 40.879,
+   "lon": -88.862,
+   "county": "Livingston"
+  },
+  "61741": {
+   "city": "Forrest",
+   "lat": 40.7513,
+   "lon": -88.4111,
+   "county": "Livingston"
+  },
+  "61742": {
+   "city": "Goodfield",
+   "lat": 40.6329,
+   "lon": -89.2727,
+   "county": "Woodford"
+  },
+  "61743": {
+   "city": "Graymont",
+   "lat": 40.8757,
+   "lon": -88.7817,
+   "county": "Livingston"
+  },
+  "61744": {
+   "city": "Gridley",
+   "lat": 40.7439,
+   "lon": -88.884,
+   "county": "McLean"
+  },
+  "61745": {
+   "city": "Heyworth",
+   "lat": 40.3307,
+   "lon": -88.9776,
+   "county": "McLean"
+  },
+  "61747": {
+   "city": "Hopedale",
+   "lat": 40.4273,
+   "lon": -89.4214,
+   "county": "Tazewell"
+  },
+  "61748": {
+   "city": "Hudson",
+   "lat": 40.6205,
+   "lon": -88.9759,
+   "county": "McLean"
+  },
+  "61749": {
+   "city": "Kenney",
+   "lat": 40.0967,
+   "lon": -89.0859,
+   "county": "De Witt"
+  },
+  "61750": {
+   "city": "Lane",
+   "lat": 40.1235,
+   "lon": -88.8597,
+   "county": "De Witt"
+  },
+  "61751": {
+   "city": "Lawndale",
+   "lat": 40.2193,
+   "lon": -89.2852,
+   "county": "Logan"
+  },
+  "61752": {
+   "city": "Le Roy",
+   "lat": 40.3468,
+   "lon": -88.7598,
+   "county": "McLean"
+  },
+  "61753": {
+   "city": "Lexington",
+   "lat": 40.6357,
+   "lon": -88.8062,
+   "county": "McLean"
+  },
+  "61754": {
+   "city": "Mc Lean",
+   "lat": 40.3282,
+   "lon": -89.1645,
+   "county": "McLean"
+  },
+  "61755": {
+   "city": "Mackinaw",
+   "lat": 40.5396,
+   "lon": -89.3458,
+   "county": "Tazewell"
+  },
+  "61756": {
+   "city": "Maroa",
+   "lat": 40.0342,
+   "lon": -88.9578,
+   "county": "Macon"
+  },
+  "61758": {
+   "city": "Merna",
+   "lat": 40.5167,
+   "lon": -88.8259,
+   "county": "McLean"
+  },
+  "61759": {
+   "city": "Minier",
+   "lat": 40.4359,
+   "lon": -89.3165,
+   "county": "Tazewell"
+  },
+  "61760": {
+   "city": "Minonk",
+   "lat": 40.8985,
+   "lon": -89.0349,
+   "county": "Woodford"
+  },
+  "61761": {
+   "city": "Normal",
+   "lat": 40.5124,
+   "lon": -88.9883,
+   "county": "McLean"
+  },
+  "61764": {
+   "city": "Pontiac",
+   "lat": 40.8764,
+   "lon": -88.6328,
+   "county": "Livingston"
+  },
+  "61769": {
+   "city": "Saunemin",
+   "lat": 40.8885,
+   "lon": -88.4094,
+   "county": "Livingston"
+  },
+  "61770": {
+   "city": "Saybrook",
+   "lat": 40.432,
+   "lon": -88.5247,
+   "county": "McLean"
+  },
+  "61771": {
+   "city": "Secor",
+   "lat": 40.7224,
+   "lon": -89.1271,
+   "county": "Woodford"
+  },
+  "61772": {
+   "city": "Shirley",
+   "lat": 40.4174,
+   "lon": -89.0822,
+   "county": "McLean"
+  },
+  "61773": {
+   "city": "Sibley",
+   "lat": 40.5823,
+   "lon": -88.3815,
+   "county": "Ford"
+  },
+  "61774": {
+   "city": "Stanford",
+   "lat": 40.4376,
+   "lon": -89.2164,
+   "county": "McLean"
+  },
+  "61775": {
+   "city": "Strawn",
+   "lat": 40.6476,
+   "lon": -88.404,
+   "county": "Livingston"
+  },
+  "61776": {
+   "city": "Towanda",
+   "lat": 40.5533,
+   "lon": -88.8886,
+   "county": "McLean"
+  },
+  "61777": {
+   "city": "Wapella",
+   "lat": 40.2323,
+   "lon": -88.9673,
+   "county": "De Witt"
+  },
+  "61778": {
+   "city": "Waynesville",
+   "lat": 40.2437,
+   "lon": -89.1143,
+   "county": "De Witt"
+  },
+  "61790": {
+   "city": "Normal",
+   "lat": 40.5103,
+   "lon": -88.998,
+   "county": "McLean"
+  },
+  "61791": {
+   "city": "Bloomington",
+   "lat": 40.5192,
+   "lon": -88.8643,
+   "county": "McLean"
+  },
+  "61799": {
+   "city": "Bloomington",
+   "lat": 40.4885,
+   "lon": -88.9396,
+   "county": "McLean"
+  },
+  "61801": {
+   "city": "Urbana",
+   "lat": 40.1095,
+   "lon": -88.2036,
+   "county": "Champaign"
+  },
+  "61802": {
+   "city": "Urbana",
+   "lat": 40.0746,
+   "lon": -88.1691,
+   "county": "Champaign"
+  },
+  "61803": {
+   "city": "Urbana",
+   "lat": 40.1059,
+   "lon": -88.2247,
+   "county": "Champaign"
+  },
+  "61810": {
+   "city": "Allerton",
+   "lat": 39.9188,
+   "lon": -87.9312,
+   "county": "Vermilion"
+  },
+  "61811": {
+   "city": "Alvin",
+   "lat": 40.3007,
+   "lon": -87.608,
+   "county": "Vermilion"
+  },
+  "61812": {
+   "city": "Armstrong",
+   "lat": 40.2175,
+   "lon": -87.8943,
+   "county": "Vermilion"
+  },
+  "61813": {
+   "city": "Bement",
+   "lat": 39.9222,
+   "lon": -88.5688,
+   "county": "Piatt"
+  },
+  "61814": {
+   "city": "Bismarck",
+   "lat": 40.2552,
+   "lon": -87.6138,
+   "county": "Vermilion"
+  },
+  "61815": {
+   "city": "Bondville",
+   "lat": 40.1134,
+   "lon": -88.3695,
+   "county": "Champaign"
+  },
+  "61816": {
+   "city": "Broadlands",
+   "lat": 39.9142,
+   "lon": -87.9948,
+   "county": "Champaign"
+  },
+  "61817": {
+   "city": "Catlin",
+   "lat": 40.0699,
+   "lon": -87.7113,
+   "county": "Vermilion"
+  },
+  "61818": {
+   "city": "Cerro Gordo",
+   "lat": 39.8681,
+   "lon": -88.7256,
+   "county": "Piatt"
+  },
+  "61820": {
+   "city": "Champaign",
+   "lat": 40.111,
+   "lon": -88.2407,
+   "county": "Champaign"
+  },
+  "61821": {
+   "city": "Champaign",
+   "lat": 40.1073,
+   "lon": -88.2788,
+   "county": "Champaign"
+  },
+  "61822": {
+   "city": "Champaign",
+   "lat": 40.1317,
+   "lon": -88.2854,
+   "county": "Champaign"
+  },
+  "61824": {
+   "city": "Champaign",
+   "lat": 40.1164,
+   "lon": -88.2434,
+   "county": "Champaign"
+  },
+  "61825": {
+   "city": "Champaign",
+   "lat": 40.1164,
+   "lon": -88.2434,
+   "county": "Champaign"
+  },
+  "61826": {
+   "city": "Champaign",
+   "lat": 40.1131,
+   "lon": -88.3613,
+   "county": "Champaign"
+  },
+  "61830": {
+   "city": "Cisco",
+   "lat": 39.9972,
+   "lon": -88.6962,
+   "county": "Piatt"
+  },
+  "61831": {
+   "city": "Collison",
+   "lat": 40.2207,
+   "lon": -87.7987,
+   "county": "Vermilion"
+  },
+  "61832": {
+   "city": "Danville",
+   "lat": 40.137,
+   "lon": -87.6217,
+   "county": "Vermilion"
+  },
+  "61833": {
+   "city": "Tilton",
+   "lat": 40.0964,
+   "lon": -87.644,
+   "county": "Vermilion"
+  },
+  "61834": {
+   "city": "Danville",
+   "lat": 40.1602,
+   "lon": -87.6729,
+   "county": "Vermilion"
+  },
+  "61839": {
+   "city": "De Land",
+   "lat": 40.1107,
+   "lon": -88.6392,
+   "county": "Piatt"
+  },
+  "61840": {
+   "city": "Dewey",
+   "lat": 40.3131,
+   "lon": -88.277,
+   "county": "Champaign"
+  },
+  "61841": {
+   "city": "Fairmount",
+   "lat": 40.0373,
+   "lon": -87.8365,
+   "county": "Vermilion"
+  },
+  "61842": {
+   "city": "Farmer City",
+   "lat": 40.2447,
+   "lon": -88.6634,
+   "county": "De Witt"
+  },
+  "61843": {
+   "city": "Fisher",
+   "lat": 40.2991,
+   "lon": -88.356,
+   "county": "Champaign"
+  },
+  "61844": {
+   "city": "Fithian",
+   "lat": 40.1192,
+   "lon": -87.8797,
+   "county": "Vermilion"
+  },
+  "61845": {
+   "city": "Foosland",
+   "lat": 40.3554,
+   "lon": -88.4202,
+   "county": "Champaign"
+  },
+  "61846": {
+   "city": "Georgetown",
+   "lat": 39.9792,
+   "lon": -87.6365,
+   "county": "Vermilion"
+  },
+  "61847": {
+   "city": "Gifford",
+   "lat": 40.3028,
+   "lon": -88.0317,
+   "county": "Champaign"
+  },
+  "61848": {
+   "city": "Henning",
+   "lat": 40.304,
+   "lon": -87.7007,
+   "county": "Vermilion"
+  },
+  "61849": {
+   "city": "Homer",
+   "lat": 40.0346,
+   "lon": -87.9627,
+   "county": "Champaign"
+  },
+  "61850": {
+   "city": "Indianola",
+   "lat": 39.9268,
+   "lon": -87.7388,
+   "county": "Vermilion"
+  },
+  "61851": {
+   "city": "Ivesdale",
+   "lat": 39.9502,
+   "lon": -88.4451,
+   "county": "Champaign"
+  },
+  "61852": {
+   "city": "Longview",
+   "lat": 39.9012,
+   "lon": -88.0753,
+   "county": "Champaign"
+  },
+  "61853": {
+   "city": "Mahomet",
+   "lat": 40.1964,
+   "lon": -88.3928,
+   "county": "Champaign"
+  },
+  "61854": {
+   "city": "Mansfield",
+   "lat": 40.2147,
+   "lon": -88.5179,
+   "county": "Piatt"
+  },
+  "61855": {
+   "city": "Milmine",
+   "lat": 39.9238,
+   "lon": -88.6599,
+   "county": "Piatt"
+  },
+  "61856": {
+   "city": "Monticello",
+   "lat": 40.0263,
+   "lon": -88.5686,
+   "county": "Piatt"
+  },
+  "61857": {
+   "city": "Muncie",
+   "lat": 40.1165,
+   "lon": -87.8447,
+   "county": "Vermilion"
+  },
+  "61858": {
+   "city": "Oakwood",
+   "lat": 40.1167,
+   "lon": -87.7825,
+   "county": "Vermilion"
+  },
+  "61859": {
+   "city": "Ogden",
+   "lat": 40.1401,
+   "lon": -87.9665,
+   "county": "Champaign"
+  },
+  "61862": {
+   "city": "Penfield",
+   "lat": 40.3101,
+   "lon": -87.957,
+   "county": "Champaign"
+  },
+  "61863": {
+   "city": "Pesotum",
+   "lat": 39.9151,
+   "lon": -88.2743,
+   "county": "Champaign"
+  },
+  "61864": {
+   "city": "Philo",
+   "lat": 40.0052,
+   "lon": -88.1595,
+   "county": "Champaign"
+  },
+  "61865": {
+   "city": "Potomac",
+   "lat": 40.309,
+   "lon": -87.8232,
+   "county": "Vermilion"
+  },
+  "61866": {
+   "city": "Rantoul",
+   "lat": 40.3107,
+   "lon": -88.1462,
+   "county": "Champaign"
+  },
+  "61870": {
+   "city": "Ridge Farm",
+   "lat": 39.9155,
+   "lon": -87.6346,
+   "county": "Vermilion"
+  },
+  "61871": {
+   "city": "Royal",
+   "lat": 40.1924,
+   "lon": -87.9742,
+   "county": "Champaign"
+  },
+  "61872": {
+   "city": "Sadorus",
+   "lat": 39.9613,
+   "lon": -88.3447,
+   "county": "Champaign"
+  },
+  "61873": {
+   "city": "Saint Joseph",
+   "lat": 40.1207,
+   "lon": -88.0472,
+   "county": "Champaign"
+  },
+  "61874": {
+   "city": "Savoy",
+   "lat": 40.0654,
+   "lon": -88.2528,
+   "county": "Champaign"
+  },
+  "61875": {
+   "city": "Seymour",
+   "lat": 40.107,
+   "lon": -88.4267,
+   "county": "Champaign"
+  },
+  "61876": {
+   "city": "Sidell",
+   "lat": 39.911,
+   "lon": -87.8248,
+   "county": "Vermilion"
+  },
+  "61877": {
+   "city": "Sidney",
+   "lat": 40.0232,
+   "lon": -88.069,
+   "county": "Champaign"
+  },
+  "61878": {
+   "city": "Thomasboro",
+   "lat": 40.2402,
+   "lon": -88.183,
+   "county": "Champaign"
+  },
+  "61880": {
+   "city": "Tolono",
+   "lat": 39.985,
+   "lon": -88.2596,
+   "county": "Champaign"
+  },
+  "61882": {
+   "city": "Weldon",
+   "lat": 40.1177,
+   "lon": -88.7531,
+   "county": "De Witt"
+  },
+  "61883": {
+   "city": "Westville",
+   "lat": 40.0451,
+   "lon": -87.636,
+   "county": "Vermilion"
+  },
+  "61884": {
+   "city": "White Heath",
+   "lat": 40.1009,
+   "lon": -88.5193,
+   "county": "Piatt"
+  },
+  "61910": {
+   "city": "Arcola",
+   "lat": 39.687,
+   "lon": -88.3037,
+   "county": "Douglas"
+  },
+  "61911": {
+   "city": "Arthur",
+   "lat": 39.7077,
+   "lon": -88.4555,
+   "county": "Douglas"
+  },
+  "61912": {
+   "city": "Ashmore",
+   "lat": 39.5254,
+   "lon": -88.0341,
+   "county": "Coles"
+  },
+  "61913": {
+   "city": "Atwood",
+   "lat": 39.8044,
+   "lon": -88.4494,
+   "county": "Douglas"
+  },
+  "61914": {
+   "city": "Bethany",
+   "lat": 39.6348,
+   "lon": -88.7543,
+   "county": "Moultrie"
+  },
+  "61917": {
+   "city": "Brocton",
+   "lat": 39.6923,
+   "lon": -87.9263,
+   "county": "Edgar"
+  },
+  "61919": {
+   "city": "Camargo",
+   "lat": 39.8,
+   "lon": -88.1468,
+   "county": "Douglas"
+  },
+  "61920": {
+   "city": "Charleston",
+   "lat": 39.4869,
+   "lon": -88.1761,
+   "county": "Coles"
+  },
+  "61924": {
+   "city": "Chrisman",
+   "lat": 39.7996,
+   "lon": -87.6556,
+   "county": "Edgar"
+  },
+  "61925": {
+   "city": "Dalton City",
+   "lat": 39.7119,
+   "lon": -88.7975,
+   "county": "Moultrie"
+  },
+  "61928": {
+   "city": "Gays",
+   "lat": 39.4796,
+   "lon": -88.5242,
+   "county": "Moultrie"
+  },
+  "61929": {
+   "city": "Hammond",
+   "lat": 39.7946,
+   "lon": -88.5793,
+   "county": "Piatt"
+  },
+  "61930": {
+   "city": "Hindsboro",
+   "lat": 39.7018,
+   "lon": -88.1486,
+   "county": "Douglas"
+  },
+  "61931": {
+   "city": "Humboldt",
+   "lat": 39.6012,
+   "lon": -88.3141,
+   "county": "Coles"
+  },
+  "61932": {
+   "city": "Hume",
+   "lat": 39.8009,
+   "lon": -87.8747,
+   "county": "Edgar"
+  },
+  "61933": {
+   "city": "Kansas",
+   "lat": 39.5525,
+   "lon": -87.9352,
+   "county": "Edgar"
+  },
+  "61936": {
+   "city": "La Place",
+   "lat": 39.7983,
+   "lon": -88.7272,
+   "county": "Piatt"
+  },
+  "61937": {
+   "city": "Lovington",
+   "lat": 39.7192,
+   "lon": -88.6417,
+   "county": "Moultrie"
+  },
+  "61938": {
+   "city": "Mattoon",
+   "lat": 39.4802,
+   "lon": -88.3762,
+   "county": "Coles"
+  },
+  "61940": {
+   "city": "Metcalf",
+   "lat": 39.8008,
+   "lon": -87.7955,
+   "county": "Edgar"
+  },
+  "61941": {
+   "city": "Murdock",
+   "lat": 39.8009,
+   "lon": -88.0784,
+   "county": "Douglas"
+  },
+  "61942": {
+   "city": "Newman",
+   "lat": 39.7848,
+   "lon": -88.0001,
+   "county": "Douglas"
+  },
+  "61943": {
+   "city": "Oakland",
+   "lat": 39.6516,
+   "lon": -88.0253,
+   "county": "Coles"
+  },
+  "61944": {
+   "city": "Paris",
+   "lat": 39.6132,
+   "lon": -87.6976,
+   "county": "Edgar"
+  },
+  "61949": {
+   "city": "Redmon",
+   "lat": 39.6453,
+   "lon": -87.8617,
+   "county": "Edgar"
+  },
+  "61951": {
+   "city": "Sullivan",
+   "lat": 39.5934,
+   "lon": -88.6038,
+   "county": "Moultrie"
+  },
+  "61953": {
+   "city": "Tuscola",
+   "lat": 39.7995,
+   "lon": -88.2816,
+   "county": "Douglas"
+  },
+  "61955": {
+   "city": "Vermilion",
+   "lat": 39.5811,
+   "lon": -87.5889,
+   "county": "Edgar"
+  },
+  "61956": {
+   "city": "Villa Grove",
+   "lat": 39.8687,
+   "lon": -88.1616,
+   "county": "Douglas"
+  },
+  "61957": {
+   "city": "Windsor",
+   "lat": 39.4302,
+   "lon": -88.5857,
+   "county": "Shelby"
+  },
+  "62001": {
+   "city": "Alhambra",
+   "lat": 38.8822,
+   "lon": -89.7441,
+   "county": "Madison"
+  },
+  "62002": {
+   "city": "Alton",
+   "lat": 38.9087,
+   "lon": -90.1568,
+   "county": "Madison"
+  },
+  "62006": {
+   "city": "Batchtown",
+   "lat": 39.0725,
+   "lon": -90.6591,
+   "county": "Calhoun"
+  },
+  "62009": {
+   "city": "Benld",
+   "lat": 39.0939,
+   "lon": -89.8031,
+   "county": "Macoupin"
+  },
+  "62010": {
+   "city": "Bethalto",
+   "lat": 38.9074,
+   "lon": -90.0344,
+   "county": "Madison"
+  },
+  "62011": {
+   "city": "Bingham",
+   "lat": 39.1128,
+   "lon": -89.2125,
+   "county": "Fayette"
+  },
+  "62012": {
+   "city": "Brighton",
+   "lat": 39.0361,
+   "lon": -90.1443,
+   "county": "Jersey"
+  },
+  "62013": {
+   "city": "Brussels",
+   "lat": 38.9495,
+   "lon": -90.5887,
+   "county": "Calhoun"
+  },
+  "62014": {
+   "city": "Bunker Hill",
+   "lat": 39.0408,
+   "lon": -89.9624,
+   "county": "Macoupin"
+  },
+  "62015": {
+   "city": "Butler",
+   "lat": 39.2114,
+   "lon": -89.5305,
+   "county": "Montgomery"
+  },
+  "62016": {
+   "city": "Carrollton",
+   "lat": 39.3009,
+   "lon": -90.4092,
+   "county": "Greene"
+  },
+  "62017": {
+   "city": "Coffeen",
+   "lat": 39.0908,
+   "lon": -89.3945,
+   "county": "Montgomery"
+  },
+  "62018": {
+   "city": "Cottage Hills",
+   "lat": 38.9124,
+   "lon": -90.0826,
+   "county": "Madison"
+  },
+  "62019": {
+   "city": "Donnellson",
+   "lat": 39.0344,
+   "lon": -89.4909,
+   "county": "Bond"
+  },
+  "62021": {
+   "city": "Dorsey",
+   "lat": 38.9832,
+   "lon": -89.9786,
+   "county": "Madison"
+  },
+  "62022": {
+   "city": "Dow",
+   "lat": 39.0312,
+   "lon": -90.3011,
+   "county": "Jersey"
+  },
+  "62023": {
+   "city": "Eagarville",
+   "lat": 39.1118,
+   "lon": -89.7855,
+   "county": "Macoupin"
+  },
+  "62024": {
+   "city": "East Alton",
+   "lat": 38.8803,
+   "lon": -90.083,
+   "county": "Madison"
+  },
+  "62025": {
+   "city": "Edwardsville",
+   "lat": 38.805,
+   "lon": -89.9637,
+   "county": "Madison"
+  },
+  "62026": {
+   "city": "Edwardsville",
+   "lat": 38.8114,
+   "lon": -89.9532,
+   "county": "Madison"
+  },
+  "62027": {
+   "city": "Eldred",
+   "lat": 39.2836,
+   "lon": -90.5329,
+   "county": "Greene"
+  },
+  "62028": {
+   "city": "Elsah",
+   "lat": 38.9594,
+   "lon": -90.3541,
+   "county": "Jersey"
+  },
+  "62030": {
+   "city": "Fidelity",
+   "lat": 39.1546,
+   "lon": -90.1642,
+   "county": "Jersey"
+  },
+  "62031": {
+   "city": "Fieldon",
+   "lat": 39.1086,
+   "lon": -90.5297,
+   "county": "Jersey"
+  },
+  "62032": {
+   "city": "Fillmore",
+   "lat": 39.1039,
+   "lon": -89.2946,
+   "county": "Montgomery"
+  },
+  "62033": {
+   "city": "Gillespie",
+   "lat": 39.1341,
+   "lon": -89.8442,
+   "county": "Macoupin"
+  },
+  "62034": {
+   "city": "Glen Carbon",
+   "lat": 38.7609,
+   "lon": -89.9706,
+   "county": "Madison"
+  },
+  "62035": {
+   "city": "Godfrey",
+   "lat": 38.946,
+   "lon": -90.206,
+   "county": "Madison"
+  },
+  "62036": {
+   "city": "Golden Eagle",
+   "lat": 38.8961,
+   "lon": -90.5602,
+   "county": "Calhoun"
+  },
+  "62037": {
+   "city": "Grafton",
+   "lat": 39.0021,
+   "lon": -90.4323,
+   "county": "Jersey"
+  },
+  "62040": {
+   "city": "Granite City",
+   "lat": 38.7261,
+   "lon": -90.1106,
+   "county": "Madison"
+  },
+  "62044": {
+   "city": "Greenfield",
+   "lat": 39.3491,
+   "lon": -90.2089,
+   "county": "Greene"
+  },
+  "62045": {
+   "city": "Hamburg",
+   "lat": 39.2235,
+   "lon": -90.6995,
+   "county": "Calhoun"
+  },
+  "62046": {
+   "city": "Hamel",
+   "lat": 38.8901,
+   "lon": -89.8457,
+   "county": "Madison"
+  },
+  "62047": {
+   "city": "Hardin",
+   "lat": 39.1547,
+   "lon": -90.624,
+   "county": "Calhoun"
+  },
+  "62048": {
+   "city": "Hartford",
+   "lat": 38.8278,
+   "lon": -90.0926,
+   "county": "Madison"
+  },
+  "62049": {
+   "city": "Hillsboro",
+   "lat": 39.1494,
+   "lon": -89.4881,
+   "county": "Montgomery"
+  },
+  "62050": {
+   "city": "Hillview",
+   "lat": 39.4674,
+   "lon": -90.5128,
+   "county": "Greene"
+  },
+  "62051": {
+   "city": "Irving",
+   "lat": 39.2089,
+   "lon": -89.4104,
+   "county": "Montgomery"
+  },
+  "62052": {
+   "city": "Jerseyville",
+   "lat": 39.1213,
+   "lon": -90.3338,
+   "county": "Jersey"
+  },
+  "62053": {
+   "city": "Kampsville",
+   "lat": 39.3064,
+   "lon": -90.6269,
+   "county": "Calhoun"
+  },
+  "62054": {
+   "city": "Kane",
+   "lat": 39.2037,
+   "lon": -90.3719,
+   "county": "Greene"
+  },
+  "62056": {
+   "city": "Litchfield",
+   "lat": 39.1793,
+   "lon": -89.6499,
+   "county": "Montgomery"
+  },
+  "62058": {
+   "city": "Livingston",
+   "lat": 38.969,
+   "lon": -89.7668,
+   "county": "Madison"
+  },
+  "62059": {
+   "city": "Lovejoy",
+   "lat": 38.44,
+   "lon": -89.9835,
+   "county": "St. Clair"
+  },
+  "62060": {
+   "city": "Madison",
+   "lat": 38.6811,
+   "lon": -90.1566,
+   "county": "Madison"
+  },
+  "62061": {
+   "city": "Marine",
+   "lat": 38.7793,
+   "lon": -89.7786,
+   "county": "Madison"
+  },
+  "62062": {
+   "city": "Maryville",
+   "lat": 38.7138,
+   "lon": -89.9658,
+   "county": "Madison"
+  },
+  "62063": {
+   "city": "Medora",
+   "lat": 39.1986,
+   "lon": -90.1542,
+   "county": "Jersey"
+  },
+  "62065": {
+   "city": "Michael",
+   "lat": 39.2353,
+   "lon": -90.6235,
+   "county": "Calhoun"
+  },
+  "62067": {
+   "city": "Moro",
+   "lat": 38.9318,
+   "lon": -89.9618,
+   "county": "Madison"
+  },
+  "62069": {
+   "city": "Mount Olive",
+   "lat": 39.0705,
+   "lon": -89.7448,
+   "county": "Macoupin"
+  },
+  "62070": {
+   "city": "Mozier",
+   "lat": 39.2925,
+   "lon": -90.7493,
+   "county": "Calhoun"
+  },
+  "62071": {
+   "city": "National Stock Yards",
+   "lat": 38.6516,
+   "lon": -90.1639,
+   "county": "St. Clair"
+  },
+  "62074": {
+   "city": "New Douglas",
+   "lat": 38.9676,
+   "lon": -89.7392,
+   "county": "Madison"
+  },
+  "62075": {
+   "city": "Nokomis",
+   "lat": 39.3036,
+   "lon": -89.2853,
+   "county": "Montgomery"
+  },
+  "62076": {
+   "city": "Ohlman",
+   "lat": 39.3434,
+   "lon": -89.2191,
+   "county": "Montgomery"
+  },
+  "62077": {
+   "city": "Panama",
+   "lat": 39.0317,
+   "lon": -89.5237,
+   "county": "Montgomery"
+  },
+  "62078": {
+   "city": "Patterson",
+   "lat": 39.4806,
+   "lon": -90.4829,
+   "county": "Greene"
+  },
+  "62079": {
+   "city": "Piasa",
+   "lat": 39.1159,
+   "lon": -90.1237,
+   "county": "Macoupin"
+  },
+  "62080": {
+   "city": "Ramsey",
+   "lat": 39.1445,
+   "lon": -89.1087,
+   "county": "Fayette"
+  },
+  "62081": {
+   "city": "Rockbridge",
+   "lat": 39.2831,
+   "lon": -90.2558,
+   "county": "Greene"
+  },
+  "62082": {
+   "city": "Roodhouse",
+   "lat": 39.4846,
+   "lon": -90.3498,
+   "county": "Greene"
+  },
+  "62083": {
+   "city": "Rosamond",
+   "lat": 39.3743,
+   "lon": -89.1983,
+   "county": "Christian"
+  },
+  "62084": {
+   "city": "Roxana",
+   "lat": 38.8482,
+   "lon": -90.0798,
+   "county": "Madison"
+  },
+  "62085": {
+   "city": "Sawyerville",
+   "lat": 39.0828,
+   "lon": -89.8043,
+   "county": "Macoupin"
+  },
+  "62086": {
+   "city": "Sorento",
+   "lat": 38.9693,
+   "lon": -89.5653,
+   "county": "Bond"
+  },
+  "62087": {
+   "city": "South Roxana",
+   "lat": 38.8225,
+   "lon": -90.0583,
+   "county": "Madison"
+  },
+  "62088": {
+   "city": "Staunton",
+   "lat": 39.0135,
+   "lon": -89.7857,
+   "county": "Macoupin"
+  },
+  "62089": {
+   "city": "Taylor Springs",
+   "lat": 39.1309,
+   "lon": -89.492,
+   "county": "Montgomery"
+  },
+  "62090": {
+   "city": "Venice",
+   "lat": 38.6706,
+   "lon": -90.1689,
+   "county": "Madison"
+  },
+  "62091": {
+   "city": "Walshville",
+   "lat": 39.0473,
+   "lon": -89.635,
+   "county": "Montgomery"
+  },
+  "62092": {
+   "city": "White Hall",
+   "lat": 39.4288,
+   "lon": -90.4019,
+   "county": "Greene"
+  },
+  "62093": {
+   "city": "Wilsonville",
+   "lat": 39.0695,
+   "lon": -89.8565,
+   "county": "Macoupin"
+  },
+  "62094": {
+   "city": "Witt",
+   "lat": 39.2469,
+   "lon": -89.3414,
+   "county": "Montgomery"
+  },
+  "62095": {
+   "city": "Wood River",
+   "lat": 38.8643,
+   "lon": -90.0875,
+   "county": "Madison"
+  },
+  "62097": {
+   "city": "Worden",
+   "lat": 38.9449,
+   "lon": -89.8532,
+   "county": "Madison"
+  },
+  "62098": {
+   "city": "Wrights",
+   "lat": 39.3762,
+   "lon": -90.2933,
+   "county": "Greene"
+  },
+  "62201": {
+   "city": "East Saint Louis",
+   "lat": 38.6427,
+   "lon": -90.1387,
+   "county": "St. Clair"
+  },
+  "62202": {
+   "city": "East Saint Louis",
+   "lat": 38.6163,
+   "lon": -90.1591,
+   "county": "St. Clair"
+  },
+  "62203": {
+   "city": "East Saint Louis",
+   "lat": 38.5992,
+   "lon": -90.0744,
+   "county": "St. Clair"
+  },
+  "62204": {
+   "city": "East Saint Louis",
+   "lat": 38.6308,
+   "lon": -90.095,
+   "county": "St. Clair"
+  },
+  "62205": {
+   "city": "East Saint Louis",
+   "lat": 38.6149,
+   "lon": -90.1275,
+   "county": "St. Clair"
+  },
+  "62206": {
+   "city": "East Saint Louis",
+   "lat": 38.5514,
+   "lon": -90.1544,
+   "county": "St. Clair"
+  },
+  "62207": {
+   "city": "East Saint Louis",
+   "lat": 38.587,
+   "lon": -90.1278,
+   "county": "St. Clair"
+  },
+  "62208": {
+   "city": "Fairview Heights",
+   "lat": 38.596,
+   "lon": -90.0071,
+   "county": "St. Clair"
+  },
+  "62214": {
+   "city": "Addieville",
+   "lat": 38.3815,
+   "lon": -89.5794,
+   "county": "Washington"
+  },
+  "62215": {
+   "city": "Albers",
+   "lat": 38.532,
+   "lon": -89.6202,
+   "county": "Clinton"
+  },
+  "62216": {
+   "city": "Aviston",
+   "lat": 38.6089,
+   "lon": -89.6034,
+   "county": "Clinton"
+  },
+  "62217": {
+   "city": "Baldwin",
+   "lat": 38.1754,
+   "lon": -89.8414,
+   "county": "Randolph"
+  },
+  "62218": {
+   "city": "Bartelso",
+   "lat": 38.5385,
+   "lon": -89.4578,
+   "county": "Clinton"
+  },
+  "62219": {
+   "city": "Beckemeyer",
+   "lat": 38.6058,
+   "lon": -89.4319,
+   "county": "Clinton"
+  },
+  "62220": {
+   "city": "Belleville",
+   "lat": 38.5127,
+   "lon": -89.9847,
+   "county": "St. Clair"
+  },
+  "62221": {
+   "city": "Belleville",
+   "lat": 38.5396,
+   "lon": -89.9583,
+   "county": "St. Clair"
+  },
+  "62222": {
+   "city": "Belleville",
+   "lat": 38.44,
+   "lon": -89.9835,
+   "county": "St. Clair"
+  },
+  "62223": {
+   "city": "Belleville",
+   "lat": 38.5456,
+   "lon": -90.0378,
+   "county": "St. Clair"
+  },
+  "62225": {
+   "city": "Scott Air Force Base",
+   "lat": 38.5432,
+   "lon": -89.859,
+   "county": "St. Clair"
+  },
+  "62226": {
+   "city": "Belleville",
+   "lat": 38.5352,
+   "lon": -90.0006,
+   "county": "St. Clair"
+  },
+  "62230": {
+   "city": "Breese",
+   "lat": 38.6188,
+   "lon": -89.5284,
+   "county": "Clinton"
+  },
+  "62231": {
+   "city": "Carlyle",
+   "lat": 38.6066,
+   "lon": -89.3805,
+   "county": "Clinton"
+  },
+  "62232": {
+   "city": "Caseyville",
+   "lat": 38.6345,
+   "lon": -90.0135,
+   "county": "St. Clair"
+  },
+  "62233": {
+   "city": "Chester",
+   "lat": 37.9188,
+   "lon": -89.8218,
+   "county": "Randolph"
+  },
+  "62234": {
+   "city": "Collinsville",
+   "lat": 38.6835,
+   "lon": -89.9853,
+   "county": "Madison"
+  },
+  "62236": {
+   "city": "Columbia",
+   "lat": 38.4325,
+   "lon": -90.2027,
+   "county": "Monroe"
+  },
+  "62237": {
+   "city": "Coulterville",
+   "lat": 38.1753,
+   "lon": -89.6479,
+   "county": "Randolph"
+  },
+  "62238": {
+   "city": "Cutler",
+   "lat": 38.0427,
+   "lon": -89.5661,
+   "county": "Perry"
+  },
+  "62239": {
+   "city": "Dupo",
+   "lat": 38.5162,
+   "lon": -90.2104,
+   "county": "St. Clair"
+  },
+  "62240": {
+   "city": "East Carondelet",
+   "lat": 38.5349,
+   "lon": -90.2208,
+   "county": "St. Clair"
+  },
+  "62241": {
+   "city": "Ellis Grove",
+   "lat": 38.0054,
+   "lon": -89.9008,
+   "county": "Randolph"
+  },
+  "62242": {
+   "city": "Evansville",
+   "lat": 38.0926,
+   "lon": -89.917,
+   "county": "Randolph"
+  },
+  "62243": {
+   "city": "Freeburg",
+   "lat": 38.408,
+   "lon": -89.9181,
+   "county": "St. Clair"
+  },
+  "62244": {
+   "city": "Fults",
+   "lat": 38.1797,
+   "lon": -90.1974,
+   "county": "Monroe"
+  },
+  "62245": {
+   "city": "Germantown",
+   "lat": 38.5487,
+   "lon": -89.5413,
+   "county": "Clinton"
+  },
+  "62246": {
+   "city": "Greenville",
+   "lat": 38.8933,
+   "lon": -89.4052,
+   "county": "Bond"
+  },
+  "62247": {
+   "city": "Hagarstown",
+   "lat": 38.9434,
+   "lon": -89.1684,
+   "county": "Fayette"
+  },
+  "62248": {
+   "city": "Hecker",
+   "lat": 38.3044,
+   "lon": -89.9935,
+   "county": "Monroe"
+  },
+  "62249": {
+   "city": "Highland",
+   "lat": 38.7631,
+   "lon": -89.6789,
+   "county": "Madison"
+  },
+  "62250": {
+   "city": "Hoffman",
+   "lat": 38.5408,
+   "lon": -89.2661,
+   "county": "Clinton"
+  },
+  "62252": {
+   "city": "Huey",
+   "lat": 38.6018,
+   "lon": -89.2915,
+   "county": "Clinton"
+  },
+  "62253": {
+   "city": "Keyesport",
+   "lat": 38.7769,
+   "lon": -89.2975,
+   "county": "Clinton"
+  },
+  "62254": {
+   "city": "Lebanon",
+   "lat": 38.6053,
+   "lon": -89.7992,
+   "county": "St. Clair"
+  },
+  "62255": {
+   "city": "Lenzburg",
+   "lat": 38.295,
+   "lon": -89.7922,
+   "county": "St. Clair"
+  },
+  "62256": {
+   "city": "Maeystown",
+   "lat": 38.3043,
+   "lon": -90.1356,
+   "county": "Monroe"
+  },
+  "62257": {
+   "city": "Marissa",
+   "lat": 38.2455,
+   "lon": -89.7501,
+   "county": "St. Clair"
+  },
+  "62258": {
+   "city": "Mascoutah",
+   "lat": 38.4745,
+   "lon": -89.7877,
+   "county": "St. Clair"
+  },
+  "62259": {
+   "city": "Menard",
+   "lat": 37.9101,
+   "lon": -89.8398,
+   "county": "Randolph"
+  },
+  "62260": {
+   "city": "Millstadt",
+   "lat": 38.4443,
+   "lon": -90.0888,
+   "county": "St. Clair"
+  },
+  "62261": {
+   "city": "Modoc",
+   "lat": 38.0507,
+   "lon": -90.0163,
+   "county": "Randolph"
+  },
+  "62262": {
+   "city": "Mulberry Grove",
+   "lat": 38.9311,
+   "lon": -89.2463,
+   "county": "Bond"
+  },
+  "62263": {
+   "city": "Nashville",
+   "lat": 38.3352,
+   "lon": -89.3841,
+   "county": "Washington"
+  },
+  "62264": {
+   "city": "New Athens",
+   "lat": 38.316,
+   "lon": -89.8728,
+   "county": "St. Clair"
+  },
+  "62265": {
+   "city": "New Baden",
+   "lat": 38.5315,
+   "lon": -89.6922,
+   "county": "Clinton"
+  },
+  "62266": {
+   "city": "New Memphis",
+   "lat": 38.4857,
+   "lon": -89.6816,
+   "county": "Clinton"
+  },
+  "62268": {
+   "city": "Oakdale",
+   "lat": 38.2573,
+   "lon": -89.596,
+   "county": "Washington"
+  },
+  "62269": {
+   "city": "O Fallon",
+   "lat": 38.5718,
+   "lon": -89.8957,
+   "county": "St. Clair"
+  },
+  "62271": {
+   "city": "Okawville",
+   "lat": 38.4319,
+   "lon": -89.523,
+   "county": "Washington"
+  },
+  "62272": {
+   "city": "Percy",
+   "lat": 38.0126,
+   "lon": -89.617,
+   "county": "Randolph"
+  },
+  "62273": {
+   "city": "Pierron",
+   "lat": 38.78,
+   "lon": -89.5981,
+   "county": "Bond"
+  },
+  "62274": {
+   "city": "Pinckneyville",
+   "lat": 38.0903,
+   "lon": -89.3858,
+   "county": "Perry"
+  },
+  "62275": {
+   "city": "Pocahontas",
+   "lat": 38.7846,
+   "lon": -89.5247,
+   "county": "Bond"
+  },
+  "62277": {
+   "city": "Prairie Du Rocher",
+   "lat": 38.0831,
+   "lon": -90.0959,
+   "county": "Randolph"
+  },
+  "62278": {
+   "city": "Red Bud",
+   "lat": 38.1907,
+   "lon": -89.9884,
+   "county": "Randolph"
+  },
+  "62279": {
+   "city": "Renault",
+   "lat": 38.1521,
+   "lon": -90.1346,
+   "county": "Monroe"
+  },
+  "62280": {
+   "city": "Rockwood",
+   "lat": 37.8322,
+   "lon": -89.6214,
+   "county": "Randolph"
+  },
+  "62281": {
+   "city": "Saint Jacob",
+   "lat": 38.7059,
+   "lon": -89.7925,
+   "county": "Madison"
+  },
+  "62282": {
+   "city": "Saint Libory",
+   "lat": 38.3632,
+   "lon": -89.7139,
+   "county": "St. Clair"
+  },
+  "62284": {
+   "city": "Smithboro",
+   "lat": 38.8739,
+   "lon": -89.3266,
+   "county": "Bond"
+  },
+  "62285": {
+   "city": "Smithton",
+   "lat": 38.4231,
+   "lon": -89.9896,
+   "county": "St. Clair"
+  },
+  "62286": {
+   "city": "Sparta",
+   "lat": 38.1318,
+   "lon": -89.7035,
+   "county": "Randolph"
+  },
+  "62288": {
+   "city": "Steeleville",
+   "lat": 38.0057,
+   "lon": -89.6665,
+   "county": "Randolph"
+  },
+  "62289": {
+   "city": "Summerfield",
+   "lat": 38.5967,
+   "lon": -89.7512,
+   "county": "St. Clair"
+  },
+  "62292": {
+   "city": "Tilden",
+   "lat": 38.2122,
+   "lon": -89.6895,
+   "county": "Randolph"
+  },
+  "62293": {
+   "city": "Trenton",
+   "lat": 38.6191,
+   "lon": -89.6447,
+   "county": "Clinton"
+  },
+  "62294": {
+   "city": "Troy",
+   "lat": 38.7243,
+   "lon": -89.8708,
+   "county": "Madison"
+  },
+  "62295": {
+   "city": "Valmeyer",
+   "lat": 38.2805,
+   "lon": -90.3122,
+   "county": "Monroe"
+  },
+  "62297": {
+   "city": "Walsh",
+   "lat": 38.0203,
+   "lon": -89.8297,
+   "county": "Randolph"
+  },
+  "62298": {
+   "city": "Waterloo",
+   "lat": 38.3223,
+   "lon": -90.1478,
+   "county": "Monroe"
+  },
+  "62301": {
+   "city": "Quincy",
+   "lat": 39.9307,
+   "lon": -91.3763,
+   "county": "Adams"
+  },
+  "62305": {
+   "city": "Quincy",
+   "lat": 39.9601,
+   "lon": -91.3026,
+   "county": "Adams"
+  },
+  "62306": {
+   "city": "Quincy",
+   "lat": 39.9356,
+   "lon": -91.4099,
+   "county": "Adams"
+  },
+  "62311": {
+   "city": "Augusta",
+   "lat": 40.2341,
+   "lon": -90.9554,
+   "county": "Hancock"
+  },
+  "62312": {
+   "city": "Barry",
+   "lat": 39.7047,
+   "lon": -91.0265,
+   "county": "Pike"
+  },
+  "62313": {
+   "city": "Basco",
+   "lat": 40.3283,
+   "lon": -91.197,
+   "county": "Hancock"
+  },
+  "62314": {
+   "city": "Baylis",
+   "lat": 39.7612,
+   "lon": -90.8832,
+   "county": "Pike"
+  },
+  "62316": {
+   "city": "Bowen",
+   "lat": 40.2341,
+   "lon": -91.0705,
+   "county": "Hancock"
+  },
+  "62319": {
+   "city": "Camden",
+   "lat": 40.1511,
+   "lon": -90.7544,
+   "county": "Schuyler"
+  },
+  "62320": {
+   "city": "Camp Point",
+   "lat": 40.0293,
+   "lon": -91.0769,
+   "county": "Adams"
+  },
+  "62321": {
+   "city": "Carthage",
+   "lat": 40.4129,
+   "lon": -91.1005,
+   "county": "Hancock"
+  },
+  "62323": {
+   "city": "Chambersburg",
+   "lat": 39.8071,
+   "lon": -90.663,
+   "county": "Pike"
+  },
+  "62324": {
+   "city": "Clayton",
+   "lat": 40.0133,
+   "lon": -90.9554,
+   "county": "Adams"
+  },
+  "62325": {
+   "city": "Coatsburg",
+   "lat": 40.0554,
+   "lon": -91.1747,
+   "county": "Adams"
+  },
+  "62326": {
+   "city": "Colchester",
+   "lat": 40.4156,
+   "lon": -90.7846,
+   "county": "McDonough"
+  },
+  "62329": {
+   "city": "Colusa",
+   "lat": 40.5714,
+   "lon": -91.1682,
+   "county": "Hancock"
+  },
+  "62330": {
+   "city": "Dallas City",
+   "lat": 40.572,
+   "lon": -91.1255,
+   "county": "Hancock"
+  },
+  "62334": {
+   "city": "Elvaston",
+   "lat": 40.395,
+   "lon": -91.2496,
+   "county": "Hancock"
+  },
+  "62336": {
+   "city": "Ferris",
+   "lat": 40.4689,
+   "lon": -91.1704,
+   "county": "Hancock"
+  },
+  "62338": {
+   "city": "Fowler",
+   "lat": 39.9925,
+   "lon": -91.2452,
+   "county": "Adams"
+  },
+  "62339": {
+   "city": "Golden",
+   "lat": 40.1203,
+   "lon": -91.0296,
+   "county": "Adams"
+  },
+  "62340": {
+   "city": "Griggsville",
+   "lat": 39.7084,
+   "lon": -90.7249,
+   "county": "Pike"
+  },
+  "62341": {
+   "city": "Hamilton",
+   "lat": 40.3964,
+   "lon": -91.339,
+   "county": "Hancock"
+  },
+  "62343": {
+   "city": "Hull",
+   "lat": 39.7186,
+   "lon": -91.2338,
+   "county": "Pike"
+  },
+  "62344": {
+   "city": "Huntsville",
+   "lat": 40.1544,
+   "lon": -90.8531,
+   "county": "Schuyler"
+  },
+  "62345": {
+   "city": "Kinderhook",
+   "lat": 39.6953,
+   "lon": -91.1637,
+   "county": "Pike"
+  },
+  "62346": {
+   "city": "La Prairie",
+   "lat": 40.1572,
+   "lon": -90.9844,
+   "county": "Adams"
+  },
+  "62347": {
+   "city": "Liberty",
+   "lat": 39.8892,
+   "lon": -91.0869,
+   "county": "Adams"
+  },
+  "62348": {
+   "city": "Lima",
+   "lat": 40.1775,
+   "lon": -91.3785,
+   "county": "Adams"
+  },
+  "62349": {
+   "city": "Loraine",
+   "lat": 40.1532,
+   "lon": -91.213,
+   "county": "Adams"
+  },
+  "62351": {
+   "city": "Mendon",
+   "lat": 40.0857,
+   "lon": -91.2899,
+   "county": "Adams"
+  },
+  "62352": {
+   "city": "Milton",
+   "lat": 39.5645,
+   "lon": -90.6504,
+   "county": "Pike"
+  },
+  "62353": {
+   "city": "Mount Sterling",
+   "lat": 39.9803,
+   "lon": -90.7414,
+   "county": "Brown"
+  },
+  "62354": {
+   "city": "Nauvoo",
+   "lat": 40.5261,
+   "lon": -91.3318,
+   "county": "Hancock"
+  },
+  "62355": {
+   "city": "Nebo",
+   "lat": 39.4202,
+   "lon": -90.7692,
+   "county": "Pike"
+  },
+  "62356": {
+   "city": "New Canton",
+   "lat": 39.6342,
+   "lon": -91.0886,
+   "county": "Pike"
+  },
+  "62357": {
+   "city": "New Salem",
+   "lat": 39.6996,
+   "lon": -90.844,
+   "county": "Pike"
+  },
+  "62358": {
+   "city": "Niota",
+   "lat": 40.5978,
+   "lon": -91.2991,
+   "county": "Hancock"
+  },
+  "62359": {
+   "city": "Paloma",
+   "lat": 40.0366,
+   "lon": -91.2053,
+   "county": "Adams"
+  },
+  "62360": {
+   "city": "Payson",
+   "lat": 39.8153,
+   "lon": -91.2627,
+   "county": "Adams"
+  },
+  "62361": {
+   "city": "Pearl",
+   "lat": 39.4441,
+   "lon": -90.638,
+   "county": "Pike"
+  },
+  "62362": {
+   "city": "Perry",
+   "lat": 39.7823,
+   "lon": -90.7471,
+   "county": "Pike"
+  },
+  "62363": {
+   "city": "Pittsfield",
+   "lat": 39.6013,
+   "lon": -90.8073,
+   "county": "Pike"
+  },
+  "62365": {
+   "city": "Plainville",
+   "lat": 39.8004,
+   "lon": -91.1436,
+   "county": "Adams"
+  },
+  "62366": {
+   "city": "Pleasant Hill",
+   "lat": 39.4467,
+   "lon": -90.877,
+   "county": "Pike"
+  },
+  "62367": {
+   "city": "Plymouth",
+   "lat": 40.3236,
+   "lon": -90.9672,
+   "county": "Hancock"
+  },
+  "62370": {
+   "city": "Rockport",
+   "lat": 39.5328,
+   "lon": -90.9722,
+   "county": "Pike"
+  },
+  "62373": {
+   "city": "Sutter",
+   "lat": 40.2865,
+   "lon": -91.3726,
+   "county": "Hancock"
+  },
+  "62374": {
+   "city": "Tennessee",
+   "lat": 40.414,
+   "lon": -90.8556,
+   "county": "McDonough"
+  },
+  "62375": {
+   "city": "Timewell",
+   "lat": 40.0117,
+   "lon": -90.8661,
+   "county": "Brown"
+  },
+  "62376": {
+   "city": "Ursa",
+   "lat": 40.0809,
+   "lon": -91.3733,
+   "county": "Adams"
+  },
+  "62378": {
+   "city": "Versailles",
+   "lat": 39.8883,
+   "lon": -90.6741,
+   "county": "Brown"
+  },
+  "62379": {
+   "city": "Warsaw",
+   "lat": 40.3544,
+   "lon": -91.4348,
+   "county": "Hancock"
+  },
+  "62380": {
+   "city": "West Point",
+   "lat": 40.255,
+   "lon": -91.1826,
+   "county": "Hancock"
+  },
+  "62401": {
+   "city": "Effingham",
+   "lat": 39.1217,
+   "lon": -88.5611,
+   "county": "Effingham"
+  },
+  "62410": {
+   "city": "Allendale",
+   "lat": 38.5232,
+   "lon": -87.7219,
+   "county": "Wabash"
+  },
+  "62411": {
+   "city": "Altamont",
+   "lat": 39.0634,
+   "lon": -88.7481,
+   "county": "Effingham"
+  },
+  "62413": {
+   "city": "Annapolis",
+   "lat": 39.1179,
+   "lon": -87.8029,
+   "county": "Crawford"
+  },
+  "62414": {
+   "city": "Beecher City",
+   "lat": 39.1835,
+   "lon": -88.8038,
+   "county": "Effingham"
+  },
+  "62417": {
+   "city": "Bridgeport",
+   "lat": 38.7067,
+   "lon": -87.7657,
+   "county": "Lawrence"
+  },
+  "62418": {
+   "city": "Brownstown",
+   "lat": 38.9891,
+   "lon": -88.9494,
+   "county": "Fayette"
+  },
+  "62419": {
+   "city": "Calhoun",
+   "lat": 38.6351,
+   "lon": -88.0037,
+   "county": "Richland"
+  },
+  "62420": {
+   "city": "Casey",
+   "lat": 39.3017,
+   "lon": -87.9913,
+   "county": "Clark"
+  },
+  "62421": {
+   "city": "Claremont",
+   "lat": 38.7429,
+   "lon": -87.9727,
+   "county": "Richland"
+  },
+  "62422": {
+   "city": "Cowden",
+   "lat": 39.2326,
+   "lon": -88.8868,
+   "county": "Shelby"
+  },
+  "62423": {
+   "city": "Dennison",
+   "lat": 39.449,
+   "lon": -87.5867,
+   "county": "Clark"
+  },
+  "62424": {
+   "city": "Dieterich",
+   "lat": 39.0319,
+   "lon": -88.4074,
+   "county": "Effingham"
+  },
+  "62425": {
+   "city": "Dundas",
+   "lat": 38.8306,
+   "lon": -88.0973,
+   "county": "Richland"
+  },
+  "62426": {
+   "city": "Edgewood",
+   "lat": 38.9021,
+   "lon": -88.6645,
+   "county": "Effingham"
+  },
+  "62427": {
+   "city": "Flat Rock",
+   "lat": 38.9096,
+   "lon": -87.6837,
+   "county": "Crawford"
+  },
+  "62428": {
+   "city": "Greenup",
+   "lat": 39.274,
+   "lon": -88.1246,
+   "county": "Cumberland"
+  },
+  "62431": {
+   "city": "Herrick",
+   "lat": 39.2245,
+   "lon": -88.9812,
+   "county": "Shelby"
+  },
+  "62432": {
+   "city": "Hidalgo",
+   "lat": 39.1228,
+   "lon": -88.1397,
+   "county": "Jasper"
+  },
+  "62433": {
+   "city": "Hutsonville",
+   "lat": 39.1064,
+   "lon": -87.6695,
+   "county": "Crawford"
+  },
+  "62434": {
+   "city": "Ingraham",
+   "lat": 38.8284,
+   "lon": -88.3204,
+   "county": "Clay"
+  },
+  "62435": {
+   "city": "Janesville",
+   "lat": 39.3743,
+   "lon": -88.2445,
+   "county": "Cumberland"
+  },
+  "62436": {
+   "city": "Jewett",
+   "lat": 39.2076,
+   "lon": -88.2474,
+   "county": "Cumberland"
+  },
+  "62438": {
+   "city": "Lakewood",
+   "lat": 39.3134,
+   "lon": -88.8715,
+   "county": "Shelby"
+  },
+  "62439": {
+   "city": "Lawrenceville",
+   "lat": 38.7309,
+   "lon": -87.6784,
+   "county": "Lawrence"
+  },
+  "62440": {
+   "city": "Lerna",
+   "lat": 39.3958,
+   "lon": -88.253,
+   "county": "Coles"
+  },
+  "62441": {
+   "city": "Marshall",
+   "lat": 39.422,
+   "lon": -87.6923,
+   "county": "Clark"
+  },
+  "62442": {
+   "city": "Martinsville",
+   "lat": 39.3174,
+   "lon": -87.8707,
+   "county": "Clark"
+  },
+  "62443": {
+   "city": "Mason",
+   "lat": 38.9645,
+   "lon": -88.6234,
+   "county": "Effingham"
+  },
+  "62444": {
+   "city": "Mode",
+   "lat": 39.2664,
+   "lon": -88.7337,
+   "county": "Shelby"
+  },
+  "62445": {
+   "city": "Montrose",
+   "lat": 39.1573,
+   "lon": -88.335,
+   "county": "Effingham"
+  },
+  "62446": {
+   "city": "Mount Erie",
+   "lat": 38.5222,
+   "lon": -88.2185,
+   "county": "Wayne"
+  },
+  "62447": {
+   "city": "Neoga",
+   "lat": 39.322,
+   "lon": -88.4503,
+   "county": "Cumberland"
+  },
+  "62448": {
+   "city": "Newton",
+   "lat": 38.9847,
+   "lon": -88.1704,
+   "county": "Jasper"
+  },
+  "62449": {
+   "city": "Oblong",
+   "lat": 39.001,
+   "lon": -87.895,
+   "county": "Crawford"
+  },
+  "62450": {
+   "city": "Olney",
+   "lat": 38.7334,
+   "lon": -88.0809,
+   "county": "Richland"
+  },
+  "62451": {
+   "city": "Palestine",
+   "lat": 39.0028,
+   "lon": -87.6157,
+   "county": "Crawford"
+  },
+  "62452": {
+   "city": "Parkersburg",
+   "lat": 38.59,
+   "lon": -88.0647,
+   "county": "Richland"
+  },
+  "62454": {
+   "city": "Robinson",
+   "lat": 39.007,
+   "lon": -87.7484,
+   "county": "Crawford"
+  },
+  "62458": {
+   "city": "Saint Elmo",
+   "lat": 39.0315,
+   "lon": -88.8552,
+   "county": "Fayette"
+  },
+  "62459": {
+   "city": "Sainte Marie",
+   "lat": 38.928,
+   "lon": -88.0291,
+   "county": "Jasper"
+  },
+  "62460": {
+   "city": "Saint Francisville",
+   "lat": 38.5921,
+   "lon": -87.6487,
+   "county": "Lawrence"
+  },
+  "62461": {
+   "city": "Shumway",
+   "lat": 39.1881,
+   "lon": -88.6418,
+   "county": "Effingham"
+  },
+  "62462": {
+   "city": "Sigel",
+   "lat": 39.2176,
+   "lon": -88.4803,
+   "county": "Shelby"
+  },
+  "62463": {
+   "city": "Stewardson",
+   "lat": 39.272,
+   "lon": -88.6319,
+   "county": "Shelby"
+  },
+  "62464": {
+   "city": "Stoy",
+   "lat": 38.9898,
+   "lon": -87.8396,
+   "county": "Crawford"
+  },
+  "62465": {
+   "city": "Strasburg",
+   "lat": 39.3641,
+   "lon": -88.6279,
+   "county": "Shelby"
+  },
+  "62466": {
+   "city": "Sumner",
+   "lat": 38.7171,
+   "lon": -87.8638,
+   "county": "Lawrence"
+  },
+  "62467": {
+   "city": "Teutopolis",
+   "lat": 39.132,
+   "lon": -88.4767,
+   "county": "Effingham"
+  },
+  "62468": {
+   "city": "Toledo",
+   "lat": 39.2772,
+   "lon": -88.2468,
+   "county": "Cumberland"
+  },
+  "62469": {
+   "city": "Trilla",
+   "lat": 39.3938,
+   "lon": -88.3488,
+   "county": "Coles"
+  },
+  "62471": {
+   "city": "Vandalia",
+   "lat": 38.9439,
+   "lon": -89.1041,
+   "county": "Fayette"
+  },
+  "62473": {
+   "city": "Watson",
+   "lat": 38.9906,
+   "lon": -88.5584,
+   "county": "Effingham"
+  },
+  "62474": {
+   "city": "Westfield",
+   "lat": 39.4564,
+   "lon": -87.9961,
+   "county": "Clark"
+  },
+  "62475": {
+   "city": "West Liberty",
+   "lat": 38.895,
+   "lon": -88.0979,
+   "county": "Jasper"
+  },
+  "62476": {
+   "city": "West Salem",
+   "lat": 38.5209,
+   "lon": -88.0048,
+   "county": "Edwards"
+  },
+  "62477": {
+   "city": "West Union",
+   "lat": 39.2402,
+   "lon": -87.6512,
+   "county": "Clark"
+  },
+  "62478": {
+   "city": "West York",
+   "lat": 39.1938,
+   "lon": -87.7131,
+   "county": "Crawford"
+  },
+  "62479": {
+   "city": "Wheeler",
+   "lat": 39.0182,
+   "lon": -88.3175,
+   "county": "Jasper"
+  },
+  "62480": {
+   "city": "Willow Hill",
+   "lat": 38.9757,
+   "lon": -88.0172,
+   "county": "Jasper"
+  },
+  "62481": {
+   "city": "Yale",
+   "lat": 39.13,
+   "lon": -88.0105,
+   "county": "Jasper"
+  },
+  "62501": {
+   "city": "Argenta",
+   "lat": 39.934,
+   "lon": -88.8052,
+   "county": "Macon"
+  },
+  "62510": {
+   "city": "Assumption",
+   "lat": 39.5095,
+   "lon": -89.0398,
+   "county": "Christian"
+  },
+  "62512": {
+   "city": "Beason",
+   "lat": 40.1437,
+   "lon": -89.1948,
+   "county": "Logan"
+  },
+  "62513": {
+   "city": "Blue Mound",
+   "lat": 39.6978,
+   "lon": -89.1136,
+   "county": "Macon"
+  },
+  "62514": {
+   "city": "Boody",
+   "lat": 39.7624,
+   "lon": -89.0507,
+   "county": "Macon"
+  },
+  "62515": {
+   "city": "Buffalo",
+   "lat": 39.8499,
+   "lon": -89.3879,
+   "county": "Sangamon"
+  },
+  "62517": {
+   "city": "Bulpitt",
+   "lat": 39.5917,
+   "lon": -89.424,
+   "county": "Christian"
+  },
+  "62518": {
+   "city": "Chestnut",
+   "lat": 40.0582,
+   "lon": -89.19,
+   "county": "Logan"
+  },
+  "62519": {
+   "city": "Cornland",
+   "lat": 39.9374,
+   "lon": -89.4023,
+   "county": "Logan"
+  },
+  "62520": {
+   "city": "Dawson",
+   "lat": 39.8563,
+   "lon": -89.4603,
+   "county": "Sangamon"
+  },
+  "62521": {
+   "city": "Decatur",
+   "lat": 39.8395,
+   "lon": -88.9465,
+   "county": "Macon"
+  },
+  "62522": {
+   "city": "Decatur",
+   "lat": 39.8432,
+   "lon": -88.9861,
+   "county": "Macon"
+  },
+  "62523": {
+   "city": "Decatur",
+   "lat": 39.8417,
+   "lon": -88.9534,
+   "county": "Macon"
+  },
+  "62524": {
+   "city": "Decatur",
+   "lat": 39.854,
+   "lon": -88.9815,
+   "county": "Macon"
+  },
+  "62525": {
+   "city": "Decatur",
+   "lat": 39.854,
+   "lon": -88.9815,
+   "county": "Macon"
+  },
+  "62526": {
+   "city": "Decatur",
+   "lat": 39.8583,
+   "lon": -88.9382,
+   "county": "Macon"
+  },
+  "62530": {
+   "city": "Divernon",
+   "lat": 39.5692,
+   "lon": -89.6626,
+   "county": "Sangamon"
+  },
+  "62531": {
+   "city": "Edinburg",
+   "lat": 39.6612,
+   "lon": -89.3779,
+   "county": "Christian"
+  },
+  "62532": {
+   "city": "Elwin",
+   "lat": 39.78,
+   "lon": -88.9808,
+   "county": "Macon"
+  },
+  "62533": {
+   "city": "Farmersville",
+   "lat": 39.4401,
+   "lon": -89.617,
+   "county": "Montgomery"
+  },
+  "62534": {
+   "city": "Findlay",
+   "lat": 39.5193,
+   "lon": -88.7468,
+   "county": "Shelby"
+  },
+  "62535": {
+   "city": "Forsyth",
+   "lat": 39.9248,
+   "lon": -88.9691,
+   "county": "Macon"
+  },
+  "62536": {
+   "city": "Glenarm",
+   "lat": 39.6327,
+   "lon": -89.6581,
+   "county": "Sangamon"
+  },
+  "62537": {
+   "city": "Harristown",
+   "lat": 39.8567,
+   "lon": -89.085,
+   "county": "Macon"
+  },
+  "62538": {
+   "city": "Harvel",
+   "lat": 39.3719,
+   "lon": -89.538,
+   "county": "Montgomery"
+  },
+  "62539": {
+   "city": "Illiopolis",
+   "lat": 39.8499,
+   "lon": -89.2513,
+   "county": "Sangamon"
+  },
+  "62540": {
+   "city": "Kincaid",
+   "lat": 39.5838,
+   "lon": -89.4185,
+   "county": "Christian"
+  },
+  "62541": {
+   "city": "Lake Fork",
+   "lat": 39.9706,
+   "lon": -89.3505,
+   "county": "Logan"
+  },
+  "62543": {
+   "city": "Latham",
+   "lat": 39.9711,
+   "lon": -89.1725,
+   "county": "Logan"
+  },
+  "62544": {
+   "city": "Macon",
+   "lat": 39.7041,
+   "lon": -88.988,
+   "county": "Macon"
+  },
+  "62545": {
+   "city": "Mechanicsburg",
+   "lat": 39.7778,
+   "lon": -89.4064,
+   "county": "Sangamon"
+  },
+  "62546": {
+   "city": "Morrisonville",
+   "lat": 39.4153,
+   "lon": -89.4541,
+   "county": "Christian"
+  },
+  "62547": {
+   "city": "Mount Auburn",
+   "lat": 39.769,
+   "lon": -89.2489,
+   "county": "Christian"
+  },
+  "62548": {
+   "city": "Mount Pulaski",
+   "lat": 40.0045,
+   "lon": -89.2935,
+   "county": "Logan"
+  },
+  "62549": {
+   "city": "Mt Zion",
+   "lat": 39.7705,
+   "lon": -88.8659,
+   "county": "Macon"
+  },
+  "62550": {
+   "city": "Moweaqua",
+   "lat": 39.6248,
+   "lon": -89.019,
+   "county": "Shelby"
+  },
+  "62551": {
+   "city": "Niantic",
+   "lat": 39.8582,
+   "lon": -89.1701,
+   "county": "Macon"
+  },
+  "62553": {
+   "city": "Oconee",
+   "lat": 39.2884,
+   "lon": -89.0836,
+   "county": "Shelby"
+  },
+  "62554": {
+   "city": "Oreana",
+   "lat": 39.9351,
+   "lon": -88.8547,
+   "county": "Macon"
+  },
+  "62555": {
+   "city": "Owaneco",
+   "lat": 39.4775,
+   "lon": -89.1951,
+   "county": "Christian"
+  },
+  "62556": {
+   "city": "Palmer",
+   "lat": 39.4699,
+   "lon": -89.3733,
+   "county": "Christian"
+  },
+  "62557": {
+   "city": "Pana",
+   "lat": 39.3971,
+   "lon": -89.1048,
+   "county": "Christian"
+  },
+  "62558": {
+   "city": "Pawnee",
+   "lat": 39.6086,
+   "lon": -89.5678,
+   "county": "Sangamon"
+  },
+  "62560": {
+   "city": "Raymond",
+   "lat": 39.3106,
+   "lon": -89.5851,
+   "county": "Montgomery"
+  },
+  "62561": {
+   "city": "Riverton",
+   "lat": 39.8663,
+   "lon": -89.5087,
+   "county": "Sangamon"
+  },
+  "62563": {
+   "city": "Rochester",
+   "lat": 39.7182,
+   "lon": -89.5649,
+   "county": "Sangamon"
+  },
+  "62565": {
+   "city": "Shelbyville",
+   "lat": 39.458,
+   "lon": -88.8058,
+   "county": "Shelby"
+  },
+  "62567": {
+   "city": "Stonington",
+   "lat": 39.6405,
+   "lon": -89.1913,
+   "county": "Christian"
+  },
+  "62568": {
+   "city": "Taylorville",
+   "lat": 39.5489,
+   "lon": -89.2945,
+   "county": "Christian"
+  },
+  "62570": {
+   "city": "Tovey",
+   "lat": 39.588,
+   "lon": -89.4495,
+   "county": "Christian"
+  },
+  "62571": {
+   "city": "Tower Hill",
+   "lat": 39.39,
+   "lon": -88.9597,
+   "county": "Shelby"
+  },
+  "62572": {
+   "city": "Waggoner",
+   "lat": 39.3688,
+   "lon": -89.6545,
+   "county": "Montgomery"
+  },
+  "62573": {
+   "city": "Warrensburg",
+   "lat": 39.9454,
+   "lon": -89.0741,
+   "county": "Macon"
+  },
+  "62601": {
+   "city": "Alexander",
+   "lat": 39.7517,
+   "lon": -90.0458,
+   "county": "Morgan"
+  },
+  "62610": {
+   "city": "Alsey",
+   "lat": 39.5606,
+   "lon": -90.434,
+   "county": "Scott"
+  },
+  "62611": {
+   "city": "Arenzville",
+   "lat": 39.8979,
+   "lon": -90.3636,
+   "county": "Cass"
+  },
+  "62612": {
+   "city": "Ashland",
+   "lat": 39.9386,
+   "lon": -90.0792,
+   "county": "Cass"
+  },
+  "62613": {
+   "city": "Athens",
+   "lat": 39.9917,
+   "lon": -89.6684,
+   "county": "Menard"
+  },
+  "62615": {
+   "city": "Auburn",
+   "lat": 39.5918,
+   "lon": -89.744,
+   "county": "Sangamon"
+  },
+  "62617": {
+   "city": "Bath",
+   "lat": 40.1536,
+   "lon": -90.1661,
+   "county": "Mason"
+  },
+  "62618": {
+   "city": "Beardstown",
+   "lat": 40.0044,
+   "lon": -90.4229,
+   "county": "Cass"
+  },
+  "62621": {
+   "city": "Bluffs",
+   "lat": 39.7296,
+   "lon": -90.5313,
+   "county": "Scott"
+  },
+  "62622": {
+   "city": "Bluff Springs",
+   "lat": 39.9796,
+   "lon": -90.3524,
+   "county": "Cass"
+  },
+  "62624": {
+   "city": "Browning",
+   "lat": 40.1289,
+   "lon": -90.3721,
+   "county": "Schuyler"
+  },
+  "62625": {
+   "city": "Cantrall",
+   "lat": 39.9169,
+   "lon": -89.6891,
+   "county": "Sangamon"
+  },
+  "62626": {
+   "city": "Carlinville",
+   "lat": 39.2885,
+   "lon": -89.8661,
+   "county": "Macoupin"
+  },
+  "62627": {
+   "city": "Chandlerville",
+   "lat": 40.0374,
+   "lon": -90.1163,
+   "county": "Cass"
+  },
+  "62628": {
+   "city": "Chapin",
+   "lat": 39.7716,
+   "lon": -90.4113,
+   "county": "Morgan"
+  },
+  "62629": {
+   "city": "Chatham",
+   "lat": 39.6737,
+   "lon": -89.7112,
+   "county": "Sangamon"
+  },
+  "62630": {
+   "city": "Chesterfield",
+   "lat": 39.2608,
+   "lon": -90.0784,
+   "county": "Macoupin"
+  },
+  "62631": {
+   "city": "Concord",
+   "lat": 39.823,
+   "lon": -90.3722,
+   "county": "Morgan"
+  },
+  "62633": {
+   "city": "Easton",
+   "lat": 40.2279,
+   "lon": -89.8903,
+   "county": "Mason"
+  },
+  "62634": {
+   "city": "Elkhart",
+   "lat": 40.0132,
+   "lon": -89.452,
+   "county": "Logan"
+  },
+  "62635": {
+   "city": "Emden",
+   "lat": 40.2967,
+   "lon": -89.4714,
+   "county": "Logan"
+  },
+  "62638": {
+   "city": "Franklin",
+   "lat": 39.6222,
+   "lon": -90.0889,
+   "county": "Morgan"
+  },
+  "62639": {
+   "city": "Frederick",
+   "lat": 40.07,
+   "lon": -90.429,
+   "county": "Schuyler"
+  },
+  "62640": {
+   "city": "Girard",
+   "lat": 39.3838,
+   "lon": -89.8501,
+   "county": "Macoupin"
+  },
+  "62642": {
+   "city": "Greenview",
+   "lat": 40.1017,
+   "lon": -89.7469,
+   "county": "Menard"
+  },
+  "62643": {
+   "city": "Hartsburg",
+   "lat": 40.2451,
+   "lon": -89.4519,
+   "county": "Logan"
+  },
+  "62644": {
+   "city": "Havana",
+   "lat": 40.3,
+   "lon": -90.061,
+   "county": "Mason"
+  },
+  "62649": {
+   "city": "Hettick",
+   "lat": 39.3752,
+   "lon": -90.0672,
+   "county": "Macoupin"
+  },
+  "62650": {
+   "city": "Jacksonville",
+   "lat": 39.7339,
+   "lon": -90.229,
+   "county": "Morgan"
+  },
+  "62651": {
+   "city": "Jacksonville",
+   "lat": 39.6983,
+   "lon": -90.2615,
+   "county": "Morgan"
+  },
+  "62655": {
+   "city": "Kilbourne",
+   "lat": 40.1587,
+   "lon": -90.0043,
+   "county": "Mason"
+  },
+  "62656": {
+   "city": "Lincoln",
+   "lat": 40.1451,
+   "lon": -89.3684,
+   "county": "Logan"
+  },
+  "62659": {
+   "city": "Lincoln'S New Salem",
+   "lat": 40.0311,
+   "lon": -89.7867,
+   "county": "Menard"
+  },
+  "62660": {
+   "city": "Literberry",
+   "lat": 39.8589,
+   "lon": -90.2007,
+   "county": "Morgan"
+  },
+  "62661": {
+   "city": "Loami",
+   "lat": 39.6704,
+   "lon": -89.8588,
+   "county": "Sangamon"
+  },
+  "62662": {
+   "city": "Lowder",
+   "lat": 39.5509,
+   "lon": -89.8459,
+   "county": "Sangamon"
+  },
+  "62663": {
+   "city": "Manchester",
+   "lat": 39.5405,
+   "lon": -90.3317,
+   "county": "Scott"
+  },
+  "62664": {
+   "city": "Mason City",
+   "lat": 40.2023,
+   "lon": -89.6982,
+   "county": "Mason"
+  },
+  "62665": {
+   "city": "Meredosia",
+   "lat": 39.8173,
+   "lon": -90.5339,
+   "county": "Morgan"
+  },
+  "62666": {
+   "city": "Middletown",
+   "lat": 40.0967,
+   "lon": -89.5818,
+   "county": "Logan"
+  },
+  "62667": {
+   "city": "Modesto",
+   "lat": 39.476,
+   "lon": -89.9794,
+   "county": "Macoupin"
+  },
+  "62668": {
+   "city": "Murrayville",
+   "lat": 39.5723,
+   "lon": -90.2379,
+   "county": "Morgan"
+  },
+  "62670": {
+   "city": "New Berlin",
+   "lat": 39.7681,
+   "lon": -89.855,
+   "county": "Sangamon"
+  },
+  "62671": {
+   "city": "New Holland",
+   "lat": 40.1682,
+   "lon": -89.5604,
+   "county": "Logan"
+  },
+  "62672": {
+   "city": "Nilwood",
+   "lat": 39.398,
+   "lon": -89.8045,
+   "county": "Macoupin"
+  },
+  "62673": {
+   "city": "Oakford",
+   "lat": 40.0994,
+   "lon": -89.9601,
+   "county": "Menard"
+  },
+  "62674": {
+   "city": "Palmyra",
+   "lat": 39.4227,
+   "lon": -90.0311,
+   "county": "Macoupin"
+  },
+  "62675": {
+   "city": "Petersburg",
+   "lat": 40.0117,
+   "lon": -89.8482,
+   "county": "Menard"
+  },
+  "62677": {
+   "city": "Pleasant Plains",
+   "lat": 39.8331,
+   "lon": -89.8686,
+   "county": "Sangamon"
+  },
+  "62681": {
+   "city": "Rushville",
+   "lat": 40.1133,
+   "lon": -90.5432,
+   "county": "Schuyler"
+  },
+  "62682": {
+   "city": "San Jose",
+   "lat": 40.3011,
+   "lon": -89.6872,
+   "county": "Mason"
+  },
+  "62683": {
+   "city": "Scottville",
+   "lat": 39.4803,
+   "lon": -90.1048,
+   "county": "Macoupin"
+  },
+  "62684": {
+   "city": "Sherman",
+   "lat": 39.9121,
+   "lon": -89.5877,
+   "county": "Sangamon"
+  },
+  "62685": {
+   "city": "Shipman",
+   "lat": 39.1952,
+   "lon": -89.9607,
+   "county": "Macoupin"
+  },
+  "62688": {
+   "city": "Tallula",
+   "lat": 39.9445,
+   "lon": -89.9373,
+   "county": "Menard"
+  },
+  "62689": {
+   "city": "Thayer",
+   "lat": 39.5394,
+   "lon": -89.7621,
+   "county": "Sangamon"
+  },
+  "62690": {
+   "city": "Virden",
+   "lat": 39.5064,
+   "lon": -89.7783,
+   "county": "Macoupin"
+  },
+  "62691": {
+   "city": "Virginia",
+   "lat": 39.9512,
+   "lon": -90.2123,
+   "county": "Cass"
+  },
+  "62692": {
+   "city": "Waverly",
+   "lat": 39.587,
+   "lon": -89.9449,
+   "county": "Morgan"
+  },
+  "62693": {
+   "city": "Williamsville",
+   "lat": 39.9542,
+   "lon": -89.5487,
+   "county": "Sangamon"
+  },
+  "62694": {
+   "city": "Winchester",
+   "lat": 39.6266,
+   "lon": -90.4664,
+   "county": "Scott"
+  },
+  "62695": {
+   "city": "Woodson",
+   "lat": 39.6289,
+   "lon": -90.219,
+   "county": "Morgan"
+  },
+  "62701": {
+   "city": "Springfield",
+   "lat": 39.8,
+   "lon": -89.6495,
+   "county": "Sangamon"
+  },
+  "62702": {
+   "city": "Springfield",
+   "lat": 39.8317,
+   "lon": -89.6465,
+   "county": "Sangamon"
+  },
+  "62703": {
+   "city": "Springfield",
+   "lat": 39.7622,
+   "lon": -89.6275,
+   "county": "Sangamon"
+  },
+  "62704": {
+   "city": "Springfield",
+   "lat": 39.7725,
+   "lon": -89.6889,
+   "county": "Sangamon"
+  },
+  "62705": {
+   "city": "Springfield",
+   "lat": 39.8017,
+   "lon": -89.6437,
+   "county": "Sangamon"
+  },
+  "62706": {
+   "city": "Springfield",
+   "lat": 39.7989,
+   "lon": -89.6534,
+   "county": "Sangamon"
+  },
+  "62707": {
+   "city": "Springfield",
+   "lat": 39.8544,
+   "lon": -89.6544,
+   "county": "Sangamon"
+  },
+  "62708": {
+   "city": "Springfield",
+   "lat": 39.8061,
+   "lon": -89.5864,
+   "county": "Sangamon"
+  },
+  "62711": {
+   "city": "Springfield",
+   "lat": 39.7655,
+   "lon": -89.7293,
+   "county": "Sangamon"
+  },
+  "62712": {
+   "city": "Springfield",
+   "lat": 39.7533,
+   "lon": -89.58,
+   "county": "Sangamon"
+  },
+  "62715": {
+   "city": "Springfield",
+   "lat": 39.8017,
+   "lon": -89.6437,
+   "county": "Sangamon"
+  },
+  "62716": {
+   "city": "Springfield",
+   "lat": 39.8482,
+   "lon": -89.5364,
+   "county": "Sangamon"
+  },
+  "62719": {
+   "city": "Springfield",
+   "lat": 39.7495,
+   "lon": -89.606,
+   "county": "Sangamon"
+  },
+  "62722": {
+   "city": "Springfield",
+   "lat": 39.7495,
+   "lon": -89.606,
+   "county": "Sangamon"
+  },
+  "62723": {
+   "city": "Springfield",
+   "lat": 39.7495,
+   "lon": -89.606,
+   "county": "Sangamon"
+  },
+  "62726": {
+   "city": "Springfield",
+   "lat": 39.7495,
+   "lon": -89.606,
+   "county": "Sangamon"
+  },
+  "62736": {
+   "city": "Springfield",
+   "lat": 39.7495,
+   "lon": -89.606,
+   "county": "Sangamon"
+  },
+  "62739": {
+   "city": "Springfield",
+   "lat": 39.8017,
+   "lon": -89.6437,
+   "county": "Sangamon"
+  },
+  "62756": {
+   "city": "Springfield",
+   "lat": 39.7495,
+   "lon": -89.606,
+   "county": "Sangamon"
+  },
+  "62757": {
+   "city": "Springfield",
+   "lat": 39.8017,
+   "lon": -89.6437,
+   "county": "Sangamon"
+  },
+  "62761": {
+   "city": "Springfield",
+   "lat": 39.8524,
+   "lon": -89.541,
+   "county": "Sangamon"
+  },
+  "62762": {
+   "city": "Springfield",
+   "lat": 39.7495,
+   "lon": -89.606,
+   "county": "Sangamon"
+  },
+  "62763": {
+   "city": "Springfield",
+   "lat": 39.7495,
+   "lon": -89.606,
+   "county": "Sangamon"
+  },
+  "62764": {
+   "city": "Springfield",
+   "lat": 39.7495,
+   "lon": -89.606,
+   "county": "Sangamon"
+  },
+  "62765": {
+   "city": "Springfield",
+   "lat": 39.8017,
+   "lon": -89.6437,
+   "county": "Sangamon"
+  },
+  "62766": {
+   "city": "Springfield",
+   "lat": 39.7495,
+   "lon": -89.606,
+   "county": "Sangamon"
+  },
+  "62767": {
+   "city": "Springfield",
+   "lat": 39.7495,
+   "lon": -89.606,
+   "county": "Sangamon"
+  },
+  "62769": {
+   "city": "Springfield",
+   "lat": 39.8017,
+   "lon": -89.6437,
+   "county": "Sangamon"
+  },
+  "62776": {
+   "city": "Springfield",
+   "lat": 39.7495,
+   "lon": -89.606,
+   "county": "Sangamon"
+  },
+  "62777": {
+   "city": "Springfield",
+   "lat": 39.7495,
+   "lon": -89.606,
+   "county": "Sangamon"
+  },
+  "62781": {
+   "city": "Springfield",
+   "lat": 39.7495,
+   "lon": -89.606,
+   "county": "Sangamon"
+  },
+  "62786": {
+   "city": "Springfield",
+   "lat": 39.7495,
+   "lon": -89.606,
+   "county": "Sangamon"
+  },
+  "62791": {
+   "city": "Springfield",
+   "lat": 39.7495,
+   "lon": -89.606,
+   "county": "Sangamon"
+  },
+  "62794": {
+   "city": "Springfield",
+   "lat": 39.7495,
+   "lon": -89.606,
+   "county": "Sangamon"
+  },
+  "62796": {
+   "city": "Springfield",
+   "lat": 39.7495,
+   "lon": -89.606,
+   "county": "Sangamon"
+  },
+  "62801": {
+   "city": "Centralia",
+   "lat": 38.5241,
+   "lon": -89.1365,
+   "county": "Marion"
+  },
+  "62803": {
+   "city": "Hoyleton",
+   "lat": 38.4455,
+   "lon": -89.3069,
+   "county": "Washington"
+  },
+  "62806": {
+   "city": "Albion",
+   "lat": 38.374,
+   "lon": -88.0636,
+   "county": "Edwards"
+  },
+  "62807": {
+   "city": "Alma",
+   "lat": 38.7231,
+   "lon": -88.9157,
+   "county": "Marion"
+  },
+  "62808": {
+   "city": "Ashley",
+   "lat": 38.306,
+   "lon": -89.2311,
+   "county": "Washington"
+  },
+  "62809": {
+   "city": "Barnhill",
+   "lat": 38.2845,
+   "lon": -88.3642,
+   "county": "Wayne"
+  },
+  "62810": {
+   "city": "Belle Rive",
+   "lat": 38.2153,
+   "lon": -88.7558,
+   "county": "Jefferson"
+  },
+  "62811": {
+   "city": "Bellmont",
+   "lat": 38.3845,
+   "lon": -87.9081,
+   "county": "Wabash"
+  },
+  "62812": {
+   "city": "Benton",
+   "lat": 38.0,
+   "lon": -88.9227,
+   "county": "Franklin"
+  },
+  "62814": {
+   "city": "Bluford",
+   "lat": 38.3531,
+   "lon": -88.7587,
+   "county": "Jefferson"
+  },
+  "62815": {
+   "city": "Bone Gap",
+   "lat": 38.449,
+   "lon": -88.0025,
+   "county": "Edwards"
+  },
+  "62816": {
+   "city": "Bonnie",
+   "lat": 38.198,
+   "lon": -88.9229,
+   "county": "Jefferson"
+  },
+  "62817": {
+   "city": "Broughton",
+   "lat": 37.9546,
+   "lon": -88.4678,
+   "county": "Hamilton"
+  },
+  "62818": {
+   "city": "Browns",
+   "lat": 38.3764,
+   "lon": -87.9928,
+   "county": "Edwards"
+  },
+  "62819": {
+   "city": "Buckner",
+   "lat": 37.9764,
+   "lon": -89.0209,
+   "county": "Franklin"
+  },
+  "62820": {
+   "city": "Burnt Prairie",
+   "lat": 38.2082,
+   "lon": -88.2147,
+   "county": "White"
+  },
+  "62821": {
+   "city": "Carmi",
+   "lat": 38.0808,
+   "lon": -88.167,
+   "county": "White"
+  },
+  "62822": {
+   "city": "Christopher",
+   "lat": 37.9849,
+   "lon": -89.0574,
+   "county": "Franklin"
+  },
+  "62823": {
+   "city": "Cisne",
+   "lat": 38.5159,
+   "lon": -88.4375,
+   "county": "Wayne"
+  },
+  "62824": {
+   "city": "Clay City",
+   "lat": 38.6695,
+   "lon": -88.3516,
+   "county": "Clay"
+  },
+  "62825": {
+   "city": "Coello",
+   "lat": 37.9946,
+   "lon": -89.0672,
+   "county": "Franklin"
+  },
+  "62827": {
+   "city": "Crossville",
+   "lat": 38.166,
+   "lon": -88.0595,
+   "county": "White"
+  },
+  "62828": {
+   "city": "Dahlgren",
+   "lat": 38.1975,
+   "lon": -88.6363,
+   "county": "Hamilton"
+  },
+  "62829": {
+   "city": "Dale",
+   "lat": 37.995,
+   "lon": -88.4917,
+   "county": "Hamilton"
+  },
+  "62830": {
+   "city": "Dix",
+   "lat": 38.4333,
+   "lon": -88.9657,
+   "county": "Jefferson"
+  },
+  "62831": {
+   "city": "Du Bois",
+   "lat": 38.2239,
+   "lon": -89.2123,
+   "county": "Washington"
+  },
+  "62832": {
+   "city": "Du Quoin",
+   "lat": 38.0137,
+   "lon": -89.2333,
+   "county": "Perry"
+  },
+  "62833": {
+   "city": "Ellery",
+   "lat": 38.365,
+   "lon": -88.1335,
+   "county": "Edwards"
+  },
+  "62834": {
+   "city": "Emma",
+   "lat": 37.9762,
+   "lon": -88.1202,
+   "county": "White"
+  },
+  "62835": {
+   "city": "Enfield",
+   "lat": 38.0927,
+   "lon": -88.3325,
+   "county": "White"
+  },
+  "62836": {
+   "city": "Ewing",
+   "lat": 38.0702,
+   "lon": -88.8504,
+   "county": "Franklin"
+  },
+  "62837": {
+   "city": "Fairfield",
+   "lat": 38.3782,
+   "lon": -88.3593,
+   "county": "Wayne"
+  },
+  "62838": {
+   "city": "Farina",
+   "lat": 38.8469,
+   "lon": -88.7614,
+   "county": "Fayette"
+  },
+  "62839": {
+   "city": "Flora",
+   "lat": 38.6703,
+   "lon": -88.4919,
+   "county": "Clay"
+  },
+  "62840": {
+   "city": "Frankfort Heights",
+   "lat": 37.9943,
+   "lon": -88.9417,
+   "county": "Franklin"
+  },
+  "62841": {
+   "city": "Freeman Spur",
+   "lat": 37.8612,
+   "lon": -88.9973,
+   "county": "Williamson"
+  },
+  "62842": {
+   "city": "Geff",
+   "lat": 38.4413,
+   "lon": -88.4144,
+   "county": "Wayne"
+  },
+  "62843": {
+   "city": "Golden Gate",
+   "lat": 38.3645,
+   "lon": -88.2075,
+   "county": "Wayne"
+  },
+  "62844": {
+   "city": "Grayville",
+   "lat": 38.2627,
+   "lon": -88.0035,
+   "county": "White"
+  },
+  "62846": {
+   "city": "Ina",
+   "lat": 38.1527,
+   "lon": -88.8894,
+   "county": "Jefferson"
+  },
+  "62848": {
+   "city": "Irvington",
+   "lat": 38.4366,
+   "lon": -89.1648,
+   "county": "Washington"
+  },
+  "62849": {
+   "city": "Iuka",
+   "lat": 38.6136,
+   "lon": -88.7689,
+   "county": "Marion"
+  },
+  "62850": {
+   "city": "Johnsonville",
+   "lat": 38.5223,
+   "lon": -88.537,
+   "county": "Wayne"
+  },
+  "62851": {
+   "city": "Keenes",
+   "lat": 38.3691,
+   "lon": -88.6481,
+   "county": "Wayne"
+  },
+  "62852": {
+   "city": "Keensburg",
+   "lat": 38.3514,
+   "lon": -87.8661,
+   "county": "Wabash"
+  },
+  "62853": {
+   "city": "Kell",
+   "lat": 38.5147,
+   "lon": -88.9127,
+   "county": "Marion"
+  },
+  "62854": {
+   "city": "Kinmundy",
+   "lat": 38.7559,
+   "lon": -88.813,
+   "county": "Marion"
+  },
+  "62855": {
+   "city": "Lancaster",
+   "lat": 38.4034,
+   "lon": -87.8187,
+   "county": "Wabash"
+  },
+  "62856": {
+   "city": "Logan",
+   "lat": 37.9559,
+   "lon": -88.8403,
+   "county": "Franklin"
+  },
+  "62858": {
+   "city": "Louisville",
+   "lat": 38.7718,
+   "lon": -88.5065,
+   "county": "Clay"
+  },
+  "62859": {
+   "city": "Mc Leansboro",
+   "lat": 38.0939,
+   "lon": -88.5286,
+   "county": "Hamilton"
+  },
+  "62860": {
+   "city": "Macedonia",
+   "lat": 38.013,
+   "lon": -88.6961,
+   "county": "Hamilton"
+  },
+  "62861": {
+   "city": "Maunie",
+   "lat": 38.0356,
+   "lon": -88.0456,
+   "county": "White"
+  },
+  "62862": {
+   "city": "Mill Shoals",
+   "lat": 38.2447,
+   "lon": -88.3338,
+   "county": "White"
+  },
+  "62863": {
+   "city": "Mount Carmel",
+   "lat": 38.4147,
+   "lon": -87.7911,
+   "county": "Wabash"
+  },
+  "62864": {
+   "city": "Mount Vernon",
+   "lat": 38.317,
+   "lon": -88.9105,
+   "county": "Jefferson"
+  },
+  "62865": {
+   "city": "Mulkeytown",
+   "lat": 37.9687,
+   "lon": -89.1159,
+   "county": "Franklin"
+  },
+  "62866": {
+   "city": "Nason",
+   "lat": 38.1654,
+   "lon": -88.9676,
+   "county": "Jefferson"
+  },
+  "62867": {
+   "city": "New Haven",
+   "lat": 37.8999,
+   "lon": -88.1285,
+   "county": "Gallatin"
+  },
+  "62868": {
+   "city": "Noble",
+   "lat": 38.7119,
+   "lon": -88.219,
+   "county": "Richland"
+  },
+  "62869": {
+   "city": "Norris City",
+   "lat": 37.9773,
+   "lon": -88.3243,
+   "county": "White"
+  },
+  "62870": {
+   "city": "Odin",
+   "lat": 38.6088,
+   "lon": -89.0552,
+   "county": "Marion"
+  },
+  "62871": {
+   "city": "Omaha",
+   "lat": 37.8904,
+   "lon": -88.2865,
+   "county": "Gallatin"
+  },
+  "62872": {
+   "city": "Opdyke",
+   "lat": 38.275,
+   "lon": -88.775,
+   "county": "Jefferson"
+  },
+  "62874": {
+   "city": "Orient",
+   "lat": 37.9182,
+   "lon": -88.9767,
+   "county": "Franklin"
+  },
+  "62875": {
+   "city": "Patoka",
+   "lat": 38.7549,
+   "lon": -89.0942,
+   "county": "Marion"
+  },
+  "62876": {
+   "city": "Radom",
+   "lat": 38.2607,
+   "lon": -89.1989,
+   "county": "Washington"
+  },
+  "62877": {
+   "city": "Richview",
+   "lat": 38.4082,
+   "lon": -89.1756,
+   "county": "Washington"
+  },
+  "62878": {
+   "city": "Rinard",
+   "lat": 38.5806,
+   "lon": -88.4641,
+   "county": "Wayne"
+  },
+  "62879": {
+   "city": "Sailor Springs",
+   "lat": 38.7639,
+   "lon": -88.3631,
+   "county": "Clay"
+  },
+  "62880": {
+   "city": "Saint Peter",
+   "lat": 38.8697,
+   "lon": -88.856,
+   "county": "Fayette"
+  },
+  "62881": {
+   "city": "Salem",
+   "lat": 38.6264,
+   "lon": -88.9481,
+   "county": "Marion"
+  },
+  "62882": {
+   "city": "Sandoval",
+   "lat": 38.6131,
+   "lon": -89.114,
+   "county": "Marion"
+  },
+  "62883": {
+   "city": "Scheller",
+   "lat": 38.1731,
+   "lon": -89.0927,
+   "county": "Jefferson"
+  },
+  "62884": {
+   "city": "Sesser",
+   "lat": 38.0894,
+   "lon": -89.0574,
+   "county": "Franklin"
+  },
+  "62885": {
+   "city": "Shobonier",
+   "lat": 38.8446,
+   "lon": -89.079,
+   "county": "Fayette"
+  },
+  "62886": {
+   "city": "Sims",
+   "lat": 38.3923,
+   "lon": -88.5306,
+   "county": "Wayne"
+  },
+  "62887": {
+   "city": "Springerton",
+   "lat": 38.1699,
+   "lon": -88.3726,
+   "county": "White"
+  },
+  "62888": {
+   "city": "Tamaroa",
+   "lat": 38.138,
+   "lon": -89.2231,
+   "county": "Perry"
+  },
+  "62889": {
+   "city": "Texico",
+   "lat": 38.425,
+   "lon": -88.8702,
+   "county": "Jefferson"
+  },
+  "62890": {
+   "city": "Thompsonville",
+   "lat": 37.8804,
+   "lon": -88.7684,
+   "county": "Franklin"
+  },
+  "62891": {
+   "city": "Valier",
+   "lat": 38.0222,
+   "lon": -89.0351,
+   "county": "Franklin"
+  },
+  "62892": {
+   "city": "Vernon",
+   "lat": 38.8033,
+   "lon": -89.083,
+   "county": "Marion"
+  },
+  "62893": {
+   "city": "Walnut Hill",
+   "lat": 38.467,
+   "lon": -89.0328,
+   "county": "Marion"
+  },
+  "62894": {
+   "city": "Waltonville",
+   "lat": 38.2089,
+   "lon": -89.039,
+   "county": "Jefferson"
+  },
+  "62895": {
+   "city": "Wayne City",
+   "lat": 38.3328,
+   "lon": -88.5833,
+   "county": "Wayne"
+  },
+  "62896": {
+   "city": "West Frankfort",
+   "lat": 37.8979,
+   "lon": -88.9307,
+   "county": "Franklin"
+  },
+  "62897": {
+   "city": "Whittington",
+   "lat": 38.0872,
+   "lon": -88.9014,
+   "county": "Franklin"
+  },
+  "62898": {
+   "city": "Woodlawn",
+   "lat": 38.3844,
+   "lon": -89.0745,
+   "county": "Jefferson"
+  },
+  "62899": {
+   "city": "Xenia",
+   "lat": 38.6359,
+   "lon": -88.6348,
+   "county": "Clay"
+  },
+  "62901": {
+   "city": "Carbondale",
+   "lat": 37.72,
+   "lon": -89.2158,
+   "county": "Jackson"
+  },
+  "62902": {
+   "city": "Carbondale",
+   "lat": 37.6636,
+   "lon": -89.1173,
+   "county": "Jackson"
+  },
+  "62903": {
+   "city": "Carbondale",
+   "lat": 37.6704,
+   "lon": -89.2778,
+   "county": "Jackson"
+  },
+  "62905": {
+   "city": "Alto Pass",
+   "lat": 37.5681,
+   "lon": -89.3172,
+   "county": "Union"
+  },
+  "62906": {
+   "city": "Anna",
+   "lat": 37.4668,
+   "lon": -89.2207,
+   "county": "Union"
+  },
+  "62907": {
+   "city": "Ava",
+   "lat": 37.8793,
+   "lon": -89.4654,
+   "county": "Jackson"
+  },
+  "62908": {
+   "city": "Belknap",
+   "lat": 37.3266,
+   "lon": -88.9507,
+   "county": "Johnson"
+  },
+  "62909": {
+   "city": "Boles",
+   "lat": 37.4472,
+   "lon": -88.8768,
+   "county": "Johnson"
+  },
+  "62910": {
+   "city": "Brookport",
+   "lat": 37.1542,
+   "lon": -88.5334,
+   "county": "Massac"
+  },
+  "62912": {
+   "city": "Buncombe",
+   "lat": 37.4637,
+   "lon": -88.9806,
+   "county": "Johnson"
+  },
+  "62914": {
+   "city": "Cairo",
+   "lat": 37.0123,
+   "lon": -89.1811,
+   "county": "Alexander"
+  },
+  "62915": {
+   "city": "Cambria",
+   "lat": 37.7814,
+   "lon": -89.1192,
+   "county": "Williamson"
+  },
+  "62916": {
+   "city": "Campbell Hill",
+   "lat": 37.9228,
+   "lon": -89.5799,
+   "county": "Jackson"
+  },
+  "62917": {
+   "city": "Carrier Mills",
+   "lat": 37.6842,
+   "lon": -88.6328,
+   "county": "Saline"
+  },
+  "62918": {
+   "city": "Carterville",
+   "lat": 37.7748,
+   "lon": -89.0978,
+   "county": "Williamson"
+  },
+  "62919": {
+   "city": "Cave In Rock",
+   "lat": 37.4692,
+   "lon": -88.1653,
+   "county": "Hardin"
+  },
+  "62920": {
+   "city": "Cobden",
+   "lat": 37.5424,
+   "lon": -89.2457,
+   "county": "Union"
+  },
+  "62921": {
+   "city": "Colp",
+   "lat": 37.8053,
+   "lon": -89.0801,
+   "county": "Williamson"
+  },
+  "62922": {
+   "city": "Creal Springs",
+   "lat": 37.6195,
+   "lon": -88.8367,
+   "county": "Williamson"
+  },
+  "62923": {
+   "city": "Cypress",
+   "lat": 37.365,
+   "lon": -88.9747,
+   "county": "Johnson"
+  },
+  "62924": {
+   "city": "De Soto",
+   "lat": 37.8147,
+   "lon": -89.2218,
+   "county": "Jackson"
+  },
+  "62926": {
+   "city": "Dongola",
+   "lat": 37.3712,
+   "lon": -89.1349,
+   "county": "Union"
+  },
+  "62927": {
+   "city": "Dowell",
+   "lat": 37.9398,
+   "lon": -89.2379,
+   "county": "Jackson"
+  },
+  "62928": {
+   "city": "Eddyville",
+   "lat": 37.4829,
+   "lon": -88.5791,
+   "county": "Pope"
+  },
+  "62930": {
+   "city": "Eldorado",
+   "lat": 37.8139,
+   "lon": -88.4434,
+   "county": "Saline"
+  },
+  "62931": {
+   "city": "Elizabethtown",
+   "lat": 37.4665,
+   "lon": -88.2867,
+   "county": "Hardin"
+  },
+  "62932": {
+   "city": "Elkville",
+   "lat": 37.9155,
+   "lon": -89.2336,
+   "county": "Jackson"
+  },
+  "62933": {
+   "city": "Energy",
+   "lat": 37.7726,
+   "lon": -89.025,
+   "county": "Williamson"
+  },
+  "62934": {
+   "city": "Equality",
+   "lat": 37.7278,
+   "lon": -88.3445,
+   "county": "Gallatin"
+  },
+  "62935": {
+   "city": "Galatia",
+   "lat": 37.8274,
+   "lon": -88.6235,
+   "county": "Saline"
+  },
+  "62938": {
+   "city": "Golconda",
+   "lat": 37.3602,
+   "lon": -88.4886,
+   "county": "Pope"
+  },
+  "62939": {
+   "city": "Goreville",
+   "lat": 37.575,
+   "lon": -88.9655,
+   "county": "Johnson"
+  },
+  "62940": {
+   "city": "Gorham",
+   "lat": 37.7406,
+   "lon": -89.444,
+   "county": "Jackson"
+  },
+  "62941": {
+   "city": "Grand Chain",
+   "lat": 37.251,
+   "lon": -89.0083,
+   "county": "Pulaski"
+  },
+  "62942": {
+   "city": "Grand Tower",
+   "lat": 37.6322,
+   "lon": -89.4999,
+   "county": "Jackson"
+  },
+  "62943": {
+   "city": "Grantsburg",
+   "lat": 37.3794,
+   "lon": -88.7583,
+   "county": "Johnson"
+  },
+  "62946": {
+   "city": "Harrisburg",
+   "lat": 37.7257,
+   "lon": -88.544,
+   "county": "Saline"
+  },
+  "62947": {
+   "city": "Herod",
+   "lat": 37.5634,
+   "lon": -88.44,
+   "county": "Pope"
+  },
+  "62948": {
+   "city": "Herrin",
+   "lat": 37.8019,
+   "lon": -89.0232,
+   "county": "Williamson"
+  },
+  "62949": {
+   "city": "Hurst",
+   "lat": 37.8366,
+   "lon": -89.1424,
+   "county": "Williamson"
+  },
+  "62950": {
+   "city": "Jacob",
+   "lat": 37.7437,
+   "lon": -89.5444,
+   "county": "Jackson"
+  },
+  "62951": {
+   "city": "Johnston City",
+   "lat": 37.8245,
+   "lon": -88.9209,
+   "county": "Williamson"
+  },
+  "62952": {
+   "city": "Jonesboro",
+   "lat": 37.4461,
+   "lon": -89.2915,
+   "county": "Union"
+  },
+  "62953": {
+   "city": "Joppa",
+   "lat": 37.2092,
+   "lon": -88.8442,
+   "county": "Massac"
+  },
+  "62954": {
+   "city": "Junction",
+   "lat": 37.6952,
+   "lon": -88.2491,
+   "county": "Gallatin"
+  },
+  "62955": {
+   "city": "Karbers Ridge",
+   "lat": 37.5008,
+   "lon": -88.2383,
+   "county": "Hardin"
+  },
+  "62956": {
+   "city": "Karnak",
+   "lat": 37.2911,
+   "lon": -88.9739,
+   "county": "Pulaski"
+  },
+  "62957": {
+   "city": "Mc Clure",
+   "lat": 37.302,
+   "lon": -89.4531,
+   "county": "Alexander"
+  },
+  "62958": {
+   "city": "Makanda",
+   "lat": 37.6176,
+   "lon": -89.209,
+   "county": "Jackson"
+  },
+  "62959": {
+   "city": "Marion",
+   "lat": 37.7257,
+   "lon": -88.9294,
+   "county": "Williamson"
+  },
+  "62960": {
+   "city": "Metropolis",
+   "lat": 37.1753,
+   "lon": -88.7252,
+   "county": "Massac"
+  },
+  "62961": {
+   "city": "Millcreek",
+   "lat": 37.3409,
+   "lon": -89.2542,
+   "county": "Union"
+  },
+  "62962": {
+   "city": "Miller City",
+   "lat": 37.1034,
+   "lon": -89.3494,
+   "county": "Alexander"
+  },
+  "62963": {
+   "city": "Mound City",
+   "lat": 37.0865,
+   "lon": -89.1637,
+   "county": "Pulaski"
+  },
+  "62964": {
+   "city": "Mounds",
+   "lat": 37.1188,
+   "lon": -89.2001,
+   "county": "Pulaski"
+  },
+  "62965": {
+   "city": "Muddy",
+   "lat": 37.765,
+   "lon": -88.5167,
+   "county": "Saline"
+  },
+  "62966": {
+   "city": "Murphysboro",
+   "lat": 37.7655,
+   "lon": -89.3317,
+   "county": "Jackson"
+  },
+  "62967": {
+   "city": "New Burnside",
+   "lat": 37.578,
+   "lon": -88.7454,
+   "county": "Johnson"
+  },
+  "62969": {
+   "city": "Olive Branch",
+   "lat": 37.1674,
+   "lon": -89.3537,
+   "county": "Alexander"
+  },
+  "62970": {
+   "city": "Olmsted",
+   "lat": 37.1935,
+   "lon": -89.0933,
+   "county": "Pulaski"
+  },
+  "62971": {
+   "city": "Oraville",
+   "lat": 37.8651,
+   "lon": -89.3834,
+   "county": "Jackson"
+  },
+  "62972": {
+   "city": "Ozark",
+   "lat": 37.5367,
+   "lon": -88.7688,
+   "county": "Johnson"
+  },
+  "62973": {
+   "city": "Perks",
+   "lat": 37.3113,
+   "lon": -89.0831,
+   "county": "Pulaski"
+  },
+  "62974": {
+   "city": "Pittsburg",
+   "lat": 37.8047,
+   "lon": -88.8081,
+   "county": "Williamson"
+  },
+  "62975": {
+   "city": "Pomona",
+   "lat": 37.6501,
+   "lon": -89.3693,
+   "county": "Jackson"
+  },
+  "62976": {
+   "city": "Pulaski",
+   "lat": 37.2146,
+   "lon": -89.1968,
+   "county": "Pulaski"
+  },
+  "62977": {
+   "city": "Raleigh",
+   "lat": 37.8256,
+   "lon": -88.5324,
+   "county": "Saline"
+  },
+  "62979": {
+   "city": "Ridgway",
+   "lat": 37.8042,
+   "lon": -88.2612,
+   "county": "Gallatin"
+  },
+  "62982": {
+   "city": "Rosiclare",
+   "lat": 37.424,
+   "lon": -88.3462,
+   "county": "Hardin"
+  },
+  "62983": {
+   "city": "Royalton",
+   "lat": 37.879,
+   "lon": -89.1141,
+   "county": "Franklin"
+  },
+  "62984": {
+   "city": "Shawneetown",
+   "lat": 37.7132,
+   "lon": -88.1785,
+   "county": "Gallatin"
+  },
+  "62985": {
+   "city": "Simpson",
+   "lat": 37.4673,
+   "lon": -88.7551,
+   "county": "Johnson"
+  },
+  "62987": {
+   "city": "Stonefort",
+   "lat": 37.6432,
+   "lon": -88.6228,
+   "county": "Saline"
+  },
+  "62988": {
+   "city": "Tamms",
+   "lat": 37.2345,
+   "lon": -89.2763,
+   "county": "Alexander"
+  },
+  "62990": {
+   "city": "Thebes",
+   "lat": 37.221,
+   "lon": -89.4599,
+   "county": "Alexander"
+  },
+  "62992": {
+   "city": "Ullin",
+   "lat": 37.277,
+   "lon": -89.1834,
+   "county": "Pulaski"
+  },
+  "62993": {
+   "city": "Unity",
+   "lat": 37.1528,
+   "lon": -89.3256,
+   "county": "Alexander"
+  },
+  "62994": {
+   "city": "Vergennes",
+   "lat": 37.9051,
+   "lon": -89.3269,
+   "county": "Jackson"
+  },
+  "62995": {
+   "city": "Vienna",
+   "lat": 37.4205,
+   "lon": -88.8879,
+   "county": "Johnson"
+  },
+  "62996": {
+   "city": "Villa Ridge",
+   "lat": 37.1578,
+   "lon": -89.1825,
+   "county": "Pulaski"
+  },
+  "62997": {
+   "city": "Willisville",
+   "lat": 37.9848,
+   "lon": -89.5899,
+   "county": "Perry"
+  },
+  "62998": {
+   "city": "Wolf Lake",
+   "lat": 37.512,
+   "lon": -89.4408,
+   "county": "Union"
+  },
+  "62999": {
+   "city": "Zeigler",
+   "lat": 37.8991,
+   "lon": -89.0523,
+   "county": "Franklin"
+  }
+ }
+}

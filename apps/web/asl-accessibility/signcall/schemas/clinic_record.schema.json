@@ -1,0 +1,36 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://github.com/signcall/schemas/clinic_record.schema.json",
+  "title": "signcall clinic record",
+  "description": "One clinic as returned by workflow/clinic_lookup.py. Four required fields -- what the agent needs to describe a clinic to the user and to call it -- plus an optional street address when the source actually has one. Sourced from Apify's Google Maps Scraper, or from the synthetic emergency fallback when a search yields nothing.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["name", "type", "phone", "zipcode"],
+  "properties": {
+    "name": {
+      "type": "string",
+      "minLength": 1,
+      "description": "The listing's own name, e.g. 'Fremont Street Dental Care'."
+    },
+    "type": {
+      "type": "string",
+      "minLength": 1,
+      "description": "The listing's own category, e.g. 'Dentist'. Falls back to the searched appointment-type label when Google Maps returns no category."
+    },
+    "phone": {
+      "type": "string",
+      "pattern": "^\\+1[0-9]{10}$",
+      "description": "US only, E.164. A listing without a callable US number is dropped rather than recorded."
+    },
+    "zipcode": {
+      "type": "string",
+      "pattern": "^[0-9]{5}$",
+      "description": "5-digit US ZIP, ZIP+4 trimmed. Used to rank clinics by distance from the user."
+    },
+    "address": {
+      "type": "string",
+      "minLength": 1,
+      "description": "The listing's own street address, when Maps returned one. Optional -- not part of the required four-field record, since the synthetic fallback has no real street to give."
+    }
+  }
+}

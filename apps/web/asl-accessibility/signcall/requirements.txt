@@ -1,0 +1,14 @@
+# Pinned exactly: calle/run.py relies on SDK internals that a minor bump could
+# change. Re-run the dev/text_harness scenarios after bumping.
+calle-ai==0.7.0
+python-dotenv==1.0.1
+
+# Validates user input against schemas/user_input.schema.json.
+jsonschema==4.23.0
+
+# Apify, IDHHC and notification HTTP calls; also backs fastapi's TestClient.
+httpx==0.28.1
+
+# HTTP API (api/server.py).
+fastapi==0.115.6
+uvicorn==0.32.1

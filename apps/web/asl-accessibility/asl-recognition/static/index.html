@@ -1,0 +1,271 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Book an Appointment</title>
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+<div id="app">
+  <div id="stepBar"></div>
+
+  <!-- ================= PROFILE: METHOD ================= -->
+  <section id="profileMethod" class="screen">
+    <h1>Set up your profile</h1>
+
+    <button id="btnUpload" class="choice-card">
+      <span class="icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M4 8h3l1.5-2h7L17 8h3a1 1 0 0 1 1 1v9a1 1 0 0 1-1 1H4a1 1 0 0 1-1-1V9a1 1 0 0 1 1-1z"/><circle cx="12" cy="13" r="3.4"/></svg></span>
+      <span>
+        <span class="label">Upload ID &amp; insurance card</span>
+      </span>
+    </button>
+    <button id="btnManual" class="choice-card">
+      <span class="icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="6" width="18" height="12" rx="2.2"/><path d="M7.2 10h.01M11 10h.01M14.8 10h.01M17.4 10h.01M7.2 14h10.2"/></svg></span>
+      <span>
+        <span class="label">Type my details</span>
+      </span>
+    </button>
+  </section>
+
+  <!-- ================= PROFILE: UPLOAD ================= -->
+  <section id="profileUpload" class="screen">
+    <h1>Upload your cards</h1>
+    <div id="uploadError" class="banner error"></div>
+
+    <label class="upload-tile" id="idTile" for="idCardInput">
+      <div class="icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="5" width="18" height="14" rx="2"/><circle cx="8.5" cy="11" r="1.7"/><path d="M5.5 16c.5-1.7 2-2.6 3-2.6s2.5.9 3 2.6M14 10h5M14 13.4h5"/></svg></div>
+      <div class="label">ID card</div>
+      <img style="display:none">
+      <input type="file" id="idCardInput" accept="image/*" capture="environment" hidden>
+    </label>
+
+    <label class="upload-tile" id="insuranceTile" for="insuranceCardInput">
+      <div class="icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3.5l6.5 2.7v4.6c0 4.2-2.8 7.2-6.5 8.4-3.7-1.2-6.5-4.2-6.5-8.4V6.2L12 3.5z"/><path d="M12 9.2v4.6M9.7 11.5h4.6"/></svg></div>
+      <div class="label">Insurance card</div>
+      <img style="display:none">
+      <input type="file" id="insuranceCardInput" accept="image/*" capture="environment" hidden>
+    </label>
+
+    <div class="actions">
+      <button id="btnUploadContinue" class="btn btn-primary" disabled>Continue</button>
+      <button id="btnUploadBack" class="btn btn-text">Back</button>
+    </div>
+  </section>
+
+  <!-- ================= PROFILE: VERIFY / MANUAL ENTRY ================= -->
+  <section id="profileVerify" class="screen">
+    <h1>Check your details</h1><br>
+    <div id="profileError" class="banner error"></div>
+
+    <div class="field"><label>Full name</label><input type="text" id="pf_name"></div>
+    <div class="field"><label>Phone number</label><input type="tel" inputmode="tel" placeholder="(555) 123-4567" id="pf_phone"></div>
+    <div class="field"><label>Date of birth</label><input type="date" id="pf_dob"></div>
+    <div class="field"><label>Age</label><input type="number" id="pf_age" min="0"></div>
+    <div class="field"><label>Address</label><input type="text" id="pf_address"></div>
+    <div class="field"><label>Zip code</label><input type="text" inputmode="numeric" id="pf_zipcode"></div>
+    <div class="field"><label>Insurance name</label><input type="text" id="pf_insurance_name"></div>
+    <div class="field"><label>Insurance / member ID</label><input type="text" id="pf_insurance_id"></div>
+
+    <div class="actions">
+      <button id="btnProfileConfirm" class="btn btn-primary">Confirm</button>
+      <button id="btnProfileBack" class="btn btn-text">Back</button>
+    </div>
+  </section>
+
+  <!-- ================= FAMILY LIST ================= -->
+  <section id="familyList" class="screen">
+    <h1>Family who can interpret</h1>
+    <p class="hint">Optional.</p>
+    <div id="familyError" class="banner error"></div>
+
+    <div id="familyCards"></div>
+    <p class="hint" id="familyEmptyHint">None yet.</p>
+    <button id="btnAddFamily" class="btn btn-secondary" style="margin-bottom:16px;">+ Add family</button>
+
+    <div class="actions">
+      <button id="btnFamilyContinue" class="btn btn-primary">Continue</button>
+      <button id="btnFamilyBack" class="btn btn-text">Back</button>
+    </div>
+  </section>
+
+  <!-- ================= FAMILY VERIFY ================= -->
+  <section id="familyVerify" class="screen">
+    <h1>Check your family list</h1>
+    <div id="familyReview"></div>
+
+    <div class="actions">
+      <button id="btnFamilyVerifyConfirm" class="btn btn-primary">Confirm</button>
+      <button id="btnFamilyVerifyBack" class="btn btn-text">Back</button>
+    </div>
+  </section>
+
+  <!-- ================= INPUT METHOD (TYPE OR SIGN) ================= -->
+  <section id="inputMethod" class="screen">
+    <h1>What do you need?</h1>
+    <p class="hint">e.g. "dentist Tuesday 3pm"</p>
+
+    <div class="toggle-row">
+      <button id="methodType" class="active">Type</button>
+      <button id="methodSign">Sign</button>
+    </div>
+
+    <div id="typedInputWrap">
+      <textarea id="typedInput" placeholder="Type here…"></textarea>
+    </div>
+
+    <div id="signInputWrap" style="display:none;">
+      <div id="videoWrap">
+        <video id="preview" autoplay playsinline muted></video>
+        <span id="statusBadge">Camera off</span>
+      </div>
+      <canvas id="captureCanvas"></canvas>
+      <button id="mainBtn" class="btn btn-primary" style="margin-top:12px;">Start camera</button>
+      <div class="btn-row" style="margin-top:8px;">
+        <button id="undoBtn" class="btn btn-secondary" disabled>Undo</button>
+        <button id="clearBtn" class="btn btn-secondary" disabled>Clear</button>
+      </div>
+      <div id="lastWord"></div>
+      <div id="transcriptBox" role="status" aria-live="polite"></div>
+    </div>
+
+    <div class="actions">
+      <button id="btnUseTranscript" class="btn btn-primary" disabled>Use this</button>
+      <button id="btnViewUpcoming" class="btn btn-text">Upcoming</button>
+      <button id="btnEditProfile" class="btn btn-text">Profile</button>
+    </div>
+  </section>
+
+  <!-- ================= UPCOMING APPOINTMENTS ================= -->
+  <section id="upcoming" class="screen">
+    <h1>Upcoming</h1><br>
+    <div id="upcomingError" class="banner error" role="alert"></div>
+    <div id="upcomingList"></div>
+    <p id="upcomingEmpty" class="hint" hidden>None.</p>
+    <div class="actions">
+      <button id="btnUpcomingBack" class="btn btn-text">Back</button>
+    </div>
+  </section>
+
+  <!-- ================= BOOKING CONFIRM ================= -->
+  <section id="bookingConfirm" class="screen">
+    <h1>Confirm request</h1>
+    <div id="bookingError" class="banner error"></div>
+
+    <div id="bc_profileSummary"></div>
+
+    <div class="field" style="margin-top:16px;">
+      <label>Clinic type</label>
+      <select id="bc_clinicType"></select>
+    </div>
+    <div class="field">
+      <label>Zip code</label>
+      <input type="text" inputmode="numeric" id="bc_zipcode">
+    </div>
+
+    <div class="field">
+      <label>Date &amp; time</label>
+      <p class="hint" style="margin:0 0 8px;">We find a slot within that hour.</p>
+      <div id="availabilityRows"></div>
+      <button id="btnAddAvailability" class="btn btn-secondary">+ Add time</button>
+    </div>
+
+    <div class="field">
+      <label>Interpreter</label>
+    </div>
+    <button id="bc_interpreterHave" class="choice-card">
+      <span class="icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="8.5"/><path d="M8.2 12.3l2.4 2.4L15.8 9"/></svg></span>
+      <span class="label">I have one</span>
+    </button>
+    <button id="bc_interpreterNeed" class="choice-card">
+      <span class="icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><circle cx="8.7" cy="8.5" r="2.6"/><path d="M3.8 18c.6-2.9 2.5-4.4 4.9-4.4s4.3 1.5 4.9 4.4"/><circle cx="16.8" cy="9.4" r="2.1"/><path d="M15 13.4c1.8.3 3.2 1.6 3.7 3.9"/></svg></span>
+      <span class="label">Find one for me</span>
+    </button>
+    <div id="bc_familyReview" style="display:none; margin-bottom:16px;"></div>
+
+    <p class="hint">Sending this request starts calls to clinics and, if needed, your family and freelance interpreters to ask about availability. Calls share your scheduling and insurance-provider details; family calls also share your name. Every call is routed to the operator's authorized test lines. Nothing is booked until you approve a proposal.</p>
+    <div class="actions">
+      <button id="btnSubmitBooking" class="btn btn-primary">Send request</button>
+      <button id="btnBookingBack" class="btn btn-text">Back</button>
+    </div>
+  </section>
+
+  <!-- ================= PROGRESS (WORKFLOW RUNNING) ================= -->
+  <section id="progress" class="screen">
+    <div class="status-block">
+      <div class="spinner"></div>
+      <h1 id="progressTitle">Finding appointment</h1>
+      <p class="hint" id="progressText" role="status" aria-live="polite"></p>
+    </div>
+  </section>
+
+  <!-- ================= CONFIRM (YOUR GO / NO-GO) ================= -->
+  <section id="confirm" class="screen">
+    <h1>Book this?</h1>
+    <div id="confirmError" class="banner error" role="alert"></div>
+
+    <div id="confirmDetails"></div>
+
+    <details id="confirmMore" class="more-details" hidden>
+      <summary>More details</summary>
+      <div id="confirmMoreDetails"></div>
+      <div id="confirmRequirements" class="notice" hidden>
+        <div class="notice-title">Required</div>
+        <ul id="confirmRequirementsList"></ul>
+      </div>
+      <div id="confirmNotes" class="notice notice-muted" hidden>
+        <div class="notice-title">Notes</div>
+        <ul id="confirmNotesList"></ul>
+      </div>
+    </details>
+
+    <div class="actions">
+      <button id="btnApprove" class="btn btn-primary">Yes, book</button>
+      <button id="btnDecline" class="btn btn-danger">No</button>
+    </div>
+  </section>
+
+  <!-- ================= DONE (BOOKED / NOT BOOKED / COULDN'T FINISH) ================= -->
+  <section id="done" class="screen">
+    <div class="status-block">
+      <div class="confirm-icon" id="doneIcon" data-kind="ok">
+        <svg class="icon-ok" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="8.5"/><path d="M8.2 12.3l2.4 2.4L15.8 9"/></svg>
+        <svg class="icon-stop" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="8.5"/><path d="M9 9l6 6M15 9l-6 6"/></svg>
+      </div>
+      <div class="confirm-title" id="doneTitle"></div>
+      <p class="confirm-sub" id="doneSub"></p>
+    </div>
+
+    <div id="doneDetails"></div>
+
+    <details id="doneMore" class="more-details" hidden>
+      <summary>More details</summary>
+      <div id="doneMoreDetails"></div>
+      <div id="doneRequirements" class="notice" hidden>
+        <div class="notice-title">Required</div>
+        <ul id="doneRequirementsList"></ul>
+      </div>
+      <div id="doneNotes" class="notice notice-muted" hidden>
+        <div class="notice-title">Notes</div>
+        <ul id="doneNotesList"></ul>
+      </div>
+    </details>
+
+    <div id="cancelError" class="banner error" role="alert"></div>
+
+    <div class="actions">
+      <button id="btnCancelAppointment" class="btn btn-danger" hidden>Cancel appointment</button>
+      <button id="btnBookAnother" class="btn btn-primary">New request</button>
+    </div>
+  </section>
+
+</div>
+
+<div id="loadingOverlay">
+  <div class="spinner"></div>
+  <div class="msg" id="loadingMsg">Loading…</div>
+</div>
+
+<script src="app.js"></script>
+</body>
+</html>
